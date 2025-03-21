@@ -1,0 +1,15 @@
+.dfx
+.kybra
+venv
+static
+dist
+node_modules
+.svelte-kit
+__pycache__
+.env
+declarations
+*.zip
+debug_files
+deleteme*
+HACK*
+kybra_simple_db

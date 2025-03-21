@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  testbench:
+    # image: jmpm/icp-dev-extended:latest
+    image: icp-dev-env-custom:latest
+    environment:
+      - RUN_TESTS=${RUN_TESTS}        # Uses the MY_VAR from the shell
+      - DEPLOY_STAGING=${DEPLOY_STAGING}
+      - FLASK_ENV=development
+    volumes:
+      # Mount the entire app directory
+      - .:/app:rw
+      # Named volume for node_modules to prevent host interference
+      - frontend_node_modules:/app/src/canister_frontend/node_modules
+      - ${PWD}/debug_files/:/app/debug_files/:rw
+    working_dir: /app
+    entrypoint: ["bash", "./entrypoint.sh"]  # Specify a custom entrypoint script
+    # ports:
+    #   - "4943:4943"
+
+volumes:
+  frontend_node_modules:
+    #   - "4943:4943"
+    # command: dasdsa # Command to run the application after the entrypoint
