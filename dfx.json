@@ -1,0 +1,43 @@
+{
+  "canisters": {
+    "realm_backend": {
+      "type": "kybra",
+      "main": "src/realm_backend/main.py"
+    },
+    "realm_frontend": {
+      "source": [
+        "src/realm_frontend/dist"
+      ],
+      "type": "assets",
+      "workspace": "realm_frontend"
+    },
+    "vault": {
+      "type": "custom",
+      "wasm": ".wasm/vault.wasm",
+      "candid": ".wasm/vault.did"
+    },
+    "ckbtc_ledger": {
+      "type": "custom",
+      "wasm": ".wasm/ledger.wasm",
+      "candid": ".wasm/ledger.did"
+    },
+    "ckbtc_indexer": {
+      "type": "custom",
+      "wasm": ".wasm/indexer.wasm",
+      "candid": ".wasm/indexer.did"
+    }
+  },
+  "defaults": { 
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "metadata": [
+   {
+     "name": "candid:service"
+   }
+  ],
+  "output_env_file": ".env",
+  "version": 1
+}

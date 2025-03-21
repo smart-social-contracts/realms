@@ -1,0 +1,85 @@
+name: Deploy to Internet Computer
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: 'choice'
+        options:
+          - staging
+          - production
+      canister:
+        description: 'Specific canister to deploy (leave empty to deploy all)'
+        required: false
+        type: 'string'
+
+jobs:
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment || 'staging' }}
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Install requirements from both root and subdirectories
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install -r src/local/requirements.txt
+          pip install -r src/realm_backend/requirements.txt
+          npm ci
+      
+      - name: Install dfx
+        run: |
+          sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
+          dfx --version
+      
+      - name: Configure identity
+        run: |
+          echo "${{ secrets.IC_IDENTITY_PEM }}" > identity.pem
+          chmod 600 identity.pem
+          dfx identity import --force github-actions identity.pem
+          dfx identity use github-actions
+          rm identity.pem
+      
+      - name: Deploy to ${{ github.event.inputs.environment || 'staging' }}
+        run: |
+          # Set the appropriate network based on environment
+          if [ "${{ github.event.inputs.environment }}" == "production" ]; then
+            NETWORK="ic"
+          else
+            NETWORK="staging"
+          fi
+          
+          # Run deployment with or without canister argument
+          if [ -n "${{ github.event.inputs.canister }}" ]; then
+            python deploy_mainnet.py ${{ github.event.inputs.canister }}
+          else
+            python deploy_mainnet.py
+          fi
+        env:
+          DFX_NETWORK: ${{ github.event.inputs.environment == 'production' && 'ic' || 'staging' }}
+      
+      - name: Verify deployment
+        run: |
+          dfx canister --network ${{ github.event.inputs.environment == 'production' && 'ic' || 'staging' }} status
