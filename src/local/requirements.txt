@@ -2,3 +2,4 @@ flask
 flask_cors
 pytest
 requests
+kybra_simple_logging

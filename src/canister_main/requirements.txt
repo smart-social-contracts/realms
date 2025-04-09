@@ -3,3 +3,4 @@ requests
 pytest
 pytest-ordering==0.6
 kybra_simple_db
+kybra_simple_logging

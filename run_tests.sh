@@ -51,8 +51,8 @@ else
     fi
     
     if [ "$MODE" = "test" ]; then
-        RUN_TESTS=1 docker-compose run $TESTBENCH_NAME
+        RUN_TESTS=1 docker compose run $TESTBENCH_NAME
     else
-        docker-compose run $TESTBENCH_NAME
+        docker compose run $TESTBENCH_NAME
     fi
 fi
