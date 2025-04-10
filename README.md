@@ -1,5 +1,25 @@
 # Smart Social Contracts
 
+TODO: 
+
+backend
+    register with an identity
+    deposit money
+    basic shell that can do transfer money
+
+frontend
+    show coutners: population, money
+    show list of transactions
+    show list of users
+    show list of organizations
+    show app store and apps installed
+        they are canisters that can be installed by the real admin
+    show welcome message and thoughts of the real admin
+
+
+
+
+
 [![CI Pipeline](https://github.com/smart-social-contracts/smart-social-contracts/actions/workflows/main.yml/badge.svg)](https://github.com/smart-social-contracts/smart-social-contracts/actions/workflows/main.yml)
 
 Smart Social Contracts is a decentralized platform that allows the deployment of public administration services on the Internet Computer Protocol (ICP).

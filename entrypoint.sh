@@ -44,14 +44,17 @@ if [ "${RUN_TESTS:-}" ]; then
         handle_error "Failed to install dependencies"
     fi
 
-    # Deploy ICRC1 ledger canister first
-    log "Deploying ICRC1 ledger canister..."
-    if ! dfx deploy icrc1_ledger_canister --verbose; then
-        handle_error "Failed to deploy ICRC1 ledger canister"
-    fi
+    # # Deploy ICRC1 ledger canister first
+    # log "Deploying ICRC1 ledger canister..."
+    # if ! dfx deploy icrc1_ledger_canister --verbose; then
+    #     handle_error "Failed to deploy ICRC1 ledger canister"
+    # fi
 
     # Build Python canister
     log "Building Python canister..."
+
+    pip install kybra_simple_logging
+    
     if ! dfx deploy canister_main --verbose; then
         handle_error "Failed to build Python canister"
     fi

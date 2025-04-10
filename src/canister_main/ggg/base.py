@@ -80,23 +80,23 @@ def initialize() -> None:
     #         real_name = str(uuid.uuid4())
     #     ggg.Realm(real_name)
 
-    def create_world():
-        ggg.World.new("Earth")
+    # def create_world():
+    #     ggg.World.new("Earth")
 
 
-    context_caller.reset()
+    # context_caller.reset()
 
     create_first_user()
     create_default_extension_code()
     create_tokens()
-    create_world()
+    # create_world()
 
-    print(Entity.db().dump_json())
-    world = ggg.World.instances()[0]
-    print(world.name)
-    print(world.to_dict())
+    # print(Entity.db().dump_json())
+    # world = ggg.World.instances()[0]
+    # print(world.name)
+    # print(world.to_dict())
     
-    world.some_method()
+    # world.some_method()
     
 
     print('initialized')
