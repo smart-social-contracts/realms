@@ -13,3 +13,5 @@ debug_files
 deleteme*
 HACK*
 kybra_simple_db
+*.wasm
+*.did

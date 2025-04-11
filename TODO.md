@@ -27,7 +27,7 @@ kybra-simple-db
 kybra-simple-logging
 kybra-simple-shell
 kybra-simple-vault
-Please use them. You can import the libraries using pip (as they are in Pypi.org).
+Please use them whenver you can. You can import the libraries using pip (as they are in Pypi.org).
 
 
 ## Future ideas

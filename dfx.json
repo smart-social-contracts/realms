@@ -10,9 +10,19 @@
       ],
       "type": "assets",
       "workspace": "canister_frontend"
+    },
+    "vault": {
+      "type": "custom",
+      "wasm": "vault.wasm",
+      "candid": "vault.did"
+    },
+    "ckbtc_ledger": {
+      "type": "custom",
+      "wasm": "ledger.wasm",
+      "candid": "ledger.did"
     }
   },
-  "defaults": {
+  "defaults": { 
     "build": {
       "args": "",
       "packtool": ""
