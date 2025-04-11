@@ -31,19 +31,51 @@ def run_command(command, error_message):
         print(e.stderr if e.stderr else "", file=sys.stderr)
         handle_error(error_message)
 
-# Function to extract canister ID from deployment output
+# Function to extract canister ID from deployment output using string methods
 def extract_canister_id(output, canister_name):
-    import re
-    pattern = f"{canister_name} canister (?:created|upgraded) with canister id: ([\w-]+)"
-    match = re.search(pattern, output)
-    if match:
-        return match.group(1)
+    # Method 1: Look for 'canister ID' in the output
+    lines = output.splitlines()
+    for line in lines:
+        line = line.strip()
+        # Check for typical pattern in output
+        if f"canister {canister_name}, with canister ID " in line:
+            parts = line.split("canister ID ")
+            if len(parts) >= 2:
+                # Extract canister ID (remove any trailing characters)
+                canister_id = parts[1].strip()
+                # ID format is typically like: be2us-64aaa-aaaaa-qaabq-cai
+                if "-" in canister_id and len(canister_id) > 10:
+                    return canister_id
     
-    # Alternative pattern for cases when only 'Upgraded code for canister' is present
-    alt_pattern = f"Upgraded code for canister {canister_name}, with canister ID ([\w-]+)"
-    match = re.search(alt_pattern, output)
-    if match:
-        return match.group(1)
+    # Method 2: Parse from the URLs section
+    in_urls_section = False
+    for line in lines:
+        line = line.strip()
+        if "URLs:" in line:
+            in_urls_section = True
+            continue
+        
+        if in_urls_section and canister_name in line and "id=" in line:
+            # Extract the ID after "id="
+            id_part = line.split("id=")[1].strip()
+            # ID format is typically like: be2us-64aaa-aaaaa-qaabq-cai
+            if "-" in id_part and len(id_part) > 10:
+                return id_part
+    
+    # Method 3: Direct lookup in the canister list
+    try:
+        # Use dfx to directly get the canister ID
+        result = subprocess.run(
+            f"dfx canister id {canister_name}", 
+            shell=True, check=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True
+        )
+        canister_id = result.stdout.strip()
+        if canister_id and "-" in canister_id and len(canister_id) > 10:
+            return canister_id
+    except:
+        pass
     
     return None
 
@@ -126,6 +158,18 @@ def main():
                "Failed to deploy vault")
     vault_id = extract_canister_id(result.stdout, "vault")
     log(f"vault deployed successfully with ID: {vault_id}")
+
+    # Deploy frontend canister
+    log("Deploying frontend canister...")
+    result = run_command("dfx deploy canister_frontend --verbose", "Failed to deploy frontend canister")
+    frontend_id = extract_canister_id(result.stdout, "canister_frontend")
+    log(f"frontend canister deployed successfully with ID: {frontend_id}")
+    
+    # Print all deployment URLs
+    log("Deployment URLs:")
+    run_command("dfx canister id canister_frontend", "Failed to get frontend canister ID")
+    frontend_url = "http://localhost:4943/?canisterId=" + frontend_id
+    log(f"Frontend URL: {frontend_url}")
 
     log("Deployment completed successfully")
 
