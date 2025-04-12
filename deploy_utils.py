@@ -16,6 +16,11 @@ logger = logging.getLogger('ic-deploy')
 # Helper function to run commands with error handling
 def run_command(command, error_message):
     try:
+        # For deploy commands, we need to handle interactive prompts
+        if "deploy" in command:
+            # Use yes command to automatically answer yes to prompts
+            command = f"yes | {command}"
+        
         result = subprocess.run(command, shell=True, check=True, 
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
                               text=True)

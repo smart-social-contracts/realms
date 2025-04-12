@@ -1,0 +1,11 @@
+{
+  "canister_frontend": {
+    "ic": "ctydg-piaaa-aaaah-aqzga-cai"
+  },
+  "canister_main": {
+    "ic": "wxfhb-tqaaa-aaaah-aq2qq-cai"
+  },
+  "vault": {
+    "ic": "ekdcf-yiaaa-aaaah-ardsq-cai"
+  }
+}

@@ -30,7 +30,7 @@ def deploy_to_mainnet():
     # 5. Deploy vault to mainnet
     logger.info("Deploying vault to mainnet...")
     # On mainnet, we use a longer heartbeat interval 
-    heartbeat_interval_seconds = 60  # Using 60 seconds for mainnet heartbeat interval
+    heartbeat_interval_seconds = 0  # Using 60 seconds for mainnet heartbeat interval
     
     logger.info(f"Initializing vault with:\n"
         f"  ckbtc_ledger_principal: {ckbtc_ledger_id} (mainnet ckBTC)\n"
@@ -38,7 +38,7 @@ def deploy_to_mainnet():
         f"  heartbeat_interval_seconds: {heartbeat_interval_seconds}")
     
     vault_arg = get_vault_arg(ckbtc_ledger_id, admin_principal, heartbeat_interval_seconds)
-    run_command(f'dfx deploy vault --network ic --verbose --argument \'{{vault_arg}}\'', 
+    run_command(f'dfx deploy vault --network ic --verbose --argument \'{vault_arg}\'',
                "Failed to deploy vault to mainnet")
     vault_id = get_canister_id("vault", "ic")
     logger.info(f"vault deployed successfully with ID: {vault_id}")
