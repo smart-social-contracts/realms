@@ -36,16 +36,16 @@ def deploy_ckbtc_ledger(admin_principal):
   }} 
 }})
 '''
-    run_command(f'dfx deploy ckbtc_ledger --verbose --argument \'{ckbtc_ledger_arg}\'', 
+    run_command(f'dfx deploy ckbtc_ledger --network local --verbose --argument \'{ckbtc_ledger_arg}\'', 
                "Failed to deploy ckbtc_ledger")
-    ckbtc_ledger_id = get_canister_id("ckbtc_ledger")
+    ckbtc_ledger_id = get_canister_id("ckbtc_ledger", "local")
     logger.info(f"ckbtc_ledger deployed successfully with ID: {ckbtc_ledger_id}")
     return ckbtc_ledger_id
 
 def deploy_canister_main():
     logger.info("Deploying canister_main...")
-    run_command("dfx deploy canister_main --verbose", "Failed to deploy canister_main")
-    canister_main_id = get_canister_id("canister_main")
+    run_command("dfx deploy canister_main --network local --verbose", "Failed to deploy canister_main")
+    canister_main_id = get_canister_id("canister_main", "local")
     logger.info(f"canister_main deployed successfully with ID: {canister_main_id}")
     return canister_main_id
 
@@ -59,15 +59,15 @@ def deploy_vault(admin_principal, ckbtc_ledger_id):
         f"  heartbeat_interval_seconds: {heartbeat_interval_seconds}")
     
     vault_arg = get_vault_arg(ckbtc_ledger_id, admin_principal, heartbeat_interval_seconds)
-    run_command(f'dfx deploy vault --verbose --argument \'{vault_arg}\'', "Failed to deploy vault")
-    vault_id = get_canister_id("vault")
+    run_command(f'dfx deploy vault --network local --verbose --argument \'{vault_arg}\'', "Failed to deploy vault")
+    vault_id = get_canister_id("vault", "local")
     logger.info(f"vault deployed successfully with ID: {vault_id}")
     return vault_id
 
 def deploy_frontend():
     logger.info("Deploying frontend canister...")
-    run_command("dfx deploy canister_frontend --verbose", "Failed to deploy frontend canister")
-    frontend_id = get_canister_id("canister_frontend")
+    run_command("dfx deploy canister_frontend --network local --verbose", "Failed to deploy frontend canister")
+    frontend_id = get_canister_id("canister_frontend", "local")
     logger.info(f"frontend canister deployed successfully with ID: {frontend_id}")
     return frontend_id
 
@@ -81,7 +81,7 @@ def deploy_local(canister_name=None):
     if canister_name == "vault":
         # Check if ckbtc_ledger exists, if not deploy it first
         try:
-            ckbtc_ledger_id = get_canister_id("ckbtc_ledger")
+            ckbtc_ledger_id = get_canister_id("ckbtc_ledger", "local")
             logger.info(f"Using existing ckbtc_ledger with ID: {ckbtc_ledger_id}")
         except:
             logger.info("ckbtc_ledger not found, deploying it first...")
