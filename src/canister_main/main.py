@@ -211,6 +211,16 @@ def user_join_organization_endpoint(user_id: str) -> str:
         return json_dumps({"error": str(e)})
 
 
+@query
+def get_realm_name_endpoint() -> str:
+    """Get the name of the realm/organization"""
+    try:
+        result = api.get_realm_name()
+        return json_dumps({"name": result})
+    except Exception as e:
+        return json_dumps({"error": str(e)})
+
+
 @update
 def run_code(source_code: str) -> str:
     # TODO: every object needs to have permissions and use ic.caller() for that...

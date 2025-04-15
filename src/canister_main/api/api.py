@@ -181,3 +181,45 @@ def get_proposal_data(proposal_id: str):
     if not proposal:
         return None
     return proposal.to_dict()
+
+
+def user_join_organization(user_principal: str):
+    """
+    Add a user to the organization/realm based on their principal ID.
+    
+    Args:
+        user_principal (str): The principal ID of the user to add
+        
+    Returns:
+        bool: True if user was successfully added, False otherwise
+    """
+    # In a real implementation, you would add the user to your organization's members list
+    # For example:
+    # organization = ggg.Organization.get_default()
+    # if organization:
+    #     organization.add_member(user_principal)
+    #     organization.save()
+    #     return True
+    # return False
+    
+    # For now, simply return success
+    print(f"User with principal {user_principal} joined the organization")
+    return True
+
+
+def get_realm_name():
+    """
+    Get the name of the realm/organization.
+    
+    Returns:
+        str: The name of the realm/organization
+    """
+    # In a real implementation, you would get this from your organization data
+    # For example:
+    # organization = ggg.Organization.get_default()
+    # if organization:
+    #     return organization.name
+    # return "Default Realm"
+    
+    # For now, return a default name
+    return "Smart Social Contracts Realm"

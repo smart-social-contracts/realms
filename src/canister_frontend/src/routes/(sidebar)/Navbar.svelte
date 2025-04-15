@@ -11,7 +11,8 @@
 		NavLi,
 		NavUl,
 		Navbar,
-		Search
+		Search,
+		Button
 	} from 'flowbite-svelte';
 	import { ChevronDownOutline } from 'flowbite-svelte-icons';
 	import '../../app.pcss';
@@ -66,6 +67,7 @@
 		<!-- <Notifications />
 		<AppsMenu />
 		<DarkMode /> -->
+		<Button class="me-2" color="alternative" href="/join" pill={true}>Join</Button>
 		<UserMenu {...Users[4]} />
 	</div>
 </Navbar>

@@ -53,8 +53,8 @@
 <div class="flex space-x-4">
 {#if $isAuthenticated}
 	<Avatar src={generateAvatarUrl($principal)} tabindex={0} />
-	<Button color="alternative" on:click={handleLogout}>Log Out</Button>
+	<Button color="alternative" pill={true} on:click={handleLogout}>Log Out</Button>
 {:else}
-	<Button color="alternative" on:click={handleLogin}>Log In</Button>
+	<Button color="alternative" pill={true} on:click={handleLogin}>Log In</Button>
 {/if}
 </div>
