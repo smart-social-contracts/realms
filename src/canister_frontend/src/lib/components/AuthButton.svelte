@@ -50,9 +50,19 @@
 </script>
 
 
-<div class="flex space-x-4">
+<div class="flex space-x-4 items-center">
 {#if $isAuthenticated}
 	<Avatar src={generateAvatarUrl($principal)} tabindex={0} />
+	<div class="flex flex-col">
+		<span class="text-xs text-gray-500 truncate max-w-[120px]" title={$principal}>Principal: {$principal.substring(0, 8)}...</span>
+		<Button size="xs" class="mt-1" on:click={() => {
+			import('$lib/auth').then(module => {
+				module.switchDummyPrincipal();
+				// Re-login to update the principal in the stores
+				handleLogin();
+			});
+		}}>Switch User</Button>
+	</div>
 	<Button color="alternative" pill={true} on:click={handleLogout}>Log Out</Button>
 {:else}
 	<Button color="alternative" pill={true} on:click={handleLogin}>Log In</Button>

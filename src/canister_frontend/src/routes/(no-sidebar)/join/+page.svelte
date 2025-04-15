@@ -135,12 +135,12 @@
           
           <div>
             {#if loading}
-              <Button type="button" color="primary" class="w-full flex justify-center items-center gap-2" disabled>
-                <Spinner size="sm" color="white" />
+              <Button type="button" color="alternative" class="w-full flex justify-center items-center gap-2" disabled>
+                <Spinner size="sm" color="blue" />
                 Joining...
               </Button>
             {:else}
-              <Button type="submit" color="primary" class="w-full">Join Realm</Button>
+              <Button type="submit" color="alternative" class="w-full">Join Realm</Button>
             {/if}
           </div>
           
