@@ -141,6 +141,64 @@ def get_universe():
     return json_dumps(universe())
 
 
+@app.route('/get_realm_name', methods=['GET'])
+@app.route('/get_realm_name_endpoint', methods=['GET'])  # IC-compatible endpoint name
+@app.route('/api/v1/realm_name', methods=['GET'])
+def handle_get_realm_name():
+    """Get the name of the realm/organization"""
+    try:
+        # In a real implementation, this would come from your organization data
+        # For example:
+        # organization = Organization.get_default()
+        # if organization:
+        #     name = organization.name
+        # else:
+        #     name = "Default Realm"
+        
+        # For now, return a default name
+        name = "Smart Social Contracts Realm"
+        return json_dumps({"name": name})
+    except Exception as e:
+        return json_dumps({"error": str(e)})
+
+
+@app.route('/user_join_organization', methods=['POST'])
+@app.route('/user_join_organization_endpoint', methods=['POST', 'GET'])  # IC-compatible endpoint name
+@app.route('/api/v1/join', methods=['POST'])
+def handle_user_join_organization():
+    """Add a user to the organization/realm based on their principal ID"""
+    try:
+        # Handle both GET (IC-style) and POST requests
+        if request.method == 'GET':
+            # Extract the user_id from query parameters for IC-style calls
+            user_id = request.args.get('user_id', '')
+        else:
+            # Get the user principal from the request data (JSON body)
+            data = request.get_json()
+            if not data or 'user_id' not in data:
+                return json_dumps({"error": "Missing user_id parameter"}), 400
+            user_id = data['user_id']
+        
+        if not user_id:
+            return json_dumps({"error": "Missing user_id parameter"}), 400
+        
+        # In a real implementation, you would add the user to your organization's members list
+        # For example:
+        # organization = Organization.get_default()
+        # if organization:
+        #     organization.add_member(user_id)
+        #     organization.save()
+        #     success = True
+        # else:
+        #     success = False
+        
+        # For now, simply log and return success
+        print(f"User with ID {user_id} joined the organization")
+        return json_dumps({"success": True})
+    except Exception as e:
+        return json_dumps({"error": str(e)}), 500
+
+
 @app.route('/get_db', methods=['GET'])
 @app.route('/api/v1/db', methods=['GET'])
 def get_db():

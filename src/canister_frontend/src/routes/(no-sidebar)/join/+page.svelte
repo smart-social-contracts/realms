@@ -2,8 +2,6 @@
   import { Button, Card, Radio, Label, Spinner } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { principal, isAuthenticated } from '$lib/stores/auth';
-  import { Actor, HttpAgent } from '@dfinity/agent';
-  import { initializeAuthClient } from '$lib/auth';
   
   let agreement = '';
   let error = '';
@@ -11,57 +9,23 @@
   let loading = false;
   let realmName = 'Smart Social Contracts Realm';
   
-  // Get the canister ID from environment or use a default for local development
-  // In production, this would come from your canister_ids.json
-  const canisterId = 'bkyz2-fmaaa-aaaaa-qaaaq-cai'; // Using the greeter canister from memory
-  
-  // Simplified interface for canister methods we need
-  const canisterInterface = {
-    get_realm_name_endpoint: () => ({}),
-    user_join_organization_endpoint: (principal) => ({ principal })
-  };
+  // URL for local Flask backend API
+  const API_BASE_URL = 'http://localhost:5000/api/v1';
   
   onMount(async () => {
     try {
-      // Create anonymous actor to get realm name
-      const authClient = await initializeAuthClient();
-      const identity = authClient.getIdentity();
-      
-      // Use agent to talk to local replica by default
-      const agent = new HttpAgent({ 
-        host: 'http://localhost:8000',
-        identity
-      });
-      
-      // For local development we need to do this, would be removed in production
-      if (process.env.NODE_ENV !== 'production') {
-        await agent.fetchRootKey();
-      }
-      
-      // Create actor to interact with canister
-      const actor = Actor.createActor(() => {}, {
-        agent,
-        canisterId,
-      });
-      
-      // Call get_realm_name_endpoint in IC format
-      try {
-        const result = await actor.get_realm_name_endpoint();
-        if (result && typeof result === 'string') {
-          try {
-            const parsed = JSON.parse(result);
-            if (parsed.name) {
-              realmName = parsed.name;
-            }
-          } catch (e) {
-            console.error('Error parsing realm name result:', e);
-          }
+      // Fetch realm name from local Flask API
+      const response = await fetch(`${API_BASE_URL}/realm_name`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.name) {
+          realmName = data.name;
         }
-      } catch (e) {
-        console.error('Error fetching realm name:', e);
+      } else {
+        console.error('Error fetching realm name:', await response.text());
       }
     } catch (e) {
-      console.error('Error setting up canister connection:', e);
+      console.error('Error fetching realm name:', e);
     }
   });
   
@@ -86,47 +50,29 @@
     try {
       loading = true;
       
-      // Get auth client to access identity
-      const authClient = await initializeAuthClient();
-      const identity = authClient.getIdentity();
-      
-      // Create an authenticated agent
-      const agent = new HttpAgent({ 
-        host: 'http://localhost:8000',
-        identity 
+      // Call local Flask API to join organization
+      const response = await fetch(`${API_BASE_URL}/join`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          user_id: $principal
+        })
       });
       
-      // For local development we need to do this, would be removed in production
-      if (process.env.NODE_ENV !== 'production') {
-        await agent.fetchRootKey();
-      }
-      
-      // Create actor to interact with canister
-      const actor = Actor.createActor(() => {}, {
-        agent,
-        canisterId,
-      });
-      
-      // Call the user_join_organization_endpoint with proper format for IC
-      // In Candid for text arguments you use ("Hello") format, not escaped quotes
-      const result = await actor.user_join_organization_endpoint($principal);
-      
-      if (result && typeof result === 'string') {
-        try {
-          const parsed = JSON.parse(result);
-          if (parsed.success) {
-            success = true;
-          } else if (parsed.error) {
-            error = parsed.error;
-          } else {
-            error = 'Unknown error occurred';
-          }
-        } catch (e) {
-          console.error('Error parsing join result:', e);
-          error = 'Failed to parse response from canister';
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          success = true;
+        } else if (data.error) {
+          error = data.error;
+        } else {
+          error = 'Unknown error occurred';
         }
       } else {
-        error = 'Unexpected response from canister';
+        const errorData = await response.json();
+        error = errorData.error || 'Failed to join the realm';
       }
     } catch (e) {
       console.error('Error joining organization:', e);
