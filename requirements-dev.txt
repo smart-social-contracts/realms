@@ -1,0 +1,7 @@
+pytest
+pytest-cov
+flake8
+black
+isort
+kybra_simple_db
+kybra_simple_logging

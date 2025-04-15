@@ -26,8 +26,10 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install -r requirements-dev.txt
+        pip install -r src/local/requirements.txt
+        pip install -r src/canister_main/requirements.txt
         
     - name: Run tests with pytest
       run: |
-        ./run_test.sh
+        ./run_tests.sh
 
