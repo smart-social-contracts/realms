@@ -33,7 +33,6 @@ stanadrization that enables interoperability and reusability of working intrastr
 The framework is specially intended for Aritifcial Inteligence to operate with the realm.
 
 
-
 ## Participate
 
 As a citizen

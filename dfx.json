@@ -13,13 +13,13 @@
     },
     "vault": {
       "type": "custom",
-      "wasm": "vault.wasm",
-      "candid": "vault.did"
+      "wasm": ".wasm_tmp/kybra-simple-vault.wasm",
+      "candid": ".wasm_tmp/kybra-simple-vault.did"
     },
     "ckbtc_ledger": {
       "type": "custom",
-      "wasm": "ledger.wasm",
-      "candid": "ledger.did"
+      "wasm": ".wasm_tmp/ic-icrc1-ledger.wasm",
+      "candid": ".wasm_tmp/ledger.did"
     }
   },
   "defaults": { 
