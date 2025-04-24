@@ -28,7 +28,7 @@ def json_dumps(obj):
 
 @app.route('/')
 def home():
-    return "Smart Social Contracts Local Development API"
+    return "Realms Local Development API"
 
 
 @app.route('/get_realm_name', methods=['GET'])
@@ -39,7 +39,7 @@ def handle_get_realm_name():
     try:
         # In a real implementation, this would come from your organization data
         # For now, return a default name
-        name = "Smart Social Contracts Realm"
+        name = "Realm"
         return json_dumps({"name": name})
     except Exception as e:
         logger.error(f"Error in get_realm_name: {str(e)}")

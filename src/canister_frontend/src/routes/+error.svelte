@@ -23,7 +23,7 @@
 
 	const path: string = `/errors/${index}`;
 	const description: string = `${index} - Smart Social Contracts`;
-	const title: string = `Smart Social Contracts - ${index} page`;
+	const title: string = `Realms - ${index} page`;
 	const subtitle: string = `${index} page`;
 </script>
 

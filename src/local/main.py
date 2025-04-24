@@ -156,7 +156,7 @@ def handle_get_realm_name():
         #     name = "Default Realm"
         
         # For now, return a default name
-        name = "Smart Social Contracts Realm"
+        name = "Realm"
         return json_dumps({"name": name})
     except Exception as e:
         return json_dumps({"error": str(e)})

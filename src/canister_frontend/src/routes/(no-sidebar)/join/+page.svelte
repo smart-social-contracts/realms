@@ -7,7 +7,7 @@
   let error = '';
   let success = false;
   let loading = false;
-  let realmName = 'Smart Social Contracts Realm';
+  let realmName = 'Realm';
   
   // URL for local Flask backend API
   const API_BASE_URL = 'http://localhost:5000/api/v1';
@@ -95,7 +95,7 @@
     {#if success}
       <Card class="p-8 text-center">
         <h2 class="text-xl font-bold text-green-600">Successfully Joined!</h2>
-        <p class="mt-2">You have successfully joined the Smart Social Contracts Realm.</p>
+        <p class="mt-2">You have successfully joined the realm.</p>
         <Button href="/" class="mt-4" color="green">Go to Dashboard</Button>
       </Card>
     {:else}

@@ -1,4 +1,4 @@
-# Smart Social Contracts
+# Realms
 
 TODO: 
 
@@ -22,7 +22,7 @@ frontend
 
 [![CI Pipeline](https://github.com/smart-social-contracts/smart-social-contracts/actions/workflows/main.yml/badge.svg)](https://github.com/smart-social-contracts/smart-social-contracts/actions/workflows/main.yml)
 
-Smart Social Contracts is a decentralized platform that allows the deployment of public administration services on the Internet Computer Protocol (ICP).
+Realms is a decentralized platform that allows the deployment of public administration services on the Internet Computer Protocol (ICP).
 
 Its purpose is to transform the way humanity manages the planet's resources and the population by creating a market of realms.
 

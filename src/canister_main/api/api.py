@@ -222,4 +222,4 @@ def get_realm_name():
     # return "Default Realm"
     
     # For now, return a default name
-    return "Smart Social Contracts Realm"
+    return "Realm"
