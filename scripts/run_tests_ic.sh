@@ -5,24 +5,24 @@ set -x
 IMAGE_NAME=realm-test
 
 # Check if the ledger files are already downloaded
-WASM_TMP_DIR=".wasm_tmp"
+WASM_TMP_DIR=".wasm"
 mkdir -p $WASM_TMP_DIR
 
-# Download the ledger files if they don't exist
-if [ ! -f "$WASM_TMP_DIR/ic-icrc1-ledger.wasm" ]; then
-    echo "Downloading ledger files..."
-    curl -L -o "$WASM_TMP_DIR/ic-icrc1-ledger.wasm.gz" https://github.com/dfinity/ic/releases/download/ledger-suite-icrc-2025-02-27/ic-icrc1-ledger.wasm.gz
-    gunzip "$WASM_TMP_DIR/ic-icrc1-ledger.wasm.gz"
-    curl -L -o "$WASM_TMP_DIR/ledger.did" https://github.com/dfinity/ic/releases/download/ledger-suite-icrc-2025-02-27/ledger.did
-fi
+# # Download the ledger files if they don't exist
+# if [ ! -f "$WASM_TMP_DIR/ic-icrc1-ledger.wasm" ]; then
+#     echo "Downloading ledger files..."
+#     curl -L -o "$WASM_TMP_DIR/ic-icrc1-ledger.wasm.gz" https://github.com/dfinity/ic/releases/download/ledger-suite-icrc-2025-02-27/ic-icrc1-ledger.wasm.gz
+#     gunzip "$WASM_TMP_DIR/ic-icrc1-ledger.wasm.gz"
+#     curl -L -o "$WASM_TMP_DIR/ledger.did" https://github.com/dfinity/ic/releases/download/ledger-suite-icrc-2025-02-27/ledger.did
+# fi
 
-# Download the vault files if they don't exist
-if [ ! -f "$WASM_TMP_DIR/kybra-simple-vault.wasm" ]; then
-    echo "Downloading vault files..."
-    curl -L -o "$WASM_TMP_DIR/kybra-simple-vault.wasm.gz" https://github.com/smart-social-contracts/kybra-simple-vault/releases/download/kybra-simple-vault-0.1.0/kybra-simple-vault.wasm.gz
-    gunzip "$WASM_TMP_DIR/kybra-simple-vault.wasm.gz"
-    curl -L -o "$WASM_TMP_DIR/kybra-simple-vault.did" https://github.com/smart-social-contracts/kybra-simple-vault/releases/download/kybra-simple-vault-0.1.0/kybra-simple-vault.did
-fi
+# # Download the vault files if they don't exist
+# if [ ! -f "$WASM_TMP_DIR/kybra-simple-vault.wasm" ]; then
+#     echo "Downloading vault files..."
+#     curl -L -o "$WASM_TMP_DIR/kybra-simple-vault.wasm.gz" https://github.com/smart-social-contracts/kybra-simple-vault/releases/download/kybra-simple-vault-0.1.0/kybra-simple-vault.wasm.gz
+#     gunzip "$WASM_TMP_DIR/kybra-simple-vault.wasm.gz"
+#     curl -L -o "$WASM_TMP_DIR/kybra-simple-vault.did" https://github.com/smart-social-contracts/kybra-simple-vault/releases/download/kybra-simple-vault-0.1.0/kybra-simple-vault.did
+# fi
 
 # Build the Docker image
 echo "Building Docker image..."
