@@ -11,48 +11,37 @@ def deploy_ledger():
     logger.info("Deploying ledger canister to local network...")
     print_ok("Starting ckBTC ledger deployment")
     
-    # Create a temporary deployment script to avoid quote escaping issues
-    deploy_script = """
-#!/bin/bash
-dfx deploy --no-wallet ckbtc_ledger --argument='(variant { 
-  Init = record { 
-    minting_account = record { 
-      owner = principal "aaaaa-aa"; 
-      subaccount = null 
-    }; 
-    transfer_fee = 10; 
-    token_symbol = "ckBTC"; 
-    token_name = "ckBTC Test"; 
-    decimals = opt 8; 
-    metadata = vec {}; 
-    initial_balances = vec { 
-      record { 
-        record { 
-          owner = principal "ah6ac-cc73l-bb2zc-ni7bh-jov4q-roeyj-6k2ob-mkg5j-pequi-vuaa6-2ae"; 
+    # Run command directly with properly escaped arguments
+    run_command("""dfx deploy --no-wallet ckbtc_ledger --argument='(variant { 
+      Init = record { 
+        minting_account = record { 
+          owner = principal "aaaaa-aa"; 
           subaccount = null 
         }; 
-        1000000000 
+        transfer_fee = 10; 
+        token_symbol = "ckBTC"; 
+        token_name = "ckBTC Test"; 
+        decimals = opt 8; 
+        metadata = vec {}; 
+        initial_balances = vec { 
+          record { 
+            record { 
+              owner = principal "ah6ac-cc73l-bb2zc-ni7bh-jov4q-roeyj-6k2ob-mkg5j-pequi-vuaa6-2ae"; 
+              subaccount = null 
+            }; 
+            1000000000 
+          } 
+        }; 
+        feature_flags = opt record { 
+          icrc2 = true 
+        }; 
+        archive_options = record { 
+          num_blocks_to_archive = 1000; 
+          trigger_threshold = 2000; 
+          controller_id = principal "ah6ac-cc73l-bb2zc-ni7bh-jov4q-roeyj-6k2ob-mkg5j-pequi-vuaa6-2ae" 
+        } 
       } 
-    }; 
-    feature_flags = opt record { 
-      icrc2 = true 
-    }; 
-    archive_options = record { 
-      num_blocks_to_archive = 1000; 
-      trigger_threshold = 2000; 
-      controller_id = principal "ah6ac-cc73l-bb2zc-ni7bh-jov4q-roeyj-6k2ob-mkg5j-pequi-vuaa6-2ae" 
-    } 
-  } 
-})'
-    """
-    
-    # Write the script to a temporary file
-    with open('/tmp/deploy_ledger.sh', 'w') as f:
-        f.write(deploy_script)
-    
-    # Make it executable and run it
-    run_command('chmod +x /tmp/deploy_ledger.sh')
-    run_command('/tmp/deploy_ledger.sh')
+    })'""")
     
     # Get the canister ID
     ledger_id = get_canister_id("ckbtc_ledger")
@@ -64,24 +53,15 @@ def deploy_indexer(ledger_id):
     logger.info("Deploying indexer canister to local network...")
     print_ok("Starting ckBTC indexer deployment")
     
-    # Create a temporary deployment script
-    deploy_script = f'''
-#!/bin/bash
-dfx deploy --no-wallet ckbtc_indexer --argument='(opt variant {{ 
-  Init = record {{ 
-    ledger_id = principal "{ledger_id}"; 
-    retrieve_blocks_from_ledger_interval_seconds = opt 1 
-  }} 
-}})'
-    '''
+    # Run command directly with properly escaped arguments
+    cmd = f"""dfx deploy --no-wallet ckbtc_indexer --argument='(opt variant {{ 
+      Init = record {{ 
+        ledger_id = principal "{ledger_id}"; 
+        retrieve_blocks_from_ledger_interval_seconds = opt 1 
+      }} 
+    }})'"""
     
-    # Write the script to a temporary file
-    with open('/tmp/deploy_indexer.sh', 'w') as f:
-        f.write(deploy_script)
-    
-    # Make it executable and run it
-    run_command('chmod +x /tmp/deploy_indexer.sh')
-    run_command('/tmp/deploy_indexer.sh')
+    run_command(cmd)
     
     # Get the canister ID
     indexer_id = get_canister_id("ckbtc_indexer")
@@ -105,27 +85,17 @@ def deploy_vault(ledger_id, indexer_id):
     # Use your principal as the admin by default
     admin_principal = get_principal()
     
-    # Create a temporary deployment script
-    deploy_script = f'''
-#!/bin/bash
-dfx deploy --no-wallet vault --argument='(opt vec {{ 
-  record {{ "ckBTC ledger"; principal "{ledger_id}" }}; 
-  record {{ "ckBTC indexer"; principal "{indexer_id}" }} 
-}}, 
-opt principal "{admin_principal}", 
-opt 2, 
-opt 2)'
-    '''
+    # Run command directly with properly escaped arguments
+    cmd = f"""dfx deploy --no-wallet vault --argument='(opt vec {{ 
+      record {{ "ckBTC ledger"; principal "{ledger_id}" }}; 
+      record {{ "ckBTC indexer"; principal "{indexer_id}" }} 
+    }}, 
+    opt principal "{admin_principal}", 
+    opt 2, 
+    opt 2)'"""
     
-    # Write the script to a temporary file
-    with open('/tmp/deploy_vault.sh', 'w') as f:
-        f.write(deploy_script)
-    
-    # Make it executable and run it
-    run_command('chmod +x /tmp/deploy_vault.sh')
-    run_command('/tmp/deploy_vault.sh')
-    
-    # Get the canister ID
+    run_command(cmd)
+
     vault_id = get_canister_id("vault")
     print_ok(f"vault deployed successfully with ID: {vault_id}")
     return vault_id

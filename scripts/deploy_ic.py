@@ -19,25 +19,19 @@ def deploy_vault(canister_main_id):
     logger.info("Deploying vault to IC network...")
     print_ok("Starting vault deployment on IC")
     
-    # Create a temporary deployment script
-    deploy_script = f'''
-#!/bin/bash
-dfx deploy vault --network ic --argument='(opt vec {{ 
-  record {{ "ckBTC ledger"; principal "{canister_main_id}" }}; 
-  record {{ "ckBTC indexer"; principal "{canister_main_id}" }} 
-}}, 
-opt principal "{get_principal()}", 
-opt 2, 
-opt 2)'
-    '''
+    # Get current principal
+    principal = get_principal()
     
-    # Write the script to a temporary file
-    with open('/tmp/deploy_vault_ic.sh', 'w') as f:
-        f.write(deploy_script)
+    # Run command directly with properly escaped arguments
+    cmd = f"""dfx deploy vault --network ic --argument='(opt vec {{ 
+      record {{ "ckBTC ledger"; principal "{canister_main_id}" }}; 
+      record {{ "ckBTC indexer"; principal "{canister_main_id}" }} 
+    }}, 
+    opt principal "{principal}", 
+    opt 2, 
+    opt 2)'"""
     
-    # Make it executable and run it
-    run_command('chmod +x /tmp/deploy_vault_ic.sh')
-    run_command('/tmp/deploy_vault_ic.sh')
+    run_command(cmd)
     
     # Get the canister ID
     vault_id = get_canister_id("vault", "ic")
