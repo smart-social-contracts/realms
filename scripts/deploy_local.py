@@ -72,7 +72,7 @@ def deploy_indexer(ledger_id):
 def deploy_canister_main():
     logger.info("Deploying canister_main to local network...")
     print_ok("Starting canister_main deployment")
-    run_command("dfx deploy --no-wallet canister_main")
+    run_command("dfx deploy --no-wallet --yes canister_main")
     canister_main_id = get_canister_id("canister_main")
     print_ok(f"canister_main deployed successfully with ID: {canister_main_id}")
     return canister_main_id
@@ -104,7 +104,7 @@ def deploy_vault(ledger_id, indexer_id):
 def deploy_frontend():
     logger.info("Deploying frontend canister to local network...")
     print_ok("Starting frontend canister deployment")
-    run_command("dfx deploy --no-wallet canister_frontend")
+    run_command("dfx deploy --no-wallet --yes canister_frontend")
     frontend_id = get_canister_id("canister_frontend")
     print_ok(f"frontend canister deployed successfully with ID: {frontend_id}")
     return frontend_id

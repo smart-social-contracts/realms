@@ -10,7 +10,7 @@ from colors import print_ok, print_error
 def deploy_canister_main():
     logger.info("Deploying canister_main to IC network...")
     print_ok("Starting canister_main deployment on IC")
-    run_command("dfx deploy canister_main --network ic")
+    run_command("dfx deploy canister_main --network ic --yes")
     canister_main_id = get_canister_id("canister_main", "ic")
     print_ok(f"canister_main deployed successfully with ID: {canister_main_id}")
     return canister_main_id
@@ -42,13 +42,17 @@ def set_canister_ids():
     logger.info("Setting canister IDs...")
     print_ok("Setting admin principals")
     admin_principal = get_canister_id("canister_main", "ic")
-    run_command(f'dfx canister --network ic call vault set_admin "(principal \"{admin_principal}\")"')
+    
+    # Using simple quotes for shell safety
+    cmd = f"dfx canister --network ic call vault set_admin '(principal \"{admin_principal}\")'"
+    run_command(cmd)
+    
     print_ok("Admin principals set successfully")
 
 def deploy_frontend():
     logger.info("Deploying frontend canister to IC network...")
     print_ok("Starting frontend canister deployment on IC")
-    run_command("dfx deploy canister_frontend --network ic")
+    run_command("dfx deploy canister_frontend --network ic --yes")
     frontend_id = get_canister_id("canister_frontend", "ic")
     print_ok(f"frontend canister deployed successfully with ID: {frontend_id}")
     return frontend_id
