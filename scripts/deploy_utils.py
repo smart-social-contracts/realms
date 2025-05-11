@@ -77,7 +77,7 @@ def get_principal():
     return principal
 
 # Print a deployment summary
-def print_deployment_summary(admin_principal, canister_main_id, 
+def print_deployment_summary(admin_principal, realm_backend_id, 
                              vault_id, frontend_id, is_ic=False):
 
     env_name = "IC" if is_ic else "local"
@@ -85,7 +85,7 @@ def print_deployment_summary(admin_principal, canister_main_id,
     logger.info("")
     logger.info(f"===== {env_name.upper()} DEPLOYMENT SUMMARY =====")
     logger.info(f"Admin Principal: {admin_principal}")
-    logger.info(f"canister_main ID: {canister_main_id}")
+    logger.info(f"realm_backend ID: {realm_backend_id}")
     logger.info(f"vault ID: {vault_id}")
     logger.info(f"frontend ID: {frontend_id}")
 

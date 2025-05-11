@@ -1,6 +1,6 @@
 #!/bin/bash
 
-pip install -r src/canister_main/requirements.txt
+pip install -r src/realm_backend/requirements.txt
 pip install -r src/local/requirements.txt
 pip install -r requirements-dev.txt
 

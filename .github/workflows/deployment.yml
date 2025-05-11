@@ -46,7 +46,7 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
           pip install -r src/local/requirements.txt
-          pip install -r src/canister_main/requirements.txt
+          pip install -r src/realm_backend/requirements.txt
           npm ci
       
       - name: Install dfx

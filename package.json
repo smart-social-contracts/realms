@@ -13,7 +13,7 @@
   },
   "type": "module",
   "workspaces": [
-    "src/canister_frontend"
+    "src/realm_frontend"
   ],
   "dependencies": {
     "@sveltejs/adapter-node": "^5.2.9",

@@ -1,5 +1,5 @@
 {
-  "name": "canister_frontend",
+  "name": "realm_frontend",
   "version": "0.0.0",
   "type": "module",
   "scripts": {

@@ -7,15 +7,15 @@ from deploy_utils import (
 )
 from colors import print_ok, print_error
 
-def deploy_canister_main():
-    logger.info("Deploying canister_main to IC network...")
-    print_ok("Starting canister_main deployment on IC")
-    run_command("dfx deploy canister_main --network ic --yes")
-    canister_main_id = get_canister_id("canister_main", "ic")
-    print_ok(f"canister_main deployed successfully with ID: {canister_main_id}")
-    return canister_main_id
+def deploy_realm_backend():
+    logger.info("Deploying realm_backend to IC network...")
+    print_ok("Starting realm_backend deployment on IC")
+    run_command("dfx deploy realm_backend --network ic --yes")
+    realm_backend_id = get_canister_id("realm_backend", "ic")
+    print_ok(f"realm_backend deployed successfully with ID: {realm_backend_id}")
+    return realm_backend_id
 
-def deploy_vault(canister_main_id):
+def deploy_vault(realm_backend_id):
     logger.info("Deploying vault to IC network...")
     print_ok("Starting vault deployment on IC")
     
@@ -24,8 +24,8 @@ def deploy_vault(canister_main_id):
     
     # Run command directly with properly escaped arguments
     cmd = f"""dfx deploy vault --network ic --argument='(opt vec {{ 
-      record {{ "ckBTC ledger"; principal "{canister_main_id}" }}; 
-      record {{ "ckBTC indexer"; principal "{canister_main_id}" }} 
+      record {{ "ckBTC ledger"; principal "{realm_backend_id}" }}; 
+      record {{ "ckBTC indexer"; principal "{realm_backend_id}" }} 
     }}, 
     opt principal "{principal}", 
     opt 2, 
@@ -41,7 +41,7 @@ def deploy_vault(canister_main_id):
 def set_canister_ids():
     logger.info("Setting canister IDs...")
     print_ok("Setting admin principals")
-    admin_principal = get_canister_id("canister_main", "ic")
+    admin_principal = get_canister_id("realm_backend", "ic")
     
     # Using simple quotes for shell safety
     cmd = f"dfx canister --network ic call vault set_admin '(principal \"{admin_principal}\")'"
@@ -52,8 +52,8 @@ def set_canister_ids():
 def deploy_frontend():
     logger.info("Deploying frontend canister to IC network...")
     print_ok("Starting frontend canister deployment on IC")
-    run_command("dfx deploy canister_frontend --network ic --yes")
-    frontend_id = get_canister_id("canister_frontend", "ic")
+    run_command("dfx deploy realm_frontend --network ic --yes")
+    frontend_id = get_canister_id("realm_frontend", "ic")
     print_ok(f"frontend canister deployed successfully with ID: {frontend_id}")
     return frontend_id
 
@@ -70,31 +70,31 @@ def deploy(canister_names=None):
 
     try:
         # Deploy only the specified canister if provided
-        if not canister_names or "canister_main" in canister_names:
-            canister_main_id = deploy_canister_main()
-            print_ok(f"Successfully deployed canister_main canister with ID: {canister_main_id}")
+        if not canister_names or "realm_backend" in canister_names:
+            realm_backend_id = deploy_realm_backend()
+            print_ok(f"Successfully deployed realm_backend canister with ID: {realm_backend_id}")
         else:
-            canister_main_id = get_canister_id("canister_main", "ic")
+            realm_backend_id = get_canister_id("realm_backend", "ic")
             
         if not canister_names or "vault" in canister_names:
-            vault_id = deploy_vault(canister_main_id)
+            vault_id = deploy_vault(realm_backend_id)
             print_ok(f"Successfully deployed vault canister with ID: {vault_id}")
             
             # Set canister IDs after vault deployment
             set_canister_ids()
             
-        if not canister_names or "canister_frontend" in canister_names:
+        if not canister_names or "realm_frontend" in canister_names:
             frontend_id = deploy_frontend()
-            print_ok(f"Successfully deployed canister_frontend canister with ID: {frontend_id}")
+            print_ok(f"Successfully deployed realm_frontend canister with ID: {frontend_id}")
 
         # Get latest IDs for summary
-        canister_main_id = get_canister_id("canister_main", "ic")
+        realm_backend_id = get_canister_id("realm_backend", "ic")
         vault_id = get_canister_id("vault", "ic")
-        frontend_id = get_canister_id("canister_frontend", "ic")
+        frontend_id = get_canister_id("realm_frontend", "ic")
         
         print_deployment_summary(
             get_principal(),
-            canister_main_id,
+            realm_backend_id,
             vault_id,
             frontend_id,
             is_ic=True)

@@ -46,7 +46,7 @@ def _parse_dfx_command(command: List[str]) -> tuple[str, str, Union[str, None]]:
     """
     endpoint = "/".join(
         command[4:]
-    )  # After ['dfx', 'canister', 'call', 'canister_main']
+    )  # After ['dfx', 'canister', 'call', 'realm_backend']
     method = "GET"
     data = None
 

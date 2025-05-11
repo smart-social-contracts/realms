@@ -1,5 +1,5 @@
 # pip install -r src/local//requirements.txt
-# PYTHONPATH=src/canister_main python src/local/main.py
+# PYTHONPATH=src/realm_backend python src/local/main.py
 
 
 import importlib
@@ -8,7 +8,7 @@ import os
 import sys
 
 PATH_LOCAL = r"/home/user/dev/the_project/app/src/local"
-PATH_CANISTER = r"/home/user/dev/the_project/app/src/canister_main"
+PATH_CANISTER = r"/home/user/dev/the_project/app/src/realm_backend"
 
 
 def load_local():
@@ -55,7 +55,7 @@ def load_module(module_name, module_path):
 
 # load_module('icrcledger', r'/home/user/dev/the_project/app/src/local/core/icrcledger.py')
 
-load_module("core", r"src/canister_main/core/__init__.py")
+load_module("core", r"src/realm_backend/core/__init__.py")
 load_module("icrcledger", r"src/local/core/icrcledger.py")
 # import core.icrcledger as icrcledger
 # importlib.reload(icrcledger)

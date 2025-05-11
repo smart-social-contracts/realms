@@ -1,15 +1,15 @@
 {
   "canisters": {
-    "canister_main": {
+    "realm_backend": {
       "type": "kybra",
-      "main": "src/canister_main/main.py"
+      "main": "src/realm_backend/main.py"
     },
-    "canister_frontend": {
+    "realm_frontend": {
       "source": [
-        "src/canister_frontend/dist"
+        "src/realm_frontend/dist"
       ],
       "type": "assets",
-      "workspace": "canister_frontend"
+      "workspace": "realm_frontend"
     },
     "vault": {
       "type": "custom",

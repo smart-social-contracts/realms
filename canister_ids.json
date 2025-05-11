@@ -1,8 +1,8 @@
 {
-  "canister_frontend": {
+  "realm_frontend": {
     "ic": "ctydg-piaaa-aaaah-aqzga-cai"
   },
-  "canister_main": {
+  "realm_backend": {
     "ic": "wxfhb-tqaaa-aaaah-aq2qq-cai"
   },
   "vault": {

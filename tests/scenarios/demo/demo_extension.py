@@ -1,5 +1,5 @@
 # This file servers to create a demo state. These are the commands to install it to the system:
-# Running on an IC server:    dfx canister call canister_main run_code "$(cat tests/scenarios/demo/demo_extension.py)"
+# Running on an IC server:    dfx canister call realm_backend run_code "$(cat tests/scenarios/demo/demo_extension.py)"
 # Running on regular server:  curl -X POST -H "Content-Type: application/json" --data-binary "@tests/scenarios/demo/demo_extension.py" http://localhost:8000/run_code
 
 """ """

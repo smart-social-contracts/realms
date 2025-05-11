@@ -13,7 +13,7 @@ from requests.exceptions import RequestException
 
 # Configuration
 LOCAL_PORT = 8000
-CANISTER_NAME = "canister_main"
+CANISTER_NAME = "realm_backend"
 EXECUTION_FUNCTION = "run_code"
 GET_UNIVERSE_FUNCTION = "get_universe"
 

@@ -14,7 +14,7 @@ if [ "$TEST_LOCAL" ]; then
         sleep 1
     done
 
-    PYTHONPATH=$PWD/src/canister_main TEST_LOCAL=$TEST_LOCAL python src/local/main.py &
+    PYTHONPATH=$PWD/src/realm_backend TEST_LOCAL=$TEST_LOCAL python src/local/main.py &
     SERVER_PID=$!
 
     echo "Waiting for port 8000 to be open again..."
@@ -25,7 +25,7 @@ if [ "$TEST_LOCAL" ]; then
 
     if [ "$MODE" = "test" ]; then
         echo "Running tests..."
-        PYTHONPATH=$PWD/src/canister_main TEST_LOCAL=$TEST_LOCAL python -m pytest -s tests/tests.py
+        PYTHONPATH=$PWD/src/realm_backend TEST_LOCAL=$TEST_LOCAL python -m pytest -s tests/tests.py
         TEST_EXIT_CODE=$?
 
         echo "Cleaning up test server..."

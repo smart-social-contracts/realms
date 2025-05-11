@@ -25,7 +25,7 @@ def ensure_local_server_running():
         except requests.exceptions.ConnectionError:
             raise Exception(
                 "Local server is not running. Please start it with:\n"
-                "PYTHONPATH=src/canister_main python src/local/main.py"
+                "PYTHONPATH=src/realm_backend python src/local/main.py"
             )
 
 
@@ -37,7 +37,7 @@ class TestScenario:
     2. A local HTTP server when TEST_LOCAL environment variable is set
 
     To run tests against local server:
-    1. Start the server: PYTHONPATH=src/canister_main python src/local/main.py
+    1. Start the server: PYTHONPATH=src/realm_backend python src/local/main.py
     2. Run tests: TEST_LOCAL=1 pytest tests/tests.py
     """
 
@@ -58,7 +58,7 @@ class TestScenario:
     @pytest.fixture
     def dfx_command(self):
         """Base dfx command with canister"""
-        return ["dfx", "canister", "call", "canister_main"]
+        return ["dfx", "canister", "call", "realm_backend"]
 
     @mark.order(1)
     def test_run_code(self, dfx_command, extension_code):

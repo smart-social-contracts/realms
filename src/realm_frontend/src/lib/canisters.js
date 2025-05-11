@@ -1,4 +1,4 @@
-// import { createActor, canisterId } from 'declarations/canister_main';
+// import { createActor, canisterId } from 'declarations/realm_backend';
 import { building } from '$app/environment';
 
 /**

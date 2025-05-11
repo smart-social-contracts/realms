@@ -69,13 +69,13 @@ def deploy_indexer(ledger_id):
     return indexer_id
 
 
-def deploy_canister_main():
-    logger.info("Deploying canister_main to local network...")
-    print_ok("Starting canister_main deployment")
-    run_command("dfx deploy --no-wallet --yes canister_main")
-    canister_main_id = get_canister_id("canister_main")
-    print_ok(f"canister_main deployed successfully with ID: {canister_main_id}")
-    return canister_main_id
+def deploy_realm_backend():
+    logger.info("Deploying realm_backend to local network...")
+    print_ok("Starting realm_backend deployment")
+    run_command("dfx deploy --no-wallet --yes realm_backend")
+    realm_backend_id = get_canister_id("realm_backend")
+    print_ok(f"realm_backend deployed successfully with ID: {realm_backend_id}")
+    return realm_backend_id
 
 
 def deploy_vault(ledger_id, indexer_id):
@@ -104,8 +104,8 @@ def deploy_vault(ledger_id, indexer_id):
 def deploy_frontend():
     logger.info("Deploying frontend canister to local network...")
     print_ok("Starting frontend canister deployment")
-    run_command("dfx deploy --no-wallet --yes canister_frontend")
-    frontend_id = get_canister_id("canister_frontend")
+    run_command("dfx deploy --no-wallet --yes realm_frontend")
+    frontend_id = get_canister_id("realm_frontend")
     print_ok(f"frontend canister deployed successfully with ID: {frontend_id}")
     return frontend_id
 
@@ -133,23 +133,23 @@ def deploy(canister_names=None):
         else:
             indexer_id = get_canister_id("ckbtc_indexer")
 
-        if not canister_names or "canister_main" in canister_names:
-            canister_main_id = deploy_canister_main()
-            print_ok(f"Successfully deployed canister_main canister with ID: {canister_main_id}")
+        if not canister_names or "realm_backend" in canister_names:
+            realm_backend_id = deploy_realm_backend()
+            print_ok(f"Successfully deployed realm_backend canister with ID: {realm_backend_id}")
         else:
-            canister_main_id = get_canister_id("canister_main")
+            realm_backend_id = get_canister_id("realm_backend")
             
         if not canister_names or "vault" in canister_names:
             vault_id = deploy_vault(ledger_id, indexer_id)
             print_ok(f"Successfully deployed vault canister with ID: {vault_id}")
             
-        if not canister_names or "canister_frontend" in canister_names:
+        if not canister_names or "realm_frontend" in canister_names:
             frontend_id = deploy_frontend()
-            print_ok(f"Successfully deployed canister_frontend canister with ID: {frontend_id}")
+            print_ok(f"Successfully deployed realm_frontend canister with ID: {frontend_id}")
 
         print_deployment_summary(
             get_principal(),
-            canister_main_id,
+            realm_backend_id,
             vault_id,
             frontend_id,
             is_ic=False)

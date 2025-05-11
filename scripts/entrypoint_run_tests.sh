@@ -19,7 +19,7 @@ handle_error() {
 log "Running tests..."
 
 cd tests
-if ! PYTHONPATH=$PWD/../src/canister_main python -m pytest -s tests.py; then
+if ! PYTHONPATH=$PWD/../src/realm_backend python -m pytest -s tests.py; then
     handle_error "Tests failed"
 fi
 
