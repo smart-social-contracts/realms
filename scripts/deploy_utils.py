@@ -14,24 +14,22 @@ logging.basicConfig(
 logger = logging.getLogger('ic-deploy')
 
 # Helper function to run commands with error handling
-def run_command(command, error_message):
+def run_command(command):
     try:
-        # For deploy commands, we need to handle interactive prompts
-        if "deploy" in command:
-            # Use yes command to automatically answer yes to prompts
-            command = f"yes | {command}"
-        
+        print(f"Running: {command}")
         result = subprocess.run(command, shell=True, check=True, 
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
                               text=True)
-        print(result.stdout)
-        if result.stderr:
-            print(result.stderr, file=sys.stderr)
-        return result
+        print(f"stdout: {result.stdout}")
+        print(f"stderr: {result.stderr}")
+
+        if result.returncode != 0:
+            raise Exception(f"Error executing command: {command}")
+        return result.stdout.strip()
     except subprocess.CalledProcessError as e:
         print(e.stdout if e.stdout else "")
         print(e.stderr if e.stderr else "", file=sys.stderr)
-        logger.error(error_message)
+        logger.error(f"Error executing command: {command}")
         sys.exit(1)
 
 # Get canister ID using dfx command
@@ -55,15 +53,15 @@ def ensure_dfx_running():
         logger.info("DFX is already running")
     except subprocess.CalledProcessError:
         logger.info("Starting DFX in background...")
-        run_command("dfx start --clean --background", "Failed to start dfx")
+        run_command("dfx start --clean --background")
 
 # Get current identity principal
-def get_admin_principal():
+def get_principal():
     result = subprocess.run("dfx identity get-principal", shell=True, check=True, 
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    admin_principal = result.stdout.strip()
-    logger.info(f"Using admin principal: {admin_principal}")
-    return admin_principal
+    principal = result.stdout.strip()
+    logger.info(f"Using principal: {principal}")
+    return principal
 
 # Print a deployment summary
 def print_deployment_summary(admin_principal, canister_main_id, 

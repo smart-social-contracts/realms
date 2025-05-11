@@ -53,9 +53,7 @@ def print_usage() -> None:
     print(
         "  --http    Use an off-chain server instead of dfx (localhost:%s)" % LOCAL_PORT
     )
-    print(
-        "  --verbose Enable verbose output (shows additional information and comments)"
-    )
+    print("  Enable verbose output (shows additional information and comments)")
 
 
 def parse_args() -> tuple[Config, List[str]]:

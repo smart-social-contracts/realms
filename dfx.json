@@ -20,6 +20,11 @@
       "type": "custom",
       "wasm": ".wasm/ledger.wasm",
       "candid": ".wasm/ledger.did"
+    },
+    "ckbtc_indexer": {
+      "type": "custom",
+      "wasm": ".wasm/indexer.wasm",
+      "candid": ".wasm/indexer.did"
     }
   },
   "defaults": { 

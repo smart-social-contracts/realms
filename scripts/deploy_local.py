@@ -2,127 +2,174 @@
 
 import sys
 from deploy_utils import (
-    logger, run_command, get_canister_id, ensure_dfx_running,
-    get_admin_principal, get_vault_arg, print_deployment_summary
+    logger, run_command, get_canister_id,
+    print_deployment_summary, get_principal
 )
 
-# Individual canister deployment functions
-def setup_environment():
-    logger.info("Setting up deployment environment...")
-    ensure_dfx_running()
-    admin_principal = get_admin_principal()
-    return admin_principal
-
-def deploy_ckbtc_ledger(admin_principal):
-    logger.info("Deploying ckbtc_ledger...")
-    ckbtc_ledger_arg = f'''
-(variant {{ 
-  Init = record {{ 
-    minting_account = record {{ owner = principal "{admin_principal}"; subaccount = null }}; 
+def deploy_ledger():
+    logger.info("Deploying ledger canister to local network...")
+    
+    # Create a temporary deployment script to avoid quote escaping issues
+    deploy_script = """
+#!/bin/bash
+dfx deploy --no-wallet ckbtc_ledger --argument='(variant { 
+  Init = record { 
+    minting_account = record { 
+      owner = principal "aaaaa-aa"; 
+      subaccount = null 
+    }; 
     transfer_fee = 10; 
     token_symbol = "ckBTC"; 
     token_name = "ckBTC Test"; 
     decimals = opt 8; 
-    metadata = vec {{}}; 
-    initial_balances = vec {{ 
-      record {{ record {{ owner = principal "{admin_principal}"; subaccount = null }}; 1_000_000_000 }} 
-    }}; 
-    feature_flags = opt record {{ icrc2 = true }}; 
-    archive_options = record {{ 
+    metadata = vec {}; 
+    initial_balances = vec { 
+      record { 
+        record { 
+          owner = principal "ah6ac-cc73l-bb2zc-ni7bh-jov4q-roeyj-6k2ob-mkg5j-pequi-vuaa6-2ae"; 
+          subaccount = null 
+        }; 
+        1000000000 
+      } 
+    }; 
+    feature_flags = opt record { 
+      icrc2 = true 
+    }; 
+    archive_options = record { 
       num_blocks_to_archive = 1000; 
       trigger_threshold = 2000; 
-      controller_id = principal "{admin_principal}" 
-    }} 
+      controller_id = principal "ah6ac-cc73l-bb2zc-ni7bh-jov4q-roeyj-6k2ob-mkg5j-pequi-vuaa6-2ae" 
+    } 
+  } 
+})'
+    """
+    
+    # Write the script to a temporary file
+    with open('/tmp/deploy_ledger.sh', 'w') as f:
+        f.write(deploy_script)
+    
+    # Make it executable and run it
+    run_command('chmod +x /tmp/deploy_ledger.sh')
+    run_command('/tmp/deploy_ledger.sh')
+    
+    # Get the canister ID
+    ledger_id = get_canister_id("ckbtc_ledger")
+    logger.info(f"ledger canister deployed successfully with ID: {ledger_id}")
+    return ledger_id
+
+
+def deploy_indexer(ledger_id):
+    logger.info("Deploying indexer canister to local network...")
+    
+    # Create a temporary deployment script
+    deploy_script = f'''
+#!/bin/bash
+dfx deploy --no-wallet ckbtc_indexer --argument='(opt variant {{ 
+  Init = record {{ 
+    ledger_id = principal "{ledger_id}"; 
+    retrieve_blocks_from_ledger_interval_seconds = opt 1 
   }} 
-}})
-'''
-    run_command(f'dfx deploy ckbtc_ledger --network local --verbose --argument \'{ckbtc_ledger_arg}\'', 
-               "Failed to deploy ckbtc_ledger")
-    ckbtc_ledger_id = get_canister_id("ckbtc_ledger", "local")
-    logger.info(f"ckbtc_ledger deployed successfully with ID: {ckbtc_ledger_id}")
-    return ckbtc_ledger_id
+}})'
+    '''
+    
+    # Write the script to a temporary file
+    with open('/tmp/deploy_indexer.sh', 'w') as f:
+        f.write(deploy_script)
+    
+    # Make it executable and run it
+    run_command('chmod +x /tmp/deploy_indexer.sh')
+    run_command('/tmp/deploy_indexer.sh')
+    
+    # Get the canister ID
+    indexer_id = get_canister_id("ckbtc_indexer")
+    logger.info(f"indexer canister deployed successfully with ID: {indexer_id}")
+    return indexer_id
 
 def deploy_canister_main():
-    logger.info("Deploying canister_main...")
-    run_command("dfx deploy canister_main --network local --verbose", "Failed to deploy canister_main")
-    canister_main_id = get_canister_id("canister_main", "local")
+    logger.info("Deploying canister_main to local network...")
+    run_command("dfx deploy --no-wallet canister_main")
+    canister_main_id = get_canister_id("canister_main")
     logger.info(f"canister_main deployed successfully with ID: {canister_main_id}")
     return canister_main_id
 
-def deploy_vault(admin_principal, ckbtc_ledger_id):
-    logger.info("Deploying vault...")
-    heartbeat_interval_seconds = 1  # Using 1 second for heartbeat interval in local environment
+
+def deploy_vault(ledger_id, indexer_id):
+    logger.info("Deploying vault to local network...")
     
-    logger.info(f"Initializing vault with:\n"
-        f"  ckbtc_ledger_principal: {ckbtc_ledger_id}\n"
-        f"  admin_principal: {admin_principal}\n"
-        f"  heartbeat_interval_seconds: {heartbeat_interval_seconds}")
+    # Use your principal as the admin by default
+    admin_principal = get_principal()
     
-    vault_arg = get_vault_arg(ckbtc_ledger_id, admin_principal, heartbeat_interval_seconds)
-    run_command(f'dfx deploy vault --network local --verbose --argument \'{vault_arg}\'', "Failed to deploy vault")
-    vault_id = get_canister_id("vault", "local")
+    # Create a temporary deployment script
+    deploy_script = f'''
+#!/bin/bash
+dfx deploy --no-wallet vault --argument='(opt vec {{ 
+  record {{ "ckBTC ledger"; principal "{ledger_id}" }}; 
+  record {{ "ckBTC indexer"; principal "{indexer_id}" }} 
+}}, 
+opt principal "{admin_principal}", 
+opt 2, 
+opt 2)'
+    '''
+    
+    # Write the script to a temporary file
+    with open('/tmp/deploy_vault.sh', 'w') as f:
+        f.write(deploy_script)
+    
+    # Make it executable and run it
+    run_command('chmod +x /tmp/deploy_vault.sh')
+    run_command('/tmp/deploy_vault.sh')
+    
+    # Get the canister ID
+    vault_id = get_canister_id("vault")
     logger.info(f"vault deployed successfully with ID: {vault_id}")
     return vault_id
 
+
 def deploy_frontend():
-    logger.info("Deploying frontend canister...")
-    run_command("dfx deploy canister_frontend --network local --verbose", "Failed to deploy frontend canister")
-    frontend_id = get_canister_id("canister_frontend", "local")
+    logger.info("Deploying frontend canister to local network...")
+    run_command("dfx deploy --no-wallet canister_frontend")
+    frontend_id = get_canister_id("canister_frontend")
     logger.info(f"frontend canister deployed successfully with ID: {frontend_id}")
     return frontend_id
 
+
 # Main deployment function
-def deploy_local(canister_name=None):
-    logger.info("Starting local deployment process...")
+def deploy(canister_names=None):
+    logger.info("Starting local network deployment process...")
     
-    admin_principal = setup_environment()
-    
-    # Special case for vault which needs the ckBTC ledger
-    if canister_name == "vault":
-        # Check if ckbtc_ledger exists, if not deploy it first
-        try:
-            ckbtc_ledger_id = get_canister_id("ckbtc_ledger", "local")
-            logger.info(f"Using existing ckbtc_ledger with ID: {ckbtc_ledger_id}")
-        except:
-            logger.info("ckbtc_ledger not found, deploying it first...")
-            ckbtc_ledger_id = deploy_ckbtc_ledger(admin_principal)
-        
-        vault_id = deploy_vault(admin_principal, ckbtc_ledger_id)
-        logger.info(f"Successfully deployed {canister_name} canister with ID: {vault_id}")
-        return
-    
+    logger.info(f"Deploying canisters: {canister_names}" if canister_names else "Deploying all canisters")
+
     # Deploy only the specified canister if provided
-    if canister_name:
-        if canister_name == "ckbtc_ledger":
-            ckbtc_ledger_id = deploy_ckbtc_ledger(admin_principal)
-            logger.info(f"Successfully deployed {canister_name} canister with ID: {ckbtc_ledger_id}")
-            return
-        elif canister_name == "canister_main":
-            canister_main_id = deploy_canister_main()
-            logger.info(f"Successfully deployed {canister_name} canister with ID: {canister_main_id}")
-            return
-        elif canister_name == "canister_frontend":
-            frontend_id = deploy_frontend()
-            logger.info(f"Successfully deployed {canister_name} canister with ID: {frontend_id}")
-            return
-        else:
-            logger.error(f"Unknown canister name: {canister_name}")
-            logger.info("Available canisters: ckbtc_ledger, canister_main, vault, canister_frontend")
-            sys.exit(1)
-    
-    # Otherwise deploy all canisters
-    ckbtc_ledger_id = deploy_ckbtc_ledger(admin_principal)
-    canister_main_id = deploy_canister_main()
-    vault_id = deploy_vault(admin_principal, ckbtc_ledger_id)
-    frontend_id = deploy_frontend()
-    
-    # Print deployment summary
-    print_deployment_summary("local", admin_principal, ckbtc_ledger_id, 
-                           canister_main_id, vault_id, frontend_id)
+    if not canister_names or "ledger" in canister_names:
+        ledger_id = deploy_ledger()
+    else:
+        ledger_id = get_canister_id("ckbtc_ledger")
+
+    if not canister_names or "indexer" in canister_names:
+        indexer_id = deploy_indexer(ledger_id)
+    else:
+        indexer_id = get_canister_id("ckbtc_indexer")
+
+    if not canister_names or "canister_main" in canister_names:
+        canister_main_id = deploy_canister_main()
+        logger.info(f"Successfully deployed canister_main canister with ID: {canister_main_id}")
+    else:
+        canister_main_id = get_canister_id("canister_main")
+        
+    if not canister_names or "vault" in canister_names:
+        vault_id = deploy_vault(ledger_id, indexer_id)
+        logger.info(f"Successfully deployed vault canister with ID: {vault_id}")
+        
+    if not canister_names or "canister_frontend" in canister_names:
+        frontend_id = deploy_frontend()
+        logger.info(f"Successfully deployed canister_frontend canister with ID: {frontend_id}")
+
+    print_deployment_summary(
+        get_principal(),
+        canister_main_id,
+        vault_id,
+        frontend_id,
+        is_ic=False)
 
 if __name__ == "__main__":
-    # Check if a specific canister is specified
-    if len(sys.argv) > 1:
-        deploy_local(sys.argv[1])
-    else:
-        deploy_local()
+    deploy(sys.argv[1:])
