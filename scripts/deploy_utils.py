@@ -4,6 +4,7 @@ import subprocess
 import sys
 import logging
 from datetime import datetime
+from colors import print_ok, print_error
 
 # Configure logging
 logging.basicConfig(
@@ -25,10 +26,16 @@ def run_command(command):
 
         if result.returncode != 0:
             raise Exception(f"Error executing command: {command}")
+            
+        # Print success message with green checkmark
+        print_ok(f"Command executed successfully: {command}")
+        
         return result.stdout.strip()
     except subprocess.CalledProcessError as e:
         print(e.stdout if e.stdout else "")
         print(e.stderr if e.stderr else "", file=sys.stderr)
+        # Print error message with red cross
+        print_error(f"Error executing command: {command}")
         logger.error(f"Error executing command: {command}")
         sys.exit(1)
 
@@ -40,8 +47,11 @@ def get_canister_id(canister_name, network=None):
                             shell=True, check=True,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             text=True)
-        return result.stdout.strip()
+        canister_id = result.stdout.strip()
+        print_ok(f"Retrieved canister ID for {canister_name}: {canister_id}")
+        return canister_id
     except:
+        print_error(f"Could not get ID for {canister_name} using direct lookup")
         logger.warning(f"Could not get ID for {canister_name} using direct lookup")
         return None
 
@@ -50,16 +60,19 @@ def ensure_dfx_running():
     try:
         subprocess.run("dfx ping", shell=True, check=True, 
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print_ok("DFX is already running")
         logger.info("DFX is already running")
     except subprocess.CalledProcessError:
         logger.info("Starting DFX in background...")
         run_command("dfx start --clean --background")
+        print_ok("DFX started in background")
 
 # Get current identity principal
 def get_principal():
     result = subprocess.run("dfx identity get-principal", shell=True, check=True, 
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     principal = result.stdout.strip()
+    print_ok(f"Using principal: {principal}")
     logger.info(f"Using principal: {principal}")
     return principal
 
@@ -83,4 +96,5 @@ def print_deployment_summary(admin_principal, canister_main_id,
     
     logger.info(f"frontend URL: {frontend_url}")
 
+    print_ok(f"===== {env_name.upper()} DEPLOYMENT COMPLETE =====")
     logger.info(f"===== {env_name.upper()} DEPLOYMENT COMPLETE =====")
