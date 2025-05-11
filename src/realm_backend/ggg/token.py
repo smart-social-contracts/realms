@@ -6,11 +6,13 @@ minting, transfers, and metadata tracking.
 
 from typing import Any, Dict, List, Optional, Union
 
-import ggg
+# Remove circular import
+# import ggg
 from core.entity import GGGEntity
 from kybra_simple_db import *
 
-from .extension_code import DEFAULT_EXTENSION_CODE_TOKEN
+# Import directly instead of through ggg
+from .extension_code import DEFAULT_EXTENSION_CODE_TOKEN, ExtensionCode
 
 
 class Token(GGGEntity):
@@ -31,8 +33,8 @@ class Token(GGGEntity):
     def new(cls, symbol: str, token_core, name: Optional[str] = None) -> "Token":
         entity = cls(_id=symbol, name=name)
         entity.token_core = token_core
-        # Create a new ExtensionCode instance with the default code
-        entity.extension_code = ggg.ExtensionCode["DEFAULT_EXTENSION_CODE_TOKEN"]
+        # Fix: Use the constant directly instead of dict-style access
+        entity.extension_code = DEFAULT_EXTENSION_CODE_TOKEN
         return entity
 
     def mint(

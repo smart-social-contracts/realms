@@ -18,7 +18,7 @@ class Transaction(Entity):
 
     def __init__(
         self,
-        token: ggg.Token,
+        token: "Token",
         tx_id: Optional[str],
         from_address: Optional[str],
         to_address: Optional[str],
@@ -44,7 +44,7 @@ class Transaction(Entity):
     @classmethod
     def new(
         cls,
-        token: ggg.Token,
+        token: "Token",
         tx_id: Optional[str],
         from_address: Optional[str],
         to_address: Optional[str],

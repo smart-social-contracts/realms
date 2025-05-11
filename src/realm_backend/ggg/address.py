@@ -10,7 +10,7 @@ class Address(Entity):
     address_id = String()
 
     @classmethod
-    def new(cls, token: ggg.Token, address_id: str, **kwargs) -> "Address":
+    def new(cls, token: "Token", address_id: str, **kwargs) -> "Address":
         address = cls(**kwargs)
         address.token = token
         address.address_id = address_id
