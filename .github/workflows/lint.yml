@@ -22,8 +22,5 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements-dev.txt
         
-    - name: Make run_linters.sh executable
-      run: chmod +x ./run_linters.sh
-      
     - name: Run linters
-      run: ./run_linters.sh
+      run: scripts/run_linters.sh

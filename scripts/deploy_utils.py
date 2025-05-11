@@ -65,30 +65,24 @@ def get_admin_principal():
     logger.info(f"Using admin principal: {admin_principal}")
     return admin_principal
 
-# Construct vault initialization argument
-def get_vault_arg(ckbtc_ledger_id, admin_principal, heartbeat_interval_seconds):
-    return f'''(
-    opt principal "{ckbtc_ledger_id}",
-    opt principal "{admin_principal}",
-    {heartbeat_interval_seconds}
-)'''
-
 # Print a deployment summary
-def print_deployment_summary(env_name, admin_principal, ckbtc_ledger_id, canister_main_id, 
-                             vault_id, frontend_id, is_mainnet=False):
+def print_deployment_summary(admin_principal, canister_main_id, 
+                             vault_id, frontend_id, is_ic=False):
+
+    env_name = "IC" if is_ic else "local"
+
     logger.info("")
     logger.info(f"===== {env_name.upper()} DEPLOYMENT SUMMARY =====")
     logger.info(f"Admin Principal: {admin_principal}")
-    
-    if is_mainnet:
-        logger.info(f"ckBTC Ledger ID: {ckbtc_ledger_id} (mainnet canister)")
-        frontend_url = f"https://{frontend_id}.icp0.io"
-    else:
-        logger.info(f"ckBTC Ledger ID: {ckbtc_ledger_id}")
-        frontend_url = f"http://localhost:4943/?canisterId={frontend_id}"
-        
     logger.info(f"canister_main ID: {canister_main_id}")
     logger.info(f"vault ID: {vault_id}")
     logger.info(f"frontend ID: {frontend_id}")
-    logger.info(f"Frontend URL: {frontend_url}")
+
+    if is_ic:
+        frontend_url = f"https://{frontend_id}.icp0.io"
+    else:
+        frontend_url = f"http://localhost:4943/?canisterId={frontend_id}"
+    
+    logger.info(f"frontend URL: {frontend_url}")
+
     logger.info(f"===== {env_name.upper()} DEPLOYMENT COMPLETE =====")

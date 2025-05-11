@@ -1,14 +1,14 @@
+import json
 import os
 import sys
-import pytest
-import json
 import time
-import requests
 from pathlib import Path
-from pytest import mark
 
-from test_utils import check
+import pytest
+import requests
+from pytest import mark
 from test_data import RUN_CODE_RESPONSE
+from test_utils import check
 
 # Constants
 THIS_DIR = Path(__file__).parent
@@ -17,9 +17,9 @@ SCENARIOS_DIR = THIS_DIR / "scenarios"
 
 def ensure_local_server_running():
     """Ensure local server is running if TEST_LOCAL is set"""
-    if os.environ.get('TEST_LOCAL'):
+    if os.environ.get("TEST_LOCAL"):
         try:
-            response = requests.get('http://localhost:8000/greet')
+            response = requests.get("http://localhost:8000/greet")
             if response.status_code != 200:
                 raise Exception("Local server is not responding correctly")
         except requests.exceptions.ConnectionError:
@@ -31,11 +31,11 @@ def ensure_local_server_running():
 
 class TestScenario:
     """Test suite for canister main functionality
-    
+
     This test suite can run against either:
     1. The actual canister (default) using dfx commands
     2. A local HTTP server when TEST_LOCAL environment variable is set
-    
+
     To run tests against local server:
     1. Start the server: PYTHONPATH=src/canister_main python src/local/main.py
     2. Run tests: TEST_LOCAL=1 pytest tests/tests.py
@@ -70,26 +70,33 @@ class TestScenario:
     def test_get_universe(self, dfx_command):
         """Test the get_universe endpoint returns correct state after running code"""
         command = dfx_command + ["get_universe"]
-        assert check(
-            command, self.get_json_file('extension')) == 0, "Unexpected universe data"
+        assert (
+            check(command, self.get_json_file("extension")) == 0
+        ), "Unexpected universe data"
 
     @mark.order(3)
     def test_get_organization_list(self, dfx_command):
         """Test getting organization list"""
         command = dfx_command + ["get_organization_list"]
-        assert check(command, self.get_json_file('get_organization_list')) == 0, "Failed to get organization list"
+        assert (
+            check(command, self.get_json_file("get_organization_list")) == 0
+        ), "Failed to get organization list"
 
     @mark.order(4)
     def test_get_organization_data(self, dfx_command):
         """Test getting organization data"""
         command = dfx_command + ["get_organization_data", "state"]
-        assert check(command, self.get_json_file('get_organization_data')) == 0, "Failed to get organization data"
+        assert (
+            check(command, self.get_json_file("get_organization_data")) == 0
+        ), "Failed to get organization data"
 
     @mark.order(5)
     def test_get_proposal_data(self, dfx_command):
         """Test getting proposal data"""
         command = dfx_command + ["get_proposal_data", "0"]
-        assert check(command, self.get_json_file('get_proposal_data')) == 0, "Failed to get proposal data"
+        assert (
+            check(command, self.get_json_file("get_proposal_data")) == 0
+        ), "Failed to get proposal data"
 
     # @mark.order(4)
     # def test_create_user(self, dfx_command, test_user_data):
@@ -132,5 +139,5 @@ class TestScenario:
     #     assert check(command, True) == 0, "Failed to join organization"
 
 
-if __name__ == '__main__':
-    pytest.main(['-v', __file__])
+if __name__ == "__main__":
+    pytest.main(["-v", __file__])

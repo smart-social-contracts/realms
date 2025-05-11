@@ -1,4 +1,3 @@
-
 class Realm(EntityLayer):
     @classmethod
     def new(cls, name, description=None):

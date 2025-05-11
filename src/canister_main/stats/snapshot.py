@@ -1,7 +1,9 @@
 from kybra_simple_db import *
 
+
 class Snapshot(Entity):
     """Entity for storing system snapshots."""
+
     _entity_type = "snapshot"
 
     def __init__(self, date: str, data: dict):
@@ -10,7 +12,7 @@ class Snapshot(Entity):
         self.data = data
 
     @classmethod
-    def new(cls, date: str, data: dict) -> 'Snapshot':
+    def new(cls, date: str, data: dict) -> "Snapshot":
         snapshot = cls(date=date, data=data)
         snapshot.save()
         return snapshot

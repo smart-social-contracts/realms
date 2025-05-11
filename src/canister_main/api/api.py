@@ -1,7 +1,7 @@
 """API implementation using Kybra Simple DB."""
 
-from typing import List, Dict, Optional
 from pprint import pprint
+from typing import Dict, List, Optional
 
 import ggg
 
@@ -46,17 +46,17 @@ def get_organization_data(organization_id: str):
     org = ggg.Organization.load(organization_id)
     if not org:
         return None
-    
+
     data = org.to_dict()
-    
+
     # Add token information
     for token_id in org.tokens:
         token = get_token(token_id)
         if token:
-            if 'tokens' not in data:
-                data['tokens'] = {}
-            data['tokens'][token.id] = token.to_dict()
-    
+            if "tokens" not in data:
+                data["tokens"] = {}
+            data["tokens"][token.id] = token.to_dict()
+
     return data
 
 
@@ -159,12 +159,9 @@ def get_token_transactions(token_id: str, address: str = None, limit: int = 100)
     token = get_token(token_id)
     if not token:
         return None
-    
+
     # Note: Transaction history is not implemented in the current version
-    return {
-        'token_symbol': token.symbol,
-        'transactions': []
-    }
+    return {"token_symbol": token.symbol, "transactions": []}
 
 
 def get_proposal_data(proposal_id: str):
@@ -186,10 +183,10 @@ def get_proposal_data(proposal_id: str):
 def user_join_organization(user_principal: str):
     """
     Add a user to the organization/realm based on their principal ID.
-    
+
     Args:
         user_principal (str): The principal ID of the user to add
-        
+
     Returns:
         bool: True if user was successfully added, False otherwise
     """
@@ -201,7 +198,7 @@ def user_join_organization(user_principal: str):
     #     organization.save()
     #     return True
     # return False
-    
+
     # For now, simply return success
     print(f"User with principal {user_principal} joined the organization")
     return True
@@ -210,7 +207,7 @@ def user_join_organization(user_principal: str):
 def get_realm_name():
     """
     Get the name of the realm/organization.
-    
+
     Returns:
         str: The name of the realm/organization
     """
@@ -220,6 +217,6 @@ def get_realm_name():
     # if organization:
     #     return organization.name
     # return "Default Realm"
-    
+
     # For now, return a default name
     return "Realm"

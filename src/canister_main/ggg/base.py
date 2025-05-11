@@ -4,30 +4,29 @@ This module contains the core initialization logic for the GGG framework and
 provides access to the underlying database functionality.
 """
 
-import time
-from datetime import datetime
-import sys
 import inspect
 import os
-from typing import Dict, List, Optional, Any
+import sys
+import time
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 import ggg
-from ggg.token import Token
-from core.token_icrc1 import TokenICRC1
-
-from ggg.extension_code import ExtensionCode
-from core.system_time import get_system_time
-from core.token_factory import token_factory
+from core.access_control import context_caller
 from core.execution import contains_function
 # from core.db import Database, Entity
 from core.logger import log
-
+from core.system_time import get_system_time
+from core.token_factory import token_factory
+from core.token_icrc1 import TokenICRC1
+from ggg.extension_code import ExtensionCode
+from ggg.token import Token
 from kybra_simple_db import *
-from core.access_control import context_caller
+
 
 def initialize() -> None:
     """Initialize the GGG framework with default entities and configurations.
-    
+
     This function performs the following setup:
     1. Creates the default user
     2. Sets up default extension code
@@ -45,14 +44,24 @@ def initialize() -> None:
         # print('this_folder', this_folder)
         # default_extension_code = open(os.path.join(this_folder, 'default_extension_code.py')).read().strip()
         # print('default_extension_code', default_extension_code)
-        ExtensionCode.new(ggg.extension_code.DEFAULT_EXTENSION_CODE_ORGANIZATION, _id='DEFAULT_EXTENSION_CODE_ORGANIZATION')
-        ExtensionCode.new(ggg.extension_code.DEFAULT_EXTENSION_CODE_TOKEN, _id='DEFAULT_EXTENSION_CODE_TOKEN')
+        ExtensionCode.new(
+            ggg.extension_code.DEFAULT_EXTENSION_CODE_ORGANIZATION,
+            _id="DEFAULT_EXTENSION_CODE_ORGANIZATION",
+        )
+        ExtensionCode.new(
+            ggg.extension_code.DEFAULT_EXTENSION_CODE_TOKEN,
+            _id="DEFAULT_EXTENSION_CODE_TOKEN",
+        )
 
     def create_tokens():
 
         for ccy_data in [
             # ("BTC", "Bitcoin", None),
-            ("ckBTC", "Chain-Key Bitcoin", 'bkyz2-fmaaa-aaaaa-qaaaq-cai'),  # TODO: check principal
+            (
+                "ckBTC",
+                "Chain-Key Bitcoin",
+                "bkyz2-fmaaa-aaaaa-qaaaq-cai",
+            ),  # TODO: check principal
             # ("ETH", "Ethereum"),
             # ("ICP", "Internet Computer Protocol"),
             # ("CKBTC", "Chain-Key Bitcoin"),
@@ -66,7 +75,6 @@ def initialize() -> None:
                 token_factory(symbol, "TokenICRC1", principal=principal, name=name)
             else:
                 token_factory(symbol, "TokenInternal")
-
 
     # def create_realm():
     #     # The address of the first realm in database is set to the principal of the canister the platform is running on
@@ -83,7 +91,6 @@ def initialize() -> None:
     # def create_world():
     #     ggg.World.new("Earth")
 
-
     # context_caller.reset()
 
     create_first_user()
@@ -95,12 +102,10 @@ def initialize() -> None:
     # world = ggg.World.instances()[0]
     # print(world.name)
     # print(world.to_dict())
-    
+
     # world.some_method()
-    
 
-    print('initialized')
-
+    print("initialized")
 
     # # Create the main state organization
     # state = ggg.Organization.new('state')
@@ -120,19 +125,18 @@ def initialize() -> None:
     # state.add_member(bob)
 
 
-
 def universe(recursive=True) -> dict:
-    from ggg.world import World
+    from core.token_icrc1 import TokenICRC1
+    from core.token_internal import TokenInternal
+    from ggg.extension_code import ExtensionCode
     # from ggg.state import State
     from ggg.organization import Organization
     from ggg.proposal import Proposal
-    from ggg.wallet import Wallet
-    from ggg.token import Token
-    from core.token_icrc1 import TokenICRC1
-    from core.token_internal import TokenInternal
-    from ggg.user import User
-    from ggg.extension_code import ExtensionCode
     from ggg.resources import LandToken
+    from ggg.token import Token
+    from ggg.user import User
+    from ggg.wallet import Wallet
+    from ggg.world import World
 
     return {
         "tokens": [i.to_dict() for i in Token.instances()],
@@ -145,6 +149,7 @@ def universe(recursive=True) -> dict:
         "proposals": [i.to_dict() for i in Proposal.instances()],
         "worlds": [i.to_dict() for i in World.instances()],
     }
+
 
 def audit() -> dict:
     return db

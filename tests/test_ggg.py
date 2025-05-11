@@ -1,20 +1,20 @@
 import os
 import sys
-import pytest
 from pathlib import Path
-from pytest import mark
 
-from test_utils import check
-from ggg.user import User, UserGroup
-from ggg.organization import Organization
-from ggg.wallet import Wallet
-from ggg.token import Token
+import pytest
 from ggg.base import initialize
+from ggg.organization import Organization
+from ggg.token import Token
+from ggg.user import User, UserGroup
+from ggg.wallet import Wallet
+from pytest import mark
+from test_utils import check
 
 
 class TestGGG:
     """Test suite for GGG framework core functionality
-    
+
     Tests the core classes and functionality of the GGG framework including:
     - User management
     - Organization operations
@@ -65,10 +65,7 @@ class TestGGG:
         """Test creating and processing proposals in organization"""
         org = Organization.new("proposal_test_org")
         proposal = org.create_proposal(
-            "Test Proposal",
-            "Description",
-            "print('test')",
-            "test_user"
+            "Test Proposal", "Description", "print('test')", "test_user"
         )
         assert proposal.title == "Test Proposal"
         assert proposal.description == "Description"
@@ -82,5 +79,5 @@ class TestGGG:
         # Note: Further wallet tests would depend on specific token implementation
 
 
-if __name__ == '__main__':
-    pytest.main(['-v', __file__])
+if __name__ == "__main__":
+    pytest.main(["-v", __file__])

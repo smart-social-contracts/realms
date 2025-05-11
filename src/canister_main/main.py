@@ -1,40 +1,18 @@
 import traceback
-from typing import List, Dict, Optional
-from kybra import (
-    Async,
-    CallResult,
-    init,
-    heartbeat,
-    blob,
-    Func,
-    match,
-    nat,
-    nat16,
-    nat64,
-    Opt,
-    Principal,
-    query,
-    Query,
-    Record,
-    Tuple,
-    Variant,
-    Vec,
-    ic,
-    update,
-    void,
-)
-
 from datetime import datetime
+from typing import Dict, List, Optional
 
-from ggg.base import universe, initialize
-from core.token_icrc1 import TokenICRC1
-from core.icrcledger import ICRCLedger, Account #, get_canister_balance_2
-
-from core.logger import json_dumps, log
 # from core.db import init_db, create_user, get_user, get_all_users, create_organization, get_organization, get_all_organizations
 # from core.transaction import Transaction
 import api
-from stats.snapshot import take_snapshot, Snapshot
+from core.icrcledger import Account, ICRCLedger  # , get_canister_balance_2
+from core.logger import json_dumps, log
+from core.token_icrc1 import TokenICRC1
+from ggg.base import initialize, universe
+from kybra import (Async, CallResult, Func, Opt, Principal, Query, Record,
+                   Tuple, Variant, Vec, blob, heartbeat, ic, init, match, nat,
+                   nat16, nat64, query, update, void)
+from stats.snapshot import Snapshot, take_snapshot
 
 # Token Transfer Types
 
@@ -62,6 +40,7 @@ class TokenTransferError(Variant, total=False):
 class TokenTransferResponse(Variant, total=False):
     Ok: nat  # Transaction index
     Err: TokenTransferError
+
 
 # Token Manager Implementation
 
@@ -107,6 +86,7 @@ class Token(Record):
 
 # API functions
 
+
 @query
 def get_universe() -> str:
     return json_dumps(universe())
@@ -114,10 +94,10 @@ def get_universe() -> str:
 
 @update
 def destroy_universe() -> str:
-    # from core.db_storage import db 
+    # from core.db_storage import db
     # TODO: broken
     db.clear()  # TODO: not supported when running on ICP
-    return 'OK'
+    return "OK"
 
 
 @query
@@ -226,6 +206,7 @@ def run_code(source_code: str) -> str:
     # TODO: every object needs to have permissions and use ic.caller() for that...
     # log("source_code = %s" % source_code)
     from core.execution import run_code
+
     result = run_code(source_code)
     # log("result = %s" % result)
     return json_dumps(result)  # {"result": result})
@@ -244,6 +225,7 @@ def create_user(name: str) -> str:
 def heartbeat_() -> Async[void]:
     # runs hooks, refreshes balances/transactions and sends transactions
     from core.execution import execute_heartbeat
+
     execute_heartbeat()
 
     # TODO:
@@ -254,6 +236,7 @@ def heartbeat_() -> Async[void]:
     #         ic.print("%s: total_supply changed from %s to %s" % (token.symbol, token.total_supply, total_supply))
     #         token.total_supply = total_supply
     #         token.save()
+
 
 @init
 def init_() -> void:
@@ -278,14 +261,16 @@ def http_request(req: HttpRequest) -> HttpResponse:
                 "headers": [],
                 "body": bytes(json_dumps({"error": "Token not found"}), "ascii"),
                 "streaming_strategy": None,
-                "upgrade": False
+                "upgrade": False,
             }
         return http_request_core(data)
-    return {"status_code": 404,
-            "headers": [],
-            "body": bytes("Not found", "ascii"),
-            "streaming_strategy": None,
-            "upgrade": False}
+    return {
+        "status_code": 404,
+        "headers": [],
+        "body": bytes("Not found", "ascii"),
+        "streaming_strategy": None,
+        "upgrade": False,
+    }
 
 
 def http_request_core(data):
@@ -325,6 +310,7 @@ def caller() -> Principal:
 
 
 # Token Management Endpoints
+
 
 @query
 def get_canister_balance() -> Async[nat]:

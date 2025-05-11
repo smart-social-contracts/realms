@@ -1,10 +1,9 @@
-from kybra_simple_db import *
 from core.db import Entity
-from core.execution import run_code, contains_function
 from core.entity import GGGEntity
+from core.execution import contains_function, run_code
+from kybra_simple_db import *
 
-DEFAULT_EXTENSION_CODE_ORGANIZATION = \
-    """
+DEFAULT_EXTENSION_CODE_ORGANIZATION = """
 def heartbeat_hook():
     pass  #print('heartbeat 0')
 
@@ -25,8 +24,7 @@ def create_proposal():
     return
 """.strip()
 
-DEFAULT_EXTENSION_CODE_TOKEN = \
-    """
+DEFAULT_EXTENSION_CODE_TOKEN = """
 def hook_mint(token, amount, address):
     return 'ok'
 
@@ -52,10 +50,10 @@ def hook_transfer(token, from_address, to_address, amount):
 
 class ExtensionCode(GGGEntity):
     source_code = String(max_length=10000)  # Add a property for source_code
-    programmable_entity = OneToMany(['Token', 'Organization'], 'extension_code')
+    programmable_entity = OneToMany(["Token", "Organization"], "extension_code")
 
     @classmethod
-    def new(cls, source_code: str, **kwargs) -> 'ExtensionCode':
+    def new(cls, source_code: str, **kwargs) -> "ExtensionCode":
         new_entity = cls(**kwargs)
         new_entity.source_code = source_code
         return new_entity
@@ -64,7 +62,10 @@ class ExtensionCode(GGGEntity):
         source_code = self.source_code
         if function_name:
             if not contains_function(source_code, function_name):
-                raise Exception('Function "%s" not found in source code:\n%s' % (function_name, source_code))
+                raise Exception(
+                    'Function "%s" not found in source code:\n%s'
+                    % (function_name, source_code)
+                )
             source_code = source_code + "\nresult = %s(%s)" % (
                 function_name,
                 function_signature,

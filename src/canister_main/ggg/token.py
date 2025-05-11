@@ -4,22 +4,21 @@ This module provides the Token class for managing digital assets, including
 minting, transfers, and metadata tracking.
 """
 
-from typing import Dict, List, Optional, Any, Union
+from typing import Any, Dict, List, Optional, Union
 
+import ggg
+from core.entity import GGGEntity
 from kybra_simple_db import *
 
 from .extension_code import DEFAULT_EXTENSION_CODE_TOKEN
 
-import ggg
-
-from core.entity import GGGEntity
 
 class Token(GGGEntity):
 
     # Define properties
     name = String()
-    extension_code = ManyToOne(['ExtensionCode'], 'programmable_entity')
-    token_core = OneToOne(['TokenInternal', 'TokenICRC1'], 'token_core')
+    extension_code = ManyToOne(["ExtensionCode"], "programmable_entity")
+    token_core = OneToOne(["TokenInternal", "TokenICRC1"], "token_core")
 
     # def __init__(self, symbol: str, name: Optional[str] = None):
     #     super().__init__("token")
@@ -29,15 +28,16 @@ class Token(GGGEntity):
     #     self.name = name
 
     @classmethod
-    def new(cls, symbol: str, token_core, name: Optional[str] = None) -> 'Token':
+    def new(cls, symbol: str, token_core, name: Optional[str] = None) -> "Token":
         entity = cls(_id=symbol, name=name)
         entity.token_core = token_core
         # Create a new ExtensionCode instance with the default code
-        entity.extension_code = ggg.ExtensionCode['DEFAULT_EXTENSION_CODE_TOKEN']
+        entity.extension_code = ggg.ExtensionCode["DEFAULT_EXTENSION_CODE_TOKEN"]
         return entity
 
-    def mint(self, address: str, amount: int,
-             metadata: Optional[Dict[str, Any]] = None) -> None:
+    def mint(
+        self, address: str, amount: int, metadata: Optional[Dict[str, Any]] = None
+    ) -> None:
         """Mint new tokens to a specified address.
 
         Args:
@@ -68,7 +68,12 @@ class Token(GGGEntity):
 
         self.save()
 
-    def transfer(self, from_address: str, to_address: str, amount: int, ) -> None:
+    def transfer(
+        self,
+        from_address: str,
+        to_address: str,
+        amount: int,
+    ) -> None:
         """Transfer tokens between addresses.
 
         Args:
@@ -97,7 +102,9 @@ class Token(GGGEntity):
 
             if transfer_count > 0:
                 transferred = self.metadata[from_address][:transfer_count]
-                self.metadata[from_address] = self.metadata[from_address][transfer_count:]
+                self.metadata[from_address] = self.metadata[from_address][
+                    transfer_count:
+                ]
                 self.metadata.setdefault(to_address, []).extend(transferred)
 
         self.save()

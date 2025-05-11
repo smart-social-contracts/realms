@@ -1,8 +1,10 @@
 import execution
 import ggg
 
+
 class RpcClient:
     pass
+
 
 class RpcServer:
     def process_instruction(instruction: dict) -> str:
@@ -47,8 +49,10 @@ class RpcServer:
                 method = getattr(user, method_name, None)
                 if method is None or not callable(method):
                     return f"Method '{method_name}' not found on User."
-                
-                modifies_state = method_name in ["update_email"]  # Add all state-modifying methods here
+
+                modifies_state = method_name in [
+                    "update_email"
+                ]  # Add all state-modifying methods here
 
                 # Call the method
                 result = method(*args)
@@ -56,7 +60,7 @@ class RpcServer:
                 # If the method modifies the object, re-save it
                 if modifies_state:
                     users_store.insert(user.id, user)
-                
+
                 return f"Method '{method_name}' executed successfully. Result: {result}"
             except Exception as e:
                 return f"Error invoking method '{method_name}': {str(e)}"
@@ -73,6 +77,3 @@ class RpcServer:
             return f"User {user_id} deleted successfully."
 
         return "Invalid instruction."
-
-
-

@@ -1,6 +1,8 @@
+from typing import Optional
+
 from ggg.token import Token
 from ggg.world import Land
-from typing import Optional
+
 
 class LandToken(Token):
     UNIT_OF_LAND = 1  # Define the fixed surface area represented by 1 token
@@ -11,7 +13,7 @@ class LandToken(Token):
         Create a new LandToken instance with default values for symbol and name.
         """
         obj = super().new(symbol=symbol, name=name)
-        obj.__dict__['type'] = 'LandToken'  # Set the correct type
+        obj.__dict__["type"] = "LandToken"  # Set the correct type
         obj.add_relation("land", "token", land)
         obj = obj.save()  # Save after setting type
         return obj
@@ -29,19 +31,25 @@ class LandToken(Token):
         tokens_to_mint = surface_area / self.UNIT_OF_LAND
 
         if tokens_to_mint <= 0 or not tokens_to_mint.is_integer():
-            raise ValueError("Surface area must map to a positive, whole number of tokens.")
+            raise ValueError(
+                "Surface area must map to a positive, whole number of tokens."
+            )
 
         # Use the base class's mint method
         super().mint(
             address=address,
             amount=int(tokens_to_mint),
-            metadata={**metadata, "surface_area": surface_area} if metadata else {"surface_area": surface_area},
+            metadata=(
+                {**metadata, "surface_area": surface_area}
+                if metadata
+                else {"surface_area": surface_area}
+            ),
         )
 
     def to_dict(self):
         """Override to_dict to ensure type field is preserved"""
         ret = super().to_dict()
-        ret['type'] = 'LandToken'
+        ret["type"] = "LandToken"
         return ret
 
     @property

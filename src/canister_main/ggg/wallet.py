@@ -6,8 +6,8 @@ and ownership across multiple tokens.
 
 from typing import Dict, List, Optional
 
-from kybra_simple_db import *
 from core.entity import GGGEntity
+from kybra_simple_db import *
 
 from .token import Token
 
@@ -15,23 +15,23 @@ from .token import Token
 class Wallet(GGGEntity):
     # Define properties
     controller = OneToOne(["User", "Organization"], "wallet")
-    addresses = OneToMany(['Address'], 'wallet')
+    addresses = OneToMany(["Address"], "wallet")
 
     # TODO
     # @classmethod
     # def new(cls, owner: Ur)
 
     def create_address(self, token: Token) -> str:
-        #new_address = token.create_address(self)
-        new_address = 'TODO'
+        # new_address = token.create_address(self)
+        new_address = "TODO"
         return new_address
 
     def get_address(self, token: Token) -> str:
-        #address = token.get_address(self)
-        address = 'TODO'
+        # address = token.get_address(self)
+        address = "TODO"
         return address
 
     def get_addresses(self, token: Token) -> List[str]:
-        #addresses = token.get_addresses(self)
-        addresses = ['TODO']
+        # addresses = token.get_addresses(self)
+        addresses = ["TODO"]
         return addresses

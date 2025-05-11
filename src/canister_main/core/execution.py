@@ -1,9 +1,8 @@
-import traceback
 import ast
 import os
+import traceback
 
-
-'''
+"""
 Any user: calling `run_code`
 Any organization: when a hook is triggered, such as:
     proposal is approved
@@ -11,12 +10,13 @@ Any organization: when a hook is triggered, such as:
     when a token operation happens and the token hooks inform the organization hook
 Any token:
     Root: during initialization
-'''
+"""
 
 
-
-ROOT_USER_NAME = 'root' # TODO: by default, and for security reasons, this should be set to None or something with no authority
-caller_id: str = None  # TODO: figure out what to do when None... it should never be... probably the best is to use the canister address, which is a DAO by itself
+ROOT_USER_NAME = "root"  # TODO: by default, and for security reasons, this should be set to None or something with no authority
+caller_id: str = (
+    None  # TODO: figure out what to do when None... it should never be... probably the best is to use the canister address, which is a DAO by itself
+)
 
 
 def _set_caller(name: str):
@@ -27,6 +27,7 @@ def _set_caller(name: str):
 def caller() -> str:
     try:
         from kybra import ic
+
         _set_caller(str(ic.caller()))
     except:
         _set_caller(str(os.environ.get("IC_CALLER", ROOT_USER_NAME)))
@@ -36,12 +37,12 @@ def caller() -> str:
 def run_code(source_code: str, locals={}):
     # from ggg.world import World
     # from ggg.state import State
+    from core.system_time import DAY, get_system_time, timestamp_to_date
     from ggg.organization import Organization
-    from ggg.wallet import Wallet
     from ggg.proposal import Proposal
     from ggg.token import Token
     from ggg.user import User
-    from core.system_time import get_system_time, timestamp_to_date, DAY
+    from ggg.wallet import Wallet
     # from ggg.base import set_caller
     from stats.snapshot import take_snapshot
 
@@ -68,12 +69,7 @@ def run_code(source_code: str, locals={}):
     import ggg
     import stats
 
-    safe_globals.update(
-        {
-            "ggg": ggg,
-            "stats": stats
-        }
-    )
+    safe_globals.update({"ggg": ggg, "stats": stats})
     safe_locals = {}
     # safe_locals = {
     #     "class_model": sys.modules[__name__]
@@ -111,17 +107,20 @@ def execute_heartbeat():
     try:
         # Get all organizations using instances method
         from ggg import Organization
+
         organizations = Organization.instances()
-        
+
         # Execute heartbeat hook for each organization that has an extension
         for org in organizations:
             if org.extension:
                 try:
                     # Run the heartbeat_hook function from the extension code
-                    org.extension.run('heartbeat_hook')
+                    org.extension.run("heartbeat_hook")
                 except Exception as e:
-                    print(f"Error executing heartbeat_hook for organization {org.id}: {str(e)}")
-        
+                    print(
+                        f"Error executing heartbeat_hook for organization {org.id}: {str(e)}"
+                    )
+
         return True
     except Exception as e:
         print(f"Error in heartbeat execution: {str(e)}")

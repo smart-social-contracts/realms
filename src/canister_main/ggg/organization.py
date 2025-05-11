@@ -4,19 +4,19 @@ This module provides the Organization class for managing decentralized
 organizations with support for proposals, tokens, and extensions.
 """
 
-from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Union
 
-from kybra_simple_db import *
+from core.access_control import requires_owner
 from core.execution import contains_function, run_code
 from core.system_time import get_system_time
 from core.token_factory import token_factory
-from core.access_control import requires_owner
+from kybra_simple_db import *
 
-from .proposal import Proposal
-from .wallet import Wallet
 from .extension_code import ExtensionCode
+from .proposal import Proposal
 from .token import Token
+from .wallet import Wallet
 
 
 class Organization(Entity, TimestampedMixin):
@@ -29,8 +29,8 @@ class Organization(Entity, TimestampedMixin):
     name = String(min_length=3, max_length=256)
     description = String(max_length=256)
     # token = ManyToOne(['Token'], 'holder')
-    extension_code = ManyToOne(['ExtensionCode'], 'programmable_entity')
-    wallet = OneToOne(['Wallet'], 'controller')
+    extension_code = ManyToOne(["ExtensionCode"], "programmable_entity")
+    wallet = OneToOne(["Wallet"], "controller")
     proposals = OneToMany("Proposal", "organization")
 
     # def __init__(self, name: Optional[str] = None, description: Optional[str] = None):
@@ -51,7 +51,7 @@ class Organization(Entity, TimestampedMixin):
     #     self.proposals = []
 
     @classmethod
-    def new(cls, name: str, description: Optional[str] = "") -> 'Organization':
+    def new(cls, name: str, description: Optional[str] = "") -> "Organization":
         entity = cls(name=name, description=description)
 
         # Create and associate wallet
@@ -59,19 +59,23 @@ class Organization(Entity, TimestampedMixin):
         entity.wallet = wallet
 
         # Create and associate organization token
-        token = token_factory(f"organization_{entity._id}" , "TokenInternal")
+        token = token_factory(f"organization_{entity._id}", "TokenInternal")
 
         wallet.create_address(token)
         # entity.token.owner = wallet.address(entity.token)
 
         # Set default extension code
-        entity.extension_code = ExtensionCode['DEFAULT_EXTENSION_CODE_ORGANIZATION']
+        entity.extension_code = ExtensionCode["DEFAULT_EXTENSION_CODE_ORGANIZATION"]
         # entity.add_relation("extension_code", "organizations", extension_code)
 
         return entity
 
-    def run(self, function_name: str, function_signature: str = "",
-            locals: Dict[str, Any] = {}) -> Any:
+    def run(
+        self,
+        function_name: str,
+        function_signature: str = "",
+        locals: Dict[str, Any] = {},
+    ) -> Any:
         """Run a function from the organization's extension code.
 
         Args:
@@ -86,25 +90,25 @@ class Organization(Entity, TimestampedMixin):
         # print('extension_codes', extension_codes)
         # extension_code = ExtensionCode.get_extension(function_name, extension_codes[::-1])
 
-        print('function_name', function_name)
-        print('function_signature', function_signature)
-        print('locals', locals)
+        print("function_name", function_name)
+        print("function_signature", function_signature)
+        print("locals", locals)
         return self.extension_code.run(function_name, function_signature, locals)
 
     @requires_owner()
-    def add_member(self, member: Union['Organization', 'User']) -> None:
+    def add_member(self, member: Union["Organization", "User"]) -> None:
         """Add a member to this organization.
 
         Args:
             member: Organization or User to add as a member
-            
+
         Raises:
             Exception: If caller is not the owner
         """
         hook_result = self.run(
             "hook_join",
             "organization=organization,joiner=joiner",
-            locals={"organization": self, "joiner": member}
+            locals={"organization": self, "joiner": member},
         )
 
         # TODO: implement
@@ -115,7 +119,7 @@ class Organization(Entity, TimestampedMixin):
         #     member_address = member.wallet.get_address(token)
         #     token.mint(member_address, 1)
 
-    def has_member(self, member: Union['Organization', 'User']) -> bool:
+    def has_member(self, member: Union["Organization", "User"]) -> bool:
         """Check if an organization or user is a member of this organization.
 
         Args:
@@ -136,7 +140,9 @@ class Organization(Entity, TimestampedMixin):
     def extension(self) -> Optional[ExtensionCode]:
         """Get the organization's current extension code."""
         extension_codes = self.get_relations(ExtensionCode, "extension_code")
-        return extension_codes[-1] if extension_codes else None  # TODO: IMPORTANT! resolve this... remove_relation needed?
+        return (
+            extension_codes[-1] if extension_codes else None
+        )  # TODO: IMPORTANT! resolve this... remove_relation needed?
 
     @requires_owner()
     @extension.setter
@@ -145,16 +151,15 @@ class Organization(Entity, TimestampedMixin):
 
         Args:
             source_code: Source code for the new extension
-            
+
         Raises:
             Exception: If caller is not the owner
         """
-        print('extension.setter')
-        print('source_code', source_code, '.')
+        print("extension.setter")
+        print("source_code", source_code, ".")
         extension_code = ExtensionCode.new(source_code)
         self.add_relation("extension_code", "organizations", extension_code)
-        print('self.relations', self.relations)
-
+        print("self.relations", self.relations)
 
     def check_proposals(self) -> List[Proposal]:
         """Check and update status of all pending proposals."""
@@ -170,7 +175,9 @@ class Organization(Entity, TimestampedMixin):
 
                 if yay_votes > nay_votes:
                     proposal.status = Proposal.APPROVED
-                    extension_code = proposal.get_relations(ExtensionCode, "extension_code")[0]
+                    extension_code = proposal.get_relations(
+                        ExtensionCode, "extension_code"
+                    )[0]
                     proposal.result = extension_code.run(locals={"organization": self})
                 else:
                     proposal.status = Proposal.REJECTED
@@ -178,7 +185,7 @@ class Organization(Entity, TimestampedMixin):
         return proposals_processed
 
     @requires_owner()
-    def spinoff(self, id: str) -> 'Organization':
+    def spinoff(self, id: str) -> "Organization":
         """Create a new organization as a spinoff.
 
         Args:
@@ -186,7 +193,7 @@ class Organization(Entity, TimestampedMixin):
 
         Returns:
             Organization: The newly created spinoff organization
-            
+
         Raises:
             Exception: If caller is not the owner
         """
@@ -195,12 +202,12 @@ class Organization(Entity, TimestampedMixin):
         return new_org
 
     @requires_owner()
-    def merge(self, target: 'Organization') -> None:
+    def merge(self, target: "Organization") -> None:
         """Merge this organization into a target organization.
 
         Args:
             target: Organization to merge into
-            
+
         Raises:
             Exception: If caller is not the owner
         """
@@ -216,4 +223,3 @@ class Organization(Entity, TimestampedMixin):
 
             if balance > 0:
                 self.token.transfer(source_address, target_address, balance)
-

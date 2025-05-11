@@ -1,27 +1,9 @@
-
 from typing import Optional
 
+from kybra import (Async, CallResult, Opt, Principal, Record, Service, Variant,
+                   blob, ic, match, nat, nat64, null, query, service_query,
+                   service_update, update)
 from kybra_simple_db import *
-
-from kybra import (
-    Async,
-    CallResult,
-    match,
-    Opt,
-    Principal,
-    Record,
-    Service,
-    service_query,
-    service_update,
-    Variant,
-    nat,
-    nat64,
-    update,
-    query,
-    blob,
-    null,
-    ic,
-)
 
 
 class Account(Record):
@@ -77,13 +59,10 @@ class TransferResult(Variant, total=False):
 
 class ICRCLedger(Service):
     @service_query
-    def icrc1_balance_of(self, account: Account) -> nat:
-        ...
+    def icrc1_balance_of(self, account: Account) -> nat: ...
 
     @service_query
-    def icrc1_fee(self) -> nat:
-        ...
+    def icrc1_fee(self) -> nat: ...
 
     @service_update
-    def icrc1_transfer(self, args: TransferArg) -> TransferResult:
-        ...
+    def icrc1_transfer(self, args: TransferArg) -> TransferResult: ...

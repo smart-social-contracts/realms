@@ -1,30 +1,30 @@
 # Time utilities
+from core.system_time import (DAY, get_system_time, set_system_time,
+                              timestamp_to_date)
 from stats.snapshot import take_snapshot
-from core.system_time import get_system_time, timestamp_to_date, DAY, set_system_time
 
 # Create the main state organization
-state = ggg.Organization.new('state')
-government = ggg.Organization.new('Government')
-tax_department = ggg.Organization.new('Tax Department')
+state = ggg.Organization.new("state")
+government = ggg.Organization.new("Government")
+tax_department = ggg.Organization.new("Tax Department")
 
 # Link the organizations
 state.add_member(government)
 government.add_member(tax_department)
 
 # Create users and assign identities
-alice = ggg.User.new('alice_identity')
-bob = ggg.User.new('bob_identity')
+alice = ggg.User.new("alice_identity")
+bob = ggg.User.new("bob_identity")
 
 # Join users to the state
 state.add_member(alice)
 state.add_member(bob)
 
 # Mint BTC tokens to the state wallet and transfer to users
-ck_btc = ggg.Token['ckBTC']
+ck_btc = ggg.Token["ckBTC"]
 # ck_btc.mint(state.wallet.get_address(ck_btc), 10000)
 # ck_btc.transfer(state.wallet.get_address(ck_btc), alice.wallet.get_address(ck_btc), 100)
 # ck_btc.transfer(state.wallet.get_address(ck_btc), bob.wallet.get_address(ck_btc), 100)
-
 
 
 # # Create a new proposal with code
@@ -98,7 +98,7 @@ ck_btc = ggg.Token['ckBTC']
 # try:
 #     ck_btc.set_owner(alice)
 # except Exception as e:
-#     pass # TODO: need to figure out a way to pass the exception down to the result    
+#     pass # TODO: need to figure out a way to pass the exception down to the result
 
 # # Capture the current system time
 # t = get_system_time()
@@ -107,4 +107,4 @@ ck_btc = ggg.Token['ckBTC']
 # for i in range(10):
 #     take_snapshot(timestamp_to_date(t - i * DAY))
 
-result = 'OK'
+result = "OK"

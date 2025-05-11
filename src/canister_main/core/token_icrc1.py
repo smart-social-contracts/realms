@@ -1,22 +1,23 @@
+from typing import Optional
+
+from kybra_simple_db import *
 
 from .icrcledger import ICRCLedger
-from kybra_simple_db import *
-from typing import Optional
+
 
 class TokenICRC1(Entity, TimestampedMixin):
 
-    token_type = String(default='TokenICRC1')
-    token_core = OneToOne(['Token'], 'token')
+    token_type = String(default="TokenICRC1")
+    token_core = OneToOne(["Token"], "token")
     principal = String()
-    total_supply = String(default='0')
+    total_supply = String(default="0")
 
     @classmethod
     def new(cls, symbol: str, principal: str, name: Optional[str] = None):
         if not principal:
             raise ValueError("Principal is required for ICRC1 tokens")
 
-        return TokenICRC1(id = symbol, name = name, principal = principal)
-
+        return TokenICRC1(id=symbol, name=name, principal=principal)
 
     def get_fee(self) -> int:
         """Get the actual transfer fee from the ledger.
@@ -32,7 +33,9 @@ class TokenICRC1(Entity, TimestampedMixin):
             ic.print(f"Error getting fee: {e}")
             return 0
 
-    def transfer(self, from_address: str, to_address: str, amount: int, fee: Optional[int] = None) -> None:
+    def transfer(
+        self, from_address: str, to_address: str, amount: int, fee: Optional[int] = None
+    ) -> None:
         """Transfer tokens between addresses following ICRC1 behavior.
 
         Args:
@@ -59,7 +62,6 @@ class TokenICRC1(Entity, TimestampedMixin):
         self.balances[from_address] = sender_balance - amount - actual_fee
         self.balances[to_address] = self.balances.get(to_address, 0) + amount
         self.save()
-
 
     def get_total_supply(self) -> int:
         """Get the total supply of tokens across all addresses.
@@ -99,13 +101,13 @@ class TokenICRC1(Entity, TimestampedMixin):
             max_attempts = 1000000
             attempts = 0
 
-            last_value = ''
+            last_value = ""
             while attempts < max_attempts:
                 try:
                     if attempts % 100 == 0:
                         # ic.print('[%d] balance_call: %s' % (attempts, balance_call))
                         new_value = str(balance_call)
-                        if hasattr(balance_call, 'notify'):
+                        if hasattr(balance_call, "notify"):
                             # ic.print("Getting balance using notify()")
                             new_value += str(balance_call.notify())
                         if str(new_value) != last_value:
@@ -118,7 +120,9 @@ class TokenICRC1(Entity, TimestampedMixin):
                     #         "Err": lambda err: 0  # Return 0 balance on error
                     #     })
                 except Exception as e:
-                    ic.print(f"Waiting for balance (attempt {attempts + 1}/{max_attempts}): {e}")
+                    ic.print(
+                        f"Waiting for balance (attempt {attempts + 1}/{max_attempts}): {e}"
+                    )
                 attempts += 1
 
             ic.print("Max attempts reached waiting for balance")

@@ -1,8 +1,11 @@
-from kybra_simple_db import *
-from ggg.extension_code import ExtensionCode
 from core.entity import GGGEntity
+from ggg.extension_code import ExtensionCode
+from kybra_simple_db import *
+
+
 class Proposal(GGGEntity):
     """Represents a proposal for organizational governance."""
+
     _entity_type = "proposal"
 
     NOT_SUBMITTED = "Not Submitted"
@@ -28,13 +31,12 @@ class Proposal(GGGEntity):
     #     self.extension_code = ExtensionCode.new(source_code)
 
     @classmethod
-    def new(cls, title: str, source_code: str, deadline: int, **kwargs) -> 'Proposal':
+    def new(cls, title: str, source_code: str, deadline: int, **kwargs) -> "Proposal":
         entity = cls(**kwargs)
         entity.title = title
         entity.extension_code = ExtensionCode.new(source_code)
         entity.deadline = deadline
         return entity
-
 
     def submit(self, organization):
         """Submit the proposal to an organization.
@@ -53,14 +55,22 @@ class Proposal(GGGEntity):
     def vote(self, address, vote_sign):
         # TODO: use caller() too instead of just address
         if address not in self.token_balances.keys():
-            raise Exception("Address %s is not eligible to participate in this voting because balance of token %s is zero" % (address, self.token_id))
+            raise Exception(
+                "Address %s is not eligible to participate in this voting because balance of token %s is zero"
+                % (address, self.token_id)
+            )
 
         if vote_sign not in [self.VOTING_YAY, self.VOTING_ABSTAIN, self.VOTING_ABSTAIN]:
             raise Exception("Unknown vote sign")
 
         if address in self.votes:
             previous_vote_sign = self.votes[address]
-            self.vote_counts[previous_vote_sign] = self.vote_counts.get(previous_vote_sign, 0) - self.token_balances[address]
+            self.vote_counts[previous_vote_sign] = (
+                self.vote_counts.get(previous_vote_sign, 0)
+                - self.token_balances[address]
+            )
         self.votes[address] = vote_sign
-        self.vote_counts[vote_sign] = self.vote_counts.get(vote_sign, 0) + self.token_balances[address]
+        self.vote_counts[vote_sign] = (
+            self.vote_counts.get(vote_sign, 0) + self.token_balances[address]
+        )
         self.save()
