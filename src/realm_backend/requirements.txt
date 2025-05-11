@@ -1,3 +1,0 @@
-kybra
-kybra_simple_db
-kybra_simple_logging
