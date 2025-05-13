@@ -1,12 +1,17 @@
+import json
 import traceback
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
-import api
-from ggg.base import initialize, universe
+from api.status import get_status
+from core.candid_types_realm import Status
 from kybra import (Async, CallResult, Func, Opt, Principal, Query, Record,
                    Tuple, Variant, Vec, blob, heartbeat, ic, init, match, nat,
                    nat16, nat64, query, update, void)
+from kybra_simple_logging import get_logger
+
+# Initialize logger
+logger = get_logger("canister_main")
 
 
 class HttpRequest(Record):
@@ -32,7 +37,7 @@ class StreamingStrategy(Variant):
 
 
 class CallbackStrategy(Record):
-    callback: "Callback"
+    callback: "Callback"  # type: ignore
     token: "Token"
 
 
@@ -48,43 +53,31 @@ class Token(Record):
     key: str
 
 
+@query
+def status() -> Status:
+    """
+    Get the current status of the realm canister
+
+    Returns:
+        Status: Current status information including version, online status, and entity counts
+    """
+    logger.info("Status query executed")
+    return Status(**get_status())
 
 
 @init
 def init_() -> void:
+    """Initialize the canister with a default realm"""
+    # Initialize the API with a default realm name
+    # In production, this would be configured via parameters
+    # logger.info("Initializing realm canister")
+    # api.initialize("DefaultRealm", str(ic.caller()))
     pass
-
-@query
-def http_request(req: HttpRequest) -> HttpResponse:
-    url = req["url"]
-    if url == "/api/v1/get_universe":
-        return http_request_core(universe())
-    elif url == "/api/v1/tokens":
-        return http_request_core(get_token_list())
-    elif url.startswith("/api/v1/tokens/"):
-        token_id = url.split("/")[-1]
-        data = get_token_data(token_id)
-        if data is None:
-            return {
-                "status_code": 404,
-                "headers": [],
-                "body": bytes(json_dumps({"error": "Token not found"}), "ascii"),
-                "streaming_strategy": None,
-                "upgrade": False,
-            }
-        return http_request_core(data)
-    return {
-        "status_code": 404,
-        "headers": [],
-        "body": bytes("Not found", "ascii"),
-        "streaming_strategy": None,
-        "upgrade": False,
-    }
 
 
 def http_request_core(data):
     try:
-        d = json_dumps(data)
+        d = json.dumps(data)
         return {
             "status_code": 200,
             "headers": [],
@@ -92,7 +85,7 @@ def http_request_core(data):
             "streaming_strategy": None,
             "upgrade": False,
         }
-    except Exception as e:
+    except Exception:
         return {
             "status_code": 500,
             "headers": [],
@@ -101,3 +94,26 @@ def http_request_core(data):
             "upgrade": False,
         }
 
+
+@query
+def http_request(req: HttpRequest) -> HttpResponse:
+    """Handle HTTP requests to the canister"""
+    method = req["method"]
+    url = req["url"]
+
+    logger.info(f"HTTP {method} request to {url}")
+
+    if method == "GET":
+        # Status endpoint
+        if url == "/api/v1/status":
+            return http_request_core(get_status())
+        # Other endpoints can be added here
+
+    # Not found
+    return HttpResponse(
+        status_code=404,
+        headers=[],
+        body=bytes("Not found", "ascii"),
+        streaming_strategy=None,
+        upgrade=False,
+    )
