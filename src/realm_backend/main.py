@@ -3,9 +3,10 @@ import traceback
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-import core.candid_types_realm as candid
 from api.status import get_status
 from api.user import user_get, user_register
+from core.candid_types_realm import (Response, ResponseData, StatusRecord,
+                                     UserGetRecord, UserRegisterRecord)
 from kybra import (Async, CallResult, Func, Opt, Principal, Query, Record,
                    StableBTreeMap, Tuple, Variant, Vec, blob, heartbeat, ic,
                    init, match, nat, nat16, nat64, query, update, void)
@@ -15,7 +16,7 @@ from kybra_simple_logging import get_logger
 storage = StableBTreeMap[str, str](
     memory_id=1, max_key_size=100000, max_value_size=1000
 )
-Database.init(db_storage=storage)
+Database.init(db_storage=storage, audit_enabled=True)
 
 logger = get_logger("main")
 
@@ -60,52 +61,99 @@ class Token(Record):
 
 
 @query
-def status() -> candid.Response:
-    """
-    Get the current status of the realm canister
-
-    Returns:
-        Status: Current status information including version, online status, and entity counts
-    """
-    logger.info("Status query executed")
-    return candid.Response(success=True, data=candid.StatusRecord(**get_status()))
+def status() -> Response:
+    try:
+        logger.info("Status query executed")
+        return Response(
+            success=True, data=ResponseData(Status=StatusRecord(**get_status()))
+        )
+    except Exception as e:
+        logger.error(f"Error getting status: {str(e)}\n{traceback.format_exc()}")
+        return Response(success=False, data=ResponseData(Error=str(e)))
 
 
 @update
-def register_user(principal: Principal) -> candid.Response:
-    return candid.Response(
-        success=True, data=candid.UserRegisterRecord(**user_register(principal))
-    )
+def register_user(principal: Principal) -> Response:
+    try:
+        return Response(
+            success=True,
+            data=ResponseData(
+                UserRegister=UserRegisterRecord(
+                    principal=Principal.from_str(user_register(principal)["principal"])
+                )
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error registering user: {str(e)}\n{traceback.format_exc()}")
+        return Response(success=False, data=ResponseData(Error=str(e)))
 
 
 @query
-def get_user(principal: Principal) -> candid.Response:
-    return candid.Response(
-        success=True, data=candid.UserRegisterRecord(**user_get(principal))
-    )
+def get_user(principal: Principal) -> Response:
+    try:
+        user_data = user_get(principal)
+        return Response(
+            success=True,
+            data=ResponseData(
+                UserGet=UserGetRecord(
+                    principal=Principal.from_str(user_data["principal"])
+                )
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error getting user: {str(e)}\n{traceback.format_exc()}")
+        return Response(success=False, data=ResponseData(Error=str(e)))
 
 
 @init
 def init_() -> void:
-    """Initialize the canister with a default realm"""
-    # Initialize the API with a default realm name
-    # In production, this would be configured via parameters
-    # logger.info("Initializing realm canister")
-    # api.initialize("DefaultRealm", str(ic.caller()))
-    pass
+    logger.info("Realm canister initialized")
 
 
 def http_request_core(data):
+    d = json.dumps(data)
+    return {
+        "status_code": 200,
+        "headers": [],
+        "body": bytes(d + "\n", "ascii"),
+        "streaming_strategy": None,
+        "upgrade": False,
+    }
+
+
+@query
+def http_request(req: HttpRequest) -> HttpResponse:
+    """Handle HTTP requests to the canister. Only for unauthenticated read operations."""
+
     try:
-        d = json.dumps(data)
-        return {
-            "status_code": 200,
-            "headers": [],
-            "body": bytes(d + "\n", "ascii"),
-            "streaming_strategy": None,
-            "upgrade": False,
-        }
-    except Exception:
+        method = req["method"]
+        url = req["url"]
+
+        logger.info(f"HTTP {method} request to {url}")
+
+        not_found = HttpResponse(
+            status_code=404,
+            headers=[],
+            body=bytes("Not found", "ascii"),
+            streaming_strategy=None,
+            upgrade=False,
+        )
+
+        if method == "GET":
+            url_path = url.split("/")
+
+            if url_path[0] != "api":
+                return not_found
+
+            if url_path[1] != "v1":
+                return not_found
+
+            if url_path[2] == "status":
+                return http_request_core(get_status())
+
+        return not_found
+    except Exception as e:
+        logger.error(f"Error handling HTTP request: {str(e)}\n{traceback.format_exc()}")
         return {
             "status_code": 500,
             "headers": [],
@@ -113,35 +161,3 @@ def http_request_core(data):
             "streaming_strategy": None,
             "upgrade": False,
         }
-
-
-@query
-def http_request(req: HttpRequest) -> HttpResponse:
-    """Handle HTTP requests to the canister. Only for unauthenticated read operations."""
-
-    method = req["method"]
-    url = req["url"]
-
-    logger.info(f"HTTP {method} request to {url}")
-
-    not_found = HttpResponse(
-        status_code=404,
-        headers=[],
-        body=bytes("Not found", "ascii"),
-        streaming_strategy=None,
-        upgrade=False,
-    )
-
-    if method == "GET":
-        url_path = url.split("/")
-
-        if url_path[0] != "api":
-            return not_found
-
-        if url_path[1] != "v1":
-            return not_found
-
-        if url_path[2] == "status":
-            return http_request_core(get_status())
-
-    return not_found

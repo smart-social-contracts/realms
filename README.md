@@ -88,6 +88,25 @@ Access control is managed through a permission system:
 - Cross-realm token transfers
 
 
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/smart-social-contracts/realms.git
+cd realms
+
+# Recommended setup
+pyenv install 3.10.7
+pyenv local 3.10.7
+python -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt -r requirements-dev.txt
+
+# Running tests
+./run_linters.sh --fix && ./run_test.sh
+```
 
 
 ## Community

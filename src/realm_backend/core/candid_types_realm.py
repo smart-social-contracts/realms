@@ -1,4 +1,4 @@
-from kybra import Opt, Principal, Record, Variant, Vec, blob, nat, nat64, text
+from kybra import Principal, Record, Variant, nat, text
 
 
 class StatusRecord(Record):
@@ -12,9 +12,14 @@ class UserRegisterRecord(Variant):
     principal: Principal
 
 
+class UserGetRecord(Variant):
+    principal: Principal
+
+
 class ResponseData(Variant):
     Status: StatusRecord
     UserRegister: UserRegisterRecord
+    UserGet: UserGetRecord
     Error: text
     Message: text
 
