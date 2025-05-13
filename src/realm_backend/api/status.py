@@ -4,10 +4,8 @@ Status API for Realm DAO system
 Provides health check and system status information
 """
 
-from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 
-from core.candid_types_realm import Status
 from ggg.organization import Organization
 from ggg.user import User
 from kybra_simple_logging import get_logger
