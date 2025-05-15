@@ -7,5 +7,5 @@ logger = get_logger("entity.realm")
 class Realm(Entity, TimestampedMixin):
     name = String(min_length=2, max_length=256)
     description = String(min_length=2, max_length=256)
-
     vault_principal_id = String(max_length=64)
+    balance = Integer()

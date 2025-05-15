@@ -24,17 +24,8 @@ def get_status() -> dict[str, Any]:
     logger.info("Status check requested")
 
     # Get entity counts from the database
-    try:
-        users_count = len(User.instances())
-    except Exception as e:
-        logger.error(f"Error counting users: {str(e)}")
-        users_count = 0
-
-    try:
-        organizations_count = len(Organization.instances())
-    except Exception as e:
-        logger.error(f"Error counting organizations: {str(e)}")
-        organizations_count = 0
+    users_count = len(User.instances())
+    organizations_count = len(Organization.instances())
 
     # Return data in the format expected by the Status Candid type
     return {
