@@ -13,35 +13,35 @@ def deploy_ledger():
     
     # Run command directly with properly escaped arguments
     run_command("""dfx deploy --no-wallet ckbtc_ledger --argument='(variant { 
-      Init = record { 
-        minting_account = record { 
-          owner = principal "aaaaa-aa"; 
-          subaccount = null 
-        }; 
-        transfer_fee = 10; 
-        token_symbol = "ckBTC"; 
-        token_name = "ckBTC Test"; 
-        decimals = opt 8; 
-        metadata = vec {}; 
-        initial_balances = vec { 
-          record { 
-            record { 
-              owner = principal "ah6ac-cc73l-bb2zc-ni7bh-jov4q-roeyj-6k2ob-mkg5j-pequi-vuaa6-2ae"; 
-              subaccount = null 
-            }; 
-            1000000000 
-          } 
-        }; 
-        feature_flags = opt record { 
-          icrc2 = true 
-        }; 
-        archive_options = record { 
-          num_blocks_to_archive = 1000; 
-          trigger_threshold = 2000; 
-          controller_id = principal "ah6ac-cc73l-bb2zc-ni7bh-jov4q-roeyj-6k2ob-mkg5j-pequi-vuaa6-2ae" 
-        } 
-      } 
-    })'""")
+Init = record { 
+  minting_account = record { 
+    owner = principal "aaaaa-aa"; 
+    subaccount = null 
+  }; 
+  transfer_fee = 10; 
+  token_symbol = "ckBTC"; 
+  token_name = "ckBTC Test"; 
+  decimals = opt 8; 
+  metadata = vec {}; 
+  initial_balances = vec { 
+    record { 
+      record { 
+        owner = principal "ah6ac-cc73l-bb2zc-ni7bh-jov4q-roeyj-6k2ob-mkg5j-pequi-vuaa6-2ae"; 
+        subaccount = null 
+      }; 
+      1000000000 
+    } 
+  }; 
+  feature_flags = opt record { 
+    icrc2 = true 
+  }; 
+  archive_options = record { 
+    num_blocks_to_archive = 1000; 
+    trigger_threshold = 2000; 
+    controller_id = principal "ah6ac-cc73l-bb2zc-ni7bh-jov4q-roeyj-6k2ob-mkg5j-pequi-vuaa6-2ae" 
+  } 
+} 
+})'""")
     
     # Get the canister ID
     ledger_id = get_canister_id("ckbtc_ledger")

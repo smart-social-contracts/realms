@@ -25,13 +25,13 @@ def get_status() -> dict[str, Any]:
 
     # Get entity counts from the database
     try:
-        users_count = len(User.query().all())
+        users_count = len(User.instances())
     except Exception as e:
         logger.error(f"Error counting users: {str(e)}")
         users_count = 0
 
     try:
-        organizations_count = len(Organization.query().all())
+        organizations_count = len(Organization.instances())
     except Exception as e:
         logger.error(f"Error counting organizations: {str(e)}")
         organizations_count = 0

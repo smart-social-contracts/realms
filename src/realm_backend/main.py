@@ -79,7 +79,7 @@ def register_user(principal: Principal) -> Response:
             success=True,
             data=ResponseData(
                 UserRegister=UserRegisterRecord(
-                    principal=Principal.from_str(user_register(principal)["principal"])
+                    principal=Principal.from_str(user_register(principal.to_str())["principal"])
                 )
             ),
         )
@@ -91,7 +91,7 @@ def register_user(principal: Principal) -> Response:
 @query
 def get_user(principal: Principal) -> Response:
     try:
-        user_data = user_get(principal)
+        user_data = user_get(principal.to_str())
         return Response(
             success=True,
             data=ResponseData(
