@@ -1,6 +1,4 @@
-from api import user, status
-
-
+from api import status, user
 
 if __name__ == "__main__":
     user.user_register("aaaaa-aa")

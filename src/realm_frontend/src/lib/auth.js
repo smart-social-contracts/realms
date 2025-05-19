@@ -3,7 +3,7 @@ import { AuthClient } from '@dfinity/auth-client';
 import { Principal } from '@dfinity/principal';
 
 // Flag to determine if we're in local development mode
-const isLocalDev = true; // Set to false when deploying to IC
+const isLocalDev = false; // Changed to false for IC deployment
 
 // Dummy data for local development
 const dummyPrincipals = [

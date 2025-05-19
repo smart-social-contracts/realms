@@ -1,10 +1,14 @@
 {
+  "dfx": "0.26.0",
   "canisters": {
     "realm_backend": {
       "type": "kybra",
       "main": "src/realm_backend/main.py"
     },
     "realm_frontend": {
+      "dependencies": [
+        "realm_backend"
+      ],
       "source": [
         "src/realm_frontend/dist"
       ],
@@ -14,23 +18,57 @@
     "vault": {
       "type": "custom",
       "wasm": ".wasm/vault.wasm",
-      "candid": ".wasm/vault.did"
+      "candid": ".wasm/vault.did",
+      "dependencies": ["ckbtc_ledger", "ckbtc_indexer"]
     },
     "ckbtc_ledger": {
       "type": "custom",
       "wasm": ".wasm/ledger.wasm",
-      "candid": ".wasm/ledger.did"
+      "candid": ".wasm/ledger.did",
+      "networks": {
+        "local": {}
+      },
+      "remote": {
+        "id": {
+          "staging": "mxzaz-hqaaa-aaaar-qaada-cai", 
+          "ic": "mxzaz-hqaaa-aaaar-qaada-cai"
+        }
+      }
     },
     "ckbtc_indexer": {
       "type": "custom",
       "wasm": ".wasm/indexer.wasm",
-      "candid": ".wasm/indexer.did"
+      "candid": ".wasm/indexer.did",
+      "dependencies": ["ckbtc_ledger"],
+      "networks": {
+        "local": {}
+      },
+      "remote": {
+        "id": {
+          "staging": "n5wcd-faaaa-aaaar-qaaea-cai",
+          "ic": "n5wcd-faaaa-aaaar-qaaea-cai"
+        }
+      }
     }
   },
   "defaults": { 
     "build": {
       "args": "",
       "packtool": ""
+    }
+  },
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:8000",
+      "type": "ephemeral"
+    },
+    "staging": {
+      "providers": ["https://icp0.io"],
+      "type": "persistent"
+    },
+    "ic": {
+      "providers": ["https://icp0.io"],
+      "type": "persistent"
     }
   },
   "metadata": [

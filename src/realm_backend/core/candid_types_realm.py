@@ -16,7 +16,7 @@ class UserGetRecord(Variant):
     principal: Principal
 
 
-class ResponseData(Variant):
+class RealmResponseData(Variant):
     Status: StatusRecord
     UserRegister: UserRegisterRecord
     UserGet: UserGetRecord
@@ -24,6 +24,6 @@ class ResponseData(Variant):
     Message: text
 
 
-class Response(Record):
+class RealmResponse(Record):
     success: bool
-    data: ResponseData
+    data: RealmResponseData

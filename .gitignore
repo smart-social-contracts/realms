@@ -1,7 +1,6 @@
 .dfx
 .kybra
 venv
-static
 dist
 node_modules
 .svelte-kit
@@ -15,3 +14,8 @@ HACK*
 kybra_simple_db
 *.wasm
 *.did
+*temp
+*.pem
+src/declarations
+e2e.log
+test_assets

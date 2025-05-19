@@ -3,10 +3,12 @@ import traceback
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from api.extensions import list_extensions
 from api.status import get_status
 from api.user import user_get, user_register
-from core.candid_types_realm import (Response, ResponseData, StatusRecord,
-                                     UserGetRecord, UserRegisterRecord)
+from core.candid_types_realm import (RealmResponse, RealmResponseData,
+                                     StatusRecord, UserGetRecord,
+                                     UserRegisterRecord)
 from kybra import (Async, CallResult, Func, Opt, Principal, Query, Record,
                    StableBTreeMap, Tuple, Variant, Vec, blob, heartbeat, ic,
                    init, match, nat, nat16, nat64, query, update, void)
@@ -61,40 +63,42 @@ class Token(Record):
 
 
 @query
-def status() -> Response:
+def status() -> RealmResponse:
     try:
         logger.info("Status query executed")
-        return Response(
-            success=True, data=ResponseData(Status=StatusRecord(**get_status()))
+        return RealmResponse(
+            success=True, data=RealmResponseData(Status=StatusRecord(**get_status()))
         )
     except Exception as e:
         logger.error(f"Error getting status: {str(e)}\n{traceback.format_exc()}")
-        return Response(success=False, data=ResponseData(Error=str(e)))
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
 @update
-def register_user(principal: Principal) -> Response:
+def register_user(principal: Principal) -> RealmResponse:
     try:
-        return Response(
+        return RealmResponse(
             success=True,
-            data=ResponseData(
+            data=RealmResponseData(
                 UserRegister=UserRegisterRecord(
-                    principal=Principal.from_str(user_register(principal.to_str())["principal"])
+                    principal=Principal.from_str(
+                        user_register(principal.to_str())["principal"]
+                    )
                 )
             ),
         )
     except Exception as e:
         logger.error(f"Error registering user: {str(e)}\n{traceback.format_exc()}")
-        return Response(success=False, data=ResponseData(Error=str(e)))
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
 @query
-def get_user(principal: Principal) -> Response:
+def get_user(principal: Principal) -> RealmResponse:
     try:
         user_data = user_get(principal.to_str())
-        return Response(
+        return RealmResponse(
             success=True,
-            data=ResponseData(
+            data=RealmResponseData(
                 UserGet=UserGetRecord(
                     principal=Principal.from_str(user_data["principal"])
                 )
@@ -102,12 +106,32 @@ def get_user(principal: Principal) -> Response:
         )
     except Exception as e:
         logger.error(f"Error getting user: {str(e)}\n{traceback.format_exc()}")
-        return Response(success=False, data=ResponseData(Error=str(e)))
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
 @init
 def init_() -> void:
     logger.info("Realm canister initialized")
+
+    # Initialize extensions
+    try:
+        # Only import the init_extensions function here to avoid circular imports
+        # during Kybra's compile-time type checking
+        from extensions import init_extensions
+
+        # Get realm data to pass to extensions
+        realm_data = {
+            "vault_principal_id": ic.id().to_str()  # For demo purposes, using self as vault
+            # In real deployment, you'd get this from a configuration or parameter
+        }
+
+        # Initialize all extensions
+        init_extensions(realm_data)
+        logger.info("Extensions initialized successfully")
+    except Exception as e:
+        logger.error(
+            f"Failed to initialize extensions: {str(e)}\n{traceback.format_exc()}"
+        )
 
 
 def http_request_core(data):
@@ -150,6 +174,15 @@ def http_request(req: HttpRequest) -> HttpResponse:
 
             if url_path[2] == "status":
                 return http_request_core(get_status())
+
+            if url_path[2] == "extensions":
+                if len(url_path) < 4:
+                    # List all extensions
+                    extensions_list = list_extensions()
+                    return http_request_core({"extensions": extensions_list})
+
+                # For specific extension endpoints, we'll implement them
+                # after fixing the core extension system
 
         return not_found
     except Exception as e:

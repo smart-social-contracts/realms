@@ -17,6 +17,10 @@ def organization_get(principal: str) -> dict[str, Any]:
     organization = Organization[principal]
     return {"principal": organization._id}
 
+
 def organization_list() -> dict[str, Any]:
-    return {"organizations": [organization.to_dict() for organization in Organization.instances()]}
-    
+    return {
+        "organizations": [
+            organization.to_dict() for organization in Organization.instances()
+        ]
+    }

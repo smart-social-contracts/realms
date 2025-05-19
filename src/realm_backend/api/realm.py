@@ -1,5 +1,3 @@
-
-
 from typing import Any
 
 from ggg.realm import Realm
@@ -19,6 +17,6 @@ def realm_get(principal: str) -> dict[str, Any]:
     realm = Realm[principal]
     return {"principal": realm._id}
 
+
 def realm_list() -> dict[str, Any]:
     return {"realms": [realm.to_dict() for realm in Realm.instances()]}
-    

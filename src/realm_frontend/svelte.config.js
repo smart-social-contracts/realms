@@ -11,17 +11,16 @@ const config = {
     adapter: adapter({
       pages: 'dist',
       assets: 'dist',
-      fallback: '200.html',
+      fallback: 'index.html',
       precompress: false,
       strict: true,
     }),
     prerender: {
+      // Instead of using enabled: false, let's use an empty entries array to disable prerendering
+      entries: [],
       handleHttpError: ({ path, referrer, message }) => {
-        // if (path === '/contact') {
         console.warn(`Error during prerendering of ${path}: ${message}`);
-        return; // Suppress the error for the /contact route
-        // }
-        // throw new Error(message); // Throw error for other routes
+        return; 
       }
     }
   },

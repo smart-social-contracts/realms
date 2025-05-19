@@ -20,4 +20,3 @@ def user_get(principal: str) -> dict[str, Any]:
 
 def user_list() -> dict[str, Any]:
     return {"users": [user.to_dict() for user in User.instances()]}
-    

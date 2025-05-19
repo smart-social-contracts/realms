@@ -10,7 +10,14 @@ export default defineConfig({
   build: {
     emptyOutDir: true,
     rollupOptions: {
-      // external dependencies can be added here if needed
+      // Comment out external dependencies for development
+      // external: [
+      //   '@dfinity/agent',
+      //   '@dfinity/principal',
+      //   '@dfinity/auth-client',
+      //   '@dfinity/identity',
+      //   '@dfinity/candid'
+      // ]
     },
     // Minimize build output
     minify: true,
@@ -23,6 +30,13 @@ export default defineConfig({
         global: "globalThis",
       },
     },
+    include: [
+      '@dfinity/agent',
+      '@dfinity/principal',
+      '@dfinity/auth-client',
+      '@dfinity/identity',
+      '@dfinity/candid'
+    ]
   },
   plugins: [
     sveltekit(),

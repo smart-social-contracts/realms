@@ -1,11 +1,14 @@
 {
-  "realm_frontend": {
-    "ic": "ctydg-piaaa-aaaah-aqzga-cai"
-  },
   "realm_backend": {
-    "ic": "wxfhb-tqaaa-aaaah-aq2qq-cai"
+    "ic": "wxfhb-tqaaa-aaaah-aq2qq-cai",
+    "staging": "h5vpp-qyaaa-aaaac-qai3a-cai"
+  },
+  "realm_frontend": {
+    "ic": "ctydg-piaaa-aaaah-aqzga-cai",
+    "staging": "gzya5-jyaaa-aaaac-qai5a-cai"
   },
   "vault": {
-    "ic": "ekdcf-yiaaa-aaaah-ardsq-cai"
+    "ic": "ekdcf-yiaaa-aaaah-ardsq-cai",
+    "staging": "gx2nv-siaaa-aaaac-qai4a-cai"
   }
 }

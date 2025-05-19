@@ -1,2 +1,3 @@
-from core.candid_types_realm import (Response, ResponseData, StatusRecord,
-                                     UserGetRecord, UserRegisterRecord)
+from core.candid_types_realm import (RealmResponse, RealmResponseData,
+                                     StatusRecord, UserGetRecord,
+                                     UserRegisterRecord)
