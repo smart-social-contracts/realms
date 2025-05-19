@@ -1,4 +1,4 @@
-from kybra import Principal, Record, Variant, nat, text, Integer
+from kybra import Principal, Record, Variant, nat, text
 
 
 class StatusRecord(Record):

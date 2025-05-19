@@ -3,7 +3,7 @@
 import sys
 from deploy_utils import (
     logger, run_command, get_canister_id,
-    print_deployment_summary, get_principal
+    print_deployment_summary, get_principal, ensure_dfx_running
 )
 from colors import print_ok, print_error
 
@@ -114,6 +114,9 @@ def deploy_frontend():
 def deploy(canister_names=None):
     logger.info("Starting local network deployment process...")
     print_ok("==== STARTING LOCAL DEPLOYMENT ====")
+
+    # Check if local dfx is running, start it if not
+    ensure_dfx_running()
     
     logger.info(f"Deploying canisters: {canister_names}" if canister_names else "Deploying all canisters")
     if canister_names:
