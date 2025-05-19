@@ -47,8 +47,8 @@
 	}
 
 	function onSubmitGetUniverse(event) {
-		backend.get_universe().then((response) => {
-			console.log('response', response);
+		backend.status().then((response) => {
+			console.log('status', response);
 			universe.set(response);
 		});
 		return false;
@@ -143,7 +143,7 @@
 	</div> -->
 	
 	
-	<!-- <AuthButton />
+	<AuthButton />
 	<section id="greeting">{greeting}</section>
 	<form action="#" on:submit|preventDefault={onSubmit}>
 		<label for="name">Enter your name: &nbsp;</label>
@@ -165,7 +165,7 @@
 	{/if}
 	{#if $snapshots != ''}
 		<section id="snapshots">Snapshots: {JSON.stringify(snapshots)}</section>
-	{/if} -->
+	{/if}
 
 
 </div>
