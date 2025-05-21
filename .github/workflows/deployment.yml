@@ -1,6 +1,8 @@
 name: Deploy to Internet Computer
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       canister:
