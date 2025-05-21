@@ -5,6 +5,7 @@ import json
 import subprocess
 import time
 import requests
+import os
 from typing import Dict, Tuple, Optional
 import html
 
@@ -15,6 +16,37 @@ def run_command(cmd: str) -> Tuple[bool, str]:
         return True, result.stdout
     except subprocess.CalledProcessError as e:
         return False, e.stderr or str(e)
+
+def load_canister_ids(canister_ids_file: Optional[str] = None, network: str = "ic") -> Dict[str, str]:
+    """Load canister IDs from dfx or fallback to a file."""
+    canister_ids = {}
+    
+    # Try to load from dfx first
+    canisters = ["realm_backend", "realm_frontend", "vault"]
+    for canister in canisters:
+        success, output = run_command(f"dfx canister --network {network} id {canister}")
+        if success and output.strip():
+            canister_ids[canister] = output.strip()
+    
+    # Fallback to file if key canisters missing
+    if (not all(k in canister_ids for k in ["realm_backend", "realm_frontend"]) and 
+            canister_ids_file and os.path.exists(canister_ids_file)):
+        try:
+            with open(canister_ids_file, 'r') as f:
+                file_ids = json.load(f)
+            
+            # Handle nested or flat structure
+            if network in file_ids:
+                for name, data in file_ids[network].items():
+                    canister_ids[name] = data["canister_id"] if isinstance(data, dict) and "canister_id" in data else data
+            else:
+                for name, data in file_ids.items():
+                    if isinstance(data, dict) and network in data:
+                        canister_ids[name] = data[network]
+        except Exception:
+            pass
+    
+    return canister_ids
 
 def verify_backend(backend_canister_id: str, network: str = "ic", expected_commit: str = None) -> bool:
     """Verify backend canister is functioning correctly"""
