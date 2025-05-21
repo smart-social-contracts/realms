@@ -9,6 +9,21 @@
 		XSolid,
 	} from 'flowbite-svelte-icons';
 	import type { ComponentType } from 'svelte';
+	
+	// Get commit hash from meta tag
+	let commitHash = '';
+	
+	// This runs on the client side only
+	if (typeof document !== 'undefined') {
+		const metaTag = document.querySelector('meta[name="commit-hash"]');
+		if (metaTag) {
+			commitHash = metaTag.getAttribute('content') || '';
+			// Format to show only first 7 characters if it's a full hash
+			if (commitHash && commitHash !== 'COMMIT_HASH_PLACEHOLDER' && commitHash.length > 7) {
+				commitHash = commitHash.substring(0, 7);
+			}
+		}
+	}
 
 	const links: LinkType[] = [
 		{ name: 'Terms and conditions', href: '#' },
@@ -49,4 +64,11 @@
 			</a>
 		{/each}
 	</div>
+	
+	<!-- Commit hash display -->
+	{#if commitHash && commitHash !== 'COMMIT_HASH_PLACEHOLDER'}
+		<div class="mt-3 text-center">
+			<span class="text-xs text-gray-400 dark:text-gray-500">Build: {commitHash}</span>
+		</div>
+	{/if}
 </Frame>

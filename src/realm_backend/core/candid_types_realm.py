@@ -6,7 +6,7 @@ class StatusRecord(Record):
     status: text
     users_count: nat
     organizations_count: nat
-
+    commit: text
 
 class UserRegisterRecord(Variant):
     principal: Principal
