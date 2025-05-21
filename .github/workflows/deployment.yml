@@ -30,33 +30,14 @@ jobs:
           sed -i "s/COMMIT_HASH_PLACEHOLDER/$COMMIT_HASH/g" src/realm_backend/api/status.py
           sed -i "s/COMMIT_HASH_PLACEHOLDER/$COMMIT_HASH/g" src/realm_frontend/src/app.html
       
-      - name: Build Docker image
-        run: |
-          ./scripts/build_image.sh
-
-      - name: Deploy to staging
+      - name: Deploy to Internet Computer
         run: |
           # Store identity in a temporary file
           echo "${{ secrets.IC_IDENTITY_PEM }}" > identity.pem
           chmod 600 identity.pem
           
-          # Set environment variables - always use staging for GitHub Actions
-          CANISTER="${{ github.event.inputs.canister }}"
+          # Run deployment script
+          ./scripts/deploy_ic.sh identity.pem
           
-          # Run deployment in container
-          docker run --rm \
-            -v "$(pwd)/identity.pem:/app/identity.pem" \
-            -e DFX_WARNING="-mainnet_plaintext_identity" \
-            smart-social-contracts/realms:latest \
-            bash -c "dfx identity import --force --storage-mode plaintext github-actions identity.pem && \
-              dfx identity use github-actions && \
-              npm install --legacy-peer-deps && \
-              dfx deploy realm_backend --network ic && \
-              dfx generate realm_backend && \
-              npm run prebuild --workspace realm_frontend && \
-              npm run build --workspace realm_frontend && \
-              dfx deploy --network ic && \
-              python /app/scripts/verify_deployment.py --network ic"
-
-          # Clean up the temporary file
+          # Clean up
           rm identity.pem
