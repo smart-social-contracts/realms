@@ -62,15 +62,13 @@ class Response(Record):
 
 class Vault(Service):
     @service_query
-    def status(self) -> Response: ...  # type: ignore
+    def status(self) -> Response: ...
 
     @service_query
-    def get_balance(self, principal: Principal) -> Response: ...  # type: ignore
+    def get_balance(self, principal: Principal) -> Response: ...
 
     @service_query
-    def get_transactions(self, principal: Principal) -> Response: ...  # type: ignore
+    def get_transactions(self, principal: Principal) -> Response: ...
 
     @service_update
-    def transfer(
-        self, principal: Principal, amount: nat
-    ) -> Async[Response]: ...  # type: ignore
+    def transfer(self, principal: Principal, amount: nat) -> Async[Response]: ...

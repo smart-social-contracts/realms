@@ -1,7 +1,7 @@
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 from core.extensions import call_extension, extension_registry
-from kybra import Opt, Record, Vec, nat, query, text, update
+from kybra import Opt, Record, Vec, nat, query, update
 from kybra_simple_logging import get_logger
 
 logger = get_logger("api.extensions")

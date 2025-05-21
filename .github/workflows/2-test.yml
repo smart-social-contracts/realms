@@ -26,8 +26,13 @@ jobs:
             });
             return workflow_run.data.head_sha;
       
-      - name: Run tests in container
+      - name: Run linting checks
         run: |
           docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get-commit-sha.outputs.result }}
-          # TODO: replace this with your actual test commands
-          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get-commit-sha.outputs.result }} echo "Running tests..."; exit 0
+          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get-commit-sha.outputs.result }} ./scripts/run_linters.sh
+      
+      # - name: Run tests in container
+      #   run: |
+      #     docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get-commit-sha.outputs.result }}
+      #     # TODO: replace this with your actual test commands
+      #     docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get-commit-sha.outputs.result }} echo "Running tests..."; exit 0
