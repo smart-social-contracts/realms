@@ -49,7 +49,8 @@ jobs:
               dfx generate realm_backend && \
               npm run prebuild --workspace realm_frontend && \
               npm run build --workspace realm_frontend && \
-              dfx deploy --network ic"
+              dfx deploy --network ic && \
+              python /app/scripts/verify_deployment.py --network ic"
 
           # Clean up the temporary file
           rm identity.pem

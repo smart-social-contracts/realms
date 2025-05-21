@@ -8,3 +8,4 @@ bumpversion>=0.5.3
 flask
 flask_cors
 requests
+urllib3
