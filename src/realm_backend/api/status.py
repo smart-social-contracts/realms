@@ -26,6 +26,11 @@ def get_status() -> dict[str, Any]:
     # Get entity counts from the database
     users_count = len(User.instances())
     organizations_count = len(Organization.instances())
+    
+    # In production, this would be set during the build process
+    # For development, we can use a placeholder
+    # This will be replaced during CI/CD deployment with the actual commit hash
+    commit_hash = "COMMIT_HASH_PLACEHOLDER"
 
     # Return data in the format expected by the Status Candid type
     return {
@@ -33,4 +38,5 @@ def get_status() -> dict[str, Any]:
         "status": "ok",
         "users_count": users_count,
         "organizations_count": organizations_count,
+        "commit": commit_hash,  # Add git commit hash
     }

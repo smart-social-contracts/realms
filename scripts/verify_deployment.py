@@ -6,12 +6,26 @@ Script to verify Internet Computer deployments.
 import argparse
 import sys
 import os
+import subprocess
 
 # Add scripts directory to path to allow absolute imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts.utils.output import print_success, print_error
+from scripts.utils.output import print_success, print_error, print_info
 from scripts.ic.verifiers import load_canister_ids, verify_backend, verify_frontend
+
+def get_current_commit():
+    """Get the current git commit hash."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"], 
+            capture_output=True, 
+            text=True, 
+            check=True
+        )
+        return result.stdout.strip()
+    except subprocess.CalledProcessError:
+        return None
 
 def main():
     """
@@ -20,7 +34,15 @@ def main():
     parser = argparse.ArgumentParser(description="Verify IC canister deployment")
     parser.add_argument("--network", default="ic", help="Network (ic, staging, etc.)")
     parser.add_argument("--canister-ids", default=None, help="Optional path to canister_ids.json (used as fallback)")
+    parser.add_argument("--commit-hash", help="Git commit hash to verify against")
     args = parser.parse_args()
+    
+    # If commit hash not provided, try to get the current one
+    commit_hash = args.commit_hash
+    if not commit_hash:
+        commit_hash = get_current_commit()
+        if commit_hash:
+            print_info(f"Using current git commit: {commit_hash}")
     
     try:
         # Load canister IDs (primarily from dfx, with file as fallback)
@@ -36,8 +58,17 @@ def main():
             sys.exit(1)
         
         # Verify canisters
-        backend_success = verify_backend(canister_ids["realm_backend"], args.network)
-        frontend_success = verify_frontend(canister_ids["realm_frontend"], args.network)
+        backend_success = verify_backend(
+            canister_ids["realm_backend"], 
+            args.network,
+            commit_hash
+        )
+        
+        frontend_success = verify_frontend(
+            canister_ids["realm_frontend"], 
+            args.network,
+            commit_hash
+        )
         
         # Exit with success only if both verifications pass
         if backend_success and frontend_success:

@@ -16,13 +16,14 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 from scripts.utils.command import run_command
 from scripts.utils.output import print_info, print_success, print_warning, print_error
 
-def verify_backend(backend_canister_id: str, network: str = "ic") -> bool:
+def verify_backend(backend_canister_id: str, network: str = "ic", expected_commit: str = None) -> bool:
     """
     Verify that the backend canister is responding correctly by calling its status endpoint using dfx.
     
     Args:
         backend_canister_id: The canister ID of the backend
         network: The network to verify on (ic, staging, etc.)
+        expected_commit: Optional git commit hash to verify against
         
     Returns:
         Boolean indicating verification success
@@ -36,18 +37,39 @@ def verify_backend(backend_canister_id: str, network: str = "ic") -> bool:
     if success:
         print_success(f"Backend canister {backend_canister_id} is responding correctly")
         print(f"Status output: {output}")
+        
+        # Check commit hash if expected_commit is provided
+        if expected_commit:
+            # Parse the commit hash from the response
+            # Example response format might contain: commit = "a1b2c3d";
+            import re
+            commit_match = re.search(r'commit = "([^"]+)"', output)
+            
+            if commit_match:
+                actual_commit = commit_match.group(1)
+                if actual_commit.startswith(expected_commit):
+                    print_success(f"Backend commit verified: {actual_commit}")
+                else:
+                    print_error(f"Commit mismatch: expected {expected_commit}, got {actual_commit}")
+                    print_warning("This suggests you may be verifying a previous deployment")
+                    return False
+            else:
+                print_warning("Could not extract commit hash from backend response")
+                print_info("To enable commit verification, add 'commit = \"$(git rev-parse HEAD)\"' to your status response")
+        
         return True
     else:
         print_error(f"Backend canister verification failed")
         return False
 
-def verify_frontend(frontend_canister_id: str, network: str = "ic") -> bool:
+def verify_frontend(frontend_canister_id: str, network: str = "ic", expected_commit: str = None) -> bool:
     """
     Verify that the frontend canister is responding correctly by making an HTTP request.
     
     Args:
         frontend_canister_id: The canister ID of the frontend
         network: The network to verify on (ic, staging, etc.)
+        expected_commit: Optional git commit hash to verify against
         
     Returns:
         Boolean indicating verification success
@@ -85,6 +107,25 @@ def verify_frontend(frontend_canister_id: str, network: str = "ic") -> bool:
                 
                 if not missing_indicators:
                     print_success(f"Frontend canister {frontend_canister_id} is responding with valid SvelteKit content")
+                    
+                    # Check for commit hash if provided
+                    if expected_commit:
+                        import re
+                        # Look for meta tag with commit hash
+                        commit_match = re.search(r'<meta name="commit-hash" content="([^"]+)"', content)
+                        
+                        if commit_match:
+                            actual_commit = commit_match.group(1)
+                            if actual_commit.startswith(expected_commit):
+                                print_success(f"Frontend commit verified: {actual_commit}")
+                            else:
+                                print_error(f"Commit mismatch: expected {expected_commit}, got {actual_commit}")
+                                print_warning("This suggests you may be verifying a previous deployment")
+                                return False
+                        else:
+                            print_warning("Could not find commit hash meta tag in the frontend HTML")
+                            print_info("To enable commit verification, add '<meta name=\"commit-hash\" content=\"YOUR_COMMIT_HASH\">' to your HTML template")
+                    
                     return True
                 else:
                     print_warning(f"Frontend response missing expected SvelteKit indicators: {', '.join(missing_indicators)}")
