@@ -1,20 +1,17 @@
 name: Deploy to Internet Computer
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       canister:
-        description: 'Specific canister to deploy (leave empty to deploy all)'
+        description: 'Canister to deploy (leave empty for all)'
         required: false
-        type: 'string'
+        default: ''
 
 jobs:
-  deploy:
-    name: Deploy to staging
+  # Build Docker image job
+  build:
     runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -29,15 +26,53 @@ jobs:
           COMMIT_HASH=$(git rev-parse HEAD)
           sed -i "s/COMMIT_HASH_PLACEHOLDER/$COMMIT_HASH/g" src/realm_backend/api/status.py
           sed -i "s/COMMIT_HASH_PLACEHOLDER/$COMMIT_HASH/g" src/realm_frontend/src/app.html
+          
+      - name: Build Docker image
+        run: |
+          ./scripts/build_image.sh
+          
+      - name: Save Docker image
+        run: |
+          docker save smart-social-contracts/realms:latest > docker-image.tar
+          
+      - name: Upload Docker image as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: docker-image
+          path: docker-image.tar
+          retention-days: 1
+          
+  # Deploy to staging environment
+  deploy-staging:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Download Docker image
+        uses: actions/download-artifact@v2
+        with:
+          name: docker-image
+          
+      - name: Load Docker image
+        run: |
+          docker load < docker-image.tar
       
-      - name: Deploy to Internet Computer
+      - name: Deploy to staging
         run: |
           # Store identity in a temporary file
           echo "${{ secrets.IC_IDENTITY_PEM }}" > identity.pem
           chmod 600 identity.pem
           
-          # Run deployment script
-          ./scripts/deploy_ic.sh identity.pem
+          # Run Docker container with deployment script
+          docker run --rm \
+            -v "$(pwd)/identity.pem:/app/identity.pem" \
+            -v "$(pwd)/scripts/deploy_ic.sh:/app/deploy_ic.sh" \
+            -e DFX_WARNING="-mainnet_plaintext_identity" \
+            smart-social-contracts/realms:latest \
+            bash -c "/app/deploy_ic.sh /app/identity.pem staging"
           
           # Clean up
           rm identity.pem
