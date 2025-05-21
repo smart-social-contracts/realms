@@ -34,8 +34,9 @@
 	];
 
 	const brands: [ComponentType, string][] = [
-		[XSolid, ''],
-		[GithubSolid, ''],
+		// [XSolid, 'https://twitter.com/realms_protocol'], # TODO: update when we have it
+		[GithubSolid, 'https://github.com/smart-social-contracts/realms'],
+		// [DiscordSolid, 'https://discord.gg/realms-community'],  # TODO: replace by OpenChat link when we have it
 	];
 </script>
 
