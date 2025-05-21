@@ -8,6 +8,7 @@ class StatusRecord(Record):
     organizations_count: nat
     commit: text
 
+
 class UserRegisterRecord(Variant):
     principal: Principal
 
