@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import core.candid_types_vault as vault_candids
 from core.extensions import Extension, ExtensionPermission, extension_registry
