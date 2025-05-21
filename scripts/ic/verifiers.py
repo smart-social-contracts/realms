@@ -78,8 +78,8 @@ def verify_backend(backend_canister_id: str, network: str = "ic", expected_commi
 
 def verify_frontend(frontend_canister_id: str, network: str = "ic", expected_commit: str = None) -> bool:
     """Verify frontend canister is functioning correctly"""
-    # For IC network, use icp0.io domain
-    if network == "ic":
+    # For IC network and staging, use icp0.io domain
+    if network in ["ic", "staging"]:
         frontend_url = f"https://{frontend_canister_id}.icp0.io"
     else:
         frontend_url = f"http://{frontend_canister_id}.localhost:8080"
