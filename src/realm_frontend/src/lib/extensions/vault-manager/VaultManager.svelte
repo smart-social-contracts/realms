@@ -31,8 +31,9 @@
 	// Get vault balance for current user
 	async function getBalance() {
 		try {
-			// Use mock data if backend is not available
-			if (!backend || !backend.get_balance) {
+			// Use the extension API method
+			if (!backend || !backend.vault_manager_get_balance) {
+				console.warn('Backend or vault_manager_get_balance method not available');
 				// Mock balance data for development
 				balanceData = {
 					balance: 1000,
@@ -43,13 +44,13 @@
 				return;
 			}
 			
-			const response = await backend.get_balance();
+			const response = await backend.vault_manager_get_balance();
 			
 			if (response.success) {
 				balanceData = {
-					balance: response.balance,
-					token: response.token,
-					principalId: response.principal_id
+					balance: response.data.balance,
+					token: response.data.token,
+					principalId: response.data.principal_id
 				};
 				console.log('Balance data:', balanceData);
 			} else {
@@ -70,24 +71,25 @@
 	// Get vault status information
 	async function getVaultStatus() {
 		try {
-			// Use mock data if backend is not available
-			if (!backend || !backend.get_vault_status) {
+			// Use the extension API method
+			if (!backend || !backend.vault_manager_get_status) {
+				console.warn('Backend or vault_manager_get_status method not available');
 				// Mock vault status data for development
 				vaultStatus = {
 					version: "1.0.0",
 					name: "Realm Vault",
 					token: "ICP",
 					total_supply: 10000000,
-					num_holders: 42
+					accounts: 42
 				};
 				console.log('Using mock vault status data:', vaultStatus);
 				return;
 			}
 			
-			const response = await backend.get_vault_status();
+			const response = await backend.vault_manager_get_status();
 			
 			if (response.success) {
-				vaultStatus = response.status;
+				vaultStatus = response.data;
 				console.log('Vault status:', vaultStatus);
 			} else {
 				error = `Failed to get vault status: ${response.error}`;
@@ -101,7 +103,7 @@
 				name: "Realm Vault",
 				token: "ICP",
 				total_supply: 10000000,
-				num_holders: 42
+				accounts: 42
 			};
 		}
 	}
@@ -109,8 +111,9 @@
 	// Get recent transactions
 	async function getTransactions() {
 		try {
-			// Use mock data if backend is not available
-			if (!backend || !backend.get_transactions) {
+			// Use the extension API method
+			if (!backend || !backend.vault_manager_get_transactions) {
+				console.warn('Backend or vault_manager_get_transactions method not available');
 				// Mock transaction data for development
 				transactions = [
 					{
@@ -137,11 +140,24 @@
 				return;
 			}
 			
-			const response = await backend.get_transactions();
+			const response = await backend.vault_manager_get_transactions({
+				limit: 10,
+				offset: 0
+			});
 			
 			if (response.success) {
-				transactions = response.transactions;
-				totalTransactions = response.total;
+				// Format transactions for the UI
+				transactions = response.data.transactions.map(tx => ({
+					id: tx.id,
+					from: tx.from_principal,
+					to: tx.to_principal,
+					amount: tx.amount,
+					token: vaultStatus?.token || "ICP",
+					timestamp: tx.timestamp,
+					status: tx.status,
+					memo: tx.memo || ""
+				}));
+				totalTransactions = response.data.total;
 				console.log('Transactions:', transactions);
 			} else {
 				error = `Failed to get transactions: ${response.error}`;
@@ -181,8 +197,9 @@
 		transferError = '';
 		
 		try {
-			// Use mock response if backend is not available
-			if (!backend || !backend.transfer_tokens) {
+			// Use the extension API method
+			if (!backend || !backend.vault_manager_transfer) {
+				console.warn('Backend or vault_manager_transfer method not available');
 				// Mock transfer response for development
 				await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate delay
 				console.log('Mock transfer completed');
@@ -192,16 +209,18 @@
 				return;
 			}
 			
-			const response = await backend.transfer_tokens({
-				to: transferRecipient,
+			const response = await backend.vault_manager_transfer({
+				to_principal_id: transferRecipient,
 				amount: parseFloat(transferAmount),
 				memo: transferMemo
 			});
 			
 			if (response.success) {
 				transferSuccess = true;
+				console.log('Transfer successful, tx ID:', response.data.transaction_id);
 				resetTransferForm();
 				await getBalance();
+				await getTransactions(); // Refresh transactions after transfer
 			} else {
 				transferError = `Transfer failed: ${response.error}`;
 			}
@@ -281,7 +300,7 @@
 									<ChartOutline class="w-5 h-5 text-primary-600" />
 									<h3 class="text-lg font-semibold">Accounts</h3>
 								</div>
-								<p class="text-2xl font-bold">{vaultStatus.num_holders}</p>
+								<p class="text-2xl font-bold">{vaultStatus.accounts}</p>
 								<p class="text-sm text-gray-500 dark:text-gray-400">Active accounts</p>
 							</div>
 							

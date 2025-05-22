@@ -66,43 +66,96 @@ async function makeRequest(endpoint, options = {}) {
 
 // Define mock implementations for API methods that may not be available yet
 const mockImplementations = {
-    // Use this pattern to define mocks for specific endpoints when needed
-    get_vault_status: async () => ({ 
-        success: true, 
-        status: { 
-            name: "Mock Vault", 
-            token: "ICP", 
-            version: "1.0.0",
-            total_supply: 10000000,
-            num_holders: 42
-        }
-    }),
-    get_balance: async () => ({
-        success: true,
-        balance: 1000,
-        token: "ICP",
-        principal_id: "2vxsx-fae"
-    }),
-    get_transactions: async () => ({
-        success: true,
-        transactions: [
-            {
-                id: "tx1",
-                from: "2vxsx-fae",
-                to: "3vxsx-fae",
-                amount: 100,
-                token: "ICP",
-                timestamp: Date.now() - 1000000,
-                memo: "Test transaction 1"
+    // Extension API methods
+    call_extension: async (extensionName, method, params = {}) => {
+        console.log(`Mock call to extension ${extensionName}.${method} with params:`, params);
+        
+        // Handle Vault Manager extension methods
+        if (extensionName === 'vault_manager') {
+            switch (method) {
+                case 'get_status':
+                    return { 
+                        success: true, 
+                        data: { 
+                            name: "Mock Vault", 
+                            token: "ICP", 
+                            version: "1.0.0",
+                            total_supply: 10000000,
+                            accounts: 42,
+                            cycles: 1000000000
+                        }
+                    };
+                case 'get_balance':
+                    return {
+                        success: true,
+                        data: {
+                            balance: 1000,
+                            token: "ICP",
+                            principal_id: "2vxsx-fae"
+                        }
+                    };
+                case 'get_transactions':
+                    return {
+                        success: true,
+                        data: {
+                            transactions: [
+                                {
+                                    id: "tx1",
+                                    from_principal: "2vxsx-fae",
+                                    to_principal: "3vxsx-fae",
+                                    amount: 100,
+                                    timestamp: Date.now() - 1000000,
+                                    status: "completed",
+                                    memo: "Test transaction 1"
+                                }
+                            ],
+                            total: 1
+                        }
+                    };
+                case 'transfer':
+                    return {
+                        success: true,
+                        data: {
+                            transaction_id: "tx" + Date.now()
+                        }
+                    };
+                default:
+                    return { success: false, error: `Unknown method ${method}` };
             }
-        ],
-        total: 1
-    }),
-    transfer_tokens: async () => ({
-        success: true,
-        message: "Mock transfer completed successfully"
-    })
+        }
+        
+        return { success: false, error: `Extension ${extensionName} not found or method not implemented` };
+    },
+    
+    // Keep the original list_extensions mock
+    list_extensions: async () => ([
+        {
+            id: "vault_manager",
+            name: "Vault Manager",
+            description: "Manage your vault balances and transfer tokens",
+            version: "1.0.0",
+            permissions: ["READ_VAULT", "TRANSFER_TOKENS"]
+        }
+    ])
 };
+
+/**
+ * Helper function to call extension methods
+ * @param {string} extensionName - Name of the extension
+ * @param {string} method - Method name to call
+ * @param {Object} params - Parameters to pass to the method
+ * @returns {Promise<any>} Response data
+ */
+async function callExtension(actor, extensionName, method, params = {}) {
+    try {
+        const result = await actor.call_extension(extensionName, method, params);
+        console.log(`Extension call ${extensionName}.${method} result:`, result);
+        return result;
+    } catch (error) {
+        console.error(`Error calling extension ${extensionName}.${method}:`, error);
+        throw error;
+    }
+}
 
 /**
  * Creates a backend proxy with graceful fallbacks
@@ -116,7 +169,37 @@ function createBackendProxy() {
         get(target, prop) {
             return async (...args) => {
                 try {
-                    // In development, use REST endpoints
+                    // Special handling for extension methods
+                    if (prop.startsWith('vault_manager_')) {
+                        const method = prop.replace('vault_manager_', '');
+                        const params = args.length > 0 ? args[0] : {};
+                        
+                        // In development with REST API
+                        if (baseUrl) {
+                            const endpoint = `${baseUrl}/extensions/vault_manager/${method}`;
+                            try {
+                                return await makeRequest(endpoint, {
+                                    method: 'POST',
+                                    body: JSON.stringify(params)
+                                });
+                            } catch (err) {
+                                console.warn(`API extension request to ${endpoint} failed, using mock implementation`);
+                                return mockImplementations.call_extension('vault_manager', method, params);
+                            }
+                        }
+                        
+                        // In production
+                        try {
+                            const { createActor, canisterId } = await import('../../../declarations/realm_backend');
+                            const actor = createActor(canisterId);
+                            return await callExtension(actor, 'vault_manager', method, params);
+                        } catch (err) {
+                            console.warn(`Error calling canister extension method vault_manager.${method}:`, err);
+                            return mockImplementations.call_extension('vault_manager', method, params);
+                        }
+                    }
+                    
+                    // Original implementation for non-extension methods
                     if (baseUrl) {
                         const endpoint = args.length > 0 
                             ? `${baseUrl}/${prop}/${args.join('/')}`
@@ -135,7 +218,6 @@ function createBackendProxy() {
                     
                     // In production, try to use canister methods, but fall back to mocks
                     try {
-                        // We need to use a function here to avoid top-level await
                         const { createActor, canisterId } = await import('../../../declarations/realm_backend');
                         const actor = createActor(canisterId);
                         
@@ -170,11 +252,11 @@ function dummyActor() {
     return {
         list_extensions: async () => ([
             {
-                id: "vault-manager",
+                id: "vault_manager",
                 name: "Vault Manager",
                 description: "Manage your vault balances and transfer tokens",
                 version: "1.0.0",
-                permissions: ["read_vault", "transfer_tokens"]
+                permissions: ["READ_VAULT", "TRANSFER_TOKENS"]
             }
         ]),
         ...mockImplementations
