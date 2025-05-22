@@ -9,6 +9,7 @@ COPY package.json ./package.json
 COPY tsconfig.json ./tsconfig.json
 COPY scripts ./scripts
 COPY src ./src
+COPY tests ./tests
 COPY dfx.json ./dfx.json
 COPY canister_ids.json ./canister_ids.json
 
