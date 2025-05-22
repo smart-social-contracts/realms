@@ -19,6 +19,7 @@ COPY mypy.ini ./mypy.ini
 COPY tsconfig.json ./tsconfig.json
 COPY dfx.json ./dfx.json
 COPY canister_ids.json ./canister_ids.json
+COPY pyproject.toml ./pyproject.toml
 
 # Source code
 COPY scripts ./scripts
