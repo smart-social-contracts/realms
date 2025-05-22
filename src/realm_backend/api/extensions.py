@@ -102,18 +102,22 @@ async def call_extension_api(args: ExtensionCallArgs) -> SuccessResponse:
 
 
 @query
-async def get_vault_status() -> SuccessResponse:
+async def get_vault_status() -> Dict[str, Any]:
     """Get vault status (convenience method for vault_manager.get_status)"""
     try:
-        await call_extension("vault_manager", "get_status")
-        return SuccessResponse(success=True, message="Status retrieved")
+        result = await call_extension("vault_manager", "get_status")
+        logger.info(f"Vault status retrieved: {result}")
+        return {
+            "success": True,
+            "data": result
+        }
     except Exception as e:
         logger.error(f"Error in get_vault_status: {str(e)}")
-        return ErrorResponse(success=False, error=str(e))
+        return {"success": False, "error": str(e)}
 
 
 @query
-async def get_balance(principal_id: Optional[str] = None) -> BalanceResponse:
+async def get_balance(principal_id: Optional[str] = None) -> Dict[str, Any]:
     """Get balance for a principal (convenience method for vault_manager.get_balance)"""
     try:
         kwargs = {}
@@ -121,42 +125,50 @@ async def get_balance(principal_id: Optional[str] = None) -> BalanceResponse:
             kwargs["principal_id"] = principal_id
 
         result = await call_extension("vault_manager", "get_balance", **kwargs)
+        logger.info(f"Balance retrieved: {result}")
 
-        # Simplified response for Candid compatibility
-        return BalanceResponse(
-            success=True,
-            balance=result.get("balance", 0),
-            token=result.get("token", "GGG"),
-            principal_id=result.get("principal_id", ""),
-        )
+        return {
+            "success": True,
+            "data": result
+        }
     except Exception as e:
         logger.error(f"Error in get_balance: {str(e)}")
-        return ErrorResponse(success=False, error=str(e))
+        return {"success": False, "error": str(e)}
 
 
 @query
 async def get_transactions(
     limit: Optional[int] = 10, offset: Optional[int] = 0
-) -> SuccessResponse:
+) -> Dict[str, Any]:
     """Get transaction history (convenience method for vault_manager.get_transactions)"""
     try:
         kwargs = {"limit": limit, "offset": offset}
-        await call_extension("vault_manager", "get_transactions", **kwargs)
-        return SuccessResponse(success=True, message="Transactions retrieved")
+        result = await call_extension("vault_manager", "get_transactions", **kwargs)
+        logger.info(f"Transactions retrieved: {len(result.get('transactions', []))} transactions")
+        
+        return {
+            "success": True,
+            "data": result
+        }
     except Exception as e:
         logger.error(f"Error in get_transactions: {str(e)}")
-        return ErrorResponse(success=False, error=str(e))
+        return {"success": False, "error": str(e)}
 
 
 @update
 async def transfer_tokens(
     to_principal_id: str, amount: int, memo: Optional[str] = ""
-) -> SuccessResponse:
+) -> Dict[str, Any]:
     """Transfer tokens (convenience method for vault_manager.transfer)"""
     try:
         kwargs = {"to_principal_id": to_principal_id, "amount": amount, "memo": memo}
-        await call_extension("vault_manager", "transfer", **kwargs)
-        return SuccessResponse(success=True, message="Transfer completed")
+        result = await call_extension("vault_manager", "transfer", **kwargs)
+        logger.info(f"Transfer completed: {result}")
+        
+        return {
+            "success": True,
+            "data": result
+        }
     except Exception as e:
         logger.error(f"Error in transfer_tokens: {str(e)}")
-        return ErrorResponse(success=False, error=str(e))
+        return {"success": False, "error": str(e)}

@@ -5,8 +5,8 @@
 	
 	type Transaction = {
 		id: string;
-		from: string;
-		to: string;
+		from_principal: string;
+		to_principal: string;
 		amount: number;
 		token: string;
 		timestamp: number;
@@ -26,7 +26,7 @@
 	// Determine if transaction is incoming or outgoing
 	function getTransactionType(tx: Transaction): 'incoming' | 'outgoing' | 'unknown' {
 		if (!principalId) return 'unknown';
-		return tx.to === principalId ? 'incoming' : 'outgoing';
+		return tx.to_principal === principalId ? 'incoming' : 'outgoing';
 	}
 	
 	// Format principal ID for display (truncate)
@@ -95,14 +95,14 @@
 							<div class="text-sm">
 								<div class="font-medium">From</div>
 								<div class="text-gray-500 dark:text-gray-400 font-mono text-xs">
-									{formatPrincipal(tx.from)}
+									{formatPrincipal(tx.from_principal)}
 								</div>
 							</div>
 						{:else}
 							<div class="text-sm">
 								<div class="font-medium">To</div>
 								<div class="text-gray-500 dark:text-gray-400 font-mono text-xs">
-									{formatPrincipal(tx.to)}
+									{formatPrincipal(tx.to_principal)}
 								</div>
 							</div>
 						{/if}
