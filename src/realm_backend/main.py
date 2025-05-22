@@ -138,10 +138,10 @@ def init_() -> void:
 #     """Get status of the vault canister"""
 #     try:
 #         from api.extensions import get_vault_status as api_get_vault_status
-        
+
 #         logger.info("Calling get_vault_status")
 #         result = api_get_vault_status()
-        
+
 #         if result["success"]:
 #             return RealmResponse(
 #                 success=True,
@@ -163,15 +163,15 @@ def init_() -> void:
 #     """Get balance for a principal (defaults to caller)"""
 #     try:
 #         from api.extensions import get_balance as api_get_balance
-        
+
 #         # Use caller's principal if none specified
 #         principal_str = None
 #         if principal_id:
 #             principal_str = principal_id.to_str()
-        
+
 #         logger.info(f"Calling get_balance for principal: {principal_str or 'caller'}")
 #         result = api_get_balance(principal_str)
-        
+
 #         if result["success"]:
 #             return RealmResponse(
 #                 success=True,
@@ -193,10 +193,10 @@ def init_() -> void:
 #     """Get transaction history for the caller"""
 #     try:
 #         from api.extensions import get_transactions as api_get_transactions
-        
+
 #         logger.info(f"Calling get_transactions with limit: {limit}, offset: {offset}")
 #         result = api_get_transactions(limit, offset)
-        
+
 #         if result["success"]:
 #             return RealmResponse(
 #                 success=True,
@@ -218,10 +218,10 @@ def init_() -> void:
 #     """Transfer tokens to another principal"""
 #     try:
 #         from api.extensions import transfer_tokens as api_transfer_tokens
-        
+
 #         logger.info(f"Calling transfer_tokens to: {to_principal_id.to_str()}, amount: {amount}")
 #         result = api_transfer_tokens(to_principal_id.to_str(), amount, memo)
-        
+
 #         if result["success"]:
 #             return RealmResponse(
 #                 success=True,
