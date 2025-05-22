@@ -21,7 +21,7 @@ npm install --legacy-peer-deps
 
 # Deploy backend (only once)
 echo "Deploying backend to $NETWORK"
-dfx deploy realm_backend --network "$NETWORK"
+dfx deploy realm_backend --network "$NETWORK" --yes
 dfx generate realm_backend
 
 # Build and deploy frontend
@@ -31,7 +31,7 @@ npm run build --workspace realm_frontend
 
 # Deploy all remaining canisters
 echo "Deploying all canisters to $NETWORK"
-dfx deploy --network "$NETWORK"
+dfx deploy --network "$NETWORK" --yes
 
 # Verify deployment
 echo "Verifying deployment on $NETWORK"
