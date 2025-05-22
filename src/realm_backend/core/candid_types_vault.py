@@ -1,5 +1,16 @@
-from kybra import (Async, Principal, Record, Service, Variant, Vec, nat, nat64,
-                   service_query, service_update, text)
+from kybra import (
+    Async,
+    Principal,
+    Record,
+    Service,
+    Variant,
+    Vec,
+    nat,
+    nat64,
+    service_query,
+    service_update,
+    text,
+)
 
 
 class TransactionRecord(Record):

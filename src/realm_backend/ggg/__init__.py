@@ -10,6 +10,7 @@ for backward compatibility and convenience.
 # from .dispute import Dispute, Evidence
 # from .land import Land
 from .organization import Organization
+
 # from .proposal import Proposal, Vote
 # from .resource import Resource
 # from .role import Permission, Role
