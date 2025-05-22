@@ -26,7 +26,7 @@ def get_status() -> dict[str, Any]:
     # Get entity counts from the database
     users_count = len(User.instances())
     organizations_count = len(Organization.instances())
-    
+
     # In production, this would be set during the build process
     # For development, we can use a placeholder
     # This will be replaced during CI/CD deployment with the actual commit hash

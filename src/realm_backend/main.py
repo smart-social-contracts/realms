@@ -1,7 +1,5 @@
 import json
 import traceback
-from datetime import datetime
-from typing import Any, Dict, List, Optional
 
 from api.extensions import list_extensions
 from api.status import get_status
@@ -9,9 +7,8 @@ from api.user import user_get, user_register
 from core.candid_types_realm import (RealmResponse, RealmResponseData,
                                      StatusRecord, UserGetRecord,
                                      UserRegisterRecord)
-from kybra import (Async, CallResult, Func, Opt, Principal, Query, Record,
-                   StableBTreeMap, Tuple, Variant, Vec, blob, heartbeat, ic,
-                   init, match, nat, nat16, nat64, query, update, void)
+from kybra import (Func, Opt, Principal, Query, Record, StableBTreeMap, Tuple,
+                   Variant, Vec, blob, ic, init, nat, query, update, void)
 from kybra_simple_db import Database
 from kybra_simple_logging import get_logger
 
@@ -31,7 +28,7 @@ class HttpRequest(Record):
 
 
 class HttpResponse(Record):
-    status_code: nat16
+    status_code: nat
     headers: Vec["Header"]
     body: blob
     streaming_strategy: Opt["StreamingStrategy"]
