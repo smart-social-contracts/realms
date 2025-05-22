@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from core.extensions import call_extension, extension_registry
 from kybra import Opt, Record, Vec, nat, query, update
@@ -107,10 +107,7 @@ async def get_vault_status() -> Dict[str, Any]:
     try:
         result = await call_extension("vault_manager", "get_status")
         logger.info(f"Vault status retrieved: {result}")
-        return {
-            "success": True,
-            "data": result
-        }
+        return {"success": True, "data": result}
     except Exception as e:
         logger.error(f"Error in get_vault_status: {str(e)}")
         return {"success": False, "error": str(e)}
@@ -127,10 +124,7 @@ async def get_balance(principal_id: Optional[str] = None) -> Dict[str, Any]:
         result = await call_extension("vault_manager", "get_balance", **kwargs)
         logger.info(f"Balance retrieved: {result}")
 
-        return {
-            "success": True,
-            "data": result
-        }
+        return {"success": True, "data": result}
     except Exception as e:
         logger.error(f"Error in get_balance: {str(e)}")
         return {"success": False, "error": str(e)}
@@ -144,12 +138,11 @@ async def get_transactions(
     try:
         kwargs = {"limit": limit, "offset": offset}
         result = await call_extension("vault_manager", "get_transactions", **kwargs)
-        logger.info(f"Transactions retrieved: {len(result.get('transactions', []))} transactions")
-        
-        return {
-            "success": True,
-            "data": result
-        }
+        logger.info(
+            f"Transactions retrieved: {len(result.get('transactions', []))} transactions"
+        )
+
+        return {"success": True, "data": result}
     except Exception as e:
         logger.error(f"Error in get_transactions: {str(e)}")
         return {"success": False, "error": str(e)}
@@ -164,11 +157,8 @@ async def transfer_tokens(
         kwargs = {"to_principal_id": to_principal_id, "amount": amount, "memo": memo}
         result = await call_extension("vault_manager", "transfer", **kwargs)
         logger.info(f"Transfer completed: {result}")
-        
-        return {
-            "success": True,
-            "data": result
-        }
+
+        return {"success": True, "data": result}
     except Exception as e:
         logger.error(f"Error in transfer_tokens: {str(e)}")
         return {"success": False, "error": str(e)}
