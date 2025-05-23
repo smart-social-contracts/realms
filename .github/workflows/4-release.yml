@@ -95,14 +95,14 @@ jobs:
           # Pull the Docker image that was already built in the build stage
           #docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get_sha.outputs.SHA }}
           # Temporarily use latest image
-          docker pull ghcr.io/${{ github.repository_owner }}/realms:latest 
+          docker pull ghcr.io/${{ github.repository_owner }}/realms:d6de67c4bd86926155137119ee52af4578f4b7b5 
       
       - name: Build canisters and extract artifacts
         run: |
           # Run DFX build in the Docker container
           docker run --rm \
             -v "$(pwd):/host" \
-            ghcr.io/${{ github.repository_owner }}/realms:latest \
+            ghcr.io/${{ github.repository_owner }}/realms:d6de67c4bd86926155137119ee52af4578f4b7b5 \
             bash -c "dfx build --network=ic && \
                     # Copy WASM files
                     cp .dfx/ic/canisters/realm_backend/*.wasm /host/realm_backend.wasm && \
