@@ -42,10 +42,23 @@ jobs:
             console.log(`Looking for ${owner}/${packageName} images older than ${days} days...`);
             
             // First, get the package ID
-            const { data: packages } = await github.rest.packages.listPackagesForOrganization({
-              org: owner,
-              package_type: 'container'
-            });
+            let packages;
+            try {
+              // Try as organization
+              const orgResponse = await github.rest.packages.listPackagesForOrganization({
+                org: owner,
+                package_type: 'container'
+              });
+              packages = orgResponse.data;
+            } catch (error) {
+              // Fall back to user
+              console.log('Not found as organization, trying as user...');
+              const userResponse = await github.rest.packages.listPackagesForUser({
+                username: owner,
+                package_type: 'container'
+              });
+              packages = userResponse.data;
+            }
             
             const targetPackage = packages.find(pkg => pkg.name === packageName);
             
@@ -55,11 +68,25 @@ jobs:
             }
             
             // Get versions of the package
-            const { data: versions } = await github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg({
-              org: owner,
-              package_type: 'container',
-              package_name: packageName
-            });
+            let versions;
+            try {
+              // Try as organization
+              const orgResponse = await github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg({
+                org: owner,
+                package_type: 'container',
+                package_name: packageName
+              });
+              versions = orgResponse.data;
+            } catch (error) {
+              // Fall back to user
+              console.log('Not found as organization, trying as user...');
+              const userResponse = await github.rest.packages.getAllPackageVersionsForPackageOwnedByUser({
+                username: owner,
+                package_type: 'container',
+                package_name: packageName
+              });
+              versions = userResponse.data;
+            }
             
             console.log(`Found ${versions.length} images for ${packageName}`);
             
@@ -100,12 +127,23 @@ jobs:
               for (const version of toDelete) {
                 console.log(`Deleting ${version.name}...`);
                 try {
-                  await github.rest.packages.deletePackageVersionForOrg({
-                    org: owner,
-                    package_type: 'container',
-                    package_name: packageName,
-                    package_version_id: version.id
-                  });
+                  try {
+                    // Try as organization
+                    await github.rest.packages.deletePackageVersionForOrg({
+                      org: owner,
+                      package_type: 'container',
+                      package_name: packageName,
+                      package_version_id: version.id
+                    });
+                  } catch (error) {
+                    // Fall back to user
+                    await github.rest.packages.deletePackageVersionForUser({
+                      username: owner,
+                      package_type: 'container',
+                      package_name: packageName,
+                      package_version_id: version.id
+                    });
+                  }
                   console.log(`Deleted ${version.name}`);
                 } catch (error) {
                   console.log(`Failed to delete ${version.name}: ${error.message}`);
