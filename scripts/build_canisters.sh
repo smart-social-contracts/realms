@@ -21,8 +21,7 @@ npm install --legacy-peer-deps
 
 # Deploy backend (only once)
 echo "Deploying backend to $NETWORK"
-dfx build realm_backend
-# dfx deploy realm_backend --network "$NETWORK" --yes # TODO: is this needed?
+dfx deploy realm_backend --network "$NETWORK" --yes
 dfx generate realm_backend
 
 # Build and deploy frontend
