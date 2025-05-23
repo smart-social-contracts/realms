@@ -1,16 +1,11 @@
 name: 4. Create Release
 
 on:
-  workflow_run:
-    workflows: ["2. Run Tests"]
-    types:
-      - completed
-    branches: [main]
-  workflow_dispatch:  # Allows manual triggering
+  workflow_dispatch:  # Allows manual triggering only
     inputs:
       release_type:
         description: 'Type of release (patch, minor, major)'
-        required: false
+        required: true
         default: 'patch'
         type: choice
         options:
@@ -25,8 +20,6 @@ on:
 
 jobs:
   deploy:
-    # Only run if the workflow_run event was successful or if it's a manual dispatch
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -57,9 +50,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install bumpversion semver
       
-      # Bump version if release_type is provided
+      # Bump version
       - name: Bump version
-        if: ${{ github.event.inputs.release_type != '' }}
         id: bump_version
         run: |
           git config --local user.email "action@github.com"
@@ -80,20 +72,11 @@ jobs:
           # Store new version for later use
           echo "NEW_VERSION=${NEW_VERSION}" >> $GITHUB_OUTPUT
       
-      # Get SHA for workflow run or use current SHA for manual dispatch
-      - name: Get commit SHA
-        id: get_sha
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_run" ]; then
-            echo "SHA=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
-          else
-            echo "SHA=${{ github.sha }}" >> $GITHUB_OUTPUT
-          fi
-      
+      # Pull the latest Docker image
       - name: Pull Docker image
         run: |
           # Pull the Docker image that was already built in the build stage
-          docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get_sha.outputs.SHA }} 
+          docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}
       
       - name: Extract canister artifacts
         run: |
@@ -103,7 +86,7 @@ jobs:
           # Extract artifacts from the known path in the Docker container
           docker run --rm \
             -v "$(pwd)/artifacts:/artifacts" \
-            ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get_sha.outputs.SHA }} \
+            ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} \
             bash -c "cp /app/.dfx/local/canisters/realm_backend/realm_backend.wasm.gz /artifacts/ && \
                     cp /app/.dfx/local/canisters/realm_backend/service.did /artifacts/realm_backend.did"
           
@@ -111,9 +94,8 @@ jobs:
           mv artifacts/realm_backend.wasm.gz ./
           mv artifacts/realm_backend.did ./
       
-      # Push changes if we did a version bump
+      # Push changes
       - name: Push changes
-        if: ${{ github.event.inputs.release_type != '' }}
         run: |
           git add version.txt
           git commit -m "Bump version to $(cat version.txt)"
@@ -124,17 +106,17 @@ jobs:
       
       # Create a GitHub release
       - name: Create Release
-        if: ${{ (github.event.inputs.release_type != '' && github.event.inputs.create_github_release == 'true') || github.event_name == 'workflow_run' }}
+        if: ${{ github.event.inputs.create_github_release == 'true' }}
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.event.inputs.release_type != '' && format('v{0}', steps.bump_version.outputs.NEW_VERSION) || format('release-{0}', github.run_id) }}
-          name: ${{ github.event.inputs.release_type != '' && format('Release v{0}', steps.bump_version.outputs.NEW_VERSION) || format('Release {0}', github.run_id) }}
+          tag_name: v${{ steps.bump_version.outputs.NEW_VERSION }}
+          name: Release v${{ steps.bump_version.outputs.NEW_VERSION }}
           generate_release_notes: true
           files: |
             realm_backend.wasm.gz
             realm_backend.did
           body: |
-            # ${{ github.event.inputs.release_type != '' && format('Release v{0}', steps.bump_version.outputs.NEW_VERSION) || format('Release {0}', github.run_id) }}
+            # Release v${{ steps.bump_version.outputs.NEW_VERSION }}
             
             This release contains the compiled WASM and Candid (DID) files for the Internet Computer canisters.
             
@@ -145,4 +127,4 @@ jobs:
             Download the appropriate files and deploy using `dfx deploy` or your preferred deployment method.
             
             ## Commit
-            ${{ steps.get_sha.outputs.SHA }}
+            ${{ github.sha }}
