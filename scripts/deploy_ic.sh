@@ -16,20 +16,6 @@ if [ -n "$IDENTITY_FILE" ]; then
   dfx identity use github-actions
 fi
 
-# Install dependencies
-npm install --legacy-peer-deps
-
-# Deploy backend (only once)
-echo "Deploying backend to $NETWORK"
-dfx build realm_backend
-# dfx deploy realm_backend --network "$NETWORK" --yes # TODO: is this needed?
-dfx generate realm_backend
-
-# Build and deploy frontend
-echo "Building frontend"
-npm run prebuild --workspace realm_frontend
-npm run build --workspace realm_frontend
-
 # Deploy all remaining canisters
 echo "Deploying all canisters to $NETWORK"
 dfx deploy --network "$NETWORK" --yes

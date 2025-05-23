@@ -103,7 +103,7 @@ jobs:
           docker run --rm \
             -v "$(pwd):/host" \
             ghcr.io/${{ github.repository_owner }}/realms:d6de67c4bd86926155137119ee52af4578f4b7b5 \
-            bash -c "dfx build --network=ic && \
+            bash -c "/app/build_canisters.sh && \
                     # Copy WASM files
                     cp .dfx/ic/canisters/realm_backend/*.wasm /host/realm_backend.wasm && \
                     cp .dfx/ic/canisters/realm_frontend/*.wasm /host/realm_frontend.wasm && \
