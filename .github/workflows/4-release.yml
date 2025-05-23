@@ -1,0 +1,151 @@
+name: 4. Create Release
+
+on:
+  workflow_run:
+    workflows: ["2. Run Tests"]
+    types:
+      - completed
+    branches: [main]
+  workflow_dispatch:  # Allows manual triggering
+    inputs:
+      release_type:
+        description: 'Type of release (patch, minor, major)'
+        required: false
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      create_github_release:
+        description: 'Create GitHub Release'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  deploy:
+    # Only run if the workflow_run event was successful or if it's a manual dispatch
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.PAT_GITHUB }}
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install bumpversion
+      
+      # Bump version if release_type is provided
+      - name: Bump version
+        if: ${{ github.event.inputs.release_type != '' }}
+        id: bump_version
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          # Create version file if it doesn't exist
+          if [ ! -f "version.txt" ]; then
+            echo "0.1.0" > version.txt
+          fi
+          
+          # Use bumpversion to increment version
+          bumpversion --current-version $(cat version.txt) --new-version $(python -c "import semver; v=semver.VersionInfo.parse('$(cat version.txt)'); print(v.bump_${{ github.event.inputs.release_type }}())") version.txt
+          
+          # Store new version for later use
+          echo "NEW_VERSION=$(cat version.txt)" >> $GITHUB_OUTPUT
+      
+      # Get SHA for workflow run or use current SHA for manual dispatch
+      - name: Get commit SHA
+        id: get_sha
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_run" ]; then
+            echo "SHA=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "SHA=${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Build Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get_sha.outputs.SHA }}
+          load: true
+      
+      - name: Build canisters and extract artifacts
+        run: |
+          # Run DFX build in the Docker container
+          docker run --rm \
+            -v "$(pwd):/host" \
+            ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get_sha.outputs.SHA }} \
+            bash -c "dfx build --network=ic && \
+                    # Copy WASM files
+                    cp .dfx/ic/canisters/realm_backend/*.wasm /host/realm_backend.wasm && \
+                    cp .dfx/ic/canisters/realm_frontend/*.wasm /host/realm_frontend.wasm && \
+                    # Copy Candid files
+                    cp .dfx/ic/canisters/realm_backend/*.did /host/realm_backend.did && \
+                    cp .dfx/ic/canisters/realm_frontend/*.did /host/realm_frontend.did"
+      
+      # Push changes if we did a version bump
+      - name: Push changes
+        if: ${{ github.event.inputs.release_type != '' }}
+        run: |
+          git add version.txt
+          git commit -m "Bump version to $(cat version.txt)"
+          git tag -a "v$(cat version.txt)" -m "Release v$(cat version.txt)"
+          git remote set-url origin https://${{ secrets.PAT_GITHUB }}@github.com/${{ github.repository }}.git
+          git push origin
+          git push origin --tags
+      
+      # Create a GitHub release
+      - name: Create Release
+        if: ${{ (github.event.inputs.release_type != '' && github.event.inputs.create_github_release == 'true') || github.event_name == 'workflow_run' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.release_type != '' && format('v{0}', steps.bump_version.outputs.NEW_VERSION) || format('release-{0}', github.run_id) }}
+          name: ${{ github.event.inputs.release_type != '' && format('Release v{0}', steps.bump_version.outputs.NEW_VERSION) || format('Release {0}', github.run_id) }}
+          generate_release_notes: true
+          files: |
+            realm_backend.wasm
+            realm_backend.did
+            realm_frontend.wasm
+            realm_frontend.did
+          body: |
+            # ${{ github.event.inputs.release_type != '' && format('Release v{0}', steps.bump_version.outputs.NEW_VERSION) || format('Release {0}', github.run_id) }}
+            
+            This release contains the compiled WASM and Candid (DID) files for the Internet Computer canisters.
+            
+            ## Included Canisters
+            - realm_backend
+            - realm_frontend
+            
+            ## Installation
+            Download the appropriate files and deploy using `dfx deploy` or your preferred deployment method.
+            
+            ## Commit
+            ${{ steps.get_sha.outputs.SHA }}
