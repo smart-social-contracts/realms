@@ -58,7 +58,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install bumpversion
+          pip install bumpversion semver
       
       # Bump version if release_type is provided
       - name: Bump version
@@ -73,11 +73,15 @@ jobs:
             echo "0.1.0" > version.txt
           fi
           
-          # Use bumpversion to increment version
-          bumpversion --current-version $(cat version.txt) --new-version $(python -c "import semver; v=semver.VersionInfo.parse('$(cat version.txt)'); print(v.bump_${{ github.event.inputs.release_type }}())") version.txt
+          # Calculate new version with Python
+          CURRENT_VERSION=$(cat version.txt)
+          NEW_VERSION=$(python -c "import semver; v=semver.VersionInfo.parse('${CURRENT_VERSION}'); print(v.bump_${{ github.event.inputs.release_type }}())")
+          
+          # Update version file
+          echo "${NEW_VERSION}" > version.txt
           
           # Store new version for later use
-          echo "NEW_VERSION=$(cat version.txt)" >> $GITHUB_OUTPUT
+          echo "NEW_VERSION=${NEW_VERSION}" >> $GITHUB_OUTPUT
       
       # Get SHA for workflow run or use current SHA for manual dispatch
       - name: Get commit SHA
