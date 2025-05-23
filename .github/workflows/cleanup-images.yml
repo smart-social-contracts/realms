@@ -29,8 +29,9 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const days = ${{ github.event.inputs.days_old || 30 }};
-            const dryRun = ${{ github.event.inputs.dry_run || false }};
+            // Get inputs (with defaults)
+            const days = context.payload.inputs ? parseInt(context.payload.inputs.days_old || '30') : 30;
+            const dryRun = context.payload.inputs ? (context.payload.inputs.dry_run === 'true') : false;
             
             // Calculate cutoff date (images older than this will be deleted)
             const cutoffDate = new Date();
