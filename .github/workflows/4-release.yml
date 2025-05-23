@@ -95,15 +95,21 @@ jobs:
           # Pull the Docker image that was already built in the build stage
           docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get_sha.outputs.SHA }} 
       
-      - name: Build canisters and extract artifacts
+      - name: Extract canister artifacts
         run: |
-          # Run DFX build in the Docker container
+          # Create directory to ensure it exists for mounting
+          mkdir -p artifacts
+
+          # Extract artifacts from the known path in the Docker container
           docker run --rm \
-            -v "$(pwd):/host" \
+            -v "$(pwd)/artifacts:/artifacts" \
             ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get_sha.outputs.SHA }} \
-            bash -c "cp .dfx/local/canisters/realm_backend/*.wasm.gz /host/realm_backend.wasm \
-                  && cp .dfx/local/canisters/realm_backend/*.did /host/realm_backend.did"
-                    
+            bash -c "cp /app/.dfx/local/canisters/realm_backend/realm_backend.wasm.gz /artifacts/ && \
+                    cp /app/.dfx/local/canisters/realm_backend/service.did /artifacts/realm_backend.did"
+          
+          # Move artifacts to the root directory for the release
+          mv artifacts/realm_backend.wasm.gz ./
+          mv artifacts/realm_backend.did ./
       
       # Push changes if we did a version bump
       - name: Push changes
@@ -125,7 +131,7 @@ jobs:
           name: ${{ github.event.inputs.release_type != '' && format('Release v{0}', steps.bump_version.outputs.NEW_VERSION) || format('Release {0}', github.run_id) }}
           generate_release_notes: true
           files: |
-            realm_backend.wasm
+            realm_backend.wasm.gz
             realm_backend.did
           body: |
             # ${{ github.event.inputs.release_type != '' && format('Release v{0}', steps.bump_version.outputs.NEW_VERSION) || format('Release {0}', github.run_id) }}
