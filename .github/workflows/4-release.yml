@@ -101,13 +101,9 @@ jobs:
           docker run --rm \
             -v "$(pwd):/host" \
             ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get_sha.outputs.SHA }} \
-            bash -c "/app/build_canisters.sh && \
-                    # Copy WASM files
-                    cp .dfx/ic/canisters/realm_backend/*.wasm /host/realm_backend.wasm && \
-                    cp .dfx/ic/canisters/realm_frontend/*.wasm /host/realm_frontend.wasm && \
-                    # Copy Candid files
-                    cp .dfx/ic/canisters/realm_backend/*.did /host/realm_backend.did && \
-                    cp .dfx/ic/canisters/realm_frontend/*.did /host/realm_frontend.did"
+            bash -c "cp .dfx/local/canisters/realm_backend/*.wasm.gz /host/realm_backend.wasm \
+                  && cp .dfx/local/canisters/realm_backend/*.did /host/realm_backend.did"
+                    
       
       # Push changes if we did a version bump
       - name: Push changes
@@ -131,8 +127,6 @@ jobs:
           files: |
             realm_backend.wasm
             realm_backend.did
-            realm_frontend.wasm
-            realm_frontend.did
           body: |
             # ${{ github.event.inputs.release_type != '' && format('Release v{0}', steps.bump_version.outputs.NEW_VERSION) || format('Release {0}', github.run_id) }}
             
@@ -140,7 +134,6 @@ jobs:
             
             ## Included Canisters
             - realm_backend
-            - realm_frontend
             
             ## Installation
             Download the appropriate files and deploy using `dfx deploy` or your preferred deployment method.
