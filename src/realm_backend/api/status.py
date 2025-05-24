@@ -38,9 +38,7 @@ def get_status() -> dict[str, Any]:
         "version": version,
         "status": "ok",
         "users_count": users_count,
-        "treasury": {
-            "vaults": get_treasury().vaults
-        },
+        "treasury": {"vaults": []},
         "organizations_count": organizations_count,
         "commit": commit_hash,
     }
