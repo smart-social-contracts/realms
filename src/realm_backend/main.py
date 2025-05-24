@@ -150,6 +150,8 @@ def init_() -> void:
             f"Failed to initialize extensions: {str(e)}\n{traceback.format_exc()}"
         )
 
+    # Initialize vault-extension extension
+    init_vault_extension()
 
 # # Extension API for Vault Manager
 

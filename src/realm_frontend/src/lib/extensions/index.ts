@@ -34,4 +34,4 @@ export function getExtension(id: string): ExtensionMetadata | undefined {
 }
 
 // Export individual extensions
-export { VaultManager };
+export { VaultManager  VaultExtension,};
