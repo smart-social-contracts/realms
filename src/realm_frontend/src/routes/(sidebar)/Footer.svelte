@@ -12,15 +12,26 @@
 	
 	// Get commit hash from meta tag
 	let commitHash = '';
+	// Get version from meta tag
+	let version = '';
 	
 	// This runs on the client side only
 	if (typeof document !== 'undefined') {
-		const metaTag = document.querySelector('meta[name="commit-hash"]');
-		if (metaTag) {
-			commitHash = metaTag.getAttribute('content') || '';
+		const commitHashMeta = document.querySelector('meta[name="commit-hash"]');
+		if (commitHashMeta) {
+			commitHash = commitHashMeta.getAttribute('content') || '';
 			// Format to show only first 7 characters if it's a full hash
 			if (commitHash && commitHash !== 'COMMIT_HASH_PLACEHOLDER' && commitHash.length > 7) {
 				commitHash = commitHash.substring(0, 7);
+			}
+		}
+		
+		const versionMeta = document.querySelector('meta[name="version"]');
+		if (versionMeta) {
+			version = versionMeta.getAttribute('content') || '';
+			// Show the full version
+			if (version && version !== 'VERSION_PLACEHOLDER') {
+				version = version;
 			}
 		}
 	}
