@@ -63,12 +63,21 @@ describe('Footer Component', () => {
     cleanup();
   });
 
-  it('does not display commit hash when it is the placeholder', async () => {
+  it('does not display commit hash and version when it is the placeholder', async () => {
     // Override the mock to return the placeholder value
     vi.stubGlobal('document', {
       ...document,
       querySelector: vi.fn().mockReturnValue({
         getAttribute: vi.fn().mockReturnValue('COMMIT_HASH_PLACEHOLDER')
+      }),
+      createElement: document.createElement.bind(document),
+      body: document.body
+    });
+
+    vi.stubGlobal('document', {
+      ...document,
+      querySelector: vi.fn().mockReturnValue({
+        getAttribute: vi.fn().mockReturnValue('VERSION_PLACEHOLDER')
       }),
       createElement: document.createElement.bind(document),
       body: document.body

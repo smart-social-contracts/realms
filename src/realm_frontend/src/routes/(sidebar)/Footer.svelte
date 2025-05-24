@@ -72,4 +72,11 @@
 			<span class="text-xs text-gray-400 dark:text-gray-500">Build: {commitHash}</span>
 		</div>
 	{/if}
+
+	<!-- Version display -->
+	{#if version && version !== 'VERSION_PLACEHOLDER'}
+		<div class="mt-3 text-center">
+			<span class="text-xs text-gray-400 dark:text-gray-500">Version: {version}</span>
+		</div>
+	{/if}
 </Frame>

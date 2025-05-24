@@ -29,6 +29,10 @@ jobs:
           COMMIT_HASH=$(git rev-parse HEAD)
           sed -i "s/COMMIT_HASH_PLACEHOLDER/$COMMIT_HASH/g" src/realm_backend/api/status.py
           sed -i "s/COMMIT_HASH_PLACEHOLDER/$COMMIT_HASH/g" src/realm_frontend/src/app.html
+
+          VERSION=$(cat version.txt)
+          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" src/realm_backend/api/status.py
+          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" src/realm_frontend/src/app.html
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2

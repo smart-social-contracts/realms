@@ -29,14 +29,18 @@ def get_status() -> dict[str, Any]:
 
     # In production, this would be set during the build process
     # For development, we can use a placeholder
-    # This will be replaced during CI/CD deployment with the actual commit hash
+    # This will be replaced during CI/CD deployment with the actual commit hash and version
     commit_hash = "COMMIT_HASH_PLACEHOLDER"
+    version = "VERSION_PLACEHOLDER"
 
     # Return data in the format expected by the Status Candid type
     return {
-        "version": "0.1.0",
+        "version": version,
         "status": "ok",
         "users_count": users_count,
+        "treasury": {
+            "vaults": get_treasury().vaults
+        },
         "organizations_count": organizations_count,
-        "commit": commit_hash,  # Add git commit hash
+        "commit": commit_hash,
     }
