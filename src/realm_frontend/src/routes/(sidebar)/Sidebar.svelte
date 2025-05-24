@@ -25,7 +25,8 @@
 		TableColumnSolid,
 		UsersOutline,
 		HomeOutline,
-		WalletSolid
+		WalletSolid,
+		PuzzlePieceSolid
 	} from 'flowbite-svelte-icons';
 
 	export let drawerHidden: boolean = false;
@@ -55,6 +56,7 @@
 		{ name: 'Dashboard', icon: ChartPieOutline, href: '/dashboard' },
 		{ name: 'My social contracts', icon: HomeOutline, href: '/contracts' },
 		{ name: 'My identities', icon: UsersOutline, href: '/identities' },
+		{ name: 'Extension Manager', icon: PuzzlePieceSolid, href: '/extensions/manage' },
 		{ name: 'Vault Manager', icon: WalletSolid, href: '/extensions/vault-manager' }
 
 		// {

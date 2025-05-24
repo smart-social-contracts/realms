@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from core.extensions import call_extension, extension_registry
 from kybra import Opt, Record, Vec, nat, query, update
@@ -46,6 +46,20 @@ class BalanceResponse(Record):
 class ErrorResponse(Record):
     success: bool
     error: str
+
+
+class ExtensionConfig(Record):
+    settings: Dict[str, Any]
+
+
+class ExtensionStatusResponse(Record):
+    success: bool
+    extensions: List[Dict[str, Any]]
+
+
+class ExtensionUpdateResponse(Record):
+    success: bool
+    message: str
 
 
 @query
@@ -162,3 +176,55 @@ async def transfer_tokens(
     except Exception as e:
         logger.error(f"Error in transfer_tokens: {str(e)}")
         return {"success": False, "error": str(e)}
+
+
+# Extension Management API
+
+
+@query
+def get_extension_status() -> ExtensionStatusResponse:
+    """Get status of all installed extensions"""
+    try:
+        extensions_list = extension_registry.list_extensions()
+        logger.info(f"Retrieved status for {len(extensions_list)} extensions")
+        return ExtensionStatusResponse(success=True, extensions=extensions_list)
+    except Exception as e:
+        logger.error(f"Error getting extension status: {str(e)}")
+        return ExtensionStatusResponse(success=False, extensions=[])
+
+
+@update
+def set_extension_status(extension_id: str, enabled: bool) -> ExtensionUpdateResponse:
+    """Enable or disable an extension"""
+    try:
+        success = extension_registry.set_extension_enabled(extension_id, enabled)
+        if success:
+            status = "enabled" if enabled else "disabled"
+            message = f"Extension '{extension_id}' {status} successfully"
+            logger.info(message)
+            return ExtensionUpdateResponse(success=True, message=message)
+        else:
+            message = f"Failed to update status for extension '{extension_id}'"
+            logger.error(message)
+            return ExtensionUpdateResponse(success=False, message=message)
+    except Exception as e:
+        logger.error(f"Error setting extension status: {str(e)}")
+        return ExtensionUpdateResponse(success=False, message=str(e))
+
+
+@update
+def set_extension_config(extension_id: str, config: ExtensionConfig) -> ExtensionUpdateResponse:
+    """Update extension configuration"""
+    try:
+        success = extension_registry.set_extension_config(extension_id, config.settings)
+        if success:
+            message = f"Configuration updated for extension '{extension_id}'"
+            logger.info(message)
+            return ExtensionUpdateResponse(success=True, message=message)
+        else:
+            message = f"Failed to update configuration for extension '{extension_id}'"
+            logger.error(message)
+            return ExtensionUpdateResponse(success=False, message=message)
+    except Exception as e:
+        logger.error(f"Error setting extension config: {str(e)}")
+        return ExtensionUpdateResponse(success=False, message=str(e))
