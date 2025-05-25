@@ -16,7 +16,9 @@
 
 <Button
 	color="primary"
-	class="w-full"
+	variant="filled"
+	size="lg"
+	class="w-full my-4 p-4 text-xl font-bold shadow-lg rounded-lg"
 	onclick={() => {
 		backend.extension_call({
 			extension_name: "test_bench",
