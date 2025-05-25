@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
+
 from kybra import Async
 from kybra_simple_logging import get_logger
 
@@ -130,12 +131,18 @@ class ExtensionRegistry:
 # Singleton instance for global access
 extension_registry = ExtensionRegistry()
 
-def call_extension(extension_name: str, function_name: str, *args, **kwargs) -> Async[Any]:
+
+def call_extension(
+    extension_name: str, function_name: str, *args, **kwargs
+) -> Async[Any]:
     """Call an entry point of an extension with permission checking"""
+
     async def async_call():
         try:
-            logger.info(f"Calling extension '{extension_name}' function '{function_name}'")
-            
+            logger.info(
+                f"Calling extension '{extension_name}' function '{function_name}'"
+            )
+
             # For the test_bench extension, handle it directly
             if extension_name == "test_bench":
                 if function_name == "get_data":
@@ -150,9 +157,9 @@ def call_extension(extension_name: str, function_name: str, *args, **kwargs) -> 
                 error_msg = f"Extension '{extension_name}' not found"
                 logger.error(error_msg)
                 raise ValueError(error_msg)
-            
+
         except Exception as e:
             logger.error(f"Error calling function '{function_name}': {str(e)}")
             raise
-    
+
     return async_call()

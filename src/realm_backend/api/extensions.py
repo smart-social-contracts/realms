@@ -1,11 +1,18 @@
-from typing import Any, Dict, Optional
+from typing import Any
 
 import core
-from core.extensions import extension_registry
-from kybra import Opt, Record, Vec, nat, query, update, Async
+from kybra import Async, update
 from kybra_simple_logging import get_logger
 
 logger = get_logger("api.extensions")
+
+
+# from typing import Any, Dict, Optional
+
+# import core
+# from core.extensions import extension_registry
+# from kybra import Async, Opt, Record, Vec, nat, query, update
+# from kybra_simple_logging import get_logger
 
 
 # @query
@@ -30,7 +37,9 @@ logger = get_logger("api.extensions")
 
 
 @update
-async def call_extension(extension_name: str, function_name: str, *args, **kwargs) -> Async[Any]:
+async def call_extension(
+    extension_name: str, function_name: str, *args, **kwargs
+) -> Async[Any]:
     """Call an extension's entry point with the provided arguments"""
     # Convert string args to appropriate types as needed
     ext_args = args
@@ -42,6 +51,8 @@ async def call_extension(extension_name: str, function_name: str, *args, **kwarg
         f"Calling extension '{extension_name}' entry point '{function_name} and params {args} and {kwargs}'"
     )
 
-    response = await core.extensions.call_extension(extension_name, function_name, *ext_args, **ext_kwargs)
+    response = await core.extensions.call_extension(
+        extension_name, function_name, *ext_args, **ext_kwargs
+    )
 
     return response

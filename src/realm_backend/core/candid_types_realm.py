@@ -1,4 +1,4 @@
-from kybra import Principal, Record, Variant, nat, text, Opt, Vec, float64
+from kybra import Opt, Principal, Record, Variant, Vec, float64, nat, text
 
 
 class StatusRecord(Record):
@@ -37,10 +37,12 @@ class ExtensionArgument(Variant):
     Boolean: bool
     # Add other types as needed
 
+
 # Define key-value pair for kwargs
 class KeyValuePair(Record):
     key: text
     value: ExtensionArgument
+
 
 # Then use these types in ExtensionCallArgs
 class ExtensionCallArgs(Record):

@@ -2,19 +2,21 @@ import json
 import traceback
 
 import api
+
 # from api.extensions import list_extensions
 from api.status import get_status
 from api.user import user_get, user_register
 from core.candid_types_realm import (
+    ExtensionCallArgs,
+    ExtensionCallResponse,
     RealmResponse,
     RealmResponseData,
     StatusRecord,
     UserGetRecord,
     UserRegisterRecord,
-    ExtensionCallArgs,
-    ExtensionCallResponse,
 )
 from kybra import (
+    Async,
     Func,
     Opt,
     Principal,
@@ -31,7 +33,6 @@ from kybra import (
     query,
     update,
     void,
-    Async,
 )
 from kybra_simple_db import Database
 from kybra_simple_logging import get_logger
@@ -162,11 +163,11 @@ def extension_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse]:
             f"Calling extension '{args['extension_name']}' entry point '{args['function_name']} with args {args['args']} and kwargs {args['kwargs']}"
         )
 
-        _args = args['args'] or []
-        _kwargs = args['kwargs'] or {}
+        _args = args["args"] or []
+        _kwargs = args["kwargs"] or {}
 
         response = yield api.extensions.call_extension(
-            args['extension_name'], args['function_name'], *_args, **_kwargs
+            args["extension_name"], args["function_name"], *_args, **_kwargs
         )
         return ExtensionCallResponse(success=True, response=str(response))
     except Exception as e:
@@ -215,14 +216,14 @@ def http_request(req: HttpRequest) -> HttpResponse:
             if url_path[2] == "status":
                 return http_request_core(get_status())
 
-            if url_path[2] == "extensions":
-                if len(url_path) < 4:
-                    # List all extensions
-                    extensions_list = list_extensions()
-                    return http_request_core({"extensions": extensions_list})
+            # if url_path[2] == "extensions":
+            #     if len(url_path) < 4:
+            #         # List all extensions
+            #         extensions_list = list_extensions()
+            #         return http_request_core({"extensions": extensions_list})
 
-                # Note: We no longer need to handle extension-specific HTTP endpoints here
-                # as we have proper canister methods now
+            # Note: We no longer need to handle extension-specific HTTP endpoints here
+            # as we have proper canister methods now
 
         return not_found
     except Exception as e:
