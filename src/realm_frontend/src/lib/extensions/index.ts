@@ -2,6 +2,7 @@ import type { ComponentType } from 'svelte';
 
 // Import all available extensions
 import * as VaultManager from './vault-manager';
+import * as MyExtension1 from './my-extension-1';
 
 // Extension metadata interface
 export interface ExtensionMetadata {
@@ -20,6 +21,10 @@ const extensionsRegistry: Record<string, ExtensionMetadata> = {
     'vault-manager': {
         ...VaultManager.metadata,
         component: VaultManager.VaultManager
+    },
+    'my-extension-1': {
+        ...MyExtension1.metadata,
+        component: MyExtension1.MyExtension1
     }
 };
 
@@ -35,3 +40,4 @@ export function getExtension(id: string): ExtensionMetadata | undefined {
 
 // Export individual extensions
 export { VaultManager };
+export { MyExtension1 };

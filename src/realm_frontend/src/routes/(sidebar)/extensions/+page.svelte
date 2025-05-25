@@ -85,6 +85,19 @@
 							</Button>
 						{/if}
 					</div>
+
+					
+					<div class="flex justify-between mt-auto">
+						{#if extension.id === 'myextension1'}
+							<Button href="/extensions/{extension.id}" color="primary" class="w-full">
+								Open Extension
+							</Button>
+						{:else}
+							<Button color="primary" class="w-full">
+								Install Extensions
+							</Button>
+						{/if}
+					</div>
 				</Card>
 			{/each}
 		</div>

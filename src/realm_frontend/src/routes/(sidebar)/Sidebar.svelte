@@ -55,7 +55,8 @@
 		{ name: 'Dashboard', icon: ChartPieOutline, href: '/dashboard' },
 		{ name: 'My social contracts', icon: HomeOutline, href: '/contracts' },
 		{ name: 'My identities', icon: UsersOutline, href: '/identities' },
-		{ name: 'Vault Manager', icon: WalletSolid, href: '/extensions/vault-manager' }
+		{ name: 'Vault Manager', icon: WalletSolid, href: '/extensions/vault-manager' },
+		{ name: 'MyExtension1', icon: WalletSolid, href: '/extensions/myextension1' }
 
 		// {
 		// 	name: 'Layouts',
