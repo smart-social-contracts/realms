@@ -7,8 +7,7 @@ export const load: PageLoad = ({ params }) => {
     
     if (!extension) {
         throw error(404, {
-            message: `Extension '${params.id}' not found`,
-            code: 'EXTENSION_NOT_FOUND'
+            message: `Extension '${params.id}' not found`
         });
     }
     
