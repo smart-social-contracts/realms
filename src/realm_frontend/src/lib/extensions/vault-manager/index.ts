@@ -1,17 +1,18 @@
-// Export all components from the vault-manager extension
-import VaultManager from './VaultManager.svelte';
+// Export the main component as default for dynamic loading
+import VaultManagerComponent from './VaultManager.svelte';
+export default VaultManagerComponent;
+
+// Also export other components for direct imports if needed
 import BalanceCard from './BalanceCard.svelte';
 import TransactionsList from './TransactionsList.svelte';
 
 export {
-    VaultManager,
     BalanceCard,
     TransactionsList
 }
 
 // Extension metadata for the marketplace
 export const metadata = {
-    id: 'vault-manager',
     name: 'Vault Manager',
     description: 'Manage your vault balances and transfer tokens',
     version: '1.0.0',

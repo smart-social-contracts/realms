@@ -1,11 +1,11 @@
 // Export the component as default for dynamic loading
-import MyExtension1Component from './MyExtension1.svelte';
-export default MyExtension1Component;
+import MyExtension2Component from './MyExtension2.svelte';
+export default MyExtension2Component;
 
 // Extension metadata for the marketplace
 export const metadata = {
-    name: 'My Extension 1',
-    description: 'My Extension 1',
+    name: 'My Extension 2',
+    description: 'My Extension 2',
     version: '1.0.0',
     icon: 'wallet', // Icon name from the icon library
     author: 'Smart Social Contracts Team',

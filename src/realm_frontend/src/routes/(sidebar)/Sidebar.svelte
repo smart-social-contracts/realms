@@ -27,6 +27,10 @@
 		HomeOutline,
 		WalletSolid
 	} from 'flowbite-svelte-icons';
+	
+	// Import extension system
+	import { getAllExtensions } from '$lib/extensions';
+	import { getIcon } from '$lib/utils/iconMap';
 
 	export let drawerHidden: boolean = false;
 
@@ -51,59 +55,25 @@
 		activeMainSidebar = navigation.to?.url.pathname ?? '';
 	});
 
-	let posts = [
+	// Get all extensions for the sidebar
+	const extensions = getAllExtensions();
+
+	// Core navigation items
+	const coreNavItems = [
 		{ name: 'Dashboard', icon: ChartPieOutline, href: '/dashboard' },
 		{ name: 'My social contracts', icon: HomeOutline, href: '/contracts' },
 		{ name: 'My identities', icon: UsersOutline, href: '/identities' },
-		{ name: 'Vault Manager', icon: WalletSolid, href: '/extensions/vault-manager' },
-		{ name: 'MyExtension1', icon: WalletSolid, href: '/extensions/myextension1' }
+	];
 
-		// {
-		// 	name: 'Layouts',
-		// 	icon: TableColumnSolid,
-		// 	children: {
-		// 		Stacked: '/layouts/stacked',
-		// 		Sidebar: '/layouts/sidebar'
-		// 	}
-		// },
-		// {
-		// 	name: 'CRUD',
-		// 	icon: RectangleListSolid,
-		// 	children: {
-		// 		Products: '/crud/products',
-		// 		Users: '/crud/users'
-		// 	}
-		// },
-		// { name: 'Settings', icon: CogOutline, href: '/settings' },
-		// {
-		// 	name: 'Pages',
-		// 	icon: FileChartBarSolid,
-		// 	children: {
-		// 		Pricing: '/pages/pricing',
-		// 		Maintenance: '/errors/400',
-		// 		'404 not found': '/errors/404',
-		// 		'500 server error': '/errors/500'
-		// 	}
-		// },
-		// {
-		// 	name: 'Authenication',
-		// 	icon: LockSolid,
-		// 	children: {
-		// 		'Sign in': '/authentication/sign-in',
-		// 		'Sign up': '/authentication/sign-up',
-		// 		'Forgot password': '/authentication/forgot-password',
-		// 		'Reset password': '/authentication/reset-password',
-		// 		'Profile lock': '/authentication/profile-lock'
-		// 	}
-		// },
-		// {
-		// 	name: 'Playground',
-		// 	icon: WandMagicSparklesOutline,
-		// 	children: {
-		// 		Stacked: '/playground/stacked',
-		// 		Sidebar: '/playground/sidebar'
-		// 	}
-		// }
+	// Create combined navigation items with core items and extensions
+	$: posts = [
+		...coreNavItems,
+		// Dynamically add extensions
+		...extensions.map(ext => ({
+			name: ext.name,
+			icon: getIcon(ext.icon, WalletSolid),
+			href: `/extensions/${ext.id}`
+		}))
 	];
 
 	let links = [
@@ -128,7 +98,9 @@
 		// 	icon: LifeSaverSolid
 		// }
 	];
-	let dropdowns = Object.fromEntries(Object.keys(posts).map((x) => [x, false]));
+	
+	// Make dropdowns reactive based on posts
+	$: dropdowns = posts ? Object.fromEntries(posts.map((post, index) => [index, false])) : {};
 </script>
 
 <Sidebar
@@ -143,9 +115,9 @@
 	>
 		<nav class="divide-y divide-gray-200 dark:divide-gray-700">
 			<SidebarGroup ulClass={groupClass} class="mb-3">
-				{#each posts as { name, icon, children, href } (name)}
+				{#each posts as { name, icon, children, href }, index}
 					{#if children}
-						<SidebarDropdownWrapper bind:isOpen={dropdowns[name]} label={name} class="pr-3">
+						<SidebarDropdownWrapper bind:isOpen={dropdowns[index]} label={name} class="pr-3">
 							<AngleDownOutline slot="arrowdown" strokeWidth="3.3" size="sm" />
 							<AngleUpOutline slot="arrowup" strokeWidth="3.3" size="sm" />
 							<svelte:component this={icon} slot="icon" class={iconClass} />
