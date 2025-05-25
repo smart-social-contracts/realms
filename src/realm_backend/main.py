@@ -1,7 +1,8 @@
 import json
 import traceback
 
-from api.extensions import list_extensions
+import api
+# from api.extensions import list_extensions
 from api.status import get_status
 from api.user import user_get, user_register
 from core.candid_types_realm import (
@@ -10,6 +11,8 @@ from core.candid_types_realm import (
     StatusRecord,
     UserGetRecord,
     UserRegisterRecord,
+    ExtensionCallArgs,
+    ExtensionCallResponse,
 )
 from kybra import (
     Func,
@@ -28,6 +31,7 @@ from kybra import (
     query,
     update,
     void,
+    Async,
 )
 from kybra_simple_db import Database
 from kybra_simple_logging import get_logger
@@ -151,111 +155,23 @@ def init_() -> void:
         )
 
 
-# # Extension API for Vault Manager
+@update
+def extension_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse]:
+    try:
+        logger.info(
+            f"Calling extension '{args['extension_name']}' entry point '{args['function_name']} with args {args['args']} and kwargs {args['kwargs']}"
+        )
 
-# @query
-# def get_vault_status() -> RealmResponse:
-#     """Get status of the vault canister"""
-#     try:
-#         from api.extensions import get_vault_status as api_get_vault_status
+        _args = args['args'] or []
+        _kwargs = args['kwargs'] or {}
 
-#         logger.info("Calling get_vault_status")
-#         result = api_get_vault_status()
-
-#         if result["success"]:
-#             return RealmResponse(
-#                 success=True,
-#                 data=RealmResponseData(Extension=result["data"])
-#             )
-#         else:
-#             logger.error(f"Error in get_vault_status: {result['error']}")
-#             return RealmResponse(
-#                 success=False,
-#                 data=RealmResponseData(Error=result["error"])
-#             )
-#     except Exception as e:
-#         logger.error(f"Error getting vault status: {str(e)}\n{traceback.format_exc()}")
-#         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-# @query
-# def get_balance(principal_id: Optional[Principal] = None) -> RealmResponse:
-#     """Get balance for a principal (defaults to caller)"""
-#     try:
-#         from api.extensions import get_balance as api_get_balance
-
-#         # Use caller's principal if none specified
-#         principal_str = None
-#         if principal_id:
-#             principal_str = principal_id.to_str()
-
-#         logger.info(f"Calling get_balance for principal: {principal_str or 'caller'}")
-#         result = api_get_balance(principal_str)
-
-#         if result["success"]:
-#             return RealmResponse(
-#                 success=True,
-#                 data=RealmResponseData(Extension=result["data"])
-#             )
-#         else:
-#             logger.error(f"Error in get_balance: {result['error']}")
-#             return RealmResponse(
-#                 success=False,
-#                 data=RealmResponseData(Error=result["error"])
-#             )
-#     except Exception as e:
-#         logger.error(f"Error getting balance: {str(e)}\n{traceback.format_exc()}")
-#         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-# @query
-# def get_transactions(limit: nat = 10, offset: nat = 0) -> RealmResponse:
-#     """Get transaction history for the caller"""
-#     try:
-#         from api.extensions import get_transactions as api_get_transactions
-
-#         logger.info(f"Calling get_transactions with limit: {limit}, offset: {offset}")
-#         result = api_get_transactions(limit, offset)
-
-#         if result["success"]:
-#             return RealmResponse(
-#                 success=True,
-#                 data=RealmResponseData(Extension=result["data"])
-#             )
-#         else:
-#             logger.error(f"Error in get_transactions: {result['error']}")
-#             return RealmResponse(
-#                 success=False,
-#                 data=RealmResponseData(Error=result["error"])
-#             )
-#     except Exception as e:
-#         logger.error(f"Error getting transactions: {str(e)}\n{traceback.format_exc()}")
-#         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-# @update
-# def transfer_tokens(to_principal_id: Principal, amount: nat, memo: str = "") -> RealmResponse:
-#     """Transfer tokens to another principal"""
-#     try:
-#         from api.extensions import transfer_tokens as api_transfer_tokens
-
-#         logger.info(f"Calling transfer_tokens to: {to_principal_id.to_str()}, amount: {amount}")
-#         result = api_transfer_tokens(to_principal_id.to_str(), amount, memo)
-
-#         if result["success"]:
-#             return RealmResponse(
-#                 success=True,
-#                 data=RealmResponseData(Extension=result["data"])
-#             )
-#         else:
-#             logger.error(f"Error in transfer_tokens: {result['error']}")
-#             return RealmResponse(
-#                 success=False,
-#                 data=RealmResponseData(Error=result["error"])
-#             )
-#     except Exception as e:
-#         logger.error(f"Error transferring tokens: {str(e)}\n{traceback.format_exc()}")
-#         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+        response = yield api.extensions.call_extension(
+            args['extension_name'], args['function_name'], *_args, **_kwargs
+        )
+        return ExtensionCallResponse(success=True, response=str(response))
+    except Exception as e:
+        logger.error(f"Error calling extension: {str(e)}\n{traceback.format_exc()}")
+        return ExtensionCallResponse(success=False, response=str(e))
 
 
 def http_request_core(data):

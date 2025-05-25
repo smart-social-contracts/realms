@@ -1,4 +1,4 @@
-from kybra import Principal, Record, Variant, nat, text
+from kybra import Principal, Record, Variant, nat, text, Opt, Vec, float64
 
 
 class StatusRecord(Record):
@@ -28,3 +28,28 @@ class RealmResponseData(Variant):
 class RealmResponse(Record):
     success: bool
     data: RealmResponseData
+
+
+# Define argument types
+class ExtensionArgument(Variant):
+    String: text
+    Number: float64
+    Boolean: bool
+    # Add other types as needed
+
+# Define key-value pair for kwargs
+class KeyValuePair(Record):
+    key: text
+    value: ExtensionArgument
+
+# Then use these types in ExtensionCallArgs
+class ExtensionCallArgs(Record):
+    extension_name: text
+    function_name: text
+    args: Opt[Vec[ExtensionArgument]]
+    kwargs: Opt[Vec[KeyValuePair]]
+
+
+class ExtensionCallResponse(Record):
+    success: bool
+    response: text
