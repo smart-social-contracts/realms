@@ -18,6 +18,7 @@
 
 <main class="p-4">
 	<div class="max-w-7xl mx-auto">
-		<svelte:component this={ExtensionComponent} />
+		<!-- Adding the extension.id as a key forces re-rendering when ID changes -->
+		<svelte:component this={ExtensionComponent} key={extension.id} />
 	</div>
 </main>

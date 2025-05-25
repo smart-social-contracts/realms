@@ -4,7 +4,7 @@
 	import { SITE_NAME } from '$lib/config';
 	import MetaTag from '../../../utils/MetaTag.svelte';
 	
-	const path: string = '/extensions/myextension2';
+	const path: string = '/extensions/my-extension-2';
 	const description: string = 'MyExtension2';
 	const title: string = SITE_NAME + ' - MyExtension2';
 	const subtitle: string = 'MyExtension2';
