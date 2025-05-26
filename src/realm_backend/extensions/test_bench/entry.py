@@ -14,7 +14,7 @@ def get_data() -> Async[TestBenchResponse]:
     # 2. Return the CALL to that function (creates a special Kybra future)
     async def async_impl():
         ic.print('async_impl executing')
-        return TestBenchResponse(data="some data 3")
+        return TestBenchResponse(data="some data 4")
     
     # Return the CALL to the async function
     # This creates a special Kybra future object that the IC runtime can process
