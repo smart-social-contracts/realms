@@ -36,9 +36,9 @@ logger = get_logger("api.extensions")
 #         return []
 
 
-@update
-async def call_extension(
-    extension_name: str, function_name: str, *args, **kwargs
+
+def call_extension(
+    extension_name: str, function_name: str, args, kwargs
 ) -> Async[Any]:
     """Call an extension's entry point with the provided arguments"""
     # Convert string args to appropriate types as needed
@@ -48,10 +48,10 @@ async def call_extension(
     ext_kwargs = kwargs
 
     logger.info(
-        f"Calling extension '{extension_name}' entry point '{function_name} and params {args} and {kwargs}'"
+        f"Calling extension '{extension_name}' entry point '{function_name}' and params {args} and {kwargs}"
     )
 
-    response = await core.extensions.call_extension(
+    response = yield core.extensions.call_extension(
         extension_name, function_name, *ext_args, **ext_kwargs
     )
 

@@ -33,6 +33,8 @@ from kybra import (
     query,
     update,
     void,
+    CallResult,
+    text
 )
 from kybra_simple_db import Database
 from kybra_simple_logging import get_logger
@@ -135,41 +137,36 @@ def get_user(principal: Principal) -> RealmResponse:
 def init_() -> void:
     logger.info("Realm canister initialized")
 
-    # Initialize extensions
-    try:
-        # Only import the init_extensions function here to avoid circular imports
-        # during Kybra's compile-time type checking
-        from extensions import init_extensions
-
-        # Get realm data to pass to extensions
-        realm_data = {
-            "vault_principal_id": ic.id().to_str()  # For demo purposes, using self as vault
-            # In real deployment, you'd get this from a configuration or parameter
-        }
-
-        # Initialize all extensions
-        init_extensions(realm_data)
-        logger.info("Extensions initialized successfully")
-    except Exception as e:
-        logger.error(
-            f"Failed to initialize extensions: {str(e)}\n{traceback.format_exc()}"
-        )
 
 
 @update
 def extension_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse]:
     try:
         logger.info(
-            f"Calling extension '{args['extension_name']}' entry point '{args['function_name']} with args {args['args']} and kwargs {args['kwargs']}"
+            f"Calling extension '{args['extension_name']}' entry point '{args['function_name']}' with args {args['args']} and kwargs {args['kwargs']}"
         )
 
-        _args = args["args"] or []
-        _kwargs = args["kwargs"] or {}
 
-        response = yield api.extensions.call_extension(
-            args["extension_name"], args["function_name"], *_args, **_kwargs
-        )
-        return ExtensionCallResponse(success=True, response=str(response))
+
+        # _args = args["args"] or []
+        # _kwargs = args["kwargs"] or {}
+
+        # response = yield api.extensions.call_extension(
+        #     args["extension_name"], args["function_name"], _args, _kwargs
+        # )
+
+        from extensions.test_bench.entry import get_data, TestBenchResponse
+
+        logger.info('Calling get_data...')
+        
+        # With the correct async pattern in entry.py, we can just yield the function call directly
+        response = yield get_data()
+        
+        logger.info('response = %s' % response)
+        logger.info('response.data = %s' % response['data'])
+
+
+        return ExtensionCallResponse(success=True, response=str(response['data']))
     except Exception as e:
         logger.error(f"Error calling extension: {str(e)}\n{traceback.format_exc()}")
         return ExtensionCallResponse(success=False, response=str(e))
