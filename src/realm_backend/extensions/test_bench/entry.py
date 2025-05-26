@@ -7,17 +7,14 @@ class TestBenchResponse(Record):
 
 
 def get_data() -> Async[TestBenchResponse]:
+    """Get test data from this extension.
+    
+    The core module will handle the async wrapping for us.
+    """
     ic.print('get_data starting')
     
-    # When returning Async[T] in Kybra for IC:
-    # 1. Define nested async function
-    # 2. Return the CALL to that function (creates a special Kybra future)
-    async def async_impl():
-        ic.print('async_impl executing')
-        return TestBenchResponse(data="some data 4")
-    
-    # Return the CALL to the async function
-    # This creates a special Kybra future object that the IC runtime can process
-    return async_impl()
+    # Simple, non-async function that returns a regular value
+    # The core/extensions.py module will handle wrapping this in an async function
+    return TestBenchResponse(data="some data 5")
 
 

@@ -28,13 +28,25 @@ def call_extension_function(extension_name: str, function_name: str, *args, **kw
     #     logger.error(error_msg)
     #     raise ValueError(error_msg)
     
-    # Get the function from registry and call it
-    # func = function_registry[extension_name][function_name]
+    # Get the function from registry
     func = get_func(extension_name, function_name)
     logger.info(f"Got function from registry: {func}")
     
-    # This will get the async function
-    return func(*args, **kwargs)
+    # Call the function to get its result
+    result = func(*args, **kwargs)
+    logger.info(f"Got result from function: {result}")
+    
+    # In Kybra, we always need to return the result of calling an async function
+    # So wrap the result in an async function if it's not already one
+    
+    # Simple approach: always wrap the result in an async function
+    # This ensures consistency across all extensions
+    async def async_wrapper():
+        return result
+    
+    # Return the CALL to the async function (not the function itself)
+    # This creates a special Kybra future object that the IC runtime can process
+    return async_wrapper()
 
 
 def call_extension(
