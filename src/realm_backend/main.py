@@ -138,7 +138,6 @@ def init_() -> void:
     logger.info("Realm canister initialized")
 
 
-
 @update
 def extension_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse]:
     try:
@@ -146,27 +145,29 @@ def extension_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse]:
             f"Calling extension '{args['extension_name']}' entry point '{args['function_name']}' with args {args['args']} and kwargs {args['kwargs']}"
         )
 
+        _args = args.get("args") or []
+        _kwargs = args.get("kwargs") or {}
 
+        # Follow the call pathway: main.py -> api/extensions.py -> core/extensions.py -> extensions/test_bench/entry.py
+        extension_result = yield api.extensions.call_extension(
+            args["extension_name"], args["function_name"], _args, _kwargs
+        )
 
-        # _args = args["args"] or []
-        # _kwargs = args["kwargs"] or {}
+        logger.info(f"Got extension result: {extension_result}")
 
-        # response = yield api.extensions.call_extension(
-        #     args["extension_name"], args["function_name"], _args, _kwargs
-        # )
+        # Process the result based on extension type
+        if args["extension_name"] == "test_bench" and args["function_name"] == "get_data":
+            if isinstance(extension_result, dict) and 'data' in extension_result:
+                result_value = extension_result['data']
+            else:
+                # Try to extract a value using str() which works for most response types
+                result_value = str(extension_result)
 
-        from extensions.test_bench.entry import get_data, TestBenchResponse
+            return ExtensionCallResponse(success=True, response=result_value)
 
-        logger.info('Calling get_data...')
-        
-        # With the correct async pattern in entry.py, we can just yield the function call directly
-        response = yield get_data()
-        
-        logger.info('response = %s' % response)
-        logger.info('response.data = %s' % response['data'])
+        # Generic handling for other extensions
+        return ExtensionCallResponse(success=True, response=str(extension_result))
 
-
-        return ExtensionCallResponse(success=True, response=str(response['data']))
     except Exception as e:
         logger.error(f"Error calling extension: {str(e)}\n{traceback.format_exc()}")
         return ExtensionCallResponse(success=False, response=str(e))

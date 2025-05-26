@@ -11,7 +11,8 @@ def call_extension_function(extension_name: str, function_name: str, *args, **kw
     Call an extension function using the static registry.
     """
     logger.info(f"Calling extension '{extension_name}' function '{function_name}'")
-    
+   
+    # Import registry inside the function to avoid import cycles
     from extensions.registry import function_registry
     
     # Check if the extension exists in the registry
@@ -28,6 +29,9 @@ def call_extension_function(extension_name: str, function_name: str, *args, **kw
     
     # Get and call the function
     func = function_registry[extension_name][function_name]
+    logger.info(f"Calling function from registry: {func}")
+    
+    # Return the function call result - for async functions, this will be an awaitable
     return func(*args, **kwargs)
 
 
@@ -37,7 +41,9 @@ def call_extension(
     """Async wrapper for calling extension functions"""
     logger.info(f"Calling extension {extension_name}...")
 
+    # Using the Kybra async pattern
     async def async_call():
-        return call_extension_function(extension_name, function_name, *args, **kwargs)
+        result = call_extension_function(extension_name, function_name, *args, **kwargs)
+        return result
     
     return async_call()

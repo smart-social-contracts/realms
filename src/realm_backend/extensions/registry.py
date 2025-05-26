@@ -1,8 +1,8 @@
-from extensions.test_bench import main as test_bench_main
+from extensions.test_bench import entry as test_bench_entry
 
 # Registry of all extension functions
 function_registry = {
     "test_bench": {
-        "get_data": test_bench_main.get_data
+        "get_data": test_bench_entry.get_data
     }
 }

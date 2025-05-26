@@ -11,7 +11,7 @@ def get_data() -> Async[TestBenchResponse]:
     
     # In Kybra, to return an Async[T], we need to return a function that returns that type
     async def async_func():
-        ret = TestBenchResponse(data="some data")
+        ret = TestBenchResponse(data="some data 2")
         ic.print('ret = %s' % ret)
         return ret
     
