@@ -148,24 +148,32 @@ def extension_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse]:
         _args = args.get("args") or []
         _kwargs = args.get("kwargs") or {}
 
-        # Follow the call pathway: main.py -> api/extensions.py -> core/extensions.py -> extensions/test_bench/entry.py
-        extension_result = yield api.extensions.call_extension(
+        # Get the async function through the call chain
+        extension_coroutine = api.extensions.call_extension(
             args["extension_name"], args["function_name"], _args, _kwargs
         )
-
-        logger.info(f"Got extension result: {extension_result}")
-
-        # Process the result based on extension type
+        
+        # In Kybra for IC, we need to yield the coroutine to get the actual result
+        extension_result = yield extension_coroutine
+        
+        logger.info(f"Coroutine yielded: {extension_coroutine}")
+        logger.info(f"Result type: {type(extension_result)}")
+        
+        logger.info(f"Got extension result: {extension_result}, type: {type(extension_result)}")
+        
+        # For test_bench extension, handle the TestBenchResponse object
         if args["extension_name"] == "test_bench" and args["function_name"] == "get_data":
-            if isinstance(extension_result, dict) and 'data' in extension_result:
-                result_value = extension_result['data']
+            # According to Kybra IC pattern, use dictionary access for Record fields
+            # rather than attribute access
+            if isinstance(extension_result, dict) and "data" in extension_result:
+                return ExtensionCallResponse(success=True, response=str(extension_result["data"]))
+            elif hasattr(extension_result, "data"):
+                return ExtensionCallResponse(success=True, response=str(extension_result.data))
             else:
-                # Try to extract a value using str() which works for most response types
-                result_value = str(extension_result)
-
-            return ExtensionCallResponse(success=True, response=result_value)
-
-        # Generic handling for other extensions
+                # Fallback to string representation
+                return ExtensionCallResponse(success=True, response=str(extension_result))
+        
+        # Generic response for other extensions
         return ExtensionCallResponse(success=True, response=str(extension_result))
 
     except Exception as e:

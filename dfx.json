@@ -6,9 +6,6 @@
       "main": "src/realm_backend/main.py"
     },
     "realm_frontend": {
-      "dependencies": [
-        "realm_backend"
-      ],
       "source": [
         "src/realm_frontend/dist"
       ],

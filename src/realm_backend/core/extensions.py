@@ -27,11 +27,11 @@ def call_extension_function(extension_name: str, function_name: str, *args, **kw
         logger.error(error_msg)
         raise ValueError(error_msg)
     
-    # Get and call the function
+    # Get the function from registry and call it
     func = function_registry[extension_name][function_name]
-    logger.info(f"Calling function from registry: {func}")
+    logger.info(f"Got function from registry: {func}")
     
-    # Return the function call result - for async functions, this will be an awaitable
+    # This will get the async function
     return func(*args, **kwargs)
 
 
@@ -41,9 +41,13 @@ def call_extension(
     """Async wrapper for calling extension functions"""
     logger.info(f"Calling extension {extension_name}...")
 
-    # Using the Kybra async pattern
-    async def async_call():
-        result = call_extension_function(extension_name, function_name, *args, **kwargs)
-        return result
+    # Following Kybra's async pattern for Internet Computer:
+    # 1. Get the async function from the extension (which is already a coroutine)
+    # 2. Return it directly to be yielded by the caller
     
-    return async_call()
+    # This gets us the coroutine from the extension function
+    result_coroutine = call_extension_function(extension_name, function_name, *args, **kwargs)
+    logger.info(f"Got coroutine from extension: {result_coroutine}")
+    
+    # Return the coroutine directly - the caller will yield it
+    return result_coroutine
