@@ -2,7 +2,7 @@ name: 3. Deploy to Staging
 
 on:
   workflow_run:
-    workflows: ["2. Run Tests"]
+    workflows: ["2. Run Tests", "2. Run Tests (extensions)"]
     types:
       - completed
 
