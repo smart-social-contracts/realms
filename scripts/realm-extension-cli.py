@@ -131,11 +131,10 @@ def package_extension(extension_id, output_dir=None):
     if not output_dir:
         output_dir = paths["project_root"]
     
-    version = manifest.get("version", "0.1.0") if manifest else "0.1.0"
-    zip_filename = f"{extension_id}-{version}.zip"
+    zip_filename = f"{extension_id}.zip"
     zip_path = os.path.join(output_dir, zip_filename)
     
-    log_info(f"Packaging extension {extension_id} (v{version})")
+    log_info(f"Packaging extension {extension_id}")
     
     with tempfile.TemporaryDirectory() as temp_dir:
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
@@ -187,7 +186,6 @@ def install_extension(package_path):
             zipf.extractall(temp_dir)
         log_info(f"Extracted package to temporary directory")
         
-        # Read the manifest to get extension ID
         manifest_path = os.path.join(temp_dir, "manifest.json")
         with open(manifest_path, 'r') as f:
             manifest = json.load(f)
@@ -197,29 +195,23 @@ def install_extension(package_path):
             log_error("No extension ID found in manifest")
             return False
         
-        # Validate extension ID
         try:
             validate_extension_id(extension_id)
         except ValueError as e:
             log_error(str(e))
             return False
         
-        # Install backend files
         backend_source = os.path.join(temp_dir, "backend")
         if os.path.exists(backend_source) and os.listdir(backend_source):
             backend_target = os.path.join(paths["backend_dir"], "extensions", extension_id)
             
-            # Remove existing files if needed
             if os.path.exists(backend_target):
                 shutil.rmtree(backend_target)
             
-            # Create target directory and copy files
             os.makedirs(backend_target, exist_ok=True)
             
-            # Copy manifest
             shutil.copy2(manifest_path, os.path.join(backend_target, "manifest.json"))
             
-            # Copy Python files
             for root, _, files in os.walk(backend_source):
                 for file in files:
                     src_file = os.path.join(root, file)
@@ -230,21 +222,27 @@ def install_extension(package_path):
                     shutil.copy2(src_file, dst_file)
                     log_info(f"Installed backend file: {rel_path}")
             
+            # Create an __init__.py file if it doesn't exist
+            init_file = os.path.join(backend_target, "__init__.py")
+            if not os.path.exists(init_file):
+                with open(init_file, 'w') as f:
+                    f.write(f'"""\n{extension_id} extension package.\n"""\n')
+                log_info(f"Created __init__.py file for {extension_id}")
+            
+            # Update extension_imports.py
+            update_extension_imports(extension_id, "add")
+            
             log_success(f"Installed backend files for {extension_id}")
         
-        # Install frontend lib files
         frontend_lib_source = os.path.join(temp_dir, "frontend/lib/extensions", extension_id)
         if os.path.exists(frontend_lib_source) and os.listdir(frontend_lib_source):
             frontend_lib_target = os.path.join(paths["frontend_dir"], "src/lib/extensions", extension_id)
             
-            # Remove existing files if needed
             if os.path.exists(frontend_lib_target):
                 shutil.rmtree(frontend_lib_target)
             
-            # Create target directory and copy files
             os.makedirs(frontend_lib_target, exist_ok=True)
             
-            # Copy files
             for root, _, files in os.walk(frontend_lib_source):
                 for file in files:
                     src_file = os.path.join(root, file)
@@ -259,19 +257,15 @@ def install_extension(package_path):
         else:
             log_info("No frontend lib files found in package")
         
-        # Install frontend route files
         frontend_route_source = os.path.join(temp_dir, "frontend/routes/(sidebar)/extensions", extension_id)
         if os.path.exists(frontend_route_source) and os.listdir(frontend_route_source):
             frontend_route_target = os.path.join(paths["frontend_dir"], "src/routes/(sidebar)/extensions", extension_id)
             
-            # Remove existing files if needed
             if os.path.exists(frontend_route_target):
                 shutil.rmtree(frontend_route_target)
             
-            # Create target directory and copy files
             os.makedirs(frontend_route_target, exist_ok=True)
             
-            # Copy files
             for root, _, files in os.walk(frontend_route_source):
                 for file in files:
                     src_file = os.path.join(root, file)
@@ -287,6 +281,106 @@ def install_extension(package_path):
             log_info("No frontend route files found in package")
     
     log_success(f"Extension {extension_id} installed successfully")
+    return True
+
+def uninstall_extension(extension_id):
+    """Uninstall an extension"""
+    try:
+        validate_extension_id(extension_id)
+    except ValueError as e:
+        log_error(str(e))
+        return False
+    
+    locations = find_extension_locations(extension_id)
+    
+    if not locations:
+        log_error(f"Extension {extension_id} not found or already uninstalled")
+        return False
+    
+    # Remove backend files
+    if "backend" in locations:
+        try:
+            shutil.rmtree(locations["backend"])
+            log_success(f"Removed backend files for {extension_id}")
+            
+            # Update extension_imports.py
+            update_extension_imports(extension_id, "remove")
+        except Exception as e:
+            log_error(f"Failed to remove backend files: {e}")
+    
+    # Remove frontend lib files
+    if "frontend_lib" in locations:
+        try:
+            shutil.rmtree(locations["frontend_lib"])
+            log_success(f"Removed frontend library files for {extension_id}")
+        except Exception as e:
+            log_error(f"Failed to remove frontend library files: {e}")
+    
+    # Remove frontend route files
+    if "frontend_route" in locations:
+        try:
+            shutil.rmtree(locations["frontend_route"])
+            log_success(f"Removed frontend route files for {extension_id}")
+        except Exception as e:
+            log_error(f"Failed to remove frontend route files: {e}")
+    
+    log_success(f"Extension {extension_id} uninstalled successfully")
+    return True
+
+def update_extension_imports(extension_id, action="add"):
+    """Update the extension_imports.py file"""
+    paths = get_project_paths()
+    imports_file = os.path.join(paths["backend_dir"], "extensions", "extension_imports.py")
+    
+    if not os.path.exists(imports_file):
+        log_error(f"Extension imports file not found: {imports_file}")
+        return False
+    
+    # Read existing content
+    with open(imports_file, "r") as f:
+        content = f.read()
+    
+    import_line = f"import extensions.{extension_id}.entry"
+    
+    if action == "add":
+        # Check if import already exists
+        if import_line in content:
+            log_info(f"Import for {extension_id} already exists in extension_imports.py")
+            return True
+        
+        # Add import line at the end of the file, preserving any trailing newlines
+        if content and not content.endswith('\n'):
+            import_line = '\n' + import_line
+        
+        # Add an extra newline if the file is not empty
+        if content:
+            import_line += '\n'
+        
+        # Write updated content
+        with open(imports_file, "a") as f:
+            f.write(import_line)
+        log_success(f"Added import for {extension_id} to extension_imports.py")
+    
+    elif action == "remove":
+        # Remove import line
+        if import_line not in content:
+            log_info(f"No import for {extension_id} found in extension_imports.py")
+            return True
+        
+        # Create new content without the import line
+        lines = content.splitlines()
+        new_lines = [line for line in lines if line.strip() != import_line]
+        new_content = '\n'.join(new_lines)
+        
+        # Add trailing newline if needed
+        if new_content and not new_content.endswith('\n'):
+            new_content += '\n'
+        
+        # Write updated content
+        with open(imports_file, "w") as f:
+            f.write(new_content)
+        log_success(f"Removed import for {extension_id} from extension_imports.py")
+    
     return True
 
 def list_extensions():
@@ -386,47 +480,6 @@ def list_extensions():
         ))
     
     return list(extensions.values())
-
-def uninstall_extension(extension_id):
-    """Uninstall an extension"""
-    try:
-        validate_extension_id(extension_id)
-    except ValueError as e:
-        log_error(str(e))
-        return False
-    
-    locations = find_extension_locations(extension_id)
-    
-    if not locations:
-        log_error(f"Extension {extension_id} not found or already uninstalled")
-        return False
-    
-    # Remove backend files
-    if "backend" in locations:
-        try:
-            shutil.rmtree(locations["backend"])
-            log_success(f"Removed backend files for {extension_id}")
-        except Exception as e:
-            log_error(f"Failed to remove backend files: {e}")
-    
-    # Remove frontend lib files
-    if "frontend_lib" in locations:
-        try:
-            shutil.rmtree(locations["frontend_lib"])
-            log_success(f"Removed frontend library files for {extension_id}")
-        except Exception as e:
-            log_error(f"Failed to remove frontend library files: {e}")
-    
-    # Remove frontend route files
-    if "frontend_route" in locations:
-        try:
-            shutil.rmtree(locations["frontend_route"])
-            log_success(f"Removed frontend route files for {extension_id}")
-        except Exception as e:
-            log_error(f"Failed to remove frontend route files: {e}")
-    
-    log_success(f"Extension {extension_id} uninstalled successfully")
-    return True
 
 def main():
     """Main entry point"""
