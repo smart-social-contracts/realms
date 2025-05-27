@@ -29,7 +29,7 @@ const extensionsRegistry: Record<string, ExtensionMetadata> = {};
 
 // Process discovered extensions
 Object.entries(extensionModules).forEach(([path, module]) => {
-    // Extract the extension ID from the path (e.g., './vault-manager/index.ts' -> 'vault-manager')
+    // Extract the extension ID from the path (e.g., './vault_manager/index.ts' -> 'vault_manager')
     const id = path.split('/')[1];
     
     // Add to registry with module metadata and component
