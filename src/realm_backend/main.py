@@ -142,15 +142,12 @@ def init_() -> void:
 def extension_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse]:
     try:
         logger.info(
-            f"Calling extension '{args['extension_name']}' entry point '{args['function_name']}' with args {args['args']} and kwargs {args['kwargs']}"
+            f"Calling extension '{args['extension_name']}' entry point '{args['function_name']}' with args {args['args']}"
         )
-
-        _args = args.get("args") or []
-        _kwargs = args.get("kwargs") or {}
 
         # Get the async function through the call chain
         extension_coroutine = api.extensions.call_extension(
-            args["extension_name"], args["function_name"], _args, _kwargs
+            args["extension_name"], args["function_name"], args["args"]
         )
         
         # In Kybra for IC, we need to yield the coroutine to get the actual result

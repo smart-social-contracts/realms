@@ -6,7 +6,7 @@ from kybra_simple_logging import get_logger
 
 logger = get_logger("core.extensions")
 
-def call_extension_function(extension_name: str, function_name: str, *args, **kwargs):
+def call_extension_function(extension_name: str, function_name: str, args:str):
     """
     Call an extension function using the static registry.
     """
@@ -33,7 +33,7 @@ def call_extension_function(extension_name: str, function_name: str, *args, **kw
     logger.info(f"Got function from registry: {func}")
     
     # Call the function to get its result
-    result = func(*args, **kwargs)
+    result = func(args)
     logger.info(f"Got result from function: {result}")
     
     # In Kybra, we always need to return the result of calling an async function
@@ -50,7 +50,7 @@ def call_extension_function(extension_name: str, function_name: str, *args, **kw
 
 
 def call_extension(
-    extension_name: str, function_name: str, *args, **kwargs
+    extension_name: str, function_name: str, args: str
 ) -> Async[Any]:
     """Async wrapper for calling extension functions"""
     logger.info(f"Calling extension {extension_name}...")
@@ -60,7 +60,7 @@ def call_extension(
     # 2. Return it directly to be yielded by the caller
     
     # This gets us the coroutine from the extension function
-    result_coroutine = call_extension_function(extension_name, function_name, *args, **kwargs)
+    result_coroutine = call_extension_function(extension_name, function_name, args)
     logger.info(f"Got coroutine from extension: {result_coroutine}")
     
     # Return the coroutine directly - the caller will yield it

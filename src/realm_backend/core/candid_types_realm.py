@@ -48,8 +48,7 @@ class KeyValuePair(Record):
 class ExtensionCallArgs(Record):
     extension_name: text
     function_name: text
-    args: Opt[Vec[ExtensionArgument]]
-    kwargs: Opt[Vec[KeyValuePair]]
+    args: text
 
 
 class ExtensionCallResponse(Record):

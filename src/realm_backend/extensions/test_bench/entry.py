@@ -29,16 +29,16 @@ class TestBenchResponse(Record):
     data: text
 
 
-def get_data(some_param) -> Async[TestBenchResponse]:
+def get_data(args: str) -> Async[TestBenchResponse]:
     """Get test data from this extension.
     
     The core module will handle the async wrapping for us.
     """
     ic.print('get_data starting')
-    ic.print(f'Parameter type: {type(some_param)}, Value: {some_param}')
+    ic.print(f'Parameter type: {type(args)}, Value: {args}')
     
     # Simple, non-async function that returns a regular value
     # The core/extensions.py module will handle wrapping this in an async function
-    return TestBenchResponse(data=f"some data {some_param}")
+    return TestBenchResponse(data=f"some data {args}")
 
 

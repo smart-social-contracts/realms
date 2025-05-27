@@ -10,6 +10,7 @@
 
 	// Import backend directly without using await in top-level
 	import { backend } from '$lib/canisters';
+	import { Some } from '@dfinity/candid';
 
 	let greeting = '';
 
@@ -45,13 +46,16 @@
 			size="lg"
 			class="w-full my-4 p-4 text-xl font-bold shadow-lg rounded-lg"
 			onclick={() => {
+				// Use the simplest approach possible
 				backend.extension_call({
 					extension_name: "test_bench",
 					function_name: "get_data",
-					args: [], // Use empty array instead of null
-					kwargs: [], // Use empty array instead of null
+					args: "from frontend"
 				}).then(response => {
 					alert("Response from extension: " + JSON.stringify(response));
+				}).catch(error => {
+					console.error("Extension call failed:", error);
+					alert("Error calling extension: " + error.message);
 				});
 			}}
 		>
