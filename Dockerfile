@@ -25,6 +25,7 @@ COPY pyproject.toml ./pyproject.toml
 COPY scripts ./scripts
 COPY src ./src
 COPY tests ./tests
+COPY extensions ./extensions
 
 # Build canisters
 RUN scripts/build_canisters.sh
