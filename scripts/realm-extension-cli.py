@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
 """
 Realm Extension CLI - A simple tool for managing extensions in the Smart Social Contracts platform.
-"""
 
-
-
-'''
-
+- `manifest.json` format:
 {
     "name": "<extension_name>",
     "version": "x.y.z",
@@ -19,7 +15,7 @@ Realm Extension CLI - A simple tool for managing extensions in the Smart Social 
 }
 
 
-- In the repo:
+- Files in the repo:
 src/realm_backend/extensions/<extension_name>/manifest.json
 src/realm_backend/extensions/<extension_name>/*.py
 src/realm_frontend/src/lib/extensions/<extension_name>/index.ts
@@ -27,15 +23,15 @@ src/realm_frontend/src/lib/extensions/<extension_name>/*.svelte
 src/realm_frontend/src/routes/(sidebar)/extensions/+page.svelte
 src/realm_frontend/src/routes/(sidebar)/extensions/<extension_name>/+page-svelte
 
-- In the zip:
+- Files in the zip:
 manifest.json
 backend/*.py
 frontend/lib/extensions/<extension_name>/index.ts
 frontend/lib/extensions/<extension_name>/*.svelte
 frontend/routes/(sidebar)/extensions/+page.svelte
 frontend/routes/(sidebar)/extensions/<extension_name>/+page.svelte
+"""
 
-'''
 
 import argparse
 import json
@@ -59,6 +55,12 @@ def log_success(message): print(f"{Colors.GREEN}[SUCCESS]{Colors.RESET} {message
 def log_warning(message): print(f"{Colors.YELLOW}[WARNING]{Colors.RESET} {message}")
 def log_error(message): print(f"{Colors.RED}[ERROR]{Colors.RESET} {message}")
 
+def validate_extension_id(extension_id):
+    """Validate extension ID (no hyphens allowed)"""
+    if "-" in extension_id:
+        raise ValueError(f"Extension ID '{extension_id}' contains hyphens. Only underscores are allowed.")
+    return True
+
 def get_project_paths():
     """Get standard project paths for extension management"""
     project_root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -68,122 +70,81 @@ def get_project_paths():
         "frontend_dir": os.path.join(project_root, "src/realm_frontend")
     }
 
-def normalize_extension_id(extension_id):
-    """Normalize extension ID for consistent handling"""
-    return extension_id.lower().replace('_', '-').replace(' ', '-')
-
 def get_extension_paths(extension_id):
     """Get all paths for an extension"""
+    validate_extension_id(extension_id)
     paths = get_project_paths()
-    normalized_id = normalize_extension_id(extension_id)
-    backend_id = normalized_id.replace('-', '_')
     
     return {
-        "backend": os.path.join(paths["backend_dir"], "extensions", backend_id),
-        "frontend_lib": os.path.join(paths["frontend_dir"], "src/lib/extensions", normalized_id),
-        "frontend_route": os.path.join(paths["frontend_dir"], "src/routes/(sidebar)/extensions", normalized_id)
+        "backend": os.path.join(paths["backend_dir"], "extensions", extension_id),
+        "frontend_lib": os.path.join(paths["frontend_dir"], "src/lib/extensions", extension_id),
+        "frontend_route": os.path.join(paths["frontend_dir"], "src/routes/(sidebar)/extensions", extension_id)
     }
 
 def find_extension_locations(extension_id):
     """Find where an extension is located"""
+    validate_extension_id(extension_id)
     paths = get_project_paths()
+    
+    backend_path = os.path.join(paths["backend_dir"], "extensions", extension_id)
+    frontend_lib_path = os.path.join(paths["frontend_dir"], "src/lib/extensions", extension_id)
+    frontend_route_path = os.path.join(paths["frontend_dir"], "src/routes/(sidebar)/extensions", extension_id)
+
     locations = {}
     
-    # Handle both kebab-case and snake_case for extensions
-    normalized_id = normalize_extension_id(extension_id)
-    snake_id = normalized_id.replace('-', '_')
-    
-    # Check backend (always uses snake_case)
-    backend_path = os.path.join(paths["backend_dir"], "extensions", snake_id)
-    if os.path.isdir(backend_path): 
+    if os.path.isdir(backend_path):
         locations["backend"] = backend_path
     
-    # Check frontend lib paths (could be either format)
-    frontend_lib_kebab = os.path.join(paths["frontend_dir"], "src/lib/extensions", normalized_id)
-    frontend_lib_snake = os.path.join(paths["frontend_dir"], "src/lib/extensions", snake_id)
+    if os.path.isdir(frontend_lib_path):
+        locations["frontend_lib"] = frontend_lib_path
     
-    if os.path.isdir(frontend_lib_kebab):
-        locations["frontend_lib"] = frontend_lib_kebab
-    elif os.path.isdir(frontend_lib_snake):
-        locations["frontend_lib"] = frontend_lib_snake
-    
-    # Check frontend route paths (could be either format)
-    frontend_route_kebab = os.path.join(paths["frontend_dir"], "src/routes/(sidebar)/extensions", normalized_id)
-    frontend_route_snake = os.path.join(paths["frontend_dir"], "src/routes/(sidebar)/extensions", snake_id)
-    
-    if os.path.isdir(frontend_route_kebab):
-        locations["frontend_route"] = frontend_route_kebab
-    elif os.path.isdir(frontend_route_snake):
-        locations["frontend_route"] = frontend_route_snake
+    if os.path.isdir(frontend_route_path):
+        locations["frontend_route"] = frontend_route_path
     
     return locations
 
 def get_extension_manifest(extension_id):
-    """Find and load an extension's manifest file"""
+    """Get extension manifest"""
+    validate_extension_id(extension_id)
     locations = find_extension_locations(extension_id)
     
-    # First check backend, then frontend locations
-    for loc_type in ["backend", "frontend_lib"]:
-        if loc_type in locations:
-            manifest_path = os.path.join(locations[loc_type], "manifest.json")
-            if os.path.exists(manifest_path):
-                try:
-                    with open(manifest_path, 'r') as f:
-                        return json.load(f)
-                except json.JSONDecodeError:
-                    log_error(f"Invalid JSON in manifest file: {manifest_path}")
+    if "backend" in locations:
+        manifest_path = os.path.join(locations["backend"], "manifest.json")
+        if os.path.exists(manifest_path):
+            with open(manifest_path, 'r') as f:
+                return json.load(f)
     
     return None
 
 def package_extension(extension_id, output_dir=None):
     """Package an extension into a zip file"""
-    # Get extension locations (handles both kebab-case and snake_case)
+    validate_extension_id(extension_id)
     locations = find_extension_locations(extension_id)
+    
     if not locations:
         log_error(f"Extension '{extension_id}' not found")
         return False
     
-    # Get manifest
     manifest = get_extension_manifest(extension_id)
-    if not manifest:
-        log_error(f"No manifest.json found for extension '{extension_id}'")
-        return False
     
-    # Ensure we have a normalized extension ID for the package
-    extension_id = normalize_extension_id(manifest.get("id", extension_id))
-    
-    # Set output directory and filename
     paths = get_project_paths()
     if not output_dir:
         output_dir = paths["project_root"]
     
-    version = manifest.get("version", "1.0.0")
+    version = manifest.get("version", "0.1.0") if manifest else "0.1.0"
     zip_filename = f"{extension_id}-{version}.zip"
     zip_path = os.path.join(output_dir, zip_filename)
     
-    log_info(f"Packaging extension {manifest.get('name', extension_id)} (v{version})")
+    log_info(f"Packaging extension {extension_id} (v{version})")
     
-    # Create the package
     with tempfile.TemporaryDirectory() as temp_dir:
-        # Copy manifest
-        if "backend" in locations and os.path.exists(os.path.join(locations["backend"], "manifest.json")):
-            manifest_path = os.path.join(locations["backend"], "manifest.json")
-        elif "frontend_lib" in locations and os.path.exists(os.path.join(locations["frontend_lib"], "manifest.json")):
-            manifest_path = os.path.join(locations["frontend_lib"], "manifest.json")
-        else:
-            # Create a new manifest if none exists
-            manifest_path = os.path.join(temp_dir, "manifest.json")
-            with open(manifest_path, 'w') as f:
-                json.dump(manifest, f, indent=2)
-        
-        # Create the zip file
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            # Add manifest.json to the root
-            if os.path.exists(manifest_path):
-                zipf.write(manifest_path, "manifest.json")
-                log_info(f"Added manifest.json")
+            if "backend" in locations:
+                manifest_path = os.path.join(locations["backend"], "manifest.json")
+                if os.path.exists(manifest_path):
+                    zipf.write(manifest_path, "manifest.json")
+                    log_info(f"Added manifest.json")
             
-            # Add backend files
             if "backend" in locations:
                 backend_src = locations["backend"]
                 for root, _, files in os.walk(backend_src):
@@ -194,7 +155,6 @@ def package_extension(extension_id, output_dir=None):
                             zipf.write(file_path, os.path.join("backend", rel_path))
                             log_info(f"Added backend/{rel_path}")
             
-            # Add frontend lib files
             if "frontend_lib" in locations:
                 frontend_lib_src = locations["frontend_lib"]
                 for root, _, files in os.walk(frontend_lib_src):
@@ -205,7 +165,6 @@ def package_extension(extension_id, output_dir=None):
                             zipf.write(file_path, os.path.join("frontend/lib/extensions", extension_id, rel_path))
                             log_info(f"Added frontend/lib/extensions/{extension_id}/{rel_path}")
             
-            # Add frontend route files
             if "frontend_route" in locations:
                 frontend_route_src = locations["frontend_route"]
                 for root, _, files in os.walk(frontend_route_src):
@@ -221,51 +180,34 @@ def package_extension(extension_id, output_dir=None):
 
 def install_extension(package_path):
     """Install an extension from a package"""
-    if not os.path.exists(package_path):
-        log_error(f"Package file not found: {package_path}")
-        return False
-    
     paths = get_project_paths()
     
-    # Extract and process the package
     with tempfile.TemporaryDirectory() as temp_dir:
-        # Extract the package
-        try:
-            with zipfile.ZipFile(package_path, 'r') as zipf:
-                zipf.extractall(temp_dir)
-            log_info(f"Extracted package to temporary directory")
-        except Exception as e:
-            log_error(f"Failed to extract package: {e}")
-            return False
+        with zipfile.ZipFile(package_path, 'r') as zipf:
+            zipf.extractall(temp_dir)
+        log_info(f"Extracted package to temporary directory")
         
-        # Read the manifest
+        # Read the manifest to get extension ID
         manifest_path = os.path.join(temp_dir, "manifest.json")
-        if not os.path.exists(manifest_path):
-            log_error("No manifest.json found in package")
-            return False
+        with open(manifest_path, 'r') as f:
+            manifest = json.load(f)
         
-        try:
-            with open(manifest_path, 'r') as f:
-                manifest = json.load(f)
-        except json.JSONDecodeError:
-            log_error("Invalid JSON in manifest.json")
-            return False
-        
-        # Get extension ID from manifest
-        extension_id = manifest.get("id") or normalize_extension_id(manifest.get("name", ""))
+        extension_id = manifest.get("name", "")
         if not extension_id:
-            log_error("No extension ID or name found in manifest")
+            log_error("No extension ID found in manifest")
             return False
         
-        # Normalize IDs for different parts
-        normalized_id = normalize_extension_id(extension_id)
-        snake_id = normalized_id.replace('-', '_')
+        # Validate extension ID
+        try:
+            validate_extension_id(extension_id)
+        except ValueError as e:
+            log_error(str(e))
+            return False
         
         # Install backend files
         backend_source = os.path.join(temp_dir, "backend")
         if os.path.exists(backend_source) and os.listdir(backend_source):
-            # Backend always uses snake_case
-            backend_target = os.path.join(paths["backend_dir"], "extensions", snake_id)
+            backend_target = os.path.join(paths["backend_dir"], "extensions", extension_id)
             
             # Remove existing files if needed
             if os.path.exists(backend_target):
@@ -291,15 +233,9 @@ def install_extension(package_path):
             log_success(f"Installed backend files for {extension_id}")
         
         # Install frontend lib files
-        frontend_lib_source = os.path.join(temp_dir, "frontend/lib/extensions", normalized_id)
-        if not os.path.exists(frontend_lib_source):
-            # Try with snake_case if kebab-case didn't work
-            frontend_lib_source = os.path.join(temp_dir, "frontend/lib/extensions", snake_id)
-            
+        frontend_lib_source = os.path.join(temp_dir, "frontend/lib/extensions", extension_id)
         if os.path.exists(frontend_lib_source) and os.listdir(frontend_lib_source):
-            # For consistency, use the same ID format that's used in the source files
-            ext_id_format = os.path.basename(frontend_lib_source)
-            frontend_lib_target = os.path.join(paths["frontend_dir"], "src/lib/extensions", ext_id_format)
+            frontend_lib_target = os.path.join(paths["frontend_dir"], "src/lib/extensions", extension_id)
             
             # Remove existing files if needed
             if os.path.exists(frontend_lib_target):
@@ -324,15 +260,9 @@ def install_extension(package_path):
             log_info("No frontend lib files found in package")
         
         # Install frontend route files
-        frontend_route_source = os.path.join(temp_dir, "frontend/routes/(sidebar)/extensions", normalized_id)
-        if not os.path.exists(frontend_route_source):
-            # Try with snake_case if kebab-case didn't work
-            frontend_route_source = os.path.join(temp_dir, "frontend/routes/(sidebar)/extensions", snake_id)
-            
+        frontend_route_source = os.path.join(temp_dir, "frontend/routes/(sidebar)/extensions", extension_id)
         if os.path.exists(frontend_route_source) and os.listdir(frontend_route_source):
-            # For consistency, use the same ID format that's used in the source files
-            ext_id_format = os.path.basename(frontend_route_source)
-            frontend_route_target = os.path.join(paths["frontend_dir"], "src/routes/(sidebar)/extensions", ext_id_format)
+            frontend_route_target = os.path.join(paths["frontend_dir"], "src/routes/(sidebar)/extensions", extension_id)
             
             # Remove existing files if needed
             if os.path.exists(frontend_route_target):
@@ -372,168 +302,173 @@ def list_extensions():
     if os.path.exists(backend_ext_dir):
         for item in os.listdir(backend_ext_dir):
             if os.path.isdir(os.path.join(backend_ext_dir, item)) and not item.startswith('__'):
-                ext_id = normalize_extension_id(item)
-                manifest_path = os.path.join(backend_ext_dir, item, "manifest.json")
-                
-                if os.path.exists(manifest_path):
-                    try:
-                        with open(manifest_path, 'r') as f:
-                            manifest = json.load(f)
-                        extensions[ext_id] = {
-                            'id': ext_id,
-                            'name': manifest.get('name', ext_id),
-                            'version': manifest.get('version', 'unknown'),
-                            'description': manifest.get('description', ''),
-                            'has_backend': True,
-                            'has_frontend': False
-                        }
-                    except Exception:
-                        # If manifest can't be read, use basic info
-                        extensions[ext_id] = {
-                            'id': ext_id, 
-                            'name': item,
-                            'version': 'unknown',
-                            'description': '',
-                            'has_backend': True,
-                            'has_frontend': False
-                        }
+                try:
+                    validate_extension_id(item)
+                    manifest_path = os.path.join(backend_ext_dir, item, "manifest.json")
+                    
+                    if os.path.exists(manifest_path):
+                        try:
+                            with open(manifest_path, 'r') as f:
+                                manifest = json.load(f)
+                            extensions[item] = {
+                                'id': item,
+                                'version': manifest.get('version', 'unknown'),
+                                'description': manifest.get('description', ''),
+                                'has_backend': True,
+                                'has_frontend': False
+                            }
+                        except Exception:
+                            # If manifest can't be read, use basic info
+                            extensions[item] = {
+                                'id': item, 
+                                'version': 'unknown',
+                                'description': '',
+                                'has_backend': True,
+                                'has_frontend': False
+                            }
+                except ValueError:
+                    log_warning(f"Skipping extension with invalid ID: {item}")
     
     # Check frontend extensions
     if os.path.exists(frontend_ext_dir):
         for item in os.listdir(frontend_ext_dir):
             if os.path.isdir(os.path.join(frontend_ext_dir, item)) and not item.startswith('__'):
-                ext_id = normalize_extension_id(item)
-                if ext_id in extensions:
-                    extensions[ext_id]['has_frontend'] = True
-                else:
-                    manifest_path = os.path.join(frontend_ext_dir, item, "manifest.json")
-                    if os.path.exists(manifest_path):
-                        try:
-                            with open(manifest_path, 'r') as f:
-                                manifest = json.load(f)
-                            extensions[ext_id] = {
-                                'id': ext_id,
-                                'name': manifest.get('name', ext_id),
-                                'version': manifest.get('version', 'unknown'),
-                                'description': manifest.get('description', ''),
-                                'has_backend': False,
-                                'has_frontend': True
-                            }
-                        except Exception:
-                            # If manifest can't be read, use basic info
-                            extensions[ext_id] = {
-                                'id': ext_id, 
-                                'name': item,
-                                'version': 'unknown',
-                                'description': '',
-                                'has_backend': False,
-                                'has_frontend': True
-                            }
+                try:
+                    validate_extension_id(item)
+                    
+                    # Check if extension is already recorded from backend
+                    if item in extensions:
+                        extensions[item]['has_frontend'] = True
+                    else:
+                        # Try to load manifest from frontend directory
+                        manifest_path = os.path.join(frontend_ext_dir, item, "manifest.json")
+                        if os.path.exists(manifest_path):
+                            try:
+                                with open(manifest_path, 'r') as f:
+                                    manifest = json.load(f)
+                                extensions[item] = {
+                                    'id': item,
+                                    'version': manifest.get('version', 'unknown'),
+                                    'description': manifest.get('description', ''),
+                                    'has_backend': False,
+                                    'has_frontend': True
+                                }
+                            except Exception:
+                                # If manifest can't be read, use basic info
+                                extensions[item] = {
+                                    'id': item,
+                                    'version': 'unknown',
+                                    'description': '',
+                                    'has_backend': False,
+                                    'has_frontend': True
+                                }
+                except ValueError:
+                    log_warning(f"Skipping extension with invalid ID: {item}")
     
-    # Print results
+    # Print the results
     if not extensions:
-        print("No extensions installed")
-        return True
+        log_info("No extensions installed")
+        return []
     
-    # Print table header
-    print(f"{'ID':<20} {'NAME':<30} {'VERSION':<15} {'COMPONENTS':<15}")
-    print(f"{'-'*20} {'-'*30} {'-'*15} {'-'*15}")
-    
-    # Print extension data
-    for ext_id in sorted(extensions.keys()):
-        ext = extensions[ext_id]
+    # Format results as a table
+    print("{:<20} {:<15} {:<15}".format("ID", "VERSION", "COMPONENTS"))
+    print("{:<20} {:<15} {:<15}".format("-" * 20, "-" * 15, "-" * 15))
+    for ext_id, ext in extensions.items():
         components = []
-        if ext.get('has_backend'):
+        if ext['has_backend']:
             components.append('backend')
-        if ext.get('has_frontend'):
+        if ext['has_frontend']:
             components.append('frontend')
-        components_str = ', '.join(components) if components else 'none'
-        
-        print(f"{ext['id']:<20} {ext['name']:<30} {ext['version']:<15} {components_str:<15}")
+        print("{:<20} {:<15} {:<15}".format(
+            ext_id,
+            ext['version'],
+            ", ".join(components)
+        ))
     
-    return True
+    return list(extensions.values())
 
 def uninstall_extension(extension_id):
     """Uninstall an extension"""
-    extension_id = normalize_extension_id(extension_id)
-    paths = get_extension_paths(extension_id)
+    try:
+        validate_extension_id(extension_id)
+    except ValueError as e:
+        log_error(str(e))
+        return False
     
-    removed = False
+    locations = find_extension_locations(extension_id)
+    
+    if not locations:
+        log_error(f"Extension {extension_id} not found or already uninstalled")
+        return False
     
     # Remove backend files
-    backend_path = paths["backend"]
-    if os.path.exists(backend_path):
+    if "backend" in locations:
         try:
-            shutil.rmtree(backend_path)
-            log_success(f"Removed backend files from {backend_path}")
-            removed = True
+            shutil.rmtree(locations["backend"])
+            log_success(f"Removed backend files for {extension_id}")
         except Exception as e:
             log_error(f"Failed to remove backend files: {e}")
     
     # Remove frontend lib files
-    frontend_lib_path = paths["frontend_lib"]
-    if os.path.exists(frontend_lib_path):
+    if "frontend_lib" in locations:
         try:
-            shutil.rmtree(frontend_lib_path)
-            log_success(f"Removed frontend lib files from {frontend_lib_path}")
-            removed = True
+            shutil.rmtree(locations["frontend_lib"])
+            log_success(f"Removed frontend library files for {extension_id}")
         except Exception as e:
-            log_error(f"Failed to remove frontend lib files: {e}")
+            log_error(f"Failed to remove frontend library files: {e}")
     
     # Remove frontend route files
-    frontend_route_path = paths["frontend_route"]
-    if os.path.exists(frontend_route_path):
+    if "frontend_route" in locations:
         try:
-            shutil.rmtree(frontend_route_path)
-            log_success(f"Removed frontend route files from {frontend_route_path}")
-            removed = True
+            shutil.rmtree(locations["frontend_route"])
+            log_success(f"Removed frontend route files for {extension_id}")
         except Exception as e:
             log_error(f"Failed to remove frontend route files: {e}")
     
-    if removed:
-        log_success(f"Extension {extension_id} uninstalled successfully")
-        return True
-    else:
-        log_error(f"Extension {extension_id} not found or already uninstalled")
-        return False
+    log_success(f"Extension {extension_id} uninstalled successfully")
+    return True
 
 def main():
     """Main entry point"""
-    parser = argparse.ArgumentParser(description="Realm Extension CLI - Manage extensions for the Smart Social Contracts platform")
+    parser = argparse.ArgumentParser(
+        description="Realm Extension CLI - Manage extensions for the Smart Social Contracts platform"
+    )
+    
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
     
     # List command
-    subparsers.add_parser("list", help="List installed extensions")
+    list_parser = subparsers.add_parser("list", help="List installed extensions")
     
     # Package command
     package_parser = subparsers.add_parser("package", help="Package an extension into a zip file")
-    package_parser.add_argument("name", help="Name of the extension to package")
-    package_parser.add_argument("--output", help="Output directory for the package")
+    package_parser.add_argument("extension_id", help="ID of the extension to package")
+    package_parser.add_argument("--output-dir", help="Directory to save the package", default=None)
     
     # Install command
     install_parser = subparsers.add_parser("install", help="Install an extension package")
-    install_parser.add_argument("package", help="Path to the extension package")
+    install_parser.add_argument("package_path", help="Path to the extension package (.zip)")
     
     # Uninstall command
     uninstall_parser = subparsers.add_parser("uninstall", help="Uninstall an extension")
-    uninstall_parser.add_argument("name", help="Name of the extension to uninstall")
+    uninstall_parser.add_argument("extension_id", help="ID of the extension to uninstall")
     
     args = parser.parse_args()
     
-    if args.command is None:
+    if not args.command:
         parser.print_help()
         return 1
     
+    # Execute the appropriate command
     if args.command == "list":
         list_extensions()
     elif args.command == "package":
-        if not package_extension(args.name, args.output):
+        if not package_extension(args.extension_id, args.output_dir):
             return 1
     elif args.command == "install":
-        if not install_extension(args.package):
+        if not install_extension(args.package_path):
             return 1
     elif args.command == "uninstall":
-        if not uninstall_extension(args.name):
+        if not uninstall_extension(args.extension_id):
             return 1
     
     return 0
