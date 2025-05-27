@@ -27,5 +27,8 @@ COPY src ./src
 COPY tests ./tests
 COPY extensions ./extensions
 
+# Install extensions
+RUN scripts/install_extensions.sh
+
 # Build canisters
 RUN scripts/build_canisters.sh
