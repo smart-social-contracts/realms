@@ -3,35 +3,35 @@
 
 from test_utils import assert_file_exists, assert_in, print_ok, run_command
 
-EXTENSION_NAME = "test_bench"
+EXTENSION_NAMES = ["test_bench", "vault_manager"]
 
 
 def test_extensions():
-    list_before = run_command("./scripts/realm-extension-cli.py list")
-    assert_in(list_before, "No extensions installed")
-
-    run_command(
-        f"./scripts/realm-extension-cli.py install extensions/{EXTENSION_NAME}.zip"
-    )
-
     list_after = run_command("./scripts/realm-extension-cli.py list")
-    assert_in(list_after, EXTENSION_NAME)
+    for name in EXTENSION_NAMES:
+        assert_in(list_after, name)
 
-    run_command(f"./scripts/realm-extension-cli.py package {EXTENSION_NAME}")
+    for name in EXTENSION_NAMES:
+        run_command(f"./scripts/realm-extension-cli.py package {name}")
 
-    assert_file_exists(f"{EXTENSION_NAME}.zip")
+    for name in EXTENSION_NAMES:
+        assert_file_exists(f"{name}.zip")
 
-    run_command(f"./scripts/realm-extension-cli.py uninstall {EXTENSION_NAME}")
+    for name in EXTENSION_NAMES:
+        run_command(f"./scripts/realm-extension-cli.py uninstall {name}")
 
     list_after_uninstall = run_command("./scripts/realm-extension-cli.py list")
     assert_in(list_after_uninstall, "No extensions installed")
 
-    run_command(f"./scripts/realm-extension-cli.py install {EXTENSION_NAME}.zip")
+    for name in EXTENSION_NAMES:
+        run_command(f"./scripts/realm-extension-cli.py install {name}.zip")
 
     list_after_install = run_command("./scripts/realm-extension-cli.py list")
-    assert_in(list_after_install, EXTENSION_NAME)
+    for name in EXTENSION_NAMES:
+        assert_in(list_after_install, name)
 
-    run_command(f"./scripts/realm-extension-cli.py uninstall {EXTENSION_NAME}")
+    for name in EXTENSION_NAMES:
+        run_command(f"./scripts/realm-extension-cli.py uninstall {name}")
 
     list_after_uninstall = run_command("./scripts/realm-extension-cli.py list")
     assert_in(list_after_uninstall, "No extensions installed")
