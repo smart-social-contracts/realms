@@ -1,7 +1,6 @@
 import os
 import subprocess
 
-#!/usr/bin/env python3
 """
 ANSI color codes for terminal output.
 """
@@ -47,8 +46,8 @@ def assert_in(text, substring):
         raise AssertionError(f"Substring '{substring}' not found in text")
     print_ok(f"Substring '{substring}' found in text")
 
+
 def assert_file_exists(file_path):
     if not os.path.exists(file_path):
         raise AssertionError(f"File '{file_path}' does not exist")
     print_ok(f"File '{file_path}' exists")
-    

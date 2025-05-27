@@ -17,6 +17,7 @@ from core.candid_types_realm import (
 )
 from kybra import (
     Async,
+    CallResult,
     Func,
     Opt,
     Principal,
@@ -31,10 +32,9 @@ from kybra import (
     init,
     nat,
     query,
+    text,
     update,
     void,
-    CallResult,
-    text
 )
 from kybra_simple_db import Database
 from kybra_simple_logging import get_logger
@@ -149,27 +149,38 @@ def extension_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse]:
         extension_coroutine = api.extensions.call_extension(
             args["extension_name"], args["function_name"], args["args"]
         )
-        
+
         # In Kybra for IC, we need to yield the coroutine to get the actual result
         extension_result = yield extension_coroutine
-        
+
         logger.info(f"Coroutine yielded: {extension_coroutine}")
         logger.info(f"Result type: {type(extension_result)}")
-        
-        logger.info(f"Got extension result: {extension_result}, type: {type(extension_result)}")
-        
+
+        logger.info(
+            f"Got extension result: {extension_result}, type: {type(extension_result)}"
+        )
+
         # For test_bench extension, handle the TestBenchResponse object
-        if args["extension_name"] == "test_bench" and args["function_name"] == "get_data":
+        if (
+            args["extension_name"] == "test_bench"
+            and args["function_name"] == "get_data"
+        ):
             # According to Kybra IC pattern, use dictionary access for Record fields
             # rather than attribute access
             if isinstance(extension_result, dict) and "data" in extension_result:
-                return ExtensionCallResponse(success=True, response=str(extension_result["data"]))
+                return ExtensionCallResponse(
+                    success=True, response=str(extension_result["data"])
+                )
             elif hasattr(extension_result, "data"):
-                return ExtensionCallResponse(success=True, response=str(extension_result.data))
+                return ExtensionCallResponse(
+                    success=True, response=str(extension_result.data)
+                )
             else:
                 # Fallback to string representation
-                return ExtensionCallResponse(success=True, response=str(extension_result))
-        
+                return ExtensionCallResponse(
+                    success=True, response=str(extension_result)
+                )
+
         # Generic response for other extensions
         return ExtensionCallResponse(success=True, response=str(extension_result))
 
