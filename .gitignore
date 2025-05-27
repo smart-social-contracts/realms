@@ -7,7 +7,6 @@ node_modules
 __pycache__
 .env
 declarations
-*.zip
 debug_files
 deleteme*
 HACK*
