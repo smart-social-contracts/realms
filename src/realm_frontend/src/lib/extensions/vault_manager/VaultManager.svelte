@@ -130,12 +130,12 @@
 	// Get recent transactions
 	async function getTransactions() {
 		try {
-			// Use the extension_call API method including vault_canister_id
+			// Use the extension_call API method to get transactions directly from the vault canister
 			const response = await backend.extension_call({
 				extension_name: "vault_manager",
 				function_name: "get_transactions",
 				args: JSON.stringify({ 
-					principal_id: userPrincipalId,
+					principal_id: vaultCanisterId, // Use the vault canister ID directly as the principal
 					vault_canister_id: vaultCanisterId
 				})
 			});
@@ -147,18 +147,26 @@
 				const data = JSON.parse(response.response);
 				console.log('Parsed transactions data:', data);
 				
-				if (data.success && Array.isArray(data.data)) {
-					// Format transactions for the UI
-					transactions = data.data.map((tx, index) => ({
-						id: tx.id || `tx${index}`,
-						from: "vault",
-						to: userPrincipalId,
-						amount: tx.amount,
-						token: "GGG",
-						timestamp: tx.timestamp * 1000, // Convert to milliseconds
-						status: "completed",
-						memo: `Transaction ${tx.id}`
-					}));
+				if (data.success && data.data && data.data.Transactions && Array.isArray(data.data.Transactions)) {
+					// Format transactions for the UI using the Transactions array
+					transactions = data.data.Transactions.map((tx) => {
+						// Convert timestamps to milliseconds by dividing by 1,000,000 (nanoseconds to milliseconds)
+						const timestamp = parseInt(tx.timestamp) / 1000000;
+						
+						// Determine if this is an incoming or outgoing transaction
+						const isIncoming = !tx.amount.startsWith("-");
+						const amount = isIncoming ? tx.amount : tx.amount.substring(1); // Remove minus sign if outgoing
+						
+						return {
+							id: tx.id,
+							from_principal: isIncoming ? "system" : userPrincipalId,
+							to_principal: isIncoming ? userPrincipalId : "recipient",
+							amount: parseInt(amount),
+							token: "GGG",
+							timestamp: timestamp,
+							status: "completed"
+						};
+					});
 					totalTransactions = transactions.length;
 					console.log('Transactions set:', transactions);
 				} else {
