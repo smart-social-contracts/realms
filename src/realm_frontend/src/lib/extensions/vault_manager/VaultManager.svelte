@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Card, Tabs, TabItem, Spinner, Button, Input, Alert } from 'flowbite-svelte';
-	import { ChartPieSolid, ClockSolid, WalletSolid,
+	import { Card, Tabs, TabItem, Spinner, Button, Input, Alert, Table, TableHead, TableHeadCell, TableBody, TableBodyRow, TableBodyCell } from 'flowbite-svelte';
+	import { ChartPieSolid, ClockSolid, WalletSolid, UsersSolid,
 		ChartOutline, PaperPlaneSolid, DollarOutline } from 'flowbite-svelte-icons';
 	import { principal } from '$lib/stores/auth';
 	import { formatNumber } from '$lib/utils';
@@ -19,6 +19,7 @@
 	let vaultStatus = null;
 	let transactions = [];
 	let totalTransactions = 0;
+	let accounts = [];
 	
 	// Principal ID management
 	let userPrincipalId = $principal || "";
@@ -36,17 +37,28 @@
 	let transferSuccess = false;
 	let transferError = '';
 	
+	// Format amounts for display (ckBTC uses 8 decimal places)
+	function formatCkBTC(amount) {
+	    return formatNumber(amount / 100000000, 8);
+	}
+	
 	// Get vault balance for current user
 	async function getBalance() {
 		try {
+			// Prepare call parameters
+			const callParams = { 
+				principal_id: userPrincipalId,
+				vault_canister_id: vaultCanisterId
+			};
+			
+			// Log the request details
+			console.log('Calling get_balance with parameters:', callParams);
+			
 			// Use the extension_call API method with proper arguments including vault_canister_id
 			const response = await backend.extension_call({
 				extension_name: "vault_manager",
 				function_name: "get_balance",
-				args: JSON.stringify({ 
-					principal_id: userPrincipalId,
-					vault_canister_id: vaultCanisterId
-				})
+				args: JSON.stringify(callParams)
 			});
 			
 			console.log('Balance response:', response);
@@ -60,7 +72,7 @@
 					// Handle successful balance response
 					balanceData = {
 						balance: data.data.amount || 0,
-						token: "GGG",
+						token: "ckBTC",
 						principalId: userPrincipalId
 					};
 					console.log('Balance data set:', balanceData);
@@ -69,7 +81,7 @@
 					console.log('Vault returned error:', data.error);
 					balanceData = {
 						balance: 0,
-						token: "GGG", 
+						token: "ckBTC", 
 						principalId: userPrincipalId,
 						error: data.error || "Balance not found"
 					};
@@ -87,11 +99,19 @@
 	// Get vault status information
 	async function getVaultStatus() {
 		try {
+			// Prepare call parameters
+			const callParams = { 
+				vault_canister_id: vaultCanisterId
+			};
+			
+			// Log the request details
+			console.log('Calling get_status with parameters:', callParams);
+			
 			// Use the extension_call API method including vault_canister_id
 			const response = await backend.extension_call({
 				extension_name: "vault_manager",
 				function_name: "get_status",
-				args: JSON.stringify({ vault_canister_id: vaultCanisterId })
+				args: JSON.stringify(callParams)
 			});
 			
 			console.log('Status response:', response);
@@ -106,13 +126,23 @@
 					vaultStatus = {
 						version: "1.0.0",
 						name: "Realm Vault",
-						token: "GGG",
+						token: "ckBTC",
 						total_supply: stats.app_data?.sync_tx_id || 0,
 						accounts: stats.balances?.length || 0,
 						admin_principal: stats.app_data?.admin_principal || "Unknown",
 						sync_status: stats.app_data?.sync_status || "Unknown"
 					};
+					
+					// Extract accounts data for the Accounts tab
+					if (stats.balances && Array.isArray(stats.balances)) {
+						accounts = stats.balances.map(account => ({
+							principal_id: account.principal_id,
+							amount: account.amount
+						}));
+					}
+					
 					console.log('Vault status set:', vaultStatus);
+					console.log('Accounts set:', accounts);
 				} else {
 					error = `Failed to get vault status: ${data.error || 'Unknown error'}`;
 					console.error(error);
@@ -130,14 +160,20 @@
 	// Get recent transactions
 	async function getTransactions() {
 		try {
+			// Prepare call parameters
+			const callParams = { 
+				principal_id: vaultCanisterId, // Use the vault canister ID directly as the principal
+				vault_canister_id: vaultCanisterId
+			};
+			
+			// Log the request details
+			console.log('Calling get_transactions with parameters:', callParams);
+			
 			// Use the extension_call API method to get transactions directly from the vault canister
 			const response = await backend.extension_call({
 				extension_name: "vault_manager",
 				function_name: "get_transactions",
-				args: JSON.stringify({ 
-					principal_id: vaultCanisterId, // Use the vault canister ID directly as the principal
-					vault_canister_id: vaultCanisterId
-				})
+				args: JSON.stringify(callParams)
 			});
 			
 			console.log('Transactions response:', response);
@@ -162,7 +198,7 @@
 							from_principal: isIncoming ? "system" : userPrincipalId,
 							to_principal: isIncoming ? userPrincipalId : "recipient",
 							amount: parseInt(amount),
-							token: "GGG",
+							token: "ckBTC",
 							timestamp: timestamp,
 							status: "completed"
 						};
@@ -316,10 +352,35 @@
 	</div>
 
 	{#if loading}
-		<!-- Enhanced loading indicator instead of big gray circle -->
-		<div class="flex flex-col items-center justify-center p-12">
-			<Spinner size="xl" color="blue" />
-			<p class="mt-4 text-gray-600 dark:text-gray-400">Loading vault data...</p>
+		<!-- Improved elegant loading animation -->
+		<div class="flex items-center justify-center py-12">
+			<div class="relative">
+				<!-- Animated spinner with gradient -->
+				<svg class="animate-spin h-16 w-16" viewBox="0 0 24 24">
+					<defs>
+						<linearGradient id="spinner-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+							<stop offset="0%" stop-color="#60A5FA" />
+							<stop offset="100%" stop-color="#3B82F6" />
+						</linearGradient>
+					</defs>
+					<circle 
+						class="opacity-25" 
+						cx="12" cy="12" r="10" 
+						stroke="currentColor" 
+						stroke-width="4"
+						fill="none"
+						stroke-dasharray="32"
+						stroke-dashoffset="12"
+						stroke-linecap="round"
+					></circle>
+					<path
+						class="opacity-75"
+						fill="url(#spinner-gradient)"
+						d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+					></path>
+				</svg>
+				<p class="mt-4 text-center text-gray-600 dark:text-gray-400 animate-pulse">Loading vault data...</p>
+			</div>
 		</div>
 	{:else if error}
 		<Alert color="red" class="mb-4">
@@ -337,9 +398,13 @@
 					<div class="flex justify-end">
 						<Button color="alternative" size="sm" on:click={loadData} disabled={loading}>
 							{#if loading}
-								<Spinner class="mr-2" size="4" />
+								<div class="flex items-center">
+									<span class="animate-spin inline-block w-4 h-4 border-2 border-t-transparent border-primary-500 rounded-full mr-2"></span>
+									<span>Loading...</span>
+								</div>
+							{:else}
+								Refresh Data
 							{/if}
-							Refresh Data
 						</Button>
 					</div>
 					
@@ -348,14 +413,16 @@
 							<div class="p-4 bg-yellow-50 dark:bg-yellow-900 rounded-lg border border-yellow-200 dark:border-yellow-700">
 								<h3 class="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-2">Balance Information</h3>
 								<p class="text-yellow-700 dark:text-yellow-300">{balanceData.error}</p>
-								<p class="text-sm text-yellow-600 dark:text-yellow-400 mt-1">
-									Principal: <span class="font-mono">{balanceData.principalId}</span>
-								</p>
+								{#if balanceData.principalId}
+									<p class="text-sm text-yellow-600 dark:text-yellow-400 mt-1">
+										Principal: <span class="font-mono">{balanceData.principalId}</span>
+									</p>
+								{/if}
 							</div>
 						{:else}
 							<BalanceCard 
 								balance={balanceData.balance} 
-								token={balanceData.token || 'GGG'} 
+								token={balanceData.token} 
 								vaultStatus={vaultStatus} 
 							/>
 						{/if}
@@ -368,8 +435,8 @@
 									<DollarOutline class="w-5 h-5 text-primary-600" />
 									<h3 class="text-lg font-semibold">Total Supply</h3>
 								</div>
-								<p class="text-2xl font-bold">{formatNumber(vaultStatus.total_supply)}</p>
-								<p class="text-sm text-gray-500 dark:text-gray-400">{vaultStatus.token || 'GGG'} tokens</p>
+								<p class="text-2xl font-bold">{formatCkBTC(vaultStatus.total_supply)}</p>
+								<p class="text-sm text-gray-500 dark:text-gray-400">{vaultStatus.token} tokens</p>
 							</div>
 							
 							<div class="bg-white dark:bg-gray-700 p-4 rounded-lg shadow">
@@ -468,9 +535,74 @@
 					<ClockSolid class="w-5 h-5" />
 					Transactions
 				</span>
-				<div>
-					<h3 class="text-xl font-semibold mb-4">Transaction History</h3>
-					<TransactionsList {transactions} principalId={balanceData?.principalId} />
+				<div class="space-y-4">
+					<div class="flex justify-between items-center mb-4">
+						<h3 class="text-xl font-semibold">Transaction History</h3>
+						<Button color="alternative" size="sm" on:click={getTransactions} disabled={loading}>
+							{#if loading}
+								<div class="flex items-center">
+									<span class="animate-spin inline-block w-4 h-4 border-2 border-t-transparent border-primary-500 rounded-full mr-2"></span>
+									<span>Loading...</span>
+								</div>
+							{:else}
+								Refresh
+							{/if}
+						</Button>
+					</div>
+					
+					<TransactionsList {transactions} principalId={userPrincipalId} />
+				</div>
+			</TabItem>
+
+			<!-- New Accounts Tab -->
+			<TabItem open={activeTab === 3} on:click={() => activeTab = 3}>
+				<span slot="title" class="flex items-center gap-2">
+					<UsersSolid class="w-5 h-5" />
+					Accounts
+				</span>
+				<div class="space-y-4">
+					<div class="flex justify-between items-center mb-4">
+						<h3 class="text-xl font-semibold">Account Balances</h3>
+						<Button color="alternative" size="sm" on:click={getVaultStatus} disabled={loading}>
+							{#if loading}
+								<div class="flex items-center">
+									<span class="animate-spin inline-block w-4 h-4 border-2 border-t-transparent border-primary-500 rounded-full mr-2"></span>
+									<span>Loading...</span>
+								</div>
+							{:else}
+								Refresh
+							{/if}
+						</Button>
+					</div>
+					
+					{#if accounts.length === 0}
+						<div class="text-center py-8 text-gray-500 dark:text-gray-400">
+							No accounts found.
+						</div>
+					{:else}
+						<Table striped={true}>
+							<TableHead>
+								<TableHeadCell>Principal ID</TableHeadCell>
+								<TableHeadCell>Balance (ckBTC)</TableHeadCell>
+							</TableHead>
+							<TableBody>
+								{#each accounts as account}
+									<TableBodyRow>
+										<TableBodyCell>
+											<div class="font-mono text-sm truncate max-w-xs" title={account.principal_id}>
+												{account.principal_id}
+											</div>
+										</TableBodyCell>
+										<TableBodyCell>
+											<div class="font-medium">
+												{formatCkBTC(account.amount)}
+											</div>
+										</TableBodyCell>
+									</TableBodyRow>
+								{/each}
+							</TableBody>
+						</Table>
+					{/if}
 				</div>
 			</TabItem>
 		</Tabs>

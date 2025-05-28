@@ -4,15 +4,15 @@
 	import { formatNumber } from '$lib/utils';
 	
 	export let balance: number;
-	export let token: string = 'GGG';
+	export let token: string = 'ckBTC';
 	export let vaultStatus: any = null;
 	
-	// Format balance for display (assuming smallest unit is 1/100)
-	$: formattedBalance = formatNumber(balance / 100);
+	// Format balance for display (ckBTC uses 8 decimal places)
+	$: formattedBalance = formatNumber(balance / 100000000, 8);
 	
 	// Random price fluctuation for demo purposes (would use real price data in production)
-	let priceUSD = Math.random() * 10 + 5; // Random price between $5-15
-	$: balanceUSD = (balance / 100) * priceUSD;
+	let priceUSD = Math.random() * 10000 + 35000; // Random price between $35,000-45,000
+	$: balanceUSD = (balance / 100000000) * priceUSD;
 </script>
 
 <div class="bg-gradient-to-r from-primary-500 to-primary-700 rounded-xl text-white p-6 shadow-lg">
