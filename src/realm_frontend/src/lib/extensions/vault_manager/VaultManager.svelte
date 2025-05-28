@@ -25,6 +25,11 @@
 	let principalInputValue = userPrincipalId;
 	let principalError = '';
 	
+	// Vault canister ID management
+	let vaultCanisterId = ""; // No default - user must specify
+	let vaultCanisterInputValue = vaultCanisterId;
+	let vaultCanisterError = '';
+	
 	// Transfer form data
 	let transferRecipient = '';
 	let transferAmount = '';
@@ -36,11 +41,14 @@
 	// Get vault balance for current user
 	async function getBalance() {
 		try {
-			// Use the extension_call API method with proper arguments
+			// Use the extension_call API method with proper arguments including vault_canister_id
 			const response = await backend.extension_call({
 				extension_name: "vault_manager",
 				function_name: "get_balance",
-				args: JSON.stringify({ principal_id: userPrincipalId })
+				args: JSON.stringify({ 
+					principal_id: userPrincipalId,
+					vault_canister_id: vaultCanisterId
+				})
 			});
 			
 			console.log('Balance response:', response);
@@ -81,11 +89,11 @@
 	// Get vault status information
 	async function getVaultStatus() {
 		try {
-			// Use the extension_call API method
+			// Use the extension_call API method including vault_canister_id
 			const response = await backend.extension_call({
 				extension_name: "vault_manager",
 				function_name: "get_status",
-				args: "{}"
+				args: JSON.stringify({ vault_canister_id: vaultCanisterId })
 			});
 			
 			console.log('Status response:', response);
@@ -124,11 +132,14 @@
 	// Get recent transactions
 	async function getTransactions() {
 		try {
-			// Use the extension_call API method
+			// Use the extension_call API method including vault_canister_id
 			const response = await backend.extension_call({
 				extension_name: "vault_manager",
 				function_name: "get_transactions",
-				args: JSON.stringify({ principal_id: userPrincipalId })
+				args: JSON.stringify({ 
+					principal_id: userPrincipalId,
+					vault_canister_id: vaultCanisterId
+				})
 			});
 			
 			console.log('Transactions response:', response);
@@ -175,13 +186,14 @@
 		transferError = '';
 		
 		try {
-			// Use the extension_call API method
+			// Use the extension_call API method including vault_canister_id
 			const response = await backend.extension_call({
 				extension_name: "vault_manager",
 				function_name: "transfer",
 				args: JSON.stringify({
 					to_principal: transferRecipient,
-					amount: parseInt(transferAmount)
+					amount: parseInt(transferAmount),
+					vault_canister_id: vaultCanisterId
 				})
 			});
 			
@@ -236,11 +248,39 @@
 		refreshVaultData();
 	}
 	
+	// Update vault canister ID and refresh data
+	function updateVaultCanisterId() {
+		if (!vaultCanisterInputValue.trim()) {
+			vaultCanisterError = 'Vault canister ID cannot be empty';
+			return;
+		}
+		
+		// Basic validation for canister ID format (should be alphanumeric with dashes)
+		const canisterRegex = /^[a-z0-9-]+$/;
+		if (!canisterRegex.test(vaultCanisterInputValue)) {
+			vaultCanisterError = 'Invalid canister ID format';
+			return;
+		}
+		
+		vaultCanisterError = '';
+		vaultCanisterId = vaultCanisterInputValue.trim();
+		
+		// Refresh all data with new vault canister ID
+		refreshVaultData();
+	}
+	
 	// Refresh all vault data
 	async function refreshVaultData() {
 		try {
 			loading = true;
 			error = '';
+			
+			// Only make API calls if vault canister ID is provided
+			if (!vaultCanisterId) {
+				error = 'Please specify a vault canister ID to load data';
+				return;
+			}
+			
 			await Promise.all([
 				getBalance(),
 				getVaultStatus(),
@@ -253,7 +293,12 @@
 	
 	// Initialize the component
 	onMount(async () => {
-		await refreshVaultData();
+		// Only load data if vault canister ID is already set
+		if (vaultCanisterId) {
+			await refreshVaultData();
+		} else {
+			loading = false; // Stop loading state since we're waiting for user input
+		}
 	});
 </script>
 
@@ -263,31 +308,80 @@
 		<h2 class="text-2xl font-bold text-gray-900 dark:text-white">Vault Manager</h2>
 	</div>
 
-	<!-- Principal ID Input Section -->
-	<div class="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-		<h3 class="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Vault Principal ID</h3>
-		<div class="flex gap-3 items-start">
-			<div class="flex-1">
-				<Input 
-					bind:value={principalInputValue} 
-					placeholder="Enter your vault principal ID (e.g., 2vxsx-fae)" 
-					class="w-full"
-					on:keydown={(e) => e.key === 'Enter' && updatePrincipalId()}
-				/>
-				{#if principalError}
-					<p class="text-red-600 text-sm mt-1">{principalError}</p>
-				{/if}
+	<!-- Configuration Section -->
+	<div class="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-4">
+		<h3 class="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Vault Configuration</h3>
+		
+		<!-- Vault Canister ID Input -->
+		<div>
+			<label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+				Vault Canister ID
+			</label>
+			<div class="flex gap-3 items-start">
+				<div class="flex-1">
+					<Input 
+						bind:value={vaultCanisterInputValue} 
+						placeholder="Enter vault canister ID (e.g., guja4-2aaaa-aaaam-qdhja-cai)" 
+						class="w-full"
+						on:keydown={(e) => e.key === 'Enter' && updateVaultCanisterId()}
+					/>
+					{#if vaultCanisterError}
+						<p class="text-red-600 text-sm mt-1">{vaultCanisterError}</p>
+					{/if}
+				</div>
+				<Button color="primary" on:click={updateVaultCanisterId} disabled={loading}>
+					{#if loading}
+						<Spinner class="mr-2" size="4" />
+					{/if}
+					Update Vault
+				</Button>
 			</div>
-			<Button color="primary" on:click={updatePrincipalId} disabled={loading}>
-				{#if loading}
-					<Spinner class="mr-2" size="4" />
+			<p class="text-sm text-gray-500 dark:text-gray-400 mt-2">
+				Current Vault: <span class="font-mono text-primary-600">{vaultCanisterId || 'Not set'}</span>
+				{#if !vaultCanisterId}
+					<Button 
+						size="xs" 
+						color="primary" 
+						class="ml-2" 
+						on:click={() => {
+							vaultCanisterInputValue = 'guja4-2aaaa-aaaam-qdhja-cai';
+							updateVaultCanisterId();
+						}}
+					>
+						Set Example
+					</Button>
 				{/if}
-				Update
-			</Button>
+			</p>
 		</div>
-		<p class="text-sm text-gray-500 dark:text-gray-400 mt-2">
-			Current Principal: <span class="font-mono text-primary-600">{userPrincipalId}</span>
-		</p>
+		
+		<!-- Principal ID Input -->
+		<div>
+			<label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+				Principal ID
+			</label>
+			<div class="flex gap-3 items-start">
+				<div class="flex-1">
+					<Input 
+						bind:value={principalInputValue} 
+						placeholder="Enter your vault principal ID (e.g., 2vxsx-fae)" 
+						class="w-full"
+						on:keydown={(e) => e.key === 'Enter' && updatePrincipalId()}
+					/>
+					{#if principalError}
+						<p class="text-red-600 text-sm mt-1">{principalError}</p>
+					{/if}
+				</div>
+				<Button color="primary" on:click={updatePrincipalId} disabled={loading}>
+					{#if loading}
+						<Spinner class="mr-2" size="4" />
+					{/if}
+					Update Principal
+				</Button>
+			</div>
+			<p class="text-sm text-gray-500 dark:text-gray-400 mt-2">
+				Current Principal: <span class="font-mono text-primary-600">{userPrincipalId}</span>
+			</p>
+		</div>
 	</div>
 
 	{#if loading}

@@ -1,4 +1,4 @@
-"""
+ """
 Vault Manager extension entry point
 """
 import json
@@ -22,9 +22,6 @@ from kybra import (
 from kybra_simple_logging import get_logger
 
 logger = get_logger("extensions.vault_manager")
-
-# Use appropriate ID based on environment - this will be updated at deployment time
-VAULT_CANISTER_ID = "ucwa4-rx777-77774-qaada-cai"  # Local development ID
 
 
 def convert_principals_to_strings(obj):
@@ -124,8 +121,13 @@ def get_balance(args: str) -> Async[str]:
         else:
             params = {}
         
+        # Get vault canister ID from parameters (required)
+        vault_canister_id = params.get("vault_canister_id")
+        if not vault_canister_id:
+            return json.dumps({"success": False, "error": "vault_canister_id parameter is required"})
+        
         # Get a reference to the vault canister
-        vault = Vault(Principal.from_str(VAULT_CANISTER_ID))
+        vault = Vault(Principal.from_str(vault_canister_id))
         
         # Call the vault method
         principal_id = params.get("principal_id", "2vxsx-fae")
@@ -151,8 +153,19 @@ def get_status(args: str) -> Async[str]:
     logger.info(f"vault_manager.get_status called with args: {args}")
     
     try:
+        # Parse args from JSON string if provided
+        if args:
+            params = json.loads(args) if isinstance(args, str) else args
+        else:
+            params = {}
+        
+        # Get vault canister ID from parameters (required)
+        vault_canister_id = params.get("vault_canister_id")
+        if not vault_canister_id:
+            return json.dumps({"success": False, "error": "vault_canister_id parameter is required"})
+        
         # Get a reference to the vault canister
-        vault = Vault(Principal.from_str(VAULT_CANISTER_ID))
+        vault = Vault(Principal.from_str(vault_canister_id))
         
         # Call the vault method
         result: CallResult[Response] = yield vault.status()
@@ -183,8 +196,13 @@ def get_transactions(args: str) -> Async[str]:
         else:
             params = {}
         
+        # Get vault canister ID from parameters (required)
+        vault_canister_id = params.get("vault_canister_id")
+        if not vault_canister_id:
+            return json.dumps({"success": False, "error": "vault_canister_id parameter is required"})
+        
         # Get a reference to the vault canister
-        vault = Vault(Principal.from_str(VAULT_CANISTER_ID))
+        vault = Vault(Principal.from_str(vault_canister_id))
         
         # Call the vault method
         principal_id = params.get("principal_id", "2vxsx-fae")
@@ -216,8 +234,13 @@ def transfer(args: str) -> Async[str]:
         else:
             params = {}
         
+        # Get vault canister ID from parameters (required)
+        vault_canister_id = params.get("vault_canister_id")
+        if not vault_canister_id:
+            return json.dumps({"success": False, "error": "vault_canister_id parameter is required"})
+        
         # Get a reference to the vault canister
-        vault = Vault(Principal.from_str(VAULT_CANISTER_ID))
+        vault = Vault(Principal.from_str(vault_canister_id))
         
         # Call the vault method
         to_principal = params.get("to_principal")
