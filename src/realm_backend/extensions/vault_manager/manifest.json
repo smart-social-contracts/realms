@@ -1,0 +1,7 @@
+{
+  "name": "vault_manager",
+  "version": "0.1.0",
+  "description": "Manages vault operations for the Realms platform",
+  "required_permissions": [],
+  "entry_points": ["get_balance", "get_status", "get_transactions", "transfer"]
+}
