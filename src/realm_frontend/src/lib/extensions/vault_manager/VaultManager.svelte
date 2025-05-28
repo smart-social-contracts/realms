@@ -21,9 +21,7 @@
 	let totalTransactions = 0;
 	
 	// Principal ID management
-	let userPrincipalId = $principal || "2vxsx-fae";
-	let principalInputValue = userPrincipalId;
-	let principalError = '';
+	let userPrincipalId = $principal || "";
 	
 	// Vault canister ID management
 	let vaultCanisterId = ""; // No default - user must specify
@@ -227,65 +225,29 @@
 		transferMemo = '';
 	}
 	
-	// Update principal ID and refresh data
-	function updatePrincipalId() {
-		if (!principalInputValue.trim()) {
-			principalError = 'Principal ID cannot be empty';
+	// Load all data
+	async function loadData() {
+		loading = true;
+		error = '';
+		
+		// Validate canister ID
+		if (!vaultCanisterInputValue || vaultCanisterInputValue.trim() === '') {
+			vaultCanisterError = 'Please enter a valid vault canister ID';
+			loading = false;
 			return;
 		}
 		
-		// Basic validation for principal ID format (should be alphanumeric with dashes)
-		const principalRegex = /^[a-z0-9-]+$/;
-		if (!principalRegex.test(principalInputValue)) {
-			principalError = 'Invalid principal ID format';
-			return;
-		}
-		
-		principalError = '';
-		userPrincipalId = principalInputValue.trim();
-		
-		// Refresh all data with new principal ID
-		refreshVaultData();
-	}
-	
-	// Update vault canister ID and refresh data
-	function updateVaultCanisterId() {
-		if (!vaultCanisterInputValue.trim()) {
-			vaultCanisterError = 'Vault canister ID cannot be empty';
-			return;
-		}
-		
-		// Basic validation for canister ID format (should be alphanumeric with dashes)
-		const canisterRegex = /^[a-z0-9-]+$/;
-		if (!canisterRegex.test(vaultCanisterInputValue)) {
-			vaultCanisterError = 'Invalid canister ID format';
-			return;
-		}
-		
-		vaultCanisterError = '';
-		vaultCanisterId = vaultCanisterInputValue.trim();
-		
-		// Refresh all data with new vault canister ID
-		refreshVaultData();
-	}
-	
-	// Refresh all vault data
-	async function refreshVaultData() {
+		// Set actual values from inputs
+		vaultCanisterId = vaultCanisterInputValue;
+		userPrincipalId = $principal || ""; // Always use authenticated principal
+
 		try {
-			loading = true;
-			error = '';
-			
-			// Only make API calls if vault canister ID is provided
-			if (!vaultCanisterId) {
-				error = 'Please specify a vault canister ID to load data';
-				return;
-			}
-			
-			await Promise.all([
-				getBalance(),
-				getVaultStatus(),
-				getTransactions()
-			]);
+			// Run all data fetching in parallel
+			await Promise.all([getBalance(), getVaultStatus(), getTransactions()]);
+			error = ''; // Clear any previous errors if successful
+		} catch (err) {
+			console.error('Error loading data:', err);
+			error = `Error loading data: ${err.message || err}`;
 		} finally {
 			loading = false;
 		}
@@ -295,7 +257,7 @@
 	onMount(async () => {
 		// Only load data if vault canister ID is already set
 		if (vaultCanisterId) {
-			await refreshVaultData();
+			await loadData();
 		} else {
 			loading = false; // Stop loading state since we're waiting for user input
 		}
@@ -309,84 +271,47 @@
 	</div>
 
 	<!-- Configuration Section -->
-	<div class="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-4">
-		<h3 class="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Vault Configuration</h3>
+	<div class="vault-configuration mb-6">
+		<h3 class="text-xl font-bold mb-4">Vault Configuration</h3>
 		
-		<!-- Vault Canister ID Input -->
-		<div>
-			<label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-				Vault Canister ID
-			</label>
-			<div class="flex gap-3 items-start">
-				<div class="flex-1">
-					<Input 
-						bind:value={vaultCanisterInputValue} 
-						placeholder="Enter vault canister ID (e.g., guja4-2aaaa-aaaam-qdhja-cai)" 
-						class="w-full"
-						on:keydown={(e) => e.key === 'Enter' && updateVaultCanisterId()}
-					/>
-					{#if vaultCanisterError}
-						<p class="text-red-600 text-sm mt-1">{vaultCanisterError}</p>
-					{/if}
-				</div>
-				<Button color="primary" on:click={updateVaultCanisterId} disabled={loading}>
-					{#if loading}
-						<Spinner class="mr-2" size="4" />
-					{/if}
-					Update Vault
-				</Button>
-			</div>
-			<p class="text-sm text-gray-500 dark:text-gray-400 mt-2">
-				Current Vault: <span class="font-mono text-primary-600">{vaultCanisterId || 'Not set'}</span>
-				{#if !vaultCanisterId}
-					<Button 
-						size="xs" 
-						color="primary" 
-						class="ml-2" 
-						on:click={() => {
-							vaultCanisterInputValue = 'guja4-2aaaa-aaaam-qdhja-cai';
-							updateVaultCanisterId();
-						}}
-					>
-						Set Example
-					</Button>
-				{/if}
-			</p>
+		<!-- Simplified to only have Vault Canister ID input -->
+		<div class="mb-4">
+			<Input 
+				type="text" 
+				id="vault-canister-id" 
+				placeholder="Enter vault canister ID" 
+				label="Vault Canister ID" 
+				bind:value={vaultCanisterInputValue} 
+				on:keydown={(e) => e.key === 'Enter' && loadData()}
+			/>
+			{#if vaultCanisterError}
+				<p class="text-red-600 text-sm mt-1">{vaultCanisterError}</p>
+			{/if}
 		</div>
 		
-		<!-- Principal ID Input -->
-		<div>
-			<label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-				Principal ID
-			</label>
-			<div class="flex gap-3 items-start">
-				<div class="flex-1">
-					<Input 
-						bind:value={principalInputValue} 
-						placeholder="Enter your vault principal ID (e.g., 2vxsx-fae)" 
-						class="w-full"
-						on:keydown={(e) => e.key === 'Enter' && updatePrincipalId()}
-					/>
-					{#if principalError}
-						<p class="text-red-600 text-sm mt-1">{principalError}</p>
-					{/if}
-				</div>
-				<Button color="primary" on:click={updatePrincipalId} disabled={loading}>
-					{#if loading}
-						<Spinner class="mr-2" size="4" />
-					{/if}
-					Update Principal
-				</Button>
+		{#if vaultCanisterId && vaultCanisterId !== vaultCanisterInputValue}
+			<div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+				Current Vault: {vaultCanisterId}
 			</div>
-			<p class="text-sm text-gray-500 dark:text-gray-400 mt-2">
-				Current Principal: <span class="font-mono text-primary-600">{userPrincipalId}</span>
-			</p>
-		</div>
+		{/if}
+		
+		<Button color="primary" on:click={loadData}>
+			{#if loading}
+				<div class="flex items-center">
+					<Spinner class="mr-2" size="sm" color="white" />
+					<span>Loading...</span>
+				</div>
+			{:else}
+				<span>Load Vault</span>
+			{/if}
+		</Button>
 	</div>
 
 	{#if loading}
-		<div class="flex justify-center items-center h-60">
-			<Spinner size="16" />
+		<!-- Enhanced loading indicator instead of big gray circle -->
+		<div class="flex flex-col items-center justify-center p-12">
+			<Spinner size="xl" color="blue" />
+			<p class="mt-4 text-gray-600 dark:text-gray-400">Loading vault data...</p>
 		</div>
 	{:else if error}
 		<Alert color="red" class="mb-4">
@@ -402,7 +327,7 @@
 				<div class="space-y-6">
 					<!-- Refresh Button -->
 					<div class="flex justify-end">
-						<Button color="alternative" size="sm" on:click={refreshVaultData} disabled={loading}>
+						<Button color="alternative" size="sm" on:click={loadData} disabled={loading}>
 							{#if loading}
 								<Spinner class="mr-2" size="4" />
 							{/if}
