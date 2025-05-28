@@ -1,3 +1,5 @@
+import traceback
+
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
@@ -13,16 +15,21 @@ def call_extension_function(extension_name: str, function_name: str, args: str):
     """
     logger.info(f"Calling extension '{extension_name}' function '{function_name}'")
 
-    # Import registry inside the function to avoid import cycles
-    from extensions.registry import get_func
+    try:
+        # Import registry inside the function to avoid import cycles
+        from extensions.registry import get_func
 
-    # Get the function from registry
-    func = get_func(extension_name, function_name)
-    logger.info(f"Got function from registry: {func}")
+        # Get the function from registry
+        func = get_func(extension_name, function_name)
+        logger.info(f"Got function from registry: {func}")
 
-    # Call the function to get its result
-    result = func(args)
-    logger.info(f"Got result from function: {result}")
+        # Call the function to get its result
+        result = func(args)
+        logger.info(f"Got result from function: {result}")
+
+    except Exception as e:
+        logger.error(f"Error calling extension function: {e}\n{traceback.format_exc()}")
+        raise e
 
     # The function already returns an Async result, so return it directly
     return result
