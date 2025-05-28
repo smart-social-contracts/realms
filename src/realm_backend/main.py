@@ -157,7 +157,7 @@ def extension_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse]:
         logger.info(f"Result type: {type(extension_result)}")
 
         logger.info(
-            f"Got extension result: {extension_result}, type: {type(extension_result)}"
+            f"Got extension result from {args['extension_name']} function {args['function_name']}: {extension_result}, type: {type(extension_result)}"
         )
 
         # # According to Kybra IC pattern, use dictionary access for Record fields

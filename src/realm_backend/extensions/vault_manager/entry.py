@@ -163,6 +163,8 @@ def get_status(args: str) -> Async[str]:
         vault_canister_id = params.get("vault_canister_id")
         if not vault_canister_id:
             return json.dumps({"success": False, "error": "vault_canister_id parameter is required"})
+
+        logger.info(f"vault_manager.get_status vault_canister_id: {vault_canister_id}")
         
         # Get a reference to the vault canister
         vault = Vault(Principal.from_str(vault_canister_id))
@@ -181,8 +183,8 @@ def get_status(args: str) -> Async[str]:
             return json.dumps({"success": False, "error": error_msg})
             
     except Exception as e:
-        logger.error(f"Error calling vault.status: {str(e)}")
-        return json.dumps({"success": False, "error": str(e)})
+        logger.error(f"Error calling vault.status: {str(e)}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": f"{str(e)}\n{traceback.format_exc()}"})
 
 
 def get_transactions(args: str) -> Async[str]:
