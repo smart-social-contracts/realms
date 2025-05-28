@@ -47,7 +47,7 @@
 		try {
 			// Prepare call parameters
 			const callParams = { 
-				principal_id: userPrincipalId,
+				principal_id: vaultCanisterId, // Use the vault canister ID as the principal, same as CLI example
 				vault_canister_id: vaultCanisterId
 			};
 			
@@ -71,9 +71,9 @@
 				if (data.success) {
 					// Handle successful balance response
 					balanceData = {
-						balance: data.data.amount || 0,
+						balance: data.data.Balance?.amount || 0,
 						token: "ckBTC",
-						principalId: userPrincipalId
+						principalId: data.data.Balance?.principal_id || vaultCanisterId
 					};
 					console.log('Balance data set:', balanceData);
 				} else {
@@ -82,7 +82,7 @@
 					balanceData = {
 						balance: 0,
 						token: "ckBTC", 
-						principalId: userPrincipalId,
+						principalId: vaultCanisterId,
 						error: data.error || "Balance not found"
 					};
 				}
