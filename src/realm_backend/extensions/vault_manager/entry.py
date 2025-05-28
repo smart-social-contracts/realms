@@ -134,20 +134,28 @@ def get_balance(args: str) -> Async[str]:
         try:
             vault = Vault(Principal.from_str(vault_canister_id))
         except Exception as e:
-            logger.error(f"Invalid vault canister ID: {vault_canister_id}, error: {str(e)}")
-            return json.dumps({"success": False, "error": f"Invalid vault canister ID: {str(e)}"})
+            logger.error(
+                f"Invalid vault canister ID: {vault_canister_id}, error: {str(e)}"
+            )
+            return json.dumps(
+                {"success": False, "error": f"Invalid vault canister ID: {str(e)}"}
+            )
 
         # Call the vault method with the user's principal ID
         try:
             principal_id = params.get("principal_id")
             if not principal_id:
-                return json.dumps({"success": False, "error": "principal_id parameter is required"})
-                
+                return json.dumps(
+                    {"success": False, "error": "principal_id parameter is required"}
+                )
+
             principal = Principal.from_str(principal_id)
             result: CallResult[Response] = yield vault.get_balance(principal)
         except Exception as e:
             logger.error(f"Error calling vault.get_balance: {str(e)}")
-            return json.dumps({"success": False, "error": f"Error calling balance: {str(e)}"})
+            return json.dumps(
+                {"success": False, "error": f"Error calling balance: {str(e)}"}
+            )
 
         # Handle the result
         if result.Ok is not None:
@@ -233,20 +241,28 @@ def get_transactions(args: str) -> Async[str]:
         try:
             vault = Vault(Principal.from_str(vault_canister_id))
         except Exception as e:
-            logger.error(f"Invalid vault canister ID: {vault_canister_id}, error: {str(e)}")
-            return json.dumps({"success": False, "error": f"Invalid vault canister ID: {str(e)}"})
+            logger.error(
+                f"Invalid vault canister ID: {vault_canister_id}, error: {str(e)}"
+            )
+            return json.dumps(
+                {"success": False, "error": f"Invalid vault canister ID: {str(e)}"}
+            )
 
         # Call the vault method with the user's principal ID
         try:
             principal_id = params.get("principal_id")
             if not principal_id:
-                return json.dumps({"success": False, "error": "principal_id parameter is required"})
-                
+                return json.dumps(
+                    {"success": False, "error": "principal_id parameter is required"}
+                )
+
             principal = Principal.from_str(principal_id)
             result: CallResult[Response] = yield vault.get_transactions(principal)
         except Exception as e:
             logger.error(f"Error calling vault.get_transactions: {str(e)}")
-            return json.dumps({"success": False, "error": f"Error calling transactions: {str(e)}"})
+            return json.dumps(
+                {"success": False, "error": f"Error calling transactions: {str(e)}"}
+            )
 
         # Handle the result
         if result.Ok is not None:
