@@ -160,7 +160,6 @@ def extension_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse]:
             f"Got extension result: {extension_result}, type: {type(extension_result)}"
         )
 
-
         # # According to Kybra IC pattern, use dictionary access for Record fields
         # # rather than attribute access
         # if isinstance(extension_result, dict) and "data" in extension_result:
