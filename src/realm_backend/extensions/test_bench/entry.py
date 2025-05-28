@@ -1,6 +1,6 @@
 from kybra import Async, Record, ic, text
 
-'''
+"""
 
 dfx canister call realm_backend extension_call '(
   record {
@@ -23,7 +23,7 @@ dfx canister call realm_backend extension_call '(
     }
   }
 )'
-'''
+"""
 
 
 class TestBenchResponse(Record):
@@ -32,12 +32,12 @@ class TestBenchResponse(Record):
 
 def get_data(args: str) -> Async[TestBenchResponse]:
     """Get test data from this extension.
-    
+
     The core module will handle the async wrapping for us.
     """
-    ic.print('get_data starting')
-    ic.print(f'Parameter type: {type(args)}, Value: {args}')
-    
+    ic.print("get_data starting")
+    ic.print(f"Parameter type: {type(args)}, Value: {args}")
+
     # Simple, non-async function that returns a regular value
     # The core/extensions.py module will handle wrapping this in an async function
     return TestBenchResponse(data=f"some data {args}")

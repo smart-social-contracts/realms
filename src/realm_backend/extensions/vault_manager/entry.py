@@ -1,7 +1,9 @@
- """
+"""
 Vault Manager extension entry point
 """
+
 import json
+import traceback
 from typing import Any, Dict
 
 from kybra import (
@@ -113,36 +115,42 @@ class Vault(Service):
 def get_balance(args: str) -> Async[str]:
     """Get user's vault balance"""
     logger.info(f"vault_manager.get_balance called with args: {args}")
-    
+
     try:
         # Parse args from JSON string if provided
         if args:
             params = json.loads(args) if isinstance(args, str) else args
         else:
             params = {}
-        
+
         # Get vault canister ID from parameters (required)
         vault_canister_id = params.get("vault_canister_id")
         if not vault_canister_id:
-            return json.dumps({"success": False, "error": "vault_canister_id parameter is required"})
-        
+            return json.dumps(
+                {"success": False, "error": "vault_canister_id parameter is required"}
+            )
+
         # Get a reference to the vault canister
         vault = Vault(Principal.from_str(vault_canister_id))
-        
+
         # Call the vault method
         principal_id = params.get("principal_id", "2vxsx-fae")
-        result: CallResult[Response] = yield vault.get_balance(Principal.from_str(principal_id))
-        
+        result: CallResult[Response] = yield vault.get_balance(
+            Principal.from_str(principal_id)
+        )
+
         # Handle the result
         if result.Ok is not None:
             response = result.Ok
             # Convert Principal objects to strings before JSON serialization
-            serializable_data = convert_principals_to_strings({"success": response["success"], "data": response["data"]})
+            serializable_data = convert_principals_to_strings(
+                {"success": response["success"], "data": response["data"]}
+            )
             return json.dumps(serializable_data)
         else:
             error_msg = str(result.Err) if result.Err is not None else "Unknown error"
             return json.dumps({"success": False, "error": error_msg})
-            
+
     except Exception as e:
         logger.error(f"Error calling vault.get_balance: {str(e)}")
         return json.dumps({"success": False, "error": str(e)})
@@ -151,75 +159,87 @@ def get_balance(args: str) -> Async[str]:
 def get_status(args: str) -> Async[str]:
     """Get vault status"""
     logger.info(f"vault_manager.get_status called with args: {args}")
-    
+
     try:
         # Parse args from JSON string if provided
         if args:
             params = json.loads(args) if isinstance(args, str) else args
         else:
             params = {}
-        
+
         # Get vault canister ID from parameters (required)
         vault_canister_id = params.get("vault_canister_id")
         if not vault_canister_id:
-            return json.dumps({"success": False, "error": "vault_canister_id parameter is required"})
+            return json.dumps(
+                {"success": False, "error": "vault_canister_id parameter is required"}
+            )
 
         logger.info(f"vault_manager.get_status vault_canister_id: {vault_canister_id}")
-        
+
         # Get a reference to the vault canister
         vault = Vault(Principal.from_str(vault_canister_id))
-        
+
         # Call the vault method
         result: CallResult[Response] = yield vault.status()
-        
+
         # Handle the result
         if result.Ok is not None:
             response = result.Ok
             # Convert Principal objects to strings before JSON serialization
-            serializable_data = convert_principals_to_strings({"success": response["success"], "data": response["data"]})
+            serializable_data = convert_principals_to_strings(
+                {"success": response["success"], "data": response["data"]}
+            )
             return json.dumps(serializable_data)
         else:
             error_msg = str(result.Err) if result.Err is not None else "Unknown error"
             return json.dumps({"success": False, "error": error_msg})
-            
+
     except Exception as e:
         logger.error(f"Error calling vault.status: {str(e)}\n{traceback.format_exc()}")
-        return json.dumps({"success": False, "error": f"{str(e)}\n{traceback.format_exc()}"})
+        return json.dumps(
+            {"success": False, "error": f"{str(e)}\n{traceback.format_exc()}"}
+        )
 
 
 def get_transactions(args: str) -> Async[str]:
     """Get user's transaction history"""
     logger.info(f"vault_manager.get_transactions called with args: {args}")
-    
+
     try:
         # Parse args from JSON string if provided
         if args:
             params = json.loads(args) if isinstance(args, str) else args
         else:
             params = {}
-        
+
         # Get vault canister ID from parameters (required)
         vault_canister_id = params.get("vault_canister_id")
         if not vault_canister_id:
-            return json.dumps({"success": False, "error": "vault_canister_id parameter is required"})
-        
+            return json.dumps(
+                {"success": False, "error": "vault_canister_id parameter is required"}
+            )
+
         # Get a reference to the vault canister
         vault = Vault(Principal.from_str(vault_canister_id))
-        
+
         # Call the vault method
         principal_id = params.get("principal_id", "2vxsx-fae")
-        result: CallResult[Response] = yield vault.get_transactions(Principal.from_str(principal_id))
-        
+        result: CallResult[Response] = yield vault.get_transactions(
+            Principal.from_str(principal_id)
+        )
+
         # Handle the result
         if result.Ok is not None:
             response = result.Ok
             # Convert Principal objects to strings before JSON serialization
-            serializable_data = convert_principals_to_strings({"success": response["success"], "data": response["data"]})
+            serializable_data = convert_principals_to_strings(
+                {"success": response["success"], "data": response["data"]}
+            )
             return json.dumps(serializable_data)
         else:
             error_msg = str(result.Err) if result.Err is not None else "Unknown error"
             return json.dumps({"success": False, "error": error_msg})
-            
+
     except Exception as e:
         logger.error(f"Error calling vault.get_transactions: {str(e)}")
         return json.dumps({"success": False, "error": str(e)})
@@ -228,37 +248,43 @@ def get_transactions(args: str) -> Async[str]:
 def transfer(args: str) -> Async[str]:
     """Transfer tokens to another user"""
     logger.info(f"vault_manager.transfer called with args: {args}")
-    
+
     try:
         # Parse args from JSON string if provided
         if args:
             params = json.loads(args) if isinstance(args, str) else args
         else:
             params = {}
-        
+
         # Get vault canister ID from parameters (required)
         vault_canister_id = params.get("vault_canister_id")
         if not vault_canister_id:
-            return json.dumps({"success": False, "error": "vault_canister_id parameter is required"})
-        
+            return json.dumps(
+                {"success": False, "error": "vault_canister_id parameter is required"}
+            )
+
         # Get a reference to the vault canister
         vault = Vault(Principal.from_str(vault_canister_id))
-        
+
         # Call the vault method
         to_principal = params.get("to_principal")
         amount = params.get("amount", 0)
-        result: CallResult[Response] = yield vault.transfer(Principal.from_str(to_principal), amount)
-        
+        result: CallResult[Response] = yield vault.transfer(
+            Principal.from_str(to_principal), amount
+        )
+
         # Handle the result
         if result.Ok is not None:
             response = result.Ok
             # Convert Principal objects to strings before JSON serialization
-            serializable_data = convert_principals_to_strings({"success": response["success"], "data": response["data"]})
+            serializable_data = convert_principals_to_strings(
+                {"success": response["success"], "data": response["data"]}
+            )
             return json.dumps(serializable_data)
         else:
             error_msg = str(result.Err) if result.Err is not None else "Unknown error"
             return json.dumps({"success": False, "error": error_msg})
-            
+
     except Exception as e:
         logger.error(f"Error calling vault.transfer: {str(e)}")
         return json.dumps({"success": False, "error": str(e)})

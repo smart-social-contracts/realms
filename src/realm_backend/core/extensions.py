@@ -44,7 +44,9 @@ def call_extension(extension_name: str, function_name: str, args: str) -> Async[
 
     # This gets us the coroutine from the extension function
     result_coroutine = call_extension_function(extension_name, function_name, args)
-    logger.info(f"Got coroutine from extension {extension_name} function {function_name}: {result_coroutine}")
+    logger.info(
+        f"Got coroutine from extension {extension_name} function {function_name}: {result_coroutine}"
+    )
 
     # Return the coroutine directly - the caller will yield it
     return result_coroutine
