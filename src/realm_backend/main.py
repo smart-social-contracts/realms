@@ -160,26 +160,22 @@ def extension_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse]:
             f"Got extension result: {extension_result}, type: {type(extension_result)}"
         )
 
-        # For test_bench extension, handle the TestBenchResponse object
-        if (
-            args["extension_name"] == "test_bench"
-            and args["function_name"] == "get_data"
-        ):
-            # According to Kybra IC pattern, use dictionary access for Record fields
-            # rather than attribute access
-            if isinstance(extension_result, dict) and "data" in extension_result:
-                return ExtensionCallResponse(
-                    success=True, response=str(extension_result["data"])
-                )
-            elif hasattr(extension_result, "data"):
-                return ExtensionCallResponse(
-                    success=True, response=str(extension_result.data)
-                )
-            else:
-                # Fallback to string representation
-                return ExtensionCallResponse(
-                    success=True, response=str(extension_result)
-                )
+
+        # # According to Kybra IC pattern, use dictionary access for Record fields
+        # # rather than attribute access
+        # if isinstance(extension_result, dict) and "data" in extension_result:
+        #     return ExtensionCallResponse(
+        #         success=True, response=str(extension_result["data"])
+        #     )
+        # elif hasattr(extension_result, "data"):
+        #     return ExtensionCallResponse(
+        #         success=True, response=str(extension_result.data)
+        #     )
+        # else:
+        #     # Fallback to string representation
+        #     return ExtensionCallResponse(
+        #         success=True, response=str(extension_result)
+        #     )
 
         # Generic response for other extensions
         return ExtensionCallResponse(success=True, response=str(extension_result))
