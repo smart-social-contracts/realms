@@ -15,37 +15,7 @@
     "vault": {
       "type": "custom",
       "wasm": ".wasm/vault.wasm",
-      "candid": ".wasm/vault.did",
-      "dependencies": ["ckbtc_ledger", "ckbtc_indexer"]
-    },
-    "ckbtc_ledger": {
-      "type": "custom",
-      "wasm": ".wasm/ledger.wasm",
-      "candid": ".wasm/ledger.did",
-      "networks": {
-        "local": {}
-      },
-      "remote": {
-        "id": {
-          "staging": "mxzaz-hqaaa-aaaar-qaada-cai", 
-          "ic": "mxzaz-hqaaa-aaaar-qaada-cai"
-        }
-      }
-    },
-    "ckbtc_indexer": {
-      "type": "custom",
-      "wasm": ".wasm/indexer.wasm",
-      "candid": ".wasm/indexer.did",
-      "dependencies": ["ckbtc_ledger"],
-      "networks": {
-        "local": {}
-      },
-      "remote": {
-        "id": {
-          "staging": "n5wcd-faaaa-aaaar-qaaea-cai",
-          "ic": "n5wcd-faaaa-aaaar-qaaea-cai"
-        }
-      }
+      "candid": ".wasm/vault.did"
     }
   },
   "defaults": { 
