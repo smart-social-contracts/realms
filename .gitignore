@@ -17,3 +17,11 @@ kybra_simple_db
 *.pem
 src/declarations
 e2e.log
+
+# Extension folders
+src/realm_backend/extensions/test_bench/
+src/realm_backend/extensions/vault_manager/
+src/realm_frontend/src/lib/extensions/test_bench/
+src/realm_frontend/src/lib/extensions/vault_manager/
+src/realm_frontend/src/routes/(sidebar)/extensions/test_bench/
+src/realm_frontend/src/routes/(sidebar)/extensions/vault_manager/
