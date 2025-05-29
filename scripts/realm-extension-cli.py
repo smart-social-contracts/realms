@@ -78,7 +78,9 @@ def get_extension_paths(extension_id):
     return {
         "backend": os.path.join(paths["backend_dir"], "extensions", extension_id),
         "frontend_lib": os.path.join(paths["frontend_dir"], "src/lib/extensions", extension_id),
-        "frontend_route": os.path.join(paths["frontend_dir"], "src/routes/(sidebar)/extensions", extension_id)
+        "frontend_route": os.path.join(paths["frontend_dir"], "src/routes/(sidebar)/extensions", extension_id),
+        "frontend_custom_routes": os.path.join(paths["frontend_dir"], "src/routes"),
+        "frontend_static": os.path.join(paths["frontend_dir"], "static")
     }
 
 def find_extension_locations(extension_id):
@@ -101,6 +103,12 @@ def find_extension_locations(extension_id):
     if os.path.isdir(frontend_route_path):
         locations["frontend_route"] = frontend_route_path
     
+    custom_routes_path = os.path.join(paths["frontend_dir"], "src/routes", extension_id)
+    if os.path.isdir(custom_routes_path):
+        locations["frontend_custom_routes"] = custom_routes_path
+    
+    locations["frontend_static"] = os.path.join(paths["frontend_dir"], "static")
+    
     return locations
 
 def get_extension_manifest(extension_id):
@@ -121,12 +129,6 @@ def package_extension(extension_id, output_dir=None):
     validate_extension_id(extension_id)
     locations = find_extension_locations(extension_id)
     
-    if not locations:
-        log_error(f"Extension '{extension_id}' not found")
-        return False
-    
-    manifest = get_extension_manifest(extension_id)
-    
     paths = get_project_paths()
     if not output_dir:
         output_dir = paths["project_root"]
@@ -136,14 +138,55 @@ def package_extension(extension_id, output_dir=None):
     
     log_info(f"Packaging extension {extension_id}")
     
+    # Ensure custom routes are properly detected
+    custom_route_path = os.path.join(paths["frontend_dir"], "src/routes", extension_id)
+    if os.path.exists(custom_route_path):
+        locations["frontend_custom_routes"] = paths["frontend_dir"]
+        log_info(f"Detected custom route: {custom_route_path}")
+    
+    # Check if we found any extension components
+    if not locations:
+        log_error(f"Extension '{extension_id}' not found or has no components")
+        return False
+    
+    # Check for manifest
+    manifest = None
+    manifest_path = None
+    if "backend" in locations:
+        manifest_path = os.path.join(locations["backend"], "manifest.json")
+        if os.path.exists(manifest_path):
+            try:
+                with open(manifest_path, 'r') as f:
+                    manifest = json.load(f)
+            except Exception as e:
+                log_error(f"Failed to load manifest: {e}")
+                return False
+    
+    # If no manifest found, create a basic one
+    if not manifest:
+        manifest = {
+            "name": extension_id,
+            "version": "1.0.0",
+            "description": f"{extension_id} extension",
+            "author": "Smart Social Contracts",
+            "permissions": []
+        }
+    
     with tempfile.TemporaryDirectory() as temp_dir:
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            if "backend" in locations:
-                manifest_path = os.path.join(locations["backend"], "manifest.json")
-                if os.path.exists(manifest_path):
-                    zipf.write(manifest_path, "manifest.json")
-                    log_info(f"Added manifest.json")
+            # Add manifest
+            if manifest_path and os.path.exists(manifest_path):
+                zipf.write(manifest_path, "manifest.json")
+                log_info(f"Added manifest.json")
+            else:
+                # Create temporary manifest file
+                temp_manifest_path = os.path.join(temp_dir, "manifest.json")
+                with open(temp_manifest_path, 'w') as f:
+                    json.dump(manifest, f, indent=2)
+                zipf.write(temp_manifest_path, "manifest.json")
+                log_info(f"Added generated manifest.json")
             
+            # Package backend files
             if "backend" in locations:
                 backend_src = locations["backend"]
                 for root, _, files in os.walk(backend_src):
@@ -154,6 +197,7 @@ def package_extension(extension_id, output_dir=None):
                             zipf.write(file_path, os.path.join("backend", rel_path))
                             log_info(f"Added backend/{rel_path}")
             
+            # Package frontend lib files
             if "frontend_lib" in locations:
                 frontend_lib_src = locations["frontend_lib"]
                 for root, _, files in os.walk(frontend_lib_src):
@@ -164,6 +208,7 @@ def package_extension(extension_id, output_dir=None):
                             zipf.write(file_path, os.path.join("frontend/lib/extensions", extension_id, rel_path))
                             log_info(f"Added frontend/lib/extensions/{extension_id}/{rel_path}")
             
+            # Package frontend route files
             if "frontend_route" in locations:
                 frontend_route_src = locations["frontend_route"]
                 for root, _, files in os.walk(frontend_route_src):
@@ -173,6 +218,67 @@ def package_extension(extension_id, output_dir=None):
                             rel_path = os.path.relpath(file_path, frontend_route_src)
                             zipf.write(file_path, os.path.join("frontend/routes/(sidebar)/extensions", extension_id, rel_path))
                             log_info(f"Added frontend/routes/(sidebar)/extensions/{extension_id}/{rel_path}")
+            
+            # Package custom route files
+            if "frontend_custom_routes" in locations:
+                custom_route_src = os.path.join(paths["frontend_dir"], "src/routes", extension_id)
+                if os.path.exists(custom_route_src):
+                    for root, _, files in os.walk(custom_route_src):
+                        for file in files:
+                            if file.endswith(('.svelte', '.ts', '.js')):
+                                file_path = os.path.join(root, file)
+                                rel_path = os.path.relpath(file_path, custom_route_src)
+                                zipf.write(file_path, os.path.join(f"frontend/routes/{extension_id}", rel_path))
+                                log_info(f"Added frontend/routes/{extension_id}/{rel_path}")
+            
+            # Package static assets related to this extension
+            static_path = os.path.join(paths["frontend_dir"], "static")
+            
+            # Define the media types to include
+            media_extensions = {
+                "videos": ['.mp4', '.webm', '.ogg'],
+                "images": ['.png', '.jpg', '.jpeg', '.gif', '.svg'],
+                "fonts": ['.ttf', '.woff', '.woff2']
+            }
+            
+            # For video files, include all videos since there's no easy way to determine which ones are used by the extension
+            videos_path = os.path.join(static_path, "videos")
+            if os.path.exists(videos_path):
+                for file in os.listdir(videos_path):
+                    if any(file.endswith(ext) for ext in media_extensions["videos"]):
+                        file_path = os.path.join(videos_path, file)
+                        zipf.write(file_path, os.path.join("frontend/static/videos", file))
+                        log_info(f"Added frontend/static/videos/{file}")
+            
+            # For other media files, try to be smarter about which ones to include
+            for static_dir in ["images", "fonts", extension_id]:
+                static_dir_path = os.path.join(static_path, static_dir)
+                if not os.path.exists(static_dir_path):
+                    continue
+                
+                # Get the list of allowed extensions for this directory type
+                allowed_extensions = []
+                if static_dir == "images":
+                    allowed_extensions = media_extensions["images"]
+                elif static_dir == "fonts":
+                    allowed_extensions = media_extensions["fonts"]
+                else:
+                    # For extension-specific folders, include all media types
+                    for exts in media_extensions.values():
+                        allowed_extensions.extend(exts)
+                
+                # Walk through directory and include matching files
+                for root, _, files in os.walk(static_dir_path):
+                    for file in files:
+                        # Check if the file has the right extension
+                        if any(file.endswith(ext) for ext in allowed_extensions):
+                            # If it's an extension-specific folder, include everything
+                            # Otherwise only include files that are likely related to this extension
+                            if static_dir == extension_id or extension_id in file.lower():
+                                file_path = os.path.join(root, file)
+                                rel_path = os.path.relpath(file_path, static_dir_path)
+                                zipf.write(file_path, os.path.join(f"frontend/static/{static_dir}", rel_path))
+                                log_info(f"Added frontend/static/{static_dir}/{rel_path}")
     
     log_success(f"Extension packaged successfully: {zip_path}")
     return True
@@ -222,14 +328,12 @@ def install_extension(package_path):
                     shutil.copy2(src_file, dst_file)
                     log_info(f"Installed backend file: {rel_path}")
             
-            # Create an __init__.py file if it doesn't exist
             init_file = os.path.join(backend_target, "__init__.py")
             if not os.path.exists(init_file):
                 with open(init_file, 'w') as f:
                     f.write(f'"""\n{extension_id} extension package.\n"""\n')
                 log_info(f"Created __init__.py file for {extension_id}")
             
-            # Update extension_imports.py
             update_extension_imports(extension_id, "add")
             
             log_success(f"Installed backend files for {extension_id}")
@@ -279,6 +383,48 @@ def install_extension(package_path):
             log_success(f"Installed frontend route files for {extension_id}")
         else:
             log_info("No frontend route files found in package")
+            
+        custom_route_source = os.path.join(temp_dir, f"frontend/routes/{extension_id}")
+        if os.path.exists(custom_route_source) and os.listdir(custom_route_source):
+            custom_route_target = os.path.join(paths["frontend_dir"], f"src/routes/{extension_id}")
+            
+            if os.path.exists(custom_route_target):
+                shutil.rmtree(custom_route_target)
+            
+            os.makedirs(custom_route_target, exist_ok=True)
+            
+            for root, _, files in os.walk(custom_route_source):
+                for file in files:
+                    src_file = os.path.join(root, file)
+                    rel_path = os.path.relpath(src_file, custom_route_source)
+                    dst_file = os.path.join(custom_route_target, rel_path)
+                    
+                    os.makedirs(os.path.dirname(dst_file), exist_ok=True)
+                    shutil.copy2(src_file, dst_file)
+                    log_info(f"Installed custom route file: {rel_path}")
+            
+            log_success(f"Installed custom route files for {extension_id}")
+        else:
+            log_info("No custom route files found in package")
+            
+        for static_dir in ["videos", "images", "fonts", extension_id]:
+            static_source = os.path.join(temp_dir, f"frontend/static/{static_dir}")
+            if os.path.exists(static_source) and os.listdir(static_source):
+                static_target = os.path.join(paths["frontend_dir"], f"static/{static_dir}")
+                
+                os.makedirs(static_target, exist_ok=True)
+                
+                for root, _, files in os.walk(static_source):
+                    for file in files:
+                        src_file = os.path.join(root, file)
+                        rel_path = os.path.relpath(src_file, static_source)
+                        dst_file = os.path.join(static_target, rel_path)
+                        
+                        os.makedirs(os.path.dirname(dst_file), exist_ok=True)
+                        shutil.copy2(src_file, dst_file)
+                        log_info(f"Installed static asset: {static_dir}/{rel_path}")
+                
+                log_success(f"Installed static assets for {static_dir}")
     
     log_success(f"Extension {extension_id} installed successfully")
     return True
@@ -297,18 +443,15 @@ def uninstall_extension(extension_id):
         log_error(f"Extension {extension_id} not found or already uninstalled")
         return False
     
-    # Remove backend files
     if "backend" in locations:
         try:
             shutil.rmtree(locations["backend"])
             log_success(f"Removed backend files for {extension_id}")
             
-            # Update extension_imports.py
             update_extension_imports(extension_id, "remove")
         except Exception as e:
             log_error(f"Failed to remove backend files: {e}")
     
-    # Remove frontend lib files
     if "frontend_lib" in locations:
         try:
             shutil.rmtree(locations["frontend_lib"])
@@ -316,13 +459,19 @@ def uninstall_extension(extension_id):
         except Exception as e:
             log_error(f"Failed to remove frontend library files: {e}")
     
-    # Remove frontend route files
     if "frontend_route" in locations:
         try:
             shutil.rmtree(locations["frontend_route"])
             log_success(f"Removed frontend route files for {extension_id}")
         except Exception as e:
             log_error(f"Failed to remove frontend route files: {e}")
+    
+    if "frontend_custom_routes" in locations:
+        try:
+            shutil.rmtree(locations["frontend_custom_routes"])
+            log_success(f"Removed custom route files for {extension_id}")
+        except Exception as e:
+            log_error(f"Failed to remove custom route files: {e}")
     
     log_success(f"Extension {extension_id} uninstalled successfully")
     return True
@@ -336,47 +485,38 @@ def update_extension_imports(extension_id, action="add"):
         log_error(f"Extension imports file not found: {imports_file}")
         return False
     
-    # Read existing content
     with open(imports_file, "r") as f:
         content = f.read()
     
     import_line = f"import extensions.{extension_id}.entry"
     
     if action == "add":
-        # Check if import already exists
         if import_line in content:
             log_info(f"Import for {extension_id} already exists in extension_imports.py")
             return True
         
-        # Add import line at the end of the file, preserving any trailing newlines
         if content and not content.endswith('\n'):
             import_line = '\n' + import_line
         
-        # Add an extra newline if the file is not empty
         if content:
             import_line += '\n'
         
-        # Write updated content
         with open(imports_file, "a") as f:
             f.write(import_line)
         log_success(f"Added import for {extension_id} to extension_imports.py")
     
     elif action == "remove":
-        # Remove import line
         if import_line not in content:
             log_info(f"No import for {extension_id} found in extension_imports.py")
             return True
         
-        # Create new content without the import line
         lines = content.splitlines()
         new_lines = [line for line in lines if line.strip() != import_line]
         new_content = '\n'.join(new_lines)
         
-        # Add trailing newline if needed
         if new_content and not new_content.endswith('\n'):
             new_content += '\n'
         
-        # Write updated content
         with open(imports_file, "w") as f:
             f.write(new_content)
         log_success(f"Removed import for {extension_id} from extension_imports.py")
@@ -389,10 +529,8 @@ def list_extensions():
     backend_ext_dir = os.path.join(paths["backend_dir"], "extensions")
     frontend_ext_dir = os.path.join(paths["frontend_dir"], "src/lib/extensions")
     
-    # Find all extensions
     extensions = {}
     
-    # Check backend extensions
     if os.path.exists(backend_ext_dir):
         for item in os.listdir(backend_ext_dir):
             if os.path.isdir(os.path.join(backend_ext_dir, item)) and not item.startswith('__'):
@@ -412,7 +550,6 @@ def list_extensions():
                                 'has_frontend': False
                             }
                         except Exception:
-                            # If manifest can't be read, use basic info
                             extensions[item] = {
                                 'id': item, 
                                 'version': 'unknown',
@@ -423,18 +560,15 @@ def list_extensions():
                 except ValueError:
                     log_warning(f"Skipping extension with invalid ID: {item}")
     
-    # Check frontend extensions
     if os.path.exists(frontend_ext_dir):
         for item in os.listdir(frontend_ext_dir):
             if os.path.isdir(os.path.join(frontend_ext_dir, item)) and not item.startswith('__'):
                 try:
                     validate_extension_id(item)
                     
-                    # Check if extension is already recorded from backend
                     if item in extensions:
                         extensions[item]['has_frontend'] = True
                     else:
-                        # Try to load manifest from frontend directory
                         manifest_path = os.path.join(frontend_ext_dir, item, "manifest.json")
                         if os.path.exists(manifest_path):
                             try:
@@ -448,7 +582,6 @@ def list_extensions():
                                     'has_frontend': True
                                 }
                             except Exception:
-                                # If manifest can't be read, use basic info
                                 extensions[item] = {
                                     'id': item,
                                     'version': 'unknown',
@@ -459,12 +592,10 @@ def list_extensions():
                 except ValueError:
                     log_warning(f"Skipping extension with invalid ID: {item}")
     
-    # Print the results
     if not extensions:
         log_info("No extensions installed")
         return []
     
-    # Format results as a table
     print("{:<20} {:<15} {:<15}".format("ID", "VERSION", "COMPONENTS"))
     print("{:<20} {:<15} {:<15}".format("-" * 20, "-" * 15, "-" * 15))
     for ext_id, ext in extensions.items():
@@ -489,19 +620,15 @@ def main():
     
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
     
-    # List command
     list_parser = subparsers.add_parser("list", help="List installed extensions")
     
-    # Package command
     package_parser = subparsers.add_parser("package", help="Package an extension into a zip file")
     package_parser.add_argument("extension_id", help="ID of the extension to package")
     package_parser.add_argument("--output-dir", help="Directory to save the package", default=None)
     
-    # Install command
     install_parser = subparsers.add_parser("install", help="Install an extension package")
     install_parser.add_argument("package_path", help="Path to the extension package (.zip)")
     
-    # Uninstall command
     uninstall_parser = subparsers.add_parser("uninstall", help="Uninstall an extension")
     uninstall_parser.add_argument("extension_id", help="ID of the extension to uninstall")
     
@@ -511,7 +638,6 @@ def main():
         parser.print_help()
         return 1
     
-    # Execute the appropriate command
     if args.command == "list":
         list_extensions()
     elif args.command == "package":
