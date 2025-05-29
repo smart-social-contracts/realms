@@ -3,6 +3,7 @@
   import { browser } from '$app/environment';
   
   let isMobile = false;
+  let videoElement;
   
   // Check for mobile viewport on client-side only
   onMount(() => {
@@ -16,6 +17,11 @@
       
       // Add resize listener
       window.addEventListener('resize', checkMobile);
+      
+      // Apply slow motion effect
+      if (videoElement) {
+        videoElement.playbackRate = 0.3; // Slow motion effect (60% of normal speed)
+      }
       
       // Cleanup
       return () => {
@@ -32,6 +38,7 @@
 <div class="welcome-container">
   {#if browser}
     <video 
+      bind:this={videoElement}
       autoplay 
       muted 
       loop 
@@ -41,6 +48,7 @@
     >
       <track kind="captions">
     </video>
+    <div class="video-overlay"></div>
   {/if}
   
   <div class="content">
@@ -66,6 +74,16 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
+    z-index: -2;
+  }
+  
+  .video-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7); /* Dark overlay */
     z-index: -1;
   }
 
