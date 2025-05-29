@@ -17,3 +17,4 @@ kybra_simple_db
 *.pem
 src/declarations
 e2e.log
+extensions/*/
