@@ -25,7 +25,8 @@
 		TableColumnSolid,
 		UsersOutline,
 		HomeOutline,
-		WalletSolid
+		WalletSolid,
+		ObjectsColumnOutline
 	} from 'flowbite-svelte-icons';
 	
 	// Import extension system
@@ -65,15 +66,21 @@
 		{ name: 'My identities', icon: UsersOutline, href: '/identities' },
 	];
 
-	// Create combined navigation items with core items and extensions
+	// Add Extensions menu with submenu of all extensions
+	const extensionsMenu = {
+		name: 'Extensions',
+		icon: ObjectsColumnOutline,
+		children: Object.fromEntries(
+			extensions.map(ext => [ext.name, `/extensions/${ext.id}`])
+		)
+	};
+
+	// Create combined navigation items with core items and extensions section
 	$: posts = [
 		...coreNavItems,
-		// Dynamically add extensions
-		...extensions.map(ext => ({
-			name: ext.name,
-			icon: getIcon(ext.icon, WalletSolid),
-			href: `/extensions/${ext.id}`
-		}))
+		extensionsMenu,
+		// Add Extensions Marketplace link
+		{ name: 'Extensions Marketplace', icon: LayersSolid, href: '/extensions' }
 	];
 
 	let links = [
