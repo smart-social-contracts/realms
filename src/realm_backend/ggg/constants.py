@@ -1,0 +1,3 @@
+
+
+STATUS_MAX_LENGTH = 16
