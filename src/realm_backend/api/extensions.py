@@ -36,17 +36,11 @@ logger = get_logger("api.extensions")
 #         return []
 
 
-def call_extension(extension_name: str, function_name: str, args: str) -> Async[Any]:
-    """Call an extension's entry point with the provided arguments"""
-    # Convert Candid format args and kwargs to Python native types
-    # ext_args, ext_kwargs = convert_extension_args(args, kwargs)
 
-    logger.info(
-        f"Calling extension '{extension_name}' entry point '{function_name}' with args {args}"
-    )
+def extension_sync_call(extension_name: str, function_name: str, args: str) -> Any:
+    return core.extensions.call_extension_function(extension_name, function_name, args)
 
-    # Pass the converted args and kwargs to the core extension layer
-    response = yield core.extensions.call_extension(extension_name, function_name, args)
 
-    # Return the response
+def extension_async_call(extension_name: str, function_name: str, args: str) -> Async[Any]:
+    response = yield core.extensions.extension_async_call(extension_name, function_name, args)
     return response

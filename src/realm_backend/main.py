@@ -138,45 +138,45 @@ def init_() -> void:
     logger.info("Realm canister initialized")
 
 
+
 @update
-def extension_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse]:
+def extension_sync_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
     try:
         logger.info(
-            f"Calling extension '{args['extension_name']}' entry point '{args['function_name']}' with args {args['args']}"
+            f"Sync calling extension '{args['extension_name']}' entry point '{args['function_name']}' with args {args['args']}"
         )
 
-        # Get the async function through the call chain
-        extension_coroutine = api.extensions.call_extension(
+        extension_result = api.extensions.extension_sync_call(
             args["extension_name"], args["function_name"], args["args"]
         )
-
-        # In Kybra for IC, we need to yield the coroutine to get the actual result
-        extension_result = yield extension_coroutine
-
-        logger.info(f"Coroutine yielded: {extension_coroutine}")
-        logger.info(f"Result type: {type(extension_result)}")
 
         logger.info(
             f"Got extension result from {args['extension_name']} function {args['function_name']}: {extension_result}, type: {type(extension_result)}"
         )
 
-        # # According to Kybra IC pattern, use dictionary access for Record fields
-        # # rather than attribute access
-        # if isinstance(extension_result, dict) and "data" in extension_result:
-        #     return ExtensionCallResponse(
-        #         success=True, response=str(extension_result["data"])
-        #     )
-        # elif hasattr(extension_result, "data"):
-        #     return ExtensionCallResponse(
-        #         success=True, response=str(extension_result.data)
-        #     )
-        # else:
-        #     # Fallback to string representation
-        #     return ExtensionCallResponse(
-        #         success=True, response=str(extension_result)
-        #     )
+        return ExtensionCallResponse(success=True, response=str(extension_result))
 
-        # Generic response for other extensions
+    except Exception as e:
+        logger.error(f"Error calling extension: {str(e)}\n{traceback.format_exc()}")
+        return ExtensionCallResponse(success=False, response=str(e))
+
+
+@update
+def extension_async_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse]:
+    try:
+        logger.info(
+            f"Async calling extension '{args['extension_name']}' entry point '{args['function_name']}' with args {args['args']}"
+        )
+
+        extension_coroutine = api.extensions.extension_async_call(
+            args["extension_name"], args["function_name"], args["args"]
+        )
+        extension_result = yield extension_coroutine
+
+        logger.info(
+            f"Got extension result from {args['extension_name']} function {args['function_name']}: {extension_result}, type: {type(extension_result)}"
+        )
+
         return ExtensionCallResponse(success=True, response=str(extension_result))
 
     except Exception as e:

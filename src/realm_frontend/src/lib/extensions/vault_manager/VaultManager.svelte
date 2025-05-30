@@ -54,8 +54,8 @@
 			// Log the request details
 			console.log('Calling get_balance with parameters:', callParams);
 			
-			// Use the extension_call API method with proper arguments including vault_canister_id
-			const response = await backend.extension_call({
+			// Use the extension_async_call API method with proper arguments including vault_canister_id
+			const response = await backend.extension_async_call({
 				extension_name: "vault_manager",
 				function_name: "get_balance",
 				args: JSON.stringify(callParams)
@@ -107,8 +107,8 @@
 			// Log the request details
 			console.log('Calling get_status with parameters:', callParams);
 			
-			// Use the extension_call API method including vault_canister_id
-			const response = await backend.extension_call({
+			// Use the extension_async_call API method including vault_canister_id
+			const response = await backend.extension_async_call({
 				extension_name: "vault_manager",
 				function_name: "get_status",
 				args: JSON.stringify(callParams)
@@ -169,8 +169,8 @@
 			// Log the request details
 			console.log('Calling get_transactions with parameters:', callParams);
 			
-			// Use the extension_call API method to get transactions directly from the vault canister
-			const response = await backend.extension_call({
+			// Use the extension_async_call API method to get transactions directly from the vault canister
+			const response = await backend.extension_async_call({
 				extension_name: "vault_manager",
 				function_name: "get_transactions",
 				args: JSON.stringify(callParams)
@@ -228,8 +228,8 @@
 		transferError = '';
 		
 		try {
-			// Use the extension_call API method including vault_canister_id
-			const response = await backend.extension_call({
+			// Use the extension_async_call API method including vault_canister_id
+			const response = await backend.extension_async_call({
 				extension_name: "vault_manager",
 				function_name: "transfer",
 				args: JSON.stringify({

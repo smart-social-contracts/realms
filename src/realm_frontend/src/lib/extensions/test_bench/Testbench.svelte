@@ -47,7 +47,7 @@
 			class="w-full my-4 p-4 text-xl font-bold shadow-lg rounded-lg"
 			onclick={() => {
 				// Use the simplest approach possible
-				backend.extension_call({
+				backend.extension_async_call({
 					extension_name: "test_bench",
 					function_name: "get_data",
 					args: "from frontend"

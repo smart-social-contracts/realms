@@ -1,8 +1,8 @@
-from kybra import Async, Record, ic, text
+from kybra import Record, ic, text
 
 """
 
-dfx canister call realm_backend extension_call '(
+dfx canister call realm_backend extension_sync_call '(
   record {
     extension_name = "test_bench";
     function_name = "get_data";
@@ -13,7 +13,7 @@ dfx canister call realm_backend extension_call '(
   }
 )'
 
-dfx canister call realm_backend extension_call '(
+dfx canister call realm_backend extension_sync_call '(
   record {
     extension_name = "test_bench";
     function_name = "get_data";
@@ -30,7 +30,7 @@ class TestBenchResponse(Record):
     data: text
 
 
-def get_data(args: str) -> Async[TestBenchResponse]:
+def get_data(args: str) -> TestBenchResponse:
     """Get test data from this extension.
 
     The core module will handle the async wrapping for us.
