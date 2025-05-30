@@ -1,8 +1,7 @@
-from kybra import Async, ic, Record
+from ggg.user import User
+from kybra import Async, Record, ic
 from kybra_simple_db import Entity, String, TimestampedMixin
 from kybra_simple_logging import get_logger
-
-from ggg.user import User
 
 logger = get_logger("entity.user")
 
@@ -18,8 +17,10 @@ dfx canister call realm_backend extension_async_call '(
 )'
 """
 
+
 class ResponseDemoLoader(Record):
     data: str
+
 
 def load(args: str):
     """Get test data from this extension.
@@ -28,12 +29,8 @@ def load(args: str):
     """
     logger.info("load_demo_data called with args: {args}")
 
-    user = User(
-        _id="user_22",
-        metadata="{}"
-    )
+    user = User(_id="user_22", metadata="{}")
 
     logger.info(f"User created: {user.to_dict()}")
-    
-    return "OK111"
 
+    return "OK111"

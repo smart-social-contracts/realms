@@ -7,7 +7,8 @@ logger = get_logger("entity.permission")
 class Permission(Entity, TimestampedMixin):
     description = String(max_length=256)
 
-'''
+
+"""
 category,permission_id,description
 Judicial Administration,create_dispute,File a dispute between parties
 Judicial Administration,view_dispute,Access case files or metadata
@@ -42,4 +43,4 @@ General Governance,view_party_permissions,Check what another party is allowed to
 General Governance,revoke_permission,Remove any previously granted ability
 General Governance,update_governance_process,Change voting or approval mechanics
 General Governance,create_contract_under_mandate,Bind new contracts to policy-based logic
-'''
+"""

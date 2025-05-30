@@ -138,7 +138,6 @@ def init_() -> void:
     logger.info("Realm canister initialized")
 
 
-
 @update
 def extension_sync_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
     try:

@@ -36,11 +36,14 @@ logger = get_logger("api.extensions")
 #         return []
 
 
-
 def extension_sync_call(extension_name: str, function_name: str, args: str) -> Any:
     return core.extensions.call_extension_function(extension_name, function_name, args)
 
 
-def extension_async_call(extension_name: str, function_name: str, args: str) -> Async[Any]:
-    response = yield core.extensions.extension_async_call(extension_name, function_name, args)
+def extension_async_call(
+    extension_name: str, function_name: str, args: str
+) -> Async[Any]:
+    response = yield core.extensions.extension_async_call(
+        extension_name, function_name, args
+    )
     return response

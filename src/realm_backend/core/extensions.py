@@ -27,7 +27,9 @@ def call_extension_function(extension_name: str, function_name: str, args: str):
     return result
 
 
-def extension_async_call(extension_name: str, function_name: str, args: str) -> Async[Any]:
+def extension_async_call(
+    extension_name: str, function_name: str, args: str
+) -> Async[Any]:
     logger.info(f"Async calling extension {extension_name}...")
 
     result_coroutine = call_extension_function(extension_name, function_name, args)

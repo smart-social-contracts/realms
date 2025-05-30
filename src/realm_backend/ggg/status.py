@@ -1,6 +1,5 @@
 from enum import Enum
 
-
 # trade status
 # dispute status
 # user status
@@ -12,15 +11,18 @@ from enum import Enum
 # vote status
 # instrument status
 
+
 class TradeStatus(Enum):
     PENDING = "pending"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
 
+
 class DisputeStatus(Enum):
     PENDING = "pending"
     RESOLVED = "resolved"
     CANCELLED = "cancelled"
+
 
 class ProposalStatus(Enum):
     PENDING_REVIEW = "pending_review"
@@ -28,6 +30,7 @@ class ProposalStatus(Enum):
     VOTING = "voting"
     ACCEPTED = "accepted"
     REJECTED = "rejected"
+
 
 class MandateStatus(Enum):
     ACTIVE = "active"
@@ -45,16 +48,19 @@ class InstrumentStatus(Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"
 
+
 class UserStatus(Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"
     SUSPENDED = "suspended"
     BANNED = "banned"
 
+
 class VoteStatus(Enum):
     YES = "yes"
     NO = "no"
     ABSTAIN = "abstain"
+
 
 class OrganizationStatus(Enum):
     ACTIVE = "active"
