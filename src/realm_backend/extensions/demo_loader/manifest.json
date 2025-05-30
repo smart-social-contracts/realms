@@ -1,0 +1,7 @@
+{
+  "name": "demo_loader",
+  "version": "0.1.0",
+  "description": "Loads demo data for the Realms platform",
+  "required_permissions": [],
+  "entry_points": ["load_demo_data"]
+}
