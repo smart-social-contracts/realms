@@ -1,9 +1,5 @@
 # Examples
 
-```bash
-PYTHONPATH=.. python examples/example1.py
-```
-
 
 
 1. Retirement Pensions
