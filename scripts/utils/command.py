@@ -31,4 +31,6 @@ def run_command(command: str) -> Tuple[bool, Optional[str]]:
         print_error(f"Error executing command: {command}")
         print_error(f"Error: {process.stderr}")
         return False, None
-    return True, process.stdout.strip()
+    output = process.stdout.strip()
+    print(f"Output: {output}")
+    return True, output
