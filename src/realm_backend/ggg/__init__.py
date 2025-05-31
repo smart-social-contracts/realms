@@ -21,6 +21,9 @@ from .trade import Trade
 from .user import User
 from .user_role import UserRole
 from .vote import Vote
+from .transfer import Transfer
+from .human import Human
+from .treasury import Treasury
 
 __all__ = [
     "Codex",
@@ -39,4 +42,7 @@ __all__ = [
     "User",
     "UserRole",
     "Vote",
+    "Transfer",
+    "Human",
+    "Treasury",
 ]
