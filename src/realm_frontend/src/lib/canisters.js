@@ -64,36 +64,6 @@ async function makeRequest(endpoint, options = {}) {
     }
 }
 
-// Define mock implementations for API methods that may not be available yet
-const mockImplementations = {
-    // Extension API methods
-    call_extension: async (extensionName, method, params = {}) => {
-        console.log(`Mock call to extension ${extensionName}.${method} with params:`, params);
-        return { success: false, error: `Extension ${extensionName} not found or method not implemented` };
-    },
-    
-    // Generic list_extensions mock
-    list_extensions: async () => ([])
-};
-
-/**
- * Helper function to call extension methods
- * @param {string} extensionName - Name of the extension
- * @param {string} method - Method name to call
- * @param {Object} params - Parameters to pass to the method
- * @returns {Promise<any>} Response data
- */
-async function callExtension(actor, extensionName, method, params = {}) {
-    try {
-        const result = await actor.call_extension(extensionName, method, params);
-        console.log(`Extension call ${extensionName}.${method} result:`, result);
-        return result;
-    } catch (error) {
-        console.error(`Error calling extension ${extensionName}.${method}:`, error);
-        throw error;
-    }
-}
-
 /**
  * Creates a backend proxy with graceful fallbacks
  * This version doesn't use dynamic imports at the top level to avoid build errors
@@ -106,42 +76,28 @@ function createBackendProxy() {
         get(target, prop) {
             return async (...args) => {
                 try {
-                    // Original implementation for non-extension methods
-                    if (baseUrl) {
-                        const endpoint = args.length > 0 
-                            ? `${baseUrl}/${prop}/${args.join('/')}`
-                            : `${baseUrl}/${prop}`;
-                            
-                        try {
-                            return await makeRequest(endpoint);
-                        } catch (err) {
-                            console.warn(`API request to ${endpoint} failed, using mock implementation`);
-                            if (mockImplementations[prop]) {
-                                return mockImplementations[prop](...args);
-                            }
-                            return { success: false, error: `API endpoint ${prop} failed` };
-                        }
-                    }
-
-                    // In production, try to use canister methods, but fall back to mocks
+                    console.log(`Backend proxy call: ${prop}(${JSON.stringify(args)})`);
+                    
+                    // In production and development, try to use canister methods
                     try {
-                        const { createActor, canisterId } = await import('../../../declarations/realm_backend');
+                        console.log(`Trying to import canister declarations for ${prop}`);
+                        const { createActor, canisterId } = await import('declarations/realm_backend');
+                        console.log(`Creating actor with canister ID: ${canisterId} for method ${prop}`);
                         const actor = createActor(canisterId);
                         
                         if (typeof actor[prop] === 'function') {
-                            return actor[prop](...args);
+                            console.log(`Calling canister method ${prop} with args:`, args);
+                            const result = await actor[prop](...args);
+                            console.log(`Canister method ${prop} result:`, result);
+                            return result;
                         } else {
-                            console.warn(`Method ${prop} not found in actor, using mock implementation`);
+                            console.warn(`Method ${prop} not found in actor, available methods:`, Object.keys(actor));
+                            return { success: false, error: `Method ${prop} not found in actor` };
                         }
                     } catch (err) {
-                        console.warn(`Error accessing canister method ${prop}:`, err);
+                        console.error(`Error accessing canister method ${prop}:`, err);
+                        return { success: false, error: `Error accessing canister method: ${err.message}` };
                     }
-                    
-                    // Fall back to mock implementation if available
-                    if (mockImplementations[prop]) {
-                        return mockImplementations[prop](...args);
-                    }
-                    return { success: false, error: `Method ${prop} not available` };
                 } catch (error) {
                     console.error(`Error in backendProxy for method ${prop}:`, error);
                     return { success: false, error: error.message };
@@ -149,17 +105,6 @@ function createBackendProxy() {
             };
         }
     });
-}
-
-/**
- * Creates a dummy actor for development without a backend
- * @returns {Object} Dummy actor with mock methods
- */
-function dummyActor() {
-    return {
-        list_extensions: async () => ([]),
-        ...mockImplementations
-    };
 }
 
 // Export the backend instance

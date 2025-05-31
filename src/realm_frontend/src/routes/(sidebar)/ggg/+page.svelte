@@ -25,14 +25,17 @@
       loading = true;
       error = null;
       
+      console.log("Loading demo data...");
       const result = await backend.extension_sync_call({
         extension_name: "demo_loader",
         function_name: "load",
         args: "load_demo"
       });
       
+      console.log("Demo data load result:", result);
+      
       if (result.success) {
-        console.log("Demo data loaded:", result.response);
+        console.log("Demo data loaded successfully:", result.response);
         await fetchData();
       } else {
         error = `Failed to load demo data: ${result.response || 'Unknown error'}`;
@@ -40,7 +43,7 @@
       }
     } catch (err) {
       error = `Error loading demo data: ${err.message}`;
-      console.error(err);
+      console.error("Demo data load error:", err);
     } finally {
       loading = false;
     }
@@ -51,7 +54,11 @@
       loading = true;
       error = null;
       
-      // Make API calls to fetch data from the backend
+      console.log("Fetching GGG data...");
+      
+      // Make API calls directly using the backend proxy
+      console.log("Calling backend methods...");
+      
       const [
         usersResult,
         mandatesResult,
@@ -63,6 +70,13 @@
         backend.get_tasks(),
         backend.get_transfers()
       ]);
+      
+      console.log("API results received:", { 
+        users: usersResult, 
+        mandates: mandatesResult, 
+        tasks: tasksResult, 
+        transfers: transfersResult 
+      });
       
       // Process users data
       if (usersResult.success && usersResult.data.UsersList) {
@@ -98,6 +112,7 @@
       
     } catch (error) {
       console.error("Error fetching data:", error);
+      error = `Data fetch error: ${error.message}`;
     } finally {
       loading = false;
     }
