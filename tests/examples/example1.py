@@ -1,5 +1,6 @@
-from ggg import Mandate, Task, User, TaskSchedule, Codex
 import os
+
+from ggg import Codex, Mandate, Task, TaskSchedule, User
 
 user_old = User(name="John Doe")
 user_young = User(name="Jane Doe")

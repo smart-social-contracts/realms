@@ -1,4 +1,5 @@
 import traceback
+
 from kybra import Record
 from kybra_simple_logging import get_logger
 
@@ -16,8 +17,10 @@ dfx canister call realm_backend extension_async_call '(
 )'
 """
 
+
 class ResponseDemoLoader(Record):
     data: str
+
 
 def load(args: str):
 

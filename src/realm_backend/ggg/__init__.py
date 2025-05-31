@@ -8,6 +8,7 @@ from .codex import Codex
 # from .constants import *
 from .contract import Contract
 from .dispute import Dispute
+from .human import Human
 from .instrument import Instrument
 from .license import License
 from .mandate import Mandate
@@ -18,12 +19,11 @@ from .realm import Realm
 from .task import Task
 from .task_schedule import TaskSchedule
 from .trade import Trade
+from .transfer import Transfer
+from .treasury import Treasury
 from .user import User
 from .user_role import UserRole
 from .vote import Vote
-from .transfer import Transfer
-from .human import Human
-from .treasury import Treasury
 
 __all__ = [
     "Codex",
