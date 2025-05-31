@@ -1,4 +1,4 @@
-FROM ghcr.io/smart-social-contracts/icp-dev-env:latest@sha256:5445ccee3ce98b032a7bc0069081bd1e351c7576f3ccd4daaae0273e6fe29d60
+FROM ghcr.io/smart-social-contracts/icp-dev-env:2f31480
 
 WORKDIR /app
 
