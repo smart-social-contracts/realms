@@ -1,4 +1,12 @@
-from kybra_simple_db import Entity, ManyToMany, ManyToOne, Integer, String, TimestampedMixin, OneToOne
+from kybra_simple_db import (
+    Entity,
+    Integer,
+    ManyToMany,
+    ManyToOne,
+    OneToOne,
+    String,
+    TimestampedMixin,
+)
 from kybra_simple_logging import get_logger
 
 logger = get_logger("entity.trade")
@@ -19,4 +27,3 @@ class Transfer(Entity, TimestampedMixin):
     to_user = ManyToOne("User", "transfers_to")
     instrument = ManyToOne("Instrument", "transfers")
     amount = Integer()
-    

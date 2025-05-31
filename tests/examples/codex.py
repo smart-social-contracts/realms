@@ -1,6 +1,5 @@
 from ggg import User
 
-
 # take all human users above of retirement
 # transfer the pension money to them
 

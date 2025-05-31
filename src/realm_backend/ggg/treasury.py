@@ -6,5 +6,3 @@ logger = get_logger("entity.treasury")
 
 class Treasury(Entity, TimestampedMixin):
     vault_principal_id = String(max_length=64)
-
-

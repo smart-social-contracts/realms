@@ -3,6 +3,9 @@ Python implementation of the Generalized Global Governance (GGG) standard
 """
 
 from .codex import Codex
+
+# Import constants separately if needed
+# from .constants import *
 from .contract import Contract
 from .dispute import Dispute
 from .instrument import Instrument
@@ -18,9 +21,6 @@ from .trade import Trade
 from .user import User
 from .user_role import UserRole
 from .vote import Vote
-
-# Import constants separately if needed
-from .constants import *
 
 __all__ = [
     "Codex",

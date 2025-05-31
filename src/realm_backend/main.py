@@ -245,7 +245,6 @@ def http_request(req: HttpRequest) -> HttpResponse:
         }
 
 
-
 @update
 def execute_code(code: str) -> str:
     """Executes Python code and returns the output.
