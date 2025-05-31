@@ -6,6 +6,7 @@ from kybra_simple_db import (
     OneToOne,
     String,
     TimestampedMixin,
+    OneToMany,
 )
 from kybra_simple_logging import get_logger
 
@@ -19,11 +20,6 @@ class Trade(Entity, TimestampedMixin):
     instruments_b = ManyToMany("Instrument", "trades_b")
     contract = ManyToOne("Contract", "trades")
     metadata = String(max_length=256)
+    transfers = OneToMany("Transfer", "trade")
 
 
-class Transfer(Entity, TimestampedMixin):
-    trade = OneToOne("Trade", "transfer")
-    from_user = ManyToOne("User", "transfers_from")
-    to_user = ManyToOne("User", "transfers_to")
-    instrument = ManyToOne("Instrument", "transfers")
-    amount = Integer()

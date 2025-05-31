@@ -5,4 +5,5 @@ logger = get_logger("entity.instrument")
 
 
 class Instrument(Entity, TimestampedMixin):
+    principal_id = String(max_length=256)
     metadata = String(max_length=256)
