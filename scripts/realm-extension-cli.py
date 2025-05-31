@@ -2,6 +2,15 @@
 """
 Realm Extension CLI - A simple tool for managing extensions in the Smart Social Contracts platform.
 
+Usage:
+  python realm-extension-cli.py list                        # List all installed extensions
+  python realm-extension-cli.py package EXTENSION_ID        # Package a specific extension
+  python realm-extension-cli.py package --all               # Package all extensions
+  python realm-extension-cli.py install PACKAGE_PATH        # Install an extension from package
+  python realm-extension-cli.py install --all               # Install all .zip packages in current dir
+  python realm-extension-cli.py uninstall EXTENSION_ID      # Uninstall a specific extension
+  python realm-extension-cli.py uninstall --all             # Uninstall all extensions
+
 - `manifest.json` format:
 {
     "name": "<extension_name>",
@@ -523,6 +532,107 @@ def update_extension_imports(extension_id, action="add"):
     
     return True
 
+def package_all_extensions(output_dir=None):
+    """Package all extensions into zip files"""
+    log_info("Packaging all extensions")
+    paths = get_project_paths()
+    backend_ext_dir = os.path.join(paths["backend_dir"], "extensions")
+    frontend_ext_dir = os.path.join(paths["frontend_dir"], "src/lib/extensions")
+    
+    # Collect all unique extension IDs
+    all_extensions = set()
+    if os.path.exists(backend_ext_dir):
+        for item in os.listdir(backend_ext_dir):
+            if os.path.isdir(os.path.join(backend_ext_dir, item)) and not item.startswith('__'):
+                try:
+                    validate_extension_id(item)
+                    all_extensions.add(item)
+                except ValueError:
+                    log_warning(f"Skipping extension with invalid ID: {item}")
+    
+    if os.path.exists(frontend_ext_dir):
+        for item in os.listdir(frontend_ext_dir):
+            if os.path.isdir(os.path.join(frontend_ext_dir, item)) and not item.startswith('__'):
+                try:
+                    validate_extension_id(item)
+                    all_extensions.add(item)
+                except ValueError:
+                    log_warning(f"Skipping extension with invalid ID: {item}")
+    
+    if not all_extensions:
+        log_error("No extensions found to package")
+        return False
+    
+    success = True
+    for ext_id in all_extensions:
+        log_info(f"Packaging extension: {ext_id}")
+        if not package_extension(ext_id, output_dir):
+            success = False
+            log_error(f"Failed to package extension: {ext_id}")
+    
+    return success
+
+def install_all_packages():
+    """Install all extension packages in the current directory"""
+    log_info("Installing all extension packages in the current directory")
+    current_dir = os.getcwd()
+    success = True
+    packages_found = False
+    
+    for item in os.listdir(current_dir):
+        if item.endswith('.zip'):
+            packages_found = True
+            log_info(f"Found package: {item}")
+            if not install_extension(os.path.join(current_dir, item)):
+                success = False
+                log_error(f"Failed to install package: {item}")
+    
+    if not packages_found:
+        log_error("No extension packages (.zip files) found in the current directory")
+        return False
+    
+    return success
+
+def uninstall_all_extensions():
+    """Uninstall all extensions"""
+    log_info("Uninstalling all extensions")
+    paths = get_project_paths()
+    backend_ext_dir = os.path.join(paths["backend_dir"], "extensions")
+    frontend_ext_dir = os.path.join(paths["frontend_dir"], "src/lib/extensions")
+    
+    # Collect all unique extension IDs
+    all_extensions = set()
+    if os.path.exists(backend_ext_dir):
+        for item in os.listdir(backend_ext_dir):
+            if os.path.isdir(os.path.join(backend_ext_dir, item)) and not item.startswith('__'):
+                try:
+                    validate_extension_id(item)
+                    all_extensions.add(item)
+                except ValueError:
+                    log_warning(f"Skipping extension with invalid ID: {item}")
+    
+    if os.path.exists(frontend_ext_dir):
+        for item in os.listdir(frontend_ext_dir):
+            if os.path.isdir(os.path.join(frontend_ext_dir, item)) and not item.startswith('__'):
+                try:
+                    validate_extension_id(item)
+                    all_extensions.add(item)
+                except ValueError:
+                    log_warning(f"Skipping extension with invalid ID: {item}")
+    
+    if not all_extensions:
+        log_error("No extensions found to uninstall")
+        return False
+    
+    success = True
+    for ext_id in all_extensions:
+        log_info(f"Uninstalling extension: {ext_id}")
+        if not uninstall_extension(ext_id):
+            success = False
+            log_error(f"Failed to uninstall extension: {ext_id}")
+    
+    return success
+
 def list_extensions():
     """List all installed extensions"""
     paths = get_project_paths()
@@ -623,14 +733,20 @@ def main():
     list_parser = subparsers.add_parser("list", help="List installed extensions")
     
     package_parser = subparsers.add_parser("package", help="Package an extension into a zip file")
-    package_parser.add_argument("extension_id", help="ID of the extension to package")
+    package_group = package_parser.add_mutually_exclusive_group(required=True)
+    package_group.add_argument("--extension-id", dest="extension_id", help="ID of the extension to package")
+    package_group.add_argument("--all", action="store_true", help="Package all extensions")
     package_parser.add_argument("--output-dir", help="Directory to save the package", default=None)
     
     install_parser = subparsers.add_parser("install", help="Install an extension package")
-    install_parser.add_argument("package_path", help="Path to the extension package (.zip)")
+    install_group = install_parser.add_mutually_exclusive_group(required=True)
+    install_group.add_argument("--package-path", dest="package_path", help="Path to the extension package (.zip)")
+    install_group.add_argument("--all", action="store_true", help="Install all packages in the current directory")
     
     uninstall_parser = subparsers.add_parser("uninstall", help="Uninstall an extension")
-    uninstall_parser.add_argument("extension_id", help="ID of the extension to uninstall")
+    uninstall_group = uninstall_parser.add_mutually_exclusive_group(required=True)
+    uninstall_group.add_argument("--extension-id", dest="extension_id", help="ID of the extension to uninstall")
+    uninstall_group.add_argument("--all", action="store_true", help="Uninstall all extensions")
     
     args = parser.parse_args()
     
@@ -641,14 +757,26 @@ def main():
     if args.command == "list":
         list_extensions()
     elif args.command == "package":
-        if not package_extension(args.extension_id, args.output_dir):
-            return 1
+        if args.all:
+            if not package_all_extensions(args.output_dir):
+                return 1
+        else:
+            if not package_extension(args.extension_id, args.output_dir):
+                return 1
     elif args.command == "install":
-        if not install_extension(args.package_path):
-            return 1
+        if args.all:
+            if not install_all_packages():
+                return 1
+        else:
+            if not install_extension(args.package_path):
+                return 1
     elif args.command == "uninstall":
-        if not uninstall_extension(args.extension_id):
-            return 1
+        if args.all:
+            if not uninstall_all_extensions():
+                return 1
+        else:
+            if not uninstall_extension(args.extension_id):
+                return 1
     
     return 0
 
