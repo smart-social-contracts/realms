@@ -1,10 +1,8 @@
-from kybra import Async, ic, Record
-from kybra_simple_db import Entity, String, TimestampedMixin, Database
+import traceback
+from kybra import Record
 from kybra_simple_logging import get_logger
 
-from ggg.user import User
-
-logger = get_logger("entity.user")
+logger = get_logger("demo_loader.entry")
 
 """
 
@@ -22,22 +20,14 @@ class ResponseDemoLoader(Record):
     data: str
 
 def load(args: str):
-    """Get test data from this extension.
 
-    The core module will handle the async wrapping for us.
-    """
-    logger.info("load_demo_data called with args: {args}")
+    try:
+        logger.info("Loading demo data")
 
-    logger.info("Clearing database")
-    Database.get_instance().clear()
+        from .demo1 import run
 
-    logger.info("Creating user")
-    user = User(
-        _id="user_1",
-        metadata="{}"
-    )
+        return run()
 
-    logger.info(f"User created: {user.to_dict()}")
-    
-    return "OK111"
-
+    except Exception as e:
+        logger.error(f"Error loading demo data: {e}\n{traceback.format_exc()}")
+        return str(e)
