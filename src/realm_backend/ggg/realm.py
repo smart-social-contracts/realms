@@ -1,4 +1,4 @@
-from kybra_simple_db import Entity, Integer, String, TimestampedMixin
+from kybra_simple_db import Entity, Integer, String, TimestampedMixin, OneToOne
 from kybra_simple_logging import get_logger
 
 logger = get_logger("entity.realm")
@@ -7,5 +7,4 @@ logger = get_logger("entity.realm")
 class Realm(Entity, TimestampedMixin):
     name = String(min_length=2, max_length=256)
     description = String(min_length=2, max_length=256)
-    vault_principal_id = String(max_length=64)
-    balance = Integer()
+    treasury = OneToOne("Treasury", "realm")
