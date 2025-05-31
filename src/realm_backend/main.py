@@ -2,6 +2,10 @@ import json
 import traceback
 
 import api
+from api.ggg_entities import (
+    list_users, list_mandates, list_tasks, list_transfers, 
+    list_instruments, list_codexes, list_organizations
+)
 
 # from api.extensions import list_extensions
 from api.status import get_status
@@ -14,6 +18,13 @@ from core.candid_types_realm import (
     StatusRecord,
     UserGetRecord,
     UserRegisterRecord,
+    UsersListRecord,
+    MandatesListRecord,
+    TasksListRecord,
+    TransfersListRecord,
+    InstrumentsListRecord,
+    CodexesListRecord,
+    OrganizationsListRecord,
 )
 from kybra import (
     Async,
@@ -130,6 +141,141 @@ def get_user(principal: Principal) -> RealmResponse:
         )
     except Exception as e:
         logger.error(f"Error getting user: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+# New GGG API endpoints
+
+@query
+def get_users() -> RealmResponse:
+    try:
+        users_data = list_users()
+        # Convert dictionary to JSON string
+        users_json = [json.dumps(user) for user in users_data["users"]]
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                UsersList=UsersListRecord(
+                    users=users_json
+                )
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error listing users: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_mandates() -> RealmResponse:
+    try:
+        mandates_data = list_mandates()
+        # Convert dictionary to JSON string
+        mandates_json = [json.dumps(mandate) for mandate in mandates_data["mandates"]]
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                MandatesList=MandatesListRecord(
+                    mandates=mandates_json
+                )
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error listing mandates: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_tasks() -> RealmResponse:
+    try:
+        tasks_data = list_tasks()
+        # Convert dictionary to JSON string
+        tasks_json = [json.dumps(task) for task in tasks_data["tasks"]]
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                TasksList=TasksListRecord(
+                    tasks=tasks_json
+                )
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error listing tasks: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_transfers() -> RealmResponse:
+    try:
+        transfers_data = list_transfers()
+        # Convert dictionary to JSON string
+        transfers_json = [json.dumps(transfer) for transfer in transfers_data["transfers"]]
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                TransfersList=TransfersListRecord(
+                    transfers=transfers_json
+                )
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error listing transfers: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_instruments() -> RealmResponse:
+    try:
+        instruments_data = list_instruments()
+        # Convert dictionary to JSON string
+        instruments_json = [json.dumps(instrument) for instrument in instruments_data["instruments"]]
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                InstrumentsList=InstrumentsListRecord(
+                    instruments=instruments_json
+                )
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error listing instruments: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_codexes() -> RealmResponse:
+    try:
+        codexes_data = list_codexes()
+        # Convert dictionary to JSON string
+        codexes_json = [json.dumps(codex) for codex in codexes_data["codexes"]]
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                CodexesList=CodexesListRecord(
+                    codexes=codexes_json
+                )
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error listing codexes: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_organizations() -> RealmResponse:
+    try:
+        organizations_data = list_organizations()
+        # Convert dictionary to JSON string
+        organizations_json = [json.dumps(org) for org in organizations_data["organizations"]]
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                OrganizationsList=OrganizationsListRecord(
+                    organizations=organizations_json
+                )
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error listing organizations: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
