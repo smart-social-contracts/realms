@@ -1,5 +1,5 @@
 from kybra import Async, ic, Record
-from kybra_simple_db import Entity, String, TimestampedMixin
+from kybra_simple_db import Entity, String, TimestampedMixin, Database
 from kybra_simple_logging import get_logger
 
 from ggg.user import User
@@ -28,8 +28,12 @@ def load(args: str):
     """
     logger.info("load_demo_data called with args: {args}")
 
+    logger.info("Clearing database")
+    Database.get_instance().clear()
+
+    logger.info("Creating user")
     user = User(
-        _id="user_22",
+        _id="user_1",
         metadata="{}"
     )
 
