@@ -13,7 +13,7 @@ logger = get_logger("entity.transfer")
 
 
 class Transfer(Entity, TimestampedMixin):
-    trade = ManyToOne("Trade", "transfers")
+    trade = OneToOne("Trade", "transfer")
     from_user = ManyToOne("User", "transfers_from")
     to_user = ManyToOne("User", "transfers_to")
     instrument = ManyToOne("Instrument", "transfers")

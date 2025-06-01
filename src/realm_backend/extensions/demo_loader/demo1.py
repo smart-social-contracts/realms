@@ -11,6 +11,7 @@ from ggg import (
     Task,
     TaskSchedule,
     Trade,
+    Transfer,
     Treasury,
     User,
 )
@@ -77,15 +78,20 @@ def run():
 
     btc_instrument = Instrument(_id="instrument_1")
 
-    # Since we can't use Transfer objects due to missing reverse relationships,
-    # we'll use Trade objects instead which should have the proper relationships set up
-
+    # Create pension trade and transfer
     pension_trade = Trade(
         _id="trade_1", metadata='{"type": "pension_payment", "month": "January 2024"}'
     )
-    pension_trade.user_a = system_user  # From system (representing realm)
-    pension_trade.user_b = user1  # To pensioner
-    pension_trade.instruments_b.add(btc_instrument)
+
+    # Add Transfer object for the pension payment
+    pension_transfer = Transfer(
+        _id="transfer_1",
+        amount=500,
+    )
+    pension_transfer.from_user = system_user
+    pension_transfer.to_user = user1
+    pension_transfer.instrument = btc_instrument
+    pension_trade.transfer_1 = pension_transfer
 
     # Example 2: Land rental
     logger.info("Creating land rental example")
@@ -109,6 +115,21 @@ def run():
 
     rental_dispute = Dispute(_id="dispute_1", status="OPEN")
 
+    # Create rental trade and transfer
+    rental_trade = Trade(
+        _id="trade_2", metadata='{"type": "rental_payment", "month": "February 2024"}'
+    )
+
+    # Add a rental payment transfer
+    rental_transfer = Transfer(
+        _id="transfer_2",
+        amount=750,
+    )
+    rental_transfer.from_user = user2  # Tenant
+    rental_transfer.to_user = user1    # Landlord
+    rental_transfer.instrument = btc_instrument
+    rental_trade.transfer_1 = rental_transfer
+
     # Example 3: Driving license
     logger.info("Creating driving license example")
 
@@ -118,12 +139,20 @@ def run():
 
     fee_instrument = Instrument(_id="instrument_2")
 
-    license_payment = Trade(
-        _id="trade_2", metadata='{"type": "license_fee", "receipt": "DL20240001"}'
+    # Create license trade and transfer
+    license_trade = Trade(
+        _id="trade_3", metadata='{"type": "license_fee", "receipt": "DL20240001"}'
     )
-    license_payment.user_a = user2  # From applicant
-    license_payment.user_b = system_user  # To system (representing realm)
-    license_payment.instruments_a.add(fee_instrument)
+
+    # Add a license fee transfer
+    license_transfer = Transfer(
+        _id="transfer_3",
+        amount=200,
+    )
+    license_transfer.from_user = user2
+    license_transfer.to_user = system_user
+    license_transfer.instrument = fee_instrument
+    license_trade.transfer_1 = license_transfer
 
     # Example 4: Tax collection
     logger.info("Creating tax collection example")
@@ -140,13 +169,38 @@ def run():
 
     tax_instrument = Instrument(_id="instrument_3")
 
-    tax_payment = Trade(
-        _id="trade_3",
+    # Create tax trade and transfer
+    tax_trade = Trade(
+        _id="trade_4",
         metadata='{"type": "tax_payment", "year": 2024, "status": "paid"}',
     )
-    tax_payment.user_a = user2  # From taxpayer
-    tax_payment.user_b = system_user  # To system (representing realm)
-    tax_payment.instruments_a.add(tax_instrument)
+
+    # Add a tax payment transfer
+    tax_transfer = Transfer(
+        _id="transfer_4",
+        amount=1200,
+    )
+    tax_transfer.from_user = user2
+    tax_transfer.to_user = system_user
+    tax_transfer.instrument = tax_instrument
+    tax_trade.transfer_1 = tax_transfer
+
+    # Additional transfers without trades
+    donation_transfer = Transfer(
+        _id="transfer_5",
+        amount=50,
+    )
+    donation_transfer.from_user = user1
+    donation_transfer.to_user = user2
+    donation_transfer.instrument = btc_instrument
+
+    refund_transfer = Transfer(
+        _id="transfer_6",
+        amount=25,
+    )
+    refund_transfer.from_user = system_user
+    refund_transfer.to_user = user1
+    refund_transfer.instrument = fee_instrument
 
     logger.info("Demo data created successfully")
 
