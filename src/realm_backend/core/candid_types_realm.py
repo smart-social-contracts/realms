@@ -7,6 +7,7 @@ class StatusRecord(Record):
     users_count: nat
     organizations_count: nat
     commit: text
+    extensions: Vec[text]
 
 
 class UserRegisterRecord(Variant):

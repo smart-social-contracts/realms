@@ -29,13 +29,14 @@ def get_status() -> dict[str, Any]:
     organizations_count = len(Organization.instances())
 
     # Get installed extensions
-    extensions = []
+    extension_names = []
     import extensions.extension_imports
     for module_name in sys.modules:
         if module_name.startswith("extensions."):
             # Extract extension name from module path (extensions.name.entry -> name)
             extension_name = module_name.split('.')[1]
-            extensions.append(extension_name)
+            extension_names.append(extension_name)
+    extension_names = list(set(extension_names))  # Remove duplicates
 
     # In production, this would be set during the build process
     # For development, we can use a placeholder
@@ -51,5 +52,5 @@ def get_status() -> dict[str, Any]:
         "treasury": {"vaults": []},
         "organizations_count": organizations_count,
         "commit": commit_hash,
-        "extensions": extensions,
+        "extensions": extension_names,
     }
