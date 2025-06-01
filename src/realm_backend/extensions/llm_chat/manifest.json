@@ -1,0 +1,7 @@
+{
+    "name": "llm_chat",
+    "version": "0.1.0",
+    "description": "Chat with an LLM model via HTTP",
+    "author": "Smart Social Contracts Team",
+    "permissions": []
+} 
