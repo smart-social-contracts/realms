@@ -14,12 +14,7 @@ class LLMChatResponse(Record):
 # Container for relevant realm data to be sent to the LLM.
 # This provides context about the current state of the realm.
 class RealmData(Record):
-    users: text
-    mandates: text
-    tasks: text
-    transfers: text
-    instruments: text
-    organizations: text
+    json: text
     principal_id: text
     timestamp: nat64
 
@@ -41,6 +36,21 @@ def get_realm_data(args) -> RealmData:
     
     Returns:
         RealmData: A record containing structured data from the realm
+
+    Parse output of this command to get the realm data:
+    '''
+dfx canister call realm_backend extension_sync_call '(
+  record {
+    extension_name = "llm_chat";
+    function_name = "get_realm_data";
+    args = "none";
+  }
+)' --output=json | jq -r '.response' | python3 -c "
+import sys, json, ast
+response = ast.literal_eval(sys.stdin.read())
+print(json.dumps(json.loads(response['json']), indent=2))
+"
+    '''
     """
     ic.print("Collecting realm data for LLM")
     
@@ -116,13 +126,17 @@ def get_realm_data(args) -> RealmData:
             ic.print(f"Error getting organizations data: {str(e)}")
         
         # Return the collected data
+        combined_data = {
+            "users": json.loads(users_data),
+            "mandates": json.loads(mandates_data),
+            "tasks": json.loads(tasks_data),
+            "transfers": json.loads(transfers_data),
+            "instruments": json.loads(instruments_data),
+            "organizations": json.loads(organizations_data)
+        }
+
         return RealmData(
-            users=users_data,
-            mandates=mandates_data,
-            tasks=tasks_data,
-            transfers=transfers_data,
-            instruments=instruments_data,
-            organizations=organizations_data,
+            json=json.dumps(combined_data),
             principal_id=principal_id,
             timestamp=current_time
         )
@@ -132,12 +146,7 @@ def get_realm_data(args) -> RealmData:
         
         # Return empty data on error
         return RealmData(
-            users="[]",
-            mandates="[]",
-            tasks="[]",
-            transfers="[]",
-            instruments="[]",
-            organizations="[]",
+            json="{}",
             principal_id=principal_id,
             timestamp=current_time
         ) 
