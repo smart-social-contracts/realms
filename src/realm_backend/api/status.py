@@ -5,6 +5,7 @@ Provides health check and system status information
 """
 
 from typing import Any
+import sys
 
 from ggg.organization import Organization
 from ggg.user import User
@@ -27,6 +28,15 @@ def get_status() -> dict[str, Any]:
     users_count = len(User.instances())
     organizations_count = len(Organization.instances())
 
+    # Get installed extensions
+    extensions = []
+    import extensions.extension_imports
+    for module_name in sys.modules:
+        if module_name.startswith("extensions."):
+            # Extract extension name from module path (extensions.name.entry -> name)
+            extension_name = module_name.split('.')[1]
+            extensions.append(extension_name)
+
     # In production, this would be set during the build process
     # For development, we can use a placeholder
     # This will be replaced during CI/CD deployment with the actual commit hash and version
@@ -41,4 +51,5 @@ def get_status() -> dict[str, Any]:
         "treasury": {"vaults": []},
         "organizations_count": organizations_count,
         "commit": commit_hash,
+        "extensions": extensions,
     }
