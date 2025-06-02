@@ -5,4 +5,4 @@ logger = get_logger("entity.proposal")
 
 
 class Proposal(Entity, TimestampedMixin):
-    metadata = String(max_length=256) 
+    metadata = String(max_length=256)

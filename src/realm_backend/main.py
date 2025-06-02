@@ -68,9 +68,7 @@ from kybra import (
 from kybra_simple_db import Database
 from kybra_simple_logging import get_logger
 
-storage = StableBTreeMap[str, str](
-    memory_id=1, max_key_size=100, max_value_size=2000
-)
+storage = StableBTreeMap[str, str](memory_id=1, max_key_size=100, max_value_size=2000)
 Database.init(db_storage=storage, audit_enabled=True)
 
 logger = get_logger("main")
@@ -220,7 +218,7 @@ def get_transfers(page: nat = 1, per_page: nat = 10) -> RealmResponse:
         transfers_json = [
             json.dumps(transfer) for transfer in transfers_data["transfers"]
         ]
-        
+
         # Create a pagination info object if available
         pagination = None
         if "pagination" in transfers_data:
@@ -230,15 +228,14 @@ def get_transfers(page: nat = 1, per_page: nat = 10) -> RealmResponse:
                 total=transfers_data["pagination"]["total"],
                 total_pages=transfers_data["pagination"]["total_pages"],
                 has_next=transfers_data["pagination"]["has_next"],
-                has_prev=transfers_data["pagination"]["has_prev"]
+                has_prev=transfers_data["pagination"]["has_prev"],
             )
-            
+
         return RealmResponse(
             success=True,
             data=RealmResponseData(
                 TransfersList=TransfersListRecord(
-                    transfers=transfers_json,
-                    pagination=pagination
+                    transfers=transfers_json, pagination=pagination
                 )
             ),
         )
@@ -344,9 +341,7 @@ def get_realms() -> RealmResponse:
         realms_json = [json.dumps(realm) for realm in realms_data["realms"]]
         return RealmResponse(
             success=True,
-            data=RealmResponseData(
-                RealmsList=RealmsListRecord(realms=realms_json)
-            ),
+            data=RealmResponseData(RealmsList=RealmsListRecord(realms=realms_json)),
         )
     except Exception as e:
         logger.error(f"Error listing realms: {str(e)}\n{traceback.format_exc()}")
@@ -361,9 +356,7 @@ def get_trades() -> RealmResponse:
         trades_json = [json.dumps(trade) for trade in trades_data["trades"]]
         return RealmResponse(
             success=True,
-            data=RealmResponseData(
-                TradesList=TradesListRecord(trades=trades_json)
-            ),
+            data=RealmResponseData(TradesList=TradesListRecord(trades=trades_json)),
         )
     except Exception as e:
         logger.error(f"Error listing trades: {str(e)}\n{traceback.format_exc()}")
@@ -375,7 +368,9 @@ def get_proposals() -> RealmResponse:
     try:
         proposals_data = list_proposals()
         # Convert dictionary to JSON string
-        proposals_json = [json.dumps(proposal) for proposal in proposals_data["proposals"]]
+        proposals_json = [
+            json.dumps(proposal) for proposal in proposals_data["proposals"]
+        ]
         return RealmResponse(
             success=True,
             data=RealmResponseData(
@@ -395,9 +390,7 @@ def get_votes() -> RealmResponse:
         votes_json = [json.dumps(vote) for vote in votes_data["votes"]]
         return RealmResponse(
             success=True,
-            data=RealmResponseData(
-                VotesList=VotesListRecord(votes=votes_json)
-            ),
+            data=RealmResponseData(VotesList=VotesListRecord(votes=votes_json)),
         )
     except Exception as e:
         logger.error(f"Error listing votes: {str(e)}\n{traceback.format_exc()}")
