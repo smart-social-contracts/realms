@@ -1,3 +1,3 @@
 """
-LLM Chat extension for Realm backend
+AI assistant extension for Realm backend
 """

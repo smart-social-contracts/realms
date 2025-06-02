@@ -4,7 +4,7 @@ export default LLMChatComponent;
 
 // Extension metadata for the marketplace
 export const metadata = {
-    name: 'LLM Chat',
+    name: 'AI assistant',
     description: 'Chat with an LLM model via HTTP',
     version: '0.1.0',
     icon: 'chat',  // Use appropriate icon from the system

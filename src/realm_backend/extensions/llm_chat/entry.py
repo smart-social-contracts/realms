@@ -26,12 +26,12 @@ class RealmData(Record):
 
 
 def get_config() -> LLMChatResponse:
-    """Get configuration for the LLM chat extension.
+    """Get configuration for the AI assistant extension.
 
     Returns:
         LLMChatResponse: A simple acknowledgment
     """
-    return LLMChatResponse(response="LLM Chat extension is ready")
+    return LLMChatResponse(response="AI assistant extension is ready")
 
 
 def get_realm_data(args) -> RealmData:

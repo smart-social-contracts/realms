@@ -191,7 +191,7 @@
 </script>
 
 <div class="w-full h-full flex flex-col p-0 m-0 max-w-none">
-	<h2 class="text-2xl font-bold p-4">LLM Chat</h2>
+	<h2 class="text-2xl font-bold p-4">AI assistant</h2>
 	
 	<div class="w-full flex-grow flex flex-col overflow-hidden">
 		<Card class="w-full h-full flex-grow flex flex-col m-0 p-0 rounded-none border-0 max-w-none">
