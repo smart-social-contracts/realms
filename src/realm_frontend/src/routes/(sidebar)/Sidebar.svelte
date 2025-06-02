@@ -62,9 +62,8 @@
 	// Core navigation items
 	const coreNavItems = [
 		{ name: 'Dashboard', icon: ChartPieOutline, href: '/dashboard' },
-		{ name: 'My social contracts', icon: HomeOutline, href: '/contracts' },
 		{ name: 'My identities', icon: UsersOutline, href: '/identities' },
-		{ name: 'GGG Dashboard', icon: TableColumnSolid, href: '/ggg' },
+		{ name: 'Admin Dashboard', icon: TableColumnSolid, href: '/ggg' },
 	];
 
 	// Add Extensions menu with submenu of all extensions

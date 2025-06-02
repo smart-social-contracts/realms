@@ -33,6 +33,7 @@ class TasksListRecord(Record):
 
 class TransfersListRecord(Record):
     transfers: Vec[text]  # JSON string of transfer data
+    pagination: Opt["PaginationInfo"]  # Optional pagination info
 
 
 class InstrumentsListRecord(Record):
@@ -47,6 +48,30 @@ class OrganizationsListRecord(Record):
     organizations: Vec[text]  # JSON string of organization data
 
 
+class DisputesListRecord(Record):
+    disputes: Vec[text]  # JSON string of dispute data
+
+
+class LicensesListRecord(Record):
+    licenses: Vec[text]  # JSON string of license data
+
+
+class TradesListRecord(Record):
+    trades: Vec[text]  # JSON string of trade data
+
+
+class RealmsListRecord(Record):
+    realms: Vec[text]  # JSON string of realm data
+
+
+class ProposalsListRecord(Record):
+    proposals: Vec[text]  # JSON string of proposal data
+
+
+class VotesListRecord(Record):
+    votes: Vec[text]  # JSON string of vote data
+
+
 class RealmResponseData(Variant):
     Status: StatusRecord
     UserRegister: UserRegisterRecord
@@ -58,6 +83,12 @@ class RealmResponseData(Variant):
     InstrumentsList: InstrumentsListRecord
     CodexesList: CodexesListRecord
     OrganizationsList: OrganizationsListRecord
+    DisputesList: DisputesListRecord
+    LicensesList: LicensesListRecord
+    TradesList: TradesListRecord
+    RealmsList: RealmsListRecord
+    ProposalsList: ProposalsListRecord
+    VotesList: VotesListRecord
     Error: text
     Message: text
 
@@ -91,3 +122,12 @@ class ExtensionCallArgs(Record):
 class ExtensionCallResponse(Record):
     success: bool
     response: text
+
+
+class PaginationInfo(Record):
+    page: nat
+    per_page: nat
+    total: nat
+    total_pages: nat
+    has_next: bool
+    has_prev: bool

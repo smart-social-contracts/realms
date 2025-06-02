@@ -4,12 +4,18 @@ import traceback
 import api
 from api.ggg_entities import (
     list_codexes,
+    list_disputes,
     list_instruments,
+    list_licenses,
     list_mandates,
     list_organizations,
+    list_proposals,
+    list_realms,
     list_tasks,
+    list_trades,
     list_transfers,
     list_users,
+    list_votes,
 )
 
 # from api.extensions import list_extensions
@@ -17,19 +23,26 @@ from api.status import get_status
 from api.user import user_get, user_register
 from core.candid_types_realm import (
     CodexesListRecord,
+    DisputesListRecord,
     ExtensionCallArgs,
     ExtensionCallResponse,
     InstrumentsListRecord,
+    LicensesListRecord,
     MandatesListRecord,
     OrganizationsListRecord,
+    PaginationInfo,
+    ProposalsListRecord,
     RealmResponse,
     RealmResponseData,
+    RealmsListRecord,
     StatusRecord,
     TasksListRecord,
+    TradesListRecord,
     TransfersListRecord,
     UserGetRecord,
     UserRegisterRecord,
     UsersListRecord,
+    VotesListRecord,
 )
 from kybra import (
     Async,
@@ -56,7 +69,7 @@ from kybra_simple_db import Database
 from kybra_simple_logging import get_logger
 
 storage = StableBTreeMap[str, str](
-    memory_id=1, max_key_size=100000, max_value_size=1000
+    memory_id=1, max_key_size=100, max_value_size=2000
 )
 Database.init(db_storage=storage, audit_enabled=True)
 
@@ -200,17 +213,33 @@ def get_tasks() -> RealmResponse:
 
 
 @query
-def get_transfers() -> RealmResponse:
+def get_transfers(page: nat = 1, per_page: nat = 10) -> RealmResponse:
     try:
-        transfers_data = list_transfers()
+        transfers_data = list_transfers(page=page, per_page=per_page)
         # Convert dictionary to JSON string
         transfers_json = [
             json.dumps(transfer) for transfer in transfers_data["transfers"]
         ]
+        
+        # Create a pagination info object if available
+        pagination = None
+        if "pagination" in transfers_data:
+            pagination = PaginationInfo(
+                page=transfers_data["pagination"]["page"],
+                per_page=transfers_data["pagination"]["per_page"],
+                total=transfers_data["pagination"]["total"],
+                total_pages=transfers_data["pagination"]["total_pages"],
+                has_next=transfers_data["pagination"]["has_next"],
+                has_prev=transfers_data["pagination"]["has_prev"]
+            )
+            
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                TransfersList=TransfersListRecord(transfers=transfers_json)
+                TransfersList=TransfersListRecord(
+                    transfers=transfers_json,
+                    pagination=pagination
+                )
             ),
         )
     except Exception as e:
@@ -270,6 +299,108 @@ def get_organizations() -> RealmResponse:
         )
     except Exception as e:
         logger.error(f"Error listing organizations: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_disputes() -> RealmResponse:
+    try:
+        disputes_data = list_disputes()
+        # Convert dictionary to JSON string
+        disputes_json = [json.dumps(dispute) for dispute in disputes_data["disputes"]]
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                DisputesList=DisputesListRecord(disputes=disputes_json)
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error listing disputes: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_licenses() -> RealmResponse:
+    try:
+        licenses_data = list_licenses()
+        # Convert dictionary to JSON string
+        licenses_json = [json.dumps(license) for license in licenses_data["licenses"]]
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                LicensesList=LicensesListRecord(licenses=licenses_json)
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error listing licenses: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_realms() -> RealmResponse:
+    try:
+        realms_data = list_realms()
+        # Convert dictionary to JSON string
+        realms_json = [json.dumps(realm) for realm in realms_data["realms"]]
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                RealmsList=RealmsListRecord(realms=realms_json)
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error listing realms: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_trades() -> RealmResponse:
+    try:
+        trades_data = list_trades()
+        # Convert dictionary to JSON string
+        trades_json = [json.dumps(trade) for trade in trades_data["trades"]]
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                TradesList=TradesListRecord(trades=trades_json)
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error listing trades: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_proposals() -> RealmResponse:
+    try:
+        proposals_data = list_proposals()
+        # Convert dictionary to JSON string
+        proposals_json = [json.dumps(proposal) for proposal in proposals_data["proposals"]]
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                ProposalsList=ProposalsListRecord(proposals=proposals_json)
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error listing proposals: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_votes() -> RealmResponse:
+    try:
+        votes_data = list_votes()
+        # Convert dictionary to JSON string
+        votes_json = [json.dumps(vote) for vote in votes_data["votes"]]
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                VotesList=VotesListRecord(votes=votes_json)
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error listing votes: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
