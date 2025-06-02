@@ -1,6 +1,45 @@
 <script lang="ts">
 	import { Button, Card, Timeline, TimelineItem } from 'flowbite-svelte';
 	import { ArrowRightOutline } from 'flowbite-svelte-icons';
+
+	// Mock activity data
+	const activities = [
+		{
+			title: "New proposal submitted in ACME Corp",
+			date: "10 minutes ago",
+			description: "A new governance proposal for budget allocation has been submitted by alice@example.com. Voting period ends in 3 days.",
+			actionText: "Review proposal",
+			actionLink: "/proposal?id=prop-135"
+		},
+		{
+			title: "Community DAO reached 150+ members",
+			date: "2 hours ago",
+			description: "Community DAO has grown to over 150 members, unlocking level 3 governance features with multi-signature capabilities.",
+			actionText: "View organization",
+			actionLink: "/organization?id=org-community-dao"
+		},
+		{
+			title: "New token distribution completed",
+			date: "Yesterday",
+			description: "GREEN Token distribution to 42 members of GreenFuture organization has been completed successfully.",
+			actionText: "View transaction details",
+			actionLink: "/transactions"
+		},
+		{
+			title: "DeFi Alliance proposal approved",
+			date: "2 days ago",
+			description: "Proposal #28 to integrate with external DeFi protocols has been approved with 82% votes in favor.",
+			actionText: "See results",
+			actionLink: "/proposal?id=prop-128"
+		},
+		{
+			title: "System maintenance completed",
+			date: "Jan 20, 2023",
+			description: "Platform maintenance and security updates have been successfully deployed without any service disruption.",
+			actionText: "View system status",
+			actionLink: "/settings/system"
+		}
+	];
 </script>
 
 <Card size="xl">
@@ -14,30 +53,15 @@
 		</a>
 	</div>
 	<Timeline>
-		<TimelineItem title="Application UI design in Figma" date="April 2023">
-			<p class="mb-4 text-base font-normal text-gray-500 dark:text-gray-400">
-				GGet access to over 20+ pages including a dashboard layout, charts, kanban board, calendar,
-				and pre-order E-commerce & Marketing pages.
-			</p>
-			<Button color="alternative">Learn more<ArrowRightOutline class="ms-2" size="sm" /></Button>
-		</TimelineItem>
-		<TimelineItem title="Marketing UI code in Flowbite" date="March 2023">
-			<p class="text-base font-normal text-gray-500 dark:text-gray-400">
-				Get started with dozens of web components and interactive elements built on top of Tailwind
-				CSS.
-			</p>
-			<a
-				href="#top"
-				class="inline-flex items-center text-xs font-medium text-primary-700 hover:underline dark:text-primary-500 sm:text-sm"
-			>
-				Go to Flowbite Blocks<ArrowRightOutline class="ms-2" size="sm" />
-			</a>
-		</TimelineItem>
-		<TimelineItem title="Marketing UI design in Figma" date="February 2023">
-			<p class="text-base font-normal text-gray-500 dark:text-gray-400">
-				Get started with dozens of web components and interactive elements built on top of Tailwind
-				CSS.
-			</p>
-		</TimelineItem>
+		{#each activities as activity, index}
+			<TimelineItem title={activity.title} date={activity.date}>
+				<p class="mb-4 text-base font-normal text-gray-500 dark:text-gray-400">
+					{activity.description}
+				</p>
+				<Button color="alternative" href={activity.actionLink}>
+					{activity.actionText}<ArrowRightOutline class="ms-2" size="sm" />
+				</Button>
+			</TimelineItem>
+		{/each}
 	</Timeline>
 </Card>

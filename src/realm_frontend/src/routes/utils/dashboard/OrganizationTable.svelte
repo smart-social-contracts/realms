@@ -38,9 +38,72 @@
 		{ text: 'Creation Time', icon: CalendarMonthSolid },
 		{ text: 'Actions', icon: null }
 	];
-	export let data = [];
+	
+	// Mock data for organizations
+	export let data = [
+		{
+			id: 'org-acme-corp',
+			members: 12,
+			membersList: 'alice@example.com, bob@example.com, carol@example.com, dave@example.com, eve@example.com, frank@example.com',
+			tokenBalance: 150000,
+			tokenName: 'ACME Token',
+			proposals: 8,
+			activeProposals: 2,
+			creationTime: '01/01/2023',
+			type: 'Corporate'
+		},
+		{
+			id: 'org-techstars',
+			members: 8,
+			membersList: 'jane@techstars.com, john@techstars.com, sarah@techstars.com',
+			tokenBalance: 75000,
+			tokenName: 'TECH Token',
+			proposals: 5,
+			activeProposals: 1,
+			creationTime: '03/15/2023',
+			type: 'Startup'
+		},
+		{
+			id: 'org-community-dao',
+			members: 156,
+			membersList: 'community-members (156)',
+			tokenBalance: 450000,
+			tokenName: 'COMM Token',
+			proposals: 24,
+			activeProposals: 5,
+			creationTime: '11/10/2022',
+			type: 'DAO'
+		},
+		{
+			id: 'org-greenfuture',
+			members: 42,
+			membersList: 'environmental-group-members (42)',
+			tokenBalance: 210000,
+			tokenName: 'GREEN Token',
+			proposals: 15,
+			activeProposals: 3,
+			creationTime: '05/22/2023',
+			type: 'Non-profit'
+		},
+		{
+			id: 'org-defi-alliance',
+			members: 68,
+			membersList: 'defi-partners (68)',
+			tokenBalance: 890000,
+			tokenName: 'DFI Token',
+			proposals: 32,
+			activeProposals: 7,
+			creationTime: '02/14/2023',
+			type: 'DeFi Consortium'
+		}
+	];
 
 	async function fetchOrganizations() {
+		// Using mock data instead of fetching from backend
+		console.log('Using mock organization data');
+		
+		// In a real scenario, you'd fetch from backend:
+		/*
 		try {
 			const organizations = await backend.get_organization_list();
 			data = organizations.map(org => ({
@@ -57,6 +120,7 @@
 		} catch (error) {
 			console.error('Error fetching organizations:', error);
 		}
+		*/
 	}
 
 	onMount(() => {

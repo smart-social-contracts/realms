@@ -8,7 +8,7 @@
 	import DarkChart from '../widgets/DarkChart.svelte';
 	import { onMount } from 'svelte';
 	import getChartOptions from '../../(sidebar)/dashboard/chart_options';
-	import ActivityList from './ActivityList.svelte';
+	import ActivityList from '../../(sidebar)/dashboard/ActivityList.svelte';
 	import Change from './Change.svelte';
 	import Chat from './Chat.svelte';
 	import DesktopPc from './DesktopPc.svelte';
@@ -24,8 +24,25 @@
 
 	let greeting = '';
 
-	const statsDatesValues = writable<[string[], number[]]>([[], []]);
-	const orgsDatesValues = writable<[string[], number[]]>([[], []]);
+	// Mock data for charts
+	const mockUserData = [
+		['01 Jan', '03 Jan', '05 Jan', '07 Jan', '09 Jan', '11 Jan', '13 Jan', '15 Jan', '17 Jan', '19 Jan', '21 Jan'],
+		[120, 145, 160, 175, 185, 190, 210, 250, 290, 310, 350]
+	];
+	
+	const mockOrgData = [
+		['01 Jan', '03 Jan', '05 Jan', '07 Jan', '09 Jan', '11 Jan', '13 Jan', '15 Jan', '17 Jan', '19 Jan', '21 Jan'],
+		[5, 5, 6, 6, 7, 8, 8, 9, 10, 12, 15]
+	];
+	
+	const mockAssetData = [
+		['01 Jan', '03 Jan', '05 Jan', '07 Jan', '09 Jan', '11 Jan', '13 Jan', '15 Jan', '17 Jan', '19 Jan', '21 Jan'],
+		[22000000, 22200000, 22500000, 22800000, 23000000, 23400000, 23800000, 24000000, 24500000, 24800000, 25000000]
+	];
+
+	const statsDatesValues = writable<[string[], number[]]>(mockUserData);
+	const orgsDatesValues = writable<[string[], number[]]>(mockOrgData);
+	const assetsDatesValues = writable<[string[], number[]]>(mockAssetData);
 
 	function onSubmit(event) {
 		const name = event.target.name.value;
@@ -55,6 +72,11 @@
 	}
 
 	function get_snapshot_data() {
+		// Use mock data instead of fetching from backend
+		console.log('Using mock data');
+		
+		// In a real scenario, you'd fetch from backend:
+		/*
 		backend
 			.get_stats()
 			.then((response) => {
@@ -100,6 +122,7 @@
 			.catch((error) => {
 				console.error('Error fetching stats:', error);
 			});
+		*/
 
 		return false;
 	}
@@ -115,31 +138,28 @@
 	<!-- <section id="aaa">{statsDatesValues}</section> -->
 	<ChartWidget
 		title="Users"
-		description=""
+		description="Active users in the platform"
 		dateValues={$statsDatesValues}
 	/>
 
 	<ChartWidget
 		title="Organizations"
-		description=""
+		description="Total registered organizations"
 		dateValues={$orgsDatesValues}
 	/>
 
 	<ChartWidget
 		title="Assets"
-		description=""
-		dateValues={[
-			['01 Jan', '05 Jan', '10 Jan', '15 Jan', '21 Jan'],
-			[22000000, 22500000, 23000000, 24000000, 25000000]
-		]}
+		description="Total assets value in USD"
+		dateValues={$assetsDatesValues}
 	/>
 
 	<!-- <ChartWidget title="Assets" description="" dateValues={statsDatesValues} /> -->
 
 	<!-- <Stats /> -->
 	<OrganizationTable />
-	<!-- <div class="grid grid-cols-1 gap-4 xl:grid-cols-1">
+	<div class="grid grid-cols-1 gap-4 xl:grid-cols-1">
 		<ActivityList />
-	</div> -->
+	</div>
 
 </div>
