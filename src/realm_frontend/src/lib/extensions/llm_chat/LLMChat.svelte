@@ -5,6 +5,8 @@
 	import SvelteMarkdown from 'svelte-markdown';
 	// @ts-ignore
 	import { backend } from '$lib/canisters';
+	// @ts-ignore
+	import { canisterId as backendCanisterId } from 'declarations/realm_backend';
 
 	// Define message interface to fix TypeScript errors
 	interface ChatMessage {
@@ -31,9 +33,58 @@
 	let isLoadingRealmData = false;
 
 	// LLM API configuration
-	// const API_URL = "https://jvql982sbyh2vo-5000.proxy.runpod.net/api/ask"; // Change this to your LLM API endpoint
-	const API_URL = "http://localhost:5000/api/ask"; // Change this to your LLM API endpoint
-	const REALM_CANISTER_ID = "uxrrr-q7777-77774-qaaaq-cai";
+
+	const isLocalhost = window.location.hostname === 'localhost' || 
+			window.location.hostname === '127.0.0.1' ||
+			window.location.hostname.includes('.localhost');
+	console.log("isLocalhost", isLocalhost);
+	
+	// Determine API URL based on environment
+	const API_URL = (() => {
+		// Check if we're running locally
+
+		
+		if (isLocalhost) {
+			return "http://localhost:5000/api/ask";
+		} else {
+			// Production URL
+			return "https://jvql982sbyh2vo-5000.proxy.runpod.net/api/ask";
+		}
+	})();
+	
+	// Get the canister ID dynamically
+	let REALM_CANISTER_ID = "";
+	
+	onMount(async () => {
+		try {
+			// Try to get canister ID from direct import
+			REALM_CANISTER_ID = backendCanisterId.toString();
+			console.log("Got canister ID from direct import:", REALM_CANISTER_ID);
+		} catch (err) {
+			console.error("Error getting canister ID from direct import:", err);
+			
+			try {
+				// Alternative method: try to get it from the URL
+				const hostname = window.location.hostname;
+				// Format: uzt4z-lp777-77774-qaaaq-cai.localhost:8000
+				if (hostname.includes('-')) {
+					const parts = hostname.split('.');
+					if (parts.length > 0) {
+						REALM_CANISTER_ID = parts[0];
+						console.log("Got canister ID from hostname:", REALM_CANISTER_ID);
+					}
+				}
+			} catch (err2) {
+				console.error("Error getting canister ID from URL:", err2);
+			}
+			
+			// Fallback if all else fails
+			if (!REALM_CANISTER_ID) {
+				REALM_CANISTER_ID = "uxrrr-q7777-77774-qaaaq-cai"; // Default fallback
+				console.log("Using default canister ID:", REALM_CANISTER_ID);
+			}
+		}
+	});
 
 	// Auto-scroll to bottom of messages when content changes
 	afterUpdate(() => {
