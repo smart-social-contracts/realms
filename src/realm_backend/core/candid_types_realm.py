@@ -47,6 +47,22 @@ class OrganizationsListRecord(Record):
     organizations: Vec[text]  # JSON string of organization data
 
 
+class DisputesListRecord(Record):
+    disputes: Vec[text]  # JSON string of dispute data
+
+
+class LicensesListRecord(Record):
+    licenses: Vec[text]  # JSON string of license data
+
+
+class TradesListRecord(Record):
+    trades: Vec[text]  # JSON string of trade data
+
+
+class RealmsListRecord(Record):
+    realms: Vec[text]  # JSON string of realm data
+
+
 class RealmResponseData(Variant):
     Status: StatusRecord
     UserRegister: UserRegisterRecord
@@ -58,6 +74,10 @@ class RealmResponseData(Variant):
     InstrumentsList: InstrumentsListRecord
     CodexesList: CodexesListRecord
     OrganizationsList: OrganizationsListRecord
+    DisputesList: DisputesListRecord
+    LicensesList: LicensesListRecord
+    TradesList: TradesListRecord
+    RealmsList: RealmsListRecord
     Error: text
     Message: text
 
