@@ -1,7 +1,12 @@
 <script>
-  export let entities = [];
   export let entityType = '';
+  export let items = [];
   export let loading = false;
+  export let pagination = null;
+  export let onPageChange = (page) => {};
+  
+  // Alias for backward compatibility
+  $: entities = items;
   
   // Dynamically determine columns based on entity structure
   $: columns = entities.length > 0 ? 
@@ -10,6 +15,9 @@
       key !== 'timestamp_updated' &&
       key !== 'relations'
     ) : [];
+  
+  // Import transfer table for specialized display
+  import TransfersTable from './TransfersTable.svelte';
   
   function formatValue(value, key) {
     if (value === null || value === undefined) return 'N/A';
@@ -127,174 +135,173 @@
 </script>
 
 <div class="w-full overflow-x-auto">
-  <h2 class="text-xl font-bold mb-4 flex items-center">
-    <span class="mr-2">{getEntityIcon(entityType)}</span>
-    {getDisplayName(entityType)} ({entities.length})
-  </h2>
-  <p class="text-sm text-gray-600 mb-4">
-    {#if entityType === 'users'}
-      Manage and monitor user accounts and citizen profiles
-    {:else if entityType === 'mandates'}
-      Governance mandates and policies that define system rules
-    {:else if entityType === 'tasks'}
-      Automated processes and scheduled operations
-    {:else if entityType === 'transfers'}
-      Asset transfers and financial transactions between entities
-    {:else if entityType === 'proposals'}
-      Governance proposals for citizen voting and decision making
-    {:else if entityType === 'votes'}
-      Citizen votes on governance proposals and democratic participation
-    {:else if entityType === 'instruments'}
-      Financial instruments and digital assets in the treasury
-    {:else if entityType === 'licenses'}
-      Issued licenses and permits for various activities
-    {:else if entityType === 'disputes'}
-      Open disputes and conflicts requiring resolution
+  {#if entityType === 'transfers'}
+    <TransfersTable 
+      transfers={entities} 
+      {loading} 
+      pagination={pagination}
+      onPageChange={onPageChange}
+    />
+  {:else}
+    <h2 class="text-xl font-bold mb-4 flex items-center">
+      <span class="mr-2">{getEntityIcon(entityType)}</span>
+      {getDisplayName(entityType)} ({entities.length})
+    </h2>
+    <p class="text-sm text-gray-600 mb-4">
+      {#if entityType === 'users'}
+        Manage and monitor user accounts and citizen profiles
+      {:else if entityType === 'mandates'}
+        Governance mandates and policies that define system rules
+      {:else if entityType === 'tasks'}
+        Automated processes and scheduled operations
+      {:else if entityType === 'transfers'}
+        Asset transfers and financial transactions between entities
+      {:else if entityType === 'proposals'}
+        Governance proposals for citizen voting and decision making
+      {:else if entityType === 'votes'}
+        Citizen votes on governance proposals and democratic participation
+      {:else if entityType === 'instruments'}
+        Financial instruments and digital assets in the treasury
+      {:else if entityType === 'licenses'}
+        Issued licenses and permits for various activities
+      {:else if entityType === 'disputes'}
+        Open disputes and conflicts requiring resolution
+      {:else}
+        {getDisplayName(entityType)} in the system
+      {/if}
+    </p>
+    
+    {#if loading}
+      <div class="text-center py-10">
+        <div class="inline-block animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+        <p class="mt-2 text-gray-600">Loading {entityType}...</p>
+      </div>
+    {:else if entities.length === 0}
+      <div class="text-center py-10 bg-gray-50 rounded-lg">
+        <p class="text-gray-600">No {entityType} found</p>
+      </div>
     {:else}
-      {getDisplayName(entityType)} in the system
-    {/if}
-  </p>
-  
-  {#if entities.length > 0}
-    <div class="space-y-4">
-      {#each entities as entity, index}
-        <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-          <div class="flex justify-between items-start mb-3">
-            <div class="flex-1">
-              <h3 class="font-semibold text-gray-900 mb-1">
-                {getEntityDescription(entity, entityType)}
-              </h3>
-              <p class="text-sm text-gray-600">ID: {entity._id}</p>
-              {#if entity.timestamp_created}
-                <p class="text-xs text-gray-500">
-                  Created: {formatValue(entity.timestamp_created, 'timestamp_created')}
-                </p>
-              {/if}
-            </div>
-            <div class="flex items-center space-x-2">
-              {#if getRelationshipInfo(entity)}
-                <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                  {getRelationshipInfo(entity)}
-                </span>
-              {/if}
-              <button class="text-blue-600 hover:text-blue-900 font-medium text-sm">
-                View Details
-              </button>
-            </div>
-          </div>
-          
-          <!-- Entity-specific information -->
-          {#if entity.metadata}
-            <div class="mt-3 p-3 bg-gray-50 rounded text-sm">
-              {#if entityType === 'transfers'}
-                {@const metadata = JSON.parse(entity.metadata || '{}')}
-                <div class="grid grid-cols-2 gap-4">
-                  <div><strong>Amount:</strong> {formatValue(entity.amount, 'amount')}</div>
-                  <div><strong>Purpose:</strong> {metadata.purpose || 'N/A'}</div>
-                </div>
-              {:else if entityType === 'proposals'}
-                {@const metadata = JSON.parse(entity.metadata || '{}')}
-                <div class="grid grid-cols-2 gap-4">
-                  <div><strong>Proposer:</strong> {metadata.proposer || 'N/A'}</div>
-                  <div><strong>Status:</strong> 
-                    <span class="px-2 py-1 rounded text-xs {metadata.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}">
-                      {metadata.status || 'unknown'}
-                    </span>
-                  </div>
-                  {#if metadata.budget}
-                    <div><strong>Budget:</strong> {metadata.budget}</div>
-                  {/if}
-                  {#if metadata.category}
-                    <div><strong>Category:</strong> {metadata.category}</div>
-                  {/if}
-                </div>
-              {:else if entityType === 'votes'}
-                {@const metadata = JSON.parse(entity.metadata || '{}')}
-                <div class="grid grid-cols-2 gap-4">
-                  <div><strong>Voter:</strong> {metadata.voter || 'N/A'}</div>
-                  <div><strong>Vote:</strong> 
-                    <span class="px-2 py-1 rounded text-xs {metadata.vote === 'yes' ? 'bg-green-100 text-green-700' : metadata.vote === 'no' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}">
-                      {metadata.vote || 'unknown'}
-                    </span>
-                  </div>
-                  <div><strong>Proposal:</strong> {metadata.proposal_id || 'N/A'}</div>
-                  <div><strong>Verified:</strong> {metadata.verified ? '✅' : '❌'}</div>
-                </div>
-              {:else if entityType === 'mandates'}
-                {@const metadata = JSON.parse(entity.metadata || '{}')}
-                <div>
-                  <strong>Description:</strong> {metadata.description || 'No description available'}
-                  {#if metadata.authority}
-                    <br><strong>Authority:</strong> {metadata.authority}
-                  {/if}
-                  {#if metadata.established_date}
-                    <br><strong>Established:</strong> {metadata.established_date}
-                  {/if}
-                </div>
-              {:else if entityType === 'instruments'}
-                {@const metadata = JSON.parse(entity.metadata || '{}')}
-                <div class="grid grid-cols-2 gap-4">
-                  <div><strong>Symbol:</strong> {metadata.symbol || 'N/A'}</div>
-                  <div><strong>Type:</strong> {metadata.type || 'N/A'}</div>
-                  {#if metadata.treasury_balance}
-                    <div><strong>Treasury Balance:</strong> {metadata.treasury_balance.toLocaleString()}</div>
-                  {/if}
-                  {#if metadata.decimal_places}
-                    <div><strong>Decimals:</strong> {metadata.decimal_places}</div>
-                  {/if}
-                </div>
-              {:else}
-                <pre class="text-xs text-gray-600 whitespace-pre-wrap">{JSON.stringify(JSON.parse(entity.metadata), null, 2)}</pre>
-              {/if}
-            </div>
-          {/if}
-          
-          <!-- Relationships -->
-          {#if entity.relations && Object.keys(entity.relations).length > 0}
-            <div class="mt-3 p-3 bg-blue-50 rounded text-sm">
-              <strong class="text-blue-800">Relationships:</strong>
-              <div class="mt-2 space-y-1">
-                {#each Object.entries(entity.relations) as [relType, relEntities]}
-                  {#if Array.isArray(relEntities) && relEntities.length > 0}
-                    <div class="flex items-center">
-                      <span class="font-medium text-blue-700">{getDisplayName(relType)}:</span>
-                      <div class="ml-2 flex flex-wrap gap-1">
-                        {#each relEntities.slice(0, 3) as relEntity}
-                          <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                            {relEntity._id}
-                          </span>
-                        {/each}
-                        {#if relEntities.length > 3}
-                          <span class="text-xs text-blue-600">+{relEntities.length - 3} more</span>
-                        {/if}
-                      </div>
-                    </div>
-                  {/if}
-                {/each}
+      <div class="space-y-4">
+        {#each entities as entity, index}
+          <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+            <div class="flex justify-between items-start mb-3">
+              <div class="flex-1">
+                <h3 class="font-semibold text-gray-900 mb-1">
+                  {getEntityDescription(entity, entityType)}
+                </h3>
+                <p class="text-sm text-gray-600">ID: {entity._id}</p>
+                {#if entity.timestamp_created}
+                  <p class="text-xs text-gray-500">
+                    Created: {formatValue(entity.timestamp_created, 'timestamp_created')}
+                  </p>
+                {/if}
+              </div>
+              <div class="flex items-center space-x-2">
+                {#if getRelationshipInfo(entity)}
+                  <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                    {getRelationshipInfo(entity)}
+                  </span>
+                {/if}
+                <button class="text-blue-600 hover:text-blue-900 font-medium text-sm">
+                  View Details
+                </button>
               </div>
             </div>
-          {/if}
-        </div>
-      {/each}
-    </div>
-  {:else if !loading}
-    <div class="text-center py-12 bg-gray-50 rounded-lg">
-      <span class="text-4xl mb-4 block">{getEntityIcon(entityType)}</span>
-      <h3 class="text-lg font-semibold text-gray-700 mb-2">No {getDisplayName(entityType)} Found</h3>
-      {#if entityType === 'transfers' || entityType === 'instruments'}
-        <p class="text-gray-600 mb-4">This entity type should have data. Try clicking "Load Demo Data" to populate it.</p>
-        <div class="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm text-yellow-800 max-w-md mx-auto">
-          💡 <strong>Tip:</strong> The {entityType} data might not be loading properly from the backend API.
-        </div>
-      {:else}
-        <p class="text-gray-600 mb-4">No {entityType} have been created yet.</p>
-        <p class="text-sm text-gray-500">Data for this entity type will appear here when available</p>
-      {/if}
-    </div>
-  {:else}
-    <div class="text-center py-12">
-      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-      <p class="text-gray-600">Loading {entityType}...</p>
-    </div>
+            
+            <!-- Entity-specific information -->
+            {#if entity.metadata}
+              <div class="mt-3 p-3 bg-gray-50 rounded text-sm">
+                {#if entityType === 'transfers'}
+                  {@const metadata = JSON.parse(entity.metadata || '{}')}
+                  <div class="grid grid-cols-2 gap-4">
+                    <div><strong>Amount:</strong> {formatValue(entity.amount, 'amount')}</div>
+                    <div><strong>Purpose:</strong> {metadata.purpose || 'N/A'}</div>
+                  </div>
+                {:else if entityType === 'proposals'}
+                  {@const metadata = JSON.parse(entity.metadata || '{}')}
+                  <div class="grid grid-cols-2 gap-4">
+                    <div><strong>Proposer:</strong> {metadata.proposer || 'N/A'}</div>
+                    <div><strong>Status:</strong> 
+                      <span class="px-2 py-1 rounded text-xs {metadata.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}">
+                        {metadata.status || 'unknown'}
+                      </span>
+                    </div>
+                    {#if metadata.budget}
+                      <div><strong>Budget:</strong> {metadata.budget}</div>
+                    {/if}
+                    {#if metadata.category}
+                      <div><strong>Category:</strong> {metadata.category}</div>
+                    {/if}
+                  </div>
+                {:else if entityType === 'votes'}
+                  {@const metadata = JSON.parse(entity.metadata || '{}')}
+                  <div class="grid grid-cols-2 gap-4">
+                    <div><strong>Voter:</strong> {metadata.voter || 'N/A'}</div>
+                    <div><strong>Vote:</strong> 
+                      <span class="px-2 py-1 rounded text-xs {metadata.vote === 'yes' ? 'bg-green-100 text-green-700' : metadata.vote === 'no' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}">
+                        {metadata.vote || 'unknown'}
+                      </span>
+                    </div>
+                    <div><strong>Proposal:</strong> {metadata.proposal_id || 'N/A'}</div>
+                    <div><strong>Verified:</strong> {metadata.verified ? '✅' : '❌'}</div>
+                  </div>
+                {:else if entityType === 'mandates'}
+                  {@const metadata = JSON.parse(entity.metadata || '{}')}
+                  <div>
+                    <strong>Description:</strong> {metadata.description || 'No description available'}
+                    {#if metadata.authority}
+                      <br><strong>Authority:</strong> {metadata.authority}
+                    {/if}
+                    {#if metadata.established_date}
+                      <br><strong>Established:</strong> {metadata.established_date}
+                    {/if}
+                  </div>
+                {:else if entityType === 'instruments'}
+                  {@const metadata = JSON.parse(entity.metadata || '{}')}
+                  <div class="grid grid-cols-2 gap-4">
+                    <div><strong>Symbol:</strong> {metadata.symbol || 'N/A'}</div>
+                    <div><strong>Type:</strong> {metadata.type || 'N/A'}</div>
+                    {#if metadata.treasury_balance}
+                      <div><strong>Treasury Balance:</strong> {metadata.treasury_balance.toLocaleString()}</div>
+                    {/if}
+                    {#if metadata.decimal_places}
+                      <div><strong>Decimals:</strong> {metadata.decimal_places}</div>
+                    {/if}
+                  </div>
+                {:else}
+                  <pre class="text-xs text-gray-600 whitespace-pre-wrap">{JSON.stringify(JSON.parse(entity.metadata), null, 2)}</pre>
+                {/if}
+              </div>
+            {/if}
+            
+            <!-- Relationships -->
+            {#if entity.relations && Object.keys(entity.relations).length > 0}
+              <div class="mt-3 p-3 bg-blue-50 rounded text-sm">
+                <strong class="text-blue-800">Relationships:</strong>
+                <div class="mt-2 space-y-1">
+                  {#each Object.entries(entity.relations) as [relType, relEntities]}
+                    {#if Array.isArray(relEntities) && relEntities.length > 0}
+                      <div class="flex items-center">
+                        <span class="font-medium text-blue-700">{getDisplayName(relType)}:</span>
+                        <div class="ml-2 flex flex-wrap gap-1">
+                          {#each relEntities.slice(0, 3) as relEntity}
+                            <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                              {relEntity._id}
+                            </span>
+                          {/each}
+                          {#if relEntities.length > 3}
+                            <span class="text-xs text-blue-600">+{relEntities.length - 3} more</span>
+                          {/if}
+                        </div>
+                      </div>
+                    {/if}
+                  {/each}
+                </div>
+              </div>
+            {/if}
+          </div>
+        {/each}
+      </div>
+    {/if}
   {/if}
 </div> 

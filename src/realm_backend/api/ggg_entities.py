@@ -100,16 +100,60 @@ def list_trades() -> Dict[str, Any]:
         raise
 
 
-def list_transfers() -> Dict[str, Any]:
-    """List all transfers in the system."""
+def list_transfers(page: int = 1, per_page: int = 10) -> Dict[str, Any]:
+    """List transfers in the system with pagination."""
     try:
         transfers = []
+        total_count = 0
+        
+        # First check if User class has instances
+        try:
+            # Test User instances access - this is where the error might be occurring
+            user_count = len(list(User.instances()))
+            logger.info(f"Found {user_count} User instances")
+        except Exception as user_error:
+            logger.error(f"Error accessing User instances: {str(user_error)}")
+            import traceback
+            logger.error(f"User error trace: {traceback.format_exc()}")
+            # Continue with empty transfers instead of failing
+        
         # Check if Transfer class is available and has instances
         if hasattr(Transfer, "instances"):
-            transfers = [transfer.to_dict() for transfer in Transfer.instances()]
-        return {"transfers": transfers}
+            try:
+                all_transfers = list(Transfer.instances())
+                total_count = len(all_transfers)
+                
+                # Calculate pagination
+                start_index = (page - 1) * per_page
+                end_index = start_index + per_page
+                
+                # Get the paginated subset
+                paginated_transfers = all_transfers[start_index:end_index]
+                
+                # Convert to dict format
+                transfers = [transfer.to_dict() for transfer in paginated_transfers]
+            except Exception as transfer_error:
+                logger.error(f"Error processing transfers: {str(transfer_error)}")
+                import traceback
+                logger.error(f"Transfer error trace: {traceback.format_exc()}")
+                # Continue with empty transfers
+                    
+        return {
+            "transfers": transfers,
+            "pagination": {
+                "page": page,
+                "per_page": per_page,
+                "total": total_count,
+                "total_pages": (total_count + per_page - 1) // per_page if total_count > 0 else 0,
+                "has_next": page * per_page < total_count,
+                "has_prev": page > 1
+            }
+        }
     except Exception as e:
         logger.error(f"Error listing transfers: {str(e)}")
+        # Provide more detailed error information
+        import traceback
+        logger.error(f"Stack trace: {traceback.format_exc()}")
         raise
 
 

@@ -30,6 +30,7 @@ from core.candid_types_realm import (
     LicensesListRecord,
     MandatesListRecord,
     OrganizationsListRecord,
+    PaginationInfo,
     ProposalsListRecord,
     RealmResponse,
     RealmResponseData,
@@ -212,17 +213,33 @@ def get_tasks() -> RealmResponse:
 
 
 @query
-def get_transfers() -> RealmResponse:
+def get_transfers(page: nat = 1, per_page: nat = 10) -> RealmResponse:
     try:
-        transfers_data = list_transfers()
+        transfers_data = list_transfers(page=page, per_page=per_page)
         # Convert dictionary to JSON string
         transfers_json = [
             json.dumps(transfer) for transfer in transfers_data["transfers"]
         ]
+        
+        # Create a pagination info object if available
+        pagination = None
+        if "pagination" in transfers_data:
+            pagination = PaginationInfo(
+                page=transfers_data["pagination"]["page"],
+                per_page=transfers_data["pagination"]["per_page"],
+                total=transfers_data["pagination"]["total"],
+                total_pages=transfers_data["pagination"]["total_pages"],
+                has_next=transfers_data["pagination"]["has_next"],
+                has_prev=transfers_data["pagination"]["has_prev"]
+            )
+            
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                TransfersList=TransfersListRecord(transfers=transfers_json)
+                TransfersList=TransfersListRecord(
+                    transfers=transfers_json,
+                    pagination=pagination
+                )
             ),
         )
     except Exception as e:

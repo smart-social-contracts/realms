@@ -5,14 +5,21 @@
   import GenericEntityTable from '$lib/components/ggg/GenericEntityTable.svelte';
   import CodexViewer from '$lib/components/ggg/CodexViewer.svelte';
   
-  let loading = true;
-  let activeTab = 'overview';
+  let activeTab = 'dashboard';
+  let loading = false;
   let error = null;
-  let searchTerm = '';
   let data = {};
   let metrics = {};
   let relationships = [];
-  let recentActivities = [];
+  let recentActivity = [];
+  let filterQuery = '';
+  let selectedFilter = 'all';
+  
+  // Add pagination state for transfers
+  let transfersPage = 1;
+  let transfersPerPage = 10;
+  let transfersPagination = null;
+  let searchTerm = '';
   
   // Static list of all known GGG entity types - always show these tabs
   const allEntityTypes = [
@@ -36,7 +43,12 @@
     { name: 'users', fetch: () => backend.get_users(), dataPath: 'UsersList.users' },
     { name: 'mandates', fetch: () => backend.get_mandates(), dataPath: 'MandatesList.mandates' },
     { name: 'tasks', fetch: () => backend.get_tasks(), dataPath: 'TasksList.tasks' },
-    { name: 'transfers', fetch: () => backend.get_transfers(), dataPath: 'TransfersList.transfers' },
+    { 
+      name: 'transfers', 
+      fetch: (page = 1, perPage = 10) => backend.get_transfers(page, perPage), 
+      dataPath: 'TransfersList.transfers',
+      paginationPath: 'TransfersList.pagination'
+    },
     { name: 'instruments', fetch: () => backend.get_instruments(), dataPath: 'InstrumentsList.instruments' },
     { name: 'codexes', fetch: () => backend.get_codexes(), dataPath: 'CodexesList.codexes' },
     { name: 'organizations', fetch: () => backend.get_organizations(), dataPath: 'OrganizationsList.organizations' },
@@ -88,7 +100,14 @@
       // Try to fetch each entity type
       for (const config of entityConfigs) {
         try {
-          const result = await config.fetch();
+          let result;
+          
+          // Handle special case for transfers with pagination
+          if (config.name === 'transfers') {
+            result = await config.fetch(transfersPage, transfersPerPage);
+          } else {
+            result = await config.fetch();
+          }
           
           if (result.success && result.data) {
             // Navigate to the data using the dataPath
@@ -119,6 +138,26 @@
               
               data[config.name] = parsedData;
               console.log(`✅ ${config.name}: ${parsedData.length} items`);
+              
+              // Get pagination info for transfers
+              if (config.name === 'transfers' && config.paginationPath) {
+                const paginationParts = config.paginationPath.split('.');
+                let paginationData = result.data;
+                
+                for (const part of paginationParts) {
+                  if (paginationData && paginationData[part]) {
+                    paginationData = paginationData[part];
+                  } else {
+                    paginationData = null;
+                    break;
+                  }
+                }
+                
+                if (paginationData) {
+                  transfersPagination = paginationData;
+                  console.log(`✅ Transfers pagination:`, transfersPagination);
+                }
+              }
             }
           }
         } catch (err) {
@@ -143,7 +182,8 @@
   
   function calculateMetrics() {
     const totalEntities = Object.values(data).reduce((sum, arr) => sum + (arr?.length || 0), 0);
-    const totalTransfers = data.transfers?.length || 0;
+    // For transfers, use the total count from pagination if available
+    const totalTransfers = transfersPagination?.total || data.transfers?.length || 0;
     const totalTransferVolume = data.transfers?.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0) || 0;
     const activeMandates = data.mandates?.filter(m => !isExpired(m)).length || 0;
     const scheduledTasks = data.tasks?.filter(t => hasSchedule(t)).length || 0;
@@ -230,7 +270,7 @@
       }
     });
     
-    recentActivities = activities
+    recentActivity = activities
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
       .slice(0, 10);
   }
@@ -307,6 +347,71 @@
   
   $: filteredData = filterData(data, searchTerm);
   
+  // Handle transfers pagination changes
+  async function handleTransfersPageChange(page) {
+    transfersPage = page;
+    loading = true;
+    
+    try {
+      const config = entityConfigs.find(c => c.name === 'transfers');
+      const result = await config.fetch(transfersPage, transfersPerPage);
+      
+      if (result.success && result.data) {
+        // Get transfer data
+        const pathParts = config.dataPath.split('.');
+        let entityData = result.data;
+        
+        for (const part of pathParts) {
+          if (entityData && entityData[part]) {
+            entityData = entityData[part];
+          } else {
+            entityData = null;
+            break;
+          }
+        }
+        
+        if (entityData && Array.isArray(entityData)) {
+          // Parse JSON strings
+          const parsedData = entityData.map(item => {
+            if (typeof item === 'string') {
+              try {
+                return JSON.parse(item);
+              } catch (e) {
+                return item;
+              }
+            }
+            return item;
+          });
+          
+          data.transfers = parsedData;
+          
+          // Get pagination info
+          if (config.paginationPath) {
+            const paginationParts = config.paginationPath.split('.');
+            let paginationData = result.data;
+            
+            for (const part of paginationParts) {
+              if (paginationData && paginationData[part]) {
+                paginationData = paginationData[part];
+              } else {
+                paginationData = null;
+                break;
+              }
+            }
+            
+            if (paginationData) {
+              transfersPagination = paginationData;
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching transfers page:", err);
+    } finally {
+      loading = false;
+    }
+  }
+  
   onMount(fetchAllData);
 </script>
 
@@ -334,7 +439,7 @@
     <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4" role="alert">
       <div class="flex items-center">
         <span class="mr-2">⚠️</span>
-        <p>{error}</p>
+      <p>{error}</p>
       </div>
     </div>
   {/if}
@@ -362,12 +467,12 @@
         📊 Overview
       </button>
       {#each allEntityTypes as entityType}
-        <button 
+      <button 
           class="px-4 py-2 mr-1 {activeTab === entityType ? 'border-b-2 border-blue-500 font-medium text-blue-600' : 'text-gray-600 hover:text-gray-900'}"
           on:click={() => activeTab = entityType}
-        >
+      >
           {entityType.charAt(0).toUpperCase() + entityType.slice(1)}
-        </button>
+      </button>
       {/each}
     </div>
   </div>
@@ -554,11 +659,11 @@
           {/if}
           
           <!-- Recent Activity -->
-          {#if recentActivities.length > 0}
+          {#if recentActivity.length > 0}
             <div class="bg-gray-50 rounded-lg p-6">
               <h3 class="text-lg font-bold mb-4">Recent Activity</h3>
               <div class="space-y-3">
-                {#each recentActivities as activity}
+                {#each recentActivity as activity}
                   <div class="flex items-start p-3 bg-white rounded border">
                     <div class="flex-1">
                       <p class="font-medium text-sm">{activity.description}</p>
@@ -593,11 +698,21 @@
             {loading} 
           />
         {:else}
-          <GenericEntityTable 
-            entities={filteredData[activeTab] || data[activeTab] || []} 
-            entityType={activeTab} 
-            {loading} 
-          />
+          {#if activeTab === 'transfers'}
+            <GenericEntityTable 
+              entityType="transfers"
+              items={data.transfers || []}
+              loading={loading}
+              pagination={transfersPagination}
+              onPageChange={handleTransfersPageChange}
+            />
+          {:else}
+            <GenericEntityTable 
+              entityType={activeTab}
+              items={filteredData[activeTab] || data[activeTab] || []}
+              loading={loading}
+            />
+          {/if}
         {/if}
       </div>
     {/if}

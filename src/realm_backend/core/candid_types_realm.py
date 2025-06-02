@@ -33,6 +33,7 @@ class TasksListRecord(Record):
 
 class TransfersListRecord(Record):
     transfers: Vec[text]  # JSON string of transfer data
+    pagination: Opt["PaginationInfo"]  # Optional pagination info
 
 
 class InstrumentsListRecord(Record):
@@ -121,3 +122,12 @@ class ExtensionCallArgs(Record):
 class ExtensionCallResponse(Record):
     success: bool
     response: text
+
+
+class PaginationInfo(Record):
+    page: nat
+    per_page: nat
+    total: nat
+    total_pages: nat
+    has_next: bool
+    has_prev: bool
