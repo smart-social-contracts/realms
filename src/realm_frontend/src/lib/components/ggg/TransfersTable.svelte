@@ -48,11 +48,17 @@
         {#each transfers as transfer}
           <tr class="border-b hover:bg-gray-50">
             <td class="px-6 py-4 whitespace-nowrap">{transfer._id || 'N/A'}</td>
-            <td class="px-6 py-4 whitespace-nowrap">{transfer.from_user?.name || 'N/A'}</td>
-            <td class="px-6 py-4 whitespace-nowrap">{transfer.to_user?.name || 'N/A'}</td>
-            <td class="px-6 py-4 whitespace-nowrap">{transfer.instrument?._id || 'N/A'}</td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              {transfer.relations?.from_user?.[0]?._id || 'N/A'}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              {transfer.relations?.to_user?.[0]?._id || 'N/A'}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              {transfer.relations?.instrument?.[0]?._id || 'N/A'}
+            </td>
             <td class="px-6 py-4 whitespace-nowrap">{transfer.amount || 'N/A'}</td>
-            <td class="px-6 py-4 whitespace-nowrap">{transfer.created_at || 'N/A'}</td>
+            <td class="px-6 py-4 whitespace-nowrap">{transfer.timestamp_created || 'N/A'}</td>
             <td class="px-6 py-4 whitespace-nowrap">
               <button class="text-blue-600 hover:text-blue-900">View</button>
             </td>
