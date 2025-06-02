@@ -7,8 +7,8 @@
   $: columns = entities.length > 0 ? 
     Object.keys(entities[0]).filter(key => 
       !key.startsWith('_internal') && 
-      !key.startsWith('relations') &&
-      key !== 'timestamp_updated'
+      key !== 'timestamp_updated' &&
+      key !== 'relations'
     ) : [];
   
   function formatValue(value, key) {
@@ -28,6 +28,15 @@
     
     if (key.includes('timestamp') || key.includes('date') || key.includes('created_at')) {
       try {
+        // Handle different date formats
+        if (typeof value === 'string') {
+          // Try parsing the date string
+          const date = new Date(value);
+          if (isNaN(date.getTime())) {
+            return value; // Return original if not a valid date
+          }
+          return date.toLocaleDateString();
+        }
         return new Date(value).toLocaleDateString();
       } catch (e) {
         return value;
@@ -72,6 +81,49 @@
     };
     return icons[entityType] || '📊';
   }
+  
+  // Extract meaningful information from metadata
+  function getEntityDescription(entity, entityType) {
+    if (entity.metadata) {
+      try {
+        const metadata = JSON.parse(entity.metadata);
+        switch(entityType) {
+          case 'proposals':
+            return metadata.title || entity._id;
+          case 'votes':
+            return `${metadata.voter}: ${metadata.vote} on ${metadata.proposal_id}`;
+          case 'transfers':
+            return metadata.purpose || `Transfer: ${entity.amount}`;
+          case 'mandates':
+            return metadata.description || entity.name;
+          case 'tasks':
+            return metadata.description || entity._id;
+          case 'licenses':
+            return `${metadata.type} for ${metadata.holder}`;
+          case 'instruments':
+            return `${metadata.symbol}: ${metadata.description}`;
+          default:
+            return metadata.description || metadata.title || entity.name || entity._id;
+        }
+      } catch (e) {
+        return entity.name || entity._id;
+      }
+    }
+    return entity.name || entity._id;
+  }
+  
+  // Get relationship info
+  function getRelationshipInfo(entity) {
+    if (entity.relations) {
+      const relationCount = Object.values(entity.relations).reduce((sum, rel) => {
+        return sum + (Array.isArray(rel) ? rel.length : 0);
+      }, 0);
+      if (relationCount > 0) {
+        return `${relationCount} relations`;
+      }
+    }
+    return '';
+  }
 </script>
 
 <div class="w-full overflow-x-auto">
@@ -81,67 +133,155 @@
   </h2>
   <p class="text-sm text-gray-600 mb-4">
     {#if entityType === 'users'}
-      Manage and monitor user accounts
+      Manage and monitor user accounts and citizen profiles
     {:else if entityType === 'mandates'}
-      Governance mandates and policies
+      Governance mandates and policies that define system rules
     {:else if entityType === 'tasks'}
-      Automated processes and schedules
+      Automated processes and scheduled operations
     {:else if entityType === 'transfers'}
-      Asset transfers between entities
+      Asset transfers and financial transactions between entities
     {:else if entityType === 'proposals'}
-      Governance proposals for citizen voting
+      Governance proposals for citizen voting and decision making
     {:else if entityType === 'votes'}
-      Citizen votes on governance proposals
+      Citizen votes on governance proposals and democratic participation
+    {:else if entityType === 'instruments'}
+      Financial instruments and digital assets in the treasury
+    {:else if entityType === 'licenses'}
+      Issued licenses and permits for various activities
+    {:else if entityType === 'disputes'}
+      Open disputes and conflicts requiring resolution
     {:else}
       {getDisplayName(entityType)} in the system
     {/if}
   </p>
   
   {#if entities.length > 0}
-    <table class="min-w-full bg-white border border-gray-200 rounded-lg">
-      <thead>
-        <tr class="bg-gray-100 border-b">
-          {#each columns.slice(0, 6) as column}
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              {getDisplayName(column)}
-            </th>
-          {/each}
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-            Actions
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {#if loading}
-          <tr>
-            <td colspan="{columns.length + 1}" class="px-6 py-4 text-center">
-              <div class="flex items-center justify-center">
-                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-                <span class="ml-2">Loading...</span>
+    <div class="space-y-4">
+      {#each entities as entity, index}
+        <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+          <div class="flex justify-between items-start mb-3">
+            <div class="flex-1">
+              <h3 class="font-semibold text-gray-900 mb-1">
+                {getEntityDescription(entity, entityType)}
+              </h3>
+              <p class="text-sm text-gray-600">ID: {entity._id}</p>
+              {#if entity.timestamp_created}
+                <p class="text-xs text-gray-500">
+                  Created: {formatValue(entity.timestamp_created, 'timestamp_created')}
+                </p>
+              {/if}
+            </div>
+            <div class="flex items-center space-x-2">
+              {#if getRelationshipInfo(entity)}
+                <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                  {getRelationshipInfo(entity)}
+                </span>
+              {/if}
+              <button class="text-blue-600 hover:text-blue-900 font-medium text-sm">
+                View Details
+              </button>
+            </div>
+          </div>
+          
+          <!-- Entity-specific information -->
+          {#if entity.metadata}
+            <div class="mt-3 p-3 bg-gray-50 rounded text-sm">
+              {#if entityType === 'transfers'}
+                {@const metadata = JSON.parse(entity.metadata || '{}')}
+                <div class="grid grid-cols-2 gap-4">
+                  <div><strong>Amount:</strong> {formatValue(entity.amount, 'amount')}</div>
+                  <div><strong>Purpose:</strong> {metadata.purpose || 'N/A'}</div>
+                </div>
+              {:else if entityType === 'proposals'}
+                {@const metadata = JSON.parse(entity.metadata || '{}')}
+                <div class="grid grid-cols-2 gap-4">
+                  <div><strong>Proposer:</strong> {metadata.proposer || 'N/A'}</div>
+                  <div><strong>Status:</strong> 
+                    <span class="px-2 py-1 rounded text-xs {metadata.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}">
+                      {metadata.status || 'unknown'}
+                    </span>
+                  </div>
+                  {#if metadata.budget}
+                    <div><strong>Budget:</strong> {metadata.budget}</div>
+                  {/if}
+                  {#if metadata.category}
+                    <div><strong>Category:</strong> {metadata.category}</div>
+                  {/if}
+                </div>
+              {:else if entityType === 'votes'}
+                {@const metadata = JSON.parse(entity.metadata || '{}')}
+                <div class="grid grid-cols-2 gap-4">
+                  <div><strong>Voter:</strong> {metadata.voter || 'N/A'}</div>
+                  <div><strong>Vote:</strong> 
+                    <span class="px-2 py-1 rounded text-xs {metadata.vote === 'yes' ? 'bg-green-100 text-green-700' : metadata.vote === 'no' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}">
+                      {metadata.vote || 'unknown'}
+                    </span>
+                  </div>
+                  <div><strong>Proposal:</strong> {metadata.proposal_id || 'N/A'}</div>
+                  <div><strong>Verified:</strong> {metadata.verified ? '✅' : '❌'}</div>
+                </div>
+              {:else if entityType === 'mandates'}
+                {@const metadata = JSON.parse(entity.metadata || '{}')}
+                <div>
+                  <strong>Description:</strong> {metadata.description || 'No description available'}
+                  {#if metadata.authority}
+                    <br><strong>Authority:</strong> {metadata.authority}
+                  {/if}
+                  {#if metadata.established_date}
+                    <br><strong>Established:</strong> {metadata.established_date}
+                  {/if}
+                </div>
+              {:else if entityType === 'instruments'}
+                {@const metadata = JSON.parse(entity.metadata || '{}')}
+                <div class="grid grid-cols-2 gap-4">
+                  <div><strong>Symbol:</strong> {metadata.symbol || 'N/A'}</div>
+                  <div><strong>Type:</strong> {metadata.type || 'N/A'}</div>
+                  {#if metadata.treasury_balance}
+                    <div><strong>Treasury Balance:</strong> {metadata.treasury_balance.toLocaleString()}</div>
+                  {/if}
+                  {#if metadata.decimal_places}
+                    <div><strong>Decimals:</strong> {metadata.decimal_places}</div>
+                  {/if}
+                </div>
+              {:else}
+                <pre class="text-xs text-gray-600 whitespace-pre-wrap">{JSON.stringify(JSON.parse(entity.metadata), null, 2)}</pre>
+              {/if}
+            </div>
+          {/if}
+          
+          <!-- Relationships -->
+          {#if entity.relations && Object.keys(entity.relations).length > 0}
+            <div class="mt-3 p-3 bg-blue-50 rounded text-sm">
+              <strong class="text-blue-800">Relationships:</strong>
+              <div class="mt-2 space-y-1">
+                {#each Object.entries(entity.relations) as [relType, relEntities]}
+                  {#if Array.isArray(relEntities) && relEntities.length > 0}
+                    <div class="flex items-center">
+                      <span class="font-medium text-blue-700">{getDisplayName(relType)}:</span>
+                      <div class="ml-2 flex flex-wrap gap-1">
+                        {#each relEntities.slice(0, 3) as relEntity}
+                          <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                            {relEntity._id}
+                          </span>
+                        {/each}
+                        {#if relEntities.length > 3}
+                          <span class="text-xs text-blue-600">+{relEntities.length - 3} more</span>
+                        {/if}
+                      </div>
+                    </div>
+                  {/if}
+                {/each}
               </div>
-            </td>
-          </tr>
-        {:else}
-          {#each entities as entity, index}
-            <tr class="border-b hover:bg-gray-50 {index % 2 === 0 ? 'bg-white' : 'bg-gray-25'}">
-              {#each columns.slice(0, 6) as column}
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                  {formatValue(entity[column], column)}
-                </td>
-              {/each}
-              <td class="px-6 py-4 whitespace-nowrap text-sm">
-                <button class="text-blue-600 hover:text-blue-900 font-medium">View</button>
-              </td>
-            </tr>
-          {/each}
-        {/if}
-      </tbody>
-    </table>
+            </div>
+          {/if}
+        </div>
+      {/each}
+    </div>
   {:else if !loading}
     <div class="text-center py-12 bg-gray-50 rounded-lg">
       <span class="text-4xl mb-4 block">{getEntityIcon(entityType)}</span>
       <h3 class="text-lg font-semibold text-gray-700 mb-2">No {getDisplayName(entityType)} Found</h3>
-      {#if entityType === 'users' || entityType === 'mandates' || entityType === 'tasks' || entityType === 'transfers'}
+      {#if entityType === 'transfers' || entityType === 'instruments'}
         <p class="text-gray-600 mb-4">This entity type should have data. Try clicking "Load Demo Data" to populate it.</p>
         <div class="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm text-yellow-800 max-w-md mx-auto">
           💡 <strong>Tip:</strong> The {entityType} data might not be loading properly from the backend API.
