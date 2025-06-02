@@ -141,31 +141,5 @@
 	<!-- <div class="grid grid-cols-1 gap-4 xl:grid-cols-1">
 		<ActivityList />
 	</div> -->
-	
-	
-	<AuthButton />
-	<section id="greeting">{greeting}</section>
-	<form action="#" on:submit|preventDefault={onSubmit}>
-		<label for="name">Enter your name: &nbsp;</label>
-		<input id="name" alt="Name" type="text" />
-		<button type="submit">Click Me!</button>
-	</form>
-	<form action="#" on:submit|preventDefault={onSubmitGetUniverse}>
-		<label for="name">Get universe</label>
-		<input id="name" alt="Name" type="text" />
-		<button type="submit">Get universe</button>
-	</form>
-	<form action="#" on:submit|preventDefault={get_snapshot_data}>
-		<label for="name">Get snapshots</label>
-		<input id="name" alt="Name" type="text" />
-		<button type="submit">Get snapshots</button>
-	</form>
-	{#if $universe != ''}
-		<section id="universe">Universe: {JSON.stringify(universe)}</section>
-	{/if}
-	{#if $snapshots != ''}
-		<section id="snapshots">Snapshots: {JSON.stringify(snapshots)}</section>
-	{/if}
-
 
 </div>
