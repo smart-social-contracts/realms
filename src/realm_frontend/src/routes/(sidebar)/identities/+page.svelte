@@ -20,11 +20,11 @@
 	<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3"></div>
 
 	<IdentityCard
-		src={imagesPath('outdid.png')}
+		src={imagesPath('outdid_logo.jpeg')}
 		title="Outdid"
 		description="Passport:ETH[0x388C818CA8B9251b393131C08a736A67ccB19297]"
 	/>
 
-	<IdentityCard src={imagesPath('swissid.jpg')} title="SwissID" description="" />
+	<IdentityCard src={imagesPath('logo-swissid_bianco.jpg')} title="SwissID" description="" />
 </div>
 <!-- <Footer /> -->
