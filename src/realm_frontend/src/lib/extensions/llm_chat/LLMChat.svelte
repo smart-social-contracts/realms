@@ -2,6 +2,7 @@
 	import { onMount, afterUpdate } from 'svelte';
 	import { Card, Button, Textarea, Spinner, Toggle } from 'flowbite-svelte';
 	import { PaperPlaneSolid, MessagesSolid, DatabaseSolid } from 'flowbite-svelte-icons';
+	import SvelteMarkdown from 'svelte-markdown';
 	// @ts-ignore
 	import { backend } from '$lib/canisters';
 
@@ -38,6 +39,12 @@
 	afterUpdate(() => {
 		scrollToBottom();
 	});
+
+	// Watch for message changes to trigger scroll
+	$: {
+		messages;
+		setTimeout(scrollToBottom, 100); // Delay slightly to ensure rendering is complete
+	}
 
 	// Function to scroll to bottom of messages container
 	function scrollToBottom() {
@@ -132,14 +139,15 @@
 	}
 </script>
 
-<div class="w-full h-full flex flex-col p-0 m-0">
+<div class="w-full h-full flex flex-col p-0 m-0 max-w-none">
 	<h2 class="text-2xl font-bold p-4">LLM Chat</h2>
 	
-	<div class="w-full flex-grow flex flex-col">
-		<Card class="w-full h-full flex-grow flex flex-col m-0 p-0 rounded-none border-0">
+	<div class="w-full flex-grow flex flex-col overflow-hidden">
+		<Card class="w-full h-full flex-grow flex flex-col m-0 p-0 rounded-none border-0 max-w-none">
 			<div 
 				bind:this={messagesContainer}
 				class="flex-grow overflow-y-auto p-4 bg-gray-50 dark:bg-gray-800"
+				style="min-height: 200px; max-height: calc(100vh - 200px);"
 			>
 				{#if messages.length === 0}
 					<div class="text-center text-gray-500 dark:text-gray-400 py-8">
@@ -150,13 +158,19 @@
 					{#each messages as message}
 						<div class="mb-4 {message.isUser ? 'text-right' : ''}">
 							<div 
-								class="inline-block rounded-lg px-4 py-2 max-w-[80%] text-left {
+								class="inline-block rounded-lg px-4 py-2 max-w-[90%] text-left {
 									message.isUser 
 										? 'bg-primary-600 text-white' 
 										: 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white'
 								}"
 							>
-								{message.text}
+								{#if message.isUser}
+									{message.text}
+								{:else}
+									<div class="markdown-content">
+										<SvelteMarkdown source={message.text} />
+									</div>
+								{/if}
 							</div>
 						</div>
 					{/each}
@@ -164,7 +178,8 @@
 					{#if isLoading}
 						<div class="flex items-center justify-start mb-4">
 							<div class="inline-block rounded-lg px-4 py-2 bg-gray-200 dark:bg-gray-700">
-								<Spinner size="4" />
+								<Spinner size="4" class="mr-2" />
+								<span>AI is thinking...</span>
 							</div>
 						</div>
 					{/if}
@@ -179,7 +194,7 @@
 				{/if}
 			</div>
 			
-			<div class="flex flex-col p-2 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+			<div class="flex flex-col p-2 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 sticky bottom-0">
 				<!-- Realm data toggle -->
 				<div class="flex items-center mb-2">
 					<Toggle bind:checked={includeRealmData} size="small" />
@@ -217,3 +232,69 @@
 		</Card>
 	</div>
 </div> 
+
+<style>
+	.markdown-content :global(h1) {
+		font-size: 1.8rem;
+		font-weight: 700;
+		margin: 1rem 0;
+		color: inherit;
+	}
+	
+	.markdown-content :global(h2) {
+		font-size: 1.5rem;
+		font-weight: 700;
+		margin: 0.8rem 0;
+		color: inherit;
+	}
+	
+	.markdown-content :global(h3) {
+		font-size: 1.25rem;
+		font-weight: 600;
+		margin: 0.6rem 0;
+		color: inherit;
+	}
+	
+	.markdown-content :global(ul) {
+		list-style-type: disc !important;
+		margin: 0.5rem 0 !important;
+		padding-left: 2rem !important;
+	}
+	
+	.markdown-content :global(ol) {
+		list-style-type: decimal !important;
+		margin: 0.5rem 0 !important;
+		padding-left: 2rem !important;
+	}
+	
+	.markdown-content :global(li) {
+		display: list-item !important;
+		margin: 0.25rem 0 !important;
+	}
+	
+	.markdown-content :global(p) {
+		margin: 0.5rem 0 !important;
+	}
+	
+	.markdown-content :global(code) {
+		font-family: monospace;
+		background-color: rgba(0, 0, 0, 0.1);
+		padding: 0.1rem 0.2rem;
+		border-radius: 0.2rem;
+	}
+	
+	.markdown-content :global(pre) {
+		background-color: rgba(0, 0, 0, 0.1);
+		padding: 0.5rem;
+		border-radius: 0.3rem;
+		overflow-x: auto;
+		margin: 0.5rem 0;
+	}
+	
+	.markdown-content :global(blockquote) {
+		border-left: 3px solid #ccc;
+		padding-left: 0.8rem;
+		margin: 0.5rem 0 0.5rem 0.5rem;
+		color: #555;
+	}
+</style> 
