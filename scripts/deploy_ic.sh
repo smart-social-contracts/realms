@@ -18,7 +18,7 @@ fi
 
 # Deploy all remaining canisters
 echo "Deploying all canisters to $NETWORK"
-dfx deploy --network "$NETWORK" --yes
+dfx deploy --network "$NETWORK" --yes --mode=reinstall
 
 # Verify deployment
 echo "Verifying deployment on $NETWORK"
