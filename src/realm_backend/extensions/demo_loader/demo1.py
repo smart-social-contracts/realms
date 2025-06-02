@@ -126,7 +126,7 @@ def run():
         amount=750,
     )
     rental_transfer.from_user = user2  # Tenant
-    rental_transfer.to_user = user1    # Landlord
+    rental_transfer.to_user = user1  # Landlord
     rental_transfer.instrument = btc_instrument
     rental_trade.transfer_1 = rental_transfer
 

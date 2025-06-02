@@ -1,19 +1,18 @@
 from typing import Any, Dict, List, Optional
 
-from ggg.user import User
-from ggg.mandate import Mandate
-from ggg.task import Task
-from ggg.task_schedule import TaskSchedule
 from ggg.codex import Codex
-from ggg.instrument import Instrument
-from ggg.trade import Trade
-from ggg.transfer import Transfer
-from ggg.organization import Organization
-from ggg.realm import Realm
-from ggg.license import License
 from ggg.dispute import Dispute
 from ggg.human import Human
-
+from ggg.instrument import Instrument
+from ggg.license import License
+from ggg.mandate import Mandate
+from ggg.organization import Organization
+from ggg.realm import Realm
+from ggg.task import Task
+from ggg.task_schedule import TaskSchedule
+from ggg.trade import Trade
+from ggg.transfer import Transfer
+from ggg.user import User
 from kybra_simple_logging import get_logger
 
 logger = get_logger("api.ggg_entities")
@@ -104,7 +103,7 @@ def list_transfers() -> Dict[str, Any]:
     try:
         transfers = []
         # Check if Transfer class is available and has instances
-        if hasattr(Transfer, 'instances'):
+        if hasattr(Transfer, "instances"):
             transfers = [transfer.to_dict() for transfer in Transfer.instances()]
         return {"transfers": transfers}
     except Exception as e:
@@ -149,4 +148,4 @@ def list_disputes() -> Dict[str, Any]:
         return {"disputes": disputes}
     except Exception as e:
         logger.error(f"Error listing disputes: {str(e)}")
-        raise 
+        raise

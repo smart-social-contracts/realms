@@ -4,8 +4,8 @@ Status API for Realm DAO system
 Provides health check and system status information
 """
 
-from typing import Any
 import sys
+from typing import Any
 
 from ggg.organization import Organization
 from ggg.user import User
@@ -31,10 +31,11 @@ def get_status() -> dict[str, Any]:
     # Get installed extensions
     extension_names = []
     import extensions.extension_imports
+
     for module_name in sys.modules:
         if module_name.startswith("extensions."):
             # Extract extension name from module path (extensions.name.entry -> name)
-            extension_name = module_name.split('.')[1]
+            extension_name = module_name.split(".")[1]
             extension_names.append(extension_name)
     extension_names = list(set(extension_names))  # Remove duplicates
 
