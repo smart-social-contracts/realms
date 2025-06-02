@@ -5,4 +5,4 @@ logger = get_logger("entity.vote")
 
 
 class Vote(Entity, TimestampedMixin):
-    pass
+    metadata = String(max_length=256)

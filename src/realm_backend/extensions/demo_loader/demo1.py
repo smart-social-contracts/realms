@@ -7,6 +7,7 @@ from ggg import (
     License,
     Mandate,
     Organization,
+    Proposal,
     Realm,
     Task,
     TaskSchedule,
@@ -14,6 +15,7 @@ from ggg import (
     Transfer,
     Treasury,
     User,
+    Vote,
 )
 from kybra_simple_db import Database, Entity, String, TimestampedMixin
 from kybra_simple_logging import get_logger
@@ -41,6 +43,54 @@ def run():
 
     # Create the Treasury
     treasury = Treasury(_id="nova_treasury", vault_principal_id="treasury_vault_9876543210")
+
+    # Create instruments - NovaCoin and ckBTC
+    novacoin = Instrument(
+        _id="instrument_novacoin",
+        metadata=json.dumps({
+            "type": "cryptocurrency",
+            "symbol": "NVC",
+            "decimal_places": 8,
+            "total_supply": 21000000,
+            "description": "Nova Republic's native digital currency",
+            "treasury_balance": 15750000  # Treasury holds 75% of total supply
+        })
+    )
+
+    ckbtc = Instrument(
+        _id="instrument_ckbtc",
+        metadata=json.dumps({
+            "type": "wrapped_cryptocurrency", 
+            "symbol": "ckBTC",
+            "decimal_places": 8,
+            "description": "Wrapped Bitcoin on Nova Republic blockchain",
+            "backing_asset": "Bitcoin",
+            "treasury_balance": 12550000000,  # 125.5 ckBTC in satoshis (125.5 * 100,000,000)
+            "current_exchange_rate": "1 ckBTC = 45,000 NVC"
+        })
+    )
+
+    fee_instrument = Instrument(
+        _id="instrument_nova_credit",
+        metadata=json.dumps({
+            "type": "digital_credit",
+            "symbol": "NVC",
+            "usage": "government_fees",
+            "issuer": "Nova Republic Treasury",
+            "treasury_balance": 2500000
+        })
+    )
+
+    tax_instrument = Instrument(
+        _id="instrument_tax_credit",
+        metadata=json.dumps({
+            "type": "tax_payment",
+            "symbol": "NVTX",
+            "usage": "tax_obligations",
+            "fiscal_year": 2024,
+            "treasury_balance": 8750000
+        })
+    )
 
     # Create basic humans and users with more realistic profiles
     logger.info("Creating humans")
@@ -107,16 +157,6 @@ return False
         cron_expression="0 0 1 * *"  # First day of each month
     )
     ubi_schedule.tasks.add(ubi_task)
-
-    novacoin = Instrument(
-        _id="instrument_novacoin",
-        metadata=json.dumps({
-            "type": "cryptocurrency",
-            "symbol": "NVC",
-            "decimal_places": 8,
-            "total_supply": 21000000
-        })
-    )
 
     # Create UBI trade and transfer
     ubi_trade = Trade(
@@ -275,16 +315,6 @@ return True
         })
     )
 
-    fee_instrument = Instrument(
-        _id="instrument_nova_credit",
-        metadata=json.dumps({
-            "type": "digital_credit",
-            "symbol": "NVC",
-            "usage": "government_fees",
-            "issuer": "Nova Republic Treasury"
-        })
-    )
-
     # Create license trade and transfer
     license_trade = Trade(
         _id="trade_av_license_sven",
@@ -368,16 +398,6 @@ def calculate_tax_for_user(user):
         cron_expression="0 0 1 3 *"  # March 1st yearly (tax preparation season)
     )
     tax_schedule.tasks.add(tax_task)
-
-    tax_instrument = Instrument(
-        _id="instrument_tax_credit",
-        metadata=json.dumps({
-            "type": "tax_payment",
-            "symbol": "NVTX",
-            "usage": "tax_obligations",
-            "fiscal_year": 2024
-        })
-    )
 
     # Create tax trade and transfer
     tax_trade = Trade(
@@ -476,6 +496,135 @@ def calculate_healthcare_contribution(user):
     healthcare_transfer.instrument = novacoin
     healthcare_trade.transfer_1 = healthcare_transfer
 
+    # Example 6: Governance Proposals and Voting
+    logger.info("Creating governance proposals and voting examples")
+
+    # Proposal 1: Increase UBI to 1500 NovaCoins
+    ubi_increase_proposal = Proposal(
+        _id="proposal_ubi_increase_2024",
+        metadata=json.dumps({
+            "title": "Increase UBI to 1,500 NVC",
+            "proposer": "Elena Rodriguez",
+            "status": "active",
+            "category": "economic_policy"
+        })
+    )
+
+    # Proposal 2: Green Energy Infrastructure Initiative
+    green_energy_proposal = Proposal(
+        _id="proposal_green_energy_2024", 
+        metadata=json.dumps({
+            "title": "Green Energy Infrastructure Initiative",
+            "proposer": "Nova Environmental Council",
+            "status": "active",
+            "budget": "50M NVC"
+        })
+    )
+
+    # Proposal 3: Autonomous Vehicle Safety Standards Update
+    av_safety_proposal = Proposal(
+        _id="proposal_av_safety_update_2024",
+        metadata=json.dumps({
+            "title": "Enhanced AV Safety Standards",
+            "proposer": "Sven Johansson",
+            "status": "active",
+            "category": "transportation"
+        })
+    )
+
+    # Votes on UBI Increase Proposal
+    elena_ubi_vote = Vote(
+        _id="vote_elena_ubi_increase",
+        metadata=json.dumps({
+            "proposal_id": "proposal_ubi_increase_2024",
+            "voter": "Elena Rodriguez", 
+            "vote": "yes",
+            "verified": True
+        })
+    )
+
+    michael_ubi_vote = Vote(
+        _id="vote_michael_ubi_increase",
+        metadata=json.dumps({
+            "proposal_id": "proposal_ubi_increase_2024",
+            "voter": "Michael Chen",
+            "vote": "yes",
+            "verified": True
+        })
+    )
+
+    aisha_ubi_vote = Vote(
+        _id="vote_aisha_ubi_increase",
+        metadata=json.dumps({
+            "proposal_id": "proposal_ubi_increase_2024", 
+            "voter": "Aisha Okoye",
+            "vote": "abstain",
+            "verified": True
+        })
+    )
+
+    sven_ubi_vote = Vote(
+        _id="vote_sven_ubi_increase",
+        metadata=json.dumps({
+            "proposal_id": "proposal_ubi_increase_2024",
+            "voter": "Sven Johansson", 
+            "vote": "no",
+            "verified": True
+        })
+    )
+
+    # Votes on Green Energy Proposal
+    elena_green_vote = Vote(
+        _id="vote_elena_green_energy",
+        metadata=json.dumps({
+            "proposal_id": "proposal_green_energy_2024",
+            "voter": "Elena Rodriguez",
+            "vote": "yes",
+            "verified": True
+        })
+    )
+
+    michael_green_vote = Vote(
+        _id="vote_michael_green_energy", 
+        metadata=json.dumps({
+            "proposal_id": "proposal_green_energy_2024",
+            "voter": "Michael Chen",
+            "vote": "yes",
+            "verified": True
+        })
+    )
+
+    aisha_green_vote = Vote(
+        _id="vote_aisha_green_energy",
+        metadata=json.dumps({
+            "proposal_id": "proposal_green_energy_2024",
+            "voter": "Aisha Okoye", 
+            "vote": "yes",
+            "verified": True
+        })
+    )
+
+    # Votes on AV Safety Proposal
+    sven_av_vote = Vote(
+        _id="vote_sven_av_safety",
+        metadata=json.dumps({
+            "proposal_id": "proposal_av_safety_update_2024",
+            "voter": "Sven Johansson",
+            "vote": "yes",
+            "verified": True
+        })
+    )
+
+    michael_av_vote = Vote(
+        _id="vote_michael_av_safety",
+        metadata=json.dumps({
+            "proposal_id": "proposal_av_safety_update_2024", 
+            "voter": "Michael Chen",
+            "vote": "yes",
+            "verified": True
+        })
+    )
+
     # Additional transfers with more context
     donation_transfer = Transfer(
         _id="transfer_donation_elena_community_garden",
@@ -516,6 +665,51 @@ def calculate_healthcare_contribution(user):
     refund_transfer.from_user = system_user
     refund_transfer.to_user = user1  # Elena
     refund_transfer.instrument = tax_instrument
+
+    # ckBTC-related transfers
+    btc_purchase_transfer = Transfer(
+        _id="transfer_btc_purchase_michael",
+        amount=50000000,  # 0.5 ckBTC in satoshis (0.5 * 100,000,000)
+        metadata=json.dumps({
+            "purpose": "Personal investment in ckBTC",
+            "exchange_rate": "45,000 NVC per ckBTC",
+            "transaction_fee": "25 NVC",
+            "exchange": "Nova Digital Exchange",
+            "settlement_time": "2024-06-01T14:30:00Z"
+        })
+    )
+    btc_purchase_transfer.from_user = system_user  # Treasury
+    btc_purchase_transfer.to_user = user2  # Michael
+    btc_purchase_transfer.instrument = ckbtc
+
+    btc_payment_transfer = Transfer(
+        _id="transfer_btc_payment_aisha_elena",
+        amount=10000000,  # 0.1 ckBTC in satoshis (0.1 * 100,000,000)
+        metadata=json.dumps({
+            "purpose": "Payment for consulting services",
+            "service": "Housing policy advisory",
+            "contract_ref": "HPA-2024-078",
+            "payment_date": "2024-06-02"
+        })
+    )
+    btc_payment_transfer.from_user = user3  # Aisha
+    btc_payment_transfer.to_user = user1  # Elena
+    btc_payment_transfer.instrument = ckbtc
+
+    treasury_rebalance_transfer = Transfer(
+        _id="transfer_treasury_rebalance_btc",
+        amount=2500000000,  # 25 ckBTC in satoshis (25 * 100,000,000)
+        metadata=json.dumps({
+            "purpose": "Treasury portfolio rebalancing",
+            "strategy": "Diversification into digital assets",
+            "approval": "Treasury Board Resolution #2024-Q2-15",
+            "market_conditions": "Strategic accumulation during market stability",
+            "allocation_target": "10% of treasury in ckBTC"
+        })
+    )
+    treasury_rebalance_transfer.from_user = system_user  # External acquisition
+    treasury_rebalance_transfer.to_user = system_user  # Treasury
+    treasury_rebalance_transfer.instrument = ckbtc
 
     logger.info("Demo data created successfully")
 

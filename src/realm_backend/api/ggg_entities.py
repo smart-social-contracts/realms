@@ -7,12 +7,14 @@ from ggg.instrument import Instrument
 from ggg.license import License
 from ggg.mandate import Mandate
 from ggg.organization import Organization
+from ggg.proposal import Proposal
 from ggg.realm import Realm
 from ggg.task import Task
 from ggg.task_schedule import TaskSchedule
 from ggg.trade import Trade
 from ggg.transfer import Transfer
 from ggg.user import User
+from ggg.vote import Vote
 from kybra_simple_logging import get_logger
 
 logger = get_logger("api.ggg_entities")
@@ -148,4 +150,24 @@ def list_disputes() -> Dict[str, Any]:
         return {"disputes": disputes}
     except Exception as e:
         logger.error(f"Error listing disputes: {str(e)}")
+        raise
+
+
+def list_proposals() -> Dict[str, Any]:
+    """List all proposals in the system."""
+    try:
+        proposals = [proposal.to_dict() for proposal in Proposal.instances()]
+        return {"proposals": proposals}
+    except Exception as e:
+        logger.error(f"Error listing proposals: {str(e)}")
+        raise
+
+
+def list_votes() -> Dict[str, Any]:
+    """List all votes in the system."""
+    try:
+        votes = [vote.to_dict() for vote in Vote.instances()]
+        return {"votes": votes}
+    except Exception as e:
+        logger.error(f"Error listing votes: {str(e)}")
         raise

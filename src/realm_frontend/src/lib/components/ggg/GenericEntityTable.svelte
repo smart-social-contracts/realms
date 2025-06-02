@@ -35,6 +35,12 @@
     }
     
     if (key === 'amount' && typeof value === 'number') {
+      // Special handling for ckBTC amounts (convert from satoshis)
+      // Note: This is a simple heuristic - in a real app you'd want to check the instrument type
+      if (value >= 10000000 && value % 10000000 === 0) {
+        // Likely ckBTC in satoshis - convert to decimal
+        return (value / 100000000).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 8}) + ' ckBTC';
+      }
       return value.toLocaleString();
     }
     
@@ -60,7 +66,9 @@
       'codexes': '💻',
       'trades': '🤝',
       'realms': '🏛️',
-      'treasury': '🏦'
+      'treasury': '🏦',
+      'proposals': '🗳️',
+      'votes': '✅'
     };
     return icons[entityType] || '📊';
   }
@@ -80,6 +88,10 @@
       Automated processes and schedules
     {:else if entityType === 'transfers'}
       Asset transfers between entities
+    {:else if entityType === 'proposals'}
+      Governance proposals for citizen voting
+    {:else if entityType === 'votes'}
+      Citizen votes on governance proposals
     {:else}
       {getDisplayName(entityType)} in the system
     {/if}

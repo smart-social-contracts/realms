@@ -9,11 +9,13 @@ from api.ggg_entities import (
     list_licenses,
     list_mandates,
     list_organizations,
+    list_proposals,
     list_realms,
     list_tasks,
     list_trades,
     list_transfers,
     list_users,
+    list_votes,
 )
 
 # from api.extensions import list_extensions
@@ -28,6 +30,7 @@ from core.candid_types_realm import (
     LicensesListRecord,
     MandatesListRecord,
     OrganizationsListRecord,
+    ProposalsListRecord,
     RealmResponse,
     RealmResponseData,
     RealmsListRecord,
@@ -38,6 +41,7 @@ from core.candid_types_realm import (
     UserGetRecord,
     UserRegisterRecord,
     UsersListRecord,
+    VotesListRecord,
 )
 from kybra import (
     Async,
@@ -346,6 +350,40 @@ def get_trades() -> RealmResponse:
         )
     except Exception as e:
         logger.error(f"Error listing trades: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_proposals() -> RealmResponse:
+    try:
+        proposals_data = list_proposals()
+        # Convert dictionary to JSON string
+        proposals_json = [json.dumps(proposal) for proposal in proposals_data["proposals"]]
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                ProposalsList=ProposalsListRecord(proposals=proposals_json)
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error listing proposals: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_votes() -> RealmResponse:
+    try:
+        votes_data = list_votes()
+        # Convert dictionary to JSON string
+        votes_json = [json.dumps(vote) for vote in votes_data["votes"]]
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                VotesList=VotesListRecord(votes=votes_json)
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error listing votes: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 

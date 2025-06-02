@@ -63,6 +63,14 @@ class RealmsListRecord(Record):
     realms: Vec[text]  # JSON string of realm data
 
 
+class ProposalsListRecord(Record):
+    proposals: Vec[text]  # JSON string of proposal data
+
+
+class VotesListRecord(Record):
+    votes: Vec[text]  # JSON string of vote data
+
+
 class RealmResponseData(Variant):
     Status: StatusRecord
     UserRegister: UserRegisterRecord
@@ -78,6 +86,8 @@ class RealmResponseData(Variant):
     LicensesList: LicensesListRecord
     TradesList: TradesListRecord
     RealmsList: RealmsListRecord
+    ProposalsList: ProposalsListRecord
+    VotesList: VotesListRecord
     Error: text
     Message: text
 
