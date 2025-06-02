@@ -86,17 +86,10 @@
 		{/each}
 	</div>
 	
-	<!-- Commit hash display -->
-	{#if commitHash && commitHash !== 'COMMIT_HASH_PLACEHOLDER'}
+	<!-- App name, version and commit hash display -->
+	{#if (version && version !== 'VERSION_PLACEHOLDER') || (commitHash && commitHash !== 'COMMIT_HASH_PLACEHOLDER')}
 		<div class="mt-3 text-center">
-			<span class="text-xs text-gray-400 dark:text-gray-500">Build: {commitHash}</span>
-		</div>
-	{/if}
-
-	<!-- Version display -->
-	{#if version && version !== 'VERSION_PLACEHOLDER'}
-		<div class="mt-3 text-center">
-			<span class="text-xs text-gray-400 dark:text-gray-500">Version: {version}</span>
+			<span class="text-xs text-gray-400 dark:text-gray-500">Realms gOS {#if version && version !== 'VERSION_PLACEHOLDER'}{version}{/if} {#if commitHash && commitHash !== 'COMMIT_HASH_PLACEHOLDER'}({commitHash}){/if}</span>
 		</div>
 	{/if}
 </Frame>
