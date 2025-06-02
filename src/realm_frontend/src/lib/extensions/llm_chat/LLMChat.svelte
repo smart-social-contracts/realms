@@ -18,18 +18,21 @@
 		realm_data?: any;
 	}
 
+	 
 	// State variables
 	let messages: ChatMessage[] = [];
 	let newMessage = '';
 	let isLoading = false;
 	let error = '';
 	let messagesContainer: HTMLElement;
-	let includeRealmData = false;
+	let includeRealmData = true;
 	let realmData: any = null;
 	let isLoadingRealmData = false;
 
 	// LLM API configuration
-	const API_URL = "https://jvql982sbyh2vo-5000.proxy.runpod.net/api/ask"; // Change this to your LLM API endpoint
+	// const API_URL = "https://jvql982sbyh2vo-5000.proxy.runpod.net/api/ask"; // Change this to your LLM API endpoint
+	const API_URL = "http://localhost:5000/api/ask"; // Change this to your LLM API endpoint
+	const REALM_CANISTER_ID = "uxrrr-q7777-77774-qaaaq-cai";
 
 	// Auto-scroll to bottom of messages when content changes
 	afterUpdate(() => {
@@ -79,22 +82,17 @@
 		isLoading = true;
 		error = '';
 		
-		// If realm data is enabled but not loaded, load it first
-		if (includeRealmData && !realmData) {
-			await fetchRealmData();
-		}
+		// // If realm data is enabled but not loaded, load it first
+		// if (includeRealmData && !realmData) {
+		// 	await fetchRealmData();
+		// }
 		
 		try {
 			// Prepare request payload
-			const payload: LLMPayload = {
-				message: messageToSend,
-				max_tokens: 1000
+			const payload = {
+				question: messageToSend,
+				realm_canister_id: REALM_CANISTER_ID
 			};
-			
-			// Include realm data if enabled and available
-			if (includeRealmData && realmData) {
-				payload.realm_data = realmData;
-			}
 			
 			// Make direct HTTP request to the LLM API
 			const response = await fetch(API_URL, {
@@ -114,7 +112,7 @@
 			
 			// Add response to the chat
 			messages = [...messages, { 
-				text: data.response || "No response from LLM", 
+				text: data.ai_response || "No response from LLM", 
 				isUser: false 
 			}];
 		} catch (err) {
