@@ -5,7 +5,7 @@ set -e  # Exit on error
 
 # Parse arguments
 IDENTITY_FILE="$1"
-NETWORK="${2:-ic}"  # Default to ic if not specified
+NETWORK="${2:-staging}"  # Default to staging if not specified
 
 echo "Deploying to network: $NETWORK"
 

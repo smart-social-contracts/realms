@@ -39,9 +39,10 @@ jobs:
           docker run --rm \
             -v "$(pwd)/identity.pem:/app/identity.pem" \
             -v "$(pwd)/scripts/deploy_ic.sh:/app/deploy_ic.sh" \
+            -v "$(pwd)/scripts/deploy_ic.sh:/app/setup_demo.sh" \
             -e DFX_WARNING="-mainnet_plaintext_identity" \
             ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get-commit-sha.outputs.result }} \
-            bash -c "/app/deploy_ic.sh /app/identity.pem staging"
+            bash -c "/app/deploy_ic.sh /app/identity.pem staging && /app/setup_demo.sh /app/identity.pem staging"
           
           # Clean up
           rm identity.pem
