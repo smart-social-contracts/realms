@@ -1,1 +1,1 @@
-export const SITE_NAME = "Smart Social Contracts";
+export const SITE_NAME = "Realms gOS";
