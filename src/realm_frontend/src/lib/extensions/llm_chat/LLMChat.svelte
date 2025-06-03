@@ -201,9 +201,52 @@
 				style="min-height: 200px; max-height: calc(100vh - 200px);"
 			>
 				{#if messages.length === 0}
-					<div class="text-center text-gray-500 dark:text-gray-400 py-8">
-						<MessagesSolid class="w-12 h-12 mx-auto mb-2" />
-						<p>Start a conversation with the LLM!</p>
+					<div class="text-center py-8 max-w-2xl mx-auto">
+						<div class="bg-blue-50 dark:bg-blue-900/30 rounded-xl p-6 shadow-sm border border-blue-100 dark:border-blue-800">
+							<div class="flex items-center justify-center">
+								<div class="rounded-full bg-blue-100 dark:bg-blue-800 p-3 mr-4">
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-10 h-10 text-blue-600 dark:text-blue-300">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+									</svg>
+								</div>
+								<h3 class="text-xl font-bold text-blue-700 dark:text-blue-300">Hello! I am Ashoka, your Governance AI assistant.</h3>
+							</div>
+							<p class="mt-3 text-gray-600 dark:text-gray-300">How can I help you today?</p>
+							
+							<!-- Template prompts -->
+							<div class="mt-6">
+								<p class="text-sm font-medium text-gray-700 dark:text-gray-400 mb-3">Try asking me:</p>
+								<div class="grid gap-2">
+									<button 
+										class="text-left p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-300"
+										on:click={() => {
+											newMessage = "Describe the status of this realm";
+											sendMessage();
+										}}
+									>
+										"Describe the status of this realm"
+									</button>
+									<button 
+										class="text-left p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-300"
+										on:click={() => {
+											newMessage = "How to improve the economy of this realm?";
+											sendMessage();
+										}}
+									>
+										"How to improve the economy of this realm?"
+									</button>
+									<button 
+										class="text-left p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-300"
+										on:click={() => {
+											newMessage = "Spot potential inefficiencies in this realm";
+											sendMessage();
+										}}
+									>
+										"Spot potential inefficiencies in this realm"
+									</button>
+								</div>
+							</div>
+						</div>
 					</div>
 				{:else}
 					{#each messages as message}
