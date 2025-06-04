@@ -2,17 +2,23 @@ import { browser } from '$app/environment';
 import { init, register, getLocaleFromNavigator, locale, dictionary, isLoading } from 'svelte-i18n';
 
 // Register locales
-const locales = ['en', 'es'];
+const locales = ['en', 'es', 'de', 'fr', 'it'];
 
 // Define supported locales
 export const supportedLocales = [
   { id: 'en', name: 'English' },
-  { id: 'es', name: 'Español' }
+  { id: 'es', name: 'Español' },
+  { id: 'de', name: 'Deutsch' },
+  { id: 'fr', name: 'Français' },
+  { id: 'it', name: 'Italiano' }
 ];
 
 // Register locale loaders
 register('en', () => import('./locales/en.json'));
 register('es', () => import('./locales/es.json'));
+register('de', () => import('./locales/de.json'));
+register('fr', () => import('./locales/fr.json'));
+register('it', () => import('./locales/it.json'));
 
 // For debugging
 if (browser) {

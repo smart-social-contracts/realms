@@ -3,12 +3,18 @@ import { init, register, getLocaleFromNavigator, isLoading } from "svelte-i18n";
 
 export const supportedLocales = [
   { id: "en", name: "English" },
-  { id: "es", name: "Español" }
+  { id: "es", name: "Español" },
+  { id: "de", name: "Deutsch" },
+  { id: "fr", name: "Français" },
+  { id: "it", name: "Italiano" }
 ];
 
 // Use the correct path for imports in realm_frontend
-register("en", () => import("$lib/i18n/locales/en.json"));
-register("es", () => import("$lib/i18n/locales/es.json"));
+register("en", () => import("./locales/en.json"));
+register("es", () => import("./locales/es.json"));
+register("de", () => import("./locales/de.json"));
+register("fr", () => import("./locales/fr.json"));
+register("it", () => import("./locales/it.json"));
 
 // Helper function to wait for locale to be ready
 export function waitLocale(): Promise<void> {
