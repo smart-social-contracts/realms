@@ -1,15 +1,26 @@
 <script>
 	import { Button, Heading, Label, Select } from 'flowbite-svelte';
 	import Card from '../widgets/Card.svelte';
-	const languages = [
-		{ name: 'English (US)', value: 'en' },
-		{ name: 'Italiano', value: 'it' },
-		{ name: 'Français (France)', value: 'fr' },
-		{ name: '正體字', value: 'ch' },
-		{ name: 'Español (España)', value: 'es' },
-		{ name: 'Deutsch', value: 'de' },
-		{ name: 'Português (Brasil)', value: 'pt' }
-	];
+	import { locale } from 'svelte-i18n';
+	import { supportedLocales } from '$lib/i18n';
+	import { _ } from 'svelte-i18n';
+	
+	// Transform supported locales to format required by Select component
+	const languages = supportedLocales.map(loc => ({
+		name: loc.name,
+		value: loc.id
+	}));
+	
+	// Get the current locale
+	let selectedLocale = $locale;
+	
+	// Function to save the selected locale
+	function saveLanguagePreference() {
+		locale.set(selectedLocale);
+		if (typeof localStorage !== "undefined") {
+			localStorage.setItem("preferredLocale", selectedLocale);
+		}
+	}
 
 	const timezones = [
 		{ name: 'GMT+0 Greenwich Mean Time (GMT)', value: '0' },
@@ -25,13 +36,14 @@
 <Card title="Language &amp; Time">
 	<div class="space-y-4">
 		<Label class="space-y-2">
-			<span>Select language</span>
-			<Select items={languages} class="font-normal"></Select>
+			<span>{$_('settings.select_language')}</span>
+			<Select bind:value={selectedLocale} items={languages} class="font-normal"></Select>
+			<p class="mt-1 text-sm text-gray-500">{$_('settings.language_description', { fallback: 'Choose your preferred display language for the interface' })}</p>
 		</Label>
 		<Label class="space-y-2">
-			<span>Time Zone</span>
+			<span>{$_('settings.time_zone', { fallback: 'Time Zone' })}</span>
 			<Select items={timezones} class="font-normal"></Select>
 		</Label>
 	</div>
-	<Button class="mt-6 w-fit">Save all</Button>
+	<Button class="mt-6 w-fit" on:click={saveLanguagePreference}>{$_('settings.save_all', { fallback: 'Save all' })}</Button>
 </Card>

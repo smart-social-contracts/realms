@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/stores';
+	import type { SvelteComponent } from 'svelte';
 
 	import {
 		Sidebar,
@@ -38,6 +39,29 @@
 	const closeDrawer = () => {
 		drawerHidden = true;
 	};
+	
+	// Define types for navigation items
+	type NavItemWithHref = {
+		name: string;
+		icon: typeof TableColumnSolid;
+		href: string;
+		children?: never;
+	};
+	
+	type NavItemWithChildren = {
+		name: string;
+		icon: typeof TableColumnSolid; 
+		children: Record<string, string>;
+		href?: never;
+	};
+	
+	type NavItem = NavItemWithHref | NavItemWithChildren;
+	
+	type Link = {
+		label: string;
+		href: string;
+		icon: typeof TableColumnSolid;
+	};
 
 	let iconClass =
 		'flex-shrink-0 w-6 h-6 text-gray-500 transition duration-75 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white';
@@ -60,14 +84,15 @@
 	const extensions = getAllExtensions();
 
 	// Core navigation items
-	const coreNavItems = [
+	const coreNavItems: NavItemWithHref[] = [
 		{ name: 'Dashboard', icon: ChartPieOutline, href: '/dashboard' },
 		{ name: 'My identities', icon: UsersOutline, href: '/identities' },
 		{ name: 'Admin Dashboard', icon: TableColumnSolid, href: '/ggg' },
+		{ name: 'Settings', icon: CogOutline, href: '/settings' },
 	];
 
 	// Add Extensions menu with submenu of all extensions
-	const extensionsMenu = {
+	const extensionsMenu: NavItemWithChildren = {
 		name: 'Extensions',
 		icon: ObjectsColumnOutline,
 		children: Object.fromEntries(
@@ -76,6 +101,7 @@
 	};
 
 	// Create combined navigation items with core items and extensions section
+	let posts: NavItem[];
 	$: posts = [
 		...coreNavItems,
 		extensionsMenu,
@@ -83,7 +109,7 @@
 		{ name: 'Extensions Marketplace', icon: LayersSolid, href: '/extensions' }
 	];
 
-	let links = [
+	let links: Link[] = [
 		// {
 		// 	label: 'GitHub Repository',
 		// 	href: 'https://github.com/themesberg/flowbite-svelte-admin-dashboard',
@@ -130,7 +156,7 @@
 							<svelte:component this={icon} slot="icon" class={iconClass} />
 
 							{#each Object.entries(children) as [title, href]}
-								<SidebarItem label={title} {href} spanClass="ml-9" class={itemClass} />
+								<SidebarItem label={title} href={href.toString()} spanClass="ml-9" class={itemClass} />
 							{/each}
 						</SidebarDropdownWrapper>
 					{:else}
