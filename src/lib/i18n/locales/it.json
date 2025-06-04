@@ -1,0 +1,30 @@
+{
+  "common": {
+    "welcome": "Benvenuto su Realms",
+    "loading": "Caricamento...",
+    "error": "Si è verificato un errore",
+    "home": "Home",
+    "settings": "Impostazioni",
+    "login": "Accedi",
+    "logout": "Disconnetti",
+    "profile": "Profilo",
+    "search": "Cerca",
+    "join": "Unisciti",
+    "switch_user": "Cambia utente"
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "explore": "Esplora",
+    "about": "Chi siamo"
+  },
+  "buttons": {
+    "save": "Salva",
+    "cancel": "Annulla",
+    "submit": "Invia",
+    "edit": "Modifica",
+    "delete": "Elimina",
+    "login": "Accedi",
+    "join": "Unisciti",
+    "switch_user": "Cambia utente"
+  }
+} 

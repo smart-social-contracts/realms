@@ -20,6 +20,9 @@
 			}],
 			xaxis: {
 				categories: dateValues[0]
+			},
+			theme: {
+				mode: 'light'
 			}
 		});
 	}
@@ -43,13 +46,19 @@
 			},
 			toolbar: {
 				show: false
-			}
+			},
+			background: '#ffffff',
+			foreColor: '#333333'
+		},
+		theme: {
+			mode: 'light'
 		},
 		tooltip: {
 			enabled: true,
 			x: {
 				show: false
-			}
+			},
+			theme: 'light'
 		},
 		fill: {
 			type: 'gradient',
@@ -73,44 +82,55 @@
 				left: 10,
 				right: 10,
 				top: 0
-			}
+			},
+			borderColor: '#e5e7eb'
 		},
 		series: seriesData,
 		xaxis: {
 			categories: dateValues[0],
 			labels: {
-				show: true
+				show: true,
+				style: {
+					colors: '#6b7280'
+				}
 			},
 			axisBorder: {
-				show: true
+				show: true,
+				color: '#e5e7eb'
 			},
 			axisTicks: {
-				show: true
+				show: true,
+				color: '#e5e7eb'
 			}
 		},
 		yaxis: {
 			labels: {
 				show: true,
+				style: {
+					colors: '#6b7280'
+				},
 				formatter: (value) => value.toLocaleString() // Format values as comma-separated numbers
 			},
 			axisBorder: {
-				show: true
+				show: true,
+				color: '#e5e7eb'
 			},
 			axisTicks: {
-				show: true
+				show: true,
+				color: '#e5e7eb'
 			}
 		}
 	};
 </script>
 
-<Card size="xl">
+<Card size="xl" class="bg-white">
 	<div class="flex justify-between">
 		<div>
-			<h5 class="pb-2 text-3xl font-bold leading-none text-gray-900 dark:text-white">{title}</h5>
-			<p class="text-base font-normal text-gray-500 dark:text-gray-400">{description}</p>
+			<h5 class="pb-2 text-3xl font-bold leading-none text-gray-900">{title}</h5>
+			<p class="text-base font-normal text-gray-500">{description}</p>
 		</div>
 		<div
-			class="flex items-center px-2.5 py-0.5 text-center text-base font-semibold text-green-500 dark:text-green-500"
+			class="flex items-center px-2.5 py-0.5 text-center text-base font-semibold text-green-500"
 		>
 			12%
 			<ChevronRightOutline class="ms-1 h-6 w-6" />
@@ -118,11 +138,11 @@
 	</div>
 	<Chart bind:chart={chart} {options} class="py-6" />
 	<div
-		class="grid grid-cols-1 items-center justify-between border-t border-gray-200 dark:border-gray-700"
+		class="grid grid-cols-1 items-center justify-between border-t border-gray-200"
 	>
 		<div class="flex items-center justify-between pt-5">
 			<Button
-				class="inline-flex items-center bg-transparent py-0 text-center text-sm font-medium text-gray-500 hover:bg-transparent hover:text-gray-900 focus:ring-transparent dark:bg-transparent dark:text-gray-400 dark:hover:bg-transparent dark:hover:text-white dark:focus:ring-transparent"
+				class="inline-flex items-center bg-transparent py-0 text-center text-sm font-medium text-gray-500 hover:bg-transparent hover:text-gray-900 focus:ring-transparent"
 			>
 				Last 7 days<ChevronDownOutline class="m-2.5 ms-1.5 w-2.5" /></Button
 			>
@@ -135,7 +155,7 @@
 			</Dropdown>
 			<A
 				href="/"
-				class="hover:text-primary-700 dark:hover:text-primary-500 rounded-lg px-3 py-2 text-sm font-semibold uppercase hover:bg-gray-100 hover:no-underline dark:border-gray-700 dark:hover:bg-gray-700 dark:focus:ring-gray-700"
+				class="hover:text-primary-700 rounded-lg px-3 py-2 text-sm font-semibold uppercase hover:bg-gray-100 hover:no-underline"
 			>
 				Users Report
 				<ChevronRightOutline class="ms-1.5 h-2.5 w-2.5" />

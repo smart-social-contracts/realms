@@ -18,3 +18,7 @@ export const metadata = {
     PersonalData
   }
 };
+
+// Translations are now in JSON files at:
+// /src/realm_frontend/src/lib/i18n/locales/extensions/citizen_dashboard/en.json
+// /src/realm_frontend/src/lib/i18n/locales/extensions/citizen_dashboard/es.json

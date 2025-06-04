@@ -3,7 +3,35 @@
 	import Navbar from './Navbar.svelte';
 	import Sidebar from './Sidebar.svelte';
 	import Footer from './Footer.svelte';
-	let drawerHidden = false;
+	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
+	
+	// Set drawerHidden to true by default for desktop screens
+	let drawerHidden = true;
+
+	onMount(() => {
+		if (browser) {
+			// Ensure light mode is applied by removing dark class
+			document.documentElement.classList.remove('dark');
+			// Force light mode
+			document.documentElement.classList.add('light');
+			
+			// Set initial drawer state based on screen size
+			const updateDrawerState = () => {
+				drawerHidden = window.innerWidth >= 1024; // 1024px is lg breakpoint in Tailwind
+			};
+			
+			// Initialize drawer state
+			updateDrawerState();
+			
+			// Update drawer state on resize
+			window.addEventListener('resize', updateDrawerState);
+			
+			return () => {
+				window.removeEventListener('resize', updateDrawerState);
+			};
+		}
+	});
 
 	console.log("Layout is rendering"); // Debugging line
 </script>
@@ -18,7 +46,7 @@
 	<Sidebar bind:drawerHidden />
 
 	<!-- Main Content -->
-	<div class="relative h-full w-full overflow-y-auto pt-[70px] lg:ml-64 lg:pl-6">
+	<div class="relative h-full w-full overflow-y-auto bg-white pt-[70px] lg:ml-64 lg:pl-6">
 		<slot />
 		<Footer />
 	</div>

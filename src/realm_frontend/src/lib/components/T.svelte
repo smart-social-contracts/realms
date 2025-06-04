@@ -1,0 +1,1 @@
+<script> import { _ } from "svelte-i18n"; export let key; export let values = {}; export let default_text = ""; </script> {#if $_(key, { values, default: default_text }) !== key} {$_(key, { values, default: default_text })} {:else if default_text} {default_text} {:else} {key} {/if}

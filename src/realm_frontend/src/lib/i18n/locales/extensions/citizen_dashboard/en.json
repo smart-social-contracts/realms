@@ -1,0 +1,24 @@
+{
+  "title": "Citizen Dashboard",
+  "summary": "Dashboard Overview",
+  "services": "Public Services",
+  "taxes": "Tax Information",
+  "personal_data": "Personal Data",
+  "no_data": "No dashboard information available at this time.",
+  "loading": "Loading dashboard...",
+  "service_status": {
+    "available": "Available",
+    "unavailable": "Unavailable",
+    "maintenance": "Under Maintenance"
+  },
+  "tax_status": {
+    "paid": "Paid",
+    "pending": "Pending",
+    "overdue": "Overdue"
+  },
+  "privacy": {
+    "show": "Show Data",
+    "hide": "Hide Data",
+    "manage": "Manage Privacy Settings"
+  }
+}
