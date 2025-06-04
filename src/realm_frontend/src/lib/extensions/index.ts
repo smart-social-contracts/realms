@@ -1,5 +1,6 @@
 import type { ComponentType } from 'svelte';
 import { getIcon } from '$lib/utils/iconMap';
+// No need to import i18n functions as translations are now loaded from JSON files
 
 // Extension metadata interface
 export interface ExtensionMetadata {
@@ -12,6 +13,7 @@ export interface ExtensionMetadata {
     permissions: string[];
     component?: ComponentType;
     enabled?: boolean;  // New field to control visibility
+    // Translations are now loaded from JSON files in /lib/i18n/locales/extensions/{id}/
 }
 
 // Type for dynamically imported modules
@@ -40,6 +42,10 @@ Object.entries(extensionModules).forEach(([path, module]) => {
             component: module.default,
             enabled: true // Default to enabled
         };
+        
+        // No need to register translations here - they're loaded automatically
+        // from JSON files in /lib/i18n/locales/extensions/{id}/
+        
         console.log(`Registered extension: ${id}`);
     } else {
         console.warn(`Failed to register extension at ${path}: missing metadata or component`);
