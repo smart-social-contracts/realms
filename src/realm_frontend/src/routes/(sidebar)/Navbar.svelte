@@ -2,6 +2,7 @@
 	import Notifications from '../utils/dashboard/NotificationList.svelte';
 	import AppsMenu from '../utils/widgets/AppsMenu.svelte';
 	import UserMenu from '../utils/widgets/UserMenu.svelte';
+	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
 	import {
 		DarkMode,
 		Dropdown,
@@ -65,8 +66,11 @@
 	</div>
 	<div class="ms-auto flex items-center text-gray-500 dark:text-gray-400 sm:order-2">
 		<!-- <Notifications />
-		<AppsMenu />
-		<DarkMode /> -->
+		<AppsMenu /> -->
+		<div class="me-4">
+			<LanguageSwitcher />
+		</div>
+		<!-- <DarkMode /> -->
 		<Button class="me-2" color="alternative" href="/join" pill={true}>Join</Button>
 		<UserMenu {...Users[4]} />
 	</div>

@@ -5,8 +5,10 @@
 	import SvelteMarkdown from 'svelte-markdown';
 	// @ts-ignore
 	import { backend } from '$lib/canisters';
+	
+	// Remove direct import and handle canister ID differently
 	// @ts-ignore
-	import { canisterId as backendCanisterId } from 'declarations/realm_backend';
+	// import { canisterId as backendCanisterId } from 'declarations/realm_backend';
 
 	// Define message interface to fix TypeScript errors
 	interface ChatMessage {
@@ -57,9 +59,15 @@
 	
 	onMount(async () => {
 		try {
-			// Try to get canister ID from direct import
-			REALM_CANISTER_ID = backendCanisterId.toString();
-			console.log("Got canister ID from direct import:", REALM_CANISTER_ID);
+			// Get canister ID from environment variables or window.env if available
+			if (typeof window !== 'undefined' && window['canisterIds'] && window['canisterIds']['realm_backend']) {
+				REALM_CANISTER_ID = window['canisterIds']['realm_backend'];
+				console.log("Got canister ID from window.canisterIds:", REALM_CANISTER_ID);
+			} else {
+				// Try to get from process.env at build time (may not work in browser)
+				REALM_CANISTER_ID = process.env.CANISTER_ID_REALM_BACKEND || "";
+				console.log("Got canister ID from process.env:", REALM_CANISTER_ID);
+			}
 		} catch (err) {
 			console.error("Error getting canister ID from direct import:", err);
 			

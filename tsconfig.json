@@ -2,10 +2,13 @@
     "compilerOptions": {
         "strict": true,
         "target": "ES2020",
+        "module": "esnext",
         "experimentalDecorators": true,
         "strictPropertyInitialization": false,
         "moduleResolution": "node",
         "allowJs": true,
-        "outDir": "HACK_BECAUSE_OF_ALLOW_JS"
+        "outDir": "HACK_BECAUSE_OF_ALLOW_JS",
+        "resolveJsonModule": true,
+        "esModuleInterop": true
     }
 }
