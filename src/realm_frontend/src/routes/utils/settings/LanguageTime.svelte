@@ -45,5 +45,5 @@
 			<Select items={timezones} class="font-normal"></Select>
 		</Label>
 	</div>
-	<Button class="mt-6 w-fit" on:click={saveLanguagePreference}>{$_('settings.save_all', { fallback: 'Save all' })}</Button>
+	<Button color="primary" class="mt-6 w-fit" on:click={saveLanguagePreference}>{$_('settings.save_all', { fallback: 'Save all' })}</Button>
 </Card>
