@@ -5,10 +5,12 @@
     "error": "An error occurred",
     "home": "Home",
     "settings": "Settings",
-    "login": "Login",
+    "login": "Log In",
     "logout": "Logout",
     "profile": "Profile",
-    "search": "Search"
+    "search": "Search",
+    "join": "Join",
+    "switch_user": "Switch User"
   },
   "navigation": {
     "dashboard": "Dashboard",
@@ -20,6 +22,9 @@
     "cancel": "Cancel",
     "submit": "Submit",
     "edit": "Edit",
-    "delete": "Delete"
+    "delete": "Delete",
+    "login": "Log In",
+    "join": "Join",
+    "switch_user": "Switch User"
   }
 } 

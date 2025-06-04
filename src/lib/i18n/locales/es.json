@@ -8,7 +8,9 @@
     "login": "Iniciar sesión",
     "logout": "Cerrar sesión",
     "profile": "Perfil",
-    "search": "Buscar"
+    "search": "Buscar",
+    "join": "Unirse",
+    "switch_user": "Cambiar usuario"
   },
   "navigation": {
     "dashboard": "Panel",
@@ -20,6 +22,9 @@
     "cancel": "Cancelar",
     "submit": "Enviar",
     "edit": "Editar",
-    "delete": "Eliminar"
+    "delete": "Eliminar",
+    "login": "Iniciar sesión",
+    "join": "Unirse",
+    "switch_user": "Cambiar usuario"
   }
 } 

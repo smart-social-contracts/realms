@@ -1,7 +1,7 @@
 <script>
 	import modeobserver from './utils/modeobserver';
 	import { onMount } from 'svelte';
-	import { initI18n } from '$lib/i18n';
+	import { initI18n, waitLocale } from '$lib/i18n';
 	import { browser } from '$app/environment';
 	import { locale, _ } from 'svelte-i18n';
 	import '../app.pcss';
@@ -12,6 +12,9 @@
 	// Initialize i18n right away
 	initI18n();
 
+	// Flag to track if i18n is ready
+	let i18nReady = false;
+
 	// Debug locale changes
 	if (browser) {
 		locale.subscribe(value => {
@@ -21,8 +24,12 @@
 		});
 	}
 
-	onMount(() => {
+	onMount(async () => {
 		modeobserver();
+		
+		// Wait for locale to be ready
+		await waitLocale();
+		i18nReady = true;
 		
 		// Restore user's preferred language from localStorage or cookie
 		if (browser) {
@@ -49,7 +56,11 @@
 </script>
 
 <div class="app">
-	<slot />
+	{#if browser && i18nReady}
+		<slot />
+	{:else}
+		<div class="loading">Loading...</div>
+	{/if}
 </div>
 
 <style>
@@ -57,5 +68,13 @@
 		display: flex;
 		flex-direction: column;
 		min-height: 100vh;
+	}
+	
+	.loading {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		height: 100vh;
+		font-size: 1.5rem;
 	}
 </style>

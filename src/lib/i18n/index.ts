@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import { init, register, getLocaleFromNavigator, locale, dictionary } from 'svelte-i18n';
+import { init, register, getLocaleFromNavigator, locale, dictionary, isLoading } from 'svelte-i18n';
 
 // Register locales
 const locales = ['en', 'es'];
@@ -25,9 +25,27 @@ if (browser) {
   });
 }
 
+// Helper function to wait for locale to be ready
+export function waitLocale(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const unsubscribe = isLoading.subscribe(($isLoading) => {
+      if (!$isLoading) {
+        unsubscribe();
+        resolve();
+      }
+    });
+  });
+}
+
 // Initialize i18n
 export function initI18n() {
   console.log('Initializing i18n...');
+  
+  // Set default locale before initialization to prevent errors
+  if (browser) {
+    locale.set(localStorage.getItem('preferredLocale') || 'en');
+  }
+  
   init({
     fallbackLocale: 'en',
     initialLocale: browser ? getLocaleFromNavigator() : 'en',

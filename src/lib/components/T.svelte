@@ -1,5 +1,6 @@
 <script>
   import { _ } from 'svelte-i18n';
+  import { browser } from '$app/environment';
 
   /**
    * Translation key path
@@ -20,10 +21,14 @@
   export let default_text = '';
 </script>
 
-{#if $_(key, { values, default: default_text }) !== key}
-  {$_(key, { values, default: default_text })}
-{:else if default_text}
-  {default_text}
+{#if browser && $_}
+  {#if $_(key, { values, default: default_text }) !== key}
+    {$_(key, { values, default: default_text })}
+  {:else if default_text}
+    {default_text}
+  {:else}
+    {key}
+  {/if}
 {:else}
-  {key}
+  {default_text || key}
 {/if} 
