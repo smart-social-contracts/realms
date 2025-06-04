@@ -84,37 +84,47 @@ def get_extension_paths(extension_id):
     validate_extension_id(extension_id)
     paths = get_project_paths()
     
+    if not paths:
+        return None
+    
     return {
         "backend": os.path.join(paths["backend_dir"], "extensions", extension_id),
         "frontend_lib": os.path.join(paths["frontend_dir"], "src/lib/extensions", extension_id),
         "frontend_route": os.path.join(paths["frontend_dir"], "src/routes/(sidebar)/extensions", extension_id),
+        "i18n": os.path.join(paths["frontend_dir"], "src/lib/i18n/locales/extensions", extension_id),
         "frontend_custom_routes": os.path.join(paths["frontend_dir"], "src/routes"),
         "frontend_static": os.path.join(paths["frontend_dir"], "static")
     }
 
 def find_extension_locations(extension_id):
     """Find where an extension is located"""
-    validate_extension_id(extension_id)
-    paths = get_project_paths()
+    paths = get_extension_paths(extension_id)
     
-    backend_path = os.path.join(paths["backend_dir"], "extensions", extension_id)
-    frontend_lib_path = os.path.join(paths["frontend_dir"], "src/lib/extensions", extension_id)
-    frontend_route_path = os.path.join(paths["frontend_dir"], "src/routes/(sidebar)/extensions", extension_id)
-
+    if not paths:
+        return {}
+    
     locations = {}
     
-    if os.path.isdir(backend_path):
-        locations["backend"] = backend_path
+    # Check backend location
+    if os.path.exists(paths["backend"]) and os.listdir(paths["backend"]):
+        locations["backend"] = paths["backend"]
     
-    if os.path.isdir(frontend_lib_path):
-        locations["frontend_lib"] = frontend_lib_path
+    # Check frontend lib location
+    if os.path.exists(paths["frontend_lib"]) and os.listdir(paths["frontend_lib"]):
+        locations["frontend_lib"] = paths["frontend_lib"]
     
-    if os.path.isdir(frontend_route_path):
-        locations["frontend_route"] = frontend_route_path
+    # Check frontend route location
+    if os.path.exists(paths["frontend_route"]) and os.listdir(paths["frontend_route"]):
+        locations["frontend_route"] = paths["frontend_route"]
     
-    custom_routes_path = os.path.join(paths["frontend_dir"], "src/routes", extension_id)
-    if os.path.isdir(custom_routes_path):
-        locations["frontend_custom_routes"] = custom_routes_path
+    # Check extension i18n location
+    if os.path.exists(paths["i18n"]) and os.listdir(paths["i18n"]):
+        locations["i18n"] = paths["i18n"]
+    
+    # Check for custom routes
+    custom_route_path = os.path.join(paths["frontend_custom_routes"], extension_id)
+    if os.path.exists(custom_route_path) and os.listdir(custom_route_path):
+        locations["frontend_custom_routes"] = custom_route_path
     
     locations["frontend_static"] = os.path.join(paths["frontend_dir"], "static")
     
@@ -216,6 +226,17 @@ def package_extension(extension_id, output_dir=None):
                             rel_path = os.path.relpath(file_path, frontend_lib_src)
                             zipf.write(file_path, os.path.join("frontend/lib/extensions", extension_id, rel_path))
                             log_info(f"Added frontend/lib/extensions/{extension_id}/{rel_path}")
+            
+            # Package i18n translation files
+            if "i18n" in locations:
+                i18n_src = locations["i18n"]
+                for root, _, files in os.walk(i18n_src):
+                    for file in files:
+                        if file.endswith(('.json')):
+                            file_path = os.path.join(root, file)
+                            rel_path = os.path.relpath(file_path, i18n_src)
+                            zipf.write(file_path, os.path.join("frontend/i18n/locales/extensions", extension_id, rel_path))
+                            log_info(f"Added frontend/i18n/locales/extensions/{extension_id}/{rel_path}")
             
             # Package frontend route files
             if "frontend_route" in locations:
@@ -392,6 +413,31 @@ def install_extension(package_path):
             log_success(f"Installed frontend route files for {extension_id}")
         else:
             log_info("No frontend route files found in package")
+        
+        # Install i18n translation files
+        i18n_source = os.path.join(temp_dir, f"frontend/i18n/locales/extensions/{extension_id}")
+        if os.path.exists(i18n_source) and os.listdir(i18n_source):
+            i18n_target = os.path.join(paths["frontend_dir"], f"src/lib/i18n/locales/extensions/{extension_id}")
+            
+            if os.path.exists(i18n_target):
+                shutil.rmtree(i18n_target)
+            
+            os.makedirs(i18n_target, exist_ok=True)
+            
+            for root, _, files in os.walk(i18n_source):
+                for file in files:
+                    if file.endswith('.json'):
+                        src_file = os.path.join(root, file)
+                        rel_path = os.path.relpath(src_file, i18n_source)
+                        dst_file = os.path.join(i18n_target, rel_path)
+                        
+                        os.makedirs(os.path.dirname(dst_file), exist_ok=True)
+                        shutil.copy2(src_file, dst_file)
+                        log_info(f"Installed i18n translation file: {rel_path}")
+            
+            log_success(f"Installed i18n translation files for {extension_id}")
+        else:
+            log_info("No i18n translation files found in package")
             
         custom_route_source = os.path.join(temp_dir, f"frontend/routes/{extension_id}")
         if os.path.exists(custom_route_source) and os.listdir(custom_route_source):
