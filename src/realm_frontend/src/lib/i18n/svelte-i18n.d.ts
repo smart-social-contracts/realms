@@ -19,6 +19,8 @@ declare module 'svelte-i18n' {
     locale: string,
     messages: Record<string, any>
   ): void;
+  
+  export const isLoading: Readable<boolean>;
 
   export function locale(): Readable<string>;
   export function locale(newLocale: string): Promise<void>;
