@@ -1,0 +1,5 @@
+import extension_packages.citizen_dashboard.entry
+import extension_packages.demo_loader.entry
+import extension_packages.llm_chat.entry
+import extension_packages.test_bench.entry
+import extension_packages.vault_manager.entry

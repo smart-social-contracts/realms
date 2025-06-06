@@ -30,11 +30,11 @@ def get_status() -> dict[str, Any]:
 
     # Get installed extensions
     extension_names = []
-    import extensions.extension_imports
+    import extension_packages.extension_imports
 
     for module_name in sys.modules:
-        if module_name.startswith("extensions."):
-            # Extract extension name from module path (extensions.name.entry -> name)
+        if module_name.startswith("extension_packages."):
+            # Extract extension name from module path (extension_packages.name.entry -> name)
             extension_name = module_name.split(".")[1]
             extension_names.append(extension_name)
     extension_names = list(set(extension_names))  # Remove duplicates
