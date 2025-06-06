@@ -3,7 +3,6 @@
 	import LanguageTime from '../../utils/settings/LanguageTime.svelte';
 	import ProfilePicture from '../../utils/settings/ProfilePicture.svelte';
 	import { Breadcrumb, BreadcrumbItem, Heading } from 'flowbite-svelte';
-	import Footer from '../Footer.svelte';
 	import { SITE_NAME } from '$lib/config';
 	import { imagesPath } from '../../utils/variables';
 	import Users from '../../data/users.json';
@@ -50,4 +49,3 @@
 		</div>
 	</div>
 </main>
-<Footer />
