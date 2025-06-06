@@ -12,7 +12,7 @@ def call_extension_function(extension_name: str, function_name: str, args: str):
     logger.info(f"Calling extension '{extension_name}' function '{function_name}'")
 
     try:
-        from extensions.registry import get_func
+        from extension_packages.registry import get_func
 
         func = get_func(extension_name, function_name)
         logger.info(f"Got function from registry: {func}")
