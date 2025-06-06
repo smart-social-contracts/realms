@@ -43,8 +43,8 @@ def run_command(command):
 
 def assert_in(text, substring):
     if substring not in text:
-        raise AssertionError(f"Substring '{substring}' not found in text")
-    print_ok(f"Substring '{substring}' found in text")
+        raise AssertionError(f"Substring '{substring}' not found in text: {text}")
+    print_ok(f"Substring '{substring}' found in text: {text}")
 
 
 def assert_file_exists(file_path):
