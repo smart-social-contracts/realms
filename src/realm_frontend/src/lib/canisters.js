@@ -82,8 +82,19 @@ function createBackendProxy() {
                     try {
                         console.log(`Trying to import canister declarations for ${prop}`);
                         const { createActor, canisterId } = await import('declarations/realm_backend');
+                        
+                        // Create proper agent options with fetchRootKey for local development
+                        const options = {
+                            agentOptions: {
+                                host: isDevelopment ? "http://localhost:8000" : "https://ic0.app",
+                                // This is the critical fix: In development, we need to fetch the root key
+                                // In production, this should be false as the root key is hardcoded
+                                fetchRootKey: isDevelopment
+                            }
+                        };
+                        
                         console.log(`Creating actor with canister ID: ${canisterId} for method ${prop}`);
-                        const actor = createActor(canisterId);
+                        const actor = createActor(canisterId, options);
                         
                         if (typeof actor[prop] === 'function') {
                             console.log(`Calling canister method ${prop} with args:`, args);
@@ -96,6 +107,16 @@ function createBackendProxy() {
                         }
                     } catch (err) {
                         console.error(`Error accessing canister method ${prop}:`, err);
+                        
+                        // Provide more specific error messages for certificate issues
+                        if (err.message && err.message.includes('certificate')) {
+                            console.error('Certificate validation error - This could be due to clock skew or network issues');
+                            return { 
+                                success: false, 
+                                error: `Certificate validation error: ${err.message}. Try refreshing the page or check your system clock` 
+                            };
+                        }
+                        
                         return { success: false, error: `Error accessing canister method: ${err.message}` };
                     }
                 } catch (error) {
