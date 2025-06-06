@@ -64,60 +64,40 @@ async function makeRequest(endpoint, options = {}) {
     }
 }
 
-// Mock implementation for build time or when canisters are not available
-class MockBackend {
-    constructor() {
-        return new Proxy(this, {
-            get: (target, prop) => {
-                if (prop in target) return target[prop];
-                return async (...args) => {
-                    console.log(`Mock backend call: ${prop}(${JSON.stringify(args)})`);
-                    return { success: false, error: 'Backend service not available in this environment' };
-                };
-            }
-        });
-    }
-}
-
 /**
  * Creates a backend proxy with graceful fallbacks
+ * This version doesn't use dynamic imports at the top level to avoid build errors
  */
 function createBackendProxy() {
-    // If we're building the app, return a mock implementation
-    if (building) {
-        console.log('Using mock backend during build');
-        return new MockBackend();
-    }
+    const isDevelopment = import.meta.env.DEV;
+    const baseUrl = isDevelopment ? 'http://localhost:8000' : undefined;
 
-    const isDevelopment = typeof import.meta !== 'undefined' && import.meta.env?.DEV;
-    
     return new Proxy({}, {
         get(target, prop) {
             return async (...args) => {
                 try {
                     console.log(`Backend proxy call: ${prop}(${JSON.stringify(args)})`);
                     
-                    // For runtime use, attempt to load the actual canister
-                    if (typeof window !== 'undefined') {
-                        try {
-                            // We'll attempt dynamic import at runtime, not during build
-                            const backendModule = '__CANISTER_IMPORT_PLACEHOLDER__';
-                            
-                            // This code only runs at runtime
-                            if (backendModule && typeof backendModule.createActor === 'function') {
-                                const actor = backendModule.createActor(backendModule.canisterId);
-                                if (typeof actor[prop] === 'function') {
-                                    const result = await actor[prop](...args);
-                                    return result;
-                                }
-                            }
-                        } catch (err) {
-                            console.error(`Error accessing canister: ${err.message}`);
+                    // In production and development, try to use canister methods
+                    try {
+                        console.log(`Trying to import canister declarations for ${prop}`);
+                        const { createActor, canisterId } = await import('declarations/realm_backend');
+                        console.log(`Creating actor with canister ID: ${canisterId} for method ${prop}`);
+                        const actor = createActor(canisterId);
+                        
+                        if (typeof actor[prop] === 'function') {
+                            console.log(`Calling canister method ${prop} with args:`, args);
+                            const result = await actor[prop](...args);
+                            console.log(`Canister method ${prop} result:`, result);
+                            return result;
+                        } else {
+                            console.warn(`Method ${prop} not found in actor, available methods:`, Object.keys(actor));
+                            return { success: false, error: `Method ${prop} not found in actor` };
                         }
+                    } catch (err) {
+                        console.error(`Error accessing canister method ${prop}:`, err);
+                        return { success: false, error: `Error accessing canister method: ${err.message}` };
                     }
-                    
-                    // Fallback response
-                    return { success: false, error: 'Backend service not available' };
                 } catch (error) {
                     console.error(`Error in backendProxy for method ${prop}:`, error);
                     return { success: false, error: error.message };
