@@ -88,7 +88,7 @@ def get_extension_paths(extension_id):
         return None
     
     return {
-        "backend": os.path.join(paths["backend_dir"], "extensions", extension_id),
+        "backend": os.path.join(paths["backend_dir"], "extension_packages", extension_id),
         "frontend_lib": os.path.join(paths["frontend_dir"], "src/lib/extensions", extension_id),
         "frontend_route": os.path.join(paths["frontend_dir"], "src/routes/(sidebar)/extensions", extension_id),
         "i18n": os.path.join(paths["frontend_dir"], "src/lib/i18n/locales/extensions", extension_id),
@@ -126,7 +126,8 @@ def find_extension_locations(extension_id):
     if os.path.exists(custom_route_path) and os.listdir(custom_route_path):
         locations["frontend_custom_routes"] = custom_route_path
     
-    locations["frontend_static"] = os.path.join(paths["frontend_dir"], "static")
+    project_paths = get_project_paths()
+    locations["frontend_static"] = os.path.join(project_paths["frontend_dir"], "static")
     
     return locations
 
@@ -339,7 +340,7 @@ def install_extension(package_path):
         
         backend_source = os.path.join(temp_dir, "backend")
         if os.path.exists(backend_source) and os.listdir(backend_source):
-            backend_target = os.path.join(paths["backend_dir"], "extensions", extension_id)
+            backend_target = os.path.join(paths["backend_dir"], "extension_packages", extension_id)
             
             if os.path.exists(backend_target):
                 shutil.rmtree(backend_target)
@@ -534,7 +535,7 @@ def uninstall_extension(extension_id):
 def update_extension_imports(extension_id, action="add"):
     """Update the extension_imports.py file"""
     paths = get_project_paths()
-    imports_file = os.path.join(paths["backend_dir"], "extensions", "extension_imports.py")
+    imports_file = os.path.join(paths["backend_dir"], "extension_packages", "extension_imports.py")
     
     if not os.path.exists(imports_file):
         log_error(f"Extension imports file not found: {imports_file}")
@@ -543,7 +544,7 @@ def update_extension_imports(extension_id, action="add"):
     with open(imports_file, "r") as f:
         content = f.read()
     
-    import_line = f"import extensions.{extension_id}.entry"
+    import_line = f"import extension_packages.{extension_id}.entry"
     
     if action == "add":
         if import_line in content:
@@ -582,7 +583,7 @@ def package_all_extensions(output_dir=None):
     """Package all extensions into zip files"""
     log_info("Packaging all extensions")
     paths = get_project_paths()
-    backend_ext_dir = os.path.join(paths["backend_dir"], "extensions")
+    backend_ext_dir = os.path.join(paths["backend_dir"], "extension_packages")
     frontend_ext_dir = os.path.join(paths["frontend_dir"], "src/lib/extensions")
     
     # Collect all unique extension IDs
@@ -643,7 +644,7 @@ def uninstall_all_extensions():
     """Uninstall all extensions"""
     log_info("Uninstalling all extensions")
     paths = get_project_paths()
-    backend_ext_dir = os.path.join(paths["backend_dir"], "extensions")
+    backend_ext_dir = os.path.join(paths["backend_dir"], "extension_packages")
     frontend_ext_dir = os.path.join(paths["frontend_dir"], "src/lib/extensions")
     
     # Collect all unique extension IDs
@@ -682,7 +683,7 @@ def uninstall_all_extensions():
 def list_extensions():
     """List all installed extensions"""
     paths = get_project_paths()
-    backend_ext_dir = os.path.join(paths["backend_dir"], "extensions")
+    backend_ext_dir = os.path.join(paths["backend_dir"], "extension_packages")
     frontend_ext_dir = os.path.join(paths["frontend_dir"], "src/lib/extensions")
     
     extensions = {}
