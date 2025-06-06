@@ -1,9 +1,6 @@
 <script>
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
-  import { _ } from 'svelte-i18n';
-  import T from '$lib/components/T.svelte';
-  import { Button } from 'flowbite-svelte';
   
   let isMobile = false;
   let videoElement;
@@ -35,7 +32,7 @@
 </script>
 
 <svelte:head>
-  <title>{$_('common.welcome')}</title>
+  <title>Welcome</title>
 </svelte:head>
 
 <div class="welcome-container">
@@ -55,52 +52,16 @@
   {/if}
   
   <div class="content">
-    <h1>
-      <T key="common.welcome" />
-    </h1>
+    <h1>Welcome</h1>
     
     <div class="button-container">
       <a href="/app-sidebar/citizen" class="btn btn-member">
-        <T key="navigation.dashboard" default_text="Access as a Member" />
+        Access as a Member
       </a>
       <a href="/app/visitor" class="btn btn-visitor">
-        <T key="navigation.explore" default_text="Access as a Visitor" />
+        Access as a Visitor
       </a>
     </div>
-  </div>
-</div>
-
-<div class="container mx-auto my-8 px-4">
-  <h1 class="mb-6 text-3xl font-bold">
-    <T key="common.welcome" />
-  </h1>
-  
-  <div class="grid gap-6 md:grid-cols-2">
-    <div class="rounded-lg bg-white p-6 shadow-md dark:bg-gray-800">
-      <h2 class="mb-4 text-xl font-semibold">{$_('navigation.dashboard')}</h2>
-      <p class="mb-4">
-        {$_('common.loading')}
-      </p>
-      <Button color="primary">
-        {$_('buttons.submit')}
-      </Button>
-    </div>
-    
-    <div class="rounded-lg bg-white p-6 shadow-md dark:bg-gray-800">
-      <h2 class="mb-4 text-xl font-semibold">{$_('navigation.explore')}</h2>
-      <p class="mb-4">
-        {$_('common.search')}
-      </p>
-      <Button color="alternative">
-        {$_('buttons.cancel')}
-      </Button>
-    </div>
-  </div>
-  
-  <div class="mt-8 rounded-lg bg-gray-100 p-4 dark:bg-gray-700">
-    <p class="text-center text-sm text-gray-600 dark:text-gray-400">
-      {$_('common.home')} | {$_('common.profile')} | {$_('common.settings')}
-    </p>
   </div>
 </div>
 

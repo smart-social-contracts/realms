@@ -25,7 +25,7 @@
 	let userPrincipalId = $principal || "";
 	
 	// Vault canister ID management
-	let vaultCanisterId = "guja4-2aaaa-aaaam-qdhjq-cai"; // Default vault canister ID
+	let vaultCanisterId = ""; // No default - user must specify
 	let vaultCanisterInputValue = vaultCanisterId;
 	let vaultCanisterError = '';
 	
