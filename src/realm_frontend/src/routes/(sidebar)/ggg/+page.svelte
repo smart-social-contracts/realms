@@ -60,6 +60,97 @@
     { name: 'votes', fetch: () => backend.get_votes(), dataPath: 'VotesList.votes' }
   ];
   
+  // Function to fetch data for a specific entity type
+  async function fetchEntityData(entityType) {
+    try {
+      loading = true;
+      error = null;
+      
+      const config = entityConfigs.find(c => c.name === entityType);
+      if (!config) {
+        error = `No configuration found for entity type: ${entityType}`;
+        loading = false;
+        return;
+      }
+      
+      console.log(`Fetching data for ${entityType}...`);
+      
+      // Handle special case for transfers with pagination
+      let result;
+      if (entityType === 'transfers') {
+        result = await config.fetch(transfersPage, transfersPerPage);
+      } else {
+        result = await config.fetch();
+      }
+      
+      if (result && result.success && result.data) {
+        // Navigate to the data using the dataPath
+        const pathParts = config.dataPath.split('.');
+        let entityData = result.data;
+        
+        for (const part of pathParts) {
+          if (entityData && entityData[part]) {
+            entityData = entityData[part];
+          } else {
+            entityData = null;
+            break;
+          }
+        }
+        
+        if (entityData && Array.isArray(entityData) && entityData.length > 0) {
+          // Parse JSON strings if needed
+          const parsedData = entityData.map(item => {
+            if (typeof item === 'string') {
+              try {
+                return JSON.parse(item);
+              } catch (e) {
+                return item;
+              }
+            }
+            return item;
+          });
+          
+          // Update only this specific entity type in the data object
+          data = {...data, [entityType]: parsedData};
+          console.log(`✅ ${entityType}: ${parsedData.length} items`);
+          
+          // Get pagination info for transfers
+          if (entityType === 'transfers' && config.paginationPath) {
+            const paginationParts = config.paginationPath.split('.');
+            let paginationData = result.data;
+            
+            for (const part of paginationParts) {
+              if (paginationData && paginationData[part]) {
+                paginationData = paginationData[part];
+              } else {
+                paginationData = null;
+                break;
+              }
+            }
+            
+            if (paginationData) {
+              transfersPagination = paginationData;
+              console.log(`✅ Transfers pagination:`, transfersPagination);
+            }
+          }
+        } else {
+          console.log(`⚠️ ${entityType}: No valid data found`);
+          // Initialize with empty array to prevent undefined errors
+          data = {...data, [entityType]: []};
+        }
+      } else {
+        console.log(`❌ ${entityType}: ${result?.error || 'Failed to fetch'}`);
+        data = {...data, [entityType]: []};
+      }
+      
+    } catch (err) {
+      console.error(`Error fetching ${entityType} data:`, err);
+      error = `Data fetch error for ${entityType}: ${err.message}`;
+    } finally {
+      loading = false;
+    }
+  }
+  
   async function fetchAllData() {
     try {
       loading = true;
@@ -162,152 +253,41 @@
     }
   }
   
-  function calculateMetrics() {
-    const totalEntities = Object.values(data).reduce((sum, arr) => sum + (arr?.length || 0), 0);
-    // For transfers, use the total count from pagination if available
-    const totalTransfers = transfersPagination?.total || data.transfers?.length || 0;
-    const totalTransferVolume = data.transfers?.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0) || 0;
-    const activeMandates = data.mandates?.filter(m => !isExpired(m)).length || 0;
-    const scheduledTasks = data.tasks?.filter(t => hasSchedule(t)).length || 0;
-    const openDisputes = data.disputes?.filter(d => d.status === 'OPEN' || d.status === 'pending').length || 0;
-    const activeProposals = data.proposals?.filter(p => {
+  // Function to handle tab changes
+  async function handleTabChange(tabName) {
+    activeTab = tabName;
+    
+    // For overview tab, load only essential data needed for the dashboard
+    if (tabName === 'overview') {
+      loading = true;
+      error = null;
+      
+      console.log("Loading essential data for Overview dashboard...");
+      
+      // Identify which entities are needed for the overview
+      const essentialEntities = ['realms', 'mandates', 'instruments', 'transfers'];
+      
+      // Load only these essential entities in sequence
       try {
-        const metadata = JSON.parse(p.metadata || '{}');
-        return metadata.status === 'active';
-      } catch (e) {
-        return false;
-      }
-    }).length || 0;
-    const totalVotes = data.votes?.length || 0;
-    
-    metrics = {
-      totalEntities,
-      totalTransfers,
-      totalTransferVolume,
-      activeMandates,
-      scheduledTasks,
-      openDisputes,
-      activeProposals,
-      totalVotes
-    };
-  }
-  
-  function findRelationships() {
-    relationships = [];
-    
-    // Find mandate-task relationships
-    if (data.mandates && data.tasks) {
-      data.mandates.forEach(mandate => {
-        const relatedTasks = data.tasks.filter(task => 
-          isRelated(task, mandate, 'mandate')
-        );
+        for (const entityType of essentialEntities) {
+          await fetchEntityData(entityType);
+        }
         
-        if (relatedTasks.length > 0) {
-          relationships.push({
-            type: 'mandate-tasks',
-            source: mandate,
-            targets: relatedTasks,
-            label: `${mandate.name} → ${relatedTasks.length} tasks`
-          });
-        }
-      });
-    }
-    
-    // Find task-transfer relationships
-    if (data.tasks && data.transfers) {
-      data.tasks.forEach(task => {
-        const relatedTransfers = data.transfers.filter(transfer =>
-          isRelated(transfer, task, 'task')
-        );
+        // Calculate metrics and relationships only with the available data
+        calculateMetrics();
+        findRelationships();
+        getRecentActivity();
         
-        if (relatedTransfers.length > 0) {
-          relationships.push({
-            type: 'task-transfers',
-            source: task,
-            targets: relatedTransfers,
-            label: `${getTaskName(task)} → ${relatedTransfers.length} transfers`
-          });
-        }
-      });
-    }
-  }
-  
-  function getRecentActivity() {
-    const activities = [];
-    
-    // Collect timestamped entities from all types
-    Object.entries(data).forEach(([entityType, entities]) => {
-      if (Array.isArray(entities)) {
-        entities.forEach(entity => {
-          const timestamp = entity.timestamp_created || entity.created_at || entity.timestamp;
-          if (timestamp) {
-            activities.push({
-              type: entityType,
-              entity: entity,
-              timestamp: timestamp,
-              description: getActivityDescription(entityType, entity)
-            });
-          }
-        });
+      } catch (err) {
+        console.error("Error loading essential data for Overview:", err);
+        error = `Error loading Overview data: ${err.message}`;
+      } finally {
+        loading = false;
       }
-    });
-    
-    recentActivity = activities
-      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-      .slice(0, 10);
-  }
-  
-  function getActivityDescription(type, entity) {
-    switch(type) {
-      case 'transfers':
-        return `Transfer of ${entity.amount || 'N/A'} from ${entity.from_user || 'unknown'} to ${entity.to_user || 'unknown'}`;
-      case 'mandates':
-        return `New mandate: ${entity.name || entity._id}`;
-      case 'tasks':
-        return `Task created: ${getTaskName(entity)}`;
-      case 'disputes':
-        return `Dispute opened: ${entity._id}`;
-      case 'licenses':
-        return `License issued: ${entity._id}`;
-      case 'proposals':
-        try {
-          const metadata = JSON.parse(entity.metadata || '{}');
-          return `New proposal: ${metadata.title || entity._id}`;
-        } catch (e) {
-          return `New proposal: ${entity._id}`;
-        }
-      case 'votes':
-        try {
-          const metadata = JSON.parse(entity.metadata || '{}');
-          return `Vote cast by ${metadata.voter || 'citizen'}: ${metadata.vote || 'unknown'}`;
-        } catch (e) {
-          return `Vote cast: ${entity._id}`;
-        }
-      default:
-        return `New ${type.slice(0, -1)}: ${entity.name || entity._id}`;
-    }
-  }
-  
-  function isExpired(mandate) {
-    // Basic expiration logic - can be enhanced
-    return false;
-  }
-  
-  function hasSchedule(task) {
-    return task.schedules && task.schedules.length > 0;
-  }
-  
-  function isRelated(entity1, entity2, relationField) {
-    // Basic relationship detection - can be enhanced
-    return entity1[relationField] === entity2._id;
-  }
-  
-  function getTaskName(task) {
-    try {
-      const metadata = JSON.parse(task.metadata || '{}');
-      return metadata.description || task._id;
-    } catch (e) {
-      return task._id;
+    } 
+    // For entity-specific tabs, just load the data for that entity
+    else if (allEntityTypes.includes(tabName)) {
+      await fetchEntityData(tabName);
     }
   }
   
@@ -322,6 +302,8 @@
             String(value).toLowerCase().includes(searchTerm.toLowerCase())
           )
         );
+      } else {
+        filtered[entityType] = entities;
       }
     });
     return filtered;
@@ -329,72 +311,14 @@
   
   $: filteredData = filterData(data, searchTerm);
   
-  // Handle transfers pagination changes
-  async function handleTransfersPageChange(page) {
-    transfersPage = page;
-    loading = true;
-    
-    try {
-      const config = entityConfigs.find(c => c.name === 'transfers');
-      const result = await config.fetch(transfersPage, transfersPerPage);
-      
-      if (result.success && result.data) {
-        // Get transfer data
-        const pathParts = config.dataPath.split('.');
-        let entityData = result.data;
-        
-        for (const part of pathParts) {
-          if (entityData && entityData[part]) {
-            entityData = entityData[part];
-          } else {
-            entityData = null;
-            break;
-          }
-        }
-        
-        if (entityData && Array.isArray(entityData)) {
-          // Parse JSON strings
-          const parsedData = entityData.map(item => {
-            if (typeof item === 'string') {
-              try {
-                return JSON.parse(item);
-              } catch (e) {
-                return item;
-              }
-            }
-            return item;
-          });
-          
-          data.transfers = parsedData;
-          
-          // Get pagination info
-          if (config.paginationPath) {
-            const paginationParts = config.paginationPath.split('.');
-            let paginationData = result.data;
-            
-            for (const part of paginationParts) {
-              if (paginationData && paginationData[part]) {
-                paginationData = paginationData[part];
-              } else {
-                paginationData = null;
-                break;
-              }
-            }
-            
-            if (paginationData) {
-              transfersPagination = paginationData;
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.error("Error fetching transfers page:", err);
-    } finally {
-      loading = false;
+  onMount(() => {
+  // On initial load, only fetch for the active tab
+    if (activeTab === 'overview') {
+      handleTabChange('overview');
+    } else if (allEntityTypes.includes(activeTab)) {
+      fetchEntityData(activeTab);
     }
-  }
-  
-  onMount(fetchAllData);
+  });
 </script>
 
 <div class="container mx-auto p-4">
@@ -432,14 +356,14 @@
     <div class="flex flex-wrap">
       <button 
         class="px-4 py-2 mr-1 {activeTab === 'overview' ? 'border-b-2 border-blue-500 font-medium text-blue-600' : 'text-gray-600 hover:text-gray-900'}"
-        on:click={() => activeTab = 'overview'}
+        on:click={() => handleTabChange('overview')}
       >
         📊 Overview
       </button>
       {#each allEntityTypes as entityType}
       <button 
           class="px-4 py-2 mr-1 {activeTab === entityType ? 'border-b-2 border-blue-500 font-medium text-blue-600' : 'text-gray-600 hover:text-gray-900'}"
-          on:click={() => activeTab = entityType}
+          on:click={() => handleTabChange(entityType)}
       >
           {entityType.charAt(0).toUpperCase() + entityType.slice(1)}
       </button>
