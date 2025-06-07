@@ -65,12 +65,14 @@ async function makeRequest(endpoint, options = {}) {
 }
 
 /**
- * Creates a backend proxy with graceful fallbacks
- * This version doesn't use dynamic imports at the top level to avoid build errors
+ * Creates a backend proxy with improved error handling for local development
  */
-function createBackendProxy() {
+export function createBackendProxy() {
     const isDevelopment = import.meta.env.DEV;
     const baseUrl = isDevelopment ? 'http://localhost:8000' : undefined;
+    
+    // Track failed methods to avoid spamming logs
+    const failedMethods = new Set();
 
     return new Proxy({}, {
         get(target, prop) {
@@ -80,27 +82,79 @@ function createBackendProxy() {
                     
                     // In production and development, try to use canister methods
                     try {
-                        console.log(`Trying to import canister declarations for ${prop}`);
-                        const { createActor, canisterId } = await import('declarations/realm_backend');
+                        // This dynamic import pattern worked in the original code
+                        const { Actor, HttpAgent } = await import('@dfinity/agent');
                         
-                        // Create proper agent options with fetchRootKey for local development
+                        // Import from dfx-generated directory - the path will be resolved by Vite
+                        // We avoid using relative paths like "../../declarations" which might be fragile
+                        const declarations = await import('declarations/realm_backend');
+                        
+                        // Log the available exports to help with debugging
+                        console.log('Available from declarations:', Object.keys(declarations));
+                        
+                        // Enhanced agent options for local development
                         const options = {
                             agentOptions: {
-                                host: isDevelopment ? "http://localhost:8000" : "https://ic0.app",
-                                // This is the critical fix: In development, we need to fetch the root key
-                                // In production, this should be false as the root key is hardcoded
-                                fetchRootKey: isDevelopment
+                                host: isDevelopment ? baseUrl : "https://ic0.app",
+                                // Fetch root key is critical for local development
+                                fetchRootKey: isDevelopment,
+                                // Add proper verification for local development
+                                verifyQuerySignatures: !isDevelopment,
+                                // Increase timeouts for local development
+                                callTimeout: isDevelopment ? 60000 : 30000,
+                                // Disable subnet lookup for local development which often fails
+                                disableRootSubnetCheck: isDevelopment
                             }
                         };
                         
+                        // Get canister ID from declarations
+                        const canisterId = declarations.canisterId;
                         console.log(`Creating actor with canister ID: ${canisterId} for method ${prop}`);
-                        const actor = createActor(canisterId, options);
+                        console.log(`Using host: ${options.agentOptions.host}`);
+                        
+                        // Create the agent first
+                        const agent = new HttpAgent(options.agentOptions);
+                        
+                        // Fetch root key once in development
+                        if (isDevelopment) {
+                            try {
+                                await agent.fetchRootKey();
+                                console.log("Successfully fetched root key for local development");
+                            } catch (rootKeyErr) {
+                                console.error("Failed to fetch root key:", rootKeyErr.message);
+                            }
+                        }
+                        
+                        // Use the createActor function from declarations if available, otherwise fall back to Actor.createActor
+                        let actor;
+                        if (typeof declarations.createActor === 'function') {
+                            actor = declarations.createActor(canisterId, { agent });
+                        } else if (declarations.idlFactory) {
+                            actor = Actor.createActor(declarations.idlFactory, { agent, canisterId });
+                        } else {
+                            throw new Error('Could not find createActor function or idlFactory in declarations');
+                        }
                         
                         if (typeof actor[prop] === 'function') {
                             console.log(`Calling canister method ${prop} with args:`, args);
-                            const result = await actor[prop](...args);
-                            console.log(`Canister method ${prop} result:`, result);
-                            return result;
+                            
+                            try {
+                                const result = await actor[prop](...args);
+                                console.log(`Canister method ${prop} result:`, result);
+                                
+                                // Clear from failed methods if it succeeded this time
+                                if (failedMethods.has(prop)) {
+                                    failedMethods.delete(prop);
+                                }
+                                
+                                return { success: true, data: result };
+                            } catch (callError) {
+                                console.error(`Error calling canister method ${prop}:`, callError);
+                                
+                                // Record the failed method
+                                failedMethods.add(prop);
+                                return { success: false, error: callError.message };
+                            }
                         } else {
                             console.warn(`Method ${prop} not found in actor, available methods:`, Object.keys(actor));
                             return { success: false, error: `Method ${prop} not found in actor` };
@@ -108,12 +162,23 @@ function createBackendProxy() {
                     } catch (err) {
                         console.error(`Error accessing canister method ${prop}:`, err);
                         
-                        // Provide more specific error messages for certificate issues
+                        // Provide more specific error messages for certificate and subnet issues
                         if (err.message && err.message.includes('certificate')) {
                             console.error('Certificate validation error - This could be due to clock skew or network issues');
                             return { 
                                 success: false, 
                                 error: `Certificate validation error: ${err.message}. Try refreshing the page or check your system clock` 
+                            };
+                        } else if (err.message && (err.message.includes('subnet') || err.message.includes('canister_not_found'))) {
+                            console.error('Subnet or canister discovery error - This is common in local development');
+                            return {
+                                success: false,
+                                error: `IC network error: ${err.message}. This may be due to local development environment issues.`
+                            };
+                        } else if (err.message && err.message.includes('HTTP error: 400')) {
+                            return { 
+                                success: false, 
+                                error: `HTTP 400 error: Backend canister not responding correctly. Verify that you're running a local replica with 'dfx start' and the canister is deployed with 'dfx deploy'.` 
                             };
                         }
                         

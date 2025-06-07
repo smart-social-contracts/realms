@@ -61,29 +61,67 @@
   ];
   
   async function loadDemoData() {
+    loading = true;
+    error = null;
+    
     try {
-      loading = true;
-      error = null;
-      
       console.log("Loading demo data...");
-      const result = await backend.extension_sync_call({
-        extension_name: "demo_loader",
-        function_name: "load",
-        args: "load_demo"
-      });
       
-      console.log("Demo data load result:", result);
+      // Configure longer timeout for demo data loading
+      const timeoutMs = 60000; // 1 minute timeout
+      const retryCount = 3;
       
-      if (result.success) {
-        console.log("Demo data loaded successfully:", result.response);
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Demo data load timeout")), timeoutMs)
+      );
+      
+      // Function to attempt the demo data load with retries
+      const attemptDemoDataLoad = async (attemptsLeft) => {
+        try {
+          console.log(`Attempting to load demo data (${attemptsLeft} attempts left)`);
+          
+          // Call the backend method to load demo data
+          const result = await backend.load_demo_data();
+          
+          if (result.success) {
+            console.log("Demo data loaded successfully");
+            return result;
+          } else {
+            throw new Error(result.error || "Unknown error from backend");
+          }
+        } catch (err) {
+          console.warn(`Demo data load attempt failed: ${err.message}`);
+          
+          if (attemptsLeft > 1) {
+            // Wait with exponential backoff before retrying
+            const delay = (retryCount - attemptsLeft + 1) * 1000;
+            console.log(`Retrying in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return attemptDemoDataLoad(attemptsLeft - 1);
+          } else {
+            throw err;
+          }
+        }
+      };
+      
+      // Create the load promise with retry logic
+      const loadPromise = attemptDemoDataLoad(retryCount);
+      
+      // Race between timeout and load with retry
+      const result = await Promise.race([loadPromise, timeoutPromise]);
+      
+      if (result && result.success) {
+        // If demo data load is successful, fetch the data
         await fetchAllData();
+        message = "Demo data loaded successfully";
       } else {
-        error = `Failed to load demo data: ${result.response || 'Unknown error'}`;
+        error = `Failed to load demo data: ${result?.error || "Unknown error"}`;
         console.error(error);
       }
     } catch (err) {
-      error = `Error loading demo data: ${err.message}`;
-      console.error("Demo data load error:", err);
+      error = `Failed to load demo data: ${err.message}`;
+      console.error("Error loading demo data:", err);
     } finally {
       loading = false;
     }
@@ -95,86 +133,97 @@
       error = null;
       data = {};
       
-      console.log("Fetching all GGG data...");
+      console.log("Fetching all GGG data in parallel...");
       
-      // Try to fetch each entity type
-      for (const config of entityConfigs) {
-        try {
-          let result;
+      // Prepare all fetch promises
+      const fetchPromises = entityConfigs.map(config => {
+        // Handle special case for transfers with pagination
+        if (config.name === 'transfers') {
+          return config.fetch(transfersPage, transfersPerPage);
+        } else {
+          return config.fetch();
+        }
+      });
+      
+      // Execute all API calls in parallel
+      const results = await Promise.all(fetchPromises);
+      
+      // Process the results in the same order as the configs
+      for (let i = 0; i < results.length; i++) {
+        const config = entityConfigs[i];
+        const result = results[i];
+        
+        if (result && result.success && result.data) {
+          // Navigate to the data using the dataPath
+          const pathParts = config.dataPath.split('.');
+          let entityData = result.data;
           
-          // Handle special case for transfers with pagination
-          if (config.name === 'transfers') {
-            result = await config.fetch(transfersPage, transfersPerPage);
+          for (const part of pathParts) {
+            if (entityData && entityData[part]) {
+              entityData = entityData[part];
+            } else {
+              entityData = null;
+              break;
+            }
+          }
+          
+          if (entityData && Array.isArray(entityData) && entityData.length > 0) {
+            // Parse JSON strings if needed
+            const parsedData = entityData.map(item => {
+              if (typeof item === 'string') {
+                try {
+                  return JSON.parse(item);
+                } catch (e) {
+                  return item;
+                }
+              }
+              return item;
+            });
+            
+            data[config.name] = parsedData;
+            console.log(`✅ ${config.name}: ${parsedData.length} items`);
+            
+            // Get pagination info for transfers
+            if (config.name === 'transfers' && config.paginationPath) {
+              const paginationParts = config.paginationPath.split('.');
+              let paginationData = result.data;
+              
+              for (const part of paginationParts) {
+                if (paginationData && paginationData[part]) {
+                  paginationData = paginationData[part];
+                } else {
+                  paginationData = null;
+                  break;
+                }
+              }
+              
+              if (paginationData) {
+                transfersPagination = paginationData;
+                console.log(`✅ Transfers pagination:`, transfersPagination);
+              }
+            }
           } else {
-            result = await config.fetch();
+            console.log(`⚠️ ${config.name}: No valid data found`);
           }
-          
-          if (result.success && result.data) {
-            // Navigate to the data using the dataPath
-            const pathParts = config.dataPath.split('.');
-            let entityData = result.data;
-            
-            for (const part of pathParts) {
-              if (entityData && entityData[part]) {
-                entityData = entityData[part];
-              } else {
-                entityData = null;
-                break;
-              }
-            }
-            
-            if (entityData && Array.isArray(entityData) && entityData.length > 0) {
-              // Parse JSON strings if needed
-              const parsedData = entityData.map(item => {
-                if (typeof item === 'string') {
-                  try {
-                    return JSON.parse(item);
-                  } catch (e) {
-                    return item;
-                  }
-                }
-                return item;
-              });
-              
-              data[config.name] = parsedData;
-              console.log(`✅ ${config.name}: ${parsedData.length} items`);
-              
-              // Get pagination info for transfers
-              if (config.name === 'transfers' && config.paginationPath) {
-                const paginationParts = config.paginationPath.split('.');
-                let paginationData = result.data;
-                
-                for (const part of paginationParts) {
-                  if (paginationData && paginationData[part]) {
-                    paginationData = paginationData[part];
-                  } else {
-                    paginationData = null;
-                    break;
-                  }
-                }
-                
-                if (paginationData) {
-                  transfersPagination = paginationData;
-                  console.log(`✅ Transfers pagination:`, transfersPagination);
-                }
-              }
-            }
-          }
-        } catch (err) {
-          console.log(`❌ ${config.name}: ${err.message}`);
+        } else {
+          console.log(`❌ ${config.name}: ${result?.error || 'Failed to fetch'}`);
         }
       }
       
       console.log("Data loaded:", Object.keys(data));
       
-      // Calculate metrics and relationships
-      calculateMetrics();
-      findRelationships();
-      getRecentActivity();
+      // Only calculate metrics and relationships if we have data
+      if (Object.keys(data).length > 0) {
+        calculateMetrics();
+        findRelationships();
+        getRecentActivity();
+      } else {
+        console.log("No data loaded, skipping calculations");
+      }
       
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      error = `Data fetch error: ${error.message}`;
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      error = `Data fetch error: ${err.message}`;
     } finally {
       loading = false;
     }
