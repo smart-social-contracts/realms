@@ -60,73 +60,6 @@
     { name: 'votes', fetch: () => backend.get_votes(), dataPath: 'VotesList.votes' }
   ];
   
-  async function loadDemoData() {
-    loading = true;
-    error = null;
-    
-    try {
-      console.log("Loading demo data...");
-      
-      // Configure longer timeout for demo data loading
-      const timeoutMs = 60000; // 1 minute timeout
-      const retryCount = 3;
-      
-      // Create a timeout promise
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Demo data load timeout")), timeoutMs)
-      );
-      
-      // Function to attempt the demo data load with retries
-      const attemptDemoDataLoad = async (attemptsLeft) => {
-        try {
-          console.log(`Attempting to load demo data (${attemptsLeft} attempts left)`);
-          
-          // Call the backend method to load demo data
-          const result = await backend.load_demo_data();
-          
-          if (result.success) {
-            console.log("Demo data loaded successfully");
-            return result;
-          } else {
-            throw new Error(result.error || "Unknown error from backend");
-          }
-        } catch (err) {
-          console.warn(`Demo data load attempt failed: ${err.message}`);
-          
-          if (attemptsLeft > 1) {
-            // Wait with exponential backoff before retrying
-            const delay = (retryCount - attemptsLeft + 1) * 1000;
-            console.log(`Retrying in ${delay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            return attemptDemoDataLoad(attemptsLeft - 1);
-          } else {
-            throw err;
-          }
-        }
-      };
-      
-      // Create the load promise with retry logic
-      const loadPromise = attemptDemoDataLoad(retryCount);
-      
-      // Race between timeout and load with retry
-      const result = await Promise.race([loadPromise, timeoutPromise]);
-      
-      if (result && result.success) {
-        // If demo data load is successful, fetch the data
-        await fetchAllData();
-        message = "Demo data loaded successfully";
-      } else {
-        error = `Failed to load demo data: ${result?.error || "Unknown error"}`;
-        console.error(error);
-      }
-    } catch (err) {
-      error = `Failed to load demo data: ${err.message}`;
-      console.error("Error loading demo data:", err);
-    } finally {
-      loading = false;
-    }
-  }
-  
   async function fetchAllData() {
     try {
       loading = true;
@@ -470,18 +403,6 @@
       <h1 class="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
       <p class="text-gray-600 mt-1">Generalized Global Governance System</p>
     </div>
-    <button 
-      class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center transition-colors"
-      on:click={loadDemoData}
-      disabled={loading}
-    >
-      {#if loading}
-        <div class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-        Loading...
-      {:else}
-        <span class="mr-2">🔄</span> Load Demo Data
-      {/if}
-    </button>
   </div>
   
   {#if error}
