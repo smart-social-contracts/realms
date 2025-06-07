@@ -1,8 +1,6 @@
+from ggg import Trade, Transfer
 from kybra_simple_db import Entity, OneToMany, String, TimestampedMixin
 from kybra_simple_logging import get_logger
-
-from ggg import Transfer, Trade
-
 
 logger = get_logger("entity.user")
 
