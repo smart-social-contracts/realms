@@ -72,9 +72,6 @@
 		<Button class="me-2" color="alternative" href="/join" pill={true}>
 			<T key="buttons.join" default_text="Join" />
 		</Button>
-		<Button class="me-2" color="primary" href="/login" pill={true}>
-			<T key="buttons.login" default_text="Log In" />
-		</Button>
 		<UserMenu {...Users[4]} />
 	</div>
 </Navbar>
