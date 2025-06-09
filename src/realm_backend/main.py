@@ -214,6 +214,7 @@ def get_tasks() -> RealmResponse:
 def get_transfers(page: nat = 1, per_page: nat = 10) -> RealmResponse:
     try:
         transfers_data = list_transfers(page=page, per_page=per_page)
+
         # Convert dictionary to JSON string
         transfers_json = [
             json.dumps(transfer) for transfer in transfers_data["transfers"]

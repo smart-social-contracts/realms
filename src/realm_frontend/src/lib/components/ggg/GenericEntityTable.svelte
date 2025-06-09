@@ -3,7 +3,9 @@
   export let items = [];
   export let loading = false;
   export let pagination = null;
-  export let onPageChange = (page) => {};
+  export let onPageChange = (page) => {
+    console.log(`Page change requested for ${entityType} to page ${page}`);
+  };
   
   // Alias for backward compatibility
   $: entities = items;

@@ -4,6 +4,19 @@
   export let pagination = null;
   export let onPageChange = (page) => {};
   
+  // Parse JSON strings if needed
+  $: parsedTransfers = transfers.map(transfer => {
+    if (typeof transfer === 'string') {
+      try {
+        return JSON.parse(transfer);
+      } catch (e) {
+        console.error('Error parsing transfer JSON:', e);
+        return {};
+      }
+    }
+    return transfer;
+  });
+  
   // Current page defaults to 1 if not provided in pagination
   $: currentPage = pagination?.page || 1;
   $: totalPages = pagination?.total_pages || 1;
@@ -14,6 +27,55 @@
     if (newPage >= 1 && newPage <= totalPages) {
       onPageChange(newPage);
     }
+  }
+
+  // Helper functions to adapt to the backend data structure
+  function getTransferId(transfer) {
+    return transfer._id || transfer.id || 'N/A';
+  }
+  
+  function getFromUser(transfer) {
+    // Check both formats: relations.from_user[0] (frontend expected) and from_user (backend actual)
+    if (transfer.relations?.from_user?.[0]?._id) {
+      return transfer.relations.from_user[0]._id;
+    } else if (transfer.from_user?.id) {
+      return transfer.from_user.id;
+    } else if (transfer.from_user) {
+      // If from_user is just a string or plain value
+      return transfer.from_user;
+    }
+    return 'N/A';
+  }
+  
+  function getToUser(transfer) {
+    // Check both formats: relations.to_user[0] (frontend expected) and to_user (backend actual)
+    if (transfer.relations?.to_user?.[0]?._id) {
+      return transfer.relations.to_user[0]._id;
+    } else if (transfer.to_user?.id) {
+      return transfer.to_user.id;
+    } else if (transfer.to_user) {
+      // If to_user is just a string or plain value
+      return transfer.to_user;
+    }
+    return 'N/A';
+  }
+  
+  function getInstrument(transfer) {
+    // Check both formats: relations.instrument[0] (frontend expected) and instrument (backend actual)
+    if (transfer.relations?.instrument?.[0]?._id) {
+      return transfer.relations.instrument[0]._id;
+    } else if (transfer.instrument?.id) {
+      return transfer.instrument.id;
+    } else if (transfer.instrument) {
+      // If instrument is just a string or plain value
+      return transfer.instrument;
+    }
+    return 'N/A';
+  }
+  
+  function getCreatedAt(transfer) {
+    // Check various possible timestamp field names
+    return transfer.timestamp_created || transfer.created_at || transfer.timestamp || 'N/A';
   }
 </script>
 
@@ -54,25 +116,19 @@
         <tr>
           <td colspan="7" class="px-6 py-4 text-center">Loading...</td>
         </tr>
-      {:else if transfers.length === 0}
+      {:else if parsedTransfers.length === 0}
         <tr>
           <td colspan="7" class="px-6 py-4 text-center">No transfers found</td>
         </tr>
       {:else}
-        {#each transfers as transfer}
+        {#each parsedTransfers as transfer}
           <tr class="border-b hover:bg-gray-50">
-            <td class="px-6 py-4 whitespace-nowrap">{transfer._id || 'N/A'}</td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              {transfer.relations?.from_user?.[0]?._id || 'N/A'}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              {transfer.relations?.to_user?.[0]?._id || 'N/A'}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              {transfer.relations?.instrument?.[0]?._id || 'N/A'}
-            </td>
+            <td class="px-6 py-4 whitespace-nowrap">{getTransferId(transfer)}</td>
+            <td class="px-6 py-4 whitespace-nowrap">{getFromUser(transfer)}</td>
+            <td class="px-6 py-4 whitespace-nowrap">{getToUser(transfer)}</td>
+            <td class="px-6 py-4 whitespace-nowrap">{getInstrument(transfer)}</td>
             <td class="px-6 py-4 whitespace-nowrap">{transfer.amount || 'N/A'}</td>
-            <td class="px-6 py-4 whitespace-nowrap">{transfer.timestamp_created || 'N/A'}</td>
+            <td class="px-6 py-4 whitespace-nowrap">{getCreatedAt(transfer)}</td>
             <td class="px-6 py-4 whitespace-nowrap">
               <button class="text-blue-600 hover:text-blue-900">View</button>
             </td>
@@ -152,7 +208,7 @@
   
   {#if pagination}
     <div class="text-xs text-gray-500 mt-2 text-center">
-      Showing {transfers.length} of {pagination.total} transfers (Page {currentPage} of {totalPages})
+      Showing {parsedTransfers.length} of {pagination.total} transfers (Page {currentPage} of {totalPages})
     </div>
   {/if}
 </div>

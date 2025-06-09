@@ -21,6 +21,12 @@
   let transfersPagination = null;
   let searchTerm = '';
   
+  // Handle pagination for transfers
+  async function handleTransfersPageChange(page) {
+    transfersPage = page;
+    await fetchEntityData('transfers');
+  }
+  
   // Static list of all known GGG entity types - always show these tabs
   const allEntityTypes = [
     'users',
