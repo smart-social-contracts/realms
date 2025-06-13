@@ -216,7 +216,7 @@ def get_transfers(from_id: nat, count: nat) -> RealmResponse:
         logger.info(f"Listing transfers from ID {from_id} with count {count}")
         transfers = list_transfers(from_id=from_id, count=count)
         logger.info(f"Found {len(transfers)} transfers")
-        transfers_json = [json.dumps(transfer) for transfer in transfers]
+        transfers_json = [json.dumps(transfer.to_dict()) for transfer in transfers]
         
         return RealmResponse(
             success=True,
