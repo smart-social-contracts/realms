@@ -33,7 +33,6 @@ class TasksListRecord(Record):
 
 class TransfersListRecord(Record):
     transfers: Vec[text]  # JSON string of transfer data
-    pagination: Opt["PaginationInfo"]  # Optional pagination info
 
 
 class InstrumentsListRecord(Record):

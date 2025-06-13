@@ -100,170 +100,22 @@ def list_trades() -> Dict[str, Any]:
         raise
 
 
-def list_transfers(page: int = 1, per_page: int = 10) -> Dict[str, Any]:
-    """List transfers in the system with pagination."""
+def list_transfers(from_id: int, count: int) -> List[Transfer]:
+    """List transfers in the system with pagination.
+    
+    Args:
+        from_id (int, optional): The starting ID.
+        count (int, optional): Number of items to return.
+        
+    Returns:
+        List[Transfer]: List of Transfer objects for the requested page
+    """
     try:
-        transfers = []
-        total_count = 0
-
-        # Check if Transfer class is available and has instances
-        if hasattr(Transfer, "instances"):
-            try:
-                # Get all transfers as a list to count them
-                all_transfers = list(Transfer.instances())
-                total_count = len(all_transfers)
-
-                # Early return if there are no transfers
-                if total_count == 0:
-                    return {
-                        "transfers": [],
-                        "pagination": {
-                            "page": page,
-                            "per_page": per_page,
-                            "total": 0,
-                            "total_pages": 0,
-                            "has_next": False,
-                            "has_prev": page > 1,
-                        },
-                    }
-
-                # Calculate pagination
-                start_index = (page - 1) * per_page
-                end_index = min(start_index + per_page, total_count)
-
-                # Get transfers for current page
-                for i in range(start_index, end_index):
-                    if i < total_count:
-                        transfer = all_transfers[i]
-                        # Create transfer dict manually to handle missing relationships
-                        transfer_dict = {
-                            "_id": transfer._id,
-                            "amount": transfer.amount,
-                            "timestamp_created": (
-                                transfer.timestamp_created
-                                if hasattr(transfer, "timestamp_created")
-                                else None
-                            ),
-                            "timestamp_updated": (
-                                transfer.timestamp_updated
-                                if hasattr(transfer, "timestamp_updated")
-                                else None
-                            ),
-                            "relations": {
-                                "from_user": [],
-                                "to_user": [],
-                                "instrument": [],
-                            },
-                        }
-
-                        # Safely handle relationships - from_user
-                        if (
-                            hasattr(transfer, "from_user")
-                            and transfer.from_user is not None
-                        ):
-                            try:
-                                from_user = {
-                                    "_id": transfer.from_user._id,
-                                    "name": (
-                                        transfer.from_user.name
-                                        if hasattr(transfer.from_user, "name")
-                                        else "Unknown"
-                                    ),
-                                }
-                                transfer_dict["relations"]["from_user"].append(
-                                    from_user
-                                )
-                            except Exception as user_error:
-                                logger.error(
-                                    f"Error getting from_user for transfer {transfer._id}: {str(user_error)}"
-                                )
-
-                        # Safely handle relationships - to_user
-                        if (
-                            hasattr(transfer, "to_user")
-                            and transfer.to_user is not None
-                        ):
-                            try:
-                                to_user = {
-                                    "_id": transfer.to_user._id,
-                                    "name": (
-                                        transfer.to_user.name
-                                        if hasattr(transfer.to_user, "name")
-                                        else "Unknown"
-                                    ),
-                                }
-                                transfer_dict["relations"]["to_user"].append(to_user)
-                            except Exception as user_error:
-                                logger.error(
-                                    f"Error getting to_user for transfer {transfer._id}: {str(user_error)}"
-                                )
-
-                        # Safely handle relationships - instrument
-                        if (
-                            hasattr(transfer, "instrument")
-                            and transfer.instrument is not None
-                        ):
-                            try:
-                                instrument = {
-                                    "_id": transfer.instrument._id,
-                                    "name": (
-                                        transfer.instrument.name
-                                        if hasattr(transfer.instrument, "name")
-                                        else "Unknown"
-                                    ),
-                                }
-                                transfer_dict["relations"]["instrument"].append(
-                                    instrument
-                                )
-                            except Exception as instrument_error:
-                                logger.error(
-                                    f"Error getting instrument for transfer {transfer._id}: {str(instrument_error)}"
-                                )
-
-                        transfers.append(transfer_dict)
-
-            except Exception as transfer_error:
-                logger.error(f"Error processing transfers: {str(transfer_error)}")
-                # Return a useful error response
-                return {
-                    "transfers": [],
-                    "pagination": {
-                        "page": page,
-                        "per_page": per_page,
-                        "total": 0,
-                        "total_pages": 0,
-                        "has_next": False,
-                        "has_prev": page > 1,
-                    },
-                }
-
-        return {
-            "transfers": transfers,
-            "pagination": {
-                "page": page,
-                "per_page": per_page,
-                "total": total_count,
-                "total_pages": (
-                    (total_count + per_page - 1) // per_page if total_count > 0 else 0
-                ),
-                "has_next": page * per_page < total_count,
-                "has_prev": page > 1,
-            },
-        }
+        transfers = Transfer.load_some(from_id=from_id, count=count)
+        return transfers
     except Exception as e:
         logger.error(f"Error listing transfers: {str(e)}")
-        # Simplified error handling - return empty results
-        return {
-            "transfers": [],
-            "pagination": {
-                "page": page,
-                "per_page": per_page,
-                "total": 0,
-                "total_pages": 0,
-                "has_next": False,
-                "has_prev": page > 1,
-            },
-        }
+        return []
 
 
 def list_organizations() -> Dict[str, Any]:
