@@ -5,6 +5,8 @@ logger = get_logger("entity.task")
 
 
 class Task(Entity, TimestampedMixin):
+    __alias__ = "name"
+    name = String(max_length=256)
     metadata = String(max_length=256)
     schedules = ManyToMany("TaskSchedule", "tasks")
     codex = ManyToOne("Codex", "tasks")

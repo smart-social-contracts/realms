@@ -5,5 +5,6 @@ logger = get_logger("entity.mandate")
 
 
 class Mandate(Entity, TimestampedMixin):
+    __alias__ = "name"
     name = String(max_length=256)
     metadata = String(max_length=256)

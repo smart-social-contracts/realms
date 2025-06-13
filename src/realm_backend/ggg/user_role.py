@@ -5,4 +5,6 @@ logger = get_logger("entity.user_role")
 
 
 class UserRole(Entity, TimestampedMixin):
+    __alias__ = "name"
+    name = String(max_length=256)
     description = String(max_length=256)

@@ -5,5 +5,7 @@ logger = get_logger("entity.task_schedule")
 
 
 class TaskSchedule(Entity, TimestampedMixin):
+    __alias__ = "name"
+    name = String(max_length=256)
     cron_expression = String(max_length=64)
     tasks = ManyToMany("Task", "schedules")

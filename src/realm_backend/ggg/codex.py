@@ -5,5 +5,8 @@ logger = get_logger("entity.codex")
 
 
 class Codex(Entity, TimestampedMixin):
+    name = String()
     code = String()
     tasks = OneToMany("Task", "codex")
+    __alias__ = "name"
+

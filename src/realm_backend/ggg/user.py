@@ -6,6 +6,7 @@ logger = get_logger("entity.user")
 
 
 class User(Entity, TimestampedMixin):
+    __alias__ = "name"
     name = String(min_length=2, max_length=256)
     transfers_from = OneToMany("Transfer", "from_user")
     transfers_to = OneToMany("Transfer", "to_user")

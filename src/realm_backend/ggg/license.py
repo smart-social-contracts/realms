@@ -5,4 +5,6 @@ logger = get_logger("entity.license")
 
 
 class License(Entity, TimestampedMixin):
+    __alias__ = "name"
+    name = String(max_length=256)
     metadata = String(max_length=256)
