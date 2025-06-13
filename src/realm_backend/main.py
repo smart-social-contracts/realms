@@ -213,7 +213,9 @@ def get_tasks() -> RealmResponse:
 @query
 def get_transfers(from_id: nat, count: nat) -> RealmResponse:
     try:
+        logger.info(f"Listing transfers from ID {from_id} with count {count}")
         transfers = list_transfers(from_id=from_id, count=count)
+        logger.info(f"Found {len(transfers)} transfers")
         transfers_json = [json.dumps(transfer) for transfer in transfers]
         
         return RealmResponse(
