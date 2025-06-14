@@ -20,9 +20,18 @@ dfx canister call realm_backend extension_sync_call '(
   record {
     extension_name = "demo_loader";
     function_name = "load";
-    args = "{\"step\": \"user_management\"}";
+    args = "{\"step\": \"user_management\", \"batch\": 0}";
   }
 )'
+
+dfx canister call realm_backend extension_sync_call '(
+  record {
+    extension_name = "demo_loader";
+    function_name = "load";
+    args = "{\"step\": \"user_management\", \"batch\": 1}";
+  }
+)'
+
 
 dfx canister call realm_backend extension_sync_call '(
   record {
@@ -61,6 +70,7 @@ def load(args: str):
         args = args or "{}"
         args = json.loads(args)
         step = args.get("step")
+        batch = args.get("batch")
 
         if not step:
             return "Error: 'step' parameter is required. Valid steps are: base_setup, user_management, financial_services, government_services, transactions"
@@ -77,7 +87,7 @@ def load(args: str):
         elif step == "user_management":
             logger.info("Step 2: Creating users and humans")
             from .user_management import run as run_user_management
-            return run_user_management()
+            return run_user_management(batch)
 
         # Step 3: Financial services
         elif step == "financial_services":
