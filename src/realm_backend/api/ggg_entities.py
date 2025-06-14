@@ -1,3 +1,4 @@
+import math
 from typing import Any, Dict, List, Optional
 
 from ggg.codex import Codex
@@ -100,19 +101,21 @@ def list_trades() -> Dict[str, Any]:
         raise
 
 
-def list_transfers(from_id: int, count: int) -> List[Transfer]:
-    """List transfers in the system with pagination.
-    
-    Args:
-        from_id (int, optional): The starting ID.
-        count (int, optional): Number of items to return.
-        
-    Returns:
-        List[Transfer]: List of Transfer objects for the requested page
-    """
+def list_transfers(page_num: int, page_size: int) -> List[Transfer]:
+    """List transfers in the system with pagination."""
+
     try:
-        transfers = Transfer.load_some(from_id=from_id, count=count)
-        return transfers
+        from_id = page_num * page_size + 1
+        logger.info(f"Listing transfers from {from_id} with page size {page_size}")
+        transfers = Transfer.load_some(from_id=from_id, count=page_size)
+        count = Transfer.count()
+        return {
+            "items": transfers,
+            "page_num": page_num,
+            "page_size": page_size,
+            "total_items_count": count,
+            "total_pages": math.ceil(count / page_size),
+        }
     except Exception as e:
         logger.error(f"Error listing transfers: {str(e)}")
         return []

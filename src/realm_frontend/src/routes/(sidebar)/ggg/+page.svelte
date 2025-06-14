@@ -16,13 +16,14 @@
   let selectedFilter = 'all';
   
   // Add pagination state for transfers
-  let transfersPage = 1;
-  let transfersPerPage = 10;
+  let transfersPage = 0;
+  let transfersPerPage = 5;
   let transfersPagination = null;
   let searchTerm = '';
   
   // Handle pagination for transfers
   async function handleTransfersPageChange(page) {
+    // page is 0-based from the table, so use as is
     transfersPage = page;
     await fetchEntityData('transfers');
   }
@@ -51,7 +52,7 @@
     { name: 'tasks', fetch: () => backend.get_tasks(), dataPath: 'TasksList.tasks' },
     { 
       name: 'transfers', 
-      fetch: (page = 1, perPage = 10) => backend.get_transfers(page, perPage), 
+      fetch: (page_num = 0, page_size = 5) => backend.get_transfers(page_num, page_size), 
       dataPath: 'TransfersList.transfers',
       paginationPath: 'TransfersList.pagination'
     },

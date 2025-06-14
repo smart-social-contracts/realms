@@ -211,18 +211,24 @@ def get_tasks() -> RealmResponse:
 
 
 @query
-def get_transfers(from_id: nat, count: nat) -> RealmResponse:
+def get_transfers(page_num: nat, page_size: nat) -> RealmResponse:
     try:
-        logger.info(f"Listing transfers from ID {from_id} with count {count}")
-        transfers = list_transfers(from_id=from_id, count=count)
-        logger.info(f"Found {len(transfers)} transfers")
+        logger.info(f"Listing transfers for page {page_num} with page size {page_size}")
+        result = list_transfers(page_num=page_num, page_size=page_size)
+        transfers = result["items"]
         transfers_json = [json.dumps(transfer.to_dict()) for transfer in transfers]
-        
+        pagination = PaginationInfo(
+            page_num=result["page_num"],
+            page_size=result["page_size"],
+            total_items_count=result["total_items_count"],
+            total_pages=result["total_pages"]
+        )
         return RealmResponse(
             success=True,
             data=RealmResponseData(
                 TransfersList=TransfersListRecord(
-                    transfers=transfers_json
+                    transfers=transfers_json,
+                    pagination=pagination
                 )
             ),
         )

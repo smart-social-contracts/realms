@@ -1,5 +1,10 @@
 from kybra import Opt, Principal, Record, Variant, Vec, float64, nat, text
 
+class PaginationInfo(Record):
+    page_num: int
+    page_size: int
+    total_items_count: int
+    total_pages: int
 
 class StatusRecord(Record):
     version: text
@@ -33,6 +38,7 @@ class TasksListRecord(Record):
 
 class TransfersListRecord(Record):
     transfers: Vec[text]  # JSON string of transfer data
+    pagination: PaginationInfo
 
 
 class InstrumentsListRecord(Record):
@@ -122,11 +128,3 @@ class ExtensionCallResponse(Record):
     success: bool
     response: text
 
-
-class PaginationInfo(Record):
-    page: nat
-    per_page: nat
-    total: nat
-    total_pages: nat
-    has_next: bool
-    has_prev: bool

@@ -3,10 +3,7 @@
   export let loading = false;
   export let pagination = null;
   export let onPageChange = (page) => {};
-  
-  // Use a constant for fallback page size
-  const FALLBACK_PAGE_SIZE = 5;
-  
+
   // Parse JSON strings if needed
   $: parsedTransfers = transfers.map(transfer => {
     if (typeof transfer === 'string') {
@@ -19,32 +16,22 @@
     }
     return transfer;
   });
-  
-  // Current page defaults to 1 if not provided in pagination
-  $: currentPage = pagination?.page || 1;
-  $: totalPages = pagination?.total_pages || 1;
-  $: hasNextPage = pagination?.has_next || false;
-  $: hasPrevPage = pagination?.has_prev || false;
-  
-  $: fallbackPageSize = FALLBACK_PAGE_SIZE;
-  $: fallbackTotal = transfers.length;
-  $: fallbackTotalPages = Math.ceil(fallbackTotal / fallbackPageSize);
-  $: fallbackCurrentPage = currentPage > fallbackTotalPages ? 1 : currentPage;
-  $: fallbackPagination = pagination || (fallbackTotal > fallbackPageSize ? {
-    page: fallbackCurrentPage,
-    total_pages: fallbackTotalPages,
-    has_next: fallbackCurrentPage < fallbackTotalPages,
-    has_prev: fallbackCurrentPage > 1,
-    total: fallbackTotal
-  } : null);
 
-  $: paginatedTransfers = fallbackPagination && !pagination
-    ? transfers.slice((fallbackCurrentPage - 1) * fallbackPageSize, fallbackCurrentPage * fallbackPageSize)
-    : transfers;
+  // Convert BigInt pagination fields to Number
+  $: safePagination = pagination && {
+    page_num: Number(pagination.page_num),
+    total_pages: Number(pagination.total_pages),
+    total_items_count: Number(pagination.total_items_count),
+    page_size: Number(pagination.page_size)
+  };
+  $: currentPage = (safePagination?.page_num ?? 0) + 1;
+  $: totalPages = safePagination?.total_pages ?? 1;
+  $: hasNextPage = safePagination ? (safePagination.page_num + 1 < safePagination.total_pages) : false;
+  $: hasPrevPage = safePagination ? (safePagination.page_num > 0) : false;
 
   function changePage(newPage) {
-    if (newPage >= 1 && newPage <= (fallbackPagination ? fallbackPagination.total_pages : totalPages)) {
-      onPageChange(newPage);
+    if (newPage >= 1 && newPage <= totalPages) {
+      onPageChange(newPage - 1); // backend expects 0-based
     }
   }
 
@@ -52,48 +39,37 @@
   function getTransferId(transfer) {
     return transfer._id || transfer.id || 'N/A';
   }
-  
   function getFromUser(transfer) {
-    // Check both formats: relations.from_user[0] (frontend expected) and from_user (backend actual)
     if (transfer.relations?.from_user?.[0]?._id) {
       return transfer.relations.from_user[0]._id;
     } else if (transfer.from_user?.id) {
       return transfer.from_user.id;
     } else if (transfer.from_user) {
-      // If from_user is just a string or plain value
       return transfer.from_user;
     }
     return 'N/A';
   }
-  
   function getToUser(transfer) {
-    // Check both formats: relations.to_user[0] (frontend expected) and to_user (backend actual)
     if (transfer.relations?.to_user?.[0]?._id) {
       return transfer.relations.to_user[0]._id;
     } else if (transfer.to_user?.id) {
       return transfer.to_user.id;
     } else if (transfer.to_user) {
-      // If to_user is just a string or plain value
       return transfer.to_user;
     }
     return 'N/A';
   }
-  
   function getInstrument(transfer) {
-    // Check both formats: relations.instrument[0] (frontend expected) and instrument (backend actual)
     if (transfer.relations?.instrument?.[0]?._id) {
       return transfer.relations.instrument[0]._id;
     } else if (transfer.instrument?.id) {
       return transfer.instrument.id;
     } else if (transfer.instrument) {
-      // If instrument is just a string or plain value
       return transfer.instrument;
     }
     return 'N/A';
   }
-  
   function getCreatedAt(transfer) {
-    // Check various possible timestamp field names
     return transfer.timestamp_created || transfer.created_at || transfer.timestamp || 'N/A';
   }
 </script>
@@ -135,25 +111,19 @@
         <tr>
           <td colspan="7" class="px-6 py-4 text-center">Loading...</td>
         </tr>
-      {:else if paginatedTransfers.length === 0}
+      {:else if parsedTransfers.length === 0}
         <tr>
           <td colspan="7" class="px-6 py-4 text-center">No transfers found</td>
         </tr>
       {:else}
-        {#each paginatedTransfers as transfer}
+        {#each parsedTransfers as transfer}
           <tr class="border-b hover:bg-gray-50">
-            <td class="px-6 py-4 whitespace-nowrap">{transfer._id || 'N/A'}</td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              {transfer.relations?.from_user?.[0]?._id || 'N/A'}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              {transfer.relations?.to_user?.[0]?._id || 'N/A'}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              {transfer.relations?.instrument?.[0]?._id || 'N/A'}
-            </td>
+            <td class="px-6 py-4 whitespace-nowrap">{getTransferId(transfer)}</td>
+            <td class="px-6 py-4 whitespace-nowrap">{getFromUser(transfer)}</td>
+            <td class="px-6 py-4 whitespace-nowrap">{getToUser(transfer)}</td>
+            <td class="px-6 py-4 whitespace-nowrap">{getInstrument(transfer)}</td>
             <td class="px-6 py-4 whitespace-nowrap">{transfer.amount || 'N/A'}</td>
-            <td class="px-6 py-4 whitespace-nowrap">{transfer.timestamp_created || 'N/A'}</td>
+            <td class="px-6 py-4 whitespace-nowrap">{getCreatedAt(transfer)}</td>
             <td class="px-6 py-4 whitespace-nowrap">
               <button class="text-blue-600 hover:text-blue-900">View</button>
             </td>
@@ -163,20 +133,20 @@
     </tbody>
   </table>
   
-  {#if fallbackPagination && fallbackPagination.total_pages > 1}
+  {#if safePagination && totalPages > 1}
     <div class="flex justify-center items-center mt-4 space-x-2">
       <button 
-        class="px-3 py-1 rounded border {fallbackPagination.has_prev ? 'bg-blue-100 hover:bg-blue-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}" 
-        disabled={!fallbackPagination.has_prev}
-        on:click={() => changePage((fallbackPagination.page || 1) - 1)}
+        class="px-3 py-1 rounded border {hasPrevPage ? 'bg-blue-100 hover:bg-blue-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}" 
+        disabled={!hasPrevPage}
+        on:click={() => changePage(currentPage - 1)}
       >
         Previous
       </button>
       <div class="flex space-x-1">
-        {#if fallbackPagination.total_pages <= 7}
-          {#each Array(fallbackPagination.total_pages) as _, i}
+        {#if totalPages <= 7}
+          {#each Array(totalPages) as _, i}
             <button 
-              class="w-8 h-8 rounded-full {fallbackPagination.page === i+1 ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
+              class="w-8 h-8 rounded-full {currentPage === i+1 ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
               on:click={() => changePage(i+1)}
             >
               {i+1}
@@ -184,49 +154,47 @@
           {/each}
         {:else}
           <button 
-            class="w-8 h-8 rounded-full {fallbackPagination.page === 1 ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
+            class="w-8 h-8 rounded-full {currentPage === 1 ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
             on:click={() => changePage(1)}
           >
             1
           </button>
-          {#if fallbackPagination.page > 3}
+          {#if currentPage > 3}
             <span class="px-1">...</span>
           {/if}
           {#each Array(3).fill(0) as _, i}
-            {@const pageNum = Math.max(2, Math.min((fallbackPagination.page || 1) - 1 + i, fallbackPagination.total_pages - 1))}
-            {#if pageNum > 1 && pageNum < fallbackPagination.total_pages}
+            {@const pageNum = Math.max(2, Math.min(currentPage - 1 + i, totalPages - 1))}
+            {#if pageNum > 1 && pageNum < totalPages}
               <button 
-                class="w-8 h-8 rounded-full {fallbackPagination.page === pageNum ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
+                class="w-8 h-8 rounded-full {currentPage === pageNum ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
                 on:click={() => changePage(pageNum)}
               >
                 {pageNum}
               </button>
             {/if}
           {/each}
-          {#if fallbackPagination.page < fallbackPagination.total_pages - 2}
+          {#if currentPage < totalPages - 2}
             <span class="px-1">...</span>
           {/if}
           <button 
-            class="w-8 h-8 rounded-full {fallbackPagination.page === fallbackPagination.total_pages ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
-            on:click={() => changePage(fallbackPagination.total_pages)}
+            class="w-8 h-8 rounded-full {currentPage === totalPages ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
+            on:click={() => changePage(totalPages)}
           >
-            {fallbackPagination.total_pages}
+            {totalPages}
           </button>
         {/if}
       </div>
       <button 
-        class="px-3 py-1 rounded border {fallbackPagination.has_next ? 'bg-blue-100 hover:bg-blue-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}" 
-        disabled={!fallbackPagination.has_next}
-        on:click={() => changePage((fallbackPagination.page || 1) + 1)}
+        class="px-3 py-1 rounded border {hasNextPage ? 'bg-blue-100 hover:bg-blue-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}" 
+        disabled={!hasNextPage}
+        on:click={() => changePage(currentPage + 1)}
       >
         Next
       </button>
     </div>
   {/if}
   
-  {#if fallbackPagination}
-    <div class="text-xs text-gray-500 mt-2 text-center">
-      Showing {paginatedTransfers.length} of {fallbackPagination.total} transfers (Page {fallbackPagination.page} of {fallbackPagination.total_pages})
-    </div>
-  {/if}
+  <div class="text-xs text-gray-500 mt-2 text-center">
+    Showing {parsedTransfers.length} of {safePagination?.total_items_count || parsedTransfers.length} transfers (Page {currentPage} of {totalPages})
+  </div>
 </div>
