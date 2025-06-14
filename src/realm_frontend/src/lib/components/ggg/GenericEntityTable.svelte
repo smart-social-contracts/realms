@@ -149,236 +149,165 @@
 </script>
 
 <div class="w-full overflow-x-auto">
-  {#if entityType === 'transfers'}
-    <TransfersTable 
-      transfers={entities} 
-      {loading} 
-      pagination={pagination}
-      onPageChange={onPageChange}
-    />
-  {:else}
-    <h2 class="text-xl font-bold mb-4 flex items-center">
-      <span class="mr-2">{getEntityIcon(entityType)}</span>
-      {getDisplayName(entityType)} ({entities.length})
-    </h2>
-    <p class="text-sm text-gray-600 mb-4">
-      {#if entityType === 'users'}
-        Manage and monitor user accounts and citizen profiles
-      {:else if entityType === 'mandates'}
-        Governance mandates and policies that define system rules
-      {:else if entityType === 'tasks'}
-        Automated processes and scheduled operations
-      {:else if entityType === 'transfers'}
-        Asset transfers and financial transactions between entities
-      {:else if entityType === 'proposals'}
-        Governance proposals for citizen voting and decision making
-      {:else if entityType === 'votes'}
-        Citizen votes on governance proposals and democratic participation
-      {:else if entityType === 'instruments'}
-        Financial instruments and digital assets in the treasury
-      {:else if entityType === 'licenses'}
-        Issued licenses and permits for various activities
-      {:else if entityType === 'disputes'}
-        Open disputes and conflicts requiring resolution
-      {:else}
-        {getDisplayName(entityType)} in the system
-      {/if}
-    </p>
-    
-    {#if loading}
-      <div class="text-center py-10">
-        <div class="inline-block animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
-        <p class="mt-2 text-gray-600">Loading {entityType}...</p>
-      </div>
-    {:else if entities.length === 0}
-      <div class="text-center py-10 bg-gray-50 rounded-lg">
-        <p class="text-gray-600">No {entityType} found</p>
-      </div>
+  <h2 class="text-xl font-bold mb-4 flex items-center">
+    <span class="mr-2">{getEntityIcon(entityType)}</span>
+    {getDisplayName(entityType)} ({entities.length})
+  </h2>
+  <p class="text-sm text-gray-600 mb-4">
+    {#if entityType === 'users'}
+      Manage and monitor user accounts and citizen profiles
+    {:else if entityType === 'mandates'}
+      Governance mandates and policies that define system rules
+    {:else if entityType === 'tasks'}
+      Automated processes and scheduled operations
+    {:else if entityType === 'transfers'}
+      Asset transfers and financial transactions between entities
+    {:else if entityType === 'proposals'}
+      Governance proposals for citizen voting and decision making
+    {:else if entityType === 'votes'}
+      Citizen votes on governance proposals and democratic participation
+    {:else if entityType === 'instruments'}
+      Financial instruments and digital assets in the treasury
+    {:else if entityType === 'licenses'}
+      Issued licenses and permits for various activities
+    {:else if entityType === 'disputes'}
+      Open disputes and conflicts requiring resolution
     {:else}
-      <div class="space-y-4">
-        {#each entities as entity, index}
-          <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-            <div class="flex justify-between items-start mb-3">
-              <div class="flex-1">
-                <h3 class="font-semibold text-gray-900 mb-1">
-                  {getEntityDescription(entity, entityType)}
-                </h3>
-                <p class="text-sm text-gray-600">ID: {entity._id}</p>
-                {#if entity.timestamp_created}
-                  <p class="text-xs text-gray-500">
-                    Created: {formatValue(entity.timestamp_created, 'timestamp_created')}
-                  </p>
-                {/if}
-              </div>
-              <div class="flex items-center space-x-2">
-                {#if getRelationshipInfo(entity)}
-                  <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                    {getRelationshipInfo(entity)}
-                  </span>
-                {/if}
-                <button class="text-blue-600 hover:text-blue-900 font-medium text-sm">
-                  View Details
-                </button>
+      {getDisplayName(entityType)} in the system
+    {/if}
+  </p>
+  {#if loading}
+    <div class="text-center py-10">
+      <div class="inline-block animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+      <p class="mt-2 text-gray-600">Loading {entityType}...</p>
+    </div>
+  {:else if entities.length === 0}
+    <div class="text-center py-10 bg-gray-50 rounded-lg">
+      <p class="text-gray-600">No {entityType} found</p>
+    </div>
+  {:else}
+    <div class="space-y-4">
+      {#each entities as entity, index}
+        <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+          <div class="flex justify-between items-start mb-3">
+            <div class="flex-1">
+              <h3 class="font-semibold text-gray-900 mb-1">
+                {getEntityDescription(entity, entityType)}
+              </h3>
+              <p class="text-sm text-gray-600">ID: {entity._id}</p>
+              {#if entity.timestamp_created}
+                <p class="text-xs text-gray-500">
+                  Created: {formatValue(entity.timestamp_created, 'timestamp_created')}
+                </p>
+              {/if}
+            </div>
+            <div class="flex items-center space-x-2">
+              {#if getRelationshipInfo(entity)}
+                <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                  {getRelationshipInfo(entity)}
+                </span>
+              {/if}
+              <button class="text-blue-600 hover:text-blue-900 font-medium text-sm">
+                View Details
+              </button>
+            </div>
+          </div>
+          <!-- Entity-specific information -->
+          {#if entity.metadata}
+            <div class="mt-3 p-3 bg-gray-50 rounded text-sm">
+              <pre class="text-xs text-gray-600 whitespace-pre-wrap">{JSON.stringify(JSON.parse(entity.metadata), null, 2)}</pre>
+            </div>
+          {/if}
+          <!-- Relationships -->
+          {#if entity.relations && Object.keys(entity.relations).length > 0}
+            <div class="mt-3 p-3 bg-blue-50 rounded text-sm">
+              <strong class="text-blue-800">Relationships:</strong>
+              <div class="mt-2 space-y-1">
+                {#each Object.entries(entity.relations) as [relType, relEntities]}
+                  {#if Array.isArray(relEntities) && relEntities.length > 0}
+                    <div class="flex items-center">
+                      <span class="font-medium text-blue-700">{getDisplayName(relType)}:</span>
+                      <div class="ml-2 flex flex-wrap gap-1">
+                        {#each relEntities.slice(0, 3) as relEntity}
+                          <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                            {relEntity._id}
+                          </span>
+                        {/each}
+                        {#if relEntities.length > 3}
+                          <span class="text-xs text-blue-600">+{relEntities.length - 3} more</span>
+                        {/if}
+                      </div>
+                    </div>
+                  {/if}
+                {/each}
               </div>
             </div>
-            
-            <!-- Entity-specific information -->
-            {#if entity.metadata}
-              <div class="mt-3 p-3 bg-gray-50 rounded text-sm">
-                {#if entityType === 'transfers'}
-                  {@const metadata = JSON.parse(entity.metadata || '{}')}
-                  <div class="grid grid-cols-2 gap-4">
-                    <div><strong>Amount:</strong> {formatValue(entity.amount, 'amount')}</div>
-                    <div><strong>Purpose:</strong> {metadata.purpose || 'N/A'}</div>
-                  </div>
-                {:else if entityType === 'proposals'}
-                  {@const metadata = JSON.parse(entity.metadata || '{}')}
-                  <div class="grid grid-cols-2 gap-4">
-                    <div><strong>Proposer:</strong> {metadata.proposer || 'N/A'}</div>
-                    <div><strong>Status:</strong> 
-                      <span class="px-2 py-1 rounded text-xs {metadata.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}">
-                        {metadata.status || 'unknown'}
-                      </span>
-                    </div>
-                    {#if metadata.budget}
-                      <div><strong>Budget:</strong> {metadata.budget}</div>
-                    {/if}
-                    {#if metadata.category}
-                      <div><strong>Category:</strong> {metadata.category}</div>
-                    {/if}
-                  </div>
-                {:else if entityType === 'votes'}
-                  {@const metadata = JSON.parse(entity.metadata || '{}')}
-                  <div class="grid grid-cols-2 gap-4">
-                    <div><strong>Voter:</strong> {metadata.voter || 'N/A'}</div>
-                    <div><strong>Vote:</strong> 
-                      <span class="px-2 py-1 rounded text-xs {metadata.vote === 'yes' ? 'bg-green-100 text-green-700' : metadata.vote === 'no' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}">
-                        {metadata.vote || 'unknown'}
-                      </span>
-                    </div>
-                    <div><strong>Proposal:</strong> {metadata.proposal_id || 'N/A'}</div>
-                    <div><strong>Verified:</strong> {metadata.verified ? '✅' : '❌'}</div>
-                  </div>
-                {:else if entityType === 'mandates'}
-                  {@const metadata = JSON.parse(entity.metadata || '{}')}
-                  <div>
-                    <strong>Description:</strong> {metadata.description || 'No description available'}
-                    {#if metadata.authority}
-                      <br><strong>Authority:</strong> {metadata.authority}
-                    {/if}
-                    {#if metadata.established_date}
-                      <br><strong>Established:</strong> {metadata.established_date}
-                    {/if}
-                  </div>
-                {:else if entityType === 'instruments'}
-                  {@const metadata = JSON.parse(entity.metadata || '{}')}
-                  <div class="grid grid-cols-2 gap-4">
-                    <div><strong>Symbol:</strong> {metadata.symbol || 'N/A'}</div>
-                    <div><strong>Type:</strong> {metadata.type || 'N/A'}</div>
-                    {#if metadata.treasury_balance}
-                      <div><strong>Treasury Balance:</strong> {metadata.treasury_balance.toLocaleString()}</div>
-                    {/if}
-                    {#if metadata.decimal_places}
-                      <div><strong>Decimals:</strong> {metadata.decimal_places}</div>
-                    {/if}
-                  </div>
-                {:else}
-                  <pre class="text-xs text-gray-600 whitespace-pre-wrap">{JSON.stringify(JSON.parse(entity.metadata), null, 2)}</pre>
-                {/if}
-              </div>
+          {/if}
+        </div>
+      {/each}
+    </div>
+  {/if}
+  {#if pagination}
+    <div class="flex justify-center items-center mt-4 space-x-2">
+      <button 
+        class="px-3 py-1 rounded border {hasPrevPage ? 'bg-blue-100 hover:bg-blue-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}" 
+        disabled={!hasPrevPage}
+        on:click={() => onPageChange(currentPage - 2)}
+      >
+        Previous
+      </button>
+      <div class="flex space-x-1">
+        {#if totalPages <= 7}
+          {#each Array(totalPages) as _, i}
+            <button 
+              class="w-8 h-8 rounded-full {currentPage === i+1 ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
+              on:click={() => onPageChange(i)}
+            >
+              {i+1}
+            </button>
+          {/each}
+        {:else}
+          <button 
+            class="w-8 h-8 rounded-full {currentPage === 1 ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
+            on:click={() => onPageChange(0)}
+          >
+            1
+          </button>
+          {#if currentPage > 3}
+            <span class="px-1">...</span>
+          {/if}
+          {#each Array(3).fill(0) as _, i}
+            {@const pageNum = Math.max(2, Math.min(currentPage - 1 + i, totalPages - 1))}
+            {#if pageNum > 1 && pageNum < totalPages}
+              <button 
+                class="w-8 h-8 rounded-full {currentPage === pageNum ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
+                on:click={() => onPageChange(pageNum - 1)}
+              >
+                {pageNum}
+              </button>
             {/if}
-            
-            <!-- Relationships -->
-            {#if entity.relations && Object.keys(entity.relations).length > 0}
-              <div class="mt-3 p-3 bg-blue-50 rounded text-sm">
-                <strong class="text-blue-800">Relationships:</strong>
-                <div class="mt-2 space-y-1">
-                  {#each Object.entries(entity.relations) as [relType, relEntities]}
-                    {#if Array.isArray(relEntities) && relEntities.length > 0}
-                      <div class="flex items-center">
-                        <span class="font-medium text-blue-700">{getDisplayName(relType)}:</span>
-                        <div class="ml-2 flex flex-wrap gap-1">
-                          {#each relEntities.slice(0, 3) as relEntity}
-                            <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                              {relEntity._id}
-                            </span>
-                          {/each}
-                          {#if relEntities.length > 3}
-                            <span class="text-xs text-blue-600">+{relEntities.length - 3} more</span>
-                          {/if}
-                        </div>
-                      </div>
-                    {/if}
-                  {/each}
-                </div>
-              </div>
-            {/if}
-          </div>
-        {/each}
+          {/each}
+          {#if currentPage < totalPages - 2}
+            <span class="px-1">...</span>
+          {/if}
+          <button 
+            class="w-8 h-8 rounded-full {currentPage === totalPages ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
+            on:click={() => onPageChange(totalPages - 1)}
+          >
+            {totalPages}
+          </button>
+        {/if}
       </div>
-      {#if entityType === 'users' && pagination}
-        <div class="flex justify-center items-center mt-4 space-x-2">
-          <button 
-            class="px-3 py-1 rounded border {hasPrevPage ? 'bg-blue-100 hover:bg-blue-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}" 
-            disabled={!hasPrevPage}
-            on:click={() => onPageChange(currentPage - 2)}
-          >
-            Previous
-          </button>
-          <div class="flex space-x-1">
-            {#if totalPages <= 7}
-              {#each Array(totalPages) as _, i}
-                <button 
-                  class="w-8 h-8 rounded-full {currentPage === i+1 ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
-                  on:click={() => onPageChange(i)}
-                >
-                  {i+1}
-                </button>
-              {/each}
-            {:else}
-              <button 
-                class="w-8 h-8 rounded-full {currentPage === 1 ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
-                on:click={() => onPageChange(0)}
-              >
-                1
-              </button>
-              {#if currentPage > 3}
-                <span class="px-1">...</span>
-              {/if}
-              {#each Array(3).fill(0) as _, i}
-                {@const pageNum = Math.max(2, Math.min(currentPage - 1 + i, totalPages - 1))}
-                {#if pageNum > 1 && pageNum < totalPages}
-                  <button 
-                    class="w-8 h-8 rounded-full {currentPage === pageNum ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
-                    on:click={() => onPageChange(pageNum - 1)}
-                  >
-                    {pageNum}
-                  </button>
-                {/if}
-              {/each}
-              {#if currentPage < totalPages - 2}
-                <span class="px-1">...</span>
-              {/if}
-              <button 
-                class="w-8 h-8 rounded-full {currentPage === totalPages ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
-                on:click={() => onPageChange(totalPages - 1)}
-              >
-                {totalPages}
-              </button>
-            {/if}
-          </div>
-          <button 
-            class="px-3 py-1 rounded border {hasNextPage ? 'bg-blue-100 hover:bg-blue-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}" 
-            disabled={!hasNextPage}
-            on:click={() => onPageChange(currentPage)}
-          >
-            Next
-          </button>
-        </div>
-        <div class="text-xs text-gray-500 mt-2 text-center">
-          Showing {entities.length} of {safePagination?.total_items_count || entities.length} users (Page {currentPage} of {totalPages})
-        </div>
-      {/if}
-    {/if}
+      <button 
+        class="px-3 py-1 rounded border {hasNextPage ? 'bg-blue-100 hover:bg-blue-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}" 
+        disabled={!hasNextPage}
+        on:click={() => onPageChange(currentPage)}
+      >
+        Next
+      </button>
+    </div>
+    <div class="text-xs text-gray-500 mt-2 text-center">
+      Showing {entities.length} of {safePagination?.total_items_count || entities.length} {getDisplayName(entityType).toLowerCase()} (Page {currentPage} of {totalPages})
+    </div>
   {/if}
 </div> 

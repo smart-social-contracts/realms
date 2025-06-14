@@ -31,10 +31,12 @@ class UsersListRecord(Record):
 
 class MandatesListRecord(Record):
     mandates: Vec[text]  # JSON string of mandate data
+    pagination: PaginationInfo
 
 
 class TasksListRecord(Record):
     tasks: Vec[text]  # JSON string of task data
+    pagination: PaginationInfo
 
 
 class TransfersListRecord(Record):
@@ -44,38 +46,47 @@ class TransfersListRecord(Record):
 
 class InstrumentsListRecord(Record):
     instruments: Vec[text]  # JSON string of instrument data
+    pagination: PaginationInfo
 
 
 class CodexesListRecord(Record):
     codexes: Vec[text]  # JSON string of codex data
+    pagination: PaginationInfo
 
 
 class OrganizationsListRecord(Record):
     organizations: Vec[text]  # JSON string of organization data
+    pagination: PaginationInfo
 
 
 class DisputesListRecord(Record):
     disputes: Vec[text]  # JSON string of dispute data
+    pagination: PaginationInfo
 
 
 class LicensesListRecord(Record):
     licenses: Vec[text]  # JSON string of license data
+    pagination: PaginationInfo
 
 
 class TradesListRecord(Record):
     trades: Vec[text]  # JSON string of trade data
+    pagination: PaginationInfo
 
 
 class RealmsListRecord(Record):
     realms: Vec[text]  # JSON string of realm data
+    pagination: PaginationInfo
 
 
 class ProposalsListRecord(Record):
     proposals: Vec[text]  # JSON string of proposal data
+    pagination: PaginationInfo
 
 
 class VotesListRecord(Record):
     votes: Vec[text]  # JSON string of vote data
+    pagination: PaginationInfo
 
 
 class RealmResponseData(Variant):

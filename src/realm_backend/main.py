@@ -191,15 +191,23 @@ def get_users(page_num: nat, page_size: nat) -> RealmResponse:
 
 
 @query
-def get_mandates() -> RealmResponse:
+def get_mandates(page_num: nat, page_size: nat) -> RealmResponse:
     try:
-        mandates_data = list_mandates()
-        # Convert dictionary to JSON string
-        mandates_json = [json.dumps(mandate) for mandate in mandates_data["mandates"]]
+        mandates_data = list_mandates(page_num=page_num, page_size=page_size)
+        mandates_json = [json.dumps(mandate.to_dict()) for mandate in mandates_data["items"]]
+        pagination = PaginationInfo(
+            page_num=mandates_data["page_num"],
+            page_size=mandates_data["page_size"],
+            total_items_count=mandates_data["total_items_count"],
+            total_pages=mandates_data["total_pages"]
+        )
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                MandatesList=MandatesListRecord(mandates=mandates_json)
+                MandatesList=MandatesListRecord(
+                    mandates=mandates_json,
+                    pagination=pagination
+                )
             ),
         )
     except Exception as e:
@@ -208,14 +216,24 @@ def get_mandates() -> RealmResponse:
 
 
 @query
-def get_tasks() -> RealmResponse:
+def get_tasks(page_num: nat, page_size: nat) -> RealmResponse:
     try:
-        tasks_data = list_tasks()
-        # Convert dictionary to JSON string
-        tasks_json = [json.dumps(task) for task in tasks_data["tasks"]]
+        tasks_data = list_tasks(page_num=page_num, page_size=page_size)
+        tasks_json = [json.dumps(task.to_dict()) for task in tasks_data["items"]]
+        pagination = PaginationInfo(
+            page_num=tasks_data["page_num"],
+            page_size=tasks_data["page_size"],
+            total_items_count=tasks_data["total_items_count"],
+            total_pages=tasks_data["total_pages"]
+        )
         return RealmResponse(
             success=True,
-            data=RealmResponseData(TasksList=TasksListRecord(tasks=tasks_json)),
+            data=RealmResponseData(
+                TasksList=TasksListRecord(
+                    tasks=tasks_json,
+                    pagination=pagination
+                )
+            ),
         )
     except Exception as e:
         logger.error(f"Error listing tasks: {str(e)}\n{traceback.format_exc()}")
@@ -250,17 +268,23 @@ def get_transfers(page_num: nat, page_size: nat) -> RealmResponse:
 
 
 @query
-def get_instruments() -> RealmResponse:
+def get_instruments(page_num: nat, page_size: nat) -> RealmResponse:
     try:
-        instruments_data = list_instruments()
-        # Convert dictionary to JSON string
-        instruments_json = [
-            json.dumps(instrument) for instrument in instruments_data["instruments"]
-        ]
+        instruments_data = list_instruments(page_num=page_num, page_size=page_size)
+        instruments_json = [json.dumps(instrument.to_dict()) for instrument in instruments_data["items"]]
+        pagination = PaginationInfo(
+            page_num=instruments_data["page_num"],
+            page_size=instruments_data["page_size"],
+            total_items_count=instruments_data["total_items_count"],
+            total_pages=instruments_data["total_pages"]
+        )
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                InstrumentsList=InstrumentsListRecord(instruments=instruments_json)
+                InstrumentsList=InstrumentsListRecord(
+                    instruments=instruments_json,
+                    pagination=pagination
+                )
             ),
         )
     except Exception as e:
@@ -269,14 +293,24 @@ def get_instruments() -> RealmResponse:
 
 
 @query
-def get_codexes() -> RealmResponse:
+def get_codexes(page_num: nat, page_size: nat) -> RealmResponse:
     try:
-        codexes_data = list_codexes()
-        # Convert dictionary to JSON string
-        codexes_json = [json.dumps(codex) for codex in codexes_data["codexes"]]
+        codexes_data = list_codexes(page_num=page_num, page_size=page_size)
+        codexes_json = [json.dumps(codex.to_dict()) for codex in codexes_data["items"]]
+        pagination = PaginationInfo(
+            page_num=codexes_data["page_num"],
+            page_size=codexes_data["page_size"],
+            total_items_count=codexes_data["total_items_count"],
+            total_pages=codexes_data["total_pages"]
+        )
         return RealmResponse(
             success=True,
-            data=RealmResponseData(CodexesList=CodexesListRecord(codexes=codexes_json)),
+            data=RealmResponseData(
+                CodexesList=CodexesListRecord(
+                    codexes=codexes_json,
+                    pagination=pagination
+                )
+            ),
         )
     except Exception as e:
         logger.error(f"Error listing codexes: {str(e)}\n{traceback.format_exc()}")
@@ -284,18 +318,22 @@ def get_codexes() -> RealmResponse:
 
 
 @query
-def get_organizations() -> RealmResponse:
+def get_organizations(page_num: nat, page_size: nat) -> RealmResponse:
     try:
-        organizations_data = list_organizations()
-        # Convert dictionary to JSON string
-        organizations_json = [
-            json.dumps(org) for org in organizations_data["organizations"]
-        ]
+        organizations_data = list_organizations(page_num=page_num, page_size=page_size)
+        organizations_json = [json.dumps(org.to_dict()) for org in organizations_data["items"]]
+        pagination = PaginationInfo(
+            page_num=organizations_data["page_num"],
+            page_size=organizations_data["page_size"],
+            total_items_count=organizations_data["total_items_count"],
+            total_pages=organizations_data["total_pages"]
+        )
         return RealmResponse(
             success=True,
             data=RealmResponseData(
                 OrganizationsList=OrganizationsListRecord(
-                    organizations=organizations_json
+                    organizations=organizations_json,
+                    pagination=pagination
                 )
             ),
         )
@@ -305,15 +343,23 @@ def get_organizations() -> RealmResponse:
 
 
 @query
-def get_disputes() -> RealmResponse:
+def get_disputes(page_num: nat, page_size: nat) -> RealmResponse:
     try:
-        disputes_data = list_disputes()
-        # Convert dictionary to JSON string
-        disputes_json = [json.dumps(dispute) for dispute in disputes_data["disputes"]]
+        disputes_data = list_disputes(page_num=page_num, page_size=page_size)
+        disputes_json = [json.dumps(dispute.to_dict()) for dispute in disputes_data["items"]]
+        pagination = PaginationInfo(
+            page_num=disputes_data["page_num"],
+            page_size=disputes_data["page_size"],
+            total_items_count=disputes_data["total_items_count"],
+            total_pages=disputes_data["total_pages"]
+        )
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                DisputesList=DisputesListRecord(disputes=disputes_json)
+                DisputesList=DisputesListRecord(
+                    disputes=disputes_json,
+                    pagination=pagination
+                )
             ),
         )
     except Exception as e:
@@ -322,15 +368,23 @@ def get_disputes() -> RealmResponse:
 
 
 @query
-def get_licenses() -> RealmResponse:
+def get_licenses(page_num: nat, page_size: nat) -> RealmResponse:
     try:
-        licenses_data = list_licenses()
-        # Convert dictionary to JSON string
-        licenses_json = [json.dumps(license) for license in licenses_data["licenses"]]
+        licenses_data = list_licenses(page_num=page_num, page_size=page_size)
+        licenses_json = [json.dumps(license.to_dict()) for license in licenses_data["items"]]
+        pagination = PaginationInfo(
+            page_num=licenses_data["page_num"],
+            page_size=licenses_data["page_size"],
+            total_items_count=licenses_data["total_items_count"],
+            total_pages=licenses_data["total_pages"]
+        )
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                LicensesList=LicensesListRecord(licenses=licenses_json)
+                LicensesList=LicensesListRecord(
+                    licenses=licenses_json,
+                    pagination=pagination
+                )
             ),
         )
     except Exception as e:
@@ -339,14 +393,24 @@ def get_licenses() -> RealmResponse:
 
 
 @query
-def get_realms() -> RealmResponse:
+def get_realms(page_num: nat, page_size: nat) -> RealmResponse:
     try:
-        realms_data = list_realms()
-        # Convert dictionary to JSON string
-        realms_json = [json.dumps(realm) for realm in realms_data["realms"]]
+        realms_data = list_realms(page_num=page_num, page_size=page_size)
+        realms_json = [json.dumps(realm.to_dict()) for realm in realms_data["items"]]
+        pagination = PaginationInfo(
+            page_num=realms_data["page_num"],
+            page_size=realms_data["page_size"],
+            total_items_count=realms_data["total_items_count"],
+            total_pages=realms_data["total_pages"]
+        )
         return RealmResponse(
             success=True,
-            data=RealmResponseData(RealmsList=RealmsListRecord(realms=realms_json)),
+            data=RealmResponseData(
+                RealmsList=RealmsListRecord(
+                    realms=realms_json,
+                    pagination=pagination
+                )
+            ),
         )
     except Exception as e:
         logger.error(f"Error listing realms: {str(e)}\n{traceback.format_exc()}")
@@ -354,14 +418,24 @@ def get_realms() -> RealmResponse:
 
 
 @query
-def get_trades() -> RealmResponse:
+def get_trades(page_num: nat, page_size: nat) -> RealmResponse:
     try:
-        trades_data = list_trades()
-        # Convert dictionary to JSON string
-        trades_json = [json.dumps(trade) for trade in trades_data["trades"]]
+        trades_data = list_trades(page_num=page_num, page_size=page_size)
+        trades_json = [json.dumps(trade.to_dict()) for trade in trades_data["items"]]
+        pagination = PaginationInfo(
+            page_num=trades_data["page_num"],
+            page_size=trades_data["page_size"],
+            total_items_count=trades_data["total_items_count"],
+            total_pages=trades_data["total_pages"]
+        )
         return RealmResponse(
             success=True,
-            data=RealmResponseData(TradesList=TradesListRecord(trades=trades_json)),
+            data=RealmResponseData(
+                TradesList=TradesListRecord(
+                    trades=trades_json,
+                    pagination=pagination
+                )
+            ),
         )
     except Exception as e:
         logger.error(f"Error listing trades: {str(e)}\n{traceback.format_exc()}")
@@ -369,17 +443,23 @@ def get_trades() -> RealmResponse:
 
 
 @query
-def get_proposals() -> RealmResponse:
+def get_proposals(page_num: nat, page_size: nat) -> RealmResponse:
     try:
-        proposals_data = list_proposals()
-        # Convert dictionary to JSON string
-        proposals_json = [
-            json.dumps(proposal) for proposal in proposals_data["proposals"]
-        ]
+        proposals_data = list_proposals(page_num=page_num, page_size=page_size)
+        proposals_json = [json.dumps(proposal.to_dict()) for proposal in proposals_data["items"]]
+        pagination = PaginationInfo(
+            page_num=proposals_data["page_num"],
+            page_size=proposals_data["page_size"],
+            total_items_count=proposals_data["total_items_count"],
+            total_pages=proposals_data["total_pages"]
+        )
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                ProposalsList=ProposalsListRecord(proposals=proposals_json)
+                ProposalsList=ProposalsListRecord(
+                    proposals=proposals_json,
+                    pagination=pagination
+                )
             ),
         )
     except Exception as e:
@@ -388,14 +468,24 @@ def get_proposals() -> RealmResponse:
 
 
 @query
-def get_votes() -> RealmResponse:
+def get_votes(page_num: nat, page_size: nat) -> RealmResponse:
     try:
-        votes_data = list_votes()
-        # Convert dictionary to JSON string
-        votes_json = [json.dumps(vote) for vote in votes_data["votes"]]
+        votes_data = list_votes(page_num=page_num, page_size=page_size)
+        votes_json = [json.dumps(vote.to_dict()) for vote in votes_data["items"]]
+        pagination = PaginationInfo(
+            page_num=votes_data["page_num"],
+            page_size=votes_data["page_size"],
+            total_items_count=votes_data["total_items_count"],
+            total_pages=votes_data["total_pages"]
+        )
         return RealmResponse(
             success=True,
-            data=RealmResponseData(VotesList=VotesListRecord(votes=votes_json)),
+            data=RealmResponseData(
+                VotesList=VotesListRecord(
+                    votes=votes_json,
+                    pagination=pagination
+                )
+            ),
         )
     except Exception as e:
         logger.error(f"Error listing votes: {str(e)}\n{traceback.format_exc()}")

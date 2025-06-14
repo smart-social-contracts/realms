@@ -14,30 +14,37 @@
   let recentActivity = [];
   let filterQuery = '';
   let selectedFilter = 'all';
-  
-  // Add pagination state for transfers
-  let transfersPage = 0;
-  let transfersPerPage = 5;
-  let transfersPagination = null;
   let searchTerm = '';
   
-  // Add pagination state for users
-  let usersPage = 0;
-  let usersPerPage = 5;
-  let usersPagination = null;
+  // Pagination state for all entities
+  let usersPage = 0, usersPerPage = 5, usersPagination = null;
+  let mandatesPage = 0, mandatesPerPage = 5, mandatesPagination = null;
+  let tasksPage = 0, tasksPerPage = 5, tasksPagination = null;
+  let transfersPage = 0, transfersPerPage = 5, transfersPagination = null;
+  let instrumentsPage = 0, instrumentsPerPage = 5, instrumentsPagination = null;
+  let codexesPage = 0, codexesPerPage = 5, codexesPagination = null;
+  let organizationsPage = 0, organizationsPerPage = 5, organizationsPagination = null;
+  let disputesPage = 0, disputesPerPage = 5, disputesPagination = null;
+  let licensesPage = 0, licensesPerPage = 5, licensesPagination = null;
+  let tradesPage = 0, tradesPerPage = 5, tradesPagination = null;
+  let realmsPage = 0, realmsPerPage = 5, realmsPagination = null;
+  let proposalsPage = 0, proposalsPerPage = 5, proposalsPagination = null;
+  let votesPage = 0, votesPerPage = 5, votesPagination = null;
   
-  // Handle pagination for transfers
-  async function handleTransfersPageChange(page) {
-    // page is 0-based from the table, so use as is
-    transfersPage = page;
-    await fetchEntityData('transfers');
-  }
-  
-  // Handle pagination for users
-  async function handleUsersPageChange(page) {
-    usersPage = page;
-    await fetchEntityData('users');
-  }
+  // Pagination handlers
+  async function handleUsersPageChange(page) { usersPage = page; await fetchEntityData('users'); }
+  async function handleMandatesPageChange(page) { mandatesPage = page; await fetchEntityData('mandates'); }
+  async function handleTasksPageChange(page) { tasksPage = page; await fetchEntityData('tasks'); }
+  async function handleTransfersPageChange(page) { transfersPage = page; await fetchEntityData('transfers'); }
+  async function handleInstrumentsPageChange(page) { instrumentsPage = page; await fetchEntityData('instruments'); }
+  async function handleCodexesPageChange(page) { codexesPage = page; await fetchEntityData('codexes'); }
+  async function handleOrganizationsPageChange(page) { organizationsPage = page; await fetchEntityData('organizations'); }
+  async function handleDisputesPageChange(page) { disputesPage = page; await fetchEntityData('disputes'); }
+  async function handleLicensesPageChange(page) { licensesPage = page; await fetchEntityData('licenses'); }
+  async function handleTradesPageChange(page) { tradesPage = page; await fetchEntityData('trades'); }
+  async function handleRealmsPageChange(page) { realmsPage = page; await fetchEntityData('realms'); }
+  async function handleProposalsPageChange(page) { proposalsPage = page; await fetchEntityData('proposals'); }
+  async function handleVotesPageChange(page) { votesPage = page; await fetchEntityData('votes'); }
   
   // Static list of all known GGG entity types - always show these tabs
   const allEntityTypes = [
@@ -58,29 +65,19 @@
   
   // Entity type configurations with their API endpoints
   const entityConfigs = [
-    { 
-      name: 'users', 
-      fetch: (page_num = 0, page_size = 5) => backend.get_users(page_num, page_size), 
-      dataPath: 'UsersList.users',
-      paginationPath: 'UsersList.pagination'
-    },
-    { name: 'mandates', fetch: () => backend.get_mandates(), dataPath: 'MandatesList.mandates' },
-    { name: 'tasks', fetch: () => backend.get_tasks(), dataPath: 'TasksList.tasks' },
-    { 
-      name: 'transfers', 
-      fetch: (page_num = 0, page_size = 5) => backend.get_transfers(page_num, page_size), 
-      dataPath: 'TransfersList.transfers',
-      paginationPath: 'TransfersList.pagination'
-    },
-    { name: 'instruments', fetch: () => backend.get_instruments(), dataPath: 'InstrumentsList.instruments' },
-    { name: 'codexes', fetch: () => backend.get_codexes(), dataPath: 'CodexesList.codexes' },
-    { name: 'organizations', fetch: () => backend.get_organizations(), dataPath: 'OrganizationsList.organizations' },
-    { name: 'disputes', fetch: () => backend.get_disputes(), dataPath: 'DisputesList.disputes' },
-    { name: 'licenses', fetch: () => backend.get_licenses(), dataPath: 'LicensesList.licenses' },
-    { name: 'trades', fetch: () => backend.get_trades(), dataPath: 'TradesList.trades' },
-    { name: 'realms', fetch: () => backend.get_realms(), dataPath: 'RealmsList.realms' },
-    { name: 'proposals', fetch: () => backend.get_proposals(), dataPath: 'ProposalsList.proposals' },
-    { name: 'votes', fetch: () => backend.get_votes(), dataPath: 'VotesList.votes' }
+    { name: 'users', fetch: (page_num = 0, page_size = 5) => backend.get_users(page_num, page_size), dataPath: 'UsersList.users', paginationPath: 'UsersList.pagination', page: () => usersPage, perPage: () => usersPerPage, pagination: () => usersPagination, onPageChange: handleUsersPageChange },
+    { name: 'mandates', fetch: (page_num = 0, page_size = 5) => backend.get_mandates(page_num, page_size), dataPath: 'MandatesList.mandates', paginationPath: 'MandatesList.pagination', page: () => mandatesPage, perPage: () => mandatesPerPage, pagination: () => mandatesPagination, onPageChange: handleMandatesPageChange },
+    { name: 'tasks', fetch: (page_num = 0, page_size = 5) => backend.get_tasks(page_num, page_size), dataPath: 'TasksList.tasks', paginationPath: 'TasksList.pagination', page: () => tasksPage, perPage: () => tasksPerPage, pagination: () => tasksPagination, onPageChange: handleTasksPageChange },
+    { name: 'transfers', fetch: (page_num = 0, page_size = 5) => backend.get_transfers(page_num, page_size), dataPath: 'TransfersList.transfers', paginationPath: 'TransfersList.pagination', page: () => transfersPage, perPage: () => transfersPerPage, pagination: () => transfersPagination, onPageChange: handleTransfersPageChange },
+    { name: 'instruments', fetch: (page_num = 0, page_size = 5) => backend.get_instruments(page_num, page_size), dataPath: 'InstrumentsList.instruments', paginationPath: 'InstrumentsList.pagination', page: () => instrumentsPage, perPage: () => instrumentsPerPage, pagination: () => instrumentsPagination, onPageChange: handleInstrumentsPageChange },
+    { name: 'codexes', fetch: (page_num = 0, page_size = 5) => backend.get_codexes(page_num, page_size), dataPath: 'CodexesList.codexes', paginationPath: 'CodexesList.pagination', page: () => codexesPage, perPage: () => codexesPerPage, pagination: () => codexesPagination, onPageChange: handleCodexesPageChange },
+    { name: 'organizations', fetch: (page_num = 0, page_size = 5) => backend.get_organizations(page_num, page_size), dataPath: 'OrganizationsList.organizations', paginationPath: 'OrganizationsList.pagination', page: () => organizationsPage, perPage: () => organizationsPerPage, pagination: () => organizationsPagination, onPageChange: handleOrganizationsPageChange },
+    { name: 'disputes', fetch: (page_num = 0, page_size = 5) => backend.get_disputes(page_num, page_size), dataPath: 'DisputesList.disputes', paginationPath: 'DisputesList.pagination', page: () => disputesPage, perPage: () => disputesPerPage, pagination: () => disputesPagination, onPageChange: handleDisputesPageChange },
+    { name: 'licenses', fetch: (page_num = 0, page_size = 5) => backend.get_licenses(page_num, page_size), dataPath: 'LicensesList.licenses', paginationPath: 'LicensesList.pagination', page: () => licensesPage, perPage: () => licensesPerPage, pagination: () => licensesPagination, onPageChange: handleLicensesPageChange },
+    { name: 'trades', fetch: (page_num = 0, page_size = 5) => backend.get_trades(page_num, page_size), dataPath: 'TradesList.trades', paginationPath: 'TradesList.pagination', page: () => tradesPage, perPage: () => tradesPerPage, pagination: () => tradesPagination, onPageChange: handleTradesPageChange },
+    { name: 'realms', fetch: (page_num = 0, page_size = 5) => backend.get_realms(page_num, page_size), dataPath: 'RealmsList.realms', paginationPath: 'RealmsList.pagination', page: () => realmsPage, perPage: () => realmsPerPage, pagination: () => realmsPagination, onPageChange: handleRealmsPageChange },
+    { name: 'proposals', fetch: (page_num = 0, page_size = 5) => backend.get_proposals(page_num, page_size), dataPath: 'ProposalsList.proposals', paginationPath: 'ProposalsList.pagination', page: () => proposalsPage, perPage: () => proposalsPerPage, pagination: () => proposalsPagination, onPageChange: handleProposalsPageChange },
+    { name: 'votes', fetch: (page_num = 0, page_size = 5) => backend.get_votes(page_num, page_size), dataPath: 'VotesList.votes', paginationPath: 'VotesList.pagination', page: () => votesPage, perPage: () => votesPerPage, pagination: () => votesPagination, onPageChange: handleVotesPageChange },
   ];
   
   // Function to fetch data for a specific entity type
@@ -98,14 +95,7 @@
       
       console.log(`Fetching data for ${entityType}...`);
       
-      let result;
-      if (entityType === 'transfers') {
-        result = await config.fetch(transfersPage, transfersPerPage);
-      } else if (entityType === 'users') {
-        result = await config.fetch(usersPage, usersPerPage);
-      } else {
-        result = await config.fetch();
-      }
+      let result = await config.fetch(config.page(), config.perPage());
       
       if (result && result.success && result.data) {
         const pathParts = config.dataPath.split('.');
@@ -135,8 +125,7 @@
           data = {...data, [entityType]: parsedData};
           console.log(`✅ ${entityType}: ${parsedData.length} items`);
           
-          // Get pagination info for transfers and users
-          if ((entityType === 'transfers' || entityType === 'users') && config.paginationPath) {
+          if (config.paginationPath) {
             const paginationParts = config.paginationPath.split('.');
             let paginationData = result.data;
             
@@ -150,13 +139,7 @@
             }
             
             if (paginationData) {
-              if (entityType === 'transfers') {
-                transfersPagination = paginationData;
-                console.log(`✅ Transfers pagination:`, transfersPagination);
-              } else if (entityType === 'users') {
-                usersPagination = paginationData;
-                console.log(`✅ Users pagination:`, usersPagination);
-              }
+              config.pagination(paginationData);
             }
           }
         } else {
@@ -188,7 +171,7 @@
       const fetchPromises = entityConfigs.map(config => {
         // Handle special case for transfers with pagination
         if (config.name === 'transfers') {
-          return config.fetch(transfersPage, transfersPerPage);
+          return config.fetch(config.page(), config.perPage());
         } else {
           return config.fetch();
         }
@@ -247,8 +230,7 @@
               }
               
               if (paginationData) {
-                transfersPagination = paginationData;
-                console.log(`✅ Transfers pagination:`, transfersPagination);
+                config.pagination(paginationData);
               }
             }
           } else {
@@ -632,6 +614,94 @@
               loading={loading}
               pagination={usersPagination}
               onPageChange={handleUsersPageChange}
+            />
+          {:else if activeTab === 'mandates'}
+            <GenericEntityTable 
+              entityType="mandates"
+              items={filteredData[activeTab] || data[activeTab] || []}
+              loading={loading}
+              pagination={mandatesPagination}
+              onPageChange={handleMandatesPageChange}
+            />
+          {:else if activeTab === 'tasks'}
+            <GenericEntityTable 
+              entityType="tasks"
+              items={filteredData[activeTab] || data[activeTab] || []}
+              loading={loading}
+              pagination={tasksPagination}
+              onPageChange={handleTasksPageChange}
+            />
+          {:else if activeTab === 'instruments'}
+            <GenericEntityTable 
+              entityType="instruments"
+              items={filteredData[activeTab] || data[activeTab] || []}
+              loading={loading}
+              pagination={instrumentsPagination}
+              onPageChange={handleInstrumentsPageChange}
+            />
+          {:else if activeTab === 'codexes'}
+            <GenericEntityTable 
+              entityType="codexes"
+              items={filteredData[activeTab] || data[activeTab] || []}
+              loading={loading}
+              pagination={codexesPagination}
+              onPageChange={handleCodexesPageChange}
+            />
+          {:else if activeTab === 'organizations'}
+            <GenericEntityTable 
+              entityType="organizations"
+              items={filteredData[activeTab] || data[activeTab] || []}
+              loading={loading}
+              pagination={organizationsPagination}
+              onPageChange={handleOrganizationsPageChange}
+            />
+          {:else if activeTab === 'disputes'}
+            <GenericEntityTable 
+              entityType="disputes"
+              items={filteredData[activeTab] || data[activeTab] || []}
+              loading={loading}
+              pagination={disputesPagination}
+              onPageChange={handleDisputesPageChange}
+            />
+          {:else if activeTab === 'licenses'}
+            <GenericEntityTable 
+              entityType="licenses"
+              items={filteredData[activeTab] || data[activeTab] || []}
+              loading={loading}
+              pagination={licensesPagination}
+              onPageChange={handleLicensesPageChange}
+            />
+          {:else if activeTab === 'trades'}
+            <GenericEntityTable 
+              entityType="trades"
+              items={filteredData[activeTab] || data[activeTab] || []}
+              loading={loading}
+              pagination={tradesPagination}
+              onPageChange={handleTradesPageChange}
+            />
+          {:else if activeTab === 'realms'}
+            <GenericEntityTable 
+              entityType="realms"
+              items={filteredData[activeTab] || data[activeTab] || []}
+              loading={loading}
+              pagination={realmsPagination}
+              onPageChange={handleRealmsPageChange}
+            />
+          {:else if activeTab === 'proposals'}
+            <GenericEntityTable 
+              entityType="proposals"
+              items={filteredData[activeTab] || data[activeTab] || []}
+              loading={loading}
+              pagination={proposalsPagination}
+              onPageChange={handleProposalsPageChange}
+            />
+          {:else if activeTab === 'votes'}
+            <GenericEntityTable 
+              entityType="votes"
+              items={filteredData[activeTab] || data[activeTab] || []}
+              loading={loading}
+              pagination={votesPagination}
+              onPageChange={handleVotesPageChange}
             />
           {:else}
             <GenericEntityTable 
