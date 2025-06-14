@@ -15,6 +15,12 @@ if [ -n "$IDENTITY_FILE" ]; then
   dfx identity use github-actions
 fi
 
+# Define steps and batches
+steps=("base_setup" "user_management" "transactions")
+user_batches=10  # Number of user_management batches
+
+# Run base_setup
+echo "Running base_setup..."
 dfx canister call realm_backend extension_sync_call '(
   record {
     extension_name = "demo_loader";
@@ -23,31 +29,20 @@ dfx canister call realm_backend extension_sync_call '(
   }
 )' --network "$NETWORK"
 
-dfx canister call realm_backend extension_sync_call '(
-  record {
-    extension_name = "demo_loader";
-    function_name = "load";
-    args = "{\"step\": \"user_management\", \"batch\": 0}";
-  }
-)' --network "$NETWORK"
+# Run user_management batches
+for batch in $(seq 0 $((user_batches - 1))); do
+  echo "Running user_management batch $batch..."
+  dfx canister call realm_backend extension_sync_call "(
+    record {
+      extension_name = \"demo_loader\";
+      function_name = \"load\";
+      args = \"{\\\"step\\\": \\\"user_management\\\", \\\"batch\\\": $batch}\";
+    }
+  )" --network "$NETWORK"
+done
 
-dfx canister call realm_backend extension_sync_call '(
-  record {
-    extension_name = "demo_loader";
-    function_name = "load";
-    args = "{\"step\": \"user_management\", \"batch\": 1}";
-  }
-)' --network "$NETWORK"
-
-dfx canister call realm_backend extension_sync_call '(
-  record {
-    extension_name = "demo_loader";
-    function_name = "load";
-    args = "{\"step\": \"user_management\", \"batch\": 2}";
-  }
-)' --network "$NETWORK"
-
-
+# Run transactions
+echo "Running transactions..."
 dfx canister call realm_backend extension_sync_call '(
   record {
     extension_name = "demo_loader";
@@ -55,3 +50,5 @@ dfx canister call realm_backend extension_sync_call '(
     args = "{\"step\": \"transactions\"}";
   }
 )' --network "$NETWORK"
+
+echo "Demo setup complete!"
