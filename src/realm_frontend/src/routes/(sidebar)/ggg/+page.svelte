@@ -123,8 +123,9 @@
           });
           
           data = {...data, [entityType]: parsedData};
-          console.log(`✅ ${entityType}: ${parsedData.length} items`);
-          
+          console.log(`✅ ${entityType}: ${parsedData.length} items: ${JSON.stringify(parsedData)}`);
+          console.log('paginationPath', config.paginationPath);
+
           if (config.paginationPath) {
             const paginationParts = config.paginationPath.split('.');
             let paginationData = result.data;
@@ -138,8 +139,22 @@
               }
             }
             
+            console.log('paginationData', paginationData);
             if (paginationData) {
               config.pagination(paginationData);
+              if (entityType === 'users') usersPagination = paginationData;
+              else if (entityType === 'mandates') mandatesPagination = paginationData;
+              else if (entityType === 'tasks') tasksPagination = paginationData;
+              else if (entityType === 'transfers') transfersPagination = paginationData;
+              else if (entityType === 'instruments') instrumentsPagination = paginationData;
+              else if (entityType === 'codexes') codexesPagination = paginationData;
+              else if (entityType === 'organizations') organizationsPagination = paginationData;
+              else if (entityType === 'disputes') disputesPagination = paginationData;
+              else if (entityType === 'licenses') licensesPagination = paginationData;
+              else if (entityType === 'trades') tradesPagination = paginationData;
+              else if (entityType === 'realms') realmsPagination = paginationData;
+              else if (entityType === 'proposals') proposalsPagination = paginationData;
+              else if (entityType === 'votes') votesPagination = paginationData;
             }
           }
         } else {

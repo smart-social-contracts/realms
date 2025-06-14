@@ -7,6 +7,11 @@
     console.log(`Page change requested for ${entityType} to page ${page}`);
   };
   
+  console.log('entityType', entityType);
+  console.log('items', items);
+  console.log('loading', loading);
+  console.log('pagination', pagination);
+  
   // Alias for backward compatibility
   $: entities = items;
   
@@ -136,7 +141,7 @@
   }
   
   // Pagination helpers for users
-  $: safePagination = pagination && entityType === 'users' ? {
+  $: safePagination = pagination ? {
     page_num: Number(pagination.page_num),
     total_pages: Number(pagination.total_pages),
     total_items_count: Number(pagination.total_items_count),
@@ -146,6 +151,8 @@
   $: totalPages = safePagination?.total_pages ?? 1;
   $: hasNextPage = safePagination ? (safePagination.page_num + 1 < safePagination.total_pages) : false;
   $: hasPrevPage = safePagination ? (safePagination.page_num > 0) : false;
+  
+  $: if (pagination) console.log('GENERIC TABLE PAGINATION:', entityType, pagination);
 </script>
 
 <div class="w-full overflow-x-auto">
