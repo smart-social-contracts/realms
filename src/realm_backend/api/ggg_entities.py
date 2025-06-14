@@ -21,11 +21,20 @@ from kybra_simple_logging import get_logger
 logger = get_logger("api.ggg_entities")
 
 
-def list_users() -> Dict[str, Any]:
-    """List all users in the system."""
+def list_users(page_num: int, page_size: int) -> Dict[str, Any]:
+    """List users in the system with pagination."""
     try:
-        users = [user.to_dict() for user in User.instances()]
-        return {"users": users}
+        from_id = page_num * page_size + 1
+        logger.info(f"Listing users from {from_id} with page size {page_size}")
+        users = User.load_some(from_id=from_id, count=page_size)
+        count = User.count()
+        return {
+            "items": users,
+            "page_num": page_num,
+            "page_size": page_size,
+            "total_items_count": count,
+            "total_pages": math.ceil(count / page_size),
+        }
     except Exception as e:
         logger.error(f"Error listing users: {str(e)}")
         raise

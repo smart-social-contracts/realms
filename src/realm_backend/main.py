@@ -164,14 +164,26 @@ def get_user(principal: Principal) -> RealmResponse:
 
 
 @query
-def get_users() -> RealmResponse:
+def get_users(page_num: nat, page_size: nat) -> RealmResponse:
     try:
-        users_data = list_users()
-        # Convert dictionary to JSON string
-        users_json = [json.dumps(user) for user in users_data["users"]]
+        logger.info(f"Listing users for page {page_num} with page size {page_size}")
+        result = list_users(page_num=page_num, page_size=page_size)
+        users = result["items"]
+        users_json = [json.dumps(user.to_dict()) for user in users]
+        pagination = PaginationInfo(
+            page_num=result["page_num"],
+            page_size=result["page_size"],
+            total_items_count=result["total_items_count"],
+            total_pages=result["total_pages"]
+        )
         return RealmResponse(
             success=True,
-            data=RealmResponseData(UsersList=UsersListRecord(users=users_json)),
+            data=RealmResponseData(
+                UsersList=UsersListRecord(
+                    users=users_json,
+                    pagination=pagination
+                )
+            ),
         )
     except Exception as e:
         logger.error(f"Error listing users: {str(e)}\n{traceback.format_exc()}")

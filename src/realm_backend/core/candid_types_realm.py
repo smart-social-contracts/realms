@@ -26,6 +26,7 @@ class UserGetRecord(Variant):
 # New GGG response records
 class UsersListRecord(Record):
     users: Vec[text]  # JSON string of user data
+    pagination: PaginationInfo
 
 
 class MandatesListRecord(Record):

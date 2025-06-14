@@ -134,6 +134,18 @@
     }
     return '';
   }
+  
+  // Pagination helpers for users
+  $: safePagination = pagination && entityType === 'users' ? {
+    page_num: Number(pagination.page_num),
+    total_pages: Number(pagination.total_pages),
+    total_items_count: Number(pagination.total_items_count),
+    page_size: Number(pagination.page_size)
+  } : null;
+  $: currentPage = (safePagination?.page_num ?? 0) + 1;
+  $: totalPages = safePagination?.total_pages ?? 1;
+  $: hasNextPage = safePagination ? (safePagination.page_num + 1 < safePagination.total_pages) : false;
+  $: hasPrevPage = safePagination ? (safePagination.page_num > 0) : false;
 </script>
 
 <div class="w-full overflow-x-auto">
@@ -304,6 +316,69 @@
           </div>
         {/each}
       </div>
+      {#if entityType === 'users' && pagination}
+        <div class="flex justify-center items-center mt-4 space-x-2">
+          <button 
+            class="px-3 py-1 rounded border {hasPrevPage ? 'bg-blue-100 hover:bg-blue-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}" 
+            disabled={!hasPrevPage}
+            on:click={() => onPageChange(currentPage - 2)}
+          >
+            Previous
+          </button>
+          <div class="flex space-x-1">
+            {#if totalPages <= 7}
+              {#each Array(totalPages) as _, i}
+                <button 
+                  class="w-8 h-8 rounded-full {currentPage === i+1 ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
+                  on:click={() => onPageChange(i)}
+                >
+                  {i+1}
+                </button>
+              {/each}
+            {:else}
+              <button 
+                class="w-8 h-8 rounded-full {currentPage === 1 ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
+                on:click={() => onPageChange(0)}
+              >
+                1
+              </button>
+              {#if currentPage > 3}
+                <span class="px-1">...</span>
+              {/if}
+              {#each Array(3).fill(0) as _, i}
+                {@const pageNum = Math.max(2, Math.min(currentPage - 1 + i, totalPages - 1))}
+                {#if pageNum > 1 && pageNum < totalPages}
+                  <button 
+                    class="w-8 h-8 rounded-full {currentPage === pageNum ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
+                    on:click={() => onPageChange(pageNum - 1)}
+                  >
+                    {pageNum}
+                  </button>
+                {/if}
+              {/each}
+              {#if currentPage < totalPages - 2}
+                <span class="px-1">...</span>
+              {/if}
+              <button 
+                class="w-8 h-8 rounded-full {currentPage === totalPages ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
+                on:click={() => onPageChange(totalPages - 1)}
+              >
+                {totalPages}
+              </button>
+            {/if}
+          </div>
+          <button 
+            class="px-3 py-1 rounded border {hasNextPage ? 'bg-blue-100 hover:bg-blue-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}" 
+            disabled={!hasNextPage}
+            on:click={() => onPageChange(currentPage)}
+          >
+            Next
+          </button>
+        </div>
+        <div class="text-xs text-gray-500 mt-2 text-center">
+          Showing {entities.length} of {safePagination?.total_items_count || entities.length} users (Page {currentPage} of {totalPages})
+        </div>
+      {/if}
     {/if}
   {/if}
 </div> 

@@ -21,11 +21,22 @@
   let transfersPagination = null;
   let searchTerm = '';
   
+  // Add pagination state for users
+  let usersPage = 0;
+  let usersPerPage = 5;
+  let usersPagination = null;
+  
   // Handle pagination for transfers
   async function handleTransfersPageChange(page) {
     // page is 0-based from the table, so use as is
     transfersPage = page;
     await fetchEntityData('transfers');
+  }
+  
+  // Handle pagination for users
+  async function handleUsersPageChange(page) {
+    usersPage = page;
+    await fetchEntityData('users');
   }
   
   // Static list of all known GGG entity types - always show these tabs
@@ -47,7 +58,12 @@
   
   // Entity type configurations with their API endpoints
   const entityConfigs = [
-    { name: 'users', fetch: () => backend.get_users(), dataPath: 'UsersList.users' },
+    { 
+      name: 'users', 
+      fetch: (page_num = 0, page_size = 5) => backend.get_users(page_num, page_size), 
+      dataPath: 'UsersList.users',
+      paginationPath: 'UsersList.pagination'
+    },
     { name: 'mandates', fetch: () => backend.get_mandates(), dataPath: 'MandatesList.mandates' },
     { name: 'tasks', fetch: () => backend.get_tasks(), dataPath: 'TasksList.tasks' },
     { 
@@ -82,16 +98,16 @@
       
       console.log(`Fetching data for ${entityType}...`);
       
-      // Handle special case for transfers with pagination
       let result;
       if (entityType === 'transfers') {
         result = await config.fetch(transfersPage, transfersPerPage);
+      } else if (entityType === 'users') {
+        result = await config.fetch(usersPage, usersPerPage);
       } else {
         result = await config.fetch();
       }
       
       if (result && result.success && result.data) {
-        // Navigate to the data using the dataPath
         const pathParts = config.dataPath.split('.');
         let entityData = result.data;
         
@@ -105,7 +121,6 @@
         }
         
         if (entityData && Array.isArray(entityData) && entityData.length > 0) {
-          // Parse JSON strings if needed
           const parsedData = entityData.map(item => {
             if (typeof item === 'string') {
               try {
@@ -117,12 +132,11 @@
             return item;
           });
           
-          // Update only this specific entity type in the data object
           data = {...data, [entityType]: parsedData};
           console.log(`✅ ${entityType}: ${parsedData.length} items`);
           
-          // Get pagination info for transfers
-          if (entityType === 'transfers' && config.paginationPath) {
+          // Get pagination info for transfers and users
+          if ((entityType === 'transfers' || entityType === 'users') && config.paginationPath) {
             const paginationParts = config.paginationPath.split('.');
             let paginationData = result.data;
             
@@ -136,13 +150,17 @@
             }
             
             if (paginationData) {
-              transfersPagination = paginationData;
-              console.log(`✅ Transfers pagination:`, transfersPagination);
+              if (entityType === 'transfers') {
+                transfersPagination = paginationData;
+                console.log(`✅ Transfers pagination:`, transfersPagination);
+              } else if (entityType === 'users') {
+                usersPagination = paginationData;
+                console.log(`✅ Users pagination:`, usersPagination);
+              }
             }
           }
         } else {
           console.log(`⚠️ ${entityType}: No valid data found`);
-          // Initialize with empty array to prevent undefined errors
           data = {...data, [entityType]: []};
         }
       } else {
@@ -606,6 +624,14 @@
               loading={loading}
               pagination={transfersPagination}
               onPageChange={handleTransfersPageChange}
+            />
+          {:else if activeTab === 'users'}
+            <GenericEntityTable 
+              entityType="users"
+              items={filteredData[activeTab] || data[activeTab] || []}
+              loading={loading}
+              pagination={usersPagination}
+              onPageChange={handleUsersPageChange}
             />
           {:else}
             <GenericEntityTable 
