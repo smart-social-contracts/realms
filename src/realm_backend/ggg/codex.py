@@ -9,4 +9,3 @@ class Codex(Entity, TimestampedMixin):
     code = String()
     tasks = OneToMany("Task", "codex")
     __alias__ = "name"
-

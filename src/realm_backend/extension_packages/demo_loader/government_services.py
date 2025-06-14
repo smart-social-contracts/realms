@@ -1,14 +1,16 @@
 from ggg import (
+    Codex,
     License,
     Mandate,
-    Codex,
     Task,
     TaskSchedule,
 )
 from kybra_simple_logging import get_logger
+
 from .config import NUM_LICENSES, NUM_MANDATES
 
 logger = get_logger("demo_loader.government_services")
+
 
 def run():
     """Create government services related entities."""
@@ -19,33 +21,32 @@ def run():
     license_data = [
         {
             "name": "Standard Driver's License",
-            "code": "if age >= 16 and passed_test: return True"
+            "code": "if age >= 16 and passed_test: return True",
         },
         {
             "name": "Professional License",
-            "code": "if has_qualification and background_check: return True"
+            "code": "if has_qualification and background_check: return True",
         },
         {
             "name": "Business License",
-            "code": "if has_registration and tax_compliant: return True"
+            "code": "if has_registration and tax_compliant: return True",
         },
         {
             "name": "Digital Asset License",
-            "code": "if has_kyc and risk_assessment: return True"
+            "code": "if has_kyc and risk_assessment: return True",
         },
         {
             "name": "Smart Contract License",
-            "code": "if has_audit and security_check: return True"
-        }
+            "code": "if has_audit and security_check: return True",
+        },
     ]
 
     for i in range(NUM_LICENSES):
         license_info = license_data[i]
         codex = Codex(
-            name=f"{license_info['name']} Verification",
-            code=license_info['code']
+            name=f"{license_info['name']} Verification", code=license_info["code"]
         )
-        license = License(name=license_info['name'])
+        license = License(name=license_info["name"])
         licenses.append(license)
 
     # Create mandates
@@ -54,51 +55,51 @@ def run():
         {
             "name": "Retirement Pension",
             "description": "Citizens receive periodic payments upon reaching age 65",
-            "cron": "0 0 1 * *"  # First day of each month
+            "cron": "0 0 1 * *",  # First day of each month
         },
         {
             "name": "Land Rental",
             "description": "Standardized land rental agreements and payments",
-            "cron": "0 0 1 * *"
+            "cron": "0 0 1 * *",
         },
         {
             "name": "Tax Collection",
             "description": "Annual tax collection and processing",
-            "cron": "0 0 15 4 *"  # April 15th yearly
+            "cron": "0 0 15 4 *",  # April 15th yearly
         },
         {
             "name": "Social Security",
             "description": "Monthly social security payments",
-            "cron": "0 0 1 * *"
+            "cron": "0 0 1 * *",
         },
         {
             "name": "Healthcare Coverage",
             "description": "Healthcare service coverage and payments",
-            "cron": "0 0 1 * *"
+            "cron": "0 0 1 * *",
         },
         {
             "name": "Education Grants",
             "description": "Educational funding and scholarship distribution",
-            "cron": "0 0 1 9 *"  # September 1st yearly
-        }
+            "cron": "0 0 1 9 *",  # September 1st yearly
+        },
     ]
 
     for i in range(NUM_MANDATES):
         mandate_info = mandate_data[i]
         mandate = Mandate(
-            name=mandate_info['name'],
-            metadata=f'{{"description": "{mandate_info["description"]}"}}'
+            name=mandate_info["name"],
+            metadata=f'{{"description": "{mandate_info["description"]}"}}',
         )
-        
+
         # Create associated task and schedule
         task = Task(
             name=f"{mandate_info['name']} Processing",
-            metadata=f'{{"description": "Process {mandate_info["name"].lower()} payments"}}'
+            metadata=f'{{"description": "Process {mandate_info["name"].lower()} payments"}}',
         )
-        
-        schedule = TaskSchedule(cron_expression=mandate_info['cron'])
+
+        schedule = TaskSchedule(cron_expression=mandate_info["cron"])
         schedule.tasks.add(task)
-        
+
         mandates.append(mandate)
 
     logger.info(f"Created {len(licenses)} licenses and {len(mandates)} mandates")

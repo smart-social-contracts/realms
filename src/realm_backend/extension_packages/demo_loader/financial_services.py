@@ -1,15 +1,19 @@
 from ggg import (
-    Organization,
     Instrument,
+    Organization,
 )
 from kybra_simple_logging import get_logger
-from .config import NUM_ORGANIZATIONS, NUM_INSTRUMENTS
+
+from .config import NUM_INSTRUMENTS, NUM_ORGANIZATIONS
 
 logger = get_logger("demo_loader.financial_services")
 
+
 def run():
     """Create financial services related entities."""
-    logger.info(f"Creating {NUM_ORGANIZATIONS} organizations and {NUM_INSTRUMENTS} instruments")
+    logger.info(
+        f"Creating {NUM_ORGANIZATIONS} organizations and {NUM_INSTRUMENTS} instruments"
+    )
 
     # Create organizations
     organizations = []
@@ -23,7 +27,7 @@ def run():
         "Smart Contract Solutions",
         "Decentralized Finance Hub",
         "Digital Payment Systems",
-        "Blockchain Infrastructure Co."
+        "Blockchain Infrastructure Co.",
     ]
 
     for i in range(NUM_ORGANIZATIONS):
@@ -37,13 +41,17 @@ def run():
         "Ethereum",
         "Digital Dollar",
         "Smart Contract Token",
-        "Governance Token"
+        "Governance Token",
     ]
 
     for i in range(NUM_INSTRUMENTS):
         instrument = Instrument(name=instrument_names[i])
         instruments.append(instrument)
 
-    logger.info(f"Created {len(organizations)} organizations and {len(instruments)} instruments")
+    logger.info(
+        f"Created {len(organizations)} organizations and {len(instruments)} instruments"
+    )
 
-    return f"Created {len(organizations)} organizations and {len(instruments)} instruments"
+    return (
+        f"Created {len(organizations)} organizations and {len(instruments)} instruments"
+    )

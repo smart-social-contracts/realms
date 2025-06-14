@@ -39,8 +39,7 @@ def run():
 
     # Create the Treasury
     treasury = Treasury(
-        name="Digital Republic Treasury",  # Added name
-        vault_principal_id="abc123"
+        name="Digital Republic Treasury", vault_principal_id="abc123"  # Added name
     )
 
     # Create basic humans and users
@@ -66,8 +65,7 @@ def run():
 
     # For codices
     pension_codex = Codex(
-        name="Pension Eligibility",  # Added name
-        code="if human.age >= 65: return True"
+        name="Pension Eligibility", code="if human.age >= 65: return True"  # Added name
     )
 
     pension_task = Task(
@@ -82,9 +80,7 @@ def run():
     pension_schedule.tasks.add(pension_task)
 
     # For the instruments
-    btc_instrument = Instrument(
-        name="Bitcoin"  # Added name
-    )
+    btc_instrument = Instrument(name="Bitcoin")  # Added name
 
     # Create pension trade and transfer
     pension_trade = Trade(
@@ -107,7 +103,7 @@ def run():
 
     rental_codex = Codex(
         name="Rental Payment Verification",  # Added name
-        code="if payment_received: return True\nelse: create_dispute()"
+        code="if payment_received: return True\nelse: create_dispute()",
     )
 
     rental_task = Task(
@@ -143,18 +139,12 @@ def run():
     license_task = Task(name="Driving License Verification")
 
     # For the license
-    driver_license = License(
-        name="Standard Driver's License"  # Added name
-    )
+    driver_license = License(name="Standard Driver's License")  # Added name
 
-    fee_instrument = Instrument(
-        name="Fee Payment Token"  # Added name
-    )
+    fee_instrument = Instrument(name="Fee Payment Token")  # Added name
 
     # Create license trade and transfer
-    license_trade = Trade(
-        metadata='{"type": "license_fee", "receipt": "DL20240001"}'
-    )
+    license_trade = Trade(metadata='{"type": "license_fee", "receipt": "DL20240001"}')
 
     # Add a license fee transfer
     license_transfer = Transfer(
@@ -169,21 +159,16 @@ def run():
     logger.info("Creating tax collection example")
 
     tax_codex = Codex(
-        name="Tax Calculation",  # Added name
-        code="calculate_tax_for_user(user)"
+        name="Tax Calculation", code="calculate_tax_for_user(user)"  # Added name
     )
 
     tax_task = Task(name="Tax Processing")
     tax_task.codex = tax_codex
 
-    tax_schedule = TaskSchedule(
-        cron_expression="0 0 15 4 *"  # April 15th yearly
-    )
+    tax_schedule = TaskSchedule(cron_expression="0 0 15 4 *")  # April 15th yearly
     tax_schedule.tasks.add(tax_task)
 
-    tax_instrument = Instrument(
-        name="Tax Payment Token"  # Added name
-    )
+    tax_instrument = Instrument(name="Tax Payment Token")  # Added name
 
     # Create tax trade and transfer
     tax_trade = Trade(

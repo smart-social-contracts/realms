@@ -81,30 +81,35 @@ def load(args: str):
         if step == "base_setup":
             logger.info("Step 1: Running base setup")
             from .base_setup import run as run_base_setup
+
             return run_base_setup()
 
         # Step 2: User management
         elif step == "user_management":
             logger.info("Step 2: Creating users and humans")
             from .user_management import run as run_user_management
+
             return run_user_management(batch)
 
         # Step 3: Financial services
         elif step == "financial_services":
             logger.info("Step 3: Creating financial services")
             from .financial_services import run as run_financial_services
+
             return run_financial_services()
 
         # Step 4: Government services
         elif step == "government_services":
             logger.info("Step 4: Creating government services")
             from .government_services import run as run_government_services
+
             return run_government_services()
 
         # Step 5: Transactions
         elif step == "transactions":
             logger.info("Step 5: Creating transactions")
             from .transactions import run as run_transactions
+
             return run_transactions()
 
         else:

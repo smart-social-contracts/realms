@@ -1,10 +1,12 @@
 from kybra import Opt, Principal, Record, Variant, Vec, float64, nat, text
 
+
 class PaginationInfo(Record):
     page_num: int
     page_size: int
     total_items_count: int
     total_pages: int
+
 
 class StatusRecord(Record):
     version: text
@@ -139,4 +141,3 @@ class ExtensionCallArgs(Record):
 class ExtensionCallResponse(Record):
     success: bool
     response: text
-
