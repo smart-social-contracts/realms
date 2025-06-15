@@ -18,7 +18,7 @@
 			
 			// Set initial drawer state based on screen size
 			const updateDrawerState = () => {
-				drawerHidden = window.innerWidth >= 1024; // 1024px is lg breakpoint in Tailwind
+				drawerHidden = window.innerWidth < 1024; // true if mobile, false if desktop
 			};
 			
 			// Initialize drawer state

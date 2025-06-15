@@ -1,4 +1,3 @@
-dfx canister create realm_backend
 dfx deploy realm_backend --yes
 dfx generate realm_backend
 npm install --legacy-peer-deps
