@@ -2,6 +2,7 @@
   import { Button, Card, Radio, Label, Spinner } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { principal, isAuthenticated } from '$lib/stores/auth';
+  import { backend } from '$lib/canisters.js';
   
   let agreement = '';
   let error = '';
@@ -49,33 +50,18 @@
     
     try {
       loading = true;
-      
-      // Call local Flask API to join organization
-      const response = await fetch(`${API_BASE_URL}/join`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          user_id: $principal
-        })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          success = true;
-        } else if (data.error) {
-          error = data.error;
-        } else {
-          error = 'Unknown error occurred';
-        }
+      // Call the Kybra canister join_realm method
+      // For now, use a static join code 'admin'
+      const response = await backend.join_realm('admin');
+      if (response.success) {
+        success = true;
+      } else if (response.data && response.data.Error) {
+        error = response.data.Error;
       } else {
-        const errorData = await response.json();
-        error = errorData.error || 'Failed to join the realm';
+        error = 'Unknown error occurred';
       }
     } catch (e) {
-      console.error('Error joining organization:', e);
+      console.error('Error joining realm:', e);
       error = e.message || 'Failed to join the realm';
     } finally {
       loading = false;

@@ -594,6 +594,17 @@ def http_request(req: HttpRequest) -> HttpResponse:
 
 
 @update
+def join_realm(join_code: str) -> RealmResponse:
+    if join_code == "admin":
+        pass # TODO
+    else:
+        pass # TODO
+    
+    return RealmResponse(success=True, data=RealmResponseData(Message=text("You now joined the realm")))
+
+
+
+@update
 def execute_code(code: str) -> str:
     """Executes Python code and returns the output.
 
