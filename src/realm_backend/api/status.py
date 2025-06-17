@@ -7,7 +7,21 @@ Provides health check and system status information
 import sys
 from typing import Any
 
-from ggg import *
+from ggg import (
+    Codex,
+    Dispute,
+    Instrument,
+    License,
+    Mandate,
+    Organization,
+    Proposal,
+    Realm,
+    Task,
+    Trade,
+    Transfer,
+    User,
+    Vote,
+)
 from kybra_simple_logging import get_logger
 
 # Initialize logger
