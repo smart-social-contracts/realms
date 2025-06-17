@@ -1,13 +1,21 @@
 from ggg import Trade, Transfer
-from kybra_simple_db import Entity, OneToMany, OneToOne, String, TimestampedMixin
+from kybra_simple_db import (
+    Entity,
+    ManyToMany,
+    OneToMany,
+    OneToOne,
+    String,
+    TimestampedMixin,
+)
 from kybra_simple_logging import get_logger
 
 logger = get_logger("entity.user")
 
 
 class User(Entity, TimestampedMixin):
-    __alias__ = "name"
-    name = String(min_length=2, max_length=256)
+    __alias__ = "id"
+    id = String()
+    profiles = ManyToMany(["UserProfile"], "users")
     human = OneToOne("Human", "user")
     citizen = OneToOne("Citizen", "user")
     transfers_from = OneToMany("Transfer", "from_user")

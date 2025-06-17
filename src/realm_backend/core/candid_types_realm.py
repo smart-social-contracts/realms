@@ -13,6 +13,17 @@ class StatusRecord(Record):
     status: text
     users_count: nat
     organizations_count: nat
+    realms_count: nat
+    mandates_count: nat
+    tasks_count: nat
+    transfers_count: nat
+    instruments_count: nat
+    codexes_count: nat
+    disputes_count: nat
+    licenses_count: nat
+    trades_count: nat
+    proposals_count: nat
+    votes_count: nat
     commit: text
     extensions: Vec[text]
 
@@ -23,6 +34,7 @@ class UserRegisterRecord(Variant):
 
 class UserGetRecord(Variant):
     principal: Principal
+    profiles: Vec[text]
 
 
 # New GGG response records

@@ -2,6 +2,7 @@ from ggg import (
     Realm,
     Treasury,
     User,
+    UserProfile,
 )
 from kybra_simple_logging import get_logger
 
@@ -18,8 +19,14 @@ def run():
         description="A digital sovereign realm governing digital assets and relationships",
     )
 
+    user_profile_admin = UserProfile(
+        name="admin",
+        allowed_to="all",
+        description="Admin user profile",
+    )
+
     # Create a system user to represent the realm in transfers
-    system_user = User(name="system")
+    system_user = User(name="system", profiles=[user_profile_admin])
 
     # Create the Treasury
     treasury = Treasury(name="Digital Republic Treasury", vault_principal_id="abc123")

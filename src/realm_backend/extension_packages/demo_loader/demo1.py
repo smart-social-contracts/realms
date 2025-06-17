@@ -28,6 +28,26 @@ def run():
     logger.info("Clearing database")
     Database.get_instance().clear()
 
+    # Re-register all entity types after clearing
+    logger.info("Re-registering entity types")
+    entity_types = [
+        User,
+        Transfer,
+        Trade,
+        Instrument,
+        Organization,
+        Realm,
+        Treasury,
+        Human,
+        Mandate,
+        Codex,
+        Task,
+        TaskSchedule,
+        License,
+        Dispute,
+    ]
+    [Database.register_entity_type(e) for e in entity_types]
+
     # Create the Realm as the top political entity
     realm = Realm(
         name="Digital Republic",

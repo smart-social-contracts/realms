@@ -126,14 +126,14 @@ def status() -> RealmResponse:
 
 
 @update
-def register_user(principal: Principal) -> RealmResponse:
+def join_realm(profile: str) -> RealmResponse:
     try:
         return RealmResponse(
             success=True,
             data=RealmResponseData(
                 UserRegister=UserRegisterRecord(
                     principal=Principal.from_str(
-                        user_register(principal.to_str())["principal"]
+                        user_register(ic.caller().to_str(), profile)["principal"],
                     )
                 )
             ),
@@ -143,21 +143,63 @@ def register_user(principal: Principal) -> RealmResponse:
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
+# @update
+# def register_user(principal: Principal, profile: str) -> RealmResponse:
+#     try:
+#         return RealmResponse(
+#             success=True,
+#             data=RealmResponseData(
+#                 UserRegister=UserRegisterRecord(
+#                     principal=Principal.from_str(
+#                         user_register(principal.to_str(), profile)["principal"],
+#                     )
+#                 )
+#             ),
+#         )
+#     except Exception as e:
+#         logger.error(f"Error registering user: {str(e)}\n{traceback.format_exc()}")
+#         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
 @query
-def get_user(principal: Principal) -> RealmResponse:
+def get_my_principal() -> text:
+    return ic.caller().to_str()
+
+
+@query
+def get_my_user_status() -> RealmResponse:
     try:
-        user_data = user_get(principal.to_str())
+        user = user_get(ic.caller().to_str())
+        logger.info(f"User: {user}")
         return RealmResponse(
             success=True,
             data=RealmResponseData(
                 UserGet=UserGetRecord(
-                    principal=Principal.from_str(user_data["principal"])
+                    principal=Principal.from_str(user["principal"]),
+                    profiles=Vec[text](user["profiles"]),
                 )
             ),
         )
     except Exception as e:
         logger.error(f"Error getting user: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+# @query
+# def get_user(principal: Principal) -> RealmResponse:
+#     try:
+#         user_data = user_get(principal.to_str())
+#         return RealmResponse(
+#             success=True,
+#             data=RealmResponseData(
+#                 UserGet=UserGetRecord(
+#                     principal=Principal.from_str(user_data["principal"])
+#                 )
+#             ),
+#         )
+#     except Exception as e:
+#         logger.error(f"Error getting user: {str(e)}\n{traceback.format_exc()}")
+#         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
 # New GGG API endpoints
@@ -481,8 +523,27 @@ def get_votes(page_num: nat, page_size: nat) -> RealmResponse:
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
+@update
+def initialize() -> void:
+    # Register all entity types from ggg
+    import ggg
+    from ggg import __all__ as entity_names
+
+    for name in entity_names:
+        try:
+            entity_class = getattr(ggg, name)
+            logger.info(f"Registering entity type {name}")
+            Database.get_instance().register_entity_type(entity_class)
+        except Exception as e:
+            logger.error(
+                f"Error registering entity type {name}: {str(e)}\n{traceback.format_exc()}"
+            )
+
+
 @init
 def init_() -> void:
+    logger.info("Initializing Realm canister")
+    initialize()
     logger.info("Realm canister initialized")
 
 
@@ -591,17 +652,6 @@ def http_request(req: HttpRequest) -> HttpResponse:
             "streaming_strategy": None,
             "upgrade": False,
         }
-
-
-@update
-def join_realm(join_code: str) -> RealmResponse:
-    if join_code == "admin":
-        pass # TODO
-    else:
-        pass # TODO
-    
-    return RealmResponse(success=True, data=RealmResponseData(Message=text("You now joined the realm")))
-
 
 
 @update

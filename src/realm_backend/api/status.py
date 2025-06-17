@@ -7,8 +7,7 @@ Provides health check and system status information
 import sys
 from typing import Any
 
-from ggg.organization import Organization
-from ggg.user import User
+from ggg import *
 from kybra_simple_logging import get_logger
 
 # Initialize logger
@@ -25,8 +24,19 @@ def get_status() -> dict[str, Any]:
     logger.info("Status check requested")
 
     # Get entity counts from the database
-    users_count = len(User.instances())
-    organizations_count = len(Organization.instances())
+    users_count = User.count()
+    organizations_count = Organization.count()
+    realms_count = Realm.count()
+    mandates_count = Mandate.count()
+    tasks_count = Task.count()
+    transfers_count = Transfer.count()
+    instruments_count = Instrument.count()
+    codexes_count = Codex.count()
+    disputes_count = Dispute.count()
+    licenses_count = License.count()
+    trades_count = Trade.count()
+    proposals_count = Proposal.count()
+    votes_count = Vote.count()
 
     # Get installed extensions
     extension_names = []
@@ -50,8 +60,18 @@ def get_status() -> dict[str, Any]:
         "version": version,
         "status": "ok",
         "users_count": users_count,
-        "treasury": {"vaults": []},
         "organizations_count": organizations_count,
+        "realms_count": realms_count,
+        "mandates_count": mandates_count,
+        "tasks_count": tasks_count,
+        "transfers_count": transfers_count,
+        "instruments_count": instruments_count,
+        "codexes_count": codexes_count,
+        "disputes_count": disputes_count,
+        "licenses_count": licenses_count,
+        "trades_count": trades_count,
+        "proposals_count": proposals_count,
+        "votes_count": votes_count,
         "commit": commit_hash,
         "extensions": extension_names,
     }
