@@ -26,6 +26,11 @@ class Operations:
     TASK_CANCEL = "task.cancel"
 
 
+class Profiles:
+    ADMIN = ["admin", [Operations.ALL]]
+    USER = ["user", []]
+
+
 class UserProfile(Entity, TimestampedMixin):
     __alias__ = "name"
     name = String(max_length=256)

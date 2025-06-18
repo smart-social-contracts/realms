@@ -171,12 +171,16 @@ def get_my_user_status() -> RealmResponse:
     try:
         user = user_get(ic.caller().to_str())
         logger.info(f"User: {user}")
+        profiles = Vec[text]()
+        for p in user["profiles"]:
+            profiles.append(p)
+        logger.info(f"Profiles: {profiles}")
         return RealmResponse(
             success=True,
             data=RealmResponseData(
                 UserGet=UserGetRecord(
                     principal=Principal.from_str(user["principal"]),
-                    profiles=Vec[text](user["profiles"]),
+                    profiles=profiles,
                 )
             ),
         )

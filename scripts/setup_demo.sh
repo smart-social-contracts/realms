@@ -29,26 +29,26 @@ dfx canister call realm_backend extension_sync_call '(
   }
 )' --network "$NETWORK"
 
-# Run user_management batches
-for batch in $(seq 0 $((user_batches - 1))); do
-  echo "Running user_management batch $batch..."
-  dfx canister call realm_backend extension_sync_call "(
-    record {
-      extension_name = \"demo_loader\";
-      function_name = \"load\";
-      args = \"{\\\"step\\\": \\\"user_management\\\", \\\"batch\\\": $batch}\";
-    }
-  )" --network "$NETWORK"
-done
+# # Run user_management batches
+# for batch in $(seq 0 $((user_batches - 1))); do
+#   echo "Running user_management batch $batch..."
+#   dfx canister call realm_backend extension_sync_call "(
+#     record {
+#       extension_name = \"demo_loader\";
+#       function_name = \"load\";
+#       args = \"{\\\"step\\\": \\\"user_management\\\", \\\"batch\\\": $batch}\";
+#     }
+#   )" --network "$NETWORK"
+# done
 
-# Run transactions
-echo "Running transactions..."
-dfx canister call realm_backend extension_sync_call '(
-  record {
-    extension_name = "demo_loader";
-    function_name = "load";
-    args = "{\"step\": \"transactions\"}";
-  }
-)' --network "$NETWORK"
+# # Run transactions
+# echo "Running transactions..."
+# dfx canister call realm_backend extension_sync_call '(
+#   record {
+#     extension_name = "demo_loader";
+#     function_name = "load";
+#     args = "{\"step\": \"transactions\"}";
+#   }
+# )' --network "$NETWORK"
 
 echo "Demo setup complete!"

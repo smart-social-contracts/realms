@@ -1,4 +1,5 @@
 from ggg import (
+    Profiles,
     Realm,
     Treasury,
     User,
@@ -20,8 +21,8 @@ def run():
     )
 
     user_profile_admin = UserProfile(
-        name="admin",
-        allowed_to="all",
+        name=Profiles.ADMIN[0],
+        allowed_to=",".join(Profiles.ADMIN[1]),
         description="Admin user profile",
     )
 

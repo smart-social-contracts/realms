@@ -24,7 +24,7 @@ from .trade import Trade
 from .transfer import Transfer
 from .treasury import Treasury
 from .user import User
-from .user_profile import UserProfile
+from .user_profile import UserProfile, Profiles, Operations
 from .vote import Vote
 
 __all__ = [
@@ -43,6 +43,8 @@ __all__ = [
     "Trade",
     "User",
     "UserProfile",
+    "Profiles",
+    "Operations",
     "Vote",
     "Transfer",
     "Human",
