@@ -40,7 +40,6 @@ from core.candid_types_realm import (
     TradesListRecord,
     TransfersListRecord,
     UserGetRecord,
-    UserRegisterRecord,
     UsersListRecord,
     VotesListRecord,
 )
@@ -128,13 +127,17 @@ def status() -> RealmResponse:
 @update
 def join_realm(profile: str) -> RealmResponse:
     try:
+        user = user_register(ic.caller().to_str(), profile)
+        profiles = Vec[text]()
+        for p in user["profiles"]:
+            profiles.append(p.name)
+
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                UserRegister=UserRegisterRecord(
-                    principal=Principal.from_str(
-                        user_register(ic.caller().to_str(), profile)["principal"],
-                    )
+                UserRegister=UserGetRecord(
+                    principal=Principal.from_str(user["principal"]),
+                    profiles=profiles,
                 )
             ),
         )

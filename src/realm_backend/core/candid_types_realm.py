@@ -28,11 +28,7 @@ class StatusRecord(Record):
     extensions: Vec[text]
 
 
-class UserRegisterRecord(Variant):
-    principal: Principal
-
-
-class UserGetRecord(Variant):
+class UserGetRecord(Record):
     principal: Principal
     profiles: Vec[text]
 
@@ -105,7 +101,6 @@ class VotesListRecord(Record):
 
 class RealmResponseData(Variant):
     Status: StatusRecord
-    UserRegister: UserRegisterRecord
     UserGet: UserGetRecord
     UsersList: UsersListRecord
     MandatesList: MandatesListRecord
