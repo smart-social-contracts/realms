@@ -136,7 +136,7 @@ def join_realm(profile: str) -> RealmResponse:
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                UserRegister=UserGetRecord(
+                UserGet=UserGetRecord(
                     principal=Principal.from_str(user["principal"]),
                     profiles=profiles,
                 )

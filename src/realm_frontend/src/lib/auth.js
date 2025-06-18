@@ -26,9 +26,13 @@ let locallyAuthenticated = false;
 // Hold the real or dummy auth client
 let authClient;
 
+// Export the authClient instance for reuse
+export { authClient };
+
 export async function initializeAuthClient() {
   if (!authClient) {
     authClient = await AuthClient.create();
+    console.log('Auth client initialized');
   }
   return authClient;
 }

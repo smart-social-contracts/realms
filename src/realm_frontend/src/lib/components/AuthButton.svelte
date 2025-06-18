@@ -6,6 +6,7 @@
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import T from '$lib/components/T.svelte';
+	import { initBackendWithIdentity } from '$lib/canisters';
 
 	import { Button } from 'flowbite-svelte';
 
@@ -21,6 +22,8 @@
 			principal.set(principalText); // Update the principal store
 
 			console.log('Principal at login:', principalText); // Debugging principal value after login
+			// Initialize backend with authenticated identity
+			await initBackendWithIdentity();
 		}
 	});
 
@@ -33,6 +36,8 @@
 		principal.set(principalText); // Update the principal store
 
 		console.log('Principal at login:', principalText); // Debugging principal value after login
+		// Initialize backend with authenticated identity
+		await initBackendWithIdentity();
 	}
 
 	async function handleLogout() {
