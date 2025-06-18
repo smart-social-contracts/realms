@@ -28,10 +28,7 @@ def user_get(principal: str) -> dict[str, Any]:
     logger.info(f"Getting user {principal}")
     user = User[principal]
     if not user:
-        return {
-            "success": False,
-            "error": f"User with principal {principal} not found"
-        }
+        return {"success": False, "error": f"User with principal {principal} not found"}
     return {
         "success": True,
         "principal": user.id,
