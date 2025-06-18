@@ -3,7 +3,14 @@ import { AuthClient } from '@dfinity/auth-client';
 import { Principal } from '@dfinity/principal';
 
 // Flag to determine if we're in local development mode
-const isLocalDev = false; // Changed to false for IC deployment
+const isLocalDev = true; //process.env.NODE_ENV === 'development';
+
+// Determine the appropriate Identity Provider URL based on environment
+const II_URL = isLocalDev
+  ? 'http://umunu-kh777-77774-qaaca-cai.localhost:8000' // Local II canister - updated ID
+  : 'https://identity.ic0.app';                                    // Mainnet II
+
+console.log(`Using Identity Provider: ${II_URL}`);
 
 // Dummy data for local development
 const dummyPrincipals = [
@@ -20,54 +27,30 @@ let locallyAuthenticated = false;
 let authClient;
 
 export async function initializeAuthClient() {
-  if (isLocalDev) {
-    // In local dev, we just return a dummy client with basic functionality
-    if (!authClient) {
-      authClient = {
-        isAuthenticated: () => Promise.resolve(locallyAuthenticated),
-        getIdentity: () => ({
-          getPrincipal: () => Principal.fromText(dummyPrincipals[currentPrincipalIndex])
-        }),
-        logout: () => {
-          locallyAuthenticated = false;
-          return Promise.resolve();
-        }
-      };
-    }
-    return authClient;
-  } else {
-    // Real IC implementation
-    if (!authClient) {
-      authClient = await AuthClient.create();
-    }
-    return authClient;
+  if (!authClient) {
+    authClient = await AuthClient.create();
   }
+  return authClient;
 }
 
 export async function login() {
-  if (isLocalDev) {
-    // In local dev, we simulate a login with a dummy principal
-    locallyAuthenticated = true;
-    console.log(`Logged in with dummy principal: ${dummyPrincipals[currentPrincipalIndex]}`);
-    const identity = {
-      getPrincipal: () => Principal.fromText(dummyPrincipals[currentPrincipalIndex])
-    };
-    const principal = identity.getPrincipal();
-    return { identity, principal };
-  } else {
-    // Real IC implementation
-    const client = await initializeAuthClient();
-    return new Promise((resolve) => {
-      client.login({
-        identityProvider: 'https://identity.ic0.app/#authorize',
-        onSuccess: () => {
-          const identity = client.getIdentity();
-          const principal = identity.getPrincipal();
-          resolve({ identity, principal });
-        },
-      });
+  const client = await initializeAuthClient();
+  
+  return new Promise((resolve) => {
+    client.login({
+      identityProvider: II_URL, // Use the appropriate II URL
+      onSuccess: () => {
+        const identity = client.getIdentity();
+        const principal = identity.getPrincipal();
+        console.log(`Logged in with principal: ${principal.toText()}`);
+        resolve({ identity, principal });
+      },
+      onError: (error) => {
+        console.error("Login failed:", error);
+        resolve({ identity: null, principal: null });
+      }
     });
-  }
+  });
 }
 
 // Function to cycle through different dummy principals (for testing different users)

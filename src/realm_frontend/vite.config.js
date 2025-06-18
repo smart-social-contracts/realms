@@ -54,7 +54,6 @@ export default defineConfig({
       // Add aliases for IC dependencies in development mode
       ...(process.env.NODE_ENV === 'development' ? [
         { find: '@dfinity/candid', replacement: fileURLToPath(new URL('./src/lib/ic-stub.js', import.meta.url)) },
-        { find: '@dfinity/principal', replacement: fileURLToPath(new URL('./src/lib/ic-stub.js', import.meta.url)) },
         { find: '@dfinity/agent', replacement: fileURLToPath(new URL('./src/lib/ic-stub.js', import.meta.url)) },
         { find: '@dfinity/identity', replacement: fileURLToPath(new URL('./src/lib/ic-stub.js', import.meta.url)) },
       ] : []),
