@@ -130,7 +130,7 @@ def join_realm(profile: str) -> RealmResponse:
         user = user_register(ic.caller().to_str(), profile)
         profiles = Vec[text]()
         for p in user["profiles"]:
-            profiles.append(p.name)
+            profiles.append(p)
 
         return RealmResponse(
             success=True,

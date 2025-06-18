@@ -1,5 +1,5 @@
 <script>
-  import { Button, Card, Radio, Label, Spinner } from 'flowbite-svelte';
+  import { Button, Card, Radio, Label, Spinner, Select } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { principal, isAuthenticated } from '$lib/stores/auth';
   import { backend } from '$lib/canisters.js';
@@ -9,6 +9,13 @@
   let success = false;
   let loading = false;
   let realmName = 'Realm';
+  let selectedProfile = 'admin'; // Default to admin profile
+  
+  // Available profiles
+  const profiles = [
+    { value: 'admin', name: 'Administrator' },
+    { value: 'user', name: 'Regular User' }
+  ];
   
   // URL for local Flask backend API
   const API_BASE_URL = 'http://localhost:5000/api/v1';
@@ -47,12 +54,17 @@
       error = 'You must be logged in to join this Realm';
       return;
     }
+
+    if (!selectedProfile) {
+      error = 'Please select a profile type';
+      return;
+    }
     
     try {
       loading = true;
-      // Call the Kybra canister join_realm method
-      // For now, use a static join code 'admin'
-      const response = await backend.join_realm('admin');
+      // Call the Kybra canister join_realm method with the selected profile
+      console.log(`Joining realm with profile: ${selectedProfile}`);
+      const response = await backend.join_realm(selectedProfile);
       if (response.success) {
         success = true;
       } else if (response.data && response.data.Error) {
@@ -119,6 +131,14 @@
             </div>
           </div>
           
+          <div class="mb-4">
+            <Select bind:value={selectedProfile} on:change={(e) => selectedProfile = e.target.value}>
+              {#each profiles as profile}
+                <option value={profile.value}>{profile.name}</option>
+              {/each}
+            </Select>
+          </div>
+          
           <div>
             {#if loading}
               <Button type="button" color="alternative" class="w-full flex justify-center items-center gap-2" disabled>
@@ -126,7 +146,7 @@
                 Joining...
               </Button>
             {:else}
-              <Button type="submit" color="alternative" class="w-full">Join Realm</Button>
+              <Button type="submit" color="alternative" class="w-full">Join Realm as {selectedProfile}</Button>
             {/if}
           </div>
           
