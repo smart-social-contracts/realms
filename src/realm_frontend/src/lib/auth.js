@@ -2,8 +2,15 @@
 import { AuthClient } from '@dfinity/auth-client';
 import { Principal } from '@dfinity/principal';
 
-// Flag to determine if we're in local development mode
-const isLocalDev = true; //process.env.NODE_ENV === 'development';
+// More reliable local development detection
+// This checks both the hostname and NODE_ENV (where available)
+const isLocalDev = (
+  window.location.hostname.includes('localhost') || 
+  window.location.hostname.includes('127.0.0.1') ||
+  process.env.NODE_ENV === 'development'
+);
+
+console.log(`Environment: ${isLocalDev ? 'Local Development' : 'Production'}`);
 
 // Determine the appropriate Identity Provider URL based on environment
 const II_URL = isLocalDev
