@@ -59,6 +59,7 @@ from kybra import (
     ic,
     init,
     nat,
+    post_upgrade,
     query,
     text,
     update,
@@ -550,6 +551,13 @@ def initialize() -> void:
 @init
 def init_() -> void:
     logger.info("Initializing Realm canister")
+    initialize()
+    logger.info("Realm canister initialized")
+
+
+@post_upgrade
+def post_upgrade_() -> void:
+    logger.info("Post-upgrade initializing Realm canister")
     initialize()
     logger.info("Realm canister initialized")
 

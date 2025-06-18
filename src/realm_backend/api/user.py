@@ -27,7 +27,13 @@ def user_register(principal: str, profile: str) -> dict[str, Any]:
 def user_get(principal: str) -> dict[str, Any]:
     logger.info(f"Getting user {principal}")
     user = User[principal]
+    if not user:
+        return {
+            "success": False,
+            "error": f"User with principal {principal} not found"
+        }
     return {
+        "success": True,
         "principal": user.id,
         "profiles": [profile.name for profile in user.profiles],
     }
