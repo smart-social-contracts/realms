@@ -65,7 +65,6 @@
 	</Button>
 	<Button size="xs" on:click={() => {
 		import('$lib/auth').then(module => {
-			module.switchDummyPrincipal();
 			// Re-login to update the principal in the stores
 			handleLogin();
 		});
