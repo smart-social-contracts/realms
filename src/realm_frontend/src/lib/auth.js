@@ -2,16 +2,19 @@
 import { AuthClient } from '@dfinity/auth-client';
 import { Principal } from '@dfinity/principal';
 
+// Import the Internet Identity canister ID from declarations
+import { canisterId as iiCanisterId } from '../../../declarations/internet_identity/index.js';
+
 // Flag to determine if we're in local development mode
 const isLocalDev = window.location.hostname.includes('localhost') || 
                    window.location.hostname.includes('127.0.0.1');
 
-// Determine the appropriate Identity Provider URL based on environment
+// Build the appropriate II URL based on environment and canister ID
 const II_URL = isLocalDev
-  ? 'http://umunu-kh777-77774-qaaca-cai.localhost:8000' // Local II canister
-  : 'https://identity.ic0.app';                         // Mainnet II
+  ? `http://${iiCanisterId}.localhost:8000` // Local II canister with dynamic ID
+  : 'https://identity.ic0.app';             // Mainnet II
 
-console.log(`Using Identity Provider: ${II_URL}`);
+console.log(`Using Identity Provider: ${II_URL} (canister ID: ${iiCanisterId})`);
 
 // Hold the real auth client
 let authClient;
