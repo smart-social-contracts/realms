@@ -1,27 +1,22 @@
 name: 2. Run Tests (Main)
 
 on:
-  workflow_run:
-    workflows: ["1. Build Docker Image"]
-    types:
-      - completed
+  push:
     branches: [main]
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
+    if: "!contains(github.event.head_commit.message, 'Bump version')"
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
       
       - name: Wait for Docker image to be available
         run: |
           # Wait up to 5 minutes for the Docker image to be available
           for i in {1..30}; do
-            if docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ github.event.workflow_run.head_sha }}; then
+            if docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}; then
               echo "Docker image is available"
               break
             else
@@ -33,11 +28,11 @@ jobs:
       - name: Run linting checks
         run: |
           # First fix formatting issues
-          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ github.event.workflow_run.head_sha }} ./scripts/run_linters.sh --fix
+          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} ./scripts/run_linters.sh --fix
           # Then verify all issues are fixed
-          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ github.event.workflow_run.head_sha }} ./scripts/run_linters.sh
+          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} ./scripts/run_linters.sh
       
       - name: Run frontend tests
         run: |
           # Run frontend tests
-          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ github.event.workflow_run.head_sha }} bash -c "cd src/realm_frontend && npm test"
+          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} bash -c "cd src/realm_frontend && npm test"
