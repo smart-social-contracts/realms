@@ -2,9 +2,7 @@ name: 1. Build Docker Image (branch)
 
 on:
   push:
-    branches: ['**']
-    except:
-      - main
+    branches-ignore: [main]
   workflow_dispatch:
     inputs:
       canister:
