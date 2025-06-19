@@ -1,33 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import Footer from './Footer.svelte';
-import { tick } from 'svelte';
-
-/**
- * Simple DOM-based testing helper for Svelte 5
- */
-async function renderComponent(Component: any, props = {}) {
-  // Create a container for the component
-  const container = document.createElement('div');
-  document.body.appendChild(container);
-
-  // Create an instance of the component
-  const component = new Component({
-    target: container,
-    props
-  });
-
-  // Wait for the component to update
-  await tick();
-
-  return {
-    container,
-    component,
-    cleanup: () => {
-      component.$destroy();
-      document.body.removeChild(container);
-    }
-  };
-}
+import { mount } from 'svelte';
 
 describe('Footer Component', () => {
   // Set up the document mock before each test
@@ -44,23 +17,31 @@ describe('Footer Component', () => {
   });
 
   it('renders GitHub link', async () => {
-    const { container, cleanup } = await renderComponent(Footer);
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    
+    const component = mount(Footer, { target });
     
     // Check if GitHub link is present
-    const githubLink = container.querySelector('a[href="https://github.com/smart-social-contracts/realms"]');
+    const githubLink = target.querySelector('a[href="https://github.com/smart-social-contracts/realms"]');
     expect(githubLink).not.toBeNull();
     
-    cleanup();
+    component.$destroy();
+    document.body.removeChild(target);
   });
 
   it('displays the commit hash when available', async () => {
-    const { container, cleanup } = await renderComponent(Footer);
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    
+    const component = mount(Footer, { target });
     
     // Check if commit hash is displayed
-    const commitElement = container.querySelector('.text-xs.text-gray-400');
-    expect(commitElement?.textContent).toContain('Build: abc1234');
+    const commitElement = target.querySelector('.text-xs.text-gray-400');
+    expect(commitElement?.textContent).toContain('(abc1234)');
     
-    cleanup();
+    component.$destroy();
+    document.body.removeChild(target);
   });
 
   it('does not display commit hash and version when it is the placeholder', async () => {
@@ -83,13 +64,17 @@ describe('Footer Component', () => {
       body: document.body
     });
     
-    const { container, cleanup } = await renderComponent(Footer);
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    
+    const component = mount(Footer, { target });
     
     // Check that the commit hash element is not present
-    const commitElement = container.querySelector('.text-xs.text-gray-400');
+    const commitElement = target.querySelector('.text-xs.text-gray-400');
     expect(commitElement).toBeNull();
     
-    cleanup();
+    component.$destroy();
+    document.body.removeChild(target);
   });
 
   it('formats long commit hashes to 7 characters', async () => {
@@ -103,12 +88,16 @@ describe('Footer Component', () => {
       body: document.body
     });
     
-    const { container, cleanup } = await renderComponent(Footer);
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    
+    const component = mount(Footer, { target });
     
     // Check that the commit hash is truncated
-    const commitElement = container.querySelector('.text-xs.text-gray-400');
-    expect(commitElement?.textContent).toContain('Build: abcdef1');
+    const commitElement = target.querySelector('.text-xs.text-gray-400');
+    expect(commitElement?.textContent).toContain('(abcdef1)');
     
-    cleanup();
+    component.$destroy();
+    document.body.removeChild(target);
   });
 });

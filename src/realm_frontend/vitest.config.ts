@@ -3,7 +3,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import path from 'path';
 
 export default defineConfig({
-  plugins: [svelte({ hot: !process.env.VITEST })],
+  plugins: [svelte({ hot: !process.env.VITEST, compilerOptions: { dev: true } })],
   test: {
     environment: 'jsdom',
     globals: true,
@@ -12,6 +12,7 @@ export default defineConfig({
     coverage: {
       reporter: ['text', 'json', 'html'],
     },
+    setupFiles: ['./src/test-setup.ts'],
   },
   resolve: {
     alias: {
