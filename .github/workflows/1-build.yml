@@ -3,6 +3,8 @@ name: 1. Build Docker Image
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       canister:
