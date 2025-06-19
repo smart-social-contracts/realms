@@ -9,12 +9,12 @@
   let success = false;
   let loading = false;
   let realmName = 'Realm';
-  let selectedProfile = 'admin'; // Default to admin profile
+  let selectedProfile = 'member'; // Default to member profile
   
   // Available profiles
   const profiles = [
+    { value: 'member', name: 'Member' },
     { value: 'admin', name: 'Administrator' },
-    { value: 'user', name: 'Regular User' }
   ];
   
   // URL for local Flask backend API

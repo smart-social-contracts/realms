@@ -1,3 +1,4 @@
+dfx deploy internet_identity
 dfx deploy realm_backend --yes
 dfx generate realm_backend
 npm install --legacy-peer-deps
