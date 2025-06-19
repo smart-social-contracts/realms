@@ -1,5 +1,15 @@
 import { vi } from 'vitest';
 
+Object.defineProperty(globalThis, 'window', {
+  value: globalThis.window || {},
+  writable: true
+});
+
+Object.defineProperty(globalThis, 'document', {
+  value: globalThis.document || {},
+  writable: true
+});
+
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: vi.fn().mockImplementation(query => ({
