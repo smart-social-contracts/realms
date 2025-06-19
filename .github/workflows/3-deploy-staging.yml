@@ -28,27 +28,21 @@ jobs:
                 status: 'completed'
               });
               
-              const testRun = runs.workflow_runs.find(run => 
-                run.name === '2. Run Tests (Main)' && run.conclusion === 'success'
-              );
-              const testExtensionsRun = runs.workflow_runs.find(run => 
-                run.name === '2. Run Tests Extensions (Main)' && run.conclusion === 'success'
+              const buildTestRun = runs.workflow_runs.find(run => 
+                run.name === '1. Build and Test (main)' && run.conclusion === 'success'
               );
               
-              if (testRun) testCompleted = true;
-              if (testExtensionsRun) testExtensionsCompleted = true;
-              
-              if (testCompleted && testExtensionsCompleted) {
-                console.log('Both test workflows completed successfully');
+              if (buildTestRun) {
+                console.log('Build and test workflow completed successfully');
                 break;
               }
               
-              console.log(`Waiting for tests... (${i+1}/60) - Test: ${testCompleted}, Extensions: ${testExtensionsCompleted}`);
+              console.log(`Waiting for build and test workflow... (${i+1}/60)`);
               await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
             }
             
-            if (!testCompleted || !testExtensionsCompleted) {
-              core.setFailed('Test workflows did not complete successfully within timeout');
+            if (!buildTestRun) {
+              core.setFailed('Build and test workflow did not complete successfully within timeout');
             }
 
   deploy-staging:
