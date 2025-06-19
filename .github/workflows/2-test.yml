@@ -5,13 +5,11 @@ on:
     workflows: ["1. Build Docker Image"]
     types:
       - completed
-  pull_request:
-    branches: [main]
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    if: "${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || (github.event_name == 'push' && !contains(github.event.head_commit.message, 'Bump version')) || github.event_name == 'pull_request' }}"
+    if: "${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || (github.event_name == 'push' && !contains(github.event.head_commit.message, 'Bump version')) }}"
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
