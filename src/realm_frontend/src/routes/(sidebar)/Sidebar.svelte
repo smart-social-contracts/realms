@@ -31,8 +31,10 @@
 	} from 'flowbite-svelte-icons';
 	
 	// Import extension system
-	import { getAllExtensions } from '$lib/extensions';
+	import { getAllExtensions, type ExtensionMetadata } from '$lib/extensions';
 	import { getIcon } from '$lib/utils/iconMap';
+	// Import user profiles store
+	import { userProfiles } from '$lib/stores/profiles';
 
 	export let drawerHidden: boolean = false;
 
@@ -46,6 +48,8 @@
 		icon: typeof TableColumnSolid;
 		href: string;
 		children?: never;
+		// Add profile restrictions
+		profiles?: string[];
 	};
 	
 	type NavItemWithChildren = {
@@ -53,6 +57,8 @@
 		icon: typeof TableColumnSolid; 
 		children: Record<string, string>;
 		href?: never;
+		// Add profile restrictions
+		profiles?: string[];
 	};
 	
 	type NavItem = NavItemWithHref | NavItemWithChildren;
@@ -82,54 +88,113 @@
 
 	// Get all extensions for the sidebar
 	const extensions = getAllExtensions();
+	
+	// Filter extensions based on their manifest profiles and enabled status
+	function filterExtensionsForSidebar(extensions: ExtensionMetadata[]): ExtensionMetadata[] {
+		return extensions.filter(ext => {
+			// Skip if extension is not enabled
+			if (ext.enabled === false) return false;
+			
+			// If no profiles specified in extension manifest, show to all users
+			if (!ext.profiles || !Array.isArray(ext.profiles) || ext.profiles.length === 0) return true;
+			
+			// Check if current user has any of the profiles required by the extension
+			return ext.profiles.some((profile: string) => $userProfiles.includes(profile));
+		});
+	}
 
 	// Core navigation items
 	const coreNavItems: NavItemWithHref[] = [
-		{ name: 'Dashboard', icon: ChartPieOutline, href: '/dashboard' },
-		{ name: 'My identities', icon: UsersOutline, href: '/identities' },
-		{ name: 'Admin Dashboard', icon: TableColumnSolid, href: '/ggg' },
-		{ name: 'Settings', icon: CogOutline, href: '/settings' },
+		{ name: 'Dashboard', icon: ChartPieOutline, href: '/dashboard' }, // For all users
+		{ name: 'My identities', icon: UsersOutline, href: '/identities' }, // For all users
+		{ name: 'Admin Dashboard', icon: TableColumnSolid, href: '/ggg', profiles: ['admin'] }, // Admin only
+		{ name: 'Settings', icon: CogOutline, href: '/settings' }, // For all users
 	];
 
-	// Add Extensions menu with submenu of all extensions
-	const extensionsMenu: NavItemWithChildren = {
+	// Filter core navigation items based on user profiles
+	$: filteredCoreNavItems = coreNavItems.filter(item => {
+		// If no profiles are available, only show Dashboard
+		if (!$userProfiles || $userProfiles.length === 0) {
+			return item.name === 'Dashboard';
+		}
+		
+		// If no profiles restriction on the item, show to everyone with a profile
+		if (!item.profiles || !item.profiles.length) return true;
+		
+		// Check if user has any of the required profiles
+		return item.profiles.some(profile => $userProfiles.includes(profile));
+	});
+
+	// Filter extensions based on user profiles and create menu items
+	$: filteredExtensions = filterExtensionsForSidebar(extensions);
+
+	// Add Extensions menu with submenu of filtered extensions
+	$: extensionsMenu = {
 		name: 'Extensions',
 		icon: ObjectsColumnOutline,
 		children: Object.fromEntries(
-			extensions.map(ext => [ext.name, `/extensions/${ext.id}`])
+			filteredExtensions.map(ext => [ext.name, `/extensions/${ext.id}`])
 		)
 	};
 
-	// Create combined navigation items with core items and extensions section
+	// Extensions Marketplace (admin only)
+	const marketplaceItem = { 
+		name: 'Extensions Marketplace', 
+		icon: LayersSolid, 
+		href: '/extensions',
+		profiles: ['admin']
+	};
+
+	// Create combined navigation items with filtered core items and extensions section
 	let posts: NavItem[];
 	$: posts = [
-		...coreNavItems,
-		extensionsMenu,
-		// Add Extensions Marketplace link
-		{ name: 'Extensions Marketplace', icon: LayersSolid, href: '/extensions' }
+		...filteredCoreNavItems,
+		// Only show Extensions dropdown if user has profiles and there are valid extensions
+		...($userProfiles && $userProfiles.length > 0 && Object.keys(extensionsMenu.children).length > 0 ? [extensionsMenu] : []),
+		// Only show Extensions Marketplace for admin
+		...($userProfiles && $userProfiles.includes('admin') ? [marketplaceItem] : [])
 	];
 
+	// Special case for Citizen Dashboard extension (for members)
+	$: {
+		const citizenDashboardExt = extensions.find((ext: ExtensionMetadata) => ext.id === 'citizen_dashboard');
+		if (citizenDashboardExt && $userProfiles && $userProfiles.includes('member')) {
+			// Make sure it's not already in the list
+			const existingIndex = posts.findIndex(item => item.href === `/extensions/${citizenDashboardExt.id}`);
+			if (existingIndex === -1) {
+				posts = [
+					...posts, 
+					{ 
+						name: 'Citizen Dashboard', 
+						icon: getIcon(citizenDashboardExt.icon) || TableColumnSolid, 
+						href: `/extensions/${citizenDashboardExt.id}` 
+					}
+				];
+			}
+		}
+	}
+	
+	// Special case for Vault Manager extension (for admin)
+	$: {
+		const vaultManagerExt = extensions.find((ext: ExtensionMetadata) => ext.id === 'vault_manager');
+		if (vaultManagerExt && $userProfiles && $userProfiles.includes('admin')) {
+			// Make sure it's not already in the list
+			const existingIndex = posts.findIndex(item => item.href === `/extensions/${vaultManagerExt.id}`);
+			if (existingIndex === -1) {
+				posts = [
+					...posts, 
+					{ 
+						name: 'Vault Manager', 
+						icon: getIcon(vaultManagerExt.icon) || WalletSolid, 
+						href: `/extensions/${vaultManagerExt.id}` 
+					}
+				];
+			}
+		}
+	}
+
 	let links: Link[] = [
-		// {
-		// 	label: 'GitHub Repository',
-		// 	href: 'https://github.com/themesberg/flowbite-svelte-admin-dashboard',
-		// 	icon: GithubSolid
-		// },
-		// {
-		// 	label: 'Flowbite Svelte',
-		// 	href: 'https://flowbite-svelte.com/docs/pages/quickstart',
-		// 	icon: ClipboardListSolid
-		// },
-		// {
-		// 	label: 'Components',
-		// 	href: 'https://flowbite-svelte.com/docs/components/accordion',
-		// 	icon: LayersSolid
-		// },
-		// {
-		// 	label: 'Support',
-		// 	href: 'https://github.com/themesberg/flowbite-svelte-admin-dashboard/issues',
-		// 	icon: LifeSaverSolid
-		// }
+		// External links removed for brevity
 	];
 	
 	// Make dropdowns reactive based on posts
