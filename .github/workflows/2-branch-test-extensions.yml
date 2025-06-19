@@ -1,9 +1,11 @@
 name: 2. Run Tests (extensions)
 
 on:
-  branches: ['**']
   workflow_run:
     workflows: ["1. Build Docker Image (branch)"]
+    branches: 
+      - '**'
+      - '!main'
     types:
       - completed
 
