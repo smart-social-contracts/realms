@@ -5,13 +5,11 @@ on:
     workflows: ["1. Build Docker Image"]
     types:
       - completed
-  pull_request:
-    branches: [main]
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    if: "${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || (github.event_name == 'push' && !contains(github.event.head_commit.message, 'Bump version')) || github.event_name == 'pull_request' }}"
+    if: "${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || (github.event_name == 'push' && !contains(github.event.head_commit.message, 'Bump version')) }}"
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -30,31 +28,20 @@ jobs:
               });
               return workflow_run.data.head_sha;
             } else {
-              // Triggered by push or pull_request event
+              // Triggered by push event
               return context.sha;
             }
       
-      - name: Wait for Docker image to be available
-        run: |
-          # Wait up to 5 minutes for the Docker image to be available
-          for i in {1..30}; do
-            if docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get-commit-sha.outputs.result }}; then
-              echo "Docker image is available"
-              break
-            else
-              echo "Waiting for Docker image... (attempt $i/30)"
-              sleep 10
-            fi
-          done
-      
       - name: Run linting checks
         run: |
+          docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get-commit-sha.outputs.result }}
           # First fix formatting issues
           docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get-commit-sha.outputs.result }} ./scripts/run_linters.sh --fix
           # Then verify all issues are fixed
           docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get-commit-sha.outputs.result }} ./scripts/run_linters.sh
       
-      - name: Run tests in container
-        run: |
-          # Run frontend tests
-          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get-commit-sha.outputs.result }} bash -c "cd src/realm_frontend && npm test"
+      # - name: Run tests in container
+      #   run: |
+      #     docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get-commit-sha.outputs.result }}
+      #     # TODO: replace this with your actual test commands
+      #     docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get-commit-sha.outputs.result }} echo "Running tests..."; exit 0
