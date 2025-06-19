@@ -6,7 +6,7 @@
 	import Faq from './FAQ.svelte';
 	import Footer from './Footer.svelte';
 	import PriceCard from './PriceCard.svelte';
-	import { SITE_NAME } from '$lib/config';
+	import { SITE_NAME } from '$lib/globals';
 
 	let yearly: boolean = false;
 	let prices: string[][] = [

@@ -4,5 +4,6 @@ dfx generate realm_backend
 npm install --legacy-peer-deps
 npm run prebuild --workspace realm_frontend
 npm run build --workspace realm_frontend
+sh scripts/update_config.sh
 dfx deploy realm_frontend
 scripts/setup_demo.sh

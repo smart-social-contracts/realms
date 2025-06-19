@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { SITE_NAME } from '$lib/config';
+	import { SITE_NAME } from '$lib/globals';
 	import MetaTag from '../../../utils/MetaTag.svelte';
 	
 	export let data;

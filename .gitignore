@@ -18,3 +18,4 @@ kybra_simple_db
 src/declarations
 e2e.log
 extensions/*/
+src/realm_frontend/src/lib/config.js

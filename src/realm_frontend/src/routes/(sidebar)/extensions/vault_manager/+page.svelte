@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import VaultManager from '$lib/extensions/vault_manager';
-	import { SITE_NAME } from '$lib/config';
+	import { SITE_NAME } from '$lib/globals';
 	import MetaTag from '../../../utils/MetaTag.svelte';
 	
 	const path: string = '/extensions/vault_manager';

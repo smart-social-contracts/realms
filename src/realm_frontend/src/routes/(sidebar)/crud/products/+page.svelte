@@ -3,7 +3,7 @@
 	import { CogSolid, DotsVerticalOutline, EditOutline, ExclamationCircleSolid, TrashBinSolid } from 'flowbite-svelte-icons';
 	import type { ComponentType } from 'svelte';
 	import { sineIn } from 'svelte/easing';
-	import { SITE_NAME } from '$lib/config';
+	import { SITE_NAME } from '$lib/globals';
 	import Products from '../../../data/product.json';
 	import MetaTag from '../../../utils/MetaTag.svelte';
 	import Delete from './Delete.svelte';

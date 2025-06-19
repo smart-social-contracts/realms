@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import Testbench from '$lib/extensions/test_bench';
-	import { SITE_NAME } from '$lib/config';
+	import { SITE_NAME } from '$lib/globals';
 	import MetaTag from '../../../utils/MetaTag.svelte';
 	
 	const path: string = '/extensions/test_bench';
