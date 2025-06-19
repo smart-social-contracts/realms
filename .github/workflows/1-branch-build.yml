@@ -1,8 +1,10 @@
-name: 1. Build Docker Image
+name: 1. Build Docker Image (branch)
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
+    except:
+      - main
   workflow_dispatch:
     inputs:
       canister:
