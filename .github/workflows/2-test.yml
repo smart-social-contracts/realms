@@ -30,7 +30,7 @@ jobs:
               });
               return workflow_run.data.head_sha;
             } else {
-              // Triggered by push event
+              // Triggered by push or pull_request event
               return context.sha;
             }
       
