@@ -1,41 +1,34 @@
-name: 2. Run Tests (extensions)
+name: 2. Run Tests Extensions (Branch)
 
 on:
   workflow_run:
     workflows: ["1. Build Docker Image (branch)"]
-    branches: 
-      - '**'
-      - '!main'
     types:
       - completed
 
 jobs:
-  test:
+  test-extensions:
     runs-on: ubuntu-latest
-    if: "${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || (github.event_name == 'push' && !contains(github.event.head_commit.message, 'Bump version')) }}"
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch != 'main' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      
-      - name: Get commit SHA
-        uses: actions/github-script@v6
-        id: get-commit-sha
         with:
-          script: |
-            if (context.payload.workflow_run) {
-              // Triggered by workflow_run event
-              const workflow_run = await github.rest.actions.getWorkflowRun({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                run_id: context.payload.workflow_run.id
-              });
-              return workflow_run.data.head_sha;
-            } else {
-              // Triggered by push event
-              return context.sha;
-            }
+          ref: ${{ github.event.workflow_run.head_sha }}
+      
+      - name: Wait for Docker image to be available
+        run: |
+          # Wait up to 5 minutes for the Docker image to be available
+          for i in {1..30}; do
+            if docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ github.event.workflow_run.head_sha }}; then
+              echo "Docker image is available"
+              break
+            else
+              echo "Waiting for Docker image... (attempt $i/30)"
+              sleep 10
+            fi
+          done
       
       - name: Run extension tests
         run: |
-          docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get-commit-sha.outputs.result }}
-          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get-commit-sha.outputs.result }} bash -c "./tests/test_extensions.py"
+          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ github.event.workflow_run.head_sha }} bash -c "./tests/test_extensions.py"

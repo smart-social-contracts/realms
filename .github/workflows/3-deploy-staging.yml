@@ -2,29 +2,47 @@ name: 3. Deploy to Staging
 
 on:
   workflow_run:
-    workflows: ["2. Run Tests", "2. Run Tests (extensions)"]
+    workflows: ["2. Run Tests (Main)", "2. Run Tests Extensions (Main)"]
     types:
       - completed
+    branches: [main]
 
 jobs:
   deploy-staging:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       
-      - name: Get commit SHA from test workflow
+      - name: Wait for both test workflows to complete
         uses: actions/github-script@v6
-        id: get-commit-sha
         with:
           script: |
-            const workflow_run = await github.rest.actions.getWorkflowRun({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: ${{ github.event.workflow_run.id }}
+            const { owner, repo } = context.repo;
+            const head_sha = '${{ github.event.workflow_run.head_sha }}';
+            
+            // Get all workflow runs for this commit
+            const { data: runs } = await github.rest.actions.listWorkflowRunsForRepo({
+              owner,
+              repo,
+              head_sha,
+              status: 'completed'
             });
-            return workflow_run.data.head_sha;
+            
+            // Check if both test workflows have completed successfully
+            const testWorkflow = runs.workflow_runs.find(run => 
+              run.name === '2. Run Tests (Main)' && run.conclusion === 'success'
+            );
+            const testExtensionsWorkflow = runs.workflow_runs.find(run => 
+              run.name === '2. Run Tests Extensions (Main)' && run.conclusion === 'success'
+            );
+            
+            if (!testWorkflow || !testExtensionsWorkflow) {
+              core.setFailed('Both test workflows must complete successfully before deployment');
+            }
       
       - name: Deploy to staging
         run: |
@@ -33,7 +51,7 @@ jobs:
           chmod 600 identity.pem
           
           # Pull the image that was tested
-          docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get-commit-sha.outputs.result }}
+          docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ github.event.workflow_run.head_sha }}
           
           # Run deployment script with staging network
           docker run --rm \
@@ -41,7 +59,7 @@ jobs:
             -v "$(pwd)/scripts/deploy_ic.sh:/app/deploy_ic.sh" \
             -v "$(pwd)/scripts/setup_demo.sh:/app/setup_demo.sh" \
             -e DFX_WARNING="-mainnet_plaintext_identity" \
-            ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get-commit-sha.outputs.result }} \
+            ghcr.io/${{ github.repository_owner }}/realms:${{ github.event.workflow_run.head_sha }} \
             bash -c "/app/deploy_ic.sh /app/identity.pem staging && /app/setup_demo.sh /app/identity.pem staging"
           
           # Clean up
