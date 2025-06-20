@@ -209,53 +209,7 @@ setup_project_dependencies() {
     log "Project dependencies installed successfully"
 }
 
-download_wasm_files() {
-    log "Downloading WASM files..."
-    
-    cd "$PROJECT_ROOT"
-    
-    if [[ -f "scripts/download_wasms.sh" ]]; then
-        chmod +x scripts/download_wasms.sh
-        ./scripts/download_wasms.sh
-        log "WASM files downloaded successfully"
-    else
-        log "Warning: download_wasms.sh script not found, skipping WASM download"
-    fi
-}
 
-install_extensions() {
-    log "Installing extensions..."
-    
-    cd "$PROJECT_ROOT"
-    
-    if [[ -f "scripts/install_extensions.sh" ]]; then
-        chmod +x scripts/install_extensions.sh
-        ./scripts/install_extensions.sh
-        log "Extensions installed successfully"
-    else
-        log "Warning: install_extensions.sh script not found, skipping extension installation"
-    fi
-}
-
-build_canisters() {
-    log "Building canisters..."
-    
-    cd "$PROJECT_ROOT"
-    
-    export PATH="$HOME/.local/share/dfx/bin:$PATH"
-    export PYENV_ROOT="$HOME/.pyenv"
-    export PATH="$PYENV_ROOT/bin:$PATH"
-    eval "$(pyenv init -)" 2>/dev/null || true
-    eval "$(pyenv virtualenv-init -)" 2>/dev/null || true
-    
-    if [[ -f "scripts/build_canisters.sh" ]]; then
-        chmod +x scripts/build_canisters.sh
-        ./scripts/build_canisters.sh
-        log "Canisters built successfully"
-    else
-        log "Warning: build_canisters.sh script not found, skipping canister build"
-    fi
-}
 
 verify_installation() {
     log "Verifying installation..."
@@ -291,6 +245,7 @@ main() {
     
     log "Starting Devin ICP development environment setup..."
     log "Target versions: Python $PYTHON_VERSION, Node $NODE_VERSION, DFX $DFX_VERSION, Kybra $KYBRA_VERSION"
+    log "Note: This script installs core dependencies only. No canisters will be built or deployed."
     
     check_ubuntu
     install_system_dependencies
@@ -301,9 +256,6 @@ main() {
     install_kybra
     install_kybra_prerequisites
     setup_project_dependencies
-    download_wasm_files
-    install_extensions
-    build_canisters
     verify_installation
     
     log "Devin ICP development environment setup completed successfully!"
