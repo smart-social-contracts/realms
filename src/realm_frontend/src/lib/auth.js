@@ -1,7 +1,6 @@
 // src/lib/auth.js
 import { AuthClient } from '@dfinity/auth-client';
 import { Principal } from '@dfinity/principal';
-import { CANISTER_IDS, DEV_PORT } from './config';
 
 // More reliable local development detection
 // This checks both the hostname and NODE_ENV (where available)
@@ -13,16 +12,12 @@ const isLocalDev = (
 
 console.log(`Environment: ${isLocalDev ? 'Local Development' : 'Production'}`);
 
-// Get the Internet Identity canister URL from the config
+// Get the Internet Identity canister URL
 function getInternetIdentityUrl() {
-  // For local development, use canister ID from the config
+  // For local development, use the known Internet Identity canister ID
   if (isLocalDev) {
-    const canisterId = CANISTER_IDS.internet_identity;
-    const port = DEV_PORT;
-    
-    if (!canisterId) {
-      throw new Error('Internet Identity canister ID not found in config.js');
-    }
+    const canisterId = 'uxrrr-q7777-77774-qaaaq-cai'; // Internet Identity canister ID from dfx deploy
+    const port = 8000; // Default DFX port
     
     return `http://${canisterId}.localhost:${port}`;
   } 

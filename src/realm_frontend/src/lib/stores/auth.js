@@ -1,11 +1,26 @@
 // src/lib/stores/auth.js
 import { writable } from 'svelte/store';
+import { browser } from '$app/environment';
 
-export const isAuthenticated = writable(false);
-export const userIdentity = writable(null); // Stores the principal text
+function createPersistentStore(key, defaultValue) {
+    const initialValue = browser && sessionStorage.getItem(key) 
+        ? JSON.parse(sessionStorage.getItem(key)) 
+        : defaultValue;
+    
+    const store = writable(initialValue);
+    
+    if (browser) {
+        store.subscribe(value => {
+            sessionStorage.setItem(key, JSON.stringify(value));
+        });
+    }
+    
+    return store;
+}
 
-// Add a dedicated store for principal value if it's not already defined
-export const principal = writable(''); // Stores the principal string for global access
+export const isAuthenticated = createPersistentStore('auth_isAuthenticated', false);
+export const userIdentity = createPersistentStore('auth_userIdentity', null);
+export const principal = createPersistentStore('auth_principal', '');
 
 export const universe = writable('');
 export const snapshots = writable('');
