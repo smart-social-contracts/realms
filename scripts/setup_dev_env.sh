@@ -53,6 +53,11 @@ install_python() {
         pyenv install -q "$PYTHON_VERSION"
     fi
     
+    export PYENV_ROOT="$HOME/.pyenv"
+    export PATH="$PYENV_ROOT/bin:$PATH"
+    eval "$(pyenv init --path)"
+    eval "$(pyenv init -)"
+
     # Activate Python 3.10
     pyenv shell "$PYTHON_VERSION"
     
