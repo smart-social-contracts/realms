@@ -71,7 +71,7 @@
 		<!-- <Notifications />
 		<AppsMenu /> -->
 		<!-- <DarkMode /> -->
-		{#if !$isAuthenticated || ($userProfiles && $userProfiles.length === 0)}
+		{#if !$isAuthenticated || !($userProfiles && $userProfiles.length > 0)}
 			<Button class="me-2" color="alternative" href="/join" pill={true}>
 				<T key="buttons.join" default_text="Join" />
 			</Button>
