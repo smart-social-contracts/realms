@@ -243,7 +243,7 @@ cleanup_on_error() {
 main() {
     trap cleanup_on_error ERR
     
-    log "Starting Devin ICP development environment setup..."
+    log "Starting ICP development environment setup..."
     log "Target versions: Python $PYTHON_VERSION, Node $NODE_VERSION, DFX $DFX_VERSION, Kybra $KYBRA_VERSION"
     log "Note: This script installs core dependencies only. No canisters will be built or deployed."
     
@@ -258,7 +258,7 @@ main() {
     setup_project_dependencies
     verify_installation
     
-    log "Devin ICP development environment setup completed successfully!"
+    log "ICP development environment setup completed successfully!"
     log "Please restart your terminal or run 'source ~/.bashrc' to ensure all PATH changes take effect."
 }
 

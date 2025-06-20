@@ -19,3 +19,4 @@ src/declarations
 e2e.log
 extensions/*/
 src/realm_frontend/src/lib/config.js
+dfx.log
