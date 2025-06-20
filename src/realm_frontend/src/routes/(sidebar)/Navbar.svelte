@@ -5,7 +5,7 @@
 	import T from '$lib/components/T.svelte';
 	import { _ } from 'svelte-i18n';
 	import { isAuthenticated } from '$lib/stores/auth';
-	import { userProfiles, isMember } from '$lib/stores/profiles';
+	import { userProfiles } from '$lib/stores/profiles';
 	import {
 		DarkMode,
 		Dropdown,
@@ -71,7 +71,7 @@
 		<!-- <Notifications />
 		<AppsMenu /> -->
 		<!-- <DarkMode /> -->
-		{#if !$isAuthenticated || !isMember()}
+		{#if !$isAuthenticated || ($userProfiles && $userProfiles.length === 0)}
 			<Button class="me-2" color="alternative" href="/join" pill={true}>
 				<T key="buttons.join" default_text="Join" />
 			</Button>
