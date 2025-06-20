@@ -37,7 +37,7 @@
 </script>
 
 <header
-	class="fixed top-0 z-40 mx-auto w-full flex-none border-b border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800"
+	class="sticky top-0 z-30 mx-auto w-full flex-none border-b border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800"
 >
 	<Navbar bind:drawerHidden />
 </header>
@@ -46,7 +46,7 @@
 	<Sidebar bind:drawerHidden />
 
 	<!-- Main Content -->
-	<div class="relative h-full w-full overflow-y-auto bg-white pt-[70px] lg:ml-64 lg:pl-6">
+	<div class="relative h-full w-full overflow-y-auto bg-white lg:ml-64 lg:pl-6">
 		<slot />
 		<Footer />
 	</div>
