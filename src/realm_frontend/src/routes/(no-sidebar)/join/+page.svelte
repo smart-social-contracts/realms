@@ -1,8 +1,9 @@
 <script>
-  import { Button, Card, Radio, Label, Spinner, Select } from 'flowbite-svelte';
+  import { Button, Card, Radio, Label, Spinner, Select, Checkbox } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { principal, isAuthenticated } from '$lib/stores/auth';
   import { backend } from '$lib/canisters.js';
+  import PassportVerification from '$lib/components/passport/PassportVerification.svelte';
   
   let agreement = '';
   let error = '';
@@ -10,6 +11,7 @@
   let loading = false;
   let realmName = 'Realm';
   let selectedProfile = 'member'; // Default to member profile
+  let includePassportVerification = false;
   
   // Available profiles
   const profiles = [
@@ -132,11 +134,30 @@
           </div>
           
           <div class="mb-4">
+            <Label class="mb-2 block text-sm font-medium text-gray-700">Select Profile Type</Label>
             <Select bind:value={selectedProfile} on:change={(e) => selectedProfile = e.target.value}>
               {#each profiles as profile}
                 <option value={profile.value}>{profile.name}</option>
               {/each}
             </Select>
+          </div>
+          
+          <div class="mb-6">
+            <div class="flex items-center gap-2 mb-4">
+              <Checkbox bind:checked={includePassportVerification} />
+              <Label class="text-sm font-medium text-gray-700">
+                Verify passport identity (optional)
+              </Label>
+            </div>
+            <p class="text-xs text-gray-500 mb-4">
+              Use zero-knowledge proofs to verify your passport securely. Your passport data never leaves your device.
+            </p>
+            
+            {#if includePassportVerification && $isAuthenticated}
+              <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <PassportVerification userId={$principal} />
+              </div>
+            {/if}
           </div>
           
           <div>
