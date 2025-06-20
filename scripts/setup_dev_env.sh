@@ -36,48 +36,50 @@ install_system_dependencies() {
 }
 
 install_pyenv() {
-    if command -v pyenv >/dev/null 2>&1; then
-        log "pyenv already installed"
-        return
+    log "Using Python's built-in venv module instead of pyenv"
+    
+    # Create venv directory if it doesn't exist
+    VENV_DIR="$PROJECT_ROOT/.venv"
+    if [ ! -d "$VENV_DIR" ]; then
+        log "Creating Python virtual environment at $VENV_DIR..."
+        python3 -m venv "$VENV_DIR"
+    else
+        log "Using existing Python virtual environment at $VENV_DIR"
     fi
     
-    log "Installing pyenv..."
+    # Add venv activation to bashrc if not already there
+    if ! grep -q "source $VENV_DIR/bin/activate" ~/.bashrc; then
+        echo "# Realms project Python virtual environment" >> ~/.bashrc
+        echo "source $VENV_DIR/bin/activate" >> ~/.bashrc
+    fi
     
-    curl https://pyenv.run | bash
-    
-    export PYENV_ROOT="$HOME/.pyenv"
-    export PATH="$PYENV_ROOT/bin:$PATH"
-    eval "$(pyenv init -)"
-    eval "$(pyenv virtualenv-init -)"
-    
-    echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
-    echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
-    echo 'eval "$(pyenv init -)"' >> ~/.bashrc
-    echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bashrc
-    
-    log "pyenv installed successfully"
+    log "Python virtual environment setup successfully"
 }
 
 install_python() {
-    export PYENV_ROOT="$HOME/.pyenv"
-    export PATH="$PYENV_ROOT/bin:$PATH"
-    eval "$(pyenv init -)" 2>/dev/null || true
-    eval "$(pyenv virtualenv-init -)" 2>/dev/null || true
-    
-    if pyenv versions | grep -q "$PYTHON_VERSION"; then
-        log "Python $PYTHON_VERSION already installed via pyenv"
-    else
-        log "Installing Python $PYTHON_VERSION..."
-        pyenv install "$PYTHON_VERSION"
-    fi
-    
-    pyenv global "$PYTHON_VERSION"
+    # Activate the virtual environment
+    VENV_DIR="$PROJECT_ROOT/.venv"
+    source "$VENV_DIR/bin/activate"
     
     python_version=$(python --version 2>&1 | cut -d' ' -f2)
-    if [[ "$python_version" == "$PYTHON_VERSION"* ]]; then
-        log "Python $PYTHON_VERSION installed and activated successfully"
+    log "Using Python $python_version in virtual environment"
+    
+    # Install pip and upgrade it
+    log "Upgrading pip..."
+    python -m pip install --upgrade pip
+    
+    # Ensure we're using the venv Python
+    if [ -f "$VENV_DIR/bin/python" ]; then
+        log "Virtual environment activated successfully"
     else
-        error "Failed to activate Python $PYTHON_VERSION. Current version: $python_version"
+        error "Failed to activate Python virtual environment"
+    fi
+    
+    # Check if Python version is at least the required version
+    if python -c "import sys; required = '${PYTHON_VERSION}'.split('.'); current = '${python_version}'.split('.'); exit(0 if [int(c) >= int(r) for c, r in zip(current, required)] else 1)" 2>/dev/null; then
+        log "Python $python_version is compatible with required $PYTHON_VERSION"
+    else
+        error "Failed to activate Python. Current version: $python_version does not meet minimum required version $PYTHON_VERSION"
     fi
 }
 
@@ -131,10 +133,9 @@ install_dfx() {
 }
 
 install_kybra() {
-    export PYENV_ROOT="$HOME/.pyenv"
-    export PATH="$PYENV_ROOT/bin:$PATH"
-    eval "$(pyenv init -)" 2>/dev/null || true
-    eval "$(pyenv virtualenv-init -)" 2>/dev/null || true
+    # Activate the virtual environment
+    VENV_DIR="$PROJECT_ROOT/.venv"
+    source "$VENV_DIR/bin/activate"
     
     if python -c "import kybra; print(kybra.__version__)" 2>/dev/null | grep -q "$KYBRA_VERSION"; then
         log "Kybra $KYBRA_VERSION already installed"
@@ -153,10 +154,8 @@ install_kybra_prerequisites() {
     log "Installing Kybra prerequisites by deploying test canister..."
     
     export PATH="$HOME/.local/share/dfx/bin:$PATH"
-    export PYENV_ROOT="$HOME/.pyenv"
-    export PATH="$PYENV_ROOT/bin:$PATH"
-    eval "$(pyenv init -)" 2>/dev/null || true
-    eval "$(pyenv virtualenv-init -)" 2>/dev/null || true
+    VENV_DIR="$PROJECT_ROOT/.venv"
+    source "$VENV_DIR/bin/activate"
     
     temp_dir=$(mktemp -d)
     cd "$temp_dir"
@@ -184,10 +183,8 @@ setup_project_dependencies() {
     
     cd "$PROJECT_ROOT"
     
-    export PYENV_ROOT="$HOME/.pyenv"
-    export PATH="$PYENV_ROOT/bin:$PATH"
-    eval "$(pyenv init -)" 2>/dev/null || true
-    eval "$(pyenv virtualenv-init -)" 2>/dev/null || true
+    VENV_DIR="$PROJECT_ROOT/.venv"
+    source "$VENV_DIR/bin/activate"
     
     if [[ -f "requirements.txt" ]]; then
         log "Installing Python requirements..."
@@ -209,16 +206,12 @@ setup_project_dependencies() {
     log "Project dependencies installed successfully"
 }
 
-
-
 verify_installation() {
     log "Verifying installation..."
     
     export PATH="$HOME/.local/share/dfx/bin:$PATH"
-    export PYENV_ROOT="$HOME/.pyenv"
-    export PATH="$PYENV_ROOT/bin:$PATH"
-    eval "$(pyenv init -)" 2>/dev/null || true
-    eval "$(pyenv virtualenv-init -)" 2>/dev/null || true
+    VENV_DIR="$PROJECT_ROOT/.venv"
+    source "$VENV_DIR/bin/activate"
     
     log "Python version: $(python --version)"
     log "Node version: $(node --version)"
