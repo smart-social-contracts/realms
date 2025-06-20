@@ -3,7 +3,7 @@
 	import { Card, Button } from 'flowbite-svelte';
 	import { getAllExtensions, toggleExtension, type ExtensionMetadata } from '$lib/extensions';
 	import { getIcon } from '$lib/utils/iconMap';
-	import { SITE_NAME } from '$lib/config';
+	import { SITE_NAME } from '$lib/globals';
 	import MetaTag from '../../utils/MetaTag.svelte';
 	
 	const path: string = '/extensions';

@@ -2,7 +2,7 @@
 	import Playground from '../../../(no-sidebar)/playground/stacked/Playground.svelte';
 	import MetaTag from '../../../utils/MetaTag.svelte';
 	import Footer from '../../Footer.svelte';
-	import { SITE_NAME } from '$lib/config';
+	import { SITE_NAME } from '$lib/globals';
 
 	const path: string = '/playground/sidebar';
 	const description: string = 'Playground Sidebar example - Smart Social Contracts';

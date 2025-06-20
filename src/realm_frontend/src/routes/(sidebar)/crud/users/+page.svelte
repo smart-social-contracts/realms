@@ -19,7 +19,7 @@
 	} from 'flowbite-svelte-icons';
 	import Users from '../../../data/users.json';
 	import { imagesPath } from '../../../utils/variables';
-	import { SITE_NAME } from '$lib/config';
+	import { SITE_NAME } from '$lib/globals';
 
 	import User from './User.svelte';
 	import Delete from './Delete.svelte';

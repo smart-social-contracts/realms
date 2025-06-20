@@ -1,30 +1,57 @@
 name: 3. Deploy to Staging
 
 on:
-  workflow_run:
-    workflows: ["2. Run Tests", "2. Run Tests (extensions)"]
-    types:
-      - completed
+  push:
+    branches: [main]
 
 jobs:
+  wait-for-tests:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'Bump version')"
+    steps:
+      - name: Wait for test workflows to complete
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const head_sha = context.sha;
+            
+            // Wait for both test workflows to complete
+            let testCompleted = false;
+            let testExtensionsCompleted = false;
+            
+            for (let i = 0; i < 60; i++) { // Wait up to 10 minutes
+              const { data: runs } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner,
+                repo,
+                head_sha,
+                status: 'completed'
+              });
+              
+              const buildTestRun = runs.workflow_runs.find(run => 
+                run.name === '1. Build and Test (main)' && run.conclusion === 'success'
+              );
+              
+              if (buildTestRun) {
+                console.log('Build and test workflow completed successfully');
+                break;
+              }
+              
+              console.log(`Waiting for build and test workflow... (${i+1}/60)`);
+              await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
+            }
+            
+            if (!buildTestRun) {
+              core.setFailed('Build and test workflow did not complete successfully within timeout');
+            }
+
   deploy-staging:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    needs: wait-for-tests
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      
-      - name: Get commit SHA from test workflow
-        uses: actions/github-script@v6
-        id: get-commit-sha
-        with:
-          script: |
-            const workflow_run = await github.rest.actions.getWorkflowRun({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: ${{ github.event.workflow_run.id }}
-            });
-            return workflow_run.data.head_sha;
+
       
       - name: Deploy to staging
         run: |
@@ -33,7 +60,7 @@ jobs:
           chmod 600 identity.pem
           
           # Pull the image that was tested
-          docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get-commit-sha.outputs.result }}
+          docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}
           
           # Run deployment script with staging network
           docker run --rm \
@@ -41,7 +68,7 @@ jobs:
             -v "$(pwd)/scripts/deploy_ic.sh:/app/deploy_ic.sh" \
             -v "$(pwd)/scripts/setup_demo.sh:/app/setup_demo.sh" \
             -e DFX_WARNING="-mainnet_plaintext_identity" \
-            ghcr.io/${{ github.repository_owner }}/realms:${{ steps.get-commit-sha.outputs.result }} \
+            ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} \
             bash -c "/app/deploy_ic.sh /app/identity.pem staging && /app/setup_demo.sh /app/identity.pem staging"
           
           # Clean up

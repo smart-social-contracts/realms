@@ -3,7 +3,7 @@
 	import MetaTag from '../../../utils/MetaTag.svelte';
 	import Footer from '../../Footer.svelte';
 	import type { PageData } from './$types';
-	import { SITE_NAME } from '$lib/config';
+	import { SITE_NAME } from '$lib/globals';
 	export let data: PageData;
 
 	const path: string = '/layouts/sidebar';

@@ -2,7 +2,7 @@
 	import Dashboard from '../../utils/dashboard/Dashboard.svelte';
 	import MetaTag from '../../utils/MetaTag.svelte';
 	import Footer from '../Footer.svelte';
-	import { SITE_NAME } from '$lib/config';
+	import { SITE_NAME } from '$lib/globals';
 	export let data;
 
 	const path: string = '/dashboard';
