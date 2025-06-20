@@ -1,6 +1,6 @@
 <!-- src/lib/components/AuthButton.svelte -->
 <script>
-	import { login, logout, isAuthenticated as checkAuth } from '$lib/auth';
+	import { login, logout, isAuthenticated as checkAuth, initializeAuthClient } from '$lib/auth';
 	import { isAuthenticated, userIdentity, principal } from '$lib/stores/auth';
 	import { userProfiles } from '$lib/stores/profiles';
 	import { Avatar} from 'flowbite-svelte';
@@ -38,14 +38,19 @@
 		const authStatus = await checkAuth();
 		isAuthenticated.set(authStatus);
 		if (authStatus) {
-			const { principal: userPrincipal } = await login();
+			// Get existing identity without triggering new login
+			const client = await initializeAuthClient();
+			const identity = client.getIdentity();
+			const userPrincipal = identity.getPrincipal();
 			principalText = userPrincipal.toText();
 			userIdentity.set(principalText);
-			principal.set(principalText); // Update the principal store
+			principal.set(principalText);
 
-			console.log('Principal at login:', principalText); // Debugging principal value after login
+			console.log('Principal restored from existing session:', principalText);
 			// Initialize backend with authenticated identity
 			await initBackendWithIdentity();
+			// Load user profiles
+			await loadUserProfiles();
 		}
 	});
 
@@ -69,10 +74,17 @@
 		isAuthenticated.set(false);
 		principalText = '';
 		userIdentity.set(null);
-		principal.set(''); // Reset the principal store
-		userProfiles.set([]); // Reset user profiles
+		principal.set('');
+		userProfiles.set([]);
 
-		console.log('Principal after logout:', principalText); // Confirm principal reset
+		// Clear sessionStorage on logout
+		if (typeof sessionStorage !== 'undefined') {
+			sessionStorage.removeItem('auth_isAuthenticated');
+			sessionStorage.removeItem('auth_userIdentity');
+			sessionStorage.removeItem('auth_principal');
+		}
+
+		console.log('Principal after logout:', principalText);
 	}
 
 	function generateAvatarUrl(seed) {

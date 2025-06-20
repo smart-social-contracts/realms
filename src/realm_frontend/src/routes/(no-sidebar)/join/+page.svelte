@@ -51,7 +51,7 @@
     }
     
     if (!$isAuthenticated) {
-      error = 'You must be logged in to join this Realm';
+      error = 'You must be logged in to join this Realm. Please log in first and then return to this page.';
       return;
     }
 
