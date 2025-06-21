@@ -2,7 +2,7 @@
 <script>
 	import { login, logout, isAuthenticated as checkAuth, initializeAuthClient } from '$lib/auth';
 	import { isAuthenticated, userIdentity, principal } from '$lib/stores/auth';
-	import { userProfiles, loadUserProfiles, profilesLoading } from '$lib/stores/profiles';
+	import { userProfiles, loadUserProfiles, profilesLoading, resetProfileState } from '$lib/stores/profiles';
 	import { Avatar} from 'flowbite-svelte';
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
@@ -56,7 +56,9 @@
 		principalText = '';
 		userIdentity.set(null);
 		principal.set('');
-		userProfiles.set([]);
+		
+		// Reset the entire profile state instead of just clearing profiles array
+		resetProfileState();
 
 		// Clear sessionStorage on logout
 		if (typeof sessionStorage !== 'undefined') {

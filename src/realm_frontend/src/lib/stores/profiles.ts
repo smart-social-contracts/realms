@@ -82,6 +82,15 @@ export function hasJoined(): boolean {
     return hasProfile('member') || hasProfile('admin');
 }
 
+// Reset profile state back to initial values
+export function resetProfileState(): void {
+    profileState.set({
+        profiles: [],
+        loading: false,
+        error: null
+    });
+}
+
 // Centralized function to load user profiles
 export async function loadUserProfiles() {
     // Skip if not authenticated
