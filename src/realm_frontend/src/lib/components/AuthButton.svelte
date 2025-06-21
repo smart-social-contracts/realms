@@ -2,37 +2,17 @@
 <script>
 	import { login, logout, isAuthenticated as checkAuth, initializeAuthClient } from '$lib/auth';
 	import { isAuthenticated, userIdentity, principal } from '$lib/stores/auth';
-	import { userProfiles } from '$lib/stores/profiles';
-	import { Avatar} from 'flowbite-svelte';
+	import { userProfiles, loadUserProfiles, profilesLoading, resetProfileState } from '$lib/stores/profiles';
+	import { Avatar, Button, DropdownDivider } from 'flowbite-svelte';
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import T from '$lib/components/T.svelte';
-	import { initBackendWithIdentity, backend } from '$lib/canisters';
-
-	import { Button } from 'flowbite-svelte';
+	import { initBackendWithIdentity } from '$lib/canisters';
 
 	let principalText = '';
+	let showDropdown = false;
 
-	async function loadUserProfiles() {
-		try {
-			if (!backend || typeof backend.get_my_user_status !== 'function') {
-				console.error("Backend canister is not properly initialized");
-				return;
-			}
-			
-			const response = await backend.get_my_user_status();
-			
-			if (response && response.success && response.data && response.data.UserGet) {
-				const profiles = response.data.UserGet.profiles || [];
-				userProfiles.set(profiles);
-				console.log("User profiles loaded:", profiles);
-			} else {
-				console.error("Invalid backend response format:", response);
-			}
-		} catch (e) {
-			console.error("Error loading user profiles:", e);
-		}
-	}
+	// Using the centralized profile loading function from the store
 
 	onMount(async () => {
 		const authStatus = await checkAuth();
@@ -52,6 +32,19 @@
 			// Load user profiles
 			await loadUserProfiles();
 		}
+		
+		// Add a click handler to close dropdown when clicking outside
+		const handleClickOutside = (event) => {
+			if (showDropdown && !event.target.closest('.avatar-dropdown')) {
+				showDropdown = false;
+			}
+		};
+		
+		document.addEventListener('click', handleClickOutside);
+		
+		return () => {
+			document.removeEventListener('click', handleClickOutside);
+		};
 	});
 
 	async function handleLogin() {
@@ -75,7 +68,9 @@
 		principalText = '';
 		userIdentity.set(null);
 		principal.set('');
-		userProfiles.set([]);
+		
+		// Reset the entire profile state instead of just clearing profiles array
+		resetProfileState();
 
 		// Clear sessionStorage on logout
 		if (typeof sessionStorage !== 'undefined') {
@@ -85,21 +80,68 @@
 		}
 
 		console.log('Principal after logout:', principalText);
+		showDropdown = false;
 	}
 
 	function generateAvatarUrl(seed) {
 		// You can customize the style (e.g., 'avataaars', 'bottts', etc.)
 		return `https://api.dicebear.com/9.x/identicon/svg?seed=${seed}`;
 	}
+
+	// Get a shortened display version of the principal
+	$: shortPrincipal = $principal ? `${$principal.substring(0, 8)}...${$principal.slice(-8)}` : '';
+	
+	// Toggle dropdown without event propagation
+	function toggleDropdown(event) {
+		event.stopPropagation();
+		showDropdown = !showDropdown;
+	}
 </script>
 
 
-<div class="flex space-x-4 items-center">
+<div class="flex items-center">
 {#if $isAuthenticated}
-	<Avatar src={generateAvatarUrl($principal)} tabindex={0} title={`Principal: ${$principal}`} />
-	<Button color="alternative" pill={true} on:click={handleLogout}>
-		<T key="common.logout" default_text="Log Out" />
-	</Button>
+	<div class="avatar-dropdown relative">
+		<!-- Avatar Image -->
+		<div 
+			class="cursor-pointer" 
+			on:click={toggleDropdown}
+			on:keydown={(e) => {
+				if (e.key === 'Enter' || e.key === ' ') {
+					toggleDropdown(e);
+				}
+			}}
+		>
+			<Avatar 
+				src={generateAvatarUrl($principal)} 
+				tabindex={0} 
+				title={`Principal: ${$principal}`} 
+				alt="User avatar"
+			/>
+		</div>
+		
+		<!-- Dropdown Menu -->
+		{#if showDropdown}
+			<div 
+				class="absolute right-0 mt-2 w-48 z-50 bg-white rounded-lg shadow-xl border border-gray-200 dark:bg-gray-800 dark:border-gray-700" 
+				role="menu"
+			>
+				<div class="px-4 py-3">
+					<p class="text-sm text-gray-900 dark:text-white truncate">
+						{shortPrincipal}
+					</p>
+				</div>
+				<hr class="h-px my-2 bg-gray-200 border-0 dark:bg-gray-700">
+				<button 
+					class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+					role="menuitem"
+					on:click={handleLogout}
+				>
+					<T key="common.logout" default_text="Log Out" />
+				</button>
+			</div>
+		{/if}
+	</div>
 {:else}
 	<Button color="alternative" pill={true} on:click={handleLogin}>
 		<T key="common.login" default_text="Log In" />
