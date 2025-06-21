@@ -91,6 +91,15 @@ export function resetProfileState(): void {
     });
 }
 
+export function setProfilesForTesting(profiles: string[]): void {
+    profileState.update(state => ({
+        ...state,
+        profiles,
+        loading: false,
+        error: null
+    }));
+}
+
 // Centralized function to load user profiles
 export async function loadUserProfiles() {
     // Skip if not authenticated
