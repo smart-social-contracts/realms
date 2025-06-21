@@ -105,6 +105,8 @@
 		<!-- Avatar Image -->
 		<div 
 			class="cursor-pointer" 
+			aria-haspopup="true"
+			aria-expanded={showDropdown}
 			on:click={toggleDropdown}
 			on:keydown={(e) => {
 				if (e.key === 'Enter' || e.key === ' ') {
