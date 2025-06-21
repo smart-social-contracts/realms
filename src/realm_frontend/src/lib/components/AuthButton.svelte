@@ -2,37 +2,18 @@
 <script>
 	import { login, logout, isAuthenticated as checkAuth, initializeAuthClient } from '$lib/auth';
 	import { isAuthenticated, userIdentity, principal } from '$lib/stores/auth';
-	import { userProfiles } from '$lib/stores/profiles';
+	import { userProfiles, loadUserProfiles, profilesLoading } from '$lib/stores/profiles';
 	import { Avatar} from 'flowbite-svelte';
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import T from '$lib/components/T.svelte';
-	import { initBackendWithIdentity, backend } from '$lib/canisters';
+	import { initBackendWithIdentity } from '$lib/canisters';
 
 	import { Button } from 'flowbite-svelte';
 
 	let principalText = '';
 
-	async function loadUserProfiles() {
-		try {
-			if (!backend || typeof backend.get_my_user_status !== 'function') {
-				console.error("Backend canister is not properly initialized");
-				return;
-			}
-			
-			const response = await backend.get_my_user_status();
-			
-			if (response && response.success && response.data && response.data.UserGet) {
-				const profiles = response.data.UserGet.profiles || [];
-				userProfiles.set(profiles);
-				console.log("User profiles loaded:", profiles);
-			} else {
-				console.error("Invalid backend response format:", response);
-			}
-		} catch (e) {
-			console.error("Error loading user profiles:", e);
-		}
-	}
+	// Using the centralized profile loading function from the store
 
 	onMount(async () => {
 		const authStatus = await checkAuth();
