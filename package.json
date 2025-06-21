@@ -21,6 +21,7 @@
     "@dfinity/candid": "^2.4.1",
     "@dfinity/identity": "^2.4.1",
     "@dfinity/principal": "^2.4.1",
+    "magic-string": "^0.30.17",
     "svelte-markdown": "^0.4.1"
   }
 }
