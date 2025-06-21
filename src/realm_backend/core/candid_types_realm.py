@@ -26,6 +26,7 @@ class StatusRecord(Record):
     votes_count: nat
     commit: text
     extensions: Vec[text]
+    demo_mode: bool
 
 
 class UserGetRecord(Record):
