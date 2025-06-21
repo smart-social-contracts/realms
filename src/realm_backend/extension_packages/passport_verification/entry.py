@@ -1,6 +1,6 @@
 import json
-import time
 
+import requests
 from ggg import Human, Identity, User
 from kybra_simple_logging import get_logger
 
@@ -9,35 +9,37 @@ logger = get_logger("passport_verification")
 REALMS_EVENT_ID = (
     "2234556494903931186902189494613533900917417361106374681011849132651019822199"
 )
-
-verification_storage = {}
+RARIMO_API_BASE = "https://api.app.rarime.com"
 
 
 def generate_verification_link(user_id: str) -> dict:
-    """Generate Rarimo verification link for passport verification (Mock Implementation)"""
+    """Generate Rarimo verification link for passport verification"""
     logger.info(f"Generating verification link for user {user_id}")
 
     try:
-        verification_id = f"verify_{user_id}_{int(time.time())}"
-        verification_link = (
-            f"https://rarime.app/verify?id={verification_id}&event={REALMS_EVENT_ID}"
-        )
-        qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={verification_link}"
-
-        verification_storage[user_id] = {
-            "status": "pending",
-            "verification_id": verification_id,
-            "created_at": int(time.time()),
-            "event_id": REALMS_EVENT_ID,
+        verification_payload = {
+            "requestId": user_id,
+            "eventId": int(REALMS_EVENT_ID),
+            "verificationOptions": {
+                "uniqueness": True,
+                "nationalityCheck": True,
+                "ageCheck": True,
+                "minAge": 18,
+            },
         }
+
+        qr_data = f"rarime://verify?requestId={user_id}&eventId={REALMS_EVENT_ID}&uniqueness=true&nationalityCheck=true"
+        qr_code_url = (
+            f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={qr_data}"
+        )
 
         logger.info(f"Successfully generated verification link for user {user_id}")
         return {
             "success": True,
-            "verification_link": verification_link,
+            "verification_link": qr_data,
             "qr_code_url": qr_code_url,
             "user_id": user_id,
-            "verification_id": verification_id,
+            "event_id": REALMS_EVENT_ID,
         }
 
     except Exception as e:
@@ -46,41 +48,56 @@ def generate_verification_link(user_id: str) -> dict:
 
 
 def check_verification_status(user_id: str) -> dict:
-    """Check passport verification status (Mock Implementation)"""
+    """Check passport verification status from Rarimo API"""
     logger.info(f"Checking verification status for user {user_id}")
 
     try:
-        verification = verification_storage.get(user_id)
+        response = requests.get(
+            f"{RARIMO_API_BASE}/integrations/verificator-svc/private/verification-status/{user_id}",
+            timeout=10,
+        )
 
-        if not verification:
+        if response.status_code == 404:
             return {"success": True, "status": "not_found", "user_id": user_id}
 
-        current_time = int(time.time())
-        time_elapsed = current_time - verification["created_at"]
+        response.raise_for_status()
+        data = response.json()
 
-        if time_elapsed > 10 and verification["status"] == "pending":
-            verification["status"] = "verified"
-            verification["citizenship"] = "US"  # Mock citizenship
-            verification["verified_at"] = current_time
-            verification["proof"] = {
-                "nullifier": f"mock_nullifier_{user_id}_{REALMS_EVENT_ID}",
-                "age_verified": True,
-                "citizenship_verified": True,
-            }
-            verification_storage[user_id] = verification
+        verification_status = (
+            data.get("data", {}).get("attributes", {}).get("status", "unknown")
+        )
 
         logger.info(
-            f"Retrieved verification status for user {user_id}: {verification['status']}"
+            f"Retrieved verification status for user {user_id}: {verification_status}"
         )
-        return {
-            "success": True,
-            "status": verification["status"],
-            "citizenship": verification.get("citizenship"),
-            "verified_at": verification.get("verified_at"),
-            "proof": verification.get("proof", {}),
-            "user_id": user_id,
-        }
 
+        result = {"success": True, "status": verification_status, "user_id": user_id}
+
+        if verification_status == "verified":
+            user_response = requests.get(
+                f"{RARIMO_API_BASE}/integrations/verificator-svc/private/user/{user_id}",
+                timeout=10,
+            )
+            if user_response.status_code == 200:
+                user_data = user_response.json()
+                attributes = user_data.get("data", {}).get("attributes", {})
+                result.update(
+                    {
+                        "citizenship": attributes.get("nationality"),
+                        "verified_at": attributes.get("verified_at"),
+                        "proof": attributes.get("proof_data", {}),
+                    }
+                )
+
+        return result
+
+    except requests.RequestException as e:
+        logger.error(f"Error checking verification status: {str(e)}")
+        return {
+            "success": False,
+            "error": f"API request failed: {str(e)}",
+            "status": "error",
+        }
     except Exception as e:
         logger.error(f"Error checking verification status: {str(e)}")
         return {"success": False, "error": str(e), "status": "error"}
