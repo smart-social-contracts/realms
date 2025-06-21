@@ -3,6 +3,7 @@ import { writable, derived, get } from 'svelte/store';
 import type { Readable } from 'svelte/store';
 
 // Add type assertions for imports from JavaScript files
+// @ts-ignore
 import { isAuthenticated } from './auth';
 
 // Type for backend response
@@ -115,6 +116,7 @@ export async function loadUserProfiles() {
     
     try {
         // Dynamically import backend to avoid circular dependencies
+        // @ts-ignore
         const { backend } = await import('$lib/canisters');
         
         if (!backend || typeof backend.get_my_user_status !== 'function') {
