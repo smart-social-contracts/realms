@@ -11,6 +11,7 @@ EXTENSION_NAMES = [
     "demo_loader",
     "citizen_dashboard",
     "llm_chat",
+    "passport_verification",
 ]
 
 

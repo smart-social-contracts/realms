@@ -1,10 +1,12 @@
 <script lang="ts">
 	import MetaTag from '../../utils/MetaTag.svelte';
 	import IdentityCard from '../../utils/settings/IdentityCard.svelte';
+	import PassportVerification from '$lib/components/passport/PassportVerification.svelte';
 	import { imagesPath } from '../../utils/variables';
 	import Footer from '../Footer.svelte';
-	import { Button, Card, Heading } from 'flowbite-svelte';
-	import { PlusOutline, FingerprintOutline } from 'flowbite-svelte-icons';
+	import { Button, Card, Heading, P } from 'flowbite-svelte';
+	import { PlusOutline, FingerprintOutline, ClipboardListSolid } from 'flowbite-svelte-icons';
+	import { userIdentity } from '$lib/stores/auth.js';
 
 	const path: string = '/identities';
 	const description: string = 'Manage your digital identities';
@@ -12,6 +14,8 @@
 	const subtitle: string = 'Identity Management';
 
 	import { onMount } from 'svelte';
+	
+	let showPassportVerification = false;
 
 	onMount(() => {});
 </script>
@@ -58,18 +62,38 @@
 			/>
 		</div>
 
-		<!-- Empty Card to Add New Identity -->
+		<!-- Passport Verification Card -->
+		<div class="transition-all duration-200 hover:shadow-md">
+			{#if !showPassportVerification}
+				<Card size="xl" class="flex flex-col items-center justify-center h-full p-8 border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 hover:border-blue-400 dark:hover:border-blue-500 cursor-pointer" on:click={() => showPassportVerification = true}>
+					<div class="flex flex-col items-center text-center">
+						<div class="p-3 mb-4 rounded-full bg-blue-100 dark:bg-blue-900">
+							<ClipboardListSolid class="w-8 h-8 text-blue-600 dark:text-blue-400" />
+						</div>
+						<Heading tag="h3" class="mb-2 text-xl font-semibold text-gray-900 dark:text-white">Verify Passport</Heading>
+						<P class="mb-5 text-sm text-gray-500 dark:text-gray-400">
+							Use zero-knowledge proofs to verify your passport identity securely and privately
+						</P>
+						<Button size="sm" color="blue" class="px-4 py-2">Start Verification</Button>
+					</div>
+				</Card>
+			{:else}
+				<PassportVerification userId={$userIdentity} />
+			{/if}
+		</div>
+
+		<!-- Empty Card to Add Other Identities -->
 		<div class="transition-all duration-200 hover:shadow-md">
 			<Card size="xl" class="flex flex-col items-center justify-center h-full p-8 border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800">
 				<div class="flex flex-col items-center text-center">
-					<div class="p-3 mb-4 rounded-full bg-blue-100 dark:bg-blue-900">
-						<PlusOutline class="w-8 h-8 text-blue-600 dark:text-blue-400" />
+					<div class="p-3 mb-4 rounded-full bg-gray-100 dark:bg-gray-700">
+						<PlusOutline class="w-8 h-8 text-gray-600 dark:text-gray-400" />
 					</div>
-					<Heading tag="h3" class="mb-2 text-xl font-semibold text-gray-900 dark:text-white">Connect New Identity</Heading>
-					<p class="mb-5 text-sm text-gray-500 dark:text-gray-400">
+					<Heading tag="h3" class="mb-2 text-xl font-semibold text-gray-900 dark:text-white">Connect Other Identity</Heading>
+					<P class="mb-5 text-sm text-gray-500 dark:text-gray-400">
 						Link additional identity providers to enhance your account security
-					</p>
-					<Button size="sm" color="blue" class="px-4 py-2">Connect Provider</Button>
+					</P>
+					<Button size="sm" color="alternative" class="px-4 py-2" disabled>Coming Soon</Button>
 				</div>
 			</Card>
 		</div>

@@ -193,6 +193,77 @@ def get_my_user_status() -> RealmResponse:
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
+@update
+def generate_passport_verification(user_id: str) -> RealmResponse:
+    try:
+        logger.info(f"Generating passport verification for user {user_id}")
+        result = api.extensions.extension_sync_call(
+            "passport_verification", "generate_verification_link", json.dumps([user_id])
+        )
+        return RealmResponse(
+            success=True, data=RealmResponseData(Message=json.dumps(result))
+        )
+    except Exception as e:
+        logger.error(
+            f"Error generating passport verification: {str(e)}\n{traceback.format_exc()}"
+        )
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def check_passport_status(user_id: str) -> RealmResponse:
+    try:
+        logger.info(f"Checking passport status for user {user_id}")
+        result = api.extensions.extension_sync_call(
+            "passport_verification", "check_verification_status", json.dumps([user_id])
+        )
+        return RealmResponse(
+            success=True, data=RealmResponseData(Message=json.dumps(result))
+        )
+    except Exception as e:
+        logger.error(
+            f"Error checking passport status: {str(e)}\n{traceback.format_exc()}"
+        )
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@update
+def create_passport_identity(user_id: str, verification_data: text) -> RealmResponse:
+    try:
+        logger.info(f"Creating passport identity for user {user_id}")
+        verification_dict = json.loads(verification_data)
+        result = api.extensions.extension_sync_call(
+            "passport_verification",
+            "create_passport_identity",
+            json.dumps([user_id, verification_dict]),
+        )
+        return RealmResponse(
+            success=True, data=RealmResponseData(Message=json.dumps(result))
+        )
+    except Exception as e:
+        logger.error(
+            f"Error creating passport identity: {str(e)}\n{traceback.format_exc()}"
+        )
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_user_passport_identity(user_id: str) -> RealmResponse:
+    try:
+        logger.info(f"Getting passport identity for user {user_id}")
+        result = api.extensions.extension_sync_call(
+            "passport_verification", "get_user_passport_identity", json.dumps([user_id])
+        )
+        return RealmResponse(
+            success=True, data=RealmResponseData(Message=json.dumps(result))
+        )
+    except Exception as e:
+        logger.error(
+            f"Error getting passport identity: {str(e)}\n{traceback.format_exc()}"
+        )
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
 # @query
 # def get_user(principal: Principal) -> RealmResponse:
 #     try:
