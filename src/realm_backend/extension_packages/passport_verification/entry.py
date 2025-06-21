@@ -1,7 +1,12 @@
 import json
 
-import requests
 from ggg import Human, Identity, User
+from kybra import Async, CallResult, ic, match, query
+from kybra.canisters.management import (
+    HttpResponse,
+    HttpTransformArgs,
+    management_canister,
+)
 from kybra_simple_logging import get_logger
 
 logger = get_logger("passport_verification")
@@ -47,21 +52,59 @@ def generate_verification_link(user_id: str) -> dict:
         return {"success": False, "error": str(e)}
 
 
-def check_verification_status(user_id: str) -> dict:
-    """Check passport verification status from Rarimo API"""
+def check_verification_status(user_id: str) -> Async[dict]:
+    """Check passport verification status from Rarimo API using IC HTTP outcalls"""
     logger.info(f"Checking verification status for user {user_id}")
 
     try:
-        response = requests.get(
-            f"{RARIMO_API_BASE}/integrations/verificator-svc/private/verification-status/{user_id}",
-            timeout=10,
+        http_result: CallResult[HttpResponse] = yield management_canister.http_request(
+            {
+                "url": f"{RARIMO_API_BASE}/integrations/verificator-svc/private/verification-status/{user_id}",
+                "max_response_bytes": 10_000,
+                "method": {"get": None},
+                "headers": [],
+                "body": bytes(),
+                "transform": {
+                    "function": (ic.id(), "rarimo_transform"),
+                    "context": bytes(),
+                },
+            }
+        ).with_cycles(50_000_000)
+
+        return match(
+            http_result,
+            {
+                "Ok": lambda response: _process_verification_response(
+                    response, user_id
+                ),
+                "Err": lambda err: {
+                    "success": False,
+                    "error": f"HTTP request failed: {err}",
+                    "status": "error",
+                },
+            },
         )
 
-        if response.status_code == 404:
+    except Exception as e:
+        logger.error(f"Error checking verification status: {str(e)}")
+        return {"success": False, "error": str(e), "status": "error"}
+
+
+def _process_verification_response(response: HttpResponse, user_id: str) -> dict:
+    """Process the HTTP response from Rarimo verification status API"""
+    try:
+        if response["status"] == 404:
             return {"success": True, "status": "not_found", "user_id": user_id}
 
-        response.raise_for_status()
-        data = response.json()
+        if response["status"] != 200:
+            return {
+                "success": False,
+                "error": f"API returned status {response['status']}",
+                "status": "error",
+            }
+
+        response_text = response["body"].decode("utf-8")
+        data = json.loads(response_text)
 
         verification_status = (
             data.get("data", {}).get("attributes", {}).get("status", "unknown")
@@ -74,32 +117,26 @@ def check_verification_status(user_id: str) -> dict:
         result = {"success": True, "status": verification_status, "user_id": user_id}
 
         if verification_status == "verified":
-            user_response = requests.get(
-                f"{RARIMO_API_BASE}/integrations/verificator-svc/private/user/{user_id}",
-                timeout=10,
+            attributes = data.get("data", {}).get("attributes", {})
+            result.update(
+                {
+                    "citizenship": attributes.get("nationality"),
+                    "verified_at": attributes.get("verified_at"),
+                    "proof": attributes.get("proof_data", {}),
+                }
             )
-            if user_response.status_code == 200:
-                user_data = user_response.json()
-                attributes = user_data.get("data", {}).get("attributes", {})
-                result.update(
-                    {
-                        "citizenship": attributes.get("nationality"),
-                        "verified_at": attributes.get("verified_at"),
-                        "proof": attributes.get("proof_data", {}),
-                    }
-                )
 
         return result
 
-    except requests.RequestException as e:
-        logger.error(f"Error checking verification status: {str(e)}")
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse JSON response: {str(e)}")
         return {
             "success": False,
-            "error": f"API request failed: {str(e)}",
+            "error": f"Invalid JSON response: {str(e)}",
             "status": "error",
         }
     except Exception as e:
-        logger.error(f"Error checking verification status: {str(e)}")
+        logger.error(f"Error processing verification response: {str(e)}")
         return {"success": False, "error": str(e), "status": "error"}
 
 
@@ -156,6 +193,14 @@ def create_passport_identity(user_id: str, verification_data: dict) -> dict:
     except Exception as e:
         logger.error(f"Error creating passport identity: {str(e)}")
         return {"success": False, "error": str(e)}
+
+
+@query
+def rarimo_transform(args: HttpTransformArgs) -> HttpResponse:
+    """Transform function for Rarimo API HTTP responses to ensure consensus"""
+    http_response = args["response"]
+    http_response["headers"] = []
+    return http_response
 
 
 def get_user_passport_identity(user_id: str) -> dict:
