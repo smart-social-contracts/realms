@@ -12,6 +12,8 @@
 	
 	// Get commit hash from meta tag
 	let commitHash = '';
+	// Get commit datetime from meta tag
+	let commitDatetime = '';
 	// Get version from meta tag
 	let version = '';
 	
@@ -24,6 +26,11 @@
 			if (commitHash && commitHash !== 'COMMIT_HASH_PLACEHOLDER' && commitHash.length > 7) {
 				commitHash = commitHash.substring(0, 7);
 			}
+		}
+		
+		const commitDatetimeMeta = document.querySelector('meta[name="commit-datetime"]');
+		if (commitDatetimeMeta) {
+			commitDatetime = commitDatetimeMeta.getAttribute('content') || '';
 		}
 		
 		const versionMeta = document.querySelector('meta[name="version"]');
@@ -87,9 +94,13 @@
 	</div>
 	
 	<!-- App name, version and commit hash display -->
-	{#if (version && version !== 'VERSION_PLACEHOLDER') || (commitHash && commitHash !== 'COMMIT_HASH_PLACEHOLDER')}
+	{#if (version && version !== 'VERSION_PLACEHOLDER') || (commitHash && commitHash !== 'COMMIT_HASH_PLACEHOLDER') || (commitDatetime && commitDatetime !== 'COMMIT_DATETIME_PLACEHOLDER')}
 		<div class="mt-3 text-center">
-			<span class="text-xs text-gray-400 dark:text-gray-500">Realms gOS {#if version && version !== 'VERSION_PLACEHOLDER'}{version}{/if} {#if commitHash && commitHash !== 'COMMIT_HASH_PLACEHOLDER'}({commitHash}){/if}</span>
+			<span class="text-xs text-gray-400 dark:text-gray-500">
+				Realms gOS {#if version && version !== 'VERSION_PLACEHOLDER'}{version}{/if} 
+				{#if commitHash && commitHash !== 'COMMIT_HASH_PLACEHOLDER'}({commitHash}){/if}
+				{#if commitDatetime && commitDatetime !== 'COMMIT_DATETIME_PLACEHOLDER'} - {commitDatetime}{/if}
+			</span>
 		</div>
 	{/if}
 </Frame>
