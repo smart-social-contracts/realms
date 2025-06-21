@@ -1,9 +1,8 @@
 import json
 
 from ggg import Human, Identity, User
-from kybra import Async, CallResult, ic, match, query
+from kybra import Async, CallResult, ic, match, query, text
 from kybra.canisters.management import (
-    HttpResponse,
     HttpTransformArgs,
     management_canister,
 )
@@ -17,7 +16,7 @@ REALMS_EVENT_ID = (
 RARIMO_API_BASE = "https://api.app.rarime.com"
 
 
-def generate_verification_link(user_id: str) -> dict:
+def generate_verification_link(user_id: str) -> text:
     """Generate Rarimo verification link for passport verification"""
     logger.info(f"Generating verification link for user {user_id}")
 
@@ -39,25 +38,27 @@ def generate_verification_link(user_id: str) -> dict:
         )
 
         logger.info(f"Successfully generated verification link for user {user_id}")
-        return {
-            "success": True,
-            "verification_link": qr_data,
-            "qr_code_url": qr_code_url,
-            "user_id": user_id,
-            "event_id": REALMS_EVENT_ID,
-        }
+        return json.dumps(
+            {
+                "success": True,
+                "verification_link": qr_data,
+                "qr_code_url": qr_code_url,
+                "user_id": user_id,
+                "event_id": REALMS_EVENT_ID,
+            }
+        )
 
     except Exception as e:
         logger.error(f"Error generating verification link: {str(e)}")
-        return {"success": False, "error": str(e)}
+        return json.dumps({"success": False, "error": str(e)})
 
 
-def check_verification_status(user_id: str) -> Async[dict]:
+def check_verification_status(user_id: str) -> Async[text]:
     """Check passport verification status from Rarimo API using IC HTTP outcalls"""
     logger.info(f"Checking verification status for user {user_id}")
 
     try:
-        http_result: CallResult[HttpResponse] = yield management_canister.http_request(
+        http_result: CallResult = yield management_canister.http_request(
             {
                 "url": f"{RARIMO_API_BASE}/integrations/verificator-svc/private/verification-status/{user_id}",
                 "max_response_bytes": 10_000,
@@ -77,31 +78,37 @@ def check_verification_status(user_id: str) -> Async[dict]:
                 "Ok": lambda response: _process_verification_response(
                     response, user_id
                 ),
-                "Err": lambda err: {
-                    "success": False,
-                    "error": f"HTTP request failed: {err}",
-                    "status": "error",
-                },
+                "Err": lambda err: json.dumps(
+                    {
+                        "success": False,
+                        "error": f"HTTP request failed: {err}",
+                        "status": "error",
+                    }
+                ),
             },
         )
 
     except Exception as e:
         logger.error(f"Error checking verification status: {str(e)}")
-        return {"success": False, "error": str(e), "status": "error"}
+        return json.dumps({"success": False, "error": str(e), "status": "error"})
 
 
-def _process_verification_response(response: HttpResponse, user_id: str) -> dict:
+def _process_verification_response(response, user_id: str) -> text:
     """Process the HTTP response from Rarimo verification status API"""
     try:
         if response["status"] == 404:
-            return {"success": True, "status": "not_found", "user_id": user_id}
+            return json.dumps(
+                {"success": True, "status": "not_found", "user_id": user_id}
+            )
 
         if response["status"] != 200:
-            return {
-                "success": False,
-                "error": f"API returned status {response['status']}",
-                "status": "error",
-            }
+            return json.dumps(
+                {
+                    "success": False,
+                    "error": f"API returned status {response['status']}",
+                    "status": "error",
+                }
+            )
 
         response_text = response["body"].decode("utf-8")
         data = json.loads(response_text)
@@ -126,21 +133,23 @@ def _process_verification_response(response: HttpResponse, user_id: str) -> dict
                 }
             )
 
-        return result
+        return json.dumps(result)
 
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse JSON response: {str(e)}")
-        return {
-            "success": False,
-            "error": f"Invalid JSON response: {str(e)}",
-            "status": "error",
-        }
+        return json.dumps(
+            {
+                "success": False,
+                "error": f"Invalid JSON response: {str(e)}",
+                "status": "error",
+            }
+        )
     except Exception as e:
         logger.error(f"Error processing verification response: {str(e)}")
-        return {"success": False, "error": str(e), "status": "error"}
+        return json.dumps({"success": False, "error": str(e), "status": "error"})
 
 
-def create_passport_identity(user_id: str, verification_data: dict) -> dict:
+def create_passport_identity(user_id: str, verification_data: dict) -> text:
     """Create passport Identity and link to User via Human"""
     logger.info(f"Creating passport identity for user {user_id}")
 
@@ -148,7 +157,7 @@ def create_passport_identity(user_id: str, verification_data: dict) -> dict:
         user = User.get(user_id)
         if not user:
             logger.error(f"User {user_id} not found")
-            return {"success": False, "error": f"User {user_id} not found"}
+            return json.dumps({"success": False, "error": f"User {user_id} not found"})
 
         human = user.human
         if not human:
@@ -164,10 +173,12 @@ def create_passport_identity(user_id: str, verification_data: dict) -> dict:
 
         if existing_passport_identity:
             logger.warning(f"Passport identity already exists for user {user_id}")
-            return {
-                "success": False,
-                "error": "Passport identity already exists for this user",
-            }
+            return json.dumps(
+                {
+                    "success": False,
+                    "error": "Passport identity already exists for this user",
+                }
+            )
 
         identity_metadata = {
             "verification_status": verification_data.get("status"),
@@ -183,55 +194,59 @@ def create_passport_identity(user_id: str, verification_data: dict) -> dict:
         )
 
         logger.info(f"Successfully created passport identity for user {user_id}")
-        return {
-            "success": True,
-            "identity_id": identity.id if hasattr(identity, "id") else "created",
-            "verification_status": verification_data.get("status"),
-            "citizenship": verification_data.get("citizenship"),
-        }
+        return json.dumps(
+            {
+                "success": True,
+                "identity_id": identity.id if hasattr(identity, "id") else "created",
+                "verification_status": verification_data.get("status"),
+                "citizenship": verification_data.get("citizenship"),
+            }
+        )
 
     except Exception as e:
         logger.error(f"Error creating passport identity: {str(e)}")
-        return {"success": False, "error": str(e)}
+        return json.dumps({"success": False, "error": str(e)})
 
 
 @query
-def rarimo_transform(args: HttpTransformArgs) -> HttpResponse:
+def rarimo_transform(args: HttpTransformArgs) -> text:
     """Transform function for Rarimo API HTTP responses to ensure consensus"""
     http_response = args["response"]
     http_response["headers"] = []
-    return http_response
+    return json.dumps(http_response)
 
 
-def get_user_passport_identity(user_id: str) -> dict:
+def get_user_passport_identity(user_id: str) -> text:
     """Get existing passport identity for a user"""
     logger.info(f"Getting passport identity for user {user_id}")
 
     try:
         user = User.get(user_id)
         if not user:
-            return {"success": False, "error": f"User {user_id} not found"}
+            return json.dumps({"success": False, "error": f"User {user_id} not found"})
 
         human = user.human
         if not human:
-            return {"success": True, "has_passport_identity": False}
+            return json.dumps({"success": True, "has_passport_identity": False})
 
         for identity in human.identities:
             if identity.type == "passport":
                 metadata = json.loads(identity.metadata) if identity.metadata else {}
-                return {
-                    "success": True,
-                    "has_passport_identity": True,
-                    "identity_id": (
-                        identity.id if hasattr(identity, "id") else "unknown"
-                    ),
-                    "verification_status": metadata.get("verification_status"),
-                    "citizenship": metadata.get("citizenship"),
-                    "verified_at": metadata.get("verified_at"),
-                }
+                return json.dumps(
+                    {
+                        "success": True,
+                        "has_passport_identity": True,
+                        "identity_id": (
+                            identity.id if hasattr(identity, "id") else "unknown"
+                        ),
+                        "verification_status": metadata.get("verification_status"),
+                        "citizenship": metadata.get("citizenship"),
+                        "verified_at": metadata.get("verified_at"),
+                    }
+                )
 
-        return {"success": True, "has_passport_identity": False}
+        return json.dumps({"success": True, "has_passport_identity": False})
 
     except Exception as e:
         logger.error(f"Error getting passport identity: {str(e)}")
-        return {"success": False, "error": str(e)}
+        return json.dumps({"success": False, "error": str(e)})
