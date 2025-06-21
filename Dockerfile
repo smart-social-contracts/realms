@@ -10,8 +10,8 @@ COPY requirements.txt ./requirements.txt
 COPY requirements-dev.txt ./requirements-dev.txt
 COPY package-lock.json ./package-lock.json
 COPY package.json ./package.json
-COPY ./scripts/setup_dev.sh ./scripts/setup_dev.sh
-RUN ./scripts/setup_dev.sh
+COPY ./scripts/setup_docker_dev_env.sh ./scripts/setup_docker_dev_env.sh
+RUN ./scripts/setup_docker_dev_env.sh
 
 # Configuration files
 COPY .flake8 ./.flake8
