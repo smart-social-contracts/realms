@@ -1,4 +1,3 @@
-// @ts-nocheck
 // src/lib/stores/profiles.ts
 import { writable, derived, get } from 'svelte/store';
 import type { Readable } from 'svelte/store';
@@ -59,7 +58,7 @@ export function hasProfile(profile: string): boolean {
         return false;
     }
     
-    console.log("Current profiles:", state.profiles); // Debug log to see what profiles are available
+
     return Array.isArray(state.profiles) && state.profiles.includes(profile);
 }
 

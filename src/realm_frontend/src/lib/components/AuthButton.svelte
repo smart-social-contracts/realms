@@ -2,8 +2,8 @@
 <script>
 	import { login, logout, isAuthenticated as checkAuth, initializeAuthClient } from '$lib/auth';
 	import { isAuthenticated, userIdentity, principal } from '$lib/stores/auth';
-	import { userProfiles, loadUserProfiles, profilesLoading, resetProfileState } from '$lib/stores/profiles';
-	import { Avatar, Button, DropdownDivider } from 'flowbite-svelte';
+	import { loadUserProfiles, resetProfileState } from '$lib/stores/profiles';
+	import { Avatar, Button } from 'flowbite-svelte';
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import T from '$lib/components/T.svelte';
