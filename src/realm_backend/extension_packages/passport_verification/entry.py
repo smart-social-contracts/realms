@@ -99,7 +99,7 @@ def check_verification_status(args: str) -> Async[str]:
         http_result,
 
         {
-            "Ok": lambda response: json.loads(response.body.decode("utf-8")),
+            "Ok": lambda response: json.loads(response['body'].decode("utf-8")),
             "Err": lambda err: f"Error: {err}"
         }
     )
