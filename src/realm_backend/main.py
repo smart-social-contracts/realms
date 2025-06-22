@@ -80,13 +80,14 @@ class HttpRequest(Record):
     headers: Vec["Header"]
     body: blob
 
+from kybra.canisters.management import HttpResponse, HttpTransformArgs
 
-class HttpResponse(Record):
-    status_code: nat
-    headers: Vec["Header"]
-    body: blob
-    streaming_strategy: Opt["StreamingStrategy"]
-    upgrade: Opt[bool]
+# class HttpResponse(Record):
+#     status_code: nat
+#     headers: Vec["Header"]
+#     body: blob
+#     streaming_strategy: Opt["StreamingStrategy"]
+#     upgrade: Opt[bool]
 
 
 Header = Tuple[str, str]
@@ -190,60 +191,6 @@ def get_my_user_status() -> RealmResponse:
         )
     except Exception as e:
         logger.error(f"Error getting user: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@update
-def generate_passport_verification(user_id: str) -> RealmResponse:
-    try:
-        logger.info(f"Generating passport verification for user {user_id}")
-        result = api.extensions.extension_sync_call(
-            "passport_verification", "generate_verification_link", json.dumps([user_id])
-        )
-        return RealmResponse(
-            success=True, data=RealmResponseData(Message=json.dumps(result))
-        )
-    except Exception as e:
-        logger.error(
-            f"Error generating passport verification: {str(e)}\n{traceback.format_exc()}"
-        )
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@query
-def check_passport_status(user_id: str) -> RealmResponse:
-    try:
-        logger.info(f"Checking passport status for user {user_id}")
-        result = api.extensions.extension_sync_call(
-            "passport_verification", "check_verification_status", json.dumps([user_id])
-        )
-        return RealmResponse(
-            success=True, data=RealmResponseData(Message=json.dumps(result))
-        )
-    except Exception as e:
-        logger.error(
-            f"Error checking passport status: {str(e)}\n{traceback.format_exc()}"
-        )
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@update
-def create_passport_identity(user_id: str, verification_data: text) -> RealmResponse:
-    try:
-        logger.info(f"Creating passport identity for user {user_id}")
-        verification_dict = json.loads(verification_data)
-        result = api.extensions.extension_sync_call(
-            "passport_verification",
-            "create_passport_identity",
-            json.dumps([user_id, verification_dict]),
-        )
-        return RealmResponse(
-            success=True, data=RealmResponseData(Message=json.dumps(result))
-        )
-    except Exception as e:
-        logger.error(
-            f"Error creating passport identity: {str(e)}\n{traceback.format_exc()}"
-        )
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
@@ -687,6 +634,18 @@ def http_request_core(data):
         "streaming_strategy": None,
         "upgrade": False,
     }
+
+
+@query
+def transform_response(args: HttpTransformArgs) -> HttpResponse:
+    """Transform function for HTTP responses from extensions"""
+    logger.info(f"🔄 Transforming HTTP response")
+    http_response = args["response"]
+    logger.info(f"📊 Original response status: {http_response['status']}")
+    logger.info(f"📄 Response body size: {len(http_response['body'])} bytes")
+    logger.info(f"🧹 Clearing response headers for security")
+    http_response["headers"] = []
+    return http_response
 
 
 @query
