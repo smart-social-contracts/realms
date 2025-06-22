@@ -194,10 +194,10 @@ def get_my_user_status() -> RealmResponse:
 
 
 @update
-def generate_passport_verification(user_id: str) -> RealmResponse:
+def generate_passport_verification(user_id: str) -> Async[RealmResponse]:
     try:
         logger.info(f"Generating passport verification for user {user_id}")
-        result = api.extensions.extension_sync_call(
+        result = yield api.extensions.extension_async_call(
             "passport_verification", "generate_verification_link", json.dumps([user_id])
         )
         return RealmResponse(

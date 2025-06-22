@@ -3,6 +3,7 @@ import json
 from ggg import Human, Identity, User
 from kybra import Async, CallResult, ic, match, query, text
 from kybra.canisters.management import (
+    HttpResponse as ManagementHttpResponse,
     HttpTransformArgs,
     management_canister,
 )
@@ -16,40 +17,92 @@ REALMS_EVENT_ID = (
 RARIMO_API_BASE = "https://api.app.rarime.com"
 
 
-def generate_verification_link(user_id: str) -> text:
-    """Generate Rarimo verification link for passport verification"""
+def generate_verification_link(user_id: str) -> Async[text]:
+    """Generate Rarimo verification link for passport verification using API calls"""
     logger.info(f"Generating verification link for user {user_id}")
 
     try:
-        verification_payload = {
-            "requestId": user_id,
-            "eventId": int(REALMS_EVENT_ID),
-            "verificationOptions": {
-                "uniqueness": True,
-                "nationalityCheck": True,
-                "ageCheck": True,
-                "minAge": 18,
-            },
+        payload = {
+            "data": {
+                "id": user_id,
+                "type": "user",
+                "attributes": {
+                    "age_lower_bound": 18,
+                    "uniqueness": True,
+                    "nationality": "",
+                    "nationality_check": True,
+                    "event_id": REALMS_EVENT_ID
+                }
+            }
         }
 
-        qr_data = f"rarime://verify?requestId={user_id}&eventId={REALMS_EVENT_ID}&uniqueness=true&nationalityCheck=true"
-        qr_code_url = (
-            f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={qr_data}"
-        )
+        logger.info(f"Sending HTTP POST request to Rarimo API with payload")
+        
+        http_result: CallResult = yield management_canister.http_request({
+            "url": f"{RARIMO_API_BASE}/integrations/verificator-svc/private/verification-link",
+            "max_response_bytes": 2_000,
+            "method": {"post": None},
+            "headers": [
+                {"name": "Content-Type", "value": "application/json"}
+            ],
+            "body": json.dumps(payload).encode("utf-8"),
+            "transform": {"function": (ic.id(), "rarimo_transform"), "context": bytes()}
+        }).with_cycles(100_000_000)
 
-        logger.info(f"Successfully generated verification link for user {user_id}")
-        return json.dumps(
+        return match(
+            http_result,
             {
-                "success": True,
-                "verification_link": qr_data,
-                "qr_code_url": qr_code_url,
-                "user_id": user_id,
-                "event_id": REALMS_EVENT_ID,
+                "Ok": lambda response: _process_verification_link_response(response, user_id),
+                "Err": lambda err: json.dumps({"success": False, "error": f"HTTP request failed: {err}"})
             }
         )
 
     except Exception as e:
         logger.error(f"Error generating verification link: {str(e)}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+def _process_verification_link_response(response, user_id: str) -> text:
+    """Process the response from Rarimo verification link API"""
+    try:
+        if response["status"] != 200:
+            return json.dumps({
+                "success": False,
+                "error": f"API returned status {response['status']}"
+            })
+
+        response_text = response["body"].decode("utf-8")
+        response_data = json.loads(response_text)
+        
+        if "data" in response_data and "attributes" in response_data["data"]:
+            proof_params_url = response_data["data"]["attributes"]["get_proof_params"]
+            
+            qr_url = f"https://app.rarime.com/external?type=proof-request&proof_params_url={proof_params_url.replace(':', '%3A').replace('/', '%2F')}"
+            
+            qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={qr_url.replace(':', '%3A').replace('/', '%2F').replace('&', '%26').replace('=', '%3D').replace('?', '%3F')}"
+            
+            logger.info(f"Successfully generated verification link for user {user_id}")
+            return json.dumps({
+                "success": True,
+                "verification_link": qr_url,
+                "qr_code_url": qr_code_url,
+                "user_id": user_id,
+                "event_id": REALMS_EVENT_ID,
+            })
+        else:
+            return json.dumps({
+                "success": False,
+                "error": "Invalid response format from Rarimo API"
+            })
+            
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse JSON response: {str(e)}")
+        return json.dumps({
+            "success": False,
+            "error": f"Invalid JSON response: {str(e)}"
+        })
+    except Exception as e:
+        logger.error(f"Error processing verification link response: {str(e)}")
         return json.dumps({"success": False, "error": str(e)})
 
 
