@@ -3,7 +3,6 @@ import json
 from ggg import Human, Identity, User
 from kybra import Async, CallResult, ic, match, query, text
 from kybra.canisters.management import (
-    HttpResponse as ManagementHttpResponse,
     HttpTransformArgs,
     management_canister,
 )
