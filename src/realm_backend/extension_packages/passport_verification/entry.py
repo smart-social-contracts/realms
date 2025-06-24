@@ -70,7 +70,7 @@ def get_verification_link(args: str) -> Async[str]:
             "headers": [{"name": "Content-Type", "value": "application/json"}],
             "body": json.dumps(payload).encode("utf-8"),
             "transform": {
-                "function": (ic.caller(), "transform_response"),
+                "function": (ic.id(), "transform_response"),
                 "context": bytes(),
             },
         }
@@ -104,7 +104,7 @@ def check_verification_status(args: str) -> Async[str]:
             "headers": [],
             "body": bytes(),
             "transform": {
-                "function": (ic.caller(), "transform_response"),
+                "function": (ic.id(), "transform_response"),
                 "context": bytes(),
             },
         }
@@ -117,6 +117,7 @@ def check_verification_status(args: str) -> Async[str]:
             "Err": lambda err: f"Error: {err}",
         },
     )
+
 
 @update
 def create_passport_identity(args: str) -> str:
