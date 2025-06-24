@@ -19,24 +19,29 @@
       errorMessage = '';
       
       console.log('Generating passport verification for user:', userId);
-      const response = await backend.generate_passport_verification(userId);
+      const response = await backend.extension_async_call({
+        extension_name: "passport_verification",
+        function_name: "get_verification_link",
+        args: userId || ""
+      });
       
       if (response.success) {
-        const result = JSON.parse(response.data.Message);
+        const result = JSON.parse(response.response);
         console.log('Verification link result:', result);
         
-        if (result.success) {
-          verificationLink = result.verification_link;
-          qrCodeData = result.qr_code_url || generateQRCodeData(result.verification_link);
+        if (result.data && result.data.attributes) {
+          const verificationUrl = result.data.attributes.get_proof_params;
+          verificationLink = verificationUrl;
+          qrCodeData = generateQRCodeData(verificationUrl);
           verificationStatus = 'pending';
           startPolling();
         } else {
           verificationStatus = 'error';
-          errorMessage = result.error || 'Failed to generate verification link';
+          errorMessage = 'Invalid response format from verification service';
         }
       } else {
         verificationStatus = 'error';
-        errorMessage = response.data.Error || 'Backend error occurred';
+        errorMessage = response.response || 'Backend error occurred';
       }
     } catch (error) {
       console.error('Error generating verification link:', error);
@@ -53,28 +58,31 @@
   
   async function checkVerificationStatus() {
     try {
-      const response = await backend.check_passport_status(userId);
+      const response = await backend.extension_async_call({
+        extension_name: "passport_verification",
+        function_name: "check_verification_status",
+        args: userId || ""
+      });
       
       if (response.success) {
-        const result = JSON.parse(response.data.Message);
+        const result = JSON.parse(response.response);
         console.log('Verification status result:', result);
         
-        if (result.success) {
-          if (result.status === 'verified') {
+        if (result.data && result.data.attributes) {
+          const status = result.data.attributes.status;
+          if (status === 'verified') {
             verificationStatus = 'verified';
-            verificationResult = result;
+            verificationResult = result.data.attributes;
             stopPolling();
             
-            // Create the passport identity
             await createPassportIdentity(result);
-          } else if (result.status === 'failed') {
+          } else if (status === 'failed') {
             verificationStatus = 'failed';
             errorMessage = 'Passport verification failed';
             stopPolling();
           }
-          // If status is still 'pending', continue polling
         } else {
-          console.warn('Status check returned error:', result.error);
+          console.warn('Unexpected response format:', result);
         }
       }
     } catch (error) {
@@ -84,10 +92,14 @@
   
   async function createPassportIdentity(verificationData) {
     try {
-      const response = await backend.create_passport_identity(userId, JSON.stringify(verificationData));
+      const response = await backend.extension_async_call({
+        extension_name: "passport_verification",
+        function_name: "create_passport_identity",
+        args: JSON.stringify(verificationData)
+      });
       
       if (response.success) {
-        const result = JSON.parse(response.data.Message);
+        const result = JSON.parse(response.response);
         console.log('Identity creation result:', result);
         
         if (!result.success) {
