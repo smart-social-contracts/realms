@@ -83,14 +83,6 @@ class HttpRequest(Record):
 
 from kybra.canisters.management import HttpResponse, HttpTransformArgs
 
-# class HttpResponse(Record):
-#     status_code: nat
-#     headers: Vec["Header"]
-#     body: blob
-#     streaming_strategy: Opt["StreamingStrategy"]
-#     upgrade: Opt[bool]
-
-
 Header = Tuple[str, str]
 
 
@@ -147,24 +139,6 @@ def join_realm(profile: str) -> RealmResponse:
     except Exception as e:
         logger.error(f"Error registering user: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-# @update
-# def register_user(principal: Principal, profile: str) -> RealmResponse:
-#     try:
-#         return RealmResponse(
-#             success=True,
-#             data=RealmResponseData(
-#                 UserRegister=UserRegisterRecord(
-#                     principal=Principal.from_str(
-#                         user_register(principal.to_str(), profile)["principal"],
-#                     )
-#                 )
-#             ),
-#         )
-#     except Exception as e:
-#         logger.error(f"Error registering user: {str(e)}\n{traceback.format_exc()}")
-#         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
 @query
