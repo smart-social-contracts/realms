@@ -81,13 +81,7 @@ class HttpRequest(Record):
     body: blob
 
 
-class HttpResponse(Record):
-    status_code: nat
-    headers: Vec["Header"]
-    body: blob
-    streaming_strategy: Opt["StreamingStrategy"]
-    upgrade: Opt[bool]
-
+from kybra.canisters.management import HttpResponse, HttpTransformArgs
 
 Header = Tuple[str, str]
 
@@ -147,24 +141,6 @@ def join_realm(profile: str) -> RealmResponse:
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
-# @update
-# def register_user(principal: Principal, profile: str) -> RealmResponse:
-#     try:
-#         return RealmResponse(
-#             success=True,
-#             data=RealmResponseData(
-#                 UserRegister=UserRegisterRecord(
-#                     principal=Principal.from_str(
-#                         user_register(principal.to_str(), profile)["principal"],
-#                     )
-#                 )
-#             ),
-#         )
-#     except Exception as e:
-#         logger.error(f"Error registering user: {str(e)}\n{traceback.format_exc()}")
-#         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
 @query
 def get_my_principal() -> text:
     return ic.caller().to_str()
@@ -191,23 +167,6 @@ def get_my_user_status() -> RealmResponse:
     except Exception as e:
         logger.error(f"Error getting user: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-# @query
-# def get_user(principal: Principal) -> RealmResponse:
-#     try:
-#         user_data = user_get(principal.to_str())
-#         return RealmResponse(
-#             success=True,
-#             data=RealmResponseData(
-#                 UserGet=UserGetRecord(
-#                     principal=Principal.from_str(user_data["principal"])
-#                 )
-#             ),
-#         )
-#     except Exception as e:
-#         logger.error(f"Error getting user: {str(e)}\n{traceback.format_exc()}")
-#         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
 # New GGG API endpoints
@@ -616,6 +575,18 @@ def http_request_core(data):
         "streaming_strategy": None,
         "upgrade": False,
     }
+
+
+@query
+def transform_response(args: HttpTransformArgs) -> HttpResponse:
+    """Transform function for HTTP responses from extensions"""
+    logger.info("🔄 Transforming HTTP response")
+    http_response = args["response"]
+    logger.info(f"📊 Original response status: {http_response['status']}")
+    logger.info(f"📄 Response body size: {len(http_response['body'])} bytes")
+    logger.info("🧹 Clearing response headers for security")
+    http_response["headers"] = []
+    return http_response
 
 
 @query
