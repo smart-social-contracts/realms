@@ -195,40 +195,6 @@ def get_my_user_status() -> RealmResponse:
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
-@query
-def get_user_passport_identity(user_id: str) -> RealmResponse:
-    try:
-        logger.info(f"Getting passport identity for user {user_id}")
-        result = api.extensions.extension_sync_call(
-            "passport_verification", "get_user_passport_identity", json.dumps([user_id])
-        )
-        return RealmResponse(
-            success=True, data=RealmResponseData(Message=json.dumps(result))
-        )
-    except Exception as e:
-        logger.error(
-            f"Error getting passport identity: {str(e)}\n{traceback.format_exc()}"
-        )
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-# @query
-# def get_user(principal: Principal) -> RealmResponse:
-#     try:
-#         user_data = user_get(principal.to_str())
-#         return RealmResponse(
-#             success=True,
-#             data=RealmResponseData(
-#                 UserGet=UserGetRecord(
-#                     principal=Principal.from_str(user_data["principal"])
-#                 )
-#             ),
-#         )
-#     except Exception as e:
-#         logger.error(f"Error getting user: {str(e)}\n{traceback.format_exc()}")
-#         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
 # New GGG API endpoints
 
 

@@ -155,7 +155,12 @@ def create_passport_identity(args: str) -> Async[str]:
                 logger.info(f"📊 Parsed verification data: {verification_data}")
             except json.JSONDecodeError as json_err:
                 logger.error(f"❌ JSON decode error: {json_err}")
-                return json.dumps({"success": False, "error": f"Invalid JSON in args: {str(json_err)}"})
+                return json.dumps(
+                    {
+                        "success": False,
+                        "error": f"Invalid JSON in args: {str(json_err)}",
+                    }
+                )
 
         result = {
             "success": True,
@@ -166,15 +171,16 @@ def create_passport_identity(args: str) -> Async[str]:
         }
 
         logger.info(f"✅ Passport identity created for session: {session_id}")
-        
+
         if False:
             yield
-        
+
         return json.dumps(result)
 
     except Exception as e:
         logger.error(f"❌ Error creating passport identity: {str(e)}")
         logger.error(f"❌ Exception type: {type(e)}")
         import traceback
+
         logger.error(f"❌ Traceback: {traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})
