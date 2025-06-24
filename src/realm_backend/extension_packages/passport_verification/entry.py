@@ -81,8 +81,10 @@ def get_verification_link(args: str) -> Async[str]:
     return match(
         http_result,
         {
-            "Ok": lambda response: json.loads(response["body"].decode("utf-8")),
-            "Err": lambda err: f"Error: {err}",
+            "Ok": lambda response: json.dumps(
+                json.loads(response["body"].decode("utf-8"))
+            ),
+            "Err": lambda err: json.dumps({"success": False, "error": str(err)}),
         },
     )
 
@@ -113,8 +115,10 @@ def check_verification_status(args: str) -> Async[str]:
     return match(
         http_result,
         {
-            "Ok": lambda response: json.loads(response["body"].decode("utf-8")),
-            "Err": lambda err: f"Error: {err}",
+            "Ok": lambda response: json.dumps(
+                json.loads(response["body"].decode("utf-8"))
+            ),
+            "Err": lambda err: json.dumps({"success": False, "error": str(err)}),
         },
     )
 
