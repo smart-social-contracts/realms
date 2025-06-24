@@ -172,9 +172,6 @@ def create_passport_identity(args: str) -> Async[str]:
 
         logger.info(f"✅ Passport identity created for session: {session_id}")
 
-        if False:
-            yield
-
         return json.dumps(result)
 
     except Exception as e:
