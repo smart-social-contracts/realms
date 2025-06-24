@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+
   import { backend } from '$lib/canisters.js';
   import { Button, Card, Heading, P, Spinner } from 'flowbite-svelte';
   import { CheckCircleSolid, ExclamationCircleSolid, ClipboardListSolid } from 'flowbite-svelte-icons';
@@ -11,7 +11,7 @@
   let qrCodeData = '';
   let errorMessage = '';
   let verificationResult = null;
-  let pollingInterval = null;
+
   
   async function generateVerificationLink() {
     try {
@@ -34,7 +34,6 @@
           verificationLink = verificationUrl;
           qrCodeData = generateQRCodeData(verificationUrl);
           verificationStatus = 'pending';
-          startPolling();
         } else {
           verificationStatus = 'error';
           errorMessage = 'Invalid response format from verification service';
@@ -73,13 +72,11 @@
           if (status === 'verified') {
             verificationStatus = 'verified';
             verificationResult = result.data.attributes;
-            stopPolling();
             
             await createPassportIdentity(result);
           } else if (status === 'failed') {
             verificationStatus = 'failed';
             errorMessage = 'Passport verification failed';
-            stopPolling();
           }
         } else {
           console.warn('Unexpected response format:', result);
@@ -111,17 +108,7 @@
     }
   }
   
-  function startPolling() {
-    // Poll every 5 seconds for verification status
-    pollingInterval = setInterval(checkVerificationStatus, 5000);
-  }
-  
-  function stopPolling() {
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
-      pollingInterval = null;
-    }
-  }
+
   
   function resetVerification() {
     verificationStatus = 'idle';
@@ -129,14 +116,8 @@
     qrCodeData = '';
     errorMessage = '';
     verificationResult = null;
-    stopPolling();
   }
-  
-  onMount(() => {
-    return () => {
-      stopPolling();
-    };
-  });
+
 </script>
 
 <Card size="xl" class="p-6">
@@ -181,9 +162,14 @@
         Open your RariMe app and scan the QR code above
       </P>
       
-      <Button color="alternative" on:click={resetVerification} size="sm">
-        Cancel
-      </Button>
+      <div class="flex gap-2 justify-center">
+        <Button on:click={checkVerificationStatus} size="sm">
+          Check Status
+        </Button>
+        <Button color="alternative" on:click={resetVerification} size="sm">
+          Cancel
+        </Button>
+      </div>
       
     {:else if verificationStatus === 'verified'}
       <div class="text-green-600 dark:text-green-400 mb-4">

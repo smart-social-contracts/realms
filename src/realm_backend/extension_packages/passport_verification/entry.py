@@ -140,24 +140,41 @@ def check_verification_status(args: str) -> Async[str]:
 
 
 @update
-def create_passport_identity(args: str) -> str:
+def create_passport_identity(args: str) -> Async[str]:
     """Create passport identity after successful verification"""
     try:
         session_id = get_session_id(args)
         logger.info(f"🆔 Creating passport identity for session: {session_id}")
+        logger.info(f"📝 Received args: {args}")
+        logger.info(f"📝 Args type: {type(args)}")
 
-        verification_data = json.loads(args) if args else {}
+        verification_data = {}
+        if args and args.strip():
+            try:
+                verification_data = json.loads(args)
+                logger.info(f"📊 Parsed verification data: {verification_data}")
+            except json.JSONDecodeError as json_err:
+                logger.error(f"❌ JSON decode error: {json_err}")
+                return json.dumps({"success": False, "error": f"Invalid JSON in args: {str(json_err)}"})
 
         result = {
             "success": True,
             "session_id": session_id,
             "identity_created": True,
             "timestamp": ic.time(),
+            "verification_data": verification_data,
         }
 
         logger.info(f"✅ Passport identity created for session: {session_id}")
+        
+        if False:
+            yield
+        
         return json.dumps(result)
 
     except Exception as e:
         logger.error(f"❌ Error creating passport identity: {str(e)}")
+        logger.error(f"❌ Exception type: {type(e)}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})
