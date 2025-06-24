@@ -80,6 +80,7 @@ class HttpRequest(Record):
     headers: Vec["Header"]
     body: blob
 
+
 from kybra.canisters.management import HttpResponse, HttpTransformArgs
 
 # class HttpResponse(Record):
@@ -639,11 +640,11 @@ def http_request_core(data):
 @query
 def transform_response(args: HttpTransformArgs) -> HttpResponse:
     """Transform function for HTTP responses from extensions"""
-    logger.info(f"🔄 Transforming HTTP response")
+    logger.info("🔄 Transforming HTTP response")
     http_response = args["response"]
     logger.info(f"📊 Original response status: {http_response['status']}")
     logger.info(f"📄 Response body size: {len(http_response['body'])} bytes")
-    logger.info(f"🧹 Clearing response headers for security")
+    logger.info("🧹 Clearing response headers for security")
     http_response["headers"] = []
     return http_response
 
