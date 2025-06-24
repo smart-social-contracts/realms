@@ -1,4 +1,5 @@
 import json
+from urllib.parse import quote
 
 from kybra import Async, CallResult, ic, match, query, update
 from kybra.canisters.management import (
@@ -78,12 +79,25 @@ def get_verification_link(args: str) -> Async[str]:
 
     logger.info(f"✅ HTTP request sent to Rarimo API. Result: {http_result}")
 
+    def format_response(response):
+        """Format the response to include proper RariMe app URL"""
+        response_data = json.loads(response["body"].decode("utf-8"))
+        
+        if "data" in response_data and "attributes" in response_data["data"]:
+            proof_params_url = response_data["data"]["attributes"].get("get_proof_params", "")
+            if proof_params_url:
+                encoded_url = quote(proof_params_url, safe="")
+                rarime_url = f"https://app.rarime.com/external?type=proof-request&proof_params_url={encoded_url}"
+                
+                response_data["data"]["attributes"]["rarime_app_url"] = rarime_url
+                logger.info(f"🔗 Formatted RariMe app URL: {rarime_url}")
+        
+        return json.dumps(response_data)
+
     return match(
         http_result,
         {
-            "Ok": lambda response: json.dumps(
-                json.loads(response["body"].decode("utf-8"))
-            ),
+            "Ok": format_response,
             "Err": lambda err: json.dumps({"success": False, "error": str(err)}),
         },
     )
@@ -115,9 +129,7 @@ def check_verification_status(args: str) -> Async[str]:
     return match(
         http_result,
         {
-            "Ok": lambda response: json.dumps(
-                json.loads(response["body"].decode("utf-8"))
-            ),
+            "Ok": lambda response: json.dumps(json.loads(response["body"].decode("utf-8"))),
             "Err": lambda err: json.dumps({"success": False, "error": str(err)}),
         },
     )
