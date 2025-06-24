@@ -125,19 +125,19 @@ def create_passport_identity(args: str) -> str:
     try:
         session_id = get_session_id(args)
         logger.info(f"🆔 Creating passport identity for session: {session_id}")
-        
+
         verification_data = json.loads(args) if args else {}
-        
+
         result = {
             "success": True,
             "session_id": session_id,
             "identity_created": True,
-            "timestamp": ic.time()
+            "timestamp": ic.time(),
         }
-        
+
         logger.info(f"✅ Passport identity created for session: {session_id}")
         return json.dumps(result)
-        
+
     except Exception as e:
         logger.error(f"❌ Error creating passport identity: {str(e)}")
         return json.dumps({"success": False, "error": str(e)})
