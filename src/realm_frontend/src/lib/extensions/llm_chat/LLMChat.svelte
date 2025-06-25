@@ -165,24 +165,24 @@
 		isLoading = true;
 		error = '';
 		
-		// // If realm data is enabled but not loaded, load it first
-		// if (includeRealmData && !realmData) {
-		// 	await fetchRealmData();
-		// }
+		// Add a placeholder message for the AI response that we'll update as we stream
+		const aiMessageIndex = messages.length;
+		messages = [...messages, { text: '', isUser: false }];
 		
 		try {
 			// Prepare request payload
 			const payload = {
 				question: messageToSend,
-				realm_canister_id: REALM_CANISTER_ID
+				realm_canister_id: REALM_CANISTER_ID,
+				stream: true  // Request streaming response
 			};
 			
-			// Make direct HTTP request to the LLM API
+			// Make streaming HTTP request to the LLM API
 			const response = await fetch(API_URL, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
-					'Accept': 'application/json'
+					'Accept': 'text/event-stream'
 				},
 				body: JSON.stringify(payload)
 			});
@@ -191,16 +191,87 @@
 				throw new Error(`HTTP error! Status: ${response.status}`);
 			}
 
-			const data = await response.json();
-			
-			// Add response to the chat
-			messages = [...messages, { 
-				text: data.ai_response || "No response from LLM", 
-				isUser: false 
-			}];
+			// Handle streaming response
+			const reader = response.body?.getReader();
+			if (!reader) {
+				throw new Error('Response body is not readable');
+			}
+
+			const decoder = new TextDecoder();
+			let accumulatedText = '';
+
+			try {
+				while (true) {
+					const { done, value } = await reader.read();
+					
+					if (done) {
+						break;
+					}
+
+					// Decode the chunk
+					const chunk = decoder.decode(value, { stream: true });
+					const lines = chunk.split('\n');
+
+					for (const line of lines) {
+						const trimmedLine = line.trim();
+						
+						// Skip empty lines and comments
+						if (!trimmedLine || trimmedLine.startsWith('#')) {
+							continue;
+						}
+
+						// Handle Server-Sent Events format
+						if (trimmedLine.startsWith('data: ')) {
+							const data = trimmedLine.substring(6);
+							
+							// Check for end of stream
+							if (data === '[DONE]') {
+								break;
+							}
+
+							try {
+								const parsed = JSON.parse(data);
+								if (parsed.content) {
+									accumulatedText += parsed.content;
+									
+									// Update the AI message in real-time
+									messages = messages.map((msg, index) => 
+										index === aiMessageIndex 
+											? { ...msg, text: accumulatedText }
+											: msg
+									);
+								}
+							} catch (e) {
+								// If it's not JSON, treat it as plain text
+								accumulatedText += data;
+								messages = messages.map((msg, index) => 
+									index === aiMessageIndex 
+										? { ...msg, text: accumulatedText }
+										: msg
+								);
+							}
+						}
+					}
+				}
+			} finally {
+				reader.releaseLock();
+			}
+
+			// Ensure we have some response
+			if (!accumulatedText.trim()) {
+				messages = messages.map((msg, index) => 
+					index === aiMessageIndex 
+						? { ...msg, text: "No response from LLM" }
+						: msg
+				);
+			}
+
 		} catch (err) {
 			console.error("Error calling LLM:", err);
 			error = "Failed to get response from LLM. Please try again.";
+			
+			// Remove the placeholder message if there was an error
+			messages = messages.slice(0, -1);
 		} finally {
 			isLoading = false;
 		}
