@@ -44,7 +44,7 @@
 	// Function to fetch server host from remote config
 	async function fetchServerHost(): Promise<string> {
 			console.log("Fetching server host from remote config...");
-			const response = await fetch('https://raw.githubusercontent.com/smart-social-contracts/ashoka/refs/heads/main/production_env.txt');
+			const response = await fetch('https://raw.githubusercontent.com/smart-social-contracts/ashoka/refs/heads/main/production.env');
 			const text = await response.text();
 			
 			// Parse SERVER_HOST from the environment file format
