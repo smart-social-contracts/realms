@@ -34,23 +34,45 @@
 
 	// LLM API configuration
 
-	const isLocalhost = window.location.hostname === 'localhost' || 
-			window.location.hostname === '127.0.0.1' ||
-			window.location.hostname.includes('.localhost');
+	// const isLocalhost = window.location.hostname === 'localhost' || 
+	// 		window.location.hostname === '127.0.0.1' ||
+	// 		window.location.hostname.includes('.localhost');
+
+	const isLocalhost = false;
 	console.log("isLocalhost", isLocalhost);
 	
+	// Function to fetch server host from remote config
+	async function fetchServerHost(): Promise<string> {
+			console.log("Fetching server host from remote config...");
+			const response = await fetch('https://raw.githubusercontent.com/smart-social-contracts/ashoka/refs/heads/main/production_env.txt');
+			const text = await response.text();
+			
+			// Parse SERVER_HOST from the environment file format
+			const lines = text.trim().split('\n');
+			for (const line of lines) {
+				if (line.startsWith('SERVER_HOST=')) {
+					const serverHost = line.split('=')[1].trim();
+					console.log("Found SERVER_HOST in remote config:", serverHost);
+					return serverHost;
+				}
+			}
+			throw new Error('SERVER_HOST not found in remote config');
+	}
+	
 	// Determine API URL based on environment
-	const API_URL = (() => {
-		// Check if we're running locally
-
-		
+	let API_URL = '';
+	
+	// Initialize API URL
+	const initializeApiUrl = async () => {
 		if (isLocalhost) {
-			return "http://localhost:5000/api/ask";
+			API_URL = "http://localhost:5000/api/ask";
 		} else {
-			// Production URL
-			return "https://jvql982sbyh2vo-5000.proxy.runpod.net/api/ask";
+			// Fetch production server host dynamically
+			const serverHost = await fetchServerHost();
+			API_URL = `https://${serverHost}/api/ask`;
 		}
-	})();
+		console.log("API_URL set to:", API_URL);
+	};
 	
 	// Get the canister ID dynamically
 	let REALM_CANISTER_ID = "";
@@ -84,6 +106,9 @@
 				console.log("Using default canister ID:", REALM_CANISTER_ID);
 			}
 		}
+		
+		// Initialize API URL
+		await initializeApiUrl();
 	});
 
 	// Auto-scroll to bottom of messages when content changes
