@@ -11,9 +11,11 @@
   let error = null;
   
   async function loadLands() {
+    console.log('loadLands function called');
     try {
       loading = true;
       error = null;
+      console.log('About to call backend.extension_sync_call');
       
       const result = await backend.extension_sync_call({
         extension_name: 'land_registry',
@@ -21,10 +23,14 @@
         args: '{}'
       });
       
-      if (result.success && result.data) {
+      console.log('Backend result:', result);
+      
+      if (result.success && result.data !== undefined) {
         const response = JSON.parse(result.data);
+        console.log('Parsed response:', response);
         if (response.success) {
           lands = response.data;
+          console.log('Lands loaded:', lands);
         } else {
           error = response.error;
         }

@@ -19,7 +19,7 @@ def get_lands(args: str) -> str:
     try:
         params = json.loads(args) if args else {}
 
-        lands = Land.get_all()
+        lands = Land.instances()
 
         land_data = []
         for land in lands:
@@ -66,11 +66,12 @@ def create_land(args: str) -> str:
                 }
             )
 
-        existing = Land.get_by(x_coordinate=x_coord, y_coordinate=y_coord)
-        if existing:
-            return json.dumps(
-                {"success": False, "error": "Land already exists at these coordinates"}
-            )
+        existing_lands = Land.instances()
+        for existing_land in existing_lands:
+            if existing_land.x_coordinate == x_coord and existing_land.y_coordinate == y_coord:
+                return json.dumps(
+                    {"success": False, "error": "Land already exists at these coordinates"}
+                )
 
         land = Land(
             x_coordinate=x_coord,
@@ -108,7 +109,12 @@ def update_land_ownership(args: str) -> str:
         if not land_id:
             return json.dumps({"success": False, "error": "land_id is required"})
 
-        land = Land.get_by_id(land_id)
+        land = None
+        for existing_land in Land.instances():
+            if existing_land.id == land_id:
+                land = existing_land
+                break
+        
         if not land:
             return json.dumps({"success": False, "error": "Land not found"})
 
@@ -129,7 +135,12 @@ def update_land_ownership(args: str) -> str:
                     }
                 )
 
-            user = User.get_by_id(owner_user_id)
+            user = None
+            for existing_user in User.instances():
+                if existing_user.id == owner_user_id:
+                    user = existing_user
+                    break
+            
             if not user:
                 return json.dumps({"success": False, "error": "User not found"})
 
@@ -145,7 +156,12 @@ def update_land_ownership(args: str) -> str:
                     }
                 )
 
-            org = Organization.get_by_id(owner_organization_id)
+            org = None
+            for existing_org in Organization.instances():
+                if existing_org.id == owner_organization_id:
+                    org = existing_org
+                    break
+            
             if not org:
                 return json.dumps({"success": False, "error": "Organization not found"})
 
@@ -181,7 +197,7 @@ def get_land_map(args: str) -> str:
         min_y = params.get("min_y", 0)
         max_y = params.get("max_y", 20)
 
-        lands = Land.get_all()
+        lands = Land.instances()
         map_data = {}
 
         for land in lands:
