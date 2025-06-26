@@ -14,6 +14,7 @@ class LandType:
 
 class Land(Entity, TimestampedMixin):
     __alias__ = "id"
+    id = String()
     x_coordinate = Integer()
     y_coordinate = Integer()
     land_type = String(max_length=64, default=LandType.UNASSIGNED)
