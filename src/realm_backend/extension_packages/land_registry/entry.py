@@ -81,7 +81,6 @@ def create_land(args: str) -> str:
             size_height=params.get("size_height", 1),
             metadata=params.get("metadata", "{}"),
         )
-        land.save()
 
         return json.dumps(
             {
