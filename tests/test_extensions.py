@@ -12,6 +12,7 @@ EXTENSION_NAMES = [
     "citizen_dashboard",
     "llm_chat",
     "passport_verification",
+    "land_registry",
 ]
 
 
