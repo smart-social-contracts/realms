@@ -22,3 +22,4 @@ class User(Entity, TimestampedMixin):
     transfers_to = OneToMany("Transfer", "to_user")
     trades_a = OneToMany("Trade", "user_a")
     trades_b = OneToMany("Trade", "user_b")
+    owned_lands = OneToMany("Land", "owner_user")
