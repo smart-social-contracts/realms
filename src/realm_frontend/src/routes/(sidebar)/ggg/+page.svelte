@@ -1,10 +1,10 @@
 <script>
   import { onMount } from 'svelte';
   import { backend } from '$lib/canisters';
-  import { Chart } from 'flowbite-svelte';
   
   import GenericEntityTable from '$lib/components/ggg/GenericEntityTable.svelte';
   import CodexViewer from '$lib/components/ggg/CodexViewer.svelte';
+  import ChartsComponent from '$lib/extensions/charts/Charts.svelte';
   
   let activeTab = 'dashboard';
   let loading = false;
@@ -16,25 +16,6 @@
   let filterQuery = '';
   let selectedFilter = 'all';
   let searchTerm = '';
-
-  // Budget visualization data
-  const budgetData = {
-    taxAllocation: [
-      { category: 'Universal Basic Income', amount: 45000, color: '#3B82F6' },
-      { category: 'Innovation Grants', amount: 25000, color: '#10B981' },
-      { category: 'Infrastructure', amount: 15000, color: '#F59E0B' },
-      { category: 'Healthcare System', amount: 8000, color: '#8B5CF6' },
-      { category: 'Education Programs', amount: 5000, color: '#EF4444' },
-      { category: 'Emergency Reserve', amount: 2000, color: '#6B7280' }
-    ],
-    assetPortfolio: [
-      { symbol: 'ckBTC', balance: 2.5, value: 112500, color: '#F7931A' },
-      { symbol: 'NVC', balance: 850000, value: 850000, color: '#3B82F6' },
-      { symbol: 'ICP', balance: 12000, value: 156000, color: '#29ABE2' },
-      { symbol: 'USDC', balance: 75000, value: 75000, color: '#2775CA' },
-      { symbol: 'ckETH', balance: 45, value: 103500, color: '#627EEA' }
-    ]
-  };
   
   // Pagination state for all entities
   let usersPage = 0, usersPerPage = 5, usersPagination = null;
@@ -439,135 +420,7 @@
           </h3>
           
           <!-- Budget Visualization Charts -->
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <!-- Tax Allocation Pie Chart -->
-            <div class="bg-white rounded-lg p-6 border border-gray-200">
-              <h4 class="font-semibold text-gray-700 mb-4 flex items-center">
-                📊 <span class="ml-2">Tax Allocation Breakdown</span>
-              </h4>
-              <Chart options={{
-                chart: {
-                  type: 'pie',
-                  height: 350,
-                  fontFamily: 'Inter, sans-serif',
-                  toolbar: { show: false }
-                },
-                labels: budgetData.taxAllocation.map(item => item.category),
-                series: budgetData.taxAllocation.map(item => item.amount),
-                colors: budgetData.taxAllocation.map(item => item.color),
-                legend: {
-                  position: 'bottom',
-                  fontSize: '12px',
-                  labels: {
-                    colors: '#4B5563'
-                  }
-                },
-                tooltip: {
-                  y: {
-                    formatter: (value) => `${value.toLocaleString()} NVC`
-                  }
-                },
-                dataLabels: {
-                  enabled: true,
-                  formatter: (val) => `${val.toFixed(1)}%`,
-                  style: {
-                    fontSize: '12px',
-                    fontWeight: 'bold'
-                  }
-                },
-                responsive: [{
-                  breakpoint: 640,
-                  options: {
-                    chart: {
-                      height: 300
-                    },
-                    legend: {
-                      position: 'bottom'
-                    }
-                  }
-                }]
-              }} />
-            </div>
-            
-            <!-- Asset Portfolio Donut Chart -->
-            <div class="bg-white rounded-lg p-6 border border-gray-200">
-              <h4 class="font-semibold text-gray-700 mb-4 flex items-center">
-                💰 <span class="ml-2">Asset Portfolio Distribution</span>
-              </h4>
-              <Chart options={{
-                chart: {
-                  type: 'donut',
-                  height: 350,
-                  fontFamily: 'Inter, sans-serif',
-                  toolbar: { show: false }
-                },
-                labels: budgetData.assetPortfolio.map(item => item.symbol),
-                series: budgetData.assetPortfolio.map(item => item.value),
-                colors: budgetData.assetPortfolio.map(item => item.color),
-                legend: {
-                  position: 'bottom',
-                  fontSize: '12px',
-                  labels: {
-                    colors: '#4B5563'
-                  },
-                  formatter: (seriesName, opts) => {
-                    const index = opts.seriesIndex;
-                    const asset = budgetData.assetPortfolio[index];
-                    return `${seriesName} (${asset.balance.toLocaleString()})`;
-                  }
-                },
-                plotOptions: {
-                  pie: {
-                    donut: {
-                      size: '70%',
-                      labels: {
-                        show: true,
-                        total: {
-                          show: true,
-                          label: 'Total Value',
-                          fontSize: '14px',
-                          fontWeight: 'bold',
-                          color: '#374151',
-                          formatter: (w) => `${(w.globals.series.reduce((a, b) => a + b, 0) / 1000).toFixed(0)}K NVC`
-                        }
-                      }
-                    }
-                  }
-                },
-                tooltip: {
-                  y: {
-                    formatter: (value) => `${(value / 1000).toFixed(1)}K NVC`
-                  }
-                },
-                dataLabels: {
-                  enabled: true,
-                  formatter: (val) => `${val.toFixed(1)}%`,
-                  style: {
-                    fontSize: '12px',
-                    fontWeight: 'bold'
-                  }
-                },
-                responsive: [{
-                  breakpoint: 640,
-                  options: {
-                    chart: {
-                      height: 300
-                    },
-                    legend: {
-                      position: 'bottom'
-                    },
-                    plotOptions: {
-                      pie: {
-                        donut: {
-                          size: '85%'
-                        }
-                      }
-                    }
-                  }
-                }]
-              }} />
-            </div>
-          </div>
+          <ChartsComponent />
         </div>
 
         <!-- Dynamic Treasury Data (if available) -->
@@ -653,137 +506,6 @@
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-            
-            <!-- Budget Visualization Charts -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-              <!-- Tax Allocation Pie Chart -->
-              <div class="bg-white rounded-lg p-6 border border-gray-200">
-                <h4 class="font-semibold text-gray-700 mb-4 flex items-center">
-                  📊 <span class="ml-2">Tax Allocation Breakdown</span>
-                </h4>
-                <Chart options={{
-                  chart: {
-                    type: 'pie',
-                    height: 350,
-                    fontFamily: 'Inter, sans-serif',
-                    toolbar: { show: false }
-                  },
-                  labels: budgetData.taxAllocation.map(item => item.category),
-                  series: budgetData.taxAllocation.map(item => item.amount),
-                  colors: budgetData.taxAllocation.map(item => item.color),
-                  legend: {
-                    position: 'bottom',
-                    fontSize: '12px',
-                    labels: {
-                      colors: '#4B5563'
-                    }
-                  },
-                  tooltip: {
-                    y: {
-                      formatter: (value) => `${value.toLocaleString()} NVC`
-                    }
-                  },
-                  dataLabels: {
-                    enabled: true,
-                    formatter: (val) => `${val.toFixed(1)}%`,
-                    style: {
-                      fontSize: '12px',
-                      fontWeight: 'bold'
-                    }
-                  },
-                  responsive: [{
-                    breakpoint: 640,
-                    options: {
-                      chart: {
-                        height: 300
-                      },
-                      legend: {
-                        position: 'bottom'
-                      }
-                    }
-                  }]
-                }} />
-              </div>
-              
-              <!-- Asset Portfolio Donut Chart -->
-              <div class="bg-white rounded-lg p-6 border border-gray-200">
-                <h4 class="font-semibold text-gray-700 mb-4 flex items-center">
-                  💰 <span class="ml-2">Asset Portfolio Distribution</span>
-                </h4>
-                <Chart options={{
-                  chart: {
-                    type: 'donut',
-                    height: 350,
-                    fontFamily: 'Inter, sans-serif',
-                    toolbar: { show: false }
-                  },
-                  labels: budgetData.assetPortfolio.map(item => item.symbol),
-                  series: budgetData.assetPortfolio.map(item => item.value),
-                  colors: budgetData.assetPortfolio.map(item => item.color),
-                  legend: {
-                    position: 'bottom',
-                    fontSize: '12px',
-                    labels: {
-                      colors: '#4B5563'
-                    },
-                    formatter: (seriesName, opts) => {
-                      const index = opts.seriesIndex;
-                      const asset = budgetData.assetPortfolio[index];
-                      return `${seriesName} (${asset.balance.toLocaleString()})`;
-                    }
-                  },
-                  plotOptions: {
-                    pie: {
-                      donut: {
-                        size: '70%',
-                        labels: {
-                          show: true,
-                          total: {
-                            show: true,
-                            label: 'Total Value',
-                            fontSize: '14px',
-                            fontWeight: 'bold',
-                            color: '#374151',
-                            formatter: (w) => `${(w.globals.series.reduce((a, b) => a + b, 0) / 1000).toFixed(0)}K NVC`
-                          }
-                        }
-                      }
-                    }
-                  },
-                  tooltip: {
-                    y: {
-                      formatter: (value) => `${(value / 1000).toFixed(1)}K NVC`
-                    }
-                  },
-                  dataLabels: {
-                    enabled: true,
-                    formatter: (val) => `${val.toFixed(1)}%`,
-                    style: {
-                      fontSize: '12px',
-                      fontWeight: 'bold'
-                    }
-                  },
-                  responsive: [{
-                    breakpoint: 640,
-                    options: {
-                      chart: {
-                        height: 300
-                      },
-                      legend: {
-                        position: 'bottom'
-                      },
-                      plotOptions: {
-                        pie: {
-                          donut: {
-                            size: '85%'
-                          }
-                        }
-                      }
-                    }
-                  }]
-                }} />
               </div>
             </div>
           </div>
@@ -1018,4 +740,4 @@
       </div>
     {/if}
   </div>
-</div>    
+</div>      
