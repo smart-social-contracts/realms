@@ -66,9 +66,15 @@ def create_land(args: str) -> str:
 
         existing_lands = Land.instances()
         for existing_land in existing_lands:
-            if existing_land.x_coordinate == x_coord and existing_land.y_coordinate == y_coord:
+            if (
+                existing_land.x_coordinate == x_coord
+                and existing_land.y_coordinate == y_coord
+            ):
                 return json.dumps(
-                    {"success": False, "error": "Land already exists at these coordinates"}
+                    {
+                        "success": False,
+                        "error": "Land already exists at these coordinates",
+                    }
                 )
 
         land = Land(
@@ -111,7 +117,7 @@ def update_land_ownership(args: str) -> str:
             if existing_land.id == land_id:
                 land = existing_land
                 break
-        
+
         if not land:
             return json.dumps({"success": False, "error": "Land not found"})
 
@@ -137,7 +143,7 @@ def update_land_ownership(args: str) -> str:
                 if existing_user.id == owner_user_id:
                     user = existing_user
                     break
-            
+
             if not user:
                 return json.dumps({"success": False, "error": "User not found"})
 
@@ -158,7 +164,7 @@ def update_land_ownership(args: str) -> str:
                 if existing_org.id == owner_organization_id:
                     org = existing_org
                     break
-            
+
             if not org:
                 return json.dumps({"success": False, "error": "Organization not found"})
 
