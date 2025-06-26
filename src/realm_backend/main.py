@@ -213,9 +213,18 @@ def get_my_user_status() -> RealmResponse:
 # New GGG API endpoints
 
 
-def _generic_paginated_list(entity_name: str, list_function, page_num: nat, page_size: nat, record_class, data_key: str) -> RealmResponse:
+def _generic_paginated_list(
+    entity_name: str,
+    list_function,
+    page_num: nat,
+    page_size: nat,
+    record_class,
+    data_key: str,
+) -> RealmResponse:
     try:
-        logger.info(f"Listing {entity_name.lower()} for page {page_num} with page size {page_size}")
+        logger.info(
+            f"Listing {entity_name.lower()} for page {page_num} with page size {page_size}"
+        )
         result = list_function(page_num=page_num, page_size=page_size)
         items = result["items"]
         items_json = [json.dumps(item.to_dict()) for item in items]
@@ -225,82 +234,129 @@ def _generic_paginated_list(entity_name: str, list_function, page_num: nat, page
             total_items_count=result["total_items_count"],
             total_pages=result["total_pages"],
         )
-        
+
         record_kwargs = {data_key: items_json, "pagination": pagination}
         response_data_kwargs = {f"{entity_name}List": record_class(**record_kwargs)}
-        
+
         return RealmResponse(
-            success=True,
-            data=RealmResponseData(**response_data_kwargs)
+            success=True, data=RealmResponseData(**response_data_kwargs)
         )
     except Exception as e:
-        logger.error(f"Error listing {entity_name.lower()}: {str(e)}\n{traceback.format_exc()}")
+        logger.error(
+            f"Error listing {entity_name.lower()}: {str(e)}\n{traceback.format_exc()}"
+        )
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
 @query
 def get_users(page_num: nat, page_size: nat) -> RealmResponse:
-    return _generic_paginated_list("Users", list_users, page_num, page_size, UsersListRecord, "users")
+    return _generic_paginated_list(
+        "Users", list_users, page_num, page_size, UsersListRecord, "users"
+    )
 
 
 @query
 def get_mandates(page_num: nat, page_size: nat) -> RealmResponse:
-    return _generic_paginated_list("Mandates", list_mandates, page_num, page_size, MandatesListRecord, "mandates")
+    return _generic_paginated_list(
+        "Mandates", list_mandates, page_num, page_size, MandatesListRecord, "mandates"
+    )
 
 
 @query
 def get_tasks(page_num: nat, page_size: nat) -> RealmResponse:
-    return _generic_paginated_list("Tasks", list_tasks, page_num, page_size, TasksListRecord, "tasks")
+    return _generic_paginated_list(
+        "Tasks", list_tasks, page_num, page_size, TasksListRecord, "tasks"
+    )
 
 
 @query
 def get_transfers(page_num: nat, page_size: nat) -> RealmResponse:
-    return _generic_paginated_list("Transfers", list_transfers, page_num, page_size, TransfersListRecord, "transfers")
+    return _generic_paginated_list(
+        "Transfers",
+        list_transfers,
+        page_num,
+        page_size,
+        TransfersListRecord,
+        "transfers",
+    )
 
 
 @query
 def get_instruments(page_num: nat, page_size: nat) -> RealmResponse:
-    return _generic_paginated_list("Instruments", list_instruments, page_num, page_size, InstrumentsListRecord, "instruments")
+    return _generic_paginated_list(
+        "Instruments",
+        list_instruments,
+        page_num,
+        page_size,
+        InstrumentsListRecord,
+        "instruments",
+    )
 
 
 @query
 def get_codexes(page_num: nat, page_size: nat) -> RealmResponse:
-    return _generic_paginated_list("Codexes", list_codexes, page_num, page_size, CodexesListRecord, "codexes")
+    return _generic_paginated_list(
+        "Codexes", list_codexes, page_num, page_size, CodexesListRecord, "codexes"
+    )
 
 
 @query
 def get_organizations(page_num: nat, page_size: nat) -> RealmResponse:
-    return _generic_paginated_list("Organizations", list_organizations, page_num, page_size, OrganizationsListRecord, "organizations")
+    return _generic_paginated_list(
+        "Organizations",
+        list_organizations,
+        page_num,
+        page_size,
+        OrganizationsListRecord,
+        "organizations",
+    )
 
 
 @query
 def get_disputes(page_num: nat, page_size: nat) -> RealmResponse:
-    return _generic_paginated_list("Disputes", list_disputes, page_num, page_size, DisputesListRecord, "disputes")
+    return _generic_paginated_list(
+        "Disputes", list_disputes, page_num, page_size, DisputesListRecord, "disputes"
+    )
 
 
 @query
 def get_licenses(page_num: nat, page_size: nat) -> RealmResponse:
-    return _generic_paginated_list("Licenses", list_licenses, page_num, page_size, LicensesListRecord, "licenses")
+    return _generic_paginated_list(
+        "Licenses", list_licenses, page_num, page_size, LicensesListRecord, "licenses"
+    )
 
 
 @query
 def get_realms(page_num: nat, page_size: nat) -> RealmResponse:
-    return _generic_paginated_list("Realms", list_realms, page_num, page_size, RealmsListRecord, "realms")
+    return _generic_paginated_list(
+        "Realms", list_realms, page_num, page_size, RealmsListRecord, "realms"
+    )
 
 
 @query
 def get_trades(page_num: nat, page_size: nat) -> RealmResponse:
-    return _generic_paginated_list("Trades", list_trades, page_num, page_size, TradesListRecord, "trades")
+    return _generic_paginated_list(
+        "Trades", list_trades, page_num, page_size, TradesListRecord, "trades"
+    )
 
 
 @query
 def get_proposals(page_num: nat, page_size: nat) -> RealmResponse:
-    return _generic_paginated_list("Proposals", list_proposals, page_num, page_size, ProposalsListRecord, "proposals")
+    return _generic_paginated_list(
+        "Proposals",
+        list_proposals,
+        page_num,
+        page_size,
+        ProposalsListRecord,
+        "proposals",
+    )
 
 
 @query
 def get_votes(page_num: nat, page_size: nat) -> RealmResponse:
-    return _generic_paginated_list("Votes", list_votes, page_num, page_size, VotesListRecord, "votes")
+    return _generic_paginated_list(
+        "Votes", list_votes, page_num, page_size, VotesListRecord, "votes"
+    )
 
 
 @update
