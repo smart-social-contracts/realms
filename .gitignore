@@ -18,5 +18,6 @@ kybra_simple_db
 src/declarations
 e2e.log
 extensions/*/
+.python-version
 src/realm_frontend/src/lib/config.js
 dfx.log

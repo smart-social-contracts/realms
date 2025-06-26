@@ -11,7 +11,8 @@
     "format": "prettier --write \"src/**/*.{json,js,jsx,ts,tsx,css,scss}\"",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "vitest run src/lib/e2e-auth-flow.test.ts"
   },
   "dependencies": {
     "@dfinity/agent": "^1.4.0",
@@ -27,6 +28,7 @@
     "svelte-highlight": "^7.8.2",
     "svelte-i18n": "^4.0.1",
     "svelte-maplibre": "^1.0.0-next.9",
+    "svelte-markdown": "^0.4.1",
     "tailwind-merge": "^2.5.2"
   },
   "peerDependencies": {
