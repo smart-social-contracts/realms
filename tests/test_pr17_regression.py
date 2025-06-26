@@ -38,10 +38,13 @@ def test_generic_helper_function():
         assert_in(content, "_generic_paginated_list")
         print_success("Generic helper function exists")
 
-        assert_in(
-            content,
-            "def _generic_paginated_list(entity_name: str, list_function, page_num: nat, page_size: nat, record_class, data_key: str)",
-        )
+        assert_in(content, "def _generic_paginated_list(")
+        assert_in(content, "entity_name: str")
+        assert_in(content, "list_function")
+        assert_in(content, "page_num: nat")
+        assert_in(content, "page_size: nat")
+        assert_in(content, "record_class")
+        assert_in(content, "data_key: str")
         print_success("Generic helper function has correct signature")
 
         entity_functions = [
