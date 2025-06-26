@@ -64,7 +64,7 @@ def test_generic_helper_function():
             assert_in(
                 content, f"def {func}(page_num: nat, page_size: nat) -> RealmResponse:"
             )
-            assert_in(content, f"return _generic_paginated_list(")
+            assert_in(content, "return _generic_paginated_list(")
             print_success(f"{func} uses generic helper")
 
         print_success("All entity functions use generic helper correctly")
@@ -160,7 +160,7 @@ def run_pr17_tests():
         else:
             failure_count += 1
 
-    print(f"\nPR #17 Test Summary:")
+    print("\nPR #17 Test Summary:")
     print(f"- {GREEN}{success_count} tests passed{RESET}")
     print(f"- {RED if failure_count > 0 else ''}{failure_count} tests failed{RESET}")
 
