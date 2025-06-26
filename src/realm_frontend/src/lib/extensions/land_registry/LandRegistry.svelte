@@ -11,11 +11,16 @@
   let error = null;
   
   async function loadLands() {
-    console.log('loadLands function called');
+    console.log('=== loadLands function called ===');
     try {
       loading = true;
       error = null;
-      console.log('About to call backend.extension_sync_call');
+      console.log('Setting loading to true, error to null');
+      console.log('About to call backend.extension_sync_call with:', {
+        extension_name: 'land_registry',
+        function_name: 'get_lands',
+        args: '{}'
+      });
       
       const result = await backend.extension_sync_call({
         extension_name: 'land_registry',
@@ -23,24 +28,60 @@
         args: '{}'
       });
       
-      console.log('Backend result:', result);
+      console.log('=== Backend result received ===');
+      console.log('Result type:', typeof result);
+      console.log('Result keys:', Object.keys(result || {}));
+      console.log('Result.success:', result?.success);
+      console.log('Result.data type:', typeof result?.data);
+      console.log('Result.data value:', result?.data);
+      console.log('Result.error:', result?.error);
+      console.log('Full result object:', JSON.stringify(result, null, 2));
       
-      if (result.success && result.data !== undefined) {
-        const response = JSON.parse(result.data);
-        console.log('Parsed response:', response);
-        if (response.success) {
-          lands = response.data;
-          console.log('Lands loaded:', lands);
-        } else {
-          error = response.error;
+      if (result && result.success && result.data !== undefined) {
+        console.log('=== Parsing result.data ===');
+        try {
+          const response = JSON.parse(result.data);
+          console.log('Parsed response type:', typeof response);
+          console.log('Parsed response keys:', Object.keys(response || {}));
+          console.log('Parsed response.success:', response?.success);
+          console.log('Parsed response.data:', response?.data);
+          console.log('Parsed response.error:', response?.error);
+          
+          if (response.success) {
+            lands = response.data;
+            console.log('=== SUCCESS: Lands loaded ===');
+            console.log('Lands array length:', lands?.length);
+            console.log('Lands data:', JSON.stringify(lands, null, 2));
+            error = null;
+          } else {
+            console.log('=== ERROR: Response not successful ===');
+            error = response.error || 'Backend returned unsuccessful response';
+            console.log('Setting error to:', error);
+          }
+        } catch (parseErr) {
+          console.log('=== ERROR: JSON Parse failed ===');
+          console.log('Parse error:', parseErr.message);
+          console.log('Raw data that failed to parse:', result.data);
+          error = `Failed to parse response: ${parseErr.message}`;
         }
       } else {
-        error = result.error || 'Failed to load lands';
+        console.log('=== ERROR: Invalid result structure ===');
+        console.log('Result success check failed');
+        error = result?.error || 'Failed to load lands - invalid response structure';
+        console.log('Setting error to:', error);
       }
     } catch (err) {
-      error = err.message;
+      console.log('=== ERROR: Exception caught ===');
+      console.log('Exception type:', err.constructor.name);
+      console.log('Exception message:', err.message);
+      console.log('Exception stack:', err.stack);
+      error = `Exception: ${err.message}`;
     } finally {
       loading = false;
+      console.log('=== loadLands completed ===');
+      console.log('Final state - loading:', loading);
+      console.log('Final state - error:', error);
+      console.log('Final state - lands length:', lands?.length);
     }
   }
   
