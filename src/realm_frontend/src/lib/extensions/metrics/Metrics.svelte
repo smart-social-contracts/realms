@@ -2,6 +2,7 @@
   import TaxAllocationChart from './TaxAllocationChart.svelte';
   import AssetPortfolioChart from './AssetPortfolioChart.svelte';
   import TaxContributionTreemap from './TaxContributionTreemap.svelte';
+  import MonthlyCashFlow from './MonthlyCashFlow.svelte';
   
   // Budget visualization data
   export const budgetData = {
@@ -53,6 +54,11 @@
   <!-- Tax Contribution Treemap -->
   <div class="mt-6">
     <TaxContributionTreemap data={budgetData.taxContributions} />
+  </div>
+  
+  <!-- Monthly Cash Flow -->
+  <div class="mt-6">
+    <MonthlyCashFlow />
   </div>
 </div>
 
