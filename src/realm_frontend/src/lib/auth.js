@@ -12,11 +12,22 @@ const isLocalDev = (
 
 console.log(`Environment: ${isLocalDev ? 'Local Development' : 'Production'}`);
 
-// Determine the appropriate Identity Provider URL based on environment
-const II_URL = isLocalDev
-  ? 'http://umunu-kh777-77774-qaaca-cai.localhost:8000' // Local II canister - updated ID
-  : 'https://identity.ic0.app';                                    // Mainnet II
+// Get the Internet Identity canister URL
+function getInternetIdentityUrl() {
+  // For local development, use the known Internet Identity canister ID
+  if (isLocalDev) {
+    const canisterId = 'uxrrr-q7777-77774-qaaaq-cai'; // Internet Identity canister ID from dfx deploy
+    const port = 8000; // Default DFX port
+    
+    return `http://${canisterId}.localhost:${port}`;
+  } 
+  
+  // For production, use the standard II URL
+  return 'https://identity.ic0.app';
+}
 
+// This may throw an error if II canister ID cannot be found in local development
+const II_URL = getInternetIdentityUrl();
 console.log(`Using Identity Provider: ${II_URL}`);
 
 let authClient;

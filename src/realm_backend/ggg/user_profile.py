@@ -28,7 +28,7 @@ class Operations:
 
 class Profiles:
     ADMIN = ["admin", [Operations.ALL]]
-    USER = ["user", []]
+    MEMBER = ["member", []]
 
 
 class UserProfile(Entity, TimestampedMixin):

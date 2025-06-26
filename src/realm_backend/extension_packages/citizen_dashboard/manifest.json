@@ -3,5 +3,6 @@
   "version": "1.0.0",
   "description": "citizen_dashboard extension",
   "author": "Smart Social Contracts",
-  "permissions": []
+  "permissions": [],
+  "profiles": ["member"]
 }

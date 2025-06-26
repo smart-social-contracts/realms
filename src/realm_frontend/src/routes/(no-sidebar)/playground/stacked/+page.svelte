@@ -1,7 +1,7 @@
 <script lang="ts">
 	import MetaTag from '../../../utils/MetaTag.svelte';
 	import Playground from './Playground.svelte';
-	import { SITE_NAME } from '$lib/config';
+	import { SITE_NAME } from '$lib/globals';
 
 	const path: string = '/playground/stacked';
 	const description: string = 'Playground stacked example - Smart Social Contracts';

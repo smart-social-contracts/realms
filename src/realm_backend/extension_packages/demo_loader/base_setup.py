@@ -26,6 +26,18 @@ def run():
         description="Admin user profile",
     )
 
+    user_profile_admin = UserProfile(
+        name=Profiles.ADMIN[0],
+        allowed_to=",".join(Profiles.ADMIN[1]),
+        description="Admin user profile",
+    )
+
+    user_profile_member = UserProfile(
+        name=Profiles.MEMBER[0],
+        allowed_to=",".join(Profiles.MEMBER[1]),
+        description="Member user profile",
+    )
+
     # Create a system user to represent the realm in transfers
     system_user = User(name="system", profiles=[user_profile_admin])
 

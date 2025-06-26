@@ -4,6 +4,8 @@
 	import UserMenu from '../utils/widgets/UserMenu.svelte';
 	import T from '$lib/components/T.svelte';
 	import { _ } from 'svelte-i18n';
+	import { isAuthenticated } from '$lib/stores/auth';
+	import { hasJoined, profilesLoading } from '$lib/stores/profiles';
 	import {
 		DarkMode,
 		Dropdown,
@@ -69,9 +71,17 @@
 		<!-- <Notifications />
 		<AppsMenu /> -->
 		<!-- <DarkMode /> -->
-		<Button class="me-2" color="alternative" href="/join" pill={true}>
-			<T key="buttons.join" default_text="Join" />
-		</Button>
+		{#if $isAuthenticated && $profilesLoading}
+			<!-- Show a loading spinner while profile data is loading -->
+			<div class="flex items-center me-2" role="status">
+				<div class="animate-spin h-4 w-4 border-2 border-gray-300 rounded-full border-t-blue-600 mr-2"></div>
+				<span class="sr-only">Loading...</span>
+			</div>
+		{:else if !hasJoined()}
+			<Button class="me-2" color="alternative" href="/join" pill={true}>
+				<T key="buttons.join" default_text="Join" />
+			</Button>
+		{/if}
 		<UserMenu {...Users[4]} />
 	</div>
 </Navbar>

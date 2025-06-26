@@ -43,6 +43,12 @@ export async function initBackendWithIdentity() {
             const identity = client.getIdentity();
             console.log('Using authenticated identity:', identity.getPrincipal().toText());
             
+            const currentActor = get(backendStore);
+            if (currentActor && currentActor._agent && currentActor._agent._identity === identity) {
+                console.log('Backend already initialized with current identity');
+                return currentActor;
+            }
+            
             // Create an agent with the identity
             const agent = new HttpAgent({ identity });
             

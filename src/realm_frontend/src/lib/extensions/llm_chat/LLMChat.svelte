@@ -34,23 +34,45 @@
 
 	// LLM API configuration
 
-	const isLocalhost = window.location.hostname === 'localhost' || 
-			window.location.hostname === '127.0.0.1' ||
-			window.location.hostname.includes('.localhost');
+	// const isLocalhost = window.location.hostname === 'localhost' || 
+	// 		window.location.hostname === '127.0.0.1' ||
+	// 		window.location.hostname.includes('.localhost');
+
+	const isLocalhost = false;
 	console.log("isLocalhost", isLocalhost);
 	
+	// Function to fetch server host from remote config
+	async function fetchServerHost(): Promise<string> {
+			console.log("Fetching server host from remote config...");
+			const response = await fetch('https://raw.githubusercontent.com/smart-social-contracts/ashoka/refs/heads/main/production.env');
+			const text = await response.text();
+			
+			// Parse SERVER_HOST from the environment file format
+			const lines = text.trim().split('\n');
+			for (const line of lines) {
+				if (line.startsWith('SERVER_HOST=')) {
+					const serverHost = line.split('=')[1].trim();
+					console.log("Found SERVER_HOST in remote config:", serverHost);
+					return serverHost;
+				}
+			}
+			throw new Error('SERVER_HOST not found in remote config');
+	}
+	
 	// Determine API URL based on environment
-	const API_URL = (() => {
-		// Check if we're running locally
-
-		
+	let API_URL = '';
+	
+	// Initialize API URL
+	const initializeApiUrl = async () => {
 		if (isLocalhost) {
-			return "http://localhost:5000/api/ask";
+			API_URL = "http://localhost:5000/api/ask";
 		} else {
-			// Production URL
-			return "https://jvql982sbyh2vo-5000.proxy.runpod.net/api/ask";
+			// Fetch production server host dynamically
+			const serverHost = await fetchServerHost();
+			API_URL = `https://${serverHost}/api/ask`;
 		}
-	})();
+		console.log("API_URL set to:", API_URL);
+	};
 	
 	// Get the canister ID dynamically
 	let REALM_CANISTER_ID = "";
@@ -84,6 +106,9 @@
 				console.log("Using default canister ID:", REALM_CANISTER_ID);
 			}
 		}
+		
+		// Initialize API URL
+		await initializeApiUrl();
 	});
 
 	// Auto-scroll to bottom of messages when content changes
@@ -140,24 +165,24 @@
 		isLoading = true;
 		error = '';
 		
-		// // If realm data is enabled but not loaded, load it first
-		// if (includeRealmData && !realmData) {
-		// 	await fetchRealmData();
-		// }
+		// Add a placeholder message for the AI response that we'll update as we stream
+		const aiMessageIndex = messages.length;
+		messages = [...messages, { text: '', isUser: false }];
 		
 		try {
 			// Prepare request payload
 			const payload = {
 				question: messageToSend,
-				realm_canister_id: REALM_CANISTER_ID
+				realm_canister_id: REALM_CANISTER_ID,
+				stream: true  // Request streaming response
 			};
 			
-			// Make direct HTTP request to the LLM API
+			// Make streaming HTTP request to the LLM API
 			const response = await fetch(API_URL, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
-					'Accept': 'application/json'
+					'Accept': 'text/event-stream'
 				},
 				body: JSON.stringify(payload)
 			});
@@ -166,16 +191,87 @@
 				throw new Error(`HTTP error! Status: ${response.status}`);
 			}
 
-			const data = await response.json();
-			
-			// Add response to the chat
-			messages = [...messages, { 
-				text: data.ai_response || "No response from LLM", 
-				isUser: false 
-			}];
+			// Handle streaming response
+			const reader = response.body?.getReader();
+			if (!reader) {
+				throw new Error('Response body is not readable');
+			}
+
+			const decoder = new TextDecoder();
+			let accumulatedText = '';
+
+			try {
+				while (true) {
+					const { done, value } = await reader.read();
+					
+					if (done) {
+						break;
+					}
+
+					// Decode the chunk
+					const chunk = decoder.decode(value, { stream: true });
+					const lines = chunk.split('\n');
+
+					for (const line of lines) {
+						const trimmedLine = line.trim();
+						
+						// Skip empty lines and comments
+						if (!trimmedLine || trimmedLine.startsWith('#')) {
+							continue;
+						}
+
+						// Handle Server-Sent Events format
+						if (trimmedLine.startsWith('data: ')) {
+							const data = trimmedLine.substring(6);
+							
+							// Check for end of stream
+							if (data === '[DONE]') {
+								break;
+							}
+
+							try {
+								const parsed = JSON.parse(data);
+								if (parsed.content) {
+									accumulatedText += parsed.content;
+									
+									// Update the AI message in real-time
+									messages = messages.map((msg, index) => 
+										index === aiMessageIndex 
+											? { ...msg, text: accumulatedText }
+											: msg
+									);
+								}
+							} catch (e) {
+								// If it's not JSON, treat it as plain text
+								accumulatedText += data;
+								messages = messages.map((msg, index) => 
+									index === aiMessageIndex 
+										? { ...msg, text: accumulatedText }
+										: msg
+								);
+							}
+						}
+					}
+				}
+			} finally {
+				reader.releaseLock();
+			}
+
+			// Ensure we have some response
+			if (!accumulatedText.trim()) {
+				messages = messages.map((msg, index) => 
+					index === aiMessageIndex 
+						? { ...msg, text: "No response from LLM" }
+						: msg
+				);
+			}
+
 		} catch (err) {
 			console.error("Error calling LLM:", err);
 			error = "Failed to get response from LLM. Please try again.";
+			
+			// Remove the placeholder message if there was an error
+			messages = messages.slice(0, -1);
 		} finally {
 			isLoading = false;
 		}

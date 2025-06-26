@@ -69,6 +69,8 @@ def get_status() -> dict[str, Any]:
     commit_hash = "COMMIT_HASH_PLACEHOLDER"
     version = "VERSION_PLACEHOLDER"
 
+    demo_mode = "demo_loader" in extension_names
+
     # Return data in the format expected by the Status Candid type
     return {
         "version": version,
@@ -88,4 +90,5 @@ def get_status() -> dict[str, Any]:
         "votes_count": votes_count,
         "commit": commit_hash,
         "extensions": extension_names,
+        "demo_mode": demo_mode,
     }

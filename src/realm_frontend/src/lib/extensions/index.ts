@@ -12,7 +12,8 @@ export interface ExtensionMetadata {
     author: string;
     permissions: string[];
     component?: ComponentType;
-    enabled?: boolean;  // New field to control visibility
+    enabled?: boolean;  // Field to control visibility
+    profiles?: string[];  // Field to specify which user profiles can access this extension
     // Translations are now loaded from JSON files in /lib/i18n/locales/extensions/{id}/
 }
 
