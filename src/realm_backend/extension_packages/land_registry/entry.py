@@ -35,8 +35,6 @@ def get_lands(args: str) -> str:
                 "owner_organization_id": (
                     land.owner_organization.id if land.owner_organization else None
                 ),
-                "created_at": str(land.created_at),
-                "updated_at": str(land.updated_at),
             }
             land_data.append(land_dict)
 
