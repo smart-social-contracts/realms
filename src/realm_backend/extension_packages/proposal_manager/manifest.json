@@ -1,0 +1,8 @@
+{
+  "name": "proposal_manager",
+  "version": "1.0.0",
+  "description": "Manage proposals with role-based permissions",
+  "required_permissions": [],
+  "entry_points": ["list_proposals", "create_proposal", "update_proposal", "delete_proposal", "vote_on_proposal", "get_proposal_details"],
+  "profiles": ["admin", "member"]
+}
