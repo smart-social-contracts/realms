@@ -20,6 +20,8 @@ export default defineConfig(({ mode }) => ({
       $routes: path.resolve('./src/routes'),
       $assets: path.resolve('./src/assets'),
       $components: path.resolve('./src/components'),
+      '$app/navigation': path.resolve('./src/test-mocks/app-navigation.js'),
+      '$app/stores': path.resolve('./src/test-mocks/app-stores.js'),
     },
   },
   test: {

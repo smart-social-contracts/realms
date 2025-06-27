@@ -48,6 +48,18 @@ Object.defineProperty(window, 'URL', {
   },
 });
 
+vi.mock('$app/navigation', () => ({
+  goto: vi.fn(),
+  afterNavigate: vi.fn()
+}));
+
+vi.mock('$app/stores', () => ({
+  page: {
+    subscribe: vi.fn(() => () => {}),
+    url: { pathname: '/' }
+  }
+}));
+
 vi.mock('maplibre-gl', () => ({
   default: {
     Map: vi.fn().mockImplementation(() => ({

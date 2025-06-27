@@ -14,7 +14,8 @@ import {
     TableColumnSolid,
     UsersOutline,
     HomeOutline,
-    FileChartBarSolid
+    FileChartBarSolid,
+    BellSolid
 } from 'flowbite-svelte-icons';
 
 /**
@@ -38,7 +39,8 @@ export const iconMap: Record<string, any> = {
     'table': TableColumnSolid,
     'users': UsersOutline,
     'home': HomeOutline,
-    'file': FileChartBarSolid
+    'file': FileChartBarSolid,
+    'bell': BellSolid
 };
 
 /**

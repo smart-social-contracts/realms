@@ -14,6 +14,7 @@ EXTENSION_NAMES = [
     "passport_verification",
     "land_registry",
     "justice_litigation",
+    "notifications",
 ]
 
 
