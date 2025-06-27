@@ -13,6 +13,7 @@ EXTENSION_NAMES = [
     "llm_chat",
     "passport_verification",
     "land_registry",
+    "justice_litigation",
 ]
 
 
