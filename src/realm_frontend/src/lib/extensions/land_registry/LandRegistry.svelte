@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { backend } from '$lib/canisters';
   import LandMap from './LandMap.svelte';
+  import GeographicMap from './GeographicMap.svelte';
   import LandTable from './LandTable.svelte';
   import AdminControls from './AdminControls.svelte';
   
@@ -108,7 +109,13 @@
         class="py-2 px-1 border-b-2 font-medium text-sm {activeTab === 'map' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
         on:click={() => activeTab = 'map'}
       >
-        Map View
+        Grid View
+      </button>
+      <button 
+        class="py-2 px-1 border-b-2 font-medium text-sm {activeTab === 'geographic' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
+        on:click={() => activeTab = 'geographic'}
+      >
+        Geographic Map
       </button>
       <button 
         class="py-2 px-1 border-b-2 font-medium text-sm {activeTab === 'table' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
@@ -129,6 +136,8 @@
     <div class="text-center py-8">Loading...</div>
   {:else if activeTab === 'map'}
     <LandMap {lands} on:refresh={loadLands} />
+  {:else if activeTab === 'geographic'}
+    <GeographicMap {lands} on:refresh={loadLands} />
   {:else if activeTab === 'table'}
     <LandTable {lands} on:refresh={loadLands} />
   {:else if activeTab === 'admin'}
