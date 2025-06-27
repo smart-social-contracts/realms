@@ -1,22 +1,9 @@
 <script lang="ts">
-	import thickbars from '../../../routes/utils/graphs/thickbars';
 	import ChartWidget from '../../../routes/utils/widgets/ChartWidget.svelte';
-	import { Card, Chart } from 'flowbite-svelte';
-	import Stats from '../../../routes/utils/dashboard/Stats.svelte';
-	import users from '../../../routes/utils/graphs/users';
-	import DarkChart from '../../../routes/utils/widgets/DarkChart.svelte';
 	import { onMount } from 'svelte';
-	import getChartOptions from '../../../routes/(sidebar)/dashboard/chart_options';
 	import ActivityList from '../../../routes/(sidebar)/dashboard/ActivityList.svelte';
-	import Change from '../../../routes/utils/dashboard/Change.svelte';
-	import Chat from '../../../routes/utils/dashboard/Chat.svelte';
-	import DesktopPc from '../../../routes/utils/dashboard/DesktopPc.svelte';
-	import Insights from '../../../routes/utils/dashboard/Insights.svelte';
-	import Traffic from '../../../routes/utils/dashboard/Traffic.svelte';
-	import Transactions from '../../../routes/utils/dashboard/Transactions.svelte';
 	import OrganizationTable from '../../../routes/utils/dashboard/OrganizationTable.svelte';
 	import { backend } from '$lib/canisters';
-	import AuthButton from '$lib/components/AuthButton.svelte';
 	import { principal } from '$lib/stores/auth';
 	import { universe, snapshots } from '$lib/stores/auth';
 	import { writable } from 'svelte/store';
