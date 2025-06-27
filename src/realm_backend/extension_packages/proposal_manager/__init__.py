@@ -1,0 +1,3 @@
+"""
+Proposal Manager extension package.
+"""
