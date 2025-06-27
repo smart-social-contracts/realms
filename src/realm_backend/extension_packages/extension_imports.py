@@ -1,5 +1,6 @@
 import extension_packages.citizen_dashboard.entry
 import extension_packages.demo_loader.entry
+import extension_packages.justice_litigation.entry
 import extension_packages.land_registry.entry
 import extension_packages.llm_chat.entry
 import extension_packages.passport_verification.entry
