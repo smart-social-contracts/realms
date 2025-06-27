@@ -12,6 +12,7 @@ from .dispute import Dispute
 from .human import Human
 from .identity import Identity
 from .instrument import Instrument
+from .land import Land, LandType
 from .license import License
 from .mandate import Mandate
 from .organization import Organization
@@ -32,6 +33,8 @@ __all__ = [
     "Contract",
     "Dispute",
     "Instrument",
+    "Land",
+    "LandType",
     "License",
     "Mandate",
     "Organization",

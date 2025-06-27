@@ -76,14 +76,21 @@
 				data: geometry // Use the FeatureCollection directly
 			});
 
-			// Add a filled layer
+			// Add a filled layer with dynamic coloring based on land_type
 			map.addLayer({
 				id: 'geometry-layer',
 				type: 'fill',
 				source: 'geometry',
 				paint: {
-					'fill-color': '#56B4D3', // Light blue
-					'fill-opacity': 0.6
+					'fill-color': [
+						'case',
+						['==', ['get', 'land_type'], 'residential'], '#4ade80',
+						['==', ['get', 'land_type'], 'agricultural'], '#fbbf24', 
+						['==', ['get', 'land_type'], 'industrial'], '#6b7280',
+						['==', ['get', 'land_type'], 'commercial'], '#3b82f6',
+						'#f3f4f6'
+					],
+					'fill-opacity': 0.7
 				}
 			});
 
@@ -93,9 +100,36 @@
 				type: 'line',
 				source: 'geometry',
 				paint: {
-					'line-color': '#3B9FCC', // Blue outline
-					'line-width': 2
+					'line-color': '#374151',
+					'line-width': 1
 				}
+			});
+
+			// Add click handler for land parcels
+			map.on('click', 'geometry-layer', (e) => {
+				const properties = e.features[0].properties;
+				const popup = new maplibregl.Popup()
+					.setLngLat(e.lngLat)
+					.setHTML(`
+						<div class="p-2">
+							<strong>Land Parcel ${properties.id}</strong><br/>
+							Grid: (${properties.x_coordinate}, ${properties.y_coordinate})<br/>
+							Type: ${properties.land_type}<br/>
+							${properties.owner_user_id ? `Owner: User ${properties.owner_user_id}` : 
+							  properties.owner_organization_id ? `Owner: Org ${properties.owner_organization_id}` : 
+							  'Unowned'}
+						</div>
+					`)
+					.addTo(map);
+			});
+
+			// Change cursor on hover
+			map.on('mouseenter', 'geometry-layer', () => {
+				map.getCanvas().style.cursor = 'pointer';
+			});
+
+			map.on('mouseleave', 'geometry-layer', () => {
+				map.getCanvas().style.cursor = '';
 			});
 
 			// Fit the map to the geometry bounds
