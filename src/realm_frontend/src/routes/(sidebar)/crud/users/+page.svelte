@@ -79,6 +79,7 @@
 
 			<div slot="end" class="flex items-center space-x-2">
 				<Button
+					color="primary"
 					size="sm"
 					class="gap-2 whitespace-nowrap px-3"
 					on:click={() => ((current_user = {}), (openUser = true))}

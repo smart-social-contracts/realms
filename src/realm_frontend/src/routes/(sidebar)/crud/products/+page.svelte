@@ -70,7 +70,7 @@
 			</ToolbarButton>
 
 			<div slot="end" class="space-x-2">
-				<Button class="whitespace-nowrap" on:click={() => toggle(Product)}>Add new product</Button>
+				<Button color="primary" class="whitespace-nowrap" on:click={() => toggle(Product)}>Add new product</Button>
 			</div>
 		</Toolbar>
 	</div>
@@ -104,7 +104,7 @@
 					<TableBodyCell class="p-4">{product.price}</TableBodyCell>
 					<TableBodyCell class="p-4">{product.discount}</TableBodyCell>
 					<TableBodyCell class="space-x-2">
-						<Button size="sm" class="gap-2 px-3" on:click={() => toggle(Product)}>
+						<Button color="primary" size="sm" class="gap-2 px-3" on:click={() => toggle(Product)}>
 							<EditOutline size="sm" /> Update
 						</Button>
 						<Button color="red" size="sm" class="gap-2 px-3" on:click={() => toggle(Delete)}>

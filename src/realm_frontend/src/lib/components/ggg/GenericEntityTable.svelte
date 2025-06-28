@@ -25,6 +25,8 @@
   
   // Import transfer table for specialized display
   import TransfersTable from './TransfersTable.svelte';
+  import { Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, Button } from 'flowbite-svelte';
+  import { ChevronLeftOutline, ChevronRightOutline } from 'flowbite-svelte-icons';
   
   function formatValue(value, key) {
     if (value === null || value === undefined) return 'N/A';
@@ -193,128 +195,58 @@
       <p class="text-gray-600">No {entityType} found</p>
     </div>
   {:else}
-    <div class="space-y-4">
-      {#each entities as entity, index}
-        <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-          <div class="flex justify-between items-start mb-3">
-            <div class="flex-1">
-              <h3 class="font-semibold text-gray-900 mb-1">
-                {getEntityDescription(entity, entityType)}
-              </h3>
-              <p class="text-sm text-gray-600">ID: {entity._id}</p>
-              {#if entity.timestamp_created}
-                <p class="text-xs text-gray-500">
-                  Created: {formatValue(entity.timestamp_created, 'timestamp_created')}
-                </p>
-              {/if}
-            </div>
-            <div class="flex items-center space-x-2">
-              {#if getRelationshipInfo(entity)}
-                <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                  {getRelationshipInfo(entity)}
-                </span>
-              {/if}
-              <button class="text-blue-600 hover:text-blue-900 font-medium text-sm">
-                View Details
-              </button>
-            </div>
-          </div>
-          <!-- Entity-specific information -->
-          {#if entity.metadata}
-            <div class="mt-3 p-3 bg-gray-50 rounded text-sm">
-              <pre class="text-xs text-gray-600 whitespace-pre-wrap">{JSON.stringify(JSON.parse(entity.metadata), null, 2)}</pre>
-            </div>
-          {/if}
-          <!-- Relationships -->
-          {#if entity.relations && Object.keys(entity.relations).length > 0}
-            <div class="mt-3 p-3 bg-blue-50 rounded text-sm">
-              <strong class="text-blue-800">Relationships:</strong>
-              <div class="mt-2 space-y-1">
-                {#each Object.entries(entity.relations) as [relType, relEntities]}
-                  {#if Array.isArray(relEntities) && relEntities.length > 0}
-                    <div class="flex items-center">
-                      <span class="font-medium text-blue-700">{getDisplayName(relType)}:</span>
-                      <div class="ml-2 flex flex-wrap gap-1">
-                        {#each relEntities.slice(0, 3) as relEntity}
-                          <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                            {relEntity._id}
-                          </span>
-                        {/each}
-                        {#if relEntities.length > 3}
-                          <span class="text-xs text-blue-600">+{relEntities.length - 3} more</span>
-                        {/if}
-                      </div>
-                    </div>
-                  {/if}
-                {/each}
-              </div>
-            </div>
-          {/if}
-        </div>
-      {/each}
-    </div>
+    <Table hoverable={true} striped={true}>
+      <TableHead>
+        {#each columns as column}
+          <TableHeadCell>{getDisplayName(column)}</TableHeadCell>
+        {/each}
+      </TableHead>
+      <TableBody>
+        {#each entities as entity}
+          <TableBodyRow>
+            {#each columns as column}
+              <TableBodyCell>
+                {formatValue(entity[column], column)}
+              </TableBodyCell>
+            {/each}
+          </TableBodyRow>
+        {/each}
+        {#if entities.length === 0}
+          <TableBodyRow>
+            <TableBodyCell colspan={columns.length} class="text-center text-gray-500 dark:text-gray-400">
+              No {entityType} found
+            </TableBodyCell>
+          </TableBodyRow>
+        {/if}
+      </TableBody>
+    </Table>
   {/if}
   {#if pagination}
     <div class="flex justify-center items-center mt-4 space-x-2">
-      <button 
-        class="px-3 py-1 rounded border {hasPrevPage ? 'bg-blue-100 hover:bg-blue-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}" 
+      <Button 
+        color="alternative"
+        size="sm"
         disabled={!hasPrevPage}
-        on:click={() => onPageChange(currentPage - 2)}
+        on:click={() => onPageChange(safePagination.page_num - 1)}
       >
+        <ChevronLeftOutline class="w-4 h-4 mr-1" />
         Previous
-      </button>
-      <div class="flex space-x-1">
-        {#if totalPages <= 7}
-          {#each Array(totalPages) as _, i}
-            <button 
-              class="w-8 h-8 rounded-full {currentPage === i+1 ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
-              on:click={() => onPageChange(i)}
-            >
-              {i+1}
-            </button>
-          {/each}
-        {:else}
-          <button 
-            class="w-8 h-8 rounded-full {currentPage === 1 ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
-            on:click={() => onPageChange(0)}
-          >
-            1
-          </button>
-          {#if currentPage > 3}
-            <span class="px-1">...</span>
-          {/if}
-          {#each Array(3).fill(0) as _, i}
-            {@const pageNum = Math.max(2, Math.min(currentPage - 1 + i, totalPages - 1))}
-            {#if pageNum > 1 && pageNum < totalPages}
-              <button 
-                class="w-8 h-8 rounded-full {currentPage === pageNum ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
-                on:click={() => onPageChange(pageNum - 1)}
-              >
-                {pageNum}
-              </button>
-            {/if}
-          {/each}
-          {#if currentPage < totalPages - 2}
-            <span class="px-1">...</span>
-          {/if}
-          <button 
-            class="w-8 h-8 rounded-full {currentPage === totalPages ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}"
-            on:click={() => onPageChange(totalPages - 1)}
-          >
-            {totalPages}
-          </button>
-        {/if}
-      </div>
-      <button 
-        class="px-3 py-1 rounded border {hasNextPage ? 'bg-blue-100 hover:bg-blue-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}" 
+      </Button>
+      
+      <span class="text-sm text-gray-700 dark:text-gray-300">
+        Page {safePagination.page_num} of {safePagination.total_pages}
+        ({safePagination.total_items_count} total items)
+      </span>
+      
+      <Button 
+        color="alternative"
+        size="sm"
         disabled={!hasNextPage}
-        on:click={() => onPageChange(currentPage)}
+        on:click={() => onPageChange(safePagination.page_num + 1)}
       >
         Next
-      </button>
-    </div>
-    <div class="text-xs text-gray-500 mt-2 text-center">
-      Showing {entities.length} of {safePagination?.total_items_count || entities.length} {getDisplayName(entityType).toLowerCase()} (Page {currentPage} of {totalPages})
+        <ChevronRightOutline class="w-4 h-4 ml-1" />
+      </Button>
     </div>
   {/if}
 </div> 

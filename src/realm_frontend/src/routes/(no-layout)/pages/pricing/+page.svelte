@@ -42,7 +42,7 @@
 	</NavUl>
 	<div class="py-4">
 		<DarkMode />
-		<Button class="gap-2 px-3"><ArrowLeftToBracketOutline />Login/Register</Button>
+		<Button color="primary" class="gap-2 px-3"><ArrowLeftToBracketOutline />Login/Register</Button>
 	</div>
 </Navbar>
 <main class="mx-auto bg-gray-50 dark:bg-gray-900">

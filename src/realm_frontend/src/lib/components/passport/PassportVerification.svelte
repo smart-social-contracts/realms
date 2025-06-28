@@ -1,7 +1,7 @@
 <script>
 
   import { backend } from '$lib/canisters.js';
-  import { Button, Card, Heading, P, Spinner } from 'flowbite-svelte';
+  import { Card, Heading, P, Spinner } from 'flowbite-svelte';
   import { CheckCircleSolid, ExclamationCircleSolid, ClipboardListSolid } from 'flowbite-svelte-icons';
   
   export let userId;
@@ -132,9 +132,12 @@
         Use zero-knowledge proofs to verify your passport identity securely and privately.
         Your passport data never leaves your device.
       </P>
-      <Button on:click={generateVerificationLink} class="px-6 py-3">
+      <button 
+        on:click={generateVerificationLink} 
+        class="inline-flex items-center px-5 py-2.5 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+      >
         Start Passport Verification
-      </Button>
+      </button>
       
     {:else if verificationStatus === 'generating'}
       <div class="flex items-center justify-center mb-4">
@@ -163,12 +166,18 @@
       </P>
       
       <div class="flex gap-2 justify-center">
-        <Button on:click={checkVerificationStatus} size="sm">
+        <button 
+          on:click={checkVerificationStatus} 
+          class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+        >
           Check Status
-        </Button>
-        <Button color="alternative" on:click={resetVerification} size="sm">
+        </button>
+        <button 
+          on:click={resetVerification} 
+          class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-700 dark:focus:ring-gray-700"
+        >
           Cancel
-        </Button>
+        </button>
       </div>
       
     {:else if verificationStatus === 'verified'}
@@ -204,9 +213,12 @@
         Passport verification was not successful. Please try again.
       </P>
       
-      <Button on:click={resetVerification}>
+      <button 
+        on:click={resetVerification} 
+        class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+      >
         Try Again
-      </Button>
+      </button>
       
     {:else if verificationStatus === 'error'}
       <div class="text-red-600 dark:text-red-400 mb-4">
@@ -218,9 +230,12 @@
         {errorMessage}
       </P>
       
-      <Button on:click={resetVerification}>
+      <button 
+        on:click={resetVerification} 
+        class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+      >
         Try Again
-      </Button>
+      </button>
     {/if}
   </div>
 </Card>

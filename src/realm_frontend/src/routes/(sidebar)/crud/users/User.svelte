@@ -95,6 +95,6 @@
 
 	<!-- Modal footer -->
 	<div slot="footer">
-		<Button type="submit">{Object.keys(data).length ? 'Save all' : 'Add user'}</Button>
+		<Button type="submit" color="primary">{Object.keys(data).length ? 'Save all' : 'Add user'}</Button>
 	</div>
 </Modal>
