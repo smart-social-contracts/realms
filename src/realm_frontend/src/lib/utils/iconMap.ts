@@ -26,6 +26,7 @@ export const iconMap: Record<string, any> = {
     'wallet': WalletSolid,
     'cog': CogOutline,
     'chart': ChartPieOutline,
+    'chart-pie': ChartPieOutline,
     'lightbulb': LightbulbOutline,
     'dollar': DollarOutline,
     'clipboard': ClipboardListSolid,
@@ -40,7 +41,6 @@ export const iconMap: Record<string, any> = {
     'home': HomeOutline,
     'file': FileChartBarSolid,
     'bell': BellSolid
-    // Add more icons as needed
 };
 
 /**

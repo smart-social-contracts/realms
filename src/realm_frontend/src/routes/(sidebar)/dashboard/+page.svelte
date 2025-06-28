@@ -1,19 +1,19 @@
 <script lang="ts">
-	import Dashboard from '../../utils/dashboard/Dashboard.svelte';
-	import MetaTag from '../../utils/MetaTag.svelte';
-	import Footer from '../Footer.svelte';
+	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
 	import { SITE_NAME } from '$lib/globals';
+	import MetaTag from '../../utils/MetaTag.svelte';
+
 	export let data;
 
 	const path: string = '/dashboard';
-	const description: string = 'Admin Dashboard example using Flowbite Svelte';
+	const description: string = 'Public Dashboard - redirecting to extension';
 	const title: string = SITE_NAME + ' - Dashboard';
-	const subtitle: string = 'Admin Dashboard';
+	const subtitle: string = 'Dashboard';
+
+	onMount(() => {
+		goto('/extensions/public_dashboard');
+	});
 </script>
 
 <MetaTag {path} {description} {title} {subtitle} />
-
-<main class="p-4">
-	<Dashboard {data} />
-</main>
-<!-- <Footer /> -->
