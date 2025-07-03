@@ -25,7 +25,7 @@ function createInitialBackend() {
         console.log('Creating dummy backend for dev mode');
         return createDummyBackend();
     } else {
-        console.log('No real backend available, using dummy');
+        console.log('No real backend available in this setup, using dummy');
         return createDummyBackend();
     }
 }
