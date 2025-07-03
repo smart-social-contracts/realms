@@ -1,24 +1,48 @@
-import { createActor, canisterId } from 'declarations/realm_backend';
-import { building } from '$app/environment';
-import { HttpAgent } from '@dfinity/agent';
-import { writable, get } from 'svelte/store';
-import { authClient, initializeAuthClient } from '$lib/auth';  
+console.log('=== MINIMAL CANISTERS.JS TEST ===');
+
+import { writable } from 'svelte/store';
+// import { createDummyBackend } from './dummyBackend.js'; // Temporarily disabled
+
+console.log('=== IMPORTS SUCCESSFUL ===');
 
 function dummyActor() {
     return new Proxy({}, { get() { throw new Error("Canister invoked while building"); } });
 }
 
-const buildingOrTesting = building || process.env.NODE_ENV === "test";
+const isDevDummyMode = true;
+console.log('=== MINIMAL TEST COMPLETE ===');
 
-// Detect if we're running in local development
-// Use a more reliable method than process.env which might not work in browser
-const isLocalDevelopment = window.location.hostname.includes('localhost') || 
-                          window.location.hostname.includes('127.0.0.1');
+// const dummyBackend = createDummyBackend(); // Temporarily disabled
+const dummyBackend = { status: async () => ({ success: true, data: { Status: { demo_mode: true } } }) };
+export const backendStore = writable(dummyBackend);
 
-console.log('Running in local development mode:', isLocalDevelopment);
+console.log('=== INITIALIZATION CHECK ===');
 
-// Create a writable store for the backend actor
-export const backendStore = writable(buildingOrTesting ? dummyActor() : createActor(canisterId));
+if (typeof window !== 'undefined') {
+    console.log('=== CLIENT-SIDE INITIALIZATION STARTING ===');
+    
+    try {
+        const isLocalDevelopment = window.location.hostname.includes('localhost') || 
+                                  window.location.hostname.includes('127.0.0.1');
+        
+        console.log('Running in local development mode:', isLocalDevelopment);
+        
+        if (isDevDummyMode) {
+            console.log('=== USING DUMMY BACKEND FOR DEVELOPMENT ===');
+            const dummyBackend = createDummyBackend();
+            console.log('Dummy backend created:', dummyBackend);
+            backendStore.set(dummyBackend);
+        } else {
+            console.log('=== LOADING REAL BACKEND DECLARATIONS ===');
+            console.log('Real backend mode not available in dev setup');
+            console.log('Backend declarations not available, using dummy actor');
+            backendStore.set(dummyActor());
+        }
+    } catch (error) {
+        console.error('Error during client-side initialization:', error);
+        backendStore.set(dummyActor());
+    }
+}
 
 // Create a proxy that always uses the latest actor from the store
 export const backend = new Proxy({}, {
@@ -30,16 +54,19 @@ export const backend = new Proxy({}, {
     }
 });
 
-// Initialize backend with authenticated identity
 export async function initBackendWithIdentity() {
     try {
         console.log('Initializing backend with authenticated identity...');
         
-        // Make sure we're using the shared auth client
-        const client = authClient || await initializeAuthClient();
+        if (isDevDummyMode) {
+            console.log('Using dummy backend, skipping authentication');
+            return get(backendStore);
+        }
         
-        if (await client.isAuthenticated()) {
-            // Get the authenticated identity from the shared client
+        // const client = authClient || await initializeAuthClient(); // Temporarily disabled
+        const client = null;
+        
+        if (client && await client.isAuthenticated()) {
             const identity = client.getIdentity();
             console.log('Using authenticated identity:', identity.getPrincipal().toText());
             
@@ -49,10 +76,10 @@ export async function initBackendWithIdentity() {
                 return currentActor;
             }
             
-            // Create an agent with the identity
             const agent = new HttpAgent({ identity });
             
-            // For local development, we need to fetch the root key
+            const isLocalDevelopment = browser && (window.location.hostname.includes('localhost') || 
+                                                           window.location.hostname.includes('127.0.0.1'));
             if (isLocalDevelopment) {
                 console.log('Fetching root key for local development');
                 await agent.fetchRootKey().catch(e => {
@@ -61,12 +88,9 @@ export async function initBackendWithIdentity() {
                 });
             }
             
-            // Create a new actor with the authenticated identity
-            const authenticatedActor = createActor(canisterId, {
-                agent
-            });
+            console.log('Real backend authentication not available in dev mode');
+            const authenticatedActor = get(backendStore);
             
-            // Update the store with the authenticated actor
             backendStore.set(authenticatedActor);
             
             console.log('Backend initialized with authenticated identity');

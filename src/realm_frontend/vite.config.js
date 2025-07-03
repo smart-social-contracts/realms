@@ -23,7 +23,7 @@ export default defineConfig({
     minify: true,
     reportCompressedSize: false,
   },
-  logLevel: 'error', // Only show errors
+  logLevel: 'info', // Show startup info for debugging
   optimizeDeps: {
     esbuildOptions: {
       define: {
@@ -42,6 +42,7 @@ export default defineConfig({
     sveltekit(),
     environment("all", { prefix: "CANISTER_" }),
     environment("all", { prefix: "DFX_" }),
+    environment("all", { prefix: "DEV_" }),
   ],
   resolve: {
     alias: [

@@ -5,8 +5,9 @@
 	import SvelteMarkdown from 'svelte-markdown';
 	// @ts-ignore
 	import { backend } from '$lib/canisters';
-	// @ts-ignore
-	import { canisterId as backendCanisterId } from 'declarations/realm_backend';
+	
+	// Use dummy canister ID in dev mode, will be overridden by real backend when available
+	const backendCanisterId = "dummy-canister-id";
 
 	// Define message interface to fix TypeScript errors
 	interface ChatMessage {
@@ -444,4 +445,4 @@
 		margin: 0.5rem 0 0.5rem 0.5rem;
 		color: #555;
 	}
-</style> 
+</style>  
