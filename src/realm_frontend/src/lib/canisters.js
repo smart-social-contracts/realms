@@ -7,25 +7,21 @@ import { createDummyBackend } from './dummyBackend.js';
 console.log('=== DUMMY BACKEND IMPORTED SUCCESSFULLY ===');
 
 const buildingOrTesting = building || process.env.NODE_ENV === "test";
-const isDevDummyMode = import.meta.env.DEV_DUMMY_MODE === 'true';
 
 console.log('Building/Testing:', buildingOrTesting);
-console.log('Dev dummy mode enabled:', isDevDummyMode);
+console.log('Forcing dummy mode for debugging');
 
 function dummyActor() {
     return new Proxy({}, { get() { throw new Error("Canister invoked while building"); } });
 }
 
-// Create initial backend actor
+// Create initial backend actor - FORCE DUMMY MODE FOR DEBUGGING
 function createInitialBackend() {
     if (buildingOrTesting) {
         console.log('Using build-time dummy actor');
         return dummyActor();
-    } else if (isDevDummyMode) {
-        console.log('Creating dummy backend for dev mode');
-        return createDummyBackend();
     } else {
-        console.log('No real backend available in this setup, using dummy');
+        console.log('FORCED: Creating dummy backend for debugging');
         return createDummyBackend();
     }
 }

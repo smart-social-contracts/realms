@@ -16,7 +16,7 @@
 	import Traffic from './Traffic.svelte';
 	import Transactions from './Transactions.svelte';
 	import OrganizationTable from './OrganizationTable.svelte';
-	import { backend } from '$lib/canisters';
+	// import { backend } from '$lib/canisters';
 	import AuthButton from '$lib/components/AuthButton.svelte';
 	import { principal } from '$lib/stores/auth';
 	import { universe, snapshots } from '$lib/stores/auth';
@@ -46,28 +46,28 @@
 
 	function onSubmit(event) {
 		const name = event.target.name.value;
-		backend.greet(name).then((response) => {
-			greeting = response;
-		});
+		// backend.greet(name).then((response) => {
+		// 	greeting = response;
+		// });
 
-		backend.get_universe().then((response) => {
-			let principalText = response;
-			console.log(`principalText = ${principalText}`);
-			principal.set(principalText); // Update the principal store
-			// Parse the string as JSON
-			const jsonObject = JSON.parse(principalText);
-			console.log(jsonObject); // This should log the JSON object
-			console.log(jsonObject.users[0].id); // This should log the JSON object
-		});
+		// backend.get_universe().then((response) => {
+		// 	let principalText = response;
+		// 	console.log(`principalText = ${principalText}`);
+		// 	principal.set(principalText); // Update the principal store
+		// 	// Parse the string as JSON
+		// 	const jsonObject = JSON.parse(principalText);
+		// 	console.log(jsonObject); // This should log the JSON object
+		// 	console.log(jsonObject.users[0].id); // This should log the JSON object
+		// });
 
 		return false;
 	}
 
 	function onSubmitGetUniverse(event) {
-		backend.status().then((response) => {
-			console.log('status', response);
-			universe.set(response);
-		});
+		// backend.status().then((response) => {
+		// 	console.log('status', response);
+		// 	universe.set(response);
+		// });
 		return false;
 	}
 

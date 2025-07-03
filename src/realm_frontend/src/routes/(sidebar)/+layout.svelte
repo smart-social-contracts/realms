@@ -3,7 +3,7 @@
 	import Navbar from './Navbar.svelte';
 	import Sidebar from './Sidebar.svelte';
 	import Footer from './Footer.svelte';
-	import DemoBanner from '$lib/components/DemoBanner.svelte';
+	// import DemoBanner from '$lib/components/DemoBanner.svelte';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	
@@ -50,7 +50,7 @@
 	<div class="relative h-full w-full overflow-y-auto bg-white lg:ml-64 lg:pl-6">
 		<!-- Demo Banner -->
 		<div class="px-4 lg:px-0">
-			<DemoBanner />
+			<!-- <DemoBanner /> -->
 		</div>
 		
 		<slot />
