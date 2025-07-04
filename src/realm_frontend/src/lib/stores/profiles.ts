@@ -24,10 +24,7 @@ interface ProfileState {
     error: string | null;
 }
 
-console.log('Profiles store: import.meta.env.DEV_DUMMY_MODE =', import.meta.env.DEV_DUMMY_MODE);
-console.log('Profiles store: typeof import.meta.env.DEV_DUMMY_MODE =', typeof import.meta.env.DEV_DUMMY_MODE);
 const isDevDummyMode = import.meta.env.DEV_DUMMY_MODE === 'true';
-console.log('Profiles store: isDevDummyMode =', isDevDummyMode);
 
 // Create a more comprehensive store for profiles with loading and error states
 const profileState = writable<ProfileState>({
@@ -38,9 +35,6 @@ const profileState = writable<ProfileState>({
 
 if (isDevDummyMode) {
     console.log('DEV_DUMMY_MODE: Initializing profiles store with dummy data immediately');
-    console.log('DEV_DUMMY_MODE: Profiles set to:', ['admin', 'member']);
-} else {
-    console.log('Normal mode: Profiles store initialized with empty array');
 }
 
 // Derived store for just the profiles array for backward compatibility
@@ -120,7 +114,6 @@ export async function loadUserProfiles() {
     }
     
     if (typeof window !== 'undefined' && import.meta.env.DEV_DUMMY_MODE === 'true') {
-        console.log('DEV_DUMMY_MODE: Setting dummy profiles without backend call');
         profileState.update(state => ({
             ...state,
             profiles: ['admin', 'member'],
