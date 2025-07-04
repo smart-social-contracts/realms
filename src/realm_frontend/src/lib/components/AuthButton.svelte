@@ -10,10 +10,11 @@
 	
 	// Dynamic import based on dummy mode
 	let initBackendWithIdentity;
-	if (typeof window !== 'undefined' && window.__DUMMY_MODE__) {
-		import('$lib/dummyCanisters').then(module => {
-			initBackendWithIdentity = module.initBackendWithIdentity;
-		});
+	if (typeof window !== 'undefined' && import.meta.env.DEV_DUMMY_MODE === 'true') {
+		// In DEV_DUMMY_MODE, we don't need to initialize backend with identity
+		initBackendWithIdentity = async () => {
+			console.log('DEV_DUMMY_MODE: Skipping backend initialization');
+		};
 	} else {
 		import('$lib/canisters').then(module => {
 			initBackendWithIdentity = module.initBackendWithIdentity;
