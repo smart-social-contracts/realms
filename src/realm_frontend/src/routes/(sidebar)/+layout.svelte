@@ -47,7 +47,7 @@
 	<Sidebar bind:drawerHidden />
 
 	<!-- Main Content -->
-	<div class="relative h-full w-full overflow-y-auto bg-white lg:pl-6">
+	<div class="relative h-full w-full overflow-y-auto bg-white lg:ml-64">
 		<!-- Demo Banner -->
 		<div class="px-4 lg:px-0">
 			<!-- <DemoBanner /> -->
