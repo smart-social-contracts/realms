@@ -2,7 +2,7 @@
   // Pure UI/UX development route - no backend dependencies
   import { onMount } from 'svelte';
   import { Button, Card, Badge, Avatar, Dropdown, DropdownItem } from 'flowbite-svelte';
-  import { ChevronDownOutline, UserCircleOutline, CogOutline, SignOutOutline } from 'flowbite-svelte-icons';
+  import { ChevronDownOutline, UserCircleOutline, CogOutline, ArrowRightToBracketOutline } from 'flowbite-svelte-icons';
   
   // Mock data for UI development
   let mockUser = {
@@ -83,7 +83,7 @@
               Settings
             </DropdownItem>
             <DropdownItem>
-              <SignOutOutline class="w-4 h-4 mr-2" />
+              <ArrowRightToBracketOutline class="w-4 h-4 mr-2" />
               Sign Out
             </DropdownItem>
           </Dropdown>

@@ -2,10 +2,12 @@ import { writable } from 'svelte/store';
 
 let backend: any;
 if (typeof window !== 'undefined' && (window as any).__DUMMY_MODE__) {
+    // @ts-ignore - Dynamic import for dev dummy mode
     import('$lib/dummyCanisters').then(module => {
         backend = module.backend;
     });
 } else {
+    // @ts-ignore - Dynamic import for canisters module
     import('$lib/canisters').then(module => {
         backend = module.backend;
     });
