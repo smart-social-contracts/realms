@@ -85,7 +85,7 @@
     </div>
     
     <div class="mt-6 p-4 bg-green-100 border border-green-400 rounded">
-      <p class="text-green-700">🚀 HOT RELOADING WORKS! This text was changed and updated instantly without page refresh!</p>
+      <p class="text-green-700">✅ HOT RELOADING CONFIRMED! Text updated at {new Date().toLocaleTimeString()} without page refresh!</p>
     </div>
   {/if}
 </div>

@@ -31,8 +31,8 @@
 	} from 'flowbite-svelte-icons';
 	
 	// Import extension system
-	// import { getAllExtensions, type ExtensionMetadata } from '$lib/extensions';
-	// import { getIcon } from '$lib/utils/iconMap';
+	import { getAllExtensions, type ExtensionMetadata } from '$lib/extensions';
+	import { getIcon } from '$lib/utils/iconMap';
 	// Import user profiles store
 	import { userProfiles } from '$lib/stores/profiles';
 
@@ -87,22 +87,20 @@
 	});
 
 	// Get all extensions for the sidebar
-	// const extensions = getAllExtensions();
-	const extensions = [];
+	const extensions = getAllExtensions();
 	
 	// Filter extensions based on their manifest profiles and enabled status
-	function filterExtensionsForSidebar(extensions: any[]): any[] {
-		return [];
-		// return extensions.filter(ext => {
-		// 	// Skip if extension is not enabled
-		// 	if (ext.enabled === false) return false;
-		// 	
-		// 	// If no profiles specified in extension manifest, show to all users
-		// 	if (!ext.profiles || !Array.isArray(ext.profiles) || ext.profiles.length === 0) return true;
-		// 	
-		// 	// Check if current user has any of the profiles required by the extension
-		// 	return ext.profiles.some((profile: string) => $userProfiles.includes(profile));
-		// });
+	function filterExtensionsForSidebar(extensions: ExtensionMetadata[]): ExtensionMetadata[] {
+		return extensions.filter(ext => {
+			// Skip if extension is not enabled
+			if (ext.enabled === false) return false;
+			
+			// If no profiles specified in extension manifest, show to all users
+			if (!ext.profiles || !Array.isArray(ext.profiles) || ext.profiles.length === 0) return true;
+			
+			// Check if current user has any of the profiles required by the extension
+			return ext.profiles.some((profile: string) => $userProfiles.includes(profile));
+		});
 	}
 
 	// Core navigation items
@@ -158,42 +156,42 @@
 	];
 
 	// Special case for Citizen Dashboard extension (for members)
-	// $: {
-	// 	const citizenDashboardExt = extensions.find((ext: ExtensionMetadata) => ext.id === 'citizen_dashboard');
-	// 	if (citizenDashboardExt && $userProfiles && $userProfiles.includes('member')) {
-	// 		// Make sure it's not already in the list
-	// 		const existingIndex = posts.findIndex(item => item.href === `/extensions/${citizenDashboardExt.id}`);
-	// 		if (existingIndex === -1) {
-	// 			posts = [
-	// 				...posts, 
-	// 				{ 
-	// 					name: 'Citizen Dashboard', 
-	// 					icon: getIcon(citizenDashboardExt.icon) || TableColumnSolid, 
-	// 					href: `/extensions/${citizenDashboardExt.id}` 
-	// 				}
-	// 			];
-	// 		}
-	// 	}
-	// }
+	$: {
+		const citizenDashboardExt = extensions.find((ext: ExtensionMetadata) => ext.id === 'citizen_dashboard');
+		if (citizenDashboardExt && $userProfiles && $userProfiles.includes('member')) {
+			// Make sure it's not already in the list
+			const existingIndex = posts.findIndex(item => item.href === `/extensions/${citizenDashboardExt.id}`);
+			if (existingIndex === -1) {
+				posts = [
+					...posts, 
+					{ 
+						name: 'Citizen Dashboard', 
+						icon: getIcon(citizenDashboardExt.icon) || TableColumnSolid, 
+						href: `/extensions/${citizenDashboardExt.id}` 
+					}
+				];
+			}
+		}
+	}
 	
 	// Special case for Vault Manager extension (for admin)
-	// $: {
-	// 	const vaultManagerExt = extensions.find((ext: ExtensionMetadata) => ext.id === 'vault_manager');
-	// 	if (vaultManagerExt && $userProfiles && $userProfiles.includes('admin')) {
-	// 		// Make sure it's not already in the list
-	// 		const existingIndex = posts.findIndex(item => item.href === `/extensions/${vaultManagerExt.id}`);
-	// 		if (existingIndex === -1) {
-	// 			posts = [
-	// 				...posts, 
-	// 				{ 
-	// 					name: 'Vault Manager', 
-	// 					icon: getIcon(vaultManagerExt.icon) || WalletSolid, 
-	// 					href: `/extensions/${vaultManagerExt.id}` 
-	// 				}
-	// 			];
-	// 		}
-	// 	}
-	// }
+	$: {
+		const vaultManagerExt = extensions.find((ext: ExtensionMetadata) => ext.id === 'vault_manager');
+		if (vaultManagerExt && $userProfiles && $userProfiles.includes('admin')) {
+			// Make sure it's not already in the list
+			const existingIndex = posts.findIndex(item => item.href === `/extensions/${vaultManagerExt.id}`);
+			if (existingIndex === -1) {
+				posts = [
+					...posts, 
+					{ 
+						name: 'Vault Manager', 
+						icon: getIcon(vaultManagerExt.icon) || WalletSolid, 
+						href: `/extensions/${vaultManagerExt.id}` 
+					}
+				];
+			}
+		}
+	}
 
 	let links: Link[] = [
 		// External links removed for brevity

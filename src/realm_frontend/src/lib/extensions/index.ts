@@ -1,6 +1,5 @@
 import type { ComponentType } from 'svelte';
 import { getIcon } from '$lib/utils/iconMap';
-// No need to import i18n functions as translations are now loaded from JSON files
 
 // Extension metadata interface
 export interface ExtensionMetadata {
@@ -12,46 +11,52 @@ export interface ExtensionMetadata {
     author: string;
     permissions: string[];
     component?: ComponentType;
-    enabled?: boolean;  // Field to control visibility
-    profiles?: string[];  // Field to specify which user profiles can access this extension
-    // Translations are now loaded from JSON files in /lib/i18n/locales/extensions/{id}/
+    enabled?: boolean;
+    profiles?: string[];
+    [key: string]: any;
 }
-
-// Type for dynamically imported modules
-interface ExtensionModule {
-    default: ComponentType;
-    metadata: Omit<ExtensionMetadata, 'id' | 'component' | 'enabled'>;
-}
-
-// Auto-discover extensions from the filesystem
-// This runs at build time with Vite, compatible with IC deployment
-const extensionModules = import.meta.glob<ExtensionModule>('./*/index.ts', { eager: true });
 
 // Registry of all available extensions
 const extensionsRegistry: Record<string, ExtensionMetadata> = {};
 
-// Process discovered extensions
-Object.entries(extensionModules).forEach(([path, module]) => {
-    // Extract the extension ID from the path (e.g., './my_extension/index.ts' -> 'my_extension')
-    const id = path.split('/')[1];
+const isDevDummyMode = typeof window !== 'undefined' && import.meta.env.DEV_DUMMY_MODE === 'true';
+
+if (isDevDummyMode) {
+    console.log('DEV_DUMMY_MODE: Extensions disabled to avoid circular imports');
+} else {
+    console.log('Normal mode: Loading extensions with manual imports');
     
-    // Add to registry with module metadata and component
-    if (module.metadata && module.default) {
-        extensionsRegistry[id] = {
-            ...module.metadata,
-            id,
-            component: module.default,
-            enabled: true // Default to enabled
-        };
-        
-        // No need to register translations here - they're loaded automatically
-        // from JSON files in /lib/i18n/locales/extensions/{id}/
-        
-        console.log(`Registered extension: ${id}`);
-    } else {
-        console.warn(`Failed to register extension at ${path}: missing metadata or component`);
-    }
-});
+    const extensionImports = [
+        { id: 'vault_manager', path: './vault_manager/index.js' },
+        { id: 'llm_chat', path: './llm_chat/index.js' },
+        { id: 'test_bench', path: './test_bench/index.js' },
+        { id: 'citizen_dashboard', path: './citizen_dashboard/index.js' },
+        { id: 'public_dashboard', path: './public_dashboard/index.js' },
+        { id: 'land_registry', path: './land_registry/index.js' },
+        { id: 'justice_litigation', path: './justice_litigation/index.js' },
+        { id: 'metrics', path: './metrics/index.js' },
+        { id: 'notifications', path: './notifications/index.js' }
+    ];
+    
+    extensionImports.forEach(async ({ id, path }) => {
+        try {
+            const module = await import(path);
+            if (module.metadata && module.default) {
+                extensionsRegistry[id] = {
+                    ...module.metadata,
+                    id,
+                    component: module.default as ComponentType,
+                    enabled: true
+                } as ExtensionMetadata;
+                console.log(`Registered extension: ${id}`);
+            } else {
+                console.warn(`Failed to register extension ${id}: missing metadata or component`);
+            }
+        } catch (error) {
+            console.warn(`Failed to load extension ${id}:`, error);
+        }
+    });
+}
 
 // Function to get all registered extensions
 export function getAllExtensions(): ExtensionMetadata[] {
