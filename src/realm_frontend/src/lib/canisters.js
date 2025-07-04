@@ -1,47 +1,51 @@
-console.log('=== CANISTERS.JS LOADING START ===');
+console.log('=== CANISTERS.JS LOADING ===');
 
 import { building } from '$app/environment';
-import { writable, get } from 'svelte/store';
-import { createDummyBackend } from './dummyBackend.js';
+import { writable } from 'svelte/store';
 
-console.log('=== DUMMY BACKEND IMPORTED SUCCESSFULLY ===');
+const isDummyMode = typeof window !== 'undefined' && window.__DUMMY_MODE__;
 
-const buildingOrTesting = building || process.env.NODE_ENV === "test";
-
-console.log('Building/Testing:', buildingOrTesting);
-console.log('Forcing dummy mode for debugging');
+console.log('Dummy mode detected:', isDummyMode);
 
 function dummyActor() {
     return new Proxy({}, { get() { throw new Error("Canister invoked while building"); } });
 }
 
-// Create initial backend actor - FORCE DUMMY MODE FOR DEBUGGING
+// Create initial backend
 function createInitialBackend() {
-    if (buildingOrTesting) {
+    if (building) {
         console.log('Using build-time dummy actor');
         return dummyActor();
+    } else if (isDummyMode && window.__DUMMY_BACKEND__) {
+        console.log('Using global dummy backend');
+        return window.__DUMMY_BACKEND__;
     } else {
-        console.log('FORCED: Creating dummy backend for debugging');
-        return createDummyBackend();
+        console.log('Loading real backend (not implemented in dummy mode)');
+        return window.__DUMMY_BACKEND__ || dummyActor();
     }
 }
 
-// Create a writable store for the backend actor (required by existing components)
-export const backendStore = writable(createInitialBackend());
+// Create backend store
+const initialBackend = createInitialBackend();
+export const backendStore = writable(initialBackend);
 
-// Create a proxy that always uses the latest actor from the store
+// Create backend proxy
 export const backend = new Proxy({}, {
     get: function(target, prop) {
-        // Get the latest actor from the store
-        const actor = get(backendStore);
-        // Forward the property access to the actor
-        return actor[prop];
+        if (isDummyMode && window.__DUMMY_BACKEND__) {
+            return window.__DUMMY_BACKEND__[prop];
+        }
+        return initialBackend[prop];
     }
 });
 
-console.log('Backend created and exported');
-
 export async function initBackendWithIdentity() {
-    console.log('initBackendWithIdentity called - returning dummy backend');
-    return get(backendStore);
+    console.log('initBackendWithIdentity called');
+    if (isDummyMode) {
+        console.log('Returning dummy backend for dev mode');
+        return window.__DUMMY_BACKEND__;
+    }
+    return initialBackend;
 }
+
+console.log('Canisters module ready');

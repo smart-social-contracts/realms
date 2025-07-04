@@ -7,7 +7,18 @@
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import T from '$lib/components/T.svelte';
-	import { initBackendWithIdentity } from '$lib/canisters';
+	
+	// Dynamic import based on dummy mode
+	let initBackendWithIdentity;
+	if (typeof window !== 'undefined' && window.__DUMMY_MODE__) {
+		import('$lib/dummyCanisters').then(module => {
+			initBackendWithIdentity = module.initBackendWithIdentity;
+		});
+	} else {
+		import('$lib/canisters').then(module => {
+			initBackendWithIdentity = module.initBackendWithIdentity;
+		});
+	}
 
 	let principalText = '';
 	let showDropdown = false;
@@ -27,8 +38,8 @@
 			principal.set(principalText);
 
 			console.log('Principal restored from existing session:', principalText);
-			// Initialize backend with authenticated identity
-			await initBackendWithIdentity();
+		// Initialize backend with authenticated identity
+		// await initBackendWithIdentity(); // Temporarily disabled for debugging
 			// Load user profiles
 			await loadUserProfiles();
 		}
@@ -57,7 +68,7 @@
 
 		console.log('Principal at login:', principalText); // Debugging principal value after login
 		// Initialize backend with authenticated identity
-		await initBackendWithIdentity();
+		// await initBackendWithIdentity(); // Temporarily disabled for debugging
 		// Load user profiles
 		await loadUserProfiles();
 	}
