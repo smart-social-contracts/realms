@@ -31,6 +31,15 @@ const profileState = writable<ProfileState>({
     error: null
 });
 
+if (typeof window !== 'undefined' && import.meta.env.DEV_DUMMY_MODE === 'true') {
+    console.log('DEV_DUMMY_MODE: Initializing profiles store with dummy data');
+    profileState.set({
+        profiles: ['member'],
+        loading: false,
+        error: null
+    });
+}
+
 // Derived store for just the profiles array for backward compatibility
 export const userProfiles = derived(
     profileState,
@@ -104,6 +113,17 @@ export function setProfilesForTesting(profiles: string[]): void {
 export async function loadUserProfiles() {
     // Skip if not authenticated
     if (!get(isAuthenticated)) {
+        return;
+    }
+    
+    if (typeof window !== 'undefined' && import.meta.env.DEV_DUMMY_MODE === 'true') {
+        console.log('DEV_DUMMY_MODE: Setting dummy profiles without backend call');
+        profileState.update(state => ({
+            ...state,
+            profiles: ['member'],
+            loading: false,
+            error: null
+        }));
         return;
     }
     
