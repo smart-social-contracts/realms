@@ -3,10 +3,22 @@
 	import { onMount } from 'svelte';
 	import ActivityList from '../../../routes/(sidebar)/dashboard/ActivityList.svelte';
 	import OrganizationTable from '../../../routes/utils/dashboard/OrganizationTable.svelte';
-	import { backend } from '$lib/canisters';
-	import { principal } from '$lib/stores/auth';
-	import { universe, snapshots } from '$lib/stores/auth';
 	import { writable } from 'svelte/store';
+	
+	let backend, principal, universe, snapshots;
+	
+	const isDevDummyMode = typeof window !== 'undefined' && import.meta.env.DEV_DUMMY_MODE === 'true';
+	
+	if (!isDevDummyMode) {
+		import('$lib/canisters').then(module => {
+			backend = module.backend;
+		});
+		import('$lib/stores/auth').then(module => {
+			principal = module.principal;
+			universe = module.universe;
+			snapshots = module.snapshots;
+		});
+	}
 
 	let greeting = '';
 
@@ -30,33 +42,52 @@
 	const assetsDatesValues = writable<[string[], number[]]>(mockAssetData);
 
 	function onSubmit(event) {
+		if (isDevDummyMode) {
+			console.log('DEV_DUMMY_MODE: Skipping backend calls');
+			greeting = 'Hello from dummy mode!';
+			return false;
+		}
+		
 		const name = event.target.name.value;
-		backend.greet(name).then((response) => {
-			greeting = response;
-		});
+		if (backend) {
+			backend.greet(name).then((response) => {
+				greeting = response;
+			});
 
-		backend.get_universe().then((response) => {
-			let principalText = response;
-			console.log(`principalText = ${principalText}`);
-			principal.set(principalText);
-			const jsonObject = JSON.parse(principalText);
-			console.log(jsonObject);
-			console.log(jsonObject.users[0].id);
-		});
+			backend.get_universe().then((response) => {
+				let principalText = response;
+				console.log(`principalText = ${principalText}`);
+				if (principal) principal.set(principalText);
+				const jsonObject = JSON.parse(principalText);
+				console.log(jsonObject);
+				console.log(jsonObject.users[0].id);
+			});
+		}
 
 		return false;
 	}
 
 	function onSubmitGetUniverse(event) {
-		backend.status().then((response) => {
-			console.log('status', response);
-			universe.set(response);
-		});
+		if (isDevDummyMode) {
+			console.log('DEV_DUMMY_MODE: Skipping backend calls');
+			return false;
+		}
+		
+		if (backend) {
+			backend.status().then((response) => {
+				console.log('status', response);
+				if (universe) universe.set(response);
+			});
+		}
 		return false;
 	}
 
 	function get_snapshot_data() {
-		console.log('Using mock data');
+		if (isDevDummyMode) {
+			console.log('DEV_DUMMY_MODE: Using mock data for public dashboard');
+		} else {
+			console.log('Using mock data');
+		}
 		
 		return false;
 	}
@@ -70,7 +101,7 @@
 
 <div class="mt-px space-y-4">
 	<ChartWidget
-		title="Users"
+		title="Users (Hot Reload Test)"
 		description="Active users in the platform"
 		dateValues={$statsDatesValues}
 	/>

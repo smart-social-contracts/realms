@@ -35,6 +35,16 @@
 	import { getIcon } from '$lib/utils/iconMap';
 	// Import user profiles store
 	import { userProfiles } from '$lib/stores/profiles';
+	
+	// Force profiles store to load in DEV_DUMMY_MODE
+	if (typeof window !== 'undefined' && import.meta.env.DEV_DUMMY_MODE === 'true') {
+		console.log('Sidebar: Forcing profiles store import in DEV_DUMMY_MODE');
+		import('$lib/stores/profiles').then(module => {
+			console.log('Sidebar: Profiles store module loaded:', module);
+		}).catch(error => {
+			console.error('Sidebar: Failed to load profiles store:', error);
+		});
+	}
 
 	export let drawerHidden: boolean = false;
 

@@ -24,6 +24,9 @@ export default defineConfig({
     reportCompressedSize: false,
   },
   logLevel: 'info', // Show startup info for debugging
+  define: {
+    'import.meta.env.DEV_DUMMY_MODE': JSON.stringify(process.env.DEV_DUMMY_MODE || 'false'),
+  },
   optimizeDeps: {
     esbuildOptions: {
       define: {

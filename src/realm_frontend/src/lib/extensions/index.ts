@@ -22,23 +22,49 @@ const extensionsRegistry: Record<string, ExtensionMetadata> = {};
 const isDevDummyMode = typeof window !== 'undefined' && import.meta.env.DEV_DUMMY_MODE === 'true';
 
 if (isDevDummyMode) {
-    console.log('DEV_DUMMY_MODE: Extensions disabled to avoid circular imports');
+    console.log('DEV_DUMMY_MODE: Loading safe extensions without backend dependencies');
+    
+    const safeExtensionImports = [
+        { id: 'vault_manager', path: './vault_manager/index.ts' },
+        { id: 'public_dashboard', path: './public_dashboard/index.ts' },
+        { id: 'metrics', path: './metrics/index.ts' },
+        { id: 'notifications', path: './notifications/index.ts' }
+    ];
+    
+    await Promise.all(safeExtensionImports.map(async ({ id, path }) => {
+        try {
+            const module = await import(path);
+            if (module.metadata && module.default) {
+                extensionsRegistry[id] = {
+                    ...module.metadata,
+                    id,
+                    component: module.default as ComponentType,
+                    enabled: true
+                } as ExtensionMetadata;
+                console.log(`Registered safe extension: ${id}`);
+            } else {
+                console.warn(`Failed to register extension ${id}: missing metadata or component`);
+            }
+        } catch (error) {
+            console.warn(`Failed to load safe extension ${id}:`, error);
+        }
+    }));
 } else {
     console.log('Normal mode: Loading extensions with manual imports');
     
     const extensionImports = [
-        { id: 'vault_manager', path: './vault_manager/index.js' },
-        { id: 'llm_chat', path: './llm_chat/index.js' },
-        { id: 'test_bench', path: './test_bench/index.js' },
-        { id: 'citizen_dashboard', path: './citizen_dashboard/index.js' },
-        { id: 'public_dashboard', path: './public_dashboard/index.js' },
-        { id: 'land_registry', path: './land_registry/index.js' },
-        { id: 'justice_litigation', path: './justice_litigation/index.js' },
-        { id: 'metrics', path: './metrics/index.js' },
-        { id: 'notifications', path: './notifications/index.js' }
+        { id: 'vault_manager', path: './vault_manager/index.ts' },
+        { id: 'llm_chat', path: './llm_chat/index.ts' },
+        { id: 'test_bench', path: './test_bench/index.ts' },
+        { id: 'citizen_dashboard', path: './citizen_dashboard/index.ts' },
+        { id: 'public_dashboard', path: './public_dashboard/index.ts' },
+        { id: 'land_registry', path: './land_registry/index.ts' },
+        { id: 'justice_litigation', path: './justice_litigation/index.ts' },
+        { id: 'metrics', path: './metrics/index.ts' },
+        { id: 'notifications', path: './notifications/index.ts' }
     ];
     
-    extensionImports.forEach(async ({ id, path }) => {
+    await Promise.all(extensionImports.map(async ({ id, path }) => {
         try {
             const module = await import(path);
             if (module.metadata && module.default) {
@@ -55,7 +81,7 @@ if (isDevDummyMode) {
         } catch (error) {
             console.warn(`Failed to load extension ${id}:`, error);
         }
-    });
+    }));
 }
 
 // Function to get all registered extensions
