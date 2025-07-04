@@ -1,17 +1,6 @@
 import { writable } from 'svelte/store';
-
-let backend: any;
-if (typeof window !== 'undefined' && (window as any).__DUMMY_MODE__) {
-    // @ts-ignore - Dynamic import for dev dummy mode
-    import('$lib/dummyCanisters').then(module => {
-        backend = module.backend;
-    });
-} else {
-    // @ts-ignore - Dynamic import for canisters module
-    import('$lib/canisters').then(module => {
-        backend = module.backend;
-    });
-}
+// @ts-ignore
+import { backend } from '$lib/canisters';
 
 export interface NotificationItem {
     id: string;
@@ -29,20 +18,16 @@ export const unreadCount = writable<number>(0);
 
 export async function loadNotifications() {
     try {
-        if (backend) {
-            const response = await backend.extension_sync_call({
-                extension_name: 'notifications',
-                function_name: 'get_notifications',
-                args: '{}'
-            });
-            const notificationData = JSON.parse(response);
-            notifications.set(notificationData.notifications || []);
-            unreadCount.set(notificationData.unread_count || 0);
-            return;
-        }
-        throw new Error('Backend not available - using sample data');
+        const response = await backend.extension_sync_call({
+            extension_name: 'notifications',
+            function_name: 'get_notifications',
+            args: '{}'
+        });
+        const notificationData = JSON.parse(response);
+        notifications.set(notificationData.notifications || []);
+        unreadCount.set(notificationData.unread_count || 0);
     } catch (error) {
-        console.log('Using sample notifications data:', (error as Error).message);
+        console.error('Failed to load notifications:', error);
         const sampleNotifications = [
             {
                 id: '1',
@@ -82,17 +67,21 @@ export async function loadNotifications() {
 
 export async function markAsRead(notificationId: string) {
     try {
-        if (backend) {
-            await backend.extension_sync_call({
-                extension_name: 'notifications',
-                function_name: 'mark_as_read',
-                args: JSON.stringify({ notification_id: notificationId })
-            });
-        } else {
-            throw new Error('Backend not available - using local update');
-        }
+        await backend.extension_sync_call({
+            extension_name: 'notifications',
+            function_name: 'mark_as_read',
+            args: JSON.stringify({ notification_id: notificationId })
+        });
+        
+        notifications.update(items => {
+            const updated = items.map(item => 
+                item.id === notificationId ? { ...item, read: true } : item
+            );
+            unreadCount.set(updated.filter(n => !n.read).length);
+            return updated;
+        });
     } catch (error) {
-        console.log('Using local notification update:', (error as Error).message);
+        console.error('Failed to mark notification as read:', error);
         notifications.update(items => {
             const updated = items.map(item => 
                 item.id === notificationId ? { ...item, read: true } : item
