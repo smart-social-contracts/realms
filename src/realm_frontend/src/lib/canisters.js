@@ -38,16 +38,6 @@ const dummyBackend = {
     get_stats: async () => ({ success: true, data: [] })
 };
 
-async function createRealBackend() {
-    try {
-        const { createActor, canisterId } = await import('declarations/realm_backend');
-        return createActor(canisterId);
-    } catch (error) {
-        console.warn('Failed to import backend declarations, falling back to dummy backend:', error);
-        return dummyBackend;
-    }
-}
-
 let initialBackend;
 if (buildingOrTesting) {
     initialBackend = dummyActor();
@@ -55,6 +45,7 @@ if (buildingOrTesting) {
     console.log('DEV_DUMMY_MODE: Using dummy backend');
     initialBackend = dummyBackend;
 } else {
+    console.log('Normal mode: Starting with dummy backend, will attempt to load real backend');
     initialBackend = dummyBackend;
 }
 
@@ -69,32 +60,40 @@ export const backend = new Proxy({}, {
 });
 
 if (!buildingOrTesting && !isDevDummyMode) {
-    import('declarations/realm_backend')
-        .then(({ createActor, canisterId }) => {
+    setTimeout(async () => {
+        try {
+            const modulePath = 'declarations/realm_backend';
+            const backendModule = await import(/* @vite-ignore */ modulePath);
+            const { createActor, canisterId } = backendModule;
+            
             console.log('Normal mode: Successfully loaded backend declarations');
             const realBackend = createActor(canisterId);
             backendStore.set(realBackend);
             console.log('Normal mode: Initialized real backend');
-        })
-        .catch(error => {
+        } catch (error) {
             console.warn('Normal mode: Failed to load backend declarations, using dummy backend:', error);
             console.warn('This is expected if dfx generate realm_backend has not been run');
-        });
+        }
+    }, 0);
 }
 
 export async function initBackendWithIdentity() {
     if (isDevDummyMode) {
-        console.log('DEV_DUMMY_MODE: Using dummy backend');
+        console.log('DEV_DUMMY_MODE: Using dummy backend for authentication');
         return dummyBackend;
     }
     
     try {
         console.log('Initializing backend with authenticated identity...');
         
+        const authModulePath = '$lib/auth';
+        const backendModulePath = 'declarations/realm_backend';
+        const agentModulePath = '@dfinity/agent';
+        
         const [authModule, backendModule, agentModule] = await Promise.all([
-            import('$lib/auth').catch(() => null),
-            import('declarations/realm_backend').catch(() => null),
-            import('@dfinity/agent').catch(() => null)
+            import(/* @vite-ignore */ authModulePath).catch(() => null),
+            import(/* @vite-ignore */ backendModulePath).catch(() => null),
+            import(/* @vite-ignore */ agentModulePath).catch(() => null)
         ]);
         
         if (!authModule || !backendModule || !agentModule) {
