@@ -26,10 +26,10 @@ async function initializeExtensions() {
         console.log('DEV_DUMMY_MODE: Loading safe extensions without backend dependencies');
         
         const safeExtensionImports = [
-            { id: 'vault_manager', path: './vault_manager/index.ts' },
-            { id: 'public_dashboard', path: './public_dashboard/index.ts' },
-            { id: 'metrics', path: './metrics/index.ts' },
-            { id: 'notifications', path: './notifications/index.ts' }
+            { id: 'vault_manager', path: './vault_manager/index.js' },
+            { id: 'public_dashboard', path: './public_dashboard/index.js' },
+            { id: 'metrics', path: './metrics/index.js' },
+            { id: 'notifications', path: './notifications/index.js' }
         ];
         
         await Promise.all(safeExtensionImports.map(async ({ id, path }) => {
@@ -54,14 +54,14 @@ async function initializeExtensions() {
         console.log('Normal mode: Loading extensions with manual imports');
         
         const extensionImports = [
-            { id: 'vault_manager', path: './vault_manager/index.ts' },
-            { id: 'llm_chat', path: './llm_chat/index.ts' },
-            { id: 'citizen_dashboard', path: './citizen_dashboard/index.ts' },
-            { id: 'public_dashboard', path: './public_dashboard/index.ts' },
-            { id: 'land_registry', path: './land_registry/index.ts' },
-            { id: 'justice_litigation', path: './justice_litigation/index.ts' },
-            { id: 'metrics', path: './metrics/index.ts' },
-            { id: 'notifications', path: './notifications/index.ts' }
+            { id: 'vault_manager', path: './vault_manager/index.js' },
+            { id: 'llm_chat', path: './llm_chat/index.js' },
+            { id: 'citizen_dashboard', path: './citizen_dashboard/index.js' },
+            { id: 'public_dashboard', path: './public_dashboard/index.js' },
+            { id: 'land_registry', path: './land_registry/index.js' },
+            { id: 'justice_litigation', path: './justice_litigation/index.js' },
+            { id: 'metrics', path: './metrics/index.js' },
+            { id: 'notifications', path: './notifications/index.js' }
         ];
         
         await Promise.all(extensionImports.map(async ({ id, path }) => {
