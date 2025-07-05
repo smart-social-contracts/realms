@@ -23,7 +23,10 @@ export default defineConfig({
     minify: true,
     reportCompressedSize: false,
   },
-  logLevel: 'error', // Only show errors
+  logLevel: 'info', // Show startup info for debugging
+  define: {
+    'import.meta.env.DEV_DUMMY_MODE': JSON.stringify(process.env.DEV_DUMMY_MODE || 'false'),
+  },
   optimizeDeps: {
     esbuildOptions: {
       define: {
@@ -42,6 +45,7 @@ export default defineConfig({
     sveltekit(),
     environment("all", { prefix: "CANISTER_" }),
     environment("all", { prefix: "DFX_" }),
+    environment("all", { prefix: "DEV_" }),
   ],
   resolve: {
     alias: [

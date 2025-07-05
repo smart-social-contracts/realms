@@ -35,50 +35,62 @@ export async function loadExtensionTranslations() {
   
   try {
     // Import all extension translation files using static patterns
-    const enModules = import.meta.glob('./locales/extensions/*/en.json');
-    const esModules = import.meta.glob('./locales/extensions/*/es.json');
+    const enModules = import.meta.glob('./locales/extensions/*/en.json', { eager: false });
+    const esModules = import.meta.glob('./locales/extensions/*/es.json', { eager: false });
     
-    // Process English translations
-    for (const path of Object.keys(enModules)) {
+    // Process English translations with better error handling
+    const enPromises = Object.keys(enModules).map(async (path) => {
       try {
         // Extract extension ID from path
         const extensionId = path.split('/').slice(-2)[0];
         const module = await enModules[path]();
         const translations = (module as JsonModule).default;
         
-        addMessages('en', {
-          extensions: {
-            [extensionId]: translations
-          }
-        });
-        
-        console.log(`Loaded translations for extension: ${extensionId}, locale: en`);
+        if (translations && typeof translations === 'object') {
+          addMessages('en', {
+            extensions: {
+              [extensionId]: translations
+            }
+          });
+          
+          console.log(`Loaded translations for extension: ${extensionId}, locale: en`);
+        } else {
+          console.warn(`Invalid translation format for extension: ${extensionId}, locale: en`);
+        }
       } catch (err) {
-        console.error(`Failed to load extension translation: ${path}`, err);
+        console.warn(`Failed to load extension translation: ${path}`, err);
       }
-    }
+    });
     
-    // Process Spanish translations
-    for (const path of Object.keys(esModules)) {
+    // Process Spanish translations with better error handling
+    const esPromises = Object.keys(esModules).map(async (path) => {
       try {
         // Extract extension ID from path
         const extensionId = path.split('/').slice(-2)[0];
         const module = await esModules[path]();
         const translations = (module as JsonModule).default;
         
-        addMessages('es', {
-          extensions: {
-            [extensionId]: translations
-          }
-        });
-        
-        console.log(`Loaded translations for extension: ${extensionId}, locale: es`);
+        if (translations && typeof translations === 'object') {
+          addMessages('es', {
+            extensions: {
+              [extensionId]: translations
+            }
+          });
+          
+          console.log(`Loaded translations for extension: ${extensionId}, locale: es`);
+        } else {
+          console.warn(`Invalid translation format for extension: ${extensionId}, locale: es`);
+        }
       } catch (err) {
-        console.error(`Failed to load extension translation: ${path}`, err);
+        console.warn(`Failed to load extension translation: ${path}`, err);
       }
-    }
+    });
+    
+    await Promise.allSettled([...enPromises, ...esPromises]);
+    console.log('Extension translation loading completed');
+    
   } catch (err) {
-    console.error("Error loading extension translations:", err);
+    console.warn("Error loading extension translations (non-fatal):", err);
   }
 }
 

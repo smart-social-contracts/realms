@@ -24,12 +24,18 @@ interface ProfileState {
     error: string | null;
 }
 
+const isDevDummyMode = import.meta.env.DEV_DUMMY_MODE === 'true';
+
 // Create a more comprehensive store for profiles with loading and error states
 const profileState = writable<ProfileState>({
-    profiles: [],
+    profiles: isDevDummyMode ? ['admin', 'member'] : [],
     loading: false,
     error: null
 });
+
+if (isDevDummyMode) {
+    console.log('DEV_DUMMY_MODE: Initializing profiles store with dummy data immediately');
+}
 
 // Derived store for just the profiles array for backward compatibility
 export const userProfiles = derived(
@@ -104,6 +110,16 @@ export function setProfilesForTesting(profiles: string[]): void {
 export async function loadUserProfiles() {
     // Skip if not authenticated
     if (!get(isAuthenticated)) {
+        return;
+    }
+    
+    if (typeof window !== 'undefined' && import.meta.env.DEV_DUMMY_MODE === 'true') {
+        profileState.update(state => ({
+            ...state,
+            profiles: ['admin', 'member'],
+            loading: false,
+            error: null
+        }));
         return;
     }
     

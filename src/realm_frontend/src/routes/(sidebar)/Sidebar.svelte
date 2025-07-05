@@ -35,6 +35,7 @@
 	import { getIcon } from '$lib/utils/iconMap';
 	// Import user profiles store
 	import { userProfiles } from '$lib/stores/profiles';
+	
 
 	export let drawerHidden: boolean = false;
 
