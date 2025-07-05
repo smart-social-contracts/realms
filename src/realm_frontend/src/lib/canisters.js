@@ -1,5 +1,15 @@
 
-console.log('=== ULTRA MINIMAL CANISTERS LOADING ===');
+import { building } from '$app/environment';
+import { writable, get } from 'svelte/store';
+
+const isDevDummyMode = typeof window !== 'undefined' && import.meta.env.DEV_DUMMY_MODE === 'true';
+const buildingOrTesting = building || process.env.NODE_ENV === "test";
+
+console.log('Canisters loading - DEV_DUMMY_MODE:', isDevDummyMode, 'Building:', buildingOrTesting);
+
+function dummyActor() {
+    return new Proxy({}, { get() { throw new Error("Canister invoked while building"); } });
+}
 
 const dummyBackend = {
     status: async () => ({ success: true, data: { Status: { demo_mode: true } } }),
@@ -28,35 +38,109 @@ const dummyBackend = {
     get_stats: async () => ({ success: true, data: [] })
 };
 
-// Simple store implementation without importing svelte/store
-let storeValue = dummyBackend;
-const subscribers = [];
-
-const backendStore = {
-    subscribe: (callback) => {
-        subscribers.push(callback);
-        callback(storeValue);
-        return () => {
-            const index = subscribers.indexOf(callback);
-            if (index !== -1) subscribers.splice(index, 1);
-        };
-    },
-    set: (value) => {
-        storeValue = value;
-        subscribers.forEach(callback => callback(value));
-    },
-    update: (updater) => {
-        storeValue = updater(storeValue);
-        subscribers.forEach(callback => callback(storeValue));
+async function createRealBackend() {
+    try {
+        const { createActor, canisterId } = await import('declarations/realm_backend');
+        return createActor(canisterId);
+    } catch (error) {
+        console.warn('Failed to import backend declarations, falling back to dummy backend:', error);
+        return dummyBackend;
     }
-};
-
-export const backend = dummyBackend;
-export { backendStore };
-
-export async function initBackendWithIdentity() {
-    console.log('=== INIT BACKEND WITH IDENTITY (DUMMY) ===');
-    return dummyBackend;
 }
 
-console.log('=== ULTRA MINIMAL CANISTERS LOADED ===');
+let initialBackend;
+if (buildingOrTesting) {
+    initialBackend = dummyActor();
+} else if (isDevDummyMode) {
+    console.log('DEV_DUMMY_MODE: Using dummy backend');
+    initialBackend = dummyBackend;
+} else {
+    initialBackend = dummyBackend;
+}
+
+export const backendStore = writable(initialBackend);
+
+// Create a proxy that always uses the latest actor from the store
+export const backend = new Proxy({}, {
+    get: function(target, prop) {
+        const actor = get(backendStore);
+        return actor[prop];
+    }
+});
+
+if (!buildingOrTesting && !isDevDummyMode) {
+    import('declarations/realm_backend')
+        .then(({ createActor, canisterId }) => {
+            console.log('Normal mode: Successfully loaded backend declarations');
+            const realBackend = createActor(canisterId);
+            backendStore.set(realBackend);
+            console.log('Normal mode: Initialized real backend');
+        })
+        .catch(error => {
+            console.warn('Normal mode: Failed to load backend declarations, using dummy backend:', error);
+            console.warn('This is expected if dfx generate realm_backend has not been run');
+        });
+}
+
+export async function initBackendWithIdentity() {
+    if (isDevDummyMode) {
+        console.log('DEV_DUMMY_MODE: Using dummy backend');
+        return dummyBackend;
+    }
+    
+    try {
+        console.log('Initializing backend with authenticated identity...');
+        
+        const [authModule, backendModule, agentModule] = await Promise.all([
+            import('$lib/auth').catch(() => null),
+            import('declarations/realm_backend').catch(() => null),
+            import('@dfinity/agent').catch(() => null)
+        ]);
+        
+        if (!authModule || !backendModule || !agentModule) {
+            console.warn('Failed to load required modules for authentication, using current backend');
+            return backend;
+        }
+        
+        const { authClient, initializeAuthClient } = authModule;
+        const { createActor, canisterId } = backendModule;
+        const { HttpAgent } = agentModule;
+        
+        const client = authClient || await initializeAuthClient();
+        
+        if (await client.isAuthenticated()) {
+            const identity = client.getIdentity();
+            console.log('Using authenticated identity:', identity.getPrincipal().toText());
+            
+            const currentActor = get(backendStore);
+            if (currentActor && currentActor._agent && currentActor._agent._identity === identity) {
+                console.log('Backend already initialized with current identity');
+                return currentActor;
+            }
+            
+            const agent = new HttpAgent({ identity });
+            
+            const isLocalDevelopment = typeof window !== 'undefined' && 
+                (window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1'));
+            
+            if (isLocalDevelopment) {
+                console.log('Fetching root key for local development');
+                await agent.fetchRootKey().catch(e => {
+                    console.warn('Error fetching root key:', e);
+                });
+            }
+            
+            const authenticatedActor = createActor(canisterId, { agent });
+            backendStore.set(authenticatedActor);
+            
+            console.log('Backend initialized with authenticated identity');
+            return authenticatedActor;
+        } else {
+            console.log('User not authenticated, using anonymous identity');
+            return backend;
+        }
+    } catch (error) {
+        console.error('Error initializing backend with identity:', error);
+        return backend;
+    }
+}
