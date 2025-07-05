@@ -4,5 +4,4 @@ import extension_packages.justice_litigation.entry
 import extension_packages.land_registry.entry
 import extension_packages.llm_chat.entry
 import extension_packages.passport_verification.entry
-import extension_packages.test_bench.entry
 import extension_packages.vault_manager.entry
