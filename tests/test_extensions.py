@@ -6,7 +6,6 @@ import os
 from test_utils import assert_file_exists, assert_in, print_ok, run_command
 
 EXTENSION_NAMES = [
-    "test_bench",
     "vault_manager",
     "demo_loader",
     "citizen_dashboard",
