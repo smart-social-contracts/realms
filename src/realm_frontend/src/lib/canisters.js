@@ -13,7 +13,7 @@ function dummyActor() {
 
 const dummyBackend = {
     status: async () => ({ success: true, data: { Status: { demo_mode: true } } }),
-    get_my_user_status: async () => ({ success: true, data: { UserGet: { principal: "demo-user", profiles: ["member"] } } }),
+    get_my_user_status: async () => ({ success: true, data: { UserGet: { principal: "dummy-user", profiles: ["admin", "member"] } } }),
     join_realm: async (profile) => ({ success: true, data: { message: `Joined as ${profile}` } }),
     get_users: async (page = 0, size = 5) => ({ success: true, data: { UsersList: { users: [], pagination: { total: 0, page, per_page: size } } } }),
     get_organizations: async (page = 0, size = 5) => ({ success: true, data: { OrganizationsList: { organizations: [], pagination: { total: 0, page, per_page: size } } } }),

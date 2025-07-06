@@ -40,7 +40,7 @@
 
 			console.log('Principal restored from existing session:', principalText);
 		// Initialize backend with authenticated identity
-		// await initBackendWithIdentity(); // Temporarily disabled for debugging
+		await initBackendWithIdentity();
 			// Load user profiles
 			await loadUserProfiles();
 		}
@@ -69,7 +69,7 @@
 
 		console.log('Principal at login:', principalText); // Debugging principal value after login
 		// Initialize backend with authenticated identity
-		// await initBackendWithIdentity(); // Temporarily disabled for debugging
+		await initBackendWithIdentity();
 		// Load user profiles
 		await loadUserProfiles();
 	}
