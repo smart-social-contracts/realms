@@ -1,0 +1,65 @@
+import { test, expect } from '@playwright/test';
+import { AuthHelper } from '../fixtures/auth-helper';
+import { SidebarPage } from '../fixtures/sidebar';
+
+test.describe('Application Navigation', () => {
+	let authHelper: AuthHelper;
+	let sidebarPage: SidebarPage;
+
+	test.beforeEach(async ({ page }) => {
+		authHelper = new AuthHelper(page);
+		sidebarPage = new SidebarPage(page);
+		
+		await authHelper.navigateToAuthenticatedApp();
+		await sidebarPage.waitForSidebarToLoad();
+	});
+
+	const sidebarPages = [
+		'Dashboard',
+		'My identities',
+		'Admin Dashboard', 
+		'Settings',
+		'Extensions Marketplace',
+		'Citizen Dashboard',
+		'Justice Litigation',
+		'Land Registry',
+		'AI assistant',
+		'Budget Metrics',
+		'Notifications',
+		'Public Dashboard',
+		'test_bench',
+		'Vault Manager'
+	];
+
+	sidebarPages.forEach(pageName => {
+		test(`should navigate to ${pageName} page`, async ({ page }) => {
+			await test.step(`Navigate to ${pageName}`, async () => {
+				await sidebarPage.navigateToPage(pageName);
+				await sidebarPage.verifyPageLoaded();
+			});
+			
+			await test.step(`Verify ${pageName} page content`, async () => {
+				switch (pageName) {
+					case 'Dashboard':
+						await expect(page.getByText('Active users in the platform')).toBeVisible();
+						await expect(page.getByText('Total registered organizations')).toBeVisible();
+						await expect(page.locator('main')).toBeVisible();
+						break;
+					default:
+						await expect(page.locator('main, [role="main"]')).toBeVisible();
+				}
+			});
+		});
+	});
+
+	test('should complete full navigation walkthrough', async ({ page }) => {
+		for (const pageName of sidebarPages) {
+			await test.step(`Navigate to ${pageName}`, async () => {
+				await sidebarPage.navigateToPage(pageName);
+				await sidebarPage.verifyPageLoaded();
+				
+				await expect(page.locator('main, [role="main"]')).toBeVisible();
+			});
+		}
+	});
+});
