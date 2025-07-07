@@ -124,12 +124,12 @@
           
           <div class="flex flex-col gap-4">
             <div class="flex items-center gap-2">
-              <Radio name="agreement" value="agree" bind:group={agreement} />
-              <Label>I agree to the terms</Label>
+              <Radio id="agreement-yes" name="agreement" value="agree" bind:group={agreement} />
+              <Label for="agreement-yes">I agree to the terms</Label>
             </div>
             <div class="flex items-center gap-2">
-              <Radio name="agreement" value="disagree" bind:group={agreement} />
-              <Label>I do not agree</Label>
+              <Radio id="agreement-no" name="agreement" value="disagree" bind:group={agreement} />
+              <Label for="agreement-no">I do not agree</Label>
             </div>
           </div>
           
