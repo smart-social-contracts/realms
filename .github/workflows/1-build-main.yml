@@ -112,7 +112,7 @@ jobs:
         run: |
           docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} bash -c "./tests/test_extensions.py"
 
-  test-playwright:
+  test-ui-e2e:
     runs-on: ubuntu-latest
     needs: build
     if: "!contains(github.event.head_commit.message, 'Bump version')"
@@ -139,7 +139,7 @@ jobs:
 
   deploy-staging:
     runs-on: ubuntu-latest
-    needs: [test, test-extensions, test-playwright]
+    needs: [test, test-extensions, test-ui-e2e]
     if: "!contains(github.event.head_commit.message, 'Bump version')"
     steps:
       - name: Checkout code
