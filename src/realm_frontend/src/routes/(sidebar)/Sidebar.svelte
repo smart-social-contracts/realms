@@ -106,7 +106,7 @@
 	// Core navigation items
 	const coreNavItems: NavItemWithHref[] = [
 		{ name: 'Dashboard', icon: ChartPieOutline, href: '/extensions/public_dashboard' }, // For all users
-		{ name: 'My identities', icon: UsersOutline, href: '/identities' }, // For all users
+		{ name: 'My Identities', icon: UsersOutline, href: '/identities' }, // For all users
 		{ name: 'Admin Dashboard', icon: TableColumnSolid, href: '/ggg', profiles: ['admin'] }, // Admin only
 		{ name: 'Settings', icon: CogOutline, href: '/settings' }, // For all users
 	];

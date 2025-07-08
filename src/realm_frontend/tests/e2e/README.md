@@ -42,7 +42,7 @@ These tests reproduce the exact user flow demonstrated in the provided video:
 3. **Admin Login**: Automated through join form
 4. **Sidebar Navigation**: Tests all pages mentioned in video:
    - Dashboard
-   - My identities
+   - My Identities
    - Admin Dashboard
    - Settings
    - Extensions (dropdown with all extensions)

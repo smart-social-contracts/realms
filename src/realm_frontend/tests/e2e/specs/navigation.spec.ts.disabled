@@ -16,7 +16,7 @@ test.describe('Application Navigation', () => {
 
 	const sidebarPages = [
 		'Dashboard',
-		'My identities',
+		'My Identities',
 		'Admin Dashboard', 
 		'Settings',
 		'Extensions Marketplace',

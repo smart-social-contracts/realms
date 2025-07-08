@@ -105,26 +105,28 @@ test.describe('User workflows', () => {
 		await page.getByRole('button', { name: 'objects column outline' }).click();
 
 		const links = [
-			{ name: 'users outline My identities' },
-			{ name: 'table column solid Admin' },
-			{ name: 'cog outline Settings' },
-			{ name: 'layers solid Extensions' },
-			{ name: 'wallet solid Vault Manager' },
-			{ name: 'Citizen Dashboard' },
-			{ name: 'Justice Litigation' },
-			{ name: 'Land Registry' },
-			{ name: 'AI assistant' },
-			{ name: 'Budget Metrics' },
-			{ name: 'Notifications' },
-			{ name: 'Public Dashboard' },
-			{ name: 'layers solid Extensions' },
-			{ name: 'wallet solid Vault Manager' },
+			{ name: 'users outline My Identities' , needle: 'Manage and connect your' },
+			{ name: 'table column solid Admin' , needle: 'Generalized Global Governance System' },
+			{ name: 'cog outline Settings' , needle: 'Principal:' },
+			{ name: 'layers solid Extensions' , needle: 'Browse and install extensions' },
+			{ name: 'wallet solid Vault Manager' , needle: 'Vault Configuration' },
+			{ name: 'Citizen Dashboard' , needle: 'My Public Services' },
+			{ name: 'Justice Litigation' , needle: 'Justice Litigation' },
+			{ name: 'Land Registry' , needle: 'Land Registry' },
+			{ name: 'AI assistant' , needle: 'AI assistant' },
+			{ name: 'Budget Metrics' , needle: 'Budget Metrics' },
+			{ name: 'Notifications' , needle: 'Notifications' },
+			{ name: 'Public Dashboard' , needle: 'Active users in the platform' },
+			{ name: 'layers solid Extensions' , needle: 'Extensions' }
 		];
 
 		for (const link of links) {
 			await page.getByRole('link', { name: link.name }).click();
 			await page.waitForLoadState('networkidle');
 			await expect(page.getByRole('complementary', { name: 'Sidebar' })).toBeVisible({ timeout: 10000 });
+			if (link.needle) {
+				await expect(page.getByText(link.needle)).toBeVisible({ timeout: 10000 });
+			}
 		}
 
 

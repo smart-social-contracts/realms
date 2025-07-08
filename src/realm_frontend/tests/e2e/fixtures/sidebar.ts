@@ -8,8 +8,8 @@ export class SidebarPage {
 			case 'Dashboard':
 				await this.page.getByRole('link', { name: 'Dashboard' }).click();
 				break;
-			case 'My identities':
-				await this.page.getByRole('link', { name: 'My identities' }).click();
+			case 'My Identities':
+				await this.page.getByRole('link', { name: 'My Identities' }).click();
 				break;
 			case 'Admin Dashboard':
 				await this.page.getByRole('link', { name: 'Admin Dashboard' }).click();
