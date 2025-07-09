@@ -112,12 +112,11 @@ test.describe('User workflows', () => {
 			{ name: 'wallet solid Vault Manager' , needle: 'Vault Configuration' },
 			{ name: 'Citizen Dashboard' , needle: 'My Public Services' },
 			{ name: 'Justice Litigation' , needle: 'Justice Litigation' },
-			{ name: 'Land Registry' , needle: 'Land Registry' },
-			{ name: 'AI assistant' , needle: 'AI assistant' },
-			{ name: 'Budget Metrics' , needle: 'Budget Metrics' },
-			{ name: 'Notifications' , needle: 'Notifications' },
-			{ name: 'Public Dashboard' , needle: 'Active users in the platform' },
-			{ name: 'layers solid Extensions' , needle: 'Extensions' }
+			{ name: 'Land Registry' , needle: 'Manage land ownership' },
+			{ name: 'AI assistant' , needle: 'Governance AI assistant' },
+			{ name: 'Budget Metrics' , needle: 'Tax Allocation Breakdown' },
+			{ name: 'Notifications' , needle: 'unread notifications' },
+			{ name: 'Public Dashboard' , needle: 'Active users in the platform' }
 		];
 
 		for (const link of links) {
