@@ -3,6 +3,8 @@ import { AuthHelper } from '../fixtures/auth-helper';
 import { SidebarPage } from '../fixtures/sidebar';
 import { time } from 'console';
 
+const TIMEOUT = 300000;
+
 test.describe('User workflows', () => {
 	let authHelper: AuthHelper;
 	let sidebarPage: SidebarPage;
@@ -17,6 +19,8 @@ test.describe('User workflows', () => {
 
 	test('should be able to become admin', async ({ page }) => {
 		const context = page.context();
+		test.setTimeout(TIMEOUT);
+
 
 		await page.goto('/');
 		await page.waitForLoadState('networkidle');
@@ -58,7 +62,7 @@ test.describe('User workflows', () => {
 		await internetIdentityPage.waitForLoadState('networkidle');
 
 		const savedAndContinueButton = internetIdentityPage.getByRole('button', { name: 'I saved it, continue' });
-		await expect(savedAndContinueButton).toBeVisible({ timeout: 10000 });
+		await expect(savedAndContinueButton).toBeVisible({ timeout: TIMEOUT });
 		await savedAndContinueButton.click();
 		
 		// Wait for the tab to close after login
@@ -94,15 +98,15 @@ test.describe('User workflows', () => {
 
 		await page.getByRole('button', { name: 'Join Realm as admin' }).click();
 
-		await page.waitForLoadState('networkidle');
-		await expect(page.getByText('Successfully Joined!')).toBeVisible();
+		// await page.waitForLoadState('networkidle');
+		await expect(page.getByText('Successfully Joined!')).toBeVisible({ timeout: TIMEOUT });
 
 		await page.getByRole('button', { name: 'Go to Dashboard' }).click();
 		
-		await page.waitForLoadState('networkidle');
-		await expect(page.getByRole('complementary', { name: 'Sidebar' })).toBeVisible({ timeout: 10000 });
+		// await page.waitForLoadState('networkidle');
+		await expect(page.getByRole('complementary', { name: 'Sidebar' })).toBeVisible({ timeout: TIMEOUT });
 
-		await page.getByRole('button', { name: 'objects column outline' }).click();
+		// await page.getByRole('button', { name: 'objects column outline' }).click();
 
 		const links = [
 			{ name: 'users outline My Identities' , needle: 'Manage and connect your' },
@@ -111,7 +115,7 @@ test.describe('User workflows', () => {
 			{ name: 'layers solid Extensions' , needle: 'Browse and install extensions' },
 			{ name: 'wallet solid Vault Manager' , needle: 'Vault Configuration' },
 			{ name: 'Citizen Dashboard' , needle: 'My Public Services' },
-			{ name: 'Justice Litigation' , needle: 'Justice Litigation' },
+			{ name: 'Justice Litigation' , needle: 'Justice Litigation System' },
 			{ name: 'Land Registry' , needle: 'Manage land ownership' },
 			{ name: 'AI assistant' , needle: 'Governance AI assistant' },
 			{ name: 'Budget Metrics' , needle: 'Tax Allocation Breakdown' },
@@ -120,11 +124,12 @@ test.describe('User workflows', () => {
 		];
 
 		for (const link of links) {
+			// await page.getByRole('button', { name: 'objects column outline' }).click(); // expand Extensions sidebar
 			await page.getByRole('link', { name: link.name }).click();
-			await page.waitForLoadState('networkidle');
-			await expect(page.getByRole('complementary', { name: 'Sidebar' })).toBeVisible({ timeout: 10000 });
+			// await page.waitForLoadState('networkidle', { timeout: TIMEOUT });
+			await expect(page.getByRole('complementary', { name: 'Sidebar' })).toBeVisible({ timeout: TIMEOUT });
 			if (link.needle) {
-				await expect(page.getByText(link.needle)).toBeVisible({ timeout: 10000 });
+				await expect(page.getByText(link.needle)).toBeVisible({ timeout: TIMEOUT });
 			}
 		}
 

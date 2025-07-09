@@ -134,14 +134,12 @@
 	// Filter extensions based on user profiles and create menu items
 	$: filteredExtensions = filterExtensionsForSidebar(extensions);
 
-	// Add Extensions menu with submenu of filtered extensions
-	$: extensionsMenu = {
-		name: 'Extensions',
-		icon: ObjectsColumnOutline,
-		children: Object.fromEntries(
-			filteredExtensions.map(ext => [ext.name, `/extensions/${ext.id}`])
-		)
-	};
+	// Create individual menu items for extensions instead of dropdown
+	$: extensionItems = filteredExtensions.map(ext => ({
+		name: ext.name,
+		icon: getIcon(ext.icon) || TableColumnSolid,
+		href: `/extensions/${ext.id}`
+	}));
 
 	// Extensions Marketplace (admin only)
 	const marketplaceItem = { 
@@ -151,12 +149,12 @@
 		profiles: ['admin']
 	};
 
-	// Create combined navigation items with filtered core items and extensions section
+	// Create combined navigation items with filtered core items and extensions as separate items
 	let posts: NavItem[];
 	$: posts = [
 		...filteredCoreNavItems,
-		// Only show Extensions dropdown if user has profiles and there are valid extensions
-		...($userProfiles && $userProfiles.length > 0 && Object.keys(extensionsMenu.children).length > 0 ? [extensionsMenu] : []),
+		// Only show Extensions items if user has profiles and there are valid extensions
+		...($userProfiles && $userProfiles.length > 0 && extensionItems.length > 0 ? extensionItems : []),
 		// Only show Extensions Marketplace for admin
 		...($userProfiles && $userProfiles.includes('admin') ? [marketplaceItem] : [])
 	];
