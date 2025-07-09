@@ -42,6 +42,12 @@
 		drawerHidden = true;
 	};
 	
+	// Function to check if a URL is an extension link
+	function isExtensionLink(href: string | undefined): boolean {
+		if (!href) return false;
+		return href.startsWith('/extensions/') && href !== '/extensions';
+	}
+	
 	// Define types for navigation items
 	type NavItemWithHref = {
 		name: string;
@@ -221,13 +227,42 @@
 							<svelte:component this={icon} slot="icon" class={iconClass} />
 
 							{#each Object.entries(children) as [title, href]}
-								<SidebarItem label={title} href={href.toString()} spanClass="ml-9" class={itemClass} />
+								{#if isExtensionLink(href?.toString())}
+									<!-- Use classic browser navigation for extension links -->
+									<li>
+										<a 
+											href={href.toString()} 
+											data-sveltekit-reload 
+											class={itemClass} 
+											on:click={closeDrawer}
+										>
+											<span class="ml-9">{title}</span>
+										</a>
+									</li>
+								{:else}
+									<SidebarItem label={title} href={href.toString()} spanClass="ml-9" class={itemClass} />
+								{/if}
 							{/each}
 						</SidebarDropdownWrapper>
+					{:else}
+						{#if isExtensionLink(href)}
+						<!-- Use classic browser navigation for extension links -->
+						<li>
+							<a 
+								href={href} 
+								data-sveltekit-reload 
+								class={itemClass} 
+								on:click={closeDrawer}
+							>
+								<svelte:component this={icon} class={iconClass} />
+								<span class="ml-3">{name}</span>
+							</a>
+						</li>
 					{:else}
 						<SidebarItem label={name} {href} spanClass="ml-3" class={itemClass}>
 							<svelte:component this={icon} slot="icon" class={iconClass} />
 						</SidebarItem>
+					{/if}
 					{/if}
 				{/each}
 			</SidebarGroup>
