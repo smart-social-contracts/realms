@@ -8,5 +8,4 @@ pip install -r requirements-dev.txt
 
 python -m kybra install-dfx-extension
 
-npx playwright install
-npx playwright install-deps
+npx --no -- playwright install --with-deps
