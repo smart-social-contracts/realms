@@ -34,8 +34,8 @@
 
 <div class="py-6">
 	<div class="mb-8">
-		<h1 class="text-2xl font-semibold text-gray-900 dark:text-gray-200">Dashboard</h1>
-		<p class="text-gray-600 dark:text-gray-400">Welcome to Realms gOS Development Mode</p>
+		<h1 class="text-2xl font-semibold text-blue-600 dark:text-blue-400">Dashboard</h1>
+		<p class="text-gray-600 dark:text-gray-400">Welcome to Realms gOS Development Mode - Hot Reloading Test!</p>
 	</div>
 
 	<div class="grid gap-6 mb-8 md:grid-cols-2 xl:grid-cols-4">

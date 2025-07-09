@@ -1,6 +1,6 @@
 <script>
 	import { Button, Dropdown, DropdownItem, Avatar } from 'flowbite-svelte';
-	import { ChevronDownOutline, UserCircleOutline, CogOutline, SignOutOutline } from 'flowbite-svelte-icons';
+	import { ChevronDownOutline, UserCircleOutline, CogOutline, LockSolid } from 'flowbite-svelte-icons';
 	import { isAuthenticated, principal } from '$lib/dummy-data/auth';
 </script>
 
@@ -46,7 +46,7 @@
 						<span>Settings</span>
 					</DropdownItem>
 					<DropdownItem class="flex items-center p-2 text-sm font-medium text-gray-600 transition-colors duration-150 rounded-md hover:bg-gray-100 hover:text-gray-800 dark:hover:bg-gray-800 dark:hover:text-gray-200">
-						<SignOutOutline class="w-4 h-4 mr-3" />
+						<LockSolid class="w-4 h-4 mr-3" />
 						<span>Log out</span>
 					</DropdownItem>
 				</Dropdown>
