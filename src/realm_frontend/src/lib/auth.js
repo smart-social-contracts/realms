@@ -4,8 +4,7 @@ import { Principal } from '@dfinity/principal';
 
 const isDevDummyMode = import.meta.env.VITE_DEV_DUMMY_MODE === 'true' || 
                       import.meta.env.DEV_DUMMY_MODE === 'true' ||
-                      (typeof window !== 'undefined' && window.location.search.includes('dummy=true')) ||
-                      (typeof window !== 'undefined' && window.location.hostname.includes('localhost'));
+                      (typeof window !== 'undefined' && window.location.search.includes('dummy=true'));
 
 
 // More reliable local development detection

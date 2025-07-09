@@ -4,8 +4,7 @@ import { writable, get } from 'svelte/store';
 
 const isDevDummyMode = import.meta.env.VITE_DEV_DUMMY_MODE === 'true' || 
                       import.meta.env.DEV_DUMMY_MODE === 'true' ||
-                      (typeof window !== 'undefined' && window.location.search.includes('dummy=true')) ||
-                      (typeof window !== 'undefined' && window.location.hostname.includes('localhost'));
+                      (typeof window !== 'undefined' && window.location.search.includes('dummy=true'));
 
 
 export const canisterId = isDevDummyMode ? 'dummy-canister-id' : 'rdmx6-jaaaa-aaaah-qcaiq-cai';  
