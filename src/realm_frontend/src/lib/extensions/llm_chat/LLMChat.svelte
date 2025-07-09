@@ -4,9 +4,7 @@
 	import { PaperPlaneSolid, MessagesSolid, DatabaseSolid } from 'flowbite-svelte-icons';
 	import SvelteMarkdown from 'svelte-markdown';
 	// @ts-ignore
-	import { backend } from '$lib/canisters';
-	// @ts-ignore
-	import { canisterId as backendCanisterId } from 'declarations/realm_backend';
+	import { backend, canisterId as backendCanisterId } from '$lib/canisters';
 
 	// Define message interface to fix TypeScript errors
 	interface ChatMessage {
@@ -444,4 +442,4 @@
 		margin: 0.5rem 0 0.5rem 0.5rem;
 		color: #555;
 	}
-</style> 
+</style>  
