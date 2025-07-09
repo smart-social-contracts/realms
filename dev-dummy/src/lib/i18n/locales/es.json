@@ -1,0 +1,35 @@
+{
+  "common": {
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "Éxito",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "view": "Ver",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "previous": "Anterior"
+  },
+  "nav": {
+    "dashboard": "Panel",
+    "extensions": "Extensiones",
+    "organizations": "Organizaciones",
+    "settings": "Configuración",
+    "logout": "Cerrar sesión"
+  },
+  "dashboard": {
+    "title": "Panel",
+    "welcome": "Bienvenido a Realms gOS",
+    "overview": "Resumen"
+  },
+  "extensions": {
+    "title": "Extensiones",
+    "vault_manager": "Gestor de Bóveda",
+    "citizen_dashboard": "Panel Ciudadano",
+    "notifications": "Notificaciones",
+    "justice_litigation": "Justicia y Litigios",
+    "land_registry": "Registro de Tierras"
+  }
+}
