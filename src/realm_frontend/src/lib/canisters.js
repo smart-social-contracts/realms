@@ -5,25 +5,32 @@ import { isDevelopmentMode } from './dev-mode.js';
 
 let createActor, canisterId, HttpAgent;
 let dummyBackend;
+let importsInitialized = false;
 
-if (isDevelopmentMode()) {
-  console.log('🔧 DEV MODE: Loading dummy backend implementations');
-  const declarationsModule = await import('./dummy-implementations/declarations-dummy.js');
-  const dfinityModule = await import('./dummy-implementations/dfinity-dummy.js');
-  const backendModule = await import('./dummy-implementations/backend-dummy.js');
+async function initializeImports() {
+  if (importsInitialized) return;
   
-  createActor = declarationsModule.createActor;
-  canisterId = declarationsModule.canisterId;
-  HttpAgent = dfinityModule.DummyHttpAgent;
-  dummyBackend = backendModule.dummyBackend;
-} else {
-  console.log('🏭 PROD MODE: Loading IC backend implementations');
-  const declarationsModule = await import('declarations/realm_backend');
-  const agentModule = await import('@dfinity/agent');
+  if (isDevelopmentMode()) {
+    console.log('🔧 DEV MODE: Loading dummy backend implementations');
+    const declarationsModule = await import('./dummy-implementations/declarations-dummy.js');
+    const dfinityModule = await import('./dummy-implementations/dfinity-dummy.js');
+    const backendModule = await import('./dummy-implementations/backend-dummy.js');
+    
+    createActor = declarationsModule.createActor;
+    canisterId = declarationsModule.canisterId;
+    HttpAgent = dfinityModule.DummyHttpAgent;
+    dummyBackend = backendModule.dummyBackend;
+  } else {
+    console.log('🏭 PROD MODE: Loading IC backend implementations');
+    const declarationsModule = await import('declarations/realm_backend');
+    const agentModule = await import('@dfinity/agent');
+    
+    createActor = declarationsModule.createActor;
+    canisterId = declarationsModule.canisterId;
+    HttpAgent = agentModule.HttpAgent;
+  }
   
-  createActor = declarationsModule.createActor;
-  canisterId = declarationsModule.canisterId;
-  HttpAgent = agentModule.HttpAgent;
+  importsInitialized = true;
 }  
 
 function dummyActor() {
@@ -40,21 +47,35 @@ const isLocalDevelopment = window.location.hostname.includes('localhost') ||
 console.log('Running in local development mode:', isLocalDevelopment);
 
 // Create a writable store for the backend actor
-export const backendStore = writable(
-  buildingOrTesting 
-    ? dummyActor() 
-    : isDevelopmentMode() 
-      ? dummyBackend 
-      : createActor(canisterId)
-);
+export const backendStore = writable(buildingOrTesting ? dummyActor() : null);
+
+// Initialize the backend store after imports are loaded
+async function initializeBackendStore() {
+  if (buildingOrTesting) return;
+  
+  await initializeImports();
+  
+  const actor = isDevelopmentMode() ? dummyBackend : createActor(canisterId);
+  backendStore.set(actor);
+}
+
+// Initialize immediately if not building/testing
+if (!buildingOrTesting) {
+  initializeBackendStore();
+}
 
 // Create a proxy that always uses the latest actor from the store
 export const backend = new Proxy({}, {
     get: function(target, prop) {
-        // Get the latest actor from the store
-        const actor = get(backendStore);
-        // Forward the property access to the actor
-        return actor[prop];
+        const currentBackend = get(backendStore);
+        if (!currentBackend) {
+            return async (...args) => {
+                await initializeBackendStore();
+                const backend = get(backendStore);
+                return backend[prop](...args);
+            };
+        }
+        return currentBackend[prop];
     }
 });
 
@@ -62,6 +83,8 @@ export const backend = new Proxy({}, {
 export async function initBackendWithIdentity() {
     try {
         console.log('Initializing backend with authenticated identity...');
+        
+        await initializeImports();
         
         if (isDevelopmentMode()) {
             console.log('🔧 DEV MODE: Using dummy backend, skipping identity initialization');

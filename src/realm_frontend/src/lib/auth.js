@@ -3,19 +3,26 @@ import { isDevelopmentMode } from './dev-mode.js';
 
 let AuthClient, Principal;
 let DummyAuthClient, dummyPrincipal;
+let authImportsInitialized = false;
 
-if (isDevelopmentMode()) {
-  // Import dummy implementations for development
-  const dummyModule = await import('./dummy-implementations/auth-dummy.js');
-  DummyAuthClient = dummyModule.DummyAuthClient;
-  dummyPrincipal = dummyModule.dummyPrincipal;
-  console.log('🔧 DEV MODE: Using dummy authentication');
-} else {
-  const icModule = await import('@dfinity/auth-client');
-  const principalModule = await import('@dfinity/principal');
-  AuthClient = icModule.AuthClient;
-  Principal = principalModule.Principal;
-  console.log('🏭 PROD MODE: Using IC authentication');
+async function initializeAuthImports() {
+  if (authImportsInitialized) return;
+  
+  if (isDevelopmentMode()) {
+    // Import dummy implementations for development
+    const dummyModule = await import('./dummy-implementations/auth-dummy.js');
+    DummyAuthClient = dummyModule.DummyAuthClient;
+    dummyPrincipal = dummyModule.dummyPrincipal;
+    console.log('🔧 DEV MODE: Using dummy authentication');
+  } else {
+    const icModule = await import('@dfinity/auth-client');
+    const principalModule = await import('@dfinity/principal');
+    AuthClient = icModule.AuthClient;
+    Principal = principalModule.Principal;
+    console.log('🏭 PROD MODE: Using IC authentication');
+  }
+  
+  authImportsInitialized = true;
 }
 
 // More reliable local development detection
@@ -53,6 +60,8 @@ export { authClient };
 
 export async function initializeAuthClient() {
   if (!authClient) {
+    await initializeAuthImports();
+    
     if (isDevelopmentMode()) {
       authClient = await DummyAuthClient.create();
       console.log('🔧 DEV MODE: Dummy auth client initialized');
@@ -65,6 +74,7 @@ export async function initializeAuthClient() {
 }
 
 export async function login() {
+  await initializeAuthImports();
   const client = await initializeAuthClient();
   
   if (isDevelopmentMode()) {
@@ -93,11 +103,13 @@ export async function login() {
 }
 
 export async function logout() {
+  await initializeAuthImports();
   const client = await initializeAuthClient();
   await client.logout();
 }
 
 export async function isAuthenticated() {
+  await initializeAuthImports();
   const client = await initializeAuthClient();
   return client.isAuthenticated();
 }
