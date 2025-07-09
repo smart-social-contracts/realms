@@ -39,7 +39,7 @@ let authClient;
 
 function createMockAuthClient() {
   return {
-    isAuthenticated: () => false,
+    isAuthenticated: () => true,
     getIdentity: () => ({
       getPrincipal: () => ({
         toText: () => 'dummy-principal-123',
