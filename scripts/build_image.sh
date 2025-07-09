@@ -3,5 +3,5 @@
 ./scripts/cleanup.sh
 
 # First, build the image
-docker build --no-cache -t smart-social-contracts/realms:latest .
+docker build -t smart-social-contracts/realms:latest .
 
