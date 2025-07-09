@@ -1,8 +1,30 @@
-import { createActor, canisterId } from 'declarations/realm_backend';
 import { building } from '$app/environment';
-import { HttpAgent } from '@dfinity/agent';
 import { writable, get } from 'svelte/store';
-import { authClient, initializeAuthClient } from '$lib/auth';  
+import { authClient, initializeAuthClient } from '$lib/auth';
+import { isDevelopmentMode } from './dev-mode.js';
+
+let createActor, canisterId, HttpAgent;
+let dummyBackend;
+
+if (isDevelopmentMode()) {
+  console.log('🔧 DEV MODE: Loading dummy backend implementations');
+  const declarationsModule = await import('./dummy-implementations/declarations-dummy.js');
+  const dfinityModule = await import('./dummy-implementations/dfinity-dummy.js');
+  const backendModule = await import('./dummy-implementations/backend-dummy.js');
+  
+  createActor = declarationsModule.createActor;
+  canisterId = declarationsModule.canisterId;
+  HttpAgent = dfinityModule.DummyHttpAgent;
+  dummyBackend = backendModule.dummyBackend;
+} else {
+  console.log('🏭 PROD MODE: Loading IC backend implementations');
+  const declarationsModule = await import('declarations/realm_backend');
+  const agentModule = await import('@dfinity/agent');
+  
+  createActor = declarationsModule.createActor;
+  canisterId = declarationsModule.canisterId;
+  HttpAgent = agentModule.HttpAgent;
+}  
 
 function dummyActor() {
     return new Proxy({}, { get() { throw new Error("Canister invoked while building"); } });
@@ -18,7 +40,13 @@ const isLocalDevelopment = window.location.hostname.includes('localhost') ||
 console.log('Running in local development mode:', isLocalDevelopment);
 
 // Create a writable store for the backend actor
-export const backendStore = writable(buildingOrTesting ? dummyActor() : createActor(canisterId));
+export const backendStore = writable(
+  buildingOrTesting 
+    ? dummyActor() 
+    : isDevelopmentMode() 
+      ? dummyBackend 
+      : createActor(canisterId)
+);
 
 // Create a proxy that always uses the latest actor from the store
 export const backend = new Proxy({}, {
@@ -34,6 +62,11 @@ export const backend = new Proxy({}, {
 export async function initBackendWithIdentity() {
     try {
         console.log('Initializing backend with authenticated identity...');
+        
+        if (isDevelopmentMode()) {
+            console.log('🔧 DEV MODE: Using dummy backend, skipping identity initialization');
+            return dummyBackend;
+        }
         
         // Make sure we're using the shared auth client
         const client = authClient || await initializeAuthClient();
