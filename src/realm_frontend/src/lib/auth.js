@@ -1,6 +1,22 @@
 // src/lib/auth.js
-import { AuthClient } from '@dfinity/auth-client';
-import { Principal } from '@dfinity/principal';
+import { isDevelopmentMode } from './dev-mode.js';
+
+let AuthClient, Principal;
+let DummyAuthClient, dummyPrincipal;
+
+if (isDevelopmentMode()) {
+  // Import dummy implementations for development
+  const dummyModule = await import('./dummy-implementations/auth-dummy.js');
+  DummyAuthClient = dummyModule.DummyAuthClient;
+  dummyPrincipal = dummyModule.dummyPrincipal;
+  console.log('🔧 DEV MODE: Using dummy authentication');
+} else {
+  const icModule = await import('@dfinity/auth-client');
+  const principalModule = await import('@dfinity/principal');
+  AuthClient = icModule.AuthClient;
+  Principal = principalModule.Principal;
+  console.log('🏭 PROD MODE: Using IC authentication');
+}
 
 // More reliable local development detection
 // This checks both the hostname and NODE_ENV (where available)
@@ -37,8 +53,13 @@ export { authClient };
 
 export async function initializeAuthClient() {
   if (!authClient) {
-    authClient = await AuthClient.create();
-    console.log('Auth client initialized');
+    if (isDevelopmentMode()) {
+      authClient = await DummyAuthClient.create();
+      console.log('🔧 DEV MODE: Dummy auth client initialized');
+    } else {
+      authClient = await AuthClient.create();
+      console.log('🏭 PROD MODE: IC auth client initialized');
+    }
   }
   return authClient;
 }
@@ -46,13 +67,21 @@ export async function initializeAuthClient() {
 export async function login() {
   const client = await initializeAuthClient();
   
+  if (isDevelopmentMode()) {
+    // Dummy login for development
+    const identity = client.getIdentity();
+    const principal = identity.getPrincipal();
+    console.log(`🔧 DEV MODE: Logged in with dummy principal: ${principal.toText()}`);
+    return Promise.resolve({ identity, principal });
+  }
+  
   return new Promise((resolve) => {
     client.login({
       identityProvider: II_URL, // Use the appropriate II URL
       onSuccess: () => {
         const identity = client.getIdentity();
         const principal = identity.getPrincipal();
-        console.log(`Logged in with principal: ${principal.toText()}`);
+        console.log(`🏭 PROD MODE: Logged in with principal: ${principal.toText()}`);
         resolve({ identity, principal });
       },
       onError: (error) => {
