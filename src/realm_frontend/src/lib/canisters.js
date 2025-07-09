@@ -193,6 +193,21 @@ function createDevDummyActor() {
                     mode: "development"
                 }
             };
+        },
+
+        join_realm: async (selectedProfile) => {
+            console.log('[DEV DUMMY] join_realm called with profile:', selectedProfile);
+            await new Promise(resolve => setTimeout(resolve, 500));
+            return {
+                success: true,
+                data: {
+                    user_id: "dev-user-123",
+                    profile: selectedProfile,
+                    joined_date: new Date().toISOString(),
+                    realm_name: "Dev Dummy Realm",
+                    message: `Successfully joined as ${selectedProfile}`
+                }
+            };
         }
     };
 }
