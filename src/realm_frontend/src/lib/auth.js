@@ -2,6 +2,12 @@
 import { AuthClient } from '@dfinity/auth-client';
 import { Principal } from '@dfinity/principal';
 
+const isDevDummyMode = import.meta.env.VITE_DEV_DUMMY_MODE === 'true' || 
+                      import.meta.env.DEV_DUMMY_MODE === 'true' ||
+                      (typeof window !== 'undefined' && window.location.search.includes('dummy=true')) ||
+                      (typeof window !== 'undefined' && window.location.hostname.includes('localhost'));
+
+
 // More reliable local development detection
 // This checks both the hostname and NODE_ENV (where available)
 const isLocalDev = (
@@ -32,19 +38,67 @@ console.log(`Using Identity Provider: ${II_URL}`);
 
 let authClient;
 
+function createMockAuthClient() {
+  return {
+    isAuthenticated: () => false,
+    getIdentity: () => ({
+      getPrincipal: () => ({
+        toText: () => 'dummy-principal-123',
+        isAnonymous: () => true
+      })
+    }),
+    login: (options) => {
+      console.log('[DEV DUMMY] Mock login called');
+      setTimeout(() => {
+        if (options.onSuccess) {
+          console.log('[DEV DUMMY] Mock login success');
+          options.onSuccess();
+        }
+      }, 100);
+    },
+    logout: () => {
+      console.log('[DEV DUMMY] Mock logout called');
+      return Promise.resolve();
+    }
+  };
+}
+
 // Export the authClient instance for reuse
 export { authClient };
 
 export async function initializeAuthClient() {
   if (!authClient) {
-    authClient = await AuthClient.create();
-    console.log('Auth client initialized');
+    if (isDevDummyMode) {
+      authClient = createMockAuthClient();
+      console.log('[DEV DUMMY] Mock auth client initialized');
+    } else {
+      authClient = await AuthClient.create();
+      console.log('Auth client initialized');
+    }
   }
   return authClient;
 }
 
 export async function login() {
   const client = await initializeAuthClient();
+  
+  if (isDevDummyMode) {
+    console.log('[DEV DUMMY] Mock login function called');
+    return new Promise((resolve) => {
+      client.login({
+        onSuccess: () => {
+          const identity = client.getIdentity();
+          const principal = identity.getPrincipal();
+          console.log(`[DEV DUMMY] Mock logged in with principal: ${principal.toText()}`);
+          resolve({ identity, principal });
+        },
+        onError: (error) => {
+          console.error("[DEV DUMMY] Mock login failed:", error);
+          resolve({ identity: null, principal: null });
+        }
+      });
+    });
+  }
   
   return new Promise((resolve) => {
     client.login({
@@ -65,10 +119,17 @@ export async function login() {
 
 export async function logout() {
   const client = await initializeAuthClient();
+  if (isDevDummyMode) {
+    console.log('[DEV DUMMY] Mock logout function called');
+  }
   await client.logout();
 }
 
 export async function isAuthenticated() {
   const client = await initializeAuthClient();
-  return client.isAuthenticated();
+  const result = client.isAuthenticated();
+  if (isDevDummyMode) {
+    console.log('[DEV DUMMY] Mock isAuthenticated called, returning:', result);
+  }
+  return result;
 }

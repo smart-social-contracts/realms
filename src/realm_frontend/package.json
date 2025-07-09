@@ -6,6 +6,7 @@
     "setup": "npm i && dfx canister create realm_backend && dfx generate realm_backend && dfx deploy",
     "start": "vite --port 3000",
     "dev": "vite dev",
+    "dev:dummy": "VITE_DEV_DUMMY_MODE=true DEV_DUMMY_MODE=true vite dev",
     "prebuild": "svelte-kit sync",
     "build": "tsc && vite build",
     "format": "prettier --write \"src/**/*.{json,js,jsx,ts,tsx,css,scss}\"",

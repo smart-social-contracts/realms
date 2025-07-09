@@ -21,8 +21,7 @@ test.describe('User workflows', () => {
 		const context = page.context();
 		test.setTimeout(TIMEOUT);
 
-
-		await page.goto('/');
+		await page.goto('/?dummy=true');
 		await page.waitForLoadState('networkidle');
 		
 		const loginButton = page.getByRole('button', { name: 'Log In' });
