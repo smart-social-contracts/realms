@@ -42,6 +42,12 @@
 		drawerHidden = true;
 	};
 	
+	// Function to check if a URL is an extension link
+	function isExtensionLink(href: string | undefined): boolean {
+		if (!href) return false;
+		return href.startsWith('/extensions/') && href !== '/extensions';
+	}
+	
 	// Define types for navigation items
 	type NavItemWithHref = {
 		name: string;
@@ -106,7 +112,7 @@
 	// Core navigation items
 	const coreNavItems: NavItemWithHref[] = [
 		{ name: 'Dashboard', icon: ChartPieOutline, href: '/extensions/public_dashboard' }, // For all users
-		{ name: 'My identities', icon: UsersOutline, href: '/identities' }, // For all users
+		{ name: 'My Identities', icon: UsersOutline, href: '/identities' }, // For all users
 		{ name: 'Admin Dashboard', icon: TableColumnSolid, href: '/ggg', profiles: ['admin'] }, // Admin only
 		{ name: 'Settings', icon: CogOutline, href: '/settings' }, // For all users
 	];
@@ -128,14 +134,12 @@
 	// Filter extensions based on user profiles and create menu items
 	$: filteredExtensions = filterExtensionsForSidebar(extensions);
 
-	// Add Extensions menu with submenu of filtered extensions
-	$: extensionsMenu = {
-		name: 'Extensions',
-		icon: ObjectsColumnOutline,
-		children: Object.fromEntries(
-			filteredExtensions.map(ext => [ext.name, `/extensions/${ext.id}`])
-		)
-	};
+	// Create individual menu items for extensions instead of dropdown
+	$: extensionItems = filteredExtensions.map(ext => ({
+		name: ext.name,
+		icon: getIcon(ext.icon) || TableColumnSolid,
+		href: `/extensions/${ext.id}`
+	}));
 
 	// Extensions Marketplace (admin only)
 	const marketplaceItem = { 
@@ -145,12 +149,12 @@
 		profiles: ['admin']
 	};
 
-	// Create combined navigation items with filtered core items and extensions section
+	// Create combined navigation items with filtered core items and extensions as separate items
 	let posts: NavItem[];
 	$: posts = [
 		...filteredCoreNavItems,
-		// Only show Extensions dropdown if user has profiles and there are valid extensions
-		...($userProfiles && $userProfiles.length > 0 && Object.keys(extensionsMenu.children).length > 0 ? [extensionsMenu] : []),
+		// Only show Extensions items if user has profiles and there are valid extensions
+		...($userProfiles && $userProfiles.length > 0 && extensionItems.length > 0 ? extensionItems : []),
 		// Only show Extensions Marketplace for admin
 		...($userProfiles && $userProfiles.includes('admin') ? [marketplaceItem] : [])
 	];
@@ -221,13 +225,42 @@
 							<svelte:component this={icon} slot="icon" class={iconClass} />
 
 							{#each Object.entries(children) as [title, href]}
-								<SidebarItem label={title} href={href.toString()} spanClass="ml-9" class={itemClass} />
+								{#if isExtensionLink(href?.toString())}
+									<!-- Use classic browser navigation for extension links -->
+									<li>
+										<a 
+											href={href.toString()} 
+											data-sveltekit-reload 
+											class={itemClass} 
+											on:click={closeDrawer}
+										>
+											<span class="ml-9">{title}</span>
+										</a>
+									</li>
+								{:else}
+									<SidebarItem label={title} href={href.toString()} spanClass="ml-9" class={itemClass} />
+								{/if}
 							{/each}
 						</SidebarDropdownWrapper>
+					{:else}
+						{#if isExtensionLink(href)}
+						<!-- Use classic browser navigation for extension links -->
+						<li>
+							<a 
+								href={href} 
+								data-sveltekit-reload 
+								class={itemClass} 
+								on:click={closeDrawer}
+							>
+								<svelte:component this={icon} class={iconClass} />
+								<span class="ml-3">{name}</span>
+							</a>
+						</li>
 					{:else}
 						<SidebarItem label={name} {href} spanClass="ml-3" class={itemClass}>
 							<svelte:component this={icon} slot="icon" class={iconClass} />
 						</SidebarItem>
+					{/if}
 					{/if}
 				{/each}
 			</SidebarGroup>

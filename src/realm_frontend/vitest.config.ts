@@ -28,7 +28,7 @@ export default defineConfig(({ mode }) => ({
     environment: 'jsdom',
     globals: true,
     includeSource: ['src/**/*.{js,ts,svelte}'],
-    exclude: ['node_modules', '.svelte-kit', 'dist'],
+    exclude: ['node_modules', '.svelte-kit', 'dist', 'tests/e2e'],
     coverage: {
       reporter: ['text', 'json', 'html'],
     },

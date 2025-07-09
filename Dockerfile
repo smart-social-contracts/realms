@@ -13,6 +13,10 @@ COPY package.json ./package.json
 COPY ./scripts/setup_docker_dev_env.sh ./scripts/setup_docker_dev_env.sh
 RUN ./scripts/setup_docker_dev_env.sh
 
+# Install playwright UI testing framework and dependencies
+COPY ./src/realm_frontend/package.json ./src/realm_frontend/package.json
+RUN cd src/realm_frontend && npm install --legacy-peer-deps && npx --no -- playwright install --with-deps
+
 # Configuration files
 COPY .flake8 ./.flake8
 COPY mypy.ini ./mypy.ini
