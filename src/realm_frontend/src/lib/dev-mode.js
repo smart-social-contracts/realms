@@ -1,6 +1,6 @@
 export const isDevelopmentMode = () => {
   return (
-    process.env.VITE_DEV_DUMMY_MODE === 'true'
+    import.meta.env.VITE_DEV_DUMMY_MODE === 'true'
   );
 };
 

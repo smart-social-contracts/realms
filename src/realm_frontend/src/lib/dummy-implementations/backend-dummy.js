@@ -98,6 +98,19 @@ export class DummyBackend {
     return ['admin', 'member'];
   }
 
+  async get_my_user_status() {
+    console.log('🔧 DEV MODE: get_my_user_status called');
+    return {
+      success: true,
+      data: {
+        UserGet: {
+          principal: 'dummy-principal-123456789',
+          profiles: ['admin', 'member']
+        }
+      }
+    };
+  }
+
   async get_organizations() {
     console.log('🔧 DEV MODE: get_organizations called');
     return [
