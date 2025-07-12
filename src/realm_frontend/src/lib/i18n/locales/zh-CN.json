@@ -10,12 +10,18 @@
     "profile": "个人资料",
     "search": "搜索",
     "join": "加入",
-    "switch_user": "切换用户"
+    "switch_user": "切换用户",
+    "identities": "我的身份",
+    "main_menu": "主菜单"
   },
   "navigation": {
     "dashboard": "仪表板",
     "explore": "探索",
-    "about": "关于"
+    "about": "关于",
+    "admin_dashboard": "管理员仪表板",
+    "extensions_marketplace": "扩展市场",
+    "citizen_dashboard": "公民仪表板",
+    "vault_manager": "保险库管理器"
   },
   "buttons": {
     "save": "保存",

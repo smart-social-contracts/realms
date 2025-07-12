@@ -10,12 +10,18 @@
     "profile": "Perfil",
     "search": "Buscar",
     "join": "Unirse",
-    "switch_user": "Cambiar usuario"
+    "switch_user": "Cambiar usuario",
+    "identities": "Mis Identidades",
+    "main_menu": "Menú Principal"
   },
   "navigation": {
     "dashboard": "Panel",
     "explore": "Explorar",
-    "about": "Acerca de"
+    "about": "Acerca de",
+    "admin_dashboard": "Panel de Administración",
+    "extensions_marketplace": "Mercado de Extensiones",
+    "citizen_dashboard": "Panel Ciudadano",
+    "vault_manager": "Gestor de Bóveda"
   },
   "buttons": {
     "save": "Guardar",

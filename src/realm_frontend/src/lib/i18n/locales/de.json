@@ -10,12 +10,18 @@
     "profile": "Profil",
     "search": "Suche",
     "join": "Beitreten",
-    "switch_user": "Benutzer wechseln"
+    "switch_user": "Benutzer wechseln",
+    "identities": "Meine Identitäten",
+    "main_menu": "Hauptmenü"
   },
   "navigation": {
     "dashboard": "Dashboard",
     "explore": "Erkunden",
-    "about": "Über uns"
+    "about": "Über uns",
+    "admin_dashboard": "Admin-Dashboard",
+    "extensions_marketplace": "Erweiterungsmarktplatz",
+    "citizen_dashboard": "Bürger-Dashboard",
+    "vault_manager": "Tresor-Manager"
   },
   "buttons": {
     "save": "Speichern",
@@ -34,4 +40,4 @@
     "time_zone": "Zeitzone",
     "save_all": "Alles speichern"
   }
-}   
+}     
