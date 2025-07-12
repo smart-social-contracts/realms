@@ -9,7 +9,6 @@ const __dirname = path.dirname(__filename);
 
 test.describe('Multilingual Support', () => {
 
-  const tag = 'dashboard';
   const supportedLanguages = [
     { code: 'en', name: 'English' },
     { code: 'de', name: 'Deutsch' },
@@ -54,38 +53,4 @@ test.describe('Multilingual Support', () => {
     }
   });
 
-  // test('should allow manual language switching', async ({ page }) => {
-  //   // TODO: needs to login, then go to Settings, then change the language
-  // });
-
-  // test('should persist language preference in localStorage', async ({ page }) => {
-  //   await page.goto('/');
-  //   await page.waitForLoadState('networkidle');
-
-  //   await page.getByRole('button', { name: 'Switch to Deutsch' }).click();
-  //   await page.waitForTimeout(500);
-    
-  //   await expect(newPage.getByText(tag)).toBeVisible();
-    
-  //   await page.reload();
-  //   await page.waitForLoadState('networkidle');
-    
-  //   await expect(newPage.getByText(tag)).toBeVisible();
-  // });
-
-  // test('should handle unsupported browser languages gracefully', async ({ page, context }) => {
-  //   const newContext = await context.browser()?.newContext({
-  //     locale: 'ja-JP'
-  //   });
-    
-  //   if (newContext) {
-  //     const newPage = await newContext.newPage();
-  //     await newPage.goto('/');
-  //     await newPage.waitForLoadState('networkidle');
-      
-  //     await expect(newPage.getByText(tag)).toBeVisible({ timeout: 10000 });
-      
-  //     await newContext.close();
-  //   }
-  // });
 });
