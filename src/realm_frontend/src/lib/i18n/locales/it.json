@@ -26,5 +26,12 @@
     "login": "Accedi",
     "join": "Unisciti",
     "switch_user": "Cambia utente"
+  },
+  "settings": {
+    "title": "Impostazioni Utente",
+    "select_language": "Seleziona Lingua",
+    "language_description": "Scegli la tua lingua di visualizzazione preferita per l'interfaccia",
+    "time_zone": "Fuso Orario",
+    "save_all": "Salva tutto"
   }
-} 
+}   

@@ -26,5 +26,12 @@
     "login": "Se connecter",
     "join": "Rejoindre",
     "switch_user": "Changer d'utilisateur"
+  },
+  "settings": {
+    "title": "Paramètres Utilisateur",
+    "select_language": "Sélectionner la Langue",
+    "language_description": "Choisissez votre langue d'affichage préférée pour l'interface",
+    "time_zone": "Fuseau Horaire",
+    "save_all": "Tout enregistrer"
   }
-} 
+}   

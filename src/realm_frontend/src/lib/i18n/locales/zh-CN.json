@@ -1,0 +1,37 @@
+{
+  "common": {
+    "welcome": "欢迎来到 Realms",
+    "loading": "加载中...",
+    "error": "发生错误",
+    "home": "首页",
+    "settings": "设置",
+    "login": "登录",
+    "logout": "退出登录",
+    "profile": "个人资料",
+    "search": "搜索",
+    "join": "加入",
+    "switch_user": "切换用户"
+  },
+  "navigation": {
+    "dashboard": "仪表板",
+    "explore": "探索",
+    "about": "关于"
+  },
+  "buttons": {
+    "save": "保存",
+    "cancel": "取消",
+    "submit": "提交",
+    "edit": "编辑",
+    "delete": "删除",
+    "login": "登录",
+    "join": "加入",
+    "switch_user": "切换用户"
+  },
+  "settings": {
+    "title": "用户设置",
+    "select_language": "选择语言",
+    "language_description": "选择界面显示语言",
+    "time_zone": "时区",
+    "save_all": "保存全部"
+  }
+}

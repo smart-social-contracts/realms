@@ -1,1 +1,37 @@
-{ "common": { "welcome": "Welcome to Realms", "loading": "Loading...", "error": "An error occurred", "home": "Home", "settings": "Settings", "login": "Log In", "logout": "Logout", "profile": "Profile", "search": "Search", "join": "Join", "switch_user": "Switch User" }, "navigation": { "dashboard": "Dashboard", "explore": "Explore", "about": "About" }, "buttons": { "save": "Save", "cancel": "Cancel", "submit": "Submit", "edit": "Edit", "delete": "Delete", "login": "Log In", "join": "Join", "switch_user": "Switch User" } }
+{
+  "common": {
+    "welcome": "Welcome to Realms",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "home": "Home",
+    "settings": "Settings",
+    "login": "Log In",
+    "logout": "Logout",
+    "profile": "Profile",
+    "search": "Search",
+    "join": "Join",
+    "switch_user": "Switch User"
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "explore": "Explore",
+    "about": "About"
+  },
+  "buttons": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "submit": "Submit",
+    "edit": "Edit",
+    "delete": "Delete",
+    "login": "Log In",
+    "join": "Join",
+    "switch_user": "Switch User"
+  },
+  "settings": {
+    "title": "User Settings",
+    "select_language": "Select Language",
+    "language_description": "Choose your preferred display language for the interface",
+    "time_zone": "Time Zone",
+    "save_all": "Save all"
+  }
+}

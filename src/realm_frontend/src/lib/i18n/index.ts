@@ -6,6 +6,7 @@ export const supportedLocales = [
   { id: "es", name: "Español" },
   { id: "de", name: "Deutsch" },
   { id: "fr", name: "Français" },
+  { id: "zh-CN", name: "中文 (简体)" },
   { id: "it", name: "Italiano" }
 ];
 
@@ -14,6 +15,7 @@ register("en", () => import("./locales/en.json"));
 register("es", () => import("./locales/es.json"));
 register("de", () => import("./locales/de.json"));
 register("fr", () => import("./locales/fr.json"));
+register("zh-CN", () => import("./locales/zh-CN.json"));
 register("it", () => import("./locales/it.json"));
 
 // Helper function to wait for locale to be ready
@@ -26,6 +28,28 @@ export function waitLocale(): Promise<void> {
       }
     });
   });
+}
+
+function getPreferredLocale(): string {
+  if (!browser) return "en";
+  
+  const targetLanguages = ["en", "de", "fr", "es", "zh-CN"];
+  
+  const browserLanguages = navigator.languages || [navigator.language];
+  
+  for (const browserLang of browserLanguages) {
+    if (targetLanguages.includes(browserLang)) {
+      return browserLang;
+    }
+    
+    const langCode = browserLang.split('-')[0];
+    if (langCode === 'zh') return 'zh-CN';
+    if (targetLanguages.includes(langCode)) {
+      return langCode;
+    }
+  }
+  
+  return "en";
 }
 
 // Find and register all extension translations
@@ -96,7 +120,7 @@ export function initI18n() {
   }
   init({
     fallbackLocale: "en",
-    initialLocale: browser ? getLocaleFromNavigator() : "en"
+    initialLocale: browser ? getPreferredLocale() : "en"
   });
 
   console.log('i18n initialized in realm_frontend');
