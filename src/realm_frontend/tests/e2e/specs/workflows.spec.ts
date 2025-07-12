@@ -119,7 +119,7 @@ test.describe('User workflows', () => {
 			{ name: 'Land Registry' , needle: 'Manage land ownership' },
 			{ name: 'AI assistant' , needle: 'Governance AI assistant' },
 			{ name: 'Budget Metrics' , needle: 'Tax Allocation Breakdown' },
-			{ name: 'Notifications' , needle: 'Notifications' },
+			{ name: 'Notifications' , needle: 'unread notification' },
 			{ name: 'Public Dashboard' , needle: 'Active users in the platform' }
 		];
 
