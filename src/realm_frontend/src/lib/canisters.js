@@ -41,10 +41,11 @@ const buildingOrTesting = building || process.env.NODE_ENV === "test";
 
 // Detect if we're running in local development
 // Use a more reliable method than process.env which might not work in browser
-const isLocalDevelopment = window.location.hostname.includes('localhost') || 
-                          window.location.hostname.includes('127.0.0.1');
-
-console.log('Running in local development mode:', isLocalDevelopment);
+function isLocalDevelopment() {
+  if (typeof window === 'undefined') return false;
+  return window.location.hostname.includes('localhost') || 
+         window.location.hostname.includes('127.0.0.1');
+}
 
 // Create a writable store for the backend actor
 export const backendStore = writable(buildingOrTesting ? dummyActor() : null);
@@ -109,7 +110,7 @@ export async function initBackendWithIdentity() {
             const agent = new HttpAgent({ identity });
             
             // For local development, we need to fetch the root key
-            if (isLocalDevelopment) {
+            if (isLocalDevelopment()) {
                 console.log('Fetching root key for local development');
                 await agent.fetchRootKey().catch(e => {
                     console.warn('Error fetching root key:', e);
