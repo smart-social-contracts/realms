@@ -46,8 +46,7 @@ test.describe('Multilingual Support', () => {
         const expectedText = localeData[lang.code].navigation.dashboard;
         
         await expect(newPage.getByText(expectedText, { exact: false })).toBeVisible({ 
-          timeout: 10000,
-          message: `Expected to find "${expectedText}" for language ${lang.name} (${lang.code})`
+          timeout: 10000
         });
         
         await newContext.close();
