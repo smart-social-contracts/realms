@@ -10,12 +10,18 @@
     "profile": "Profile",
     "search": "Search",
     "join": "Join",
-    "switch_user": "Switch User"
+    "switch_user": "Switch User",
+    "identities": "My Identities",
+    "main_menu": "Main menu"
   },
   "navigation": {
     "dashboard": "Dashboard",
     "explore": "Explore",
-    "about": "About"
+    "about": "About",
+    "admin_dashboard": "Admin Dashboard",
+    "extensions_marketplace": "Extensions Marketplace",
+    "citizen_dashboard": "Citizen Dashboard",
+    "vault_manager": "Vault Manager"
   },
   "buttons": {
     "save": "Save",

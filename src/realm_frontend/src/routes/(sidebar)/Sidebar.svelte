@@ -35,6 +35,9 @@
 	import { getIcon } from '$lib/utils/iconMap';
 	// Import user profiles store
 	import { userProfiles } from '$lib/stores/profiles';
+	
+	// Import i18n functionality
+	import { _, locale } from 'svelte-i18n';
 
 	export let drawerHidden: boolean = false;
 
@@ -109,19 +112,19 @@
 		});
 	}
 
-	// Core navigation items
+	// Core navigation items with translation keys
 	const coreNavItems: NavItemWithHref[] = [
-		{ name: 'Dashboard', icon: ChartPieOutline, href: '/extensions/public_dashboard' }, // For all users
-		{ name: 'My Identities', icon: UsersOutline, href: '/identities' }, // For all users
-		{ name: 'Admin Dashboard', icon: TableColumnSolid, href: '/ggg', profiles: ['admin'] }, // Admin only
-		{ name: 'Settings', icon: CogOutline, href: '/settings' }, // For all users
+		{ name: $_('navigation.dashboard'), icon: ChartPieOutline, href: '/extensions/public_dashboard' }, // For all users
+		{ name: $_('common.identities') || 'My Identities', icon: UsersOutline, href: '/identities' }, // For all users
+		{ name: $_('navigation.admin_dashboard') || 'Admin Dashboard', icon: TableColumnSolid, href: '/ggg', profiles: ['admin'] }, // Admin only
+		{ name: $_('common.settings'), icon: CogOutline, href: '/settings' }, // For all users
 	];
 
 	// Filter core navigation items based on user profiles
 	$: filteredCoreNavItems = coreNavItems.filter(item => {
 		// If no profiles are available, only show Dashboard
 		if (!$userProfiles || $userProfiles.length === 0) {
-			return item.name === 'Dashboard';
+			return item.name === $_('navigation.dashboard');
 		}
 		
 		// If no profiles restriction on the item, show to everyone with a profile
@@ -143,7 +146,7 @@
 
 	// Extensions Marketplace (admin only)
 	const marketplaceItem = { 
-		name: 'Extensions Marketplace', 
+		name: $_('navigation.extensions_marketplace') || 'Extensions Marketplace', 
 		icon: LayersSolid, 
 		href: '/extensions',
 		profiles: ['admin']
@@ -169,7 +172,7 @@
 				posts = [
 					...posts, 
 					{ 
-						name: 'Citizen Dashboard', 
+						name: $_('navigation.citizen_dashboard') || 'Citizen Dashboard', 
 						icon: getIcon(citizenDashboardExt.icon) || TableColumnSolid, 
 						href: `/extensions/${citizenDashboardExt.id}` 
 					}
@@ -188,7 +191,7 @@
 				posts = [
 					...posts, 
 					{ 
-						name: 'Vault Manager', 
+						name: $_('navigation.vault_manager') || 'Vault Manager', 
 						icon: getIcon(vaultManagerExt.icon) || WalletSolid, 
 						href: `/extensions/${vaultManagerExt.id}` 
 					}
@@ -211,7 +214,7 @@
 	activeClass="bg-gray-100 dark:bg-gray-700"
 	asideClass="fixed inset-0 z-30 flex-none h-full w-64 lg:h-auto border-e border-gray-200 dark:border-gray-600 lg:overflow-y-visible lg:pt-16 lg:block"
 >
-	<h4 class="sr-only">Main menu</h4>
+	<h4 class="sr-only">{$_('common.main_menu')}</h4>
 	<SidebarWrapper
 		divClass="overflow-y-auto px-3 pt-20 lg:pt-5 h-full bg-white scrolling-touch max-w-2xs lg:h-[calc(100vh-4rem)] lg:block dark:bg-gray-800 lg:me-0 lg:sticky top-2"
 	>
@@ -234,11 +237,11 @@
 											class={itemClass} 
 											on:click={closeDrawer}
 										>
-											<span class="ml-9">{title}</span>
+											<span class="ml-9">{$_(title)}</span>
 										</a>
 									</li>
 								{:else}
-									<SidebarItem label={title} href={href.toString()} spanClass="ml-9" class={itemClass} />
+									<SidebarItem label={$_(title)} href={href.toString()} spanClass="ml-9" class={itemClass} />
 								{/if}
 							{/each}
 						</SidebarDropdownWrapper>
