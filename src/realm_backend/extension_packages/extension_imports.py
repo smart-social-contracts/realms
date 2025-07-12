@@ -6,3 +6,4 @@ import extension_packages.llm_chat.entry
 import extension_packages.passport_verification.entry
 import extension_packages.test_bench.entry
 import extension_packages.vault_manager.entry
+import extension_packages.notifications.entry
