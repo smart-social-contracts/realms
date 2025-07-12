@@ -39,5 +39,49 @@
     "language_description": "Choose your preferred display language for the interface",
     "time_zone": "Time Zone",
     "save_all": "Save all"
+  },
+  "extensions": {
+    "marketplace": {
+      "title": "Extensions Marketplace",
+      "description": "Browse and install extensions to enhance your Smart Social Contracts platform. These modular apps add new functionality while maintaining security through our permission system.",
+      "required_permissions": "Required permissions:",
+      "open_extension": "Open Extension"
+    },
+    "vault_manager": {
+      "name": "Vault Manager",
+      "description": "Manage your vault balances and transfer tokens"
+    },
+    "notifications": {
+      "name": "Notifications",
+      "description": "View and manage your notifications in an inbox-style interface"
+    },
+    "citizen_dashboard": {
+      "name": "Citizen Dashboard",
+      "description": "View your public services, tax information, and personal data in one place"
+    },
+    "justice_litigation": {
+      "name": "Justice & Litigation",
+      "description": "Manage legal cases and litigation processes"
+    },
+    "land_registry": {
+      "name": "Land Registry",
+      "description": "Manage land ownership and property records"
+    },
+    "llm_chat": {
+      "name": "LLM Chat",
+      "description": "AI-powered chat assistant for smart contracts"
+    },
+    "metrics": {
+      "name": "Metrics",
+      "description": "View system metrics and analytics"
+    },
+    "public_dashboard": {
+      "name": "Public Dashboard",
+      "description": "Public dashboard for community information"
+    },
+    "test_bench": {
+      "name": "Test Bench",
+      "description": "Testing and development tools"
+    }
   }
 }
