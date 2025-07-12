@@ -137,7 +137,7 @@
 <div class="mt-px space-y-4">
 	<!-- <section id="aaa">{statsDatesValues}</section> -->
 	<ChartWidget
-		title="🚀 Users (Hot Reload Test!)"
+		title="🚀 Users"
 		description="Active users in the platform - Dev Mode Working!"
 		dateValues={$statsDatesValues}
 	/>
