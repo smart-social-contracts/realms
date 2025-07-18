@@ -58,51 +58,41 @@ export async function loadExtensionTranslations() {
   type JsonModule = { default: Record<string, any> };
   
   try {
-    // Import all extension translation files using static patterns
-    const enModules = import.meta.glob('./locales/extensions/*/en.json');
-    const esModules = import.meta.glob('./locales/extensions/*/es.json');
-    
-    // Process English translations
-    for (const path of Object.keys(enModules)) {
-      try {
-        // Extract extension ID from path
-        const extensionId = path.split('/').slice(-2)[0];
-        const module = await enModules[path]();
-        const translations = (module as JsonModule).default;
-        
-        addMessages('en', {
-          extensions: {
-            [extensionId]: translations
-          }
-        });
-        
-        console.log(`Loaded translations for extension: ${extensionId}, locale: en`);
-      } catch (err) {
-        console.error(`Failed to load extension translation: ${path}`, err);
+    // Define supported locales for extension translations
+    const supportedExtensionLocales = [
+      { code: 'en', modules: import.meta.glob('./locales/extensions/*/en.json') },
+      { code: 'es', modules: import.meta.glob('./locales/extensions/*/es.json') },
+      { code: 'de', modules: import.meta.glob('./locales/extensions/*/de.json') },
+      { code: 'fr', modules: import.meta.glob('./locales/extensions/*/fr.json') },
+      { code: 'it', modules: import.meta.glob('./locales/extensions/*/it.json') },
+      { code: 'zh-CN', modules: import.meta.glob('./locales/extensions/*/zh-CN.json') }
+    ];
+
+    // Process all locales
+    await Promise.all(supportedExtensionLocales.map(async ({ code, modules }) => {
+      for (const path of Object.keys(modules)) {
+        try {
+          // Extract extension ID from path
+          const extensionId = path.split('/').slice(-2)[0];
+          const module = await modules[path]();
+          const translations = (module as JsonModule).default;
+          
+          addMessages(code, {
+            extensions: {
+              [extensionId]: translations
+            }
+          });
+          
+          console.log(`Loaded translations for extension: ${extensionId}, locale: ${code}, translations: ${JSON.stringify(translations)}`);
+        } catch (err) {
+          console.error(`Failed to load extension translation: ${path} for locale: ${code}`, err);
+        }
       }
-    }
+    }));
     
-    // Process Spanish translations
-    for (const path of Object.keys(esModules)) {
-      try {
-        // Extract extension ID from path
-        const extensionId = path.split('/').slice(-2)[0];
-        const module = await esModules[path]();
-        const translations = (module as JsonModule).default;
-        
-        addMessages('es', {
-          extensions: {
-            [extensionId]: translations
-          }
-        });
-        
-        console.log(`Loaded translations for extension: ${extensionId}, locale: es`);
-      } catch (err) {
-        console.error(`Failed to load extension translation: ${path}`, err);
-      }
-    }
-  } catch (err) {
-    console.error("Error loading extension translations:", err);
+    console.log('All extension translations loaded successfully');
+  } catch (error) {
+    console.error('Error loading extension translations:', error);
   }
 }
 

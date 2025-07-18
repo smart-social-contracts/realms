@@ -1,7 +1,12 @@
 {
   "title": "Notifications",
-  "unread_count": "{count} unread notification{count, plural, one {} other {s}}",
+  "description": "View and manage your notifications in an inbox-style interface",
+  "unread_count": "{count, plural, =0 {No unread notifications} =1 {1 unread notification} other {# unread notifications}}",
   "mark_all_read": "Mark all as read",
+  "all": "All",
+  "unread": "Unread",
+  "no_notifications": "No notifications yet",
+  "empty_state_message": "When you receive notifications, they will appear here",
   "tabs": {
     "all": "All ({count})",
     "unread": "Unread ({count})"

@@ -39,5 +39,8 @@
     "language_description": "选择界面显示语言",
     "time_zone": "时区",
     "save_all": "保存全部"
+  },
+  "notifications": {
+    "title": "通知"
   }
 }

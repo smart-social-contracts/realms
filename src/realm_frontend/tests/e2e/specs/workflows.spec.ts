@@ -112,7 +112,7 @@ test.describe('User workflows', () => {
 			{ name: 'users outline My Identities' , needle: 'Manage and connect your' },
 			{ name: 'table column solid Admin' , needle: 'Generalized Global Governance System' },
 			{ name: 'cog outline Settings' , needle: 'Principal:' },
-			{ name: 'layers solid Extensions' , needle: 'Extensions Marketplace' },
+			{ name: 'layers solid Extensions' , needle: 'Browse and install' },
 			{ name: 'wallet solid Vault Manager' , needle: 'Vault Configuration' },
 			{ name: 'Citizen Dashboard' , needle: 'Citizen Dashboard' },
 			{ name: 'Justice Litigation' , needle: 'Justice Litigation System' },
