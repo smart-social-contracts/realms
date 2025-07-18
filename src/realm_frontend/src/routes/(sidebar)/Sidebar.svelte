@@ -37,9 +37,40 @@
 	import { userProfiles } from '$lib/stores/profiles';
 	
 	// Import i18n functionality
-	import { _, locale } from 'svelte-i18n';
+	import { _, locale, isLoading } from 'svelte-i18n';
+	import { waitLocale } from '$lib/i18n';
+	import { onMount } from 'svelte';
+	
 
 	export let drawerHidden: boolean = false;
+
+	// Add state to track if translations are loaded
+	let translationsLoaded = false;
+	
+	// Wait for translations to be loaded before rendering sidebar
+	onMount(async () => {
+		console.log('Sidebar: waiting for translations to load...');
+		console.log('Current locale:', $locale);
+		
+		// Add a timeout to prevent infinite waiting
+		try {
+			const timeoutPromise = new Promise((_, reject) => {
+				setTimeout(() => reject(new Error('Translation loading timed out')), 5000);
+			});
+			
+			// Race between waitLocale and timeout
+			await Promise.race([waitLocale(), timeoutPromise]);
+			console.log('Sidebar: translations loaded successfully');
+			console.log('Locale after loading:', $locale);
+			console.log('Translation for vault_manager:', $_('navigation.vault_manager'));
+		} catch (error) {
+			console.warn('Sidebar: translation loading issue:', error);
+			// Set translations as loaded anyway to prevent UI from being stuck
+		}
+		
+		// Always set to true to prevent permanent loading state
+		translationsLoaded = true;
+	});
 
 	const closeDrawer = () => {
 		drawerHidden = true;
@@ -191,7 +222,7 @@
 				posts = [
 					...posts, 
 					{ 
-						name: $_('navigation.vault_manager') || 'Vault Manager', 
+						name: $_('navigation.vault_manager'), 
 						icon: getIcon(vaultManagerExt.icon) || WalletSolid, 
 						href: `/extensions/${vaultManagerExt.id}` 
 					}
@@ -206,6 +237,12 @@
 	
 	// Make dropdowns reactive based on posts
 	$: dropdowns = posts ? Object.fromEntries(posts.map((post, index) => [index, false])) : {};
+
+	afterNavigate((navigation) => {
+		// this fixes https://github.com/themesberg/flowbite-svelte/issues/364
+		document.getElementById('svelte')?.scrollTo({ top: 0 });
+		closeDrawer();
+	});
 </script>
 
 <Sidebar
@@ -214,68 +251,75 @@
 	activeClass="bg-gray-100 dark:bg-gray-700"
 	asideClass="fixed inset-0 z-30 flex-none h-full w-64 lg:h-auto border-e border-gray-200 dark:border-gray-600 lg:overflow-y-visible lg:pt-16 lg:block"
 >
-	<h4 class="sr-only">{$_('common.main_menu')}</h4>
-	<SidebarWrapper
-		divClass="overflow-y-auto px-3 pt-20 lg:pt-5 h-full bg-white scrolling-touch max-w-2xs lg:h-[calc(100vh-4rem)] lg:block dark:bg-gray-800 lg:me-0 lg:sticky top-2"
-	>
-		<nav class="divide-y divide-gray-200 dark:divide-gray-700">
-			<SidebarGroup ulClass={groupClass} class="mb-3">
-				{#each posts as { name, icon, children, href }, index}
-					{#if children}
-						<SidebarDropdownWrapper bind:isOpen={dropdowns[index]} label={name} class="pr-3">
-							<AngleDownOutline slot="arrowdown" strokeWidth="3.3" size="sm" />
-							<AngleUpOutline slot="arrowup" strokeWidth="3.3" size="sm" />
-							<svelte:component this={icon} slot="icon" class={iconClass} />
+	{#if !translationsLoaded}
+		<div class="p-4 text-center text-gray-500 dark:text-gray-400">
+			<span class="animate-pulse">Loading...</span>
+		</div>
+	{:else}
+		<h4 class="sr-only">{$_('common.main_menu')}</h4>
+		<SidebarWrapper
+			divClass="overflow-y-auto h-full bg-white px-3 pb-4 dark:bg-gray-800"
+			asideClass="fixed top-0 left-0 z-40 w-64 h-screen pt-14 transition-transform border-r lg:translate-x-0 bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700 {drawerHidden ? '-translate-x-full' : ''}"
+		>
+			<nav class="divide-y divide-gray-200 dark:divide-gray-700">
+				<SidebarGroup ulClass={groupClass} class="mb-3">
+					{#each posts as { name, icon, children, href }, index}
+						{#if children}
+							<SidebarDropdownWrapper bind:isOpen={dropdowns[index]} label={name} class="pr-3">
+								<AngleDownOutline slot="arrowdown" strokeWidth="3.3" size="sm" />
+								<AngleUpOutline slot="arrowup" strokeWidth="3.3" size="sm" />
+								<svelte:component this={icon} slot="icon" class={iconClass} />
 
-							{#each Object.entries(children) as [title, href]}
-								{#if isExtensionLink(href?.toString())}
-									<!-- Use classic browser navigation for extension links -->
-									<li>
-										<a 
-											href={href.toString()} 
-											data-sveltekit-reload 
-											class={itemClass} 
-											on:click={closeDrawer}
-										>
-											<span class="ml-9">{$_(title)}</span>
-										</a>
-									</li>
-								{:else}
-									<SidebarItem label={$_(title)} href={href.toString()} spanClass="ml-9" class={itemClass} />
-								{/if}
-							{/each}
-						</SidebarDropdownWrapper>
-					{:else}
-						{#if isExtensionLink(href)}
-						<!-- Use classic browser navigation for extension links -->
-						<li>
-							<a 
-								href={href} 
-								data-sveltekit-reload 
-								class={itemClass} 
-								on:click={closeDrawer}
-							>
-								<svelte:component this={icon} class={iconClass} />
-								<span class="ml-3">{name}</span>
-							</a>
-						</li>
-					{:else}
-						<SidebarItem label={name} {href} spanClass="ml-3" class={itemClass}>
+								{#each Object.entries(children) as [title, href]}
+									{#if isExtensionLink(href?.toString())}
+										<!-- Use classic browser navigation for extension links -->
+										<li>
+											<a 
+												href={href.toString()} 
+												data-sveltekit-reload 
+												class={itemClass} 
+												on:click={closeDrawer}
+											>
+												<span class="ml-9">{$_(title)}</span>
+											</a>
+										</li>
+									{:else}
+										<SidebarItem label={$_(title)} href={href.toString()} spanClass="ml-9" class={itemClass} />
+									{/if}
+								{/each}
+							</SidebarDropdownWrapper>
+						{:else}
+							{#if isExtensionLink(href)}
+								<!-- Use classic browser navigation for extension links -->
+								<li>
+									<a 
+										href={href} 
+										data-sveltekit-reload 
+										class={itemClass} 
+										on:click={closeDrawer}
+									>
+										<svelte:component this={icon} class={iconClass} />
+										<span class="ml-3">{name}</span>
+									</a>
+								</li>
+							{:else}
+								<SidebarItem label={name} {href} spanClass="ml-3" class={itemClass}>
+									<svelte:component this={icon} slot="icon" class={iconClass} />
+								</SidebarItem>
+							{/if}
+						{/if}
+					{/each}
+				</SidebarGroup>
+				<SidebarGroup ulClass={groupClass}>
+					{#each links as { label, href, icon } (label)}
+						<SidebarItem {label} {href} spanClass="ml-3" class={itemClass} target="_blank">
 							<svelte:component this={icon} slot="icon" class={iconClass} />
 						</SidebarItem>
-					{/if}
-					{/if}
-				{/each}
-			</SidebarGroup>
-			<SidebarGroup ulClass={groupClass}>
-				{#each links as { label, href, icon } (label)}
-					<SidebarItem {label} {href} spanClass="ml-3" class={itemClass} target="_blank">
-						<svelte:component this={icon} slot="icon" class={iconClass} />
-					</SidebarItem>
-				{/each}
-			</SidebarGroup>
-		</nav>
-	</SidebarWrapper>
+					{/each}
+				</SidebarGroup>
+			</nav>
+		</SidebarWrapper>
+	{/if}
 </Sidebar>
 
 <div
