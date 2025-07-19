@@ -1,5 +1,5 @@
 {
-  "_sidebar": "公共仪表板",
+  "sidebar": "公共仪表板",
   "users_chart": {
     "title": "用户",
     "description": "活跃用户数量"

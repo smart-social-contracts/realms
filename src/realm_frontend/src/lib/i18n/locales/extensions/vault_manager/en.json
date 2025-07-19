@@ -1,4 +1,5 @@
 {
+  "sidebar": "Vault Manager (sidebar)",
   "title": "Vault Manager",
   "configuration": {
     "title": "Vault Configuration",

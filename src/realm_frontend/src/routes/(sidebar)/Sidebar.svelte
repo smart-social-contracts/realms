@@ -37,40 +37,19 @@
 	import { userProfiles } from '$lib/stores/profiles';
 	
 	// Import i18n functionality
-	import { _, locale, isLoading } from 'svelte-i18n';
-	import { waitLocale } from '$lib/i18n';
+	import { _, locale, isLoading, getLocaleFromNavigator } from 'svelte-i18n';
 	import { onMount } from 'svelte';
-	
 
 	export let drawerHidden: boolean = false;
 
-	// Add state to track if translations are loaded
-	let translationsLoaded = false;
-	
-	// Wait for translations to be loaded before rendering sidebar
-	onMount(async () => {
-		console.log('Sidebar: waiting for translations to load...');
-		console.log('Current locale:', $locale);
-		
-		// Add a timeout to prevent infinite waiting
-		try {
-			const timeoutPromise = new Promise((_, reject) => {
-				setTimeout(() => reject(new Error('Translation loading timed out')), 5000);
-			});
-			
-			// Race between waitLocale and timeout
-			await Promise.race([waitLocale(), timeoutPromise]);
-			console.log('Sidebar: translations loaded successfully');
-			console.log('Locale after loading:', $locale);
-			console.log('Translation for vault_manager:', $_('navigation.vault_manager'));
-		} catch (error) {
-			console.warn('Sidebar: translation loading issue:', error);
-			// Set translations as loaded anyway to prevent UI from being stuck
+	$: {
+		if ($locale) {
+			console.log('Sidebar: Current locale:', $locale);
+			// Debug translation for Vault Manager
+			const vaultManagerTranslation = $_('extensions.vault_manager.sidebar');
+			console.log('Sidebar: Vault Manager translation key result:', vaultManagerTranslation);
 		}
-		
-		// Always set to true to prevent permanent loading state
-		translationsLoaded = true;
-	});
+	}
 
 	const closeDrawer = () => {
 		drawerHidden = true;
@@ -84,7 +63,8 @@
 	
 	// Define types for navigation items
 	type NavItemWithHref = {
-		name: string;
+		name?: string;
+		translationKey?: string; // Added translation key property for i18n
 		icon: typeof TableColumnSolid;
 		href: string;
 		children?: never;
@@ -169,11 +149,14 @@
 	$: filteredExtensions = filterExtensionsForSidebar(extensions);
 
 	// Create individual menu items for extensions instead of dropdown
-	$: extensionItems = filteredExtensions.map(ext => ({
-		name: ext.name,
-		icon: getIcon(ext.icon) || TableColumnSolid,
-		href: `/extensions/${ext.id}`
-	}));
+	// Exclude vault_manager since it's handled separately with translation key
+	$: extensionItems = filteredExtensions
+		.filter(ext => ext.id !== 'vault_manager')
+		.map(ext => ({
+			name: ext.name,
+			icon: getIcon(ext.icon) || TableColumnSolid,
+			href: `/extensions/${ext.id}`
+		}));
 
 	// Extensions Marketplace (admin only)
 	const marketplaceItem = { 
@@ -219,10 +202,15 @@
 			// Make sure it's not already in the list
 			const existingIndex = posts.findIndex(item => item.href === `/extensions/${vaultManagerExt.id}`);
 			if (existingIndex === -1) {
+				console.log('Vault Manager extension found for admin');
+				console.log('Current locale when adding to posts:', $locale);
+				
+				// Using standard reactive Svelte approach for translations
 				posts = [
 					...posts, 
 					{ 
-						name: $_('navigation.vault_manager'), 
+						// Store the translation key instead of the translated value
+						translationKey: 'extensions.vault_manager.sidebar',
 						icon: getIcon(vaultManagerExt.icon) || WalletSolid, 
 						href: `/extensions/${vaultManagerExt.id}` 
 					}
@@ -251,19 +239,18 @@
 	activeClass="bg-gray-100 dark:bg-gray-700"
 	asideClass="fixed inset-0 z-30 flex-none h-full w-64 lg:h-auto border-e border-gray-200 dark:border-gray-600 lg:overflow-y-visible lg:pt-16 lg:block"
 >
-	{#if !translationsLoaded}
-		<div class="p-4 text-center text-gray-500 dark:text-gray-400">
-			<span class="animate-pulse">Loading...</span>
-		</div>
-	{:else}
-		<h4 class="sr-only">{$_('common.main_menu')}</h4>
-		<SidebarWrapper
-			divClass="overflow-y-auto h-full bg-white px-3 pb-4 dark:bg-gray-800"
-			asideClass="fixed top-0 left-0 z-40 w-64 h-screen pt-14 transition-transform border-r lg:translate-x-0 bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700 {drawerHidden ? '-translate-x-full' : ''}"
+	<h4 class="sr-only">{$_('common.main_menu')}</h4>
+	<SidebarWrapper
+		divClass="overflow-y-auto h-full bg-white px-3 pb-4 dark:bg-gray-800"
+		asideClass="fixed top-0 left-0 z-40 w-64 h-screen pt-14 transition-transform border-r lg:translate-x-0 bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700 {drawerHidden ? '-translate-x-full' : ''}"
+	>
 		>
 			<nav class="divide-y divide-gray-200 dark:divide-gray-700">
 				<SidebarGroup ulClass={groupClass} class="mb-3">
-					{#each posts as { name, icon, children, href }, index}
+					{#each posts as { name, translationKey, icon, children, href }, index}
+						{#if href && href.includes('vault_manager')}
+							{console.log('Vault Manager item:', { name, translationKey, href })}
+						{/if}
 						{#if children}
 							<SidebarDropdownWrapper bind:isOpen={dropdowns[index]} label={name} class="pr-3">
 								<AngleDownOutline slot="arrowdown" strokeWidth="3.3" size="sm" />
@@ -299,7 +286,7 @@
 										on:click={closeDrawer}
 									>
 										<svelte:component this={icon} class={iconClass} />
-										<span class="ml-3">{name}</span>
+										<span class="ml-3">{translationKey ? $_(translationKey) : name}</span>
 									</a>
 								</li>
 							{:else}
@@ -319,7 +306,6 @@
 				</SidebarGroup>
 			</nav>
 		</SidebarWrapper>
-	{/if}
 </Sidebar>
 
 <div
