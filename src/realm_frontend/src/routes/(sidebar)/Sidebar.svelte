@@ -156,22 +156,32 @@
 
 	// Create individual menu items for extensions instead of dropdown
 	// Exclude extensions that are handled in coreNavItems with translation keys
-	$: extensionItems = filteredExtensions
-		.filter(ext => ![
-			'vault_manager',
-			'public_dashboard', 
-			'citizen_dashboard',
-			'justice_litigation',
-			'land_registry',
-			'ai_assistant',
-			'budget_metrics',
-			'notifications'
-		].includes(ext.id))
-		.map(ext => ({
-			name: ext.name,
-			icon: getIcon(ext.icon) || TableColumnSolid,
-			href: `/extensions/${ext.id}`
-		}));
+	let extensionItems: NavItemWithHref[];
+	$: {
+		console.log('All filtered extensions:', filteredExtensions.map(ext => ({ id: ext.id, name: ext.name })));
+		extensionItems = filteredExtensions
+			.filter(ext => {
+				const excluded = [
+					'vault_manager',
+					'public_dashboard', 
+					'citizen_dashboard',
+					'justice_litigation',
+					'land_registry',
+					'llm_chat', // AI Assistant
+					'metrics', // Budget Metrics
+					'notifications'
+				].includes(ext.id);
+				if (!excluded) {
+					console.log('Including extension in extensionItems:', ext.id, ext.name);
+				}
+				return !excluded;
+			})
+			.map(ext => ({
+				name: ext.name,
+				icon: getIcon(ext.icon) || TableColumnSolid,
+				href: `/extensions/${ext.id}`
+			}));
+	}
 
 	// Extensions Marketplace (admin only)
 	const marketplaceItem = { 
