@@ -125,7 +125,7 @@
 
 	// Core navigation items with translation keys
 	const coreNavItems: NavItemWithHref[] = [
-		{ name: $_('navigation.dashboard'), icon: ChartPieOutline, href: '/extensions/public_dashboard' }, // For all users
+		{ translationKey: 'extensions.public_dashboard.sidebar', icon: ChartPieOutline, href: '/extensions/public_dashboard' }, // For all users
 		{ name: $_('common.identities') || 'My Identities', icon: UsersOutline, href: '/identities' }, // For all users
 		{ name: $_('navigation.admin_dashboard') || 'Admin Dashboard', icon: TableColumnSolid, href: '/ggg', profiles: ['admin'] }, // Admin only
 		{ name: $_('common.settings'), icon: CogOutline, href: '/settings' }, // For all users
@@ -149,9 +149,9 @@
 	$: filteredExtensions = filterExtensionsForSidebar(extensions);
 
 	// Create individual menu items for extensions instead of dropdown
-	// Exclude vault_manager since it's handled separately with translation key
+	// Exclude vault_manager and public_dashboard since they're handled separately with translation keys
 	$: extensionItems = filteredExtensions
-		.filter(ext => ext.id !== 'vault_manager')
+		.filter(ext => ext.id !== 'vault_manager' && ext.id !== 'public_dashboard')
 		.map(ext => ({
 			name: ext.name,
 			icon: getIcon(ext.icon) || TableColumnSolid,
@@ -250,6 +250,9 @@
 					{#each posts as { name, translationKey, icon, children, href }, index}
 						{#if href && href.includes('vault_manager')}
 							{console.log('Vault Manager item:', { name, translationKey, href })}
+						{/if}
+						{#if href && href.includes('public_dashboard')}
+							{console.log('Public Dashboard item:', { name, translationKey, href })}
 						{/if}
 						{#if children}
 							<SidebarDropdownWrapper bind:isOpen={dropdowns[index]} label={name} class="pr-3">
