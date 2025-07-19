@@ -1,4 +1,5 @@
 {
+  "sidebar": "通知",
   "title": "通知",
   "unread_count": "{count} 条未读通知",
   "mark_all_read": "全部标记为已读",

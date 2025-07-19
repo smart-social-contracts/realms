@@ -35,6 +35,30 @@ function getPreferredLocale(): string {
   
   const targetLanguages = ["en", "de", "fr", "es", "zh-CN"];
   
+  // Check URL parameters first
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlLocale = urlParams.get('locale');
+    if (urlLocale && targetLanguages.includes(urlLocale)) {
+      console.log('Using locale from URL parameter:', urlLocale);
+      return urlLocale;
+    }
+  } catch (e) {
+    console.error('Error reading URL parameters:', e);
+  }
+  
+  // Check localStorage
+  try {
+    const storedLocale = localStorage.getItem('preferredLocale');
+    if (storedLocale && targetLanguages.includes(storedLocale)) {
+      console.log('Using locale from localStorage:', storedLocale);
+      return storedLocale;
+    }
+  } catch (e) {
+    console.error('Error accessing localStorage:', e);
+  }
+  
+  // Fall back to browser language preferences
   const browserLanguages = navigator.languages || [navigator.language];
   
   for (const browserLang of browserLanguages) {
@@ -97,17 +121,6 @@ export async function loadExtensionTranslations() {
 }
 
 export function initI18n() {
-  // Set default locale before initialization to prevent errors
-  if (browser) {
-    try {
-      const storedLocale = localStorage.getItem('preferredLocale');
-      if (storedLocale) {
-        console.log('Setting initial locale from localStorage:', storedLocale);
-      }
-    } catch (e) {
-      console.error('Error accessing localStorage:', e);
-    }
-  }
   init({
     fallbackLocale: "en",
     initialLocale: browser ? getPreferredLocale() : "en"

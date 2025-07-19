@@ -129,6 +129,12 @@
 		{ name: $_('common.identities') || 'My Identities', icon: UsersOutline, href: '/identities' }, // For all users
 		{ name: $_('navigation.admin_dashboard') || 'Admin Dashboard', icon: TableColumnSolid, href: '/ggg', profiles: ['admin'] }, // Admin only
 		{ name: $_('common.settings'), icon: CogOutline, href: '/settings' }, // For all users
+		{ translationKey: 'extensions.citizen_dashboard.sidebar', icon: TableColumnSolid, href: '/extensions/citizen_dashboard', profiles: ['member'] }, // Member only
+		{ translationKey: 'extensions.justice_litigation.sidebar', icon: ClipboardListSolid, href: '/extensions/justice_litigation' }, // For all users
+		{ translationKey: 'extensions.land_registry.sidebar', icon: RectangleListSolid, href: '/extensions/land_registry' }, // For all users
+		{ translationKey: 'extensions.ai_assistant.sidebar', icon: WandMagicSparklesOutline, href: '/extensions/llm_chat' }, // For all users
+		{ translationKey: 'extensions.budget_metrics.sidebar', icon: FileChartBarSolid, href: '/extensions/metrics' }, // For all users
+		{ translationKey: 'extensions.notifications.sidebar', icon: LifeSaverSolid, href: '/extensions/notifications' }, // For all users
 	];
 
 	// Filter core navigation items based on user profiles
@@ -149,9 +155,18 @@
 	$: filteredExtensions = filterExtensionsForSidebar(extensions);
 
 	// Create individual menu items for extensions instead of dropdown
-	// Exclude vault_manager and public_dashboard since they're handled separately with translation keys
+	// Exclude extensions that are handled in coreNavItems with translation keys
 	$: extensionItems = filteredExtensions
-		.filter(ext => ext.id !== 'vault_manager' && ext.id !== 'public_dashboard')
+		.filter(ext => ![
+			'vault_manager',
+			'public_dashboard', 
+			'citizen_dashboard',
+			'justice_litigation',
+			'land_registry',
+			'ai_assistant',
+			'budget_metrics',
+			'notifications'
+		].includes(ext.id))
 		.map(ext => ({
 			name: ext.name,
 			icon: getIcon(ext.icon) || TableColumnSolid,
@@ -176,24 +191,7 @@
 		...($userProfiles && $userProfiles.includes('admin') ? [marketplaceItem] : [])
 	];
 
-	// Special case for Citizen Dashboard extension (for members)
-	$: {
-		const citizenDashboardExt = extensions.find((ext: ExtensionMetadata) => ext.id === 'citizen_dashboard');
-		if (citizenDashboardExt && $userProfiles && $userProfiles.includes('member')) {
-			// Make sure it's not already in the list
-			const existingIndex = posts.findIndex(item => item.href === `/extensions/${citizenDashboardExt.id}`);
-			if (existingIndex === -1) {
-				posts = [
-					...posts, 
-					{ 
-						name: $_('navigation.citizen_dashboard') || 'Citizen Dashboard', 
-						icon: getIcon(citizenDashboardExt.icon) || TableColumnSolid, 
-						href: `/extensions/${citizenDashboardExt.id}` 
-					}
-				];
-			}
-		}
-	}
+	// Citizen Dashboard is now handled in coreNavItems with proper translation key
 	
 	// Special case for Vault Manager extension (for admin)
 	$: {

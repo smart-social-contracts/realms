@@ -1,0 +1,11 @@
+{
+  "sidebar": "Justice Litigation",
+  "title": "Justice Litigation",
+  "description": "Legal case management and litigation tracking system",
+  "cases": "Cases",
+  "documents": "Documents",
+  "hearings": "Hearings",
+  "status": "Status",
+  "no_cases": "No cases found",
+  "loading": "Loading cases..."
+}

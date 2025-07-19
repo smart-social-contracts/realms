@@ -1,0 +1,12 @@
+{
+  "sidebar": "Budget Metrics",
+  "title": "Budget Metrics",
+  "description": "Financial tracking and budget analysis dashboard",
+  "budget": "Budget",
+  "expenses": "Expenses",
+  "revenue": "Revenue",
+  "reports": "Reports",
+  "analytics": "Analytics",
+  "no_data": "No budget data available",
+  "loading": "Loading budget metrics..."
+}

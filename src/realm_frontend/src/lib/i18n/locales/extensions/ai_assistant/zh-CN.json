@@ -1,0 +1,11 @@
+{
+  "sidebar": "AI助手",
+  "title": "AI助手",
+  "description": "用于自动化任务和决策支持的智能助手",
+  "chat": "聊天",
+  "history": "历史",
+  "settings": "设置",
+  "models": "模型",
+  "no_conversations": "未找到对话",
+  "loading": "正在加载助手..."
+}

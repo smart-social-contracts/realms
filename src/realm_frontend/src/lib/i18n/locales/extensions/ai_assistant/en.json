@@ -1,0 +1,11 @@
+{
+  "sidebar": "AI Assistant",
+  "title": "AI Assistant",
+  "description": "Intelligent assistant for automated tasks and decision support",
+  "chat": "Chat",
+  "history": "History",
+  "settings": "Settings",
+  "models": "Models",
+  "no_conversations": "No conversations found",
+  "loading": "Loading assistant..."
+}
