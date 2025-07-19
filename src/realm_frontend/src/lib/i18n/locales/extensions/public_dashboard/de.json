@@ -1,0 +1,57 @@
+{
+  "title": "Bürger-Dashboard",
+  "summary": "Dashboard-Übersicht",
+  "services": "Öffentliche Dienste",
+  "taxes": "Steuerinformationen",
+  "personal_data": "Persönliche Daten",
+  "no_data": "Derzeit sind keine Dashboard-Informationen verfügbar.",
+  "loading": "Dashboard wird geladen...",
+  "dashboard_overview": "Dashboard-Übersicht",
+  "welcome_back": "Willkommen zurück, {name}",
+  "last_updated": "Zuletzt aktualisiert: {date}",
+  "services_count": "{count} Aktive Dienste",
+  "approaching_deadlines": "{count} nahende Fristen",
+  "tax_records": "{count} Steuerunterlagen",
+  "overdue_payments": "{count} überfällige Zahlungen",
+  "data_records": "{count} Dateneinträge",
+  "recently_updated": "{count} kürzlich aktualisiert",
+  "tabs": {
+    "public_services": "Öffentliche Dienste",
+    "my_taxes": "Meine Steuern",
+    "personal_data": "Persönliche Daten"
+  },
+  "services_list": {
+    "title": "Meine öffentlichen Dienste",
+    "request_new": "Neuen Dienst anfordern",
+    "loading": "Dienste werden geladen...",
+    "no_services": "Derzeit sind keine öffentlichen Dienste verfügbar.",
+    "table": {
+      "service_name": "Dienstname",
+      "status": "Status",
+      "due_date": "Fälligkeitsdatum",
+      "provider": "Anbieter",
+      "actions": "Aktionen",
+      "details": "Details",
+      "approaching": "Nahend"
+    }
+  },
+  "service_status": {
+    "available": "Verfügbar",
+    "unavailable": "Nicht verfügbar",
+    "maintenance": "In Wartung",
+    "active": "Aktiv",
+    "pending": "Ausstehend",
+    "expired": "Abgelaufen",
+    "suspended": "Ausgesetzt"
+  },
+  "tax_status": {
+    "paid": "Bezahlt",
+    "pending": "Ausstehend",
+    "overdue": "Überfällig"
+  },
+  "privacy": {
+    "show": "Daten anzeigen",
+    "hide": "Daten verbergen",
+    "manage": "Datenschutzeinstellungen verwalten"
+  }
+}

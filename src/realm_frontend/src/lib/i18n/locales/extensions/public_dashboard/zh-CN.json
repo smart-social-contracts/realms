@@ -1,0 +1,18 @@
+{
+  "name": "公共仪表板",
+  "description": "公共访问仪表板，提供公民服务和社区信息",
+  "sidebar": "公共仪表板",
+  "title": "公民仪表板",
+  "users_chart": {
+    "title": "用户",
+    "description": "活跃用户数量"
+  },
+  "organizations_chart": {
+    "title": "组织",
+    "description": "活跃组织数量"
+  },
+  "assets_chart": {
+    "title": "资产",
+    "description": "活跃资产数量"
+  }
+}

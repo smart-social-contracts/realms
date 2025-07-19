@@ -23,7 +23,7 @@ export class SidebarPage {
 			case 'Citizen Dashboard':
 			case 'Justice Litigation':
 			case 'Land Registry':
-			case 'AI assistant':
+			case 'AI Assistant':
 			case 'Budget Metrics':
 			case 'Notifications':
 			case 'Public Dashboard':

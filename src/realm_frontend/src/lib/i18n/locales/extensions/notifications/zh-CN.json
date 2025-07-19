@@ -1,0 +1,36 @@
+{
+  "name": "通知",
+  "description": "在收件箱式界面中查看和管理您的通知",
+  "sidebar": "通知",
+  "title": "通知",
+  "unread_count": "{count} 条未读通知",
+  "mark_all_read": "全部标记为已读",
+  "tabs": {
+    "all": "全部 ({count})",
+    "unread": "未读 ({count})"
+  },
+  "empty_states": {
+    "no_unread": "没有未读通知",
+    "no_notifications": "没有通知",
+    "all_caught_up": "全部已读！您没有未读通知。",
+    "none_available": "您目前没有通知。"
+  },
+  "badge_new": "新",
+  "sample": {
+    "welcome": {
+      "title": "欢迎来到 Realms",
+      "message": "您的账户已成功创建并验证。",
+      "timestamp": "刚刚"
+    },
+    "task_assignment": {
+      "title": "新任务分配",
+      "message": "您被分配了一个需要您关注的新治理任务。",
+      "timestamp": "10分钟前"
+    },
+    "vault_transaction": {
+      "title": "保险库交易",
+      "message": "100个代币的转账已成功完成。",
+      "timestamp": "1小时前"
+    }
+  }
+}

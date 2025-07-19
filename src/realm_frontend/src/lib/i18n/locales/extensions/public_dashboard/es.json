@@ -1,0 +1,24 @@
+{
+  "title": "Panel del Ciudadano",
+  "summary": "Resumen del Panel",
+  "services": "Servicios Públicos",
+  "taxes": "Información Fiscal",
+  "personal_data": "Datos Personales",
+  "no_data": "No hay información disponible en este momento.",
+  "loading": "Cargando panel...",
+  "service_status": {
+    "available": "Disponible",
+    "unavailable": "No Disponible",
+    "maintenance": "En Mantenimiento"
+  },
+  "tax_status": {
+    "paid": "Pagado",
+    "pending": "Pendiente",
+    "overdue": "Vencido"
+  },
+  "privacy": {
+    "show": "Mostrar Datos",
+    "hide": "Ocultar Datos",
+    "manage": "Administrar Configuración de Privacidad"
+  }
+}

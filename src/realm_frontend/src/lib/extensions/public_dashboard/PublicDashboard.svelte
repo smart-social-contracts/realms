@@ -7,6 +7,7 @@
 	import { principal } from '$lib/stores/auth';
 	import { universe, snapshots } from '$lib/stores/auth';
 	import { writable } from 'svelte/store';
+	import { _ } from 'svelte-i18n';
 
 	let greeting = '';
 
@@ -70,20 +71,20 @@
 
 <div class="mt-px space-y-4">
 	<ChartWidget
-		title="Users"
-		description="Active users in the platform"
+		title={$_('extensions.public_dashboard.users_chart.title')}
+		description={$_('extensions.public_dashboard.users_chart.description')}
 		dateValues={$statsDatesValues}
 	/>
 
 	<ChartWidget
-		title="Organizations"
-		description="Total registered organizations"
+		title={$_('extensions.public_dashboard.organizations_chart.title')}
+		description={$_('extensions.public_dashboard.organizations_chart.description')}
 		dateValues={$orgsDatesValues}
 	/>
 
 	<ChartWidget
-		title="Assets"
-		description="Total assets value in USD"
+		title={$_('extensions.public_dashboard.assets_chart.title')}
+		description={$_('extensions.public_dashboard.assets_chart.description')}
 		dateValues={$assetsDatesValues}
 	/>
 

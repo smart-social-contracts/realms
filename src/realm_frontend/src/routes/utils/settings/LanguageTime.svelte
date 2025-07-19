@@ -44,6 +44,6 @@
 			<span>{$_('settings.time_zone', { fallback: 'Time Zone' })}</span>
 			<Select items={timezones} class="font-normal"></Select>
 		</Label>
+		<Button size="sm" class="w-fit whitespace-nowrap" color="alternative">Save all</Button>
 	</div>
-	<Button color="primary" class="mt-6 w-fit" on:click={saveLanguagePreference}>{$_('settings.save_all', { fallback: 'Save all' })}</Button>
 </Card>

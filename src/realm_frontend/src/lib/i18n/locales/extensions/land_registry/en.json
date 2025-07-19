@@ -1,0 +1,12 @@
+{
+  "name": "Land Registry",
+  "description": "Manage land ownership records, property transfers, and cadastral information",
+  "sidebar": "Land Registry",
+  "title": "Land Registry",
+  "properties": "Properties",
+  "ownership": "Ownership",
+  "transfers": "Transfers",
+  "records": "Records",
+  "no_properties": "No properties found",
+  "loading": "Loading properties..."
+}

@@ -26,6 +26,6 @@
 				<Input {type} {placeholder} class="border font-normal outline-none" />
 			</Label>
 		{/each}
-		<Button class="w-fit whitespace-nowrap">Save all</Button>
+		<Button size="sm" class="w-fit whitespace-nowrap" color="alternative">Save all</Button>
 	</form>
 </Card>

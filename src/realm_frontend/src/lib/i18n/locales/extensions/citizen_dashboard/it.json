@@ -1,0 +1,57 @@
+{
+  "title": "Dashboard Cittadino",
+  "summary": "Panoramica Dashboard",
+  "services": "Servizi Pubblici",
+  "taxes": "Informazioni Fiscali",
+  "personal_data": "Dati Personali",
+  "no_data": "Nessuna informazione dashboard disponibile al momento.",
+  "loading": "Caricamento dashboard...",
+  "dashboard_overview": "Panoramica Dashboard",
+  "welcome_back": "Bentornato, {name}",
+  "last_updated": "Ultimo aggiornamento: {date}",
+  "services_count": "{count} Servizi attivi",
+  "approaching_deadlines": "{count} scadenze in avvicinamento",
+  "tax_records": "{count} Registrazioni fiscali",
+  "overdue_payments": "{count} pagamenti scaduti",
+  "data_records": "{count} Record di dati",
+  "recently_updated": "{count} aggiornati di recente",
+  "tabs": {
+    "public_services": "Servizi Pubblici",
+    "my_taxes": "Le Mie Tasse",
+    "personal_data": "Dati Personali"
+  },
+  "services_list": {
+    "title": "I Miei Servizi Pubblici",
+    "request_new": "Richiedi Nuovo Servizio",
+    "loading": "Caricamento servizi...",
+    "no_services": "Nessun servizio pubblico disponibile al momento.",
+    "table": {
+      "service_name": "Nome Servizio",
+      "status": "Stato",
+      "due_date": "Data di Scadenza",
+      "provider": "Fornitore",
+      "actions": "Azioni",
+      "details": "Dettagli",
+      "approaching": "In Avvicinamento"
+    }
+  },
+  "service_status": {
+    "available": "Disponibile",
+    "unavailable": "Non Disponibile",
+    "maintenance": "In Manutenzione",
+    "active": "Attivo",
+    "pending": "In Attesa",
+    "expired": "Scaduto",
+    "suspended": "Sospeso"
+  },
+  "tax_status": {
+    "paid": "Pagato",
+    "pending": "In Attesa",
+    "overdue": "Scaduto"
+  },
+  "privacy": {
+    "show": "Mostra Dati",
+    "hide": "Nascondi Dati",
+    "manage": "Gestisci Impostazioni Privacy"
+  }
+}
