@@ -1,4 +1,6 @@
 {
+  "name": "Citizen Dashboard",
+  "description": "Access public services, view tax information, and manage personal data",
   "sidebar": "Citizen Dashboard",
   "title": "Citizen Dashboard",
   "summary": "Dashboard Overview",

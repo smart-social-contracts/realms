@@ -1,4 +1,6 @@
 {
+  "name": "Public Dashboard",
+  "description": "Public access dashboard with citizen services and community information",
   "sidebar": "Public Dashboard",
   "title": "Citizen Dashboard",
   "summary": "Dashboard Overview",

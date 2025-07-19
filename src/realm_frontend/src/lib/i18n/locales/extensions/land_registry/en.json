@@ -1,7 +1,8 @@
 {
+  "name": "Land Registry",
+  "description": "Manage land ownership records, property transfers, and cadastral information",
   "sidebar": "Land Registry",
   "title": "Land Registry",
-  "description": "Property registration and land ownership management system",
   "properties": "Properties",
   "ownership": "Ownership",
   "transfers": "Transfers",

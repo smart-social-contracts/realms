@@ -27,10 +27,10 @@
 
 <main class="p-4">
 	<div class="max-w-7xl mx-auto">
-		<h1 class="text-3xl font-bold mb-6 text-gray-900 dark:text-white">{$_('extensions.marketplace.title')}</h1>
+		<h1 class="text-3xl font-bold mb-6 text-gray-900 dark:text-white">{$_('extensions.market_place.title')}</h1>
 		
 		<p class="mb-8 text-gray-600 dark:text-gray-400">
-			{$_('extensions.marketplace.description')}
+			{$_('extensions.market_place.description')}
 		</p>
 		
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -55,7 +55,7 @@
 					
 					{#if extension.permissions && extension.permissions.length > 0}
 						<div class="mb-4">
-							<p class="text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">{$_('extensions.marketplace.required_permissions')}</p>
+							<p class="text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">{$_('extensions.market_place.required_permissions')}</p>
 							<div class="flex flex-wrap gap-2">
 								{#each extension.permissions as permission}
 									<span class="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded dark:bg-gray-700 dark:text-gray-300">
@@ -68,7 +68,7 @@
 					
 					<div class="flex justify-between mt-auto">
 						<Button href="/extensions/{extension.id}" color="primary" class="w-full">
-							{$_('extensions.marketplace.open_extension')}
+							{$_('extensions.market_place.open_extension')}
 						</Button>
 					</div>
 				</Card>

@@ -1,4 +1,6 @@
 {
+  "name": "Vault Manager",
+  "description": "Manage vault configurations, canister IDs, and vault operations",
   "sidebar": "Vault Manager",
   "title": "Vault Manager",
   "configuration": {

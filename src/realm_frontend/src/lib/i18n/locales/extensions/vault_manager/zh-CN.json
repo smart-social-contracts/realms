@@ -1,4 +1,6 @@
 {
+  "name": "保险库管理器",
+  "description": "管理保险库配置、容器ID和保险库操作",
   "sidebar": "保险库管理器",
   "title": "保险库管理器",
   "configuration": {

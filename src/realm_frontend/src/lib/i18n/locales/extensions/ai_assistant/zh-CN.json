@@ -1,7 +1,8 @@
 {
+  "name": "AI助手",
+  "description": "智能助手，提供智能合约指导和区块链查询",
   "sidebar": "AI助手",
   "title": "AI助手",
-  "description": "用于自动化任务和决策支持的智能助手",
   "chat": "聊天",
   "history": "历史",
   "settings": "设置",

@@ -185,7 +185,7 @@
 
 	// Extensions Marketplace (admin only)
 	const marketplaceItem = { 
-		name: $_('navigation.extensions_marketplace') || 'Extensions Marketplace', 
+		name: $_('extensions.market_place.sidebar'), 
 		icon: LayersSolid, 
 		href: '/extensions',
 		profiles: ['admin']
@@ -252,7 +252,6 @@
 		divClass="overflow-y-auto h-full bg-white px-3 pb-4 dark:bg-gray-800"
 		asideClass="fixed top-0 left-0 z-40 w-64 h-screen pt-14 transition-transform border-r lg:translate-x-0 bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700 {drawerHidden ? '-translate-x-full' : ''}"
 	>
-		>
 			<nav class="divide-y divide-gray-200 dark:divide-gray-700">
 				<SidebarGroup ulClass={groupClass} class="mb-3">
 					{#each posts as { name, translationKey, icon, children, href }, index}

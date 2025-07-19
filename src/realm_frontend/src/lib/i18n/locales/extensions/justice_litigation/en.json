@@ -1,7 +1,8 @@
 {
+  "name": "Justice Litigation",
+  "description": "Manage legal cases, track litigation progress, and access court documents",
   "sidebar": "Justice Litigation",
   "title": "Justice Litigation",
-  "description": "Legal case management and litigation tracking system",
   "cases": "Cases",
   "documents": "Documents",
   "hearings": "Hearings",

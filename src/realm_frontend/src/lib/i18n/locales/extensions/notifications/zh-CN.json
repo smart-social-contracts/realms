@@ -1,4 +1,6 @@
 {
+  "name": "通知",
+  "description": "在收件箱式界面中查看和管理您的通知",
   "sidebar": "通知",
   "title": "通知",
   "unread_count": "{count} 条未读通知",
