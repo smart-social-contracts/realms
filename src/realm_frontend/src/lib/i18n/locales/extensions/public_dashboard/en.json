@@ -59,5 +59,17 @@
   },
   "settings": {
     "profile_picture": "Profile Picture"
+  },
+  "users_chart": {
+    "title": "Active Users",
+    "description": "Active users on the platform"
+  },
+  "organizations_chart": {
+    "title": "Organizations",
+    "description": "Number of registered organizations"
+  },
+  "assets_chart": {
+    "title": "Total Assets",
+    "description": "Total value of assets managed on the platform"
   }
 }

@@ -50,15 +50,15 @@
 <div class="p-6">
     <div class="flex justify-between items-center mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{$_('notifications.title')}</h1>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{$_('extensions.notifications.title')}</h1>
             <p class="text-gray-600 dark:text-gray-400">
-                {$_('notifications.unread_count', { values: { count: $unreadCount } })}
+                {$_('extensions.notifications.unread_count', { values: { count: $unreadCount } })}
             </p>
         </div>
         {#if $unreadCount > 0}
             <Button color="alternative" on:click={markAllAsRead}>
                 <CheckOutline class="w-4 h-4 mr-2" />
-                {$_('notifications.mark_all_read')}
+                {$_('extensions.notifications.mark_all_read')}
             </Button>
         {/if}
     </div>
@@ -68,13 +68,13 @@
             color={selectedTab === 'all' ? 'primary' : 'alternative'}
             on:click={() => selectedTab = 'all'}
         >
-            {$_('notifications.tabs.all', { values: { count: $notifications.length } })}
+            {$_('extensions.notifications.tabs.all', { values: { count: $notifications.length } })}
         </Button>
         <Button 
             color={selectedTab === 'unread' ? 'primary' : 'alternative'}
             on:click={() => selectedTab = 'unread'}
         >
-            {$_('notifications.tabs.unread', { values: { count: $unreadCount } })}
+            {$_('extensions.notifications.tabs.unread', { values: { count: $unreadCount } })}
         </Button>
     </div>
 
@@ -86,12 +86,12 @@
         <Card class="text-center py-12">
             <EyeSolid class="w-12 h-12 mx-auto mb-4 text-gray-400" />
             <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                {selectedTab === 'unread' ? $_('notifications.empty_states.no_unread') : $_('notifications.empty_states.no_notifications')}
+                {selectedTab === 'unread' ? $_('extensions.notifications.empty_states.no_unread') : $_('extensions.notifications.empty_states.no_notifications')}
             </h3>
             <p class="text-gray-600 dark:text-gray-400">
                 {selectedTab === 'unread' 
-                    ? $_('notifications.empty_states.all_caught_up') 
-                    : $_('notifications.empty_states.none_available')}
+                    ? $_('extensions.notifications.empty_states.all_caught_up') 
+                    : $_('extensions.notifications.empty_states.none_available')}
             </p>
         </Card>
     {:else}
@@ -117,7 +117,7 @@
                                 </h4>
                                 <div class="flex items-center space-x-2">
                                     {#if !notification.read}
-                                        <Badge color="blue" class="text-xs">{$_('notifications.badge_new')}</Badge>
+                                        <Badge color="blue" class="text-xs">{$_('extensions.notifications.badge_new')}</Badge>
                                     {/if}
                                     <span class="text-xs text-gray-500 dark:text-gray-400">
                                         {notification.timestamp}
