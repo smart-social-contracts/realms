@@ -10,6 +10,7 @@
 	
 	// Import backend directly without using await in top-level
 	import { backend } from '$lib/canisters';
+	import { _ } from 'svelte-i18n';
 	
 	// Component state
 	let loading = true;
@@ -311,12 +312,12 @@
 <Card size="lg" padding="xl" class="w-full">
 	<div class="flex items-center mb-4">
 		<WalletSolid class="mr-2 h-8 w-8 text-primary-600" />
-		<h2 class="text-2xl font-bold text-gray-900 dark:text-white">Vault Manager</h2>
+		<h2 class="text-2xl font-bold text-gray-900 dark:text-white">{$_('extensions.vault_manager.title')}</h2>
 	</div>
 
 	<!-- Configuration Section -->
 	<div class="vault-configuration mb-6">
-		<h3 class="text-xl font-bold mb-4">Vault Configuration</h3>
+		<h3 class="text-xl font-bold mb-4">{$_('extensions.vault_manager.configuration.title')}</h3>
 		
 		<!-- Simplified to only have Vault Canister ID input -->
 		<div class="mb-4">

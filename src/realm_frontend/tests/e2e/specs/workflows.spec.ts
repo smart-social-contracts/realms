@@ -112,15 +112,15 @@ test.describe('User workflows', () => {
 			{ name: 'users outline My Identities' , needle: 'Manage and connect your' },
 			{ name: 'table column solid Admin' , needle: 'Generalized Global Governance System' },
 			{ name: 'cog outline Settings' , needle: 'Principal:' },
-			{ name: 'layers solid Extensions' , needle: 'Browse and install extensions' },
+			{ name: 'layers solid Extensions' , needle: 'Browse and install' },
 			{ name: 'wallet solid Vault Manager' , needle: 'Vault Configuration' },
-			{ name: 'Citizen Dashboard' , needle: 'My Public Services' },
+			{ name: 'Citizen Dashboard' , needle: 'Dashboard Overview' },
 			{ name: 'Justice Litigation' , needle: 'Justice Litigation System' },
 			{ name: 'Land Registry' , needle: 'Manage land ownership' },
-			{ name: 'AI assistant' , needle: 'Governance AI assistant' },
+			{ name: 'AI Assistant' , needle: 'Governance AI assistant' },
 			{ name: 'Budget Metrics' , needle: 'Tax Allocation Breakdown' },
 			{ name: 'Notifications' , needle: 'unread notifications' },
-			{ name: 'Public Dashboard' , needle: 'Active users in the platform' }
+			{ name: 'Public Dashboard' , needle: 'Active users on the platform' }
 		];
 
 		for (const link of links) {

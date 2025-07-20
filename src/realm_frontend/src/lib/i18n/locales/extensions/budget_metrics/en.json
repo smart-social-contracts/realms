@@ -1,0 +1,13 @@
+{
+  "name": "Budget Metrics",
+  "description": "Comprehensive budget visualization including charts, cash flow analysis, and tax metrics",
+  "sidebar": "Budget Metrics",
+  "title": "Budget Metrics",
+  "budget": "Budget",
+  "expenses": "Expenses",
+  "revenue": "Revenue",
+  "reports": "Reports",
+  "analytics": "Analytics",
+  "no_data": "No budget data available",
+  "loading": "Loading budget metrics..."
+}

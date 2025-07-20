@@ -1,0 +1,12 @@
+{
+  "name": "AI Assistant",
+  "description": "Intelligent assistant for smart contract guidance and blockchain queries",
+  "sidebar": "AI Assistant",
+  "title": "AI Assistant",
+  "chat": "Chat",
+  "history": "History",
+  "settings": "Settings",
+  "models": "Models",
+  "no_conversations": "No conversations found",
+  "loading": "Loading assistant..."
+}

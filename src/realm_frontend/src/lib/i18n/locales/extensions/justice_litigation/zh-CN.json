@@ -1,0 +1,12 @@
+{
+  "name": "司法诉讼",
+  "description": "管理法律案件、跟踪诉讼进展并访问法庭文件",
+  "sidebar": "司法诉讼",
+  "title": "司法诉讼",
+  "cases": "案件",
+  "documents": "文件",
+  "hearings": "听证会",
+  "status": "状态",
+  "no_cases": "未找到案件",
+  "loading": "正在加载案件..."
+}

@@ -35,8 +35,21 @@
 	import { getIcon } from '$lib/utils/iconMap';
 	// Import user profiles store
 	import { userProfiles } from '$lib/stores/profiles';
+	
+	// Import i18n functionality
+	import { _, locale, isLoading, getLocaleFromNavigator } from 'svelte-i18n';
+	import { onMount } from 'svelte';
 
 	export let drawerHidden: boolean = false;
+
+	$: {
+		if ($locale) {
+			console.log('Sidebar: Current locale:', $locale);
+			// Debug translation for Vault Manager
+			const vaultManagerTranslation = $_('extensions.vault_manager.sidebar');
+			console.log('Sidebar: Vault Manager translation key result:', vaultManagerTranslation);
+		}
+	}
 
 	const closeDrawer = () => {
 		drawerHidden = true;
@@ -50,7 +63,8 @@
 	
 	// Define types for navigation items
 	type NavItemWithHref = {
-		name: string;
+		name?: string;
+		translationKey?: string; // Added translation key property for i18n
 		icon: typeof TableColumnSolid;
 		href: string;
 		children?: never;
@@ -109,19 +123,25 @@
 		});
 	}
 
-	// Core navigation items
+	// Core navigation items with translation keys
 	const coreNavItems: NavItemWithHref[] = [
-		{ name: 'Dashboard', icon: ChartPieOutline, href: '/extensions/public_dashboard' }, // For all users
-		{ name: 'My Identities', icon: UsersOutline, href: '/identities' }, // For all users
-		{ name: 'Admin Dashboard', icon: TableColumnSolid, href: '/ggg', profiles: ['admin'] }, // Admin only
-		{ name: 'Settings', icon: CogOutline, href: '/settings' }, // For all users
+		{ translationKey: 'extensions.public_dashboard.sidebar', icon: ChartPieOutline, href: '/extensions/public_dashboard' }, // For all users
+		{ name: $_('common.identities') || 'My Identities', icon: UsersOutline, href: '/identities' }, // For all users
+		{ name: $_('navigation.admin_dashboard') || 'Admin Dashboard', icon: TableColumnSolid, href: '/ggg', profiles: ['admin'] }, // Admin only
+		{ name: $_('common.settings'), icon: CogOutline, href: '/settings' }, // For all users
+		{ translationKey: 'extensions.citizen_dashboard.sidebar', icon: TableColumnSolid, href: '/extensions/citizen_dashboard' }, // For all users
+		{ translationKey: 'extensions.justice_litigation.sidebar', icon: ClipboardListSolid, href: '/extensions/justice_litigation' }, // For all users
+		{ translationKey: 'extensions.land_registry.sidebar', icon: RectangleListSolid, href: '/extensions/land_registry' }, // For all users
+		{ translationKey: 'extensions.ai_assistant.sidebar', icon: WandMagicSparklesOutline, href: '/extensions/llm_chat' }, // For all users
+		{ translationKey: 'extensions.budget_metrics.sidebar', icon: FileChartBarSolid, href: '/extensions/metrics' }, // For all users
+		{ translationKey: 'extensions.notifications.sidebar', icon: LifeSaverSolid, href: '/extensions/notifications' }, // For all users
 	];
 
 	// Filter core navigation items based on user profiles
 	$: filteredCoreNavItems = coreNavItems.filter(item => {
 		// If no profiles are available, only show Dashboard
 		if (!$userProfiles || $userProfiles.length === 0) {
-			return item.name === 'Dashboard';
+			return item.name === $_('navigation.dashboard');
 		}
 		
 		// If no profiles restriction on the item, show to everyone with a profile
@@ -135,15 +155,37 @@
 	$: filteredExtensions = filterExtensionsForSidebar(extensions);
 
 	// Create individual menu items for extensions instead of dropdown
-	$: extensionItems = filteredExtensions.map(ext => ({
-		name: ext.name,
-		icon: getIcon(ext.icon) || TableColumnSolid,
-		href: `/extensions/${ext.id}`
-	}));
+	// Exclude extensions that are handled in coreNavItems with translation keys
+	let extensionItems: NavItemWithHref[];
+	$: {
+		console.log('All filtered extensions:', filteredExtensions.map(ext => ({ id: ext.id, name: ext.name })));
+		extensionItems = filteredExtensions
+			.filter(ext => {
+				const excluded = [
+					'vault_manager',
+					'public_dashboard', 
+					'citizen_dashboard',
+					'justice_litigation',
+					'land_registry',
+					'llm_chat', // AI Assistant
+					'metrics', // Budget Metrics
+					'notifications'
+				].includes(ext.id);
+				if (!excluded) {
+					console.log('Including extension in extensionItems:', ext.id, ext.name);
+				}
+				return !excluded;
+			})
+			.map(ext => ({
+				name: ext.name,
+				icon: getIcon(ext.icon) || TableColumnSolid,
+				href: `/extensions/${ext.id}`
+			}));
+	}
 
 	// Extensions Marketplace (admin only)
 	const marketplaceItem = { 
-		name: 'Extensions Marketplace', 
+		name: $_('extensions.market_place.sidebar'), 
 		icon: LayersSolid, 
 		href: '/extensions',
 		profiles: ['admin']
@@ -159,24 +201,7 @@
 		...($userProfiles && $userProfiles.includes('admin') ? [marketplaceItem] : [])
 	];
 
-	// Special case for Citizen Dashboard extension (for members)
-	$: {
-		const citizenDashboardExt = extensions.find((ext: ExtensionMetadata) => ext.id === 'citizen_dashboard');
-		if (citizenDashboardExt && $userProfiles && $userProfiles.includes('member')) {
-			// Make sure it's not already in the list
-			const existingIndex = posts.findIndex(item => item.href === `/extensions/${citizenDashboardExt.id}`);
-			if (existingIndex === -1) {
-				posts = [
-					...posts, 
-					{ 
-						name: 'Citizen Dashboard', 
-						icon: getIcon(citizenDashboardExt.icon) || TableColumnSolid, 
-						href: `/extensions/${citizenDashboardExt.id}` 
-					}
-				];
-			}
-		}
-	}
+	// Citizen Dashboard is now handled in coreNavItems with proper translation key
 	
 	// Special case for Vault Manager extension (for admin)
 	$: {
@@ -185,10 +210,15 @@
 			// Make sure it's not already in the list
 			const existingIndex = posts.findIndex(item => item.href === `/extensions/${vaultManagerExt.id}`);
 			if (existingIndex === -1) {
+				console.log('Vault Manager extension found for admin');
+				console.log('Current locale when adding to posts:', $locale);
+				
+				// Using standard reactive Svelte approach for translations
 				posts = [
 					...posts, 
 					{ 
-						name: 'Vault Manager', 
+						// Store the translation key instead of the translated value
+						translationKey: 'extensions.vault_manager.sidebar',
 						icon: getIcon(vaultManagerExt.icon) || WalletSolid, 
 						href: `/extensions/${vaultManagerExt.id}` 
 					}
@@ -203,6 +233,12 @@
 	
 	// Make dropdowns reactive based on posts
 	$: dropdowns = posts ? Object.fromEntries(posts.map((post, index) => [index, false])) : {};
+
+	afterNavigate((navigation) => {
+		// this fixes https://github.com/themesberg/flowbite-svelte/issues/364
+		document.getElementById('svelte')?.scrollTo({ top: 0 });
+		closeDrawer();
+	});
 </script>
 
 <Sidebar
@@ -211,68 +247,75 @@
 	activeClass="bg-gray-100 dark:bg-gray-700"
 	asideClass="fixed inset-0 z-30 flex-none h-full w-64 lg:h-auto border-e border-gray-200 dark:border-gray-600 lg:overflow-y-visible lg:pt-16 lg:block"
 >
-	<h4 class="sr-only">Main menu</h4>
+	<h4 class="sr-only">{$_('common.main_menu')}</h4>
 	<SidebarWrapper
-		divClass="overflow-y-auto px-3 pt-20 lg:pt-5 h-full bg-white scrolling-touch max-w-2xs lg:h-[calc(100vh-4rem)] lg:block dark:bg-gray-800 lg:me-0 lg:sticky top-2"
+		divClass="overflow-y-auto h-full bg-white px-3 pb-4 dark:bg-gray-800"
+		asideClass="fixed top-0 left-0 z-40 w-64 h-screen pt-14 transition-transform border-r lg:translate-x-0 bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700 {drawerHidden ? '-translate-x-full' : ''}"
 	>
-		<nav class="divide-y divide-gray-200 dark:divide-gray-700">
-			<SidebarGroup ulClass={groupClass} class="mb-3">
-				{#each posts as { name, icon, children, href }, index}
-					{#if children}
-						<SidebarDropdownWrapper bind:isOpen={dropdowns[index]} label={name} class="pr-3">
-							<AngleDownOutline slot="arrowdown" strokeWidth="3.3" size="sm" />
-							<AngleUpOutline slot="arrowup" strokeWidth="3.3" size="sm" />
-							<svelte:component this={icon} slot="icon" class={iconClass} />
+			<nav class="divide-y divide-gray-200 dark:divide-gray-700">
+				<SidebarGroup ulClass={groupClass} class="mb-3">
+					{#each posts as { name, translationKey, icon, children, href }, index}
+						{#if href && href.includes('vault_manager')}
+							{console.log('Vault Manager item:', { name, translationKey, href })}
+						{/if}
+						{#if href && href.includes('public_dashboard')}
+							{console.log('Public Dashboard item:', { name, translationKey, href })}
+						{/if}
+						{#if children}
+							<SidebarDropdownWrapper bind:isOpen={dropdowns[index]} label={name} class="pr-3">
+								<AngleDownOutline slot="arrowdown" strokeWidth="3.3" size="sm" />
+								<AngleUpOutline slot="arrowup" strokeWidth="3.3" size="sm" />
+								<svelte:component this={icon} slot="icon" class={iconClass} />
 
-							{#each Object.entries(children) as [title, href]}
-								{#if isExtensionLink(href?.toString())}
-									<!-- Use classic browser navigation for extension links -->
-									<li>
-										<a 
-											href={href.toString()} 
-											data-sveltekit-reload 
-											class={itemClass} 
-											on:click={closeDrawer}
-										>
-											<span class="ml-9">{title}</span>
-										</a>
-									</li>
-								{:else}
-									<SidebarItem label={title} href={href.toString()} spanClass="ml-9" class={itemClass} />
-								{/if}
-							{/each}
-						</SidebarDropdownWrapper>
-					{:else}
-						{#if isExtensionLink(href)}
-						<!-- Use classic browser navigation for extension links -->
-						<li>
-							<a 
-								href={href} 
-								data-sveltekit-reload 
-								class={itemClass} 
-								on:click={closeDrawer}
-							>
-								<svelte:component this={icon} class={iconClass} />
-								<span class="ml-3">{name}</span>
-							</a>
-						</li>
-					{:else}
-						<SidebarItem label={name} {href} spanClass="ml-3" class={itemClass}>
+								{#each Object.entries(children) as [title, href]}
+									{#if isExtensionLink(href?.toString())}
+										<!-- Use classic browser navigation for extension links -->
+										<li>
+											<a 
+												href={href.toString()} 
+												data-sveltekit-reload 
+												class={itemClass} 
+												on:click={closeDrawer}
+											>
+												<span class="ml-9">{$_(title)}</span>
+											</a>
+										</li>
+									{:else}
+										<SidebarItem label={$_(title)} href={href.toString()} spanClass="ml-9" class={itemClass} />
+									{/if}
+								{/each}
+							</SidebarDropdownWrapper>
+						{:else}
+							{#if isExtensionLink(href)}
+								<!-- Use classic browser navigation for extension links -->
+								<li>
+									<a 
+										href={href} 
+										data-sveltekit-reload 
+										class={itemClass} 
+										on:click={closeDrawer}
+									>
+										<svelte:component this={icon} class={iconClass} />
+										<span class="ml-3">{translationKey ? $_(translationKey) : name}</span>
+									</a>
+								</li>
+							{:else}
+								<SidebarItem label={name} {href} spanClass="ml-3" class={itemClass}>
+									<svelte:component this={icon} slot="icon" class={iconClass} />
+								</SidebarItem>
+							{/if}
+						{/if}
+					{/each}
+				</SidebarGroup>
+				<SidebarGroup ulClass={groupClass}>
+					{#each links as { label, href, icon } (label)}
+						<SidebarItem {label} {href} spanClass="ml-3" class={itemClass} target="_blank">
 							<svelte:component this={icon} slot="icon" class={iconClass} />
 						</SidebarItem>
-					{/if}
-					{/if}
-				{/each}
-			</SidebarGroup>
-			<SidebarGroup ulClass={groupClass}>
-				{#each links as { label, href, icon } (label)}
-					<SidebarItem {label} {href} spanClass="ml-3" class={itemClass} target="_blank">
-						<svelte:component this={icon} slot="icon" class={iconClass} />
-					</SidebarItem>
-				{/each}
-			</SidebarGroup>
-		</nav>
-	</SidebarWrapper>
+					{/each}
+				</SidebarGroup>
+			</nav>
+		</SidebarWrapper>
 </Sidebar>
 
 <div

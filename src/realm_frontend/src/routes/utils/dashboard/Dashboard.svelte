@@ -138,7 +138,7 @@
 	<!-- <section id="aaa">{statsDatesValues}</section> -->
 	<ChartWidget
 		title="🚀 Users"
-		description="Active users in the platform - Dev Mode Working!"
+		description="Active users on the platform"
 		dateValues={$statsDatesValues}
 	/>
 

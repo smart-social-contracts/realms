@@ -1,0 +1,57 @@
+{
+  "title": "Tableau de Bord Citoyen",
+  "summary": "Aperçu du Tableau de Bord",
+  "services": "Services Publics",
+  "taxes": "Informations Fiscales",
+  "personal_data": "Données Personnelles",
+  "no_data": "Aucune information de tableau de bord disponible pour le moment.",
+  "loading": "Chargement du tableau de bord...",
+  "dashboard_overview": "Aperçu du Tableau de Bord",
+  "welcome_back": "Bon retour, {name}",
+  "last_updated": "Dernière mise à jour : {date}",
+  "services_count": "{count} Services actifs",
+  "approaching_deadlines": "{count} échéances approchantes",
+  "tax_records": "{count} Dossiers fiscaux",
+  "overdue_payments": "{count} paiements en retard",
+  "data_records": "{count} Enregistrements de données",
+  "recently_updated": "{count} récemment mis à jour",
+  "tabs": {
+    "public_services": "Services Publics",
+    "my_taxes": "Mes Impôts",
+    "personal_data": "Données Personnelles"
+  },
+  "services_list": {
+    "title": "Mes Services Publics",
+    "request_new": "Demander un Nouveau Service",
+    "loading": "Chargement des services...",
+    "no_services": "Aucun service public disponible pour le moment.",
+    "table": {
+      "service_name": "Nom du Service",
+      "status": "Statut",
+      "due_date": "Date d'Échéance",
+      "provider": "Fournisseur",
+      "actions": "Actions",
+      "details": "Détails",
+      "approaching": "Approchant"
+    }
+  },
+  "service_status": {
+    "available": "Disponible",
+    "unavailable": "Indisponible",
+    "maintenance": "En Maintenance",
+    "active": "Actif",
+    "pending": "En Attente",
+    "expired": "Expiré",
+    "suspended": "Suspendu"
+  },
+  "tax_status": {
+    "paid": "Payé",
+    "pending": "En Attente",
+    "overdue": "En Retard"
+  },
+  "privacy": {
+    "show": "Afficher les Données",
+    "hide": "Masquer les Données",
+    "manage": "Gérer les Paramètres de Confidentialité"
+  }
+}
