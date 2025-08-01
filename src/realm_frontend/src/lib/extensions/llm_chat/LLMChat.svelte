@@ -71,7 +71,7 @@
 		} else {
 			// Fetch production server host dynamically
 			const serverHost = await fetchServerHost();
-			API_URL = `https://${serverHost}/api/ask`;
+			API_URL = `${serverHost}api/ask`;
 		}
 		console.log("API_URL set to:", API_URL);
 	};
