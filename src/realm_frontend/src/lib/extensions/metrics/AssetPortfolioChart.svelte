@@ -1,12 +1,13 @@
 <script>
   import { Chart } from 'flowbite-svelte';
+  import { _ } from 'svelte-i18n';
   
   export let data = [];
 </script>
 
 <div class="bg-white rounded-lg p-6 border border-gray-200">
   <h4 class="font-semibold text-gray-700 mb-4 flex items-center">
-    💰 <span class="ml-2">Asset Portfolio Distribution</span>
+    💰 <span class="ml-2">{$_('extensions.metrics.asset_portfolio_distribution')}</span>
   </h4>
   <Chart options={{
     chart: {
@@ -38,7 +39,7 @@
             show: true,
             total: {
               show: true,
-              label: 'Total Value',
+              label: $_('extensions.metrics.total_value'),
               fontSize: '14px',
               fontWeight: 'bold',
               color: '#374151',

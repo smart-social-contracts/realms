@@ -7,6 +7,8 @@
 	import { backend } from '$lib/canisters';
 	// @ts-ignore
 	import { canisterId as backendCanisterId } from 'declarations/realm_backend';
+	import { principal } from '$lib/stores/auth';
+	import { _ } from 'svelte-i18n';
 
 	// Define message interface to fix TypeScript errors
 	interface ChatMessage {
@@ -31,6 +33,7 @@
 	let includeRealmData = true;
 	let realmData: any = null;
 	let isLoadingRealmData = false;
+	let userPrincipal = $principal || '';
 
 	// LLM API configuration
 
@@ -69,7 +72,7 @@
 		} else {
 			// Fetch production server host dynamically
 			const serverHost = await fetchServerHost();
-			API_URL = `https://${serverHost}/api/ask`;
+			API_URL = `${serverHost}api/ask`;
 		}
 		console.log("API_URL set to:", API_URL);
 	};
@@ -165,17 +168,17 @@
 		isLoading = true;
 		error = '';
 		
-		// Add a placeholder message for the AI response that we'll update as we stream
-		const aiMessageIndex = messages.length;
-		messages = [...messages, { text: '', isUser: false }];
+		// We'll add the AI message when we start receiving content
 		
 		try {
-			// Prepare request payload
 			const payload = {
 				question: messageToSend,
-				realm_canister_id: REALM_CANISTER_ID,
-				stream: true  // Request streaming response
+				realm_principal: REALM_CANISTER_ID,
+				user_principal: userPrincipal,
+				stream: true
 			};
+
+			console.log("Sending payload to LLM API:", payload);
 			
 			// Make streaming HTTP request to the LLM API
 			const response = await fetch(API_URL, {
@@ -208,70 +211,51 @@
 						break;
 					}
 
-					// Decode the chunk
-					const chunk = decoder.decode(value, { stream: true });
-					const lines = chunk.split('\n');
-
-					for (const line of lines) {
-						const trimmedLine = line.trim();
-						
-						// Skip empty lines and comments
-						if (!trimmedLine || trimmedLine.startsWith('#')) {
-							continue;
-						}
-
-						// Handle Server-Sent Events format
-						if (trimmedLine.startsWith('data: ')) {
-							const data = trimmedLine.substring(6);
-							
-							// Check for end of stream
-							if (data === '[DONE]') {
-								break;
-							}
-
-							try {
-								const parsed = JSON.parse(data);
-								if (parsed.content) {
-									accumulatedText += parsed.content;
-									
-									// Update the AI message in real-time
-									messages = messages.map((msg, index) => 
-										index === aiMessageIndex 
-											? { ...msg, text: accumulatedText }
-											: msg
-									);
-								}
-							} catch (e) {
-								// If it's not JSON, treat it as plain text
-								accumulatedText += data;
-								messages = messages.map((msg, index) => 
-									index === aiMessageIndex 
-										? { ...msg, text: accumulatedText }
-										: msg
-								);
-							}
-						}
-					}
-				}
-			} finally {
-				reader.releaseLock();
-			}
+        // Decode the chunk
+        const chunk = decoder.decode(value, { stream: true });
+        console.log('Received chunk:', chunk);
+        
+        // Since your server sends plain text, just accumulate it directly
+        accumulatedText += chunk;
+        
+        // Add or update the AI message
+        if (messages.length === 0 || messages[messages.length - 1].isUser) {
+          // Add new AI message if the last message is from user or no messages
+          messages = [...messages, { text: accumulatedText, isUser: false }];
+        } else {
+          // Update the last AI message
+          messages = messages.map((msg, index) => 
+            index === messages.length - 1 && !msg.isUser
+              ? { ...msg, text: accumulatedText }
+              : msg
+          );
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
 
 			// Ensure we have some response
 			if (!accumulatedText.trim()) {
-				messages = messages.map((msg, index) => 
-					index === aiMessageIndex 
-						? { ...msg, text: "No response from LLM" }
-						: msg
-				);
+				if (messages.length > 0 && !messages[messages.length - 1].isUser) {
+					messages = messages.map((msg, index) => 
+						index === messages.length - 1
+							? { ...msg, text: "No response from LLM" }
+							: msg
+					);
+				} else {
+					messages = [...messages, { text: "No response from LLM", isUser: false }];
+				}
 			}
 
 		} catch (err) {
 			console.error("Error calling LLM:", err);
 			error = "Failed to get response from LLM. Please try again.";
 			
-			// Remove the placeholder message if there was an error
-			messages = messages.slice(0, -1);
+			// Remove the AI message if there was an error and it exists
+			if (messages.length > 0 && !messages[messages.length - 1].isUser) {
+				messages = messages.slice(0, -1);
+			}
 		} finally {
 			isLoading = false;
 		}
@@ -287,7 +271,7 @@
 </script>
 
 <div class="w-full h-full flex flex-col p-0 m-0 max-w-none">
-	<h2 class="text-2xl font-bold p-4">Governance AI assistant</h2>
+	<h2 class="text-2xl font-bold p-4">{$_('extensions.llm_chat.title')}</h2>
 	
 	<div class="w-full flex-grow flex flex-col overflow-hidden">
 		<Card class="w-full h-full flex-grow flex flex-col m-0 p-0 rounded-none border-0 max-w-none">
@@ -299,23 +283,39 @@
 				{#if messages.length === 0}
 					<div class="text-center text-gray-500 dark:text-gray-400 py-8">
 						<MessagesSolid class="w-12 h-12 mx-auto mb-2" />
-						<p>Start a conversation with the LLM!</p>
+						<p>{$_('extensions.llm_chat.start_conversation')}</p>
 					</div>
 				{:else}
 					{#each messages as message}
-						<div class="mb-4 {message.isUser ? 'text-right' : ''}">
-							<div 
-								class="inline-block rounded-lg px-4 py-2 max-w-[90%] text-left {
-									message.isUser 
-										? 'bg-primary-600 text-white' 
-										: 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white'
-								}"
-							>
+						<div class="mb-6 {message.isUser ? 'flex justify-end' : 'flex justify-start'}">
+							<div class="flex items-start space-x-3 max-w-[85%]">
+								{#if !message.isUser}
+									<!-- AI Avatar -->
+									<div class="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+										AI
+									</div>
+								{/if}
+								
+								<div class="flex-1">
+									{#if message.isUser}
+										<!-- User Message -->
+										<div class="bg-blue-600 text-white rounded-2xl rounded-br-md px-4 py-3 shadow-sm">
+											<p class="text-sm leading-relaxed">{message.text}</p>
+										</div>
+									{:else}
+										<!-- AI Message -->
+										<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl rounded-bl-md px-5 py-4 shadow-sm">
+											<div class="markdown-content prose prose-sm max-w-none dark:prose-invert">
+												<SvelteMarkdown source={message.text} />
+											</div>
+										</div>
+									{/if}
+								</div>
+								
 								{#if message.isUser}
-									{message.text}
-								{:else}
-									<div class="markdown-content">
-										<SvelteMarkdown source={message.text} />
+									<!-- User Avatar -->
+									<div class="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-green-500 to-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+										U
 									</div>
 								{/if}
 							</div>
@@ -323,10 +323,23 @@
 					{/each}
 					
 					{#if isLoading}
-						<div class="flex items-center justify-start mb-4">
-							<div class="inline-block rounded-lg px-4 py-2 bg-gray-200 dark:bg-gray-700">
-								<Spinner size="4" class="mr-2" />
-								<span>AI is thinking...</span>
+						<div class="mb-6 flex justify-start">
+							<div class="flex items-start space-x-3 max-w-[85%]">
+								<!-- AI Avatar -->
+								<div class="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+									AI
+								</div>
+								<div class="flex-1">
+									<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl rounded-bl-md px-5 py-4 shadow-sm">
+										<div class="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
+											<div class="typing-animation">
+												<span></span>
+												<span></span>
+												<span></span>
+											</div>
+										</div>
+									</div>
+								</div>
 							</div>
 						</div>
 					{/if}
@@ -342,26 +355,11 @@
 			</div>
 			
 			<div class="flex flex-col p-2 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 sticky bottom-0">
-				<!-- Realm data toggle -->
-				<div class="flex items-center mb-2">
-					<Toggle bind:checked={includeRealmData} size="small" />
-					<span class="ml-2 text-sm text-gray-700 dark:text-gray-300 flex items-center">
-						<DatabaseSolid class="w-4 h-4 mr-1" />
-						Include realm data
-						{#if isLoadingRealmData}
-							<Spinner size="4" class="ml-2" />
-						{/if}
-					</span>
-					{#if includeRealmData && !realmData && !isLoadingRealmData}
-						<Button size="xs" color="light" class="ml-2" on:click={fetchRealmData}>Fetch Data</Button>
-					{/if}
-				</div>
-				
 				<!-- Message input -->
 				<div class="flex">
 					<Textarea
 						class="flex-grow resize-none rounded-r-none"
-						placeholder="Type your message..."
+						placeholder={$_('extensions.llm_chat.message_placeholder')}
 						rows="2"
 						bind:value={newMessage}
 						on:keydown={handleKeydown}
@@ -381,25 +379,138 @@
 </div> 
 
 <style>
-	.markdown-content :global(h1) {
-		font-size: 1.8rem;
-		font-weight: 700;
-		margin: 1rem 0;
+	/* Enhanced markdown styling for AI responses */
+	.markdown-content :global(p) {
+		margin: 0.75rem 0;
+		line-height: 1.6;
 		color: inherit;
 	}
 	
-	.markdown-content :global(h2) {
+	.markdown-content :global(p:first-child) {
+		margin-top: 0;
+	}
+	
+	.markdown-content :global(p:last-child) {
+		margin-bottom: 0;
+	}
+	
+	.markdown-content :global(h1) {
 		font-size: 1.5rem;
 		font-weight: 700;
-		margin: 0.8rem 0;
+		margin: 1.5rem 0 0.75rem 0;
+		color: inherit;
+		border-bottom: 2px solid #e5e7eb;
+		padding-bottom: 0.5rem;
+	}
+	
+	.markdown-content :global(h2) {
+		font-size: 1.25rem;
+		font-weight: 600;
+		margin: 1.25rem 0 0.5rem 0;
 		color: inherit;
 	}
 	
 	.markdown-content :global(h3) {
-		font-size: 1.25rem;
+		font-size: 1.125rem;
 		font-weight: 600;
-		margin: 0.6rem 0;
+		margin: 1rem 0 0.5rem 0;
 		color: inherit;
+	}
+	
+	.markdown-content :global(ul), .markdown-content :global(ol) {
+		margin: 0.75rem 0;
+		padding-left: 1.5rem;
+	}
+	
+	.markdown-content :global(li) {
+		margin: 0.25rem 0;
+		line-height: 1.5;
+	}
+	
+	.markdown-content :global(code) {
+		background-color: #f3f4f6;
+		color: #374151;
+		padding: 0.125rem 0.25rem;
+		border-radius: 0.25rem;
+		font-size: 0.875rem;
+		font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+	}
+	
+	.dark .markdown-content :global(code) {
+		background-color: #374151;
+		color: #f3f4f6;
+	}
+	
+	.markdown-content :global(pre) {
+		background-color: #f8fafc;
+		border: 1px solid #e2e8f0;
+		border-radius: 0.5rem;
+		padding: 1rem;
+		margin: 1rem 0;
+		overflow-x: auto;
+	}
+	
+	.dark .markdown-content :global(pre) {
+		background-color: #1f2937;
+		border-color: #374151;
+	}
+	
+	.markdown-content :global(blockquote) {
+		border-left: 4px solid #3b82f6;
+		padding-left: 1rem;
+		margin: 1rem 0;
+		font-style: italic;
+		color: #6b7280;
+	}
+	
+	.dark .markdown-content :global(blockquote) {
+		color: #9ca3af;
+	}
+	
+	.markdown-content :global(strong) {
+		font-weight: 600;
+	}
+	
+	.markdown-content :global(em) {
+		font-style: italic;
+	}
+	
+	/* Typing animation */
+	.typing-animation {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+	}
+	
+	.typing-animation span {
+		width: 6px;
+		height: 6px;
+		background-color: #9ca3af;
+		border-radius: 50%;
+		animation: typing 1.4s infinite ease-in-out;
+	}
+	
+	.typing-animation span:nth-child(1) {
+		animation-delay: 0s;
+	}
+	
+	.typing-animation span:nth-child(2) {
+		animation-delay: 0.2s;
+	}
+	
+	.typing-animation span:nth-child(3) {
+		animation-delay: 0.4s;
+	}
+	
+	@keyframes typing {
+		0%, 60%, 100% {
+			transform: translateY(0);
+			opacity: 0.4;
+		}
+		30% {
+			transform: translateY(-10px);
+			opacity: 1;
+		}
 	}
 	
 	.markdown-content :global(ul) {

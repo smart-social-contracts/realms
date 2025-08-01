@@ -1,0 +1,11 @@
+{
+  "name": "AI 助手",
+  "description": "治理 AI 助手，用于智能对话",
+  "sidebar": "AI 助手",
+  "title": "治理 AI 助手",
+  "start_conversation": "开始与 LLM 对话！",
+  "message_placeholder": "输入您的消息...",
+  "no_response": "LLM 无响应",
+  "error_response": "无法从 LLM 获取响应。请重试。",
+  "loading": "加载中..."
+}

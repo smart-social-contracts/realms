@@ -6,6 +6,7 @@
 	import { backend } from '$lib/canisters';
 	import LitigationsList from './LitigationsList.svelte';
 	import CreateLitigationForm from './CreateLitigationForm.svelte';
+	import { _ } from 'svelte-i18n';
 	
 	let loading = true;
 	let error = '';
@@ -82,7 +83,7 @@
 <Card size="lg" padding="xl" class="w-full">
 	<div class="flex items-center mb-4">
 		<LockSolid class="mr-2 h-8 w-8 text-primary-600" />
-		<h2 class="text-2xl font-bold text-gray-900 dark:text-white">Justice Litigation System</h2>
+		<h2 class="text-2xl font-bold text-gray-900 dark:text-white">{$_('extensions.justice_litigation.title')}</h2>
 	</div>
 
 	{#if loading}
@@ -111,32 +112,32 @@
 						d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
 					></path>
 				</svg>
-				<p class="mt-4 text-center text-gray-600 dark:text-gray-400 animate-pulse">Loading litigation data...</p>
+				<p class="mt-4 text-center text-gray-600 dark:text-gray-400 animate-pulse">{$_('extensions.justice_litigation.loading_data')}</p>
 			</div>
 		</div>
 	{:else if error}
 		<Alert color="red" class="mb-4">
-			<span class="font-medium">Error:</span> {error}
+			<span class="font-medium">{$_('common.error')}:</span> {error}
 		</Alert>
 	{:else}
 		<div class="mb-4">
 			<div class="flex items-center justify-between">
 				<div class="flex items-center gap-4">
 					<div class="text-sm text-gray-600 dark:text-gray-400">
-						Profile: <span class="font-semibold capitalize">{userProfile}</span>
+						{$_('extensions.justice_litigation.profile')}: <span class="font-semibold capitalize">{userProfile}</span>
 					</div>
 					<div class="text-sm text-gray-600 dark:text-gray-400">
-						Total Cases: <span class="font-semibold">{totalCount}</span>
+						{$_('extensions.justice_litigation.total_cases')}: <span class="font-semibold">{totalCount}</span>
 					</div>
 				</div>
 				<Button color="alternative" size="sm" on:click={loadLitigations} disabled={loading}>
 					{#if loading}
 						<div class="flex items-center">
 							<span class="animate-spin inline-block w-4 h-4 border-2 border-t-transparent border-primary-500 rounded-full mr-2"></span>
-							<span>Loading...</span>
+							<span>{$_('common.loading')}</span>
 						</div>
 					{:else}
-						Refresh Data
+						{$_('extensions.justice_litigation.refresh_data')}
 					{/if}
 				</Button>
 			</div>
@@ -146,7 +147,7 @@
 			<TabItem open={activeTab === 0} on:click={() => activeTab = 0}>
 				<span slot="title" class="flex items-center gap-2">
 					<ClipboardListSolid class="w-5 h-5" />
-					{userProfile === 'admin' ? 'All Litigations' : 'My Litigations'}
+					{userProfile === 'admin' ? $_('extensions.justice_litigation.all_litigations') : $_('extensions.justice_litigation.my_litigations')}
 				</span>
 				<LitigationsList 
 					{litigations} 
@@ -159,7 +160,7 @@
 			<TabItem open={activeTab === 1} on:click={() => activeTab = 1}>
 				<span slot="title" class="flex items-center gap-2">
 					<CheckOutline class="w-5 h-5" />
-					Create Litigation
+					{$_('extensions.justice_litigation.create_litigation')}
 				</span>
 				<CreateLitigationForm 
 					{userPrincipalId}
@@ -170,24 +171,24 @@
 			<TabItem open={activeTab === 2} on:click={() => activeTab = 2}>
 				<span slot="title" class="flex items-center gap-2">
 					<ClockSolid class="w-5 h-5" />
-					Statistics
+					{$_('extensions.justice_litigation.statistics')}
 				</span>
 				<div class="space-y-6">
 					<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 						<div class="bg-white dark:bg-gray-700 p-4 rounded-lg shadow">
-							<h3 class="text-lg font-semibold mb-2">Total Cases</h3>
+							<h3 class="text-lg font-semibold mb-2">{$_('extensions.justice_litigation.total_cases')}</h3>
 							<p class="text-2xl font-bold text-primary-600">{totalCount}</p>
 						</div>
 						
 						<div class="bg-white dark:bg-gray-700 p-4 rounded-lg shadow">
-							<h3 class="text-lg font-semibold mb-2">Pending</h3>
+							<h3 class="text-lg font-semibold mb-2">{$_('extensions.justice_litigation.pending')}</h3>
 							<p class="text-2xl font-bold text-yellow-600">
 								{litigations.filter(lit => lit.status === 'pending').length}
 							</p>
 						</div>
 						
 						<div class="bg-white dark:bg-gray-700 p-4 rounded-lg shadow">
-							<h3 class="text-lg font-semibold mb-2">Resolved</h3>
+							<h3 class="text-lg font-semibold mb-2">{$_('extensions.justice_litigation.resolved')}</h3>
 							<p class="text-2xl font-bold text-green-600">
 								{litigations.filter(lit => lit.status === 'resolved').length}
 							</p>

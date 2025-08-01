@@ -5,6 +5,7 @@
   import GeographicMap from './GeographicMap.svelte';
   import LandTable from './LandTable.svelte';
   import AdminControls from './AdminControls.svelte';
+  import { _ } from 'svelte-i18n';
   
   let activeTab = 'map';
   let lands = [];
@@ -93,13 +94,13 @@
 
 <div class="land-registry">
   <div class="header mb-6">
-    <h2 class="text-2xl font-bold text-gray-900">Land Registry</h2>
-    <p class="text-gray-600">Manage land ownership and visualize parcels</p>
+    <h2 class="text-2xl font-bold text-gray-900">{$_('extensions.land_registry.title')}</h2>
+    <p class="text-gray-600">{$_('extensions.land_registry.description')}</p>
   </div>
   
   {#if error}
     <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-      Error: {error}
+      {$_('common.error')}: {error}
     </div>
   {/if}
   
@@ -109,31 +110,31 @@
         class="py-2 px-1 border-b-2 font-medium text-sm {activeTab === 'map' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
         on:click={() => activeTab = 'map'}
       >
-        Grid View
+        {$_('extensions.land_registry.grid_view')}
       </button>
       <button 
         class="py-2 px-1 border-b-2 font-medium text-sm {activeTab === 'geographic' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
         on:click={() => activeTab = 'geographic'}
       >
-        Geographic Map
+        {$_('extensions.land_registry.geographic_map')}
       </button>
       <button 
         class="py-2 px-1 border-b-2 font-medium text-sm {activeTab === 'table' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
         on:click={() => activeTab = 'table'}
       >
-        Table View
+        {$_('extensions.land_registry.table_view')}
       </button>
       <button 
         class="py-2 px-1 border-b-2 font-medium text-sm {activeTab === 'admin' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
         on:click={() => activeTab = 'admin'}
       >
-        Admin Controls
+        {$_('extensions.land_registry.admin_controls')}
       </button>
     </nav>
   </div>
   
   {#if loading}
-    <div class="text-center py-8">Loading...</div>
+    <div class="text-center py-8">{$_('common.loading')}</div>
   {:else if activeTab === 'map'}
     <LandMap {lands} on:refresh={loadLands} />
   {:else if activeTab === 'geographic'}

@@ -44,6 +44,11 @@
   "notifications": {
     "title": "通知"
   },
+  "demo_banner": {
+    "title": "演示模式已激活",
+    "description": "此应用程序正在演示模式下运行，使用示例数据。显示的功能和数据仅用于演示目的。",
+    "dismiss_label": "关闭演示模式通知"
+  },
   "extensions": {
     "market_place": {
       "sidebar": "扩展市场",

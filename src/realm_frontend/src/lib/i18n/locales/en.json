@@ -44,6 +44,11 @@
   "notifications": {
     "title": "Notifications"
   },
+  "demo_banner": {
+    "title": "Demo Mode Active",
+    "description": "This application is running in demonstration mode with sample data. Features and data shown are for demonstration purposes only.",
+    "dismiss_label": "Dismiss demo mode notice"
+  },
   "extensions": {
     "market_place": {
       "sidebar": "Extensions Marketplace",

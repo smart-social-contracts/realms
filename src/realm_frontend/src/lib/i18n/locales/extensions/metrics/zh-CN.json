@@ -1,0 +1,11 @@
+{
+  "name": "指标",
+  "description": "财务指标、图表和分析仪表板",
+  "sidebar": "指标",
+  "title": "财务指标仪表板",
+  "asset_portfolio_distribution": "资产组合分布",
+  "total_value": "总价值",
+  "tax_allocation": "税收分配",
+  "tax_contributions": "税收贡献",
+  "monthly_cash_flow": "月度现金流"
+}

@@ -1,0 +1,11 @@
+{
+  "name": "Metrics",
+  "description": "Financial metrics, charts, and analytics dashboard",
+  "sidebar": "Metrics",
+  "title": "Financial Metrics Dashboard",
+  "asset_portfolio_distribution": "Asset Portfolio Distribution",
+  "total_value": "Total Value",
+  "tax_allocation": "Tax Allocation",
+  "tax_contributions": "Tax Contributions",
+  "monthly_cash_flow": "Monthly Cash Flow"
+}
