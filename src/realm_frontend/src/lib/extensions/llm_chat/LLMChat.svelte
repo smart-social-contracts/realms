@@ -167,9 +167,7 @@
 		isLoading = true;
 		error = '';
 		
-		// Add a placeholder message for the AI response that we'll update as we stream
-		const aiMessageIndex = messages.length;
-		messages = [...messages, { text: '', isUser: false }];
+		// We'll add the AI message when we start receiving content
 		
 		try {
 			const payload = {
@@ -212,39 +210,51 @@
 						break;
 					}
 
-					// Decode the chunk
-					const chunk = decoder.decode(value, { stream: true });
-					console.log('Received chunk:', chunk);
-					
-					// Since your server sends plain text, just accumulate it directly
-					accumulatedText += chunk;
-					
-					// Update the AI message in real-time
-					messages = messages.map((msg, index) => 
-						index === aiMessageIndex 
-							? { ...msg, text: accumulatedText }
-							: msg
-					);
-				}
-			} finally {
-				reader.releaseLock();
-			}
+        // Decode the chunk
+        const chunk = decoder.decode(value, { stream: true });
+        console.log('Received chunk:', chunk);
+        
+        // Since your server sends plain text, just accumulate it directly
+        accumulatedText += chunk;
+        
+        // Add or update the AI message
+        if (messages.length === 0 || messages[messages.length - 1].isUser) {
+          // Add new AI message if the last message is from user or no messages
+          messages = [...messages, { text: accumulatedText, isUser: false }];
+        } else {
+          // Update the last AI message
+          messages = messages.map((msg, index) => 
+            index === messages.length - 1 && !msg.isUser
+              ? { ...msg, text: accumulatedText }
+              : msg
+          );
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
 
 			// Ensure we have some response
 			if (!accumulatedText.trim()) {
-				messages = messages.map((msg, index) => 
-					index === aiMessageIndex 
-						? { ...msg, text: "No response from LLM" }
-						: msg
-				);
+				if (messages.length > 0 && !messages[messages.length - 1].isUser) {
+					messages = messages.map((msg, index) => 
+						index === messages.length - 1
+							? { ...msg, text: "No response from LLM" }
+							: msg
+					);
+				} else {
+					messages = [...messages, { text: "No response from LLM", isUser: false }];
+				}
 			}
 
 		} catch (err) {
 			console.error("Error calling LLM:", err);
 			error = "Failed to get response from LLM. Please try again.";
 			
-			// Remove the placeholder message if there was an error
-			messages = messages.slice(0, -1);
+			// Remove the AI message if there was an error and it exists
+			if (messages.length > 0 && !messages[messages.length - 1].isUser) {
+				messages = messages.slice(0, -1);
+			}
 		} finally {
 			isLoading = false;
 		}
@@ -321,8 +331,11 @@
 								<div class="flex-1">
 									<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl rounded-bl-md px-5 py-4 shadow-sm">
 										<div class="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
-											<Spinner size="4" />
-											<span class="text-sm">AI is thinking...</span>
+											<div class="typing-animation">
+												<span></span>
+												<span></span>
+												<span></span>
+											</div>
 										</div>
 									</div>
 								</div>
@@ -474,6 +487,44 @@
 	
 	.markdown-content :global(em) {
 		font-style: italic;
+	}
+	
+	/* Typing animation */
+	.typing-animation {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+	}
+	
+	.typing-animation span {
+		width: 6px;
+		height: 6px;
+		background-color: #9ca3af;
+		border-radius: 50%;
+		animation: typing 1.4s infinite ease-in-out;
+	}
+	
+	.typing-animation span:nth-child(1) {
+		animation-delay: 0s;
+	}
+	
+	.typing-animation span:nth-child(2) {
+		animation-delay: 0.2s;
+	}
+	
+	.typing-animation span:nth-child(3) {
+		animation-delay: 0.4s;
+	}
+	
+	@keyframes typing {
+		0%, 60%, 100% {
+			transform: translateY(0);
+			opacity: 0.4;
+		}
+		30% {
+			transform: translateY(-10px);
+			opacity: 1;
+		}
 	}
 	
 	.markdown-content :global(ul) {
