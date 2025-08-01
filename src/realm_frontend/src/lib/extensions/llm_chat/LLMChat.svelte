@@ -7,6 +7,7 @@
 	import { backend } from '$lib/canisters';
 	// @ts-ignore
 	import { canisterId as backendCanisterId } from 'declarations/realm_backend';
+	import { principal } from '$lib/stores/auth';
 
 	// Define message interface to fix TypeScript errors
 	interface ChatMessage {
@@ -31,6 +32,7 @@
 	let includeRealmData = true;
 	let realmData: any = null;
 	let isLoadingRealmData = false;
+	let userPrincipal = $principal || '';
 
 	// LLM API configuration
 
@@ -170,12 +172,14 @@
 		messages = [...messages, { text: '', isUser: false }];
 		
 		try {
-			// Prepare request payload
 			const payload = {
 				question: messageToSend,
-				realm_canister_id: REALM_CANISTER_ID,
-				stream: true  // Request streaming response
+				realm_principal: REALM_CANISTER_ID,
+				user_principal: userPrincipal,
+				stream: true
 			};
+
+			console.log("Sending payload to LLM API:", payload);
 			
 			// Make streaming HTTP request to the LLM API
 			const response = await fetch(API_URL, {
