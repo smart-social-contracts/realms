@@ -214,48 +214,17 @@
 
 					// Decode the chunk
 					const chunk = decoder.decode(value, { stream: true });
-					const lines = chunk.split('\n');
-
-					for (const line of lines) {
-						const trimmedLine = line.trim();
-						
-						// Skip empty lines and comments
-						if (!trimmedLine || trimmedLine.startsWith('#')) {
-							continue;
-						}
-
-						// Handle Server-Sent Events format
-						if (trimmedLine.startsWith('data: ')) {
-							const data = trimmedLine.substring(6);
-							
-							// Check for end of stream
-							if (data === '[DONE]') {
-								break;
-							}
-
-							try {
-								const parsed = JSON.parse(data);
-								if (parsed.content) {
-									accumulatedText += parsed.content;
-									
-									// Update the AI message in real-time
-									messages = messages.map((msg, index) => 
-										index === aiMessageIndex 
-											? { ...msg, text: accumulatedText }
-											: msg
-									);
-								}
-							} catch (e) {
-								// If it's not JSON, treat it as plain text
-								accumulatedText += data;
-								messages = messages.map((msg, index) => 
-									index === aiMessageIndex 
-										? { ...msg, text: accumulatedText }
-										: msg
-								);
-							}
-						}
-					}
+					console.log('Received chunk:', chunk);
+					
+					// Since your server sends plain text, just accumulate it directly
+					accumulatedText += chunk;
+					
+					// Update the AI message in real-time
+					messages = messages.map((msg, index) => 
+						index === aiMessageIndex 
+							? { ...msg, text: accumulatedText }
+							: msg
+					);
 				}
 			} finally {
 				reader.releaseLock();
