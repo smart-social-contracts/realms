@@ -7,6 +7,7 @@
 	import { formatNumber } from '$lib/utils';
 	import { writable } from 'svelte/store';
 	import AuthButton from '$lib/components/AuthButton.svelte';
+	import { _ } from 'svelte-i18n';
 
 	// Import backend directly without using await in top-level
 	import { backend } from '$lib/canisters';
@@ -43,10 +44,10 @@
 
 
 <div class="p-4">
-	<h2 class="text-2xl font-bold mb-6">Test Bench Extension</h2>
+	<h2 class="text-2xl font-bold mb-6">{$_('extensions.test_bench.title')}</h2>
 
 	<Card class="mb-6">
-		<h3 class="text-lg font-semibold mb-4">Extension API Testing</h3>
+		<h3 class="text-lg font-semibold mb-4">{$_('extensions.test_bench.extension_api_testing')}</h3>
 		<Button
 			color="primary"
 			variant="filled"
@@ -66,46 +67,46 @@
 				});
 			}}
 		>
-			Call Testbench Extension API
+			{$_('extensions.test_bench.call_testbench_api')}
 		</Button>
 	</Card>
 
 	<Card class="mb-6">
-		<h3 class="text-lg font-semibold mb-4">Authentication</h3>
+		<h3 class="text-lg font-semibold mb-4">{$_('extensions.test_bench.authentication')}</h3>
 		<AuthButton />
 	</Card>
 
 	<Card class="mb-6">
-		<h3 class="text-lg font-semibold mb-4">Greeting Test</h3>
+		<h3 class="text-lg font-semibold mb-4">{$_('extensions.test_bench.greeting_test')}</h3>
 		<section id="greeting" class="mb-2">{greeting}</section>
 		<form action="#" on:submit|preventDefault={onSubmit} class="flex flex-col gap-2">
-			<label for="name">Enter your name:</label>
+			<label for="name">{$_('extensions.test_bench.enter_name')}</label>
 			<input id="name" alt="Name" type="text" class="border p-2 rounded" />
-			<Button type="submit" color="blue">Submit Greeting</Button>
+			<Button type="submit" color="blue">{$_('extensions.test_bench.submit_greeting')}</Button>
 		</form>
 	</Card>
 
 	<Card class="mb-6">
-		<h3 class="text-lg font-semibold mb-4">Universe Data</h3>
+		<h3 class="text-lg font-semibold mb-4">{$_('extensions.test_bench.universe_data')}</h3>
 		<form action="#" on:submit|preventDefault={onSubmitGetUniverse} class="flex flex-col gap-2">
-			<Button type="submit" color="green">Get Universe Data</Button>
+			<Button type="submit" color="green">{$_('extensions.test_bench.get_universe_data')}</Button>
 		</form>
 		{#if $universe != ''}
 			<section id="universe" class="mt-4 p-3 bg-gray-100 rounded">
-				<h4 class="font-semibold">Universe Data:</h4>
+				<h4 class="font-semibold">{$_('extensions.test_bench.universe_data_label')}</h4>
 				<pre class="whitespace-pre-wrap break-words">{JSON.stringify($universe, null, 2)}</pre>
 			</section>
 		{/if}
 	</Card>
 
 	<Card class="mb-6">
-		<h3 class="text-lg font-semibold mb-4">Snapshot Data</h3>
+		<h3 class="text-lg font-semibold mb-4">{$_('extensions.test_bench.snapshot_data')}</h3>
 		<form action="#" on:submit|preventDefault={get_snapshot_data} class="flex flex-col gap-2">
-			<Button type="submit" color="purple">Get Snapshots</Button>
+			<Button type="submit" color="purple">{$_('extensions.test_bench.get_snapshots')}</Button>
 		</form>
 		{#if $snapshots != ''}
 			<section id="snapshots" class="mt-4 p-3 bg-gray-100 rounded">
-				<h4 class="font-semibold">Snapshots:</h4>
+				<h4 class="font-semibold">{$_('extensions.test_bench.snapshots_label')}</h4>
 				<pre class="whitespace-pre-wrap break-words">{JSON.stringify($snapshots, null, 2)}</pre>
 			</section>
 		{/if}

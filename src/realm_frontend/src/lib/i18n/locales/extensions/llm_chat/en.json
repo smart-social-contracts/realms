@@ -1,0 +1,11 @@
+{
+  "name": "AI Assistant",
+  "description": "Governance AI assistant for intelligent conversations",
+  "sidebar": "AI Assistant",
+  "title": "Governance AI assistant",
+  "start_conversation": "Start a conversation with the LLM!",
+  "message_placeholder": "Type your message...",
+  "no_response": "No response from LLM",
+  "error_response": "Failed to get response from LLM. Please try again.",
+  "loading": "Loading..."
+}
