@@ -354,21 +354,6 @@
 			</div>
 			
 			<div class="flex flex-col p-2 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 sticky bottom-0">
-				<!-- Realm data toggle -->
-				<div class="flex items-center mb-2">
-					<Toggle bind:checked={includeRealmData} size="small" />
-					<span class="ml-2 text-sm text-gray-700 dark:text-gray-300 flex items-center">
-						<DatabaseSolid class="w-4 h-4 mr-1" />
-						Include realm data
-						{#if isLoadingRealmData}
-							<Spinner size="4" class="ml-2" />
-						{/if}
-					</span>
-					{#if includeRealmData && !realmData && !isLoadingRealmData}
-						<Button size="xs" color="light" class="ml-2" on:click={fetchRealmData}>Fetch Data</Button>
-					{/if}
-				</div>
-				
 				<!-- Message input -->
 				<div class="flex">
 					<Textarea
