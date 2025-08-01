@@ -276,19 +276,35 @@
 					</div>
 				{:else}
 					{#each messages as message}
-						<div class="mb-4 {message.isUser ? 'text-right' : ''}">
-							<div 
-								class="inline-block rounded-lg px-4 py-2 max-w-[90%] text-left {
-									message.isUser 
-										? 'bg-primary-600 text-white' 
-										: 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white'
-								}"
-							>
+						<div class="mb-6 {message.isUser ? 'flex justify-end' : 'flex justify-start'}">
+							<div class="flex items-start space-x-3 max-w-[85%]">
+								{#if !message.isUser}
+									<!-- AI Avatar -->
+									<div class="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+										AI
+									</div>
+								{/if}
+								
+								<div class="flex-1">
+									{#if message.isUser}
+										<!-- User Message -->
+										<div class="bg-blue-600 text-white rounded-2xl rounded-br-md px-4 py-3 shadow-sm">
+											<p class="text-sm leading-relaxed">{message.text}</p>
+										</div>
+									{:else}
+										<!-- AI Message -->
+										<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl rounded-bl-md px-5 py-4 shadow-sm">
+											<div class="markdown-content prose prose-sm max-w-none dark:prose-invert">
+												<SvelteMarkdown source={message.text} />
+											</div>
+										</div>
+									{/if}
+								</div>
+								
 								{#if message.isUser}
-									{message.text}
-								{:else}
-									<div class="markdown-content">
-										<SvelteMarkdown source={message.text} />
+									<!-- User Avatar -->
+									<div class="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-green-500 to-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+										U
 									</div>
 								{/if}
 							</div>
@@ -296,10 +312,20 @@
 					{/each}
 					
 					{#if isLoading}
-						<div class="flex items-center justify-start mb-4">
-							<div class="inline-block rounded-lg px-4 py-2 bg-gray-200 dark:bg-gray-700">
-								<Spinner size="4" class="mr-2" />
-								<span>AI is thinking...</span>
+						<div class="mb-6 flex justify-start">
+							<div class="flex items-start space-x-3 max-w-[85%]">
+								<!-- AI Avatar -->
+								<div class="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+									AI
+								</div>
+								<div class="flex-1">
+									<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl rounded-bl-md px-5 py-4 shadow-sm">
+										<div class="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
+											<Spinner size="4" />
+											<span class="text-sm">AI is thinking...</span>
+										</div>
+									</div>
+								</div>
 							</div>
 						</div>
 					{/if}
@@ -354,25 +380,100 @@
 </div> 
 
 <style>
-	.markdown-content :global(h1) {
-		font-size: 1.8rem;
-		font-weight: 700;
-		margin: 1rem 0;
+	/* Enhanced markdown styling for AI responses */
+	.markdown-content :global(p) {
+		margin: 0.75rem 0;
+		line-height: 1.6;
 		color: inherit;
 	}
 	
-	.markdown-content :global(h2) {
+	.markdown-content :global(p:first-child) {
+		margin-top: 0;
+	}
+	
+	.markdown-content :global(p:last-child) {
+		margin-bottom: 0;
+	}
+	
+	.markdown-content :global(h1) {
 		font-size: 1.5rem;
 		font-weight: 700;
-		margin: 0.8rem 0;
+		margin: 1.5rem 0 0.75rem 0;
+		color: inherit;
+		border-bottom: 2px solid #e5e7eb;
+		padding-bottom: 0.5rem;
+	}
+	
+	.markdown-content :global(h2) {
+		font-size: 1.25rem;
+		font-weight: 600;
+		margin: 1.25rem 0 0.5rem 0;
 		color: inherit;
 	}
 	
 	.markdown-content :global(h3) {
-		font-size: 1.25rem;
+		font-size: 1.125rem;
 		font-weight: 600;
-		margin: 0.6rem 0;
+		margin: 1rem 0 0.5rem 0;
 		color: inherit;
+	}
+	
+	.markdown-content :global(ul), .markdown-content :global(ol) {
+		margin: 0.75rem 0;
+		padding-left: 1.5rem;
+	}
+	
+	.markdown-content :global(li) {
+		margin: 0.25rem 0;
+		line-height: 1.5;
+	}
+	
+	.markdown-content :global(code) {
+		background-color: #f3f4f6;
+		color: #374151;
+		padding: 0.125rem 0.25rem;
+		border-radius: 0.25rem;
+		font-size: 0.875rem;
+		font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+	}
+	
+	.dark .markdown-content :global(code) {
+		background-color: #374151;
+		color: #f3f4f6;
+	}
+	
+	.markdown-content :global(pre) {
+		background-color: #f8fafc;
+		border: 1px solid #e2e8f0;
+		border-radius: 0.5rem;
+		padding: 1rem;
+		margin: 1rem 0;
+		overflow-x: auto;
+	}
+	
+	.dark .markdown-content :global(pre) {
+		background-color: #1f2937;
+		border-color: #374151;
+	}
+	
+	.markdown-content :global(blockquote) {
+		border-left: 4px solid #3b82f6;
+		padding-left: 1rem;
+		margin: 1rem 0;
+		font-style: italic;
+		color: #6b7280;
+	}
+	
+	.dark .markdown-content :global(blockquote) {
+		color: #9ca3af;
+	}
+	
+	.markdown-content :global(strong) {
+		font-weight: 600;
+	}
+	
+	.markdown-content :global(em) {
+		font-style: italic;
 	}
 	
 	.markdown-content :global(ul) {
