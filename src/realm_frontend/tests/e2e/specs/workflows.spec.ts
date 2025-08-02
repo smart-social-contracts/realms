@@ -135,5 +135,26 @@ test.describe('User workflows', () => {
 
 
 
+	});
+
+	test('should navigate to home page when logo is clicked', async ({ page }) => {
+		test.setTimeout(TIMEOUT);
+		
+		await page.setViewportSize({ width: 1200, height: 800 }); // Ensure desktop view
+		await page.goto('/');
+		await page.waitForLoadState('networkidle');
+		
+		await page.goto('/join');
+		await page.waitForLoadState('networkidle');
+		
+		const logoLink = page.getByRole('link').filter({ has: page.getByAltText('Smart Social Contracts Logo') });
+		await expect(logoLink).toBeVisible();
+		await logoLink.click();
+		
+		await page.waitForLoadState('networkidle');
+		await expect(page).toHaveURL('/');
+		
+		const loginButton = page.getByRole('button', { name: 'Log In' });
+		await expect(loginButton).toBeVisible();
 	});	
 });
