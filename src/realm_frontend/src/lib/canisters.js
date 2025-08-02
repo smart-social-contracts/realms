@@ -22,15 +22,12 @@ async function initializeImports() {
 		dummyBackend = backendModule.dummyBackend;
 	} else {
 		console.log('🏭 PROD MODE: Loading IC backend implementations');
-		console.log('🔧 TEMP: Using dummy implementations to enable local testing');
-		const declarationsModule = await import('./dummy-implementations/declarations-dummy.js');
-		const dfinityModule = await import('./dummy-implementations/dfinity-dummy.js');
-		const backendModule = await import('./dummy-implementations/backend-dummy.js');
+		const declarationsModule = await import('declarations/realm_backend');
+		const agentModule = await import('@dfinity/agent');
 
 		createActor = declarationsModule.createActor;
 		canisterId = declarationsModule.canisterId;
-		HttpAgent = dfinityModule.DummyHttpAgent;
-		dummyBackend = backendModule.dummyBackend;
+		HttpAgent = agentModule.HttpAgent;
 	}
 
 	importsInitialized = true;
