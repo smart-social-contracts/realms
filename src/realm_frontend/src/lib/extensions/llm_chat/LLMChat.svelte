@@ -5,8 +5,7 @@
 	import SvelteMarkdown from 'svelte-markdown';
 	// @ts-ignore
 	import { backend } from '$lib/canisters';
-	// @ts-ignore
-	import { canisterId as backendCanisterId } from 'declarations/realm_backend';
+	import { isDevelopmentMode } from '$lib/dev-mode.js';
 	import { principal } from '$lib/stores/auth';
 	import { _ } from 'svelte-i18n';
 	import SafeText from '$lib/components/SafeText.svelte';
@@ -558,4 +557,4 @@
 		margin: 0.5rem 0 0.5rem 0.5rem;
 		color: #555;
 	}
-</style> 
+</style>  
