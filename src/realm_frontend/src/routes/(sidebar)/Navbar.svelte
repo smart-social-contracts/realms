@@ -33,14 +33,14 @@
 		onClick={() => (drawerHidden = !drawerHidden)}
 		class="m-0 me-3 md:block lg:hidden"
 	/>
-	<NavBrand href="/" class={list ? 'w-40' : 'lg:w-60'}>
+	<NavBrand href="/" class="{list ? 'w-40' : 'lg:w-60'} relative z-10 cursor-pointer">
 		<img
 			src="/images/logo_white_horizontal.png"
-			class="h-8 sm:h-10"
+			class="h-8 sm:h-10 pointer-events-none"
 			alt="Smart Social Contracts Logo"
 		/>
 		<span
-			class="ml-px self-center whitespace-nowrap text-xl font-semibold dark:text-white sm:text-2xl"
+			class="ml-px self-center whitespace-nowrap text-xl font-semibold dark:text-white sm:text-2xl pointer-events-none"
 		>
 			<!-- Flowbite -->
 		</span>
