@@ -6,11 +6,20 @@
   import LandTable from './LandTable.svelte';
   import AdminControls from './AdminControls.svelte';
   import { _ } from 'svelte-i18n';
+  import { safeTranslate } from '$lib/i18n/safe-translate.js';
   
   let activeTab = 'map';
   let lands = [];
   let loading = false;
   let error = null;
+  
+  // Safe translations for visible UI elements
+  $: safeTitle = $safeTranslate('extensions.land_registry.title');
+  $: safeDescription = $safeTranslate('extensions.land_registry.description');
+  $: safeGridView = $safeTranslate('extensions.land_registry.grid_view');
+  $: safeGeographicMap = $safeTranslate('extensions.land_registry.geographic_map');
+  $: safeTableView = $safeTranslate('extensions.land_registry.table_view');
+  $: safeAdminControls = $safeTranslate('extensions.land_registry.admin_controls');
   
   async function loadLands() {
     console.log('=== loadLands function called ===');
@@ -94,8 +103,8 @@
 
 <div class="land-registry">
   <div class="header mb-6">
-    <h2 class="text-2xl font-bold text-gray-900">{$_('extensions.land_registry.title')}</h2>
-    <p class="text-gray-600">{$_('extensions.land_registry.description')}</p>
+    <h2 class="text-2xl font-bold text-gray-900">{safeTitle}</h2>
+    <p class="text-gray-600">{safeDescription}</p>
   </div>
   
   {#if error}
@@ -110,25 +119,25 @@
         class="py-2 px-1 border-b-2 font-medium text-sm {activeTab === 'map' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
         on:click={() => activeTab = 'map'}
       >
-        {$_('extensions.land_registry.grid_view')}
+        {safeGridView}
       </button>
       <button 
         class="py-2 px-1 border-b-2 font-medium text-sm {activeTab === 'geographic' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
         on:click={() => activeTab = 'geographic'}
       >
-        {$_('extensions.land_registry.geographic_map')}
+        {safeGeographicMap}
       </button>
       <button 
         class="py-2 px-1 border-b-2 font-medium text-sm {activeTab === 'table' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
         on:click={() => activeTab = 'table'}
       >
-        {$_('extensions.land_registry.table_view')}
+        {safeTableView}
       </button>
       <button 
         class="py-2 px-1 border-b-2 font-medium text-sm {activeTab === 'admin' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
         on:click={() => activeTab = 'admin'}
       >
-        {$_('extensions.land_registry.admin_controls')}
+        {safeAdminControls}
       </button>
     </nav>
   </div>
