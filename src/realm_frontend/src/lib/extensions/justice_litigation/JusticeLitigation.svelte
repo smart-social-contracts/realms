@@ -7,6 +7,10 @@
 	import LitigationsList from './LitigationsList.svelte';
 	import CreateLitigationForm from './CreateLitigationForm.svelte';
 	import { _ } from 'svelte-i18n';
+	import { safeTranslate } from '$lib/i18n/safe-translate.js';
+	
+	// Use safe translation to prevent key flashing
+	$: safeTitle = $safeTranslate('extensions.justice_litigation.title');
 	
 	let loading = true;
 	let error = '';
@@ -83,7 +87,7 @@
 <Card size="lg" padding="xl" class="w-full">
 	<div class="flex items-center mb-4">
 		<LockSolid class="mr-2 h-8 w-8 text-primary-600" />
-		<h2 class="text-2xl font-bold text-gray-900 dark:text-white">{$_('extensions.justice_litigation.title')}</h2>
+		<h2 class="text-2xl font-bold text-gray-900 dark:text-white">{safeTitle}</h2>
 	</div>
 
 	{#if loading}
