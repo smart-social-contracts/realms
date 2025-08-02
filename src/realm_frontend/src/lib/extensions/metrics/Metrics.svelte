@@ -4,25 +4,17 @@
   import TaxContributionTreemap from './TaxContributionTreemap.svelte';
   import MonthlyCashFlow from './MonthlyCashFlow.svelte';
   import { _ } from 'svelte-i18n';
-  import { safeTranslate } from '$lib/i18n/safe-translate.js';
-  
-  // Safe translations for visible UI elements
-  $: safeUniversalBasicIncome = $safeTranslate('extensions.metrics.universal_basic_income');
-  $: safeInnovationGrants = $safeTranslate('extensions.metrics.innovation_grants');
-  $: safeInfrastructure = $safeTranslate('extensions.metrics.infrastructure');
-  $: safeHealthcareSystem = $safeTranslate('extensions.metrics.healthcare_system');
-  $: safeEducationPrograms = $safeTranslate('extensions.metrics.education_programs');
-  $: safeEmergencyReserve = $safeTranslate('extensions.metrics.emergency_reserve');
-  
-  // Budget visualization data with safe translation keys
+  import SafeText from '$lib/components/SafeText.svelte';
+
+  // Budget visualization data with translation keys (charts need string values)
   $: budgetData = {
     taxAllocation: [
-      { category: safeUniversalBasicIncome, amount: 45000, color: '#3B82F6' },
-      { category: safeInnovationGrants, amount: 25000, color: '#10B981' },
-      { category: safeInfrastructure, amount: 15000, color: '#F59E0B' },
-      { category: safeHealthcareSystem, amount: 8000, color: '#8B5CF6' },
-      { category: safeEducationPrograms, amount: 5000, color: '#EF4444' },
-      { category: safeEmergencyReserve, amount: 2000, color: '#6B7280' }
+      { category: $_('extensions.metrics.universal_basic_income'), amount: 45000, color: '#3B82F6' },
+      { category: $_('extensions.metrics.innovation_grants'), amount: 25000, color: '#10B981' },
+      { category: $_('extensions.metrics.infrastructure'), amount: 15000, color: '#F59E0B' },
+      { category: $_('extensions.metrics.healthcare_system'), amount: 8000, color: '#8B5CF6' },
+      { category: $_('extensions.metrics.education_programs'), amount: 5000, color: '#EF4444' },
+      { category: $_('extensions.metrics.emergency_reserve'), amount: 2000, color: '#6B7280' }
     ],
     assetPortfolio: [
       { symbol: 'ckBTC', balance: 2.5, value: 112500, color: '#F7931A' },

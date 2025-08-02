@@ -9,7 +9,7 @@
 	import { canisterId as backendCanisterId } from 'declarations/realm_backend';
 	import { principal } from '$lib/stores/auth';
 	import { _ } from 'svelte-i18n';
-	import { safeTranslate } from '$lib/i18n/safe-translate.js';
+	import SafeText from '$lib/components/SafeText.svelte';
 
 	// Define message interface to fix TypeScript errors
 	interface ChatMessage {
@@ -36,11 +36,6 @@
 	let isLoadingRealmData = false;
 	let userPrincipal = $principal || '';
 	
-	// Safe translations for visible UI elements
-	$: safeTitle = $safeTranslate('extensions.llm_chat.title');
-	$: safeStartConversation = $safeTranslate('extensions.llm_chat.start_conversation');
-	$: safeMessagePlaceholder = $safeTranslate('extensions.llm_chat.message_placeholder');
-
 	// LLM API configuration
 
 	// const isLocalhost = window.location.hostname === 'localhost' || 
@@ -277,7 +272,9 @@
 </script>
 
 <div class="w-full h-full flex flex-col p-0 m-0 max-w-none">
-	<h2 class="text-2xl font-bold p-4">{safeTitle}</h2>
+	<h2 class="text-2xl font-bold text-gray-900 mb-6">
+		<SafeText key="extensions.llm_chat.title" spinnerSize="sm" />
+	</h2>
 	
 	<div class="w-full flex-grow flex flex-col overflow-hidden">
 		<Card class="w-full h-full flex-grow flex flex-col m-0 p-0 rounded-none border-0 max-w-none">
@@ -289,7 +286,7 @@
 				{#if messages.length === 0}
 					<div class="text-center text-gray-500 dark:text-gray-400 py-8">
 						<MessagesSolid class="w-12 h-12 mx-auto mb-2" />
-						<p>{safeStartConversation}</p>
+						<SafeText key="extensions.llm_chat.start_conversation" spinnerSize="xs" />
 					</div>
 				{:else}
 					{#each messages as message}
@@ -365,7 +362,7 @@
 				<div class="flex">
 					<Textarea
 						class="flex-grow resize-none rounded-r-none"
-						placeholder={safeMessagePlaceholder}
+						placeholder={$_('extensions.llm_chat.message_placeholder')}
 						rows="2"
 						bind:value={newMessage}
 						on:keydown={handleKeydown}

@@ -8,7 +8,7 @@
 	import { writable } from 'svelte/store';
 	import AuthButton from '$lib/components/AuthButton.svelte';
 	import { _ } from 'svelte-i18n';
-	import { safeTranslate } from '$lib/i18n/safe-translate.js';
+	import SafeText from '$lib/components/SafeText.svelte';
 
 	// Import backend directly without using await in top-level
 	import { backend } from '$lib/canisters';
@@ -22,21 +22,6 @@
 	}
 
 	let greeting = '';
-	
-	// Safe translations for visible UI elements
-	$: safeTitle = $safeTranslate('extensions.test_bench.title');
-	$: safeExtensionApiTesting = $safeTranslate('extensions.test_bench.extension_api_testing');
-	$: safeCallTestbenchApi = $safeTranslate('extensions.test_bench.call_testbench_api');
-	$: safeAuthentication = $safeTranslate('extensions.test_bench.authentication');
-	$: safeGreetingTest = $safeTranslate('extensions.test_bench.greeting_test');
-	$: safeEnterName = $safeTranslate('extensions.test_bench.enter_name');
-	$: safeSubmitGreeting = $safeTranslate('extensions.test_bench.submit_greeting');
-	$: safeUniverseData = $safeTranslate('extensions.test_bench.universe_data');
-	$: safeGetUniverseData = $safeTranslate('extensions.test_bench.get_universe_data');
-	$: safeUniverseDataLabel = $safeTranslate('extensions.test_bench.universe_data_label');
-	$: safeSnapshotData = $safeTranslate('extensions.test_bench.snapshot_data');
-	$: safeGetSnapshots = $safeTranslate('extensions.test_bench.get_snapshots');
-	$: safeSnapshotsLabel = $safeTranslate('extensions.test_bench.snapshots_label');
 
 	function onSubmit(event) {
 		const name = event.target.name.value;
@@ -60,10 +45,14 @@
 
 
 <div class="p-4">
-	<h2 class="text-2xl font-bold mb-6">{safeTitle}</h2>
+	<h1 class="text-3xl font-bold text-gray-900 mb-6">
+		<SafeText key="extensions.test_bench.title" spinnerSize="sm" />
+	</h1>
 
 	<Card class="mb-6">
-		<h3 class="text-lg font-semibold mb-4">{safeExtensionApiTesting}</h3>
+		<p class="text-lg text-gray-700 mb-8">
+			<SafeText key="extensions.test_bench.extension_api_testing" spinnerSize="sm" />
+		</p>
 		<Button
 			color="primary"
 			variant="filled"
@@ -83,46 +72,70 @@
 				});
 			}}
 		>
-			{safeCallTestbenchApi}
+			<SafeText key="extensions.test_bench.call_testbench_api" spinnerSize="xs" />
 		</Button>
 	</Card>
 
 	<Card class="mb-6">
-		<h3 class="text-lg font-semibold mb-4">{safeAuthentication}</h3>
+		<h2 class="text-xl font-semibold mb-4">
+			<SafeText key="extensions.test_bench.authentication" spinnerSize="sm" />
+		</h2>
 		<AuthButton />
 	</Card>
 
 	<Card class="mb-6">
-		<h3 class="text-lg font-semibold mb-4">{safeGreetingTest}</h3>
+		<h3 class="text-lg font-medium mb-2">
+			<SafeText key="extensions.test_bench.greeting_test" spinnerSize="sm" />
+		</h3>
 		<section id="greeting" class="mb-2">{greeting}</section>
 		<form action="#" on:submit|preventDefault={onSubmit} class="flex flex-col gap-2">
-			<label for="name">{safeEnterName}</label>
+			<label for="name">
+				<SafeText key="extensions.test_bench.enter_name" spinnerSize="xs" />
+			</label>
 			<input id="name" alt="Name" type="text" class="border p-2 rounded" />
-			<Button type="submit" color="blue">{safeSubmitGreeting}</Button>
+			<Button type="submit" color="blue">
+				<SafeText key="extensions.test_bench.submit_greeting" spinnerSize="xs" />
+			</Button>
 		</form>
 	</Card>
 
 	<Card class="mb-6">
-		<h3 class="text-lg font-semibold mb-4">{safeUniverseData}</h3>
+		<h3 class="text-lg font-medium mb-2">
+			<SafeText key="extensions.test_bench.universe_data" spinnerSize="sm" />
+		</h3>
 		<form action="#" on:submit|preventDefault={onSubmitGetUniverse} class="flex flex-col gap-2">
-			<Button type="submit" color="green">{safeGetUniverseData}</Button>
+			<Button type="submit" color="green">
+				<SafeText key="extensions.test_bench.get_universe_data" spinnerSize="xs" />
+			</Button>
 		</form>
 		{#if $universe != ''}
 			<section id="universe" class="mt-4 p-3 bg-gray-100 rounded">
-				<h4 class="font-semibold">{safeUniverseDataLabel}</h4>
+				<h4 class="font-semibold">
+					<strong>
+						<SafeText key="extensions.test_bench.universe_data_label" spinnerSize="xs" />
+					</strong>
+				</h4>
 				<pre class="whitespace-pre-wrap break-words">{JSON.stringify($universe, null, 2)}</pre>
 			</section>
 		{/if}
 	</Card>
 
 	<Card class="mb-6">
-		<h3 class="text-lg font-semibold mb-4">{safeSnapshotData}</h3>
+		<h3 class="text-lg font-medium mb-2">
+			<SafeText key="extensions.test_bench.snapshot_data" spinnerSize="sm" />
+		</h3>
 		<form action="#" on:submit|preventDefault={get_snapshot_data} class="flex flex-col gap-2">
-			<Button type="submit" color="purple">{safeGetSnapshots}</Button>
+			<Button type="submit" color="purple">
+				<SafeText key="extensions.test_bench.get_snapshots" spinnerSize="xs" />
+			</Button>
 		</form>
 		{#if $snapshots != ''}
 			<section id="snapshots" class="mt-4 p-3 bg-gray-100 rounded">
-				<h4 class="font-semibold">{safeSnapshotsLabel}</h4>
+				<h4 class="font-semibold">
+					<strong>
+						<SafeText key="extensions.test_bench.snapshots_label" spinnerSize="xs" />
+					</strong>
+				</h4>
 				<pre class="whitespace-pre-wrap break-words">{JSON.stringify($snapshots, null, 2)}</pre>
 			</section>
 		{/if}
