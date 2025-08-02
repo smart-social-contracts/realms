@@ -28,19 +28,19 @@
 	export let list = false;
 </script>
 
-<Navbar {fluid} class="text-black" color="default" let:NavContainer>
+<Navbar {fluid} class="text-black relative z-50" color="default" let:NavContainer style="pointer-events: auto;">
 	<NavHamburger
 		onClick={() => (drawerHidden = !drawerHidden)}
 		class="m-0 me-3 md:block lg:hidden"
 	/>
-	<NavBrand href="/" class={list ? 'w-40' : 'lg:w-60'}>
+	<NavBrand href="/" class="{list ? 'w-40' : 'lg:w-60'} relative z-40 cursor-pointer">
 		<img
 			src="/images/logo_white_horizontal.png"
-			class="h-8 sm:h-10"
+			class="h-8 sm:h-10 pointer-events-none"
 			alt="Smart Social Contracts Logo"
 		/>
 		<span
-			class="ml-px self-center whitespace-nowrap text-xl font-semibold dark:text-white sm:text-2xl"
+			class="ml-px self-center whitespace-nowrap text-xl font-semibold dark:text-white sm:text-2xl pointer-events-none"
 		>
 			<!-- Flowbite -->
 		</span>
