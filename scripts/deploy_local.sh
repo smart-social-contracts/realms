@@ -3,8 +3,8 @@
 set -e
 set -x
 
-# dfx stop
-# dfx start --clean --background --logfile dfx.log
+dfx stop
+dfx start --clean --background --logfile dfx.log
 dfx deploy internet_identity
 dfx deploy realm_backend --yes
 dfx generate realm_backend
