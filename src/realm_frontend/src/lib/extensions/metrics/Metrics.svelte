@@ -3,16 +3,17 @@
   import AssetPortfolioChart from './AssetPortfolioChart.svelte';
   import TaxContributionTreemap from './TaxContributionTreemap.svelte';
   import MonthlyCashFlow from './MonthlyCashFlow.svelte';
+  import { _ } from 'svelte-i18n';
   
-  // Budget visualization data
-  export const budgetData = {
+  // Budget visualization data with translation keys
+  $: budgetData = {
     taxAllocation: [
-      { category: 'Universal Basic Income', amount: 45000, color: '#3B82F6' },
-      { category: 'Innovation Grants', amount: 25000, color: '#10B981' },
-      { category: 'Infrastructure', amount: 15000, color: '#F59E0B' },
-      { category: 'Healthcare System', amount: 8000, color: '#8B5CF6' },
-      { category: 'Education Programs', amount: 5000, color: '#EF4444' },
-      { category: 'Emergency Reserve', amount: 2000, color: '#6B7280' }
+      { category: $_('extensions.metrics.universal_basic_income'), amount: 45000, color: '#3B82F6' },
+      { category: $_('extensions.metrics.innovation_grants'), amount: 25000, color: '#10B981' },
+      { category: $_('extensions.metrics.infrastructure'), amount: 15000, color: '#F59E0B' },
+      { category: $_('extensions.metrics.healthcare_system'), amount: 8000, color: '#8B5CF6' },
+      { category: $_('extensions.metrics.education_programs'), amount: 5000, color: '#EF4444' },
+      { category: $_('extensions.metrics.emergency_reserve'), amount: 2000, color: '#6B7280' }
     ],
     assetPortfolio: [
       { symbol: 'ckBTC', balance: 2.5, value: 112500, color: '#F7931A' },

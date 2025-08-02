@@ -1,19 +1,20 @@
 <script>
   import { Chart } from 'flowbite-svelte';
+  import { _ } from 'svelte-i18n';
   
   export let data = [];
   
   // Group data by type for better visualization
   $: groupedData = [
     {
-      name: 'Citizens',
+      name: $_('extensions.metrics.citizens'),
       data: data.filter(item => item.type === 'citizen').map(item => ({
         x: item.name,
         y: item.contribution
       }))
     },
     {
-      name: 'Organizations', 
+      name: $_('extensions.metrics.organizations'), 
       data: data.filter(item => item.type === 'organization').map(item => ({
         x: item.name,
         y: item.contribution
@@ -24,7 +25,7 @@
 
 <div class="bg-white rounded-lg p-6 border border-gray-200">
   <h4 class="font-semibold text-gray-700 mb-4 flex items-center">
-    🌳 <span class="ml-2">Tax Contribution Analysis</span>
+    🌳 <span class="ml-2">{$_('extensions.metrics.tax_contribution_analysis')}</span>
   </h4>
   <Chart options={{
     chart: {

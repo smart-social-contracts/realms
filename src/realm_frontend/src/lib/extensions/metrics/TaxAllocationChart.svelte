@@ -1,12 +1,13 @@
 <script>
   import { Chart } from 'flowbite-svelte';
+  import { _ } from 'svelte-i18n';
   
   export let data = [];
 </script>
 
 <div class="bg-white rounded-lg p-6 border border-gray-200">
   <h4 class="font-semibold text-gray-700 mb-4 flex items-center">
-    📊 <span class="ml-2">Tax Allocation Breakdown</span>
+    📊 <span class="ml-2">{$_('extensions.metrics.tax_allocation_breakdown')}</span>
   </h4>
   <Chart options={{
     chart: {
