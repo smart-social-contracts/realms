@@ -5,7 +5,7 @@ export const metadata = {
 	version: '1.0.0',
 	author: 'Realms Team',
 	icon: 'LayersSolid',
-	profiles: ['admin'], // Only admins can access the marketplace
+	profiles: ['admin'],
 	permissions: ['read_extensions', 'manage_extensions']
 };
 

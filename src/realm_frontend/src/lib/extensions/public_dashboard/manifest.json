@@ -1,0 +1,7 @@
+{
+  "name": "public_dashboard",
+  "version": "1.0.0",
+  "description": "View platform statistics including users, organizations, and assets with interactive charts",
+  "author": "Smart Social Contracts",
+  "categories": ["public_services"]
+}

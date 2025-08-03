@@ -16,7 +16,7 @@ export const metadata = {
     name: 'Vault Manager',
     description: 'Manage your vault balances and transfer tokens',
     version: '1.0.0',
-    icon: 'wallet', // Icon name from the icon library
+    icon: 'wallet',
     author: 'Smart Social Contracts Team',
     permissions: ['read_vault', 'transfer_tokens']
 };

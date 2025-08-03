@@ -378,6 +378,9 @@ def install_extension(package_path):
             
             os.makedirs(frontend_lib_target, exist_ok=True)
             
+            shutil.copy2(manifest_path, os.path.join(frontend_lib_target, "manifest.json"))
+            log_info(f"Copied manifest.json to frontend extension directory")
+            
             for root, _, files in os.walk(frontend_lib_source):
                 for file in files:
                     src_file = os.path.join(root, file)

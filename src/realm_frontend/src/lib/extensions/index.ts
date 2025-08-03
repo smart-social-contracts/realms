@@ -11,6 +11,7 @@ export interface ExtensionMetadata {
     icon: string;
     author: string;
     permissions: string[];
+    categories?: string[];
     component?: ComponentType;
     enabled?: boolean;  // Field to control visibility
     profiles?: string[];  // Field to specify which user profiles can access this extension
@@ -26,6 +27,7 @@ interface ExtensionModule {
 // Auto-discover extensions from the filesystem
 // This runs at build time with Vite, compatible with IC deployment
 const extensionModules = import.meta.glob<ExtensionModule>('./*/index.ts', { eager: true });
+const manifestModules = import.meta.glob<{ categories?: string[] }>('./*/manifest.json', { eager: true });
 
 // Registry of all available extensions
 const extensionsRegistry: Record<string, ExtensionMetadata> = {};
@@ -35,19 +37,25 @@ Object.entries(extensionModules).forEach(([path, module]) => {
     // Extract the extension ID from the path (e.g., './my_extension/index.ts' -> 'my_extension')
     const id = path.split('/')[1];
     
+    // Get manifest data for this extension
+    const manifestPath = `./${id}/manifest.json`;
+    const manifestModule = manifestModules[manifestPath];
+    const categories = manifestModule?.categories || ['other'];
+    
     // Add to registry with module metadata and component
     if (module.metadata && module.default) {
         extensionsRegistry[id] = {
             ...module.metadata,
             id,
             component: module.default,
-            enabled: true // Default to enabled
+            enabled: true,
+            categories: categories
         };
         
         // No need to register translations here - they're loaded automatically
         // from JSON files in /lib/i18n/locales/extensions/{id}/
         
-        console.log(`Registered extension: ${id}`);
+        console.log(`Registered extension: ${id} with categories: ${categories.join(', ')}`);
     } else {
         console.warn(`Failed to register extension at ${path}: missing metadata or component`);
     }
