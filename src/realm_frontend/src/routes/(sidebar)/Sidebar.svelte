@@ -125,16 +125,9 @@
 
 	// Core navigation items with translation keys
 	const coreNavItems: NavItemWithHref[] = [
-		{ translationKey: 'extensions.public_dashboard.sidebar', icon: ChartPieOutline, href: '/extensions/public_dashboard' }, // For all users
 		{ name: $_('common.identities') || 'My Identities', icon: UsersOutline, href: '/identities' }, // For all users
 		{ name: $_('navigation.admin_dashboard') || 'Admin Dashboard', icon: TableColumnSolid, href: '/ggg', profiles: ['admin'] }, // Admin only
 		{ name: $_('common.settings'), icon: CogOutline, href: '/settings' }, // For all users
-		{ translationKey: 'extensions.citizen_dashboard.sidebar', icon: TableColumnSolid, href: '/extensions/citizen_dashboard' }, // For all users
-		{ translationKey: 'extensions.justice_litigation.sidebar', icon: ClipboardListSolid, href: '/extensions/justice_litigation' }, // For all users
-		{ translationKey: 'extensions.land_registry.sidebar', icon: RectangleListSolid, href: '/extensions/land_registry' }, // For all users
-		{ translationKey: 'extensions.ai_assistant.sidebar', icon: WandMagicSparklesOutline, href: '/extensions/llm_chat' }, // For all users
-		{ translationKey: 'extensions.budget_metrics.sidebar', icon: FileChartBarSolid, href: '/extensions/metrics' }, // For all users
-		{ translationKey: 'extensions.notifications.sidebar', icon: LifeSaverSolid, href: '/extensions/notifications' }, // For all users
 	];
 
 	// Filter core navigation items based on user profiles
