@@ -15,6 +15,9 @@ EXTENSION_NAMES = [
     "land_registry",
     "justice_litigation",
     "notifications",
+    "market_place",
+    "public_dashboard",
+    "metrics",
 ]
 
 
@@ -35,13 +38,15 @@ def test_extensions():
     list_after_uninstall = run_command("./scripts/realm-extension-cli.py list")
     assert_in(list_after_uninstall, "No extensions installed")
 
+    frontend_only_extensions = ["market_place", "public_dashboard", "metrics"]
+    
     for name in EXTENSION_NAMES:
         run_command(
             f"./scripts/realm-extension-cli.py install --package-path {name}.zip"
         )
-        # Verify files exist in the new extension_packages directory
-        assert_file_exists(f"src/realm_backend/extension_packages/{name}/entry.py")
-        assert_file_exists(f"src/realm_backend/extension_packages/{name}/manifest.json")
+        if name not in frontend_only_extensions:
+            assert_file_exists(f"src/realm_backend/extension_packages/{name}/entry.py")
+            assert_file_exists(f"src/realm_backend/extension_packages/{name}/manifest.json")
 
     list_after_install = run_command("./scripts/realm-extension-cli.py list")
     for name in EXTENSION_NAMES:
@@ -52,7 +57,8 @@ def test_extensions():
         imports_content = f.read()
 
     for name in EXTENSION_NAMES:
-        assert_in(imports_content, f"import extension_packages.{name}.entry")
+        if name not in frontend_only_extensions:
+            assert_in(imports_content, f"import extension_packages.{name}.entry")
 
     # Test uninstalling again
     for name in EXTENSION_NAMES:
