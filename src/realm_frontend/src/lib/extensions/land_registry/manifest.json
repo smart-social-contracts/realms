@@ -7,5 +7,6 @@
   "entry_points": ["get_lands", "create_land", "update_land_ownership", "get_land_map"],
   "profiles": ["admin"],
   "categories": ["public_services"],
+  "icon": "list",
   "url": "https://github.com/smart-social-contracts/extensions/land_registry"
 }

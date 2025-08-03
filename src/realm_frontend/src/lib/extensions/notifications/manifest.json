@@ -6,5 +6,6 @@
   "required_permissions": [],
   "entry_points": ["get_notifications", "mark_as_read", "create_notification"],
   "categories": ["other"],
+  "icon": "bell",
   "url": "https://github.com/smart-social-contracts/extensions/notifications"
 }

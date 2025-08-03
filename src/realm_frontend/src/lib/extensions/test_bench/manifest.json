@@ -10,5 +10,6 @@
     ],
     "enabled": false,
     "categories": ["other"],
+    "icon": "lightbulb",
     "url": "https://github.com/smart-social-contracts/extensions/test_bench"
 }

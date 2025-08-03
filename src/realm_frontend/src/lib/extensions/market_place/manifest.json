@@ -3,5 +3,6 @@
   "version": "1.0.0",
   "description": "Browse and install extensions for your Smart Social Contracts platform",
   "author": "Realms Team",
-  "categories": ["other"]
+  "categories": ["other"],
+  "icon": "layers"
 }

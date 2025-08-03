@@ -4,5 +4,8 @@
   "description": "Manages vault operations for the Realms platform",
   "required_permissions": [],
   "entry_points": ["get_balance", "get_status", "get_transactions", "transfer"],
-  "profiles": ["admin"]
+  "profiles": ["admin"],
+  "categories": ["finances"],
+  "icon": "wallet",
+  "url": "https://github.com/smart-social-contracts/extensions/vault_manager"
 }

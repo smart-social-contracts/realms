@@ -7,5 +7,6 @@
   "permissions": [],
   "profiles": ["member"],
   "categories": ["public_services"],
+  "icon": "table",
   "url": "https://github.com/smart-social-contracts/extensions/citizen_dashboard"
 }
