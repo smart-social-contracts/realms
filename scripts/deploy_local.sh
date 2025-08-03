@@ -6,10 +6,7 @@ set -x
 dfx stop
 dfx start --clean --background --logfile dfx.log
 dfx deploy internet_identity
-
-
-scripts/realm-extension-cli.py package 
-
+scripts/install_extensions.sh
 dfx deploy realm_backend --yes
 dfx generate realm_backend
 npm install --legacy-peer-deps

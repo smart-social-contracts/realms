@@ -1,0 +1,40 @@
+{
+  "name": "Notifications",
+  "description": "View and manage your notifications in an inbox-style interface",
+  "sidebar": "Notifications",
+  "title": "Notifications",
+  "unread_count": "{count, plural, =0 {No unread notifications} =1 {1 unread notification} other {# unread notifications}}",
+  "mark_all_read": "Mark all as read",
+  "all": "All",
+  "unread": "Unread",
+  "no_notifications": "No notifications yet",
+  "empty_state_message": "When you receive notifications, they will appear here",
+  "tabs": {
+    "all": "All ({count})",
+    "unread": "Unread ({count})"
+  },
+  "empty_states": {
+    "no_unread": "No unread notifications",
+    "no_notifications": "No notifications",
+    "all_caught_up": "All caught up! You have no unread notifications.",
+    "none_available": "You have no notifications at this time."
+  },
+  "badge_new": "New",
+  "sample": {
+    "welcome": {
+      "title": "Welcome to Realms",
+      "message": "Your account has been successfully created and verified.",
+      "timestamp": "a few moments ago"
+    },
+    "task_assignment": {
+      "title": "New Task Assignment",
+      "message": "You have been assigned a new governance task that requires your attention.",
+      "timestamp": "10 minutes ago"
+    },
+    "vault_transaction": {
+      "title": "Vault Transaction",
+      "message": "A transfer of 100 tokens has been completed successfully.",
+      "timestamp": "1 hour ago"
+    }
+  }
+}

@@ -1,15 +1,26 @@
 #!/bin/bash
 
+# This script is used to install extensions by:
+# 1. Packaging all extensions in to zip files
+# 2. Installing all extensions using the realm-extension-cli
+# 3. Cleanup
+
+set -e
+set -x
+
+
 echo "Installing extensions..."
 
-# Array of extensions to install
-extensions=("test_bench" "vault_manager" "welcome" "demo_loader")
-
-# Loop through extensions and install each one
-for extension in "${extensions[@]}"; do
-    echo "Installing ${extension}..."
-    python scripts/realm-extension-cli.py install extensions/${extension}.zip
-    echo "Installed ${extension}"
+# Package all extensions
+for dir in */ ; do
+  zip -r "$dir.zip" "$dir"
 done
 
-echo "Extensions installed successfully"
+# Install all extensions
+for dir in */ ; do
+  python scripts/realm-extension-cli.py install "$dir"
+done
+
+# Cleanup
+rm -rf */
+
