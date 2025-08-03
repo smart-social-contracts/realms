@@ -497,8 +497,9 @@ def uninstall_extension(extension_id):
         return False
     
     locations = find_extension_locations(extension_id)
+    paths = get_extension_paths(extension_id)
     
-    if not locations:
+    if not locations and not any(os.path.exists(path) for path in paths.values()):
         log_error(f"Extension {extension_id} not found or already uninstalled")
         return False
     
@@ -511,19 +512,29 @@ def uninstall_extension(extension_id):
         except Exception as e:
             log_error(f"Failed to remove backend files: {e}")
     
-    if "frontend_lib" in locations:
+    if "frontend_lib" in locations or os.path.exists(paths["frontend_lib"]):
         try:
-            shutil.rmtree(locations["frontend_lib"])
-            log_success(f"Removed frontend library files for {extension_id}")
+            if os.path.exists(paths["frontend_lib"]):
+                shutil.rmtree(paths["frontend_lib"])
+                log_success(f"Removed frontend library files for {extension_id}")
         except Exception as e:
             log_error(f"Failed to remove frontend library files: {e}")
     
-    if "frontend_route" in locations:
+    if "frontend_route" in locations or os.path.exists(paths["frontend_route"]):
         try:
-            shutil.rmtree(locations["frontend_route"])
-            log_success(f"Removed frontend route files for {extension_id}")
+            if os.path.exists(paths["frontend_route"]):
+                shutil.rmtree(paths["frontend_route"])
+                log_success(f"Removed frontend route files for {extension_id}")
         except Exception as e:
             log_error(f"Failed to remove frontend route files: {e}")
+    
+    if "i18n" in locations or os.path.exists(paths["i18n"]):
+        try:
+            if os.path.exists(paths["i18n"]):
+                shutil.rmtree(paths["i18n"])
+                log_success(f"Removed i18n files for {extension_id}")
+        except Exception as e:
+            log_error(f"Failed to remove i18n files: {e}")
     
     if "frontend_custom_routes" in locations:
         try:
