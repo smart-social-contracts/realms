@@ -1,8 +1,11 @@
 {
-  "name": "justice_litigation",
+  "id": "justice_litigation",
+  "name": "Justice Litigation",
   "version": "0.1.0",
   "description": "External justice litigation system integration",
   "required_permissions": [],
   "entry_points": ["get_litigations", "create_litigation", "execute_verdict"],
-  "profiles": ["admin", "member"]
+  "profiles": ["admin", "member"],
+  "categories": ["public_services"],
+  "url": "https://github.com/smart-social-contracts/extensions/justice_litigation"
 }
