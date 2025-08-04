@@ -17,7 +17,6 @@ dfx generate realm_backend
 dfx stop
 
 echo "Building frontend"
-npm install --legacy-peer-deps
 sh scripts/update_config.sh
 npm run prebuild --workspace realm_frontend
 npm run build --workspace realm_frontend
