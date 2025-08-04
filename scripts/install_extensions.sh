@@ -8,19 +8,21 @@
 set -e
 set -x
 
+cd extensions
 
 echo "Installing extensions..."
 
 # Package all extensions
 for dir in */ ; do
-  zip -r "$dir.zip" "$dir"
+  dir_name=${dir%/}  # Remove trailing slash
+  (cd "$dir" && zip -r "../${dir_name}.zip" .)
 done
 
-# Install all extensions
-for dir in */ ; do
-  python scripts/realm-extension-cli.py install "$dir"
-done
+mv *.zip ..
+cd ..
 
-# Cleanup
-rm -rf */
+python scripts/realm-extension-cli.py install --all
+
+rm *.zip
+
 
