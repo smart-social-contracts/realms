@@ -593,6 +593,82 @@ def update_extension_imports(extension_id, action="add"):
     
     return True
 
+def package_extension_from_source(extension_id, source_dir, output_dir=None):
+    """Package an extension directly from source directory"""
+    validate_extension_id(extension_id)
+    
+    extension_source_path = os.path.join(source_dir, extension_id)
+    if not os.path.exists(extension_source_path):
+        log_error(f"Extension source directory not found: {extension_source_path}")
+        return False
+    
+    if not os.path.isdir(extension_source_path):
+        log_error(f"Extension source path is not a directory: {extension_source_path}")
+        return False
+    
+    # Set output directory
+    if output_dir is None:
+        output_dir = os.getcwd()
+    
+    output_path = os.path.join(output_dir, f"{extension_id}.zip")
+    
+    try:
+        log_info(f"Packaging extension '{extension_id}' from source: {extension_source_path}")
+        
+        with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            # Walk through the extension source directory
+            for root, dirs, files in os.walk(extension_source_path):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    # Calculate the archive path (relative to extension directory)
+                    archive_path = os.path.relpath(file_path, extension_source_path)
+                    zipf.write(file_path, archive_path)
+                    log_info(f"  Added: {archive_path}")
+        
+        log_success(f"Extension '{extension_id}' packaged successfully: {output_path}")
+        return True
+        
+    except Exception as e:
+        log_error(f"Failed to package extension '{extension_id}': {str(e)}")
+        if os.path.exists(output_path):
+            os.remove(output_path)
+        return False
+
+def package_all_extensions_from_source(source_dir, output_dir=None):
+    """Package all extensions from source directory"""
+    if not os.path.exists(source_dir):
+        log_error(f"Source directory not found: {source_dir}")
+        return False
+    
+    if not os.path.isdir(source_dir):
+        log_error(f"Source path is not a directory: {source_dir}")
+        return False
+    
+    log_info(f"Packaging all extensions from source directory: {source_dir}")
+    
+    # Find all extension directories
+    extension_dirs = []
+    for item in os.listdir(source_dir):
+        item_path = os.path.join(source_dir, item)
+        if os.path.isdir(item_path) and not item.startswith('.'):
+            try:
+                validate_extension_id(item)
+                extension_dirs.append(item)
+            except ValueError:
+                log_warning(f"Skipping directory with invalid extension ID: {item}")
+    
+    if not extension_dirs:
+        log_error("No valid extension directories found in source directory")
+        return False
+    
+    success = True
+    for ext_id in extension_dirs:
+        if not package_extension_from_source(ext_id, source_dir, output_dir):
+            success = False
+            log_error(f"Failed to package extension: {ext_id}")
+    
+    return success
+
 def package_all_extensions(output_dir=None):
     """Package all extensions into zip files"""
     log_info("Packaging all extensions")
@@ -783,6 +859,41 @@ def list_extensions():
     
     return list(extensions.values())
 
+def install_from_source(source_dir="extensions"):
+    """Package all extensions from source and install them (replaces install_extensions.sh)"""
+    paths = get_project_paths()
+    extensions_source_dir = os.path.join(paths["project_root"], source_dir)
+    
+    if not os.path.exists(extensions_source_dir):
+        log_error(f"Extensions source directory not found: {extensions_source_dir}")
+        return False
+    
+    log_info(f"Installing extensions from source directory: {extensions_source_dir}")
+    
+    # Step 1: Package all extensions from source
+    temp_dir = tempfile.mkdtemp()
+    try:
+        if not package_all_extensions_from_source(extensions_source_dir, temp_dir):
+            log_error("Failed to package extensions from source")
+            return False
+        
+        # Step 2: Install all packages
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(temp_dir)
+            if not install_all_packages():
+                log_error("Failed to install packaged extensions")
+                return False
+        finally:
+            os.chdir(original_cwd)
+        
+        log_success("All extensions installed successfully from source")
+        return True
+        
+    finally:
+        # Clean up temporary directory
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(
@@ -798,11 +909,22 @@ def main():
     package_group.add_argument("--extension-id", dest="extension_id", help="ID of the extension to package")
     package_group.add_argument("--all", action="store_true", help="Package all extensions")
     package_parser.add_argument("--output-dir", help="Directory to save the package", default=None)
+    package_parser.add_argument("--from-source", dest="from_source", help="Package from source directory (default: extensions)", default=None)
+    
+    package_source_parser = subparsers.add_parser("package-source", help="Package extensions from source directory")
+    package_source_group = package_source_parser.add_mutually_exclusive_group(required=True)
+    package_source_group.add_argument("--extension-id", dest="extension_id", help="ID of the extension to package")
+    package_source_group.add_argument("--all", action="store_true", help="Package all extensions")
+    package_source_parser.add_argument("--source-dir", help="Source directory containing extensions", default="extensions")
+    package_source_parser.add_argument("--output-dir", help="Directory to save the package", default=None)
     
     install_parser = subparsers.add_parser("install", help="Install an extension package")
     install_group = install_parser.add_mutually_exclusive_group(required=True)
     install_group.add_argument("--package-path", dest="package_path", help="Path to the extension package (.zip)")
     install_group.add_argument("--all", action="store_true", help="Install all packages in the current directory")
+    
+    install_source_parser = subparsers.add_parser("install-from-source", help="Package and install extensions from source (replaces install_extensions.sh)")
+    install_source_parser.add_argument("--source-dir", help="Source directory containing extensions", default="extensions")
     
     uninstall_parser = subparsers.add_parser("uninstall", help="Uninstall an extension")
     uninstall_group = uninstall_parser.add_mutually_exclusive_group(required=True)
@@ -818,11 +940,32 @@ def main():
     if args.command == "list":
         list_extensions()
     elif args.command == "package":
+        if args.from_source:
+            # Package from source directory
+            paths = get_project_paths()
+            source_dir = os.path.join(paths["project_root"], args.from_source)
+            if args.all:
+                if not package_all_extensions_from_source(source_dir, args.output_dir):
+                    return 1
+            else:
+                if not package_extension_from_source(args.extension_id, source_dir, args.output_dir):
+                    return 1
+        else:
+            # Package from installed extensions
+            if args.all:
+                if not package_all_extensions(args.output_dir):
+                    return 1
+            else:
+                if not package_extension(args.extension_id, args.output_dir):
+                    return 1
+    elif args.command == "package-source":
+        paths = get_project_paths()
+        source_dir = os.path.join(paths["project_root"], args.source_dir)
         if args.all:
-            if not package_all_extensions(args.output_dir):
+            if not package_all_extensions_from_source(source_dir, args.output_dir):
                 return 1
         else:
-            if not package_extension(args.extension_id, args.output_dir):
+            if not package_extension_from_source(args.extension_id, source_dir, args.output_dir):
                 return 1
     elif args.command == "install":
         if args.all:
@@ -831,6 +974,9 @@ def main():
         else:
             if not install_extension(args.package_path):
                 return 1
+    elif args.command == "install-from-source":
+        if not install_from_source(args.source_dir):
+            return 1
     elif args.command == "uninstall":
         if args.all:
             if not uninstall_all_extensions():

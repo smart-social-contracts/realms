@@ -9,6 +9,7 @@ echo "Building backend"
 dfx start --clean --background
 
 dfx deploy internet_identity
+scripts/install_extensions.sh
 
 dfx canister create realm_backend
 dfx build realm_backend
