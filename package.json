@@ -22,5 +22,8 @@
     "@dfinity/identity": "^2.4.1",
     "@dfinity/principal": "^2.4.1",
     "svelte-markdown": "^0.4.1"
+  },
+  "devDependencies": {
+    "@sveltejs/kit": "^2.27.0"
   }
 }

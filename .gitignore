@@ -17,8 +17,14 @@ kybra_simple_db
 *.pem
 src/declarations
 e2e.log
-extensions/*/
 src/realm_frontend/src/lib/config.js
 dfx.log
 playwright-report
 test-results
+
+# Extension deployment artifacts (source code is in extensions/)
+# These folders contain deployed extensions and should not be version controlled
+src/realm_backend/extension_packages/
+src/realm_frontend/src/lib/extensions/
+src/realm_frontend/src/routes/(sidebar)/extensions/
+src/realm_frontend/src/lib/i18n/locales/extensions/

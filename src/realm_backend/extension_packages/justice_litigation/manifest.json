@@ -1,8 +1,0 @@
-{
-  "name": "justice_litigation",
-  "version": "0.1.0",
-  "description": "External justice litigation system integration",
-  "required_permissions": [],
-  "entry_points": ["get_litigations", "create_litigation", "execute_verdict"],
-  "profiles": ["admin", "member"]
-}

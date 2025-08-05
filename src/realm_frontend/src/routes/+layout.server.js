@@ -1,2 +1,2 @@
 /** @type {import('./$types').LayoutServerLoad} \*/
-export const prerender = true;
+export const prerender = false;
