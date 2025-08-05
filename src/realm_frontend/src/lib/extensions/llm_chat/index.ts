@@ -7,7 +7,7 @@ export const metadata = {
     name: 'AI Assistant',
     description: 'Chat with an LLM model via HTTP',
     version: '0.1.0',
-    icon: 'chat',  // Use appropriate icon from the system
+    icon: 'chat',
     author: 'Smart Social Contracts Team',
     permissions: []
 }; 

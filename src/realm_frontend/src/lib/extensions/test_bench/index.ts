@@ -7,7 +7,7 @@ export const metadata = {
     name: 'test_bench',
     description: 'Test bench extension',
     version: '0.1.0',
-    icon: 'clipboard', // Changed from 'wallet' to 'clipboard' for test bench
+    icon: 'clipboard',
     author: 'Smart Social Contracts Team',
     permissions: ['read_vault', 'transfer_tokens']
 };

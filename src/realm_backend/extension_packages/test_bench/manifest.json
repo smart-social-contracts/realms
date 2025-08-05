@@ -7,5 +7,8 @@
         "read_vault",
         "transfer_tokens"
     ],
-    "enabled": false
+    "enabled": false,
+    "categories": ["other"],
+    "icon": "lightbulb",
+    "url": "https://github.com/smart-social-contracts/extensions/test_bench"
 }

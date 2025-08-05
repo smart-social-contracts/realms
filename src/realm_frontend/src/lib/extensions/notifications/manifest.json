@@ -1,0 +1,10 @@
+{
+  "name": "notifications",
+  "version": "1.0.0",
+  "description": "Manages user notifications and alerts",
+  "required_permissions": [],
+  "entry_points": ["get_notifications", "mark_as_read", "create_notification"],
+  "categories": ["other"],
+  "icon": "bell",
+  "url": "https://github.com/smart-social-contracts/extensions/notifications"
+}
