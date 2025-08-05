@@ -1,0 +1,16 @@
+{
+  "name": "Land Registry",
+  "description": "Manage land ownership and visualize parcels",
+  "sidebar": "Land Registry",
+  "title": "Land Registry",
+  "grid_view": "Grid View",
+  "geographic_map": "Geographic Map",
+  "table_view": "Table View",
+  "admin_controls": "Admin Controls",
+  "properties": "Properties",
+  "ownership": "Ownership",
+  "transfers": "Transfers",
+  "records": "Records",
+  "no_properties": "No properties found",
+  "loading": "Loading properties..."
+}

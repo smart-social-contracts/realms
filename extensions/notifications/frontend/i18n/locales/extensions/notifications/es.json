@@ -1,0 +1,33 @@
+{
+  "title": "Notificaciones",
+  "unread_count": "{count} notificación{count, plural, one {} other {es}} sin leer",
+  "mark_all_read": "Marcar todas como leídas",
+  "tabs": {
+    "all": "Todas ({count})",
+    "unread": "Sin leer ({count})"
+  },
+  "empty_states": {
+    "no_unread": "No hay notificaciones sin leer",
+    "no_notifications": "No hay notificaciones",
+    "all_caught_up": "¡Todo al día! No tienes notificaciones sin leer.",
+    "none_available": "No tienes notificaciones en este momento."
+  },
+  "badge_new": "Nuevo",
+  "sample": {
+    "welcome": {
+      "title": "Bienvenido a Realms",
+      "message": "Tu cuenta ha sido creada y verificada exitosamente.",
+      "timestamp": "hace unos momentos"
+    },
+    "task_assignment": {
+      "title": "Nueva Asignación de Tarea",
+      "message": "Se te ha asignado una nueva tarea de gobernanza que requiere tu atención.",
+      "timestamp": "hace 10 minutos"
+    },
+    "vault_transaction": {
+      "title": "Transacción de Bóveda",
+      "message": "Una transferencia de 100 tokens se ha completado exitosamente.",
+      "timestamp": "hace 1 hora"
+    }
+  }
+}

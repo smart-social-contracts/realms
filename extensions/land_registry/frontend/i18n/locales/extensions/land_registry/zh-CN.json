@@ -1,0 +1,16 @@
+{
+  "name": "土地登记",
+  "description": "管理土地所有权并可视化地块",
+  "sidebar": "土地登记",
+  "title": "土地登记",
+  "grid_view": "网格视图",
+  "geographic_map": "地理地图",
+  "table_view": "表格视图",
+  "admin_controls": "管理控制",
+  "properties": "财产",
+  "ownership": "所有权",
+  "transfers": "转让",
+  "records": "记录",
+  "no_properties": "未找到财产",
+  "loading": "正在加载财产..."
+}
