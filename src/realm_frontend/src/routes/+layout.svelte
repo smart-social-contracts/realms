@@ -6,6 +6,7 @@
 	import { locale, _ } from 'svelte-i18n';
 	import '../app.pcss';
 	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
+	import { initializeTheme } from '$lib/theme/init';
 
 	export const SITE_NAME = "Realms gOS";
 	
@@ -26,6 +27,9 @@
 
 	onMount(async () => {
 		modeobserver();
+		
+		// Initialize theme system
+		initializeTheme();
 		
 		// Wait for locale to be ready
 		await waitLocale();
@@ -75,6 +79,7 @@
 		justify-content: center;
 		align-items: center;
 		height: 100vh;
-		font-size: 1.5rem;
+		font-size: var(--font-size-lg);
+		color: var(--color-text-secondary);
 	}
 </style>
