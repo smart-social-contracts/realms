@@ -269,6 +269,12 @@
 			sendMessage();
 		}
 	}
+
+	// Handle suggestion click
+	function handleSuggestionClick(suggestion: string): void {
+		newMessage = suggestion;
+		sendMessage();
+	}
 </script>
 
 <div class="w-full h-full flex flex-col p-0 m-0 max-w-none">
@@ -285,8 +291,35 @@
 			>
 				{#if messages.length === 0}
 					<div class="text-center text-gray-500 dark:text-gray-400 py-8">
-						<MessagesSolid class="w-12 h-12 mx-auto mb-2" />
+						<MessagesSolid class="w-12 h-12 mx-auto mb-4" />
 						<SafeText key="extensions.llm_chat.start_conversation" spinnerSize="xs" />
+						
+						<!-- Question Suggestions -->
+						<div class="mt-6 max-w-md mx-auto">
+							<h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+								<SafeText key="extensions.llm_chat.suggestions_title" spinnerSize="xs" />
+							</h3>
+							<div class="space-y-2">
+								<button
+									class="w-full text-left p-3 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors duration-200 text-sm text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
+									on:click={() => handleSuggestionClick($_('extensions.llm_chat.suggestion_1'))}
+								>
+									<SafeText key="extensions.llm_chat.suggestion_1" spinnerSize="xs" />
+								</button>
+								<button
+									class="w-full text-left p-3 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors duration-200 text-sm text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
+									on:click={() => handleSuggestionClick($_('extensions.llm_chat.suggestion_2'))}
+								>
+									<SafeText key="extensions.llm_chat.suggestion_2" spinnerSize="xs" />
+								</button>
+								<button
+									class="w-full text-left p-3 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors duration-200 text-sm text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
+									on:click={() => handleSuggestionClick($_('extensions.llm_chat.suggestion_3'))}
+								>
+									<SafeText key="extensions.llm_chat.suggestion_3" spinnerSize="xs" />
+								</button>
+							</div>
+						</div>
 					</div>
 				{:else}
 					{#each messages as message}

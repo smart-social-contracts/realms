@@ -7,5 +7,9 @@
   "message_placeholder": "Type your message...",
   "no_response": "No response from LLM",
   "error_response": "Failed to get response from LLM. Please try again.",
-  "loading": "Loading..."
+  "loading": "Loading...",
+  "suggestions_title": "Try asking:",
+  "suggestion_1": "What is a realm?",
+  "suggestion_2": "What is an AI governance assistant?",
+  "suggestion_3": "Why should I join this realm?"
 }
