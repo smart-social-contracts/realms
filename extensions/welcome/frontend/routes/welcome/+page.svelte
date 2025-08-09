@@ -68,6 +68,11 @@
     </div>
   {/if}
   
+  <!-- Realms logo in top left corner -->
+  <div class="realms-logo">
+    <img src="/images/logo_black_horizontal.png" alt="Realms Logo" class="logo-img" />
+  </div>
+
   <div class="content">
     <div class="hero-text">
       <h1>Realms GOS - The Governance Operating System</h1>
@@ -189,27 +194,24 @@
   
   .built-with-love {
     position: absolute;
-    bottom: 1rem;
+    bottom: 4rem;
     right: 1rem;
-    color: white;
-    font-size: 0.9rem;
-    font-weight: 400;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
-    z-index: 1;
-    background-color: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    border-radius: 8px;
     padding: 0.5rem 0.8rem;
-    border-radius: 4px;
-    backdrop-filter: blur(4px);
+    font-size: 0.9rem;
+    z-index: 20;
   }
-  
+
   .built-with-link {
     color: white;
     text-decoration: none;
     display: flex;
     align-items: center;
-    gap: 0.2rem;
+    gap: 0.3rem;
   }
-  
+
   .built-with-link:hover {
     color: rgba(255, 255, 255, 0.8);
     text-decoration: none;
@@ -219,6 +221,19 @@
     display: inline-block;
     vertical-align: middle;
     margin: 0 0.2rem;
+  }
+
+  .realms-logo {
+    position: absolute;
+    top: 2rem;
+    left: 2rem;
+    z-index: 30;
+  }
+
+  .logo-img {
+    height: 40px;
+    width: auto;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
   }
 
   .content {
