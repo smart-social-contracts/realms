@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import Footer from '$lib/../routes/(sidebar)/Footer.svelte';
+  import { _ } from 'svelte-i18n';
   
   let isMobile = false;
   let currentPhotoIndex = 0;
@@ -43,7 +44,7 @@
 </script>
 
 <svelte:head>
-  <title>Welcome</title>
+  <title>{$_('extensions.welcome.page_title')}</title>
 </svelte:head>
 
 <div class="welcome-container">
@@ -52,7 +53,7 @@
       {#each photos as photo, index}
         <img
           src={photo}
-          alt="Background {index + 1}"
+          alt="{$_('extensions.welcome.alt_text.background', { values: { index: index + 1 } })}"
           class="background-photo {index === currentPhotoIndex ? 'active' : ''}"
         />
       {/each}
@@ -65,29 +66,29 @@
     <!-- "Built with" text -->
     <div class="built-with-love">
       <a href="https://internetcomputer.org" target="_blank" rel="noopener noreferrer" class="built-with-link">
-        Built on the 
-        <img src="/images/internet-computer-icp-logo.svg" alt="Internet Computer Logo" width="20" height="20" class="inline-logo" />
-        with ❤️ from 🇨🇭
+        {$_('extensions.welcome.built_with.text')} 
+        <img src="/images/internet-computer-icp-logo.svg" alt="{$_('extensions.welcome.alt_text.internet_computer_logo')}" width="20" height="20" class="inline-logo" />
+        {$_('extensions.welcome.built_with.with_love')}
       </a>
     </div>
   {/if}
   
   <!-- Realms logo in top left corner -->
   <div class="realms-logo">
-    <img src="/images/logo_horizontal.png" alt="Realms Logo" class="logo-img" />
+    <img src="/images/logo_horizontal.png" alt="{$_('extensions.welcome.alt_text.realms_logo')}" class="logo-img" />
   </div>
 
   <div class="content">
     <div class="hero-text">
-      <h1>Realms GOS - The Governance Operating System</h1>
-      <p class="hero-subtitle">• Launch a full public administration in seconds</p>
-      <p class="hero-subtitle">• Fully auditable. Fully transparent. AI-powered</p>
-      <p class="hero-subtitle">• Engineered to eliminate corruption and inefficiencies</p>
+      <h1>{$_('extensions.welcome.hero.title')}</h1>
+      <p class="hero-subtitle">{$_('extensions.welcome.hero.subtitle_1')}</p>
+      <p class="hero-subtitle">{$_('extensions.welcome.hero.subtitle_2')}</p>
+      <p class="hero-subtitle">{$_('extensions.welcome.hero.subtitle_3')}</p>
     </div>
     
     <div class="button-container">
       <a href="/" class="btn btn-visitor">
-        Try the sandbox
+        {$_('extensions.welcome.hero.try_sandbox')}
       </a>
     </div>
   </div>
@@ -104,45 +105,40 @@
 <!-- Our Mission Section -->
 <section class="mission-section">
   <div class="mission-content">
-    <h2>Governance as It Should Be</h2>
+    <h2>{$_('extensions.welcome.mission.title')}</h2>
     <p>
-      <b>Realms</b> is a decentralized software platform for public administration — 
-      a Governance Operating System (GOS) designed to deliver essential public 
-      services such as justice, social welfare, property registries, and more. 
-      From small towns to entire nations, it empowers communities to design, run, 
-      and evolve their own governance systems — free from the corruption and 
-      inefficiencies of traditional bureaucracy.
+      {@html $_('extensions.welcome.mission.description')}
     </p>
 </section>
 
 <!-- Design principles Section -->
 <section class="values-section">
   <div class="values-container">
-    <h2>Design principles</h2>
+    <h2>{$_('extensions.welcome.principles.title')}</h2>
     
     <div class="values-grid">
       <div class="value-item">
         <div class="value-number">01</div>
-        <h3>Transparency</h3>
-        <p>Transparency builds trust between the government and the public, as users can see how processes are executed and where resources, such as tax money, are allocated. Transparency also helps prevent corruption and strengthens the legitimacy of institutions.</p>
+        <h3>{$_('extensions.welcome.principles.transparency.title')}</h3>
+        <p>{$_('extensions.welcome.principles.transparency.description')}</p>
       </div>
       
       <div class="value-item">
         <div class="value-number">02</div>
-        <h3>Efficiency</h3>
-        <p>Efficiency involves delivering services effectively while minimizing costs and reducing waste. This fosters a strong sense of fairness, reinforcing public confidence in the governance system. As a result, users are more likely to support and comply with tax obligations, reducing tax evasion and promoting greater civic responsibility.</p>
+        <h3>{$_('extensions.welcome.principles.efficiency.title')}</h3>
+        <p>{$_('extensions.welcome.principles.efficiency.description')}</p>
       </div>
       
       <div class="value-item">
         <div class="value-number">03</div>
-        <h3>Diversity</h3>
-        <p>Diversity in governance ensures that a wide range of perspectives are represented. This leads to more inclusive and equitable policies that cater to different societal needs, fostering social cohesion and reducing marginalization.</p>
+        <h3>{$_('extensions.welcome.principles.diversity.title')}</h3>
+        <p>{$_('extensions.welcome.principles.diversity.description')}</p>
       </div>
       
       <div class="value-item">
         <div class="value-number">04</div>
-        <h3>Resilience</h3>
-        <p>Resilience enables governance systems to respond to crises, adapt to changes, and recover from setbacks, such as economic shocks or natural disasters. A resilient governance system ensures stability and continuity, even in times of stress, protecting long-term societal wellbeing.</p>
+        <h3>{$_('extensions.welcome.principles.resilience.title')}</h3>
+        <p>{$_('extensions.welcome.principles.resilience.description')}</p>
       </div>
     </div>
   </div>
