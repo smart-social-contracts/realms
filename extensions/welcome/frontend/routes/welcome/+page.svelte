@@ -161,10 +161,32 @@
     flex-direction: column;
     align-items: center;
   }
+  
+  /* Desktop layout - content on the right */
+  @media (min-width: 768px) {
+    .content {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 50%;
+      max-width: 600px;
+      padding: 3rem;
+      align-items: flex-start;
+      text-align: left;
+    }
+  }
 
   .hero-text {
     text-align: center;
     margin-bottom: 2rem;
+  }
+  
+  /* Desktop hero text alignment */
+  @media (min-width: 768px) {
+    .hero-text {
+      text-align: left;
+    }
   }
   
   h1 {
