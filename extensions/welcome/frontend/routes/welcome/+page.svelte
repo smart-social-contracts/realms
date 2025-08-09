@@ -80,9 +80,9 @@
   <div class="content">
     <div class="hero-text">
       <h1>Realms GOS - The Governance Operating System</h1>
+      <p class="hero-subtitle">• Launch a full public administration in seconds.</p>
       <p class="hero-subtitle">• Fully auditable. Fully transparent. AI-powered.</p>
       <p class="hero-subtitle">• Engineered to eliminate corruption and inefficiencies.</p>
-      <!-- <p class="hero-subtitle">Create a complete ready-to-use public administration in seconds.</p> -->
     </div>
     
     <div class="button-container">
@@ -290,7 +290,7 @@
   }
   
   h1 {
-    font-size: 2.8rem;
+    font-size: 2.2rem;
     margin-bottom: 1.5rem;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
     line-height: 1.2;
@@ -298,7 +298,7 @@
   }
   
   .hero-subtitle {
-    font-size: 1.3rem;
+    font-size: 1.1rem;
     margin-bottom: 0.5rem;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
     font-weight: 400;
@@ -312,6 +312,14 @@
     margin-top: 1rem;
     width: 100%;
     max-width: 300px;
+  }
+
+  /* Center button in desktop view */
+  @media (min-width: 768px) {
+    .button-container {
+      align-self: center;
+      align-items: center;
+    }
   }
   
   .btn {
