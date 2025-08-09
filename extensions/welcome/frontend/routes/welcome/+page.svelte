@@ -74,7 +74,7 @@
   
   <!-- Realms logo in top left corner -->
   <div class="realms-logo">
-    <img src="/images/logo_black_horizontal.png" alt="Realms Logo" class="logo-img" />
+    <img src="/images/logo_horizontal.png" alt="Realms Logo" class="logo-img" />
   </div>
 
   <div class="content">
@@ -425,6 +425,7 @@
   .mission-section {
     display: flex;
     align-items: center;
+    justify-content: center;
     min-height: 60vh;
     padding: 4rem 2rem;
     background-color: #f8f9fa;
@@ -433,7 +434,8 @@
   
   .mission-content {
     flex: 1;
-    max-width: 600px;
+    max-width: 100%;
+    text-align: center;
   }
   
   .mission-content h2 {
