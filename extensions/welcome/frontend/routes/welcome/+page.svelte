@@ -104,19 +104,21 @@
 <!-- Our Mission Section -->
 <section class="mission-section">
   <div class="mission-content">
-    <h2>Our mission</h2>
-    <p>We are the Open Governance Foundation, a Switzerland-based non-profit dedicated to promote the development of decentralized technology to create transparent, efficient, and innovative governance systems, fostering better governance practices worldwide.</p>
-    <button class="read-more-btn">Read More</button>
-  </div>
-  <div class="mission-image">
-    <!-- Placeholder for image -->
-  </div>
+    <h2>Governance as It Should Be</h2>
+    <p>
+      <b>Realms</b> is a decentralized software platform for public administration — 
+      a Governance Operating System (GOS) designed to deliver essential public 
+      services such as justice, social welfare, property registries, and more. 
+      From small towns to entire nations, it empowers communities to design, run, 
+      and evolve their own governance systems — free from the corruption and 
+      inefficiencies of traditional bureaucracy.
+    </p>
 </section>
 
-<!-- Our Founding Values Section -->
+<!-- Design principles Section -->
 <section class="values-section">
   <div class="values-container">
-    <h2>Our founding values</h2>
+    <h2>Design principles</h2>
     
     <div class="values-grid">
       <div class="value-item">
