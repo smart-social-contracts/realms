@@ -552,8 +552,11 @@ def update_extension_imports(extension_id, action="add"):
     imports_file = os.path.join(paths["backend_dir"], "extension_packages", "extension_imports.py")
     
     if not os.path.exists(imports_file):
-        log_error(f"Extension imports file not found: {imports_file}")
-        return False
+        # Create the extension_imports.py file if it doesn't exist
+        os.makedirs(os.path.dirname(imports_file), exist_ok=True)
+        with open(imports_file, "w") as f:
+            f.write("")
+        log_info(f"Created extension imports file: {imports_file}")
     
     with open(imports_file, "r") as f:
         content = f.read()
