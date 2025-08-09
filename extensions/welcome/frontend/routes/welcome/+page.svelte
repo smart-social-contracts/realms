@@ -63,6 +63,14 @@
       </a>
     </div>
   </div>
+  
+  <!-- Scroll indicator -->
+  <div class="scroll-indicator">
+    <div class="scroll-text">Scroll to learn more</div>
+    <div class="scroll-arrow">
+      <div class="arrow-down"></div>
+    </div>
+  </div>
 </div>
 
 <style>
@@ -156,6 +164,67 @@
     border-color: rgba(255, 255, 255, 0.8);
     transform: translateY(-2px);
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  }
+  
+  /* Scroll indicator styles */
+  .scroll-indicator {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    z-index: 2;
+    animation: fadeInUp 2s ease-out 1s both;
+  }
+  
+  .scroll-text {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.9rem;
+    font-weight: 400;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+    letter-spacing: 0.5px;
+  }
+  
+  .scroll-arrow {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    animation: bounce 2s infinite;
+  }
+  
+  .arrow-down {
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 12px solid rgba(255, 255, 255, 0.8);
+    filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.5));
+  }
+  
+  @keyframes bounce {
+    0%, 20%, 50%, 80%, 100% {
+      transform: translateY(0);
+    }
+    40% {
+      transform: translateY(-8px);
+    }
+    60% {
+      transform: translateY(-4px);
+    }
+  }
+  
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
   }
   
   /* For mobile screens */
