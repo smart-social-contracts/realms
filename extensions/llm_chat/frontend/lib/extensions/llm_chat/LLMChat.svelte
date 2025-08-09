@@ -35,6 +35,8 @@
 	let realmData: any = null;
 	let isLoadingRealmData = false;
 	let userPrincipal = $principal || '';
+	let suggestions: string[] = [];
+	let isLoadingSuggestions = false;
 	
 	// LLM API configuration
 
@@ -65,17 +67,21 @@
 	
 	// Determine API URL based on environment
 	let API_URL = '';
+	let SUGGESTIONS_API_URL = '';
 	
 	// Initialize API URL
 	const initializeApiUrl = async () => {
 		if (isLocalhost) {
 			API_URL = "http://localhost:5000/api/ask";
+			SUGGESTIONS_API_URL = "http://localhost:5000/suggestions";
 		} else {
 			// Fetch production server host dynamically
 			const serverHost = await fetchServerHost();
 			API_URL = `${serverHost}api/ask`;
+			SUGGESTIONS_API_URL = `${serverHost}suggestions`;
 		}
 		console.log("API_URL set to:", API_URL);
+		console.log("SUGGESTIONS_API_URL set to:", SUGGESTIONS_API_URL);
 	};
 	
 	// Get the canister ID dynamically
@@ -113,6 +119,9 @@
 		
 		// Initialize API URL
 		await initializeApiUrl();
+		
+		// Fetch initial suggestions
+		await fetchSuggestions();
 	});
 
 	// Auto-scroll to bottom of messages when content changes
@@ -130,6 +139,39 @@
 	function scrollToBottom() {
 		if (messagesContainer) {
 			messagesContainer.scrollTop = messagesContainer.scrollHeight;
+		}
+	}
+
+	// Function to fetch suggestions from API
+	async function fetchSuggestions(): Promise<void> {
+		if (isLoadingSuggestions || !SUGGESTIONS_API_URL) return;
+		
+		isLoadingSuggestions = true;
+		try {
+			console.log("Fetching suggestions from:", SUGGESTIONS_API_URL);
+			const response = await fetch(SUGGESTIONS_API_URL, {
+				method: 'GET',
+				headers: {
+					'Content-Type': 'application/json'
+				}
+			});
+			
+			if (!response.ok) {
+				throw new Error(`HTTP error! Status: ${response.status}`);
+			}
+			
+			const data = await response.json();
+			if (data.suggestions && Array.isArray(data.suggestions)) {
+				suggestions = data.suggestions;
+				console.log("Fetched suggestions:", suggestions);
+			} else {
+				console.warn("Invalid suggestions response format:", data);
+			}
+		} catch (err) {
+			console.error("Error fetching suggestions:", err);
+			// Keep existing suggestions on error
+		} finally {
+			isLoadingSuggestions = false;
 		}
 	}
 
@@ -248,6 +290,9 @@
 					messages = [...messages, { text: "No response from LLM", isUser: false }];
 				}
 			}
+			
+			// Fetch new suggestions after successful response
+			await fetchSuggestions();
 
 		} catch (err) {
 			console.error("Error calling LLM:", err);
@@ -367,6 +412,22 @@
 				<!-- Question Suggestions -->
 				<div class="mb-3 px-1">
 					<div class="flex flex-wrap gap-2 justify-center">
+					{#if isLoadingSuggestions}
+						<div class="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+							<Spinner size="4" />
+							<span class="text-xs">Loading suggestions...</span>
+						</div>
+					{:else if suggestions.length > 0}
+						{#each suggestions as suggestion}
+							<button
+								class="px-3 py-1.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors duration-200 whitespace-nowrap"
+								on:click={() => handleSuggestionClick(suggestion)}
+							>
+								{suggestion}
+							</button>
+						{/each}
+					{:else}
+						<!-- Fallback to static suggestions if dynamic ones fail -->
 						<button
 							class="px-3 py-1.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors duration-200 whitespace-nowrap"
 							on:click={() => handleSuggestionClick($_('extensions.llm_chat.suggestion_1'))}
@@ -385,7 +446,8 @@
 						>
 							<SafeText key="extensions.llm_chat.suggestion_3" spinnerSize="xs" />
 						</button>
-					</div>
+					{/if}
+				</div>
 				</div>
 				
 				<!-- Message input -->
