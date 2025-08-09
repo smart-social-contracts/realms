@@ -80,9 +80,9 @@
   <div class="content">
     <div class="hero-text">
       <h1>Realms GOS - The Governance Operating System</h1>
-      <p class="hero-subtitle">• Launch a full public administration in seconds.</p>
-      <p class="hero-subtitle">• Fully auditable. Fully transparent. AI-powered.</p>
-      <p class="hero-subtitle">• Engineered to eliminate corruption and inefficiencies.</p>
+      <p class="hero-subtitle">• Launch a full public administration in seconds</p>
+      <p class="hero-subtitle">• Fully auditable. Fully transparent. AI-powered</p>
+      <p class="hero-subtitle">• Engineered to eliminate corruption and inefficiencies</p>
     </div>
     
     <div class="button-container">
