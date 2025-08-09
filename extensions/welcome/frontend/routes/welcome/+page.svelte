@@ -54,17 +54,14 @@
   <div class="content">
     <div class="hero-text">
       <h1>Discover Realms GOS — The Governance Operating System</h1>
-      <p class="hero-subtitle">Create a complete public administration in seconds.</p>
       <p class="hero-subtitle">Fully auditable. Fully transparent. AI-powered.</p>
       <p class="hero-subtitle">Engineered to eliminate corruption and inefficiencies.</p>
+      <p class="hero-subtitle">Create a complete ready-to-use public administration in seconds.</p>
     </div>
     
     <div class="button-container">
-      <a href="/app-sidebar/citizen" class="btn btn-member">
-        Access as a Member
-      </a>
       <a href="/app/visitor" class="btn btn-visitor">
-        Access as a Visitor
+        Try the sandbox
       </a>
     </div>
   </div>
