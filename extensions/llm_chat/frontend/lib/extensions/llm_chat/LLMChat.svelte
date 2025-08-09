@@ -148,8 +148,15 @@
 		
 		isLoadingSuggestions = true;
 		try {
-			console.log("Fetching suggestions from:", SUGGESTIONS_API_URL);
-			const response = await fetch(SUGGESTIONS_API_URL, {
+			// Build URL with query parameters for contextual suggestions
+			const params = new URLSearchParams({
+				user_principal: userPrincipal || '',
+				realm_principal: REALM_CANISTER_ID || ''
+			});
+			const urlWithParams = `${SUGGESTIONS_API_URL}?${params.toString()}`;
+			
+			console.log("Fetching suggestions from:", urlWithParams);
+			const response = await fetch(urlWithParams, {
 				method: 'GET',
 				headers: {
 					'Content-Type': 'application/json'
@@ -163,7 +170,7 @@
 			const data = await response.json();
 			if (data.suggestions && Array.isArray(data.suggestions)) {
 				suggestions = data.suggestions;
-				console.log("Fetched suggestions:", suggestions);
+				console.log("Fetched contextual suggestions:", suggestions);
 			} else {
 				console.warn("Invalid suggestions response format:", data);
 			}
