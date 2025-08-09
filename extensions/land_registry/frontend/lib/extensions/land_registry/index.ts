@@ -19,5 +19,6 @@ export const metadata = {
     version: '1.0.0',
     icon: 'map',
     author: 'Smart Social Contracts Team',
-    permissions: ['manage_land', 'view_land_registry']
+    permissions: ['manage_land', 'view_land_registry'],
+    profiles: ['member', 'admin']
 };
