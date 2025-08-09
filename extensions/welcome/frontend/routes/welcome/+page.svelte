@@ -7,8 +7,8 @@
   
   // Available photos
   const photos = [
-    '/photos/lucerne1.jpg',
-    '/photos/zurich1.jpg'
+    '/photos/Luzern.jpg',
+    '/photos/Zürich.jpg'
   ];
   
   // Check for mobile viewport and setup photo carousel
@@ -58,9 +58,13 @@
       {photos[currentPhotoIndex].split('/').pop().replace('.jpg', '')}
     </div>
     
-    <!-- Built with love text -->
+    <!-- "Built with" text -->
     <div class="built-with-love">
-      Built with ❤️ from 🇨🇭
+      <a href="https://internetcomputer.org" target="_blank" rel="noopener noreferrer" class="built-with-link">
+        Built on the 
+        <img src="/images/internet-computer-icp-logo.svg" alt="Internet Computer Logo" width="20" height="20" class="inline-logo" />
+        with ❤️ from 🇨🇭
+      </a>
     </div>
   {/if}
   
@@ -69,7 +73,7 @@
       <h1>Discover Realms GOS — The Governance A Operating System</h1>
       <p class="hero-subtitle">Fully auditable. Fully transparent. AI-powered.</p>
       <p class="hero-subtitle">Engineered to eliminate corruption and inefficiencies.</p>
-      <p class="hero-subtitle">Create a complete ready-to-use public administration in seconds.</p>
+      <!-- <p class="hero-subtitle">Create a complete ready-to-use public administration in seconds.</p> -->
     </div>
     
     <div class="button-container">
