@@ -8,9 +8,12 @@
   
   // Available photos
   const photos = [
-    '/photos/Luzern.jpg',
-    '/photos/Zürich.jpg'
-  ];
+    '/photos/Sucre, Bolivia.jpg',
+    '/photos/Bönigen, Switzerland.jpg',
+    '/photos/Hoi An, Vietnam.jpg',
+    '/photos/Varanasi, India.jpg', 
+    '/photos/Requena, Spain.jpg'
+   ];
   
   // Check for mobile viewport and setup photo carousel
   onMount(() => {
