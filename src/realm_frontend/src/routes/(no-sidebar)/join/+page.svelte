@@ -95,8 +95,8 @@
     {#if success}
       <Card class="p-8 text-center">
         <h2 class="text-xl font-bold text-green-600">Successfully Joined!</h2>
-        <p class="mt-2">You have successfully joined the realm.</p>
-        <Button href="/" class="mt-4" color="green">Go to Dashboard</Button>
+        <p class="mt-2 mb-4">You have successfully joined the realm.</p>
+        <Button href="/" class="mt-4 w-full" color="green">Go to Dashboard</Button>
       </Card>
     {:else}
       <Card class="p-8">
@@ -163,7 +163,7 @@
           <div>
             {#if loading}
               <Button type="button" color="alternative" class="w-full flex justify-center items-center gap-2" disabled>
-                <Spinner size="sm" color="blue" />
+                <Spinner size="4" color="blue" />
                 Joining...
               </Button>
             {:else}
