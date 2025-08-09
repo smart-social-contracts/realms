@@ -12,6 +12,7 @@ export const metadata = {
   icon: UserCircleOutline,
   author: "Smart Social Contracts",
   permissions: ["read"],
+  profiles: ["member", "admin"],
   subComponents: {
     ServicesList,
     TaxInformation,

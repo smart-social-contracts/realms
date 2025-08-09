@@ -9,5 +9,6 @@ export const metadata = {
     version: '0.1.0',
     icon: 'chat',
     author: 'Smart Social Contracts Team',
-    permissions: []
-}; 
+    permissions: [],
+    profiles: []
+};   

@@ -18,5 +18,6 @@ export const metadata = {
     version: '1.0.0',
     icon: 'wallet',
     author: 'Smart Social Contracts Team',
-    permissions: ['read_vault', 'transfer_tokens']
+    permissions: ['read_vault', 'transfer_tokens'],
+    profiles: ['admin']
 };

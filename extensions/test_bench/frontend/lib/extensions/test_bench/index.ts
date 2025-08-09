@@ -9,5 +9,6 @@ export const metadata = {
     version: '0.1.0',
     icon: 'clipboard',
     author: 'Smart Social Contracts Team',
-    permissions: ['read_vault', 'transfer_tokens']
+    permissions: ['read_vault', 'transfer_tokens'],
+    profiles: ['admin']
 };

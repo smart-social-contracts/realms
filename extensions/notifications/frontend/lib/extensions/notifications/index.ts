@@ -7,5 +7,6 @@ export const metadata = {
     version: '1.0.0',
     icon: 'bell',
     author: 'Smart Social Contracts Team',
-    permissions: ['read_notifications']
+    permissions: ['read_notifications'],
+    profiles: ['member', 'admin']
 };
