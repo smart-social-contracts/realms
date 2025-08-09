@@ -8,7 +8,7 @@ export default defineConfig({
 	workers: process.env.CI ? 1 : undefined,
 	reporter: 'html',
 	use: {
-		baseURL: 'http://umunu-kh777-77774-qaaca-cai.localhost:8000',
+		baseURL: 'http://localhost:5173',
 		trace: 'on-first-retry',
 		headless: true,
 	},

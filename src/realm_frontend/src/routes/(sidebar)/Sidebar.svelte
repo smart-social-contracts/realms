@@ -110,10 +110,9 @@
 
 	// Get all extensions for the sidebar
 	const extensions = getAllExtensions();
-	console.log('Extensions loaded with profiles:', extensions.map(ext => ({ id: ext.id, profiles: ext.profiles })));
 	
 	// Filter extensions based on their manifest profiles and enabled status
-	function filterExtensionsForSidebar(extensions: ExtensionMetadata[]): ExtensionMetadata[] {
+	function filterExtensionsForSidebar(extensions: ExtensionMetadata[], userProfiles: string[]): ExtensionMetadata[] {
 		return extensions.filter(ext => {
 			// Skip if extension is not enabled
 			if (ext.enabled === false) return false;
@@ -124,7 +123,7 @@
 			}
 			
 			// Check if current user has any of the profiles required by the extension
-			return ext.profiles.some((profile: string) => $userProfiles.includes(profile));
+			return ext.profiles.some((profile: string) => userProfiles.includes(profile));
 		});
 	}
 
@@ -150,11 +149,8 @@
 	});
 
 	// Filter extensions based on user profiles and create menu items
-	$: {
-		console.log('Reactive filtering triggered. userProfiles:', $userProfiles);
-		filteredExtensions = filterExtensionsForSidebar(extensions);
-		console.log('Filtered extensions:', filteredExtensions.map(ext => ext.id));
-	}
+	let filteredExtensions: ExtensionMetadata[] = [];
+	$: filteredExtensions = filterExtensionsForSidebar(extensions, $userProfiles);
 
 	// Group extensions by categories
 	$: extensionsByCategory = (() => {
