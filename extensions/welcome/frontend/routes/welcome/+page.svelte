@@ -3,9 +3,15 @@
   import { browser } from '$app/environment';
   
   let isMobile = false;
-  let videoElement;
+  let currentPhotoIndex = 0;
   
-  // Check for mobile viewport on client-side only
+  // Available photos
+  const photos = [
+    '/photos/lucerne1.jpg',
+    '/photos/zurich1.jpg'
+  ];
+  
+  // Check for mobile viewport and setup photo carousel
   onMount(() => {
     if (browser) {
       const checkMobile = () => {
@@ -18,14 +24,15 @@
       // Add resize listener
       window.addEventListener('resize', checkMobile);
       
-      // Apply slow motion effect
-      if (videoElement) {
-        videoElement.playbackRate = 0.3; // Slow motion effect (30% of normal speed)
-      }
+      // Setup photo carousel - change every 5 seconds
+      const photoInterval = setInterval(() => {
+        currentPhotoIndex = (currentPhotoIndex + 1) % photos.length;
+      }, 5000);
       
       // Cleanup
       return () => {
         window.removeEventListener('resize', checkMobile);
+        clearInterval(photoInterval);
       };
     }
   });
@@ -37,23 +44,21 @@
 
 <div class="welcome-container">
   {#if browser}
-    <video 
-      bind:this={videoElement}
-      autoplay 
-      muted 
-      loop 
-      playsinline
-      class="background-video"
-      src={isMobile ? '/videos/video_vertical.mp4' : '/videos/video_horizontal.mp4'}
-    >
-      <track kind="captions">
-    </video>
-    <div class="video-overlay"></div>
+    <div class="background-photo-container">
+      {#each photos as photo, index}
+        <img
+          src={photo}
+          alt="Background {index + 1}"
+          class="background-photo {index === currentPhotoIndex ? 'active' : ''}"
+        />
+      {/each}
+    </div>
+    <div class="photo-overlay"></div>
   {/if}
   
   <div class="content">
     <div class="hero-text">
-      <h1>Discover Realms GOS — The Governance Operating System</h1>
+      <h1>Discover Realms GOS — The Governance A Operating System</h1>
       <p class="hero-subtitle">Fully auditable. Fully transparent. AI-powered.</p>
       <p class="hero-subtitle">Engineered to eliminate corruption and inefficiencies.</p>
       <p class="hero-subtitle">Create a complete ready-to-use public administration in seconds.</p>
@@ -131,17 +136,31 @@
     justify-content: center;
   }
 
-  .background-video {
+  .background-photo-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2;
+  }
+  
+  .background-photo {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
-    z-index: -2;
+    opacity: 0;
+    transition: opacity 1s ease-in-out;
   }
   
-  .video-overlay {
+  .background-photo.active {
+    opacity: 1;
+  }
+  
+  .photo-overlay {
     position: absolute;
     top: 0;
     left: 0;
