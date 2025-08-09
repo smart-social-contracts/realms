@@ -201,6 +201,25 @@
     border-radius: 4px;
     backdrop-filter: blur(4px);
   }
+  
+  .built-with-link {
+    color: white;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+  }
+  
+  .built-with-link:hover {
+    color: rgba(255, 255, 255, 0.8);
+    text-decoration: none;
+  }
+  
+  .inline-logo {
+    display: inline-block;
+    vertical-align: middle;
+    margin: 0 0.2rem;
+  }
 
   .content {
     position: relative;
