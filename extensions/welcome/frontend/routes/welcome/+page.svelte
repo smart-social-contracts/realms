@@ -52,7 +52,12 @@
   {/if}
   
   <div class="content">
-    <h1>Welcome</h1>
+    <div class="hero-text">
+      <h1>Discover Realms GOS — The Governance Operating System</h1>
+      <p class="hero-subtitle">Create a complete public administration in seconds.</p>
+      <p class="hero-subtitle">Fully auditable. Fully transparent. AI-powered.</p>
+      <p class="hero-subtitle">Engineered to eliminate corruption and inefficiencies.</p>
+    </div>
     
     <div class="button-container">
       <a href="/app-sidebar/citizen" class="btn btn-member">
@@ -160,10 +165,25 @@
     align-items: center;
   }
 
-  h1 {
-    font-size: 3rem;
+  .hero-text {
+    text-align: center;
     margin-bottom: 2rem;
+  }
+  
+  h1 {
+    font-size: 2.8rem;
+    margin-bottom: 1.5rem;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    line-height: 1.2;
+    font-weight: 600;
+  }
+  
+  .hero-subtitle {
+    font-size: 1.3rem;
+    margin-bottom: 0.5rem;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+    font-weight: 400;
+    opacity: 0.95;
   }
   
   .button-container {
@@ -380,7 +400,16 @@
   /* For mobile screens */
   @media (max-width: 767px) {
     h1 {
-      font-size: 2rem;
+      font-size: 1.8rem;
+      margin-bottom: 1rem;
+    }
+    
+    .hero-subtitle {
+      font-size: 1.1rem;
+      margin-bottom: 0.4rem;
+    }
+    
+    .hero-text {
       margin-bottom: 1.5rem;
     }
     
