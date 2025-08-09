@@ -86,7 +86,7 @@
     </div>
     
     <div class="button-container">
-      <a href="/app/visitor" class="btn btn-visitor">
+      <a href="/" class="btn btn-visitor">
         Try the sandbox
       </a>
     </div>
