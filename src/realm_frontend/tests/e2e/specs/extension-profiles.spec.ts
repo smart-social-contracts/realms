@@ -13,9 +13,18 @@ test.describe('Extension Profile Filtering', () => {
 	test('should show only public extensions when not logged in', async ({ page }) => {
 		test.setTimeout(TIMEOUT);
 		
+		page.on('console', msg => {
+			console.log('Browser console:', msg.text());
+		});
+		
 		await page.goto('/dashboard');
 		await page.waitForLoadState('networkidle');
 		await sidebarPage.waitForSidebarToLoad();
+		
+		const userProfilesState = await page.evaluate(() => {
+			return window.localStorage.getItem('userProfiles') || 'not found in localStorage';
+		});
+		console.log('userProfiles in localStorage:', userProfilesState);
 		
 		const sidebarLinks = await page.locator('nav a').allTextContents();
 		console.log('Sidebar links found when not logged in:', sidebarLinks);
