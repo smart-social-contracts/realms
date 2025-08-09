@@ -174,6 +174,10 @@
       padding: 3rem;
       align-items: flex-start;
       text-align: left;
+      background-color: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
+      border-radius: 12px;
+      margin-right: 2rem;
     }
   }
 
