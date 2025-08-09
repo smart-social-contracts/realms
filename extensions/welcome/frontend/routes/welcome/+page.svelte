@@ -70,7 +70,7 @@
   
   <div class="content">
     <div class="hero-text">
-      <h1>Discover Realms GOS — The Governance A Operating System</h1>
+      <h1>Realms GOS - The Governance Operating System</h1>
       <p class="hero-subtitle">Fully auditable. Fully transparent. AI-powered.</p>
       <p class="hero-subtitle">Engineered to eliminate corruption and inefficiencies.</p>
       <!-- <p class="hero-subtitle">Create a complete ready-to-use public administration in seconds.</p> -->
@@ -516,6 +516,25 @@
     
     .btn {
       padding: 0.8rem 1.2rem;
+    }
+    
+    /* Adjust positioning for mobile to avoid overlap */
+    .built-with-love {
+      bottom: 4rem; /* Move higher to avoid arrow overlap */
+      right: 0.5rem;
+      font-size: 0.8rem;
+      padding: 0.4rem 0.6rem;
+    }
+    
+    .photo-info {
+      bottom: 4rem; /* Move higher to match built-with text */
+      left: 0.5rem;
+      font-size: 0.8rem;
+      padding: 0.4rem 0.6rem;
+    }
+    
+    .scroll-indicator {
+      bottom: 1rem; /* Keep arrow at bottom */
     }
     
     /* Mission section mobile */
