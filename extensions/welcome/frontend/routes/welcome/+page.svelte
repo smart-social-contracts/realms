@@ -60,7 +60,7 @@
     
     <!-- Built with love text -->
     <div class="built-with-love">
-      Built with love from Switzerland
+      Built with ❤️ from 🇨🇭
     </div>
   {/if}
   
@@ -81,7 +81,7 @@
   
   <!-- Scroll indicator -->
   <div class="scroll-indicator">
-    <div class="scroll-text">Scroll to learn more</div>
+    <!-- <div class="scroll-text">Scroll to learn more</div> -->
     <div class="scroll-arrow">
       <div class="arrow-down"></div>
     </div>
@@ -207,6 +207,10 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    border-radius: 12px;
+    margin: 2rem;
   }
   
   /* Desktop layout - content on the right */
