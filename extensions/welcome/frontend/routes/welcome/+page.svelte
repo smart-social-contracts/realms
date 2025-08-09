@@ -53,7 +53,15 @@
         />
       {/each}
     </div>
-    <div class="photo-overlay"></div>
+    <!-- Photo filename display -->
+    <div class="photo-info">
+      {photos[currentPhotoIndex].split('/').pop().replace('.jpg', '')}
+    </div>
+    
+    <!-- Built with love text -->
+    <div class="built-with-love">
+      Built with love from Switzerland
+    </div>
   {/if}
   
   <div class="content">
@@ -160,14 +168,34 @@
     opacity: 1;
   }
   
-  .photo-overlay {
+  .photo-info {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.7); /* Dark overlay */
-    z-index: -1;
+    bottom: 1rem;
+    left: 1rem;
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 400;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+    z-index: 1;
+    background-color: rgba(0, 0, 0, 0.3);
+    padding: 0.5rem 0.8rem;
+    border-radius: 4px;
+    backdrop-filter: blur(4px);
+  }
+  
+  .built-with-love {
+    position: absolute;
+    bottom: 1rem;
+    right: 1rem;
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 400;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+    z-index: 1;
+    background-color: rgba(0, 0, 0, 0.3);
+    padding: 0.5rem 0.8rem;
+    border-radius: 4px;
+    backdrop-filter: blur(4px);
   }
 
   .content {
