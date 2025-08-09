@@ -1,11 +1,21 @@
 <script>
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
+  import Footer from '$lib/../routes/(sidebar)/Footer.svelte';
   
   let isMobile = false;
-  let videoElement;
+  let currentPhotoIndex = 0;
   
-  // Check for mobile viewport on client-side only
+  // Available photos
+  const photos = [
+    '/photos/Sucre, Bolivia.jpg',
+    '/photos/Bönigen, Switzerland.jpg',
+    '/photos/Hoi An, Vietnam.jpg',
+    '/photos/Varanasi, India.jpg', 
+    '/photos/Requena, Spain.jpg'
+   ];
+  
+  // Check for mobile viewport and setup photo carousel
   onMount(() => {
     if (browser) {
       const checkMobile = () => {
@@ -18,14 +28,15 @@
       // Add resize listener
       window.addEventListener('resize', checkMobile);
       
-      // Apply slow motion effect
-      if (videoElement) {
-        videoElement.playbackRate = 0.3; // Slow motion effect (30% of normal speed)
-      }
+      // Setup photo carousel - change every 5 seconds
+      const photoInterval = setInterval(() => {
+        currentPhotoIndex = (currentPhotoIndex + 1) % photos.length;
+      }, 5000);
       
       // Cleanup
       return () => {
         window.removeEventListener('resize', checkMobile);
+        clearInterval(photoInterval);
       };
     }
   });
@@ -37,33 +48,108 @@
 
 <div class="welcome-container">
   {#if browser}
-    <video 
-      bind:this={videoElement}
-      autoplay 
-      muted 
-      loop 
-      playsinline
-      class="background-video"
-      src={isMobile ? '/videos/video_vertical.mp4' : '/videos/video_horizontal.mp4'}
-    >
-      <track kind="captions">
-    </video>
-    <div class="video-overlay"></div>
+    <div class="background-photo-container">
+      {#each photos as photo, index}
+        <img
+          src={photo}
+          alt="Background {index + 1}"
+          class="background-photo {index === currentPhotoIndex ? 'active' : ''}"
+        />
+      {/each}
+    </div>
+    <!-- Photo filename display -->
+    <div class="photo-info">
+      {photos[currentPhotoIndex].split('/').pop().replace('.jpg', '')}
+    </div>
+    
+    <!-- "Built with" text -->
+    <div class="built-with-love">
+      <a href="https://internetcomputer.org" target="_blank" rel="noopener noreferrer" class="built-with-link">
+        Built on the 
+        <img src="/images/internet-computer-icp-logo.svg" alt="Internet Computer Logo" width="20" height="20" class="inline-logo" />
+        with ❤️ from 🇨🇭
+      </a>
+    </div>
   {/if}
   
+  <!-- Realms logo in top left corner -->
+  <div class="realms-logo">
+    <img src="/images/logo_horizontal.png" alt="Realms Logo" class="logo-img" />
+  </div>
+
   <div class="content">
-    <h1>Welcome</h1>
+    <div class="hero-text">
+      <h1>Realms GOS - The Governance Operating System</h1>
+      <p class="hero-subtitle">• Launch a full public administration in seconds</p>
+      <p class="hero-subtitle">• Fully auditable. Fully transparent. AI-powered</p>
+      <p class="hero-subtitle">• Engineered to eliminate corruption and inefficiencies</p>
+    </div>
     
     <div class="button-container">
-      <a href="/app-sidebar/citizen" class="btn btn-member">
-        Access as a Member
-      </a>
-      <a href="/app/visitor" class="btn btn-visitor">
-        Access as a Visitor
+      <a href="/" class="btn btn-visitor">
+        Try the sandbox
       </a>
     </div>
   </div>
+  
+  <!-- Scroll indicator -->
+  <div class="scroll-indicator">
+    <!-- <div class="scroll-text">Scroll to learn more</div> -->
+    <div class="scroll-arrow">
+      <div class="arrow-down"></div>
+    </div>
+  </div>
 </div>
+
+<!-- Our Mission Section -->
+<section class="mission-section">
+  <div class="mission-content">
+    <h2>Governance as It Should Be</h2>
+    <p>
+      <b>Realms</b> is a decentralized software platform for public administration — 
+      a Governance Operating System (GOS) designed to deliver essential public 
+      services such as justice, social welfare, property registries, and more. 
+      From small towns to entire nations, it empowers communities to design, run, 
+      and evolve their own governance systems — free from the corruption and 
+      inefficiencies of traditional bureaucracy.
+    </p>
+</section>
+
+<!-- Design principles Section -->
+<section class="values-section">
+  <div class="values-container">
+    <h2>Design principles</h2>
+    
+    <div class="values-grid">
+      <div class="value-item">
+        <div class="value-number">01</div>
+        <h3>Transparency</h3>
+        <p>Transparency builds trust between the government and the public, as users can see how processes are executed and where resources, such as tax money, are allocated. Transparency also helps prevent corruption and strengthens the legitimacy of institutions.</p>
+      </div>
+      
+      <div class="value-item">
+        <div class="value-number">02</div>
+        <h3>Efficiency</h3>
+        <p>Efficiency involves delivering services effectively while minimizing costs and reducing waste. This fosters a strong sense of fairness, reinforcing public confidence in the governance system. As a result, users are more likely to support and comply with tax obligations, reducing tax evasion and promoting greater civic responsibility.</p>
+      </div>
+      
+      <div class="value-item">
+        <div class="value-number">03</div>
+        <h3>Diversity</h3>
+        <p>Diversity in governance ensures that a wide range of perspectives are represented. This leads to more inclusive and equitable policies that cater to different societal needs, fostering social cohesion and reducing marginalization.</p>
+      </div>
+      
+      <div class="value-item">
+        <div class="value-number">04</div>
+        <h3>Resilience</h3>
+        <p>Resilience enables governance systems to respond to crises, adapt to changes, and recover from setbacks, such as economic shocks or natural disasters. A resilient governance system ensures stability and continuity, even in times of stress, protecting long-term societal wellbeing.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<Footer />
 
 <style>
   .welcome-container {
@@ -76,24 +162,87 @@
     justify-content: center;
   }
 
-  .background-video {
+  .background-photo-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2;
+  }
+  
+  .background-photo {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
-    z-index: -2;
+    opacity: 0;
+    transition: opacity 1s ease-in-out;
   }
   
-  .video-overlay {
+  .background-photo.active {
+    opacity: 1;
+  }
+  
+  .photo-info {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.7); /* Dark overlay */
-    z-index: -1;
+    bottom: 1rem;
+    left: 1rem;
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 400;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+    z-index: 1;
+    background-color: rgba(0, 0, 0, 0.3);
+    padding: 0.5rem 0.8rem;
+    border-radius: 4px;
+    backdrop-filter: blur(4px);
+  }
+  
+  .built-with-love {
+    position: absolute;
+    bottom: 4rem;
+    right: 1rem;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    border-radius: 8px;
+    padding: 0.5rem 0.8rem;
+    font-size: 0.9rem;
+    z-index: 20;
+  }
+
+  .built-with-link {
+    color: white;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  .built-with-link:hover {
+    color: rgba(255, 255, 255, 0.8);
+    text-decoration: none;
+  }
+  
+  .inline-logo {
+    display: inline-block;
+    vertical-align: middle;
+    margin: 0 0.2rem;
+  }
+
+  .realms-logo {
+    position: absolute;
+    top: 2rem;
+    left: 2rem;
+    z-index: 30;
+  }
+
+  .logo-img {
+    height: 40px;
+    width: auto;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
   }
 
   .content {
@@ -105,12 +254,57 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    border-radius: 12px;
+    margin: 2rem;
+  }
+  
+  /* Desktop layout - content on the right */
+  @media (min-width: 768px) {
+    .content {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 50%;
+      max-width: 600px;
+      padding: 3rem;
+      align-items: flex-start;
+      text-align: left;
+      background-color: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
+      border-radius: 12px;
+      margin-right: 2rem;
+    }
   }
 
-  h1 {
-    font-size: 3rem;
+  .hero-text {
+    text-align: center;
     margin-bottom: 2rem;
+  }
+  
+  /* Desktop hero text alignment */
+  @media (min-width: 768px) {
+    .hero-text {
+      text-align: left;
+    }
+  }
+  
+  h1 {
+    font-size: 2.2rem;
+    margin-bottom: 1.5rem;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    line-height: 1.2;
+    font-weight: 600;
+  }
+  
+  .hero-subtitle {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+    font-weight: 400;
+    opacity: 0.95;
   }
   
   .button-container {
@@ -120,6 +314,14 @@
     margin-top: 1rem;
     width: 100%;
     max-width: 300px;
+  }
+
+  /* Center button in desktop view */
+  @media (min-width: 768px) {
+    .button-container {
+      align-self: center;
+      align-items: center;
+    }
   }
   
   .btn {
@@ -158,10 +360,187 @@
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
   }
   
+  /* Scroll indicator styles */
+  .scroll-indicator {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    z-index: 2;
+    animation: fadeInUp 2s ease-out 1s both;
+  }
+  
+  .scroll-text {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.9rem;
+    font-weight: 400;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+    letter-spacing: 0.5px;
+  }
+  
+  .scroll-arrow {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    animation: bounce 2s infinite;
+  }
+  
+  .arrow-down {
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 12px solid rgba(255, 255, 255, 0.8);
+    filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.5));
+  }
+  
+  @keyframes bounce {
+    0%, 20%, 50%, 80%, 100% {
+      transform: translateY(0);
+    }
+    40% {
+      transform: translateY(-8px);
+    }
+    60% {
+      transform: translateY(-4px);
+    }
+  }
+  
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+  
+  /* Mission Section Styles */
+  .mission-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    padding: 4rem 2rem;
+    background-color: #f8f9fa;
+    gap: 4rem;
+  }
+  
+  .mission-content {
+    flex: 1;
+    max-width: 100%;
+    text-align: center;
+  }
+  
+  .mission-content h2 {
+    font-size: 2.5rem;
+    font-weight: 400;
+    color: #333;
+    margin-bottom: 2rem;
+    line-height: 1.2;
+  }
+  
+  .mission-content p {
+    font-size: 1.1rem;
+    line-height: 1.6;
+    color: #555;
+    margin-bottom: 2rem;
+  }
+  
+  .read-more-btn {
+    background-color: #333;
+    color: white;
+    border: none;
+    padding: 0.8rem 2rem;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .read-more-btn:hover {
+    background-color: #555;
+  }
+  
+  .mission-image {
+    flex: 1;
+    min-height: 300px;
+    background-color: #e9ecef;
+    border-radius: 8px;
+  }
+  
+  /* Values Section Styles */
+  .values-section {
+    padding: 5rem 2rem;
+    background-color: white;
+  }
+  
+  .values-container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .values-container h2 {
+    font-size: 2.5rem;
+    font-weight: 400;
+    color: #333;
+    text-align: center;
+    margin-bottom: 4rem;
+    line-height: 1.2;
+  }
+  
+  .values-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 3rem;
+  }
+  
+  .value-item {
+    padding: 2rem;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+  }
+  
+  .value-number {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #666;
+    margin-bottom: 1rem;
+  }
+  
+  .value-item h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 1rem;
+    line-height: 1.3;
+  }
+  
+  .value-item p {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: #555;
+  }
+  
   /* For mobile screens */
   @media (max-width: 767px) {
     h1 {
-      font-size: 2rem;
+      font-size: 1.8rem;
+      margin-bottom: 1rem;
+    }
+    
+    .hero-subtitle {
+      font-size: 1.1rem;
+      margin-bottom: 0.4rem;
+    }
+    
+    .hero-text {
       margin-bottom: 1.5rem;
     }
     
@@ -171,6 +550,77 @@
     
     .btn {
       padding: 0.8rem 1.2rem;
+    }
+    
+    /* Adjust positioning for mobile to avoid overlap */
+    .built-with-love {
+      bottom: 4rem; /* Move higher to avoid arrow overlap */
+      right: 0.5rem;
+      font-size: 0.8rem;
+      padding: 0.4rem 0.6rem;
+    }
+    
+    .photo-info {
+      bottom: 4rem; /* Move higher to match built-with text */
+      left: 0.5rem;
+      font-size: 0.8rem;
+      padding: 0.4rem 0.6rem;
+    }
+    
+    .scroll-indicator {
+      bottom: 1rem; /* Keep arrow at bottom */
+    }
+    
+    /* Mission section mobile */
+    .mission-section {
+      flex-direction: column;
+      padding: 3rem 1rem;
+      gap: 2rem;
+      min-height: auto;
+    }
+    
+    .mission-content h2 {
+      font-size: 2rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .mission-content p {
+      font-size: 1rem;
+    }
+    
+    .mission-image {
+      min-height: 200px;
+    }
+    
+    /* Values section mobile */
+    .values-section {
+      padding: 3rem 1rem;
+    }
+    
+    .values-container h2 {
+      font-size: 2rem;
+      margin-bottom: 3rem;
+    }
+    
+    .values-grid {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+    
+    .value-item {
+      padding: 1.5rem;
+    }
+    
+    .value-item h3 {
+      font-size: 1.3rem;
+    }
+    
+    .scroll-indicator {
+      bottom: 1rem;
+    }
+    
+    .scroll-text {
+      font-size: 0.8rem;
     }
   }
 </style>

@@ -282,7 +282,7 @@ def package_extension(extension_id, output_dir=None):
                         log_info(f"Added frontend/static/videos/{file}")
             
             # For other media files, try to be smarter about which ones to include
-            for static_dir in ["images", "fonts", extension_id]:
+            for static_dir in ["images", "fonts", "photos", extension_id]:
                 static_dir_path = os.path.join(static_path, static_dir)
                 if not os.path.exists(static_dir_path):
                     continue
@@ -466,7 +466,7 @@ def install_extension(package_path):
         else:
             log_info("No custom route files found in package")
             
-        for static_dir in ["videos", "images", "fonts", extension_id]:
+        for static_dir in ["videos", "images", "fonts", "photos", extension_id]:
             static_source = os.path.join(temp_dir, f"frontend/static/{static_dir}")
             if os.path.exists(static_source) and os.listdir(static_source):
                 static_target = os.path.join(paths["frontend_dir"], f"static/{static_dir}")
