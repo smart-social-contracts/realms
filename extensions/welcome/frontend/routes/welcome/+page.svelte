@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
+  import Footer from '$lib/../routes/(sidebar)/Footer.svelte';
   
   let isMobile = false;
   let currentPhotoIndex = 0;
@@ -141,6 +142,9 @@
     </div>
   </div>
 </section>
+
+<!-- Footer -->
+<Footer />
 
 <style>
   .welcome-container {
