@@ -50,19 +50,19 @@
 	// Function to fetch server host from remote config
 	async function fetchServerHost(): Promise<string> {
 			console.log("Fetching server host from remote config...");
-			const response = await fetch('https://raw.githubusercontent.com/smart-social-contracts/ashoka/refs/heads/main/production.env');
+			const response = await fetch('https://raw.githubusercontent.com/smart-social-contracts/ashoka/refs/heads/main/public.env');
 			const text = await response.text();
 			
-			// Parse SERVER_HOST from the environment file format
+			// Parse MAIN_SERVER_HOST from the environment file format
 			const lines = text.trim().split('\n');
 			for (const line of lines) {
-				if (line.startsWith('SERVER_HOST=')) {
+				if (line.startsWith('MAIN_SERVER_HOST=')) {
 					const serverHost = line.split('=')[1].trim();
-					console.log("Found SERVER_HOST in remote config:", serverHost);
+					console.log("Found MAIN_SERVER_HOST in remote config:", serverHost);
 					return serverHost;
 				}
 			}
-			throw new Error('SERVER_HOST not found in remote config');
+			throw new Error('MAIN_SERVER_HOST not found in remote config');
 	}
 	
 	// Determine API URL based on environment
