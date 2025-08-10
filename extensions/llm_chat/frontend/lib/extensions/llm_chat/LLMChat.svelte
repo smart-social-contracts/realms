@@ -334,26 +334,53 @@
 
 	// Auto-resize textarea based on content
 	function autoResizeTextarea(): void {
-		if (textareaElement) {
-			// Reset height to auto to get the correct scrollHeight
-			textareaElement.style.height = 'auto';
-			// Set height based on scrollHeight, with min and max limits
-			const minHeight = 44; // Approximately 1 line with padding
-			const maxHeight = 200; // Maximum height before scrolling
-			const newHeight = Math.min(Math.max(textareaElement.scrollHeight, minHeight), maxHeight);
-			textareaElement.style.height = `${newHeight}px`;
+		if (!textareaElement) return;
+		
+		// Reset height to calculate scrollHeight properly
+		textareaElement.style.height = 'auto';
+		
+		// Calculate new height
+		const minHeight = 44;
+		const maxHeight = 200;
+		const scrollHeight = textareaElement.scrollHeight;
+		const newHeight = Math.min(Math.max(scrollHeight, minHeight), maxHeight);
+		
+		// Apply the height
+		textareaElement.style.height = `${newHeight}px`;
+		
+		// Handle overflow
+		if (scrollHeight > maxHeight) {
+			textareaElement.style.overflowY = 'auto';
+		} else {
+			textareaElement.style.overflowY = 'hidden';
 		}
 	}
 
-	// Handle input changes to trigger auto-resize
-	function handleInput(): void {
+	// Handle input events with auto-resize
+	function handleInputWithResize(event: Event): void {
 		autoResizeTextarea();
 	}
 
-	// Handle textarea focus to ensure proper sizing
-	function handleFocus(): void {
-		autoResizeTextarea();
+	// Handle keydown events
+	function handleKeydownWithResize(event: KeyboardEvent): void {
+		if (event.key === 'Enter') {
+			if (event.shiftKey) {
+				// Shift+Enter: Allow new line and resize
+				setTimeout(() => autoResizeTextarea(), 0);
+			} else {
+				// Enter: Send message
+				event.preventDefault();
+				sendMessage();
+			}
+		}
 	}
+
+	// Initialize textarea size when mounted
+	onMount(() => {
+		if (textareaElement) {
+			autoResizeTextarea();
+		}
+	});
 </script>
 
 <div class="w-full h-full flex flex-col p-0 m-0 max-w-none">
@@ -504,17 +531,16 @@
 				
 				<!-- Message input -->
 				<div class="flex gap-2">
-					<Textarea
+					<textarea
 						bind:this={textareaElement}
-						class="flex-grow resize-none !px-5 !py-4 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white leading-relaxed transition-all duration-200"
+						class="flex-grow resize-none px-5 py-4 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white leading-relaxed transition-all duration-200 outline-none"
 						placeholder={$_('extensions.llm_chat.message_placeholder')}
-						rows="1"
-						style="min-height: 44px; max-height: 200px; overflow-y: auto;"
+						style="min-height: 44px; max-height: 200px; height: 44px; overflow-y: hidden; font-family: inherit; font-size: inherit;"
 						bind:value={newMessage}
-						on:keydown={handleKeydown}
-						on:input={handleInput}
-						on:focus={handleFocus}
-					/>
+						on:keydown={handleKeydownWithResize}
+						on:input={handleInputWithResize}
+						on:paste={handleInputWithResize}
+					></textarea>
 					<Button 
 						color="primary" 
 						class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 flex items-center justify-center min-w-[50px]"
