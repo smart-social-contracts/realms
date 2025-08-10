@@ -298,7 +298,10 @@
 				}
 			}
 			
-			// Fetch new suggestions after successful response
+			// Clear loading state immediately after response is complete
+			isLoading = false;
+			
+			// Fetch new suggestions after successful response (this can happen in background)
 			await fetchSuggestions();
 
 		} catch (err) {
