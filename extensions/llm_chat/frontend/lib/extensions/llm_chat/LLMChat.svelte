@@ -339,8 +339,8 @@
 		// Reset height to calculate scrollHeight properly
 		textareaElement.style.height = 'auto';
 		
-		// Calculate new height
-		const minHeight = 44;
+		// Calculate new height (single line with ultra-minimal padding)
+		const minHeight = 28; // Ultra-compact single line
 		const maxHeight = 200;
 		const scrollHeight = textareaElement.scrollHeight;
 		const newHeight = Math.min(Math.max(scrollHeight, minHeight), maxHeight);
@@ -533,9 +533,9 @@
 				<div class="flex gap-2">
 					<textarea
 						bind:this={textareaElement}
-						class="flex-grow resize-none px-5 py-4 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white leading-relaxed transition-all duration-200 outline-none"
+						class="flex-grow resize-none px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white leading-relaxed transition-all duration-200 outline-none"
 						placeholder={$_('extensions.llm_chat.message_placeholder')}
-						style="min-height: 44px; max-height: 200px; height: 44px; overflow-y: hidden; font-family: inherit; font-size: inherit;"
+						style="min-height: 28px; max-height: 200px; height: 28px; overflow-y: hidden; font-family: inherit; font-size: inherit; line-height: 1.2;"
 						bind:value={newMessage}
 						on:keydown={handleKeydownWithResize}
 						on:input={handleInputWithResize}
