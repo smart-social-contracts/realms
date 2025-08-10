@@ -4,6 +4,8 @@
   "sidebar": "AI Assistant",
   "title": "Governance AI assistant",
   "start_conversation": "Start a conversation with the LLM!",
+  "welcome_authenticated": "Welcome back! I'm your Governance AI Assistant, ready to help you navigate realm governance, answer questions about policies, and provide insights based on your realm's data. What would you like to discuss today?",
+  "welcome_visitor": "Welcome to the Governance AI Assistant! I'm here to help you understand how realms work, explore governance concepts, and answer questions about decentralized governance. Please note that as a visitor, I have limited access to realm-specific data. Consider joining this realm for a more personalized experience!",
   "message_placeholder": "Type your message...",
   "no_response": "No response from LLM",
   "error_response": "Failed to get response from LLM. Please try again.",
