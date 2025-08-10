@@ -337,12 +337,12 @@
 		<SafeText key="extensions.llm_chat.title" spinnerSize="sm" />
 	</h2>
 	
-	<div class="w-full flex-grow flex flex-col overflow-hidden">
+	<div class="w-full flex-grow flex flex-col overflow-hidden" style="height: calc(100vh - 120px);">
 		<Card class="w-full h-full flex-grow flex flex-col m-0 p-0 rounded-none border-0 max-w-none">
 			<div 
 				bind:this={messagesContainer}
 				class="flex-grow overflow-y-auto p-4 bg-gray-50 dark:bg-gray-800"
-				style="min-height: 200px; max-height: calc(100vh - 200px);"
+				style="min-height: 200px; flex: 1 1 auto;"
 			>
 				{#if messages.length === 0}
 					<div class="text-center text-gray-500 dark:text-gray-400 py-8">
@@ -436,7 +436,7 @@
 				{/if}
 			</div>
 			
-			<div class="flex flex-col p-2 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 sticky bottom-0">
+			<div class="flex flex-col p-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
 				<!-- Question Suggestions -->
 				<div class="mb-3 px-1">
 					<div class="flex flex-wrap gap-2 justify-center">
