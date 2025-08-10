@@ -112,16 +112,18 @@
 	const extensions = getAllExtensions();
 	
 	// Filter extensions based on their manifest profiles and enabled status
-	function filterExtensionsForSidebar(extensions: ExtensionMetadata[]): ExtensionMetadata[] {
+	function filterExtensionsForSidebar(extensions: ExtensionMetadata[], userProfiles: string[]): ExtensionMetadata[] {
 		return extensions.filter(ext => {
 			// Skip if extension is not enabled
 			if (ext.enabled === false) return false;
 			
 			// If no profiles specified in extension manifest, show to all users
-			if (!ext.profiles || !Array.isArray(ext.profiles) || ext.profiles.length === 0) return true;
+			if (!ext.profiles || !Array.isArray(ext.profiles) || ext.profiles.length === 0) {
+				return true;
+			}
 			
 			// Check if current user has any of the profiles required by the extension
-			return ext.profiles.some((profile: string) => $userProfiles.includes(profile));
+			return ext.profiles.some((profile: string) => userProfiles.includes(profile));
 		});
 	}
 
@@ -147,7 +149,8 @@
 	});
 
 	// Filter extensions based on user profiles and create menu items
-	$: filteredExtensions = filterExtensionsForSidebar(extensions);
+	let filteredExtensions: ExtensionMetadata[] = [];
+	$: filteredExtensions = filterExtensionsForSidebar(extensions, $userProfiles);
 
 	// Group extensions by categories
 	$: extensionsByCategory = (() => {

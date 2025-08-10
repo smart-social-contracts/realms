@@ -4,7 +4,7 @@
   "description": "citizen_dashboard extension",
   "author": "Smart Social Contracts",
   "permissions": [],
-  "profiles": ["member"],
+  "profiles": ["member", "admin"],
   "categories": ["public_services"],
   "icon": "table",
   "url": "https://github.com/smart-social-contracts/extensions/citizen_dashboard"

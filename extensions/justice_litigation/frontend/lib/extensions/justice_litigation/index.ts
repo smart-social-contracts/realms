@@ -15,5 +15,6 @@ export const metadata = {
     version: '1.0.0',
     icon: 'lock',
     author: 'Smart Social Contracts Team',
-    permissions: ['litigation_access']
+    permissions: ['litigation_access'],
+    profiles: ['member', 'admin']
 };

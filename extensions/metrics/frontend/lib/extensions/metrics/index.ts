@@ -21,5 +21,6 @@ export const metadata = {
     version: '1.0.0',
     icon: 'chart-bar',
     author: 'Smart Social Contracts Team',
-    permissions: ['read_budget', 'read_treasury']
+    permissions: ['read_budget', 'read_treasury'],
+    profiles: ['member', 'admin']
 };
