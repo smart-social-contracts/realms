@@ -481,7 +481,7 @@
 				<!-- Message input -->
 				<div class="flex gap-2">
 					<Textarea
-						class="flex-grow resize-none px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+						class="flex-grow resize-none !px-5 !py-4 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white leading-relaxed"
 						placeholder={$_('extensions.llm_chat.message_placeholder')}
 						rows="2"
 						bind:value={newMessage}
