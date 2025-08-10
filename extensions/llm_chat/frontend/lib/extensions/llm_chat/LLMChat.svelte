@@ -37,6 +37,7 @@
 	let userPrincipal = $principal || '';
 	let suggestions: string[] = [];
 	let isLoadingSuggestions = false;
+	let textareaElement: HTMLTextAreaElement;
 	
 	// LLM API configuration
 
@@ -330,6 +331,29 @@
 		newMessage = suggestion;
 		sendMessage();
 	}
+
+	// Auto-resize textarea based on content
+	function autoResizeTextarea(): void {
+		if (textareaElement) {
+			// Reset height to auto to get the correct scrollHeight
+			textareaElement.style.height = 'auto';
+			// Set height based on scrollHeight, with min and max limits
+			const minHeight = 44; // Approximately 1 line with padding
+			const maxHeight = 200; // Maximum height before scrolling
+			const newHeight = Math.min(Math.max(textareaElement.scrollHeight, minHeight), maxHeight);
+			textareaElement.style.height = `${newHeight}px`;
+		}
+	}
+
+	// Handle input changes to trigger auto-resize
+	function handleInput(): void {
+		autoResizeTextarea();
+	}
+
+	// Handle textarea focus to ensure proper sizing
+	function handleFocus(): void {
+		autoResizeTextarea();
+	}
 </script>
 
 <div class="w-full h-full flex flex-col p-0 m-0 max-w-none">
@@ -481,11 +505,15 @@
 				<!-- Message input -->
 				<div class="flex gap-2">
 					<Textarea
-						class="flex-grow resize-none !px-5 !py-4 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white leading-relaxed"
+						bind:this={textareaElement}
+						class="flex-grow resize-none !px-5 !py-4 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white leading-relaxed transition-all duration-200"
 						placeholder={$_('extensions.llm_chat.message_placeholder')}
-						rows="2"
+						rows="1"
+						style="min-height: 44px; max-height: 200px; overflow-y: auto;"
 						bind:value={newMessage}
 						on:keydown={handleKeydown}
+						on:input={handleInput}
+						on:focus={handleFocus}
 					/>
 					<Button 
 						color="primary" 
