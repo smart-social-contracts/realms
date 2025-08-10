@@ -4,6 +4,8 @@
   "sidebar": "AI 助手",
   "title": "治理 AI 助手",
   "start_conversation": "开始与 LLM 对话！",
+  "welcome_authenticated": "欢迎回来！我是您在此领域的AI助手，准备帮助您导航领域治理、回答政策问题，并基于您领域的数据提供见解。今天您想讨论什么？",
+  "welcome_visitor": "欢迎来到此领域！我是您的AI助手！我在这里帮助您了解领域如何运作、探索治理概念，并回答有关去中心化治理的问题。请注意，作为访客，我对领域特定数据的访问有限。考虑加入此领域以获得更个性化的体验！",
   "message_placeholder": "输入您的消息...",
   "no_response": "LLM 无响应",
   "error_response": "无法从 LLM 获取响应。请重试。",

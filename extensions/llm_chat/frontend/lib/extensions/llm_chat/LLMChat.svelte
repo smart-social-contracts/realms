@@ -7,7 +7,7 @@
 	import { backend } from '$lib/canisters';
 	// @ts-ignore
 	import { canisterId as backendCanisterId } from 'declarations/realm_backend';
-	import { principal } from '$lib/stores/auth';
+	import { principal, isAuthenticated } from '$lib/stores/auth';
 	import { _ } from 'svelte-i18n';
 	import SafeText from '$lib/components/SafeText.svelte';
 
@@ -298,7 +298,10 @@
 				}
 			}
 			
-			// Fetch new suggestions after successful response
+			// Clear loading state immediately after response is complete
+			isLoading = false;
+			
+			// Fetch new suggestions after successful response (this can happen in background)
 			await fetchSuggestions();
 
 		} catch (err) {
@@ -343,8 +346,26 @@
 			>
 				{#if messages.length === 0}
 					<div class="text-center text-gray-500 dark:text-gray-400 py-8">
-						<MessagesSolid class="w-12 h-12 mx-auto mb-2" />
-						<SafeText key="extensions.llm_chat.start_conversation" spinnerSize="xs" />
+						<MessagesSolid class="w-12 h-12 mx-auto mb-4 text-blue-500" />
+						<div class="max-w-2xl mx-auto">
+							{#if $isAuthenticated}
+								<div class="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-6 border border-blue-200 dark:border-blue-700">
+									<h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">👋 {$_('extensions.llm_chat.welcome_authenticated')}</h3>
+									<div class="text-sm text-gray-600 dark:text-gray-400 space-y-2">
+										<p>💡 <strong>Tip:</strong> I can access your realm's data to provide more accurate and contextual responses.</p>
+										<p>🔍 Try asking about governance policies, member activities, or realm statistics.</p>
+									</div>
+								</div>
+							{:else}
+								<div class="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800 dark:to-blue-900/20 rounded-lg p-6 border border-gray-200 dark:border-gray-600">
+									<h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">🌟 {$_('extensions.llm_chat.welcome_visitor')}</h3>
+									<div class="text-sm text-gray-600 dark:text-gray-400 space-y-2">
+										<p>📚 I can help you learn about decentralized governance and realm concepts.</p>
+										<p>🚀 <strong>Join this realm</strong> to unlock personalized insights and realm-specific data!</p>
+									</div>
+								</div>
+							{/if}
+						</div>
 					</div>
 				{:else}
 					{#each messages as message}
@@ -458,9 +479,9 @@
 				</div>
 				
 				<!-- Message input -->
-				<div class="flex">
+				<div class="flex gap-2">
 					<Textarea
-						class="flex-grow resize-none rounded-r-none"
+						class="flex-grow resize-none px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
 						placeholder={$_('extensions.llm_chat.message_placeholder')}
 						rows="2"
 						bind:value={newMessage}
@@ -468,11 +489,16 @@
 					/>
 					<Button 
 						color="primary" 
-						class="rounded-l-none"
+						class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 flex items-center justify-center min-w-[50px]"
 						disabled={isLoading || !newMessage.trim()}
 						on:click={sendMessage}
+						title="Send message (Enter)"
 					>
-						<PaperPlaneSolid class="w-5 h-5" />
+						{#if isLoading}
+							<Spinner class="w-4 h-4" />
+						{:else}
+							<PaperPlaneSolid class="w-4 h-4" />
+						{/if}
 					</Button>
 				</div>
 			</div>
