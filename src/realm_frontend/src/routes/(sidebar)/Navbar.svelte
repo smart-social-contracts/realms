@@ -78,7 +78,7 @@
 				<div class="animate-spin h-4 w-4 border-2 border-gray-300 rounded-full border-t-blue-600 mr-2"></div>
 				<span class="sr-only">Loading...</span>
 			</div>
-		{:else if !hasJoined()}
+		{:else if $isAuthenticated && !hasJoined()}
 			<Button class="me-2" color="alternative" href="/join" pill={true}>
 				<T key="buttons.join" default_text="Join" />
 			</Button>
