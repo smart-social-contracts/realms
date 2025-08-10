@@ -87,7 +87,7 @@
     </div>
     
     <div class="button-container">
-      <a href="/" class="btn btn-visitor">
+      <a href="/extensions/llm_chat" class="btn btn-visitor">  <!-- TODO: generalize this! -->
         {$_('extensions.welcome.hero.try_sandbox')}
       </a>
     </div>
