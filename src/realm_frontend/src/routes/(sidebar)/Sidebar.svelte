@@ -228,13 +228,13 @@
 		return result;
 	})();
 
-	// Category display names for i18n
-	const categoryNames: Record<string, string> = {
-		'public_services': $_('categories.public_services') || 'Public Services',
-		'finances': $_('categories.finances') || 'Finances',
-		'identity': $_('categories.identity') || 'Identity',
-		'other': $_('categories.other') || 'Other'
-	};
+	// Function to format category names for display
+	function formatCategoryName(category: string): string {
+		return category
+			.split('_')
+			.map(word => word.charAt(0).toUpperCase() + word.slice(1))
+			.join(' ');
+	}
 
 	// Marketplace item for admin users
 	const marketplaceItem: NavItemWithHref = {
@@ -301,7 +301,7 @@
 							<!-- Category Header -->
 							<li class="px-3 py-2">
 								<h3 class={styles.sidebar.categoryHeader()}>
-									{categoryNames[category] || category}
+									{formatCategoryName(category)}
 								</h3>
 							</li>
 							
