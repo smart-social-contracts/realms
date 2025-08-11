@@ -132,7 +132,7 @@
         Use zero-knowledge proofs to verify your passport identity securely and privately.
         Your passport data never leaves your device.
       </P>
-      <Button on:click={generateVerificationLink} class="px-6 py-3">
+      <Button on:click={generateVerificationLink} class="px-6 py-3 bg-blue-600 text-white hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
         Start Passport Verification
       </Button>
       
@@ -163,7 +163,7 @@
       </P>
       
       <div class="flex gap-2 justify-center">
-        <Button on:click={checkVerificationStatus} size="sm">
+        <Button on:click={checkVerificationStatus} size="sm" class="bg-blue-600 text-white hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
           Check Status
         </Button>
         <Button color="alternative" on:click={resetVerification} size="sm">
