@@ -162,7 +162,15 @@ test.describe('User workflows', () => {
 		await page.goto('/');
 		await page.waitForLoadState('networkidle');
 
-		const categoryHeaders = page.locator('[data-testid="category-header"], h3').filter({ hasText: /^(Public Services|Finances|Identity|Other)$/ });
+		// Wait for extensions to load from backend API
+		await page.waitForFunction(() => {
+			const categoryHeaders = document.querySelectorAll('h3');
+			return Array.from(categoryHeaders).some(header => 
+				/^(PUBLIC SERVICES|FINANCES|IDENTITY|OTHER)$/.test(header.textContent?.trim() || '')
+			);
+		}, { timeout: 10000 });
+
+		const categoryHeaders = page.locator('h3').filter({ hasText: /^(PUBLIC SERVICES|FINANCES|IDENTITY|OTHER)$/ });
 		const categoryCount = await categoryHeaders.count();
 		expect(categoryCount).toBeGreaterThan(0);
 
@@ -170,14 +178,18 @@ test.describe('User workflows', () => {
 		const badCount = await badCategoryHeaders.count();
 		expect(badCount).toBe(0);
 
-		const publicServicesSection = page.locator('h3:has-text("Public Services")').locator('..').locator('..');
-		const financesSection = page.locator('h3:has-text("Finances")').locator('..').locator('..');
+		const publicServicesSection = page.locator('h3:has-text("PUBLIC SERVICES")').locator('..').locator('..');
+		const financesSection = page.locator('h3:has-text("FINANCES")').locator('..').locator('..');
+		const identitySection = page.locator('h3:has-text("IDENTITY")').locator('..').locator('..');
 		
 		if (await publicServicesSection.isVisible()) {
 			await expect(publicServicesSection.locator('text=Citizen Dashboard')).toBeVisible();
 		}
 		if (await financesSection.isVisible()) {
 			await expect(financesSection.locator('text=Vault Manager')).toBeVisible();
+		}
+		if (await identitySection.isVisible()) {
+			await expect(identitySection.locator('text=passport_verification')).toBeVisible();
 		}
 	});
 });
