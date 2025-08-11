@@ -156,5 +156,28 @@ test.describe('User workflows', () => {
 		
 		const loginButton = page.getByRole('button', { name: 'Log In' });
 		await expect(loginButton).toBeVisible();
-	});	
+	});
+
+	test('should display extensions under correct categories', async ({ page }) => {
+		await page.goto('/');
+		await page.waitForLoadState('networkidle');
+
+		const categoryHeaders = page.locator('[data-testid="category-header"], h3').filter({ hasText: /^(Public Services|Finances|Identity|Other)$/ });
+		const categoryCount = await categoryHeaders.count();
+		expect(categoryCount).toBeGreaterThan(0);
+
+		const badCategoryHeaders = page.locator('h3').filter({ hasText: /CATEGORIES\./ });
+		const badCount = await badCategoryHeaders.count();
+		expect(badCount).toBe(0);
+
+		const publicServicesSection = page.locator('h3:has-text("Public Services")').locator('..').locator('..');
+		const financesSection = page.locator('h3:has-text("Finances")').locator('..').locator('..');
+		
+		if (await publicServicesSection.isVisible()) {
+			await expect(publicServicesSection.locator('text=Citizen Dashboard')).toBeVisible();
+		}
+		if (await financesSection.isVisible()) {
+			await expect(financesSection.locator('text=Vault Manager')).toBeVisible();
+		}
+	});
 });

@@ -136,6 +136,61 @@ export class DummyBackend {
     console.log('🔧 DEV MODE: greet called with:', name);
     return `Hello, ${name}! This is a dummy greeting from dev mode.`;
   }
+
+  async get_extensions() {
+    console.log('🔧 DEV MODE: get_extensions called');
+    const mockExtensions = [
+      {
+        name: 'citizen_dashboard',
+        description: 'Citizen Dashboard for public services',
+        version: '1.0.0',
+        author: 'Realms Team',
+        categories: ['public_services'],
+        profiles: ['citizen', 'admin'],
+        icon: 'dashboard',
+        url: '/extensions/citizen_dashboard'
+      },
+      {
+        name: 'vault_manager',
+        description: 'Manage your digital vault and tokens',
+        version: '1.0.0',
+        author: 'Realms Team',
+        categories: ['finances'],
+        profiles: ['citizen', 'admin'],
+        icon: 'wallet',
+        url: '/extensions/vault_manager'
+      },
+      {
+        name: 'passport_verification',
+        description: 'Verify and manage digital identity',
+        version: '1.0.0',
+        author: 'Realms Team',
+        categories: ['identity'],
+        profiles: ['citizen', 'admin'],
+        icon: 'id-card',
+        url: '/extensions/passport_verification'
+      },
+      {
+        name: 'notifications',
+        description: 'System notifications and alerts',
+        version: '1.0.0',
+        author: 'Realms Team',
+        categories: ['other'],
+        profiles: ['citizen', 'admin'],
+        icon: 'bell',
+        url: '/extensions/notifications'
+      }
+    ];
+
+    return {
+      success: true,
+      data: {
+        ExtensionsList: {
+          extensions: mockExtensions.map(ext => JSON.stringify(ext))
+        }
+      }
+    };
+  }
 }
 
 export const dummyBackend = new DummyBackend();

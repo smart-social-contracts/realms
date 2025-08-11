@@ -100,6 +100,10 @@ class VotesListRecord(Record):
     pagination: PaginationInfo
 
 
+class ExtensionsListRecord(Record):
+    extensions: Vec[text]
+
+
 class RealmResponseData(Variant):
     Status: StatusRecord
     UserGet: UserGetRecord
@@ -116,6 +120,7 @@ class RealmResponseData(Variant):
     RealmsList: RealmsListRecord
     ProposalsList: ProposalsListRecord
     VotesList: VotesListRecord
+    ExtensionsList: ExtensionsListRecord
     Error: text
     Message: text
 
@@ -149,3 +154,14 @@ class ExtensionCallArgs(Record):
 class ExtensionCallResponse(Record):
     success: bool
     response: text
+
+
+class ExtensionInfo(Record):
+    name: text
+    description: text
+    version: text
+    author: text
+    categories: Vec[text]
+    profiles: Vec[text]
+    icon: text
+    url: text
