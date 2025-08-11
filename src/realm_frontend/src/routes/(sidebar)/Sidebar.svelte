@@ -31,10 +31,12 @@
 	} from 'flowbite-svelte-icons';
 	
 	// Import extension system
-	import { getAllExtensions, type ExtensionMetadata } from '$lib/extensions';
+	import { type ExtensionMetadata } from '$lib/extensions';
 	import { getIcon } from '$lib/utils/iconMap';
 	// Import user profiles store
 	import { userProfiles } from '$lib/stores/profiles';
+	// Import backend for extension loading
+	import { backend } from '$lib/canisters';
 	
 	// Import i18n functionality
 	import { _, locale, isLoading, getLocaleFromNavigator } from 'svelte-i18n';
@@ -108,11 +110,58 @@
 		activeMainSidebar = navigation.to?.url.pathname ?? '';
 	});
 
-	// Get all extensions for the sidebar
-	const extensions = getAllExtensions();
+	// Get all extensions from backend instead of filesystem
+	let extensions: ExtensionMetadata[] = [];
+	let extensionsLoaded = false;
+
+	async function loadExtensionsFromBackend() {
+		try {
+			console.log('Calling backend.get_extensions()...');
+			const response = await backend.get_extensions();
+			console.log('Backend response:', response);
+			console.log('Response type:', typeof response);
+			console.log('Response success:', response?.success);
+			console.log('Response data:', response?.data);
+			
+			if (response.success && response.data.ExtensionsList) {
+				console.log('Extensions list:', response.data.ExtensionsList.extensions);
+				const extensionData = response.data.ExtensionsList.extensions.map(ext => JSON.parse(ext));
+				console.log('Parsed extension data:', extensionData);
+				
+				extensions = extensionData.map(ext => ({
+					id: ext.name,
+					name: ext.name,
+					description: ext.description,
+					version: ext.version,
+					icon: ext.icon,
+					author: ext.author,
+					permissions: ext.required_permissions || ext.permissions || [],
+					enabled: true,
+					profiles: ext.profiles || [],
+					categories: ext.categories || ['other']
+				}));
+				console.log('Mapped extensions:', extensions);
+				extensionsLoaded = true;
+			} else {
+				console.log('Invalid response format or no extensions data');
+				extensions = [];
+				extensionsLoaded = true;
+			}
+		} catch (error) {
+			console.error('Error loading extensions from backend:', error);
+			extensions = [];
+			extensionsLoaded = true;
+		}
+	}
+
+	// Load extensions on component mount
+	onMount(() => {
+		loadExtensionsFromBackend();
+	});
 	
 	// Filter extensions based on their manifest profiles and enabled status
 	function filterExtensionsForSidebar(extensions: ExtensionMetadata[], userProfiles: string[]): ExtensionMetadata[] {
+		if (!extensionsLoaded) return [];
 		return extensions.filter(ext => {
 			// Skip if extension is not enabled
 			if (ext.enabled === false) return false;

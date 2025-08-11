@@ -2,6 +2,7 @@ import json
 import traceback
 
 import api
+from api.extensions import list_extensions
 from api.ggg_entities import (
     list_codexes,
     list_disputes,
@@ -17,8 +18,6 @@ from api.ggg_entities import (
     list_users,
     list_votes,
 )
-
-# from api.extensions import list_extensions
 from api.status import get_status
 from api.user import user_get, user_register
 from core.candid_types_realm import (
@@ -117,6 +116,12 @@ def status() -> RealmResponse:
     except Exception as e:
         logger.error(f"Error getting status: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_extensions() -> RealmResponse:
+    """Get all available extensions with their metadata"""
+    return list_extensions()
 
 
 @update
