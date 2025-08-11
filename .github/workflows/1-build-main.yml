@@ -9,6 +9,11 @@ on:
         description: 'Canister to deploy (leave empty for all)'
         required: false
         default: ''
+      skip_tests:
+        description: 'Skip test dependencies for deployment (allows deployment even if tests fail)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -142,8 +147,8 @@ jobs:
 
   deploy-staging:
     runs-on: ubuntu-latest
-    needs: [test, test-extensions, test-ui-e2e]
-    if: "!contains(github.event.head_commit.message, 'Bump version')"
+    needs: ${{ github.event.inputs.skip_tests == 'true' && 'build' || fromJSON('["test", "test-extensions", "test-ui-e2e"]') }}
+    if: "!contains(github.event.head_commit.message, 'Bump version') && (github.event.inputs.skip_tests == 'true' || (needs.test.result == 'success' && needs.test-extensions.result == 'success' && needs.test-ui-e2e.result == 'success'))"
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
