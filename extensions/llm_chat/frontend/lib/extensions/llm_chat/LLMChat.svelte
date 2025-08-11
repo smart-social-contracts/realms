@@ -219,6 +219,11 @@
 		isLoading = true;
 		error = '';
 		
+		// Reset textarea height to single line
+		if (textareaElement) {
+			textareaElement.style.height = '24px';
+		}
+		
 		// We'll add the AI message when we start receiving content
 		
 		try {
@@ -339,8 +344,8 @@
 		// Reset height to calculate scrollHeight properly
 		textareaElement.style.height = 'auto';
 		
-		// Calculate new height (single line with ultra-minimal padding)
-		const minHeight = 28; // Ultra-compact single line
+		// Calculate new height (single line with extremely minimal padding)
+		const minHeight = 24; // Extremely compact single line
 		const maxHeight = 200;
 		const scrollHeight = textareaElement.scrollHeight;
 		const newHeight = Math.min(Math.max(scrollHeight, minHeight), maxHeight);
@@ -388,7 +393,7 @@
 		<SafeText key="extensions.llm_chat.title" spinnerSize="sm" />
 	</h2>
 	
-	<div class="w-full flex-grow flex flex-col overflow-hidden" style="height: calc(100vh - 120px);">
+	<div class="w-full flex-grow flex flex-col overflow-hidden" style="height: calc(100vh - 140px); height: calc(100dvh - 140px);">
 		<Card class="w-full h-full flex-grow flex flex-col m-0 p-0 rounded-none border-0 max-w-none">
 			<div 
 				bind:this={messagesContainer}
@@ -490,7 +495,7 @@
 			<div class="flex flex-col p-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
 				<!-- Question Suggestions -->
 				<div class="mb-3 px-1">
-					<div class="flex flex-wrap gap-2 justify-center">
+					<div class="flex gap-2 justify-start overflow-x-auto scrollbar-hide pb-1 px-2 md:flex-wrap md:overflow-x-visible md:justify-center md:px-0">
 					{#if isLoadingSuggestions}
 						<div class="flex items-center gap-2 text-gray-500 dark:text-gray-400">
 							<Spinner size="4" />
@@ -527,15 +532,15 @@
 						</button>
 					{/if}
 				</div>
-				</div>
 				
+				</div>
 				<!-- Message input -->
-				<div class="flex gap-2">
+				<div class="flex gap-2 px-4 sm:px-0">
 					<textarea
 						bind:this={textareaElement}
-						class="flex-grow resize-none px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white leading-relaxed transition-all duration-200 outline-none"
+						class="flex-grow resize-none border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-all duration-200 outline-none"
 						placeholder={$_('extensions.llm_chat.message_placeholder')}
-						style="min-height: 28px; max-height: 200px; height: 28px; overflow-y: hidden; font-family: inherit; font-size: inherit; line-height: 1.2;"
+						style="min-height: 24px; max-height: 200px; height: 24px; overflow-y: hidden; font-family: inherit; font-size: 14px; line-height: 1; padding: 5px 8px; box-sizing: border-box;"
 						bind:value={newMessage}
 						on:keydown={handleKeydownWithResize}
 						on:input={handleInputWithResize}
