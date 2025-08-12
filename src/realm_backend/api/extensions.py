@@ -7,10 +7,10 @@ from core.candid_types_realm import (
     RealmResponse,
     RealmResponseData,
 )
+from extension_packages.extension_manifests import get_all_extension_manifests
 from ggg.user import User
 from kybra import Async, query, update
 from kybra_simple_logging import get_logger
-from extension_packages.extension_manifests import get_all_extension_manifests
 
 logger = get_logger("api.extensions")
 
@@ -20,12 +20,12 @@ def list_extensions(principal: str) -> RealmResponse:
     """List all available extensions with their metadata"""
     try:
         user = User[principal]
-        
+
         # Use static manifest registry instead of filesystem access
         # (Kybra canisters don't have filesystem access)
         extension_manifests = get_all_extension_manifests()
         extensions_data = list(extension_manifests.values())
-        
+
         extensions_json = [json.dumps(ext) for ext in extensions_data]
         logger.info(f"Listed {len(extensions_data)} extensions from static registry")
 
