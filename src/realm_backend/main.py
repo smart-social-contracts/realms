@@ -121,7 +121,7 @@ def status() -> RealmResponse:
 @query
 def get_extensions() -> RealmResponse:
     """Get all available extensions with their metadata"""
-    return list_extensions()
+    return list_extensions(ic.caller().to_str())
 
 
 @update
