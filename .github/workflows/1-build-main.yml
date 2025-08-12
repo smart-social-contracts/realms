@@ -9,11 +9,6 @@ on:
         description: 'Canister to deploy (leave empty for all)'
         required: false
         default: ''
-      skip_tests:
-        description: 'Skip test dependencies for deployment (allows deployment even if tests fail)'
-        required: false
-        type: boolean
-        default: false
 
 jobs:
   build:
@@ -145,24 +140,10 @@ jobs:
           cd src/realm_frontend &&
           npx playwright test specs/workflows.spec.ts --reporter=line"
 
-  # Wait for tests to complete (only if not skipping tests)
-  wait-for-tests:
-    runs-on: ubuntu-latest
-    needs: [test, test-extensions, test-ui-e2e]
-    if: "!contains(github.event.head_commit.message, 'Bump version') && github.event.inputs.skip_tests != 'true'"
-    steps:
-      - name: Tests completed successfully
-        run: echo "All tests passed, ready for deployment"
-
   deploy-staging:
     runs-on: ubuntu-latest
-    needs: [build]
-    # Run if: (tests are skipped) OR (tests completed successfully)
-    if: |
-      !contains(github.event.head_commit.message, 'Bump version') && (
-        github.event.inputs.skip_tests == 'true' || 
-        needs.wait-for-tests.result == 'success'
-      )
+    needs: [test, test-extensions, test-ui-e2e]
+    if: "!contains(github.event.head_commit.message, 'Bump version')"
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -173,7 +154,7 @@ jobs:
           echo "${{ secrets.IC_IDENTITY_PEM }}" > identity.pem
           chmod 600 identity.pem
           
-          # Pull the image that was built
+          # Pull the image that was tested
           docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}
           
           # Run deployment script with staging network

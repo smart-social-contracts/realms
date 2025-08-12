@@ -1,0 +1,37 @@
+name: 99. Force Deploy (main)
+
+on:
+  workflow_dispatch:
+    inputs:
+      canister:
+        description: 'Canister to deploy (leave empty for all)'
+        required: false
+        default: ''
+
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy to staging
+        run: |
+          # Store identity in a temporary file
+          echo "${{ secrets.IC_IDENTITY_PEM }}" > identity.pem
+          chmod 600 identity.pem
+          
+          # Pull the image that was built (NOTE: we assume it was built in a previous workflow!)
+          docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}
+          
+          # Run deployment script with staging network
+          docker run --rm \
+            -v "$(pwd)/identity.pem:/app/identity.pem" \
+            -v "$(pwd)/scripts/deploy_ic.sh:/app/deploy_ic.sh" \
+            -v "$(pwd)/scripts/setup_demo.sh:/app/setup_demo.sh" \
+            -e DFX_WARNING="-mainnet_plaintext_identity" \
+            ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} \
+            bash -c "/app/deploy_ic.sh /app/identity.pem staging && /app/setup_demo.sh /app/identity.pem staging"
+          
+          # Clean up
+          rm identity.pem
