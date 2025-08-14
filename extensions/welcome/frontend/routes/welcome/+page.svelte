@@ -75,7 +75,7 @@
   
   <!-- Realms logo in top left corner -->
   <div class="realms-logo">
-    <img src="/images/logo_horizontal.svg" alt="{$_('extensions.welcome.alt_text.realms_logo')}" class="logo-img" />
+    <img src="/images/logo_horizontal_white.svg" alt="{$_('extensions.welcome.alt_text.realms_logo')}" class="logo-img" width="200" />
   </div>
 
   <div class="content">
@@ -236,9 +236,23 @@
   }
 
   .logo-img {
-    height: 40px;
+    height: 48px; /* Mobile size */
     width: auto;
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  }
+
+  /* Desktop logo size */
+  @media (min-width: 768px) {
+    .logo-img {
+      height: 52px; /* Larger size for desktop */
+    }
+  }
+
+  /* Large desktop logo size */
+  @media (min-width: 1024px) {
+    .logo-img {
+      height: 56px; /* Even larger for large screens */
+    }
   }
 
   .content {
