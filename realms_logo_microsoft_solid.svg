@@ -1,0 +1,27 @@
+<svg width="300" height="100" viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Text gradient -->
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#495057;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#212529;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Top-left quadrant - lightest -->
+  <path d="M 50 15 A 35 35 0 0 1 85 50 L 50 50 Z" fill="#f8f9fa" stroke="#ffffff" stroke-width="2"/>
+  
+  <!-- Top-right quadrant - light -->
+  <path d="M 85 50 A 35 35 0 0 1 50 85 L 50 50 Z" fill="#dee2e6" stroke="#ffffff" stroke-width="2"/>
+  
+  <!-- Bottom-right quadrant - medium -->
+  <path d="M 50 85 A 35 35 0 0 1 15 50 L 50 50 Z" fill="#adb5bd" stroke="#ffffff" stroke-width="2"/>
+  
+  <!-- Bottom-left quadrant - dark -->
+  <path d="M 15 50 A 35 35 0 0 1 50 15 L 50 50 Z" fill="#6c757d" stroke="#ffffff" stroke-width="2"/>
+  
+  <!-- Outer circle border -->
+  <circle cx="50" cy="50" r="35" fill="none" stroke="#495057" stroke-width="2"/>
+  
+  <!-- Text -->
+  <text x="110" y="58" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="28" font-weight="500" fill="url(#textGradient)">realms</text>
+</svg>
