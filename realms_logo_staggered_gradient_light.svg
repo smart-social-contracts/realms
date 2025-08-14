@@ -1,0 +1,32 @@
+<svg width="200" height="40" viewBox="0 0 200 40" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Darker gradients for white background -->
+    <linearGradient id="barGradientLight1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6B7280;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4B5563;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="barGradientLight2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4B5563;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#374151;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="barGradientLight3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6B7280;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4B5563;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Three staggered bars with darker gradients for light background -->
+  
+  <!-- Bar 1 - shortest -->
+  <rect x="0" y="14" width="8" height="18" rx="2" fill="url(#barGradientLight1)"/>
+  
+  <!-- Bar 2 - tallest -->
+  <rect x="12" y="6" width="8" height="28" rx="2" fill="url(#barGradientLight2)"/>
+  
+  <!-- Bar 3 - medium -->
+  <rect x="24" y="10" width="8" height="22" rx="2" fill="url(#barGradientLight3)"/>
+  
+  <!-- Realms text in dark color for light background -->
+  <text x="45" y="26" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+        font-size="24" font-weight="600" fill="#1F2937" letter-spacing="-0.5px">realms</text>
+</svg>
