@@ -1,0 +1,149 @@
+<svg width="300" height="100" viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Text gradient -->
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#495057;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#212529;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Subtle shadow filter -->
+    <filter id="dotShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="0.6"/>
+      <feOffset dx="0.6" dy="0.6" result="offset"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.1"/>
+      </feComponentTransfer>
+      <feMerge> 
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/> 
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Ultra-dense stippled sphere pattern -->
+  <g filter="url(#dotShadow)">
+    
+    <!-- Center region - largest dots (closest to viewer) -->
+    <circle cx="50" cy="50" r="2.5" fill="#212529" opacity="0.95"/>
+    <circle cx="48" cy="48" r="2.1" fill="#343a40" opacity="0.9"/>
+    <circle cx="52" cy="52" r="1.9" fill="#495057" opacity="0.85"/>
+    <circle cx="51" cy="46" r="1.7" fill="#6c757d" opacity="0.8"/>
+    <circle cx="49" cy="54" r="1.5" fill="#adb5bd" opacity="0.75"/>
+    <circle cx="47" cy="51" r="1.3" fill="#495057" opacity="0.8"/>
+    <circle cx="53" cy="49" r="1.1" fill="#6c757d" opacity="0.75"/>
+    <circle cx="46" cy="53" r="0.9" fill="#6c757d" opacity="0.7"/>
+    <circle cx="54" cy="47" r="0.7" fill="#adb5bd" opacity="0.65"/>
+    <circle cx="49" cy="49" r="0.5" fill="#495057" opacity="0.7"/>
+    <circle cx="51" cy="51" r="0.3" fill="#6c757d" opacity="0.65"/>
+    
+    <!-- Inner ring - medium-large dots (dense pattern) -->
+    <circle cx="44" cy="50" r="1.4" fill="#343a40" opacity="0.85"/>
+    <circle cx="56" cy="50" r="1.2" fill="#495057" opacity="0.8"/>
+    <circle cx="50" cy="42" r="1.3" fill="#6c757d" opacity="0.75"/>
+    <circle cx="50" cy="58" r="1.1" fill="#adb5bd" opacity="0.7"/>
+    <circle cx="46" cy="44" r="1.0" fill="#495057" opacity="0.75"/>
+    <circle cx="54" cy="56" r="0.9" fill="#6c757d" opacity="0.7"/>
+    <circle cx="44" cy="56" r="0.8" fill="#adb5bd" opacity="0.65"/>
+    <circle cx="56" cy="44" r="0.7" fill="#6c757d" opacity="0.65"/>
+    <circle cx="47" cy="40" r="0.6" fill="#6c757d" opacity="0.6"/>
+    <circle cx="53" cy="60" r="0.5" fill="#adb5bd" opacity="0.6"/>
+    <circle cx="40" cy="53" r="0.4" fill="#adb5bd" opacity="0.6"/>
+    <circle cx="60" cy="47" r="0.3" fill="#6c757d" opacity="0.6"/>
+    <circle cx="45" cy="46" r="0.5" fill="#6c757d" opacity="0.6"/>
+    <circle cx="55" cy="54" r="0.4" fill="#adb5bd" opacity="0.55"/>
+    <circle cx="48" cy="44" r="0.3" fill="#adb5bd" opacity="0.55"/>
+    <circle cx="52" cy="56" r="0.2" fill="#adb5bd" opacity="0.5"/>
+    <circle cx="43" cy="47" r="0.3" fill="#6c757d" opacity="0.55"/>
+    <circle cx="57" cy="53" r="0.2" fill="#adb5bd" opacity="0.5"/>
+    <circle cx="47" cy="57" r="0.2" fill="#adb5bd" opacity="0.5"/>
+    <circle cx="53" cy="43" r="0.1" fill="#6c757d" opacity="0.5"/>
+    
+    <!-- Middle ring - medium dots (very dense) -->
+    <circle cx="38" cy="50" r="0.8" fill="#495057" opacity="0.7"/>
+    <circle cx="62" cy="50" r="0.6" fill="#6c757d" opacity="0.65"/>
+    <circle cx="50" cy="37" r="0.7" fill="#6c757d" opacity="0.65"/>
+    <circle cx="50" cy="63" r="0.5" fill="#adb5bd" opacity="0.6"/>
+    <circle cx="41" cy="41" r="0.6" fill="#6c757d" opacity="0.65"/>
+    <circle cx="59" cy="59" r="0.4" fill="#adb5bd" opacity="0.55"/>
+    <circle cx="41" cy="59" r="0.5" fill="#adb5bd" opacity="0.6"/>
+    <circle cx="59" cy="41" r="0.3" fill="#6c757d" opacity="0.6"/>
+    <circle cx="48" cy="38" r="0.4" fill="#adb5bd" opacity="0.55"/>
+    <circle cx="52" cy="62" r="0.2" fill="#adb5bd" opacity="0.5"/>
+    <circle cx="38" cy="48" r="0.3" fill="#6c757d" opacity="0.55"/>
+    <circle cx="62" cy="52" r="0.1" fill="#adb5bd" opacity="0.45"/>
+    <circle cx="43" cy="39" r="0.2" fill="#6c757d" opacity="0.5"/>
+    <circle cx="57" cy="61" r="0.1" fill="#adb5bd" opacity="0.45"/>
+    <circle cx="39" cy="43" r="0.1" fill="#adb5bd" opacity="0.45"/>
+    <circle cx="61" cy="57" r="0.1" fill="#adb5bd" opacity="0.4"/>
+    <circle cx="46" cy="35" r="0.1" fill="#adb5bd" opacity="0.4"/>
+    <circle cx="54" cy="65" r="0.1" fill="#adb5bd" opacity="0.35"/>
+    <circle cx="35" cy="46" r="0.1" fill="#6c757d" opacity="0.4"/>
+    <circle cx="65" cy="54" r="0.1" fill="#adb5bd" opacity="0.3"/>
+    <circle cx="42" cy="36" r="0.1" fill="#adb5bd" opacity="0.35"/>
+    <circle cx="58" cy="64" r="0.1" fill="#adb5bd" opacity="0.3"/>
+    <circle cx="36" cy="42" r="0.1" fill="#adb5bd" opacity="0.3"/>
+    <circle cx="64" cy="58" r="0.1" fill="#adb5bd" opacity="0.25"/>
+    
+    <!-- Outer ring - small dots (edge of sphere, ultra-dense) -->
+    <circle cx="33" cy="50" r="0.2" fill="#6c757d" opacity="0.5"/>
+    <circle cx="67" cy="50" r="0.1" fill="#adb5bd" opacity="0.4"/>
+    <circle cx="50" cy="32" r="0.1" fill="#adb5bd" opacity="0.45"/>
+    <circle cx="50" cy="68" r="0.1" fill="#adb5bd" opacity="0.35"/>
+    <circle cx="35" cy="35" r="0.1" fill="#adb5bd" opacity="0.4"/>
+    <circle cx="65" cy="65" r="0.1" fill="#adb5bd" opacity="0.3"/>
+    <circle cx="35" cy="65" r="0.1" fill="#adb5bd" opacity="0.35"/>
+    <circle cx="65" cy="35" r="0.1" fill="#adb5bd" opacity="0.3"/>
+    <circle cx="42" cy="33" r="0.1" fill="#adb5bd" opacity="0.35"/>
+    <circle cx="58" cy="67" r="0.1" fill="#adb5bd" opacity="0.25"/>
+    <circle cx="33" cy="42" r="0.1" fill="#adb5bd" opacity="0.3"/>
+    <circle cx="67" cy="58" r="0.1" fill="#adb5bd" opacity="0.25"/>
+    <circle cx="39" cy="34" r="0.1" fill="#adb5bd" opacity="0.25"/>
+    <circle cx="61" cy="66" r="0.1" fill="#adb5bd" opacity="0.2"/>
+    <circle cx="34" cy="39" r="0.1" fill="#adb5bd" opacity="0.25"/>
+    <circle cx="66" cy="61" r="0.1" fill="#adb5bd" opacity="0.2"/>
+    
+    <!-- Ultra-dense additional scattered dots for maximum texture -->
+    <circle cx="45" cy="41" r="0.1" fill="#6c757d" opacity="0.45"/>
+    <circle cx="55" cy="59" r="0.1" fill="#adb5bd" opacity="0.4"/>
+    <circle cx="41" cy="45" r="0.1" fill="#6c757d" opacity="0.4"/>
+    <circle cx="59" cy="55" r="0.1" fill="#adb5bd" opacity="0.35"/>
+    <circle cx="47" cy="62" r="0.1" fill="#adb5bd" opacity="0.3"/>
+    <circle cx="53" cy="38" r="0.1" fill="#6c757d" opacity="0.35"/>
+    <circle cx="42" cy="48" r="0.1" fill="#6c757d" opacity="0.35"/>
+    <circle cx="58" cy="52" r="0.1" fill="#adb5bd" opacity="0.3"/>
+    <circle cx="48" cy="42" r="0.1" fill="#adb5bd" opacity="0.3"/>
+    <circle cx="52" cy="58" r="0.1" fill="#adb5bd" opacity="0.25"/>
+    <circle cx="44" cy="52" r="0.1" fill="#adb5bd" opacity="0.25"/>
+    <circle cx="56" cy="48" r="0.1" fill="#adb5bd" opacity="0.25"/>
+    <circle cx="49" cy="47" r="0.1" fill="#6c757d" opacity="0.3"/>
+    <circle cx="51" cy="53" r="0.1" fill="#adb5bd" opacity="0.25"/>
+    <circle cx="47" cy="49" r="0.1" fill="#6c757d" opacity="0.25"/>
+    <circle cx="53" cy="51" r="0.1" fill="#adb5bd" opacity="0.2"/>
+    <circle cx="46" cy="50" r="0.1" fill="#6c757d" opacity="0.25"/>
+    <circle cx="54" cy="50" r="0.1" fill="#adb5bd" opacity="0.2"/>
+    <circle cx="50" cy="46" r="0.1" fill="#adb5bd" opacity="0.2"/>
+    <circle cx="50" cy="54" r="0.1" fill="#adb5bd" opacity="0.15"/>
+    
+    <!-- Maximum density micro-dots -->
+    <circle cx="37" cy="49" r="0.1" fill="#6c757d" opacity="0.3"/>
+    <circle cx="63" cy="51" r="0.1" fill="#adb5bd" opacity="0.25"/>
+    <circle cx="49" cy="37" r="0.1" fill="#adb5bd" opacity="0.25"/>
+    <circle cx="51" cy="63" r="0.1" fill="#adb5bd" opacity="0.2"/>
+    <circle cx="38" cy="51" r="0.1" fill="#adb5bd" opacity="0.25"/>
+    <circle cx="62" cy="49" r="0.1" fill="#adb5bd" opacity="0.2"/>
+    <circle cx="51" cy="38" r="0.1" fill="#adb5bd" opacity="0.2"/>
+    <circle cx="49" cy="62" r="0.1" fill="#adb5bd" opacity="0.15"/>
+    <circle cx="40" cy="46" r="0.1" fill="#6c757d" opacity="0.25"/>
+    <circle cx="60" cy="54" r="0.1" fill="#adb5bd" opacity="0.2"/>
+    <circle cx="46" cy="60" r="0.1" fill="#adb5bd" opacity="0.2"/>
+    <circle cx="54" cy="40" r="0.1" fill="#adb5bd" opacity="0.2"/>
+    <circle cx="40" cy="54" r="0.1" fill="#adb5bd" opacity="0.2"/>
+    <circle cx="60" cy="46" r="0.1" fill="#adb5bd" opacity="0.15"/>
+    <circle cx="54" cy="60" r="0.1" fill="#adb5bd" opacity="0.15"/>
+    <circle cx="46" cy="40" r="0.1" fill="#adb5bd" opacity="0.15"/>
+    
+  </g>
+  
+  <!-- Text -->
+  <text x="110" y="58" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="28" font-weight="500" fill="url(#textGradient)">realms</text>
+</svg>

@@ -1,0 +1,73 @@
+<svg width="300" height="100" viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Planet gradient with sophisticated lighting -->
+    <radialGradient id="planetBody" cx="30%" cy="20%" r="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="15%" style="stop-color:#f8f9fa;stop-opacity:1" />
+      <stop offset="40%" style="stop-color:#e9ecef;stop-opacity:1" />
+      <stop offset="70%" style="stop-color:#adb5bd;stop-opacity:1" />
+      <stop offset="90%" style="stop-color:#495057;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#212529;stop-opacity:1" />
+    </radialGradient>
+    
+    <!-- Text gradient -->
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#495057;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#212529;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Planet shadow -->
+    <filter id="planetShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="3" dy="3" result="offset"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.25"/>
+      </feComponentTransfer>
+      <feMerge> 
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/> 
+      </feMerge>
+    </filter>
+    
+    <!-- Clipping path for planet boundary -->
+    <clipPath id="planetClip">
+      <circle cx="50" cy="50" r="30"/>
+    </clipPath>
+  </defs>
+  
+  <!-- Planet base -->
+  <circle cx="50" cy="50" r="30" fill="url(#planetBody)" filter="url(#planetShadow)"/>
+  
+  <!-- Tennis ball-inspired divisions (3 divisions) -->
+  <g clip-path="url(#planetClip)">
+    
+    <!-- Division 1: Upper region with flowing curve -->
+    <path d="M 30 25 Q 50 30 70 35 Q 65 50 50 55 Q 35 50 30 25 Z" 
+          fill="#ffffff" opacity="0.9" stroke="#212529" stroke-width="0.6"/>
+    
+    <!-- Division 2: Right region with complementary curve -->
+    <path d="M 70 35 Q 75 55 70 75 Q 55 70 50 55 Q 65 50 70 35 Z" 
+          fill="#e9ecef" opacity="0.9" stroke="#212529" stroke-width="0.6"/>
+    
+    <!-- Division 3: Left region completing the pattern -->
+    <path d="M 30 25 Q 25 45 30 75 Q 45 70 50 55 Q 35 50 30 25 Z" 
+          fill="#6c757d" opacity="0.9" stroke="#212529" stroke-width="0.6"/>
+    
+    <!-- Flowing curves (tennis ball seam style) -->
+    <path d="M 30 25 Q 50 30 70 35 Q 75 55 70 75 Q 55 70 50 55 Q 45 70 30 75 Q 25 45 30 25" 
+          fill="none" stroke="#212529" stroke-width="0.8" opacity="0.6"/>
+    
+  </g>
+  
+  <!-- Atmospheric layers -->
+  <circle cx="50" cy="50" r="31" fill="none" stroke="#ffffff" stroke-width="0.5" opacity="0.3"/>
+  <circle cx="50" cy="50" r="32.5" fill="none" stroke="#ffffff" stroke-width="0.3" opacity="0.2"/>
+  
+  <!-- Surface features -->
+  <circle cx="45" cy="35" r="0.8" fill="#ffffff" opacity="0.4"/>
+  <circle cx="65" cy="55" r="0.6" fill="#ffffff" opacity="0.3"/>
+  <circle cx="35" cy="65" r="0.7" fill="#ffffff" opacity="0.3"/>
+  
+  <!-- Text -->
+  <text x="110" y="58" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="28" font-weight="500" fill="url(#textGradient)">realms</text>
+</svg>
