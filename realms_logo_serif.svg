@@ -1,0 +1,26 @@
+<svg width="200" height="40" viewBox="0 0 200 40" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Subtle gradients for depth -->
+    <linearGradient id="barGradient1serif" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#9CA3AF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6B7280;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="barGradient2serif" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6B7280;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4B5563;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="barGradient3serif" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#9CA3AF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6B7280;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Three staggered bars with gradients -->
+  <rect x="0" y="14" width="8" height="18" rx="2" fill="url(#barGradient1serif)"/>
+  <rect x="12" y="6" width="8" height="28" rx="2" fill="url(#barGradient2serif)"/>
+  <rect x="24" y="10" width="8" height="22" rx="2" fill="url(#barGradient3serif)"/>
+  
+  <!-- Realms text with serif font -->
+  <text x="45" y="26" font-family="'Playfair Display', 'Times New Roman', serif" 
+        font-size="24" font-weight="600" fill="white" letter-spacing="-0.3px">realms</text>
+</svg>
