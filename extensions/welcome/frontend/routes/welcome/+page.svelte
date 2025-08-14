@@ -73,9 +73,11 @@
     </div>
   {/if}
   
-  <!-- Realms logo in top left corner -->
-  <div class="realms-logo">
-    <img src="/images/logo_horizontal_white.svg" alt="{$_('extensions.welcome.alt_text.realms_logo')}" class="logo-img" width="200" />
+  <!-- Top bar with logo -->
+  <div class="top-bar">
+    <div class="realms-logo">
+      <img src="/images/logo_horizontal_white.svg" alt="{$_('extensions.welcome.alt_text.realms_logo')}" class="logo-img" width="200" />
+    </div>
   </div>
 
   <div class="content">
@@ -228,10 +230,21 @@
     margin: 0 0.2rem;
   }
 
-  .realms-logo {
+  .top-bar {
     position: absolute;
-    top: 2rem;
-    left: 2rem;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 80px;
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    z-index: 20;
+    display: flex;
+    align-items: center;
+  }
+
+  .realms-logo {
+    margin-left: 2rem;
     z-index: 30;
   }
 
