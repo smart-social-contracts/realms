@@ -2,8 +2,8 @@
   "name": "欢迎",
   "description": "Realms GOS 欢迎页面",
   "sidebar": "欢迎",
-  "title": "欢迎",
-  "page_title": "欢迎",
+  "title": "Realms GOS",
+  "page_title": "Realms GOS",
   "hero": {
     "title": "Realms GOS - 治理操作系统",
     "subtitle_1": "• 几秒钟内启动完整的公共管理系统",

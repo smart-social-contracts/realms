@@ -2,8 +2,8 @@
   "name": "Welcome",
   "description": "Welcome page for Realms GOS",
   "sidebar": "Welcome",
-  "title": "Welcome",
-  "page_title": "Welcome",
+  "title": "Realms GOS",
+  "page_title": "Realms GOS",
   "hero": {
     "title": "Realms GOS - The Governance Operating System",
     "subtitle_1": "• Launch a full public administration in seconds",
