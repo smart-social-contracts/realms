@@ -1,0 +1,28 @@
+<svg width="300" height="100" viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Text gradient -->
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#495057;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#212529;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Golden ratio divisions: φ (1.618) and 1 -->
+  <!-- Normalized: φ/(φ+1) ≈ 0.618 and 1/(φ+1) ≈ 0.382 -->
+  <!-- 0.618 × 360° = 222.5°, 0.382 × 360° = 137.5° -->
+  
+  <!-- Large segment: 222.5° (golden ratio portion) -->
+  <path d="M 50 15 A 35 35 0 1 1 19.7 35 L 50 50 Z" fill="#adb5bd" stroke="#ffffff" stroke-width="2"/>
+  
+  <!-- Small segment: 137.5° (remaining portion) -->
+  <path d="M 19.7 35 A 35 35 0 0 1 50 15 L 50 50 Z" fill="#f8f9fa" stroke="#ffffff" stroke-width="2"/>
+  
+  <!-- Outer circle border -->
+  <circle cx="50" cy="50" r="35" fill="none" stroke="#495057" stroke-width="2"/>
+  
+  <!-- Golden ratio symbol (φ) in center -->
+  <text x="50" y="55" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="8" font-weight="300" fill="#495057" text-anchor="middle" opacity="0.6">φ</text>
+  
+  <!-- Text -->
+  <text x="110" y="58" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="28" font-weight="500" fill="url(#textGradient)">realms</text>
+</svg>
