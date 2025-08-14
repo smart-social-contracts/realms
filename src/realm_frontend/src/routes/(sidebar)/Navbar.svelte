@@ -35,7 +35,7 @@
 	/>
 	<NavBrand href="/" class="{list ? 'w-40' : 'lg:w-60'} relative z-40 cursor-pointer">
 		<img
-			src="/images/logo_white_horizontal.png"
+			src="/images/logo_horizontal.png"
 			class="h-8 sm:h-10 pointer-events-none"
 			alt="Smart Social Contracts Logo"
 		/>
