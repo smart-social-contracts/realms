@@ -75,7 +75,7 @@
   
   <!-- Realms logo in top left corner -->
   <div class="realms-logo">
-    <img src="/images/logo_horizontal.png" alt="{$_('extensions.welcome.alt_text.realms_logo')}" class="logo-img" />
+    <img src="/images/logo_horizontal.svg" alt="{$_('extensions.welcome.alt_text.realms_logo')}" class="logo-img" />
   </div>
 
   <div class="content">
