@@ -1,0 +1,84 @@
+<svg width="300" height="100" viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Planet gradient with realistic lighting -->
+    <radialGradient id="planetBody" cx="25%" cy="15%" r="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="15%" style="stop-color:#f8f9fa;stop-opacity:1" />
+      <stop offset="40%" style="stop-color:#e9ecef;stop-opacity:1" />
+      <stop offset="70%" style="stop-color:#adb5bd;stop-opacity:1" />
+      <stop offset="90%" style="stop-color:#495057;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#212529;stop-opacity:1" />
+    </radialGradient>
+    
+    <!-- Text gradient -->
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#495057;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#212529;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Planet shadow -->
+    <filter id="planetShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="3" dy="3" result="offset"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.25"/>
+      </feComponentTransfer>
+      <feMerge> 
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/> 
+      </feMerge>
+    </filter>
+    
+    <!-- Clipping path for planet boundary -->
+    <clipPath id="planetClip">
+      <circle cx="50" cy="50" r="30"/>
+    </clipPath>
+  </defs>
+  
+  <!-- Planet base -->
+  <circle cx="50" cy="50" r="30" fill="url(#planetBody)" filter="url(#planetShadow)"/>
+  
+  <!-- Flowing organic territories within planet boundary -->
+  <g clip-path="url(#planetClip)">
+    
+    <!-- Territory 1: Archipelago region (Fibonacci: 1 unit) -->
+    <path d="M 35 22 Q 50 20 60 28 Q 55 35 45 32 Q 38 30 35 22 Z" 
+          fill="#ffffff" opacity="0.9" stroke="#212529" stroke-width="0.5"/>
+    
+    <!-- Territory 2: Mountain peninsula (Fibonacci: 1 unit) -->
+    <path d="M 65 35 Q 75 45 72 58 Q 68 50 65 45 Q 67 40 65 35 Z" 
+          fill="#e9ecef" opacity="0.95" stroke="#212529" stroke-width="0.5"/>
+    
+    <!-- Territory 3: River delta (Fibonacci: 2 units) -->
+    <path d="M 60 65 Q 45 75 30 68 Q 35 60 50 65 Q 58 67 60 65 Z" 
+          fill="#adb5bd" opacity="0.95" stroke="#212529" stroke-width="0.5"/>
+    
+    <!-- Territory 4: Great plains (Fibonacci: 3 units) -->
+    <path d="M 22 55 Q 15 40 25 25 Q 35 22 45 32 Q 38 30 35 22 Q 25 25 22 35 Q 20 45 22 55 Z" 
+          fill="#6c757d" opacity="0.95" stroke="#212529" stroke-width="0.5"/>
+    
+    <!-- Flowing boundary lines between regions -->
+    <path d="M 35 22 Q 50 20 60 28 Q 65 35 67 40 Q 65 45 68 50 Q 72 58 75 45 Q 72 58 68 50 Q 65 58 60 65 Q 58 67 50 65 Q 45 75 30 68 Q 35 60 22 55 Q 20 45 22 35 Q 25 25 35 22" 
+          fill="none" stroke="#ffffff" stroke-width="0.3" opacity="0.2"/>
+    
+    <!-- Internal flowing boundaries -->
+    <path d="M 45 32 Q 55 35 60 28 Q 65 35 67 40" 
+          fill="none" stroke="#ffffff" stroke-width="0.2" opacity="0.15"/>
+    
+    <path d="M 50 65 Q 45 55 38 50 Q 30 45 25 40" 
+          fill="none" stroke="#ffffff" stroke-width="0.2" opacity="0.15"/>
+    
+  </g>
+  
+  <!-- Atmospheric layers -->
+  <circle cx="50" cy="50" r="31" fill="none" stroke="#ffffff" stroke-width="0.5" opacity="0.3"/>
+  <circle cx="50" cy="50" r="32.5" fill="none" stroke="#ffffff" stroke-width="0.3" opacity="0.2"/>
+  
+  <!-- Surface features -->
+  <circle cx="42" cy="30" r="0.8" fill="#ffffff" opacity="0.4"/>
+  <circle cx="68" cy="48" r="0.6" fill="#ffffff" opacity="0.3"/>
+  <circle cx="35" cy="62" r="1" fill="#ffffff" opacity="0.25"/>
+  
+  <!-- Text -->
+  <text x="110" y="58" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="28" font-weight="500" fill="url(#textGradient)">realms</text>
+</svg>
