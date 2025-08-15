@@ -1,11 +1,13 @@
 {
   "name": "market_place",
   "version": "1.0.0",
-  "description": "market_place extension",
+  "description": "Extensions marketplace for browsing and managing extensions",
   "author": "Smart Social Contracts",
   "permissions": [],
   "profiles": ["admin"],
+  "categories": ["other"],
   "icon": "layers",
-  "url": "https://github.com/smart-social-contracts/extensions/market_place",
-  "path": "extensions"
+  "doc_url": "https://github.com/smart-social-contracts/extensions/market_place",
+  "url_path": "extensions",
+  "show_in_sidebar": true
 }

@@ -18,8 +18,8 @@ extensions/{your_extension_id}/
 ├── manifest.json              # Extension metadata
 ├── backend/                   # Python backend code
 │   ├── __init__.py
-│   ├── entry.py              # Main backend entry point
-│   └── manifest.json         # Backend-specific manifest
+│   └── entry.py              # Main backend entry point
+│   
 └── frontend/                 # Frontend components
     ├── lib/extensions/{extension_id}/
     │   ├── index.ts          # TypeScript entry point
@@ -45,7 +45,9 @@ extensions/{your_extension_id}/
   "profiles": ["member", "admin"],
   "categories": ["public_services", "finances", "other"],
   "icon": "table",
-  "url": "https://github.com/yourname/your-extension"
+  "doc_url": "https://github.com/yourname/your-extension",
+  "url_path": null,
+  "show_in_sidebar": true
 }
 ```
 
@@ -57,8 +59,11 @@ extensions/{your_extension_id}/
 - `permissions`: Array of required permissions
 - `profiles`: User profiles that can access this extension
 - `categories`: Grouping categories for sidebar organization
-- `icon`: Icon name (from Flowbite icons)
-- `url`: Repository or documentation URL
+- `icon`: Icon name (from Flowbite icons) (optional) (default: a default icon will be used)
+- `doc_url`: Documentation URL (optional)
+- `url_path`: Custom path for the extension (optional) (default: the extension name, e.g. `/welcome`)
+- `show_in_sidebar`: Whether to show the extension in the sidebar (optional) (default: true)
+
 
 **Available Categories:**
 - `public_services`: Government and public sector functionality
@@ -92,39 +97,8 @@ def helper_function():
     pass
 ```
 
-### Backend Manifest (`backend/manifest.json`)
-
-```json
-{
-  "name": "your_extension_name",
-  "version": "1.0.0",
-  "description": "Backend component description",
-  "author": "Your Name",
-  "permissions": ["read", "write"]
-}
-```
 
 ## 🎨 Frontend Development
-
-### TypeScript Entry Point (`frontend/lib/extensions/{extension_id}/index.ts`)
-
-```typescript
-import { default as YourMainComponent } from './YourMainComponent.svelte';
-import { YourIcon } from 'flowbite-svelte-icons';
-
-export default YourMainComponent;
-
-export const metadata = {
-  name: "Your Extension Display Name",
-  description: "User-facing description",
-  icon: YourIcon,
-  author: "Your Name",
-  permissions: ["read"],
-  subComponents: {
-    // Export additional components if needed
-  }
-};
-```
 
 ### Svelte Components
 
@@ -230,123 +204,3 @@ python scripts/realm-extension-cli.py install --package-path your_extension.zip
 # Uninstall an extension
 python scripts/realm-extension-cli.py uninstall --extension-id your_extension_name
 ```
-
-### Local Development Workflow
-
-1. **Create your extension** in `extensions/your_extension_name/`
-2. **Install locally** using `./scripts/install_extensions.sh`
-3. **Test in browser** at `http://localhost:8080`
-4. **Iterate** by editing source files and re-running install script
-
-## 📦 Distribution
-
-### Packaging
-
-```bash
-# Package your extension for distribution
-python scripts/realm-extension-cli.py package --extension-id your_extension_name --output-dir ./dist
-```
-
-This creates a `your_extension_name.zip` file containing:
-- `manifest.json`
-- `backend/` folder with Python files
-- `frontend/` folder with TypeScript/Svelte files
-
-### Installation by End Users
-
-Users can install your extension:
-
-```bash
-# Download your extension package
-python scripts/realm-extension-cli.py install --package-path your_extension_name.zip
-```
-
-## 🎯 Best Practices
-
-### Code Organization
-- Keep backend logic in `backend/entry.py`
-- Create focused, reusable Svelte components
-- Use TypeScript for better development experience
-- Follow the existing code style and patterns
-
-### Security
-- Validate all input parameters in backend functions
-- Use appropriate permission levels
-- Sanitize user input before database operations
-- Follow principle of least privilege
-
-### Performance
-- Minimize backend function complexity
-- Use efficient database queries
-- Implement proper error handling
-- Consider caching for expensive operations
-
-### User Experience
-- Provide clear loading states
-- Handle errors gracefully
-- Use consistent UI patterns
-- Support internationalization
-
-## 🔧 API Reference
-
-### Backend API
-
-Extensions can access the platform's core functionality:
-
-```python
-# Example backend function with platform integration
-def get_user_data(args):
-    from core.database import get_user_by_id
-    
-    user_id = args.get('user_id')
-    if not user_id:
-        return {"error": "user_id required"}
-    
-    user = get_user_by_id(user_id)
-    return {"user": user.to_dict()} if user else {"error": "User not found"}
-```
-
-### Frontend API
-
-Call backend functions from your Svelte components:
-
-```typescript
-import { callExtension } from '$lib/api/extensions';
-
-// Call your backend function
-const result = await callExtension('extension_name', 'function_name', {
-  param1: 'value1',
-  param2: 'value2'
-});
-```
-
-## 📚 Examples
-
-Check out the existing extensions in this directory for examples:
-- `citizen_dashboard`: User dashboard with multiple components
-- `vault_manager`: Financial management interface
-- `land_registry`: Geographic data visualization
-- `llm_chat`: AI chat integration
-- `notifications`: Real-time notification system
-
-## 🤝 Contributing
-
-1. **Fork** the repository
-2. **Create** your extension following this guide
-3. **Test** thoroughly in local environment
-4. **Submit** a pull request with your extension
-5. **Document** any special requirements or dependencies
-
-## 📞 Support
-
-- **Documentation**: Check existing extensions for examples
-- **Issues**: Report bugs or request features via GitHub issues
-- **Community**: Join our developer community discussions
-
-## 📄 License
-
-Extensions should be compatible with the main project license. Please include appropriate license information in your extension repository.
-
----
-
-Happy coding! 🚀 Build amazing extensions for the Realms platform!

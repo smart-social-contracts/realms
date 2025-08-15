@@ -1,11 +1,13 @@
 {
   "name": "vault_manager",
   "version": "0.1.0",
-  "description": "Manages vault operations for the Realms platform",
-  "required_permissions": [],
+  "description": "Secure digital asset and token management",
+  "permissions": [],
   "entry_points": ["get_balance", "get_status", "get_transactions", "transfer"],
   "profiles": ["admin"],
   "categories": ["finances"],
   "icon": "wallet",
-  "url": "https://github.com/smart-social-contracts/extensions/vault_manager"
+  "doc_url": "https://github.com/smart-social-contracts/extensions/vault_manager",
+  "url_path": null,
+  "show_in_sidebar": true
 }

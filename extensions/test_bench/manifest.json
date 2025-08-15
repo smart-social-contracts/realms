@@ -1,14 +1,17 @@
 {
     "name": "test_bench",
     "version": "0.1.0",
-    "description": "Test bench extension",
+    "description": "Development testing and debugging tools",
     "author": "Smart Social Contracts Team",
     "permissions": [
         "read_vault",
         "transfer_tokens"
     ],
+    "profiles": ["admin"],
     "enabled": false,
     "categories": ["other"],
     "icon": "lightbulb",
-    "url": "https://github.com/smart-social-contracts/extensions/test_bench"
+    "doc_url": "https://github.com/smart-social-contracts/extensions/test_bench",
+    "url_path": null,
+    "show_in_sidebar": false
 }

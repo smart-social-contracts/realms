@@ -38,6 +38,8 @@
 		path?: string | null;
 		categories?: string[];
 		profiles?: string[];
+		doc_url?: string;
+		show_in_sidebar?: boolean;
 		enabled?: boolean;
 	}
 	import { getIcon } from '$lib/utils/iconMap';
@@ -147,7 +149,9 @@
 					enabled: true,
 					profiles: ext.profiles || [],
 					categories: ext.categories || ['other'],
-					path: ext.path
+					path: ext.url_path || ext.path,
+					doc_url: ext.doc_url,
+					show_in_sidebar: ext.show_in_sidebar !== false // default to true
 				}));
 				console.log('Mapped extensions:', extensions);
 				extensionsLoaded = true;
@@ -174,6 +178,9 @@
 		return extensions.filter(ext => {
 			// Skip if extension is not enabled
 			if (ext.enabled === false) return false;
+			
+			// Skip if show_in_sidebar is explicitly set to false
+			if (ext.show_in_sidebar === false) return false;
 			
 			// Skip if path is explicitly set to null (hide from sidebar)
 			if (ext.path === null) return false;

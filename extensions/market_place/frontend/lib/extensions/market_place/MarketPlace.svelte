@@ -13,7 +13,9 @@
 		icon?: string;
 		categories?: string[];
 		profiles?: string[];
-		url?: string;
+		doc_url?: string;
+		url_path?: string;
+		show_in_sidebar?: boolean;
 		installed?: boolean;
 	}
 
@@ -39,7 +41,9 @@
 					icon: ext.icon,
 					categories: ext.categories,
 					profiles: ext.profiles,
-					url: ext.url,
+					doc_url: ext.doc_url,
+					url_path: ext.url_path,
+					show_in_sidebar: ext.show_in_sidebar,
 					installed: true // All extensions returned by backend are installed
 				}));
 			} else {
@@ -156,8 +160,8 @@
 									</Button>
 								{/if}
 								
-								{#if extension.url}
-									<Button color="light" size="sm" href={extension.url} target="_blank">
+								{#if extension.doc_url}
+									<Button color="light" size="sm" href={extension.doc_url} target="_blank">
 										<ArrowUpRightFromSquareOutline class="w-4 h-4" />
 									</Button>
 								{/if}
