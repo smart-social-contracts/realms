@@ -4,5 +4,6 @@
   "description": "market_place extension",
   "author": "Smart Social Contracts",
   "permissions": [],
-  "profiles": ["admin"]
+  "profiles": ["admin"],
+  "icon": "wand"
 }

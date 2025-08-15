@@ -4,5 +4,6 @@
   "description": "public_dashboard extension",
   "author": "Smart Social Contracts",
   "permissions": [],
-  "profiles": []
+  "profiles": [],
+  "icon": "table"
 }

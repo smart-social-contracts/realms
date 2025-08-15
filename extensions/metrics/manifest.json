@@ -4,5 +4,6 @@
   "description": "metrics extension",
   "author": "Smart Social Contracts",
   "permissions": [],
-  "profiles": ["member", "admin"]
+  "profiles": ["member", "admin"],
+  "icon": "analytics"
 }

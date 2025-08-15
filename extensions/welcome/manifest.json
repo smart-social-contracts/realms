@@ -4,5 +4,6 @@
   "description": "welcome extension",
   "author": "Smart Social Contracts",
   "permissions": [],
-  "profiles": []
+  "profiles": [],
+  "icon": "home"
 }
