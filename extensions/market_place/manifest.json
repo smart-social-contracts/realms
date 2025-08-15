@@ -8,6 +8,6 @@
   "categories": ["other"],
   "icon": "layers",
   "doc_url": "https://github.com/smart-social-contracts/extensions/market_place",
-  "url_path": "extensions",
+  "url_path": null,
   "show_in_sidebar": true
 }

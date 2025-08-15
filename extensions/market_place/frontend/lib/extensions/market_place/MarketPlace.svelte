@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
-	import { Card, Button, Badge, Spinner } from 'flowbite-svelte';
-	import { DownloadOutline, ArrowUpRightFromSquareOutline } from 'flowbite-svelte-icons';
+	import { Card, Button, Badge, Spinner, Toggle } from 'flowbite-svelte';
+	import { ArrowUpRightFromSquareOutline, LayersOutline, UserOutline, RectangleListSolid, WalletSolid, BellOutline, ChartPieOutline, BookOpenOutline, ShieldCheckOutline, HomeOutline, CogOutline } from 'flowbite-svelte-icons';
 	import { backend } from '$lib/canisters';
 
 	interface Extension {
@@ -17,6 +17,7 @@
 		url_path?: string;
 		show_in_sidebar?: boolean;
 		installed?: boolean;
+		enabled?: boolean;
 	}
 
 	let extensions: Extension[] = [];
@@ -44,7 +45,8 @@
 					doc_url: ext.doc_url,
 					url_path: ext.url_path,
 					show_in_sidebar: ext.show_in_sidebar,
-					installed: true // All extensions returned by backend are installed
+					installed: true, // All extensions returned by backend are installed
+				enabled: ext.show_in_sidebar !== false // Default to enabled unless explicitly disabled
 				}));
 			} else {
 				throw new Error('Failed to load extensions from backend');
@@ -72,6 +74,33 @@
 
 	function getStatusText(installed: boolean): string {
 		return installed ? 'Installed' : 'Available';
+	}
+
+	function getExtensionIcon(iconName: string | undefined, extensionName: string) {
+		const iconMap: Record<string, any> = {
+			layers: LayersOutline,
+			user: UserOutline,
+			table: RectangleListSolid,
+			wallet: WalletSolid,
+			chat: UserOutline, // Fallback since ChatBubbleLeftRightOutline doesn't exist
+			bell: BellOutline,
+			chart: ChartPieOutline,
+			book: BookOpenOutline,
+			shield: ShieldCheckOutline,
+			beaker: UserOutline, // Fallback since BeakerOutline doesn't exist
+			home: HomeOutline,
+			cog: CogOutline
+		};
+		return iconMap[iconName || ''] || UserOutline;
+	}
+
+	function handleToggleExtension(extension: Extension) {
+		// Update the extension's enabled state
+		extension.enabled = !extension.enabled;
+		// Here you would typically call a backend API to enable/disable the extension
+		console.log(`${extension.enabled ? 'Enabled' : 'Disabled'} extension:`, extension.name);
+		// Force reactivity update
+		extensions = [...extensions];
 	}
 </script>
 
@@ -109,9 +138,7 @@
 						<div class="flex items-start justify-between mb-4">
 							<div class="flex items-center">
 								<div class="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center mr-3">
-									<span class="text-blue-600 dark:text-blue-400 text-lg font-semibold">
-										{extension.icon || extension.name.charAt(0).toUpperCase()}
-									</span>
+									<svelte:component this={getExtensionIcon(extension.icon, extension.name)} class="w-6 h-6 text-blue-600 dark:text-blue-400" />
 								</div>
 								<div>
 									<h3 class="text-lg font-semibold text-gray-900 dark:text-white capitalize">
@@ -147,18 +174,17 @@
 								{/if}
 							</div>
 
-							<div class="flex gap-2 pt-2">
-								{#if extension.installed}
-									<Button color="alternative" size="sm" disabled class="flex-1">
-										<DownloadOutline class="w-4 h-4 mr-2" />
-										Installed
-									</Button>
-								{:else}
-									<Button color="primary" size="sm" class="flex-1">
-										<DownloadOutline class="w-4 h-4 mr-2" />
-										Install
-									</Button>
-								{/if}
+							<div class="flex items-center justify-between pt-2">
+								<div class="flex items-center space-x-2">
+									<span class="text-sm text-gray-600 dark:text-gray-400">
+										{extension.enabled ? 'Enabled' : 'Disabled'}
+									</span>
+									<Toggle 
+										checked={extension.enabled || false} 
+										on:change={() => handleToggleExtension(extension)}
+										size="small"
+									/>
+								</div>
 								
 								{#if extension.doc_url}
 									<Button color="light" size="sm" href={extension.doc_url} target="_blank">
