@@ -6,6 +6,6 @@
   "functions": ["get_verification_link", "check_verification_status", "create_passport_identity"],
   "profiles": ["member", "admin"],
   "categories": ["identity"],
-  "icon": "users",
+  "icon": "book",
   "url": "https://github.com/smart-social-contracts/extensions/passport_verification"
 }

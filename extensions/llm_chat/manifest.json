@@ -6,6 +6,6 @@
     "permissions": [],
     "profiles": [],
     "categories": ["other"],
-    "icon": "wand",
+    "icon": "brain",
     "url": "https://github.com/smart-social-contracts/extensions/llm_chat"
 }                

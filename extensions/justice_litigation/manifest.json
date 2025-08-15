@@ -6,6 +6,6 @@
   "entry_points": ["get_litigations", "create_litigation", "execute_verdict"],
   "profiles": ["admin", "member"],
   "categories": ["public_services"],
-  "icon": "clipboard",
+  "icon": "building",
   "url": "https://github.com/smart-social-contracts/extensions/justice_litigation"
 }

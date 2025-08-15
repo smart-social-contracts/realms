@@ -15,7 +15,10 @@ import {
     UsersOutline,
     HomeOutline,
     FileChartBarSolid,
-    BellSolid
+    BellSolid,
+    BuildingSolid,
+    BookOutline,
+    BrainOutline,
 } from 'flowbite-svelte-icons';
 
 /**
@@ -34,13 +37,16 @@ export const iconMap: Record<string, any> = {
     'lifesaver': LifeSaverSolid,
     'lock': LockSolid,
     'wand': WandMagicSparklesOutline,
-    'analytics': ChartOutline,
+    'analytics': ChartPieOutline,
     'list': RectangleListSolid,
     'table': TableColumnSolid,
     'users': UsersOutline,
     'home': HomeOutline,
     'file': FileChartBarSolid,
-    'bell': BellSolid
+    'bell': BellSolid,
+    'building': BuildingSolid,
+    'book': BookOutline,
+    'brain': BrainOutline,
 };
 
 /**
@@ -49,6 +55,6 @@ export const iconMap: Record<string, any> = {
  * @param defaultIcon Default icon to use if not found
  * @returns The icon component
  */
-export function getIcon(iconName: string, defaultIcon: any = LightbulbOutline): any {
+export function getIcon(iconName: string, defaultIcon: any = LayersSolid): any {
     return iconMap[iconName] || defaultIcon;
 }
