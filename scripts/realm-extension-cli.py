@@ -417,29 +417,71 @@ def install_extension(package_path):
             
             log_success(f"Installed frontend route files for {extension_id}")
         else:
-            # Auto-generate missing route files
-            log_info("No frontend route files found in package, auto-generating...")
+            # Check if extension has frontend components and should get auto-generated routes
+            frontend_lib_target = os.path.join(paths["frontend_dir"], f"src/lib/extensions/{extension_id}")
             
-            # Create route directory
-            os.makedirs(frontend_route_target, exist_ok=True)
+            # Load manifest to check for special path configuration
+            manifest_path = os.path.join(temp_dir, "manifest.json")
+            should_auto_generate = True
             
-            # Generate component name (PascalCase)
-            component_name = ''.join(word.capitalize() for word in extension_id.split('_'))
+            if os.path.exists(manifest_path):
+                try:
+                    with open(manifest_path, 'r') as f:
+                        manifest = json.load(f)
+                        # Skip auto-generation if extension has custom path or is hidden
+                        if "path" in manifest:
+                            should_auto_generate = False
+                            log_info(f"Extension {extension_id} has custom path configuration, skipping route generation")
+                except Exception as e:
+                    log_info(f"Could not read manifest for {extension_id}: {e}")
             
-            # Generate +page.svelte content
-            route_content = f"""<script lang="ts">
-\timport {component_name} from '$lib/extensions/{extension_id}/{component_name}.svelte';
+            if should_auto_generate and os.path.exists(frontend_lib_target) and os.listdir(frontend_lib_target):
+                # Auto-generate missing route files only if frontend components exist and no custom path
+                log_info("No frontend route files found in package, auto-generating...")
+                
+                # Create route directory
+                os.makedirs(frontend_route_target, exist_ok=True)
+                
+                # Find the main component file
+                component_files = [f for f in os.listdir(frontend_lib_target) if f.endswith('.svelte')]
+                main_component = None
+                
+                # Look for the main component (try different naming patterns)
+                component_name = ''.join(word.capitalize() for word in extension_id.split('_'))
+                possible_names = [
+                    f"{component_name}.svelte",
+                    f"{extension_id.upper().replace('_', '')}.svelte",  # e.g., LLMCHAT.svelte
+                    f"{extension_id.replace('_', '').upper()}.svelte",   # e.g., LLMCHAT.svelte
+                    f"{''.join(word.upper() for word in extension_id.split('_'))}.svelte"  # e.g., LLMChat.svelte
+                ]
+                
+                for possible_name in possible_names:
+                    if possible_name in component_files:
+                        main_component = possible_name[:-7]  # Remove .svelte extension
+                        break
+                
+                # If no match found, use the first component file or fallback to PascalCase
+                if not main_component and component_files:
+                    main_component = component_files[0][:-7]  # Remove .svelte extension
+                elif not main_component:
+                    main_component = component_name
+                
+                # Generate +page.svelte content
+                route_content = f"""<script lang="ts">
+\timport {main_component} from '$lib/extensions/{extension_id}/{main_component}.svelte';
 </script>
 
-<{component_name} />
+<{main_component} />
 """
-            
-            # Write the route file
-            route_file_path = os.path.join(frontend_route_target, "+page.svelte")
-            with open(route_file_path, 'w', encoding='utf-8') as f:
-                f.write(route_content)
-            
-            log_success(f"Auto-generated route file for {extension_id}: +page.svelte")
+                
+                # Write the route file
+                route_file_path = os.path.join(frontend_route_target, "+page.svelte")
+                with open(route_file_path, 'w', encoding='utf-8') as f:
+                    f.write(route_content)
+                
+                log_success(f"Auto-generated route file for {extension_id}: +page.svelte")
+            else:
+                log_info(f"No frontend components found for {extension_id}, skipping route generation")
         
         # Install i18n translation files
         i18n_source = os.path.join(temp_dir, f"frontend/i18n/locales/extensions/{extension_id}")
