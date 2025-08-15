@@ -9,7 +9,6 @@ import {
     LifeSaverSolid,
     LockSolid,
     WandMagicSparklesOutline,
-    ChartOutline,
     RectangleListSolid,
     TableColumnSolid,
     UsersOutline,
@@ -19,6 +18,7 @@ import {
     BuildingSolid,
     BookOutline,
     BrainOutline,
+    MapPinSolid,
 } from 'flowbite-svelte-icons';
 
 /**
@@ -47,6 +47,7 @@ export const iconMap: Record<string, any> = {
     'building': BuildingSolid,
     'book': BookOutline,
     'brain': BrainOutline,
+    'map_pin': MapPinSolid,
 };
 
 /**
