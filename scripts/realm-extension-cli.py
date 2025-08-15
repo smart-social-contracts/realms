@@ -966,11 +966,55 @@ DO NOT EDIT MANUALLY - your changes will be overwritten.
 EXTENSION_MANIFESTS = {
 '''
     
-    # Add each extension manifest
+    # Add each extension manifest with pretty formatting
     for extension_id, manifest in extension_manifests.items():
-        # Convert JSON to Python representation (handles true/false -> True/False)
-        manifest_repr = repr(manifest).replace("'", '"')
-        python_content += f'    "{extension_id}": {manifest_repr},\n\n'
+        python_content += f'    "{extension_id}": {{\n'
+        
+        # Format each key-value pair in the manifest with proper indentation
+        for key, value in manifest.items():
+            if isinstance(value, str):
+                python_content += f'        "{key}": "{value}",\n'
+            elif isinstance(value, list):
+                if not value:
+                    python_content += f'        "{key}": [],\n'
+                else:
+                    python_content += f'        "{key}": [\n'
+                    for item in value:
+                        if isinstance(item, str):
+                            python_content += f'            "{item}",\n'
+                        else:
+                            python_content += f'            {repr(item)},\n'
+                    python_content += f'        ],\n'
+            elif isinstance(value, dict):
+                if not value:
+                    python_content += f'        "{key}": {{}},\n'
+                else:
+                    python_content += f'        "{key}": {{\n'
+                    for sub_key, sub_value in value.items():
+                        if isinstance(sub_value, str):
+                            python_content += f'            "{sub_key}": "{sub_value}",\n'
+                        elif isinstance(sub_value, list):
+                            if not sub_value:
+                                python_content += f'            "{sub_key}": [],\n'
+                            else:
+                                python_content += f'            "{sub_key}": [\n'
+                                for sub_item in sub_value:
+                                    if isinstance(sub_item, str):
+                                        python_content += f'                "{sub_item}",\n'
+                                    else:
+                                        python_content += f'                {repr(sub_item)},\n'
+                                python_content += f'            ],\n'
+                        elif isinstance(sub_value, bool):
+                            python_content += f'            "{sub_key}": {str(sub_value)},\n'
+                        else:
+                            python_content += f'            "{sub_key}": {repr(sub_value)},\n'
+                    python_content += f'        }},\n'
+            elif isinstance(value, bool):
+                python_content += f'        "{key}": {str(value)},\n'
+            else:
+                python_content += f'        "{key}": {repr(value)},\n'
+        
+        python_content += f'    }},\n\n'
     
     python_content += '''}
 
