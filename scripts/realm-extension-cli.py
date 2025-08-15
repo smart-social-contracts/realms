@@ -396,9 +396,10 @@ def install_extension(package_path):
             log_info("No frontend lib files found in package")
         
         frontend_route_source = os.path.join(temp_dir, "frontend/routes/(sidebar)/extensions", extension_id)
+        frontend_route_target = os.path.join(paths["frontend_dir"], "src/routes/(sidebar)/extensions", extension_id)
+        
         if os.path.exists(frontend_route_source) and os.listdir(frontend_route_source):
-            frontend_route_target = os.path.join(paths["frontend_dir"], "src/routes/(sidebar)/extensions", extension_id)
-            
+            # Install existing route files from package
             if os.path.exists(frontend_route_target):
                 shutil.rmtree(frontend_route_target)
             
@@ -416,7 +417,71 @@ def install_extension(package_path):
             
             log_success(f"Installed frontend route files for {extension_id}")
         else:
-            log_info("No frontend route files found in package")
+            # Check if extension has frontend components and should get auto-generated routes
+            frontend_lib_target = os.path.join(paths["frontend_dir"], f"src/lib/extensions/{extension_id}")
+            
+            # Load manifest to check for special path configuration
+            manifest_path = os.path.join(temp_dir, "manifest.json")
+            should_auto_generate = True
+            
+            if os.path.exists(manifest_path):
+                try:
+                    with open(manifest_path, 'r') as f:
+                        manifest = json.load(f)
+                        # Skip auto-generation if extension has custom path or is hidden
+                        if "path" in manifest:
+                            should_auto_generate = False
+                            log_info(f"Extension {extension_id} has custom path configuration, skipping route generation")
+                except Exception as e:
+                    log_info(f"Could not read manifest for {extension_id}: {e}")
+            
+            if should_auto_generate and os.path.exists(frontend_lib_target) and os.listdir(frontend_lib_target):
+                # Auto-generate missing route files only if frontend components exist and no custom path
+                log_info("No frontend route files found in package, auto-generating...")
+                
+                # Create route directory
+                os.makedirs(frontend_route_target, exist_ok=True)
+                
+                # Find the main component file
+                component_files = [f for f in os.listdir(frontend_lib_target) if f.endswith('.svelte')]
+                main_component = None
+                
+                # Look for the main component (try different naming patterns)
+                component_name = ''.join(word.capitalize() for word in extension_id.split('_'))
+                possible_names = [
+                    f"{component_name}.svelte",
+                    f"{extension_id.upper().replace('_', '')}.svelte",  # e.g., LLMCHAT.svelte
+                    f"{extension_id.replace('_', '').upper()}.svelte",   # e.g., LLMCHAT.svelte
+                    f"{''.join(word.upper() for word in extension_id.split('_'))}.svelte"  # e.g., LLMChat.svelte
+                ]
+                
+                for possible_name in possible_names:
+                    if possible_name in component_files:
+                        main_component = possible_name[:-7]  # Remove .svelte extension
+                        break
+                
+                # If no match found, use the first component file or fallback to PascalCase
+                if not main_component and component_files:
+                    main_component = component_files[0][:-7]  # Remove .svelte extension
+                elif not main_component:
+                    main_component = component_name
+                
+                # Generate +page.svelte content
+                route_content = f"""<script lang="ts">
+\timport {main_component} from '$lib/extensions/{extension_id}/{main_component}.svelte';
+</script>
+
+<{main_component} />
+"""
+                
+                # Write the route file
+                route_file_path = os.path.join(frontend_route_target, "+page.svelte")
+                with open(route_file_path, 'w', encoding='utf-8') as f:
+                    f.write(route_content)
+                
+                log_success(f"Auto-generated route file for {extension_id}: +page.svelte")
+            else:
+                log_info(f"No frontend components found for {extension_id}, skipping route generation")
         
         # Install i18n translation files
         i18n_source = os.path.join(temp_dir, f"frontend/i18n/locales/extensions/{extension_id}")
@@ -966,11 +1031,55 @@ DO NOT EDIT MANUALLY - your changes will be overwritten.
 EXTENSION_MANIFESTS = {
 '''
     
-    # Add each extension manifest
+    # Add each extension manifest with pretty formatting
     for extension_id, manifest in extension_manifests.items():
-        # Convert JSON to Python representation (handles true/false -> True/False)
-        manifest_repr = repr(manifest).replace("'", '"')
-        python_content += f'    "{extension_id}": {manifest_repr},\n\n'
+        python_content += f'    "{extension_id}": {{\n'
+        
+        # Format each key-value pair in the manifest with proper indentation
+        for key, value in manifest.items():
+            if isinstance(value, str):
+                python_content += f'        "{key}": "{value}",\n'
+            elif isinstance(value, list):
+                if not value:
+                    python_content += f'        "{key}": [],\n'
+                else:
+                    python_content += f'        "{key}": [\n'
+                    for item in value:
+                        if isinstance(item, str):
+                            python_content += f'            "{item}",\n'
+                        else:
+                            python_content += f'            {repr(item)},\n'
+                    python_content += f'        ],\n'
+            elif isinstance(value, dict):
+                if not value:
+                    python_content += f'        "{key}": {{}},\n'
+                else:
+                    python_content += f'        "{key}": {{\n'
+                    for sub_key, sub_value in value.items():
+                        if isinstance(sub_value, str):
+                            python_content += f'            "{sub_key}": "{sub_value}",\n'
+                        elif isinstance(sub_value, list):
+                            if not sub_value:
+                                python_content += f'            "{sub_key}": [],\n'
+                            else:
+                                python_content += f'            "{sub_key}": [\n'
+                                for sub_item in sub_value:
+                                    if isinstance(sub_item, str):
+                                        python_content += f'                "{sub_item}",\n'
+                                    else:
+                                        python_content += f'                {repr(sub_item)},\n'
+                                python_content += f'            ],\n'
+                        elif isinstance(sub_value, bool):
+                            python_content += f'            "{sub_key}": {str(sub_value)},\n'
+                        else:
+                            python_content += f'            "{sub_key}": {repr(sub_value)},\n'
+                    python_content += f'        }},\n'
+            elif isinstance(value, bool):
+                python_content += f'        "{key}": {str(value)},\n'
+            else:
+                python_content += f'        "{key}": {repr(value)},\n'
+        
+        python_content += f'    }},\n\n'
     
     python_content += '''}
 

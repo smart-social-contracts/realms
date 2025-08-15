@@ -13,12 +13,3 @@ export {
     AdminControls
 }
 
-export const metadata = {
-    name: 'Land Registry',
-    description: 'Manage land ownership and visualize land parcels on a map',
-    version: '1.0.0',
-    icon: 'map',
-    author: 'Smart Social Contracts Team',
-    permissions: ['manage_land', 'view_land_registry'],
-    profiles: ['member', 'admin']
-};

@@ -2,9 +2,12 @@
   "name": "demo_loader",
   "version": "0.1.0",
   "description": "Loads demo data for the Realms platform",
-  "required_permissions": [],
+  "permissions": [],
   "entry_points": ["load_demo_data"],
+  "profiles": ["admin"],
   "categories": ["other"],
   "icon": "lightbulb",
-  "url": "https://github.com/smart-social-contracts/extensions/demo_loader"
+  "doc_url": "https://github.com/smart-social-contracts/extensions/demo_loader",
+  "url_path": null,
+  "show_in_sidebar": false
 }

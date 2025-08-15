@@ -9,12 +9,3 @@ export {
     CreateLitigationForm
 }
 
-export const metadata = {
-    name: 'Justice Litigation',
-    description: 'External justice litigation system integration',
-    version: '1.0.0',
-    icon: 'lock',
-    author: 'Smart Social Contracts Team',
-    permissions: ['litigation_access'],
-    profiles: ['member', 'admin']
-};

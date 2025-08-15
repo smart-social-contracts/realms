@@ -373,8 +373,8 @@
 							<div class="flex items-start space-x-3 max-w-[85%]">
 								{#if !message.isUser}
 									<!-- AI Avatar -->
-									<div class="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-										AI
+									<div class="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden">
+										<img src="/extensions/llm_chat/photos/ashoka.png" alt="AI Assistant" class="w-full h-full object-cover" />
 									</div>
 								{/if}
 								
@@ -408,8 +408,8 @@
 						<div class="mb-6 flex justify-start">
 							<div class="flex items-start space-x-3 max-w-[85%]">
 								<!-- AI Avatar -->
-								<div class="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-									AI
+								<div class="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden">
+									<img src="/extensions/llm_chat/images/ashoka.png" alt="AI Assistant" class="w-full h-full object-cover" />
 								</div>
 								<div class="flex-1">
 									<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl rounded-bl-md px-5 py-4 shadow-sm">

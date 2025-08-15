@@ -1,0 +1,10 @@
+{
+  "sidebar": "Passport Verification",
+  "title": "Passport Verification",
+  "description": "Secure identity verification using ZK proofs",
+  "get_verification_link": "Get Verification Link",
+  "check_status": "Check Status",
+  "verification_complete": "Verification Complete",
+  "verification_pending": "Verification Pending",
+  "verification_failed": "Verification Failed"
+}

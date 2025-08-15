@@ -1,3 +1,5 @@
+<!-- TODO: generalize this page just like any other extension -->
+
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Card, Button } from 'flowbite-svelte';

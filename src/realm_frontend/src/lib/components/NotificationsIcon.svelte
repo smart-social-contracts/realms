@@ -7,8 +7,9 @@
 
     onMount(() => {
         loadNotifications();
-        const interval = setInterval(loadNotifications, 30000);
-        return () => clearInterval(interval);
+        // TODO: temporarily disabled
+        // const interval = setInterval(loadNotifications, 30000);
+        // return () => clearInterval(interval);
     });
 
     function handleClick() {

@@ -3,9 +3,12 @@
   "version": "1.0.0",
   "description": "Rarimo ZK Passport verification extension for secure identity verification",
   "author": "Realms Team",
+  "permissions": [],
   "functions": ["get_verification_link", "check_verification_status", "create_passport_identity"],
   "profiles": ["member", "admin"],
-  "categories": ["identity"],
-  "icon": "users",
-  "url": "https://github.com/smart-social-contracts/extensions/passport_verification"
+  "categories": ["public_services"],
+  "icon": "book",
+  "doc_url": "https://github.com/smart-social-contracts/extensions/passport_verification",
+  "url_path": null,
+  "show_in_sidebar": true
 }

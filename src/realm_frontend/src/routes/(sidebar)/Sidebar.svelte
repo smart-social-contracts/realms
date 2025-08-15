@@ -32,6 +32,17 @@
 	
 	// Import extension system
 	import { type ExtensionMetadata } from '$lib/extensions';
+	
+	// Extend ExtensionMetadata to include path field and other properties
+	interface ExtensionMetadataWithPath extends ExtensionMetadata {
+		path?: string | null;
+		url_path?: string | null;
+		categories?: string[];
+		profiles?: string[];
+		doc_url?: string;
+		show_in_sidebar?: boolean;
+		enabled?: boolean;
+	}
 	import { getIcon } from '$lib/utils/iconMap';
 	// Import user profiles store
 	import { userProfiles } from '$lib/stores/profiles';
@@ -111,7 +122,7 @@
 	});
 
 	// Get all extensions from backend instead of filesystem
-	let extensions: ExtensionMetadata[] = [];
+	let extensions: ExtensionMetadataWithPath[] = [];
 	let extensionsLoaded = false;
 
 	async function loadExtensionsFromBackend() {
@@ -138,7 +149,10 @@
 					permissions: ext.required_permissions || ext.permissions || [],
 					enabled: true,
 					profiles: ext.profiles || [],
-					categories: ext.categories || ['other']
+					categories: ext.categories || ['other'],
+					path: ext.url_path || ext.path,
+					doc_url: ext.doc_url,
+					show_in_sidebar: ext.show_in_sidebar !== false // default to true
 				}));
 				console.log('Mapped extensions:', extensions);
 				extensionsLoaded = true;
@@ -160,11 +174,17 @@
 	});
 	
 	// Filter extensions based on their manifest profiles and enabled status
-	function filterExtensionsForSidebar(extensions: ExtensionMetadata[], userProfiles: string[]): ExtensionMetadata[] {
+	function filterExtensionsForSidebar(extensions: ExtensionMetadataWithPath[], userProfiles: string[]): ExtensionMetadataWithPath[] {
 		if (!extensionsLoaded) return [];
 		return extensions.filter(ext => {
 			// Skip if extension is not enabled
 			if (ext.enabled === false) return false;
+			
+			// Skip if show_in_sidebar is explicitly set to false
+			if (ext.show_in_sidebar === false) return false;
+			
+			// Skip if path is explicitly set to null (hide from sidebar)
+			if (ext.path === null) return false;
 			
 			// If no profiles specified in extension manifest, show to all users
 			if (!ext.profiles || !Array.isArray(ext.profiles) || ext.profiles.length === 0) {
@@ -198,12 +218,12 @@
 	});
 
 	// Filter extensions based on user profiles and create menu items
-	let filteredExtensions: ExtensionMetadata[] = [];
+	let filteredExtensions: ExtensionMetadataWithPath[] = [];
 	$: filteredExtensions = filterExtensionsForSidebar(extensions, $userProfiles);
 
 	// Group extensions by categories
 	$: extensionsByCategory = (() => {
-		const categories: Record<string, ExtensionMetadata[]> = {};
+		const categories: Record<string, ExtensionMetadataWithPath[]> = {};
 		
 		filteredExtensions.forEach(ext => {
 			// Get categories from manifest, default to 'other' if none specified
@@ -235,41 +255,22 @@
 					return !excluded.includes(ext.id);
 				})
 				.map(ext => {
-					// Handle special cases with translation keys
-					if (ext.id === 'public_dashboard') {
-						return {
-							translationKey: 'extensions.public_dashboard.sidebar',
-							icon: getIcon(ext.icon) || ChartPieOutline,
-							href: `/extensions/${ext.id}`
-						};
-					}
-					if (ext.id === 'citizen_dashboard') {
-						return {
-							translationKey: 'extensions.citizen_dashboard.sidebar',
-							icon: getIcon(ext.icon) || RectangleListSolid,
-							href: `/extensions/${ext.id}`
-						};
-					}
-					if (ext.id === 'vault_manager') {
-						return {
-							translationKey: 'extensions.vault_manager.sidebar',
-							icon: getIcon(ext.icon) || WalletSolid,
-							href: `/extensions/${ext.id}`
-						};
-					}
-					if (ext.id === 'notifications') {
-						return {
-							translationKey: 'extensions.notifications.sidebar',
-							icon: getIcon(ext.icon) || LifeSaverSolid,
-							href: `/extensions/${ext.id}`
-						};
+					// Determine href based on url_path field (new manifest schema)
+					let href: string;
+					if (ext.url_path === undefined || ext.url_path === null) {
+						// Default behavior: use extensions/<extension_id> route
+						href = `/extensions/${ext.id}`;
+					} else {
+						// Use custom path from url_path field
+						href = `/${ext.url_path}`;
 					}
 					
-					// Default case for other extensions
+					// Consistent handling for all extensions
 					return {
-						name: ext.name || ext.id,
+						translationKey: `extensions.${ext.id}.sidebar`,
+						name: ext.name || ext.id, // Fallback if translation doesn't exist
 						icon: getIcon(ext.icon) || LayersSolid,
-						href: `/extensions/${ext.id}`
+						href
 					};
 				});
 		});
@@ -284,14 +285,6 @@
 			.map(word => word.charAt(0).toUpperCase() + word.slice(1))
 			.join(' ');
 	}
-
-	// Marketplace item for admin users
-	const marketplaceItem: NavItemWithHref = {
-		name: $_('navigation.extensions_marketplace') || 'Extensions Marketplace',
-		icon: WandMagicSparklesOutline,
-		href: '/extensions'
-	};
-
 
 	let links: Link[] = [
 		// External links removed for brevity
@@ -379,14 +372,6 @@
 					{/if}
 				{/each}
 
-				<!-- Admin-only Extensions Marketplace -->
-				{#if $userProfiles && $userProfiles.includes('admin')}
-					<SidebarGroup ulClass={groupClass}>
-						<SidebarItem label={marketplaceItem.name} href={marketplaceItem.href} spanClass="ml-3" class={itemClass}>
-							<svelte:component this={marketplaceItem.icon} slot="icon" class={iconClass} />
-						</SidebarItem>
-					</SidebarGroup>
-				{/if}
 
 				<!-- External Links -->
 				<SidebarGroup ulClass={groupClass}>
