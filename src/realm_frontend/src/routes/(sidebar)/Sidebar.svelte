@@ -256,14 +256,6 @@
 			.join(' ');
 	}
 
-	// Marketplace item for admin users
-	const marketplaceItem: NavItemWithHref = {
-		name: $_('navigation.extensions_marketplace') || 'Extensions Marketplace',
-		icon: WandMagicSparklesOutline,
-		href: '/extensions'
-	};
-
-
 	let links: Link[] = [
 		// External links removed for brevity
 	];
@@ -350,14 +342,6 @@
 					{/if}
 				{/each}
 
-				<!-- Admin-only Extensions Marketplace -->
-				{#if $userProfiles && $userProfiles.includes('admin')}
-					<SidebarGroup ulClass={groupClass}>
-						<SidebarItem label={marketplaceItem.name} href={marketplaceItem.href} spanClass="ml-3" class={itemClass}>
-							<svelte:component this={marketplaceItem.icon} slot="icon" class={iconClass} />
-						</SidebarItem>
-					</SidebarGroup>
-				{/if}
 
 				<!-- External Links -->
 				<SidebarGroup ulClass={groupClass}>
