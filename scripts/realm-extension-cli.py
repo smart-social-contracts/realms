@@ -718,7 +718,7 @@ def package_all_extensions_from_source(source_dir, output_dir=None):
     extension_dirs = []
     for item in os.listdir(source_dir):
         item_path = os.path.join(source_dir, item)
-        if os.path.isdir(item_path) and not item.startswith('.'):
+        if os.path.isdir(item_path) and not item.startswith('.') and item != '_shared':
             try:
                 validate_extension_id(item)
                 extension_dirs.append(item)
@@ -1105,8 +1105,13 @@ def list_extension_names() -> list:
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(python_content)
         
-        log_success(f"Generated extension_manifests.py with {len(extension_manifests)} extensions")
-        log_info(f"Extensions included: {', '.join(extension_manifests.keys())}")
+        log_success(f"✅ Generated extension_manifests.py with {len(extension_manifests)} extensions")
+        
+        # Format extension list vertically
+        extension_list = list(extension_manifests.keys())
+        log_info("📦 Extensions:")
+        for i, ext in enumerate(extension_list, 1):
+            log_info(f"   {i:2d}. {ext}")
         return True
         
     except Exception as e:

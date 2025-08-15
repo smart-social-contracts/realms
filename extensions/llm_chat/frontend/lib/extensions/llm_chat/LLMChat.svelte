@@ -10,6 +10,7 @@
 	import { principal, isAuthenticated } from '$lib/stores/auth';
 	import { _ } from 'svelte-i18n';
 	import SafeText from '$lib/components/SafeText.svelte';
+	import { styles, cn } from '../../theme/utilities';
 
 	// Define message interface to fix TypeScript errors
 	interface ChatMessage {
@@ -346,10 +347,10 @@
 			>
 				{#if messages.length === 0}
 					<div class="text-center text-gray-500 dark:text-gray-400 py-8">
-						<MessagesSolid class="w-12 h-12 mx-auto mb-4 text-blue-500" />
+						<MessagesSolid class="w-12 h-12 mx-auto mb-4 text-gray-500" />
 						<div class="max-w-2xl mx-auto">
 							{#if $isAuthenticated}
-								<div class="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-6 border border-blue-200 dark:border-blue-700">
+								<div class={cn(styles.card.default(), "p-6")}>
 									<h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">👋 {$_('extensions.llm_chat.welcome_authenticated')}</h3>
 									<div class="text-sm text-gray-600 dark:text-gray-400 space-y-2">
 										<p>💡 <strong>Tip:</strong> I can access your realm's data to provide more accurate and contextual responses.</p>
@@ -381,7 +382,7 @@
 								<div class="flex-1">
 									{#if message.isUser}
 										<!-- User Message -->
-										<div class="bg-blue-600 text-white rounded-2xl rounded-br-md px-4 py-3 shadow-sm">
+										<div class="bg-gray-600 text-white rounded-2xl rounded-br-md px-4 py-3 shadow-sm">
 											<p class="text-sm leading-relaxed">{message.text}</p>
 										</div>
 									{:else}
@@ -428,7 +429,7 @@
 					
 					{#if error}
 						<div class="mb-4">
-							<div class="inline-block rounded-lg px-4 py-2 bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100">
+							<div class={cn(styles.alert.error(), "inline-block rounded-lg px-4 py-2")}>
 								{error}
 							</div>
 						</div>
@@ -448,7 +449,7 @@
 					{:else if suggestions.length > 0}
 						{#each suggestions as suggestion}
 							<button
-								class="px-3 py-1.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors duration-200 whitespace-nowrap"
+								class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 whitespace-nowrap"
 								on:click={() => handleSuggestionClick(suggestion)}
 							>
 								{suggestion}
@@ -457,19 +458,19 @@
 					{:else}
 						<!-- Fallback to static suggestions if dynamic ones fail -->
 						<button
-							class="px-3 py-1.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors duration-200 whitespace-nowrap"
+							class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 whitespace-nowrap"
 							on:click={() => handleSuggestionClick($_('extensions.llm_chat.suggestion_1'))}
 						>
 							<SafeText key="extensions.llm_chat.suggestion_1" spinnerSize="xs" />
 						</button>
 						<button
-							class="px-3 py-1.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors duration-200 whitespace-nowrap"
+							class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 whitespace-nowrap"
 							on:click={() => handleSuggestionClick($_('extensions.llm_chat.suggestion_2'))}
 						>
 							<SafeText key="extensions.llm_chat.suggestion_2" spinnerSize="xs" />
 						</button>
 						<button
-							class="px-3 py-1.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors duration-200 whitespace-nowrap"
+							class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 whitespace-nowrap"
 							on:click={() => handleSuggestionClick($_('extensions.llm_chat.suggestion_3'))}
 						>
 							<SafeText key="extensions.llm_chat.suggestion_3" spinnerSize="xs" />
@@ -481,7 +482,7 @@
 				<!-- Message input -->
 				<div class="flex gap-2">
 					<Textarea
-						class="flex-grow resize-none px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+						class={cn(styles.input.default(), "flex-grow resize-none px-4 py-3 rounded-lg")}
 						placeholder={$_('extensions.llm_chat.message_placeholder')}
 						rows="2"
 						bind:value={newMessage}
@@ -489,7 +490,7 @@
 					/>
 					<Button 
 						color="primary" 
-						class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 flex items-center justify-center min-w-[50px]"
+						class={cn(styles.button.primary(), "px-4 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center min-w-[50px]")}
 						disabled={isLoading || !newMessage.trim()}
 						on:click={sendMessage}
 						title="Send message (Enter)"

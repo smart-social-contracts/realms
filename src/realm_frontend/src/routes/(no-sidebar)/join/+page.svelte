@@ -4,6 +4,7 @@
   import { principal, isAuthenticated } from '$lib/stores/auth';
   import { backend } from '$lib/canisters.js';
   import PassportVerification from '$lib/components/passport/PassportVerification.svelte';
+  import { styles, cn } from '$lib/theme/utilities';
   
   let agreement = '';
   let error = '';
@@ -94,9 +95,9 @@
     
     {#if success}
       <Card class="p-8 text-center">
-        <h2 class="text-xl font-bold text-green-600">Successfully Joined!</h2>
+        <h2 class={cn("text-xl font-bold", styles.text.success())}>Successfully Joined!</h2>
         <p class="mt-2 mb-4">You have successfully joined the realm.</p>
-        <Button href="/" class="mt-4 w-full bg-green-600 text-white hover:bg-green-700 focus:ring-4 focus:ring-green-300 dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800" color="green">Go to Dashboard</Button>
+        <Button href="/" class={cn("mt-4 w-full", styles.button.primary())}>Go to Dashboard</Button>
       </Card>
     {:else}
       <Card class="p-8">

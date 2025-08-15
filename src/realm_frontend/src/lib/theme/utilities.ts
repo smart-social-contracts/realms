@@ -141,6 +141,21 @@ export const textStyles = {
     text-[var(--color-text-primary)] 
     dark:text-[var(--color-text-inverse)] 
     leading-[var(--line-height-normal)]
+  `,
+  
+  success: () => `
+    text-[var(--color-success-700)] 
+    dark:text-[var(--color-success-300)]
+  `,
+  
+  warning: () => `
+    text-[var(--color-warning-700)] 
+    dark:text-[var(--color-warning-300)]
+  `,
+  
+  error: () => `
+    text-[var(--color-error-700)] 
+    dark:text-[var(--color-error-300)]
   `
 };
 

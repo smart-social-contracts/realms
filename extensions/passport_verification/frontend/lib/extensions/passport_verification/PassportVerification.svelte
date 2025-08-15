@@ -2,6 +2,7 @@
   import { backend } from '$lib/canisters.js';
   import { Button, Card, Heading, P, Spinner } from 'flowbite-svelte';
   import { CheckCircleSolid, ExclamationCircleSolid, ClipboardListSolid } from 'flowbite-svelte-icons';
+  import { styles, cn } from '../../theme/utilities';
   
   export let userId: string;
   
@@ -119,7 +120,7 @@
 <Card size="xl" class="p-6">
   <div class="text-center">
     <div class="flex items-center justify-center mb-4">
-      <ClipboardListSolid class="w-8 h-8 text-blue-600 dark:text-blue-400 mr-2" />
+      <ClipboardListSolid class="w-8 h-8 text-gray-600 dark:text-gray-400 mr-2" />
       <Heading tag="h3">Verify Your Passport</Heading>
     </div>
     
@@ -128,7 +129,7 @@
         Use zero-knowledge proofs to verify your passport identity securely and privately.
         Your passport data never leaves your device.
       </P>
-      <Button on:click={generateVerificationLink} class="px-6 py-3 bg-blue-600 text-white hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
+      <Button on:click={generateVerificationLink} class={cn(styles.button.primary(), "px-6 py-3")}>
         Start Passport Verification
       </Button>
       
@@ -151,7 +152,7 @@
       
       <div class="flex items-center justify-center mb-4">
         <Spinner class="mr-3" size="4" />
-        <P class="text-blue-600 dark:text-blue-400">Waiting for verification...</P>
+        <P class="text-gray-600 dark:text-gray-400">Waiting for verification...</P>
       </div>
       
       <P class="text-sm text-gray-500 dark:text-gray-400 mb-4">
@@ -159,7 +160,7 @@
       </P>
       
       <div class="flex gap-2 justify-center">
-        <Button on:click={checkVerificationStatus} size="sm" class="bg-blue-600 text-white hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
+        <Button on:click={checkVerificationStatus} size="sm" class={styles.button.primary()}>
           Check Status
         </Button>
         <Button color="alternative" on:click={resetVerification} size="sm">
@@ -168,18 +169,18 @@
       </div>
       
     {:else if verificationStatus === 'verified'}
-      <div class="text-green-600 dark:text-green-400 mb-4">
+      <div class="text-gray-700 dark:text-gray-300 mb-4">
         <CheckCircleSolid class="w-12 h-12 mx-auto mb-2" />
-        <Heading tag="h4" class="text-green-600 dark:text-green-400">Passport Verified Successfully!</Heading>
+        <Heading tag="h4" class="text-gray-700 dark:text-gray-300">Passport Verified Successfully!</Heading>
       </div>
       
       {#if verificationResult}
-        <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 mb-4">
-          <P class="text-sm text-green-800 dark:text-green-200">
+        <div class={cn(styles.alert.success(), "p-4 mb-4")}>
+          <P class="text-sm text-gray-800 dark:text-gray-200">
             <strong>Citizenship:</strong> {verificationResult.citizenship || 'Verified'}
           </P>
           {#if verificationResult.verified_at}
-            <P class="text-sm text-green-800 dark:text-green-200">
+            <P class="text-sm text-gray-800 dark:text-gray-200">
               <strong>Verified:</strong> {new Date(verificationResult.verified_at).toLocaleString()}
             </P>
           {/if}
@@ -191,30 +192,30 @@
       </P>
       
     {:else if verificationStatus === 'failed'}
-      <div class="text-red-600 dark:text-red-400 mb-4">
+      <div class="text-gray-700 dark:text-gray-300 mb-4">
         <ExclamationCircleSolid class="w-12 h-12 mx-auto mb-2" />
-        <Heading tag="h4" class="text-red-600 dark:text-red-400">Verification Failed</Heading>
+        <Heading tag="h4" class="text-gray-700 dark:text-gray-300">Verification Failed</Heading>
       </div>
       
-      <P class="text-red-600 dark:text-red-400 mb-4">
+      <P class="text-gray-600 dark:text-gray-400 mb-4">
         Passport verification was not successful. Please try again.
       </P>
-      
-      <Button on:click={resetVerification}>
+
+      <Button on:click={resetVerification} class={extensionStyles.button.primary}>
         Try Again
       </Button>
       
     {:else if verificationStatus === 'error'}
-      <div class="text-red-600 dark:text-red-400 mb-4">
+      <div class="text-gray-700 dark:text-gray-300 mb-4">
         <ExclamationCircleSolid class="w-12 h-12 mx-auto mb-2" />
-        <Heading tag="h4" class="text-red-600 dark:text-red-400">Error Occurred</Heading>
+        <Heading tag="h4" class="text-gray-700 dark:text-gray-300">Error Occurred</Heading>
       </div>
-      
-      <P class="text-red-600 dark:text-red-400 mb-4">
+
+      <P class="text-gray-600 dark:text-gray-400 mb-4">
         {errorMessage}
       </P>
-      
-      <Button on:click={resetVerification}>
+
+      <Button on:click={resetVerification} class={extensionStyles.button.primary}>
         Try Again
       </Button>
     {/if}
