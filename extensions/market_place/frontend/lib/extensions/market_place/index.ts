@@ -1,2 +1,1 @@
-// No default export component needed since marketplace is handled by routes
-export default null;
+export { default } from './MarketPlace.svelte';
