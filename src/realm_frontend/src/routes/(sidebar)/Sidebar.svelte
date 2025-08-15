@@ -235,39 +235,10 @@
 					return !excluded.includes(ext.id);
 				})
 				.map(ext => {
-					// Handle special cases with translation keys
-					if (ext.id === 'public_dashboard') {
-						return {
-							translationKey: 'extensions.public_dashboard.sidebar',
-							icon: getIcon(ext.icon) || ChartPieOutline,
-							href: `/extensions/${ext.id}`
-						};
-					}
-					if (ext.id === 'citizen_dashboard') {
-						return {
-							translationKey: 'extensions.citizen_dashboard.sidebar',
-							icon: getIcon(ext.icon) || RectangleListSolid,
-							href: `/extensions/${ext.id}`
-						};
-					}
-					if (ext.id === 'vault_manager') {
-						return {
-							translationKey: 'extensions.vault_manager.sidebar',
-							icon: getIcon(ext.icon) || WalletSolid,
-							href: `/extensions/${ext.id}`
-						};
-					}
-					if (ext.id === 'notifications') {
-						return {
-							translationKey: 'extensions.notifications.sidebar',
-							icon: getIcon(ext.icon) || LifeSaverSolid,
-							href: `/extensions/${ext.id}`
-						};
-					}
-					
-					// Default case for other extensions
+					// Consistent handling for all extensions
 					return {
-						name: ext.name || ext.id,
+						translationKey: `extensions.${ext.id}.sidebar`,
+						name: ext.name || ext.id, // Fallback if translation doesn't exist
 						icon: getIcon(ext.icon) || LayersSolid,
 						href: `/extensions/${ext.id}`
 					};
