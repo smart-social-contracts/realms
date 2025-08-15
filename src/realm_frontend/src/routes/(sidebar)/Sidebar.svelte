@@ -250,13 +250,14 @@
 					// Determine href based on path field
 					let href: string;
 					if (ext.path === undefined) {
-						// Default behavior: use extensions/<name>
+						// Default behavior: use extensions/<extension_id> route
 						href = `/extensions/${ext.id}`;
 					} else if (ext.path === null) {
 						// This should not happen as we filter these out, but handle gracefully
 						href = `/extensions/${ext.id}`;
 					} else {
-						// Use custom path
+						// Use custom path - for market_place "extensions" means the marketplace at /extensions
+						// For welcome extension it could be a custom path like "welcome"
 						href = `/${ext.path}`;
 					}
 					

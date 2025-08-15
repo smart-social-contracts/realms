@@ -14,13 +14,3 @@ export {
     MonthlyCashFlow
 };
 
-// Extension metadata for the marketplace
-export const metadata = {
-    name: 'Budget Metrics',
-    description: 'Comprehensive budget visualization including charts, cash flow analysis, and tax contribution metrics',
-    version: '1.0.0',
-    icon: 'chart-bar',
-    author: 'Smart Social Contracts Team',
-    permissions: ['read_budget', 'read_treasury'],
-    profiles: ['member', 'admin']
-};
