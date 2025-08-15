@@ -32,6 +32,14 @@
 	
 	// Import extension system
 	import { type ExtensionMetadata } from '$lib/extensions';
+	
+	// Extend ExtensionMetadata to include path field and other properties
+	interface ExtensionMetadataWithPath extends ExtensionMetadata {
+		path?: string | null;
+		categories?: string[];
+		profiles?: string[];
+		enabled?: boolean;
+	}
 	import { getIcon } from '$lib/utils/iconMap';
 	// Import user profiles store
 	import { userProfiles } from '$lib/stores/profiles';
@@ -111,7 +119,7 @@
 	});
 
 	// Get all extensions from backend instead of filesystem
-	let extensions: ExtensionMetadata[] = [];
+	let extensions: ExtensionMetadataWithPath[] = [];
 	let extensionsLoaded = false;
 
 	async function loadExtensionsFromBackend() {
@@ -138,7 +146,8 @@
 					permissions: ext.required_permissions || ext.permissions || [],
 					enabled: true,
 					profiles: ext.profiles || [],
-					categories: ext.categories || ['other']
+					categories: ext.categories || ['other'],
+					path: ext.path
 				}));
 				console.log('Mapped extensions:', extensions);
 				extensionsLoaded = true;
@@ -160,11 +169,14 @@
 	});
 	
 	// Filter extensions based on their manifest profiles and enabled status
-	function filterExtensionsForSidebar(extensions: ExtensionMetadata[], userProfiles: string[]): ExtensionMetadata[] {
+	function filterExtensionsForSidebar(extensions: ExtensionMetadataWithPath[], userProfiles: string[]): ExtensionMetadataWithPath[] {
 		if (!extensionsLoaded) return [];
 		return extensions.filter(ext => {
 			// Skip if extension is not enabled
 			if (ext.enabled === false) return false;
+			
+			// Skip if path is explicitly set to null (hide from sidebar)
+			if (ext.path === null) return false;
 			
 			// If no profiles specified in extension manifest, show to all users
 			if (!ext.profiles || !Array.isArray(ext.profiles) || ext.profiles.length === 0) {
@@ -198,12 +210,12 @@
 	});
 
 	// Filter extensions based on user profiles and create menu items
-	let filteredExtensions: ExtensionMetadata[] = [];
+	let filteredExtensions: ExtensionMetadataWithPath[] = [];
 	$: filteredExtensions = filterExtensionsForSidebar(extensions, $userProfiles);
 
 	// Group extensions by categories
 	$: extensionsByCategory = (() => {
-		const categories: Record<string, ExtensionMetadata[]> = {};
+		const categories: Record<string, ExtensionMetadataWithPath[]> = {};
 		
 		filteredExtensions.forEach(ext => {
 			// Get categories from manifest, default to 'other' if none specified
@@ -235,12 +247,25 @@
 					return !excluded.includes(ext.id);
 				})
 				.map(ext => {
+					// Determine href based on path field
+					let href: string;
+					if (ext.path === undefined) {
+						// Default behavior: use extensions/<name>
+						href = `/extensions/${ext.id}`;
+					} else if (ext.path === null) {
+						// This should not happen as we filter these out, but handle gracefully
+						href = `/extensions/${ext.id}`;
+					} else {
+						// Use custom path
+						href = `/${ext.path}`;
+					}
+					
 					// Consistent handling for all extensions
 					return {
 						translationKey: `extensions.${ext.id}.sidebar`,
 						name: ext.name || ext.id, // Fallback if translation doesn't exist
 						icon: getIcon(ext.icon) || LayersSolid,
-						href: `/extensions/${ext.id}`
+						href
 					};
 				});
 		});

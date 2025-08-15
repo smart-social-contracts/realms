@@ -5,5 +5,7 @@
   "author": "Smart Social Contracts",
   "permissions": [],
   "profiles": ["admin"],
-  "icon": "layers"
+  "icon": "layers",
+  "url": "https://github.com/smart-social-contracts/extensions/market_place",
+  "path": "extensions"
 }
