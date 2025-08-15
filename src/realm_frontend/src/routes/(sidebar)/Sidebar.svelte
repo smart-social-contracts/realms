@@ -36,6 +36,7 @@
 	// Extend ExtensionMetadata to include path field and other properties
 	interface ExtensionMetadataWithPath extends ExtensionMetadata {
 		path?: string | null;
+		url_path?: string | null;
 		categories?: string[];
 		profiles?: string[];
 		doc_url?: string;
@@ -254,18 +255,14 @@
 					return !excluded.includes(ext.id);
 				})
 				.map(ext => {
-					// Determine href based on path field
+					// Determine href based on url_path field (new manifest schema)
 					let href: string;
-					if (ext.path === undefined) {
+					if (ext.url_path === undefined || ext.url_path === null) {
 						// Default behavior: use extensions/<extension_id> route
 						href = `/extensions/${ext.id}`;
-					} else if (ext.path === null) {
-						// This should not happen as we filter these out, but handle gracefully
-						href = `/extensions/${ext.id}`;
 					} else {
-						// Use custom path - for market_place "extensions" means the marketplace at /extensions
-						// For welcome extension it could be a custom path like "welcome"
-						href = `/${ext.path}`;
+						// Use custom path from url_path field
+						href = `/${ext.url_path}`;
 					}
 					
 					// Consistent handling for all extensions
