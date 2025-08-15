@@ -396,9 +396,10 @@ def install_extension(package_path):
             log_info("No frontend lib files found in package")
         
         frontend_route_source = os.path.join(temp_dir, "frontend/routes/(sidebar)/extensions", extension_id)
+        frontend_route_target = os.path.join(paths["frontend_dir"], "src/routes/(sidebar)/extensions", extension_id)
+        
         if os.path.exists(frontend_route_source) and os.listdir(frontend_route_source):
-            frontend_route_target = os.path.join(paths["frontend_dir"], "src/routes/(sidebar)/extensions", extension_id)
-            
+            # Install existing route files from package
             if os.path.exists(frontend_route_target):
                 shutil.rmtree(frontend_route_target)
             
@@ -416,7 +417,29 @@ def install_extension(package_path):
             
             log_success(f"Installed frontend route files for {extension_id}")
         else:
-            log_info("No frontend route files found in package")
+            # Auto-generate missing route files
+            log_info("No frontend route files found in package, auto-generating...")
+            
+            # Create route directory
+            os.makedirs(frontend_route_target, exist_ok=True)
+            
+            # Generate component name (PascalCase)
+            component_name = ''.join(word.capitalize() for word in extension_id.split('_'))
+            
+            # Generate +page.svelte content
+            route_content = f"""<script lang="ts">
+\timport {component_name} from '$lib/extensions/{extension_id}/{component_name}.svelte';
+</script>
+
+<{component_name} />
+"""
+            
+            # Write the route file
+            route_file_path = os.path.join(frontend_route_target, "+page.svelte")
+            with open(route_file_path, 'w', encoding='utf-8') as f:
+                f.write(route_content)
+            
+            log_success(f"Auto-generated route file for {extension_id}: +page.svelte")
         
         # Install i18n translation files
         i18n_source = os.path.join(temp_dir, f"frontend/i18n/locales/extensions/{extension_id}")
