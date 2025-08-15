@@ -10,5 +10,5 @@
   "icon": "book",
   "doc_url": "https://github.com/smart-social-contracts/extensions/passport_verification",
   "url_path": null,
-  "show_in_sidebar": false
+  "show_in_sidebar": true
 }
