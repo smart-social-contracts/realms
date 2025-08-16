@@ -373,12 +373,12 @@
 		<SafeText key="extensions.llm_chat.title" spinnerSize="sm" />
 	</h2>
 	
-	<div class="w-full flex-grow flex flex-col overflow-hidden pb-32">
+	<div class="w-full flex-grow flex flex-col overflow-hidden">
 		<Card class="w-full flex-grow flex flex-col m-0 p-0 rounded-none border-0 max-w-none">
 			<div 
 				bind:this={messagesContainer}
 				class="flex-grow overflow-y-auto p-4 bg-gray-50 dark:bg-gray-800"
-				style="min-height: 200px;"
+				style="min-height: 200px; padding-bottom: 140px;"
 			>
 				{#if messages.length === 0}
 					<!-- Welcome message with Ashoka avatar -->
