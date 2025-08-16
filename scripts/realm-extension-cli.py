@@ -718,7 +718,7 @@ def package_all_extensions_from_source(source_dir, output_dir=None):
     extension_dirs = []
     for item in os.listdir(source_dir):
         item_path = os.path.join(source_dir, item)
-        if os.path.isdir(item_path) and not item.startswith('.'):
+        if os.path.isdir(item_path) and not item.startswith('.')``:
             try:
                 validate_extension_id(item)
                 extension_dirs.append(item)
