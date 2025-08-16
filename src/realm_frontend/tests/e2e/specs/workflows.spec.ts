@@ -117,7 +117,7 @@ test.describe('User workflows', () => {
 			{ name: 'Citizen Dashboard' , needle: 'Dashboard Overview' },
 			{ name: 'Justice Litigation' , needle: 'Justice Litigation System' },
 			{ name: 'Land Registry' , needle: 'Manage land ownership' },
-			{ name: 'AI Assistant' , needle: 'Governance AI assistant' },
+			{ name: 'AI Assistance' , needle: 'Governance AI Assistance' },
 			{ name: 'Budget Metrics' , needle: 'Tax Allocation Breakdown' },
 			{ name: 'Notifications' , needle: 'unread notifications' },
 			{ name: 'Public Dashboard' , needle: 'Active users on the platform' }

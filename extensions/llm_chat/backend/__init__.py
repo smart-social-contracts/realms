@@ -1,3 +1,3 @@
 """
-AI assistant extension for Realm backend
+AI assistance extension for Realm backend
 """

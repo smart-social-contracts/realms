@@ -49,7 +49,7 @@ These tests reproduce the exact user flow demonstrated in the provided video:
    - Citizen Dashboard
    - Justice Litigation
    - Land Registry
-   - AI assistant
+   - AI assistance
    - Budget Metrics
    - Notifications
    - Public Dashboard

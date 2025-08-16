@@ -387,7 +387,7 @@
 								<div class="flex-1">
 									{#if message.isUser}
 										<!-- User Message -->
-										<div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-2xl rounded-br-md px-5 py-4 shadow-lg">
+										<div class={cn(styles.button.primary(), "rounded-2xl rounded-br-md px-5 py-4 shadow-lg")}>
 											<p class="text-sm leading-relaxed">{message.text}</p>
 										</div>
 									{:else}
