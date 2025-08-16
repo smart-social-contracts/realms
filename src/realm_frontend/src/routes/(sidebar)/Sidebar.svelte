@@ -45,7 +45,7 @@
 	}
 	import { getIcon } from '$lib/utils/iconMap';
 	// Import user profiles store
-	import { userProfiles } from '$lib/stores/profiles';
+	import { userProfiles, profilesLoading } from '$lib/stores/profiles';
 	// Import backend for extension loading
 	import { backend } from '$lib/canisters';
 	
@@ -124,8 +124,10 @@
 	// Get all extensions from backend instead of filesystem
 	let extensions: ExtensionMetadataWithPath[] = [];
 	let extensionsLoaded = false;
+	let extensionsLoading = false;
 
 	async function loadExtensionsFromBackend() {
+		extensionsLoading = true;
 		try {
 			console.log('Calling backend.get_extensions()...');
 			const response = await backend.get_extensions();
@@ -165,6 +167,8 @@
 			console.error('Error loading extensions from backend:', error);
 			extensions = [];
 			extensionsLoaded = true;
+		} finally {
+			extensionsLoading = false;
 		}
 	}
 
@@ -195,7 +199,10 @@
 	 *    - Skip if path is explicitly set to null (hide from sidebar)
 	 */
 	function filterExtensionsForSidebar(extensions: ExtensionMetadataWithPath[], userProfiles: string[]): ExtensionMetadataWithPath[] {
-		if (!extensionsLoaded) return [];
+		if (!extensionsLoaded) {
+			console.log('Extensions not loaded yet, returning empty array');
+			return [];
+		}
 		console.log('Filtering extensions:', extensions.length, 'User profiles:', userProfiles);
 		
 		return extensions.filter(ext => {
@@ -255,7 +262,17 @@
 
 	// Filter extensions based on user profiles and create menu items
 	let filteredExtensions: ExtensionMetadataWithPath[] = [];
-	$: filteredExtensions = filterExtensionsForSidebar(extensions, $userProfiles);
+	
+	// Reactive statement with explicit dependency tracking
+	$: {
+		if (extensionsLoaded && !$profilesLoading) {
+			console.log('Both extensions and profiles are ready, filtering...');
+			filteredExtensions = filterExtensionsForSidebar(extensions, $userProfiles);
+		} else {
+			console.log('Waiting for data - extensionsLoaded:', extensionsLoaded, 'profilesLoading:', $profilesLoading);
+			filteredExtensions = [];
+		}
+	}
 
 	// Group extensions by categories
 	$: extensionsByCategory = (() => {
@@ -371,6 +388,16 @@
 						{/if}
 					{/each}
 				</SidebarGroup>
+
+				<!-- Loading State -->
+				{#if extensionsLoading || $profilesLoading}
+					<SidebarGroup ulClass={groupClass} class="mb-3">
+						<li class="px-3 py-2 flex items-center">
+							<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 dark:border-gray-100"></div>
+							<span class="ml-3 text-sm text-gray-500 dark:text-gray-400">Loading extensions...</span>
+						</li>
+					</SidebarGroup>
+				{/if}
 
 				<!-- Categorized Extension Items -->
 				{#each Object.entries(categorizedNavItems) as [category, items]}
