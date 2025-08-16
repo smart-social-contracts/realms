@@ -10,6 +10,7 @@
 	import { principal, isAuthenticated } from '$lib/stores/auth';
 	import { _ } from 'svelte-i18n';
 	import SafeText from '$lib/components/SafeText.svelte';
+	import { styles, cn } from '../../theme/utilities';
 
 	// Define message interface to fix TypeScript errors
 	interface ChatMessage {
@@ -345,80 +346,79 @@
 				style="min-height: 200px; max-height: calc(100vh - 200px);"
 			>
 				{#if messages.length === 0}
-					<div class="text-center text-gray-500 dark:text-gray-400 py-8">
-						<MessagesSolid class="w-12 h-12 mx-auto mb-4 text-blue-500" />
-						<div class="max-w-2xl mx-auto">
-							{#if $isAuthenticated}
-								<div class="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-6 border border-blue-200 dark:border-blue-700">
-									<h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">👋 {$_('extensions.llm_chat.welcome_authenticated')}</h3>
-									<div class="text-sm text-gray-600 dark:text-gray-400 space-y-2">
-										<p>💡 <strong>Tip:</strong> I can access your realm's data to provide more accurate and contextual responses.</p>
-										<p>🔍 Try asking about governance policies, member activities, or realm statistics.</p>
-									</div>
+					<!-- Welcome message with Ashoka avatar -->
+					<div class="flex justify-start mb-6 mt-8">
+						<div class="flex items-start space-x-4 max-w-[85%]">
+							<!-- Ashoka Avatar -->
+							<div class="flex-shrink-0 w-12 h-12 rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-600 shadow-lg">
+								<img src="/photos/ashoka.png" alt="Ashoka AI Assistant" class="w-full h-full object-cover" />
+							</div>
+							
+							<!-- Welcome Chat Bubble -->
+							<div class="flex-1">
+								<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl rounded-bl-md px-6 py-5 shadow-lg">
+									<!-- <div class="flex items-center mb-3">
+										<h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200"><SafeText key="extensions.llm_chat.title" spinnerSize="xs" /></h3>
+									</div> -->
+									{#if $isAuthenticated}
+										<div class="text-sm text-gray-600 dark:text-gray-400 space-y-3 leading-relaxed">
+											<p><SafeText key="extensions.llm_chat.welcome_authenticated" spinnerSize="xs" /></p>
+										</div>
+									{:else}
+										<div class="text-sm text-gray-600 dark:text-gray-400 space-y-3 leading-relaxed">
+											<p><SafeText key="extensions.llm_chat.welcome_visitor" spinnerSize="xs" /></p>
+										</div>
+									{/if}
 								</div>
-							{:else}
-								<div class="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800 dark:to-blue-900/20 rounded-lg p-6 border border-gray-200 dark:border-gray-600">
-									<h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">🌟 {$_('extensions.llm_chat.welcome_visitor')}</h3>
-									<div class="text-sm text-gray-600 dark:text-gray-400 space-y-2">
-										<p>📚 I can help you learn about decentralized governance and realm concepts.</p>
-										<p>🚀 <strong>Join this realm</strong> to unlock personalized insights and realm-specific data!</p>
-									</div>
-								</div>
-							{/if}
+							</div>
 						</div>
 					</div>
 				{:else}
 					{#each messages as message}
 						<div class="mb-6 {message.isUser ? 'flex justify-end' : 'flex justify-start'}">
-							<div class="flex items-start space-x-3 max-w-[85%]">
+							<div class="flex items-start space-x-4 max-w-[85%]">
 								{#if !message.isUser}
-									<!-- AI Avatar -->
-									<div class="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden">
-										<img src="/extensions/llm_chat/photos/ashoka.png" alt="AI Assistant" class="w-full h-full object-cover" />
+									<!-- Ashoka AI Avatar -->
+									<div class="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-600 shadow-md">
+										<img src="/photos/ashoka.png" alt="Ashoka AI Assistant" class="w-full h-full object-cover" />
 									</div>
 								{/if}
 								
 								<div class="flex-1">
 									{#if message.isUser}
 										<!-- User Message -->
-										<div class="bg-blue-600 text-white rounded-2xl rounded-br-md px-4 py-3 shadow-sm">
+										<div class={cn(styles.button.primary(), "rounded-2xl rounded-br-md px-5 py-4 shadow-lg")}>
 											<p class="text-sm leading-relaxed">{message.text}</p>
 										</div>
 									{:else}
-										<!-- AI Message -->
-										<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl rounded-bl-md px-5 py-4 shadow-sm">
+										<!-- Ashoka AI Message -->
+										<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl rounded-bl-md px-6 py-5 shadow-lg">
 											<div class="markdown-content prose prose-sm max-w-none dark:prose-invert">
 												<SvelteMarkdown source={message.text} />
 											</div>
 										</div>
 									{/if}
 								</div>
-								
-								{#if message.isUser}
-									<!-- User Avatar -->
-									<div class="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-green-500 to-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-										U
-									</div>
-								{/if}
 							</div>
 						</div>
 					{/each}
 					
 					{#if isLoading}
 						<div class="mb-6 flex justify-start">
-							<div class="flex items-start space-x-3 max-w-[85%]">
-								<!-- AI Avatar -->
-								<div class="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden">
-									<img src="/extensions/llm_chat/images/ashoka.png" alt="AI Assistant" class="w-full h-full object-cover" />
+							<div class="flex items-start space-x-4 max-w-[85%]">
+								<!-- Ashoka AI Avatar -->
+								<div class="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-600 shadow-md">
+									<img src="/photos/ashoka.png" alt="Ashoka AI Assistant" class="w-full h-full object-cover" />
 								</div>
 								<div class="flex-1">
-									<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl rounded-bl-md px-5 py-4 shadow-sm">
-										<div class="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
+									<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl rounded-bl-md px-6 py-5 shadow-lg">
+										<div class="flex items-center space-x-3 text-gray-600 dark:text-gray-400">
 											<div class="typing-animation">
 												<span></span>
 												<span></span>
 												<span></span>
 											</div>
+											<span class="text-sm font-medium"><SafeText key="extensions.llm_chat.loading" spinnerSize="xs" /></span>
 										</div>
 									</div>
 								</div>
@@ -428,7 +428,7 @@
 					
 					{#if error}
 						<div class="mb-4">
-							<div class="inline-block rounded-lg px-4 py-2 bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100">
+							<div class={cn(styles.alert.error(), "inline-block rounded-lg px-4 py-2")}>
 								{error}
 							</div>
 						</div>
@@ -448,7 +448,7 @@
 					{:else if suggestions.length > 0}
 						{#each suggestions as suggestion}
 							<button
-								class="px-3 py-1.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors duration-200 whitespace-nowrap"
+								class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 whitespace-nowrap"
 								on:click={() => handleSuggestionClick(suggestion)}
 							>
 								{suggestion}
@@ -457,19 +457,19 @@
 					{:else}
 						<!-- Fallback to static suggestions if dynamic ones fail -->
 						<button
-							class="px-3 py-1.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors duration-200 whitespace-nowrap"
+							class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 whitespace-nowrap"
 							on:click={() => handleSuggestionClick($_('extensions.llm_chat.suggestion_1'))}
 						>
 							<SafeText key="extensions.llm_chat.suggestion_1" spinnerSize="xs" />
 						</button>
 						<button
-							class="px-3 py-1.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors duration-200 whitespace-nowrap"
+							class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 whitespace-nowrap"
 							on:click={() => handleSuggestionClick($_('extensions.llm_chat.suggestion_2'))}
 						>
 							<SafeText key="extensions.llm_chat.suggestion_2" spinnerSize="xs" />
 						</button>
 						<button
-							class="px-3 py-1.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors duration-200 whitespace-nowrap"
+							class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 whitespace-nowrap"
 							on:click={() => handleSuggestionClick($_('extensions.llm_chat.suggestion_3'))}
 						>
 							<SafeText key="extensions.llm_chat.suggestion_3" spinnerSize="xs" />
@@ -481,7 +481,7 @@
 				<!-- Message input -->
 				<div class="flex gap-2">
 					<Textarea
-						class="flex-grow resize-none px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+						class={cn(styles.input.default(), "flex-grow resize-none px-4 py-3 rounded-lg")}
 						placeholder={$_('extensions.llm_chat.message_placeholder')}
 						rows="2"
 						bind:value={newMessage}
@@ -489,7 +489,7 @@
 					/>
 					<Button 
 						color="primary" 
-						class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 flex items-center justify-center min-w-[50px]"
+						class={cn(styles.button.primary(), "px-4 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center min-w-[50px]")}
 						disabled={isLoading || !newMessage.trim()}
 						on:click={sendMessage}
 						title="Send message (Enter)"

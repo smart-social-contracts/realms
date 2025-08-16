@@ -45,7 +45,7 @@
 	}
 	import { getIcon } from '$lib/utils/iconMap';
 	// Import user profiles store
-	import { userProfiles } from '$lib/stores/profiles';
+	import { userProfiles, profilesLoading } from '$lib/stores/profiles';
 	// Import backend for extension loading
 	import { backend } from '$lib/canisters';
 	
@@ -124,8 +124,10 @@
 	// Get all extensions from backend instead of filesystem
 	let extensions: ExtensionMetadataWithPath[] = [];
 	let extensionsLoaded = false;
+	let extensionsLoading = false;
 
 	async function loadExtensionsFromBackend() {
+		extensionsLoading = true;
 		try {
 			console.log('Calling backend.get_extensions()...');
 			const response = await backend.get_extensions();
@@ -165,6 +167,8 @@
 			console.error('Error loading extensions from backend:', error);
 			extensions = [];
 			extensionsLoaded = true;
+		} finally {
+			extensionsLoading = false;
 		}
 	}
 
@@ -173,26 +177,65 @@
 		loadExtensionsFromBackend();
 	});
 	
-	// Filter extensions based on their manifest profiles and enabled status
+	/**
+	 * SIDEBAR EXTENSION FILTERING RULES
+	 * 
+	 * This function implements the following filtering logic for sidebar extension visibility:
+	 * 
+	 * 1. SHOW_IN_SIDEBAR CHECK:
+	 *    - If show_in_sidebar is false, do not show the extension icon in the sidebar
+	 * 
+	 * 2. UNAUTHENTICATED USERS (neither admin nor member):
+	 *    - Only show llm_chat extension (AI Assistant) and Public Dashboard
+	 * 
+	 * 3. MEMBER USERS:
+	 *    - Show extensions that contain "member" among the list of values of the "profiles" attribute in manifest
+	 * 
+	 * 4. ADMIN USERS:
+	 *    - Show extensions that contain "admin" among the list of values of the "profiles" attribute in manifest
+	 * 
+	 * 5. ADDITIONAL FILTERS:
+	 *    - Skip if extension is explicitly disabled (enabled: false)
+	 *    - Skip if path is explicitly set to null (hide from sidebar)
+	 */
 	function filterExtensionsForSidebar(extensions: ExtensionMetadataWithPath[], userProfiles: string[]): ExtensionMetadataWithPath[] {
-		if (!extensionsLoaded) return [];
+		if (!extensionsLoaded) {
+			console.log('Extensions not loaded yet, returning empty array');
+			return [];
+		}
+		console.log('Filtering extensions:', extensions.length, 'User profiles:', userProfiles);
+		
 		return extensions.filter(ext => {
+			console.log('Checking extension:', ext.name, 'enabled:', ext.enabled, 'show_in_sidebar:', ext.show_in_sidebar, 'profiles:', ext.profiles);
+			
 			// Skip if extension is not enabled
 			if (ext.enabled === false) return false;
 			
-			// Skip if show_in_sidebar is explicitly set to false
+			// RULE 1: Skip if show_in_sidebar is explicitly set to false
 			if (ext.show_in_sidebar === false) return false;
 			
 			// Skip if path is explicitly set to null (hide from sidebar)
 			if (ext.path === null) return false;
 			
-			// If no profiles specified in extension manifest, show to all users
+			// RULE 2: If user is neither admin nor member, only show llm_chat and public_dashboard
+			if (!userProfiles || userProfiles.length === 0 || 
+				(!userProfiles.includes('admin') && !userProfiles.includes('member'))) {
+				const allowedForUnauthenticated = ['llm_chat', 'public_dashboard'];
+				const isAllowed = allowedForUnauthenticated.includes(ext.name);
+				console.log('Unauthenticated user - extension allowed:', isAllowed);
+				return isAllowed;
+			}
+			
+			// If no profiles specified in extension manifest, show to all authenticated users
 			if (!ext.profiles || !Array.isArray(ext.profiles) || ext.profiles.length === 0) {
+				console.log('Extension has no profile restrictions, showing to authenticated users');
 				return true;
 			}
 			
-			// Check if current user has any of the profiles required by the extension
-			return ext.profiles.some((profile: string) => userProfiles.includes(profile));
+			// RULE 3 & 4: Check if current user has any of the profiles required by the extension
+			const hasProfile = ext.profiles.some((profile: string) => userProfiles.includes(profile));
+			console.log('Profile check result:', hasProfile);
+			return hasProfile;
 		});
 	}
 
@@ -219,7 +262,17 @@
 
 	// Filter extensions based on user profiles and create menu items
 	let filteredExtensions: ExtensionMetadataWithPath[] = [];
-	$: filteredExtensions = filterExtensionsForSidebar(extensions, $userProfiles);
+	
+	// Reactive statement with explicit dependency tracking
+	$: {
+		if (extensionsLoaded && !$profilesLoading) {
+			console.log('Both extensions and profiles are ready, filtering...');
+			filteredExtensions = filterExtensionsForSidebar(extensions, $userProfiles);
+		} else {
+			console.log('Waiting for data - extensionsLoaded:', extensionsLoaded, 'profilesLoading:', $profilesLoading);
+			filteredExtensions = [];
+		}
+	}
 
 	// Group extensions by categories
 	$: extensionsByCategory = (() => {
@@ -335,6 +388,16 @@
 						{/if}
 					{/each}
 				</SidebarGroup>
+
+				<!-- Loading State -->
+				{#if extensionsLoading || $profilesLoading}
+					<SidebarGroup ulClass={groupClass} class="mb-3">
+						<li class="px-3 py-2 flex items-center">
+							<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 dark:border-gray-100"></div>
+							<span class="ml-3 text-sm text-gray-500 dark:text-gray-400">Loading extensions...</span>
+						</li>
+					</SidebarGroup>
+				{/if}
 
 				<!-- Categorized Extension Items -->
 				{#each Object.entries(categorizedNavItems) as [category, items]}
