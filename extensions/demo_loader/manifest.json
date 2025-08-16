@@ -7,7 +7,7 @@
   "profiles": ["admin"],
   "categories": ["other"],
   "icon": "lightbulb",
-  "doc_url": "https://github.com/smart-social-contracts/extensions/demo_loader",
+  "doc_url": "https://github.com/smart-social-contracts/realms/tree/main/extensions/demo_loader",
   "url_path": null,
   "show_in_sidebar": false
 }
