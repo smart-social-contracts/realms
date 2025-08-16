@@ -9,7 +9,9 @@
     "dev-dummy": "VITE_DEV_DUMMY_MODE=true vite dev --port 3001",
     "prebuild": "svelte-kit sync",
     "build": "tsc && vite build",
-    "format": "prettier --write \"src/**/*.{json,js,jsx,ts,tsx,css,scss}\""
+    "format": "prettier --write \"src/**/*.{json,js,jsx,ts,tsx,css,scss}\"",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@dfinity/agent": "^1.4.0",
