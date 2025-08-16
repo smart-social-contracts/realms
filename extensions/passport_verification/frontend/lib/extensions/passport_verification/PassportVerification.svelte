@@ -2,7 +2,6 @@
   import { backend } from '$lib/canisters.js';
   import { Button, Card, Heading, P, Spinner } from 'flowbite-svelte';
   import { CheckCircleSolid, ExclamationCircleSolid, ClipboardListSolid } from 'flowbite-svelte-icons';
-  import { styles, cn } from '../../theme/utilities';
   
   export let userId: string;
   
@@ -129,7 +128,7 @@
         Use zero-knowledge proofs to verify your passport identity securely and privately.
         Your passport data never leaves your device.
       </P>
-      <Button on:click={generateVerificationLink} class={cn(styles.button.primary(), "px-6 py-3")}>
+      <Button on:click={generateVerificationLink} class="bg-blue-600 text-white hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800 px-6 py-3">
         Start Passport Verification
       </Button>
       
@@ -160,10 +159,10 @@
       </P>
       
       <div class="flex gap-2 justify-center">
-        <Button on:click={checkVerificationStatus} size="sm" class={styles.button.primary()}>
+        <Button on:click={checkVerificationStatus} size="sm" class="bg-blue-600 text-white hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
           Check Status
         </Button>
-        <Button color="alternative" on:click={resetVerification} size="sm">
+        <Button color="alternative" on:click={resetVerification} size="sm" class="border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-4 focus:ring-gray-300 dark:border-gray-600 dark:text-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700 dark:focus:ring-gray-700">
           Cancel
         </Button>
       </div>
@@ -175,7 +174,7 @@
       </div>
       
       {#if verificationResult}
-        <div class={cn(styles.alert.success(), "p-4 mb-4")}>
+        <div class="bg-green-100 border border-green-400 text-green-700 p-4 mb-4 rounded">
           <P class="text-sm text-gray-800 dark:text-gray-200">
             <strong>Citizenship:</strong> {verificationResult.citizenship || 'Verified'}
           </P>
@@ -201,7 +200,7 @@
         Passport verification was not successful. Please try again.
       </P>
 
-      <Button on:click={resetVerification} class={extensionStyles.button.primary}>
+      <Button on:click={resetVerification} class="bg-blue-600 text-white hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
         Try Again
       </Button>
       
@@ -215,7 +214,7 @@
         {errorMessage}
       </P>
 
-      <Button on:click={resetVerification} class={extensionStyles.button.primary}>
+      <Button on:click={resetVerification} class="bg-blue-600 text-white hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
         Try Again
       </Button>
     {/if}

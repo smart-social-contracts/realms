@@ -53,8 +53,7 @@
 	import { _, locale, isLoading, getLocaleFromNavigator } from 'svelte-i18n';
 	import { onMount } from 'svelte';
 	
-	// Import theme utilities
-	import { styles, cn } from '$lib/theme/utilities';
+	// Theme utilities removed - using standard Tailwind classes
 
 	export let drawerHidden: boolean = false;
 
@@ -105,9 +104,9 @@
 		icon: typeof TableColumnSolid;
 	};
 
-	// Use theme utilities for consistent styling
-	let iconClass = styles.sidebar.icon();
-	let itemClass = styles.sidebar.item();
+	// Use standard Tailwind classes for consistent styling
+	let iconClass = 'w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white';
+	let itemClass = 'flex items-center p-2 text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group';
 	let groupClass = 'pt-2 space-y-2';
 
 	$: mainSidebarUrl = $page.url.pathname;
@@ -361,8 +360,8 @@
 >
 	<h4 class="sr-only">{$_('common.main_menu')}</h4>
 	<SidebarWrapper
-		divClass={cn(styles.sidebar.container(), "overflow-y-auto h-full px-3 pb-4")}
-		asideClass="fixed top-0 left-0 z-40 w-64 h-screen pt-14 transition-transform border-r lg:translate-x-0 {styles.sidebar.container()} {drawerHidden ? '-translate-x-full' : ''}"
+		divClass="bg-white dark:bg-gray-800 overflow-y-auto h-full px-3 pb-4"
+		class="fixed top-0 left-0 z-40 w-64 h-screen pt-14 transition-transform bg-white border-r border-gray-200 dark:bg-gray-800 dark:border-gray-700 lg:translate-x-0 {drawerHidden ? '-translate-x-full' : ''}"
 	>
 			<nav class="divide-y divide-gray-200 dark:divide-gray-700">
 				<!-- Core Navigation Items -->
@@ -405,7 +404,7 @@
 						<SidebarGroup ulClass={groupClass} class="mb-3">
 							<!-- Category Header -->
 							<li class="px-3 py-2">
-								<h3 class={styles.sidebar.categoryHeader()}>
+								<h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide dark:text-gray-400">
 									{formatCategoryName(category)}
 								</h3>
 							</li>

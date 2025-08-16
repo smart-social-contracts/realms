@@ -10,7 +10,6 @@
 	import { principal, isAuthenticated } from '$lib/stores/auth';
 	import { _ } from 'svelte-i18n';
 	import SafeText from '$lib/components/SafeText.svelte';
-	import { styles, cn } from '../../theme/utilities';
 
 	// Define message interface to fix TypeScript errors
 	interface ChatMessage {
@@ -387,7 +386,7 @@
 								<div class="flex-1">
 									{#if message.isUser}
 										<!-- User Message -->
-										<div class={cn(styles.button.primary(), "rounded-2xl rounded-br-md px-5 py-4 shadow-lg")}>
+										<div class="bg-blue-600 text-white rounded-2xl rounded-br-md px-5 py-4 shadow-lg">
 											<p class="text-sm leading-relaxed">{message.text}</p>
 										</div>
 									{:else}
@@ -428,7 +427,7 @@
 					
 					{#if error}
 						<div class="mb-4">
-							<div class={cn(styles.alert.error(), "inline-block rounded-lg px-4 py-2")}>
+							<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded-lg inline-block">
 								{error}
 							</div>
 						</div>
@@ -481,7 +480,7 @@
 				<!-- Message input -->
 				<div class="flex gap-2">
 					<Textarea
-						class={cn(styles.input.default(), "flex-grow resize-none px-4 py-3 rounded-lg")}
+						class="flex-grow resize-none px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 						placeholder={$_('extensions.llm_chat.message_placeholder')}
 						rows="2"
 						bind:value={newMessage}
@@ -489,7 +488,7 @@
 					/>
 					<Button 
 						color="primary" 
-						class={cn(styles.button.primary(), "px-4 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center min-w-[50px]")}
+						class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center min-w-[50px]"
 						disabled={isLoading || !newMessage.trim()}
 						on:click={sendMessage}
 						title="Send message (Enter)"
