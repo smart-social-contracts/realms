@@ -32,6 +32,7 @@ class StatusRecord(Record):
 class UserGetRecord(Record):
     principal: Principal
     profiles: Vec[text]
+    profile_picture_url: text
 
 
 # New GGG response records
