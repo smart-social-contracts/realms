@@ -368,17 +368,18 @@
 	}
 </script>
 
-<div class="w-full h-screen flex flex-col max-w-none -mx-6 -my-6 relative">
-	<h2 class="text-2xl font-bold text-gray-900 mb-6 flex-shrink-0 px-6 pt-6">
+<div class="w-full flex flex-col max-w-none" style="height: calc(100vh - 80px);">
+	<h2 class="text-2xl font-bold text-gray-900 mb-6 flex-shrink-0">
 		<SafeText key="extensions.llm_chat.title" spinnerSize="sm" />
 	</h2>
 	
-	<div class="w-full flex-grow flex flex-col overflow-hidden">
-		<Card class="w-full flex-grow flex flex-col m-0 p-0 rounded-none border-0 max-w-none">
+	<div class="w-full flex flex-col flex-grow min-h-0">
+		<!-- Messages Container -->
+		<Card class="w-full flex-grow flex flex-col m-0 p-0 rounded-none border-0 max-w-none min-h-0">
 			<div 
 				bind:this={messagesContainer}
 				class="flex-grow overflow-y-auto p-4 bg-gray-50 dark:bg-gray-800"
-				style="min-height: 200px; padding-bottom: 140px;"
+				style="min-height: 300px;"
 			>
 				{#if messages.length === 0}
 					<!-- Welcome message with Ashoka avatar -->
@@ -468,8 +469,8 @@
 			</div>
 		</Card>
 		
-		<!-- Input section - fixed at bottom -->
-		<div class="absolute bottom-0 left-0 right-0 flex flex-col p-4 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+		<!-- Input section - Fixed at bottom -->
+		<div class="flex-shrink-0 flex flex-col p-4 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
 				<!-- Question Suggestions -->
 				<div class="mb-3 px-1">
 					<!-- Mobile: Horizontal scrollable carousel -->
@@ -757,4 +758,4 @@
 		margin: 0.5rem 0 0.5rem 0.5rem;
 		color: #555;
 	}
-</style>    
+</style>                                        

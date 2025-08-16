@@ -6,6 +6,7 @@
 	import DemoBanner from '$lib/components/DemoBanner.svelte';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
+	import { page } from '$app/stores';
 	
 	// Set drawerHidden to true by default for desktop screens
 	let drawerHidden = true;
@@ -54,6 +55,8 @@
 		</div>
 		
 		<slot />
-		<Footer />
+		{#if !($page.url.pathname.includes('/extensions/') && $page.url.pathname.includes('/llm_chat'))}
+			<Footer />
+		{/if}
 	</div>
 </div>
