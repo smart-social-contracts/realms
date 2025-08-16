@@ -423,7 +423,7 @@
 									{#if message.isUser}
 										<!-- User Message -->
 										<div class={cn(styles.button.primary(), "rounded-2xl rounded-br-md px-5 py-4 shadow-lg")}>
-											<p class="text-sm leading-relaxed">{message.text}</p>
+											<pre class="text-sm leading-relaxed whitespace-pre-wrap font-sans m-0">{message.text}</pre>
 										</div>
 									{:else}
 										<!-- Ashoka AI Message (no bubble, just content) -->
