@@ -368,7 +368,7 @@
 	}
 </script>
 
-<div class="w-full h-screen flex flex-col p-0 m-0 max-w-none">
+<div class="w-full h-screen flex flex-col p-0 m-0 max-w-none pb-4">
 	<h2 class="text-2xl font-bold text-gray-900 mb-6 flex-shrink-0">
 		<SafeText key="extensions.llm_chat.title" spinnerSize="sm" />
 	</h2>
