@@ -38,6 +38,7 @@
 	let userPrincipal = $principal || '';
 	let suggestions: string[] = [];
 	let isLoadingSuggestions = false;
+	let textareaElement: HTMLTextAreaElement;
 	
 	// LLM API configuration
 
@@ -123,6 +124,13 @@
 		
 		// Fetch initial suggestions
 		await fetchSuggestions();
+		
+		// Initialize textarea auto-resize
+		setTimeout(() => {
+			if (textareaElement) {
+				autoResizeTextarea();
+			}
+		}, 100);
 	});
 
 	// Auto-scroll to bottom of messages when content changes
@@ -318,11 +326,38 @@
 		}
 	}
 
+	// Auto-resize textarea function
+	function autoResizeTextarea(): void {
+		if (textareaElement) {
+			// Reset height to auto to get correct scrollHeight
+			textareaElement.style.height = 'auto';
+			// Set height based on content, with min and max constraints
+			const newHeight = Math.max(40, Math.min(textareaElement.scrollHeight, 120));
+			textareaElement.style.height = newHeight + 'px';
+			console.log('Auto-resize triggered, new height:', newHeight);
+		}
+	}
+
 	// Handle Enter key in textarea
 	function handleKeydown(event: KeyboardEvent): void {
 		if (event.key === 'Enter' && !event.shiftKey) {
 			event.preventDefault();
 			sendMessage();
+		}
+		// Auto-resize after key input
+		setTimeout(autoResizeTextarea, 0);
+	}
+
+	// Handle input changes for auto-resize
+	function handleInput(): void {
+		console.log('Input event triggered');
+		autoResizeTextarea();
+	}
+
+	// Watch for newMessage changes to trigger auto-resize
+	$: {
+		if (newMessage && textareaElement) {
+			setTimeout(autoResizeTextarea, 0);
 		}
 	}
 
@@ -391,11 +426,9 @@
 											<p class="text-sm leading-relaxed">{message.text}</p>
 										</div>
 									{:else}
-										<!-- Ashoka AI Message -->
-										<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl rounded-bl-md px-6 py-5 shadow-lg">
-											<div class="markdown-content prose prose-sm max-w-none dark:prose-invert">
-												<SvelteMarkdown source={message.text} />
-											</div>
+										<!-- Ashoka AI Message (no bubble, just content) -->
+										<div class="markdown-content prose prose-sm max-w-none dark:prose-invert">
+											<SvelteMarkdown source={message.text} />
 										</div>
 									{/if}
 								</div>
@@ -411,15 +444,13 @@
 									<img src="/photos/ashoka.png" alt="Ashoka AI Assistant" class="w-full h-full object-cover" />
 								</div>
 								<div class="flex-1">
-									<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl rounded-bl-md px-6 py-5 shadow-lg">
-										<div class="flex items-center space-x-3 text-gray-600 dark:text-gray-400">
-											<div class="typing-animation">
-												<span></span>
-												<span></span>
-												<span></span>
-											</div>
-											<span class="text-sm font-medium"><SafeText key="extensions.llm_chat.loading" spinnerSize="xs" /></span>
+									<div class="flex items-center space-x-3 text-gray-600 dark:text-gray-400">
+										<div class="typing-animation">
+											<span></span>
+											<span></span>
+											<span></span>
 										</div>
+										<span class="text-sm font-medium"><SafeText key="extensions.llm_chat.loading" spinnerSize="xs" /></span>
 									</div>
 								</div>
 							</div>
@@ -439,54 +470,96 @@
 			<div class="flex flex-col p-2 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 sticky bottom-0">
 				<!-- Question Suggestions -->
 				<div class="mb-3 px-1">
-					<div class="flex flex-wrap gap-2 justify-center">
-					{#if isLoadingSuggestions}
-						<div class="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-							<Spinner size="4" />
-							<span class="text-xs">Loading suggestions...</span>
+					<!-- Mobile: Horizontal scrollable carousel -->
+					<div class="md:hidden overflow-x-auto">
+						<div class="flex gap-2 pb-2" style="min-width: max-content;">
+							{#if isLoadingSuggestions}
+								<div class="flex items-center gap-2 text-gray-500 dark:text-gray-400 px-2">
+									<Spinner size="4" />
+									<span class="text-xs whitespace-nowrap">Loading suggestions...</span>
+								</div>
+							{:else if suggestions.length > 0}
+								{#each suggestions as suggestion}
+									<button
+										class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 whitespace-nowrap flex-shrink-0"
+										on:click={() => handleSuggestionClick(suggestion)}
+									>
+										{suggestion}
+									</button>
+								{/each}
+							{:else}
+								<button
+									class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 whitespace-nowrap flex-shrink-0"
+									on:click={() => handleSuggestionClick($_('extensions.llm_chat.suggestion_1'))}
+								>
+									<SafeText key="extensions.llm_chat.suggestion_1" spinnerSize="xs" />
+								</button>
+								<button
+									class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 whitespace-nowrap flex-shrink-0"
+									on:click={() => handleSuggestionClick($_('extensions.llm_chat.suggestion_2'))}
+								>
+									<SafeText key="extensions.llm_chat.suggestion_2" spinnerSize="xs" />
+								</button>
+								<button
+									class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 whitespace-nowrap flex-shrink-0"
+									on:click={() => handleSuggestionClick($_('extensions.llm_chat.suggestion_3'))}
+								>
+									<SafeText key="extensions.llm_chat.suggestion_3" spinnerSize="xs" />
+								</button>
+							{/if}
 						</div>
-					{:else if suggestions.length > 0}
-						{#each suggestions as suggestion}
+					</div>
+					<!-- Desktop: Wrapped layout -->
+					<div class="hidden md:flex flex-wrap gap-2 justify-center">
+						{#if isLoadingSuggestions}
+							<div class="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+								<Spinner size="4" />
+								<span class="text-xs">Loading suggestions...</span>
+							</div>
+						{:else if suggestions.length > 0}
+							{#each suggestions as suggestion}
+								<button
+									class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 whitespace-nowrap"
+									on:click={() => handleSuggestionClick(suggestion)}
+								>
+									{suggestion}
+								</button>
+							{/each}
+						{:else}
 							<button
 								class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 whitespace-nowrap"
-								on:click={() => handleSuggestionClick(suggestion)}
+								on:click={() => handleSuggestionClick($_('extensions.llm_chat.suggestion_1'))}
 							>
-								{suggestion}
+								<SafeText key="extensions.llm_chat.suggestion_1" spinnerSize="xs" />
 							</button>
-						{/each}
-					{:else}
-						<!-- Fallback to static suggestions if dynamic ones fail -->
-						<button
-							class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 whitespace-nowrap"
-							on:click={() => handleSuggestionClick($_('extensions.llm_chat.suggestion_1'))}
-						>
-							<SafeText key="extensions.llm_chat.suggestion_1" spinnerSize="xs" />
-						</button>
-						<button
-							class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 whitespace-nowrap"
-							on:click={() => handleSuggestionClick($_('extensions.llm_chat.suggestion_2'))}
-						>
-							<SafeText key="extensions.llm_chat.suggestion_2" spinnerSize="xs" />
-						</button>
-						<button
-							class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 whitespace-nowrap"
-							on:click={() => handleSuggestionClick($_('extensions.llm_chat.suggestion_3'))}
-						>
-							<SafeText key="extensions.llm_chat.suggestion_3" spinnerSize="xs" />
-						</button>
-					{/if}
-				</div>
+							<button
+								class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 whitespace-nowrap"
+								on:click={() => handleSuggestionClick($_('extensions.llm_chat.suggestion_2'))}
+							>
+								<SafeText key="extensions.llm_chat.suggestion_2" spinnerSize="xs" />
+							</button>
+							<button
+								class="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 whitespace-nowrap"
+								on:click={() => handleSuggestionClick($_('extensions.llm_chat.suggestion_3'))}
+							>
+								<SafeText key="extensions.llm_chat.suggestion_3" spinnerSize="xs" />
+							</button>
+						{/if}
+					</div>
 				</div>
 				
 				<!-- Message input -->
 				<div class="flex gap-2">
-					<Textarea
+					<textarea
+						bind:this={textareaElement}
 						class={cn(styles.input.default(), "flex-grow resize-none px-4 py-3 rounded-lg")}
 						placeholder={$_('extensions.llm_chat.message_placeholder')}
-						rows="2"
+						rows="1"
 						bind:value={newMessage}
 						on:keydown={handleKeydown}
-					/>
+						on:input={handleInput}
+						style="min-height: 40px; max-height: 120px; overflow-y: auto; height: 40px;"
+					></textarea>
 					<Button 
 						color="primary" 
 						class={cn(styles.button.primary(), "px-4 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center min-w-[50px]")}
