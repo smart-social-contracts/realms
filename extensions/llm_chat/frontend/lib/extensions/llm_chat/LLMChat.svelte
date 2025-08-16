@@ -368,17 +368,17 @@
 	}
 </script>
 
-<div class="w-full h-full flex flex-col p-0 m-0 max-w-none">
-	<h2 class="text-2xl font-bold text-gray-900 mb-6">
+<div class="w-full h-screen flex flex-col p-0 m-0 max-w-none">
+	<h2 class="text-2xl font-bold text-gray-900 mb-6 flex-shrink-0">
 		<SafeText key="extensions.llm_chat.title" spinnerSize="sm" />
 	</h2>
 	
 	<div class="w-full flex-grow flex flex-col overflow-hidden">
-		<Card class="w-full h-full flex-grow flex flex-col m-0 p-0 rounded-none border-0 max-w-none">
+		<Card class="w-full flex-grow flex flex-col m-0 p-0 rounded-none border-0 max-w-none">
 			<div 
 				bind:this={messagesContainer}
 				class="flex-grow overflow-y-auto p-4 bg-gray-50 dark:bg-gray-800"
-				style="min-height: 200px; max-height: calc(100vh - 200px);"
+				style="min-height: 200px;"
 			>
 				{#if messages.length === 0}
 					<!-- Welcome message with Ashoka avatar -->
@@ -466,8 +466,10 @@
 					{/if}
 				{/if}
 			</div>
-			
-			<div class="flex flex-col p-2 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 sticky bottom-0">
+		</Card>
+		
+		<!-- Input section - always at bottom -->
+		<div class="flex flex-col p-4 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
 				<!-- Question Suggestions -->
 				<div class="mb-3 px-1">
 					<!-- Mobile: Horizontal scrollable carousel -->
@@ -574,8 +576,7 @@
 						{/if}
 					</Button>
 				</div>
-			</div>
-		</Card>
+		</div>
 	</div>
 </div> 
 
