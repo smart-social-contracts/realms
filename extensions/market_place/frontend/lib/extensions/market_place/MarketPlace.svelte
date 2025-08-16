@@ -22,7 +22,6 @@
 
 	let extensions: Extension[] = [];
 	let loading = true;
-	let error: string | null = null;
 
 	onMount(async () => {
 		try {
@@ -30,7 +29,7 @@
 			const response = await backend.get_extensions();
 			console.log('Backend response:', response);
 			
-			if (response.success && response.data.ExtensionsList) {
+			if (response && response.success && response.data && response.data.ExtensionsList) {
 				const extensionData = response.data.ExtensionsList.extensions.map(ext => JSON.parse(ext));
 				console.log('Parsed extension data:', extensionData);
 				
@@ -46,13 +45,14 @@
 					url_path: ext.url_path,
 					show_in_sidebar: ext.show_in_sidebar,
 					installed: true, // All extensions returned by backend are installed
-				enabled: ext.show_in_sidebar !== false // Default to enabled unless explicitly disabled
+					enabled: ext.show_in_sidebar !== false // Default to enabled unless explicitly disabled
 				}));
+				
+				console.log('Extensions loaded successfully:', extensions.length);
 			} else {
-				throw new Error('Failed to load extensions from backend');
+				console.error('Invalid response format from backend:', response);
 			}
 		} catch (err) {
-			error = 'Failed to load extensions';
 			console.error('Error loading extensions:', err);
 		} finally {
 			loading = false;
@@ -119,17 +119,6 @@
 			<Spinner size="8" />
 			<span class="ml-3 text-gray-600 dark:text-gray-400">Loading extensions...</span>
 		</div>
-	{:else if error}
-		<Card class="text-center py-12">
-			<div class="text-red-600 dark:text-red-400 mb-4">
-				<ArrowUpRightFromSquareOutline size="xl" class="mx-auto mb-2" />
-				<p class="text-lg font-semibold">Error Loading Extensions</p>
-				<p class="text-sm">{error}</p>
-			</div>
-			<Button color="alternative" on:click={() => window.location.reload()}>
-				Try Again
-			</Button>
-		</Card>
 	{:else}
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 			{#each extensions as extension}
