@@ -15,6 +15,7 @@ logger = get_logger("entity.user")
 class User(Entity, TimestampedMixin):
     __alias__ = "id"
     id = String()
+    profile_picture_url = String(max_length=512)
     profiles = ManyToMany(["UserProfile"], "users")
     human = OneToOne("Human", "user")
     citizen = OneToOne("Citizen", "user")

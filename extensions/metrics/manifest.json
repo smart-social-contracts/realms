@@ -5,7 +5,7 @@
   "author": "Smart Social Contracts",
   "permissions": [],
   "profiles": ["member", "admin"],
-  "categories": ["other"],
+  "categories": ["oversight"],
   "icon": "analytics",
   "doc_url": null,
   "url_path": null,

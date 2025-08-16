@@ -43,7 +43,7 @@ extensions/{your_extension_id}/
   "author": "Your Name",
   "permissions": ["read", "write"],
   "profiles": ["member", "admin"],
-  "categories": ["public_services", "finances", "other"],
+  "categories": ["public_services", "finances", "oversight", "system", "other"],
   "icon": "table",
   "doc_url": "https://github.com/yourname/your-extension",
   "url_path": null,
@@ -66,9 +66,11 @@ extensions/{your_extension_id}/
 
 
 **Available Categories:**
-- `public_services`: Government and public sector functionality
-- `finances`: Financial and economic tools
-- `other`: General purpose extensions
+- `public_services`: Government and public sector functionality (citizen services, land registry, justice, identity verification)
+- `finances`: Financial and economic tools (vault management, treasury, payments)
+- `oversight`: Monitoring, analytics, and intelligence tools (dashboards, metrics, AI assistants)
+- `system`: Platform administration and management (marketplace, configuration, deployment)
+- `other`: General purpose extensions and utilities
 
 ## 🐍 Backend Development
 
