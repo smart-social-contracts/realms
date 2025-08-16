@@ -22,6 +22,7 @@
 
 	let extensions: Extension[] = [];
 	let loading = true;
+	let error: string | null = null;
 
 	onMount(async () => {
 		try {
