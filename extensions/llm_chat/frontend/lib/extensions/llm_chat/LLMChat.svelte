@@ -368,12 +368,12 @@
 	}
 </script>
 
-<div class="w-full h-screen flex flex-col max-w-none -mx-6 -my-6">
-	<h2 class="text-2xl font-bold text-gray-900 mb-6 flex-shrink-0 px-6 pt-6">
+<div class="w-full flex flex-col max-w-none space-y-4">
+	<h2 class="text-2xl font-bold text-gray-900 mb-6 flex-shrink-0">
 		<SafeText key="extensions.llm_chat.title" spinnerSize="sm" />
 	</h2>
 	
-	<div class="w-full flex-grow flex flex-col min-h-0">
+	<div class="w-full flex flex-col" style="height: 400px;">
 		<Card class="w-full flex-grow flex flex-col m-0 p-0 rounded-none border-0 max-w-none min-h-0">
 			<div 
 				bind:this={messagesContainer}
@@ -757,4 +757,4 @@
 		margin: 0.5rem 0 0.5rem 0.5rem;
 		color: #555;
 	}
-</style>        
+</style>                                        
