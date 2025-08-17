@@ -32,13 +32,21 @@
 			});
 			
 			console.log('Proposals response:', response);
+			console.log('Response type:', typeof response.response);
+			console.log('Response content:', response.response);
 			
 			if (response.success) {
 				const data = response.response;
-				if (data && data.success) {
-					proposals = data.data.proposals || [];
+				console.log('Data extracted:', data);
+				console.log('Data success:', data?.success);
+				console.log('Data proposals:', data?.data?.proposals);
+				
+				if (data && data.success && data.data && data.data.proposals) {
+					proposals = data.data.proposals;
+					console.log('Proposals set to:', proposals);
 				} else {
 					error = data?.error || 'Failed to load proposals';
+					console.log('Error set to:', error);
 				}
 			} else {
 				error = 'Failed to communicate with backend';
