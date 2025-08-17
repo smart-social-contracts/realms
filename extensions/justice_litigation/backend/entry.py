@@ -12,63 +12,8 @@ from kybra_simple_logging import get_logger
 
 logger = get_logger("extensions.justice_litigation")
 
-DUMMY_LITIGATIONS = [
-    {
-        "id": "lit_001",
-        "requester_principal": "zstof-mh46j-ewupb-oxihp-j5cpv-d5d7p-6o6i4-spm3c-54ho5-meqol-xqe",
-        "defendant_principal": "rrkah-fqaaa-aaaah-qcaiq-cai",
-        "case_title": "Contract Breach Dispute",
-        "description": "Defendant failed to deliver goods as per smart contract agreement",
-        "status": "pending",
-        "requested_at": "2025-06-20T10:30:00Z",
-        "verdict": None,
-        "actions_taken": [],
-    },
-    {
-        "id": "lit_001b",
-        "requester_principal": "rdmx6-jaaaa-aaaah-qcaiq-cai",
-        "defendant_principal": "rrkah-fqaaa-aaaah-qcaiq-cai",
-        "case_title": "Contract Breach Dispute",
-        "description": "Defendant failed to deliver goods as per smart contract agreement",
-        "status": "pending",
-        "requested_at": "2025-06-20T10:30:00Z",
-        "verdict": None,
-        "actions_taken": [],
-    },
-    {
-        "id": "lit_002",
-        "requester_principal": "rrkah-fqaaa-aaaah-qcaiq-cai",
-        "defendant_principal": "rdmx6-jaaaa-aaaah-qcaiq-cai",
-        "case_title": "Payment Dispute",
-        "description": "Disagreement over payment terms and late fees",
-        "status": "in_review",
-        "requested_at": "2025-06-18T14:15:00Z",
-        "verdict": None,
-        "actions_taken": [],
-    },
-    {
-        "id": "lit_003",
-        "requester_principal": "be2us-64aaa-aaaah-qcaiq-cai",
-        "defendant_principal": "rdmx6-jaaaa-aaaah-qcaiq-cai",
-        "case_title": "Asset Transfer Violation",
-        "description": "Unauthorized transfer of realm assets without proper authorization",
-        "status": "resolved",
-        "requested_at": "2025-06-15T09:45:00Z",
-        "verdict": "transfer(defendant_principal, requester_principal, 1000, 'Compensation for unauthorized transfer')",
-        "actions_taken": ["transfer_executed", "case_closed"],
-    },
-    {
-        "id": "lit_004",
-        "requester_principal": "rdmx6-jaaaa-aaaah-qcaiq-cai",
-        "defendant_principal": "be2us-64aaa-aaaah-qcaiq-cai",
-        "case_title": "Service Agreement Breach",
-        "description": "Service provider failed to meet agreed upon deliverables",
-        "status": "resolved",
-        "requested_at": "2025-06-12T16:20:00Z",
-        "verdict": "transfer(defendant_principal, requester_principal, 500, 'Partial refund for incomplete services')",
-        "actions_taken": ["transfer_executed", "case_closed"],
-    },
-]
+# Global litigation storage - will be populated by demo_loader
+LITIGATION_STORAGE = []
 
 
 def get_litigations(args: str) -> str:
@@ -90,11 +35,11 @@ def get_litigations(args: str) -> str:
             )
 
         if user_profile == "admin":
-            filtered_litigations = DUMMY_LITIGATIONS
+            filtered_litigations = LITIGATION_STORAGE
         else:
             filtered_litigations = [
                 lit
-                for lit in DUMMY_LITIGATIONS
+                for lit in LITIGATION_STORAGE
                 if lit["requester_principal"] == user_principal
             ]
 
@@ -138,7 +83,7 @@ def create_litigation(args: str) -> str:
             )
 
         new_litigation = {
-            "id": f"lit_{len(DUMMY_LITIGATIONS) + 1:03d}",
+            "id": f"lit_{len(LITIGATION_STORAGE) + 1:03d}",
             "requester_principal": requester_principal,
             "defendant_principal": defendant_principal,
             "case_title": case_title,
@@ -149,7 +94,7 @@ def create_litigation(args: str) -> str:
             "actions_taken": [],
         }
 
-        DUMMY_LITIGATIONS.append(new_litigation)
+        LITIGATION_STORAGE.append(new_litigation)
 
         return json.dumps(
             {
@@ -189,7 +134,7 @@ def execute_verdict(args: str) -> str:
             )
 
         litigation = None
-        for lit in DUMMY_LITIGATIONS:
+        for lit in LITIGATION_STORAGE:
             if lit["id"] == litigation_id:
                 litigation = lit
                 break
@@ -226,4 +171,40 @@ def execute_verdict(args: str) -> str:
 
     except Exception as e:
         logger.error(f"Error in execute_verdict: {str(e)}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+def load_demo_litigations(args: str) -> str:
+    """Load demo litigation data - called by demo_loader extension"""
+    logger.info(f"justice_litigation.load_demo_litigations called with args: {args}")
+    
+    try:
+        if args:
+            params = json.loads(args) if isinstance(args, str) else args
+        else:
+            params = {}
+        
+        demo_cases = params.get("cases", [])
+        
+        if not demo_cases:
+            return json.dumps({"success": False, "error": "No demo cases provided"})
+        
+        # Clear existing storage and load demo cases
+        global LITIGATION_STORAGE
+        LITIGATION_STORAGE.clear()
+        LITIGATION_STORAGE.extend(demo_cases)
+        
+        logger.info(f"Loaded {len(demo_cases)} demo litigation cases")
+        
+        return json.dumps({
+            "success": True,
+            "message": f"Successfully loaded {len(demo_cases)} demo litigation cases",
+            "data": {
+                "total_loaded": len(demo_cases),
+                "storage_size": len(LITIGATION_STORAGE)
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in load_demo_litigations: {str(e)}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})

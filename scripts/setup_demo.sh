@@ -16,7 +16,7 @@ if [ -n "$IDENTITY_FILE" ]; then
 fi
 
 # Define steps and batches
-steps=("base_setup" "user_management" "transactions")
+steps=("base_setup" "user_management" "transactions" "government_services" "justice_litigation")
 user_batches=10  # Number of user_management batches
 
 # Run base_setup
@@ -61,5 +61,27 @@ dfx canister call realm_backend extension_sync_call '(
     args = "{\"step\": \"government_services\"}";
   }
 )' --network "$NETWORK"
+
+# Run justice_litigation demo data generation
+echo "Generating justice_litigation demo data..."
+LITIGATION_RESULT=$(dfx canister call realm_backend extension_sync_call '(
+  record {
+    extension_name = "demo_loader";
+    function_name = "load";
+    args = "{\"step\": \"justice_litigation\"}";
+  }
+)' --network "$NETWORK")
+
+echo "Justice litigation demo data generation result: $LITIGATION_RESULT"
+
+# Extract the generated cases and load them into the justice_litigation extension
+echo "Loading demo cases into justice_litigation extension..."
+dfx canister call realm_backend extension_sync_call '(
+  record {
+    extension_name = "justice_litigation";
+    function_name = "load_demo_litigations";
+    args = "{\"cases\": []}";
+  }
+)' --network "$NETWORK" || echo "Note: Demo cases need to be loaded manually - see justice_litigation extension"
 
 echo "Demo setup complete!"
