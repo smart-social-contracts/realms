@@ -8,6 +8,7 @@
   "no_proposals": "No proposals found",
   "no_proposals_hint": "Be the first to submit a proposal!",
   "view_details": "View Details",
+  "view": "View",
   "cast_vote": "Cast Your Vote",
   "casting_vote": "Casting vote...",
   "voting_not_active": "Voting not active",
@@ -73,6 +74,14 @@
       "backend_error": "Backend communication error",
       "network_error": "Network error occurred"
     }
+  },
+  "table": {
+    "title": "Title",
+    "status": "Status",
+    "proposer": "Proposer",
+    "created": "Created",
+    "votes": "Votes",
+    "actions": "Actions"
   },
   "detail": {
     "title": "Proposal Details",

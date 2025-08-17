@@ -10,6 +10,7 @@
       "no_proposals": "未找到提案",
       "no_proposals_hint": "成为第一个提交提案的人！",
       "view_details": "查看详情",
+  "view": "查看",
       "cast_vote": "投票",
       "casting_vote": "投票中...",
       "voting_not_active": "投票未激活",
@@ -75,6 +76,14 @@
           "backend_error": "后端通信错误",
           "network_error": "发生网络错误"
         }
+      },
+      "table": {
+        "title": "标题",
+        "status": "状态",
+        "proposer": "提案人",
+        "created": "创建时间",
+        "votes": "投票",
+        "actions": "操作"
       },
       "detail": {
         "title": "提案详情",

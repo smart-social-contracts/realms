@@ -95,7 +95,7 @@
 	<title>{$_('extensions.voting.title')}</title>
 </svelte:head>
 
-<div class="container mx-auto p-6 max-w-6xl">
+<div class="w-full px-6 max-w-none">
 	<div class="mb-8">
 		<h1 class="text-3xl font-bold text-gray-900 mb-2">
 			{$_('extensions.voting.title')}
@@ -112,7 +112,7 @@
 		</Alert>
 	{/if}
 
-	<Card class="mb-6">
+	<Card class="mb-6 w-full max-w-none">
 		<div class="flex justify-between items-center mb-4">
 			<div class="flex space-x-4">
 				<Button 

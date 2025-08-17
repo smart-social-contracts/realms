@@ -58,96 +58,141 @@
 			on:vote={handleVote}
 		/>
 	{:else}
-		<div class="space-y-4">
+		<!-- Desktop Table View -->
+		<div class="hidden lg:block">
+			<Table hoverable={true} class="w-full">
+				<TableHead>
+					<TableHeadCell class="w-1/4">{$_('extensions.voting.table.title')}</TableHeadCell>
+					<TableHeadCell class="w-1/6">{$_('extensions.voting.table.status')}</TableHeadCell>
+					<TableHeadCell class="w-1/6">{$_('extensions.voting.table.proposer')}</TableHeadCell>
+					<TableHeadCell class="w-1/6">{$_('extensions.voting.table.created')}</TableHeadCell>
+					<TableHeadCell class="w-1/6">{$_('extensions.voting.table.votes')}</TableHeadCell>
+					<TableHeadCell class="w-1/6">{$_('extensions.voting.table.actions')}</TableHeadCell>
+				</TableHead>
+				<TableBody>
+					{#each proposals as proposal}
+						<TableBodyRow class="hover:bg-gray-50">
+							<TableBodyCell class="font-medium">
+								<div>
+									<h3 class="text-sm font-semibold text-gray-900 mb-1">
+										{proposal.title}
+									</h3>
+									<p class="text-xs text-gray-600 line-clamp-2">
+										{proposal.description}
+									</p>
+								</div>
+							</TableBodyCell>
+							<TableBodyCell>
+								<Badge color={getStatusColor(proposal.status)} class="text-xs">
+									{$_(`extensions.voting.status.${proposal.status}`)}
+								</Badge>
+							</TableBodyCell>
+							<TableBodyCell class="text-sm text-gray-600">
+								{proposal.proposer}
+							</TableBodyCell>
+							<TableBodyCell class="text-sm text-gray-600">
+								{formatDate(proposal.created_at)}
+							</TableBodyCell>
+							<TableBodyCell>
+								{#if proposal.status === 'voting'}
+									<div class="text-xs space-y-1">
+										<div class="flex gap-2">
+											<span class="text-green-600">Y: {proposal.votes.yes}</span>
+											<span class="text-red-600">N: {proposal.votes.no}</span>
+											<span class="text-gray-600">A: {proposal.votes.abstain}</span>
+										</div>
+										<div class="w-full bg-gray-200 rounded-full h-1">
+											<div 
+												class="bg-green-600 h-1 rounded-full" 
+												style="width: {(proposal.votes.yes / Math.max(proposal.total_voters, 1)) * 100}%"
+											></div>
+										</div>
+									</div>
+								{:else}
+									<span class="text-xs text-gray-400">-</span>
+								{/if}
+							</TableBodyCell>
+							<TableBodyCell>
+								<div class="flex gap-2">
+									<Button 
+										size="xs" 
+										color="light"
+										on:click={() => handleViewDetails(proposal)}
+									>
+										<EyeSolid class="w-3 h-3 mr-1" />
+										{$_('extensions.voting.view')}
+									</Button>
+									{#if proposal.status === 'voting'}
+										<VotingCard 
+											{proposal}
+											compact={true}
+											on:vote={handleVote}
+										/>
+									{/if}
+								</div>
+							</TableBodyCell>
+						</TableBodyRow>
+					{/each}
+				</TableBody>
+			</Table>
+		</div>
+
+		<!-- Mobile Card View -->
+		<div class="lg:hidden space-y-3">
 			{#each proposals as proposal}
-				<Card class="hover:shadow-lg transition-shadow">
-					<div class="flex justify-between items-start">
-						<div class="flex-1">
-							<div class="flex items-center gap-3 mb-2">
-								<h3 class="text-lg font-semibold text-gray-900">
+				<Card class="hover:shadow-md transition-shadow p-4">
+					<div class="space-y-3">
+						<div class="flex items-start justify-between">
+							<div class="flex-1 min-w-0">
+								<h3 class="text-base font-semibold text-gray-900 truncate">
 									{proposal.title}
 								</h3>
-								<Badge color={getStatusColor(proposal.status)}>
+								<Badge color={getStatusColor(proposal.status)} class="text-xs mt-1">
 									{$_(`extensions.voting.status.${proposal.status}`)}
 								</Badge>
 							</div>
-							
-							<p class="text-gray-600 mb-3 line-clamp-2">
-								{proposal.description}
-							</p>
-							
-							<div class="flex items-center gap-4 text-sm text-gray-500">
-								<div class="flex items-center gap-1">
-									<UserSolid class="w-4 h-4" />
-									<span>{proposal.proposer}</span>
-								</div>
-								<div class="flex items-center gap-1">
-									<ClockSolid class="w-4 h-4" />
-									<span>{formatDate(proposal.created_at)}</span>
-								</div>
-								{#if proposal.voting_deadline}
-									<div class="flex items-center gap-1">
-										<ClockSolid class="w-4 h-4" />
-										<span>{$_('extensions.voting.deadline')}: {formatDate(proposal.voting_deadline)}</span>
-									</div>
-								{/if}
-							</div>
-						</div>
-						
-						<div class="flex flex-col items-end gap-2 ml-4">
 							<Button 
-								size="sm" 
+								size="xs" 
 								color="light"
 								on:click={() => handleViewDetails(proposal)}
+								class="ml-2"
 							>
-								<EyeSolid class="w-4 h-4 mr-1" />
-								{$_('extensions.voting.view_details')}
+								<EyeSolid class="w-3 h-3" />
 							</Button>
-							
-							{#if proposal.status === 'voting'}
-								<div class="text-right">
+						</div>
+						
+						<p class="text-sm text-gray-600 line-clamp-2">
+							{proposal.description}
+						</p>
+						
+						<div class="flex items-center justify-between text-xs text-gray-500">
+							<span>{proposal.proposer}</span>
+							<span>{formatDate(proposal.created_at)}</span>
+						</div>
+						
+						{#if proposal.status === 'voting'}
+							<div class="pt-2 border-t border-gray-100">
+								<div class="flex justify-between items-center mb-2">
+									<div class="flex gap-3 text-xs">
+										<span class="text-green-600">Y: {proposal.votes.yes}</span>
+										<span class="text-red-600">N: {proposal.votes.no}</span>
+										<span class="text-gray-600">A: {proposal.votes.abstain}</span>
+									</div>
 									<VotingCard 
 										{proposal}
 										compact={true}
 										on:vote={handleVote}
 									/>
 								</div>
-							{/if}
-						</div>
-					</div>
-					
-					{#if proposal.status === 'voting'}
-						<div class="mt-4 pt-4 border-t border-gray-200">
-							<div class="flex justify-between items-center text-sm">
-								<div class="flex gap-4">
-									<span class="text-green-600">
-										{$_('extensions.voting.votes.yes')}: {proposal.votes.yes}
-									</span>
-									<span class="text-red-600">
-										{$_('extensions.voting.votes.no')}: {proposal.votes.no}
-									</span>
-									<span class="text-gray-600">
-										{$_('extensions.voting.votes.abstain')}: {proposal.votes.abstain}
-									</span>
-								</div>
-								<span class="text-gray-500">
-									{$_('extensions.voting.total_votes')}: {proposal.total_voters}
-								</span>
-							</div>
-							
-							<div class="mt-2">
-								<div class="w-full bg-gray-200 rounded-full h-2">
+								<div class="w-full bg-gray-200 rounded-full h-1.5">
 									<div 
-										class="bg-green-600 h-2 rounded-full" 
+										class="bg-green-600 h-1.5 rounded-full" 
 										style="width: {(proposal.votes.yes / Math.max(proposal.total_voters, 1)) * 100}%"
 									></div>
 								</div>
-								<p class="text-xs text-gray-500 mt-1">
-									{$_('extensions.voting.threshold_required')}: {(proposal.required_threshold * 100).toFixed(0)}%
-								</p>
 							</div>
-						</div>
-					{/if}
+						{/if}
+					</div>
 				</Card>
 			{/each}
 		</div>
