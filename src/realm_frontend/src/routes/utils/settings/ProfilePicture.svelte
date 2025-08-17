@@ -3,7 +3,7 @@
 	import { UserOutline } from 'flowbite-svelte-icons';
 	import { _ } from 'svelte-i18n';
 
-	export let src: string;
+	export let src: string | undefined;
 </script>
 
 <Card

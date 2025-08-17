@@ -5,8 +5,6 @@
 	import MessagingHandles from '../../utils/settings/MessagingHandles.svelte';
 	import { Breadcrumb, BreadcrumbItem, Heading } from 'flowbite-svelte';
 	import { SITE_NAME } from '$lib/globals';
-	import { imagesPath } from '../../utils/variables';
-	import Users from '../../data/users.json';
 	import MetaTag from '../../utils/MetaTag.svelte';
 	import { _ } from 'svelte-i18n';
 	import { onMount } from 'svelte';
@@ -19,6 +17,7 @@
 
 	let principal: string = '';
 	let profiles: string[] = [];
+	let avatar: string | undefined = undefined;
 	let loadingUserStatus = true;
 	let userStatusError = '';
 
@@ -40,6 +39,7 @@
 			if (response && response.success && response.data && response.data.UserGet) {
 				principal = response.data.UserGet.principal;
 				profiles = response.data.UserGet.profiles || [];
+				avatar = response.data.UserGet.avatar;
 			} else {
 				console.error("Invalid backend response format:", response);
 				throw new Error('Could not fetch user status: Invalid response format.');
@@ -83,7 +83,7 @@
 		<!-- Simplified settings with profile and messaging handles -->
 		<div class="grid grid-cols-1 gap-6 md:grid-cols-2">
 			<div class="space-y-6">
-				<ProfilePicture src={imagesPath(Users[4].avatar, 'users')} />
+				<ProfilePicture src={avatar} />
 			</div>
 			<div class="space-y-6">
 				<MessagingHandles />
