@@ -190,15 +190,18 @@
 						// Convert timestamps to milliseconds by dividing by 1,000,000 (nanoseconds to milliseconds)
 						const timestamp = parseInt(tx.timestamp) / 1000000;
 						
+						// Safely handle amount field - ensure it exists and is a string
+						const txAmount = tx.amount ? String(tx.amount) : "0";
+						
 						// Determine if this is an incoming or outgoing transaction
-						const isIncoming = !tx.amount.startsWith("-");
-						const amount = isIncoming ? tx.amount : tx.amount.substring(1); // Remove minus sign if outgoing
+						const isIncoming = !txAmount.startsWith("-");
+						const amount = isIncoming ? txAmount : txAmount.substring(1); // Remove minus sign if outgoing
 						
 						return {
-							id: tx.id,
+							id: tx.id || "unknown",
 							from_principal: isIncoming ? "system" : userPrincipalId,
 							to_principal: isIncoming ? userPrincipalId : "recipient",
-							amount: parseInt(amount),
+							amount: parseInt(amount) || 0,
 							token: "ckBTC",
 							timestamp: timestamp,
 							status: "completed"
