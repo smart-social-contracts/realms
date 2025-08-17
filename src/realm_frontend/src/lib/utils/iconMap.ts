@@ -57,7 +57,7 @@ export const iconMap: Record<string, any> = {
     'objects': ObjectsColumnSolid,
     'scale': ScaleBalancedSolid,
     'vote': CheckCircleOutline,
-    'users_group': UsersGroupSolid,
+    'users_group': UsersGroupSolid
 };
 
 /**
