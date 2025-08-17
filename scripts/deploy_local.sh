@@ -3,7 +3,8 @@
 set -e
 set -x
 
-pkill -9 pocket-ic || pkill -9 dfx || true
+pkill -9 pocket-ic || true
+pkill -9 dfx || true
 dfx stop
 dfx start --clean --background --logfile dfx.log
 dfx deploy internet_identity
