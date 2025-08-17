@@ -312,7 +312,7 @@
 	});
 </script>
 
-<Card size="lg" padding="xl" class="w-full">
+<div class="w-full h-full p-6 bg-white dark:bg-gray-900">
 	<div class="flex items-center mb-4">
 		<WalletSolid class="mr-2 h-8 w-8 text-primary-600" />
 		<h2 class="text-2xl font-bold text-gray-900 dark:text-white">{$_('extensions.vault_manager.title')}</h2>
@@ -611,4 +611,4 @@
 			</TabItem>
 		</Tabs>
 	{/if}
-</Card>
+</div>
