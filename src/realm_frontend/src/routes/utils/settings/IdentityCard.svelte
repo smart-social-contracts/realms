@@ -39,13 +39,15 @@
 			<p class="mb-4 text-sm text-gray-600 dark:text-gray-400 flex-grow min-h-[40px]">{description}</p>
 			
 			<div class="flex items-center gap-3 mt-auto">
-				<Button 
-					size="sm" 
-					color={isEnabled ? 'alternative' : 'green'}
-					class="px-4 py-2"
-					on:click={() => isEnabled = !isEnabled}
+				<Button
+					size="sm"
+					class={cn(
+						'w-full sm:w-auto',
+						isEnabled ? styles.button.secondary() : styles.button.success()
+					)}
+					on:click={() => (isEnabled = !isEnabled)}
 				>
-					{isEnabled ? "Disable" : "Enable"}
+					{isEnabled ? 'Disable' : 'Enable'}
 				</Button>
 			</div>
 		</div>
