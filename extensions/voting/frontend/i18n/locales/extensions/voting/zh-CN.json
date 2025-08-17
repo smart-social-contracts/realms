@@ -1,120 +1,117 @@
 {
-  "extensions": {
-    "voting": {
-      "title": "治理投票",
-      "description": "提交并投票决定在领域内执行Python代码的提案",
-      "error": "错误：",
-      "loading": "加载中...",
-      "refresh": "刷新",
-      "loading_proposals": "加载提案中...",
-      "no_proposals": "未找到提案",
-      "no_proposals_hint": "成为第一个提交提案的人！",
-      "view_details": "查看详情",
+  "title": "治理投票",
+  "description": "提交并投票决定在领域内执行Python代码的提案",
+  "sidebar": "投票",
+  "error": "错误：",
+  "loading": "加载中...",
+  "refresh": "刷新",
+  "loading_proposals": "加载提案中...",
+  "no_proposals": "未找到提案",
+  "no_proposals_hint": "成为第一个提交提案的人！",
+  "view_details": "查看详情",
   "view": "查看",
-      "cast_vote": "投票",
-      "casting_vote": "投票中...",
-      "voting_not_active": "投票未激活",
-      "deadline": "截止时间",
-      "total_votes": "总票数",
-      "threshold_required": "所需阈值",
-      "approval_progress": "批准进度",
-      "tabs": {
-        "proposals": "提案",
-        "submit": "提交提案"
-      },
-      "status": {
-        "pending_review": "待审核",
-        "pending_vote": "待投票",
-        "voting": "投票中",
-        "accepted": "已通过",
-        "rejected": "已拒绝"
-      },
-      "votes": {
-        "yes": "赞成",
-        "no": "反对",
-        "abstain": "弃权"
-      },
-      "vote": {
-        "yes": "赞成",
-        "no": "反对",
-        "abstain": "弃权"
-      },
-      "form": {
-        "title": "提交新提案",
-        "description": "创建一个新的治理提案，包含在社区批准后执行的Python代码。",
-        "success": "提案提交成功！将在投票开始前进行审核。",
-        "fields": {
-          "title": "提案标题",
-          "description": "描述",
-          "code_url": "代码URL"
-        },
-        "placeholders": {
-          "title": "为您的提案输入清晰、描述性的标题",
-          "description": "描述此提案的作用以及为什么应该被批准",
-          "code_url": "https://github.com/your-repo/proposal.py"
-        },
-        "help": {
-          "code_url": "链接到如果此提案通过将执行的Python代码"
-        },
-        "security": {
-          "title": "安全提醒",
-          "point1": "所有代码在投票开始前都会被审核",
-          "point2": "执行前将验证代码校验和",
-          "point3": "只有批准的提案才能修改领域逻辑"
-        },
-        "buttons": {
-          "submit": "提交提案",
-          "submitting": "提交中...",
-          "cancel": "取消"
-        },
-        "validation": {
-          "required_fields": "所有字段都是必需的",
-          "invalid_url": "请输入有效的URL"
-        },
-        "error": {
-          "submit_failed": "提案提交失败",
-          "backend_error": "后端通信错误",
-          "network_error": "发生网络错误"
-        },
-        "preview": {
-          "title": "提案预览",
-          "description": "查看您的提案如何向投票者显示",
-          "empty_title": "输入提案标题...",
-          "empty_description": "输入提案描述...",
-          "empty_code_url": "输入代码URL...",
-          "summary": "提交摘要",
-          "ready_to_submit": "准备提交",
-          "checklist": "完成清单",
-          "check_title": "已提供标题",
-          "check_description": "已提供描述",
-          "check_code_url": "已提供代码URL"
-        }
-      },
-      "table": {
-        "title": "标题",
-        "status": "状态",
-        "proposer": "提案人",
-        "created": "创建时间",
-        "votes": "投票",
-        "actions": "操作"
-      },
-      "detail": {
-        "title": "提案详情",
-        "code_diff": "代码变更",
-        "proposer": "提案人",
-        "created": "创建时间",
-        "deadline": "投票截止时间",
-        "description": "描述",
-        "code_info": "代码信息",
-        "code_url": "代码URL",
-        "view_code": "查看",
-        "checksum": "校验和",
-        "voting_info": "投票信息",
-        "security_warning": {
-          "title": "安全警告：",
-          "message": "投票前请仔细审核代码。批准的提案将以领域权限执行。"
-        }
-      }
+  "cast_vote": "投票",
+  "casting_vote": "投票中...",
+  "voting_not_active": "投票未激活",
+  "deadline": "截止时间",
+  "total_votes": "总票数",
+  "threshold_required": "所需阈值",
+  "approval_progress": "批准进度",
+  "tabs": {
+    "proposals": "提案",
+    "submit": "提交提案"
+  },
+  "status": {
+    "pending_review": "待审核",
+    "pending_vote": "待投票",
+    "voting": "投票中",
+    "accepted": "已通过",
+    "rejected": "已拒绝"
+  },
+  "votes": {
+    "yes": "赞成",
+    "no": "反对",
+    "abstain": "弃权"
+  },
+  "vote": {
+    "yes": "赞成",
+    "no": "反对",
+    "abstain": "弃权"
+  },
+  "form": {
+    "title": "提交新提案",
+    "description": "创建一个新的治理提案，包含在社区批准后执行的Python代码。",
+    "success": "提案提交成功！将在投票开始前进行审核。",
+    "fields": {
+      "title": "提案标题",
+      "description": "描述",
+      "code_url": "代码URL"
+    },
+    "placeholders": {
+      "title": "为您的提案输入清晰、描述性的标题",
+      "description": "描述此提案的作用以及为什么应该被批准",
+      "code_url": "https://github.com/your-repo/proposal.py"
+    },
+    "help": {
+      "code_url": "链接到如果此提案通过将执行的Python代码"
+    },
+    "security": {
+      "title": "安全提醒",
+      "point1": "所有代码在投票开始前都会被审核",
+      "point2": "执行前将验证代码校验和",
+      "point3": "只有批准的提案才能修改领域逻辑"
+    },
+    "buttons": {
+      "submit": "提交提案",
+      "submitting": "提交中...",
+      "cancel": "取消"
+    },
+    "validation": {
+      "required_fields": "所有字段都是必需的",
+      "invalid_url": "请输入有效的URL"
+    },
+    "error": {
+      "submit_failed": "提案提交失败",
+      "backend_error": "后端通信错误",
+      "network_error": "发生网络错误"
+    },
+    "preview": {
+      "title": "提案预览",
+      "description": "查看您的提案如何向投票者显示",
+      "empty_title": "输入提案标题...",
+      "empty_description": "输入提案描述...",
+      "empty_code_url": "输入代码URL...",
+      "summary": "提交摘要",
+      "ready_to_submit": "准备提交",
+      "checklist": "完成清单",
+      "check_title": "已提供标题",
+      "check_description": "已提供描述",
+      "check_code_url": "已提供代码URL"
+    }
+  },
+  "table": {
+    "title": "标题",
+    "status": "状态",
+    "proposer": "提案人",
+    "created": "创建时间",
+    "votes": "投票",
+    "actions": "操作"
+  },
+  "detail": {
+    "title": "提案详情",
+    "code_diff": "代码变更",
+    "proposer": "提案人",
+    "created": "创建时间",
+    "deadline": "投票截止时间",
+    "description": "描述",
+    "code_info": "代码信息",
+    "code_url": "代码URL",
+    "view_code": "查看",
+    "checksum": "校验和",
+    "voting_info": "投票信息",
+    "security_warning": {
+      "title": "安全警告：",
+      "message": "投票前请仔细审核代码。批准的提案将以领域权限执行。"
     }
   }
 }

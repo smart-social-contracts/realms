@@ -6,7 +6,7 @@
   "permissions": [],
   "profiles": ["member", "admin"],
   "categories": ["public_services"],
-  "icon": "vote",
+  "icon": "users_group",
   "doc_url": "https://github.com/smart-social-contracts/realms/tree/main/extensions/voting",
   "url_path": null,
   "show_in_sidebar": true

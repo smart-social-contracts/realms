@@ -1,6 +1,7 @@
 {
   "title": "Governance Voting",
   "description": "Submit and vote on proposals to execute Python code within the realm",
+  "sidebar": "Voting",
   "error": "Error:",
   "loading": "Loading...",
   "refresh": "Refresh",

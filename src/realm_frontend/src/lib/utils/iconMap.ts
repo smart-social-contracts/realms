@@ -21,7 +21,9 @@ import {
     MapPinSolid,
     ProfileCardSolid,
     ObjectsColumnSolid,
-    ScaleBalancedSolid
+    ScaleBalancedSolid,
+    CheckCircleOutline,
+    UsersGroupSolid
 } from 'flowbite-svelte-icons';
 
 /**
@@ -53,7 +55,9 @@ export const iconMap: Record<string, any> = {
     'map_pin': MapPinSolid,
     'id_card': ProfileCardSolid,
     'objects': ObjectsColumnSolid,
-    'scale': ScaleBalancedSolid
+    'scale': ScaleBalancedSolid,
+    'vote': CheckCircleOutline,
+    'users_group': UsersGroupSolid,
 };
 
 /**
