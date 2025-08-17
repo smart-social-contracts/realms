@@ -147,26 +147,29 @@
                 </button>
                 
                 {#if dropdownOpen}
-                  <div class="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 w-fit">
+                  <div style="position: absolute; top: 100%; left: 0; margin-top: 4px; background: white; border: 1px solid #d1d5db; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); z-index: 50; width: 150px;">
                     {#each profiles as profile}
-                      <button
-                        type="button"
-                        class="w-full px-3 py-2 text-left text-sm text-gray-900 hover:bg-gray-100 first:rounded-t-lg last:rounded-b-lg"
+                      <div 
+                        style="padding: 8px 12px; text-align: left; font-size: 14px; color: #111827; cursor: pointer; white-space: nowrap;"
+                        class="hover:bg-gray-100 first:rounded-t-lg last:rounded-b-lg"
                         on:click={() => {
                           selectedProfile = profile.value;
                           dropdownOpen = false;
                         }}
+                        on:keydown={(e) => e.key === 'Enter' && (() => {
+                          selectedProfile = profile.value;
+                          dropdownOpen = false;
+                        })()}
+                        role="button"
+                        tabindex="0"
                       >
                         {profile.name}
-                      </button>
+                      </div>
                     {/each}
                   </div>
                 {/if}
               </div>
-            </div>
           
-            <!-- DISABLED FOR NOW
-             
             <div class="mb-6">
               <div class="flex items-center gap-2 mb-4">
                 <Checkbox bind:checked={includePassportVerification} />
