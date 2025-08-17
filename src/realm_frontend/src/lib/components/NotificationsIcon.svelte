@@ -17,7 +17,7 @@
     }
 </script>
 
-<div class="relative">
+<div class="relative mr-4">
     <ToolbarButton 
         size="lg" 
         class="-mx-0.5 hover:text-gray-900 dark:hover:text-white"

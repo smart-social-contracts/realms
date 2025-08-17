@@ -1,0 +1,97 @@
+{
+  "extensions": {
+    "voting": {
+      "title": "Governance Voting",
+      "description": "Submit and vote on proposals to execute Python code within the realm",
+      "error": "Error:",
+      "loading": "Loading...",
+      "refresh": "Refresh",
+      "loading_proposals": "Loading proposals...",
+      "no_proposals": "No proposals found",
+      "no_proposals_hint": "Be the first to submit a proposal!",
+      "view_details": "View Details",
+      "cast_vote": "Cast Your Vote",
+      "casting_vote": "Casting vote...",
+      "voting_not_active": "Voting not active",
+      "deadline": "Deadline",
+      "total_votes": "Total Votes",
+      "threshold_required": "Threshold Required",
+      "approval_progress": "Approval Progress",
+      "tabs": {
+        "proposals": "Proposals",
+        "submit": "Submit Proposal"
+      },
+      "status": {
+        "pending_review": "Pending Review",
+        "pending_vote": "Pending Vote",
+        "voting": "Voting Active",
+        "accepted": "Accepted",
+        "rejected": "Rejected"
+      },
+      "votes": {
+        "yes": "Yes",
+        "no": "No",
+        "abstain": "Abstain"
+      },
+      "vote": {
+        "yes": "Yes",
+        "no": "No",
+        "abstain": "Abstain"
+      },
+      "form": {
+        "title": "Submit New Proposal",
+        "description": "Create a new governance proposal with Python code to be executed if approved by the community.",
+        "success": "Proposal submitted successfully! It will be reviewed before voting begins.",
+        "fields": {
+          "title": "Proposal Title",
+          "description": "Description",
+          "code_url": "Code URL"
+        },
+        "placeholders": {
+          "title": "Enter a clear, descriptive title for your proposal",
+          "description": "Describe what this proposal does and why it should be approved",
+          "code_url": "https://github.com/your-repo/proposal.py"
+        },
+        "help": {
+          "code_url": "Link to the Python code that will be executed if this proposal passes"
+        },
+        "security": {
+          "title": "Security Notice",
+          "point1": "All code will be reviewed before voting begins",
+          "point2": "Code checksums will be verified before execution",
+          "point3": "Only approved proposals can modify realm logic"
+        },
+        "buttons": {
+          "submit": "Submit Proposal",
+          "submitting": "Submitting...",
+          "cancel": "Cancel"
+        },
+        "validation": {
+          "required_fields": "All fields are required",
+          "invalid_url": "Please enter a valid URL"
+        },
+        "error": {
+          "submit_failed": "Failed to submit proposal",
+          "backend_error": "Backend communication error",
+          "network_error": "Network error occurred"
+        }
+      },
+      "detail": {
+        "title": "Proposal Details",
+        "proposer": "Proposer",
+        "created": "Created",
+        "deadline": "Voting Deadline",
+        "description": "Description",
+        "code_info": "Code Information",
+        "code_url": "Code URL",
+        "view_code": "View",
+        "checksum": "Checksum",
+        "voting_info": "Voting Information",
+        "security_warning": {
+          "title": "Security Warning:",
+          "message": "Always review the code carefully before voting. Approved proposals will execute with realm privileges."
+        }
+      }
+    }
+  }
+}
