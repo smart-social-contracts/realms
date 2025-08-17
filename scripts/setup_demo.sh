@@ -51,4 +51,15 @@ dfx canister call realm_backend extension_sync_call '(
   }
 )' --network "$NETWORK"
 
+
+# Run government_services
+echo "Running government_services..."
+dfx canister call realm_backend extension_sync_call '(
+  record {
+    extension_name = "demo_loader";
+    function_name = "load";
+    args = "{\"step\": \"government_services\"}";
+  }
+)' --network "$NETWORK"
+
 echo "Demo setup complete!"
