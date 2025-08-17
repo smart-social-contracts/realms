@@ -12,7 +12,7 @@ logger = get_logger("demo_loader.government_services")
 
 def run():
     """Create government services related entities."""
-    
+
     # Create licenses
     licenses = []
     license_data = [
