@@ -7,7 +7,7 @@
   import { styles, cn } from '$lib/theme/utilities';
   import { _ } from 'svelte-i18n';
   
-  let agreement = '';
+  let agreement = false;
   let showDemoBanner = true;
   let error = '';
   let success = false;
@@ -47,11 +47,6 @@
     error = '';
     
     if (!agreement) {
-      error = 'Please indicate whether you agree to the terms';
-      return;
-    }
-    
-    if (agreement === 'disagree') {
       error = 'You must agree to the terms to join this Realm';
       return;
     }
@@ -87,9 +82,8 @@
   }
 </script>
 
-<div class="min-h-screen bg-gray-50 px-4 py-12 sm:px-6 lg:px-8" style="transform: none !important;">
-  <div class="flex items-center justify-center">
-    <div class="w-full max-w-md space-y-8">
+<div class="min-h-screen bg-gray-50 px-4 py-12 sm:px-8 md:px-16 lg:px-24 xl:px-32" style="transform: none !important;">
+    <div class="w-full space-y-8">
     <div class="text-center">
       <h1 class="text-3xl font-extrabold text-gray-900">Join {realmName}</h1>
       <p class="mt-2 text-sm text-gray-600">
@@ -123,19 +117,13 @@
               <li>Your participation in this realm is subject to the rules established by the decentralized governance</li>
               <li>All transactions within this realm are recorded on the Internet Computer blockchain</li>
             </ul>
-            
-            <p class="font-medium">Do you agree to these terms?</p>
           </div>
           
-          <div class="flex flex-col gap-4">
-            <div class="flex items-center gap-2">
-              <Radio id="agreement-yes" name="agreement" value="agree" bind:group={agreement} />
-              <Label for="agreement-yes">I agree to the terms</Label>
-            </div>
-            <div class="flex items-center gap-2">
-              <Radio id="agreement-no" name="agreement" value="disagree" bind:group={agreement} />
-              <Label for="agreement-no">I do not agree</Label>
-            </div>
+          <div class="flex items-center gap-2 mb-4">
+            <Checkbox id="agreement" bind:checked={agreement} />
+            <Label for="agreement" class="text-sm font-medium text-gray-700">
+              I agree to these terms and conditions
+            </Label>
           </div>
           
           <!-- Demo Feature: Profile Selection -->
@@ -179,26 +167,30 @@
                 {/if}
               </div>
             </div>
-          </div>
           
-          <div class="mb-6">
-            <div class="flex items-center gap-2 mb-4">
-              <Checkbox bind:checked={includePassportVerification} />
-              <Label class="text-sm font-medium text-gray-700">
-                Verify passport identity (optional)
-              </Label>
-            </div>
-            <p class="text-xs text-gray-500 mb-4">
-              Use zero-knowledge proofs to verify your passport securely. Your passport data never leaves your device.
-            </p>
-            
-            {#if includePassportVerification && $isAuthenticated}
-              <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                <PassportVerification userId={$principal} />
+            <!-- DISABLED FOR NOW
+             
+            <div class="mb-6">
+              <div class="flex items-center gap-2 mb-4">
+                <Checkbox bind:checked={includePassportVerification} />
+                <Label class="text-sm font-medium text-gray-700">
+                  Verify passport identity (optional)
+                </Label>
               </div>
-            {/if}
+              <p class="text-xs text-gray-500 mb-4">
+                Use zero-knowledge proofs to verify your passport securely. Your passport data never leaves your device.
+              </p>
+              
+              {#if includePassportVerification && $isAuthenticated}
+                <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <PassportVerification userId={$principal} />
+                </div>
+              {/if}
+            </div> -->
+            
           </div>
           
+
           <div>
             {#if loading}
               <Button type="button" color="alternative" class="w-full flex justify-center items-center gap-2" disabled>
@@ -206,7 +198,7 @@
                 Joining...
               </Button>
             {:else}
-              <Button type="submit" color="alternative" class="w-full">Join Realm as {selectedProfile}</Button>
+              <Button type="submit" color="alternative" class="w-full">Join Realm</Button>
             {/if}
           </div>
           
@@ -220,5 +212,4 @@
       </Card>
     {/if}
     </div>
-  </div>
 </div>
