@@ -17,14 +17,22 @@
 	
 	// Load proposals on component mount
 	onMount(async () => {
-		await loadProposals();
+		console.log('onMount called - about to load proposals');
+		try {
+			await loadProposals();
+			console.log('loadProposals completed');
+		} catch (error) {
+			console.error('Error in onMount:', error);
+		}
 	});
 	
 	async function loadProposals() {
+		console.log('loadProposals function started');
 		try {
 			loading = true;
 			error = '';
 			
+			console.log('About to call backend.extension_sync_call');
 			const response = await backend.extension_sync_call({
 				extension_name: "voting",
 				function_name: "get_proposals",
