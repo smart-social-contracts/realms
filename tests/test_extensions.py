@@ -34,8 +34,7 @@ def test_extensions():
                 if extension_id and extension_id != "ID":
                     run_command(f"./scripts/realm-extension-cli.py uninstall --extension-id {extension_id} || true")
     
-    for name in EXTENSION_NAMES:
-        run_command(f"./scripts/realm-extension-cli.py install --extension-id {name}")
+    run_command("./scripts/realm-extension-cli.py install --all")
     
     list_after = run_command("./scripts/realm-extension-cli.py list")
     for name in EXTENSION_NAMES:
