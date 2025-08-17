@@ -5,8 +5,10 @@
   import { backend } from '$lib/canisters.js';
   import PassportVerification from '$lib/components/passport/PassportVerification.svelte';
   import { styles, cn } from '$lib/theme/utilities';
+  import { _ } from 'svelte-i18n';
   
   let agreement = '';
+  let showDemoBanner = true;
   let error = '';
   let success = false;
   let loading = false;
@@ -136,37 +138,46 @@
             </div>
           </div>
           
-          <div class="mb-4">
-            <label for="profile-dropdown" class="mb-2 block text-sm font-medium text-gray-700">Select Profile Type</label>
-            <div class="relative">
-              <button
-                id="profile-dropdown"
-                type="button"
-                class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 text-left flex justify-between items-center"
-                on:click={() => dropdownOpen = !dropdownOpen}
-              >
-                <span>{profiles.find(p => p.value === selectedProfile)?.name || 'Select...'}</span>
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-              </button>
-              
-              {#if dropdownOpen}
-                <div class="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50">
-                  {#each profiles as profile}
-                    <button
-                      type="button"
-                      class="w-full px-3 py-2 text-left text-sm text-gray-900 hover:bg-gray-100 first:rounded-t-lg last:rounded-b-lg"
-                      on:click={() => {
-                        selectedProfile = profile.value;
-                        dropdownOpen = false;
-                      }}
-                    >
-                      {profile.name}
-                    </button>
-                  {/each}
-                </div>
-              {/if}
+          <!-- Demo Feature: Profile Selection -->
+          <div class="mb-4 relative">
+            <div class="absolute -top-2 -right-2 z-10">
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                Demo Feature
+              </span>
+            </div>
+            <div class="border border-blue-200 rounded-lg p-4 bg-blue-50/30">
+              <label for="profile-dropdown" class="mb-2 block text-sm font-medium text-gray-700">Select Profile Type</label>
+              <p class="text-xs text-blue-700 mb-3">In demo mode, you can select different profile types. In production, this would be determined by your organization role.</p>
+              <div class="relative">
+                <button
+                  id="profile-dropdown"
+                  type="button"
+                  class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 text-left flex justify-between items-center"
+                  on:click={() => dropdownOpen = !dropdownOpen}
+                >
+                  <span>{profiles.find(p => p.value === selectedProfile)?.name || 'Select...'}</span>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </button>
+                
+                {#if dropdownOpen}
+                  <div class="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50">
+                    {#each profiles as profile}
+                      <button
+                        type="button"
+                        class="w-full px-3 py-2 text-left text-sm text-gray-900 hover:bg-gray-100 first:rounded-t-lg last:rounded-b-lg"
+                        on:click={() => {
+                          selectedProfile = profile.value;
+                          dropdownOpen = false;
+                        }}
+                      >
+                        {profile.name}
+                      </button>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
             </div>
           </div>
           
