@@ -34,7 +34,7 @@
 			console.log('Proposals response:', response);
 			
 			if (response.success) {
-				const data = JSON.parse(response.response);
+				const data = response.response;
 				if (data.success) {
 					proposals = data.data.proposals;
 				} else {
