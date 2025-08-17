@@ -82,6 +82,26 @@ export const buttonStyles = {
     px-[var(--spacing-lg)] 
     py-[var(--spacing-sm)] 
     transition-[var(--transition-fast)]
+  `,
+
+  errorSecondary: () => `
+    border
+    border-[var(--color-error-500)]
+    text-[var(--color-error-600)]
+    bg-transparent
+    hover:bg-[var(--color-error-50)]
+    focus:ring-4
+    focus:ring-[var(--color-error-300)]
+    dark:border-[var(--color-error-500)]
+    dark:text-[var(--color-error-400)]
+    dark:hover:bg-[var(--color-error-900)]
+    dark:hover:text-white
+    dark:focus:ring-[var(--color-error-800)]
+    font-medium
+    rounded-[var(--border-radius-lg)]
+    px-[var(--spacing-lg)]
+    py-[var(--spacing-sm)]
+    transition-[var(--transition-fast)]
   `
 };
 

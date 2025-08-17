@@ -43,7 +43,7 @@
 					size="xs" 
 					class={cn(
 						"px-3 py-1.5",
-						isEnabled ? styles.button.error() : styles.button.success()
+						isEnabled ? styles.button.errorSecondary() : styles.button.success()
 					)}
 					on:click={() => isEnabled = !isEnabled}
 				>
