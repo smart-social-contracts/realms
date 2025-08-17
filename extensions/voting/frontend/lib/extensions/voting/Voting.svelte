@@ -35,10 +35,10 @@
 			
 			if (response.success) {
 				const data = response.response;
-				if (data.success) {
-					proposals = data.data.proposals;
+				if (data && data.success) {
+					proposals = data.data.proposals || [];
 				} else {
-					error = data.error || 'Failed to load proposals';
+					error = data?.error || 'Failed to load proposals';
 				}
 			} else {
 				error = 'Failed to communicate with backend';
