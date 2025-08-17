@@ -15,10 +15,13 @@ import {
     HomeOutline,
     FileChartBarSolid,
     BellSolid,
-    BuildingSolid,
+    LandmarkSolid,
     BookOutline,
     BrainOutline,
     MapPinSolid,
+    ProfileCardSolid,
+    ObjectsColumnSolid,
+    ScaleBalancedSolid
 } from 'flowbite-svelte-icons';
 
 /**
@@ -44,10 +47,13 @@ export const iconMap: Record<string, any> = {
     'home': HomeOutline,
     'file': FileChartBarSolid,
     'bell': BellSolid,
-    'building': BuildingSolid,
+    'building': LandmarkSolid,
     'book': BookOutline,
     'brain': BrainOutline,
     'map_pin': MapPinSolid,
+    'id_card': ProfileCardSolid,
+    'objects': ObjectsColumnSolid,
+    'scale': ScaleBalancedSolid
 };
 
 /**

@@ -6,7 +6,7 @@
   "entry_points": ["get_litigations", "create_litigation", "execute_verdict"],
   "profiles": ["admin", "member"],
   "categories": ["public_services"],
-  "icon": "building",
+  "icon": "scale",
   "doc_url": "https://github.com/smart-social-contracts/realms/tree/main/extensions/justice_litigation",
   "url_path": null,
   "show_in_sidebar": true
