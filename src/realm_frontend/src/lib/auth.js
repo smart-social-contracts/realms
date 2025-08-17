@@ -40,9 +40,10 @@ function getInternetIdentityUrl() {
   // For local development, use the known Internet Identity canister ID
   if (isLocalDev) {
     const canisterId = 'uxrrr-q7777-77774-qaaaq-cai'; // Internet Identity canister ID from dfx deploy
-    const port = 8000; // Default DFX port
+    // Dynamically detect the port from current URL
+    const currentPort = window.location.port || '8000';
     
-    return `http://${canisterId}.localhost:${port}`;
+    return `http://${canisterId}.localhost:${currentPort}`;
   } 
   
   // For production, use the standard II URL

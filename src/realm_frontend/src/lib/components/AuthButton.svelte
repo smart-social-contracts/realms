@@ -119,6 +119,7 @@
 				tabindex={0} 
 				title={`Principal: ${$principal}`} 
 				alt="User avatar"
+				size="sm"
 			/>
 		</div>
 		

@@ -5,14 +5,17 @@
   import { backend } from '$lib/canisters.js';
   import PassportVerification from '$lib/components/passport/PassportVerification.svelte';
   import { styles, cn } from '$lib/theme/utilities';
+  import { _ } from 'svelte-i18n';
   
-  let agreement = '';
+  let agreement = false;
+  let showDemoBanner = true;
   let error = '';
   let success = false;
   let loading = false;
   let realmName = 'Realm';
   let selectedProfile = 'member'; // Default to member profile
   let includePassportVerification = false;
+  let dropdownOpen = false;
   
   // Available profiles
   const profiles = [
@@ -44,11 +47,6 @@
     error = '';
     
     if (!agreement) {
-      error = 'Please indicate whether you agree to the terms';
-      return;
-    }
-    
-    if (agreement === 'disagree') {
       error = 'You must agree to the terms to join this Realm';
       return;
     }
@@ -84,23 +82,20 @@
   }
 </script>
 
-<div class="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
-  <div class="w-full max-w-md space-y-8">
-    <div class="text-center">
-      <h1 class="text-3xl font-extrabold text-gray-900">Join {realmName}</h1>
-      <p class="mt-2 text-sm text-gray-600">
-        Accept the terms to join this Realm
-      </p>
-    </div>
-    
-    {#if success}
-      <Card class="p-8 text-center">
+<div class="min-h-screen bg-gray-50 px-4 py-12" style="transform: none !important;">
+    <div class="w-full mx-auto space-y-8 md:w-[80%]">
+      <div class="text-center">
+        <h1 class="text-3xl font-extrabold text-gray-900">Join {realmName}</h1>
+      </div>
+      
+      {#if success}
+      <Card class="p-8 text-center !w-full !max-w-none">
         <h2 class={cn("text-xl font-bold", styles.text.success())}>Successfully Joined!</h2>
         <p class="mt-2 mb-4">You have successfully joined the realm.</p>
         <Button href="/" class={cn("mt-4 w-full", styles.button.primary())}>Go to Dashboard</Button>
       </Card>
-    {:else}
-      <Card class="p-8">
+      {:else}
+      <Card class="p-8 !w-full !max-w-none">
         <form class="space-y-6" on:submit|preventDefault={handleSubmit}>
           {#if error}
             <div class="rounded-md bg-red-50 p-4">
@@ -119,48 +114,65 @@
               <li>Your participation in this realm is subject to the rules established by the decentralized governance</li>
               <li>All transactions within this realm are recorded on the Internet Computer blockchain</li>
             </ul>
-            
-            <p class="font-medium">Do you agree to these terms?</p>
           </div>
           
-          <div class="flex flex-col gap-4">
-            <div class="flex items-center gap-2">
-              <Radio id="agreement-yes" name="agreement" value="agree" bind:group={agreement} />
-              <Label for="agreement-yes">I agree to the terms</Label>
-            </div>
-            <div class="flex items-center gap-2">
-              <Radio id="agreement-no" name="agreement" value="disagree" bind:group={agreement} />
-              <Label for="agreement-no">I do not agree</Label>
-            </div>
+          <div class="flex items-center gap-2 mb-4">
+            <Checkbox id="agreement" bind:checked={agreement} />
+            <Label for="agreement" class="text-sm font-medium text-gray-700">
+              I agree to these terms and conditions
+            </Label>
           </div>
           
-          <div class="mb-4">
-            <Label class="mb-2 block text-sm font-medium text-gray-700">Select Profile Type</Label>
-            <Select bind:value={selectedProfile} on:change={(e) => selectedProfile = e.target.value}>
-              {#each profiles as profile}
-                <option value={profile.value}>{profile.name}</option>
-              {/each}
-            </Select>
-          </div>
-          
-          <div class="mb-6">
-            <div class="flex items-center gap-2 mb-4">
-              <Checkbox bind:checked={includePassportVerification} />
-              <Label class="text-sm font-medium text-gray-700">
-                Verify passport identity (optional)
-              </Label>
+          <!-- Demo Feature: Profile Selection -->
+          <div class="mb-4 relative">
+            <div class="absolute -top-2 -right-2 z-10">
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                Demo Feature
+              </span>
             </div>
-            <p class="text-xs text-gray-500 mb-4">
-              Use zero-knowledge proofs to verify your passport securely. Your passport data never leaves your device.
-            </p>
-            
-            {#if includePassportVerification && $isAuthenticated}
-              <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                <PassportVerification userId={$principal} />
+            <div class="border border-blue-200 rounded-lg p-4 bg-blue-50/30">
+              <label for="profile-dropdown" class="mb-2 block text-sm font-medium text-gray-700">Select Profile Type</label>
+              <p class="text-xs text-blue-700 mb-3">In demo mode, you can select different profile types. In production, this would be determined by your organization role.</p>
+              <div class="relative">
+                <button
+                  id="profile-dropdown"
+                  type="button"
+                  class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 text-left flex justify-between items-center"
+                  on:click={() => dropdownOpen = !dropdownOpen}
+                >
+                  <span>{profiles.find(p => p.value === selectedProfile)?.name || 'Select...'}</span>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </button>
+                
+                {#if dropdownOpen}
+                  <div style="position: absolute; top: 100%; left: 0; margin-top: 4px; background: white; border: 1px solid #d1d5db; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); z-index: 50; width: 150px;">
+                    {#each profiles as profile}
+                      <div 
+                        style="padding: 8px 12px; text-align: left; font-size: 14px; color: #111827; cursor: pointer; white-space: nowrap;"
+                        class="hover:bg-gray-100 first:rounded-t-lg last:rounded-b-lg"
+                        on:click={() => {
+                          selectedProfile = profile.value;
+                          dropdownOpen = false;
+                        }}
+                        on:keydown={(e) => e.key === 'Enter' && (() => {
+                          selectedProfile = profile.value;
+                          dropdownOpen = false;
+                        })()}
+                        role="button"
+                        tabindex="0"
+                      >
+                        {profile.name}
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
               </div>
-            {/if}
           </div>
-          
+
+          <br />
+
           <div>
             {#if loading}
               <Button type="button" color="alternative" class="w-full flex justify-center items-center gap-2" disabled>
@@ -168,18 +180,12 @@
                 Joining...
               </Button>
             {:else}
-              <Button type="submit" color="alternative" class="w-full">Join Realm as {selectedProfile}</Button>
+              <Button type="submit" color="alternative" class="w-full">Join Realm</Button>
             {/if}
           </div>
-          
-          <div class="text-center text-sm">
-            Already a member? 
-            <a href="/login" class="font-medium text-primary-600 hover:text-primary-500">
-              Log in
-            </a>
-          </div>
+        
         </form>
       </Card>
-    {/if}
-  </div>
+      {/if}
+      </div>
 </div>
