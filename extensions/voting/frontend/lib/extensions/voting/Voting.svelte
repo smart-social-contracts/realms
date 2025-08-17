@@ -32,35 +32,22 @@
 			});
 			
 			console.log('Proposals response:', response);
-			console.log('Step 1: About to check response.success');
 			
-			if (response.success && response.response) {
-				console.log('Step 2: Response success check passed');
-				// The backend returns response.response as an already parsed object
-				const backendData = response.response;
-				console.log('Step 3: Backend data extracted:', backendData);
+			if (response.success) {
+				// Parse the JSON response like other extensions do
+				const data = JSON.parse(response.response);
+				console.log('Parsed data:', data);
 				
-				// Check if backendData.success exists and what type it is
-				console.log('Step 4: Backend success value:', backendData.success, 'type:', typeof backendData.success);
-				
-				// Handle Python True/False vs JavaScript true/false
-				const isSuccess = backendData.success === true || backendData.success === 'True' || backendData.success === True;
-				if (isSuccess && backendData.data && backendData.data.proposals) {
-					console.log('Step 5: Simple success check passed');
-					proposals = backendData.data.proposals;
-					console.log('Step 6: Successfully loaded proposals:', proposals.length);
+				if (data.success) {
+					proposals = data.data.proposals;
+					console.log('Successfully loaded proposals:', proposals.length);
 				} else {
-					console.log('Step 5: Simple success check failed');
-					console.log('  - backendData.success:', backendData.success);
-					console.log('  - backendData.data:', backendData.data);
-					console.log('  - backendData.data.proposals:', backendData.data?.proposals);
-					error = backendData.error || 'No proposals found';
+					error = data.error || 'Failed to load proposals';
+					console.log('Backend error:', error);
 				}
 			} else {
-				console.log('Step 2: Response success check failed');
-				console.log('  - response.success:', response.success);
-				console.log('  - response.response:', response.response);
 				error = 'Failed to communicate with backend';
+				console.log('Communication error:', error);
 			}
 		} catch (e) {
 			console.error('Error loading proposals:', e);
