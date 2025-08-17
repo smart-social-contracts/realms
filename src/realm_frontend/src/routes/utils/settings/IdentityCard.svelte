@@ -21,7 +21,7 @@
 			<img src={src} alt={title} class="h-full max-w-full object-contain" />
 		</div>
 
-		<div class="flex-1">
+		<div class="flex-1 flex flex-col">
 			<div class="flex flex-wrap justify-between items-start gap-2 mb-2">
 				<Heading tag="h3" class="text-xl font-semibold text-gray-900 dark:text-white">{title}</Heading>
 				{#if status === 'Verified'}
@@ -36,14 +36,14 @@
 				{/if}
 			</div>
 			
-			<p class="mb-4 text-sm text-gray-600 dark:text-gray-400">{description}</p>
+			<p class="mb-4 text-sm text-gray-600 dark:text-gray-400 flex-grow">{description}</p>
 			
 			<div class="flex items-center gap-3 mt-auto">
 				<Button 
 					size="xs" 
 					class={cn(
 						"px-3 py-1.5",
-						isEnabled ? styles.button.errorSecondary() : styles.button.success()
+						isEnabled ? styles.button.secondary() : styles.button.success()
 					)}
 					on:click={() => isEnabled = !isEnabled}
 				>
