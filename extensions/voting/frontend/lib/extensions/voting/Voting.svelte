@@ -32,24 +32,21 @@
 			});
 			
 			console.log('Proposals response:', response);
-			console.log('Response type:', typeof response.response);
-			console.log('Response content:', response.response);
 			
-			if (response.success) {
-				const data = response.response;
-				console.log('Data extracted:', data);
-				console.log('Data success:', data?.success);
-				console.log('Data proposals:', data?.data?.proposals);
+			if (response.success && response.response) {
+				// The backend returns a Python dict structure: {'success': True, 'data': {'proposals': [...]}}
+				const backendData = response.response;
 				
-				if (data && data.success && data.data && data.data.proposals) {
-					proposals = data.data.proposals;
-					console.log('Proposals set to:', proposals);
+				if (backendData.success && backendData.data && Array.isArray(backendData.data.proposals)) {
+					proposals = backendData.data.proposals;
+					console.log('Successfully loaded proposals:', proposals.length);
 				} else {
-					error = data?.error || 'Failed to load proposals';
-					console.log('Error set to:', error);
+					error = backendData.error || 'No proposals found';
+					console.log('Backend error or no proposals:', error);
 				}
 			} else {
 				error = 'Failed to communicate with backend';
+				console.log('Communication error:', error);
 			}
 		} catch (e) {
 			console.error('Error loading proposals:', e);
