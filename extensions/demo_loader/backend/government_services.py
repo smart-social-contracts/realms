@@ -7,15 +7,12 @@ from ggg import (
 )
 from kybra_simple_logging import get_logger
 
-from .config import NUM_LICENSES, NUM_MANDATES
-
 logger = get_logger("demo_loader.government_services")
 
 
 def run():
     """Create government services related entities."""
-    logger.info(f"Creating {NUM_LICENSES} licenses and {NUM_MANDATES} mandates")
-
+    
     # Create licenses
     licenses = []
     license_data = [
@@ -41,7 +38,9 @@ def run():
         },
     ]
 
-    for i in range(NUM_LICENSES):
+    logger.info(f"Creating {len(license_data)} licenses")
+
+    for i in range(len(license_data)):
         license_info = license_data[i]
         codex = Codex(
             name=f"{license_info['name']} Verification", code=license_info["code"]
@@ -84,7 +83,9 @@ def run():
         },
     ]
 
-    for i in range(NUM_MANDATES):
+    logger.info(f"Creating {len(mandate_data)} mandates")
+
+    for i in range(len(mandate_data)):
         mandate_info = mandate_data[i]
         mandate = Mandate(
             name=mandate_info["name"],
@@ -102,6 +103,6 @@ def run():
 
         mandates.append(mandate)
 
-    logger.info(f"Created {len(licenses)} licenses and {len(mandates)} mandates")
+    logger.info(f"Created {len(mandates)} mandates")
 
-    return f"Created {len(licenses)} licenses and {len(mandates)} mandates"
+    return f"Created {len(mandates)} mandates"

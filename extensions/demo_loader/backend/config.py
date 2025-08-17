@@ -10,10 +10,6 @@ NUM_USERS = 1000  # Number of users to create
 NUM_ORGANIZATIONS = 20  # Number of organizations to create
 NUM_INSTRUMENTS = 20  # Number of financial instruments to create
 
-# Government Services
-NUM_LICENSES = 20  # Number of different license types
-NUM_MANDATES = 50  # Number of different mandates
-
 # Transactions
 NUM_TRADES = 20  # Number of trades to create
 NUM_TRANSFERS = 30  # Number of transfers to create
