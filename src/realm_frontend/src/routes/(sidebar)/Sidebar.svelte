@@ -394,7 +394,6 @@
 					<SidebarGroup ulClass={groupClass} class="mb-3">
 						<li class="px-3 py-2 flex items-center">
 							<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 dark:border-gray-100"></div>
-							<span class="ml-3 text-sm text-gray-500 dark:text-gray-400">Loading extensions...</span>
 						</li>
 					</SidebarGroup>
 				{/if}
