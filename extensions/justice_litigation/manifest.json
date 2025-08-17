@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Legal case management and litigation tracking system",
   "permissions": [],
-  "entry_points": ["get_litigations", "create_litigation", "execute_verdict"],
+  "entry_points": ["get_litigations", "create_litigation", "execute_verdict", "load_demo_litigations"],
   "profiles": ["admin", "member"],
   "categories": ["public_services"],
   "icon": "scale",
