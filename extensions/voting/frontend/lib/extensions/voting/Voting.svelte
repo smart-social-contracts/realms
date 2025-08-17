@@ -43,8 +43,9 @@
 				// Check if backendData.success exists and what type it is
 				console.log('Step 4: Backend success value:', backendData.success, 'type:', typeof backendData.success);
 				
-				// Simple success check first
-				if (backendData.success && backendData.data && backendData.data.proposals) {
+				// Handle Python True/False vs JavaScript true/false
+				const isSuccess = backendData.success === true || backendData.success === 'True' || backendData.success === True;
+				if (isSuccess && backendData.data && backendData.data.proposals) {
 					console.log('Step 5: Simple success check passed');
 					proposals = backendData.data.proposals;
 					console.log('Step 6: Successfully loaded proposals:', proposals.length);
