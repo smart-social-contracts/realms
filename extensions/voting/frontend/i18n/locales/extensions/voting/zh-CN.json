@@ -75,6 +75,19 @@
           "submit_failed": "提案提交失败",
           "backend_error": "后端通信错误",
           "network_error": "发生网络错误"
+        },
+        "preview": {
+          "title": "提案预览",
+          "description": "查看您的提案如何向投票者显示",
+          "empty_title": "输入提案标题...",
+          "empty_description": "输入提案描述...",
+          "empty_code_url": "输入代码URL...",
+          "summary": "提交摘要",
+          "ready_to_submit": "准备提交",
+          "checklist": "完成清单",
+          "check_title": "已提供标题",
+          "check_description": "已提供描述",
+          "check_code_url": "已提供代码URL"
         }
       },
       "table": {
@@ -87,6 +100,7 @@
       },
       "detail": {
         "title": "提案详情",
+        "code_diff": "代码变更",
         "proposer": "提案人",
         "created": "创建时间",
         "deadline": "投票截止时间",

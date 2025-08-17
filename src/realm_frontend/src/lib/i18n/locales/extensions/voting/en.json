@@ -73,6 +73,19 @@
       "submit_failed": "Failed to submit proposal",
       "backend_error": "Backend communication error",
       "network_error": "Network error occurred"
+    },
+    "preview": {
+      "title": "Proposal Preview",
+      "description": "See how your proposal will appear to voters",
+      "empty_title": "Enter a proposal title...",
+      "empty_description": "Enter a proposal description...",
+      "empty_code_url": "Enter a code URL...",
+      "summary": "Submission Summary",
+      "ready_to_submit": "Ready to Submit",
+      "checklist": "Completion Checklist",
+      "check_title": "Title provided",
+      "check_description": "Description provided",
+      "check_code_url": "Code URL provided"
     }
   },
   "table": {
@@ -85,6 +98,7 @@
   },
   "detail": {
     "title": "Proposal Details",
+    "code_diff": "Code Changes",
     "proposer": "Proposer",
     "created": "Created",
     "deadline": "Voting Deadline",
