@@ -18,7 +18,7 @@
     ],
     assetPortfolio: [
       { symbol: 'ckBTC', balance: 2.5, value: 112500, color: '#F7931A' },
-      { symbol: 'NVC', balance: 850000, value: 850000, color: '#3B82F6' },
+      { symbol: 'ckBTC', balance: 850000, value: 850000, color: '#3B82F6' },
       { symbol: 'ICP', balance: 12000, value: 156000, color: '#29ABE2' },
       { symbol: 'USDC', balance: 75000, value: 75000, color: '#2775CA' },
       { symbol: 'ckETH', balance: 45, value: 103500, color: '#627EEA' }

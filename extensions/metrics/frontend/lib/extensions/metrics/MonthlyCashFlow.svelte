@@ -31,13 +31,13 @@
     <div class="bg-white rounded-lg p-3 border">
       <div class="flex items-center justify-between mb-2">
         <span class="text-sm font-medium text-green-700">📈 {$_('extensions.metrics.income')}</span>
-        <span class="text-lg font-bold text-green-600">+{totalIncome.toLocaleString()} NVC</span>
+        <span class="text-lg font-bold text-green-600">+{totalIncome.toLocaleString()} ckBTC</span>
       </div>
       <div class="text-xs text-gray-600 space-y-1">
         {#each cashFlowData.income as item}
           <div class="flex justify-between">
             <span>{item.category}</span>
-            <span>{item.amount.toLocaleString()} NVC</span>
+            <span>{item.amount.toLocaleString()} ckBTC</span>
           </div>
         {/each}
       </div>
@@ -47,13 +47,13 @@
     <div class="bg-white rounded-lg p-3 border">
       <div class="flex items-center justify-between mb-2">
         <span class="text-sm font-medium text-red-700">📉 {$_('extensions.metrics.expenses')}</span>
-        <span class="text-lg font-bold text-red-600">-{totalExpenses.toLocaleString()} NVC</span>
+        <span class="text-lg font-bold text-red-600">-{totalExpenses.toLocaleString()} ckBTC</span>
       </div>
       <div class="text-xs text-gray-600 space-y-1">
         {#each cashFlowData.expenses as item}
           <div class="flex justify-between">
             <span>{item.category}</span>
-            <span>{item.amount.toLocaleString()} NVC</span>
+            <span>{item.amount.toLocaleString()} ckBTC</span>
           </div>
         {/each}
       </div>
@@ -64,7 +64,7 @@
       <div class="flex items-center justify-between">
         <span class="text-sm font-medium text-blue-700">💰 {$_('extensions.metrics.net_monthly_flow')}</span>
         <span class="text-lg font-bold {netFlow >= 0 ? 'text-blue-600' : 'text-red-600'}">
-          {netFlow >= 0 ? '+' : ''}{netFlow.toLocaleString()} NVC
+          {netFlow >= 0 ? '+' : ''}{netFlow.toLocaleString()} ckBTC
         </span>
       </div>
     </div>

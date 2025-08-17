@@ -444,7 +444,7 @@
                       <div class="flex items-center justify-between bg-white rounded-lg p-3 border">
                         <div class="flex items-center">
                           <div class="w-3 h-3 rounded-full mr-3" 
-                               style="background-color: {symbol === 'NVC' ? '#3B82F6' : symbol === 'ckBTC' ? '#F59E0B' : '#10B981'}"></div>
+                               style="background-color: '#10B981'}"></div>
                           <div>
                             <p class="font-medium">{symbol}</p>
                             <p class="text-xs text-gray-500">{metadata.description || metadata.type}</p>
@@ -453,11 +453,11 @@
                         <div class="text-right">
                           {#if symbol === 'ckBTC' && decimals === 8}
                             <p class="font-bold">{(balance / 100000000).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 4})}</p>
-                            <p class="text-xs text-gray-500">≈ {((balance / 100000000) * 45000).toLocaleString()} NVC</p>
+                            <p class="text-xs text-gray-500">≈ {((balance / 100000000) * 45000).toLocaleString()} ckBTC</p>
                           {:else}
                             <p class="font-bold">{balance.toLocaleString()}</p>
                             {#if symbol === 'ckBTC'}
-                              <p class="text-xs text-gray-500">≈ {(balance * 45000).toLocaleString()} NVC</p>
+                              <p class="text-xs text-gray-500">≈ {(balance * 45000).toLocaleString()} ckBTC</p>
                             {/if}
                           {/if}
                         </div>
@@ -475,13 +475,13 @@
                   <div class="bg-white rounded-lg p-3 border">
                     <div class="flex items-center justify-between mb-2">
                       <span class="text-sm font-medium text-green-700">📈 Income</span>
-                      <span class="text-lg font-bold text-green-600">+{(3450 + 350 + 180 + 750).toLocaleString()} NVC</span>
+                      <span class="text-lg font-bold text-green-600">+{(3450 + 350 + 180 + 750).toLocaleString()} ckBTC</span>
                     </div>
                     <div class="text-xs text-gray-600 space-y-1">
-                      <div class="flex justify-between"><span>Tax Revenue</span><span>3,450 NVC</span></div>
-                      <div class="flex justify-between"><span>License Fees</span><span>350 NVC</span></div>
-                      <div class="flex justify-between"><span>Healthcare Contributions</span><span>180 NVC</span></div>
-                      <div class="flex justify-between"><span>Housing Payments</span><span>750 NVC</span></div>
+                      <div class="flex justify-between"><span>Tax Revenue</span><span>3,450 ckBTC</span></div>
+                      <div class="flex justify-between"><span>License Fees</span><span>350 ckBTC</span></div>
+                      <div class="flex justify-between"><span>Healthcare Contributions</span><span>180 ckBTC</span></div>
+                      <div class="flex justify-between"><span>Housing Payments</span><span>750 ckBTC</span></div>
                     </div>
                   </div>
                   
@@ -489,12 +489,12 @@
                   <div class="bg-white rounded-lg p-3 border">
                     <div class="flex items-center justify-between mb-2">
                       <span class="text-sm font-medium text-red-700">📉 Expenses</span>
-                      <span class="text-lg font-bold text-red-600">-{(1200 + 5000 + 125).toLocaleString()} NVC</span>
+                      <span class="text-lg font-bold text-red-600">-{(1200 + 5000 + 125).toLocaleString()} ckBTC</span>
                     </div>
                     <div class="text-xs text-gray-600 space-y-1">
-                      <div class="flex justify-between"><span>UBI Payments</span><span>1,200 NVC</span></div>
-                      <div class="flex justify-between"><span>Innovation Grants</span><span>5,000 NVC</span></div>
-                      <div class="flex justify-between"><span>Tax Refunds</span><span>125 NVC</span></div>
+                      <div class="flex justify-between"><span>UBI Payments</span><span>1,200 ckBTC</span></div>
+                      <div class="flex justify-between"><span>Innovation Grants</span><span>5,000 ckBTC</span></div>
+                      <div class="flex justify-between"><span>Tax Refunds</span><span>125 ckBTC</span></div>
                     </div>
                   </div>
                   
@@ -502,7 +502,7 @@
                   <div class="bg-blue-50 rounded-lg p-3 border border-blue-200">
                     <div class="flex items-center justify-between">
                       <span class="text-sm font-medium text-blue-700">💰 Net Monthly Flow</span>
-                      <span class="text-lg font-bold text-blue-600">+{((3450 + 350 + 180 + 750) - (1200 + 5000 + 125)).toLocaleString()} NVC</span>
+                      <span class="text-lg font-bold text-blue-600">+{((3450 + 350 + 180 + 750) - (1200 + 5000 + 125)).toLocaleString()} ckBTC</span>
                     </div>
                   </div>
                 </div>
