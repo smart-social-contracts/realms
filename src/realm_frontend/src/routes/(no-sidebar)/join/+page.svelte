@@ -82,20 +82,20 @@
   }
 </script>
 
-<div class="min-h-screen bg-gray-50 px-4 py-12 sm:px-8 md:px-16 lg:px-24 xl:px-32" style="transform: none !important;">
-    <div class="w-full space-y-8">
-    <div class="text-center">
-      <h1 class="text-3xl font-extrabold text-gray-900">Join {realmName}</h1>
-    </div>
-    
-    {#if success}
-      <Card class="p-8 text-center w-full max-w-none" style="max-width: none">
+<div class="min-h-screen bg-gray-50 px-4 py-12" style="transform: none !important;">
+    <div class="w-full mx-auto space-y-8 md:w-[80%]">
+      <div class="text-center">
+        <h1 class="text-3xl font-extrabold text-gray-900">Join {realmName}</h1>
+      </div>
+      
+      {#if success}
+      <Card class="p-8 text-center !w-full !max-w-none">
         <h2 class={cn("text-xl font-bold", styles.text.success())}>Successfully Joined!</h2>
         <p class="mt-2 mb-4">You have successfully joined the realm.</p>
         <Button href="/" class={cn("mt-4 w-full", styles.button.primary())}>Go to Dashboard</Button>
       </Card>
-    {:else}
-      <Card class="p-8 w-full max-w-none" style="max-width: none">
+      {:else}
+      <Card class="p-8 !w-full !max-w-none">
         <form class="space-y-6" on:submit|preventDefault={handleSubmit}>
           {#if error}
             <div class="rounded-md bg-red-50 p-4">
@@ -172,7 +172,7 @@
           </div>
 
           <br />
-          
+
           <div>
             {#if loading}
               <Button type="button" color="alternative" class="w-full flex justify-center items-center gap-2" disabled>
@@ -186,6 +186,6 @@
         
         </form>
       </Card>
-    {/if}
-    </div>
+      {/if}
+      </div>
 </div>
