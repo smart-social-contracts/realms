@@ -13,6 +13,7 @@
   let realmName = 'Realm';
   let selectedProfile = 'member'; // Default to member profile
   let includePassportVerification = false;
+  let dropdownOpen = false;
   
   // Available profiles
   const profiles = [
@@ -84,8 +85,9 @@
   }
 </script>
 
-<div class="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
-  <div class="w-full max-w-md space-y-8">
+<div class="min-h-screen bg-gray-50 px-4 py-12 sm:px-6 lg:px-8" style="transform: none !important;">
+  <div class="flex items-center justify-center">
+    <div class="w-full max-w-md space-y-8">
     <div class="text-center">
       <h1 class="text-3xl font-extrabold text-gray-900">Join {realmName}</h1>
       <p class="mt-2 text-sm text-gray-600">
@@ -135,12 +137,37 @@
           </div>
           
           <div class="mb-4">
-            <Label class="mb-2 block text-sm font-medium text-gray-700">Select Profile Type</Label>
-            <Select bind:value={selectedProfile} on:change={(e) => selectedProfile = e.target.value}>
-              {#each profiles as profile}
-                <option value={profile.value}>{profile.name}</option>
-              {/each}
-            </Select>
+            <label for="profile-dropdown" class="mb-2 block text-sm font-medium text-gray-700">Select Profile Type</label>
+            <div class="relative">
+              <button
+                id="profile-dropdown"
+                type="button"
+                class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 text-left flex justify-between items-center"
+                on:click={() => dropdownOpen = !dropdownOpen}
+              >
+                <span>{profiles.find(p => p.value === selectedProfile)?.name || 'Select...'}</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
+              
+              {#if dropdownOpen}
+                <div class="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50">
+                  {#each profiles as profile}
+                    <button
+                      type="button"
+                      class="w-full px-3 py-2 text-left text-sm text-gray-900 hover:bg-gray-100 first:rounded-t-lg last:rounded-b-lg"
+                      on:click={() => {
+                        selectedProfile = profile.value;
+                        dropdownOpen = false;
+                      }}
+                    >
+                      {profile.name}
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+            </div>
           </div>
           
           <div class="mb-6">
@@ -181,5 +208,6 @@
         </form>
       </Card>
     {/if}
+    </div>
   </div>
 </div>
