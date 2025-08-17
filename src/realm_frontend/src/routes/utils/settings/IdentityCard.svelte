@@ -36,7 +36,7 @@
 				{/if}
 			</div>
 			
-			<p class="mb-4 text-sm text-gray-600 dark:text-gray-400 flex-grow">{description}</p>
+			<p class="mb-4 text-sm text-gray-600 dark:text-gray-400 flex-grow min-h-[40px]">{description}</p>
 			
 			<div class="flex items-center gap-3 mt-auto">
 				<Button 
