@@ -66,7 +66,7 @@
 	});
 </script>
 
-<div class="w-full">
+<div class="w-full max-w-none px-4">
 	<h2 class="text-2xl font-bold mb-4">{$_('extensions.citizen_dashboard.title')}</h2>
 	
 	{#if loading}
@@ -80,7 +80,7 @@
 		</Alert>
 	{:else if summaryData}
 		<!-- Dashboard Summary -->
-		<Card padding="xl" class="mb-6">
+		<Card padding="xl" class="mb-6 w-full max-w-none">
 			<div class="flex flex-col md:flex-row items-start md:items-center justify-between mb-4">
 				<div>
 					<h3 class="text-xl font-semibold">{$_('extensions.citizen_dashboard.dashboard_overview')}</h3>
@@ -91,7 +91,7 @@
 				</div>
 			</div>
 			
-			<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+			<div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
 				<!-- Public Services Summary -->
 				<div class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-900/30">
 					<div class="flex items-center">

@@ -344,7 +344,7 @@
   });
 </script>
 
-<div class="container mx-auto p-4">
+<div class="w-full px-4 max-w-none">
   <div class="flex justify-between items-center mb-6">
     <div>
       <h1 class="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
@@ -430,7 +430,7 @@
               🏦 <span class="ml-2">Treasury Portfolio</span>
             </h3>
             
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               <!-- Asset Holdings -->
               <div>
                 <h4 class="font-semibold text-gray-700 mb-3">Asset Holdings</h4>
@@ -512,7 +512,7 @@
         {/if}
         
         <!-- Metrics Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-8">
           <div class="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-lg border border-blue-200">
             <h3 class="text-lg font-semibold text-blue-800">Total Entities</h3>
             <p class="text-3xl font-bold text-blue-600">{metrics.totalEntities || 0}</p>
@@ -564,7 +564,7 @@
           {/if}
         </div>
         
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           <!-- Relationships -->
           {#if relationships.length > 0}
             <div class="bg-gray-50 rounded-lg p-6">

@@ -78,10 +78,6 @@
 <div class="w-full">
 	<div class="flex items-center justify-between mb-4">
 		<h3 class="text-xl font-semibold">My Personal Data</h3>
-		<div class="flex items-center text-sm text-gray-500 dark:text-gray-400">
-			<ShieldCheckSolid class="w-4 h-4 mr-1 text-green-500" />
-			<span>Secured with End-to-End Encryption</span>
-		</div>
 	</div>
 	
 	{#if loading}
