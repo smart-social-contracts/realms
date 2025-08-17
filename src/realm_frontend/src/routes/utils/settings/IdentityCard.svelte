@@ -40,11 +40,9 @@
 			
 			<div class="flex items-center gap-3 mt-auto">
 				<Button 
-					size="xs" 
-					class={cn(
-						"px-3 py-1.5",
-						isEnabled ? styles.button.secondary() : styles.button.success()
-					)}
+					size="sm" 
+					color={isEnabled ? 'alternative' : 'green'}
+					class="px-4 py-2"
 					on:click={() => isEnabled = !isEnabled}
 				>
 					{isEnabled ? "Disable" : "Enable"}
