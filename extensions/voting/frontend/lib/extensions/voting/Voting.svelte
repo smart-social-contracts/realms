@@ -37,13 +37,19 @@
 				// The backend returns response.response as an already parsed object
 				const backendData = response.response;
 				console.log('Backend data:', backendData);
+				console.log('Backend success value:', backendData.success, 'type:', typeof backendData.success);
 				
-				if (backendData.success && backendData.data && Array.isArray(backendData.data.proposals)) {
+				// Handle Python True/False vs JavaScript true/false
+				const isSuccess = backendData.success === true || backendData.success === 'True' || String(backendData.success) === 'True';
+				console.log('Success check result:', isSuccess);
+				
+				if (isSuccess && backendData.data && Array.isArray(backendData.data.proposals)) {
 					proposals = backendData.data.proposals;
 					console.log('Successfully loaded proposals:', proposals.length);
 				} else {
 					error = backendData.error || 'No proposals found';
 					console.log('Backend error or no proposals:', error);
+					console.log('Debug - isSuccess:', isSuccess, 'has data:', !!backendData.data, 'is array:', Array.isArray(backendData.data?.proposals));
 				}
 			} else {
 				error = 'Failed to communicate with backend';
