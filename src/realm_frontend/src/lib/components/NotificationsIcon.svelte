@@ -17,7 +17,7 @@
     }
 </script>
 
-<div class="relative">
+<div class="relative mr-4">
     <ToolbarButton 
         size="lg" 
         class="-mx-0.5 hover:text-gray-900 dark:hover:text-white"
@@ -29,7 +29,7 @@
         <Badge 
             color="red" 
             rounded 
-            class="absolute -top-2 -right-2 px-1.5 py-0.5 text-xs font-bold leading-none text-red-100 transform translate-x-1/2 -translate-y-1/2"
+            class="absolute -top-1 -right-1 px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 border-2 border-white dark:border-gray-800 shadow-lg"
         >
             {$unreadCount > 99 ? '99+' : $unreadCount}
         </Badge>
