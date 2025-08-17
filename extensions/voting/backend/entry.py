@@ -55,15 +55,15 @@ def get_proposals(args: str) -> Dict[str, Any]:
         if status_filter:
             proposals = [p for p in proposals if p['status'] == status_filter]
             
-        return {
+        return json.dumps({
             "success": True,
             "data": {
                 "proposals": proposals,
                 "total": len(proposals)
             }
-        }
+        })
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return json.dumps({"success": False, "error": str(e)})
 
 def get_proposal(args: str) -> Dict[str, Any]:
     """Get a specific proposal by ID"""
@@ -76,15 +76,15 @@ def get_proposal(args: str) -> Dict[str, Any]:
             
         proposal_id = args_dict.get('proposal_id')
         if not proposal_id:
-            return {"success": False, "error": "proposal_id is required"}
+            return json.dumps({"success": False, "error": "proposal_id is required"})
             
         proposal = next((p for p in DUMMY_PROPOSALS if p['id'] == proposal_id), None)
         if not proposal:
-            return {"success": False, "error": "Proposal not found"}
+            return json.dumps({"success": False, "error": "Proposal not found"})
             
-        return {"success": True, "data": proposal}
+        return json.dumps({"success": True, "data": proposal})
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return json.dumps({"success": False, "error": str(e)})
 
 def submit_proposal(args: str) -> Dict[str, Any]:
     """Submit a new proposal"""
@@ -98,7 +98,7 @@ def submit_proposal(args: str) -> Dict[str, Any]:
         required_fields = ['title', 'description', 'code_url', 'proposer']
         for field in required_fields:
             if field not in args_dict:
-                return {"success": False, "error": f"{field} is required"}
+                return json.dumps({"success": False, "error": f"{field} is required"})
         
         # Generate checksum placeholder
         code_checksum = f"sha256:{hashlib.sha256(args_dict['code_url'].encode()).hexdigest()[:16]}..."
@@ -118,9 +118,9 @@ def submit_proposal(args: str) -> Dict[str, Any]:
             "required_threshold": 0.6
         }
         
-        return {"success": True, "data": new_proposal}
+        return json.dumps({"success": True, "data": new_proposal})
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return json.dumps({"success": False, "error": str(e)})
 
 def cast_vote(args: str) -> Dict[str, Any]:
     """Cast a vote on a proposal"""
@@ -136,14 +136,14 @@ def cast_vote(args: str) -> Dict[str, Any]:
         voter = args_dict.get('voter')
         
         if not all([proposal_id, vote, voter]):
-            return {"success": False, "error": "proposal_id, vote, and voter are required"}
+            return json.dumps({"success": False, "error": "proposal_id, vote, and voter are required"})
             
         if vote not in ['yes', 'no', 'abstain']:
-            return {"success": False, "error": "vote must be 'yes', 'no', or 'abstain'"}
+            return json.dumps({"success": False, "error": "vote must be 'yes', 'no', or 'abstain'"})
             
-        return {"success": True, "data": {"message": "Vote cast successfully"}}
+        return json.dumps({"success": True, "data": {"message": "Vote cast successfully"}})
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return json.dumps({"success": False, "error": str(e)})
 
 # Extension API endpoints
 EXTENSION_FUNCTIONS = {
