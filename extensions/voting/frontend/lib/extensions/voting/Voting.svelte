@@ -32,18 +32,33 @@
 			});
 			
 			console.log('Proposals response:', response);
+			console.log('Response type:', typeof response.response);
+			console.log('Response content:', response.response);
 			
 			if (response.success) {
-				// Parse the JSON response like other extensions do
-				const data = JSON.parse(response.response);
-				console.log('Parsed data:', data);
-				
-				if (data.success) {
-					proposals = data.data.proposals;
-					console.log('Successfully loaded proposals:', proposals.length);
-				} else {
-					error = data.error || 'Failed to load proposals';
-					console.log('Backend error:', error);
+				try {
+					// Check if response.response is already an object or needs parsing
+					let data;
+					if (typeof response.response === 'string') {
+						console.log('Parsing JSON string...');
+						data = JSON.parse(response.response);
+					} else {
+						console.log('Using response as object...');
+						data = response.response;
+					}
+					console.log('Parsed data:', data);
+					
+					if (data.success) {
+						proposals = data.data.proposals;
+						console.log('Successfully loaded proposals:', proposals.length);
+					} else {
+						error = data.error || 'Failed to load proposals';
+						console.log('Backend error:', error);
+					}
+				} catch (parseError) {
+					console.error('JSON parse error:', parseError);
+					console.log('Raw response that failed to parse:', response.response);
+					error = 'Failed to parse backend response';
 				}
 			} else {
 				error = 'Failed to communicate with backend';
