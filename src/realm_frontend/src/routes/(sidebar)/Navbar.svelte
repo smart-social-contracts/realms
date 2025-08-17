@@ -1,6 +1,5 @@
 <script>
 	import Notifications from '../utils/dashboard/NotificationList.svelte';
-	import NotificationsIcon from '$lib/components/NotificationsIcon.svelte';
 	import AppsMenu from '../utils/widgets/AppsMenu.svelte';
 	import UserMenu from '../utils/widgets/UserMenu.svelte';
 	import T from '$lib/components/T.svelte';
@@ -69,7 +68,6 @@
 		{/if}
 	</div>
 	<div class="ms-auto flex items-center text-gray-500 dark:text-gray-400 sm:order-2">
-		<NotificationsIcon />
 		<!-- <AppsMenu /> -->
 		<!-- <DarkMode /> -->
 		{#if $isAuthenticated && $profilesLoading}

@@ -29,7 +29,7 @@
         <Badge 
             color="red" 
             rounded 
-            class="absolute -top-2 -right-2 px-1.5 py-0.5 text-xs font-bold leading-none text-red-100 transform translate-x-1/2 -translate-y-1/2"
+            class="absolute -top-1 -right-1 px-1 py-0.5 text-xs font-bold leading-none text-red-100 w-1 h-1 flex items-center justify-center"
         >
             {$unreadCount > 99 ? '99+' : $unreadCount}
         </Badge>
