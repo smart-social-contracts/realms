@@ -18,6 +18,7 @@ EXTENSION_NAMES = [
     "market_place",
     "public_dashboard",
     "metrics",
+    "voting",
 ]
 
 
