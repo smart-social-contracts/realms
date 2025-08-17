@@ -86,19 +86,16 @@
     <div class="w-full space-y-8">
     <div class="text-center">
       <h1 class="text-3xl font-extrabold text-gray-900">Join {realmName}</h1>
-      <p class="mt-2 text-sm text-gray-600">
-        Accept the terms to join this Realm
-      </p>
     </div>
     
     {#if success}
-      <Card class="p-8 text-center">
+      <Card class="p-8 text-center w-full max-w-none" style="max-width: none">
         <h2 class={cn("text-xl font-bold", styles.text.success())}>Successfully Joined!</h2>
         <p class="mt-2 mb-4">You have successfully joined the realm.</p>
         <Button href="/" class={cn("mt-4 w-full", styles.button.primary())}>Go to Dashboard</Button>
       </Card>
     {:else}
-      <Card class="p-8">
+      <Card class="p-8 w-full max-w-none" style="max-width: none">
         <form class="space-y-6" on:submit|preventDefault={handleSubmit}>
           {#if error}
             <div class="rounded-md bg-red-50 p-4">
@@ -150,7 +147,7 @@
                 </button>
                 
                 {#if dropdownOpen}
-                  <div class="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50">
+                  <div class="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 w-fit">
                     {#each profiles as profile}
                       <button
                         type="button"
@@ -201,13 +198,7 @@
               <Button type="submit" color="alternative" class="w-full">Join Realm</Button>
             {/if}
           </div>
-          
-          <div class="text-center text-sm">
-            Already a member? 
-            <a href="/login" class="font-medium text-primary-600 hover:text-primary-500">
-              Log in
-            </a>
-          </div>
+        
         </form>
       </Card>
     {/if}
