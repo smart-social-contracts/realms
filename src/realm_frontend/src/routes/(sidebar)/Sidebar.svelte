@@ -366,7 +366,7 @@
 	>
 			<nav class="divide-y divide-gray-200 dark:divide-gray-700">
 				<!-- Core Navigation Items -->
-				<SidebarGroup ulClass={groupClass} class="mb-3">
+				<SidebarGroup ulClass={groupClass} class="mb-3 pt-10">
 					{#each filteredCoreNavItems as { name, translationKey, icon, href }}
 						{#if isExtensionLink(href)}
 							<!-- Use classic browser navigation for extension links -->
