@@ -34,9 +34,9 @@
 			console.log('Proposals response:', response);
 			
 			if (response.success && response.response) {
-				// Parse the JSON response like other extensions do
-				const backendData = JSON.parse(response.response);
-				console.log('Parsed backend data:', backendData);
+				// The backend returns response.response as an already parsed object
+				const backendData = response.response;
+				console.log('Backend data:', backendData);
 				
 				if (backendData.success && backendData.data && Array.isArray(backendData.data.proposals)) {
 					proposals = backendData.data.proposals;
