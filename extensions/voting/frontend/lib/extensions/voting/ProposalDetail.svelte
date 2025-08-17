@@ -263,7 +263,7 @@
 							<span class="text-gray-700">        # Log the transaction</span>
 						</div>
 						<div class="bg-green-50 border-l-4 border-green-400 pl-3 py-1">
-							<span class="text-green-600">+         logger.info(f"Processing transaction: {amount}, fee: {fee}")</span>
+							<span class="text-green-600">+         logger.info(f"Processing transaction: &#123;amount&#125;, fee: &#123;fee&#125;")</span>
 						</div>
 						<div class="pl-3 py-1">
 							<span class="text-gray-700">        </span>
