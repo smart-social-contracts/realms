@@ -1,21 +1,24 @@
 <script lang="ts">
 	import { Avatar, Button, Card, Heading, Badge } from 'flowbite-svelte';
 	import { PenOutline, TrashBinOutline, CheckCircleSolid } from 'flowbite-svelte-icons';
+	import { styles, cn } from '$lib/theme/utilities';
 
 	export let src: string;
 	export let title: string;
 	export let description: string;
 	export let status: string = 'Verified'; // Default status is Verified
+	
+	let isEnabled = true; // Track enable/disable state
 </script>
 
 <Card
 	size="xl"
 	class="h-full block bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 hover:border-blue-200 dark:hover:border-blue-700 transition-all duration-200"
 >
-	<div class="flex flex-col sm:flex-row gap-6">
-		<!-- Logo Container -->
-		<div class="flex items-center justify-center h-28 w-28 bg-gray-100 dark:bg-gray-700 rounded-lg p-2 border border-gray-200 dark:border-gray-600">
-			<img src={src} alt={title} class="h-full w-full object-contain" />
+	<div class="flex flex-col gap-4">
+		<!-- Logo Container - Full Width at Top -->
+		<div class="flex items-center justify-center h-20 w-full p-3">
+			<img src={src} alt={title} class="h-full max-w-full object-contain" />
 		</div>
 
 		<div class="flex-1">
@@ -29,20 +32,22 @@
 				{:else if status === 'Pending'}
 					<Badge color="yellow" class="px-2.5 py-1">Pending</Badge>
 				{:else}
-					<Badge color="gray" class="px-2.5 py-1">{status}</Badge>
+					<Badge color="dark" class="px-2.5 py-1">{status}</Badge>
 				{/if}
 			</div>
 			
 			<p class="mb-4 text-sm text-gray-600 dark:text-gray-400">{description}</p>
 			
 			<div class="flex items-center gap-3 mt-auto">
-				<Button size="xs" color="light" class="px-3 py-1.5 flex items-center gap-1 border border-gray-200 dark:border-gray-600">
-					<PenOutline class="w-3.5 h-3.5" />
-					Update
-				</Button>
-				<Button size="xs" color="light" class="px-3 py-1.5 flex items-center gap-1 text-red-600 hover:text-red-700 dark:text-red-500 border border-gray-200 dark:border-gray-600">
-					<TrashBinOutline class="w-3.5 h-3.5" />
-					Delete
+				<Button 
+					size="xs" 
+					class={cn(
+						"px-3 py-1.5",
+						isEnabled ? styles.button.error() : styles.button.success()
+					)}
+					on:click={() => isEnabled = !isEnabled}
+				>
+					{isEnabled ? "Disable" : "Enable"}
 				</Button>
 			</div>
 		</div>
