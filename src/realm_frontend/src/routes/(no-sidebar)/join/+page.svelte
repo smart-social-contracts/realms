@@ -169,28 +169,10 @@
                   </div>
                 {/if}
               </div>
-          
-            <div class="mb-6">
-              <div class="flex items-center gap-2 mb-4">
-                <Checkbox bind:checked={includePassportVerification} />
-                <Label class="text-sm font-medium text-gray-700">
-                  Verify passport identity (optional)
-                </Label>
-              </div>
-              <p class="text-xs text-gray-500 mb-4">
-                Use zero-knowledge proofs to verify your passport securely. Your passport data never leaves your device.
-              </p>
-              
-              {#if includePassportVerification && $isAuthenticated}
-                <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                  <PassportVerification userId={$principal} />
-                </div>
-              {/if}
-            </div> -->
-            
           </div>
-          
 
+          <br />
+          
           <div>
             {#if loading}
               <Button type="button" color="alternative" class="w-full flex justify-center items-center gap-2" disabled>
