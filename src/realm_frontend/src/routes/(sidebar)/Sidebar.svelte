@@ -402,7 +402,8 @@
 				{/if}
 
 				<!-- Categorized Extension Items -->
-				{#each Object.entries(categorizedNavItems) as [category, items]}
+				{#each ['public_services', 'finances', 'other'] as category}
+					{@const items = categorizedNavItems[category] || []}
 					{#if items.length > 0}
 						<SidebarGroup ulClass={groupClass} class="mb-3">
 							<!-- Category Header -->
