@@ -451,7 +451,6 @@
 											<span></span>
 											<span></span>
 										</div>
-										<span class="text-sm font-medium"><SafeText key="extensions.llm_chat.loading" spinnerSize="xs" /></span>
 									</div>
 								</div>
 							</div>
