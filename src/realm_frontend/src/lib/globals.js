@@ -1,1 +1,1 @@
-export const SITE_NAME = "Realms gOS";
+export const SITE_NAME = "Realms GOS";

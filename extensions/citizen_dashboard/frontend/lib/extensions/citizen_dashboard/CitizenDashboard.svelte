@@ -66,7 +66,7 @@
 	});
 </script>
 
-<div class="w-full">
+<div class="w-full max-w-none px-4">
 	<h2 class="text-2xl font-bold mb-4">{$_('extensions.citizen_dashboard.title')}</h2>
 	
 	{#if loading}
@@ -80,59 +80,59 @@
 		</Alert>
 	{:else if summaryData}
 		<!-- Dashboard Summary -->
-		<Card padding="xl" class="mb-6">
-			<div class="flex flex-col md:flex-row items-start md:items-center justify-between mb-4">
+		<Card padding="md" class="mb-4 w-full max-w-none">
+			<div class="flex flex-col md:flex-row items-start md:items-center justify-between mb-3">
 				<div>
 					<h3 class="text-xl font-semibold">{$_('extensions.citizen_dashboard.dashboard_overview')}</h3>
 					<p class="text-gray-500 dark:text-gray-400">{$_('extensions.citizen_dashboard.welcome_back', { values: { name: summaryData.user_name || 'Citizen' } })}</p>
 				</div>
-				<div class="mt-3 md:mt-0">
+				<div class="mt-2 md:mt-0">
 					<p class="text-sm text-gray-500 dark:text-gray-400">{$_('extensions.citizen_dashboard.last_updated', { values: { date: new Date().toLocaleString() } })}</p>
 				</div>
 			</div>
 			
-			<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
 				<!-- Public Services Summary -->
-				<div class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-900/30">
-					<div class="flex items-center">
-						<FileDocOutline class="w-6 h-6 text-blue-600 dark:text-blue-400 mr-2" />
-						<h4 class="text-lg font-medium text-blue-600 dark:text-blue-400">{$_('extensions.citizen_dashboard.tabs.public_services')}</h4>
+				<div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-900/30">
+					<div class="flex items-center mb-2">
+						<FileDocOutline class="w-5 h-5 text-blue-600 dark:text-blue-400 mr-2" />
+						<h4 class="text-base font-medium text-blue-600 dark:text-blue-400">{$_('extensions.citizen_dashboard.tabs.public_services')}</h4>
 					</div>
-					<div class="mt-2">
-						<p class="font-bold text-2xl">{summaryData.services_count || 0}</p>
-						<p class="text-sm text-gray-600 dark:text-gray-400">{$_('extensions.citizen_dashboard.services_count', { values: { count: '' } })}</p>
+					<div class="mb-2">
+						<p class="font-bold text-xl">{summaryData.services_count || 0}</p>
+						<p class="text-xs text-gray-600 dark:text-gray-400">{$_('extensions.citizen_dashboard.services_count', { values: { count: '' } })}</p>
 					</div>
-					<div class="mt-2 text-sm font-medium">
+					<div class="text-xs font-medium">
 						<span class="text-yellow-600 dark:text-yellow-400">{$_('extensions.citizen_dashboard.approaching_deadlines', { values: { count: summaryData.services_approaching || 0 } })}</span>
 					</div>
 				</div>
 				
 				<!-- Tax Summary -->
-				<div class="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-100 dark:border-green-900/30">
-					<div class="flex items-center">
-						<DollarOutline class="w-6 h-6 text-green-600 dark:text-green-400 mr-2" />
-						<h4 class="text-lg font-medium text-green-600 dark:text-green-400">{$_('extensions.citizen_dashboard.tabs.my_taxes')}</h4>
+				<div class="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-100 dark:border-green-900/30">
+					<div class="flex items-center mb-2">
+						<DollarOutline class="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
+						<h4 class="text-base font-medium text-green-600 dark:text-green-400">{$_('extensions.citizen_dashboard.tabs.my_taxes')}</h4>
 					</div>
-					<div class="mt-2">
-						<p class="font-bold text-2xl">{summaryData.tax_records || 0}</p>
-						<p class="text-sm text-gray-600 dark:text-gray-400">{$_('extensions.citizen_dashboard.tax_records', { values: { count: '' } })}</p>
+					<div class="mb-2">
+						<p class="font-bold text-xl">{summaryData.tax_records || 0}</p>
+						<p class="text-xs text-gray-600 dark:text-gray-400">{$_('extensions.citizen_dashboard.tax_records', { values: { count: '' } })}</p>
 					</div>
-					<div class="mt-2 text-sm font-medium">
+					<div class="text-xs font-medium">
 						<span class="text-red-600 dark:text-red-400">{$_('extensions.citizen_dashboard.overdue_payments', { values: { count: summaryData.tax_overdue || 0 } })}</span>
 					</div>
 				</div>
 				
 				<!-- Personal Data Summary -->
-				<div class="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-100 dark:border-purple-900/30">
-					<div class="flex items-center">
-						<UserCircleOutline class="w-6 h-6 text-purple-600 dark:text-purple-400 mr-2" />
-						<h4 class="text-lg font-medium text-purple-600 dark:text-purple-400">{$_('extensions.citizen_dashboard.tabs.personal_data')}</h4>
+				<div class="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-100 dark:border-purple-900/30">
+					<div class="flex items-center mb-2">
+						<UserCircleOutline class="w-5 h-5 text-purple-600 dark:text-purple-400 mr-2" />
+						<h4 class="text-base font-medium text-purple-600 dark:text-purple-400">{$_('extensions.citizen_dashboard.tabs.personal_data')}</h4>
 					</div>
-					<div class="mt-2">
-						<p class="font-bold text-2xl">{summaryData.personal_data_items || 0}</p>
-						<p class="text-sm text-gray-600 dark:text-gray-400">{$_('extensions.citizen_dashboard.data_records', { values: { count: '' } })}</p>
+					<div class="mb-2">
+						<p class="font-bold text-xl">{summaryData.personal_data_items || 0}</p>
+						<p class="text-xs text-gray-600 dark:text-gray-400">{$_('extensions.citizen_dashboard.data_records', { values: { count: '' } })}</p>
 					</div>
-					<div class="mt-2 text-sm font-medium">
+					<div class="text-xs font-medium">
 						<span class="text-blue-600 dark:text-blue-400">{$_('extensions.citizen_dashboard.recently_updated', { values: { count: summaryData.personal_data_updated || 0 } })}</span>
 					</div>
 				</div>

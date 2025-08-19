@@ -82,8 +82,7 @@ export const buttonStyles = {
     px-[var(--spacing-lg)] 
     py-[var(--spacing-sm)] 
     transition-[var(--transition-fast)]
-  `
-};
+  `};
 
 // Text style generators
 export const textStyles = {

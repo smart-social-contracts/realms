@@ -7,7 +7,7 @@
   "profiles": ["admin"],
   "categories": ["public_services"],
   "icon": "map_pin",
-  "doc_url": "https://github.com/smart-social-contracts/extensions/land_registry",
+  "doc_url": "https://github.com/smart-social-contracts/realms/tree/main/extensions/land_registry",
   "url_path": null,
   "show_in_sidebar": true
 }

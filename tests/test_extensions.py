@@ -18,10 +18,29 @@ EXTENSION_NAMES = [
     "market_place",
     "public_dashboard",
     "metrics",
+    "voting",
 ]
 
 
 def test_extensions():
+    for name in EXTENSION_NAMES:
+        run_command(
+            f"./scripts/realm-extension-cli.py uninstall --extension-id {name} || true"
+        )
+
+    current_list = run_command("./scripts/realm-extension-cli.py list")
+    if "No extensions installed" not in current_list:
+        lines = current_list.strip().split("\n")
+        for line in lines[2:]:  # Skip header lines
+            if line.strip() and not line.startswith("-"):
+                extension_id = line.split()[0]
+                if extension_id and extension_id != "ID":
+                    run_command(
+                        f"./scripts/realm-extension-cli.py uninstall --extension-id {extension_id} || true"
+                    )
+
+    run_command("./scripts/realm-extension-cli.py install-from-source")
+
     list_after = run_command("./scripts/realm-extension-cli.py list")
     for name in EXTENSION_NAMES:
         assert_in(list_after, name)

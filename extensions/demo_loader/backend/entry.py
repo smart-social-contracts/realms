@@ -57,6 +57,14 @@ dfx canister call realm_backend extension_sync_call '(
   }
 )'
 
+dfx canister call realm_backend extension_sync_call '(
+  record {
+    extension_name = "demo_loader";
+    function_name = "load";
+    args = "{\"step\": \"justice_litigation\"}";
+  }
+)'
+
 """
 
 
@@ -73,7 +81,7 @@ def load(args: str):
         batch = args.get("batch")
 
         if not step:
-            return "Error: 'step' parameter is required. Valid steps are: base_setup, user_management, financial_services, government_services, transactions"
+            return "Error: 'step' parameter is required. Valid steps are: base_setup, user_management, financial_services, government_services, transactions, governance_activity, justice_litigation"
 
         logger.info(f"Starting modular demo data loading for step: {step}")
 
@@ -112,8 +120,22 @@ def load(args: str):
 
             return run_transactions()
 
+        # Step 6: Governance Activity (NEW)
+        elif step == "governance_activity":
+            logger.info("Step 6: Creating governance proposals and votes")
+            from .governance_activity import run as run_governance_activity
+
+            return run_governance_activity(batch)
+
+        # Step 7: Justice Litigation
+        elif step == "justice_litigation":
+            logger.info("Step 7: Creating justice litigation cases")
+            from .justice_litigation import run as run_justice_litigation
+
+            return run_justice_litigation(batch)
+
         else:
-            return f"Error: Invalid step '{step}'. Valid steps are: base_setup, user_management, financial_services, government_services, transactions"
+            return f"Error: Invalid step '{step}'. Valid steps are: base_setup, user_management, financial_services, government_services, transactions, governance_activity, justice_litigation"
 
     except Exception as e:
         error_msg = f"Error loading demo data: {e}\n{traceback.format_exc()}"

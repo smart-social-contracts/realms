@@ -61,7 +61,7 @@
     },
     tooltip: {
       y: {
-        formatter: (value) => `${value.toLocaleString()} NVC`
+        formatter: (value) => `${value.toLocaleString()} ckBTC`
       }
     },
     dataLabels: {
@@ -72,7 +72,7 @@
         colors: ['#FFFFFF']
       },
       formatter: (text, op) => {
-        return [text, `${op.value.toLocaleString()} NVC`];
+        return [text, `${op.value.toLocaleString()} ckBTC`];
       }
     },
     responsive: [{

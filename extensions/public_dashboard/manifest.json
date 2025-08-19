@@ -7,7 +7,7 @@
   "profiles": ["member", "admin"],
   "categories": ["oversight"],
   "icon": "table",
-  "doc_url": "https://github.com/smart-social-contracts/extensions/public_dashboard",
+  "doc_url": "https://github.com/smart-social-contracts/realms/tree/main/extensions/public_dashboard",
   "url_path": null,
   "show_in_sidebar": true
 }

@@ -25,10 +25,103 @@
 	// Principal ID management
 	let userPrincipalId = $principal || "";
 	
-	// Vault canister ID management
-	let vaultCanisterId = ""; // No default - user must specify
+	// Vault canister ID management - Demo data populated
+	let vaultCanisterId = "rdmx6-jaaaa-aaaah-qcaiq-cai"; // Demo ckBTC vault canister ID
 	let vaultCanisterInputValue = vaultCanisterId;
 	let vaultCanisterError = '';
+	
+	// Demo vault data - populated with realistic ckBTC values
+	let demoMode = true;
+	let demoBalanceData = {
+		balance: 250000000, // 2.5 ckBTC (in satoshis)
+		token: "ckBTC",
+		principalId: "rdmx6-jaaaa-aaaah-qcaiq-cai"
+	};
+	
+	let demoVaultStatus = {
+		version: "1.2.3",
+		name: "Realms ckBTC Vault",
+		token: "ckBTC",
+		total_supply: 1500000000000, // 15,000 ckBTC total supply
+		accounts: 47,
+		admin_principal: "rrkah-fqaaa-aaaah-qcuaq-cai",
+		sync_status: "Synced"
+	};
+	
+	let demoTransactions = [
+		{
+			id: "tx_001_demo",
+			from_principal: "2vxsx-fae",
+			to_principal: "rdmx6-jaaaa-aaaah-qcaiq-cai",
+			amount: 50000000, // 0.5 ckBTC
+			token: "ckBTC",
+			timestamp: Date.now() - 3600000, // 1 hour ago
+			status: "completed"
+		},
+		{
+			id: "tx_002_demo", 
+			from_principal: "rdmx6-jaaaa-aaaah-qcaiq-cai",
+			to_principal: "rrkah-fqaaa-aaaah-qcuaq-cai",
+			amount: 25000000, // 0.25 ckBTC
+			token: "ckBTC",
+			timestamp: Date.now() - 7200000, // 2 hours ago
+			status: "completed"
+		},
+		{
+			id: "tx_003_demo",
+			from_principal: "be2us-64aaa-aaaah-qabeq-cai",
+			to_principal: "rdmx6-jaaaa-aaaah-qcaiq-cai", 
+			amount: 100000000, // 1.0 ckBTC
+			token: "ckBTC",
+			timestamp: Date.now() - 14400000, // 4 hours ago
+			status: "completed"
+		},
+		{
+			id: "tx_004_demo",
+			from_principal: "rdmx6-jaaaa-aaaah-qcaiq-cai",
+			to_principal: "suaf3-haaaa-aaaah-qaaya-cai",
+			amount: 75000000, // 0.75 ckBTC
+			token: "ckBTC", 
+			timestamp: Date.now() - 21600000, // 6 hours ago
+			status: "completed"
+		},
+		{
+			id: "tx_005_demo",
+			from_principal: "qjdve-lqaaa-aaaah-qcvbq-cai",
+			to_principal: "rdmx6-jaaaa-aaaah-qcaiq-cai",
+			amount: 200000000, // 2.0 ckBTC
+			token: "ckBTC",
+			timestamp: Date.now() - 86400000, // 1 day ago
+			status: "completed"
+		}
+	];
+	
+	let demoAccounts = [
+		{
+			principal_id: "rdmx6-jaaaa-aaaah-qcaiq-cai",
+			amount: 250000000 // 2.5 ckBTC
+		},
+		{
+			principal_id: "rrkah-fqaaa-aaaah-qcuaq-cai", 
+			amount: 500000000 // 5.0 ckBTC
+		},
+		{
+			principal_id: "be2us-64aaa-aaaah-qabeq-cai",
+			amount: 150000000 // 1.5 ckBTC
+		},
+		{
+			principal_id: "suaf3-haaaa-aaaah-qaaya-cai",
+			amount: 300000000 // 3.0 ckBTC
+		},
+		{
+			principal_id: "qjdve-lqaaa-aaaah-qcvbq-cai",
+			amount: 750000000 // 7.5 ckBTC
+		},
+		{
+			principal_id: "2vxsx-fae",
+			amount: 100000000 // 1.0 ckBTC
+		}
+	];
 	
 	// Transfer form data
 	let transferRecipient = '';
@@ -45,6 +138,13 @@
 	
 	// Get vault balance for current user
 	async function getBalance() {
+		if (demoMode) {
+			// Use demo data
+			await new Promise(resolve => setTimeout(resolve, 500));
+			balanceData = { ...demoBalanceData };
+			return;
+		}
+		
 		try {
 			// Prepare call parameters
 			const callParams = { 
@@ -99,6 +199,14 @@
 	
 	// Get vault status information
 	async function getVaultStatus() {
+		if (demoMode) {
+			// Use demo data
+			await new Promise(resolve => setTimeout(resolve, 500));
+			vaultStatus = { ...demoVaultStatus };
+			accounts = [...demoAccounts];
+			return;
+		}
+		
 		try {
 			// Prepare call parameters
 			const callParams = { 
@@ -160,6 +268,14 @@
 	
 	// Get recent transactions
 	async function getTransactions() {
+		if (demoMode) {
+			// Use demo data
+			await new Promise(resolve => setTimeout(resolve, 500));
+			transactions = [...demoTransactions];
+			totalTransactions = demoTransactions.length;
+			return;
+		}
+		
 		try {
 			// Prepare call parameters
 			const callParams = { 
@@ -190,15 +306,18 @@
 						// Convert timestamps to milliseconds by dividing by 1,000,000 (nanoseconds to milliseconds)
 						const timestamp = parseInt(tx.timestamp) / 1000000;
 						
+						// Safely handle amount field - ensure it exists and is a string
+						const txAmount = tx.amount ? String(tx.amount) : "0";
+						
 						// Determine if this is an incoming or outgoing transaction
-						const isIncoming = !tx.amount.startsWith("-");
-						const amount = isIncoming ? tx.amount : tx.amount.substring(1); // Remove minus sign if outgoing
+						const isIncoming = !txAmount.startsWith("-");
+						const amount = isIncoming ? txAmount : txAmount.substring(1); // Remove minus sign if outgoing
 						
 						return {
-							id: tx.id,
+							id: tx.id || "unknown",
 							from_principal: isIncoming ? "system" : userPrincipalId,
 							to_principal: isIncoming ? userPrincipalId : "recipient",
-							amount: parseInt(amount),
+							amount: parseInt(amount) || 0,
 							token: "ckBTC",
 							timestamp: timestamp,
 							status: "completed"
@@ -287,8 +406,13 @@
 		userPrincipalId = $principal || ""; // Always use authenticated principal
 
 		try {
-			// Run all data fetching in parallel
-			await Promise.all([getBalance(), getVaultStatus(), getTransactions()]);
+			if (demoMode) {
+				// Use demo data for development/testing
+				await loadDemoData();
+			} else {
+				// Run all data fetching in parallel
+				await Promise.all([getBalance(), getVaultStatus(), getTransactions()]);
+			}
 			error = ''; // Clear any previous errors if successful
 		} catch (err) {
 			console.error('Error loading data:', err);
@@ -296,6 +420,26 @@
 		} finally {
 			loading = false;
 		}
+	}
+	
+	// Load demo data with simulated delay
+	async function loadDemoData() {
+		// Simulate network delay
+		await new Promise(resolve => setTimeout(resolve, 1000));
+		
+		// Set demo data
+		balanceData = { ...demoBalanceData };
+		vaultStatus = { ...demoVaultStatus };
+		transactions = [...demoTransactions];
+		totalTransactions = demoTransactions.length;
+		accounts = [...demoAccounts];
+		
+		console.log('Demo data loaded:', {
+			balanceData,
+			vaultStatus,
+			transactions: transactions.length,
+			accounts: accounts.length
+		});
 	}
 	
 	// Initialize the component
@@ -309,7 +453,7 @@
 	});
 </script>
 
-<Card size="lg" padding="xl" class="w-full">
+<div class="w-full h-full p-6 bg-white dark:bg-gray-900">
 	<div class="flex items-center mb-4">
 		<WalletSolid class="mr-2 h-8 w-8 text-primary-600" />
 		<h2 class="text-2xl font-bold text-gray-900 dark:text-white">{$_('extensions.vault_manager.title')}</h2>
@@ -319,14 +463,43 @@
 	<div class="vault-configuration mb-6">
 		<h3 class="text-xl font-bold mb-4">{$_('extensions.vault_manager.configuration.title')}</h3>
 		
-		<!-- Simplified to only have Vault Canister ID input -->
+		<!-- Demo Mode Toggle -->
+		<div class="mb-4 p-4 bg-blue-50 dark:bg-blue-900 rounded-lg border border-blue-200 dark:border-blue-700">
+			<div class="flex items-center justify-between mb-2">
+				<div class="flex items-center">
+					<span class="text-sm font-medium text-blue-800 dark:text-blue-200">Demo Mode</span>
+					{#if demoMode}
+						<span class="ml-2 px-2 py-1 text-xs bg-blue-600 text-white rounded-full">Active</span>
+					{/if}
+				</div>
+				<Button 
+					size="xs" 
+					color={demoMode ? "red" : "blue"} 
+					on:click={() => { demoMode = !demoMode; if (demoMode) loadData(); }}
+				>
+					{demoMode ? "Disable Demo" : "Enable Demo"}
+				</Button>
+			</div>
+			{#if demoMode}
+				<p class="text-sm text-blue-700 dark:text-blue-300">
+					Using demo data with realistic ckBTC vault information. Perfect for testing and demonstrations.
+				</p>
+			{:else}
+				<p class="text-sm text-blue-700 dark:text-blue-300">
+					Connect to a real ckBTC vault canister. Enter the canister ID below.
+				</p>
+			{/if}
+		</div>
+		
+		<!-- Vault Canister ID input - disabled in demo mode -->
 		<div class="mb-4">
 			<Input 
 				type="text" 
 				id="vault-canister-id" 
-				placeholder="Enter vault canister ID" 
+				placeholder={demoMode ? "Demo vault: rdmx6-jaaaa-aaaah-qcaiq-cai" : "Enter vault canister ID"} 
 				label="Vault Canister ID" 
 				bind:value={vaultCanisterInputValue} 
+				disabled={demoMode}
 				on:keydown={(e) => e.key === 'Enter' && loadData()}
 			/>
 			{#if vaultCanisterError}
@@ -334,7 +507,7 @@
 			{/if}
 		</div>
 		
-		{#if vaultCanisterId && vaultCanisterId !== vaultCanisterInputValue}
+		{#if vaultCanisterId && vaultCanisterId !== vaultCanisterInputValue && !demoMode}
 			<div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
 				Current Vault: {vaultCanisterId}
 			</div>
@@ -347,7 +520,7 @@
 					<span>Loading...</span>
 				</div>
 			{:else}
-				<span>Load Vault</span>
+				<span>{demoMode ? "Load Demo Data" : "Load Vault"}</span>
 			{/if}
 		</Button>
 	</div>
@@ -395,8 +568,17 @@
 					Overview
 				</span>
 				<div class="space-y-6">
-					<!-- Refresh Button -->
-					<div class="flex justify-end">
+					<!-- Demo Mode Indicator and Refresh Button -->
+					<div class="flex justify-between items-center">
+						{#if demoMode}
+							<div class="flex items-center">
+								<span class="px-3 py-1 text-sm bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full">
+									📊 Demo Data Active
+								</span>
+							</div>
+						{:else}
+							<div></div>
+						{/if}
 						<Button color="alternative" size="sm" on:click={loadData} disabled={loading}>
 							{#if loading}
 								<div class="flex items-center">
@@ -608,4 +790,4 @@
 			</TabItem>
 		</Tabs>
 	{/if}
-</Card>
+</div>

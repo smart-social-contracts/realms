@@ -7,7 +7,7 @@
   "profiles": ["admin"],
   "categories": ["finances"],
   "icon": "wallet",
-  "doc_url": "https://github.com/smart-social-contracts/extensions/vault_manager",
+  "doc_url": "https://github.com/smart-social-contracts/realms/tree/main/extensions/vault_manager",
   "url_path": null,
   "show_in_sidebar": true
 }

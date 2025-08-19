@@ -10,7 +10,7 @@
 >
 	<Navbar />
 </header>
-<div class="mx-auto max-w-screen-2xl pt-[70px]">
+	<div class="w-full pt-[70px]">
 	<slot />
 	<Footer />
 </div>

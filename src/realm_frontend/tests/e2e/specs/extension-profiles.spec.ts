@@ -30,7 +30,7 @@ test.describe('Extension Profile Filtering', () => {
 		console.log('Sidebar links found when not logged in:', sidebarLinks);
 		
 		const expectedPublicExtensions = [
-			'AI Assistant',
+			'AI Assistance',
 			'Public Dashboard'
 		];
 		

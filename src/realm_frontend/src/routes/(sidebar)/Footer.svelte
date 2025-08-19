@@ -97,7 +97,7 @@
 	{#if (version && version !== 'VERSION_PLACEHOLDER') || (commitHash && commitHash !== 'COMMIT_HASH_PLACEHOLDER') || (commitDatetime && commitDatetime !== 'COMMIT_DATETIME_PLACEHOLDER')}
 		<div class="mt-3 text-center">
 			<span class="text-xs text-gray-400 dark:text-gray-500">
-				Realms gOS {#if version && version !== 'VERSION_PLACEHOLDER'}{version}{/if} 
+				Realms GOS {#if version && version !== 'VERSION_PLACEHOLDER'}{version}{/if} 
 				{#if commitHash && commitHash !== 'COMMIT_HASH_PLACEHOLDER'}({commitHash}){/if}
 				{#if commitDatetime && commitDatetime !== 'COMMIT_DATETIME_PLACEHOLDER'} - {commitDatetime}{/if}
 			</span>

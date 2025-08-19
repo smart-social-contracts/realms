@@ -43,7 +43,7 @@
               fontSize: '14px',
               fontWeight: 'bold',
               color: '#374151',
-              formatter: (w) => `${(w.globals.series.reduce((a, b) => a + b, 0) / 1000).toFixed(0)}K NVC`
+              formatter: (w) => `${(w.globals.series.reduce((a, b) => a + b, 0) / 1000).toFixed(0)}K ckBTC`
             }
           }
         }
@@ -51,7 +51,7 @@
     },
     tooltip: {
       y: {
-        formatter: (value) => `${(value / 1000).toFixed(1)}K NVC`
+        formatter: (value) => `${(value / 1000).toFixed(1)}K ckBTC`
       }
     },
     dataLabels: {

@@ -7,7 +7,8 @@
     "profiles": ["member", "admin"],
     "categories": ["oversight"],
     "icon": "brain",
-    "doc_url": "https://github.com/smart-social-contracts/extensions/llm_chat",
+    "doc_url": "https://github.com/smart-social-contracts/realms/tree/main/extensions/llm_chat",
     "url_path": null,
-    "show_in_sidebar": true
-}                
+    "show_in_sidebar": true,
+    "hideFooter": true
+}                                                

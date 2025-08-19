@@ -8,7 +8,7 @@
 	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
 	import { initializeTheme } from '$lib/theme/init';
 
-	export const SITE_NAME = "Realms gOS";
+	export const SITE_NAME = "Realms GOS";
 	
 	// Initialize i18n right away
 	initI18n();

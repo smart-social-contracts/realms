@@ -7,7 +7,7 @@
   "profiles": ["member", "admin"],
   "categories": ["public_services"],
   "icon": "table",
-  "doc_url": "https://github.com/smart-social-contracts/extensions/citizen_dashboard",
+  "doc_url": "https://github.com/smart-social-contracts/realms/tree/main/extensions/citizen_dashboard",
   "url_path": null,
   "show_in_sidebar": true
 }

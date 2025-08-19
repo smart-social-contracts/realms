@@ -83,7 +83,7 @@
 	});
 </script>
 
-<Card size="lg" padding="xl" class="w-full">
+<div class="w-full max-w-none px-4">
 	<div class="flex items-center mb-4">
 		<LockSolid class="mr-2 h-8 w-8 text-primary-600" />
 		<h2 class="text-2xl font-bold text-gray-900 dark:text-white">
@@ -179,7 +179,7 @@
 					{$_('extensions.justice_litigation.statistics')}
 				</span>
 				<div class="space-y-6">
-					<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+					<div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
 						<div class="bg-white dark:bg-gray-700 p-4 rounded-lg shadow">
 							<h3 class="text-lg font-semibold mb-2">{$_('extensions.justice_litigation.total_cases')}</h3>
 							<p class="text-2xl font-bold text-primary-600">{totalCount}</p>
@@ -203,4 +203,4 @@
 			</TabItem>
 		</Tabs>
 	{/if}
-</Card>
+</div>

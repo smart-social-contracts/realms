@@ -28,7 +28,7 @@
     },
     tooltip: {
       y: {
-        formatter: (value) => `${value.toLocaleString()} NVC`
+        formatter: (value) => `${value.toLocaleString()} ckBTC`
       }
     },
     dataLabels: {

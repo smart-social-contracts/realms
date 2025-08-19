@@ -147,7 +147,7 @@ test.describe('User workflows', () => {
 		await page.goto('/join');
 		await page.waitForLoadState('networkidle');
 		
-		const logoLink = page.getByRole('link').filter({ has: page.getByAltText('Smart Social Contracts Logo') });
+		const logoLink = page.getByRole('link').filter({ has: page.getByAltText('Realms Logo') });
 		await expect(logoLink).toBeVisible();
 		await logoLink.click();
 		

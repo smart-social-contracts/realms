@@ -27,7 +27,10 @@
 		UsersOutline,
 		HomeOutline,
 		WalletSolid,
-		ObjectsColumnOutline
+		ObjectsColumnOutline,
+
+		FingerprintOutline
+
 	} from 'flowbite-svelte-icons';
 	
 	// Import extension system
@@ -241,7 +244,7 @@
 
 	// Core navigation items with translation keys
 	const coreNavItems: NavItemWithHref[] = [
-		{ name: $_('common.identities') || 'My Identities', icon: UsersOutline, href: '/identities' }, // For all users
+		{ name: $_('common.identities') || 'My Identities', icon: FingerprintOutline, href: '/identities' }, // For all users
 		{ name: $_('navigation.admin_dashboard') || 'Admin Dashboard', icon: TableColumnSolid, href: '/ggg', profiles: ['admin'] }, // Admin only
 		{ name: $_('common.settings'), icon: CogOutline, href: '/settings' }, // For all users
 	];
@@ -376,7 +379,7 @@
 	>
 			<nav class="divide-y divide-gray-200 dark:divide-gray-700">
 				<!-- Core Navigation Items -->
-				<SidebarGroup ulClass={groupClass} class="mb-3">
+				<SidebarGroup ulClass={groupClass} class="mb-3 pt-5 lg:pt-0">
 					{#each filteredCoreNavItems as { name, translationKey, icon, href }}
 						{#if isExtensionLink(href)}
 							<!-- Use classic browser navigation for extension links -->
@@ -404,13 +407,13 @@
 					<SidebarGroup ulClass={groupClass} class="mb-3">
 						<li class="px-3 py-2 flex items-center">
 							<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 dark:border-gray-100"></div>
-							<span class="ml-3 text-sm text-gray-500 dark:text-gray-400">Loading extensions...</span>
 						</li>
 					</SidebarGroup>
 				{/if}
 
 				<!-- Categorized Extension Items -->
-				{#each Object.entries(categorizedNavItems) as [category, items]}
+				{#each ['public_services', 'finances', 'other'] as category}
+					{@const items = categorizedNavItems[category] || []}
 					{#if items.length > 0}
 						<SidebarGroup ulClass={groupClass} class="mb-3">
 							<!-- Category Header -->
