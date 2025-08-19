@@ -52,6 +52,15 @@ def get_status() -> dict[str, Any]:
     proposals_count = Proposal.count()
     votes_count = Vote.count()
 
+    # Get realm name - use the first realm if any exist
+    realm_name = "Unnamed Realm"  # Default name
+    try:
+        realms = Realm.all()
+        if realms:
+            realm_name = realms[0].name
+    except Exception as e:
+        logger.warning(f"Could not retrieve realm name: {e}")
+
     # Get installed extensions
     extension_names = []
     import extension_packages.extension_imports
@@ -75,6 +84,7 @@ def get_status() -> dict[str, Any]:
     return {
         "version": version,
         "status": "ok",
+        "realm_name": realm_name,
         "users_count": users_count,
         "organizations_count": organizations_count,
         "realms_count": realms_count,
