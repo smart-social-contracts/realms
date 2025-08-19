@@ -67,8 +67,12 @@
 	async function loadLatestUsers() {
 		try {
 			const response = await backend.get_users(0, 8);
+			console.log('Users response:', response);
 			if (response && response.success && response.data && response.data.UsersList) {
-				latestUsers = response.data.UsersList.items || [];
+				// Parse the JSON strings returned by the backend
+				const usersJsonStrings = response.data.UsersList.users || [];
+				latestUsers = usersJsonStrings.map(userJsonString => JSON.parse(userJsonString));
+				console.log('Parsed users:', latestUsers);
 			}
 		} catch (error) {
 			console.error('Error loading latest users:', error);
@@ -91,6 +95,29 @@
 		dateValues={$statsDatesValues}
 	/>
 
+	<!-- Latest Users Joined Section -->
+	<Card class="w-full">
+		<div class="flex items-center justify-between mb-6">
+			<Heading tag="h3" class="text-lg font-semibold">
+				{$_('extensions.public_dashboard.latest_users.title')}
+			</Heading>
+		</div>
+		<div class="flex flex-wrap gap-6 justify-start w-full">
+			{#each latestUsers as user}
+				<div class="flex flex-col items-center space-y-2 min-w-0">
+					<Avatar 
+						src={user.profile_picture_url || `https://api.dicebear.com/9.x/identicon/svg?seed=${user.id}`}
+						class="w-16 h-16 ring-2 ring-gray-200 hover:ring-gray-300 transition-all duration-200"
+						alt={user.name || user.id}
+					/>
+					<span class="text-xs text-gray-600 text-center max-w-[4rem] truncate" title={user.name || user.id}>
+						{user.name || user.id.substring(0, 8)}
+					</span>
+				</div>
+			{/each}
+		</div>
+	</Card>
+
 	<ChartWidget
 		title={$_('extensions.public_dashboard.organizations_chart.title')}
 		description={$_('extensions.public_dashboard.organizations_chart.description')}
@@ -102,29 +129,6 @@
 		description={$_('extensions.public_dashboard.assets_chart.description')}
 		dateValues={$assetsDatesValues}
 	/>
-
-	<!-- Latest Users Joined Section -->
-	<Card class="mt-4">
-		<div class="flex items-center justify-between mb-4">
-			<Heading tag="h3" class="text-lg font-semibold">
-				{$_('extensions.public_dashboard.latest_users.title')}
-			</Heading>
-		</div>
-		<div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
-			{#each latestUsers as user}
-				<div class="flex flex-col items-center">
-					<Avatar 
-						src={user.profile_picture_url || `https://api.dicebear.com/9.x/identicon/svg?seed=${user.id}`}
-						class="w-12 h-12 mb-2"
-						alt={user.name || user.id}
-					/>
-					<span class="text-xs text-center truncate w-full" title={user.name || user.id}>
-						{user.name || user.id.substring(0, 8)}
-					</span>
-				</div>
-			{/each}
-		</div>
-	</Card>
 
 	<OrganizationTable />
 	<div class="grid grid-cols-1 gap-4 xl:grid-cols-1">
