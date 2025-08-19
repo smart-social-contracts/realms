@@ -17,24 +17,32 @@ def run():
     licenses = []
     license_data = [
         {
-            "name": "Standard Driver's License",
-            "code": "if age >= 16 and passed_test: return True",
+            "name": "Digital Citizenship License",
+            "code": "if age >= 16 and identity_verified and civic_test_passed: return True",
         },
         {
-            "name": "Professional License",
-            "code": "if has_qualification and background_check: return True",
+            "name": "DeFi Trading License",
+            "code": "if financial_literacy_certified and risk_assessment_passed: return True",
         },
         {
-            "name": "Business License",
-            "code": "if has_registration and tax_compliant: return True",
+            "name": "DAO Governance License",
+            "code": "if governance_training_completed and community_standing >= 80: return True",
         },
         {
-            "name": "Digital Asset License",
-            "code": "if has_kyc and risk_assessment: return True",
+            "name": "Smart Contract Developer License",
+            "code": "if security_audit_passed and code_review_approved: return True",
         },
         {
-            "name": "Smart Contract License",
-            "code": "if has_audit and security_check: return True",
+            "name": "Community Leader License",
+            "code": "if leadership_experience and community_endorsement >= 5: return True",
+        },
+        {
+            "name": "Innovation Project License",
+            "code": "if project_proposal_approved and sustainability_score >= 70: return True",
+        },
+        {
+            "name": "Digital Asset Custodian License",
+            "code": "if security_certification and insurance_coverage and audit_passed: return True",
         },
     ]
 
@@ -48,38 +56,48 @@ def run():
         license = License(name=license_info["name"])
         licenses.append(license)
 
-    # Create mandates
+    # Create mandates - Enhanced for impressive demo
     mandates = []
     mandate_data = [
         {
-            "name": "Retirement Pension",
-            "description": "Citizens receive periodic payments upon reaching age 65",
+            "name": "Universal Basic Income",
+            "description": "Monthly UBI payments to all verified citizens - 500 tokens per month",
             "cron": "0 0 1 * *",  # First day of each month
         },
         {
-            "name": "Land Rental",
-            "description": "Standardized land rental agreements and payments",
-            "cron": "0 0 1 * *",
+            "name": "Carbon Credit Distribution",
+            "description": "Quarterly carbon credit rewards for sustainable practices",
+            "cron": "0 0 1 1,4,7,10 *",  # Quarterly
         },
         {
-            "name": "Tax Collection",
-            "description": "Annual tax collection and processing",
-            "cron": "0 0 15 4 *",  # April 15th yearly
+            "name": "Democratic Participation Rewards",
+            "description": "Monthly rewards for active governance participation and voting",
+            "cron": "0 0 15 * *",  # 15th of each month
         },
         {
-            "name": "Social Security",
-            "description": "Monthly social security payments",
-            "cron": "0 0 1 * *",
+            "name": "Innovation Fund Grants",
+            "description": "Quarterly grants for community innovation projects and startups",
+            "cron": "0 0 1 3,6,9,12 *",  # Quarterly
         },
         {
-            "name": "Healthcare Coverage",
-            "description": "Healthcare service coverage and payments",
-            "cron": "0 0 1 * *",
+            "name": "Digital Infrastructure Maintenance",
+            "description": "Weekly automated maintenance and security updates for realm infrastructure",
+            "cron": "0 2 * * 0",  # Every Sunday at 2 AM
         },
         {
-            "name": "Education Grants",
-            "description": "Educational funding and scholarship distribution",
-            "cron": "0 0 1 9 *",  # September 1st yearly
+            "name": "Community Health Monitoring",
+            "description": "Daily health checks and wellness support for all citizens",
+            "cron": "0 8 * * *",  # Daily at 8 AM
+        },
+        {
+            "name": "Education Excellence Program",
+            "description": "Bi-annual educational advancement and skill development funding",
+            "cron": "0 0 1 3,9 *",  # March and September
+        },
+        {
+            "name": "Transparency Reporting",
+            "description": "Monthly automated transparency reports on governance activities",
+            "cron": "0 0 1 * *",  # First day of each month
         },
     ]
 

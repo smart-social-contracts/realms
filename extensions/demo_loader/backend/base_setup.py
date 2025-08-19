@@ -16,8 +16,8 @@ def run():
 
     # Create the Realm as the top political entity
     realm = Realm(
-        name="Digital Republic",
-        description="A digital sovereign realm governing digital assets and relationships",
+        name="New Geneva Digital Republic",
+        description="A thriving digital democracy with active governance, diverse organizations, and innovative financial systems. Home to 250+ engaged citizens participating in decentralized decision-making.",
     )
 
     user_profile_admin = UserProfile(
@@ -42,12 +42,12 @@ def run():
     system_user = User(name="system", profiles=[user_profile_admin])
 
     # Create the Treasury
-    treasury = Treasury(name="Digital Republic Treasury", vault_principal_id="abc123")
+    treasury = Treasury(name="New Geneva Treasury", vault_principal_id="abc123")
 
     logger.info("Base setup completed successfully")
 
     # Return a string representation instead of objects
-    return "Created Realm, System User, and Treasury"
+    return "Created New Geneva Digital Republic - A thriving democracy with active governance, System User, and Treasury"
 
 
 if __name__ == "__main__":
