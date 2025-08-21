@@ -71,5 +71,8 @@
   "assets_chart": {
     "title": "Total Assets",
     "description": "Total value of assets managed on the platform"
+  },
+  "latest_users": {
+    "title": "Latest Users Joined"
   }
 }

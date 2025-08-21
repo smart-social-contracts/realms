@@ -27,10 +27,11 @@
 			principal.set(principalText);
 
 			console.log('Principal restored from existing session:', principalText);
-			// Initialize backend with authenticated identity
-			await initBackendWithIdentity();
-			// Load user profiles
-			await loadUserProfiles();
+		// Initialize backend with authenticated identity
+		await initBackendWithIdentity();
+		// Load user profiles
+		await loadUserProfiles();
+		await loadUserProfilePicture();
 		}
 		
 		// Add a click handler to close dropdown when clicking outside
@@ -60,6 +61,7 @@
 		await initBackendWithIdentity();
 		// Load user profiles
 		await loadUserProfiles();
+		await loadUserProfilePicture();
 	}
 
 	async function handleLogout() {
@@ -83,9 +85,26 @@
 		showDropdown = false;
 	}
 
-	function generateAvatarUrl(seed) {
-		// You can customize the style (e.g., 'avataaars', 'bottts', etc.)
+	function generateAvatarUrl(seed, profilePictureUrl) {
+		// Use profile picture URL if available, otherwise fall back to DiceBear
+		if (profilePictureUrl && profilePictureUrl.trim()) {
+			return profilePictureUrl;
+		}
 		return `https://api.dicebear.com/9.x/identicon/svg?seed=${seed}`;
+	}
+
+	let userProfilePictureUrl = '';
+
+	async function loadUserProfilePicture() {
+		try {
+			const response = await backend.get_my_user_status();
+			if (response && response.success && response.data && response.data.UserGet) {
+				userProfilePictureUrl = response.data.UserGet.profile_picture_url || '';
+			}
+		} catch (error) {
+			console.error('Error loading user profile picture:', error);
+			userProfilePictureUrl = '';
+		}
 	}
 
 	// Get a shortened display version of the principal
@@ -114,13 +133,12 @@
 				}
 			}}
 		>
-			<Avatar 
-				src={generateAvatarUrl($principal)} 
-				tabindex={0} 
-				title={`Principal: ${$principal}`} 
-				alt="User avatar"
-				size="sm"
-			/>
+		<Avatar 
+			src={generateAvatarUrl($principal, userProfilePictureUrl)} 
+			tabindex={0} 
+			title={`Principal: ${$principal}`} 
+			alt="User avatar"
+		/>
 		</div>
 		
 		<!-- Dropdown Menu -->

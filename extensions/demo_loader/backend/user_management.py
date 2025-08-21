@@ -409,6 +409,25 @@ LAST_NAMES = [
     "Diaz",
 ]
 
+SAMPLE_PROFILE_PICTURES = [
+    "https://randomuser.me/api/portraits/men/1.jpg",
+    "https://randomuser.me/api/portraits/women/1.jpg",
+    "https://randomuser.me/api/portraits/men/2.jpg",
+    "https://randomuser.me/api/portraits/women/2.jpg",
+    "https://randomuser.me/api/portraits/men/3.jpg",
+    "https://randomuser.me/api/portraits/women/3.jpg",
+    "https://i.pravatar.cc/150?img=1",
+    "https://i.pravatar.cc/150?img=2",
+    "https://i.pravatar.cc/150?img=3",
+    "https://i.pravatar.cc/150?img=4",
+    "https://i.pravatar.cc/150?img=5",
+    "https://i.pravatar.cc/150?img=6",
+    "https://i.pravatar.cc/150?img=7",
+    "https://i.pravatar.cc/150?img=8",
+    "https://i.pravatar.cc/150?img=9",
+    "https://i.pravatar.cc/150?img=10",
+]
+
 
 def generate_deterministic_name(index):
     """Generate a deterministic name based on the index.
@@ -448,8 +467,10 @@ def run(batch):
     for i in range(start_idx, end_idx):
         # Generate deterministic name for this user
         user_data = generate_deterministic_name(i)
+        profile_picture_url = SAMPLE_PROFILE_PICTURES[i % len(SAMPLE_PROFILE_PICTURES)]
+
         human = Human(name=user_data["human_name"])
-        user = User(name=user_data["name"])
+        user = User(name=user_data["name"], profile_picture_url=profile_picture_url)
         humans.append(human)
         users.append(user)
 

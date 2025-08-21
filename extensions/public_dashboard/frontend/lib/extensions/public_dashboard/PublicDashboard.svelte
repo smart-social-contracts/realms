@@ -8,8 +8,10 @@
 	import { universe, snapshots } from '$lib/stores/auth';
 	import { writable } from 'svelte/store';
 	import { _ } from 'svelte-i18n';
+	import { Avatar, Card, Heading } from 'flowbite-svelte';
 
 	let greeting = '';
+	let latestUsers = [];
 
 	const mockUserData = [
 		['01 Jan', '03 Jan', '05 Jan', '07 Jan', '09 Jan', '11 Jan', '13 Jan', '15 Jan', '17 Jan', '19 Jan', '21 Jan'],
@@ -62,10 +64,27 @@
 		return false;
 	}
 
+	async function loadLatestUsers() {
+		try {
+			const response = await backend.get_users(0, 8);
+			console.log('Users response:', response);
+			if (response && response.success && response.data && response.data.UsersList) {
+				// Parse the JSON strings returned by the backend
+				const usersJsonStrings = response.data.UsersList.users || [];
+				latestUsers = usersJsonStrings.map(userJsonString => JSON.parse(userJsonString));
+				console.log('Parsed users:', latestUsers);
+			}
+		} catch (error) {
+			console.error('Error loading latest users:', error);
+			latestUsers = [];
+		}
+	}
+
 	$: console.log('Parent statsDatesValues updated:', $statsDatesValues);
 
 	onMount(() => {
 		get_snapshot_data();
+		loadLatestUsers();
 	});
 </script>
 
@@ -75,6 +94,29 @@
 		description={$_('extensions.public_dashboard.users_chart.description')}
 		dateValues={$statsDatesValues}
 	/>
+
+	<!-- Latest Users Joined Section -->
+	<Card class="w-full">
+		<div class="flex items-center justify-between mb-6">
+			<Heading tag="h3" class="text-lg font-semibold">
+				{$_('extensions.public_dashboard.latest_users.title')}
+			</Heading>
+		</div>
+		<div class="flex flex-wrap gap-6 justify-start w-full">
+			{#each latestUsers as user}
+				<div class="flex flex-col items-center space-y-2 min-w-0">
+					<Avatar 
+						src={user.profile_picture_url || `https://api.dicebear.com/9.x/identicon/svg?seed=${user.id}`}
+						class="w-16 h-16 ring-2 ring-gray-200 hover:ring-gray-300 transition-all duration-200"
+						alt={user.name || user.id}
+					/>
+					<span class="text-xs text-gray-600 text-center max-w-[4rem] truncate" title={user.name || user.id}>
+						{user.name || user.id.substring(0, 8)}
+					</span>
+				</div>
+			{/each}
+		</div>
+	</Card>
 
 	<ChartWidget
 		title={$_('extensions.public_dashboard.organizations_chart.title')}

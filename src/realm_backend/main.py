@@ -19,7 +19,7 @@ from api.ggg_entities import (
     list_votes,
 )
 from api.status import get_status
-from api.user import user_get, user_register
+from api.user import user_get, user_register, user_update_profile_picture
 from core.candid_types_realm import (
     CodexesListRecord,
     DisputesListRecord,
@@ -129,8 +129,9 @@ def join_realm(profile: str) -> RealmResponse:
     try:
         user = user_register(ic.caller().to_str(), profile)
         profiles = Vec[text]()
-        for p in user["profiles"]:
-            profiles.append(p)
+        if "profiles" in user and user["profiles"]:
+            for p in user["profiles"]:
+                profiles.append(p)
 
         return RealmResponse(
             success=True,
@@ -138,6 +139,7 @@ def join_realm(profile: str) -> RealmResponse:
                 UserGet=UserGetRecord(
                     principal=Principal.from_str(user["principal"]),
                     profiles=profiles,
+                    profile_picture_url=user.get("profile_picture_url", ""),
                 )
             ),
         )
@@ -156,9 +158,15 @@ def get_my_user_status() -> RealmResponse:
     try:
         user = user_get(ic.caller().to_str())
         logger.info(f"User: {user}")
+        if not user["success"]:
+            return RealmResponse(
+                success=False, data=RealmResponseData(Error=user["error"])
+            )
+
         profiles = Vec[text]()
-        for p in user["profiles"]:
-            profiles.append(p)
+        if "profiles" in user and user["profiles"]:
+            for p in user["profiles"]:
+                profiles.append(p)
         logger.info(f"Profiles: {profiles}")
         return RealmResponse(
             success=True,
@@ -166,11 +174,38 @@ def get_my_user_status() -> RealmResponse:
                 UserGet=UserGetRecord(
                     principal=Principal.from_str(user["principal"]),
                     profiles=profiles,
+                    profile_picture_url=user["profile_picture_url"],
                 )
             ),
         )
     except Exception as e:
         logger.error(f"Error getting user: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@update
+def update_my_profile_picture(profile_picture_url: str) -> RealmResponse:
+    try:
+        result = user_update_profile_picture(ic.caller().to_str(), profile_picture_url)
+        if not result["success"]:
+            return RealmResponse(
+                success=False, data=RealmResponseData(Error=result["error"])
+            )
+
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                UserGet=UserGetRecord(
+                    principal=ic.caller(),
+                    profiles=Vec[text](),
+                    profile_picture_url=result["profile_picture_url"],
+                )
+            ),
+        )
+    except Exception as e:
+        logger.error(
+            f"Error updating profile picture: {str(e)}\n{traceback.format_exc()}"
+        )
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 

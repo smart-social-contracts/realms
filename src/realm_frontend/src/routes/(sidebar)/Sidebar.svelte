@@ -334,8 +334,18 @@
 		return result;
 	})();
 
-	// Function to format category names for display
+	// Function to format category names for display with i18n support
 	function formatCategoryName(category: string): string {
+		// Try to get translated category name first
+		const translationKey = `categories.${category}`;
+		const translated = $_(translationKey);
+		
+		// If translation exists and is different from the key, use it
+		if (translated && translated !== translationKey) {
+			return translated;
+		}
+		
+		// Fallback to formatted category name
 		return category
 			.split('_')
 			.map(word => word.charAt(0).toUpperCase() + word.slice(1))
