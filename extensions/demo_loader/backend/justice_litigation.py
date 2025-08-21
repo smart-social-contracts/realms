@@ -6,7 +6,7 @@ Creates realistic litigation cases for testing and demonstration
 import json
 import random
 from datetime import datetime, timedelta
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 from kybra_simple_logging import get_logger
 
@@ -20,8 +20,8 @@ CASE_TYPES = [
             "Defendant failed to deliver goods as per smart contract agreement",
             "Service provider did not meet contractual obligations within specified timeframe",
             "Breach of payment terms in commercial agreement",
-            "Failure to provide agreed-upon services as outlined in contract"
-        ]
+            "Failure to provide agreed-upon services as outlined in contract",
+        ],
     },
     {
         "title": "Payment Dispute",
@@ -29,8 +29,8 @@ CASE_TYPES = [
             "Disagreement over payment terms and late fees",
             "Disputed invoice amounts and billing discrepancies",
             "Non-payment of agreed compensation for services rendered",
-            "Overcharging for services beyond agreed scope"
-        ]
+            "Overcharging for services beyond agreed scope",
+        ],
     },
     {
         "title": "Asset Transfer Violation",
@@ -38,8 +38,8 @@ CASE_TYPES = [
             "Unauthorized transfer of realm assets without proper authorization",
             "Improper handling of digital asset ownership transfer",
             "Violation of asset custody agreements",
-            "Unauthorized access and transfer of protected assets"
-        ]
+            "Unauthorized access and transfer of protected assets",
+        ],
     },
     {
         "title": "Service Agreement Breach",
@@ -47,8 +47,8 @@ CASE_TYPES = [
             "Service provider failed to meet agreed upon deliverables",
             "Incomplete or substandard service delivery",
             "Violation of service level agreements",
-            "Failure to maintain agreed service quality standards"
-        ]
+            "Failure to maintain agreed service quality standards",
+        ],
     },
     {
         "title": "Intellectual Property Dispute",
@@ -56,8 +56,8 @@ CASE_TYPES = [
             "Unauthorized use of proprietary algorithms or code",
             "Copyright infringement in digital content creation",
             "Patent violation in smart contract implementation",
-            "Trademark misuse in platform branding"
-        ]
+            "Trademark misuse in platform branding",
+        ],
     },
     {
         "title": "Data Privacy Violation",
@@ -65,8 +65,8 @@ CASE_TYPES = [
             "Unauthorized access to personal user data",
             "Breach of data protection agreements",
             "Improper sharing of confidential information",
-            "Violation of privacy consent terms"
-        ]
+            "Violation of privacy consent terms",
+        ],
     },
     {
         "title": "Governance Dispute",
@@ -74,8 +74,8 @@ CASE_TYPES = [
             "Disagreement over voting rights and procedures",
             "Challenge to administrative decisions",
             "Dispute over resource allocation policies",
-            "Violation of community governance rules"
-        ]
+            "Violation of community governance rules",
+        ],
     },
     {
         "title": "Employment Dispute",
@@ -83,9 +83,9 @@ CASE_TYPES = [
             "Wrongful termination of service agreement",
             "Dispute over compensation and benefits",
             "Violation of workplace conduct policies",
-            "Disagreement over work scope and responsibilities"
-        ]
-    }
+            "Disagreement over work scope and responsibilities",
+        ],
+    },
 ]
 
 # Sample verdicts for resolved cases
@@ -99,7 +99,7 @@ SAMPLE_VERDICTS = [
     "transfer(requester_principal, defendant_principal, 200, 'Counter-claim settlement')",
     "no_action_required('Case dismissed - insufficient evidence')",
     "mediation_required('Parties must engage in mediation process')",
-    "warning_issued('Formal warning issued to defendant')"
+    "warning_issued('Formal warning issued to defendant')",
 ]
 
 # Sample actions taken for cases
@@ -111,12 +111,13 @@ ACTIONS_TAKEN = [
     ["settlement_negotiated", "agreement_reached"],
     ["investigation_completed", "verdict_rendered"],
     ["appeal_filed", "review_pending"],
-    ["compliance_check", "resolution_verified"]
+    ["compliance_check", "resolution_verified"],
 ]
+
 
 def generate_litigation_cases(num_cases: int = 25) -> List[Dict[str, Any]]:
     """Generate realistic litigation cases with various statuses and types"""
-    
+
     # Sample principals (these should match existing users in the system)
     sample_principals = [
         "zstof-mh46j-ewupb-oxihp-j5cpv-d5d7p-6o6i4-spm3c-54ho5-meqol-xqe",
@@ -128,27 +129,41 @@ def generate_litigation_cases(num_cases: int = 25) -> List[Dict[str, Any]]:
         "bw4dl-smaaa-aaaah-qcaiq-cai",
         "by6od-j4aaa-aaaah-qcaiq-cai",
         "c5kvi-uuaaa-aaaah-qcaiq-cai",
-        "cbopz-duaaa-aaaah-qcaiq-cai"
+        "cbopz-duaaa-aaaah-qcaiq-cai",
     ]
-    
-    statuses = ["pending", "in_review", "mediation", "resolved", "dismissed", "appealed"]
-    status_weights = [0.3, 0.25, 0.15, 0.2, 0.05, 0.05]  # More pending and in_review cases
-    
+
+    statuses = [
+        "pending",
+        "in_review",
+        "mediation",
+        "resolved",
+        "dismissed",
+        "appealed",
+    ]
+    status_weights = [
+        0.3,
+        0.25,
+        0.15,
+        0.2,
+        0.05,
+        0.05,
+    ]  # More pending and in_review cases
+
     cases = []
     base_date = datetime.now() - timedelta(days=90)  # Start 90 days ago
-    
+
     for i in range(num_cases):
         case_type = random.choice(CASE_TYPES)
         status = random.choices(statuses, weights=status_weights)[0]
-        
+
         # Ensure different principals for requester and defendant
         requester = random.choice(sample_principals)
         defendant = random.choice([p for p in sample_principals if p != requester])
-        
+
         # Generate case date (more recent cases are more likely)
         days_ago = random.randint(1, 90)
         case_date = base_date + timedelta(days=days_ago)
-        
+
         case = {
             "id": f"lit_{i+100:03d}",  # Start from lit_100 to avoid conflicts
             "requester_principal": requester,
@@ -158,81 +173,95 @@ def generate_litigation_cases(num_cases: int = 25) -> List[Dict[str, Any]]:
             "status": status,
             "requested_at": case_date.isoformat() + "Z",
             "verdict": None,
-            "actions_taken": []
+            "actions_taken": [],
         }
-        
+
         # Add verdict and actions for resolved cases
         if status in ["resolved", "dismissed"]:
             if status == "resolved":
                 case["verdict"] = random.choice(SAMPLE_VERDICTS)
-                case["actions_taken"] = ["transfer_executed", "case_closed"] if "transfer(" in case["verdict"] else ["verdict_rendered", "case_closed"]
+                case["actions_taken"] = (
+                    ["transfer_executed", "case_closed"]
+                    if "transfer(" in case["verdict"]
+                    else ["verdict_rendered", "case_closed"]
+                )
             else:
-                case["verdict"] = "no_action_required('Case dismissed - insufficient evidence')"
+                case["verdict"] = (
+                    "no_action_required('Case dismissed - insufficient evidence')"
+                )
                 case["actions_taken"] = ["investigation_completed", "case_dismissed"]
         elif status in ["in_review", "mediation"]:
             case["actions_taken"] = random.choice(ACTIONS_TAKEN[:6])  # Partial actions
         elif status == "appealed":
             case["verdict"] = random.choice(SAMPLE_VERDICTS)
-            case["actions_taken"] = ["verdict_rendered", "appeal_filed", "review_pending"]
-        
+            case["actions_taken"] = [
+                "verdict_rendered",
+                "appeal_filed",
+                "review_pending",
+            ]
+
         cases.append(case)
-    
+
     return cases
+
 
 def run(batch: int = None) -> str:
     """Load justice litigation demo data"""
     try:
         logger.info("Starting justice litigation demo data creation")
-        
+
         # Generate litigation cases
         litigation_cases = generate_litigation_cases(25)
-        
+
         logger.info(f"Generated {len(litigation_cases)} litigation cases")
-        
+
         # Direct integration: Import and populate the justice_litigation storage
         try:
             # Import the justice_litigation module directly to populate its storage
-            import sys
             import os
-            
+            import sys
+
             # Get the path to the justice_litigation extension
             justice_litigation_path = os.path.join(
-                os.path.dirname(__file__), 
-                '..', '..', 
-                'justice_litigation', 
-                'backend'
+                os.path.dirname(__file__), "..", "..", "justice_litigation", "backend"
             )
-            
+
             if os.path.exists(justice_litigation_path):
                 sys.path.insert(0, justice_litigation_path)
-                
+
                 # Import and directly populate the litigation storage
                 import entry as justice_litigation_entry
-                
+
                 # Clear existing storage and add our demo cases
                 justice_litigation_entry.LITIGATION_STORAGE.clear()
                 justice_litigation_entry.LITIGATION_STORAGE.extend(litigation_cases)
-                
-                logger.info(f"Successfully loaded {len(litigation_cases)} cases into justice_litigation storage")
-                
+
+                logger.info(
+                    f"Successfully loaded {len(litigation_cases)} cases into justice_litigation storage"
+                )
+
             else:
-                logger.warning(f"Justice litigation path not found: {justice_litigation_path}")
-                
+                logger.warning(
+                    f"Justice litigation path not found: {justice_litigation_path}"
+                )
+
         except Exception as integration_error:
             logger.warning(f"Direct integration failed: {integration_error}")
-            logger.info("Demo cases generated but not loaded - use manual loading process")
-        
+            logger.info(
+                "Demo cases generated but not loaded - use manual loading process"
+            )
+
         # Summary statistics
         status_counts = {}
         for case in litigation_cases:
             status = case["status"]
             status_counts[status] = status_counts.get(status, 0) + 1
-        
+
         case_type_counts = {}
         for case in litigation_cases:
             case_type = case["case_title"]
             case_type_counts[case_type] = case_type_counts.get(case_type, 0) + 1
-        
+
         result = {
             "success": True,
             "message": f"Successfully generated and loaded {len(litigation_cases)} litigation cases",
@@ -242,15 +271,17 @@ def run(batch: int = None) -> str:
                 "case_type_distribution": case_type_counts,
                 "date_range": {
                     "earliest": min(case["requested_at"] for case in litigation_cases),
-                    "latest": max(case["requested_at"] for case in litigation_cases)
-                }
+                    "latest": max(case["requested_at"] for case in litigation_cases),
+                },
             },
-            "sample_cases": litigation_cases[:3]  # Include first 3 cases as examples
+            "sample_cases": litigation_cases[:3],  # Include first 3 cases as examples
         }
-        
-        logger.info(f"Justice litigation demo data creation completed: {result['statistics']}")
+
+        logger.info(
+            f"Justice litigation demo data creation completed: {result['statistics']}"
+        )
         return json.dumps(result, indent=2)
-        
+
     except Exception as e:
         error_msg = f"Error creating justice litigation demo data: {str(e)}"
         logger.error(error_msg)

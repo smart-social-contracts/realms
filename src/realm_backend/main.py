@@ -159,8 +159,10 @@ def get_my_user_status() -> RealmResponse:
         user = user_get(ic.caller().to_str())
         logger.info(f"User: {user}")
         if not user["success"]:
-            return RealmResponse(success=False, data=RealmResponseData(Error=user["error"]))
-        
+            return RealmResponse(
+                success=False, data=RealmResponseData(Error=user["error"])
+            )
+
         profiles = Vec[text]()
         if "profiles" in user and user["profiles"]:
             for p in user["profiles"]:

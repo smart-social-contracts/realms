@@ -23,11 +23,7 @@ LITIGATION_STORAGE = [
         "status": "appealed",
         "requested_at": "2025-07-04T08:52:58.901560Z",
         "verdict": "transfer(requester_principal, defendant_principal, 200, 'Counter-claim settlement')",
-        "actions_taken": [
-            "verdict_rendered",
-            "appeal_filed",
-            "review_pending"
-        ]
+        "actions_taken": ["verdict_rendered", "appeal_filed", "review_pending"],
     },
     {
         "id": "lit_101",
@@ -38,10 +34,7 @@ LITIGATION_STORAGE = [
         "status": "resolved",
         "requested_at": "2025-06-16T08:52:58.901560Z",
         "verdict": "transfer(requester_principal, defendant_principal, 200, 'Counter-claim settlement')",
-        "actions_taken": [
-            "transfer_executed",
-            "case_closed"
-        ]
+        "actions_taken": ["transfer_executed", "case_closed"],
     },
     {
         "id": "lit_102",
@@ -52,10 +45,7 @@ LITIGATION_STORAGE = [
         "status": "resolved",
         "requested_at": "2025-07-05T08:52:58.901560Z",
         "verdict": "transfer(defendant_principal, requester_principal, 1000, 'Compensation for breach of contract')",
-        "actions_taken": [
-            "transfer_executed",
-            "case_closed"
-        ]
+        "actions_taken": ["transfer_executed", "case_closed"],
     },
     {
         "id": "lit_103",
@@ -66,10 +56,7 @@ LITIGATION_STORAGE = [
         "status": "mediation",
         "requested_at": "2025-08-13T08:52:58.901560Z",
         "verdict": None,
-        "actions_taken": [
-            "warning_issued",
-            "monitoring_period"
-        ]
+        "actions_taken": ["warning_issued", "monitoring_period"],
     },
     {
         "id": "lit_104",
@@ -80,7 +67,7 @@ LITIGATION_STORAGE = [
         "status": "pending",
         "requested_at": "2025-07-26T08:52:58.901560Z",
         "verdict": None,
-        "actions_taken": []
+        "actions_taken": [],
     },
     {
         "id": "lit_105",
@@ -91,10 +78,7 @@ LITIGATION_STORAGE = [
         "status": "resolved",
         "requested_at": "2025-06-17T08:52:58.901560Z",
         "verdict": "transfer(defendant_principal, requester_principal, 500, 'Partial refund for incomplete services')",
-        "actions_taken": [
-            "transfer_executed",
-            "case_closed"
-        ]
+        "actions_taken": ["transfer_executed", "case_closed"],
     },
     {
         "id": "lit_106",
@@ -105,10 +89,7 @@ LITIGATION_STORAGE = [
         "status": "resolved",
         "requested_at": "2025-08-16T08:52:58.901560Z",
         "verdict": "no_action_required('Case dismissed - insufficient evidence')",
-        "actions_taken": [
-            "verdict_rendered",
-            "case_closed"
-        ]
+        "actions_taken": ["verdict_rendered", "case_closed"],
     },
     {
         "id": "lit_107",
@@ -119,7 +100,7 @@ LITIGATION_STORAGE = [
         "status": "pending",
         "requested_at": "2025-06-29T08:52:58.901560Z",
         "verdict": None,
-        "actions_taken": []
+        "actions_taken": [],
     },
     {
         "id": "lit_108",
@@ -130,10 +111,7 @@ LITIGATION_STORAGE = [
         "status": "mediation",
         "requested_at": "2025-07-09T08:52:58.901560Z",
         "verdict": None,
-        "actions_taken": [
-            "warning_issued",
-            "monitoring_period"
-        ]
+        "actions_taken": ["warning_issued", "monitoring_period"],
     },
     {
         "id": "lit_109",
@@ -144,11 +122,7 @@ LITIGATION_STORAGE = [
         "status": "appealed",
         "requested_at": "2025-05-31T08:52:58.901560Z",
         "verdict": "transfer(defendant_principal, requester_principal, 500, 'Partial refund for incomplete services')",
-        "actions_taken": [
-            "verdict_rendered",
-            "appeal_filed",
-            "review_pending"
-        ]
+        "actions_taken": ["verdict_rendered", "appeal_filed", "review_pending"],
     },
     {
         "id": "lit_110",
@@ -159,7 +133,7 @@ LITIGATION_STORAGE = [
         "status": "pending",
         "requested_at": "2025-08-09T08:52:58.901560Z",
         "verdict": None,
-        "actions_taken": []
+        "actions_taken": [],
     },
     {
         "id": "lit_111",
@@ -170,10 +144,7 @@ LITIGATION_STORAGE = [
         "status": "resolved",
         "requested_at": "2025-06-24T08:52:58.901560Z",
         "verdict": "transfer(requester_principal, defendant_principal, 200, 'Counter-claim settlement')",
-        "actions_taken": [
-            "transfer_executed",
-            "case_closed"
-        ]
+        "actions_taken": ["transfer_executed", "case_closed"],
     },
     {
         "id": "lit_112",
@@ -184,10 +155,7 @@ LITIGATION_STORAGE = [
         "status": "dismissed",
         "requested_at": "2025-07-31T08:52:58.901560Z",
         "verdict": "no_action_required('Case dismissed - insufficient evidence')",
-        "actions_taken": [
-            "investigation_completed",
-            "case_dismissed"
-        ]
+        "actions_taken": ["investigation_completed", "case_dismissed"],
     },
     {
         "id": "lit_113",
@@ -198,10 +166,7 @@ LITIGATION_STORAGE = [
         "status": "mediation",
         "requested_at": "2025-08-10T08:52:58.901560Z",
         "verdict": None,
-        "actions_taken": [
-            "settlement_negotiated",
-            "agreement_reached"
-        ]
+        "actions_taken": ["settlement_negotiated", "agreement_reached"],
     },
     {
         "id": "lit_114",
@@ -212,10 +177,7 @@ LITIGATION_STORAGE = [
         "status": "in_review",
         "requested_at": "2025-06-13T08:52:58.901560Z",
         "verdict": None,
-        "actions_taken": [
-            "transfer_executed",
-            "case_closed"
-        ]
+        "actions_taken": ["transfer_executed", "case_closed"],
     },
     {
         "id": "lit_115",
@@ -226,10 +188,7 @@ LITIGATION_STORAGE = [
         "status": "in_review",
         "requested_at": "2025-06-17T08:52:58.901560Z",
         "verdict": None,
-        "actions_taken": [
-            "investigation_completed",
-            "verdict_rendered"
-        ]
+        "actions_taken": ["investigation_completed", "verdict_rendered"],
     },
     {
         "id": "lit_116",
@@ -240,7 +199,7 @@ LITIGATION_STORAGE = [
         "status": "pending",
         "requested_at": "2025-07-31T08:52:58.901560Z",
         "verdict": None,
-        "actions_taken": []
+        "actions_taken": [],
     },
     {
         "id": "lit_117",
@@ -251,10 +210,7 @@ LITIGATION_STORAGE = [
         "status": "resolved",
         "requested_at": "2025-06-03T08:52:58.901560Z",
         "verdict": "transfer(defendant_principal, requester_principal, 2000, 'Damages for unauthorized asset transfer')",
-        "actions_taken": [
-            "transfer_executed",
-            "case_closed"
-        ]
+        "actions_taken": ["transfer_executed", "case_closed"],
     },
     {
         "id": "lit_118",
@@ -265,10 +221,7 @@ LITIGATION_STORAGE = [
         "status": "resolved",
         "requested_at": "2025-07-10T08:52:58.901560Z",
         "verdict": "transfer(defendant_principal, requester_principal, 2000, 'Damages for unauthorized asset transfer')",
-        "actions_taken": [
-            "transfer_executed",
-            "case_closed"
-        ]
+        "actions_taken": ["transfer_executed", "case_closed"],
     },
     {
         "id": "lit_119",
@@ -279,10 +232,7 @@ LITIGATION_STORAGE = [
         "status": "in_review",
         "requested_at": "2025-07-25T08:52:58.901560Z",
         "verdict": None,
-        "actions_taken": [
-            "settlement_negotiated",
-            "agreement_reached"
-        ]
+        "actions_taken": ["settlement_negotiated", "agreement_reached"],
     },
     {
         "id": "lit_120",
@@ -293,10 +243,7 @@ LITIGATION_STORAGE = [
         "status": "in_review",
         "requested_at": "2025-07-20T08:52:58.901560Z",
         "verdict": None,
-        "actions_taken": [
-            "settlement_negotiated",
-            "agreement_reached"
-        ]
+        "actions_taken": ["settlement_negotiated", "agreement_reached"],
     },
     {
         "id": "lit_121",
@@ -307,10 +254,7 @@ LITIGATION_STORAGE = [
         "status": "in_review",
         "requested_at": "2025-06-27T08:52:58.901560Z",
         "verdict": None,
-        "actions_taken": [
-            "investigation_completed",
-            "verdict_rendered"
-        ]
+        "actions_taken": ["investigation_completed", "verdict_rendered"],
     },
     {
         "id": "lit_122",
@@ -321,10 +265,7 @@ LITIGATION_STORAGE = [
         "status": "resolved",
         "requested_at": "2025-08-11T08:52:58.901560Z",
         "verdict": "transfer(defendant_principal, requester_principal, 500, 'Partial refund for incomplete services')",
-        "actions_taken": [
-            "transfer_executed",
-            "case_closed"
-        ]
+        "actions_taken": ["transfer_executed", "case_closed"],
     },
     {
         "id": "lit_123",
@@ -335,10 +276,7 @@ LITIGATION_STORAGE = [
         "status": "in_review",
         "requested_at": "2025-08-08T08:52:58.901560Z",
         "verdict": None,
-        "actions_taken": [
-            "initial_review",
-            "evidence_collected"
-        ]
+        "actions_taken": ["initial_review", "evidence_collected"],
     },
     {
         "id": "lit_124",
@@ -349,11 +287,8 @@ LITIGATION_STORAGE = [
         "status": "resolved",
         "requested_at": "2025-06-26T08:52:58.901560Z",
         "verdict": "mediation_required('Parties must engage in mediation process')",
-        "actions_taken": [
-            "verdict_rendered",
-            "case_closed"
-        ]
-    }
+        "actions_taken": ["verdict_rendered", "case_closed"],
+    },
 ]
 
 
@@ -516,34 +451,37 @@ def execute_verdict(args: str) -> str:
 def load_demo_litigations(args: str) -> str:
     """Load demo litigation data - called by demo_loader extension"""
     logger.info(f"justice_litigation.load_demo_litigations called with args: {args}")
-    
+
     try:
         if args:
             params = json.loads(args) if isinstance(args, str) else args
         else:
             params = {}
-        
+
         demo_cases = params.get("cases", [])
-        
+
         if not demo_cases:
             return json.dumps({"success": False, "error": "No demo cases provided"})
-        
+
         # Clear existing storage and load demo cases
-        global LITIGATION_STORAGE
         LITIGATION_STORAGE.clear()
         LITIGATION_STORAGE.extend(demo_cases)
-        
+
         logger.info(f"Loaded {len(demo_cases)} demo litigation cases")
-        
-        return json.dumps({
-            "success": True,
-            "message": f"Successfully loaded {len(demo_cases)} demo litigation cases",
-            "data": {
-                "total_loaded": len(demo_cases),
-                "storage_size": len(LITIGATION_STORAGE)
+
+        return json.dumps(
+            {
+                "success": True,
+                "message": f"Successfully loaded {len(demo_cases)} demo litigation cases",
+                "data": {
+                    "total_loaded": len(demo_cases),
+                    "storage_size": len(LITIGATION_STORAGE),
+                },
             }
-        })
-        
+        )
+
     except Exception as e:
-        logger.error(f"Error in load_demo_litigations: {str(e)}\n{traceback.format_exc()}")
+        logger.error(
+            f"Error in load_demo_litigations: {str(e)}\n{traceback.format_exc()}"
+        )
         return json.dumps({"success": False, "error": str(e)})
