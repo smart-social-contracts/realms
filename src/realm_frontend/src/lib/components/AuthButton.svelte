@@ -7,7 +7,7 @@
 	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import T from '$lib/components/T.svelte';
-	import { initBackendWithIdentity } from '$lib/canisters';
+	import { initBackendWithIdentity, backend } from '$lib/canisters';
 
 	let principalText = '';
 	let showDropdown = false;
@@ -107,6 +107,22 @@
 		}
 	}
 
+	// Listen for profile picture updates from settings page
+	function handleProfilePictureUpdate(event) {
+		if (event.detail && event.detail.profilePictureUrl !== undefined) {
+			userProfilePictureUrl = event.detail.profilePictureUrl;
+		}
+	}
+
+	onMount(() => {
+		// Listen for custom events when profile picture is updated
+		window.addEventListener('profilePictureUpdated', handleProfilePictureUpdate);
+		
+		return () => {
+			window.removeEventListener('profilePictureUpdated', handleProfilePictureUpdate);
+		};
+	});
+
 	// Get a shortened display version of the principal
 	$: shortPrincipal = $principal ? `${$principal.substring(0, 8)}...${$principal.slice(-8)}` : '';
 	
@@ -124,8 +140,10 @@
 		<!-- Avatar Image -->
 		<div 
 			class="cursor-pointer" 
+			role="button"
 			aria-haspopup="true"
 			aria-expanded={showDropdown}
+			tabindex="0"
 			on:click={toggleDropdown}
 			on:keydown={(e) => {
 				if (e.key === 'Enter' || e.key === ' ') {

@@ -38,8 +38,10 @@
 			const response = await backend.update_my_profile_picture(profilePictureUrl.trim());
 			if (response && response.success) {
 				message = 'Profile picture updated successfully!';
-				// Trigger a page refresh to update the avatar in the header
-				window.location.reload();
+				// Dispatch custom event to update avatar in header without page refresh
+				window.dispatchEvent(new CustomEvent('profilePictureUpdated', {
+					detail: { profilePictureUrl: profilePictureUrl.trim() }
+				}));
 			} else {
 				message = 'Failed to update profile picture';
 			}
@@ -52,8 +54,27 @@
 	}
 
 	async function removeProfilePicture() {
-		profilePictureUrl = '';
-		await updateProfilePicture();
+		isLoading = true;
+		message = '';
+
+		try {
+			const response = await backend.update_my_profile_picture('');
+			if (response && response.success) {
+				profilePictureUrl = '';
+				message = 'Profile picture removed successfully!';
+				// Dispatch custom event to update avatar in header
+				window.dispatchEvent(new CustomEvent('profilePictureUpdated', {
+					detail: { profilePictureUrl: '' }
+				}));
+			} else {
+				message = 'Failed to remove profile picture';
+			}
+		} catch (error) {
+			console.error('Error removing profile picture:', error);
+			message = 'Error removing profile picture';
+		} finally {
+			isLoading = false;
+		}
 	}
 
 	$: displaySrc = profilePictureUrl || src;
