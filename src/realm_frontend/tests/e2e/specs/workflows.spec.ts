@@ -89,14 +89,17 @@ test.describe('User workflows', () => {
 
 		
 
-		const selectProfileType = page.getByRole('combobox');
+		const selectProfileType = page.locator('#profile-dropdown');
 		await expect(selectProfileType).toBeVisible();
-		await selectProfileType.selectOption('Administrator');
+		await selectProfileType.click();
+		
+		// Wait for dropdown to open and select Administrator option
+		await page.getByText('Administrator').click();
 
-		await page.getByRole('radio', { name: 'I agree to the terms' }).click();
+		await page.getByRole('checkbox', { name: 'I agree to these terms and conditions' }).click();
 		
 
-		await page.getByRole('button', { name: 'Join Realm as admin' }).click();
+		await page.getByRole('button', { name: 'Join Realm' }).click();
 
 		// await page.waitForLoadState('networkidle');
 		await expect(page.getByText('Successfully Joined!')).toBeVisible({ timeout: TIMEOUT });
