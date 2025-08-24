@@ -14,11 +14,11 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
-    "@dfinity/agent": "^1.4.0",
-    "@dfinity/auth-client": "^1.4.0",
-    "@dfinity/candid": "^1.4.0",
-    "@dfinity/identity": "^1.4.0",
-    "@dfinity/principal": "^1.4.0",
+    "@dfinity/agent": "^2.1.3",
+    "@dfinity/auth-client": "^2.1.3",
+    "@dfinity/candid": "^2.1.3",
+    "@dfinity/identity": "^2.1.3",
+    "@dfinity/principal": "^2.1.3",
     "@onsvisual/svelte-maps": "^1.2.23",
     "leaflet": "^1.9.4",
     "maplibre-gl": "^5.0.1",

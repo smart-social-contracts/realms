@@ -1,10 +1,30 @@
 {
-  "dfx": "0.27.0",
+  "dfx": "0.29.0",
   "canisters": {
     "realm_backend": {
-      "type": "kybra",
-      "main": "src/realm_backend/main.py"
+      "build": "python -m kybra realm_backend src/realm_backend/main.py",
+      "candid": "src/realm_backend/realm_backend.did",
+      "declarations": {
+        "node_compatibility": true
+      },
+      "gzip": true,
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ],
+      "tech_stack": {
+        "cdk": {
+          "kybra": {}
+        },
+        "language": {
+          "python": {}
+        }
+      },
+      "type": "custom",
+      "wasm": ".kybra/realm_backend/realm_backend.wasm"
     },
+
     "realm_frontend": {
       "source": [
         "src/realm_frontend/dist"
