@@ -31,7 +31,6 @@ python3 -m kybra --version || {
     pip3 install -r requirements.txt
 }
 
-
 # Only stop dfx processes using our specific port
 lsof -ti:$PORT | xargs kill -9 2>/dev/null || true
 dfx stop 2>/dev/null || true
