@@ -16,6 +16,15 @@ fi
 
 echo "Deploying branch '$BRANCH_NAME' on port $PORT"
 
+
+# Check if virtual environment is activated, if not activate it
+if [[ "$VIRTUAL_ENV" == "" ]]; then
+    echo "Virtual environment not detected, please activate it (and set it up if needed)"
+    exit 1
+else
+    echo "Virtual environment already active: $VIRTUAL_ENV"
+fi
+
 # Only stop dfx processes using our specific port
 lsof -ti:$PORT | xargs kill -9 2>/dev/null || true
 dfx stop 2>/dev/null || true
