@@ -55,7 +55,7 @@ def get_status() -> dict[str, Any]:
     # Get realm name - use the first realm if any exist
     realm_name = "Unnamed Realm"  # Default name
     try:
-        realms = Realm.all()
+        realms = Realm.instances()
         if realms:
             realm_name = realms[0].name
     except Exception as e:
