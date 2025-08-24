@@ -3,18 +3,24 @@
 set -e
 set -x
 
-# Get current branch name
-BRANCH_NAME=$(git branch --show-current)
+# Get current branch name (fallback to default if git is not available)
+if whereis git | grep -q "/"; then
+    BRANCH_NAME=$(git branch --show-current 2>/dev/null || echo "main")
 
-# Set port based on branch (main uses default 8000, others get unique ports)
-if [ "$BRANCH_NAME" = "main" ]; then
-    PORT=8000
+    # Set port based on branch (main uses default 8000, others get unique ports)
+    if [ "$BRANCH_NAME" = "main" ]; then
+        PORT=8000
+    else
+        # Generate unique port based on branch name hash
+        PORT=$((8001 + $(echo $BRANCH_NAME | cksum | cut -d' ' -f1) % 99))
+    fi
+
+    echo "Deploying branch '$BRANCH_NAME' on port $PORT"
+
 else
-    # Generate unique port based on branch name hash
-    PORT=$((8001 + $(echo $BRANCH_NAME | cksum | cut -d' ' -f1) % 99))
+    PORT=8000
+    echo "Git not available, using default port $PORT"
 fi
-
-echo "Deploying branch '$BRANCH_NAME' on port $PORT"
 
 
 # Check if virtual environment is activated, if not activate it
