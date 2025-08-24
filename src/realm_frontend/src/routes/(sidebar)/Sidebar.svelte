@@ -49,6 +49,9 @@
 	import { getIcon } from '$lib/utils/iconMap';
 	// Import user profiles store
 	import { userProfiles, profilesLoading } from '$lib/stores/profiles';
+	// Import authentication store
+	// @ts-ignore
+	import { isAuthenticated } from '$lib/stores/auth';
 	// Import backend for extension loading
 	import { backend } from '$lib/canisters';
 	
@@ -142,24 +145,18 @@
 			if (response.success && response.data.ExtensionsList) {
 				console.log('Extensions list:', response.data.ExtensionsList.extensions);
 				const extensionData = response.data.ExtensionsList.extensions.map(ext => JSON.parse(ext));
-				console.log('Parsed extension data:', extensionData);
+				console.log('Raw extension data:', extensionData);
 				
 				extensions = extensionData.map(ext => ({
 					id: ext.name,
 					name: ext.name,
-					description: ext.description,
-					version: ext.version,
 					icon: ext.icon,
-					author: ext.author,
-					permissions: ext.required_permissions || ext.permissions || [],
-					enabled: true,
-					profiles: ext.profiles || [],
+					url_path: ext.url_path,
 					categories: ext.categories || ['other'],
-					path: ext.url_path || ext.path,
-					doc_url: ext.doc_url,
-					show_in_sidebar: ext.show_in_sidebar !== false // default to true
+					profiles: ext.profiles || [],
+					show_in_sidebar: ext.show_in_sidebar !== false
 				}));
-				console.log('Mapped extensions:', extensions);
+				console.log('Processed extensions:', extensions);
 				extensionsLoaded = true;
 			} else {
 				console.log('Invalid response format or no extensions data');
@@ -268,9 +265,17 @@
 	
 	// Reactive statement with explicit dependency tracking
 	$: {
+		console.log('=== SIDEBAR REACTIVE UPDATE ===');
+		console.log('extensionsLoaded:', extensionsLoaded);
+		console.log('profilesLoading:', $profilesLoading);
+		console.log('userProfiles:', $userProfiles);
+		console.log('extensions count:', extensions.length);
+		console.log('raw extensions:', extensions);
+		
 		if (extensionsLoaded && !$profilesLoading) {
 			console.log('Both extensions and profiles are ready, filtering...');
 			filteredExtensions = filterExtensionsForSidebar(extensions, $userProfiles);
+			console.log('Filtered extensions result:', filteredExtensions);
 		} else {
 			console.log('Waiting for data - extensionsLoaded:', extensionsLoaded, 'profilesLoading:', $profilesLoading);
 			filteredExtensions = [];
@@ -298,9 +303,13 @@
 
 	// Create navigation items for each category
 	$: categorizedNavItems = (() => {
+		console.log('=== CREATING CATEGORIZED NAV ITEMS ===');
+		console.log('extensionsByCategory:', extensionsByCategory);
+		
 		const result: Record<string, NavItemWithHref[]> = {};
 		
 		Object.entries(extensionsByCategory).forEach(([category, exts]) => {
+			console.log(`Processing category: ${category}, extensions:`, exts);
 			result[category] = exts
 				.filter(ext => {
 					// Exclude extensions that are handled separately or have special logic
@@ -308,9 +317,12 @@
 						'demo_loader',
 						'test_bench'
 					];
-					return !excluded.includes(ext.id);
+					const isExcluded = excluded.includes(ext.id);
+					console.log(`Extension ${ext.id} excluded:`, isExcluded);
+					return !isExcluded;
 				})
 				.map(ext => {
+					console.log(`Mapping extension ${ext.id}:`, ext);
 					// Determine href based on url_path field (new manifest schema)
 					let href: string;
 					if (ext.url_path === undefined || ext.url_path === null) {
@@ -322,30 +334,26 @@
 					}
 					
 					// Consistent handling for all extensions
-					return {
+					const iconComponent = getIcon(ext.icon) || LayersSolid;
+					console.log(`Extension ${ext.id}: icon="${ext.icon}", resolved to:`, iconComponent);
+					console.log(`Extension ${ext.id}: href="${href}"`);
+					
+					const navItem = {
 						translationKey: `extensions.${ext.id}.sidebar`,
 						name: ext.name || ext.id, // Fallback if translation doesn't exist
-						icon: getIcon(ext.icon) || LayersSolid,
+						icon: iconComponent,
 						href
 					};
+					console.log(`Created nav item for ${ext.id}:`, navItem);
+					return navItem;
 				});
 		});
 		
+		console.log('Final categorized nav items:', result);
 		return result;
 	})();
 
-	// Function to format category names for display with i18n support
 	function formatCategoryName(category: string): string {
-		// Try to get translated category name first
-		const translationKey = `categories.${category}`;
-		const translated = $_(translationKey);
-		
-		// If translation exists and is different from the key, use it
-		if (translated && translated !== translationKey) {
-			return translated;
-		}
-		
-		// Fallback to formatted category name
 		return category
 			.split('_')
 			.map(word => word.charAt(0).toUpperCase() + word.slice(1))
@@ -412,7 +420,7 @@
 				{/if}
 
 				<!-- Categorized Extension Items -->
-				{#each ['public_services', 'finances', 'other'] as category}
+				{#each ['public_services', 'finances', 'oversight', 'other'] as category}
 					{@const items = categorizedNavItems[category] || []}
 					{#if items.length > 0}
 						<SidebarGroup ulClass={groupClass} class="mb-3">
