@@ -6,9 +6,6 @@
 # Exit on first error
 set -e
 
-# Activate venv
-source venv/bin/activate
-
 # Check if we should fix issues or just check
 FIX_MODE=false
 if [ "$1" == "--fix" ]; then

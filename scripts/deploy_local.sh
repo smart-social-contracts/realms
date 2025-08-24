@@ -23,13 +23,14 @@ else
 fi
 
 
-# Check if virtual environment is activated, if not activate it
-if [[ "$VIRTUAL_ENV" == "" ]]; then
-    echo "Virtual environment not detected, please activate it (and set it up if needed)"
-    exit 1
-else
-    echo "Virtual environment already active: $VIRTUAL_ENV"
-fi
+# Quickly check if the Python environment has not even been setup by check if
+# kybra requirements are installed in Python, and quit fast if not.
+echo "Checking kybra installation..."
+python3 -m kybra --version || {
+    echo "Kybra not found. Installing requirements..."
+    pip3 install -r requirements.txt
+}
+
 
 # Only stop dfx processes using our specific port
 lsof -ti:$PORT | xargs kill -9 2>/dev/null || true
