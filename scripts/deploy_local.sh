@@ -25,8 +25,16 @@ fi
 
 # Check if virtual environment is activated, if not activate it
 if [[ "$VIRTUAL_ENV" == "" ]]; then
-    echo "Virtual environment not detected, please activate it (and set it up if needed)"
-    exit 1
+    
+    # Check if venv folder exists and activate it
+    if [ -d "venv" ]; then
+        echo "Virtual environment found, activating..."
+        source venv/bin/activate
+        echo "Virtual environment activated: $VIRTUAL_ENV"
+    else
+        echo "Virtual environment not detected, please create it"
+        exit 1
+    fi
 else
     echo "Virtual environment already active: $VIRTUAL_ENV"
 fi
