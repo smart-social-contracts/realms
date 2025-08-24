@@ -1,0 +1,118 @@
+{
+  "realm": {
+    "id": "my_government_realm",
+    "name": "My Government Realm",
+    "description": "A digital government platform for citizen services",
+    "admin_principal": "2vxsx-fae",
+    "version": "1.0.0",
+    "tags": ["government", "citizen-services", "demo"]
+  },
+  "deployment": {
+    "network": "local",
+    "clean_deploy": true
+  },
+  "extensions": {
+    "initial": [
+      {
+        "name": "demo_loader",
+        "source": "local",
+        "enabled": true
+      },
+      {
+        "name": "public_dashboard",
+        "source": "local",
+        "enabled": true
+      }
+    ],
+    "q1": [
+      {
+        "name": "citizen_dashboard",
+        "source": "local",
+        "init_params": {
+          "theme": "government",
+          "features": ["profile", "documents", "services"]
+        },
+        "enabled": true
+      },
+      {
+        "name": "vault_manager",
+        "source": "local",
+        "enabled": true
+      }
+    ],
+    "q2": [
+      {
+        "name": "land_registry",
+        "source": "local",
+        "init_params": {
+          "auto_approve": false,
+          "require_verification": true
+        },
+        "enabled": true
+      },
+      {
+        "name": "justice_litigation",
+        "source": "local",
+        "enabled": true
+      }
+    ]
+  },
+  "post_deployment": {
+    "actions": [
+      {
+        "type": "wait",
+        "name": "Wait for canisters to initialize",
+        "duration": 5
+      },
+      {
+        "type": "extension_call",
+        "name": "Load base demo data",
+        "extension_name": "demo_loader",
+        "function_name": "load",
+        "args": {
+          "step": "base_setup"
+        },
+        "retry_count": 2
+      },
+      {
+        "type": "extension_call",
+        "name": "Load user management data",
+        "extension_name": "demo_loader",
+        "function_name": "load",
+        "args": {
+          "step": "user_management",
+          "batch": 0
+        },
+        "retry_count": 1
+      },
+      {
+        "type": "extension_call",
+        "name": "Load transactions data",
+        "extension_name": "demo_loader",
+        "function_name": "load",
+        "args": {
+          "step": "transactions"
+        },
+        "ignore_failure": true
+      },
+      {
+        "type": "extension_call",
+        "name": "Load government services data",
+        "extension_name": "demo_loader",
+        "function_name": "load",
+        "args": {
+          "step": "government_services"
+        }
+      },
+      {
+        "type": "extension_call",
+        "name": "Load justice litigation demo data",
+        "extension_name": "demo_loader",
+        "function_name": "load",
+        "args": {
+          "step": "justice_litigation"
+        }
+      }
+    ]
+  }
+}

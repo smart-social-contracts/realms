@@ -1,0 +1,168 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Realm Configuration Schema",
+  "type": "object",
+  "required": ["realm", "deployment"],
+  "properties": {
+    "realm": {
+      "type": "object",
+      "required": ["id", "name", "description", "admin_principal"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$",
+          "description": "Unique identifier for the realm (lowercase, underscores allowed)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable name of the realm"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the realm's purpose"
+        },
+        "admin_principal": {
+          "type": "string",
+          "description": "Principal ID of the realm administrator"
+        },
+        "version": {
+          "type": "string",
+          "default": "1.0.0",
+          "description": "Version of the realm"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Tags for categorizing the realm"
+        }
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "required": ["network"],
+      "properties": {
+        "network": {
+          "type": "string",
+          "enum": ["local", "local2", "staging", "ic"],
+          "description": "Target network for deployment"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 8000,
+          "maximum": 8100,
+          "description": "Port for local deployment (auto-generated if not specified)"
+        },
+        "identity_file": {
+          "type": "string",
+          "description": "Path to identity file for deployment authentication"
+        },
+        "clean_deploy": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to perform a clean deployment"
+        }
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "description": "Extensions organized by deployment quarters",
+      "patternProperties": {
+        "^(q1|q2|q3|q4|initial|phase_[0-9]+)$": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Extension name/identifier"
+              },
+              "version": {
+                "type": "string",
+                "description": "Extension version"
+              },
+              "source": {
+                "type": "string",
+                "enum": ["local", "package", "git"],
+                "default": "local",
+                "description": "Source type for the extension"
+              },
+              "source_path": {
+                "type": "string",
+                "description": "Path to extension source (local path, package name, or git URL)"
+              },
+              "init_params": {
+                "type": "object",
+                "description": "Initialization parameters for the extension"
+              },
+              "enabled": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether this extension should be deployed"
+              }
+            }
+          }
+        }
+      }
+    },
+    "post_deployment": {
+      "type": "object",
+      "properties": {
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["extension_call", "script", "wait"],
+                "description": "Type of post-deployment action"
+              },
+              "name": {
+                "type": "string",
+                "description": "Human-readable name for the action"
+              },
+              "extension_name": {
+                "type": "string",
+                "description": "Extension to call (for extension_call type)"
+              },
+              "function_name": {
+                "type": "string",
+                "description": "Function to call (for extension_call type)"
+              },
+              "args": {
+                "type": "object",
+                "description": "Arguments to pass to the function"
+              },
+              "script_path": {
+                "type": "string",
+                "description": "Path to script to execute (for script type)"
+              },
+              "duration": {
+                "type": "integer",
+                "description": "Duration to wait in seconds (for wait type)"
+              },
+              "condition": {
+                "type": "string",
+                "description": "Condition to check before running action"
+              },
+              "retry_count": {
+                "type": "integer",
+                "default": 0,
+                "description": "Number of retries if action fails"
+              },
+              "ignore_failure": {
+                "type": "boolean",
+                "default": false,
+                "description": "Whether to continue if this action fails"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

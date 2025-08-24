@@ -1,0 +1,80 @@
+"""Data models for Realms CLI configuration."""
+
+from typing import Dict, List, Optional, Any, Literal
+from pydantic import BaseModel, Field, validator
+import re
+
+
+class RealmMetadata(BaseModel):
+    """Realm metadata configuration."""
+    
+    id: str = Field(..., description="Unique identifier for the realm")
+    name: str = Field(..., description="Human-readable name of the realm")
+    description: str = Field(..., description="Description of the realm's purpose")
+    admin_principal: str = Field(..., description="Principal ID of the realm administrator")
+    version: str = Field(default="1.0.0", description="Version of the realm")
+    tags: List[str] = Field(default_factory=list, description="Tags for categorizing the realm")
+    
+    @validator('id')
+    def validate_id(cls, v):
+        if not re.match(r'^[a-z0-9_]+$', v):
+            raise ValueError('Realm ID must contain only lowercase letters, numbers, and underscores')
+        return v
+
+
+class DeploymentConfig(BaseModel):
+    """Deployment configuration."""
+    
+    network: Literal["local", "local2", "staging", "ic"] = Field(..., description="Target network for deployment")
+    port: Optional[int] = Field(None, ge=8000, le=8100, description="Port for local deployment")
+    identity_file: Optional[str] = Field(None, description="Path to identity file for deployment authentication")
+    clean_deploy: bool = Field(default=True, description="Whether to perform a clean deployment")
+
+
+class Extension(BaseModel):
+    """Extension configuration."""
+    
+    name: str = Field(..., description="Extension name/identifier")
+    version: Optional[str] = Field(None, description="Extension version")
+    source: Literal["local", "package", "git"] = Field(default="local", description="Source type for the extension")
+    source_path: Optional[str] = Field(None, description="Path to extension source")
+    init_params: Dict[str, Any] = Field(default_factory=dict, description="Initialization parameters")
+    enabled: bool = Field(default=True, description="Whether this extension should be deployed")
+
+
+class PostDeploymentAction(BaseModel):
+    """Post-deployment action configuration."""
+    
+    type: Literal["extension_call", "script", "wait"] = Field(..., description="Type of post-deployment action")
+    name: Optional[str] = Field(None, description="Human-readable name for the action")
+    extension_name: Optional[str] = Field(None, description="Extension to call (for extension_call type)")
+    function_name: Optional[str] = Field(None, description="Function to call (for extension_call type)")
+    args: Dict[str, Any] = Field(default_factory=dict, description="Arguments to pass to the function")
+    script_path: Optional[str] = Field(None, description="Path to script to execute (for script type)")
+    duration: Optional[int] = Field(None, description="Duration to wait in seconds (for wait type)")
+    condition: Optional[str] = Field(None, description="Condition to check before running action")
+    retry_count: int = Field(default=0, description="Number of retries if action fails")
+    ignore_failure: bool = Field(default=False, description="Whether to continue if this action fails")
+
+
+class PostDeploymentConfig(BaseModel):
+    """Post-deployment configuration."""
+    
+    actions: List[PostDeploymentAction] = Field(default_factory=list, description="List of post-deployment actions")
+
+
+class RealmConfig(BaseModel):
+    """Complete realm configuration."""
+    
+    realm: RealmMetadata
+    deployment: DeploymentConfig
+    extensions: Dict[str, List[Extension]] = Field(default_factory=dict, description="Extensions organized by deployment phases")
+    post_deployment: Optional[PostDeploymentConfig] = Field(None, description="Post-deployment configuration")
+    
+    @validator('extensions')
+    def validate_extension_phases(cls, v):
+        valid_phases = {'q1', 'q2', 'q3', 'q4', 'initial', 'phase_1', 'phase_2', 'phase_3', 'phase_4'}
+        for phase in v.keys():
+            if not (phase in valid_phases or re.match(r'^phase_\d+$', phase)):
+                raise ValueError(f'Invalid extension phase: {phase}. Must be q1-q4, initial, or phase_N')
+        return v
