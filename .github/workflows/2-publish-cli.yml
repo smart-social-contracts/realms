@@ -33,7 +33,7 @@ jobs:
         # Extract version from pyproject.toml
         PYPROJECT_VERSION=$(grep -Po '(?<=version = ")[^"]*' realms_cli/pyproject.toml)
         # Extract version from __init__.py
-        INIT_VERSION=$(grep -Po '(?<=__version__ = ")[^"]*' realms_cli/__init__.py)
+        INIT_VERSION=$(grep -Po '(?<=__version__ = ")[^"]*' realms_cli/realms_cli/__init__.py)
         
         echo "Version in pyproject.toml: $PYPROJECT_VERSION"
         echo "Version in __init__.py: $INIT_VERSION"
