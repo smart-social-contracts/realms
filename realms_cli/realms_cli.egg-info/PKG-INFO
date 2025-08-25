@@ -45,20 +45,46 @@ Dynamic: license-file
 
 # Realms CLI
 
-A powerful command-line tool for managing the lifecycle of Realms projects - digital government platforms built on the Internet Computer.
+A powerful command-line tool for managing Realms project lifecycle on the Internet Computer.
 
 ## Features
 
-- **🏗️ Project Scaffolding**: Initialize new Realms projects with `realms init`
-- **🚀 Automated Deployment**: Deploy backend/frontend canisters and extensions with `realms deploy`
-- **📦 Extension Management**: Support for phased extension deployment
+- **🏗️ Project Scaffolding**: Initialize complete Realms projects with proper structure
+- **🚀 Automated Deployment**: Deploy backend + frontend + extensions with single command
+- **📦 Extension Management**: Phased rollouts (q1-q4) with dependency management
 - **⚙️ Post-Deployment Actions**: Automated setup and data population
-- **🔧 Configuration Validation**: Validate realm configurations before deployment
+- **🔧 Configuration Validation**: Schema validation with helpful error messages
 - **📊 Project Status**: Check project health and deployment status
 
-## Installation
+## Prerequisites
 
-### From PyPI (Recommended)
+Before installing realms-cli, ensure you have the following dependencies:
+
+### 1. DFX (DFINITY Canister SDK)
+```bash
+sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
+```
+- **Required for**: Canister deployment, local replica management
+- **Used by**: `realms deploy` command for backend/frontend deployment
+- **Verify installation**: `dfx --version`
+
+### 2. Node.js (v16 or later)
+```bash
+# Option 1: Download from https://nodejs.org
+# Option 2: Via package manager (Ubuntu/Debian)
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Option 3: Via nvm (recommended)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+nvm install 18
+nvm use 18
+```
+- **Required for**: Frontend building, npm package management
+- **Used by**: Frontend canister builds during deployment
+- **Verify installation**: `node --version && npm --version`
+
+## Installation
 
 ```bash
 pip install realms-cli

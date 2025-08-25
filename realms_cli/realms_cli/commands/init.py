@@ -462,7 +462,9 @@ def _get_root_package_json(realm_id: str) -> str:
 
 def _get_requirements_txt() -> str:
     """Get requirements.txt template."""
-    return '''kybra>=0.17.0
+    return '''kybra==0.7.*
+kybra-simple-logging==0.2.*
+kybra-simple-db>=0.2.1
 '''
 
 def _get_deploy_script_template() -> str:
