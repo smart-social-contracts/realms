@@ -5,7 +5,6 @@ from rich.console import Console
 from rich.table import Table
 from typing import Optional, List
 
-from .commands.init import init_command
 from .commands.deploy import deploy_command
 from .utils import check_dependencies, display_info_panel
 
@@ -13,23 +12,10 @@ console = Console()
 
 app = typer.Typer(
     name="realms",
-    help="CLI tool for managing Realms project lifecycle",
+    help="CLI tool for deploying and managing Realms projects",
     add_completion=False,
     rich_markup_mode="rich"
 )
-
-
-@app.command("init")
-def init(
-    name: Optional[str] = typer.Option(None, "--name", "-n", help="Realm name"),
-    realm_id: Optional[str] = typer.Option(None, "--id", help="Realm ID"),
-    admin_principal: Optional[str] = typer.Option(None, "--admin", help="Admin principal ID"),
-    network: str = typer.Option("local", "--network", help="Target network"),
-    interactive: bool = typer.Option(True, "--interactive/--no-interactive", help="Interactive mode"),
-    output_dir: str = typer.Option(".", "--output", "-o", help="Output directory")
-) -> None:
-    """Initialize a new Realms project with scaffolding and configuration."""
-    init_command(name, realm_id, admin_principal, network, interactive, output_dir)
 
 
 @app.command("deploy")
@@ -59,50 +45,28 @@ def status() -> None:
         console.print("  ❌ Some dependencies are missing")
         return
     
-    # Check for configuration file
-    import os
-    config_files = ["realm_config.json", "example_realm_config.json"]
-    config_found = None
+    # Try to call backend canister status
+    console.print(f"\n[bold]Canister Status:[/bold]")
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["dfx", "canister", "call", "realm_backend", "status"], 
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0:
+            console.print("  ✅ Backend canister is responding")
+            # Parse the response if needed
+            if "success = true" in result.stdout:
+                console.print("  ✅ Backend status: healthy")
+        else:
+            console.print("  ❌ Backend canister not responding")
+            if result.stderr:
+                console.print(f"      Error: {result.stderr.strip()}")
+    except Exception as e:
+        console.print(f"  ❌ Could not check backend status: {e}")
     
-    for config_file in config_files:
-        if os.path.exists(config_file):
-            config_found = config_file
-            break
-    
-    console.print(f"\n[bold]Configuration:[/bold]")
-    if config_found:
-        console.print(f"  ✅ Found configuration: {config_found}")
-        
-        # Try to load and show basic info
-        try:
-            from .utils import load_config
-            from .models import RealmConfig
-            
-            config_data = load_config(config_found)
-            config = RealmConfig(**config_data)
-            
-            table = Table(show_header=True, header_style="bold magenta")
-            table.add_column("Property", style="cyan")
-            table.add_column("Value", style="white")
-            
-            table.add_row("Realm ID", config.realm.id)
-            table.add_row("Name", config.realm.name)
-            table.add_row("Network", config.deployment.network)
-            table.add_row("Admin", config.realm.admin_principal)
-            
-            extension_count = sum(len(exts) for exts in config.extensions.values())
-            table.add_row("Extensions", str(extension_count))
-            
-            console.print(table)
-            
-        except Exception as e:
-            console.print(f"  ⚠️  Configuration file found but invalid: {e}")
-    else:
-        console.print("  ❌ No configuration file found")
-        console.print("      Run 'realms init' to create a new project")
-    
-    # Check dfx status
-    console.print(f"\n[bold]dfx Status:[/bold]")
+    # Check dfx replica status
+    console.print(f"\n[bold]dfx Replica:[/bold]")
     try:
         import subprocess
         result = subprocess.run(["dfx", "ping"], capture_output=True, text=True, timeout=5)
@@ -112,46 +76,6 @@ def status() -> None:
             console.print("  ❌ dfx replica is not running")
     except Exception:
         console.print("  ❌ dfx replica is not running")
-
-
-@app.command("validate")
-def validate(
-    config_file: str = typer.Option("realm_config.json", "--file", "-f", help="Path to realm configuration file")
-) -> None:
-    """Validate a realm configuration file."""
-    console.print("[bold blue]✅ Validating Configuration[/bold blue]\n")
-    
-    try:
-        from .utils import load_config
-        from .models import RealmConfig
-        import jsonschema
-        import json
-        
-        # Load configuration
-        config_data = load_config(config_file)
-        
-        # Validate with Pydantic model
-        config = RealmConfig(**config_data)
-        
-        console.print(f"[green]✅ Configuration file '{config_file}' is valid![/green]\n")
-        
-        # Show summary
-        table = Table(show_header=True, header_style="bold magenta")
-        table.add_column("Component", style="cyan")
-        table.add_column("Details", style="white")
-        
-        table.add_row("Realm", f"{config.realm.name} ({config.realm.id})")
-        table.add_row("Network", config.deployment.network)
-        table.add_row("Extensions", f"{sum(len(exts) for exts in config.extensions.values())} across {len(config.extensions)} phases")
-        
-        if config.post_deployment:
-            table.add_row("Post-deployment", f"{len(config.post_deployment.actions)} actions")
-        
-        console.print(table)
-        
-    except Exception as e:
-        console.print(f"[red]❌ Configuration validation failed: {e}[/red]")
-        raise typer.Exit(1)
 
 
 @app.command("version")
@@ -170,9 +94,14 @@ def main(
     version_flag: bool = typer.Option(False, "--version", help="Show version and exit")
 ) -> None:
     """
-    Realms CLI - Manage the lifecycle of Realms projects.
+    Realms CLI - Deploy and manage Realms projects.
     
     🏛️ Build and deploy digital government platforms on the Internet Computer.
+    
+    Quick start:
+    1. Copy and modify example_realm_config.json
+    2. realms deploy --file your_config.json
+    3. realms status
     """
     if version_flag:
         version()

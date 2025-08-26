@@ -216,10 +216,12 @@ def _execute_single_action(action: PostDeploymentAction, config: RealmConfig, pr
                     raise ValueError("extension_call requires extension_name and function_name")
                 
                 args_json = json.dumps(action.args) if action.args else "{}"
+                # Escape quotes in JSON string for Candid
+                escaped_args = args_json.replace('"', '\\"')
                 
                 run_command([
                     "dfx", "canister", "call", "realm_backend", "extension_sync_call",
-                    f'(record {{ extension_name = "{action.extension_name}"; function_name = "{action.function_name}"; args = "{args_json}"; }})',
+                    f'(record {{ extension_name = "{action.extension_name}"; function_name = "{action.function_name}"; args = "{escaped_args}"; }})',
                     "--network", config.deployment.network
                 ], cwd=project_root)
                 return
