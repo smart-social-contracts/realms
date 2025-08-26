@@ -16,6 +16,14 @@
   let recentActivity = [];
   let searchTerm = '';
   
+  // Bulk import state
+  let selectedEntityType = 'users';
+  let selectedFormat = 'csv';
+  let importData = '';
+  let importResults = null;
+  let importLoading = false;
+  let templates = {};
+  
   // Pagination state for all entities
   let usersPage = 0, usersPerPage = 5, usersPagination = null;
   let mandatesPage = 0, mandatesPerPage = 5, mandatesPagination = null;
@@ -217,6 +225,65 @@
   
   $: filteredData = filterData(data, searchTerm);
   
+  // Bulk import functions
+  async function loadTemplate() {
+    try {
+      const result = await backend.extension_sync_call('admin_dashboard', 'get_templates', {
+        entity_type: selectedEntityType
+      });
+      
+      if (result.success) {
+        templates = result.data;
+        importData = selectedFormat === 'csv' ? templates.csv : JSON.stringify(templates.json, null, 2);
+      } else {
+        error = `Template load error: ${result.error}`;
+      }
+    } catch (err) {
+      console.error('Error loading template:', err);
+      error = `Template load error: ${err.message}`;
+    }
+  }
+  
+  async function importBulkData() {
+    if (!importData.trim()) {
+      error = 'Please provide data to import';
+      return;
+    }
+    
+    importLoading = true;
+    importResults = null;
+    error = null;
+    
+    try {
+      const result = await backend.extension_sync_call('admin_dashboard', 'import_data', {
+        entity_type: selectedEntityType,
+        format: selectedFormat,
+        data: importData
+      });
+      
+      if (result.success) {
+        importResults = result.data;
+        // Refresh the relevant entity data if we're on that tab
+        if (allEntityTypes.includes(activeTab) && activeTab === selectedEntityType) {
+          await fetchEntityData(activeTab);
+        }
+      } else {
+        error = `Import error: ${result.error}`;
+      }
+    } catch (err) {
+      console.error('Error importing data:', err);
+      error = `Import error: ${err.message}`;
+    } finally {
+      importLoading = false;
+    }
+  }
+  
+  function clearImportData() {
+    importData = '';
+    importResults = null;
+    error = null;
+  }
+  
   onMount(() => {
     if (activeTab === 'overview') {
       handleTabChange('overview');
@@ -264,6 +331,12 @@
         on:click={() => handleTabChange('overview')}
       >
         📊 {$_('extensions.admin_dashboard.overview') || 'Overview'}
+      </button>
+      <button 
+        class="px-4 py-2 mr-1 {activeTab === 'bulk_import' ? 'border-b-2 border-blue-500 font-medium text-blue-600' : 'text-gray-600 hover:text-gray-900'}"
+        on:click={() => handleTabChange('bulk_import')}
+      >
+        📥 {$_('extensions.admin_dashboard.bulk_import') || 'Bulk Import'}
       </button>
       {#each allEntityTypes as entityType}
       <button 
@@ -475,6 +548,138 @@
             loading={loading}
           />
         {/if}
+      </div>
+    {:else if activeTab === 'bulk_import'}
+      <!-- Bulk Import Section -->
+      <div class="p-6">
+        <div class="max-w-4xl mx-auto">
+          <h2 class="text-2xl font-bold mb-6 flex items-center">
+            📥 {$_('extensions.admin_dashboard.bulk_import_title') || 'Bulk Data Import'}
+          </h2>
+          <p class="text-gray-600 mb-6">
+            {$_('extensions.admin_dashboard.bulk_import_description') || 'Import multiple entities at once using CSV or JSON format. Select an entity type, choose your data format, and paste or load template data.'}
+          </p>
+          
+          <!-- Configuration Section -->
+          <div class="bg-gray-50 rounded-lg p-6 mb-6">
+            <h3 class="text-lg font-semibold mb-4">{$_('extensions.admin_dashboard.import_configuration') || 'Import Configuration'}</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <!-- Entity Type Selection -->
+              <div>
+                <label for="entity-type-select" class="block text-sm font-medium text-gray-700 mb-2">
+                  {$_('extensions.admin_dashboard.entity_type') || 'Entity Type'}
+                </label>
+                <select 
+                  id="entity-type-select"
+                  bind:value={selectedEntityType}
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="users">{$_('extensions.admin_dashboard.users') || 'Users'}</option>
+                  <option value="humans">{$_('extensions.admin_dashboard.humans') || 'Humans'}</option>
+                  <option value="organizations">{$_('extensions.admin_dashboard.organizations') || 'Organizations'}</option>
+                  <option value="mandates">{$_('extensions.admin_dashboard.mandates') || 'Mandates'}</option>
+                  <option value="codexes">{$_('extensions.admin_dashboard.codexes') || 'Codexes'}</option>
+                  <option value="instruments">{$_('extensions.admin_dashboard.instruments') || 'Instruments'}</option>
+                </select>
+              </div>
+              
+              <!-- Data Format Selection -->
+              <div>
+                <label for="data-format-select" class="block text-sm font-medium text-gray-700 mb-2">
+                  {$_('extensions.admin_dashboard.data_format') || 'Data Format'}
+                </label>
+                <select 
+                  id="data-format-select"
+                  bind:value={selectedFormat}
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="csv">CSV</option>
+                  <option value="json">JSON</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- Template Actions -->
+            <div class="flex flex-wrap gap-2">
+              <button 
+                on:click={loadTemplate}
+                class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition-colors"
+              >
+                📋 {$_('extensions.admin_dashboard.load_template') || 'Load Template'}
+              </button>
+              <button 
+                on:click={clearImportData}
+                class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 focus:ring-4 focus:ring-gray-300 transition-colors"
+              >
+                🗑️ {$_('extensions.admin_dashboard.clear_data') || 'Clear Data'}
+              </button>
+            </div>
+          </div>
+          
+          <!-- Data Input Section -->
+          <div class="mb-6">
+            <label for="import-data-textarea" class="block text-sm font-medium text-gray-700 mb-2">
+              {$_('extensions.admin_dashboard.import_data_label') || 'Import Data'}
+            </label>
+            <textarea 
+              id="import-data-textarea"
+              bind:value={importData}
+              placeholder={selectedFormat === 'csv' ? 'Paste CSV data here...' : 'Paste JSON data here...'}
+              class="w-full h-64 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+            ></textarea>
+          </div>
+          
+          <!-- Import Action -->
+          <div class="mb-6">
+            <button 
+              on:click={importBulkData}
+              disabled={importLoading || !importData.trim()}
+              class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 focus:ring-4 focus:ring-green-300 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center"
+            >
+              {#if importLoading}
+                <span class="animate-spin mr-2">⏳</span>
+                {$_('extensions.admin_dashboard.importing') || 'Importing...'}
+              {:else}
+                🚀 {$_('extensions.admin_dashboard.import_data') || 'Import Data'}
+              {/if}
+            </button>
+          </div>
+          
+          <!-- Import Results -->
+          {#if importResults}
+            <div class="bg-green-50 border border-green-200 rounded-lg p-6">
+              <h3 class="text-lg font-semibold text-green-800 mb-4 flex items-center">
+                ✅ {$_('extensions.admin_dashboard.import_results') || 'Import Results'}
+              </h3>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div class="text-center">
+                  <div class="text-2xl font-bold text-green-600">{importResults.total_records}</div>
+                  <div class="text-sm text-gray-600">{$_('extensions.admin_dashboard.total_records') || 'Total Records'}</div>
+                </div>
+                <div class="text-center">
+                  <div class="text-2xl font-bold text-green-600">{importResults.successful}</div>
+                  <div class="text-sm text-gray-600">{$_('extensions.admin_dashboard.successful') || 'Successful'}</div>
+                </div>
+                <div class="text-center">
+                  <div class="text-2xl font-bold text-red-600">{importResults.failed}</div>
+                  <div class="text-sm text-gray-600">{$_('extensions.admin_dashboard.failed') || 'Failed'}</div>
+                </div>
+              </div>
+              
+              {#if importResults.errors && importResults.errors.length > 0}
+                <div class="mt-4">
+                  <h4 class="font-semibold text-red-800 mb-2">{$_('extensions.admin_dashboard.errors') || 'Errors'}:</h4>
+                  <ul class="list-disc list-inside text-sm text-red-700 space-y-1">
+                    {#each importResults.errors as error}
+                      <li>{error}</li>
+                    {/each}
+                  </ul>
+                </div>
+              {/if}
+            </div>
+          {/if}
+        </div>
       </div>
     {/if}
   </div>
