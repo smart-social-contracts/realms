@@ -138,38 +138,76 @@ def get_templates(args):
     """
     try:
         entity_type = args.get("entity_type", "users")
-        
+
         templates = {
             "users": {
                 "csv": "username,email,profile_type\nexample_user,user@example.com,member",
-                "json": [{"username": "example_user", "email": "user@example.com", "profile_type": "member"}]
+                "json": [
+                    {
+                        "username": "example_user",
+                        "email": "user@example.com",
+                        "profile_type": "member",
+                    }
+                ],
             },
             "humans": {
                 "csv": "name,email,phone,address\nJohn Doe,john@example.com,+1234567890,123 Main St",
-                "json": [{"name": "John Doe", "email": "john@example.com", "phone": "+1234567890", "address": "123 Main St"}]
+                "json": [
+                    {
+                        "name": "John Doe",
+                        "email": "john@example.com",
+                        "phone": "+1234567890",
+                        "address": "123 Main St",
+                    }
+                ],
             },
             "organizations": {
                 "csv": "name,description,website,contact_email\nExample Org,A sample organization,https://example.org,contact@example.org",
-                "json": [{"name": "Example Org", "description": "A sample organization", "website": "https://example.org", "contact_email": "contact@example.org"}]
+                "json": [
+                    {
+                        "name": "Example Org",
+                        "description": "A sample organization",
+                        "website": "https://example.org",
+                        "contact_email": "contact@example.org",
+                    }
+                ],
             },
             "mandates": {
                 "csv": "title,description,status,priority\nSample Mandate,A sample mandate description,active,high",
-                "json": [{"title": "Sample Mandate", "description": "A sample mandate description", "status": "active", "priority": "high"}]
+                "json": [
+                    {
+                        "title": "Sample Mandate",
+                        "description": "A sample mandate description",
+                        "status": "active",
+                        "priority": "high",
+                    }
+                ],
             },
             "codexes": {
                 "csv": "title,content,category,version\nSample Codex,Sample codex content,policy,1.0",
-                "json": [{"title": "Sample Codex", "content": "Sample codex content", "category": "policy", "version": "1.0"}]
+                "json": [
+                    {
+                        "title": "Sample Codex",
+                        "content": "Sample codex content",
+                        "category": "policy",
+                        "version": "1.0",
+                    }
+                ],
             },
             "instruments": {
                 "csv": "name,type,description,value\nSample Instrument,contract,A sample instrument,1000",
-                "json": [{"name": "Sample Instrument", "type": "contract", "description": "A sample instrument", "value": 1000}]
-            }
+                "json": [
+                    {
+                        "name": "Sample Instrument",
+                        "type": "contract",
+                        "description": "A sample instrument",
+                        "value": 1000,
+                    }
+                ],
+            },
         }
-        
-        return {
-            "success": True,
-            "data": templates.get(entity_type, templates["users"])
-        }
+
+        return {"success": True, "data": templates.get(entity_type, templates["users"])}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -182,10 +220,10 @@ def import_data(args):
         entity_type = args.get("entity_type", "users")
         data_format = args.get("format", "csv")
         data_content = args.get("data", "")
-        
+
         if not data_content:
             return {"success": False, "error": "No data provided"}
-        
+
         # Parse data based on format
         parsed_data = []
         if data_format == "csv":
@@ -194,13 +232,13 @@ def import_data(args):
             parsed_data = parse_json_data(data_content)
         else:
             return {"success": False, "error": f"Unsupported format: {data_format}"}
-        
+
         if not parsed_data:
             return {"success": False, "error": "No valid data found"}
-        
+
         # Process data in batches
         results = process_bulk_import(entity_type, parsed_data)
-        
+
         return {
             "success": True,
             "data": {
@@ -209,8 +247,8 @@ def import_data(args):
                 "total_records": len(parsed_data),
                 "successful": results["successful"],
                 "failed": results["failed"],
-                "errors": results["errors"]
-            }
+                "errors": results["errors"],
+            },
         }
     except Exception as e:
         return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
@@ -245,12 +283,12 @@ def process_bulk_import(entity_type: str, data: List[Dict[str, Any]]) -> Dict[st
     successful = 0
     failed = 0
     errors = []
-    
+
     # Process in batches to avoid cycle limits
     batch_size = 50
     for i in range(0, len(data), batch_size):
-        batch = data[i:i + batch_size]
-        
+        batch = data[i : i + batch_size]
+
         for record in batch:
             try:
                 if entity_type == "users":
@@ -267,16 +305,16 @@ def process_bulk_import(entity_type: str, data: List[Dict[str, Any]]) -> Dict[st
                     create_instrument_entity(record)
                 else:
                     raise Exception(f"Unsupported entity type: {entity_type}")
-                
+
                 successful += 1
             except Exception as e:
                 failed += 1
                 errors.append(f"Record {record}: {str(e)}")
-    
+
     return {
         "successful": successful,
         "failed": failed,
-        "errors": errors[:10]  # Limit to first 10 errors
+        "errors": errors[:10],  # Limit to first 10 errors
     }
 
 
@@ -288,7 +326,7 @@ def create_user_entity(data: Dict[str, Any]):
     for field in required_fields:
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
-    
+
     # Simulate User.create() call
     pass
 
@@ -299,7 +337,7 @@ def create_human_entity(data: Dict[str, Any]):
     for field in required_fields:
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
-    
+
     # Simulate Human.create() call
     pass
 
@@ -310,7 +348,7 @@ def create_organization_entity(data: Dict[str, Any]):
     for field in required_fields:
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
-    
+
     # Simulate Organization.create() call
     pass
 
@@ -321,7 +359,7 @@ def create_mandate_entity(data: Dict[str, Any]):
     for field in required_fields:
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
-    
+
     # Simulate Mandate.create() call
     pass
 
@@ -332,7 +370,7 @@ def create_codex_entity(data: Dict[str, Any]):
     for field in required_fields:
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
-    
+
     # Simulate Codex.create() call
     pass
 
@@ -343,6 +381,6 @@ def create_instrument_entity(data: Dict[str, Any]):
     for field in required_fields:
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
-    
+
     # Simulate Instrument.create() call
     pass
