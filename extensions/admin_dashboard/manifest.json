@@ -6,11 +6,6 @@
   "categories": ["other"],
   "permissions": ["admin"],
   "profiles": ["admin"],
-  "visibility": {
-    "authentication_required": true,
-    "allowed_profiles": ["admin"],
-    "public_access": false,
-    "admin_only": true
-  },
-  "path": "admin"
+  "url_path": null,
+  "show_in_sidebar": true
 }

@@ -12,7 +12,7 @@ console = Console()
 
 app = typer.Typer(
     name="realms",
-    help="CLI tool for deploying and managing Realms projects",
+    help="CLI tool for deploying and managing Realms",
     add_completion=False,
     rich_markup_mode="rich"
 )
