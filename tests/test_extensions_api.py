@@ -31,7 +31,7 @@ try:
                     categories_found[category] = []
                 categories_found[category].append(name)
 
-        print(f"\nExtensions grouped by category:")
+        print("\nExtensions grouped by category:")
         for category, ext_names in categories_found.items():
             print(f"  {category}: {ext_names}")
 
@@ -41,7 +41,7 @@ try:
             "identity": ["passport_verification"],
         }
 
-        print(f"\nValidating expected categorizations:")
+        print("\nValidating expected categorizations:")
         for expected_cat, expected_exts in expected_categories.items():
             if expected_cat in categories_found:
                 found_exts = categories_found[expected_cat]
