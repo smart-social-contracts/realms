@@ -242,7 +242,6 @@
 	// Core navigation items with translation keys
 	const coreNavItems: NavItemWithHref[] = [
 		{ name: $_('common.identities') || 'My Identities', icon: FingerprintOutline, href: '/identities' }, // For all users
-		{ name: $_('navigation.admin_dashboard') || 'Admin Dashboard', icon: TableColumnSolid, href: '/ggg', profiles: ['admin'] }, // Admin only
 		{ name: $_('common.settings'), icon: CogOutline, href: '/settings' }, // For all users
 	];
 

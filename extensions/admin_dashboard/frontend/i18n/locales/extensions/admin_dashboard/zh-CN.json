@@ -1,0 +1,28 @@
+{
+  "extensions": {
+    "admin_dashboard": {
+      "title": "管理仪表板",
+      "subtitle": "通用全球治理系统",
+      "overview": "概览",
+      "system_overview": "系统概览",
+      "treasury_portfolio": "财政投资组合",
+      "search_placeholder": "搜索所有实体...",
+      "total_entities": "实体总数",
+      "across_all_types": "跨所有类型",
+      "transfer_volume": "转账量",
+      "transfers": "转账",
+      "active_mandates": "活跃授权",
+      "governance_policies": "治理政策",
+      "scheduled_tasks": "计划任务",
+      "automated_processes": "自动化流程",
+      "open_disputes": "未解决争议",
+      "requiring_attention": "需要关注",
+      "active_proposals": "活跃提案",
+      "open_for_voting": "开放投票",
+      "citizen_votes": "公民投票",
+      "democratic_participation": "民主参与",
+      "no_data_found": "未找到GGG数据",
+      "load_demo_data": "点击\"加载演示数据\"以填充系统示例治理数据"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "admin_dashboard",
+  "version": "1.0.0",
+  "description": "Backend services for administrative dashboard operations",
+  "entry_point": "entry.py",
+  "dependencies": []
+}

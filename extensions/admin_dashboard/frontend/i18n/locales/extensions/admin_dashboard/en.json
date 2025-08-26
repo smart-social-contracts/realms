@@ -1,0 +1,28 @@
+{
+  "extensions": {
+    "admin_dashboard": {
+      "title": "Admin Dashboard",
+      "subtitle": "Generalized Global Governance System",
+      "overview": "Overview",
+      "system_overview": "System Overview",
+      "treasury_portfolio": "Treasury Portfolio",
+      "search_placeholder": "Search across all entities...",
+      "total_entities": "Total Entities",
+      "across_all_types": "Across all types",
+      "transfer_volume": "Transfer Volume",
+      "transfers": "transfers",
+      "active_mandates": "Active Mandates",
+      "governance_policies": "Governance policies",
+      "scheduled_tasks": "Scheduled Tasks",
+      "automated_processes": "Automated processes",
+      "open_disputes": "Open Disputes",
+      "requiring_attention": "Requiring attention",
+      "active_proposals": "Active Proposals",
+      "open_for_voting": "Open for voting",
+      "citizen_votes": "Citizen Votes",
+      "democratic_participation": "Democratic participation",
+      "no_data_found": "No GGG Data Found",
+      "load_demo_data": "Click \"Load Demo Data\" to populate the system with sample governance data"
+    }
+  }
+}
