@@ -24,29 +24,29 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        cd realms_cli
+        cd cli
         pip install -e ".[dev]"
     
     - name: Run tests
       run: |
-        cd realms_cli
+        cd cli
         pytest tests/ -v --cov=realms_cli --cov-report=xml
     
     - name: Run linting
       run: |
-        cd realms_cli
+        cd cli
         flake8 realms_cli/ --max-line-length=88 --extend-ignore=E203,W503
         black --check realms_cli/
         isort --check-only realms_cli/
     
     - name: Test CLI functionality
       run: |
-        cd realms_cli
+        cd cli
         python test_realms_cli.py
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
-        file: ./realms_cli/coverage.xml
+        file: ./cli/coverage.xml
         flags: unittests
         name: codecov-umbrella

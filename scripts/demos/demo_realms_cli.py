@@ -12,8 +12,8 @@ import tempfile
 import shutil
 from pathlib import Path
 
-# Add the realms_cli directory to Python path
-sys.path.insert(0, str(Path(__file__).parent / "realms_cli"))
+# Add the cli directory to Python path
+sys.path.insert(0, str(Path(__file__).parent.parent / "cli"))
 
 from realms_cli.commands.init import init_command
 from realms_cli.commands.deploy import deploy_command

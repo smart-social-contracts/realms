@@ -18,7 +18,7 @@ from typing import Optional
 
 def get_current_version() -> str:
     """Get current version from pyproject.toml."""
-    pyproject_path = Path("realms_cli/pyproject.toml")
+    pyproject_path = Path("pyproject.toml")
     
     if not pyproject_path.exists():
         raise FileNotFoundError("pyproject.toml not found")
@@ -37,7 +37,7 @@ def update_version(new_version: str) -> None:
     """Update version in pyproject.toml and __init__.py."""
     
     # Update pyproject.toml
-    pyproject_path = Path("realms_cli/pyproject.toml")
+    pyproject_path = Path("pyproject.toml")
     with open(pyproject_path, 'r') as f:
         content = f.read()
     
@@ -85,7 +85,7 @@ def build_package() -> bool:
     
     try:
         # Clean previous builds
-        dist_dir = Path("realms_cli/dist")
+        dist_dir = Path("dist")
         if dist_dir.exists():
             import shutil
             shutil.rmtree(dist_dir)
@@ -93,7 +93,7 @@ def build_package() -> bool:
         # Build package
         result = subprocess.run([
             sys.executable, "-m", "build"
-        ], cwd="realms_cli", capture_output=True, text=True)
+        ], capture_output=True, text=True)
         
         if result.returncode == 0:
             print("✅ Package built successfully")
@@ -113,7 +113,7 @@ def check_package() -> bool:
     try:
         result = subprocess.run([
             "twine", "check", "dist/*"
-        ], cwd="realms_cli", capture_output=True, text=True)
+        ], capture_output=True, text=True)
         
         if result.returncode == 0:
             print("✅ Package check passed")
@@ -133,7 +133,7 @@ def publish_to_test_pypi() -> bool:
     try:
         result = subprocess.run([
             "twine", "upload", "--repository", "testpypi", "dist/*"
-        ], cwd="realms_cli")
+        ])
         
         if result.returncode == 0:
             print("✅ Published to Test PyPI successfully")
@@ -154,7 +154,7 @@ def publish_to_pypi() -> bool:
     try:
         result = subprocess.run([
             "twine", "upload", "dist/*"
-        ], cwd="realms_cli")
+        ])
         
         if result.returncode == 0:
             print("✅ Published to PyPI successfully")
@@ -184,7 +184,7 @@ def main():
     
     # Check if we're in the right directory
     if not Path("realms_cli").exists():
-        print("❌ Please run this script from the project root directory")
+        print("❌ Please run this script from the cli directory")
         return 1
     
     # Get current version

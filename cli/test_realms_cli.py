@@ -7,7 +7,7 @@ import tempfile
 import subprocess
 from pathlib import Path
 
-# Add the realms_cli directory to Python path
+# Add the cli directory to Python path
 sys.path.insert(0, str(Path(__file__).parent))
 
 try:
@@ -16,7 +16,7 @@ try:
     from realms_cli.utils import load_config, save_config
 except ImportError as e:
     print(f"❌ Failed to import realms_cli modules: {e}")
-    print("Make sure to install the package first: cd realms_cli && pip install -e .")
+    print("Make sure to install the package first: cd cli && pip install -e .")
     sys.exit(1)
 
 def test_cli_help():

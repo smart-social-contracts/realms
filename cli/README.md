@@ -49,7 +49,7 @@ pip install realms-cli
 
 ```bash
 git clone https://github.com/smartsocialcontracts/realms
-cd realms/realms_cli
+cd realms/cli
 pip install -e .
 ```
 
@@ -224,7 +224,7 @@ Automate setup tasks after deployment:
 
 ```bash
 git clone https://github.com/smartsocialcontracts/realms
-cd realms/realms_cli
+cd realms/cli
 python -m venv venv
 source venv/bin/activate
 pip install -e ".[dev]"
