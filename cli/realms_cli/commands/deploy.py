@@ -57,14 +57,6 @@ def deploy_command(
     if identity_file:
         config.deployment.identity_file = identity_file
     
-    # Set port for local deployment
-    if config.deployment.network in ["local", "local2"]:
-        if not config.deployment.port:
-            branch_name = get_current_branch()
-            config.deployment.port = generate_port_from_branch(branch_name)
-        
-        console.print(f"[dim]Deploying to {config.deployment.network} network on port {config.deployment.port}[/dim]")
-    
     if dry_run:
         _show_deployment_plan(config, phases, skip_extensions, skip_post_deployment)
         return
@@ -72,17 +64,13 @@ def deploy_command(
     project_root = get_project_root()
     
     try:
-        # Phase 1: Setup environment and identity
-        _setup_deployment_environment(config, project_root)
+        # Delegate to appropriate deployment script
+        if config.deployment.network in ["local", "local2"]:
+            _deploy_local(project_root)
+        else:
+            _deploy_ic(config, project_root)
         
-        # Phase 2: Deploy core canisters
-        _deploy_core_canisters(config, project_root)
-        
-        # Phase 3: Deploy extensions
-        if not skip_extensions:
-            _deploy_extensions(config, project_root, phases)
-        
-        # Phase 4: Post-deployment actions
+        # Post-deployment actions
         if not skip_post_deployment and config.post_deployment:
             _execute_post_deployment_actions(config, project_root)
         
@@ -92,6 +80,45 @@ def deploy_command(
     except Exception as e:
         display_error_panel("Deployment Failed", str(e))
         raise typer.Exit(1)
+
+
+def _deploy_local(project_root: Path) -> None:
+    """Deploy to local network using deploy_local.sh script."""
+    
+    console.print("[bold]Deploying to local network...[/bold]")
+    
+    deploy_script = project_root / "scripts" / "deploy_local.sh"
+    if not deploy_script.exists():
+        raise FileNotFoundError(f"Local deployment script not found: {deploy_script}")
+    
+    run_command([str(deploy_script)], cwd=project_root)
+
+
+def _deploy_ic(config: RealmConfig, project_root: Path) -> None:
+    """Deploy to Internet Computer network using deploy_ic.sh script."""
+    
+    console.print(f"[bold]Deploying to {config.deployment.network} network...[/bold]")
+    
+    deploy_script = project_root / "scripts" / "deploy_ic.sh"
+    if not deploy_script.exists():
+        raise FileNotFoundError(f"IC deployment script not found: {deploy_script}")
+    
+    # Prepare arguments for deploy_ic.sh
+    args = [str(deploy_script)]
+    
+    # Add identity file if specified
+    if config.deployment.identity_file:
+        args.append(config.deployment.identity_file)
+    
+    # Add network (defaults to staging in script if not provided)
+    if config.deployment.network != "local":
+        if config.deployment.identity_file:
+            args.append(config.deployment.network)
+        else:
+            # If no identity file, we need to add empty string as first arg
+            args.extend(["", config.deployment.network])
+    
+    run_command(args, cwd=project_root)
 
 
 def _show_deployment_plan(
@@ -113,7 +140,13 @@ def _show_deployment_plan(
     console.print("  • realm_frontend (SvelteKit/Assets)")
     
     if not skip_extensions and config.extensions:
-        console.print(f"\n[bold]Extensions ({len(_get_extensions_to_deploy(config, phases))} total):[/bold]")
+        # Count enabled extensions
+        total_extensions = sum(
+            len([ext for ext in extensions if ext.enabled])
+            for phase, extensions in config.extensions.items()
+            if not phases or phase in phases
+        )
+        console.print(f"\n[bold]Extensions ({total_extensions} total):[/bold]")
         for phase, extensions in config.extensions.items():
             if not phases or phase in phases:
                 console.print(f"  [cyan]{phase}:[/cyan]")
@@ -127,136 +160,6 @@ def _show_deployment_plan(
             console.print(f"  {i}. {action.name or action.type}")
 
 
-def _setup_deployment_environment(config: RealmConfig, project_root: Path) -> None:
-    """Setup deployment environment and identity."""
-    
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console
-    ) as progress:
-        
-        # Setup identity if provided
-        if config.deployment.identity_file:
-            task = progress.add_task("Setting up identity...", total=None)
-            run_command([
-                "dfx", "identity", "import", "--force", "--storage-mode", "plaintext",
-                "deployment", config.deployment.identity_file
-            ], cwd=project_root)
-            run_command(["dfx", "identity", "use", "deployment"], cwd=project_root)
-            progress.update(task, description="[green]Identity configured[/green]")
-        
-        # Setup virtual environment
-        task = progress.add_task("Setting up Python environment...", total=None)
-        venv_path = project_root / "venv"
-        if not venv_path.exists():
-            run_command(["python3", "-m", "venv", "venv"], cwd=project_root)
-        
-        # Install Python dependencies
-        pip_path = venv_path / "bin" / "pip"
-        if (project_root / "requirements.txt").exists():
-            run_command([str(pip_path), "install", "-r", "requirements.txt"], cwd=project_root)
-        
-        progress.update(task, description="[green]Python environment ready[/green]")
-        
-        # Stop and start dfx
-        task = progress.add_task("Starting dfx replica...", total=None)
-        run_command(["dfx", "stop"], cwd=project_root, check=False)
-        
-        dfx_args = ["dfx", "start", "--background"]
-        if config.deployment.clean_deploy:
-            dfx_args.append("--clean")
-        
-        if config.deployment.network == "local" and config.deployment.port:
-            dfx_args.extend(["--host", f"127.0.0.1:{config.deployment.port}"])
-        
-        run_command(dfx_args, cwd=project_root)
-        progress.update(task, description="[green]dfx replica started[/green]")
-
-
-def _deploy_core_canisters(config: RealmConfig, project_root: Path) -> None:
-    """Deploy core backend and frontend canisters."""
-    
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TimeElapsedColumn(),
-        console=console
-    ) as progress:
-        
-        task = progress.add_task("Deploying backend canister...", total=3)
-        
-        # Deploy backend
-        run_command([
-            "dfx", "deploy", "realm_backend", "--yes",
-            "--network", config.deployment.network
-        ], cwd=project_root)
-        progress.advance(task)
-        
-        # Generate declarations
-        run_command([
-            "dfx", "generate", "realm_backend",
-            "--network", config.deployment.network
-        ], cwd=project_root)
-        progress.advance(task)
-        progress.update(task, description="[green]Backend deployed[/green]")
-        
-        # Deploy frontend
-        task2 = progress.add_task("Building and deploying frontend...", total=4)
-        
-        # Install npm dependencies
-        run_command(["npm", "install", "--legacy-peer-deps"], cwd=project_root)
-        progress.advance(task2)
-        
-        # Build frontend
-        if (project_root / "src" / "realm_frontend").exists():
-            run_command(["npm", "run", "build", "--workspace", "realm_frontend"], cwd=project_root)
-        progress.advance(task2)
-        
-        # Update config if script exists
-        update_config_script = project_root / "scripts" / "update_config.sh"
-        if update_config_script.exists():
-            run_command(["sh", str(update_config_script)], cwd=project_root)
-        progress.advance(task2)
-        
-        # Deploy frontend canister
-        run_command([
-            "dfx", "deploy", "realm_frontend",
-            "--network", config.deployment.network
-        ], cwd=project_root)
-        progress.advance(task2)
-        progress.update(task2, description="[green]Frontend deployed[/green]")
-
-
-def _deploy_extensions(config: RealmConfig, project_root: Path, phases: Optional[List[str]]) -> None:
-    """Deploy extensions based on configuration."""
-    
-    extensions_to_deploy = _get_extensions_to_deploy(config, phases)
-    
-    if not extensions_to_deploy:
-        console.print("[yellow]No extensions to deploy[/yellow]")
-        return
-    
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console
-    ) as progress:
-        
-        task = progress.add_task("Installing extensions...", total=None)
-        
-        # Check if install script exists
-        install_script = project_root / "scripts" / "install_extensions.sh"
-        if install_script.exists():
-            run_command([str(install_script)], cwd=project_root)
-        else:
-            # Fallback: use extension CLI if available
-            cli_script = project_root / "scripts" / "realm-extension-cli.py"
-            if cli_script.exists():
-                run_command(["python", str(cli_script), "install", "--all"], cwd=project_root)
-        
-        progress.update(task, description=f"[green]{len(extensions_to_deploy)} extensions installed[/green]")
 
 
 def _execute_post_deployment_actions(config: RealmConfig, project_root: Path) -> None:
@@ -344,24 +247,6 @@ def _execute_single_action(action: PostDeploymentAction, config: RealmConfig, pr
                 raise
 
 
-def _get_extensions_to_deploy(config: RealmConfig, phases: Optional[List[str]]) -> List[Dict[str, Any]]:
-    """Get list of extensions to deploy based on phases filter."""
-    
-    extensions = []
-    
-    for phase, phase_extensions in config.extensions.items():
-        if phases and phase not in phases:
-            continue
-        
-        for ext in phase_extensions:
-            if ext.enabled:
-                extensions.append({
-                    "name": ext.name,
-                    "phase": phase,
-                    "source": ext.source
-                })
-    
-    return extensions
 
 
 def _show_deployment_success(config: RealmConfig) -> None:
