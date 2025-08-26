@@ -60,58 +60,109 @@
   "post_deployment": {
     "actions": [
       {
-        "type": "wait",
-        "name": "Wait for canisters to initialize",
-        "duration": 5
+        "type": "extension_call",
+        "name": "Load base setup",
+        "extension_name": "demo_loader",
+        "function_name": "load",
+        "args": {"step": "base_setup"}
       },
       {
         "type": "extension_call",
-        "name": "Load base demo data",
+        "name": "Load user management batch 0",
         "extension_name": "demo_loader",
         "function_name": "load",
-        "args": {
-          "step": "base_setup"
-        },
-        "retry_count": 2
+        "args": {"step": "user_management", "batch": 0}
       },
       {
         "type": "extension_call",
-        "name": "Load user management data",
+        "name": "Load user management batch 1",
         "extension_name": "demo_loader",
         "function_name": "load",
-        "args": {
-          "step": "user_management",
-          "batch": 0
-        },
-        "retry_count": 1
+        "args": {"step": "user_management", "batch": 1}
       },
       {
         "type": "extension_call",
-        "name": "Load transactions data",
+        "name": "Load user management batch 2",
         "extension_name": "demo_loader",
         "function_name": "load",
-        "args": {
-          "step": "transactions"
-        },
-        "ignore_failure": true
+        "args": {"step": "user_management", "batch": 2}
       },
       {
         "type": "extension_call",
-        "name": "Load government services data",
+        "name": "Load user management batch 3",
         "extension_name": "demo_loader",
         "function_name": "load",
-        "args": {
-          "step": "government_services"
-        }
+        "args": {"step": "user_management", "batch": 3}
       },
       {
         "type": "extension_call",
-        "name": "Load justice litigation demo data",
+        "name": "Load user management batch 4",
         "extension_name": "demo_loader",
         "function_name": "load",
-        "args": {
-          "step": "justice_litigation"
-        }
+        "args": {"step": "user_management", "batch": 4}
+      },
+      {
+        "type": "extension_call",
+        "name": "Load user management batch 5",
+        "extension_name": "demo_loader",
+        "function_name": "load",
+        "args": {"step": "user_management", "batch": 5}
+      },
+      {
+        "type": "extension_call",
+        "name": "Load user management batch 6",
+        "extension_name": "demo_loader",
+        "function_name": "load",
+        "args": {"step": "user_management", "batch": 6}
+      },
+      {
+        "type": "extension_call",
+        "name": "Load user management batch 7",
+        "extension_name": "demo_loader",
+        "function_name": "load",
+        "args": {"step": "user_management", "batch": 7}
+      },
+      {
+        "type": "extension_call",
+        "name": "Load user management batch 8",
+        "extension_name": "demo_loader",
+        "function_name": "load",
+        "args": {"step": "user_management", "batch": 8}
+      },
+      {
+        "type": "extension_call",
+        "name": "Load user management batch 9",
+        "extension_name": "demo_loader",
+        "function_name": "load",
+        "args": {"step": "user_management", "batch": 9}
+      },
+      {
+        "type": "extension_call",
+        "name": "Load transactions",
+        "extension_name": "demo_loader",
+        "function_name": "load",
+        "args": {"step": "transactions"}
+      },
+      {
+        "type": "extension_call",
+        "name": "Load government services",
+        "extension_name": "demo_loader",
+        "function_name": "load",
+        "args": {"step": "government_services"}
+      },
+      {
+        "type": "extension_call",
+        "name": "Load justice litigation",
+        "extension_name": "demo_loader",
+        "function_name": "load",
+        "args": {"step": "justice_litigation"}
+      },
+      {
+        "type": "extension_call",
+        "name": "Load demo litigation cases",
+        "extension_name": "justice_litigation",
+        "function_name": "load_demo_litigations",
+        "args": {"cases": []}
       }
     ]
   }

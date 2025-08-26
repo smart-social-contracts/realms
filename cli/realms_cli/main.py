@@ -78,6 +78,73 @@ def status() -> None:
         console.print("  ❌ dfx replica is not running")
 
 
+# Create realm subcommand group
+realm_app = typer.Typer(name="realm", help="Realm-specific operations")
+app.add_typer(realm_app, name="realm")
+
+@realm_app.command("extension")
+def realm_extension(
+    extension_name: str = typer.Argument(help="Extension name"),
+    function_name: str = typer.Argument(help="Function name to call"),
+    args: str = typer.Argument(help="JSON arguments for the function"),
+    network: str = typer.Option("local", "--network", "-n", help="Network to use")
+) -> None:
+    """Call an extension function on the realm backend."""
+    console.print(f"[bold blue]🔧 Calling Extension Function[/bold blue]\n")
+    
+    console.print(f"Extension: [cyan]{extension_name}[/cyan]")
+    console.print(f"Function: [cyan]{function_name}[/cyan]")
+    console.print(f"Args: [dim]{args}[/dim]")
+    console.print(f"Network: [dim]{network}[/dim]\n")
+    
+    try:
+        import subprocess
+        import json
+        
+        # Validate JSON args
+        try:
+            json.loads(args)
+        except json.JSONDecodeError as e:
+            console.print(f"[red]❌ Invalid JSON arguments: {e}[/red]")
+            raise typer.Exit(1)
+        
+        # Build dfx command - escape quotes in JSON args
+        escaped_args = args.replace('"', '\\"')
+        call_record = f'''(
+  record {{
+    extension_name = "{extension_name}";
+    function_name = "{function_name}";
+    args = "{escaped_args}";
+  }}
+)'''
+        
+        cmd = ["dfx", "canister", "call", "realm_backend", "extension_sync_call", call_record]
+        if network != "local":
+            cmd.extend(["--network", network])
+        
+        console.print("[dim]Executing...[/dim]")
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        
+        if result.returncode == 0:
+            console.print("[green]✅ Extension call successful[/green]\n")
+            console.print("[bold]Response:[/bold]")
+            console.print(result.stdout)
+        else:
+            console.print("[red]❌ Extension call failed[/red]\n")
+            if result.stderr:
+                console.print(f"[red]Error: {result.stderr}[/red]")
+            if result.stdout:
+                console.print(f"Output: {result.stdout}")
+            raise typer.Exit(1)
+            
+    except subprocess.TimeoutExpired:
+        console.print("[red]❌ Extension call timed out[/red]")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"[red]❌ Error executing extension call: {e}[/red]")
+        raise typer.Exit(1)
+
+
 @app.command("version")
 def version() -> None:
     """Show version information."""
