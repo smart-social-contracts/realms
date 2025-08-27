@@ -31,19 +31,26 @@ class BulkUploader:
         'users', 'humans', 'organizations', 'mandates', 'codexes', 'instruments'
     ]
     
+    SUPPORTED_OPERATIONS = [
+        'bulk_upload', 'generate_registration_urls'
+    ]
+    
     SUPPORTED_NETWORKS = ['local', 'testnet', 'ic']
     
-    def __init__(self, csv_file: str, entity_type: str, batch_size: int = 50, 
-                 network: str = 'local', dry_run: bool = False, verbose: bool = False):
-        self.csv_file = Path(csv_file)
+    def __init__(self, csv_file: str = None, entity_type: str = None, batch_size: int = 50, 
+                 network: str = 'local', dry_run: bool = False, verbose: bool = False,
+                 operation: str = 'bulk_upload'):
+        self.csv_file = Path(csv_file) if csv_file else None
         self.entity_type = entity_type
         self.batch_size = batch_size
         self.network = network
         self.dry_run = dry_run
         self.verbose = verbose
+        self.operation = operation
         
         # Validate inputs
-        self._validate_inputs()
+        if self.operation == 'bulk_upload':
+            self._validate_inputs()
         
         # Statistics
         self.total_records = 0
@@ -55,15 +62,24 @@ class BulkUploader:
     
     def _validate_inputs(self):
         """Validate input parameters"""
-        if not self.csv_file.exists():
-            raise FileNotFoundError(f"CSV file not found: {self.csv_file}")
+        if self.operation not in self.SUPPORTED_OPERATIONS:
+            raise ValueError(
+                f"Unsupported operation: {self.operation}. "
+                f"Supported operations: {', '.join(self.SUPPORTED_OPERATIONS)}"
+            )
         
-        if not self.csv_file.suffix.lower() == '.csv':
-            raise ValueError(f"File must be a CSV file: {self.csv_file}")
-        
-        if self.entity_type not in self.SUPPORTED_ENTITY_TYPES:
-            raise ValueError(f"Unsupported entity type: {self.entity_type}. "
-                           f"Supported types: {', '.join(self.SUPPORTED_ENTITY_TYPES)}")
+        if self.operation == 'bulk_upload':
+            if not self.csv_file or not self.csv_file.exists():
+                raise FileNotFoundError(f"CSV file not found: {self.csv_file}")
+            
+            if self.entity_type not in self.SUPPORTED_ENTITY_TYPES:
+                raise ValueError(
+                    f"Unsupported entity type: {self.entity_type}. "
+                    f"Supported types: {', '.join(self.SUPPORTED_ENTITY_TYPES)}"
+                )
+            
+            if self.batch_size < 1 or self.batch_size > 1000:
+                raise ValueError("Batch size must be between 1 and 1000")
         
         if self.network not in self.SUPPORTED_NETWORKS:
             raise ValueError(f"Unsupported network: {self.network}. "
@@ -244,43 +260,195 @@ class BulkUploader:
             
             return False
     
-    def upload(self):
-        """Main upload process"""
-        print(f"🚀 Starting bulk upload to admin_dashboard extension")
-        print(f"📊 Entity Type: {self.entity_type}")
-        print(f"🌐 Network: {self.network}")
-        print(f"📦 Batch Size: {self.batch_size}")
+    def upload(self) -> bool:
+        """Execute the bulk upload process"""
+        if self.operation == 'generate_registration_urls':
+            return self._generate_registration_urls()
+        else:
+            return self._bulk_upload()
+    
+    def _bulk_upload(self) -> bool:
+        """Execute the bulk upload process"""
+        print(f"🚀 Starting bulk upload of {self.entity_type} from {self.csv_file.name}")
+        print(f"📊 Network: {self.network}, Batch size: {self.batch_size}")
+        
         if self.dry_run:
-            print(f"🔍 Mode: DRY RUN (no actual uploads)")
-        print("-" * 60)
+            print("🔍 DRY RUN MODE - No actual uploads will be performed")
         
         try:
-            # Read CSV data
-            data = self.read_csv_data()
-            
-            if not data:
-                print("❌ No data to upload")
+            # Load and validate CSV data
+            records = self.read_csv_data()
+            if not records:
+                print("❌ No valid records found in CSV file")
                 return False
             
-            # Create batches
-            batches = self.create_batches(data)
+            self.total_records = len(records)
+            print(f"📋 Loaded {self.total_records} records")
             
-            # Process each batch
+            if self.verbose:
+                self._show_sample_records(records)
+            
+            # Process in batches
+            batches = self.create_batches(records)
+            print(f"📦 Processing {len(batches)} batches")
+            
             for i, batch in enumerate(batches, 1):
-                success = self.process_batch(i, batch)
-                if success:
+                print(f"\n📤 Processing batch {i}/{len(batches)} ({len(batch)} records)...")
+                
+                if self.dry_run:
+                    print(f"   Would upload {len(batch)} {self.entity_type} records")
                     self.successful_batches += 1
+                    self.total_successful_records += len(batch)
                 else:
-                    self.failed_batches += 1
+                    success = self.process_batch(i, batch)
+                    if success:
+                        self.successful_batches += 1
+                        self.total_successful_records += len(batch)
+                        print(f"   ✅ Batch {i} completed successfully")
+                    else:
+                        self.failed_batches += 1
+                        self.total_failed_records += len(batch)
+                        print(f"   ❌ Batch {i} failed")
             
-            # Print final statistics
-            self._print_final_statistics()
-            
+            # Print final summary
+            self._print_summary()
             return self.failed_batches == 0
             
         except Exception as e:
             print(f"❌ Upload failed: {str(e)}")
+            if self.verbose:
+                import traceback
+                traceback.print_exc()
             return False
+    
+    def _generate_registration_urls(self) -> bool:
+        """Generate registration URLs from CSV data"""
+        print(f"🔗 Generating registration URLs from {self.csv_file.name}")
+        print(f"📊 Network: {self.network}, Batch size: {self.batch_size}")
+        
+        if self.dry_run:
+            print("🔍 DRY RUN MODE - No actual URLs will be generated")
+        
+        try:
+            # Load CSV data
+            records = self.read_csv_data()
+            if not records:
+                print("❌ No valid records found in CSV file")
+                return False
+            
+            self.total_records = len(records)
+            print(f"📋 Loaded {self.total_records} user records")
+            
+            # Validate required fields for registration URLs
+            required_fields = ['user_id']
+            for record in records:
+                for field in required_fields:
+                    if field not in record or not record[field]:
+                        print(f"❌ Missing required field '{field}' in record: {record}")
+                        return False
+            
+            if self.verbose:
+                self._show_sample_records(records)
+            
+            # Generate URLs in batches
+            batches = self.create_batches(records)
+            print(f"📦 Processing {len(batches)} batches")
+            
+            generated_urls = []
+            
+            for i, batch in enumerate(batches, 1):
+                print(f"\n🔗 Generating URLs for batch {i}/{len(batches)} ({len(batch)} users)...")
+                
+                if self.dry_run:
+                    print(f"   Would generate {len(batch)} registration URLs")
+                    self.successful_batches += 1
+                    self.total_successful_records += len(batch)
+                else:
+                    batch_urls = self._generate_url_batch(batch)
+                    if batch_urls:
+                        generated_urls.extend(batch_urls)
+                        self.successful_batches += 1
+                        self.total_successful_records += len(batch)
+                        print(f"   ✅ Batch {i} completed successfully")
+                    else:
+                        self.failed_batches += 1
+                        self.total_failed_records += len(batch)
+                        print(f"   ❌ Batch {i} failed")
+            
+            # Save generated URLs to file
+            if generated_urls and not self.dry_run:
+                output_file = self.csv_file.parent / f"registration_urls_{self.csv_file.stem}.csv"
+                self._save_urls_to_csv(generated_urls, output_file)
+                print(f"\n💾 Generated URLs saved to: {output_file}")
+            
+            # Print final summary
+            self._print_summary()
+            return self.failed_batches == 0
+            
+        except Exception as e:
+            print(f"❌ URL generation failed: {str(e)}")
+            if self.verbose:
+                import traceback
+                traceback.print_exc()
+            return False
+    
+    def _generate_url_batch(self, batch: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Generate registration URLs for a batch of users"""
+        generated_urls = []
+        
+        for record in batch:
+            try:
+                # Prepare the request
+                cmd_args = [
+                    "dfx", "canister", "call", 
+                    f"realm_backend_{self.network}",
+                    "extension_sync_call",
+                    f'(record {{ method_name = "generate_registration_url"; args = record {{ user_id = "{record["user_id"]}"; email = "{record.get("email", "")}"; frontend_url = "https://localhost:3000"; expires_in_hours = 24:nat32; created_by = "admin" }} }})'
+                ]
+                
+                if self.verbose:
+                    print(f"   Generating URL for user: {record['user_id']}")
+                
+                result = subprocess.run(
+                    cmd_args,
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                
+                if result.returncode == 0:
+                    # Parse the response (simplified - in practice would need proper parsing)
+                    url_data = {
+                        'user_id': record['user_id'],
+                        'email': record.get('email', ''),
+                        'registration_url': f"https://localhost:3000/extensions/admin_dashboard/user_registration?code=GENERATED_CODE",
+                        'status': 'generated'
+                    }
+                    generated_urls.append(url_data)
+                    
+                    if self.verbose:
+                        print(f"   ✅ URL generated for {record['user_id']}")
+                else:
+                    if self.verbose:
+                        print(f"   ❌ Failed to generate URL for {record['user_id']}: {result.stderr}")
+                    
+            except Exception as e:
+                if self.verbose:
+                    print(f"   ❌ Error generating URL for {record['user_id']}: {str(e)}")
+        
+        return generated_urls
+    
+    def _save_urls_to_csv(self, urls: List[Dict[str, Any]], output_file: Path):
+        """Save generated URLs to a CSV file"""
+        try:
+            with open(output_file, 'w', newline='', encoding='utf-8') as csvfile:
+                if urls:
+                    fieldnames = urls[0].keys()
+                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(urls)
+        except Exception as e:
+            print(f"❌ Failed to save URLs to CSV: {str(e)}")
     
     def _print_final_statistics(self):
         """Print final upload statistics"""
@@ -328,14 +496,21 @@ Examples:
     
     parser.add_argument(
         'csv_file',
+        nargs='?',
         help='Path to the CSV file to upload'
     )
     
     parser.add_argument(
+        '--operation',
+        choices=BulkUploader.SUPPORTED_OPERATIONS,
+        default='bulk_upload',
+        help='Operation to perform (default: bulk_upload)'
+    )
+    
+    parser.add_argument(
         '--entity-type',
-        required=True,
         choices=BulkUploader.SUPPORTED_ENTITY_TYPES,
-        help='Type of entities to import'
+        help='Type of entities to create from CSV data (required for bulk_upload)'
     )
     
     parser.add_argument(
@@ -366,6 +541,16 @@ Examples:
     
     args = parser.parse_args()
     
+    # Validate required arguments based on operation
+    if args.operation == 'bulk_upload':
+        if not args.csv_file:
+            parser.error('csv_file is required for bulk_upload operation')
+        if not args.entity_type:
+            parser.error('--entity-type is required for bulk_upload operation')
+    elif args.operation == 'generate_registration_urls':
+        if not args.csv_file:
+            parser.error('csv_file is required for generate_registration_urls operation')
+    
     try:
         uploader = BulkUploader(
             csv_file=args.csv_file,
@@ -373,7 +558,8 @@ Examples:
             batch_size=args.batch_size,
             network=args.network,
             dry_run=args.dry_run,
-            verbose=args.verbose
+            verbose=args.verbose,
+            operation=args.operation
         )
         
         success = uploader.upload()

@@ -6,10 +6,12 @@ Provides administrative operations and data aggregation for the GGG system.
 import csv
 import json
 import traceback
+from datetime import datetime
 from io import StringIO
 from typing import Any, Dict, List
 
 from ggg import Codex, Human, Instrument, Mandate, Organization, User
+from .models import RegistrationCode
 
 
 def extension_sync_call(method_name: str, args: dict):
@@ -26,6 +28,12 @@ def extension_sync_call(method_name: str, args: dict):
         return get_templates(args)
     elif method_name == "import_data":
         return import_data(args)
+    elif method_name == "generate_registration_url":
+        return generate_registration_url(args)
+    elif method_name == "validate_registration_code":
+        return validate_registration_code(args)
+    elif method_name == "get_registration_codes":
+        return get_registration_codes(args)
     else:
         return {"success": False, "error": f"Unknown method: {method_name}"}
 
@@ -384,3 +392,104 @@ def create_instrument_entity(data: Dict[str, Any]):
 
     # Simulate Instrument.create() call
     pass
+
+
+def generate_registration_url(args: dict):
+    """Generate a registration URL for a user"""
+    try:
+        user_id = args.get("user_id")
+        created_by = args.get("created_by", "admin")
+        frontend_url = args.get("frontend_url", "https://localhost:3000")
+        email = args.get("email")
+        expires_in_hours = args.get("expires_in_hours", 24)
+
+        if not user_id:
+            return {"success": False, "error": "user_id is required"}
+
+        # Create registration code
+        reg_code = RegistrationCode.create(
+            user_id=user_id,
+            created_by=created_by,
+            frontend_url=frontend_url,
+            email=email,
+            expires_in_hours=expires_in_hours
+        )
+
+        return {
+            "success": True,
+            "data": {
+                "code": reg_code.code,
+                "registration_url": reg_code.registration_url,
+                "expires_at": datetime.fromtimestamp(reg_code.expires_at).isoformat(),
+                "user_id": reg_code.user_id
+            }
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def validate_registration_code(args: dict):
+    """Validate a registration code"""
+    try:
+        code = args.get("code")
+        if not code:
+            return {"success": False, "error": "code is required"}
+
+        # Find registration code
+        reg_code = RegistrationCode.find_by_code(code)
+        if not reg_code:
+            return {"success": False, "error": "Invalid registration code"}
+
+        # Check if valid
+        if not reg_code.is_valid():
+            current_timestamp = int(datetime.utcnow().timestamp())
+            reason = "expired" if reg_code.expires_at < current_timestamp else "already used"
+            return {"success": False, "error": f"Registration code is {reason}"}
+
+        return {
+            "success": True,
+            "data": {
+                "user_id": reg_code.user_id,
+                "email": reg_code.email,
+                "expires_at": datetime.fromtimestamp(reg_code.expires_at).isoformat(),
+                "created_by": reg_code.created_by
+            }
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def get_registration_codes(args: dict):
+    """Get registration codes with optional filtering"""
+    try:
+        user_id = args.get("user_id")
+        include_used = args.get("include_used", False)
+        
+        if user_id:
+            codes = RegistrationCode.find_by_user_id(user_id)
+        else:
+            codes = RegistrationCode.instances()
+
+        # Filter out used codes if requested
+        if not include_used:
+            codes = [code for code in codes if code.used == 0]
+
+        return {
+            "success": True,
+            "data": [
+                {
+                    "code": code.code,
+                    "user_id": code.user_id,
+                    "email": code.email,
+                    "registration_url": code.registration_url,
+                    "expires_at": datetime.fromtimestamp(code.expires_at).isoformat(),
+                    "used": code.used == 1,
+                    "used_at": datetime.fromtimestamp(code.used_at).isoformat() if code.used_at > 0 else None,
+                    "created_by": code.created_by,
+                    "is_valid": code.is_valid()
+                }
+                for code in codes
+            ]
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}

@@ -6,6 +6,7 @@
   import GenericEntityTable from '$lib/components/ggg/GenericEntityTable.svelte';
   import CodexViewer from '$lib/components/ggg/CodexViewer.svelte';
   import MetricsComponent from '$lib/extensions/metrics/Metrics.svelte';
+  import RegistrationUrlManager from './RegistrationUrlManager.svelte';
   
   let activeTab = 'overview';
   let loading = false;
@@ -337,6 +338,12 @@
         on:click={() => handleTabChange('bulk_import')}
       >
         📥 {$_('extensions.admin_dashboard.bulk_import') || 'Bulk Import'}
+      </button>
+      <button 
+        class="px-4 py-2 mr-1 {activeTab === 'registration_urls' ? 'border-b-2 border-blue-500 font-medium text-blue-600' : 'text-gray-600 hover:text-gray-900'}"
+        on:click={() => handleTabChange('registration_urls')}
+      >
+        🔗 {$_('extensions.admin_dashboard.registration_urls') || 'Registration URLs'}
       </button>
       {#each allEntityTypes as entityType}
       <button 
@@ -681,6 +688,9 @@
           {/if}
         </div>
       </div>
+    {:else if activeTab === 'registration_urls'}
+      <!-- Registration URL Management -->
+      <RegistrationUrlManager />
     {/if}
   </div>
 </div>
