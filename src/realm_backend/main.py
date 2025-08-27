@@ -118,6 +118,22 @@ def status() -> RealmResponse:
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
+@update
+def run() -> RealmResponse:
+    try:
+        logger.info("Executing run")
+
+        import codex
+        codex.run()
+        
+
+        logger.info("Executed run")
+        return RealmResponse(success=True, data=RealmResponseData(Message="Run executed successfully"))
+    except Exception as e:
+        logger.error(f"Error running: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
 @query
 def get_extensions() -> RealmResponse:
     """Get all available extensions with their metadata"""
