@@ -26,11 +26,6 @@ def mandate_1_tax_payment():
         if cursor > User.count():
             cursor = 1
 
-    #mandate = Mandate["tax_payment"]
-    #d = json.loads(mandate.metadata)
-    #d["last_user_checked"] = ic.now()
-
-
 def run():
 
     # TODO: Mandate1: check if citizens have paid their taxes on time

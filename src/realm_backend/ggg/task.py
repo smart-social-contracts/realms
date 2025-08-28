@@ -11,5 +11,7 @@ class Task(Entity, TimestampedMixin):
     schedules = ManyToMany("TaskSchedule", "tasks")
     codex = ManyToOne("Codex", "tasks")
 
-    def run():
-        raise Exception("Not implemented")
+    def run(self):
+        """Add this task to the TaskManager queue for execution"""
+        from core.task_manager import task_manager
+        return task_manager.add_task_to_queue(self.id)

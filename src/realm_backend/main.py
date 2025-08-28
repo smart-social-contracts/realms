@@ -123,12 +123,20 @@ def run() -> RealmResponse:
     try:
         logger.info("Executing run")
 
+        # Execute legacy codex
         import codex
         codex.run()
         
-
-        logger.info("Executed run")
-        return RealmResponse(success=True, data=RealmResponseData(Message="Run executed successfully"))
+        # Process TaskManager queue (includes scheduled tasks)
+        from core.task_manager import run_pending_tasks
+        task_results = run_pending_tasks()
+        
+        message = f"Run executed successfully. Processed {len(task_results)} tasks."
+        logger.info(message)
+        return RealmResponse(
+            success=True, 
+            data=RealmResponseData(Message=message, Data={"task_results": task_results})
+        )
     except Exception as e:
         logger.error(f"Error running: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
@@ -731,3 +739,112 @@ def execute_code(code: str) -> str:
     sys.stdout = sys.__stdout__
     sys.stderr = sys.__stderr__
     return stdout.getvalue() + stderr.getvalue()
+
+
+# TaskManager API endpoints
+@update
+def run_task(task_id: str) -> RealmResponse:
+    """Add a specific task to the execution queue"""
+    try:
+        from core.task_manager import execute_task
+        success = execute_task(task_id)
+        if success:
+            return RealmResponse(
+                success=True, 
+                data=RealmResponseData(Message=f"Task {task_id} added to queue")
+            )
+        else:
+            return RealmResponse(
+                success=False, 
+                data=RealmResponseData(Error=f"Failed to add task {task_id} to queue")
+            )
+    except Exception as e:
+        logger.error(f"Error running task {task_id}: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@update
+def process_task_queue() -> RealmResponse:
+    """Process all pending tasks in the TaskManager queue"""
+    try:
+        from core.task_manager import run_pending_tasks
+        results = run_pending_tasks()
+        return RealmResponse(
+            success=True, 
+            data=RealmResponseData(Message=f"Processed {len(results)} tasks", Data=results)
+        )
+    except Exception as e:
+        logger.error(f"Error processing task queue: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_task_queue_status() -> RealmResponse:
+    """Get current TaskManager queue status"""
+    try:
+        from core.task_manager import get_task_manager_status
+        status = get_task_manager_status()
+        return RealmResponse(
+            success=True, 
+            data=RealmResponseData(Data=status)
+        )
+    except Exception as e:
+        logger.error(f"Error getting task queue status: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@update
+def clear_task_queue() -> RealmResponse:
+    """Clear all pending tasks from the queue"""
+    try:
+        from core.task_manager import task_manager
+        cleared_count = task_manager.clear_queue()
+        return RealmResponse(
+            success=True, 
+            data=RealmResponseData(Message=f"Cleared {cleared_count} tasks from queue")
+        )
+    except Exception as e:
+        logger.error(f"Error clearing task queue: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@update
+def cancel_task(task_id: str) -> RealmResponse:
+    """Cancel a pending task by removing it from the queue"""
+    try:
+        from core.task_manager import task_manager
+        success = task_manager.cancel_task(task_id)
+        if success:
+            return RealmResponse(
+                success=True, 
+                data=RealmResponseData(Message=f"Task {task_id} cancelled successfully")
+            )
+        else:
+            return RealmResponse(
+                success=False, 
+                data=RealmResponseData(Error=f"Task {task_id} not found in queue")
+            )
+    except Exception as e:
+        logger.error(f"Error cancelling task {task_id}: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_task_details(task_id: str) -> RealmResponse:
+    """Get details of a specific task"""
+    try:
+        from core.task_manager import task_manager
+        task = task_manager.get_task_by_id(task_id)
+        if task:
+            return RealmResponse(
+                success=True, 
+                data=RealmResponseData(Data=task.to_dict())
+            )
+        else:
+            return RealmResponse(
+                success=False, 
+                data=RealmResponseData(Error=f"Task {task_id} not found")
+            )
+    except Exception as e:
+        logger.error(f"Error getting task details {task_id}: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))

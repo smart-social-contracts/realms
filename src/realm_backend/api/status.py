@@ -80,6 +80,15 @@ def get_status() -> dict[str, Any]:
 
     demo_mode = "demo_loader" in extension_names
 
+    # Get TaskManager status
+    task_manager_status = {}
+    try:
+        from core.task_manager import get_task_manager_status
+        task_manager_status = get_task_manager_status()
+    except Exception as e:
+        logger.warning(f"Could not retrieve TaskManager status: {e}")
+        task_manager_status = {"error": "TaskManager unavailable"}
+
     # Return data in the format expected by the Status Candid type
     return {
         "version": version,
@@ -101,4 +110,5 @@ def get_status() -> dict[str, Any]:
         "commit": commit_hash,
         "extensions": extension_names,
         "demo_mode": demo_mode,
+        "task_manager": task_manager_status,
     }
