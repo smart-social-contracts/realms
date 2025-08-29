@@ -237,6 +237,51 @@ def _execute_single_action(action: PostDeploymentAction, config: RealmConfig, pr
                 run_command([str(script_path)], cwd=project_root)
                 return
             
+            elif action.type == "create_codex":
+                if not action.codex_id:
+                    raise ValueError("create_codex action requires codex_id")
+                
+                # Get codex configuration from config
+                if action.codex_id not in config.codexes:
+                    raise ValueError(f"Codex '{action.codex_id}' not found in configuration")
+                
+                codex_config = config.codexes[action.codex_id]
+                
+                # Escape the code string for Candid format
+                escaped_code = codex_config.code.replace('\n', '\\n').replace('"', '\\"')
+                
+                run_command([
+                    "dfx", "canister", "call", "realm_backend", "create_codex",
+                    f'(record {{ name = "{codex_config.name}"; code = "{escaped_code}"; }})',
+                    "--network", config.deployment.network
+                ], cwd=project_root)
+                return
+            
+            elif action.type == "create_task":
+                if not action.task_id:
+                    raise ValueError("create_task action requires task_id")
+                
+                # Get task configuration from config
+                if action.task_id not in config.tasks:
+                    raise ValueError(f"Task '{action.task_id}' not found in configuration")
+                
+                task_config = config.tasks[action.task_id]
+                
+                # Verify the referenced codex exists
+                if task_config.codex not in config.codexes:
+                    raise ValueError(f"Task '{action.task_id}' references unknown codex '{task_config.codex}'")
+                
+                # Create task via backend API
+                metadata_json = json.dumps(task_config.metadata) if task_config.metadata else "{}"
+                escaped_metadata = metadata_json.replace('"', '\\"')
+                
+                run_command([
+                    "dfx", "canister", "call", "realm_backend", "create_task",
+                    f'(record {{ name = "{task_config.name}"; metadata = "{escaped_metadata}"; codex_name = "{config.codexes[task_config.codex].name}"; }})',
+                    "--network", config.deployment.network
+                ], cwd=project_root)
+                return
+            
             else:
                 raise ValueError(f"Unknown action type: {action.type}")
         

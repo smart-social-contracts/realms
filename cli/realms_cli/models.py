@@ -45,13 +45,15 @@ class Extension(BaseModel):
 class PostDeploymentAction(BaseModel):
     """Post-deployment action configuration."""
     
-    type: Literal["extension_call", "script", "wait"] = Field(..., description="Type of post-deployment action")
+    type: Literal["extension_call", "script", "wait", "create_codex", "create_task"] = Field(..., description="Type of post-deployment action")
     name: Optional[str] = Field(None, description="Human-readable name for the action")
     extension_name: Optional[str] = Field(None, description="Extension to call (for extension_call type)")
     function_name: Optional[str] = Field(None, description="Function to call (for extension_call type)")
     args: Dict[str, Any] = Field(default_factory=dict, description="Arguments to pass to the function")
     script_path: Optional[str] = Field(None, description="Path to script to execute (for script type)")
     duration: Optional[int] = Field(None, description="Duration to wait in seconds (for wait type)")
+    codex_id: Optional[str] = Field(None, description="Codex ID to create (for create_codex type)")
+    task_id: Optional[str] = Field(None, description="Task ID to create (for create_task type)")
     condition: Optional[str] = Field(None, description="Condition to check before running action")
     retry_count: int = Field(default=0, description="Number of retries if action fails")
     ignore_failure: bool = Field(default=False, description="Whether to continue if this action fails")
@@ -63,12 +65,31 @@ class PostDeploymentConfig(BaseModel):
     actions: List[PostDeploymentAction] = Field(default_factory=list, description="List of post-deployment actions")
 
 
+class CodexConfig(BaseModel):
+    """Codex configuration."""
+    
+    name: str = Field(..., description="Human-readable name of the codex")
+    description: Optional[str] = Field(None, description="Description of the codex's purpose")
+    code: str = Field(..., description="Python code to execute")
+
+
+class TaskConfig(BaseModel):
+    """Task configuration."""
+    
+    name: str = Field(..., description="Human-readable name of the task")
+    description: Optional[str] = Field(None, description="Description of the task's purpose")
+    codex: str = Field(..., description="ID of the codex this task should execute")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Task metadata including scheduling information")
+
+
 class RealmConfig(BaseModel):
     """Complete realm configuration."""
     
     realm: RealmMetadata
     deployment: DeploymentConfig
     extensions: Dict[str, List[Extension]] = Field(default_factory=dict, description="Extensions organized by deployment phases")
+    codexes: Dict[str, CodexConfig] = Field(default_factory=dict, description="Codex definitions")
+    tasks: Dict[str, TaskConfig] = Field(default_factory=dict, description="Task definitions")
     post_deployment: Optional[PostDeploymentConfig] = Field(None, description="Post-deployment configuration")
     
     @validator('extensions')

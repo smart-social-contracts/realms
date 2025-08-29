@@ -57,6 +57,68 @@
       }
     ]
   },
+  "codexes": {
+    "tax_collection_codex": {
+      "name": "Tax Collection Automation",
+      "description": "Automated tax collection and compliance monitoring system",
+      "code": "from ggg import Mandate, User, Transfer, Treasury\nfrom kybra_simple_logging import get_logger\n\nlogger = get_logger(\"tax_collection_codex\")\n\ndef check_tax_compliance():\n    \"\"\"Check if citizens have paid their taxes on time\"\"\"\n    logger.info(\"Starting tax compliance check\")\n    \n    users = User.load_all()\n    treasury = Treasury.load_by_name(\"New Geneva Treasury\")\n    \n    for user in users:\n        # Check last tax payment (simplified logic)\n        recent_transfers = Transfer.load_by_sender(user.id, limit=10)\n        tax_paid = any(t.recipient_id == treasury.id and 'tax' in t.metadata for t in recent_transfers)\n        \n        if not tax_paid:\n            logger.info(f\"User {user.name} has not paid taxes recently\")\n            # Could trigger notifications or penalties here\n    \n    return \"Tax compliance check completed\"\n\ndef run():\n    return check_tax_compliance()"
+    },
+    "subsidy_distribution_codex": {
+      "name": "Subsidy Distribution System",
+      "description": "Automated distribution of subsidies and benefits to eligible citizens",
+      "code": "from ggg import User, Transfer, Treasury, UserProfile\nfrom kybra_simple_logging import get_logger\nimport json\n\nlogger = get_logger(\"subsidy_distribution_codex\")\n\ndef distribute_universal_basic_income():\n    \"\"\"Distribute UBI to all eligible citizens\"\"\"\n    logger.info(\"Starting UBI distribution\")\n    \n    users = User.load_all()\n    treasury = Treasury.load_by_name(\"New Geneva Treasury\")\n    ubi_amount = 500  # tokens per month\n    \n    distributed_count = 0\n    for user in users:\n        # Check eligibility (simplified)\n        if user.profiles and any(p.name == 'member' for p in user.profiles):\n            transfer = Transfer(\n                sender_id=treasury.id,\n                recipient_id=user.id,\n                amount=ubi_amount,\n                metadata=json.dumps({\"type\": \"ubi\", \"month\": \"current\"})\n            )\n            distributed_count += 1\n    \n    logger.info(f\"Distributed UBI to {distributed_count} citizens\")\n    return f\"UBI distributed to {distributed_count} eligible citizens\"\n\ndef run():\n    return distribute_universal_basic_income()"
+    },
+    "governance_automation_codex": {
+      "name": "Governance Process Automation",
+      "description": "Automated governance processes including proposal lifecycle and voting tallies",
+      "code": "from ggg import Proposal, Vote, User\nfrom kybra_simple_logging import get_logger\nimport json\nfrom datetime import datetime, timedelta\n\nlogger = get_logger(\"governance_automation_codex\")\n\ndef process_expired_proposals():\n    \"\"\"Process proposals that have reached their voting deadline\"\"\"\n    logger.info(\"Processing expired proposals\")\n    \n    proposals = Proposal.load_all()\n    processed_count = 0\n    \n    for proposal in proposals:\n        try:\n            metadata = json.loads(proposal.metadata)\n            if metadata.get('status') == 'voting':\n                deadline = datetime.fromisoformat(metadata.get('voting_deadline', ''))\n                if datetime.now() > deadline:\n                    # Tally votes\n                    votes = Vote.load_by_proposal(proposal.id)\n                    support_votes = sum(1 for v in votes if 'support' in v.choice)\n                    total_votes = len(votes)\n                    \n                    # Determine outcome\n                    if total_votes > 0 and support_votes / total_votes > 0.5:\n                        metadata['status'] = 'passed'\n                    else:\n                        metadata['status'] = 'rejected'\n                    \n                    proposal.metadata = json.dumps(metadata)\n                    processed_count += 1\n                    logger.info(f\"Processed proposal: {proposal.name} - {metadata['status']}\")\n        except Exception as e:\n            logger.error(f\"Error processing proposal {proposal.name}: {str(e)}\")\n    \n    return f\"Processed {processed_count} expired proposals\"\n\ndef run():\n    return process_expired_proposals()"
+    }
+  },
+  "tasks": {
+    "daily_tax_check": {
+      "name": "Daily Tax Compliance Check",
+      "description": "Daily automated check for tax compliance across all citizens",
+      "codex": "tax_collection_codex",
+      "metadata": {
+        "frequency": "daily",
+        "priority": "high",
+        "category": "financial_compliance"
+      }
+    },
+    "monthly_ubi_distribution": {
+      "name": "Monthly UBI Distribution",
+      "description": "Monthly distribution of Universal Basic Income to eligible citizens",
+      "codex": "subsidy_distribution_codex",
+      "metadata": {
+        "frequency": "monthly",
+        "priority": "high",
+        "category": "social_benefits",
+        "day_of_month": 1
+      }
+    },
+    "weekly_governance_processing": {
+      "name": "Weekly Governance Processing",
+      "description": "Weekly processing of expired proposals and governance automation",
+      "codex": "governance_automation_codex",
+      "metadata": {
+        "frequency": "weekly",
+        "priority": "medium",
+        "category": "governance",
+        "day_of_week": "monday"
+      }
+    },
+    "quarterly_financial_audit": {
+      "name": "Quarterly Financial Audit",
+      "description": "Quarterly automated financial audit and reporting",
+      "codex": "tax_collection_codex",
+      "metadata": {
+        "frequency": "quarterly",
+        "priority": "medium",
+        "category": "financial_audit",
+        "months": [3, 6, 9, 12]
+      }
+    }
+  },
   "post_deployment": {
     "actions": [
       {
@@ -163,6 +225,41 @@
         "extension_name": "justice_litigation",
         "function_name": "load_demo_litigations",
         "args": {"cases": []}
+      },
+      {
+        "type": "create_codex",
+        "name": "Create Tax Collection Codex",
+        "codex_id": "tax_collection_codex"
+      },
+      {
+        "type": "create_codex",
+        "name": "Create Subsidy Distribution Codex",
+        "codex_id": "subsidy_distribution_codex"
+      },
+      {
+        "type": "create_codex",
+        "name": "Create Governance Automation Codex",
+        "codex_id": "governance_automation_codex"
+      },
+      {
+        "type": "create_task",
+        "name": "Create Daily Tax Check Task",
+        "task_id": "daily_tax_check"
+      },
+      {
+        "type": "create_task",
+        "name": "Create Monthly UBI Distribution Task",
+        "task_id": "monthly_ubi_distribution"
+      },
+      {
+        "type": "create_task",
+        "name": "Create Weekly Governance Processing Task",
+        "task_id": "weekly_governance_processing"
+      },
+      {
+        "type": "create_task",
+        "name": "Create Quarterly Financial Audit Task",
+        "task_id": "quarterly_financial_audit"
       }
     ]
   }
