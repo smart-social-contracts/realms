@@ -571,6 +571,20 @@ def initialize() -> void:
             )
 
 
+    from codex import code
+    c = ggg.Codex()
+    c.code = code
+
+    t = ggg.Task()
+    t.codex = c
+    t.name = "codex"
+    t.metadata = "codex"
+
+    from core.task_manager import task_manager
+    
+    # task_manager.set_timer_interval(t, 1000)
+    task_manager.run_now(t)
+
 @init
 def init_() -> void:
     logger.info("Initializing Realm canister")
@@ -778,21 +792,6 @@ def process_task_queue() -> RealmResponse:
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
-@query
-def get_task_queue_status() -> RealmResponse:
-    """Get current TaskManager queue status"""
-    try:
-        from core.task_manager import get_task_manager_status
-        status = get_task_manager_status()
-        return RealmResponse(
-            success=True, 
-            data=RealmResponseData(Data=status)
-        )
-    except Exception as e:
-        logger.error(f"Error getting task queue status: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
 @update
 def clear_task_queue() -> RealmResponse:
     """Clear all pending tasks from the queue"""
@@ -829,22 +828,101 @@ def cancel_task(task_id: str) -> RealmResponse:
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
-@query
-def get_task_details(task_id: str) -> RealmResponse:
-    """Get details of a specific task"""
+@update
+def create_task_timer(task_id: str, delay_seconds: nat) -> RealmResponse:
+    """Create a one-time timer to execute a task after delay_seconds"""
     try:
-        from core.task_manager import task_manager
-        task = task_manager.get_task_by_id(task_id)
-        if task:
+        from core.task_manager import create_task_timer
+        success = create_task_timer(task_id, int(delay_seconds))
+        if success:
             return RealmResponse(
                 success=True, 
-                data=RealmResponseData(Data=task.to_dict())
+                data=RealmResponseData(Message=f"Timer created for task {task_id} with {delay_seconds}s delay")
             )
         else:
             return RealmResponse(
                 success=False, 
-                data=RealmResponseData(Error=f"Task {task_id} not found")
+                data=RealmResponseData(Error=f"Failed to create timer for task {task_id}")
             )
     except Exception as e:
-        logger.error(f"Error getting task details {task_id}: {str(e)}\n{traceback.format_exc()}")
+        logger.error(f"Error creating timer for task {task_id}: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@update
+def create_task_interval_timer(task_id: str, interval_seconds: nat) -> RealmResponse:
+    """Create a recurring timer to execute a task every interval_seconds"""
+    try:
+        from core.task_manager import create_task_interval_timer
+        success = create_task_interval_timer(task_id, int(interval_seconds))
+        if success:
+            return RealmResponse(
+                success=True, 
+                data=RealmResponseData(Message=f"Interval timer created for task {task_id} with {interval_seconds}s interval")
+            )
+        else:
+            return RealmResponse(
+                success=False, 
+                data=RealmResponseData(Error=f"Failed to create interval timer for task {task_id}")
+            )
+    except Exception as e:
+        logger.error(f"Error creating interval timer for task {task_id}: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@update
+def cancel_task_timer(task_id: str) -> RealmResponse:
+    """Cancel a timer for a specific task"""
+    try:
+        from core.task_manager import cancel_task_timer
+        success = cancel_task_timer(task_id)
+        if success:
+            return RealmResponse(
+                success=True, 
+                data=RealmResponseData(Message=f"Timer cancelled for task {task_id}")
+            )
+        else:
+            return RealmResponse(
+                success=False, 
+                data=RealmResponseData(Error=f"No timer found for task {task_id}")
+            )
+    except Exception as e:
+        logger.error(f"Error cancelling timer for task {task_id}: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_active_timers() -> RealmResponse:
+    """Get list of all active timers"""
+    try:
+        from core.task_manager import get_active_timers
+        timers = get_active_timers()
+        return RealmResponse(
+            success=True, 
+            data=RealmResponseData(Message="Active timers retrieved", Data=timers)
+        )
+    except Exception as e:
+        logger.error(f"Error getting active timers: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_task_status(task_id: str) -> RealmResponse:
+    """Get the execution status of a specific task"""
+    try:
+        from core.task_manager import get_task_execution_status
+        status = get_task_execution_status(task_id)
+        if status:
+            return RealmResponse(
+                success=True, 
+                data=RealmResponseData(Message=f"Task {task_id} status: {status}")
+            )
+        else:
+            return RealmResponse(
+                success=False, 
+                data=RealmResponseData(Error=f"Task {task_id} not found or no status available")
+            )
+    except Exception as e:
+        logger.error(f"Error getting task status for {task_id}: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+

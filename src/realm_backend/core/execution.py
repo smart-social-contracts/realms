@@ -1,7 +1,11 @@
 import traceback
 
+from kybra_simple_logging import get_logger
+logger = get_logger("execution")
+
 
 def run_code(source_code: str, locals={}):
+    logger.info("running code")
     safe_globals = globals()
 
     import ggg

@@ -1,4 +1,8 @@
 
+code = """
+
+print("inside the codex")
+
 from ggg import Mandate, User
 from kybra_simple_logging import get_logger
 
@@ -28,12 +32,17 @@ def mandate_1_tax_payment():
 
 def run():
 
+    logger.info("run inside codex")
+
     # TODO: Mandate1: check if citizens have paid their taxes on time
     # TODO: Mandate2: pay any pending subsidies to citizens
     # TODO: Mandate3: pay any pending bills to providers
     mandate_1_tax_payment()
 
 
+run()
+
+""".strip()
 
 
     

@@ -1,5 +1,6 @@
 from kybra_simple_db import Entity, ManyToMany, ManyToOne, String, TimestampedMixin
 from kybra_simple_logging import get_logger
+from core.execution import run_code
 
 logger = get_logger("entity.task")
 
@@ -12,6 +13,4 @@ class Task(Entity, TimestampedMixin):
     codex = ManyToOne("Codex", "tasks")
 
     def run(self):
-        """Add this task to the TaskManager queue for execution"""
-        from core.task_manager import task_manager
-        return task_manager.add_task_to_queue(self.id)
+        run_code(self.codex.code)

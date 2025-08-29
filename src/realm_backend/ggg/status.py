@@ -67,3 +67,9 @@ class OrganizationStatus(Enum):
     INACTIVE = "inactive"
     SUSPENDED = "suspended"
     BANNED = "banned"
+
+class TaskStatus(Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
