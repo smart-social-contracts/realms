@@ -1,5 +1,6 @@
 import json
 import traceback
+from typing import Optional, Tuple
 
 import api
 from api.extensions import list_extensions
@@ -57,6 +58,7 @@ from kybra import (
     blob,
     ic,
     init,
+    match,
     nat,
     post_upgrade,
     query,
@@ -80,7 +82,7 @@ class HttpRequest(Record):
     body: blob
 
 
-from kybra.canisters.management import HttpResponse, HttpTransformArgs
+from kybra.canisters.management import HttpResponse, HttpTransformArgs, management_canister
 
 Header = Tuple[str, str]
 
@@ -672,6 +674,127 @@ def transform_response(args: HttpTransformArgs) -> HttpResponse:
 
 
 @query
+def http_transform(args: HttpTransformArgs) -> HttpResponse:
+    """Transform function for HTTP requests - removes headers for consensus"""
+    http_response = args["response"]
+    http_response["headers"] = []
+    return http_response
+
+
+def download_code_from_url(url: str, expected_checksum: Optional[str] = None) -> Async[Tuple[bool, str]]:
+    """
+    Download code from a URL and verify its checksum.
+    
+    Args:
+        url: The URL to download from
+        expected_checksum: Optional SHA-256 checksum to verify against (format: "sha256:hash")
+    
+    Returns:
+        Tuple of (success: bool, result: str)
+        - If success=True, result contains the downloaded code
+        - If success=False, result contains the error message
+    """
+    try:
+        logger.info(f"Downloading code from URL: {url}")
+        
+        # Make HTTP request to download the code
+        http_result: CallResult[HttpResponse] = yield management_canister.http_request(
+            {
+                "url": url,
+                "max_response_bytes": 1024 * 1024,  # 1MB limit for security
+                "method": {"get": None},
+                "headers": [
+                    {
+                        "name": "User-Agent",
+                        "value": "Realms-Codex-Downloader/1.0"
+                    }
+                ],
+                "body": None,
+                "transform": {
+                    "function": (ic.id(), "http_transform"),
+                    "context": bytes()
+                },
+            }
+        ).with_cycles(15_000_000_000)
+        
+        def handle_response(response: HttpResponse) -> Tuple[bool, str]:
+            try:
+                # Decode the response body
+                code_content = response["body"].decode('utf-8')
+                logger.info(f"Successfully downloaded {len(code_content)} bytes")
+                
+                # Verify checksum if provided
+                if expected_checksum:
+                    is_valid, checksum_error = verify_checksum(code_content, expected_checksum)
+                    if not is_valid:
+                        logger.error(f"Checksum verification failed: {checksum_error}")
+                        return False, checksum_error
+                    logger.info("Checksum verification passed")
+                
+                return True, code_content
+                
+            except UnicodeDecodeError as e:
+                error_msg = f"Failed to decode response as UTF-8: {str(e)}"
+                logger.error(error_msg)
+                return False, error_msg
+            except Exception as e:
+                error_msg = f"Error processing response: {str(e)}"
+                logger.error(error_msg)
+                return False, error_msg
+        
+        def handle_error(err: str) -> Tuple[bool, str]:
+            error_msg = f"HTTP request failed: {err}"
+            logger.error(error_msg)
+            return False, error_msg
+        
+        return match(
+            http_result,
+            {
+                "Ok": handle_response,
+                "Err": handle_error
+            }
+        )
+        
+    except Exception as e:
+        error_msg = f"Unexpected error downloading code: {str(e)}"
+        logger.error(error_msg)
+        return False, error_msg
+
+
+def verify_checksum(content: str, expected_checksum: str) -> Tuple[bool, str]:
+    """
+    Verify the SHA-256 checksum of content.
+    
+    Args:
+        content: The content to verify
+        expected_checksum: Expected checksum in format "sha256:hash"
+    
+    Returns:
+        Tuple of (is_valid: bool, error_message: str)
+    """
+    try:
+        import hashlib
+        
+        # Parse the checksum format
+        if not expected_checksum.startswith("sha256:"):
+            return False, "Checksum must be in format 'sha256:hash'"
+        
+        expected_hash = expected_checksum[7:]  # Remove "sha256:" prefix
+        
+        # Calculate actual hash
+        actual_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()
+        
+        # Compare hashes
+        if actual_hash.lower() == expected_hash.lower():
+            return True, ""
+        else:
+            return False, f"Checksum mismatch. Expected: {expected_hash}, Got: {actual_hash}"
+            
+    except Exception as e:
+        return False, f"Error verifying checksum: {str(e)}"
+
+
+@query
 def http_request(req: HttpRequest) -> HttpResponse:
     """Handle HTTP requests to the canister. Only for unauthenticated read operations."""
 
@@ -929,4 +1052,37 @@ def get_task_status(task_id: str) -> RealmResponse:
     except Exception as e:
         logger.error(f"Error getting task status for {task_id}: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@update
+def test_download_code_from_url(url: str, checksum: str = "") -> Async[RealmResponse]:
+    """Test function to download code from a URL with checksum verification"""
+    try:
+        logger.info(f"Testing download from URL: {url}")
+        
+        # Use the local download_code_from_url function
+        expected_checksum = checksum if checksum and checksum.strip() else None
+        success, result = yield download_code_from_url(url, expected_checksum)
+        
+        if success:
+            # Return success with preview of content
+            content_length = len(result)
+            preview = result[:500] + "..." if content_length > 500 else result
+            
+            return RealmResponse(
+                success=True,
+                data=RealmResponseData(
+                    Message=f"Successfully downloaded {content_length} bytes from {url}",
+                    Data=preview
+                )
+            )
+        else:
+            return RealmResponse(success=False, data=RealmResponseData(Error=result))
+        
+    except Exception as e:
+        error_msg = f"Error in test_download_code_from_url: {str(e)}"
+        logger.error(f"{error_msg}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=error_msg))
+
+
 

@@ -247,12 +247,23 @@ def _execute_single_action(action: PostDeploymentAction, config: RealmConfig, pr
                 
                 codex_config = config.codexes[action.codex_id]
                 
-                # Escape the code string for Candid format
-                escaped_code = codex_config.code.replace('\n', '\\n').replace('"', '\\"')
+                # Build function call based on codex configuration
+                if hasattr(codex_config, 'code') and codex_config.code:
+                    # Inline code
+                    escaped_code = codex_config.code.replace('\n', '\\n').replace('"', '\\"')
+                    function_call = f'("{codex_config.name}", "{escaped_code}", "", "")'
+                    
+                elif hasattr(codex_config, 'url') and codex_config.url:
+                    # Downloadable code
+                    url = codex_config.url
+                    checksum = getattr(codex_config, 'checksum', '')
+                    function_call = f'("{codex_config.name}", "", "{url}", "{checksum}")'
+                else:
+                    raise ValueError(f"Codex '{action.codex_id}' must have either 'code' or 'url' specified")
                 
                 run_command([
                     "dfx", "canister", "call", "realm_backend", "create_codex",
-                    f'(record {{ name = "{codex_config.name}"; code = "{escaped_code}"; }})',
+                    function_call,
                     "--network", config.deployment.network
                 ], cwd=project_root)
                 return
@@ -272,12 +283,16 @@ def _execute_single_action(action: PostDeploymentAction, config: RealmConfig, pr
                     raise ValueError(f"Task '{action.task_id}' references unknown codex '{task_config.codex}'")
                 
                 # Create task via backend API
-                metadata_json = json.dumps(task_config.metadata) if task_config.metadata else "{}"
-                escaped_metadata = metadata_json.replace('"', '\\"')
+                task_data = {
+                    "name": task_config.name,
+                    "codex": config.codexes[task_config.codex].name,
+                    "metadata": task_config.metadata
+                }
+                task_json = json.dumps(task_data).replace('"', '\\"')
                 
                 run_command([
                     "dfx", "canister", "call", "realm_backend", "create_task",
-                    f'(record {{ name = "{task_config.name}"; metadata = "{escaped_metadata}"; codex_name = "{config.codexes[task_config.codex].name}"; }})',
+                    f'("{task_json}")',
                     "--network", config.deployment.network
                 ], cwd=project_root)
                 return

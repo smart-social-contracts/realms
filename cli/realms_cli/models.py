@@ -70,7 +70,26 @@ class CodexConfig(BaseModel):
     
     name: str = Field(..., description="Human-readable name of the codex")
     description: Optional[str] = Field(None, description="Description of the codex's purpose")
-    code: str = Field(..., description="Python code to execute")
+    code: Optional[str] = Field(None, description="Python code to execute (for inline codexes)")
+    url: Optional[str] = Field(None, description="URL to download code from (for downloadable codexes)")
+    checksum: Optional[str] = Field(None, description="SHA-256 checksum for code verification (format: sha256:hash)")
+    
+    @validator('checksum')
+    def validate_checksum_format(cls, v):
+        if v and not v.startswith('sha256:'):
+            raise ValueError('Checksum must be in format "sha256:hash"')
+        return v
+    
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Validate that either code or url is provided, but not both
+        has_code = self.code is not None and self.code.strip()
+        has_url = self.url is not None and self.url.strip()
+        
+        if not has_code and not has_url:
+            raise ValueError("Codex must have either 'code' or 'url' specified")
+        if has_code and has_url:
+            raise ValueError("Codex cannot have both 'code' and 'url' specified - choose one")
 
 
 class TaskConfig(BaseModel):
