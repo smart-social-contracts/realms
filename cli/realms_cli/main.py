@@ -6,6 +6,7 @@ from rich.table import Table
 from typing import Optional, List
 
 from .commands.deploy import deploy_command
+from .commands.shell import shell_command
 from .utils import check_dependencies, display_info_panel
 
 console = Console()
@@ -143,6 +144,15 @@ def realm_extension(
     except Exception as e:
         console.print(f"[red]❌ Error executing extension call: {e}[/red]")
         raise typer.Exit(1)
+
+
+@app.command("shell")
+def shell(
+    network: Optional[str] = typer.Option(None, "--network", "-n", help="Network to use (local, ic, etc.)"),
+    canister: str = typer.Option("realm_backend", "--canister", "-c", help="Canister name to connect to")
+) -> None:
+    """Start an interactive Python shell connected to the Realms backend canister."""
+    shell_command(network, canister)
 
 
 @app.command("version")
