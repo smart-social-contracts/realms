@@ -571,6 +571,9 @@ def initialize() -> void:
             )
 
 
+    # import codex
+    # codex.run()
+
     from codex import code
     c = ggg.Codex()
     c.code = code
@@ -583,7 +586,8 @@ def initialize() -> void:
     from core.task_manager import task_manager
     
     # task_manager.set_timer_interval(t, 1000)
-    task_manager.run_now(t)
+    task_execution = task_manager.run_now(t)
+    logger.info(f"Task execution result: {task_execution}")
 
 @init
 def init_() -> void:

@@ -6,7 +6,7 @@ import re
 from kybra_simple_logging import get_logger
 from ggg.task import Task
 from ggg.task_schedule import TaskSchedule
-from core.execution import run_code
+from ggg.task_executions import TaskExecution
 
 from kybra import TimerId, ic
 
@@ -21,9 +21,9 @@ class TaskManager:
     def __init__(self):
         pass
 
-    def run_now(self, task: Task):
+    def run_now(self, task: Task) -> TaskExecution:
         logger.info(f"Running task {task.name} now")
-        task.run()
+        return task.run()
 
     def set_timer_interval(self, task: Task, interval: int) -> TimerId:
         logger.info(f"Setting timer interval for task {task.name} with interval {interval}")
