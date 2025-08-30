@@ -6,7 +6,7 @@
   "scripts": {
     "setup": "npm i && dfx canister create realm_registry_backend && dfx generate realm_registry_backend && dfx deploy",
     "start": "vite --port 3000",
-    "prebuild": "dfx generate",
+    "prebuild": "dfx generate realm_registry_backend",
     "build": "vite build",
     "format": "prettier --write \"src/**/*.{json,js,jsx,ts,tsx,css,scss}\""
   },
