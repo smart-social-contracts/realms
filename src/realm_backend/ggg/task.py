@@ -1,7 +1,14 @@
-from kybra_simple_db import Entity, ManyToMany, ManyToOne, OneToMany, String, TimestampedMixin
-from kybra_simple_logging import get_logger
 from core.execution import run_code
 from ggg.task_executions import TaskExecution
+from kybra_simple_db import (
+    Entity,
+    ManyToMany,
+    ManyToOne,
+    OneToMany,
+    String,
+    TimestampedMixin,
+)
+from kybra_simple_logging import get_logger
 
 logger = get_logger("entity.task")
 
@@ -19,7 +26,7 @@ class Task(Entity, TimestampedMixin):
 
         execution = TaskExecution()
         execution.task = self
-        execution.logs = '\n'.join(execution_result.get("logs") or [])
+        execution.logs = "\n".join(execution_result.get("logs") or [])
         execution.result = execution_result.get("result")
 
         return execution

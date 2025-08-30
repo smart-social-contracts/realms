@@ -84,6 +84,7 @@ def get_status() -> dict[str, Any]:
     task_manager_status = {}
     try:
         from core.task_manager import get_task_manager_status
+
         task_manager_status = get_task_manager_status()
     except Exception as e:
         logger.warning(f"Could not retrieve TaskManager status: {e}")
