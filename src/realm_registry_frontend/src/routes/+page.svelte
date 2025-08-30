@@ -275,9 +275,9 @@
             <div class="realm-header">
               <div class="realm-title">
                 <h3 class="realm-name">{realm.name}</h3>
-                <div class="health-indicator" title={getRealmHealth(realm).label}>
-                  <span class="health-icon">{getRealmHealth(realm).icon}</span>
-                  <span class="health-label">{getRealmHealth(realm).label}</span>
+                <div class="health-indicator" title="Click to view status">
+                  <span class="health-icon">🔄</span>
+                  <span class="health-label">Click for status</span>
                 </div>
               </div>
               <span class="realm-id">{realm.id}</span>
