@@ -179,10 +179,6 @@
   <header class="header">
     <div class="header-content">
       <img src="/images/logo_horizontal.svg" alt="Realms Logo" class="header-logo" />
-      <div class="header-text">
-        <h1>🌍 Realms Registry</h1>
-        <p class="subtitle">Discover and explore Realm instances on the Internet Computer</p>
-      </div>
     </div>
   </header>
 
@@ -485,7 +481,7 @@
   }
 
   .header-logo {
-    height: 60px;
+    height: 120px;
     width: auto;
   }
 
