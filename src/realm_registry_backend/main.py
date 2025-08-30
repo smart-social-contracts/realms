@@ -1,6 +1,6 @@
 import json
 import traceback
-from typing import Optional, Tuple
+from typing import Optional
 
 from api.registry import (
     add_registered_realm,

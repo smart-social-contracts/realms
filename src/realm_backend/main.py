@@ -1,6 +1,6 @@
 import json
 import traceback
-from typing import Optional, Tuple
+from typing import Optional
 
 import api
 from api.extensions import list_extensions

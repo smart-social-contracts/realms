@@ -59,22 +59,6 @@
     }
   }
 
-  async function removeRealm(realmId) {
-    if (!confirm(`Are you sure you want to remove realm "${realmId}"?`)) {
-      return;
-    }
-
-    try {
-      const result = await backend.remove_realm(realmId);
-      if (result.Ok) {
-        await loadRealms();
-      } else {
-        error = result.Err;
-      }
-    } catch (err) {
-      error = err.message || 'Failed to remove realm';
-    }
-  }
 
   function formatDate(timestamp) {
     return new Date(timestamp * 1000).toLocaleDateString('en-US', {
@@ -86,19 +70,49 @@
     });
   }
 
-  function getRealmHealth(realm) {
-    // Simulate health status based on realm properties
-    if (!realm.url) return { status: 'offline', icon: '🔴', label: 'Offline' };
-    
-    // Simple heuristic: newer realms are healthier
-    const daysSinceCreation = (Date.now() / 1000 - realm.created_at) / (24 * 60 * 60);
-    if (daysSinceCreation < 7) return { status: 'healthy', icon: '🟢', label: 'Healthy' };
-    if (daysSinceCreation < 30) return { status: 'degraded', icon: '🟡', label: 'Degraded' };
-    return { status: 'offline', icon: '🔴', label: 'Offline' };
+  async function getRealmStatus(realm) {
+    try {
+      if (!realm.url) {
+        return {
+          status: 'unknown',
+          icon: '❓',
+          label: 'Status unavailable',
+          details: 'No URL configured for this realm'
+        };
+      }
+
+      const statusUrl = `https://${realm.url}/status`;
+      const response = await fetch(statusUrl);
+      
+      if (response.ok) {
+        const statusData = await response.json();
+        return {
+          status: 'healthy',
+          icon: '✅',
+          label: 'Healthy',
+          details: statusData
+        };
+      } else {
+        return {
+          status: 'error',
+          icon: '❌',
+          label: 'Error',
+          details: `HTTP ${response.status}: ${response.statusText}`
+        };
+      }
+    } catch (error) {
+      return {
+        status: 'error',
+        icon: '❌',
+        label: 'Error',
+        details: error.message
+      };
+    }
   }
 
   async function openRealmDetails(realm) {
     selectedRealm = realm;
+    selectedRealm.statusInfo = await getRealmStatus(realm);
     showDrawer = true;
     // Generate QR code when drawer opens
     qrCodeDataUrl = await generateQRCode(getPublicLink(realm));
@@ -163,8 +177,13 @@
 
 <div class="container">
   <header class="header">
-    <h1>🌍 Realms Registry</h1>
-    <p class="subtitle">Discover and explore Realm instances on the Internet Computer</p>
+    <div class="header-content">
+      <img src="/images/logo_horizontal.svg" alt="Realms Logo" class="header-logo" />
+      <div class="header-text">
+        <h1>🌍 Realms Registry</h1>
+        <p class="subtitle">Discover and explore Realm instances on the Internet Computer</p>
+      </div>
+    </div>
   </header>
 
   <div class="controls">
@@ -256,9 +275,9 @@
             <div class="realm-header">
               <div class="realm-title">
                 <h3 class="realm-name">{realm.name}</h3>
-                <div class="health-indicator" title={getRealmHealth(realm).label}>
-                  <span class="health-icon">{getRealmHealth(realm).icon}</span>
-                  <span class="health-label">{getRealmHealth(realm).label}</span>
+                <div class="health-indicator" title="Click to view status">
+                  <span class="health-icon">🔄</span>
+                  <span class="health-label">Click for status</span>
                 </div>
               </div>
               <span class="realm-id">{realm.id}</span>
@@ -293,12 +312,6 @@
                   Visit
                 </button>
               {/if}
-              <button 
-                class="btn btn-danger btn-sm"
-                on:click={() => removeRealm(realm.id)}
-              >
-                Remove
-              </button>
             </div>
           </button>
         {/each}
@@ -359,14 +372,22 @@
           <h3>Status</h3>
           <div class="status-card">
             <div class="status-indicator">
-              <span class="status-icon">{getRealmHealth(selectedRealm).icon}</span>
-              <span class="status-text">{getRealmHealth(selectedRealm).label}</span>
+              <span class="status-icon">{selectedRealm.statusInfo?.icon || '🔄'}</span>
+              <span class="status-text">{selectedRealm.statusInfo?.label || 'Loading...'}</span>
             </div>
             <div class="status-details">
               <p><strong>Realm ID:</strong> {selectedRealm.id}</p>
               <p><strong>Created:</strong> {formatDate(selectedRealm.created_at)}</p>
               {#if selectedRealm.url}
                 <p><strong>URL:</strong> <code>{selectedRealm.url}</code></p>
+              {/if}
+              <p><strong>Last Check:</strong> {new Date().toLocaleString()}</p>
+              {#if selectedRealm.statusInfo?.details && typeof selectedRealm.statusInfo.details === 'object'}
+                <p><strong>Version:</strong> {selectedRealm.statusInfo.details.version || 'Unknown'}</p>
+                <p><strong>Users:</strong> {selectedRealm.statusInfo.details.users_count || 0}</p>
+                <p><strong>Organizations:</strong> {selectedRealm.statusInfo.details.organizations_count || 0}</p>
+              {:else if selectedRealm.statusInfo?.details}
+                <p><strong>Details:</strong> {selectedRealm.statusInfo.details}</p>
               {/if}
             </div>
           </div>
@@ -420,12 +441,6 @@
               🌐 Visit Realm
             </button>
           {/if}
-          <button 
-            class="btn btn-danger"
-            on:click={() => { removeRealm(selectedRealm.id); closeDrawer(); }}
-          >
-            🗑️ Remove Realm
-          </button>
         </div>
       </div>
     </div>
@@ -460,6 +475,18 @@
   .logo {
     height: 3rem;
     margin-bottom: 1rem;
+  }
+
+  .header-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+  }
+
+  .header-logo {
+    height: 60px;
+    width: auto;
   }
 
   .header h1 {
@@ -995,6 +1022,22 @@
 
     .header h1 {
       font-size: 2rem;
+    }
+
+    .header-content {
+      flex-direction: column;
+    }
+
+    .header-logo {
+      height: 50px;
+    }
+
+    .header-content {
+      flex-direction: column;
+    }
+
+    .header-logo {
+      height: 50px;
     }
 
     .controls {
