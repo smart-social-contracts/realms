@@ -10,6 +10,9 @@
   let showAddForm = false;
   let newRealm = { id: '', name: '', url: '' };
   let addingRealm = false;
+  let selectedRealm = null;
+  let showDrawer = false;
+  let copiedLink = null;
 
   onMount(async () => {
     await loadRealms();
@@ -79,6 +82,47 @@
       hour: '2-digit',
       minute: '2-digit'
     });
+  }
+
+  function getRealmHealth(realm) {
+    // Simulate health status based on realm properties
+    if (!realm.url) return { status: 'offline', icon: '🔴', label: 'Offline' };
+    
+    // Simple heuristic: newer realms are healthier
+    const daysSinceCreation = (Date.now() / 1000 - realm.created_at) / (24 * 60 * 60);
+    if (daysSinceCreation < 7) return { status: 'healthy', icon: '🟢', label: 'Healthy' };
+    if (daysSinceCreation < 30) return { status: 'degraded', icon: '🟡', label: 'Degraded' };
+    return { status: 'offline', icon: '🔴', label: 'Offline' };
+  }
+
+  function openRealmDetails(realm) {
+    selectedRealm = realm;
+    showDrawer = true;
+  }
+
+  function closeDrawer() {
+    showDrawer = false;
+    selectedRealm = null;
+  }
+
+  function getPublicLink(realm) {
+    return realm.url ? `https://${realm.url}` : `${window.location.origin}/realm/${realm.id}`;
+  }
+
+  async function copyLink(realm) {
+    const link = getPublicLink(realm);
+    try {
+      await navigator.clipboard.writeText(link);
+      copiedLink = realm.id;
+      setTimeout(() => copiedLink = null, 2000);
+    } catch (err) {
+      console.error('Failed to copy link:', err);
+    }
+  }
+
+  function generateQRCode(text) {
+    // Simple QR code using qr-server.com API
+    return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(text)}`;
   }
 
   function searchRealms() {
@@ -192,9 +236,15 @@
     {:else}
       <div class="realms-grid">
         {#each filteredRealms as realm}
-          <div class="realm-card">
+          <div class="realm-card" on:click={() => openRealmDetails(realm)}>
             <div class="realm-header">
-              <h3 class="realm-name">{realm.name}</h3>
+              <div class="realm-title">
+                <h3 class="realm-name">{realm.name}</h3>
+                <div class="health-indicator" title={getRealmHealth(realm).label}>
+                  <span class="health-icon">{getRealmHealth(realm).icon}</span>
+                  <span class="health-label">{getRealmHealth(realm).label}</span>
+                </div>
+              </div>
               <span class="realm-id">{realm.id}</span>
             </div>
             
@@ -211,17 +261,24 @@
               </p>
             </div>
             
-            <div class="realm-actions">
+            <div class="realm-actions" on:click|stopPropagation>
+              <button 
+                class="btn btn-secondary btn-sm"
+                on:click={() => copyLink(realm)}
+                title="Copy public link"
+              >
+                {copiedLink === realm.id ? '✓ Copied!' : '🔗 Copy Link'}
+              </button>
               {#if realm.url}
                 <button 
-                  class="btn btn-primary"
+                  class="btn btn-primary btn-sm"
                   on:click={() => window.open(`https://${realm.url}`, '_blank')}
                 >
-                  Visit Realm
+                  Visit
                 </button>
               {/if}
               <button 
-                class="btn btn-danger"
+                class="btn btn-danger btn-sm"
                 on:click={() => removeRealm(realm.id)}
               >
                 Remove
@@ -237,6 +294,88 @@
     {/if}
   </main>
 </div>
+
+<!-- Realm Details Drawer -->
+{#if showDrawer && selectedRealm}
+  <div class="drawer-overlay" on:click={closeDrawer}>
+    <div class="drawer" on:click|stopPropagation>
+      <div class="drawer-header">
+        <h2>{selectedRealm.name}</h2>
+        <button class="close-btn" on:click={closeDrawer}>✕</button>
+      </div>
+      
+      <div class="drawer-content">
+        <div class="status-section">
+          <h3>Status</h3>
+          <div class="status-card">
+            <div class="status-indicator">
+              <span class="status-icon">{getRealmHealth(selectedRealm).icon}</span>
+              <span class="status-text">{getRealmHealth(selectedRealm).label}</span>
+            </div>
+            <div class="status-details">
+              <p><strong>Realm ID:</strong> {selectedRealm.id}</p>
+              <p><strong>Created:</strong> {formatDate(selectedRealm.created_at)}</p>
+              {#if selectedRealm.url}
+                <p><strong>URL:</strong> <code>{selectedRealm.url}</code></p>
+              {/if}
+            </div>
+          </div>
+        </div>
+        
+        <div class="sharing-section">
+          <h3>Share Realm</h3>
+          <div class="sharing-card">
+            <div class="public-link">
+              <label>Public Link:</label>
+              <div class="link-input">
+                <input 
+                  type="text" 
+                  value={getPublicLink(selectedRealm)} 
+                  readonly 
+                  class="link-field"
+                />
+                <button 
+                  class="btn btn-primary btn-sm"
+                  on:click={() => copyLink(selectedRealm)}
+                >
+                  {copiedLink === selectedRealm.id ? '✓' : 'Copy'}
+                </button>
+              </div>
+            </div>
+            
+            <div class="qr-code">
+              <label>QR Code:</label>
+              <div class="qr-container">
+                <img 
+                  src={generateQRCode(getPublicLink(selectedRealm))} 
+                  alt="QR Code for {selectedRealm.name}"
+                  class="qr-image"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="actions-section">
+          {#if selectedRealm.url}
+            <button 
+              class="btn btn-primary"
+              on:click={() => window.open(`https://${selectedRealm.url}`, '_blank')}
+            >
+              🌐 Visit Realm
+            </button>
+          {/if}
+          <button 
+            class="btn btn-danger"
+            on:click={() => { removeRealm(selectedRealm.id); closeDrawer(); }}
+          >
+            🗑️ Remove Realm
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   :global(body) {
@@ -402,25 +541,75 @@
 
   .realm-card {
     border: 1px solid #e1e5e9;
-    border-radius: 8px;
+    border-radius: 12px;
     padding: 1.5rem;
     background: #fafbfc;
-    transition: transform 0.2s, box-shadow 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .realm-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    transition: left 0.5s;
   }
 
   .realm-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+    border-color: #667eea;
+  }
+
+  .realm-card:hover::before {
+    left: 100%;
+  }
+
+  .realm-card:active {
+    transform: translateY(-4px) scale(1.01);
   }
 
   .realm-header {
     margin-bottom: 1rem;
   }
 
+  .realm-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+
   .realm-name {
-    margin: 0 0 0.5rem 0;
+    margin: 0;
     color: #2c3e50;
     font-size: 1.25rem;
+  }
+
+  .health-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.8);
+    border: 1px solid #e1e5e9;
+  }
+
+  .health-icon {
+    font-size: 0.9rem;
+  }
+
+  .health-label {
+    font-weight: 500;
+    color: #495057;
   }
 
   .realm-id {
@@ -486,6 +675,178 @@
 
   .btn-danger:hover {
     background: #c82333;
+  }
+
+  .btn-secondary {
+    background: #6c757d;
+    color: white;
+  }
+
+  .btn-secondary:hover {
+    background: #5a6268;
+  }
+
+  .btn-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  /* Drawer Styles */
+  .drawer-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    display: flex;
+    justify-content: flex-end;
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .drawer {
+    width: 400px;
+    max-width: 90vw;
+    background: white;
+    height: 100vh;
+    overflow-y: auto;
+    box-shadow: -4px 0 20px rgba(0,0,0,0.1);
+    animation: slideIn 0.3s ease-out;
+  }
+
+  .drawer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e1e5e9;
+    background: #f8f9fa;
+  }
+
+  .drawer-header h2 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 1.5rem;
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6c757d;
+    padding: 0.5rem;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+  }
+
+  .close-btn:hover {
+    background: rgba(0,0,0,0.1);
+  }
+
+  .drawer-content {
+    padding: 1.5rem;
+  }
+
+  .status-section, .sharing-section, .actions-section {
+    margin-bottom: 2rem;
+  }
+
+  .status-section h3, .sharing-section h3 {
+    margin: 0 0 1rem 0;
+    color: #2c3e50;
+    font-size: 1.1rem;
+  }
+
+  .status-card, .sharing-card {
+    background: #f8f9fa;
+    border: 1px solid #e1e5e9;
+    border-radius: 8px;
+    padding: 1rem;
+  }
+
+  .status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background: white;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+  }
+
+  .status-icon {
+    font-size: 1.2rem;
+  }
+
+  .status-text {
+    font-weight: 600;
+    color: #495057;
+  }
+
+  .status-details p {
+    margin: 0.5rem 0;
+    font-size: 0.9rem;
+    color: #6c757d;
+  }
+
+  .public-link {
+    margin-bottom: 1.5rem;
+  }
+
+  .public-link label, .qr-code label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #495057;
+    font-size: 0.9rem;
+  }
+
+  .link-input {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .link-field {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-family: monospace;
+    background: white;
+  }
+
+  .qr-container {
+    text-align: center;
+    padding: 1rem;
+    background: white;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+  }
+
+  .qr-image {
+    max-width: 150px;
+    height: auto;
+    border-radius: 4px;
+  }
+
+  .actions-section {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideIn {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
   }
 
   .stats {
