@@ -26,7 +26,6 @@ from kybra import (
     Query,
     Record,
     StableBTreeMap,
-    Tuple,
     Variant,
     Vec,
     blob,

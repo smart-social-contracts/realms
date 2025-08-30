@@ -49,13 +49,11 @@ def main():
         canister_ids = load_canister_ids(args.canister_ids, args.network)
         
         # Check if required canisters exist
-        if "realm_backend" not in canister_ids:
-            print_error("realm_backend canister ID not found")
-            sys.exit(1)
-        
-        if "realm_frontend" not in canister_ids:
-            print_error("realm_frontend canister ID not found") 
-            sys.exit(1)
+        required_canisters = ["realm_backend", "realm_frontend", "realm_registry_backend", "realm_registry_frontend"]
+        for canister in required_canisters:
+            if canister not in canister_ids:
+                print_error(f"{canister} canister ID not found")
+                sys.exit(1)
         
         # Verify canisters
         backend_success = verify_backend(
@@ -70,8 +68,20 @@ def main():
             commit_hash
         )
         
-        # Exit with success only if both verifications pass
-        if backend_success and frontend_success:
+        registry_backend_success = verify_backend(
+            canister_ids["realm_registry_backend"], 
+            args.network,
+            commit_hash
+        )
+        
+        registry_frontend_success = verify_frontend(
+            canister_ids["realm_registry_frontend"], 
+            args.network,
+            commit_hash
+        )
+        
+        # Exit with success only if all verifications pass
+        if backend_success and frontend_success and registry_backend_success and registry_frontend_success:
             print_success("Deployment verification successful!")
             sys.exit(0)
         else:

@@ -4,7 +4,7 @@ set -e
 
 PYTHON_VERSION="3.10"
 NODE_VERSION="22"
-DFX_VERSION="0.27.0"
+DFX_VERSION="0.29.0"
 KYBRA_VERSION="0.7.1"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -238,7 +238,6 @@ main() {
     install_kybra
     install_kybra_prerequisites
     setup_project_dependencies
-    install_playwright
     verify_installation
     
     log "ICP development environment setup completed successfully!"

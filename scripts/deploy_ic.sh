@@ -18,6 +18,8 @@ fi
 
 # Deploy all remaining canisters
 echo "Deploying all canisters to $NETWORK"
+dfx deploy --network "$NETWORK" --yes realm_registry_backend --mode=reinstall
+dfx deploy --network "$NETWORK" --yes realm_registry_frontend
 dfx deploy --network "$NETWORK" --yes realm_backend --mode=reinstall
 dfx deploy --network "$NETWORK" --yes realm_frontend
 
