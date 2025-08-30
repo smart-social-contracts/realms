@@ -68,7 +68,7 @@ from kybra import (
 from kybra_simple_db import Database
 from kybra_simple_logging import get_logger
 
-storage = StableBTreeMap[str, str](memory_id=1, max_key_size=100, max_value_size=2000)
+storage = StableBTreeMap[str, str](memory_id=1, max_key_size=100, max_value_size=3000)
 Database.init(db_storage=storage, audit_enabled=True)
 
 logger = get_logger("main")
@@ -1117,34 +1117,3 @@ def get_task_status(task_id: str) -> RealmResponse:
             f"Error getting task status for {task_id}: {str(e)}\n{traceback.format_exc()}"
         )
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@update
-def test_download_code_from_url(url: str, checksum: str = "") -> Async[RealmResponse]:
-    """Test function to download code from a URL with checksum verification"""
-    try:
-        logger.info(f"Testing download from URL: {url}")
-
-        # Use the local download_code_from_url function
-        expected_checksum = checksum if checksum and checksum.strip() else None
-        success, result = yield download_code_from_url(url, expected_checksum)
-
-        if success:
-            # Return success with preview of content
-            content_length = len(result)
-            preview = result[:500] + "..." if content_length > 500 else result
-
-            return RealmResponse(
-                success=True,
-                data=RealmResponseData(
-                    Message=f"Successfully downloaded {content_length} bytes from {url}",
-                    Data=preview,
-                ),
-            )
-        else:
-            return RealmResponse(success=False, data=RealmResponseData(Error=result))
-
-    except Exception as e:
-        error_msg = f"Error in test_download_code_from_url: {str(e)}"
-        logger.error(f"{error_msg}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=error_msg))
