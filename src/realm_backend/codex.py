@@ -1,4 +1,3 @@
-
 code = """
 print("inside the codex")
 
@@ -57,6 +56,3 @@ except Exception as e:
 logger.info("codex result: " + result)
 
 """.strip()
-
-
-    

@@ -11,6 +11,7 @@ from io import StringIO
 from typing import Any, Dict, List
 
 from ggg import Codex, Human, Instrument, Mandate, Organization, User
+
 from .models import RegistrationCode
 
 
@@ -412,7 +413,7 @@ def generate_registration_url(args: dict):
             created_by=created_by,
             frontend_url=frontend_url,
             email=email,
-            expires_in_hours=expires_in_hours
+            expires_in_hours=expires_in_hours,
         )
 
         return {
@@ -421,8 +422,8 @@ def generate_registration_url(args: dict):
                 "code": reg_code.code,
                 "registration_url": reg_code.registration_url,
                 "expires_at": datetime.fromtimestamp(reg_code.expires_at).isoformat(),
-                "user_id": reg_code.user_id
-            }
+                "user_id": reg_code.user_id,
+            },
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -443,7 +444,9 @@ def validate_registration_code(args: dict):
         # Check if valid
         if not reg_code.is_valid():
             current_timestamp = int(datetime.utcnow().timestamp())
-            reason = "expired" if reg_code.expires_at < current_timestamp else "already used"
+            reason = (
+                "expired" if reg_code.expires_at < current_timestamp else "already used"
+            )
             return {"success": False, "error": f"Registration code is {reason}"}
 
         return {
@@ -452,8 +455,8 @@ def validate_registration_code(args: dict):
                 "user_id": reg_code.user_id,
                 "email": reg_code.email,
                 "expires_at": datetime.fromtimestamp(reg_code.expires_at).isoformat(),
-                "created_by": reg_code.created_by
-            }
+                "created_by": reg_code.created_by,
+            },
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -464,7 +467,7 @@ def get_registration_codes(args: dict):
     try:
         user_id = args.get("user_id")
         include_used = args.get("include_used", False)
-        
+
         if user_id:
             codes = RegistrationCode.find_by_user_id(user_id)
         else:
@@ -484,12 +487,16 @@ def get_registration_codes(args: dict):
                     "registration_url": code.registration_url,
                     "expires_at": datetime.fromtimestamp(code.expires_at).isoformat(),
                     "used": code.used == 1,
-                    "used_at": datetime.fromtimestamp(code.used_at).isoformat() if code.used_at > 0 else None,
+                    "used_at": (
+                        datetime.fromtimestamp(code.used_at).isoformat()
+                        if code.used_at > 0
+                        else None
+                    ),
                     "created_by": code.created_by,
-                    "is_valid": code.is_valid()
+                    "is_valid": code.is_valid(),
                 }
                 for code in codes
-            ]
+            ],
         }
     except Exception as e:
         return {"success": False, "error": str(e)}

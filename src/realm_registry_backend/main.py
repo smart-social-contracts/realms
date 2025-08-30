@@ -3,17 +3,17 @@ import traceback
 from typing import Optional, Tuple
 
 from api.registry import (
-    list_registered_realms,
     add_registered_realm,
+    count_registered_realms,
     get_registered_realm,
+    list_registered_realms,
     remove_registered_realm,
     search_registered_realms,
-    count_registered_realms,
 )
 from core.candid_types_registry import (
-    RealmRecord,
     AddRealmResult,
     GetRealmResult,
+    RealmRecord,
     RealmsListRecord,
     SearchRealmsResult,
 )
@@ -41,7 +41,6 @@ from kybra import (
     update,
     void,
 )
-
 from kybra_simple_db import Database
 from kybra_simple_logging import get_logger
 
