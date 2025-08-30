@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { backend } from "$lib/canisters";
+  import QRCode from 'qrcode';
 
   let realms = [];
   let loading = true;
@@ -13,6 +14,7 @@
   let selectedRealm = null;
   let showDrawer = false;
   let copiedLink = null;
+  let qrCodeDataUrl = '';
 
   onMount(async () => {
     await loadRealms();
@@ -95,9 +97,11 @@
     return { status: 'offline', icon: '🔴', label: 'Offline' };
   }
 
-  function openRealmDetails(realm) {
+  async function openRealmDetails(realm) {
     selectedRealm = realm;
     showDrawer = true;
+    // Generate QR code when drawer opens
+    qrCodeDataUrl = await generateQRCode(getPublicLink(realm));
   }
 
   function closeDrawer() {
@@ -120,9 +124,21 @@
     }
   }
 
-  function generateQRCode(text) {
-    // Simple QR code using qr-server.com API
-    return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(text)}`;
+  async function generateQRCode(text) {
+    try {
+      const dataUrl = await QRCode.toDataURL(text, {
+        width: 200,
+        margin: 2,
+        color: {
+          dark: '#2c3e50',
+          light: '#ffffff'
+        }
+      });
+      return dataUrl;
+    } catch (err) {
+      console.error('Failed to generate QR code:', err);
+      return '';
+    }
   }
 
   function searchRealms() {
@@ -147,7 +163,7 @@
 
 <div class="container">
   <header class="header">
-    <h1>🌍 Realm Registry</h1>
+    <h1>🌍 Realms Registry</h1>
     <p class="subtitle">Discover and explore Realm instances on the Internet Computer</p>
   </header>
 
@@ -236,7 +252,7 @@
     {:else}
       <div class="realms-grid">
         {#each filteredRealms as realm}
-          <div class="realm-card" on:click={() => openRealmDetails(realm)}>
+          <button class="realm-card" on:click={() => openRealmDetails(realm)} type="button">
             <div class="realm-header">
               <div class="realm-title">
                 <h3 class="realm-name">{realm.name}</h3>
@@ -261,7 +277,7 @@
               </p>
             </div>
             
-            <div class="realm-actions" on:click|stopPropagation>
+            <div class="realm-actions" on:click|stopPropagation on:keydown|stopPropagation role="group" aria-label="Realm actions">
               <button 
                 class="btn btn-secondary btn-sm"
                 on:click={() => copyLink(realm)}
@@ -284,7 +300,7 @@
                 Remove
               </button>
             </div>
-          </div>
+          </button>
         {/each}
       </div>
       
@@ -293,12 +309,46 @@
       </div>
     {/if}
   </main>
+  
+  <!-- Footer -->
+  <footer class="footer">
+    <!-- Built on Internet Computer section -->
+    <div class="footer-ic">
+      <a href="https://internetcomputer.org" target="_blank" rel="noopener noreferrer" class="ic-link">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="ic-logo">
+          <circle cx="12" cy="12" r="10" fill="url(#gradient)" />
+          <path d="M8 12h8M12 8v8" stroke="white" stroke-width="2" stroke-linecap="round" />
+          <defs>
+            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#667eea" />
+              <stop offset="100%" style="stop-color:#764ba2" />
+            </linearGradient>
+          </defs>
+        </svg>
+        <span>Built on the Internet Computer</span>
+      </a>
+    </div>
+    
+    <!-- GitHub link -->
+    <div class="footer-links">
+      <a href="https://github.com/smart-social-contracts/realms" target="_blank" rel="noopener noreferrer" class="github-link">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+        </svg>
+      </a>
+    </div>
+    
+    <!-- Version info -->
+    <div class="footer-version">
+      <span>Realm Registry v1.0</span>
+    </div>
+  </footer>
 </div>
 
 <!-- Realm Details Drawer -->
 {#if showDrawer && selectedRealm}
-  <div class="drawer-overlay" on:click={closeDrawer}>
-    <div class="drawer" on:click|stopPropagation>
+  <div class="drawer-overlay" on:click={closeDrawer} on:keydown={(e) => e.key === 'Escape' && closeDrawer()} role="dialog" aria-modal="true">
+    <div class="drawer" on:click|stopPropagation on:keydown|stopPropagation role="document">
       <div class="drawer-header">
         <h2>{selectedRealm.name}</h2>
         <button class="close-btn" on:click={closeDrawer}>✕</button>
@@ -326,9 +376,10 @@
           <h3>Share Realm</h3>
           <div class="sharing-card">
             <div class="public-link">
-              <label>Public Link:</label>
+              <label for="public-link-input">Public Link:</label>
               <div class="link-input">
                 <input 
+                  id="public-link-input"
                   type="text" 
                   value={getPublicLink(selectedRealm)} 
                   readonly 
@@ -344,13 +395,17 @@
             </div>
             
             <div class="qr-code">
-              <label>QR Code:</label>
-              <div class="qr-container">
-                <img 
-                  src={generateQRCode(getPublicLink(selectedRealm))} 
-                  alt="QR Code for {selectedRealm.name}"
-                  class="qr-image"
-                />
+              <label for="qr-code-container">QR Code:</label>
+              <div id="qr-code-container" class="qr-container">
+                {#if qrCodeDataUrl}
+                  <img 
+                    src={qrCodeDataUrl} 
+                    alt="QR Code for {selectedRealm.name}"
+                    class="qr-image"
+                  />
+                {:else}
+                  <div class="qr-loading">Generating QR code...</div>
+                {/if}
               </div>
             </div>
           </div>
@@ -381,9 +436,10 @@
   :global(body) {
     margin: 0;
     padding: 0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+    background: #FAFAFA;
     min-height: 100vh;
+    color: #171717;
   }
 
   .container {
@@ -398,19 +454,26 @@
   .header {
     text-align: center;
     margin-bottom: 2rem;
-    color: white;
+    color: #171717;
+  }
+
+  .logo {
+    height: 3rem;
+    margin-bottom: 1rem;
   }
 
   .header h1 {
-    font-size: 3rem;
+    font-size: 2.5rem;
     margin: 0;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    font-weight: 700;
+    color: #171717;
   }
 
   .subtitle {
     font-size: 1.2rem;
     margin: 1rem 0 0 0;
-    opacity: 0.9;
+    color: #525252;
+    font-weight: 400;
   }
 
   .controls {
@@ -430,14 +493,17 @@
     width: 100%;
     padding: 1rem;
     font-size: 1rem;
-    border: none;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    border: 1px solid #E5E5E5;
+    border-radius: 0.5rem;
+    background: #FFFFFF;
+    color: #171717;
+    font-family: inherit;
   }
 
   .search-input:focus {
     outline: none;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    border-color: #525252;
+    box-shadow: 0 0 0 3px rgba(82, 82, 82, 0.1);
   }
 
   .add-btn {
@@ -445,16 +511,18 @@
   }
 
   .add-form {
-    background: white;
+    background: #FFFFFF;
     padding: 2rem;
-    border-radius: 12px;
+    border-radius: 0.75rem;
     margin-bottom: 2rem;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    border: 1px solid #E5E5E5;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.12), 0 2px 4px -1px rgba(0, 0, 0, 0.08);
   }
 
   .add-form h3 {
     margin: 0 0 1rem 0;
-    color: #2c3e50;
+    color: #171717;
+    font-weight: 600;
   }
 
   .form-row {
@@ -468,15 +536,18 @@
     flex: 1;
     min-width: 200px;
     padding: 0.75rem;
-    border: 1px solid #ddd;
-    border-radius: 6px;
+    border: 1px solid #E5E5E5;
+    border-radius: 0.375rem;
     font-size: 1rem;
+    background: #FFFFFF;
+    color: #171717;
+    font-family: inherit;
   }
 
   .form-input:focus {
     outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+    border-color: #525252;
+    box-shadow: 0 0 0 3px rgba(82, 82, 82, 0.1);
   }
 
   .form-actions {
@@ -485,31 +556,32 @@
   }
 
   .error-banner {
-    background: #fee;
-    color: #c33;
+    background: #FAFAFA;
+    color: #737373;
     padding: 1rem;
-    border-radius: 8px;
+    border-radius: 0.5rem;
     margin-bottom: 2rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border: 1px solid #fcc;
+    border: 1px solid #D4D4D4;
   }
 
   .error-banner button {
     background: none;
     border: none;
-    color: #c33;
+    color: #737373;
     cursor: pointer;
     font-size: 1.2rem;
   }
 
   .main-content {
     flex: 1;
-    background: white;
-    border-radius: 12px;
+    background: #FFFFFF;
+    border-radius: 0.75rem;
     padding: 2rem;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    border: 1px solid #E5E5E5;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.12), 0 2px 4px -1px rgba(0, 0, 0, 0.08);
   }
 
   .loading, .empty-state {
@@ -520,8 +592,8 @@
   .spinner {
     width: 40px;
     height: 40px;
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #667eea;
+    border: 4px solid #F5F5F5;
+    border-top: 4px solid #525252;
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin: 0 auto 1rem;
@@ -540,39 +612,40 @@
   }
 
   .realm-card {
-    border: 1px solid #e1e5e9;
-    border-radius: 12px;
+    background: #FFFFFF;
+    border-radius: 0.75rem;
     padding: 1.5rem;
-    background: #fafbfc;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid #E5E5E5;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    transition: all 0.15s ease-in-out;
     cursor: pointer;
     position: relative;
     overflow: hidden;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+    font-size: inherit;
   }
 
   .realm-card::before {
     content: '';
     position: absolute;
     top: 0;
-    left: -100%;
+    left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-    transition: left 0.5s;
+    background: linear-gradient(90deg, transparent, rgba(23, 23, 23, 0.05), transparent);
+    transition: left 0.3s ease-in-out;
   }
 
   .realm-card:hover {
-    transform: translateY(-8px) scale(1.02);
-    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-    border-color: #667eea;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    border-color: #D4D4D4;
   }
 
   .realm-card:hover::before {
     left: 100%;
-  }
-
-  .realm-card:active {
-    transform: translateY(-4px) scale(1.01);
   }
 
   .realm-header {
@@ -644,54 +717,58 @@
   }
 
   .btn {
-    padding: 0.5rem 1rem;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
+    padding: 0.75rem 1.5rem;
+    border: 1px solid transparent;
+    border-radius: 0.375rem;
     font-size: 0.875rem;
-    transition: background-color 0.2s;
-    text-decoration: none;
-    display: inline-block;
-  }
-
-  .btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    font-weight: 500;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .btn-primary {
-    background: #667eea;
-    color: white;
+    background: #171717;
+    color: #FFFFFF;
+    border-color: #171717;
   }
 
-  .btn-primary:hover:not(:disabled) {
-    background: #5a6fd8;
-  }
-
-  .btn-danger {
-    background: #dc3545;
-    color: white;
-  }
-
-  .btn-danger:hover {
-    background: #c82333;
+  .btn-primary:hover {
+    background: #262626;
+    border-color: #262626;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.12), 0 2px 4px -1px rgba(0, 0, 0, 0.08);
   }
 
   .btn-secondary {
-    background: #6c757d;
-    color: white;
+    background: #FFFFFF;
+    color: #171717;
+    border-color: #E5E5E5;
   }
 
   .btn-secondary:hover {
-    background: #5a6268;
+    background: #F5F5F5;
+    border-color: #D4D4D4;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.12), 0 2px 4px -1px rgba(0, 0, 0, 0.08);
   }
 
-  .btn-sm {
-    padding: 0.375rem 0.75rem;
-    font-size: 0.8rem;
+  .btn-danger {
+    background: #DC2626;
+    color: #FFFFFF;
+    border-color: #DC2626;
   }
 
-  /* Drawer Styles */
+  .btn-danger:hover {
+    background: #B91C1C;
+    border-color: #B91C1C;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.12), 0 2px 4px -1px rgba(220, 38, 38, 0.08);
+  }
+
   .drawer-overlay {
     position: fixed;
     top: 0;
@@ -706,28 +783,29 @@
   }
 
   .drawer {
-    width: 400px;
-    max-width: 90vw;
-    background: white;
-    height: 100vh;
+    width: 500px;
+    height: 100%;
+    background: #FFFFFF;
+    border-left: 1px solid #E5E5E5;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
     overflow-y: auto;
-    box-shadow: -4px 0 20px rgba(0,0,0,0.1);
-    animation: slideIn 0.3s ease-out;
   }
 
+
   .drawer-header {
+    padding: 2rem;
+    border-bottom: 1px solid #E5E5E5;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1.5rem;
-    border-bottom: 1px solid #e1e5e9;
-    background: #f8f9fa;
   }
 
   .drawer-header h2 {
     margin: 0;
-    color: #2c3e50;
-    font-size: 1.5rem;
+    color: #171717;
+    font-weight: 600;
   }
 
   .close-btn {
@@ -746,7 +824,22 @@
   }
 
   .drawer-content {
-    padding: 1.5rem;
+    padding: 2rem;
+  }
+
+  .drawer-content label {
+    font-weight: 600;
+    color: #171717;
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+  }
+
+  .drawer-content p {
+    margin: 0 0 1.5rem 0;
+    color: #525252;
+    word-break: break-all;
+    font-size: 0.875rem;
   }
 
   .status-section, .sharing-section, .actions-section {
@@ -855,6 +948,44 @@
     font-size: 0.9rem;
     padding-top: 1rem;
     border-top: 1px solid #e1e5e9;
+  }
+
+  /* Footer Styles */
+  .footer {
+    margin-top: 3rem;
+    padding: 2rem 0;
+    border-top: 1px solid #E5E5E5;
+    text-align: center;
+    color: #737373;
+    font-size: 0.875rem;
+    background: #FAFAFA;
+  }
+
+
+  .footer-links {
+    display: flex;
+    justify-content: center;
+  }
+
+  .github-link {
+    color: #6c757d;
+    transition: color 0.2s;
+    padding: 0.5rem;
+    border-radius: 6px;
+  }
+
+  .github-link:hover {
+    color: #2c3e50;
+    background: rgba(0,0,0,0.05);
+  }
+
+  .footer-version {
+    text-align: center;
+  }
+
+  .footer-version span {
+    font-size: 0.8rem;
+    color: #9ca3af;
   }
 
   @media (max-width: 768px) {
