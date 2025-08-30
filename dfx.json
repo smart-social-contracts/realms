@@ -24,7 +24,6 @@
       "type": "custom",
       "wasm": ".kybra/realm_backend/realm_backend.wasm"
     },
-
     "realm_frontend": {
       "source": [
         "src/realm_frontend/dist"
@@ -36,6 +35,36 @@
       "type": "custom",
       "wasm": ".wasm/vault.wasm",
       "candid": ".wasm/vault.did"
+    },
+    "realm_registry_backend": {
+      "build": "python -m kybra realm_registry_backend src/realm_registry_backend/main.py",
+      "candid": "src/realm_registry_backend/realm_registry_backend.did",
+      "declarations": {
+        "node_compatibility": true
+      },
+      "gzip": true,
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ],
+      "tech_stack": {
+        "cdk": {
+          "kybra": {}
+        },
+        "language": {
+          "python": {}
+        }
+      },
+      "type": "custom",
+      "wasm": ".kybra/realm_registry_backend/realm_registry_backend.wasm"
+    },
+    "realm_registry_frontend": {
+      "source": [
+        "src/realm_registry_frontend/dist"
+      ],
+      "type": "assets",
+      "workspace": "realm_registry_frontend"
     },
     "internet_identity": {
       "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",

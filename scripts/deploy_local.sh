@@ -37,10 +37,15 @@ dfx stop 2>/dev/null || true
 dfx start --clean --background --host 127.0.0.1:$PORT --logfile dfx.log
 dfx deploy internet_identity
 scripts/install_extensions.sh
+dfx deploy realm_registry_backend --yes
 dfx deploy realm_backend --yes
+dfx generate realm_registry_backend
 dfx generate realm_backend
 npm install --legacy-peer-deps
+npm run prebuild --workspace realm_registry_frontend
+npm run build --workspace realm_registry_frontend
 npm run prebuild --workspace realm_frontend
 npm run build --workspace realm_frontend
 sh scripts/update_config.sh
+dfx deploy realm_registry_frontend
 dfx deploy realm_frontend

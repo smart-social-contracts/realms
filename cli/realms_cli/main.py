@@ -7,6 +7,14 @@ from typing import Optional, List
 
 from .commands.deploy import deploy_command
 from .commands.shell import shell_command
+from .commands.registry import (
+    registry_add_command,
+    registry_list_command,
+    registry_get_command,
+    registry_remove_command,
+    registry_search_command,
+    registry_count_command
+)
 from .utils import check_dependencies, display_info_panel
 
 console = Console()
@@ -144,6 +152,65 @@ def realm_extension(
     except Exception as e:
         console.print(f"[red]❌ Error executing extension call: {e}[/red]")
         raise typer.Exit(1)
+
+
+# Create registry subcommand group
+registry_app = typer.Typer(name="registry", help="Realm registry operations")
+realm_app.add_typer(registry_app, name="registry")
+
+@registry_app.command("add")
+def registry_add(
+    realm_id: str = typer.Option(..., "--id", help="Unique realm identifier"),
+    name: str = typer.Option(..., "--name", help="Human-readable realm name"),
+    url: str = typer.Option("", "--url", help="Realm URL or canister ID"),
+    network: str = typer.Option("local", "--network", "-n", help="Network to use"),
+    canister_id: Optional[str] = typer.Option(None, "--canister-id", help="Registry canister ID")
+) -> None:
+    """Add a new realm to the registry."""
+    registry_add_command(realm_id, name, url, network, canister_id)
+
+@registry_app.command("list")
+def registry_list(
+    network: str = typer.Option("local", "--network", "-n", help="Network to use"),
+    canister_id: Optional[str] = typer.Option(None, "--canister-id", help="Registry canister ID")
+) -> None:
+    """List all realms in the registry."""
+    registry_list_command(network, canister_id)
+
+@registry_app.command("get")
+def registry_get(
+    realm_id: str = typer.Option(..., "--id", help="Realm ID to retrieve"),
+    network: str = typer.Option("local", "--network", "-n", help="Network to use"),
+    canister_id: Optional[str] = typer.Option(None, "--canister-id", help="Registry canister ID")
+) -> None:
+    """Get a specific realm by ID."""
+    registry_get_command(realm_id, network, canister_id)
+
+@registry_app.command("remove")
+def registry_remove(
+    realm_id: str = typer.Option(..., "--id", help="Realm ID to remove"),
+    network: str = typer.Option("local", "--network", "-n", help="Network to use"),
+    canister_id: Optional[str] = typer.Option(None, "--canister-id", help="Registry canister ID")
+) -> None:
+    """Remove a realm from the registry."""
+    registry_remove_command(realm_id, network, canister_id)
+
+@registry_app.command("search")
+def registry_search(
+    query: str = typer.Option(..., "--query", help="Search query"),
+    network: str = typer.Option("local", "--network", "-n", help="Network to use"),
+    canister_id: Optional[str] = typer.Option(None, "--canister-id", help="Registry canister ID")
+) -> None:
+    """Search realms by name or ID."""
+    registry_search_command(query, network, canister_id)
+
+@registry_app.command("count")
+def registry_count(
+    network: str = typer.Option("local", "--network", "-n", help="Network to use"),
+    canister_id: Optional[str] = typer.Option(None, "--canister-id", help="Registry canister ID")
+) -> None:
+    """Get the total number of realms."""
+    registry_count_command(network, canister_id)
 
 
 @app.command("shell")
