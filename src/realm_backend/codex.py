@@ -1,4 +1,3 @@
-code = """
 print("inside the codex")
 
 from ggg import Mandate, User
@@ -55,4 +54,3 @@ except Exception as e:
 
 logger.info("codex result: " + result)
 
-""".strip()
