@@ -1,6 +1,6 @@
 """Data models for Realms CLI configuration."""
 
-from typing import Dict, List, Optional, Any, Literal
+from typing import Dict, List, Optional, Any, Literal, Union
 from pydantic import BaseModel, Field, validator
 import re
 
@@ -109,7 +109,7 @@ class RealmConfig(BaseModel):
     extensions: Dict[str, List[Extension]] = Field(default_factory=dict, description="Extensions organized by deployment phases")
     codexes: Dict[str, CodexConfig] = Field(default_factory=dict, description="Codex definitions")
     tasks: Dict[str, TaskConfig] = Field(default_factory=dict, description="Task definitions")
-    post_deployment: Optional[PostDeploymentConfig] = Field(None, description="Post-deployment configuration")
+    post_deployment: Optional[Union[PostDeploymentConfig, List[str]]] = Field(None, description="Post-deployment configuration (complex actions or simple command strings)")
     
     @validator('extensions')
     def validate_extension_phases(cls, v):

@@ -223,9 +223,16 @@ class RealmsShell:
 
 def shell_command(
     network: Optional[str] = typer.Option(None, "--network", "-n", help="Network to use (local, ic, etc.)"),
-    canister: str = typer.Option("realm_backend", "--canister", "-c", help="Canister name to connect to")
+    canister: str = typer.Option("realm_backend", "--canister", "-c", help="Canister name to connect to"),
+    file: Optional[str] = typer.Option(None, "--file", "-f", help="Execute Python file instead of interactive shell")
 ) -> None:
-    """Start an interactive Python shell connected to the Realms backend canister."""
+    """Start an interactive Python shell connected to the Realms backend canister or execute a Python file."""
+    # If file is provided, execute it instead of interactive shell
+    if file:
+        console.print(f"[bold blue]📄 Executing Python file: {file}[/bold blue]\n")
+        execute_python_file(file, canister, network)
+        return
+    
     console.print(f"[bold blue]🚀 Starting Realms Shell[/bold blue]\n")
     
     # Check if dfx is available
@@ -247,3 +254,40 @@ def shell_command(
     # Create and run the shell
     shell = RealmsShell(canister_name=canister, network=network)
     shell.run_shell()
+
+
+def execute_python_file(file_path: str, canister: str, network: Optional[str]) -> None:
+    """Execute a Python file on the Realms backend canister."""
+    import os
+    from pathlib import Path
+    
+    # Check if file exists
+    if not os.path.exists(file_path):
+        console.print(f"[red]❌ File not found: {file_path}[/red]")
+        raise typer.Exit(1)
+    
+    # Read the file content
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            code_content = f.read()
+    except Exception as e:
+        console.print(f"[red]❌ Error reading file: {e}[/red]")
+        raise typer.Exit(1)
+    
+    if not code_content.strip():
+        console.print(f"[yellow]⚠️  File is empty: {file_path}[/yellow]")
+        return
+    
+    console.print(f"[dim]Executing {len(code_content)} characters of Python code...[/dim]")
+    
+    # Create shell instance and execute the code
+    shell = RealmsShell(canister_name=canister, network=network)
+    
+    try:
+        result = shell.execute(code_content)
+        if result:
+            console.print(result)
+        console.print(f"[green]✅ Successfully executed {Path(file_path).name}[/green]")
+    except Exception as e:
+        console.print(f"[red]❌ Error executing file: {e}[/red]")
+        raise typer.Exit(1)

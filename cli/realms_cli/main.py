@@ -216,10 +216,11 @@ def registry_count(
 @app.command("shell")
 def shell(
     network: Optional[str] = typer.Option(None, "--network", "-n", help="Network to use (local, ic, etc.)"),
-    canister: str = typer.Option("realm_backend", "--canister", "-c", help="Canister name to connect to")
+    canister: str = typer.Option("realm_backend", "--canister", "-c", help="Canister name to connect to"),
+    file: Optional[str] = typer.Option(None, "--file", "-f", help="Execute Python file instead of interactive shell")
 ) -> None:
-    """Start an interactive Python shell connected to the Realms backend canister."""
-    shell_command(network, canister)
+    """Start an interactive Python shell connected to the Realms backend canister or execute a Python file."""
+    shell_command(network, canister, file)
 
 
 @app.command("version")

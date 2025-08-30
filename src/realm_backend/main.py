@@ -582,10 +582,34 @@ def initialize() -> void:
     # import codex
     # codex.run()
 
-    from codex import code
-
+    # Create a codex with the tax collection code
+    import codex
+    
     c = ggg.Codex()
-    c.code = code
+    c.code = """
+from ggg import Mandate, User
+from kybra_simple_logging import get_logger
+
+logger = get_logger("codex")
+
+def mandate_1_tax_payment():
+    # check if citizens have paid their taxes on time
+    user_count = User.count()
+    logger.info("mandate_1_tax_payment: User.count()" + str(user_count))
+    
+    if user_count == 0:
+        logger.info("No users found, skipping tax payment processing")
+        return
+    
+    # Process tax payments for users
+    logger.info("Processing tax payments for users")
+
+def run():
+    logger.info("run inside codex")
+    mandate_1_tax_payment()
+
+run()
+"""
 
     t = ggg.Task()
     t.codex = c

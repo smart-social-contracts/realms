@@ -155,9 +155,14 @@ def _show_deployment_plan(
                     console.print(f"    {status} {ext.name}")
     
     if not skip_post_deployment and config.post_deployment:
-        console.print(f"\n[bold]Post-deployment Actions ({len(config.post_deployment.actions)}):[/bold]")
-        for i, action in enumerate(config.post_deployment.actions, 1):
-            console.print(f"  {i}. {action.name or action.type}")
+        if isinstance(config.post_deployment, list):
+            console.print(f"\n[bold]Post-deployment Commands ({len(config.post_deployment)}):[/bold]")
+            for i, command in enumerate(config.post_deployment, 1):
+                console.print(f"  {i}. {command}")
+        else:
+            console.print(f"\n[bold]Post-deployment Actions ({len(config.post_deployment.actions)}):[/bold]")
+            for i, action in enumerate(config.post_deployment.actions, 1):
+                console.print(f"  {i}. {action.name or action.type}")
 
 
 
@@ -165,7 +170,17 @@ def _show_deployment_plan(
 def _execute_post_deployment_actions(config: RealmConfig, project_root: Path) -> None:
     """Execute post-deployment actions."""
     
-    if not config.post_deployment or not config.post_deployment.actions:
+    if not config.post_deployment:
+        return
+    
+    # Handle both simple string array and complex action format
+    if isinstance(config.post_deployment, list):
+        # Simple string array format
+        _execute_simple_post_deployment_commands(config.post_deployment, config, project_root)
+        return
+    
+    # Complex action format
+    if not config.post_deployment.actions:
         return
     
     actions = config.post_deployment.actions
@@ -196,6 +211,72 @@ def _execute_post_deployment_actions(config: RealmConfig, project_root: Path) ->
                     raise
         
         progress.update(task, description="[green]All post-deployment actions completed[/green]")
+
+
+def _execute_simple_post_deployment_commands(commands: List[str], config: RealmConfig, project_root: Path) -> None:
+    """Execute simple post-deployment commands from string array."""
+    
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TimeElapsedColumn(),
+        console=console
+    ) as progress:
+        
+        task = progress.add_task("Executing post-deployment commands...", total=len(commands))
+        
+        for i, command in enumerate(commands, 1):
+            progress.update(task, description=f"Running: {command}")
+            
+            try:
+                _execute_simple_command(command, config, project_root)
+                progress.advance(task)
+            except Exception as e:
+                console.print(f"[red]Command '{command}' failed: {e}[/red]")
+                raise
+        
+        progress.update(task, description="[green]All post-deployment commands completed[/green]")
+
+
+def _execute_simple_command(command: str, config: RealmConfig, project_root: Path) -> None:
+    """Execute a single simple post-deployment command."""
+    
+    # Handle shell scripts
+    if command.endswith('.sh'):
+        script_path = project_root / command
+        if not script_path.exists():
+            raise FileNotFoundError(f"Script not found: {script_path}")
+        
+        run_command([str(script_path)], cwd=project_root)
+        return
+    
+    # Handle realms shell -f commands
+    if command.startswith('realms shell -f '):
+        python_file = command.replace('realms shell -f ', '').strip()
+        python_path = project_root / python_file
+        
+        if not python_path.exists():
+            raise FileNotFoundError(f"Python file not found: {python_path}")
+        
+        # Import the shell command function
+        from .shell import execute_python_file
+        
+        # Execute the Python file using the shell command
+        canister = "realm_backend"
+        network = config.deployment.network
+        execute_python_file(str(python_path), canister, network)
+        return
+    
+    # Handle other command formats
+    if command.startswith('realms '):
+        # Parse realms CLI commands
+        cmd_parts = command.split()
+        run_command(cmd_parts, cwd=project_root)
+        return
+    
+    # Default: treat as shell command
+    run_command(command.split(), cwd=project_root)
 
 
 def _execute_single_action(action: PostDeploymentAction, config: RealmConfig, project_root: Path) -> None:
