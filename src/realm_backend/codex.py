@@ -1,4 +1,3 @@
-
 code = """
 print("inside the codex")
 
@@ -43,7 +42,7 @@ def run():
     logger.info("run inside codex")
     
     # TODO: Mandate1: check if citizens have paid their taxes on time
-    # TODO: Mandate2: pay any pending subsidies to citizens  
+    # TODO: Mandate2: pay any pending subsidies to citizens
     # TODO: Mandate3: pay any pending bills to providers
     mandate_1_tax_payment()
 
@@ -57,6 +56,3 @@ except Exception as e:
 logger.info("codex result: " + result)
 
 """.strip()
-
-
-    

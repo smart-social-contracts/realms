@@ -1,6 +1,6 @@
 import json
 import traceback
-from typing import Optional, Tuple
+from typing import Optional
 
 import api
 from api.extensions import list_extensions
@@ -82,7 +82,11 @@ class HttpRequest(Record):
     body: blob
 
 
-from kybra.canisters.management import HttpResponse, HttpTransformArgs, management_canister
+from kybra.canisters.management import (
+    HttpResponse,
+    HttpTransformArgs,
+    management_canister,
+)
 
 Header = Tuple[str, str]
 
@@ -127,17 +131,21 @@ def run() -> RealmResponse:
 
         # Execute legacy codex
         import codex
+
         codex.run()
-        
+
         # Process TaskManager queue (includes scheduled tasks)
         from core.task_manager import run_pending_tasks
+
         task_results = run_pending_tasks()
-        
+
         message = f"Run executed successfully. Processed {len(task_results)} tasks."
         logger.info(message)
         return RealmResponse(
-            success=True, 
-            data=RealmResponseData(Message=message, Data={"task_results": task_results})
+            success=True,
+            data=RealmResponseData(
+                Message=message, Data={"task_results": task_results}
+            ),
         )
     except Exception as e:
         logger.error(f"Error running: {str(e)}\n{traceback.format_exc()}")
@@ -572,11 +580,11 @@ def initialize() -> void:
                 f"Error registering entity type {name}: {str(e)}\n{traceback.format_exc()}"
             )
 
-
     # import codex
     # codex.run()
 
     from codex import code
+
     c = ggg.Codex()
     c.code = code
 
@@ -586,10 +594,11 @@ def initialize() -> void:
     t.metadata = "codex"
 
     from core.task_manager import task_manager
-    
+
     # task_manager.set_timer_interval(t, 1000)
     task_execution = task_manager.run_now(t)
     logger.info(f"Task execution result: {task_execution}")
+
 
 @init
 def init_() -> void:
@@ -681,14 +690,16 @@ def http_transform(args: HttpTransformArgs) -> HttpResponse:
     return http_response
 
 
-def download_code_from_url(url: str, expected_checksum: Optional[str] = None) -> Async[Tuple[bool, str]]:
+def download_code_from_url(
+    url: str, expected_checksum: Optional[str] = None
+) -> Async[Tuple[bool, str]]:
     """
     Download code from a URL and verify its checksum.
-    
+
     Args:
         url: The URL to download from
         expected_checksum: Optional SHA-256 checksum to verify against (format: "sha256:hash")
-    
+
     Returns:
         Tuple of (success: bool, result: str)
         - If success=True, result contains the downloaded code
@@ -696,7 +707,7 @@ def download_code_from_url(url: str, expected_checksum: Optional[str] = None) ->
     """
     try:
         logger.info(f"Downloading code from URL: {url}")
-        
+
         # Make HTTP request to download the code
         http_result: CallResult[HttpResponse] = yield management_canister.http_request(
             {
@@ -704,35 +715,34 @@ def download_code_from_url(url: str, expected_checksum: Optional[str] = None) ->
                 "max_response_bytes": 1024 * 1024,  # 1MB limit for security
                 "method": {"get": None},
                 "headers": [
-                    {
-                        "name": "User-Agent",
-                        "value": "Realms-Codex-Downloader/1.0"
-                    }
+                    {"name": "User-Agent", "value": "Realms-Codex-Downloader/1.0"}
                 ],
                 "body": None,
                 "transform": {
                     "function": (ic.id(), "http_transform"),
-                    "context": bytes()
+                    "context": bytes(),
                 },
             }
         ).with_cycles(15_000_000_000)
-        
+
         def handle_response(response: HttpResponse) -> Tuple[bool, str]:
             try:
                 # Decode the response body
-                code_content = response["body"].decode('utf-8')
+                code_content = response["body"].decode("utf-8")
                 logger.info(f"Successfully downloaded {len(code_content)} bytes")
-                
+
                 # Verify checksum if provided
                 if expected_checksum:
-                    is_valid, checksum_error = verify_checksum(code_content, expected_checksum)
+                    is_valid, checksum_error = verify_checksum(
+                        code_content, expected_checksum
+                    )
                     if not is_valid:
                         logger.error(f"Checksum verification failed: {checksum_error}")
                         return False, checksum_error
                     logger.info("Checksum verification passed")
-                
+
                 return True, code_content
-                
+
             except UnicodeDecodeError as e:
                 error_msg = f"Failed to decode response as UTF-8: {str(e)}"
                 logger.error(error_msg)
@@ -741,20 +751,14 @@ def download_code_from_url(url: str, expected_checksum: Optional[str] = None) ->
                 error_msg = f"Error processing response: {str(e)}"
                 logger.error(error_msg)
                 return False, error_msg
-        
+
         def handle_error(err: str) -> Tuple[bool, str]:
             error_msg = f"HTTP request failed: {err}"
             logger.error(error_msg)
             return False, error_msg
-        
-        return match(
-            http_result,
-            {
-                "Ok": handle_response,
-                "Err": handle_error
-            }
-        )
-        
+
+        return match(http_result, {"Ok": handle_response, "Err": handle_error})
+
     except Exception as e:
         error_msg = f"Unexpected error downloading code: {str(e)}"
         logger.error(error_msg)
@@ -764,32 +768,35 @@ def download_code_from_url(url: str, expected_checksum: Optional[str] = None) ->
 def verify_checksum(content: str, expected_checksum: str) -> Tuple[bool, str]:
     """
     Verify the SHA-256 checksum of content.
-    
+
     Args:
         content: The content to verify
         expected_checksum: Expected checksum in format "sha256:hash"
-    
+
     Returns:
         Tuple of (is_valid: bool, error_message: str)
     """
     try:
         import hashlib
-        
+
         # Parse the checksum format
         if not expected_checksum.startswith("sha256:"):
             return False, "Checksum must be in format 'sha256:hash'"
-        
+
         expected_hash = expected_checksum[7:]  # Remove "sha256:" prefix
-        
+
         # Calculate actual hash
-        actual_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()
-        
+        actual_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+
         # Compare hashes
         if actual_hash.lower() == expected_hash.lower():
             return True, ""
         else:
-            return False, f"Checksum mismatch. Expected: {expected_hash}, Got: {actual_hash}"
-            
+            return (
+                False,
+                f"Checksum mismatch. Expected: {expected_hash}, Got: {actual_hash}",
+            )
+
     except Exception as e:
         return False, f"Error verifying checksum: {str(e)}"
 
@@ -888,19 +895,22 @@ def run_task(task_id: str) -> RealmResponse:
     """Add a specific task to the execution queue"""
     try:
         from core.task_manager import execute_task
+
         success = execute_task(task_id)
         if success:
             return RealmResponse(
-                success=True, 
-                data=RealmResponseData(Message=f"Task {task_id} added to queue")
+                success=True,
+                data=RealmResponseData(Message=f"Task {task_id} added to queue"),
             )
         else:
             return RealmResponse(
-                success=False, 
-                data=RealmResponseData(Error=f"Failed to add task {task_id} to queue")
+                success=False,
+                data=RealmResponseData(Error=f"Failed to add task {task_id} to queue"),
             )
     except Exception as e:
-        logger.error(f"Error running task {task_id}: {str(e)}\n{traceback.format_exc()}")
+        logger.error(
+            f"Error running task {task_id}: {str(e)}\n{traceback.format_exc()}"
+        )
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
@@ -909,10 +919,13 @@ def process_task_queue() -> RealmResponse:
     """Process all pending tasks in the TaskManager queue"""
     try:
         from core.task_manager import run_pending_tasks
+
         results = run_pending_tasks()
         return RealmResponse(
-            success=True, 
-            data=RealmResponseData(Message=f"Processed {len(results)} tasks", Data=results)
+            success=True,
+            data=RealmResponseData(
+                Message=f"Processed {len(results)} tasks", Data=results
+            ),
         )
     except Exception as e:
         logger.error(f"Error processing task queue: {str(e)}\n{traceback.format_exc()}")
@@ -924,10 +937,11 @@ def clear_task_queue() -> RealmResponse:
     """Clear all pending tasks from the queue"""
     try:
         from core.task_manager import task_manager
+
         cleared_count = task_manager.clear_queue()
         return RealmResponse(
-            success=True, 
-            data=RealmResponseData(Message=f"Cleared {cleared_count} tasks from queue")
+            success=True,
+            data=RealmResponseData(Message=f"Cleared {cleared_count} tasks from queue"),
         )
     except Exception as e:
         logger.error(f"Error clearing task queue: {str(e)}\n{traceback.format_exc()}")
@@ -939,19 +953,24 @@ def cancel_task(task_id: str) -> RealmResponse:
     """Cancel a pending task by removing it from the queue"""
     try:
         from core.task_manager import task_manager
+
         success = task_manager.cancel_task(task_id)
         if success:
             return RealmResponse(
-                success=True, 
-                data=RealmResponseData(Message=f"Task {task_id} cancelled successfully")
+                success=True,
+                data=RealmResponseData(
+                    Message=f"Task {task_id} cancelled successfully"
+                ),
             )
         else:
             return RealmResponse(
-                success=False, 
-                data=RealmResponseData(Error=f"Task {task_id} not found in queue")
+                success=False,
+                data=RealmResponseData(Error=f"Task {task_id} not found in queue"),
             )
     except Exception as e:
-        logger.error(f"Error cancelling task {task_id}: {str(e)}\n{traceback.format_exc()}")
+        logger.error(
+            f"Error cancelling task {task_id}: {str(e)}\n{traceback.format_exc()}"
+        )
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
@@ -960,19 +979,26 @@ def create_task_timer(task_id: str, delay_seconds: nat) -> RealmResponse:
     """Create a one-time timer to execute a task after delay_seconds"""
     try:
         from core.task_manager import create_task_timer
+
         success = create_task_timer(task_id, int(delay_seconds))
         if success:
             return RealmResponse(
-                success=True, 
-                data=RealmResponseData(Message=f"Timer created for task {task_id} with {delay_seconds}s delay")
+                success=True,
+                data=RealmResponseData(
+                    Message=f"Timer created for task {task_id} with {delay_seconds}s delay"
+                ),
             )
         else:
             return RealmResponse(
-                success=False, 
-                data=RealmResponseData(Error=f"Failed to create timer for task {task_id}")
+                success=False,
+                data=RealmResponseData(
+                    Error=f"Failed to create timer for task {task_id}"
+                ),
             )
     except Exception as e:
-        logger.error(f"Error creating timer for task {task_id}: {str(e)}\n{traceback.format_exc()}")
+        logger.error(
+            f"Error creating timer for task {task_id}: {str(e)}\n{traceback.format_exc()}"
+        )
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
@@ -981,19 +1007,26 @@ def create_task_interval_timer(task_id: str, interval_seconds: nat) -> RealmResp
     """Create a recurring timer to execute a task every interval_seconds"""
     try:
         from core.task_manager import create_task_interval_timer
+
         success = create_task_interval_timer(task_id, int(interval_seconds))
         if success:
             return RealmResponse(
-                success=True, 
-                data=RealmResponseData(Message=f"Interval timer created for task {task_id} with {interval_seconds}s interval")
+                success=True,
+                data=RealmResponseData(
+                    Message=f"Interval timer created for task {task_id} with {interval_seconds}s interval"
+                ),
             )
         else:
             return RealmResponse(
-                success=False, 
-                data=RealmResponseData(Error=f"Failed to create interval timer for task {task_id}")
+                success=False,
+                data=RealmResponseData(
+                    Error=f"Failed to create interval timer for task {task_id}"
+                ),
             )
     except Exception as e:
-        logger.error(f"Error creating interval timer for task {task_id}: {str(e)}\n{traceback.format_exc()}")
+        logger.error(
+            f"Error creating interval timer for task {task_id}: {str(e)}\n{traceback.format_exc()}"
+        )
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
@@ -1002,19 +1035,22 @@ def cancel_task_timer(task_id: str) -> RealmResponse:
     """Cancel a timer for a specific task"""
     try:
         from core.task_manager import cancel_task_timer
+
         success = cancel_task_timer(task_id)
         if success:
             return RealmResponse(
-                success=True, 
-                data=RealmResponseData(Message=f"Timer cancelled for task {task_id}")
+                success=True,
+                data=RealmResponseData(Message=f"Timer cancelled for task {task_id}"),
             )
         else:
             return RealmResponse(
-                success=False, 
-                data=RealmResponseData(Error=f"No timer found for task {task_id}")
+                success=False,
+                data=RealmResponseData(Error=f"No timer found for task {task_id}"),
             )
     except Exception as e:
-        logger.error(f"Error cancelling timer for task {task_id}: {str(e)}\n{traceback.format_exc()}")
+        logger.error(
+            f"Error cancelling timer for task {task_id}: {str(e)}\n{traceback.format_exc()}"
+        )
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
@@ -1023,10 +1059,11 @@ def get_active_timers() -> RealmResponse:
     """Get list of all active timers"""
     try:
         from core.task_manager import get_active_timers
+
         timers = get_active_timers()
         return RealmResponse(
-            success=True, 
-            data=RealmResponseData(Message="Active timers retrieved", Data=timers)
+            success=True,
+            data=RealmResponseData(Message="Active timers retrieved", Data=timers),
         )
     except Exception as e:
         logger.error(f"Error getting active timers: {str(e)}\n{traceback.format_exc()}")
@@ -1038,19 +1075,24 @@ def get_task_status(task_id: str) -> RealmResponse:
     """Get the execution status of a specific task"""
     try:
         from core.task_manager import get_task_execution_status
+
         status = get_task_execution_status(task_id)
         if status:
             return RealmResponse(
-                success=True, 
-                data=RealmResponseData(Message=f"Task {task_id} status: {status}")
+                success=True,
+                data=RealmResponseData(Message=f"Task {task_id} status: {status}"),
             )
         else:
             return RealmResponse(
-                success=False, 
-                data=RealmResponseData(Error=f"Task {task_id} not found or no status available")
+                success=False,
+                data=RealmResponseData(
+                    Error=f"Task {task_id} not found or no status available"
+                ),
             )
     except Exception as e:
-        logger.error(f"Error getting task status for {task_id}: {str(e)}\n{traceback.format_exc()}")
+        logger.error(
+            f"Error getting task status for {task_id}: {str(e)}\n{traceback.format_exc()}"
+        )
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
@@ -1059,30 +1101,27 @@ def test_download_code_from_url(url: str, checksum: str = "") -> Async[RealmResp
     """Test function to download code from a URL with checksum verification"""
     try:
         logger.info(f"Testing download from URL: {url}")
-        
+
         # Use the local download_code_from_url function
         expected_checksum = checksum if checksum and checksum.strip() else None
         success, result = yield download_code_from_url(url, expected_checksum)
-        
+
         if success:
             # Return success with preview of content
             content_length = len(result)
             preview = result[:500] + "..." if content_length > 500 else result
-            
+
             return RealmResponse(
                 success=True,
                 data=RealmResponseData(
                     Message=f"Successfully downloaded {content_length} bytes from {url}",
-                    Data=preview
-                )
+                    Data=preview,
+                ),
             )
         else:
             return RealmResponse(success=False, data=RealmResponseData(Error=result))
-        
+
     except Exception as e:
         error_msg = f"Error in test_download_code_from_url: {str(e)}"
         logger.error(f"{error_msg}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(Error=error_msg))
-
-
-
