@@ -238,7 +238,6 @@ main() {
     install_kybra
     install_kybra_prerequisites
     setup_project_dependencies
-    install_playwright
     verify_installation
     
     log "ICP development environment setup completed successfully!"
