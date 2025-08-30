@@ -455,7 +455,7 @@ class BulkUploader:
                     url_data = {
                         "user_id": record["user_id"],
                         "email": record.get("email", ""),
-                        "registration_url": f"https://localhost:3000/extensions/admin_dashboard/user_registration?code=GENERATED_CODE",
+                        "registration_url": "https://localhost:3000/extensions/admin_dashboard/user_registration?code=GENERATED_CODE",
                         "status": "generated",
                     }
                     generated_urls.append(url_data)
@@ -498,7 +498,7 @@ class BulkUploader:
         print(f"🌐 Network: {self.network}")
 
         if self.dry_run:
-            print(f"🔍 Mode: DRY RUN")
+            print("🔍 Mode: DRY RUN")
             print(f"📄 Total Records: {self.total_records}")
             print(
                 f"📦 Total Batches: {len(self.create_batches([{}] * self.total_records))}"

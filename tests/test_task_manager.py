@@ -144,13 +144,13 @@ def test_execution_integration():
 
         # Test simple code execution
         result = run_code("result = 2 + 2")
-        assert result["success"] == True
+        assert result["success"] is True
         assert result["result"] == 4
         print("✓ Simple code execution works")
 
         # Test code with error
         result = run_code("invalid_syntax ===")
-        assert result["success"] == False
+        assert result["success"] is False
         assert "error" in result
         print("✓ Error handling in code execution works")
 
