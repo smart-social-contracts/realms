@@ -39,7 +39,14 @@
                 })
             });
             
-            const result = JSON.parse(response.response);
+            let result;
+            try {
+                result = JSON.parse(response.response);
+            } catch (e) {
+                console.error('Failed to parse registration URL response:', e);
+                error = 'Invalid response format from server';
+                return;
+            }
 
             if (result.success) {
                 generatedUrl = result.data.registration_url;
@@ -68,9 +75,15 @@
                 })
             });
 
-            const result = JSON.parse(response.response);
-            if (result.success) {
-                registrationCodes = result.data;
+            let result;
+            try {
+                result = JSON.parse(response.response);
+                if (result.success) {
+                    registrationCodes = result.data;
+                }
+            } catch (e) {
+                console.error('Failed to parse registration codes response:', e);
+                error = 'Invalid response format from server';
             }
         } catch (e) {
             console.error('Failed to load registration codes:', e);
