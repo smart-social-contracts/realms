@@ -584,7 +584,7 @@ def initialize() -> void:
 
     # Create a codex with the tax collection code
     import codex
-    
+
     c = ggg.Codex()
     c.code = """
 from ggg import Mandate, User
