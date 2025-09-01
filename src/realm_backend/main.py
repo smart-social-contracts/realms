@@ -64,9 +64,12 @@ from kybra import (
     text,
     update,
     void,
+    TimerId,
+    Duration
 )
 from kybra_simple_db import Database
 from kybra_simple_logging import get_logger
+from ggg import Codex
 
 storage = StableBTreeMap[str, str](memory_id=1, max_key_size=100, max_value_size=3000)
 Database.init(db_storage=storage, audit_enabled=True)
@@ -713,8 +716,34 @@ def http_transform(args: HttpTransformArgs) -> HttpResponse:
     return http_response
 
 
+@update
+def set_timer(delay: Duration) -> TimerId:
+    ic.call_self("timer_callback")
+    return ic.set_timer(delay, timer_callback)
+
+
+def timer_callback():
+    ic.print("timer_callback")
+
+
+@update
+def fire_download(codex_id: str) -> str:
+    logger.info("Firing download for codex: " + codex_id)
+    ic.set_timer(1, lambda: run_download)
+
+@update
+async def run_download() -> Async[None]:
+    codex_id = "test"
+    logger.info("Downloading code for codex: " + codex_id)
+    c = Codex[codex_id]
+    success, message = yield download_code_from_url(c.url, c.checksum, c)
+    logger.info("Success: " + str(success))
+    logger.info("Downloaded code: " + message)
+
+
+
 def download_code_from_url(
-    url: str, expected_checksum: Optional[str] = None
+    url: str, expected_checksum: Optional[str] = None, codex: Codex = None
 ) -> Async[Tuple[bool, str]]:
     """
     Download code from a URL and verify its checksum.
@@ -763,6 +792,10 @@ def download_code_from_url(
                         logger.error(f"Checksum verification failed: {checksum_error}")
                         return False, checksum_error
                     logger.info("Checksum verification passed")
+
+                if codex:
+                    codex.code = code_content
+                    logger.info("Codex code updated")
 
                 return True, code_content
 

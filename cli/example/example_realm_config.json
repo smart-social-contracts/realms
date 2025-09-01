@@ -59,6 +59,7 @@
   },
   "post_deployment": [
     "scripts/setup_demo.sh",
-    "realms shell -f cli/example_realm_config.py"
+    "realms realm codex import cli/example_realm_codex.py",
+    "realms realm import cli/example_realm_data.json"
   ]
 }

@@ -6,7 +6,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 import hashlib
 
 from rich.console import Console
@@ -211,3 +211,171 @@ def display_info_panel(title: str, message: str) -> None:
         title=f"[bold blue]{title}[/bold blue]",
         border_style="blue"
     ))
+
+
+# Realm Context Management
+
+def get_realms_config_dir() -> Path:
+    """Get the Realms configuration directory."""
+    config_dir = Path.home() / ".realms"
+    config_dir.mkdir(exist_ok=True)
+    return config_dir
+
+
+def get_context_file() -> Path:
+    """Get the path to the context configuration file."""
+    return get_realms_config_dir() / "context.json"
+
+
+def load_context() -> Dict[str, Any]:
+    """Load the current realm context."""
+    context_file = get_context_file()
+    if not context_file.exists():
+        return {}
+    
+    try:
+        with open(context_file, 'r') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return {}
+
+
+def save_context(context: Dict[str, Any]) -> None:
+    """Save the realm context."""
+    context_file = get_context_file()
+    try:
+        with open(context_file, 'w') as f:
+            json.dump(context, f, indent=2)
+    except IOError as e:
+        console.print(f"[red]Failed to save context: {e}[/red]")
+        raise
+
+
+def get_current_realm() -> Optional[str]:
+    """Get the current active realm name."""
+    context = load_context()
+    return context.get("current_realm")
+
+
+def set_current_realm(realm_name: str) -> None:
+    """Set the current active realm."""
+    context = load_context()
+    context["current_realm"] = realm_name
+    save_context(context)
+
+
+def unset_current_realm() -> None:
+    """Clear the current realm context."""
+    context = load_context()
+    context.pop("current_realm", None)
+    save_context(context)
+
+
+def get_current_network() -> str:
+    """Get the current active network (defaults to 'local')."""
+    context = load_context()
+    return context.get("current_network", "local")
+
+
+def set_current_network(network_name: str) -> None:
+    """Set the current active network."""
+    context = load_context()
+    context["current_network"] = network_name
+    save_context(context)
+
+
+def unset_current_network() -> None:
+    """Clear the current network context (reverts to 'local')."""
+    context = load_context()
+    context.pop("current_network", None)
+    save_context(context)
+
+
+def resolve_realm_details(realm_name: str, registry_network: Optional[str] = None, registry_canister: str = "realm_registry_backend") -> Tuple[str, str]:
+    """Resolve realm name to network and canister ID via registry lookup.
+    
+    Returns:
+        Tuple[str, str]: (network, canister_id)
+    """
+    # Use current network context if no registry network specified
+    effective_registry_network = registry_network or get_current_network()
+    
+    try:
+        # Call registry to get realm details
+        cmd = [
+            "dfx", "canister", "call",
+            "--network", effective_registry_network,
+            registry_canister,
+            "get_realm",
+            f'("{realm_name}")'
+        ]
+        
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=30
+        )
+        
+        # Parse the Candid output
+        output = result.stdout.strip()
+        if "Ok" in output:
+            # Extract realm details from Candid response
+            # This is a simplified parser - in production you'd use proper Candid parsing
+            if "url" in output:
+                # Extract canister ID from URL field
+                import re
+                canister_match = re.search(r'url = "([^"]+)"', output)
+                if canister_match:
+                    canister_id = canister_match.group(1)
+                    # For now, assume IC network if canister ID is provided
+                    # This could be enhanced to store network info in registry
+                    network = "ic" if len(canister_id) > 10 else "local"
+                    return network, canister_id
+            
+            # Fallback: assume local network with realm name as canister
+            return "local", f"{realm_name}_backend"
+        else:
+            raise ValueError(f"Realm '{realm_name}' not found in registry")
+            
+    except subprocess.CalledProcessError as e:
+        raise ValueError(f"Failed to lookup realm '{realm_name}': {e.stderr}")
+    except subprocess.TimeoutExpired:
+        raise ValueError(f"Timeout looking up realm '{realm_name}'")
+    except Exception as e:
+        raise ValueError(f"Error resolving realm '{realm_name}': {str(e)}")
+
+
+def get_effective_network_and_canister(explicit_network: Optional[str] = None, explicit_canister: Optional[str] = None) -> Tuple[str, str]:
+    """Get the effective network and canister, considering realm and network context.
+    
+    Priority:
+    1. Explicit parameters (if provided)
+    2. Current realm context (if set) - overrides network context
+    3. Current network context (if set)
+    4. Default values (local, realm_backend)
+    
+    Returns:
+        Tuple[str, str]: (network, canister_id)
+    """
+    # If both explicit parameters provided, use them
+    if explicit_network and explicit_canister:
+        return explicit_network, explicit_canister
+    
+    # Check for current realm context (highest priority)
+    current_realm = get_current_realm()
+    if current_realm:
+        try:
+            realm_network, realm_canister = resolve_realm_details(current_realm)
+            # Override with explicit parameters if provided
+            return explicit_network or realm_network, explicit_canister or realm_canister
+        except ValueError as e:
+            console.print(f"[yellow]Warning: {e}[/yellow]")
+            console.print(f"[yellow]Falling back to network/default values[/yellow]")
+    
+    # Use network context or explicit network
+    effective_network = explicit_network or get_current_network()
+    effective_canister = explicit_canister or "realm_backend"
+    
+    return effective_network, effective_canister

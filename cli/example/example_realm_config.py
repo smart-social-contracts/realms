@@ -1,6 +1,7 @@
 from ggg import Codex, Task
 from main import download_code_from_url
 
+
 print("Creating codex")
 
 c = Codex()
@@ -10,6 +11,15 @@ c.url = "https://raw.githubusercontent.com/smart-social-contracts/realms/refs/he
 c.checksum = "sha256:e45a166550a08eb872e3c14f517dc5b200cae354ee44cc07779d250dbbf4e575"
 
 print("Downloading code")
+
+
+task_steps =
+[
+    'download_code_from_url(Codex[...])', # download codex
+    'copy_the_code_in_codex(Codex[...]), create task and cheduled',
+]
+
+
 
 # The async function returns a generator in the execution environment
 download_generator = download_code_from_url(c.url, c.checksum)
@@ -41,3 +51,15 @@ if success:
     print("Task completed")
 else:
     print("Failed to download code, skipping task execution")
+
+
+def run(step):
+    if step == 0:
+        result = download_code_from_url(c.url, c.checksum)
+    elif step == 1:
+        result =task_and_schedule(c)
+    else:
+        raise Exception("Invalid step")
+
+    
+    

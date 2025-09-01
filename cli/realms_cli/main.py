@@ -15,7 +15,12 @@ from .commands.registry import (
     registry_search_command,
     registry_count_command
 )
-from .utils import check_dependencies, display_info_panel
+from .utils import (
+    check_dependencies, display_info_panel,
+    get_current_realm, set_current_realm, unset_current_realm,
+    get_current_network, set_current_network, unset_current_network,
+    get_effective_network_and_canister, resolve_realm_details
+)
 
 console = Console()
 
@@ -42,9 +47,21 @@ def deploy(
 
 
 @app.command("status")
-def status() -> None:
+def status(
+    network: Optional[str] = typer.Option(None, "--network", "-n", help="Network to use (overrides context)"),
+    canister: Optional[str] = typer.Option(None, "--canister", "-c", help="Canister name to check (overrides context)")
+) -> None:
     """Show status of current Realms project."""
     console.print("[bold blue]📊 Realms Project Status[/bold blue]\n")
+    
+    # Get effective network and canister from context
+    effective_network, effective_canister = get_effective_network_and_canister(network, canister)
+    
+    # Show current context
+    current_realm = get_current_realm()
+    if current_realm:
+        console.print(f"[dim]Using realm context: {current_realm}[/dim]")
+    console.print(f"[dim]Network: {effective_network}, Canister: {effective_canister}[/dim]\n")
     
     # Check dependencies
     console.print("[bold]Dependencies:[/bold]")
@@ -58,8 +75,12 @@ def status() -> None:
     console.print(f"\n[bold]Canister Status:[/bold]")
     try:
         import subprocess
+        cmd = ["dfx", "canister", "call", effective_canister, "status"]
+        if effective_network != "local":
+            cmd.extend(["--network", effective_network])
+        
         result = subprocess.run(
-            ["dfx", "canister", "call", "realm_backend", "status"], 
+            cmd, 
             capture_output=True, text=True, timeout=10
         )
         if result.returncode == 0:
@@ -78,7 +99,11 @@ def status() -> None:
     console.print(f"\n[bold]dfx Replica:[/bold]")
     try:
         import subprocess
-        result = subprocess.run(["dfx", "ping"], capture_output=True, text=True, timeout=5)
+        cmd = ["dfx", "ping"]
+        if effective_network != "local":
+            cmd.extend(["--network", effective_network])
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
             console.print("  ✅ dfx replica is running")
         else:
@@ -96,15 +121,19 @@ def realm_extension(
     extension_name: str = typer.Argument(help="Extension name"),
     function_name: str = typer.Argument(help="Function name to call"),
     args: str = typer.Argument(help="JSON arguments for the function"),
-    network: str = typer.Option("local", "--network", "-n", help="Network to use")
+    network: Optional[str] = typer.Option(None, "--network", "-n", help="Network to use (overrides context)")
 ) -> None:
     """Call an extension function on the realm backend."""
     console.print(f"[bold blue]🔧 Calling Extension Function[/bold blue]\n")
     
+    # Get effective network and canister from context
+    effective_network, effective_canister = get_effective_network_and_canister(network, None)
+    
     console.print(f"Extension: [cyan]{extension_name}[/cyan]")
     console.print(f"Function: [cyan]{function_name}[/cyan]")
     console.print(f"Args: [dim]{args}[/dim]")
-    console.print(f"Network: [dim]{network}[/dim]\n")
+    console.print(f"Network: [dim]{effective_network}[/dim]")
+    console.print(f"Canister: [dim]{effective_canister}[/dim]\n")
     
     try:
         import subprocess
@@ -127,9 +156,9 @@ def realm_extension(
   }}
 )'''
         
-        cmd = ["dfx", "canister", "call", "realm_backend", "extension_sync_call", call_record]
-        if network != "local":
-            cmd.extend(["--network", network])
+        cmd = ["dfx", "canister", "call", effective_canister, "extension_sync_call", call_record]
+        if effective_network != "local":
+            cmd.extend(["--network", effective_network])
         
         console.print("[dim]Executing...[/dim]")
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
@@ -213,14 +242,124 @@ def registry_count(
     registry_count_command(network, canister_id)
 
 
+# Realm context management commands
+@realm_app.command("set")
+def realm_set(
+    realm_name: str = typer.Argument(help="Realm name to set as current context")
+) -> None:
+    """Set the current realm context."""
+    console.print(f"[bold blue]🏛️  Setting Realm Context[/bold blue]\n")
+    
+    try:
+        # Verify realm exists in registry
+        network, canister = resolve_realm_details(realm_name)
+        set_current_realm(realm_name)
+        
+        console.print(f"[green]✅ Realm context set to: [bold]{realm_name}[/bold][/green]")
+        console.print(f"[dim]Network: {network}[/dim]")
+        console.print(f"[dim]Canister: {canister}[/dim]")
+        
+    except ValueError as e:
+        console.print(f"[red]❌ {e}[/red]")
+        console.print(f"[yellow]💡 Add the realm to registry first: realms realm registry add --id {realm_name} --name \"Realm Name\"[/yellow]")
+        raise typer.Exit(1)
+
+
+@realm_app.command("current")
+def realm_current() -> None:
+    """Show the current realm and network context."""
+    console.print(f"[bold blue]📍 Current Context[/bold blue]\n")
+    
+    current_realm = get_current_realm()
+    current_network = get_current_network()
+    
+    if current_realm:
+        try:
+            realm_network, realm_canister = resolve_realm_details(current_realm)
+            console.print(f"[green]🏛️  Realm: [bold]{current_realm}[/bold][/green]")
+            console.print(f"[dim]   Network: {realm_network}[/dim]")
+            console.print(f"[dim]   Canister: {realm_canister}[/dim]")
+        except ValueError as e:
+            console.print(f"[red]🏛️  Realm: [bold]{current_realm}[/bold] (⚠️  {e})[/red]")
+    else:
+        console.print(f"[dim]🏛️  Realm: Not set[/dim]")
+    
+    console.print(f"[cyan]🌐 Network: [bold]{current_network}[/bold][/cyan]")
+    
+    if not current_realm and current_network == "local":
+        console.print(f"\n[dim]💡 Using defaults: local network, realm_backend canister[/dim]")
+
+
+@realm_app.command("unset")
+def realm_unset() -> None:
+    """Clear the current realm context."""
+    console.print(f"[bold blue]🔄 Clearing Realm Context[/bold blue]\n")
+    
+    current_realm = get_current_realm()
+    if current_realm:
+        unset_current_realm()
+        console.print(f"[green]✅ Cleared realm context: [bold]{current_realm}[/bold][/green]")
+        console.print(f"[dim]Will use network context or defaults[/dim]")
+    else:
+        console.print(f"[yellow]No realm context set[/yellow]")
+
+
 @app.command("shell")
 def shell(
-    network: Optional[str] = typer.Option(None, "--network", "-n", help="Network to use (local, ic, etc.)"),
-    canister: str = typer.Option("realm_backend", "--canister", "-c", help="Canister name to connect to"),
+    network: Optional[str] = typer.Option(None, "--network", "-n", help="Network to use (overrides context)"),
+    canister: Optional[str] = typer.Option(None, "--canister", "-c", help="Canister name to connect to (overrides context)"),
     file: Optional[str] = typer.Option(None, "--file", "-f", help="Execute Python file instead of interactive shell")
 ) -> None:
     """Start an interactive Python shell connected to the Realms backend canister or execute a Python file."""
-    shell_command(network, canister, file)
+    # Get effective network and canister from context
+    effective_network, effective_canister = get_effective_network_and_canister(network, canister)
+    shell_command(effective_network, effective_canister, file)
+
+
+# Create network subcommand group
+network_app = typer.Typer(name="network", help="Network context management")
+app.add_typer(network_app, name="network")
+
+@network_app.command("set")
+def network_set(
+    network_name: str = typer.Argument(help="Network name to set as current context (local, ic, testnet, etc.)")
+) -> None:
+    """Set the current network context."""
+    console.print(f"[bold blue]🌐 Setting Network Context[/bold blue]\n")
+    
+    set_current_network(network_name)
+    console.print(f"[green]✅ Network context set to: [bold]{network_name}[/bold][/green]")
+    
+    # Show warning if realm context overrides network
+    current_realm = get_current_realm()
+    if current_realm:
+        console.print(f"[yellow]⚠️  Note: Realm context '[bold]{current_realm}[/bold]' may override network setting[/yellow]")
+
+
+@network_app.command("current")
+def network_current() -> None:
+    """Show the current network context."""
+    console.print(f"[bold blue]📍 Current Network Context[/bold blue]\n")
+    
+    current_network = get_current_network()
+    console.print(f"[cyan]🌐 Network: [bold]{current_network}[/bold][/cyan]")
+    
+    if current_network == "local":
+        console.print(f"[dim]💡 This is the default network[/dim]")
+
+
+@network_app.command("unset")
+def network_unset() -> None:
+    """Clear the current network context (reverts to 'local')."""
+    console.print(f"[bold blue]🔄 Clearing Network Context[/bold blue]\n")
+    
+    current_network = get_current_network()
+    if current_network != "local":
+        unset_current_network()
+        console.print(f"[green]✅ Cleared network context: [bold]{current_network}[/bold][/green]")
+        console.print(f"[dim]Reverted to default: local[/dim]")
+    else:
+        console.print(f"[yellow]Already using default network: local[/yellow]")
 
 
 @app.command("version")
