@@ -3,17 +3,26 @@ from typing import List, Callable
 from kybra import TimerId, Duration, void, ic, Async
 from execution import run_code
 from ggg.status import TaskStatus
+from ggg import Codex
 from kybra_simple_logging import get_logger
 
 logger = get_logger("core.task_manager")
 
 
-class Codex:
-    code = ""
+class SyncCall:
+    function_def = None
+    function_params = None
+    codex: Codex = None
 
     def function(self) -> void:
-        logger.info("Executing codex")
-        run_code(self.code)
+        logger.info("Executing sync call")
+        if self.codex:
+            logger.info("Executing codex")
+            run_code(self.codex.code)
+        else:
+            result = self.function_def(*self.function_params)
+            return result
+
 
 class AsyncCall:
     function_def = None
@@ -33,10 +42,10 @@ class TaskSchedule:
 
 
 class TaskStep:
-    call: Codex | AsyncCall
+    call: SyncCall | AsyncCall
     status: TaskStatus
 
-    def __init__(self, call: Codex | AsyncCall):
+    def __init__(self, call: SyncCall | AsyncCall):
         self.call = call
         self.status = TaskStatus.PENDING
 
@@ -96,7 +105,7 @@ class TaskManager:
                     step.status = TaskStatus.FAILED
                     task.status = TaskStatus.FAILED
             return async_timer_callback
-        else:
+        elif isinstance(step.call, SyncCall):
             def sync_timer_callback() -> void:
                 logger.info(f"Executing sync timer callback for {step.call}")
                 try:
