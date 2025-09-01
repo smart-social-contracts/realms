@@ -20,13 +20,3 @@ class Task(Entity, TimestampedMixin):
     schedules = ManyToMany("TaskSchedule", "tasks")
     codex = ManyToOne("Codex", "tasks")
     executions = OneToMany("TaskExecution", "task")
-
-    def run(self) -> TaskExecution:
-        execution_result = run_code(self.codex.code)
-
-        execution = TaskExecution()
-        execution.task = self
-        execution.logs = "\n".join(execution_result.get("logs") or [])
-        execution.result = execution_result.get("result")
-
-        return execution

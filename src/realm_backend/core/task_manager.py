@@ -2,16 +2,11 @@ from enum import Enum
 from typing import List, Callable
 from kybra import TimerId, Duration, void, ic, Async
 from execution import run_code
-
+from ggg.status import TaskStatus
 from kybra_simple_logging import get_logger
 
 logger = get_logger("core.task_manager")
 
-class Status(Enum):
-    PENDING = "PENDING"
-    IN_PROGRESS = "IN_PROGRESS"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
 
 class Codex:
     code = ""
@@ -39,11 +34,11 @@ class TaskSchedule:
 
 class TaskStep:
     call: Codex | AsyncCall
-    status: Status
+    status: TaskStatus
 
     def __init__(self, call: Codex | AsyncCall):
         self.call = call
-        self.status = Status.PENDING
+        self.status = TaskStatus.PENDING
 
 class TaskHistory:
     executed_at: int
@@ -56,7 +51,7 @@ class Task:
     schedule: TaskSchedule
     history: List[TaskHistory]
 
-    status: Status
+    status: TaskStatus
     step_to_execute: int
     
 
@@ -64,7 +59,7 @@ class Task:
         self.name = name
         self.steps = steps
         self.schedule = schedule
-        self.status = Status.PENDING
+        self.status = TaskStatus.PENDING
         self.history = []
         self.step_to_execute = 0
 
@@ -94,24 +89,24 @@ class TaskManager:
                     else:
                         result = yield step.call.function_def()
                     logger.info(f"Async timer callback completed with result: {result}")
-                    step.status = Status.COMPLETED
+                    step.status = TaskStatus.COMPLETED
                     self._check_and_schedule_next_step(task)
                 except Exception as e:
                     logger.error(f"Async timer callback failed: {e}")
-                    step.status = Status.FAILED
-                    task.status = Status.FAILED
+                    step.status = TaskStatus.FAILED
+                    task.status = TaskStatus.FAILED
             return async_timer_callback
         else:
             def sync_timer_callback() -> void:
                 logger.info(f"Executing sync timer callback for {step.call}")
                 try:
                     step.call.function()
-                    step.status = Status.COMPLETED
+                    step.status = TaskStatus.COMPLETED
                     self._check_and_schedule_next_step(task)
                 except Exception as e:
                     logger.error(f"Sync timer callback failed: {e}")
-                    step.status = Status.FAILED
-                    task.status = Status.FAILED
+                    step.status = TaskStatus.FAILED
+                    task.status = TaskStatus.FAILED
             return sync_timer_callback
 
     def _check_and_schedule_next_step(self, task: Task) -> void:
@@ -124,23 +119,23 @@ class TaskManager:
             
             callback_function = self._create_timer_callback(step, task)
             task.schedule.timer_id = ic.set_timer(Duration(task.schedule.seconds), callback_function)
-            step.status = Status.IN_PROGRESS
+            step.status = TaskStatus.RUNNING
             task.step_to_execute += 1
         else:
             logger.info(f"Task {task.name} completed all steps")
-            task.status = Status.COMPLETED
+            task.status = TaskStatus.COMPLETED
 
     def _update_timers(self) -> void:
         logger.info("Updating timers")
         for task in self.tasks:
-            if task.status == Status.PENDING:
+            if task.status == TaskStatus.PENDING:
                 step = task.steps[task.step_to_execute]
                 logger.info(f"Starting task {task.name} - executing step {task.step_to_execute}/{len(task.steps)}")
 
                 callback_function = self._create_timer_callback(step, task)
                 task.schedule.timer_id = ic.set_timer(Duration(task.schedule.seconds), callback_function)
-                step.status = Status.IN_PROGRESS
-                task.status = Status.IN_PROGRESS
+                step.status = TaskStatus.RUNNING
+                task.status = TaskStatus.RUNNING
                 task.step_to_execute += 1
                 
                 return
