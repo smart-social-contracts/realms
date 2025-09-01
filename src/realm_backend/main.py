@@ -126,34 +126,6 @@ def status() -> RealmResponse:
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
-@update
-def run() -> RealmResponse:
-    try:
-        logger.info("Executing run")
-
-        # Execute legacy codex
-        import codex
-
-        codex.run()
-
-        # Process TaskManager queue (includes scheduled tasks)
-        from core.task_manager import run_pending_tasks
-
-        task_results = run_pending_tasks()
-
-        message = f"Run executed successfully. Processed {len(task_results)} tasks."
-        logger.info(message)
-        return RealmResponse(
-            success=True,
-            data=RealmResponseData(
-                Message=message, Data={"task_results": task_results}
-            ),
-        )
-    except Exception as e:
-        logger.error(f"Error running: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
 @query
 def get_extensions() -> RealmResponse:
     """Get all available extensions with their metadata"""
@@ -582,49 +554,6 @@ def initialize() -> void:
                 f"Error registering entity type {name}: {str(e)}\n{traceback.format_exc()}"
             )
 
-    # import codex
-    # codex.run()
-
-    # Create a codex with the tax collection code
-    import codex
-
-    c = ggg.Codex()
-    c.code = """
-from ggg import Mandate, User
-from kybra_simple_logging import get_logger
-
-logger = get_logger("codex")
-
-def mandate_1_tax_payment():
-    # check if citizens have paid their taxes on time
-    user_count = User.count()
-    logger.info("mandate_1_tax_payment: User.count()" + str(user_count))
-    
-    if user_count == 0:
-        logger.info("No users found, skipping tax payment processing")
-        return
-    
-    # Process tax payments for users
-    logger.info("Processing tax payments for users")
-
-def run():
-    logger.info("run inside codex")
-    mandate_1_tax_payment()
-
-run()
-"""
-
-    t = ggg.Task()
-    t.codex = c
-    t.name = "codex"
-    t.metadata = "codex"
-
-    from core.task_manager import task_manager
-
-    # task_manager.set_timer_interval(t, 1000)
-    task_execution = task_manager.run_now(t)
-    logger.info(f"Task execution result: {task_execution}")
-
 
 @init
 def init_() -> void:
@@ -742,23 +671,22 @@ async def run_download() -> Async[None]:
 
 
 
-def download_code_from_url(
-    url: str, expected_checksum: Optional[str] = None, codex: Codex = None
-) -> Async[Tuple[bool, str]]:
+@update
+def download_file_from_url(url: str = '') -> Async[Tuple[bool, str]]:
     """
-    Download code from a URL and verify its checksum.
-
-    Args:
-        url: The URL to download from
-        expected_checksum: Optional SHA-256 checksum to verify against (format: "sha256:hash")
+    Download file from a URL.
 
     Returns:
         Tuple of (success: bool, result: str)
-        - If success=True, result contains the downloaded code
+        - If success=True, result contains the downloaded file content
         - If success=False, result contains the error message
     """
+
     try:
-        logger.info(f"Downloading code from URL: {url}")
+
+        url = "https://raw.githubusercontent.com/smart-social-contracts/realms/refs/heads/main/src/realm_backend/codex.py"
+        
+        ic.print(f"Downloading code from URL: {url}")
 
         # Make HTTP request to download the code
         http_result: CallResult[HttpResponse] = yield management_canister.http_request(
@@ -781,44 +709,34 @@ def download_code_from_url(
             try:
                 # Decode the response body
                 code_content = response["body"].decode("utf-8")
-                logger.info(f"Successfully downloaded {len(code_content)} bytes")
+                ic.print(f"Successfully downloaded {len(code_content)} bytes")
 
-                # Verify checksum if provided
-                if expected_checksum:
-                    is_valid, checksum_error = verify_checksum(
-                        code_content, expected_checksum
-                    )
-                    if not is_valid:
-                        logger.error(f"Checksum verification failed: {checksum_error}")
-                        return False, checksum_error
-                    logger.info("Checksum verification passed")
-
-                if codex:
-                    codex.code = code_content
-                    logger.info("Codex code updated")
-
+                global message, downloaded_content
+                message = "Downloaded successfully"
+                downloaded_content = code_content
                 return True, code_content
 
             except UnicodeDecodeError as e:
                 error_msg = f"Failed to decode response as UTF-8: {str(e)}"
-                logger.error(error_msg)
+                ic.print(error_msg)
                 return False, error_msg
             except Exception as e:
                 error_msg = f"Error processing response: {str(e)}"
-                logger.error(error_msg)
+                ic.print(error_msg)
                 return False, error_msg
 
         def handle_error(err: str) -> Tuple[bool, str]:
             error_msg = f"HTTP request failed: {err}"
-            logger.error(error_msg)
+            ic.print(error_msg)
             return False, error_msg
 
         return match(http_result, {"Ok": handle_response, "Err": handle_error})
 
     except Exception as e:
         error_msg = f"Unexpected error downloading code: {str(e)}"
-        logger.error(error_msg)
+        ic.print(error_msg)
         return False, error_msg
+
 
 
 def verify_checksum(content: str, expected_checksum: str) -> Tuple[bool, str]:
@@ -945,208 +863,48 @@ def execute_code(code: str) -> str:
     return stdout.getvalue() + stderr.getvalue()
 
 
-# TaskManager API endpoints
-@update
-def run_task(task_id: str) -> RealmResponse:
-    """Add a specific task to the execution queue"""
-    try:
-        from core.task_manager import execute_task
 
-        success = execute_task(task_id)
-        if success:
-            return RealmResponse(
-                success=True,
-                data=RealmResponseData(Message=f"Task {task_id} added to queue"),
-            )
-        else:
-            return RealmResponse(
-                success=False,
-                data=RealmResponseData(Error=f"Failed to add task {task_id} to queue"),
-            )
-    except Exception as e:
-        logger.error(
-            f"Error running task {task_id}: {str(e)}\n{traceback.format_exc()}"
-        )
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+from core.task_manager import AsyncCall, TaskManager, Task, TaskStep, Status, TaskSchedule, Codex
 
+downloaded_content: str = ''
 
 @update
-def process_task_queue() -> RealmResponse:
-    """Process all pending tasks in the TaskManager queue"""
-    try:
-        from core.task_manager import run_pending_tasks
-
-        results = run_pending_tasks()
-        return RealmResponse(
-            success=True,
-            data=RealmResponseData(
-                Message=f"Processed {len(results)} tasks", Data=results
-            ),
-        )
-    except Exception as e:
-        logger.error(f"Error processing task queue: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@update
-def clear_task_queue() -> RealmResponse:
-    """Clear all pending tasks from the queue"""
-    try:
-        from core.task_manager import task_manager
-
-        cleared_count = task_manager.clear_queue()
-        return RealmResponse(
-            success=True,
-            data=RealmResponseData(Message=f"Cleared {cleared_count} tasks from queue"),
-        )
-    except Exception as e:
-        logger.error(f"Error clearing task queue: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@update
-def cancel_task(task_id: str) -> RealmResponse:
-    """Cancel a pending task by removing it from the queue"""
-    try:
-        from core.task_manager import task_manager
-
-        success = task_manager.cancel_task(task_id)
-        if success:
-            return RealmResponse(
-                success=True,
-                data=RealmResponseData(
-                    Message=f"Task {task_id} cancelled successfully"
-                ),
-            )
-        else:
-            return RealmResponse(
-                success=False,
-                data=RealmResponseData(Error=f"Task {task_id} not found in queue"),
-            )
-    except Exception as e:
-        logger.error(
-            f"Error cancelling task {task_id}: {str(e)}\n{traceback.format_exc()}"
-        )
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@update
-def create_task_timer(task_id: str, delay_seconds: nat) -> RealmResponse:
-    """Create a one-time timer to execute a task after delay_seconds"""
-    try:
-        from core.task_manager import create_task_timer
-
-        success = create_task_timer(task_id, int(delay_seconds))
-        if success:
-            return RealmResponse(
-                success=True,
-                data=RealmResponseData(
-                    Message=f"Timer created for task {task_id} with {delay_seconds}s delay"
-                ),
-            )
-        else:
-            return RealmResponse(
-                success=False,
-                data=RealmResponseData(
-                    Error=f"Failed to create timer for task {task_id}"
-                ),
-            )
-    except Exception as e:
-        logger.error(
-            f"Error creating timer for task {task_id}: {str(e)}\n{traceback.format_exc()}"
-        )
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@update
-def create_task_interval_timer(task_id: str, interval_seconds: nat) -> RealmResponse:
-    """Create a recurring timer to execute a task every interval_seconds"""
-    try:
-        from core.task_manager import create_task_interval_timer
-
-        success = create_task_interval_timer(task_id, int(interval_seconds))
-        if success:
-            return RealmResponse(
-                success=True,
-                data=RealmResponseData(
-                    Message=f"Interval timer created for task {task_id} with {interval_seconds}s interval"
-                ),
-            )
-        else:
-            return RealmResponse(
-                success=False,
-                data=RealmResponseData(
-                    Error=f"Failed to create interval timer for task {task_id}"
-                ),
-            )
-    except Exception as e:
-        logger.error(
-            f"Error creating interval timer for task {task_id}: {str(e)}\n{traceback.format_exc()}"
-        )
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@update
-def cancel_task_timer(task_id: str) -> RealmResponse:
-    """Cancel a timer for a specific task"""
-    try:
-        from core.task_manager import cancel_task_timer
-
-        success = cancel_task_timer(task_id)
-        if success:
-            return RealmResponse(
-                success=True,
-                data=RealmResponseData(Message=f"Timer cancelled for task {task_id}"),
-            )
-        else:
-            return RealmResponse(
-                success=False,
-                data=RealmResponseData(Error=f"No timer found for task {task_id}"),
-            )
-    except Exception as e:
-        logger.error(
-            f"Error cancelling timer for task {task_id}: {str(e)}\n{traceback.format_exc()}"
-        )
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@query
-def get_active_timers() -> RealmResponse:
-    """Get list of all active timers"""
-    try:
-        from core.task_manager import get_active_timers
-
-        timers = get_active_timers()
-        return RealmResponse(
-            success=True,
-            data=RealmResponseData(Message="Active timers retrieved", Data=timers),
-        )
-    except Exception as e:
-        logger.error(f"Error getting active timers: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@query
-def get_task_status(task_id: str) -> RealmResponse:
-    """Get the execution status of a specific task"""
-    try:
-        from core.task_manager import get_task_execution_status
-
-        status = get_task_execution_status(task_id)
-        if status:
-            return RealmResponse(
-                success=True,
-                data=RealmResponseData(Message=f"Task {task_id} status: {status}"),
-            )
-        else:
-            return RealmResponse(
-                success=False,
-                data=RealmResponseData(
-                    Error=f"Task {task_id} not found or no status available"
-                ),
-            )
-    except Exception as e:
-        logger.error(
-            f"Error getting task status for {task_id}: {str(e)}\n{traceback.format_exc()}"
-        )
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+def test_mixed_sync_async_task() -> void:
+    """Test function to verify TaskManager can handle mixed sync/async steps in sequence"""
+    ic.print("Setting up mixed sync/async task test")
+    
+    global downloaded_content
+    downloaded_content = ''
+    
+    async_call = AsyncCall()
+    async_call.function_def = download_file_from_url
+    async_call.function_params = ["https://raw.githubusercontent.com/smart-social-contracts/realms/refs/heads/main/src/realm_backend/codex.py"]
+    step1 = TaskStep(call=async_call)
+    
+    codex_call = Codex()
+    codex_call.code = '''
+from main import downloaded_content
+ic.print("=== VERIFICATION STEP ===")
+ic.print(f"Downloaded content length: {len(downloaded_content)}")
+if len(downloaded_content) > 0:
+    ic.print("✅ SUCCESS: File was downloaded successfully!")
+    if "def " in downloaded_content:
+        ic.print("✅ SUCCESS: Content contains Python code (found 'def')")
+    else:
+        ic.print("❌ WARNING: Content doesn't appear to be Python code")
+    preview = downloaded_content[:100].replace("\\n", " ")
+    ic.print(f"Content preview: {preview}...")
+else:
+    ic.print("❌ FAILURE: No content was downloaded!")
+ic.print("=== VERIFICATION COMPLETE ===")
+'''.strip()
+    step2 = TaskStep(call=codex_call)
+    
+    schedule = TaskSchedule(seconds=10)
+    task = Task(name="test_mixed_steps", steps=[step1, step2], schedule=schedule)
+    
+    task_manager = TaskManager()
+    task_manager.add_task(task)
+    task_manager.run()
+    
+    ic.print("Mixed sync/async task test initiated - download step in 10s, verification step in 20s")
