@@ -488,15 +488,19 @@ class BulkUploader:
         except Exception as e:
             print(f"❌ Failed to save URLs to CSV: {str(e)}")
 
-    def _show_sample_records(self, records: List[Dict[str, Any]], max_records: int = 3) -> None:
+    def _show_sample_records(
+        self, records: List[Dict[str, Any]], max_records: int = 3
+    ) -> None:
         """Show sample records for verbose output."""
         if not records:
             return
-        
-        print(f"📄 Sample records ({min(len(records), max_records)} of {len(records)}):")
+
+        print(
+            f"📄 Sample records ({min(len(records), max_records)} of {len(records)}):"
+        )
         for i, record in enumerate(records[:max_records], 1):
             print(f"  {i}. {json.dumps(record, indent=4)}")
-        
+
         if len(records) > max_records:
             print(f"  ... and {len(records) - max_records} more records")
 

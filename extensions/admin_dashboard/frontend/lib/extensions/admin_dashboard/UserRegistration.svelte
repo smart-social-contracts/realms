@@ -47,10 +47,18 @@
                 })
             });
 
-            const result = JSON.parse(response.response);
-            if (result.success) {
-                codeValid = true;
-                userInfo = result.data;
+            let result;
+            try {
+                result = JSON.parse(response.response);
+                if (result.success) {
+                    codeValid = true;
+                    userInfo = result.data;
+                }
+            } catch (e) {
+                console.error('Failed to parse validation response:', e);
+                error = 'Invalid response format from server';
+                return;
+            }
                 // Pre-fill email if available
                 if (userInfo.email) {
                     formData.email = userInfo.email;
