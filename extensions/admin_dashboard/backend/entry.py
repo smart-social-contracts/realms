@@ -228,11 +228,11 @@ def import_data(args):
     try:
         if isinstance(args, str):
             args = json.loads(args)
-        
+
         if "file_path" in args and "data_type" in args:
             file_path = args["file_path"]
             entity_type = args["data_type"]
-            
+
             return {
                 "success": True,
                 "message": f"File-based import for {entity_type} from {file_path} would be processed here",
