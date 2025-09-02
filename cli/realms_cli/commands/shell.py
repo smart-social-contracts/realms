@@ -17,7 +17,7 @@ console = Console()
 
 class RealmsShell:
     """Interactive Python shell for Realms backend canister."""
-    
+
     def __init__(self, canister_name: str = "realm_backend", network: Optional[str] = None):
         self.canister_name = canister_name
         self.network = network
@@ -153,7 +153,7 @@ class RealmsShell:
             if self.network:
                 cmd.extend(["--network", self.network])
             cmd.extend([self.canister_name, "status"])
-            
+
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
             if result.returncode == 0:
                 console.print("[green]✅ Backend canister is responding[/green]")
@@ -176,7 +176,7 @@ class RealmsShell:
         dfx_version = self.get_dfx_version()
 
         # Display welcome message with version info
-        console.print(f"[bold blue]🏛️  Realms Interactive Shell[/bold blue]")
+        console.print("[bold blue]🏛️  Realms Interactive Shell[/bold blue]")
         console.print(f"[dim]Python {python_version} ({python_implementation}) on {platform.system()}[/dim]")
         console.print(f"[dim]DFX: {dfx_version}[/dim]")
         console.print(f"[bold]Canister:[/bold] [cyan]{self.canister_name}[/cyan]")
@@ -232,16 +232,16 @@ def shell_command(
         console.print(f"[bold blue]📄 Executing Python file: {file}[/bold blue]\n")
         execute_python_file(file, canister, network)
         return
-    
-    console.print(f"[bold blue]🚀 Starting Realms Shell[/bold blue]\n")
-    
+
+    console.print("[bold blue]🚀 Starting Realms Shell[/bold blue]\n")
+
     # Check if dfx is available
     try:
         subprocess.run(["dfx", "--version"], capture_output=True, check=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
         console.print("[red]❌ dfx not found. Please install dfx and ensure it's in your PATH.[/red]")
         raise typer.Exit(1)
-    
+
     # Check if dfx replica is running (for local network)
     if not network or network == "local":
         try:
@@ -250,7 +250,7 @@ def shell_command(
                 console.print("[yellow]⚠️  dfx replica doesn't seem to be running. You may need to run 'dfx start'.[/yellow]")
         except Exception:
             console.print("[yellow]⚠️  Could not check dfx replica status.[/yellow]")
-    
+
     # Create and run the shell
     shell = RealmsShell(canister_name=canister, network=network)
     shell.run_shell()
@@ -260,12 +260,12 @@ def execute_python_file(file_path: str, canister: str, network: Optional[str]) -
     """Execute a Python file on the Realms backend canister."""
     import os
     from pathlib import Path
-    
+
     # Check if file exists
     if not os.path.exists(file_path):
         console.print(f"[red]❌ File not found: {file_path}[/red]")
         raise typer.Exit(1)
-    
+
     # Read the file content
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -273,16 +273,16 @@ def execute_python_file(file_path: str, canister: str, network: Optional[str]) -
     except Exception as e:
         console.print(f"[red]❌ Error reading file: {e}[/red]")
         raise typer.Exit(1)
-    
+
     if not code_content.strip():
         console.print(f"[yellow]⚠️  File is empty: {file_path}[/yellow]")
         return
-    
+
     console.print(f"[dim]Executing {len(code_content)} characters of Python code...[/dim]")
-    
+
     # Create shell instance and execute the code
     shell = RealmsShell(canister_name=canister, network=network)
-    
+
     try:
         result = shell.execute(code_content)
         if result:

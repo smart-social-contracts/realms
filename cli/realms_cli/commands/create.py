@@ -16,7 +16,7 @@ from .deploy import deploy_command
 def create_command(
     random: bool,
     citizens: int,
-    organizations: int, 
+    organizations: int,
     transactions: int,
     disputes: int,
     seed: Optional[int],
@@ -105,30 +105,30 @@ def _generate_random_realm_data(
 
 def _create_realm_folder_structure(output_path: Path, realm_data: dict, network: str, realm_name: str) -> None:
     """Create the complete realm folder structure."""
-    
+
     console.print(f"📁 Creating realm folder structure in {output_path}...")
-    
+
     output_path.mkdir(exist_ok=True)
-    
+
     data_dir = output_path / "data"
     codexes_dir = output_path / "codexes"
     data_dir.mkdir(exist_ok=True)
     codexes_dir.mkdir(exist_ok=True)
-    
+
     _create_realm_config(output_path, realm_data, network, realm_name)
-    
+
     _create_json_data_files(data_dir, realm_data)
-    
+
     _create_codex_files(codexes_dir, realm_data)
-    
+
     console.print("✅ Folder structure created successfully")
 
 
 def _create_realm_config(output_path: Path, realm_data: dict, network: str, realm_name: str) -> None:
     """Create the main realm configuration file."""
-    
+
     realm_info = realm_data.get("realm", {"name": realm_name, "description": f"Random generated realm: {realm_name}"})
-    
+
     config = {
         "realm": {
             "id": realm_info["name"].lower().replace(" ", "_").replace("-", "_"),
@@ -150,13 +150,13 @@ def _create_realm_config(output_path: Path, realm_data: dict, network: str, real
                     "enabled": True
                 },
                 {
-                    "name": "citizen_dashboard", 
+                    "name": "citizen_dashboard",
                     "source": "local",
                     "enabled": True
                 },
                 {
                     "name": "voting",
-                    "source": "local", 
+                    "source": "local",
                     "enabled": True
                 }
             ]
@@ -169,23 +169,23 @@ def _create_realm_config(output_path: Path, realm_data: dict, network: str, real
                     "command": "realms import data/users.json --type users"
                 },
                 {
-                    "type": "shell", 
+                    "type": "shell",
                     "name": "Import Organizations",
                     "command": "realms import data/organizations.json --type organizations"
                 },
                 {
                     "type": "shell",
-                    "name": "Import Transfers", 
+                    "name": "Import Transfers",
                     "command": "realms import data/transfers.json --type transfers"
                 },
                 {
                     "type": "shell",
-                    "name": "Import Instruments", 
+                    "name": "Import Instruments",
                     "command": "realms import data/instruments.json --type instruments"
                 },
                 {
                     "type": "shell",
-                    "name": "Import Mandates", 
+                    "name": "Import Mandates",
                     "command": "realms import data/mandates.json --type mandates"
                 }
             ]
@@ -201,16 +201,16 @@ def _create_realm_config(output_path: Path, realm_data: dict, network: str, real
 
 def _create_json_data_files(data_dir: Path, realm_data: dict) -> None:
     """Create JSON data files for each entity type."""
-    
+
     entity_mappings = {
         "users.json": realm_data.get("users", []),
-        "humans.json": realm_data.get("humans", []), 
+        "humans.json": realm_data.get("humans", []),
         "organizations.json": realm_data.get("organizations", []),
         "instruments.json": realm_data.get("instruments", []),
         "transfers.json": realm_data.get("transfers", []),
         "mandates.json": realm_data.get("mandates", [])
     }
-    
+
     for filename, data in entity_mappings.items():
         if data:
             file_path = data_dir / filename
@@ -221,9 +221,9 @@ def _create_json_data_files(data_dir: Path, realm_data: dict) -> None:
 
 def _create_codex_files(codexes_dir: Path, realm_data: dict) -> None:
     """Create Python codex files."""
-    
+
     codex_files = realm_data.get("codex_files", {})
-    
+
     for filename, content in codex_files.items():
         file_path = codexes_dir / filename
         with open(file_path, 'w') as f:

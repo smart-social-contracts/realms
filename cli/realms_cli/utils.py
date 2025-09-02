@@ -27,7 +27,7 @@ def run_command(
     """Run a shell command with proper error handling."""
     try:
         console.print(f"[dim]Running: {' '.join(command)}[/dim]")
-        
+
         result = subprocess.run(
             command,
             cwd=cwd,
@@ -36,12 +36,12 @@ def run_command(
             check=check,
             env=env
         )
-        
+
         if capture_output and result.stdout:
             console.print(f"[dim]{result.stdout}[/dim]")
-            
+
         return result
-        
+
     except subprocess.CalledProcessError as e:
         console.print(f"[red]Command failed: {' '.join(command)}[/red]")
         if e.stdout:
@@ -59,20 +59,20 @@ def check_dependencies() -> bool:
     """Check if required dependencies are available."""
     required_tools = ["dfx", "npm", "python3"]
     missing_tools = []
-    
+
     for tool in required_tools:
         try:
             subprocess.run([tool, "--version"], capture_output=True, check=True)
         except (subprocess.CalledProcessError, FileNotFoundError):
             missing_tools.append(tool)
-    
+
     if missing_tools:
         console.print("[red]Missing required dependencies:[/red]")
         for tool in missing_tools:
             console.print(f"  - {tool}")
         console.print("\n[yellow]Please install the missing tools and try again.[/yellow]")
         return False
-    
+
     return True
 
 
@@ -104,13 +104,13 @@ def save_config(config_data: Dict[str, Any], config_path: str) -> None:
 def get_project_root() -> Path:
     """Get the project root directory."""
     current_path = Path.cwd()
-    
+
     # Look for dfx.json to identify project root
     while current_path != current_path.parent:
         if (current_path / "dfx.json").exists():
             return current_path
         current_path = current_path.parent
-    
+
     # If not found, use current directory
     return Path.cwd()
 
@@ -119,7 +119,7 @@ def generate_port_from_branch(branch_name: str) -> int:
     """Generate a unique port number based on branch name."""
     if branch_name == "main":
         return 8000
-    
+
     # Generate hash-based port
     hash_obj = hashlib.md5(branch_name.encode())
     hash_int = int(hash_obj.hexdigest()[:8], 16)
@@ -143,14 +143,14 @@ def get_current_branch() -> str:
 def wait_for_canister_ready(canister_name: str, network: str = "local", timeout: int = 60) -> bool:
     """Wait for a canister to be ready."""
     start_time = time.time()
-    
+
     with Progress(
         SpinnerColumn(),
         TextColumn(f"[progress.description]Waiting for {canister_name} to be ready..."),
         console=console
     ) as progress:
         task = progress.add_task("waiting", total=None)
-        
+
         while time.time() - start_time < timeout:
             try:
                 result = subprocess.run(
@@ -163,9 +163,9 @@ def wait_for_canister_ready(canister_name: str, network: str = "local", timeout:
                     return True
             except subprocess.CalledProcessError:
                 pass
-            
+
             time.sleep(2)
-    
+
     console.print(f"[red]Timeout waiting for {canister_name} to be ready[/red]")
     return False
 
@@ -174,7 +174,7 @@ def create_directory_structure(base_path: Path, structure: Dict[str, Any]) -> No
     """Create directory structure from nested dictionary."""
     for name, content in structure.items():
         path = base_path / name
-        
+
         if isinstance(content, dict):
             path.mkdir(parents=True, exist_ok=True)
             create_directory_structure(path, content)
@@ -232,7 +232,7 @@ def load_context() -> Dict[str, Any]:
     context_file = get_context_file()
     if not context_file.exists():
         return {}
-    
+
     try:
         with open(context_file, 'r') as f:
             return json.load(f)
@@ -293,13 +293,13 @@ def unset_current_network() -> None:
 
 def resolve_realm_details(realm_name: str, registry_network: Optional[str] = None, registry_canister: str = "realm_registry_backend") -> Tuple[str, str]:
     """Resolve realm name to network and canister ID via registry lookup.
-    
+
     Returns:
         Tuple[str, str]: (network, canister_id)
     """
     # Use current network context if no registry network specified
     effective_registry_network = registry_network or get_current_network()
-    
+
     try:
         # Call registry to get realm details
         cmd = [
@@ -309,7 +309,7 @@ def resolve_realm_details(realm_name: str, registry_network: Optional[str] = Non
             "get_realm",
             f'("{realm_name}")'
         ]
-        
+
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -317,7 +317,7 @@ def resolve_realm_details(realm_name: str, registry_network: Optional[str] = Non
             check=True,
             timeout=30
         )
-        
+
         # Parse the Candid output
         output = result.stdout.strip()
         if "Ok" in output:
@@ -333,12 +333,12 @@ def resolve_realm_details(realm_name: str, registry_network: Optional[str] = Non
                     # This could be enhanced to store network info in registry
                     network = "ic" if len(canister_id) > 10 else "local"
                     return network, canister_id
-            
+
             # Fallback: assume local network with realm name as canister
             return "local", f"{realm_name}_backend"
         else:
             raise ValueError(f"Realm '{realm_name}' not found in registry")
-            
+
     except subprocess.CalledProcessError as e:
         raise ValueError(f"Failed to lookup realm '{realm_name}': {e.stderr}")
     except subprocess.TimeoutExpired:
@@ -349,20 +349,20 @@ def resolve_realm_details(realm_name: str, registry_network: Optional[str] = Non
 
 def get_effective_network_and_canister(explicit_network: Optional[str] = None, explicit_canister: Optional[str] = None) -> Tuple[str, str]:
     """Get the effective network and canister, considering realm and network context.
-    
+
     Priority:
     1. Explicit parameters (if provided)
     2. Current realm context (if set) - overrides network context
     3. Current network context (if set)
     4. Default values (local, realm_backend)
-    
+
     Returns:
         Tuple[str, str]: (network, canister_id)
     """
     # If both explicit parameters provided, use them
     if explicit_network and explicit_canister:
         return explicit_network, explicit_canister
-    
+
     # Check for current realm context (highest priority)
     current_realm = get_current_realm()
     if current_realm:
@@ -372,10 +372,10 @@ def get_effective_network_and_canister(explicit_network: Optional[str] = None, e
             return explicit_network or realm_network, explicit_canister or realm_canister
         except ValueError as e:
             console.print(f"[yellow]Warning: {e}[/yellow]")
-            console.print(f"[yellow]Falling back to network/default values[/yellow]")
-    
+            console.print("[yellow]Falling back to network/default values[/yellow]")
+
     # Use network context or explicit network
     effective_network = explicit_network or get_current_network()
     effective_canister = explicit_canister or "realm_backend"
-    
+
     return effective_network, effective_canister

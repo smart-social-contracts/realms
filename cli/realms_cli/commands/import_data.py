@@ -101,9 +101,10 @@ def import_codex_command(
         
         project_root = get_project_root()
         
+        escaped_content = codex_content.replace('"', '\\"')
         run_command([
             "dfx", "canister", "call", "realm_backend", "create_codex",
-            f'(record {{ name = "{codex_name}"; code = "{codex_content.replace('"', '\\"')}"; }})',
+            f'(record {{ name = "{codex_name}"; code = "{escaped_content}"; }})',
             "--network", "local"
         ], cwd=project_root)
         
