@@ -136,7 +136,7 @@ def get_current_branch() -> str:
             check=True
         )
         return result.stdout.strip() or "main"
-    except (subprocess.CalledProcessError, FileNotFoundError):
+    except Exception:
         return "main"
 
 
