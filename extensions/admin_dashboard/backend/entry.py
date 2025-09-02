@@ -11,6 +11,7 @@ from io import StringIO
 from typing import Any, Dict, List
 
 from ggg import Codex, Human, Instrument, Mandate, Organization, User
+
 from .models import RegistrationCode
 
 
