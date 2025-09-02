@@ -14,7 +14,7 @@
   "extensions": {
     "initial": [
       {
-        "name": "demo_loader",
+        "name": "admin_dashboard",
         "source": "local",
         "enabled": true
       },
@@ -57,10 +57,13 @@
       }
     ]
   },
-  "post_deployment": [
-    "scripts/setup_demo.sh", // can run shell scripts
-    "cli/example_realm_setup.py", // can run python scripts
-    "realms realm codex import cli/example_realm_codex.py", // can import codex directly
-    "realms realm import cli/example_realm_data.json" // can import data via json directly
-  ]
+  "post_deployment": {
+    "actions": [
+      {
+        "type": "shell",
+        "name": "Import realm data",
+        "command": "realms realm import cli/example_realm_data.json"
+      }
+    ]
+  }
 }

@@ -296,7 +296,16 @@ def _execute_single_action(action: PostDeploymentAction, config: RealmConfig, pr
                 if not action.extension_name or not action.function_name:
                     raise ValueError("extension_call requires extension_name and function_name")
                 
-                args_json = json.dumps(action.args) if action.args else "{}"
+                args = action.args.copy() if action.args else {}
+                if "data_file" in args:
+                    data_file_path = project_root / args["data_file"]
+                    if data_file_path.exists():
+                        with open(data_file_path, 'r') as f:
+                            file_data = json.load(f)
+                        args["data"] = json.dumps(file_data)
+                        del args["data_file"]
+                
+                args_json = json.dumps(args) if args else "{}"
                 # Escape quotes in JSON string for Candid
                 escaped_args = args_json.replace('"', '\\"')
                 

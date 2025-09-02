@@ -78,7 +78,7 @@ def get_status() -> dict[str, Any]:
     commit_hash = "COMMIT_HASH_PLACEHOLDER"
     version = "VERSION_PLACEHOLDER"
 
-    demo_mode = "demo_loader" in extension_names
+    demo_mode = False
 
     # Get TaskManager status
     task_manager_status = {}

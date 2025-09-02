@@ -10,8 +10,6 @@ from datetime import datetime
 from io import StringIO
 from typing import Any, Dict, List
 
-from ggg import Codex, Human, Instrument, Mandate, Organization, User
-
 from .models import RegistrationCode
 
 
@@ -329,70 +327,109 @@ def process_bulk_import(entity_type: str, data: List[Dict[str, Any]]) -> Dict[st
 
 def create_user_entity(data: Dict[str, Any]):
     """Create a User entity from import data"""
-    # This would integrate with the actual User creation logic
-    # For now, simulate the creation
-    required_fields = ["username"]
+    required_fields = ["id"]
     for field in required_fields:
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
 
-    # Simulate User.create() call
-    pass
+    from ggg import User
+
+    user = User(id=data["id"], profile_picture_url=data.get("profile_picture_url", ""))
+    return user
 
 
 def create_human_entity(data: Dict[str, Any]):
     """Create a Human entity from import data"""
-    required_fields = ["name"]
+    required_fields = ["id", "name"]
     for field in required_fields:
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
 
-    # Simulate Human.create() call
-    pass
+    from ggg import Human
+
+    human = Human(
+        id=data["id"],
+        name=data["name"],
+        email=data.get("email", ""),
+        phone=data.get("phone", ""),
+        address=data.get("address", ""),
+    )
+    return human
 
 
 def create_organization_entity(data: Dict[str, Any]):
     """Create an Organization entity from import data"""
-    required_fields = ["name"]
+    required_fields = ["id", "name"]
     for field in required_fields:
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
 
-    # Simulate Organization.create() call
-    pass
+    from ggg import Organization
+
+    org = Organization(
+        id=data["id"],
+        name=data["name"],
+        description=data.get("description", ""),
+        website=data.get("website", ""),
+        email=data.get("email", ""),
+    )
+    return org
 
 
 def create_mandate_entity(data: Dict[str, Any]):
     """Create a Mandate entity from import data"""
-    required_fields = ["title"]
+    required_fields = ["id", "name"]
     for field in required_fields:
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
 
-    # Simulate Mandate.create() call
-    pass
+    from ggg import Mandate
+
+    mandate = Mandate(
+        id=data["id"],
+        name=data["name"],
+        description=data.get("description", ""),
+        status=data.get("status", "active"),
+    )
+    return mandate
 
 
 def create_codex_entity(data: Dict[str, Any]):
     """Create a Codex entity from import data"""
-    required_fields = ["title", "content"]
+    required_fields = ["id", "name", "code"]
     for field in required_fields:
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
 
-    # Simulate Codex.create() call
-    pass
+    from ggg import Codex
+
+    codex = Codex(
+        id=data["id"],
+        name=data["name"],
+        code=data["code"],
+        description=data.get("description", ""),
+        version=data.get("version", "1.0.0"),
+    )
+    return codex
 
 
 def create_instrument_entity(data: Dict[str, Any]):
     """Create an Instrument entity from import data"""
-    required_fields = ["name", "type"]
+    required_fields = ["id", "name", "type"]
     for field in required_fields:
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
 
-    # Simulate Instrument.create() call
-    pass
+    from ggg import Instrument
+
+    instrument = Instrument(
+        id=data["id"],
+        name=data["name"],
+        type=data["type"],
+        description=data.get("description", ""),
+        value=data.get("value", 0),
+    )
+    return instrument
 
 
 def generate_registration_url(args: dict):

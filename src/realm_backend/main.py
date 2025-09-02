@@ -43,15 +43,18 @@ from core.candid_types_realm import (
     UsersListRecord,
     VotesListRecord,
 )
+from ggg import Codex
 from kybra import (
     Async,
     CallResult,
+    Duration,
     Func,
     Opt,
     Principal,
     Query,
     Record,
     StableBTreeMap,
+    TimerId,
     Variant,
     Vec,
     blob,
@@ -64,12 +67,9 @@ from kybra import (
     text,
     update,
     void,
-    TimerId,
-    Duration
 )
 from kybra_simple_db import Database
 from kybra_simple_logging import get_logger
-from ggg import Codex
 
 storage = StableBTreeMap[str, str](memory_id=1, max_key_size=100, max_value_size=3000)
 Database.init(db_storage=storage, audit_enabled=True)
@@ -660,15 +660,15 @@ def fire_download(codex_id: str) -> str:
     logger.info("Firing download for codex: " + codex_id)
     ic.set_timer(1, lambda: run_download)
 
+
 @update
 async def run_download() -> Async[None]:
     codex_id = "test"
     logger.info("Downloading code for codex: " + codex_id)
     c = Codex[codex_id]
-    success, message = yield download_code_from_url(c.url, c.checksum, c)
+    success, message = yield download_file_from_url(c.url)
     logger.info("Success: " + str(success))
     logger.info("Downloaded code: " + message)
-
 
 
 @update
@@ -731,7 +731,6 @@ def download_file_from_url(url: str) -> Async[Tuple[bool, str]]:
         error_msg = f"Unexpected error downloading code: {str(e)}"
         ic.print(error_msg)
         return False, error_msg
-
 
 
 def verify_checksum(content: str, expected_checksum: str) -> Tuple[bool, str]:
@@ -858,31 +857,30 @@ def execute_code(code: str) -> str:
     return stdout.getvalue() + stderr.getvalue()
 
 
-
-from core.task_manager import Call, TaskManager, Task, TaskStep
+from core.task_manager import Call, Task, TaskManager, TaskStep
 from ggg.task_schedule import TaskSchedule
 
 downloaded_content: dict = {}
+
 
 @update
 def test_mixed_sync_async_task() -> void:
     try:
         """Test function to verify TaskManager can handle mixed sync/async steps in sequence"""
         ic.print("Setting up mixed sync/async task test")
-        
+
         url = "https://raw.githubusercontent.com/smart-social-contracts/realms/refs/heads/main/src/realm_backend/codex.py"
-        
+
         async_call = Call()
         async_call.is_async = True
         async_call._function_def = download_file_from_url
         async_call._function_params = [url]
         step1 = TaskStep(call=async_call, run_next_after=10)
-        
-            
+
         sync_call = Call()
         sync_call.is_async = False
         codex = Codex()
-        codex.code = '''
+        codex.code = """
 from main import downloaded_content
 
 content = downloaded_content['{url}']
@@ -905,18 +903,18 @@ if len(content) > 0:
     ic.print("Content preview: " + preview + "...")
 else:
     ic.print("❌ FAILURE: No content was downloaded!")
-ic.print("=== VERIFICATION COMPLETE ===")'''.strip()
+ic.print("=== VERIFICATION COMPLETE ===")""".strip()
         sync_call.codex = codex
         step2 = TaskStep(call=sync_call)
-        
+
         task = Task(name="test_mixed_steps", steps=[step1, step2])
         schedule = TaskSchedule(run_at=0, repeat_every=30)
         task.schedules = [schedule]
-        
+
         task_manager = TaskManager()
         task_manager.add_task(task)
         task_manager.run()
-        
+
         ic.print("Mixed sync/async task test initiated...")
     except Exception as e:
         logger.error(traceback.format_exc())

@@ -6,6 +6,8 @@ from rich.table import Table
 from typing import Optional, List
 
 from .commands.deploy import deploy_command
+from .commands.create import create_command
+from .commands.import_data import import_data_command, import_codex_command
 from .commands.shell import shell_command
 from .commands.registry import (
     registry_add_command,
@@ -30,6 +32,45 @@ app = typer.Typer(
     add_completion=False,
     rich_markup_mode="rich"
 )
+
+
+@app.command("create")
+def create(
+    random: bool = typer.Option(False, "--random", help="Generate random realm data"),
+    citizens: int = typer.Option(50, "--citizens", help="Number of citizens to generate"),
+    organizations: int = typer.Option(5, "--organizations", help="Number of organizations to generate"),
+    transactions: int = typer.Option(100, "--transactions", help="Number of transactions to generate"),
+    disputes: int = typer.Option(10, "--disputes", help="Number of disputes to generate"),
+    seed: Optional[int] = typer.Option(None, "--seed", help="Random seed for reproducible generation"),
+    output_dir: str = typer.Option("generated_realm", "--output-dir", help="Output directory"),
+    realm_name: str = typer.Option("Generated Demo Realm", "--realm-name", help="Name of the realm"),
+    network: str = typer.Option("local", "--network", help="Target network for deployment"),
+    deploy: bool = typer.Option(False, "--deploy", help="Deploy the realm after creation")
+) -> None:
+    """Create a new realm with optional random data generation."""
+    create_command(random, citizens, organizations, transactions, disputes, seed, output_dir, realm_name, network, deploy)
+
+
+@app.command("import")
+def import_data(
+    file_path: str = typer.Argument(..., help="Path to JSON data file"),
+    entity_type: str = typer.Option(..., "--type", help="Entity type (users, organizations, instruments, etc.)"),
+    format: str = typer.Option("json", "--format", help="Data format (json)"),
+    batch_size: int = typer.Option(100, "--batch-size", help="Batch size for import"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be imported without executing")
+) -> None:
+    """Import JSON data into the realm."""
+    import_data_command(file_path, entity_type, format, batch_size, dry_run)
+
+
+@app.command("codex")
+def codex_import(
+    file_path: str = typer.Argument(..., help="Path to Python codex file"),
+    name: Optional[str] = typer.Option(None, "--name", help="Codex name (defaults to filename)"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be imported without executing")
+) -> None:
+    """Import Python codex file into the realm."""
+    import_codex_command(file_path, name, dry_run)
 
 
 @app.command("deploy")
