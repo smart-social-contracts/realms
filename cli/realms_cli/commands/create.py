@@ -165,29 +165,51 @@ def _create_realm_config(
         "post_deployment": {
             "actions": [
                 {
-                    "type": "shell",
+                    "type": "extension_call",
                     "name": "Import Users",
-                    "command": "realms import data/users.json --type users",
+                    "extension_name": "admin_dashboard",
+                    "function_name": "import_data",
+                    "args": {"file_path": "data/users.json", "data_type": "users"},
                 },
                 {
-                    "type": "shell",
+                    "type": "extension_call",
                     "name": "Import Organizations",
-                    "command": "realms import data/organizations.json --type organizations",
+                    "extension_name": "admin_dashboard",
+                    "function_name": "import_data",
+                    "args": {
+                        "file_path": "data/organizations.json",
+                        "data_type": "organizations",
+                    },
                 },
                 {
-                    "type": "shell",
+                    "type": "extension_call",
                     "name": "Import Transfers",
-                    "command": "realms import data/transfers.json --type transfers",
+                    "extension_name": "admin_dashboard",
+                    "function_name": "import_data",
+                    "args": {
+                        "file_path": "data/transfers.json",
+                        "data_type": "transfers",
+                    },
                 },
                 {
-                    "type": "shell",
+                    "type": "extension_call",
                     "name": "Import Instruments",
-                    "command": "realms import data/instruments.json --type instruments",
+                    "extension_name": "admin_dashboard",
+                    "function_name": "import_data",
+                    "args": {
+                        "file_path": "data/instruments.json",
+                        "data_type": "instruments",
+                    },
                 },
                 {
-                    "type": "shell",
+                    "type": "extension_call",
                     "name": "Import Mandates",
-                    "command": "realms import data/mandates.json --type mandates",
+                    "extension_name": "admin_dashboard",
+                    "function_name": "import_data",
+                    "args": {
+                        "file_path": "data/mandates.json",
+                        "data_type": "mandates",
+                    },
                 },
             ]
         },
