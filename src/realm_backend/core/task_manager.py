@@ -7,7 +7,7 @@ from ggg.codex import Codex
 from ggg.task import Task as GGGTask
 from ggg.task_schedule import TaskSchedule  # as GGGTaskSchedule
 from kybra_simple_logging import get_logger
-from kybra_simple_db import Entity, TimestampedMixin, Boolean, OneToOne, String, Integer, Boolean
+from kybra_simple_db import Entity, TimestampedMixin, Boolean, OneToOne, String, Integer, Boolean, OneToMany, ManyToOne
 
 logger = get_logger("core.task_manager")
 
@@ -35,7 +35,7 @@ class Call(Entity, TimestampedMixin):
             result = self._function_def(*self._function_params)
             return result
 
-    def async_function(self) -> Async:
+    def _async_function(self) -> Async:
         logger.info("Executing async call")
         result = yield self._function_def(*self._function_params)
         return result
@@ -45,13 +45,14 @@ class TaskStep(Entity, TimestampedMixin):
     call = OneToOne("Call", "task_step")
     status = String()
     run_next_after = Integer()  # number of seconds to schedule the next step
-    timer_id: Integer()
+    timer_id = Integer()
+    task = ManyToOne("Task", "steps")
 
     def __init__(self, call: Call, run_next_after: int = 0, **kwargs):
         super().__init__(**kwargs)
         self.call = call
         self.run_next_after = run_next_after
-        self.status = TaskStatus.PENDING
+        self.status = TaskStatus.PENDING.value
 
 # TODO
 # class TaskHistory:
@@ -60,15 +61,15 @@ class TaskStep(Entity, TimestampedMixin):
  
 
 class Task(GGGTask):
-    steps: List[TaskStep]
-    status: TaskStatus
-    step_to_execute: int
+    steps = OneToMany("TaskStep", "task")
+    status = String()
+    step_to_execute = Integer()
     
 
     def __init__(self,  steps: List[TaskStep], **kwargs):
         super().__init__(**kwargs)
         self.steps = steps
-        self.status = TaskStatus.PENDING
+        self.status = TaskStatus.PENDING.value
         self.step_to_execute = 0
 
 
@@ -98,24 +99,24 @@ class TaskManager:
                     else:
                         result = yield step.call._function_def()
                     logger.info(f"Async timer callback completed with result: {result}")
-                    step.status = TaskStatus.COMPLETED
+                    step.status = TaskStatus.COMPLETED.value
                     self._check_and_schedule_next_step(task)
                 except Exception as e:
                     logger.error(f"Async timer callback failed: {e}")
-                    step.status = TaskStatus.FAILED
-                    task.status = TaskStatus.FAILED
+                    step.status = TaskStatus.FAILED.value
+                    task.status = TaskStatus.FAILED.value
             return async_timer_callback
         elif not step.call.is_async:
             def sync_timer_callback() -> void:
                 logger.info(f"Executing sync timer callback for {step.call}")
                 try:
                     step.call._function()
-                    step.status = TaskStatus.COMPLETED
+                    step.status = TaskStatus.COMPLETED.value
                     self._check_and_schedule_next_step(task)
                 except Exception as e:
                     logger.error(f"Sync timer callback failed: {e}")
-                    step.status = TaskStatus.FAILED
-                    task.status = TaskStatus.FAILED
+                    step.status = TaskStatus.FAILED.value
+                    task.status = TaskStatus.FAILED.value
             return sync_timer_callback
 
     def _check_and_schedule_next_step(self, task: Task) -> void:
@@ -128,31 +129,32 @@ class TaskManager:
             
             callback_function = self._create_timer_callback(step, task)
             step.timer_id = ic.set_timer(Duration(step.run_next_after), callback_function)
-            step.status = TaskStatus.RUNNING
+            step.status = TaskStatus.RUNNING.value
             task.step_to_execute += 1
         else:
             logger.info(f"Task {task.name} completed all steps")
-            task.status = TaskStatus.COMPLETED
+            task.status = TaskStatus.COMPLETED.value
 
     def _update_timers(self) -> void:
         logger.info("Updating timers")
         for task in self.tasks:
-            if task.status == TaskStatus.PENDING:
+            if task.status == TaskStatus.PENDING.value:
                 for schedule in task.schedules:
-                    now = ic.now()
+                    now = int(ic.time() / 1e9)
+                    logger.info(f"Current time: {now}")
                     if schedule.disabled:
                         logger.info(f"Skipping disabled schedule for task {task.name}")
                         continue
                     if schedule.run_at < now or schedule.last_run_at + schedule.repeat_every < now:
                         logger.info(f"Scheduling task {task.name} for immediate execution")
                         schedule.last_run_at = now
-                        step = task.steps[task.step_to_execute]
+                        step = list(task.steps)[task.step_to_execute]  # TODO: fix this
                         logger.info(f"Starting task {task.name} - executing step {task.step_to_execute}/{len(task.steps)}")
 
                         callback_function = self._create_timer_callback(step, task)
                         step.timer_id = ic.set_timer(Duration(step.run_next_after), callback_function)
-                        step.status = TaskStatus.RUNNING
-                        task.status = TaskStatus.RUNNING
+                        step.status = TaskStatus.RUNNING.value
+                        task.status = TaskStatus.RUNNING.value
                         task.step_to_execute += 1
 
                         

@@ -866,22 +866,23 @@ downloaded_content: dict = {}
 
 @update
 def test_mixed_sync_async_task() -> void:
-    """Test function to verify TaskManager can handle mixed sync/async steps in sequence"""
-    ic.print("Setting up mixed sync/async task test")
-    
-    url = "https://raw.githubusercontent.com/smart-social-contracts/realms/refs/heads/main/src/realm_backend/codex.py"
-    
-    async_call = Call()
-    async_call.is_async = True
-    async_call.function_def = download_file_from_url
-    async_call.function_params = [url]
-    step1 = TaskStep(call=async_call, run_next_after=10)
-    
-    
-    sync_call = Call()
-    sync_call.is_async = False
-    codex = Codex()
-    codex.code = '''
+    try:
+        """Test function to verify TaskManager can handle mixed sync/async steps in sequence"""
+        ic.print("Setting up mixed sync/async task test")
+        
+        url = "https://raw.githubusercontent.com/smart-social-contracts/realms/refs/heads/main/src/realm_backend/codex.py"
+        
+        async_call = Call()
+        async_call.is_async = True
+        async_call._function_def = download_file_from_url
+        async_call._function_params = [url]
+        step1 = TaskStep(call=async_call, run_next_after=10)
+        
+            
+        sync_call = Call()
+        sync_call.is_async = False
+        codex = Codex()
+        codex.code = '''
 from main import downloaded_content
 
 content = downloaded_content['{url}']
@@ -904,17 +905,18 @@ if len(content) > 0:
     ic.print("Content preview: " + preview + "...")
 else:
     ic.print("❌ FAILURE: No content was downloaded!")
-ic.print("=== VERIFICATION COMPLETE ===")
-'''.strip()
-    sync_call.codex = codex
-    step2 = TaskStep(call=sync_call)
-    
-    task = Task(name="test_mixed_steps", steps=[step1, step2])
-    schedule = TaskSchedule(run_at=0, repeat_every=30)
-    task.schedules = [schedule]
-    
-    task_manager = TaskManager()
-    task_manager.add_task(task)
-    task_manager.run()
-    
-    ic.print("Mixed sync/async task test initiated...")
+ic.print("=== VERIFICATION COMPLETE ===")'''.strip()
+        sync_call.codex = codex
+        step2 = TaskStep(call=sync_call)
+        
+        task = Task(name="test_mixed_steps", steps=[step1, step2])
+        schedule = TaskSchedule(run_at=0, repeat_every=30)
+        task.schedules = [schedule]
+        
+        task_manager = TaskManager()
+        task_manager.add_task(task)
+        task_manager.run()
+        
+        ic.print("Mixed sync/async task test initiated...")
+    except Exception as e:
+        logger.error(traceback.format_exc())
