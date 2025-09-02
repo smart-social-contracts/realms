@@ -1,0 +1,563 @@
+{
+  "realm": {
+    "name": "Reproducible Test",
+    "description": "Auto-generated realm with 11 users, 2 organizations",
+    "created_at": "2025-09-02T18:31:32.112546",
+    "updated_at": "2025-09-02T18:31:32.112548"
+  },
+  "treasury": {
+    "name": "Reproducible Test Treasury",
+    "vault_principal_id": "0l7253j2d54i3qk2iagl58kxo9t-cai",
+    "created_at": "2025-09-02T18:31:32.112559",
+    "updated_at": "2025-09-02T18:31:32.112560"
+  },
+  "users": [
+    {
+      "id": "system",
+      "profile_picture_url": "",
+      "created_at": "2025-09-02T18:31:32.111492",
+      "updated_at": "2025-09-02T18:31:32.111523"
+    },
+    {
+      "id": "helen_anderson_000",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=HelenAnderson",
+      "created_at": "2025-04-14T18:31:32.111556",
+      "updated_at": "2025-09-02T18:31:32.111586"
+    },
+    {
+      "id": "patricia_harris_001",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=PatriciaHarris",
+      "created_at": "2025-06-22T18:31:32.111594",
+      "updated_at": "2025-09-02T18:31:32.111600"
+    },
+    {
+      "id": "george_wilson_002",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=GeorgeWilson",
+      "created_at": "2024-11-26T18:31:32.111607",
+      "updated_at": "2025-09-02T18:31:32.111613"
+    },
+    {
+      "id": "fiona_taylor_003",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=FionaTaylor",
+      "created_at": "2025-01-28T18:31:32.111619",
+      "updated_at": "2025-09-02T18:31:32.111624"
+    },
+    {
+      "id": "charlie_anderson_004",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=CharlieAnderson",
+      "created_at": "2025-07-16T18:31:32.111630",
+      "updated_at": "2025-09-02T18:31:32.111635"
+    },
+    {
+      "id": "nina_harris_005",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=NinaHarris",
+      "created_at": "2024-12-17T18:31:32.111640",
+      "updated_at": "2025-09-02T18:31:32.111645"
+    },
+    {
+      "id": "bob_smith_006",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=BobSmith",
+      "created_at": "2025-05-23T18:31:32.111651",
+      "updated_at": "2025-09-02T18:31:32.111656"
+    },
+    {
+      "id": "adrian_harris_007",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=AdrianHarris",
+      "created_at": "2025-01-15T18:31:32.111662",
+      "updated_at": "2025-09-02T18:31:32.111668"
+    },
+    {
+      "id": "rachel_adams_008",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=RachelAdams",
+      "created_at": "2025-08-29T18:31:32.111675",
+      "updated_at": "2025-09-02T18:31:32.111680"
+    },
+    {
+      "id": "kevin_xavier_009",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=KevinXavier",
+      "created_at": "2025-01-28T18:31:32.111685",
+      "updated_at": "2025-09-02T18:31:32.111690"
+    }
+  ],
+  "humans": [
+    {
+      "name": "Helen Anderson",
+      "date_of_birth": "1977-02-27",
+      "user_id": "helen_anderson_000",
+      "created_at": "2025-04-14T18:31:32.111556",
+      "updated_at": "2025-09-02T18:31:32.111586"
+    },
+    {
+      "name": "Patricia Harris",
+      "date_of_birth": "1982-10-03",
+      "user_id": "patricia_harris_001",
+      "created_at": "2025-06-22T18:31:32.111594",
+      "updated_at": "2025-09-02T18:31:32.111600"
+    },
+    {
+      "name": "George Wilson",
+      "date_of_birth": "1993-09-26",
+      "user_id": "george_wilson_002",
+      "created_at": "2024-11-26T18:31:32.111607",
+      "updated_at": "2025-09-02T18:31:32.111613"
+    },
+    {
+      "name": "Fiona Taylor",
+      "date_of_birth": "1988-05-14",
+      "user_id": "fiona_taylor_003",
+      "created_at": "2025-01-28T18:31:32.111619",
+      "updated_at": "2025-09-02T18:31:32.111624"
+    },
+    {
+      "name": "Charlie Anderson",
+      "date_of_birth": "1977-06-27",
+      "user_id": "charlie_anderson_004",
+      "created_at": "2025-07-16T18:31:32.111630",
+      "updated_at": "2025-09-02T18:31:32.111635"
+    },
+    {
+      "name": "Nina Harris",
+      "date_of_birth": "1998-07-07",
+      "user_id": "nina_harris_005",
+      "created_at": "2024-12-17T18:31:32.111640",
+      "updated_at": "2025-09-02T18:31:32.111645"
+    },
+    {
+      "name": "Bob Smith",
+      "date_of_birth": "1999-05-13",
+      "user_id": "bob_smith_006",
+      "created_at": "2025-05-23T18:31:32.111651",
+      "updated_at": "2025-09-02T18:31:32.111656"
+    },
+    {
+      "name": "Adrian Harris",
+      "date_of_birth": "1973-08-07",
+      "user_id": "adrian_harris_007",
+      "created_at": "2025-01-15T18:31:32.111662",
+      "updated_at": "2025-09-02T18:31:32.111668"
+    },
+    {
+      "name": "Rachel Adams",
+      "date_of_birth": "1999-01-03",
+      "user_id": "rachel_adams_008",
+      "created_at": "2025-08-29T18:31:32.111675",
+      "updated_at": "2025-09-02T18:31:32.111680"
+    },
+    {
+      "name": "Kevin Xavier",
+      "date_of_birth": "1975-06-24",
+      "user_id": "kevin_xavier_009",
+      "created_at": "2025-01-28T18:31:32.111685",
+      "updated_at": "2025-09-02T18:31:32.111690"
+    }
+  ],
+  "citizens": [
+    {
+      "id": "cit_cfeecb26",
+      "user_id": "helen_anderson_000",
+      "residence_permit": "expired",
+      "tax_compliance": "under_review",
+      "identity_verification": "pending",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "minor_offenses",
+      "created_at": "2025-04-14T18:31:32.111556",
+      "updated_at": "2025-09-02T18:31:32.111586"
+    },
+    {
+      "id": "cit_f3a31836",
+      "user_id": "patricia_harris_001",
+      "residence_permit": "pending",
+      "tax_compliance": "compliant",
+      "identity_verification": "pending",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "minor_offenses",
+      "created_at": "2025-06-22T18:31:32.111594",
+      "updated_at": "2025-09-02T18:31:32.111600"
+    },
+    {
+      "id": "cit_d0c9394c",
+      "user_id": "george_wilson_002",
+      "residence_permit": "pending",
+      "tax_compliance": "under_review",
+      "identity_verification": "pending",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "major_offenses",
+      "created_at": "2024-11-26T18:31:32.111607",
+      "updated_at": "2025-09-02T18:31:32.111613"
+    },
+    {
+      "id": "cit_ddd4cf11",
+      "user_id": "fiona_taylor_003",
+      "residence_permit": "valid",
+      "tax_compliance": "compliant",
+      "identity_verification": "rejected",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "clean",
+      "created_at": "2025-01-28T18:31:32.111619",
+      "updated_at": "2025-09-02T18:31:32.111624"
+    },
+    {
+      "id": "cit_ddb15b3f",
+      "user_id": "charlie_anderson_004",
+      "residence_permit": "valid",
+      "tax_compliance": "compliant",
+      "identity_verification": "pending",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "major_offenses",
+      "created_at": "2025-07-16T18:31:32.111630",
+      "updated_at": "2025-09-02T18:31:32.111635"
+    },
+    {
+      "id": "cit_80dc26cd",
+      "user_id": "nina_harris_005",
+      "residence_permit": "expired",
+      "tax_compliance": "compliant",
+      "identity_verification": "pending",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "major_offenses",
+      "created_at": "2024-12-17T18:31:32.111640",
+      "updated_at": "2025-09-02T18:31:32.111645"
+    },
+    {
+      "id": "cit_dcc3815b",
+      "user_id": "bob_smith_006",
+      "residence_permit": "expired",
+      "tax_compliance": "under_review",
+      "identity_verification": "rejected",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "major_offenses",
+      "created_at": "2025-05-23T18:31:32.111651",
+      "updated_at": "2025-09-02T18:31:32.111656"
+    },
+    {
+      "id": "cit_79f68e91",
+      "user_id": "adrian_harris_007",
+      "residence_permit": "pending",
+      "tax_compliance": "compliant",
+      "identity_verification": "rejected",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "clean",
+      "created_at": "2025-01-15T18:31:32.111662",
+      "updated_at": "2025-09-02T18:31:32.111668"
+    },
+    {
+      "id": "cit_841f5ec7",
+      "user_id": "rachel_adams_008",
+      "residence_permit": "expired",
+      "tax_compliance": "delinquent",
+      "identity_verification": "pending",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "major_offenses",
+      "created_at": "2025-08-29T18:31:32.111675",
+      "updated_at": "2025-09-02T18:31:32.111680"
+    },
+    {
+      "id": "cit_90102645",
+      "user_id": "kevin_xavier_009",
+      "residence_permit": "valid",
+      "tax_compliance": "under_review",
+      "identity_verification": "pending",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "clean",
+      "created_at": "2025-01-28T18:31:32.111685",
+      "updated_at": "2025-09-02T18:31:32.111690"
+    }
+  ],
+  "organizations": [
+    {
+      "name": "Infrastructure Management #001",
+      "created_at": "2024-09-14T18:31:32.112003",
+      "updated_at": "2025-09-02T18:31:32.112012"
+    },
+    {
+      "name": "Financial Services Inc #002",
+      "created_at": "2024-11-02T18:31:32.112016",
+      "updated_at": "2025-09-02T18:31:32.112020"
+    }
+  ],
+  "instruments": [
+    {
+      "name": "Bitcoin",
+      "principal_id": "c6uzhr5xff0t0pvn9er14ffyvnv-cai",
+      "metadata": "{\"symbol\": \"BTC\", \"type\": \"token\"}",
+      "created_at": "2025-09-02T18:31:32.112077",
+      "updated_at": "2025-09-02T18:31:32.112080"
+    },
+    {
+      "name": "Ethereum",
+      "principal_id": "qjt7ye511mkfazz81sdw4shnf87-cai",
+      "metadata": "{\"symbol\": \"ETH\", \"type\": \"token\"}",
+      "created_at": "2025-09-02T18:31:32.112097",
+      "updated_at": "2025-09-02T18:31:32.112099"
+    },
+    {
+      "name": "Realm Token",
+      "principal_id": "7vren93iiuc039tex8fsv871yzo-cai",
+      "metadata": "{\"symbol\": \"RLM\", \"type\": \"token\"}",
+      "created_at": "2025-09-02T18:31:32.112112",
+      "updated_at": "2025-09-02T18:31:32.112114"
+    },
+    {
+      "name": "Governance Token",
+      "principal_id": "yn6qicatvazccblskrt05uirodx-cai",
+      "metadata": "{\"symbol\": \"GOV\", \"type\": \"token\"}",
+      "created_at": "2025-09-02T18:31:32.112126",
+      "updated_at": "2025-09-02T18:31:32.112128"
+    },
+    {
+      "name": "Utility Token",
+      "principal_id": "mo5bxxc02dgtfgq5c34dxtad1io-cai",
+      "metadata": "{\"symbol\": \"UTL\", \"type\": \"token\"}",
+      "created_at": "2025-09-02T18:31:32.112139",
+      "updated_at": "2025-09-02T18:31:32.112146"
+    },
+    {
+      "name": "Service Credit",
+      "principal_id": "r56fao72kz02xrghc0clbr7tcs4-cai",
+      "metadata": "{\"symbol\": \"SVC\", \"type\": \"token\"}",
+      "created_at": "2025-09-02T18:31:32.112157",
+      "updated_at": "2025-09-02T18:31:32.112159"
+    }
+  ],
+  "transfers": [
+    {
+      "from_user_id": "helen_anderson_000",
+      "to_user_id": "kevin_xavier_009",
+      "instrument_name": "Bitcoin",
+      "amount": 3854,
+      "created_at": "2025-05-21T18:31:32.112173",
+      "updated_at": "2025-09-02T18:31:32.112178"
+    },
+    {
+      "from_user_id": "helen_anderson_000",
+      "to_user_id": "kevin_xavier_009",
+      "instrument_name": "Ethereum",
+      "amount": 9486,
+      "created_at": "2025-04-02T18:31:32.112186",
+      "updated_at": "2025-09-02T18:31:32.112189"
+    },
+    {
+      "from_user_id": "system",
+      "to_user_id": "kevin_xavier_009",
+      "instrument_name": "Bitcoin",
+      "amount": 6869,
+      "created_at": "2025-03-17T18:31:32.112196",
+      "updated_at": "2025-09-02T18:31:32.112200"
+    },
+    {
+      "from_user_id": "rachel_adams_008",
+      "to_user_id": "kevin_xavier_009",
+      "instrument_name": "Utility Token",
+      "amount": 5184,
+      "created_at": "2025-06-27T18:31:32.112206",
+      "updated_at": "2025-09-02T18:31:32.112210"
+    },
+    {
+      "from_user_id": "george_wilson_002",
+      "to_user_id": "nina_harris_005",
+      "instrument_name": "Ethereum",
+      "amount": 4352,
+      "created_at": "2025-05-23T18:31:32.112216",
+      "updated_at": "2025-09-02T18:31:32.112220"
+    },
+    {
+      "from_user_id": "patricia_harris_001",
+      "to_user_id": "charlie_anderson_004",
+      "instrument_name": "Governance Token",
+      "amount": 5181,
+      "created_at": "2025-08-14T18:31:32.112226",
+      "updated_at": "2025-09-02T18:31:32.112230"
+    },
+    {
+      "from_user_id": "system",
+      "to_user_id": "adrian_harris_007",
+      "instrument_name": "Utility Token",
+      "amount": 9225,
+      "created_at": "2025-08-07T18:31:32.112236",
+      "updated_at": "2025-09-02T18:31:32.112240"
+    },
+    {
+      "from_user_id": "helen_anderson_000",
+      "to_user_id": "rachel_adams_008",
+      "instrument_name": "Ethereum",
+      "amount": 8289,
+      "created_at": "2025-06-26T18:31:32.112246",
+      "updated_at": "2025-09-02T18:31:32.112249"
+    },
+    {
+      "from_user_id": "patricia_harris_001",
+      "to_user_id": "nina_harris_005",
+      "instrument_name": "Bitcoin",
+      "amount": 4003,
+      "created_at": "2025-05-30T18:31:32.112256",
+      "updated_at": "2025-09-02T18:31:32.112260"
+    },
+    {
+      "from_user_id": "fiona_taylor_003",
+      "to_user_id": "patricia_harris_001",
+      "instrument_name": "Governance Token",
+      "amount": 8901,
+      "created_at": "2025-06-16T18:31:32.112266",
+      "updated_at": "2025-09-02T18:31:32.112270"
+    },
+    {
+      "from_user_id": "rachel_adams_008",
+      "to_user_id": "adrian_harris_007",
+      "instrument_name": "Bitcoin",
+      "amount": 9087,
+      "created_at": "2025-06-17T18:31:32.112276",
+      "updated_at": "2025-09-02T18:31:32.112279"
+    },
+    {
+      "from_user_id": "kevin_xavier_009",
+      "to_user_id": "helen_anderson_000",
+      "instrument_name": "Ethereum",
+      "amount": 4334,
+      "created_at": "2025-08-03T18:31:32.112285",
+      "updated_at": "2025-09-02T18:31:32.112289"
+    },
+    {
+      "from_user_id": "helen_anderson_000",
+      "to_user_id": "rachel_adams_008",
+      "instrument_name": "Ethereum",
+      "amount": 4463,
+      "created_at": "2025-06-21T18:31:32.112295",
+      "updated_at": "2025-09-02T18:31:32.112298"
+    },
+    {
+      "from_user_id": "rachel_adams_008",
+      "to_user_id": "george_wilson_002",
+      "instrument_name": "Service Credit",
+      "amount": 5618,
+      "created_at": "2025-07-11T18:31:32.112308",
+      "updated_at": "2025-09-02T18:31:32.112311"
+    },
+    {
+      "from_user_id": "kevin_xavier_009",
+      "to_user_id": "fiona_taylor_003",
+      "instrument_name": "Utility Token",
+      "amount": 8005,
+      "created_at": "2025-06-29T18:31:32.112317",
+      "updated_at": "2025-09-02T18:31:32.112321"
+    },
+    {
+      "from_user_id": "system",
+      "to_user_id": "patricia_harris_001",
+      "instrument_name": "Service Credit",
+      "amount": 6940,
+      "created_at": "2025-06-23T18:31:32.112327",
+      "updated_at": "2025-09-02T18:31:32.112330"
+    },
+    {
+      "from_user_id": "system",
+      "to_user_id": "helen_anderson_000",
+      "instrument_name": "Realm Token",
+      "amount": 2144,
+      "created_at": "2025-03-22T18:31:32.112336",
+      "updated_at": "2025-09-02T18:31:32.112340"
+    },
+    {
+      "from_user_id": "fiona_taylor_003",
+      "to_user_id": "patricia_harris_001",
+      "instrument_name": "Service Credit",
+      "amount": 7240,
+      "created_at": "2025-04-13T18:31:32.112346",
+      "updated_at": "2025-09-02T18:31:32.112349"
+    },
+    {
+      "from_user_id": "nina_harris_005",
+      "to_user_id": "rachel_adams_008",
+      "instrument_name": "Bitcoin",
+      "amount": 1833,
+      "created_at": "2025-08-13T18:31:32.112355",
+      "updated_at": "2025-09-02T18:31:32.112359"
+    },
+    {
+      "from_user_id": "patricia_harris_001",
+      "to_user_id": "rachel_adams_008",
+      "instrument_name": "Bitcoin",
+      "amount": 6050,
+      "created_at": "2025-04-05T18:31:32.112365",
+      "updated_at": "2025-09-02T18:31:32.112368"
+    }
+  ],
+  "disputes": [
+    {
+      "status": "appealed",
+      "metadata": "{\"case_id\": \"CASE_000001\", \"type\": \"property\", \"priority\": \"urgent\"}",
+      "created_at": "2025-06-28T18:31:32.112383",
+      "updated_at": "2025-09-02T18:31:32.112388"
+    },
+    {
+      "status": "open",
+      "metadata": "{\"case_id\": \"CASE_000002\", \"type\": \"tax\", \"priority\": \"high\"}",
+      "created_at": "2025-08-12T18:31:32.112398",
+      "updated_at": "2025-09-02T18:31:32.112402"
+    },
+    {
+      "status": "resolved",
+      "metadata": "{\"case_id\": \"CASE_000003\", \"type\": \"property\", \"priority\": \"medium\"}",
+      "created_at": "2024-09-25T18:31:32.112412",
+      "updated_at": "2025-09-02T18:31:32.112416"
+    }
+  ],
+  "mandates": [
+    {
+      "name": "Tax Collection",
+      "metadata": "{\"description\": \"Automated tax assessment and collection\", \"authority\": \"Digital Republic Government\", \"effective_date\": \"2025-06-12\"}",
+      "created_at": "2025-02-03T18:31:32.112447",
+      "updated_at": "2025-09-02T18:31:32.112452"
+    },
+    {
+      "name": "Social Benefits",
+      "metadata": "{\"description\": \"Distribution of social welfare benefits\", \"authority\": \"Digital Republic Government\", \"effective_date\": \"2024-10-21\"}",
+      "created_at": "2025-01-07T18:31:32.112465",
+      "updated_at": "2025-09-02T18:31:32.112469"
+    },
+    {
+      "name": "License Management",
+      "metadata": "{\"description\": \"Processing and renewal of licenses\", \"authority\": \"Digital Republic Government\", \"effective_date\": \"2024-09-20\"}",
+      "created_at": "2025-05-16T18:31:32.112482",
+      "updated_at": "2025-09-02T18:31:32.112486"
+    },
+    {
+      "name": "Land Registry",
+      "metadata": "{\"description\": \"Property registration and transfers\", \"authority\": \"Digital Republic Government\", \"effective_date\": \"2025-04-04\"}",
+      "created_at": "2025-05-12T18:31:32.112498",
+      "updated_at": "2025-09-02T18:31:32.112502"
+    },
+    {
+      "name": "Voting System",
+      "metadata": "{\"description\": \"Democratic voting and governance\", \"authority\": \"Digital Republic Government\", \"effective_date\": \"2025-05-05\"}",
+      "created_at": "2025-01-04T18:31:32.112513",
+      "updated_at": "2025-09-02T18:31:32.112517"
+    },
+    {
+      "name": "Healthcare Services",
+      "metadata": "{\"description\": \"Public healthcare administration\", \"authority\": \"Digital Republic Government\", \"effective_date\": \"2025-07-22\"}",
+      "created_at": "2025-05-04T18:31:32.112539",
+      "updated_at": "2025-09-02T18:31:32.112543"
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-09-02T18:31:32.112563",
+    "seed": 42,
+    "parameters": {
+      "citizens": 10,
+      "organizations": 2,
+      "transactions": 20,
+      "disputes": 3,
+      "realm_name": "Reproducible Test"
+    }
+  }
+}

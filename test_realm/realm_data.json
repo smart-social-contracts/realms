@@ -1,0 +1,1195 @@
+{
+  "realm": {
+    "name": "Test Demo Realm",
+    "description": "Auto-generated realm with 26 users, 3 organizations",
+    "created_at": "2025-09-02T18:18:28.777021",
+    "updated_at": "2025-09-02T18:18:28.777022"
+  },
+  "treasury": {
+    "name": "Test Demo Realm Treasury",
+    "vault_principal_id": "ws4ofym7oam8r3nvchdoluxijae-cai",
+    "created_at": "2025-09-02T18:18:28.777036",
+    "updated_at": "2025-09-02T18:18:28.777038"
+  },
+  "users": [
+    {
+      "id": "system",
+      "profile_picture_url": "",
+      "created_at": "2025-09-02T18:18:28.774815",
+      "updated_at": "2025-09-02T18:18:28.774854"
+    },
+    {
+      "id": "adrian_young_000",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=AdrianYoung",
+      "created_at": "2025-08-27T18:18:28.774904",
+      "updated_at": "2025-09-02T18:18:28.774931"
+    },
+    {
+      "id": "tina_cooper_001",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=TinaCooper",
+      "created_at": "2025-02-25T18:18:28.774938",
+      "updated_at": "2025-09-02T18:18:28.774944"
+    },
+    {
+      "id": "michael_johnson_002",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=MichaelJohnson",
+      "created_at": "2024-11-16T18:18:28.774950",
+      "updated_at": "2025-09-02T18:18:28.774954"
+    },
+    {
+      "id": "bella_fisher_003",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=BellaFisher",
+      "created_at": "2025-02-22T18:18:28.774959",
+      "updated_at": "2025-09-02T18:18:28.774973"
+    },
+    {
+      "id": "helen_cooper_004",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=HelenCooper",
+      "created_at": "2025-01-23T18:18:28.774979",
+      "updated_at": "2025-09-02T18:18:28.774984"
+    },
+    {
+      "id": "quinn_smith_005",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=QuinnSmith",
+      "created_at": "2024-10-15T18:18:28.774990",
+      "updated_at": "2025-09-02T18:18:28.774995"
+    },
+    {
+      "id": "laura_underwood_006",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=LauraUnderwood",
+      "created_at": "2024-11-22T18:18:28.775001",
+      "updated_at": "2025-09-02T18:18:28.775005"
+    },
+    {
+      "id": "laura_miller_007",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=LauraMiller",
+      "created_at": "2025-07-17T18:18:28.775009",
+      "updated_at": "2025-09-02T18:18:28.775013"
+    },
+    {
+      "id": "adrian_taylor_008",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=AdrianTaylor",
+      "created_at": "2024-12-17T18:18:28.775019",
+      "updated_at": "2025-09-02T18:18:28.775024"
+    },
+    {
+      "id": "kevin_evans_009",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=KevinEvans",
+      "created_at": "2025-05-19T18:18:28.775030",
+      "updated_at": "2025-09-02T18:18:28.775035"
+    },
+    {
+      "id": "edward_garcia_010",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=EdwardGarcia",
+      "created_at": "2025-03-11T18:18:28.775041",
+      "updated_at": "2025-09-02T18:18:28.775046"
+    },
+    {
+      "id": "ulrich_anderson_011",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=UlrichAnderson",
+      "created_at": "2025-01-10T18:18:28.775052",
+      "updated_at": "2025-09-02T18:18:28.775058"
+    },
+    {
+      "id": "victoria_anderson_012",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=VictoriaAnderson",
+      "created_at": "2024-12-14T18:18:28.775063",
+      "updated_at": "2025-09-02T18:18:28.775068"
+    },
+    {
+      "id": "adrian_anderson_013",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=AdrianAnderson",
+      "created_at": "2025-08-29T18:18:28.775075",
+      "updated_at": "2025-09-02T18:18:28.775079"
+    },
+    {
+      "id": "kevin_zhang_014",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=KevinZhang",
+      "created_at": "2024-11-08T18:18:28.775085",
+      "updated_at": "2025-09-02T18:18:28.775090"
+    },
+    {
+      "id": "laura_king_015",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=LauraKing",
+      "created_at": "2025-07-13T18:18:28.775096",
+      "updated_at": "2025-09-02T18:18:28.775100"
+    },
+    {
+      "id": "adrian_davis_016",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=AdrianDavis",
+      "created_at": "2024-09-18T18:18:28.775104",
+      "updated_at": "2025-09-02T18:18:28.775108"
+    },
+    {
+      "id": "laura_young_017",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=LauraYoung",
+      "created_at": "2025-02-21T18:18:28.775111",
+      "updated_at": "2025-09-02T18:18:28.775122"
+    },
+    {
+      "id": "oliver_foster_018",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=OliverFoster",
+      "created_at": "2024-12-07T18:18:28.775126",
+      "updated_at": "2025-09-02T18:18:28.775130"
+    },
+    {
+      "id": "victoria_adams_019",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=VictoriaAdams",
+      "created_at": "2025-08-12T18:18:28.775135",
+      "updated_at": "2025-09-02T18:18:28.775138"
+    },
+    {
+      "id": "oliver_davis_020",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=OliverDavis",
+      "created_at": "2024-12-20T18:18:28.775142",
+      "updated_at": "2025-09-02T18:18:28.775145"
+    },
+    {
+      "id": "nina_young_021",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=NinaYoung",
+      "created_at": "2024-11-21T18:18:28.775149",
+      "updated_at": "2025-09-02T18:18:28.775152"
+    },
+    {
+      "id": "laura_johnson_022",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=LauraJohnson",
+      "created_at": "2024-11-04T18:18:28.775156",
+      "updated_at": "2025-09-02T18:18:28.775160"
+    },
+    {
+      "id": "bella_rodriguez_023",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=BellaRodriguez",
+      "created_at": "2025-06-27T18:18:28.775164",
+      "updated_at": "2025-09-02T18:18:28.775168"
+    },
+    {
+      "id": "charlie_fisher_024",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=CharlieFisher",
+      "created_at": "2025-03-31T18:18:28.775176",
+      "updated_at": "2025-09-02T18:18:28.775181"
+    }
+  ],
+  "humans": [
+    {
+      "name": "Adrian Young",
+      "date_of_birth": "2006-11-05",
+      "user_id": "adrian_young_000",
+      "created_at": "2025-08-27T18:18:28.774904",
+      "updated_at": "2025-09-02T18:18:28.774931"
+    },
+    {
+      "name": "Tina Cooper",
+      "date_of_birth": "1994-03-15",
+      "user_id": "tina_cooper_001",
+      "created_at": "2025-02-25T18:18:28.774938",
+      "updated_at": "2025-09-02T18:18:28.774944"
+    },
+    {
+      "name": "Michael Johnson",
+      "date_of_birth": "1987-02-17",
+      "user_id": "michael_johnson_002",
+      "created_at": "2024-11-16T18:18:28.774950",
+      "updated_at": "2025-09-02T18:18:28.774954"
+    },
+    {
+      "name": "Bella Fisher",
+      "date_of_birth": "1976-04-23",
+      "user_id": "bella_fisher_003",
+      "created_at": "2025-02-22T18:18:28.774959",
+      "updated_at": "2025-09-02T18:18:28.774973"
+    },
+    {
+      "name": "Helen Cooper",
+      "date_of_birth": "1959-04-26",
+      "user_id": "helen_cooper_004",
+      "created_at": "2025-01-23T18:18:28.774979",
+      "updated_at": "2025-09-02T18:18:28.774984"
+    },
+    {
+      "name": "Quinn Smith",
+      "date_of_birth": "1977-01-02",
+      "user_id": "quinn_smith_005",
+      "created_at": "2024-10-15T18:18:28.774990",
+      "updated_at": "2025-09-02T18:18:28.774995"
+    },
+    {
+      "name": "Laura Underwood",
+      "date_of_birth": "1993-08-08",
+      "user_id": "laura_underwood_006",
+      "created_at": "2024-11-22T18:18:28.775001",
+      "updated_at": "2025-09-02T18:18:28.775005"
+    },
+    {
+      "name": "Laura Miller",
+      "date_of_birth": "1973-01-20",
+      "user_id": "laura_miller_007",
+      "created_at": "2025-07-17T18:18:28.775009",
+      "updated_at": "2025-09-02T18:18:28.775013"
+    },
+    {
+      "name": "Adrian Taylor",
+      "date_of_birth": "1978-08-22",
+      "user_id": "adrian_taylor_008",
+      "created_at": "2024-12-17T18:18:28.775019",
+      "updated_at": "2025-09-02T18:18:28.775024"
+    },
+    {
+      "name": "Kevin Evans",
+      "date_of_birth": "2006-07-14",
+      "user_id": "kevin_evans_009",
+      "created_at": "2025-05-19T18:18:28.775030",
+      "updated_at": "2025-09-02T18:18:28.775035"
+    },
+    {
+      "name": "Edward Garcia",
+      "date_of_birth": "2003-04-05",
+      "user_id": "edward_garcia_010",
+      "created_at": "2025-03-11T18:18:28.775041",
+      "updated_at": "2025-09-02T18:18:28.775046"
+    },
+    {
+      "name": "Ulrich Anderson",
+      "date_of_birth": "2002-03-22",
+      "user_id": "ulrich_anderson_011",
+      "created_at": "2025-01-10T18:18:28.775052",
+      "updated_at": "2025-09-02T18:18:28.775058"
+    },
+    {
+      "name": "Victoria Anderson",
+      "date_of_birth": "1967-10-02",
+      "user_id": "victoria_anderson_012",
+      "created_at": "2024-12-14T18:18:28.775063",
+      "updated_at": "2025-09-02T18:18:28.775068"
+    },
+    {
+      "name": "Adrian Anderson",
+      "date_of_birth": "2000-08-20",
+      "user_id": "adrian_anderson_013",
+      "created_at": "2025-08-29T18:18:28.775075",
+      "updated_at": "2025-09-02T18:18:28.775079"
+    },
+    {
+      "name": "Kevin Zhang",
+      "date_of_birth": "1972-11-12",
+      "user_id": "kevin_zhang_014",
+      "created_at": "2024-11-08T18:18:28.775085",
+      "updated_at": "2025-09-02T18:18:28.775090"
+    },
+    {
+      "name": "Laura King",
+      "date_of_birth": "1991-08-01",
+      "user_id": "laura_king_015",
+      "created_at": "2025-07-13T18:18:28.775096",
+      "updated_at": "2025-09-02T18:18:28.775100"
+    },
+    {
+      "name": "Adrian Davis",
+      "date_of_birth": "2006-08-20",
+      "user_id": "adrian_davis_016",
+      "created_at": "2024-09-18T18:18:28.775104",
+      "updated_at": "2025-09-02T18:18:28.775108"
+    },
+    {
+      "name": "Laura Young",
+      "date_of_birth": "1974-09-10",
+      "user_id": "laura_young_017",
+      "created_at": "2025-02-21T18:18:28.775111",
+      "updated_at": "2025-09-02T18:18:28.775122"
+    },
+    {
+      "name": "Oliver Foster",
+      "date_of_birth": "1988-05-13",
+      "user_id": "oliver_foster_018",
+      "created_at": "2024-12-07T18:18:28.775126",
+      "updated_at": "2025-09-02T18:18:28.775130"
+    },
+    {
+      "name": "Victoria Adams",
+      "date_of_birth": "1946-10-18",
+      "user_id": "victoria_adams_019",
+      "created_at": "2025-08-12T18:18:28.775135",
+      "updated_at": "2025-09-02T18:18:28.775138"
+    },
+    {
+      "name": "Oliver Davis",
+      "date_of_birth": "1961-09-14",
+      "user_id": "oliver_davis_020",
+      "created_at": "2024-12-20T18:18:28.775142",
+      "updated_at": "2025-09-02T18:18:28.775145"
+    },
+    {
+      "name": "Nina Young",
+      "date_of_birth": "1996-10-13",
+      "user_id": "nina_young_021",
+      "created_at": "2024-11-21T18:18:28.775149",
+      "updated_at": "2025-09-02T18:18:28.775152"
+    },
+    {
+      "name": "Laura Johnson",
+      "date_of_birth": "1964-07-20",
+      "user_id": "laura_johnson_022",
+      "created_at": "2024-11-04T18:18:28.775156",
+      "updated_at": "2025-09-02T18:18:28.775160"
+    },
+    {
+      "name": "Bella Rodriguez",
+      "date_of_birth": "1951-11-24",
+      "user_id": "bella_rodriguez_023",
+      "created_at": "2025-06-27T18:18:28.775164",
+      "updated_at": "2025-09-02T18:18:28.775168"
+    },
+    {
+      "name": "Charlie Fisher",
+      "date_of_birth": "2002-03-01",
+      "user_id": "charlie_fisher_024",
+      "created_at": "2025-03-31T18:18:28.775176",
+      "updated_at": "2025-09-02T18:18:28.775181"
+    }
+  ],
+  "citizens": [
+    {
+      "id": "cit_135078b4",
+      "user_id": "adrian_young_000",
+      "residence_permit": "valid",
+      "tax_compliance": "under_review",
+      "identity_verification": "pending",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "minor_offenses",
+      "created_at": "2025-08-27T18:18:28.774904",
+      "updated_at": "2025-09-02T18:18:28.774931"
+    },
+    {
+      "id": "cit_c19eca1d",
+      "user_id": "tina_cooper_001",
+      "residence_permit": "pending",
+      "tax_compliance": "compliant",
+      "identity_verification": "pending",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "clean",
+      "created_at": "2025-02-25T18:18:28.774938",
+      "updated_at": "2025-09-02T18:18:28.774944"
+    },
+    {
+      "id": "cit_2bcb772a",
+      "user_id": "michael_johnson_002",
+      "residence_permit": "pending",
+      "tax_compliance": "compliant",
+      "identity_verification": "verified",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "minor_offenses",
+      "created_at": "2024-11-16T18:18:28.774950",
+      "updated_at": "2025-09-02T18:18:28.774954"
+    },
+    {
+      "id": "cit_08baf2a4",
+      "user_id": "bella_fisher_003",
+      "residence_permit": "valid",
+      "tax_compliance": "compliant",
+      "identity_verification": "verified",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "clean",
+      "created_at": "2025-02-22T18:18:28.774959",
+      "updated_at": "2025-09-02T18:18:28.774973"
+    },
+    {
+      "id": "cit_b285cb14",
+      "user_id": "helen_cooper_004",
+      "residence_permit": "pending",
+      "tax_compliance": "compliant",
+      "identity_verification": "rejected",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "clean",
+      "created_at": "2025-01-23T18:18:28.774979",
+      "updated_at": "2025-09-02T18:18:28.774984"
+    },
+    {
+      "id": "cit_c19ce64f",
+      "user_id": "quinn_smith_005",
+      "residence_permit": "valid",
+      "tax_compliance": "under_review",
+      "identity_verification": "pending",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "clean",
+      "created_at": "2024-10-15T18:18:28.774990",
+      "updated_at": "2025-09-02T18:18:28.774995"
+    },
+    {
+      "id": "cit_16632fd8",
+      "user_id": "laura_underwood_006",
+      "residence_permit": "expired",
+      "tax_compliance": "under_review",
+      "identity_verification": "pending",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "minor_offenses",
+      "created_at": "2024-11-22T18:18:28.775001",
+      "updated_at": "2025-09-02T18:18:28.775005"
+    },
+    {
+      "id": "cit_02e42c03",
+      "user_id": "laura_miller_007",
+      "residence_permit": "valid",
+      "tax_compliance": "compliant",
+      "identity_verification": "verified",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "minor_offenses",
+      "created_at": "2025-07-17T18:18:28.775009",
+      "updated_at": "2025-09-02T18:18:28.775013"
+    },
+    {
+      "id": "cit_c98a661d",
+      "user_id": "adrian_taylor_008",
+      "residence_permit": "valid",
+      "tax_compliance": "delinquent",
+      "identity_verification": "verified",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "major_offenses",
+      "created_at": "2024-12-17T18:18:28.775019",
+      "updated_at": "2025-09-02T18:18:28.775024"
+    },
+    {
+      "id": "cit_b182ecd4",
+      "user_id": "kevin_evans_009",
+      "residence_permit": "pending",
+      "tax_compliance": "compliant",
+      "identity_verification": "pending",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "minor_offenses",
+      "created_at": "2025-05-19T18:18:28.775030",
+      "updated_at": "2025-09-02T18:18:28.775035"
+    },
+    {
+      "id": "cit_01fb5536",
+      "user_id": "edward_garcia_010",
+      "residence_permit": "expired",
+      "tax_compliance": "compliant",
+      "identity_verification": "verified",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "major_offenses",
+      "created_at": "2025-03-11T18:18:28.775041",
+      "updated_at": "2025-09-02T18:18:28.775046"
+    },
+    {
+      "id": "cit_1e23f6fc",
+      "user_id": "ulrich_anderson_011",
+      "residence_permit": "valid",
+      "tax_compliance": "under_review",
+      "identity_verification": "rejected",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "major_offenses",
+      "created_at": "2025-01-10T18:18:28.775052",
+      "updated_at": "2025-09-02T18:18:28.775058"
+    },
+    {
+      "id": "cit_526d462a",
+      "user_id": "victoria_anderson_012",
+      "residence_permit": "valid",
+      "tax_compliance": "under_review",
+      "identity_verification": "verified",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "minor_offenses",
+      "created_at": "2024-12-14T18:18:28.775063",
+      "updated_at": "2025-09-02T18:18:28.775068"
+    },
+    {
+      "id": "cit_b732cace",
+      "user_id": "adrian_anderson_013",
+      "residence_permit": "valid",
+      "tax_compliance": "under_review",
+      "identity_verification": "rejected",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "clean",
+      "created_at": "2025-08-29T18:18:28.775075",
+      "updated_at": "2025-09-02T18:18:28.775079"
+    },
+    {
+      "id": "cit_eecffc6b",
+      "user_id": "kevin_zhang_014",
+      "residence_permit": "expired",
+      "tax_compliance": "delinquent",
+      "identity_verification": "verified",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "major_offenses",
+      "created_at": "2024-11-08T18:18:28.775085",
+      "updated_at": "2025-09-02T18:18:28.775090"
+    },
+    {
+      "id": "cit_c637c7db",
+      "user_id": "laura_king_015",
+      "residence_permit": "pending",
+      "tax_compliance": "compliant",
+      "identity_verification": "rejected",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "minor_offenses",
+      "created_at": "2025-07-13T18:18:28.775096",
+      "updated_at": "2025-09-02T18:18:28.775100"
+    },
+    {
+      "id": "cit_579562d7",
+      "user_id": "adrian_davis_016",
+      "residence_permit": "pending",
+      "tax_compliance": "under_review",
+      "identity_verification": "verified",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "minor_offenses",
+      "created_at": "2024-09-18T18:18:28.775104",
+      "updated_at": "2025-09-02T18:18:28.775108"
+    },
+    {
+      "id": "cit_32227820",
+      "user_id": "laura_young_017",
+      "residence_permit": "pending",
+      "tax_compliance": "delinquent",
+      "identity_verification": "pending",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "major_offenses",
+      "created_at": "2025-02-21T18:18:28.775111",
+      "updated_at": "2025-09-02T18:18:28.775122"
+    },
+    {
+      "id": "cit_6215c750",
+      "user_id": "oliver_foster_018",
+      "residence_permit": "expired",
+      "tax_compliance": "delinquent",
+      "identity_verification": "rejected",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "clean",
+      "created_at": "2024-12-07T18:18:28.775126",
+      "updated_at": "2025-09-02T18:18:28.775130"
+    },
+    {
+      "id": "cit_5623db93",
+      "user_id": "victoria_adams_019",
+      "residence_permit": "expired",
+      "tax_compliance": "delinquent",
+      "identity_verification": "verified",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "clean",
+      "created_at": "2025-08-12T18:18:28.775135",
+      "updated_at": "2025-09-02T18:18:28.775138"
+    },
+    {
+      "id": "cit_10fd12f0",
+      "user_id": "oliver_davis_020",
+      "residence_permit": "valid",
+      "tax_compliance": "under_review",
+      "identity_verification": "rejected",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "clean",
+      "created_at": "2024-12-20T18:18:28.775142",
+      "updated_at": "2025-09-02T18:18:28.775145"
+    },
+    {
+      "id": "cit_cbb85b0d",
+      "user_id": "nina_young_021",
+      "residence_permit": "pending",
+      "tax_compliance": "compliant",
+      "identity_verification": "pending",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "minor_offenses",
+      "created_at": "2024-11-21T18:18:28.775149",
+      "updated_at": "2025-09-02T18:18:28.775152"
+    },
+    {
+      "id": "cit_ea6cece4",
+      "user_id": "laura_johnson_022",
+      "residence_permit": "expired",
+      "tax_compliance": "compliant",
+      "identity_verification": "pending",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "minor_offenses",
+      "created_at": "2024-11-04T18:18:28.775156",
+      "updated_at": "2025-09-02T18:18:28.775160"
+    },
+    {
+      "id": "cit_6914fb4c",
+      "user_id": "bella_rodriguez_023",
+      "residence_permit": "valid",
+      "tax_compliance": "under_review",
+      "identity_verification": "pending",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "minor_offenses",
+      "created_at": "2025-06-27T18:18:28.775164",
+      "updated_at": "2025-09-02T18:18:28.775168"
+    },
+    {
+      "id": "cit_c5a69757",
+      "user_id": "charlie_fisher_024",
+      "residence_permit": "valid",
+      "tax_compliance": "compliant",
+      "identity_verification": "verified",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "clean",
+      "created_at": "2025-03-31T18:18:28.775176",
+      "updated_at": "2025-09-02T18:18:28.775181"
+    }
+  ],
+  "organizations": [
+    {
+      "name": "Housing Development Co #001",
+      "created_at": "2024-05-26T18:18:28.775673",
+      "updated_at": "2025-09-02T18:18:28.775679"
+    },
+    {
+      "name": "Education Foundation #002",
+      "created_at": "2025-07-20T18:18:28.775684",
+      "updated_at": "2025-09-02T18:18:28.775687"
+    },
+    {
+      "name": "Healthcare Partners #003",
+      "created_at": "2025-04-09T18:18:28.775691",
+      "updated_at": "2025-09-02T18:18:28.775694"
+    }
+  ],
+  "instruments": [
+    {
+      "name": "Bitcoin",
+      "principal_id": "8b9o5irujtf0b5dhs89asvl16qp-cai",
+      "metadata": "{\"symbol\": \"BTC\", \"type\": \"token\"}",
+      "created_at": "2025-09-02T18:18:28.775785",
+      "updated_at": "2025-09-02T18:18:28.775787"
+    },
+    {
+      "name": "Ethereum",
+      "principal_id": "nanytvlploknwurewbb4sqqp6l2-cai",
+      "metadata": "{\"symbol\": \"ETH\", \"type\": \"token\"}",
+      "created_at": "2025-09-02T18:18:28.775805",
+      "updated_at": "2025-09-02T18:18:28.775807"
+    },
+    {
+      "name": "Realm Token",
+      "principal_id": "nt9yqghuthyq1xc6c3duhjr0qoi-cai",
+      "metadata": "{\"symbol\": \"RLM\", \"type\": \"token\"}",
+      "created_at": "2025-09-02T18:18:28.775819",
+      "updated_at": "2025-09-02T18:18:28.775821"
+    },
+    {
+      "name": "Governance Token",
+      "principal_id": "q4ssstyircqlppehw7j51ga0j3r-cai",
+      "metadata": "{\"symbol\": \"GOV\", \"type\": \"token\"}",
+      "created_at": "2025-09-02T18:18:28.775833",
+      "updated_at": "2025-09-02T18:18:28.775834"
+    },
+    {
+      "name": "Utility Token",
+      "principal_id": "lw2k0n79i7h7afu7eh4wsbp7u2x-cai",
+      "metadata": "{\"symbol\": \"UTL\", \"type\": \"token\"}",
+      "created_at": "2025-09-02T18:18:28.775846",
+      "updated_at": "2025-09-02T18:18:28.775848"
+    },
+    {
+      "name": "Service Credit",
+      "principal_id": "xpukkcr4rx6bd6ex50r9yep9aqw-cai",
+      "metadata": "{\"symbol\": \"SVC\", \"type\": \"token\"}",
+      "created_at": "2025-09-02T18:18:28.775862",
+      "updated_at": "2025-09-02T18:18:28.775864"
+    }
+  ],
+  "transfers": [
+    {
+      "from_user_id": "edward_garcia_010",
+      "to_user_id": "helen_cooper_004",
+      "instrument_name": "Service Credit",
+      "amount": 4422,
+      "created_at": "2025-07-27T18:18:28.775878",
+      "updated_at": "2025-09-02T18:18:28.775883"
+    },
+    {
+      "from_user_id": "ulrich_anderson_011",
+      "to_user_id": "helen_cooper_004",
+      "instrument_name": "Realm Token",
+      "amount": 5284,
+      "created_at": "2025-03-25T18:18:28.775901",
+      "updated_at": "2025-09-02T18:18:28.775905"
+    },
+    {
+      "from_user_id": "oliver_foster_018",
+      "to_user_id": "kevin_evans_009",
+      "instrument_name": "Governance Token",
+      "amount": 643,
+      "created_at": "2025-06-03T18:18:28.775913",
+      "updated_at": "2025-09-02T18:18:28.775917"
+    },
+    {
+      "from_user_id": "laura_underwood_006",
+      "to_user_id": "laura_johnson_022",
+      "instrument_name": "Utility Token",
+      "amount": 7501,
+      "created_at": "2025-08-26T18:18:28.775924",
+      "updated_at": "2025-09-02T18:18:28.775927"
+    },
+    {
+      "from_user_id": "edward_garcia_010",
+      "to_user_id": "nina_young_021",
+      "instrument_name": "Governance Token",
+      "amount": 8157,
+      "created_at": "2025-07-28T18:18:28.775934",
+      "updated_at": "2025-09-02T18:18:28.775938"
+    },
+    {
+      "from_user_id": "oliver_foster_018",
+      "to_user_id": "charlie_fisher_024",
+      "instrument_name": "Realm Token",
+      "amount": 9303,
+      "created_at": "2025-06-17T18:18:28.775945",
+      "updated_at": "2025-09-02T18:18:28.775949"
+    },
+    {
+      "from_user_id": "charlie_fisher_024",
+      "to_user_id": "adrian_davis_016",
+      "instrument_name": "Ethereum",
+      "amount": 8174,
+      "created_at": "2025-05-09T18:18:28.775956",
+      "updated_at": "2025-09-02T18:18:28.775959"
+    },
+    {
+      "from_user_id": "nina_young_021",
+      "to_user_id": "system",
+      "instrument_name": "Governance Token",
+      "amount": 6023,
+      "created_at": "2025-07-04T18:18:28.775987",
+      "updated_at": "2025-09-02T18:18:28.775992"
+    },
+    {
+      "from_user_id": "victoria_anderson_012",
+      "to_user_id": "laura_king_015",
+      "instrument_name": "Ethereum",
+      "amount": 8327,
+      "created_at": "2025-06-06T18:18:28.775999",
+      "updated_at": "2025-09-02T18:18:28.776003"
+    },
+    {
+      "from_user_id": "kevin_zhang_014",
+      "to_user_id": "adrian_taylor_008",
+      "instrument_name": "Utility Token",
+      "amount": 3746,
+      "created_at": "2025-05-18T18:18:28.776010",
+      "updated_at": "2025-09-02T18:18:28.776014"
+    },
+    {
+      "from_user_id": "kevin_evans_009",
+      "to_user_id": "michael_johnson_002",
+      "instrument_name": "Ethereum",
+      "amount": 3043,
+      "created_at": "2025-04-18T18:18:28.776021",
+      "updated_at": "2025-09-02T18:18:28.776025"
+    },
+    {
+      "from_user_id": "adrian_young_000",
+      "to_user_id": "charlie_fisher_024",
+      "instrument_name": "Service Credit",
+      "amount": 2015,
+      "created_at": "2025-05-25T18:18:28.776040",
+      "updated_at": "2025-09-02T18:18:28.776043"
+    },
+    {
+      "from_user_id": "bella_fisher_003",
+      "to_user_id": "ulrich_anderson_011",
+      "instrument_name": "Bitcoin",
+      "amount": 3284,
+      "created_at": "2025-03-17T18:18:28.776051",
+      "updated_at": "2025-09-02T18:18:28.776055"
+    },
+    {
+      "from_user_id": "quinn_smith_005",
+      "to_user_id": "system",
+      "instrument_name": "Bitcoin",
+      "amount": 5523,
+      "created_at": "2025-06-27T18:18:28.776061",
+      "updated_at": "2025-09-02T18:18:28.776065"
+    },
+    {
+      "from_user_id": "laura_young_017",
+      "to_user_id": "laura_underwood_006",
+      "instrument_name": "Service Credit",
+      "amount": 8819,
+      "created_at": "2025-03-28T18:18:28.776072",
+      "updated_at": "2025-09-02T18:18:28.776075"
+    },
+    {
+      "from_user_id": "laura_miller_007",
+      "to_user_id": "victoria_adams_019",
+      "instrument_name": "Utility Token",
+      "amount": 5088,
+      "created_at": "2025-06-05T18:18:28.776328",
+      "updated_at": "2025-09-02T18:18:28.776350"
+    },
+    {
+      "from_user_id": "kevin_evans_009",
+      "to_user_id": "victoria_anderson_012",
+      "instrument_name": "Bitcoin",
+      "amount": 9520,
+      "created_at": "2025-08-02T18:18:28.776360",
+      "updated_at": "2025-09-02T18:18:28.776364"
+    },
+    {
+      "from_user_id": "laura_young_017",
+      "to_user_id": "adrian_anderson_013",
+      "instrument_name": "Governance Token",
+      "amount": 5170,
+      "created_at": "2025-07-03T18:18:28.776371",
+      "updated_at": "2025-09-02T18:18:28.776375"
+    },
+    {
+      "from_user_id": "laura_miller_007",
+      "to_user_id": "michael_johnson_002",
+      "instrument_name": "Ethereum",
+      "amount": 4751,
+      "created_at": "2025-03-13T18:18:28.776382",
+      "updated_at": "2025-09-02T18:18:28.776386"
+    },
+    {
+      "from_user_id": "adrian_young_000",
+      "to_user_id": "adrian_davis_016",
+      "instrument_name": "Ethereum",
+      "amount": 2310,
+      "created_at": "2025-04-19T18:18:28.776393",
+      "updated_at": "2025-09-02T18:18:28.776397"
+    },
+    {
+      "from_user_id": "quinn_smith_005",
+      "to_user_id": "laura_johnson_022",
+      "instrument_name": "Realm Token",
+      "amount": 3457,
+      "created_at": "2025-06-28T18:18:28.776404",
+      "updated_at": "2025-09-02T18:18:28.776408"
+    },
+    {
+      "from_user_id": "edward_garcia_010",
+      "to_user_id": "adrian_young_000",
+      "instrument_name": "Bitcoin",
+      "amount": 2316,
+      "created_at": "2025-07-04T18:18:28.776415",
+      "updated_at": "2025-09-02T18:18:28.776419"
+    },
+    {
+      "from_user_id": "nina_young_021",
+      "to_user_id": "adrian_young_000",
+      "instrument_name": "Ethereum",
+      "amount": 323,
+      "created_at": "2025-08-23T18:18:28.776426",
+      "updated_at": "2025-09-02T18:18:28.776430"
+    },
+    {
+      "from_user_id": "bella_fisher_003",
+      "to_user_id": "victoria_anderson_012",
+      "instrument_name": "Governance Token",
+      "amount": 9496,
+      "created_at": "2025-05-17T18:18:28.776436",
+      "updated_at": "2025-09-02T18:18:28.776440"
+    },
+    {
+      "from_user_id": "system",
+      "to_user_id": "quinn_smith_005",
+      "instrument_name": "Ethereum",
+      "amount": 8357,
+      "created_at": "2025-04-22T18:18:28.776457",
+      "updated_at": "2025-09-02T18:18:28.776461"
+    },
+    {
+      "from_user_id": "bella_fisher_003",
+      "to_user_id": "laura_king_015",
+      "instrument_name": "Bitcoin",
+      "amount": 5840,
+      "created_at": "2025-08-13T18:18:28.776469",
+      "updated_at": "2025-09-02T18:18:28.776472"
+    },
+    {
+      "from_user_id": "laura_johnson_022",
+      "to_user_id": "bella_fisher_003",
+      "instrument_name": "Bitcoin",
+      "amount": 1178,
+      "created_at": "2025-06-03T18:18:28.776479",
+      "updated_at": "2025-09-02T18:18:28.776483"
+    },
+    {
+      "from_user_id": "bella_fisher_003",
+      "to_user_id": "ulrich_anderson_011",
+      "instrument_name": "Realm Token",
+      "amount": 3472,
+      "created_at": "2025-06-18T18:18:28.776495",
+      "updated_at": "2025-09-02T18:18:28.776499"
+    },
+    {
+      "from_user_id": "quinn_smith_005",
+      "to_user_id": "laura_young_017",
+      "instrument_name": "Realm Token",
+      "amount": 6649,
+      "created_at": "2025-08-14T18:18:28.776507",
+      "updated_at": "2025-09-02T18:18:28.776510"
+    },
+    {
+      "from_user_id": "kevin_evans_009",
+      "to_user_id": "helen_cooper_004",
+      "instrument_name": "Realm Token",
+      "amount": 7742,
+      "created_at": "2025-04-13T18:18:28.776517",
+      "updated_at": "2025-09-02T18:18:28.776521"
+    },
+    {
+      "from_user_id": "helen_cooper_004",
+      "to_user_id": "laura_young_017",
+      "instrument_name": "Service Credit",
+      "amount": 2163,
+      "created_at": "2025-05-26T18:18:28.776528",
+      "updated_at": "2025-09-02T18:18:28.776531"
+    },
+    {
+      "from_user_id": "system",
+      "to_user_id": "kevin_zhang_014",
+      "instrument_name": "Ethereum",
+      "amount": 4198,
+      "created_at": "2025-07-29T18:18:28.776538",
+      "updated_at": "2025-09-02T18:18:28.776542"
+    },
+    {
+      "from_user_id": "bella_rodriguez_023",
+      "to_user_id": "oliver_davis_020",
+      "instrument_name": "Ethereum",
+      "amount": 9102,
+      "created_at": "2025-04-01T18:18:28.776549",
+      "updated_at": "2025-09-02T18:18:28.776553"
+    },
+    {
+      "from_user_id": "laura_miller_007",
+      "to_user_id": "laura_johnson_022",
+      "instrument_name": "Realm Token",
+      "amount": 4749,
+      "created_at": "2025-03-06T18:18:28.776564",
+      "updated_at": "2025-09-02T18:18:28.776575"
+    },
+    {
+      "from_user_id": "system",
+      "to_user_id": "adrian_davis_016",
+      "instrument_name": "Utility Token",
+      "amount": 6039,
+      "created_at": "2025-05-22T18:18:28.776589",
+      "updated_at": "2025-09-02T18:18:28.776595"
+    },
+    {
+      "from_user_id": "adrian_davis_016",
+      "to_user_id": "quinn_smith_005",
+      "instrument_name": "Governance Token",
+      "amount": 1653,
+      "created_at": "2025-08-05T18:18:28.776606",
+      "updated_at": "2025-09-02T18:18:28.776611"
+    },
+    {
+      "from_user_id": "victoria_adams_019",
+      "to_user_id": "adrian_davis_016",
+      "instrument_name": "Ethereum",
+      "amount": 7601,
+      "created_at": "2025-04-26T18:18:28.776621",
+      "updated_at": "2025-09-02T18:18:28.776627"
+    },
+    {
+      "from_user_id": "helen_cooper_004",
+      "to_user_id": "tina_cooper_001",
+      "instrument_name": "Service Credit",
+      "amount": 9612,
+      "created_at": "2025-08-05T18:18:28.776642",
+      "updated_at": "2025-09-02T18:18:28.776645"
+    },
+    {
+      "from_user_id": "charlie_fisher_024",
+      "to_user_id": "michael_johnson_002",
+      "instrument_name": "Governance Token",
+      "amount": 2492,
+      "created_at": "2025-08-21T18:18:28.776652",
+      "updated_at": "2025-09-02T18:18:28.776656"
+    },
+    {
+      "from_user_id": "adrian_anderson_013",
+      "to_user_id": "oliver_davis_020",
+      "instrument_name": "Bitcoin",
+      "amount": 6622,
+      "created_at": "2025-06-27T18:18:28.776663",
+      "updated_at": "2025-09-02T18:18:28.776666"
+    },
+    {
+      "from_user_id": "adrian_taylor_008",
+      "to_user_id": "bella_fisher_003",
+      "instrument_name": "Utility Token",
+      "amount": 8539,
+      "created_at": "2025-07-06T18:18:28.776673",
+      "updated_at": "2025-09-02T18:18:28.776677"
+    },
+    {
+      "from_user_id": "charlie_fisher_024",
+      "to_user_id": "laura_johnson_022",
+      "instrument_name": "Ethereum",
+      "amount": 1605,
+      "created_at": "2025-05-15T18:18:28.776684",
+      "updated_at": "2025-09-02T18:18:28.776687"
+    },
+    {
+      "from_user_id": "bella_fisher_003",
+      "to_user_id": "adrian_taylor_008",
+      "instrument_name": "Ethereum",
+      "amount": 1962,
+      "created_at": "2025-03-14T18:18:28.776694",
+      "updated_at": "2025-09-02T18:18:28.776698"
+    },
+    {
+      "from_user_id": "kevin_evans_009",
+      "to_user_id": "nina_young_021",
+      "instrument_name": "Governance Token",
+      "amount": 9146,
+      "created_at": "2025-04-04T18:18:28.776705",
+      "updated_at": "2025-09-02T18:18:28.776709"
+    },
+    {
+      "from_user_id": "charlie_fisher_024",
+      "to_user_id": "laura_miller_007",
+      "instrument_name": "Ethereum",
+      "amount": 6121,
+      "created_at": "2025-05-25T18:18:28.776716",
+      "updated_at": "2025-09-02T18:18:28.776719"
+    },
+    {
+      "from_user_id": "adrian_taylor_008",
+      "to_user_id": "system",
+      "instrument_name": "Realm Token",
+      "amount": 7099,
+      "created_at": "2025-05-09T18:18:28.776727",
+      "updated_at": "2025-09-02T18:18:28.776730"
+    },
+    {
+      "from_user_id": "victoria_anderson_012",
+      "to_user_id": "laura_king_015",
+      "instrument_name": "Bitcoin",
+      "amount": 7774,
+      "created_at": "2025-05-03T18:18:28.776737",
+      "updated_at": "2025-09-02T18:18:28.776740"
+    },
+    {
+      "from_user_id": "laura_underwood_006",
+      "to_user_id": "oliver_foster_018",
+      "instrument_name": "Bitcoin",
+      "amount": 5739,
+      "created_at": "2025-07-19T18:18:28.776747",
+      "updated_at": "2025-09-02T18:18:28.776750"
+    },
+    {
+      "from_user_id": "laura_king_015",
+      "to_user_id": "quinn_smith_005",
+      "instrument_name": "Ethereum",
+      "amount": 1262,
+      "created_at": "2025-04-05T18:18:28.776757",
+      "updated_at": "2025-09-02T18:18:28.776762"
+    },
+    {
+      "from_user_id": "charlie_fisher_024",
+      "to_user_id": "adrian_davis_016",
+      "instrument_name": "Ethereum",
+      "amount": 2908,
+      "created_at": "2025-07-30T18:18:28.776769",
+      "updated_at": "2025-09-02T18:18:28.776773"
+    }
+  ],
+  "disputes": [
+    {
+      "status": "investigating",
+      "metadata": "{\"case_id\": \"CASE_000001\", \"type\": \"contract\", \"priority\": \"low\"}",
+      "created_at": "2025-06-27T18:18:28.776816",
+      "updated_at": "2025-09-02T18:18:28.776821"
+    },
+    {
+      "status": "open",
+      "metadata": "{\"case_id\": \"CASE_000002\", \"type\": \"contract\", \"priority\": \"high\"}",
+      "created_at": "2025-07-01T18:18:28.776834",
+      "updated_at": "2025-09-02T18:18:28.776838"
+    },
+    {
+      "status": "appealed",
+      "metadata": "{\"case_id\": \"CASE_000003\", \"type\": \"tax\", \"priority\": \"low\"}",
+      "created_at": "2024-12-29T18:18:28.776853",
+      "updated_at": "2025-09-02T18:18:28.776858"
+    },
+    {
+      "status": "appealed",
+      "metadata": "{\"case_id\": \"CASE_000004\", \"type\": \"governance\", \"priority\": \"medium\"}",
+      "created_at": "2025-03-12T18:18:28.776867",
+      "updated_at": "2025-09-02T18:18:28.776870"
+    },
+    {
+      "status": "open",
+      "metadata": "{\"case_id\": \"CASE_000005\", \"type\": \"contract\", \"priority\": \"low\"}",
+      "created_at": "2024-10-05T18:18:28.776878",
+      "updated_at": "2025-09-02T18:18:28.776882"
+    }
+  ],
+  "mandates": [
+    {
+      "name": "Tax Collection",
+      "metadata": "{\"description\": \"Automated tax assessment and collection\", \"authority\": \"Digital Republic Government\", \"effective_date\": \"2025-01-05\"}",
+      "created_at": "2025-06-13T18:18:28.776910",
+      "updated_at": "2025-09-02T18:18:28.776915"
+    },
+    {
+      "name": "Social Benefits",
+      "metadata": "{\"description\": \"Distribution of social welfare benefits\", \"authority\": \"Digital Republic Government\", \"effective_date\": \"2025-02-26\"}",
+      "created_at": "2024-12-19T18:18:28.776928",
+      "updated_at": "2025-09-02T18:18:28.776932"
+    },
+    {
+      "name": "License Management",
+      "metadata": "{\"description\": \"Processing and renewal of licenses\", \"authority\": \"Digital Republic Government\", \"effective_date\": \"2025-06-29\"}",
+      "created_at": "2025-06-27T18:18:28.776944",
+      "updated_at": "2025-09-02T18:18:28.776948"
+    },
+    {
+      "name": "Land Registry",
+      "metadata": "{\"description\": \"Property registration and transfers\", \"authority\": \"Digital Republic Government\", \"effective_date\": \"2025-01-19\"}",
+      "created_at": "2025-05-16T18:18:28.776959",
+      "updated_at": "2025-09-02T18:18:28.776975"
+    },
+    {
+      "name": "Voting System",
+      "metadata": "{\"description\": \"Democratic voting and governance\", \"authority\": \"Digital Republic Government\", \"effective_date\": \"2024-12-15\"}",
+      "created_at": "2025-02-17T18:18:28.776992",
+      "updated_at": "2025-09-02T18:18:28.776996"
+    },
+    {
+      "name": "Healthcare Services",
+      "metadata": "{\"description\": \"Public healthcare administration\", \"authority\": \"Digital Republic Government\", \"effective_date\": \"2024-12-06\"}",
+      "created_at": "2025-05-22T18:18:28.777013",
+      "updated_at": "2025-09-02T18:18:28.777017"
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-09-02T18:18:28.777040",
+    "seed": 12345,
+    "parameters": {
+      "citizens": 25,
+      "organizations": 3,
+      "transactions": 50,
+      "disputes": 5,
+      "realm_name": "Test Demo Realm"
+    }
+  }
+}
