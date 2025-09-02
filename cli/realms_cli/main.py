@@ -15,13 +15,19 @@ from .commands.registry import (
     registry_get_command,
     registry_remove_command,
     registry_search_command,
-    registry_count_command
+    registry_count_command,
 )
 from .utils import (
-    check_dependencies, display_info_panel,
-    get_current_realm, set_current_realm, unset_current_realm,
-    get_current_network, set_current_network, unset_current_network,
-    get_effective_network_and_canister, resolve_realm_details
+    check_dependencies,
+    display_info_panel,
+    get_current_realm,
+    set_current_realm,
+    unset_current_realm,
+    get_current_network,
+    set_current_network,
+    unset_current_network,
+    get_effective_network_and_canister,
+    resolve_realm_details,
 )
 
 console = Console()
@@ -30,34 +36,67 @@ app = typer.Typer(
     name="realms",
     help="CLI tool for deploying and managing Realms",
     add_completion=False,
-    rich_markup_mode="rich"
+    rich_markup_mode="rich",
 )
 
 
 @app.command("create")
 def create(
     random: bool = typer.Option(False, "--random", help="Generate random realm data"),
-    citizens: int = typer.Option(50, "--citizens", help="Number of citizens to generate"),
-    organizations: int = typer.Option(5, "--organizations", help="Number of organizations to generate"),
-    transactions: int = typer.Option(100, "--transactions", help="Number of transactions to generate"),
-    disputes: int = typer.Option(10, "--disputes", help="Number of disputes to generate"),
-    seed: Optional[int] = typer.Option(None, "--seed", help="Random seed for reproducible generation"),
-    output_dir: str = typer.Option("generated_realm", "--output-dir", help="Output directory"),
-    realm_name: str = typer.Option("Generated Demo Realm", "--realm-name", help="Name of the realm"),
-    network: str = typer.Option("local", "--network", help="Target network for deployment"),
-    deploy: bool = typer.Option(False, "--deploy", help="Deploy the realm after creation")
+    citizens: int = typer.Option(
+        50, "--citizens", help="Number of citizens to generate"
+    ),
+    organizations: int = typer.Option(
+        5, "--organizations", help="Number of organizations to generate"
+    ),
+    transactions: int = typer.Option(
+        100, "--transactions", help="Number of transactions to generate"
+    ),
+    disputes: int = typer.Option(
+        10, "--disputes", help="Number of disputes to generate"
+    ),
+    seed: Optional[int] = typer.Option(
+        None, "--seed", help="Random seed for reproducible generation"
+    ),
+    output_dir: str = typer.Option(
+        "generated_realm", "--output-dir", help="Output directory"
+    ),
+    realm_name: str = typer.Option(
+        "Generated Demo Realm", "--realm-name", help="Name of the realm"
+    ),
+    network: str = typer.Option(
+        "local", "--network", help="Target network for deployment"
+    ),
+    deploy: bool = typer.Option(
+        False, "--deploy", help="Deploy the realm after creation"
+    ),
 ) -> None:
     """Create a new realm with optional random data generation."""
-    create_command(random, citizens, organizations, transactions, disputes, seed, output_dir, realm_name, network, deploy)
+    create_command(
+        random,
+        citizens,
+        organizations,
+        transactions,
+        disputes,
+        seed,
+        output_dir,
+        realm_name,
+        network,
+        deploy,
+    )
 
 
 @app.command("import")
 def import_data(
     file_path: str = typer.Argument(..., help="Path to JSON data file"),
-    entity_type: str = typer.Option(..., "--type", help="Entity type (users, organizations, instruments, etc.)"),
+    entity_type: str = typer.Option(
+        ..., "--type", help="Entity type (users, organizations, instruments, etc.)"
+    ),
     format: str = typer.Option("json", "--format", help="Data format (json)"),
     batch_size: int = typer.Option(100, "--batch-size", help="Batch size for import"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be imported without executing")
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be imported without executing"
+    ),
 ) -> None:
     """Import JSON data into the realm."""
     import_data_command(file_path, entity_type, format, batch_size, dry_run)
@@ -66,8 +105,12 @@ def import_data(
 @app.command("codex")
 def codex_import(
     file_path: str = typer.Argument(..., help="Path to Python codex file"),
-    name: Optional[str] = typer.Option(None, "--name", help="Codex name (defaults to filename)"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be imported without executing")
+    name: Optional[str] = typer.Option(
+        None, "--name", help="Codex name (defaults to filename)"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be imported without executing"
+    ),
 ) -> None:
     """Import Python codex file into the realm."""
     import_codex_command(file_path, name, dry_run)
@@ -75,34 +118,64 @@ def codex_import(
 
 @app.command("deploy")
 def deploy(
-    config_file: str = typer.Option("realm_config.json", "--file", "-f", help="Path to realm configuration file"),
-    network: Optional[str] = typer.Option(None, "--network", "-n", help="Override network from config"),
-    skip_extensions: bool = typer.Option(False, "--skip-extensions", help="Skip extension deployment"),
-    skip_post_deployment: bool = typer.Option(False, "--skip-post-deployment", help="Skip post-deployment actions"),
-    phases: Optional[List[str]] = typer.Option(None, "--phases", help="Deploy specific extension phases only"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be deployed without executing"),
-    identity_file: Optional[str] = typer.Option(None, "--identity", help="Path to identity file for authentication")
+    config_file: str = typer.Option(
+        "realm_config.json", "--file", "-f", help="Path to realm configuration file"
+    ),
+    network: Optional[str] = typer.Option(
+        None, "--network", "-n", help="Override network from config"
+    ),
+    skip_extensions: bool = typer.Option(
+        False, "--skip-extensions", help="Skip extension deployment"
+    ),
+    skip_post_deployment: bool = typer.Option(
+        False, "--skip-post-deployment", help="Skip post-deployment actions"
+    ),
+    phases: Optional[List[str]] = typer.Option(
+        None, "--phases", help="Deploy specific extension phases only"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be deployed without executing"
+    ),
+    identity_file: Optional[str] = typer.Option(
+        None, "--identity", help="Path to identity file for authentication"
+    ),
 ) -> None:
     """Deploy a Realms project based on configuration file."""
-    deploy_command(config_file, network, skip_extensions, skip_post_deployment, phases, dry_run, identity_file)
+    deploy_command(
+        config_file,
+        network,
+        skip_extensions,
+        skip_post_deployment,
+        phases,
+        dry_run,
+        identity_file,
+    )
 
 
 @app.command("status")
 def status(
-    network: Optional[str] = typer.Option(None, "--network", "-n", help="Network to use (overrides context)"),
-    canister: Optional[str] = typer.Option(None, "--canister", "-c", help="Canister name to check (overrides context)")
+    network: Optional[str] = typer.Option(
+        None, "--network", "-n", help="Network to use (overrides context)"
+    ),
+    canister: Optional[str] = typer.Option(
+        None, "--canister", "-c", help="Canister name to check (overrides context)"
+    ),
 ) -> None:
     """Show status of current Realms project."""
     console.print("[bold blue]📊 Realms Project Status[/bold blue]\n")
 
     # Get effective network and canister from context
-    effective_network, effective_canister = get_effective_network_and_canister(network, canister)
+    effective_network, effective_canister = get_effective_network_and_canister(
+        network, canister
+    )
 
     # Show current context
     current_realm = get_current_realm()
     if current_realm:
         console.print(f"[dim]Using realm context: {current_realm}[/dim]")
-    console.print(f"[dim]Network: {effective_network}, Canister: {effective_canister}[/dim]\n")
+    console.print(
+        f"[dim]Network: {effective_network}, Canister: {effective_canister}[/dim]\n"
+    )
 
     # Check dependencies
     console.print("[bold]Dependencies:[/bold]")
@@ -116,14 +189,12 @@ def status(
     console.print("\n[bold]Canister Status:[/bold]")
     try:
         import subprocess
+
         cmd = ["dfx", "canister", "call", effective_canister, "status"]
         if effective_network != "local":
             cmd.extend(["--network", effective_network])
 
-        result = subprocess.run(
-            cmd,
-            capture_output=True, text=True, timeout=10
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         if result.returncode == 0:
             console.print("  ✅ Backend canister is responding")
             # Parse the response if needed
@@ -140,6 +211,7 @@ def status(
     console.print("\n[bold]dfx Replica:[/bold]")
     try:
         import subprocess
+
         cmd = ["dfx", "ping"]
         if effective_network != "local":
             cmd.extend(["--network", effective_network])
@@ -163,13 +235,17 @@ def realm_extension(
     extension_name: str = typer.Argument(help="Extension name"),
     function_name: str = typer.Argument(help="Function name to call"),
     args: str = typer.Argument(help="JSON arguments for the function"),
-    network: Optional[str] = typer.Option(None, "--network", "-n", help="Network to use (overrides context)")
+    network: Optional[str] = typer.Option(
+        None, "--network", "-n", help="Network to use (overrides context)"
+    ),
 ) -> None:
     """Call an extension function on the realm backend."""
     console.print("[bold blue]🔧 Calling Extension Function[/bold blue]\n")
 
     # Get effective network and canister from context
-    effective_network, effective_canister = get_effective_network_and_canister(network, None)
+    effective_network, effective_canister = get_effective_network_and_canister(
+        network, None
+    )
 
     console.print(f"Extension: [cyan]{extension_name}[/cyan]")
     console.print(f"Function: [cyan]{function_name}[/cyan]")
@@ -190,15 +266,22 @@ def realm_extension(
 
         # Build dfx command - escape quotes in JSON args
         escaped_args = args.replace('"', '\\"')
-        call_record = f'''(
+        call_record = f"""(
   record {{
     extension_name = "{extension_name}";
     function_name = "{function_name}";
     args = "{escaped_args}";
   }}
-)'''
+)"""
 
-        cmd = ["dfx", "canister", "call", effective_canister, "extension_sync_call", call_record]
+        cmd = [
+            "dfx",
+            "canister",
+            "call",
+            effective_canister,
+            "extension_sync_call",
+            call_record,
+        ]
         if effective_network != "local":
             cmd.extend(["--network", effective_network])
 
@@ -236,7 +319,9 @@ def registry_add(
     name: str = typer.Option(..., "--name", help="Human-readable realm name"),
     url: str = typer.Option("", "--url", help="Realm URL or canister ID"),
     network: str = typer.Option("local", "--network", "-n", help="Network to use"),
-    canister_id: Optional[str] = typer.Option(None, "--canister-id", help="Registry canister ID")
+    canister_id: Optional[str] = typer.Option(
+        None, "--canister-id", help="Registry canister ID"
+    ),
 ) -> None:
     """Add a new realm to the registry."""
     registry_add_command(realm_id, name, url, network, canister_id)
@@ -245,7 +330,9 @@ def registry_add(
 @registry_app.command("list")
 def registry_list(
     network: str = typer.Option("local", "--network", "-n", help="Network to use"),
-    canister_id: Optional[str] = typer.Option(None, "--canister-id", help="Registry canister ID")
+    canister_id: Optional[str] = typer.Option(
+        None, "--canister-id", help="Registry canister ID"
+    ),
 ) -> None:
     """List all realms in the registry."""
     registry_list_command(network, canister_id)
@@ -255,7 +342,9 @@ def registry_list(
 def registry_get(
     realm_id: str = typer.Option(..., "--id", help="Realm ID to retrieve"),
     network: str = typer.Option("local", "--network", "-n", help="Network to use"),
-    canister_id: Optional[str] = typer.Option(None, "--canister-id", help="Registry canister ID")
+    canister_id: Optional[str] = typer.Option(
+        None, "--canister-id", help="Registry canister ID"
+    ),
 ) -> None:
     """Get a specific realm by ID."""
     registry_get_command(realm_id, network, canister_id)
@@ -265,7 +354,9 @@ def registry_get(
 def registry_remove(
     realm_id: str = typer.Option(..., "--id", help="Realm ID to remove"),
     network: str = typer.Option("local", "--network", "-n", help="Network to use"),
-    canister_id: Optional[str] = typer.Option(None, "--canister-id", help="Registry canister ID")
+    canister_id: Optional[str] = typer.Option(
+        None, "--canister-id", help="Registry canister ID"
+    ),
 ) -> None:
     """Remove a realm from the registry."""
     registry_remove_command(realm_id, network, canister_id)
@@ -275,7 +366,9 @@ def registry_remove(
 def registry_search(
     query: str = typer.Option(..., "--query", help="Search query"),
     network: str = typer.Option("local", "--network", "-n", help="Network to use"),
-    canister_id: Optional[str] = typer.Option(None, "--canister-id", help="Registry canister ID")
+    canister_id: Optional[str] = typer.Option(
+        None, "--canister-id", help="Registry canister ID"
+    ),
 ) -> None:
     """Search realms by name or ID."""
     registry_search_command(query, network, canister_id)
@@ -284,7 +377,9 @@ def registry_search(
 @registry_app.command("count")
 def registry_count(
     network: str = typer.Option("local", "--network", "-n", help="Network to use"),
-    canister_id: Optional[str] = typer.Option(None, "--canister-id", help="Registry canister ID")
+    canister_id: Optional[str] = typer.Option(
+        None, "--canister-id", help="Registry canister ID"
+    ),
 ) -> None:
     """Get the total number of realms."""
     registry_count_command(network, canister_id)
@@ -293,7 +388,7 @@ def registry_count(
 # Realm context management commands
 @realm_app.command("set")
 def realm_set(
-    realm_name: str = typer.Argument(help="Realm name to set as current context")
+    realm_name: str = typer.Argument(help="Realm name to set as current context"),
 ) -> None:
     """Set the current realm context."""
     console.print("[bold blue]🏛️  Setting Realm Context[/bold blue]\n")
@@ -303,13 +398,17 @@ def realm_set(
         network, canister = resolve_realm_details(realm_name)
         set_current_realm(realm_name)
 
-        console.print(f"[green]✅ Realm context set to: [bold]{realm_name}[/bold][/green]")
+        console.print(
+            f"[green]✅ Realm context set to: [bold]{realm_name}[/bold][/green]"
+        )
         console.print(f"[dim]Network: {network}[/dim]")
         console.print(f"[dim]Canister: {canister}[/dim]")
 
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
-        console.print(f"[yellow]💡 Add the realm to registry first: realms realm registry add --id {realm_name} --name \"Realm Name\"[/yellow]")
+        console.print(
+            f'[yellow]💡 Add the realm to registry first: realms realm registry add --id {realm_name} --name "Realm Name"[/yellow]'
+        )
         raise typer.Exit(1)
 
 
@@ -335,7 +434,9 @@ def realm_current() -> None:
     console.print(f"[cyan]🌐 Network: [bold]{current_network}[/bold][/cyan]")
 
     if not current_realm and current_network == "local":
-        console.print("\n[dim]💡 Using defaults: local network, realm_backend canister[/dim]")
+        console.print(
+            "\n[dim]💡 Using defaults: local network, realm_backend canister[/dim]"
+        )
 
 
 @realm_app.command("unset")
@@ -346,7 +447,9 @@ def realm_unset() -> None:
     current_realm = get_current_realm()
     if current_realm:
         unset_current_realm()
-        console.print(f"[green]✅ Cleared realm context: [bold]{current_realm}[/bold][/green]")
+        console.print(
+            f"[green]✅ Cleared realm context: [bold]{current_realm}[/bold][/green]"
+        )
         console.print("[dim]Will use network context or defaults[/dim]")
     else:
         console.print("[yellow]No realm context set[/yellow]")
@@ -354,13 +457,21 @@ def realm_unset() -> None:
 
 @app.command("shell")
 def shell(
-    network: Optional[str] = typer.Option(None, "--network", "-n", help="Network to use (overrides context)"),
-    canister: Optional[str] = typer.Option(None, "--canister", "-c", help="Canister name to connect to (overrides context)"),
-    file: Optional[str] = typer.Option(None, "--file", "-f", help="Execute Python file instead of interactive shell")
+    network: Optional[str] = typer.Option(
+        None, "--network", "-n", help="Network to use (overrides context)"
+    ),
+    canister: Optional[str] = typer.Option(
+        None, "--canister", "-c", help="Canister name to connect to (overrides context)"
+    ),
+    file: Optional[str] = typer.Option(
+        None, "--file", "-f", help="Execute Python file instead of interactive shell"
+    ),
 ) -> None:
     """Start an interactive Python shell connected to the Realms backend canister or execute a Python file."""
     # Get effective network and canister from context
-    effective_network, effective_canister = get_effective_network_and_canister(network, canister)
+    effective_network, effective_canister = get_effective_network_and_canister(
+        network, canister
+    )
     shell_command(effective_network, effective_canister, file)
 
 
@@ -371,18 +482,24 @@ app.add_typer(network_app, name="network")
 
 @network_app.command("set")
 def network_set(
-    network_name: str = typer.Argument(help="Network name to set as current context (local, ic, testnet, etc.)")
+    network_name: str = typer.Argument(
+        help="Network name to set as current context (local, ic, testnet, etc.)"
+    ),
 ) -> None:
     """Set the current network context."""
     console.print("[bold blue]🌐 Setting Network Context[/bold blue]\n")
 
     set_current_network(network_name)
-    console.print(f"[green]✅ Network context set to: [bold]{network_name}[/bold][/green]")
+    console.print(
+        f"[green]✅ Network context set to: [bold]{network_name}[/bold][/green]"
+    )
 
     # Show warning if realm context overrides network
     current_realm = get_current_realm()
     if current_realm:
-        console.print(f"[yellow]⚠️  Note: Realm context '[bold]{current_realm}[/bold]' may override network setting[/yellow]")
+        console.print(
+            f"[yellow]⚠️  Note: Realm context '[bold]{current_realm}[/bold]' may override network setting[/yellow]"
+        )
 
 
 @network_app.command("current")
@@ -405,7 +522,9 @@ def network_unset() -> None:
     current_network = get_current_network()
     if current_network != "local":
         unset_current_network()
-        console.print(f"[green]✅ Cleared network context: [bold]{current_network}[/bold][/green]")
+        console.print(
+            f"[green]✅ Cleared network context: [bold]{current_network}[/bold][/green]"
+        )
         console.print("[dim]Reverted to default: local[/dim]")
     else:
         console.print("[yellow]Already using default network: local[/yellow]")
@@ -416,15 +535,19 @@ def version() -> None:
     """Show version information."""
     from . import __version__
 
-    console.print(f"[bold blue]Realms CLI[/bold blue] version [bold green]{__version__}[/bold green]")
+    console.print(
+        f"[bold blue]Realms CLI[/bold blue] version [bold green]{__version__}[/bold green]"
+    )
     console.print("\nA tool for managing Realms project lifecycle")
     console.print("🏛️  Build digital government platforms with ease")
 
 
 @app.callback()
 def main(
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
-    version_flag: bool = typer.Option(False, "--version", help="Show version and exit")
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Enable verbose output"
+    ),
+    version_flag: bool = typer.Option(False, "--version", help="Show version and exit"),
 ) -> None:
     """
     Realms CLI - Deploy and manage Realms projects.

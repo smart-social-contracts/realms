@@ -22,7 +22,7 @@ def run_command(
     cwd: Optional[str] = None,
     capture_output: bool = False,
     check: bool = True,
-    env: Optional[Dict[str, str]] = None
+    env: Optional[Dict[str, str]] = None,
 ) -> subprocess.CompletedProcess:
     """Run a shell command with proper error handling."""
     try:
@@ -34,7 +34,7 @@ def run_command(
             capture_output=capture_output,
             text=True,
             check=check,
-            env=env
+            env=env,
         )
 
         if capture_output and result.stdout:
@@ -51,7 +51,9 @@ def run_command(
         raise
     except FileNotFoundError:
         console.print(f"[red]Command not found: {command[0]}[/red]")
-        console.print("[yellow]Make sure the required tools are installed and in your PATH[/yellow]")
+        console.print(
+            "[yellow]Make sure the required tools are installed and in your PATH[/yellow]"
+        )
         raise
 
 
@@ -70,7 +72,9 @@ def check_dependencies() -> bool:
         console.print("[red]Missing required dependencies:[/red]")
         for tool in missing_tools:
             console.print(f"  - {tool}")
-        console.print("\n[yellow]Please install the missing tools and try again.[/yellow]")
+        console.print(
+            "\n[yellow]Please install the missing tools and try again.[/yellow]"
+        )
         return False
 
     return True
@@ -79,7 +83,7 @@ def check_dependencies() -> bool:
 def load_config(config_path: str) -> Dict[str, Any]:
     """Load and validate realm configuration."""
     try:
-        with open(config_path, 'r') as f:
+        with open(config_path, "r") as f:
             config_data = json.load(f)
         return config_data
     except FileNotFoundError:
@@ -93,7 +97,7 @@ def load_config(config_path: str) -> Dict[str, Any]:
 def save_config(config_data: Dict[str, Any], config_path: str) -> None:
     """Save configuration to file."""
     try:
-        with open(config_path, 'w') as f:
+        with open(config_path, "w") as f:
             json.dump(config_data, f, indent=2)
         console.print(f"[green]Configuration saved to {config_path}[/green]")
     except Exception as e:
@@ -133,21 +137,23 @@ def get_current_branch() -> str:
             ["git", "branch", "--show-current"],
             capture_output=True,
             text=True,
-            check=True
+            check=True,
         )
         return result.stdout.strip() or "main"
     except Exception:
         return "main"
 
 
-def wait_for_canister_ready(canister_name: str, network: str = "local", timeout: int = 60) -> bool:
+def wait_for_canister_ready(
+    canister_name: str, network: str = "local", timeout: int = 60
+) -> bool:
     """Wait for a canister to be ready."""
     start_time = time.time()
 
     with Progress(
         SpinnerColumn(),
         TextColumn(f"[progress.description]Waiting for {canister_name} to be ready..."),
-        console=console
+        console=console,
     ) as progress:
         task = progress.add_task("waiting", total=None)
 
@@ -156,10 +162,12 @@ def wait_for_canister_ready(canister_name: str, network: str = "local", timeout:
                 result = subprocess.run(
                     ["dfx", "canister", "status", canister_name, "--network", network],
                     capture_output=True,
-                    check=True
+                    check=True,
                 )
                 if "Status: Running" in result.stdout:
-                    progress.update(task, description=f"[green]{canister_name} is ready![/green]")
+                    progress.update(
+                        task, description=f"[green]{canister_name} is ready![/green]"
+                    )
                     return True
             except subprocess.CalledProcessError:
                 pass
@@ -182,38 +190,45 @@ def create_directory_structure(base_path: Path, structure: Dict[str, Any]) -> No
             # It's a file
             path.parent.mkdir(parents=True, exist_ok=True)
             if content is not None:
-                with open(path, 'w') as f:
+                with open(path, "w") as f:
                     f.write(content)
 
 
 def display_success_panel(title: str, message: str) -> None:
     """Display a success panel."""
-    console.print(Panel(
-        Text(message, style="green"),
-        title=f"[bold green]{title}[/bold green]",
-        border_style="green"
-    ))
+    console.print(
+        Panel(
+            Text(message, style="green"),
+            title=f"[bold green]{title}[/bold green]",
+            border_style="green",
+        )
+    )
 
 
 def display_error_panel(title: str, message: str) -> None:
     """Display an error panel."""
-    console.print(Panel(
-        Text(message, style="red"),
-        title=f"[bold red]{title}[/bold red]",
-        border_style="red"
-    ))
+    console.print(
+        Panel(
+            Text(message, style="red"),
+            title=f"[bold red]{title}[/bold red]",
+            border_style="red",
+        )
+    )
 
 
 def display_info_panel(title: str, message: str) -> None:
     """Display an info panel."""
-    console.print(Panel(
-        Text(message, style="blue"),
-        title=f"[bold blue]{title}[/bold blue]",
-        border_style="blue"
-    ))
+    console.print(
+        Panel(
+            Text(message, style="blue"),
+            title=f"[bold blue]{title}[/bold blue]",
+            border_style="blue",
+        )
+    )
 
 
 # Realm Context Management
+
 
 def get_realms_config_dir() -> Path:
     """Get the Realms configuration directory."""
@@ -234,7 +249,7 @@ def load_context() -> Dict[str, Any]:
         return {}
 
     try:
-        with open(context_file, 'r') as f:
+        with open(context_file, "r") as f:
             return json.load(f)
     except (json.JSONDecodeError, IOError):
         return {}
@@ -244,7 +259,7 @@ def save_context(context: Dict[str, Any]) -> None:
     """Save the realm context."""
     context_file = get_context_file()
     try:
-        with open(context_file, 'w') as f:
+        with open(context_file, "w") as f:
             json.dump(context, f, indent=2)
     except IOError as e:
         console.print(f"[red]Failed to save context: {e}[/red]")
@@ -291,7 +306,11 @@ def unset_current_network() -> None:
     save_context(context)
 
 
-def resolve_realm_details(realm_name: str, registry_network: Optional[str] = None, registry_canister: str = "realm_registry_backend") -> Tuple[str, str]:
+def resolve_realm_details(
+    realm_name: str,
+    registry_network: Optional[str] = None,
+    registry_canister: str = "realm_registry_backend",
+) -> Tuple[str, str]:
     """Resolve realm name to network and canister ID via registry lookup.
 
     Returns:
@@ -303,19 +322,18 @@ def resolve_realm_details(realm_name: str, registry_network: Optional[str] = Non
     try:
         # Call registry to get realm details
         cmd = [
-            "dfx", "canister", "call",
-            "--network", effective_registry_network,
+            "dfx",
+            "canister",
+            "call",
+            "--network",
+            effective_registry_network,
             registry_canister,
             "get_realm",
-            f'("{realm_name}")'
+            f'("{realm_name}")',
         ]
 
         result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=30
+            cmd, capture_output=True, text=True, check=True, timeout=30
         )
 
         # Parse the Candid output
@@ -326,6 +344,7 @@ def resolve_realm_details(realm_name: str, registry_network: Optional[str] = Non
             if "url" in output:
                 # Extract canister ID from URL field
                 import re
+
                 canister_match = re.search(r'url = "([^"]+)"', output)
                 if canister_match:
                     canister_id = canister_match.group(1)
@@ -347,7 +366,9 @@ def resolve_realm_details(realm_name: str, registry_network: Optional[str] = Non
         raise ValueError(f"Error resolving realm '{realm_name}': {str(e)}")
 
 
-def get_effective_network_and_canister(explicit_network: Optional[str] = None, explicit_canister: Optional[str] = None) -> Tuple[str, str]:
+def get_effective_network_and_canister(
+    explicit_network: Optional[str] = None, explicit_canister: Optional[str] = None
+) -> Tuple[str, str]:
     """Get the effective network and canister, considering realm and network context.
 
     Priority:
@@ -369,7 +390,10 @@ def get_effective_network_and_canister(explicit_network: Optional[str] = None, e
         try:
             realm_network, realm_canister = resolve_realm_details(current_realm)
             # Override with explicit parameters if provided
-            return explicit_network or realm_network, explicit_canister or realm_canister
+            return (
+                explicit_network or realm_network,
+                explicit_canister or realm_canister,
+            )
         except ValueError as e:
             console.print(f"[yellow]Warning: {e}[/yellow]")
             console.print("[yellow]Falling back to network/default values[/yellow]")

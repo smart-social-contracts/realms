@@ -6,7 +6,13 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 import typer
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+from rich.progress import (
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    BarColumn,
+    TimeElapsedColumn,
+)
 
 from ..models import RealmConfig, PostDeploymentAction
 from ..utils import (
@@ -20,18 +26,32 @@ from ..utils import (
     wait_for_canister_ready,
     display_success_panel,
     display_error_panel,
-    display_info_panel
+    display_info_panel,
 )
 
 
 def deploy_command(
-    config_file: str = typer.Option("realm_config.json", "--file", "-f", help="Path to realm configuration file"),
-    network: Optional[str] = typer.Option(None, "--network", "-n", help="Override network from config"),
-    skip_extensions: bool = typer.Option(False, "--skip-extensions", help="Skip extension deployment"),
-    skip_post_deployment: bool = typer.Option(False, "--skip-post-deployment", help="Skip post-deployment actions"),
-    phases: Optional[List[str]] = typer.Option(None, "--phases", help="Deploy specific extension phases only"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be deployed without executing"),
-    identity_file: Optional[str] = typer.Option(None, "--identity", help="Path to identity file for authentication")
+    config_file: str = typer.Option(
+        "realm_config.json", "--file", "-f", help="Path to realm configuration file"
+    ),
+    network: Optional[str] = typer.Option(
+        None, "--network", "-n", help="Override network from config"
+    ),
+    skip_extensions: bool = typer.Option(
+        False, "--skip-extensions", help="Skip extension deployment"
+    ),
+    skip_post_deployment: bool = typer.Option(
+        False, "--skip-post-deployment", help="Skip post-deployment actions"
+    ),
+    phases: Optional[List[str]] = typer.Option(
+        None, "--phases", help="Deploy specific extension phases only"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be deployed without executing"
+    ),
+    identity_file: Optional[str] = typer.Option(
+        None, "--identity", help="Path to identity file for authentication"
+    ),
 ) -> None:
     """Deploy a Realms project based on configuration file."""
 
@@ -125,7 +145,7 @@ def _show_deployment_plan(
     config: RealmConfig,
     phases: Optional[List[str]],
     skip_extensions: bool,
-    skip_post_deployment: bool
+    skip_post_deployment: bool,
 ) -> None:
     """Show what would be deployed in dry-run mode."""
 
@@ -156,11 +176,15 @@ def _show_deployment_plan(
 
     if not skip_post_deployment and config.post_deployment:
         if isinstance(config.post_deployment, list):
-            console.print(f"\n[bold]Post-deployment Commands ({len(config.post_deployment)}):[/bold]")
+            console.print(
+                f"\n[bold]Post-deployment Commands ({len(config.post_deployment)}):[/bold]"
+            )
             for i, command in enumerate(config.post_deployment, 1):
                 console.print(f"  {i}. {command}")
         else:
-            console.print(f"\n[bold]Post-deployment Actions ({len(config.post_deployment.actions)}):[/bold]")
+            console.print(
+                f"\n[bold]Post-deployment Actions ({len(config.post_deployment.actions)}):[/bold]"
+            )
             for i, action in enumerate(config.post_deployment.actions, 1):
                 console.print(f"  {i}. {action.name or action.type}")
 
@@ -174,7 +198,9 @@ def _execute_post_deployment_actions(config: RealmConfig, project_root: Path) ->
     # Handle both simple string array and complex action format
     if isinstance(config.post_deployment, list):
         # Simple string array format
-        _execute_simple_post_deployment_commands(config.post_deployment, config, project_root)
+        _execute_simple_post_deployment_commands(
+            config.post_deployment, config, project_root
+        )
         return
 
     # Complex action format
@@ -188,10 +214,12 @@ def _execute_post_deployment_actions(config: RealmConfig, project_root: Path) ->
         TextColumn("[progress.description]{task.description}"),
         BarColumn(),
         TimeElapsedColumn(),
-        console=console
+        console=console,
     ) as progress:
 
-        task = progress.add_task("Executing post-deployment actions...", total=len(actions))
+        task = progress.add_task(
+            "Executing post-deployment actions...", total=len(actions)
+        )
 
         for i, action in enumerate(actions, 1):
             action_name = action.name or f"{action.type} action {i}"
@@ -202,16 +230,22 @@ def _execute_post_deployment_actions(config: RealmConfig, project_root: Path) ->
                 progress.advance(task)
             except Exception as e:
                 if action.ignore_failure:
-                    console.print(f"[yellow]Action '{action_name}' failed but continuing: {e}[/yellow]")
+                    console.print(
+                        f"[yellow]Action '{action_name}' failed but continuing: {e}[/yellow]"
+                    )
                     progress.advance(task)
                 else:
                     console.print(f"[red]Action '{action_name}' failed: {e}[/red]")
                     raise
 
-        progress.update(task, description="[green]All post-deployment actions completed[/green]")
+        progress.update(
+            task, description="[green]All post-deployment actions completed[/green]"
+        )
 
 
-def _execute_simple_post_deployment_commands(commands: List[str], config: RealmConfig, project_root: Path) -> None:
+def _execute_simple_post_deployment_commands(
+    commands: List[str], config: RealmConfig, project_root: Path
+) -> None:
     """Execute simple post-deployment commands from string array."""
 
     with Progress(
@@ -219,10 +253,12 @@ def _execute_simple_post_deployment_commands(commands: List[str], config: RealmC
         TextColumn("[progress.description]{task.description}"),
         BarColumn(),
         TimeElapsedColumn(),
-        console=console
+        console=console,
     ) as progress:
 
-        task = progress.add_task("Executing post-deployment commands...", total=len(commands))
+        task = progress.add_task(
+            "Executing post-deployment commands...", total=len(commands)
+        )
 
         for i, command in enumerate(commands, 1):
             progress.update(task, description=f"Running: {command}")
@@ -234,14 +270,18 @@ def _execute_simple_post_deployment_commands(commands: List[str], config: RealmC
                 console.print(f"[red]Command '{command}' failed: {e}[/red]")
                 raise
 
-        progress.update(task, description="[green]All post-deployment commands completed[/green]")
+        progress.update(
+            task, description="[green]All post-deployment commands completed[/green]"
+        )
 
 
-def _execute_simple_command(command: str, config: RealmConfig, project_root: Path) -> None:
+def _execute_simple_command(
+    command: str, config: RealmConfig, project_root: Path
+) -> None:
     """Execute a single simple post-deployment command."""
 
     # Handle shell scripts
-    if command.endswith('.sh'):
+    if command.endswith(".sh"):
         script_path = project_root / command
         if not script_path.exists():
             raise FileNotFoundError(f"Script not found: {script_path}")
@@ -250,8 +290,8 @@ def _execute_simple_command(command: str, config: RealmConfig, project_root: Pat
         return
 
     # Handle realms shell -f commands
-    if command.startswith('realms shell -f '):
-        python_file = command.replace('realms shell -f ', '').strip()
+    if command.startswith("realms shell -f "):
+        python_file = command.replace("realms shell -f ", "").strip()
         python_path = project_root / python_file
 
         if not python_path.exists():
@@ -267,7 +307,7 @@ def _execute_simple_command(command: str, config: RealmConfig, project_root: Pat
         return
 
     # Handle other command formats
-    if command.startswith('realms '):
+    if command.startswith("realms "):
         # Parse realms CLI commands
         cmd_parts = command.split()
         run_command(cmd_parts, cwd=project_root)
@@ -277,7 +317,9 @@ def _execute_simple_command(command: str, config: RealmConfig, project_root: Pat
     run_command(command.split(), cwd=project_root)
 
 
-def _execute_single_action(action: PostDeploymentAction, config: RealmConfig, project_root: Path) -> None:
+def _execute_single_action(
+    action: PostDeploymentAction, config: RealmConfig, project_root: Path
+) -> None:
     """Execute a single post-deployment action."""
 
     retry_count = 0
@@ -292,13 +334,15 @@ def _execute_single_action(action: PostDeploymentAction, config: RealmConfig, pr
 
             elif action.type == "extension_call":
                 if not action.extension_name or not action.function_name:
-                    raise ValueError("extension_call requires extension_name and function_name")
+                    raise ValueError(
+                        "extension_call requires extension_name and function_name"
+                    )
 
                 args = action.args.copy() if action.args else {}
                 if "data_file" in args:
                     data_file_path = project_root / args["data_file"]
                     if data_file_path.exists():
-                        with open(data_file_path, 'r') as f:
+                        with open(data_file_path, "r") as f:
                             file_data = json.load(f)
                         args["data"] = json.dumps(file_data)
                         del args["data_file"]
@@ -307,11 +351,19 @@ def _execute_single_action(action: PostDeploymentAction, config: RealmConfig, pr
                 # Escape quotes in JSON string for Candid
                 escaped_args = args_json.replace('"', '\\"')
 
-                run_command([
-                    "dfx", "canister", "call", "realm_backend", "extension_sync_call",
-                    f'(record {{ extension_name = "{action.extension_name}"; function_name = "{action.function_name}"; args = "{escaped_args}"; }})',
-                    "--network", config.deployment.network
-                ], cwd=project_root)
+                run_command(
+                    [
+                        "dfx",
+                        "canister",
+                        "call",
+                        "realm_backend",
+                        "extension_sync_call",
+                        f'(record {{ extension_name = "{action.extension_name}"; function_name = "{action.function_name}"; args = "{escaped_args}"; }})',
+                        "--network",
+                        config.deployment.network,
+                    ],
+                    cwd=project_root,
+                )
                 return
 
             elif action.type == "script":
@@ -331,29 +383,45 @@ def _execute_single_action(action: PostDeploymentAction, config: RealmConfig, pr
 
                 # Get codex configuration from config
                 if action.codex_id not in config.codexes:
-                    raise ValueError(f"Codex '{action.codex_id}' not found in configuration")
+                    raise ValueError(
+                        f"Codex '{action.codex_id}' not found in configuration"
+                    )
 
                 codex_config = config.codexes[action.codex_id]
 
                 # Build function call based on codex configuration
-                if hasattr(codex_config, 'code') and codex_config.code:
+                if hasattr(codex_config, "code") and codex_config.code:
                     # Inline code
-                    escaped_code = codex_config.code.replace('\n', '\\n').replace('"', '\\"')
+                    escaped_code = codex_config.code.replace("\n", "\\n").replace(
+                        '"', '\\"'
+                    )
                     function_call = f'("{codex_config.name}", "{escaped_code}", "", "")'
 
-                elif hasattr(codex_config, 'url') and codex_config.url:
+                elif hasattr(codex_config, "url") and codex_config.url:
                     # Downloadable code
                     url = codex_config.url
-                    checksum = getattr(codex_config, 'checksum', '')
-                    function_call = f'("{codex_config.name}", "", "{url}", "{checksum}")'
+                    checksum = getattr(codex_config, "checksum", "")
+                    function_call = (
+                        f'("{codex_config.name}", "", "{url}", "{checksum}")'
+                    )
                 else:
-                    raise ValueError(f"Codex '{action.codex_id}' must have either 'code' or 'url' specified")
+                    raise ValueError(
+                        f"Codex '{action.codex_id}' must have either 'code' or 'url' specified"
+                    )
 
-                run_command([
-                    "dfx", "canister", "call", "realm_backend", "create_codex",
-                    function_call,
-                    "--network", config.deployment.network
-                ], cwd=project_root)
+                run_command(
+                    [
+                        "dfx",
+                        "canister",
+                        "call",
+                        "realm_backend",
+                        "create_codex",
+                        function_call,
+                        "--network",
+                        config.deployment.network,
+                    ],
+                    cwd=project_root,
+                )
                 return
 
             elif action.type == "create_task":
@@ -362,27 +430,39 @@ def _execute_single_action(action: PostDeploymentAction, config: RealmConfig, pr
 
                 # Get task configuration from config
                 if action.task_id not in config.tasks:
-                    raise ValueError(f"Task '{action.task_id}' not found in configuration")
+                    raise ValueError(
+                        f"Task '{action.task_id}' not found in configuration"
+                    )
 
                 task_config = config.tasks[action.task_id]
 
                 # Verify the referenced codex exists
                 if task_config.codex not in config.codexes:
-                    raise ValueError(f"Task '{action.task_id}' references unknown codex '{task_config.codex}'")
+                    raise ValueError(
+                        f"Task '{action.task_id}' references unknown codex '{task_config.codex}'"
+                    )
 
                 # Create task via backend API
                 task_data = {
                     "name": task_config.name,
                     "codex": config.codexes[task_config.codex].name,
-                    "metadata": task_config.metadata
+                    "metadata": task_config.metadata,
                 }
                 task_json = json.dumps(task_data).replace('"', '\\"')
 
-                run_command([
-                    "dfx", "canister", "call", "realm_backend", "create_task",
-                    f'("{task_json}")',
-                    "--network", config.deployment.network
-                ], cwd=project_root)
+                run_command(
+                    [
+                        "dfx",
+                        "canister",
+                        "call",
+                        "realm_backend",
+                        "create_task",
+                        f'("{task_json}")',
+                        "--network",
+                        config.deployment.network,
+                    ],
+                    cwd=project_root,
+                )
                 return
 
             else:
@@ -391,7 +471,9 @@ def _execute_single_action(action: PostDeploymentAction, config: RealmConfig, pr
         except Exception as e:
             retry_count += 1
             if retry_count <= max_retries:
-                console.print(f"[yellow]Action failed, retrying ({retry_count}/{max_retries}): {e}[/yellow]")
+                console.print(
+                    f"[yellow]Action failed, retrying ({retry_count}/{max_retries}): {e}[/yellow]"
+                )
                 time.sleep(2)
             else:
                 raise
@@ -413,5 +495,5 @@ def _show_deployment_success(config: RealmConfig) -> None:
         f"🌐 Network: {config.deployment.network}\n"
         f"🔗 URL: {url}\n"
         f"👤 Admin: {config.realm.admin_principal}\n\n"
-        "Your Realms platform is now ready to use!"
+        "Your Realms platform is now ready to use!",
     )

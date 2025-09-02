@@ -9,7 +9,12 @@ from typing import Optional
 import typer
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from ..utils import console, display_success_panel, display_error_panel, get_project_root
+from ..utils import (
+    console,
+    display_success_panel,
+    display_error_panel,
+    get_project_root,
+)
 from .deploy import deploy_command
 
 
@@ -23,16 +28,16 @@ def create_command(
     output_dir: str,
     realm_name: str,
     network: str,
-    deploy: bool
+    deploy: bool,
 ) -> None:
     """Create a new realm with optional random data generation."""
-    
+
     if not random:
         display_error_panel("Error", "Only --random mode is currently supported")
         raise typer.Exit(1)
-    
+
     console.print("[bold blue]🏗️  Creating Random Realm[/bold blue]\n")
-    
+
     try:
         realm_data = _generate_random_realm_data(
             citizens=citizens,
@@ -40,19 +45,21 @@ def create_command(
             transactions=transactions,
             disputes=disputes,
             seed=seed,
-            realm_name=realm_name
+            realm_name=realm_name,
         )
-        
+
         output_path = Path(output_dir)
         _create_realm_folder_structure(output_path, realm_data, network, realm_name)
-        
-        console.print(f"[green]✅ Random realm created successfully in: {output_path.absolute()}[/green]")
-        
+
+        console.print(
+            f"[green]✅ Random realm created successfully in: {output_path.absolute()}[/green]"
+        )
+
         if deploy:
             console.print("\n[bold blue]🚀 Deploying Realm[/bold blue]")
             config_file = str(output_path / "realm_config.json")
             deploy_command(config_file, network, False, False, None, False, None)
-        
+
         display_success_panel(
             "Realm Creation Complete! 🎉",
             f"Random realm '{realm_name}' has been created successfully.\n\n"
@@ -64,9 +71,9 @@ def create_command(
             f"Next steps:\n"
             f"1. Review the generated configuration in realm_config.json\n"
             f"2. Deploy with: realms deploy --file {output_dir}/realm_config.json\n"
-            f"3. The realm will be automatically populated with demo data"
+            f"3. The realm will be automatically populated with demo data",
         )
-        
+
     except Exception as e:
         display_error_panel("Realm Creation Failed", str(e))
         raise typer.Exit(1)
@@ -78,32 +85,36 @@ def _generate_random_realm_data(
     transactions: int,
     disputes: int,
     seed: Optional[int],
-    realm_name: str
+    realm_name: str,
 ) -> dict:
     """Generate random realm data using existing realm_generator logic."""
-    
+
     console.print("🎲 Generating random realm data...")
-    
+
     project_root = get_project_root()
     sys.path.append(str(project_root / "scripts"))
-    
+
     import realm_generator
-    
+
     generator = realm_generator.RealmGenerator(seed)
     realm_data = generator.generate_realm_data(
         citizens=citizens,
         organizations=organizations,
         transactions=transactions,
         disputes=disputes,
-        realm_name=realm_name
+        realm_name=realm_name,
     )
-    
-    console.print(f"✅ Generated data for {len(realm_data['users'])} users, {len(realm_data['organizations'])} organizations")
-    
+
+    console.print(
+        f"✅ Generated data for {len(realm_data['users'])} users, {len(realm_data['organizations'])} organizations"
+    )
+
     return realm_data
 
 
-def _create_realm_folder_structure(output_path: Path, realm_data: dict, network: str, realm_name: str) -> None:
+def _create_realm_folder_structure(
+    output_path: Path, realm_data: dict, network: str, realm_name: str
+) -> None:
     """Create the complete realm folder structure."""
 
     console.print(f"📁 Creating realm folder structure in {output_path}...")
@@ -124,10 +135,15 @@ def _create_realm_folder_structure(output_path: Path, realm_data: dict, network:
     console.print("✅ Folder structure created successfully")
 
 
-def _create_realm_config(output_path: Path, realm_data: dict, network: str, realm_name: str) -> None:
+def _create_realm_config(
+    output_path: Path, realm_data: dict, network: str, realm_name: str
+) -> None:
     """Create the main realm configuration file."""
 
-    realm_info = realm_data.get("realm", {"name": realm_name, "description": f"Random generated realm: {realm_name}"})
+    realm_info = realm_data.get(
+        "realm",
+        {"name": realm_name, "description": f"Random generated realm: {realm_name}"},
+    )
 
     config = {
         "realm": {
@@ -136,29 +152,14 @@ def _create_realm_config(output_path: Path, realm_data: dict, network: str, real
             "description": realm_info["description"],
             "admin_principal": "2vxsx-fae",
             "version": "1.0.0",
-            "tags": ["demo", "random-generated", "governance"]
+            "tags": ["demo", "random-generated", "governance"],
         },
-        "deployment": {
-            "network": network,
-            "clean_deploy": True
-        },
+        "deployment": {"network": network, "clean_deploy": True},
         "extensions": {
             "initial": [
-                {
-                    "name": "admin_dashboard",
-                    "source": "local",
-                    "enabled": True
-                },
-                {
-                    "name": "citizen_dashboard",
-                    "source": "local",
-                    "enabled": True
-                },
-                {
-                    "name": "voting",
-                    "source": "local",
-                    "enabled": True
-                }
+                {"name": "admin_dashboard", "source": "local", "enabled": True},
+                {"name": "citizen_dashboard", "source": "local", "enabled": True},
+                {"name": "voting", "source": "local", "enabled": True},
             ]
         },
         "post_deployment": {
@@ -166,36 +167,36 @@ def _create_realm_config(output_path: Path, realm_data: dict, network: str, real
                 {
                     "type": "shell",
                     "name": "Import Users",
-                    "command": "realms import data/users.json --type users"
+                    "command": "realms import data/users.json --type users",
                 },
                 {
                     "type": "shell",
                     "name": "Import Organizations",
-                    "command": "realms import data/organizations.json --type organizations"
+                    "command": "realms import data/organizations.json --type organizations",
                 },
                 {
                     "type": "shell",
                     "name": "Import Transfers",
-                    "command": "realms import data/transfers.json --type transfers"
+                    "command": "realms import data/transfers.json --type transfers",
                 },
                 {
                     "type": "shell",
                     "name": "Import Instruments",
-                    "command": "realms import data/instruments.json --type instruments"
+                    "command": "realms import data/instruments.json --type instruments",
                 },
                 {
                     "type": "shell",
                     "name": "Import Mandates",
-                    "command": "realms import data/mandates.json --type mandates"
-                }
+                    "command": "realms import data/mandates.json --type mandates",
+                },
             ]
-        }
+        },
     }
-    
+
     config_file = output_path / "realm_config.json"
-    with open(config_file, 'w') as f:
+    with open(config_file, "w") as f:
         json.dump(config, f, indent=2)
-    
+
     console.print(f"✅ Created realm configuration: {config_file}")
 
 
@@ -208,13 +209,13 @@ def _create_json_data_files(data_dir: Path, realm_data: dict) -> None:
         "organizations.json": realm_data.get("organizations", []),
         "instruments.json": realm_data.get("instruments", []),
         "transfers.json": realm_data.get("transfers", []),
-        "mandates.json": realm_data.get("mandates", [])
+        "mandates.json": realm_data.get("mandates", []),
     }
 
     for filename, data in entity_mappings.items():
         if data:
             file_path = data_dir / filename
-            with open(file_path, 'w') as f:
+            with open(file_path, "w") as f:
                 json.dump(data, f, indent=2)
             console.print(f"✅ Created {filename} with {len(data)} records")
 
@@ -226,6 +227,6 @@ def _create_codex_files(codexes_dir: Path, realm_data: dict) -> None:
 
     for filename, content in codex_files.items():
         file_path = codexes_dir / filename
-        with open(file_path, 'w') as f:
+        with open(file_path, "w") as f:
             f.write(content)
         console.print(f"✅ Created codex file: {filename}")
