@@ -1,8 +1,9 @@
 """Data models for Realms CLI configuration."""
 
-from typing import Dict, List, Optional, Any, Literal, Union
-from pydantic import BaseModel, Field, validator
 import re
+from typing import Any, Dict, List, Literal, Optional, Union
+
+from pydantic import BaseModel, Field, validator
 
 
 class RealmMetadata(BaseModel):

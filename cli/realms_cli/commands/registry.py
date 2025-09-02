@@ -1,10 +1,11 @@
 """Registry commands for managing realm registrations."""
 
 import subprocess
+from typing import Optional
+
 import typer
 from rich.console import Console
 from rich.table import Table
-from typing import Optional
 
 console = Console()
 

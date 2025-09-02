@@ -8,8 +8,8 @@ import typer
 
 from ..utils import (
     console,
-    display_success_panel,
     display_error_panel,
+    display_success_panel,
     get_project_root,
     run_command,
 )

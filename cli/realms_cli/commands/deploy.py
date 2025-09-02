@@ -3,30 +3,30 @@
 import json
 import time
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 
 import typer
 from rich.progress import (
+    BarColumn,
     Progress,
     SpinnerColumn,
     TextColumn,
-    BarColumn,
     TimeElapsedColumn,
 )
 
-from ..models import RealmConfig, PostDeploymentAction
+from ..models import PostDeploymentAction, RealmConfig
 from ..utils import (
-    console,
-    run_command,
-    load_config,
     check_dependencies,
-    get_project_root,
-    get_current_branch,
-    generate_port_from_branch,
-    wait_for_canister_ready,
-    display_success_panel,
+    console,
     display_error_panel,
     display_info_panel,
+    display_success_panel,
+    generate_port_from_branch,
+    get_current_branch,
+    get_project_root,
+    load_config,
+    run_command,
+    wait_for_canister_ready,
 )
 
 

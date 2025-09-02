@@ -1,33 +1,34 @@
 """Main CLI application for Realms."""
 
+from typing import List, Optional
+
 import typer
 from rich.console import Console
 from rich.table import Table
-from typing import Optional, List
 
-from .commands.deploy import deploy_command
 from .commands.create import create_command
-from .commands.import_data import import_data_command, import_codex_command
-from .commands.shell import shell_command
+from .commands.deploy import deploy_command
+from .commands.import_data import import_codex_command, import_data_command
 from .commands.registry import (
     registry_add_command,
-    registry_list_command,
+    registry_count_command,
     registry_get_command,
+    registry_list_command,
     registry_remove_command,
     registry_search_command,
-    registry_count_command,
 )
+from .commands.shell import shell_command
 from .utils import (
     check_dependencies,
     display_info_panel,
-    get_current_realm,
-    set_current_realm,
-    unset_current_realm,
     get_current_network,
-    set_current_network,
-    unset_current_network,
+    get_current_realm,
     get_effective_network_and_canister,
     resolve_realm_details,
+    set_current_network,
+    set_current_realm,
+    unset_current_network,
+    unset_current_realm,
 )
 
 console = Console()
@@ -254,8 +255,8 @@ def realm_extension(
     console.print(f"Canister: [dim]{effective_canister}[/dim]\n")
 
     try:
-        import subprocess
         import json
+        import subprocess
 
         # Validate JSON args
         try:
