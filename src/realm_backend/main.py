@@ -672,7 +672,7 @@ async def run_download() -> Async[None]:
 
 
 @update
-def download_file_from_url(url: str = '') -> Async[Tuple[bool, str]]:
+def download_file_from_url(url: str) -> Async[Tuple[bool, str]]:
     """
     Download file from a URL.
 
@@ -683,9 +683,6 @@ def download_file_from_url(url: str = '') -> Async[Tuple[bool, str]]:
     """
 
     try:
-
-        url = "https://raw.githubusercontent.com/smart-social-contracts/realms/refs/heads/main/src/realm_backend/codex.py"
-        
         ic.print(f"Downloading code from URL: {url}")
 
         # Make HTTP request to download the code
@@ -711,9 +708,7 @@ def download_file_from_url(url: str = '') -> Async[Tuple[bool, str]]:
                 code_content = response["body"].decode("utf-8")
                 ic.print(f"Successfully downloaded {len(code_content)} bytes")
 
-                global message, downloaded_content
-                message = "Downloaded successfully"
-                downloaded_content = code_content
+                downloaded_content[url] = code_content
                 return True, code_content
 
             except UnicodeDecodeError as e:
@@ -864,48 +859,57 @@ def execute_code(code: str) -> str:
 
 
 
-from core.task_manager import AsyncCall, TaskManager, Task, TaskStep, TaskSchedule, SyncCall
+from core.task_manager import AsyncCall, TaskManager, Task, TaskStep, SyncCall
+from ggg.task_schedule import TaskSchedule
 
-downloaded_content: str = ''
+downloaded_content: dict = {}
 
 @update
 def test_mixed_sync_async_task() -> void:
     """Test function to verify TaskManager can handle mixed sync/async steps in sequence"""
     ic.print("Setting up mixed sync/async task test")
     
-    global downloaded_content
-    downloaded_content = ''
+    url = "https://raw.githubusercontent.com/smart-social-contracts/realms/refs/heads/main/src/realm_backend/codex.py"
     
     async_call = AsyncCall()
     async_call.function_def = download_file_from_url
-    async_call.function_params = ["https://raw.githubusercontent.com/smart-social-contracts/realms/refs/heads/main/src/realm_backend/codex.py"]
-    step1 = TaskStep(call=async_call)
+    async_call.function_params = [url]
+    step1 = TaskStep(call=async_call, run_next_after=10)
     
     sync_call = SyncCall()
     sync_call.codex = Codex()
-    sync_call.codex.code = '''
+    sync_call.codex.code = f'''
 from main import downloaded_content
+
+content = downloaded_content['{url}']
+
+codex = Codex["the_code"]
+if not codex:
+    codex = Codex()
+    codex.name = "the_code"
+codex.code = content
+
 ic.print("=== VERIFICATION STEP ===")
-ic.print(f"Downloaded content length: {len(downloaded_content)}")
-if len(downloaded_content) > 0:
+ic.print(f"Downloaded content length: len(content)")
+if len(content) > 0:
     ic.print("✅ SUCCESS: File was downloaded successfully!")
     if "def " in downloaded_content:
         ic.print("✅ SUCCESS: Content contains Python code (found 'def')")
     else:
         ic.print("❌ WARNING: Content doesn't appear to be Python code")
     preview = downloaded_content[:100].replace("\\n", " ")
-    ic.print(f"Content preview: {preview}...")
+    ic.print("Content preview: " + preview + "...")
 else:
     ic.print("❌ FAILURE: No content was downloaded!")
 ic.print("=== VERIFICATION COMPLETE ===")
 '''.strip()
     step2 = TaskStep(call=sync_call)
     
-    schedule = TaskSchedule(seconds=10)
+    schedule = TaskSchedule(run_at=0, repeat_every=30)
     task = Task(name="test_mixed_steps", steps=[step1, step2], schedule=schedule)
     
     task_manager = TaskManager()
     task_manager.add_task(task)
     task_manager.run()
     
-    ic.print("Mixed sync/async task test initiated - download step in 10s, verification step in 20s")
+    ic.print("Mixed sync/async task test initiated...")

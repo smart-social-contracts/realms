@@ -3,7 +3,9 @@ from typing import List, Callable
 from kybra import TimerId, Duration, void, ic, Async
 from execution import run_code
 from ggg.status import TaskStatus
-from ggg import Codex
+from ggg.codex import Codex
+from ggg.task import Task as GGGTask
+from ggg.task_schedule import TaskSchedule  # as GGGTaskSchedule
 from kybra_simple_logging import get_logger
 
 logger = get_logger("core.task_manager")
@@ -34,46 +36,47 @@ class AsyncCall:
         return result
 
 
-class TaskSchedule:
-    timer_id: TimerId
+# class TaskSchedule(GGGTaskSchedule):
+#     timer_id: TimerId
 
-    def __init__(self, seconds: int = 0):
-        self.seconds = seconds
+    # def __init__(self,  timer_id: TimerId, **kwargs):
+    #     super().__init__(**kwargs)
+    #     self.timer_id = timer_id
+
 
 
 class TaskStep:
     call: SyncCall | AsyncCall
     status: TaskStatus
+    run_next_after: int  # number of seconds to schedule the next step
+    timer_id: TimerId
 
-    def __init__(self, call: SyncCall | AsyncCall):
+    def __init__(self, call: SyncCall | AsyncCall, run_next_after: int = 0):
         self.call = call
         self.status = TaskStatus.PENDING
+        self.run_next_after = run_next_after
+
 
 class TaskHistory:
     executed_at: int
     result: dict
  
 
-class Task:
-    name: str
+class Task(GGGTask):
     steps: List[TaskStep]
-    schedule: TaskSchedule
-    history: List[TaskHistory]
-
     status: TaskStatus
     step_to_execute: int
     
 
-    def __init__(self, name: str, steps: List[TaskStep], schedule: TaskSchedule):
-        self.name = name
+    def __init__(self,  steps: List[TaskStep], **kwargs):
+        super().__init__(**kwargs)
         self.steps = steps
-        self.schedule = schedule
         self.status = TaskStatus.PENDING
-        self.history = []
         self.step_to_execute = 0
 
+
     def __repr__(self) -> str:
-        return f"Task(name={self.name}, steps={self.steps}, schedule={self.schedule}, status={self.status}, step_to_execute={self.step_to_execute})"
+        return f"Task(name={self.name}, steps={self.steps}, schedules={self.schedules}, status={self.status}, step_to_execute={self.step_to_execute})"
 
 
 class TaskManager:
@@ -127,7 +130,7 @@ class TaskManager:
             logger.info(f"Scheduling next step {task.step_to_execute}/{len(task.steps)} for task {task.name}")
             
             callback_function = self._create_timer_callback(step, task)
-            task.schedule.timer_id = ic.set_timer(Duration(task.schedule.seconds), callback_function)
+            step.timer_id = ic.set_timer(Duration(step.run_next_after), callback_function)
             step.status = TaskStatus.RUNNING
             task.step_to_execute += 1
         else:
@@ -138,15 +141,24 @@ class TaskManager:
         logger.info("Updating timers")
         for task in self.tasks:
             if task.status == TaskStatus.PENDING:
-                step = task.steps[task.step_to_execute]
-                logger.info(f"Starting task {task.name} - executing step {task.step_to_execute}/{len(task.steps)}")
+                for schedule in task.schedules:
+                    now = ic.now()
+                    if schedule.disabled:
+                        logger.info(f"Skipping disabled schedule for task {task.name}")
+                        continue
+                    if schedule.run_at < now or schedule.last_run_at + schedule.repeat_every < now:
+                        logger.info(f"Scheduling task {task.name} for immediate execution")
+                        schedule.last_run_at = now
+                        step = task.steps[task.step_to_execute]
+                        logger.info(f"Starting task {task.name} - executing step {task.step_to_execute}/{len(task.steps)}")
 
-                callback_function = self._create_timer_callback(step, task)
-                task.schedule.timer_id = ic.set_timer(Duration(task.schedule.seconds), callback_function)
-                step.status = TaskStatus.RUNNING
-                task.status = TaskStatus.RUNNING
-                task.step_to_execute += 1
-                
+                        callback_function = self._create_timer_callback(step, task)
+                        step.timer_id = ic.set_timer(Duration(step.run_next_after), callback_function)
+                        step.status = TaskStatus.RUNNING
+                        task.status = TaskStatus.RUNNING
+                        task.step_to_execute += 1
+
+                        
                 return
         logger.info("No pending tasks to execute")
 

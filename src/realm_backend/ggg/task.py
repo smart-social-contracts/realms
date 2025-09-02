@@ -18,5 +18,4 @@ class Task(Entity, TimestampedMixin):
     name = String(max_length=256)
     metadata = String(max_length=256)
     schedules = ManyToMany("TaskSchedule", "tasks")
-    codex = ManyToOne("Codex", "tasks")
     executions = OneToMany("TaskExecution", "task")
