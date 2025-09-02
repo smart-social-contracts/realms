@@ -18,6 +18,7 @@ EXTENSION_NAMES = [
     "public_dashboard",
     "metrics",
     "voting",
+    "admin_dashboard",
 ]
 
 
