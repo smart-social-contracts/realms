@@ -9,7 +9,7 @@ logger = get_logger("execution")
 
 
 def run_code(source_code: str, locals={}):
-    logger.info("running code")
+    logger.info("running code: ************************ %s" % source_code)
     # Use current globals to ensure built-ins and proper scope
     safe_globals = globals().copy()
 
