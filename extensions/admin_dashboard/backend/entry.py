@@ -10,6 +10,7 @@ from datetime import datetime
 from io import StringIO
 from typing import Any, Dict, List
 
+from ggg import Codex, Human, Instrument, Mandate, Organization, User
 from .models import RegistrationCode
 
 
@@ -332,8 +333,6 @@ def create_user_entity(data: Dict[str, Any]):
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
 
-    from ggg import User
-
     user = User(id=data["id"], profile_picture_url=data.get("profile_picture_url", ""))
     return user
 
@@ -344,8 +343,6 @@ def create_human_entity(data: Dict[str, Any]):
     for field in required_fields:
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
-
-    from ggg import Human
 
     human = Human(
         id=data["id"],
@@ -364,8 +361,6 @@ def create_organization_entity(data: Dict[str, Any]):
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
 
-    from ggg import Organization
-
     org = Organization(
         id=data["id"],
         name=data["name"],
@@ -383,8 +378,6 @@ def create_mandate_entity(data: Dict[str, Any]):
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
 
-    from ggg import Mandate
-
     mandate = Mandate(
         id=data["id"],
         name=data["name"],
@@ -400,8 +393,6 @@ def create_codex_entity(data: Dict[str, Any]):
     for field in required_fields:
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
-
-    from ggg import Codex
 
     codex = Codex(
         id=data["id"],
@@ -419,8 +410,6 @@ def create_instrument_entity(data: Dict[str, Any]):
     for field in required_fields:
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
-
-    from ggg import Instrument
 
     instrument = Instrument(
         id=data["id"],
