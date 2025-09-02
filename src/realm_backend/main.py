@@ -859,7 +859,7 @@ def execute_code(code: str) -> str:
 
 
 
-from core.task_manager import AsyncCall, TaskManager, Task, TaskStep, SyncCall
+from core.task_manager import Call, TaskManager, Task, TaskStep
 from ggg.task_schedule import TaskSchedule
 
 downloaded_content: dict = {}
@@ -871,14 +871,17 @@ def test_mixed_sync_async_task() -> void:
     
     url = "https://raw.githubusercontent.com/smart-social-contracts/realms/refs/heads/main/src/realm_backend/codex.py"
     
-    async_call = AsyncCall()
+    async_call = Call()
+    async_call.is_async = True
     async_call.function_def = download_file_from_url
     async_call.function_params = [url]
     step1 = TaskStep(call=async_call, run_next_after=10)
     
-    sync_call = SyncCall()
-    sync_call.codex = Codex()
-    sync_call.codex.code = f'''
+    
+    sync_call = Call()
+    sync_call.is_async = False
+    codex = Codex()
+    codex.code = '''
 from main import downloaded_content
 
 content = downloaded_content['{url}']
@@ -903,10 +906,12 @@ else:
     ic.print("❌ FAILURE: No content was downloaded!")
 ic.print("=== VERIFICATION COMPLETE ===")
 '''.strip()
+    sync_call.codex = codex
     step2 = TaskStep(call=sync_call)
     
+    task = Task(name="test_mixed_steps", steps=[step1, step2])
     schedule = TaskSchedule(run_at=0, repeat_every=30)
-    task = Task(name="test_mixed_steps", steps=[step1, step2], schedule=schedule)
+    task.schedules = [schedule]
     
     task_manager = TaskManager()
     task_manager.add_task(task)

@@ -1,4 +1,4 @@
-from kybra_simple_db import Entity, OneToMany, String, TimestampedMixin
+from kybra_simple_db import Entity, OneToMany, String, TimestampedMixin, OneToOne
 from kybra_simple_logging import get_logger
 
 logger = get_logger("entity.codex")
@@ -9,5 +9,5 @@ class Codex(Entity, TimestampedMixin):
     code = String()
     url = String()  # Optional URL for downloadable code
     checksum = String()  # Optional SHA-256 checksum for verification
-    tasks = OneToMany("Task", "codex")
+    call = OneToOne("Call", "codex")
     __alias__ = "name"

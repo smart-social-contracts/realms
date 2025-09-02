@@ -7,59 +7,56 @@ from ggg.codex import Codex
 from ggg.task import Task as GGGTask
 from ggg.task_schedule import TaskSchedule  # as GGGTaskSchedule
 from kybra_simple_logging import get_logger
+from kybra_simple_db import Entity, TimestampedMixin, Boolean, OneToOne, String, Integer, Boolean
 
 logger = get_logger("core.task_manager")
 
 
-class SyncCall:
-    function_def = None
-    function_params = None
-    codex: Codex = None
+class Call(Entity, TimestampedMixin):
+    _function_def = None
+    _function_params = None
 
-    def function(self) -> void:
+    is_async = Boolean()
+    codex = OneToOne('Codex', 'call')
+    task_step = OneToOne('TaskStep', 'call')
+
+    def _function(self):
+        if self.is_async:
+            return self._async_function
+        else:
+            return self._sync_function
+
+    def _sync_function(self) -> void:
         logger.info("Executing sync call")
         if self.codex:
             logger.info("Executing codex")
             run_code(self.codex.code)
         else:
-            result = self.function_def(*self.function_params)
+            result = self._function_def(*self._function_params)
             return result
 
-
-class AsyncCall:
-    function_def = None
-    function_params = None
-
-    def function(self) -> Async:
+    def async_function(self) -> Async:
         logger.info("Executing async call")
-        result = yield self.function_def(*self.function_params)
+        result = yield self._function_def(*self._function_params)
         return result
 
 
-# class TaskSchedule(GGGTaskSchedule):
-#     timer_id: TimerId
+class TaskStep(Entity, TimestampedMixin):
+    call = OneToOne("Call", "task_step")
+    status = String()
+    run_next_after = Integer()  # number of seconds to schedule the next step
+    timer_id: Integer()
 
-    # def __init__(self,  timer_id: TimerId, **kwargs):
-    #     super().__init__(**kwargs)
-    #     self.timer_id = timer_id
-
-
-
-class TaskStep:
-    call: SyncCall | AsyncCall
-    status: TaskStatus
-    run_next_after: int  # number of seconds to schedule the next step
-    timer_id: TimerId
-
-    def __init__(self, call: SyncCall | AsyncCall, run_next_after: int = 0):
+    def __init__(self, call: Call, run_next_after: int = 0, **kwargs):
+        super().__init__(**kwargs)
         self.call = call
-        self.status = TaskStatus.PENDING
         self.run_next_after = run_next_after
+        self.status = TaskStatus.PENDING
 
-
-class TaskHistory:
-    executed_at: int
-    result: dict
+# TODO
+# class TaskHistory:
+#     executed_at: int
+#     result: dict
  
 
 class Task(GGGTask):
@@ -92,14 +89,14 @@ class TaskManager:
 
     def _create_timer_callback(self, step: TaskStep, task: Task) -> Callable:
         """Create a proper timer callback function that can handle both sync and async calls"""
-        if isinstance(step.call, AsyncCall):
+        if step.call.is_async:
             def async_timer_callback() -> Async[void]:
                 logger.info(f"Executing async timer callback for {step.call}")
                 try:
-                    if step.call.function_params:
-                        result = yield step.call.function_def(*step.call.function_params)
+                    if step.call._function_params:
+                        result = yield step.call._function_def(*step.call._function_params)
                     else:
-                        result = yield step.call.function_def()
+                        result = yield step.call._function_def()
                     logger.info(f"Async timer callback completed with result: {result}")
                     step.status = TaskStatus.COMPLETED
                     self._check_and_schedule_next_step(task)
@@ -108,11 +105,11 @@ class TaskManager:
                     step.status = TaskStatus.FAILED
                     task.status = TaskStatus.FAILED
             return async_timer_callback
-        elif isinstance(step.call, SyncCall):
+        elif not step.call.is_async:
             def sync_timer_callback() -> void:
                 logger.info(f"Executing sync timer callback for {step.call}")
                 try:
-                    step.call.function()
+                    step.call._function()
                     step.status = TaskStatus.COMPLETED
                     self._check_and_schedule_next_step(task)
                 except Exception as e:
