@@ -104,6 +104,22 @@ def _generate_random_realm_data(
         disputes=disputes,
         realm_name=realm_name,
     )
+    
+    # Generate codex files and add them to realm_data
+    from pathlib import Path
+    import tempfile
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        codex_files = generator.generate_codex_files(temp_path)
+        
+        # Read the generated codex files and store their content
+        codex_content = {}
+        for codex_file_path in codex_files:
+            file_path = Path(codex_file_path)
+            with open(file_path, 'r') as f:
+                codex_content[file_path.name] = f.read()
+        
+        realm_data['codex_files'] = codex_content
 
     console.print(
         f"✅ Generated data for {len(realm_data['users'])} users, {len(realm_data['organizations'])} organizations"
@@ -164,6 +180,13 @@ def _create_realm_config(
         },
         "post_deployment": {
             "actions": [
+                {
+                    "type": "extension_call",
+                    "name": "Import User Profiles",
+                    "extension_name": "admin_dashboard",
+                    "function_name": "import_data",
+                    "args": {"file_path": "data/user_profiles.json", "data_type": "user_profiles"},
+                },
                 {
                     "type": "extension_call",
                     "name": "Import Users",
@@ -228,6 +251,7 @@ def _create_json_data_files(data_dir: Path, realm_data: dict) -> None:
     entity_mappings = {
         "users.json": realm_data.get("users", []),
         "humans.json": realm_data.get("humans", []),
+        "user_profiles.json": realm_data.get("user_profiles", []),
         "organizations.json": realm_data.get("organizations", []),
         "instruments.json": realm_data.get("instruments", []),
         "transfers.json": realm_data.get("transfers", []),
