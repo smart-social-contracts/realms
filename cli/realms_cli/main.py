@@ -93,7 +93,8 @@ def create(
 @app.command("extension")
 def extension(
     action: str = typer.Argument(
-        ..., help="Action to perform: list, install-from-source, package, install, uninstall"
+        ...,
+        help="Action to perform: list, install-from-source, package, install, uninstall",
     ),
     extension_id: Optional[str] = typer.Option(
         None, "--extension-id", help="Extension ID for package/uninstall operations"
