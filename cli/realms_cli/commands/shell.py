@@ -17,8 +17,10 @@ console = Console()
 
 class RealmsShell:
     """Interactive Python shell for Realms backend canister."""
-    
-    def __init__(self, canister_name: str = "realm_backend", network: Optional[str] = None):
+
+    def __init__(
+        self, canister_name: str = "realm_backend", network: Optional[str] = None
+    ):
         self.canister_name = canister_name
         self.network = network
         self.globals_dict = {}
@@ -84,7 +86,9 @@ class RealmsShell:
                     # Properly unescape the string content inside the tuple
                     unescaped_content = ast.literal_eval(f'"{tuple_content}"')
                     # If it's a list representation, evaluate it as such
-                    if unescaped_content.startswith("[") and unescaped_content.endswith("]"):
+                    if unescaped_content.startswith("[") and unescaped_content.endswith(
+                        "]"
+                    ):
                         try:
                             # Try to parse it as a list if it looks like one
                             list_content = ast.literal_eval(unescaped_content)
@@ -95,7 +99,9 @@ class RealmsShell:
                     return unescaped_content
                 except (SyntaxError, ValueError):
                     # Fallback to basic unescaping
-                    unescaped_content = tuple_content.replace("\\n", "\n").replace('\\"', '"')
+                    unescaped_content = tuple_content.replace("\\n", "\n").replace(
+                        '\\"', '"'
+                    )
                     return unescaped_content
 
             # If not a tuple, try the standard pattern: ("content")
@@ -124,7 +130,9 @@ class RealmsShell:
     def get_dfx_version(self) -> str:
         """Get the installed dfx version."""
         try:
-            result = subprocess.run(["dfx", "--version"], capture_output=True, text=True)
+            result = subprocess.run(
+                ["dfx", "--version"], capture_output=True, text=True
+            )
             if result.returncode == 0:
                 return result.stdout.strip()
             return "dfx not found or error getting version"
@@ -141,7 +149,9 @@ class RealmsShell:
         console.print("  Up Arrow     - Go to previous command in history")
         console.print("  Down Arrow   - Go to next command in history")
         console.print("\n[dim]You can execute Python code directly in this shell.")
-        console.print("The code will be sent to your Realms backend canister for execution.")
+        console.print(
+            "The code will be sent to your Realms backend canister for execution."
+        )
         console.print("Example: print('Hello from Realms!')")
         console.print("Example: from ggg_entities import User; User.list_all()[/dim]")
         console.print()
@@ -153,7 +163,7 @@ class RealmsShell:
             if self.network:
                 cmd.extend(["--network", self.network])
             cmd.extend([self.canister_name, "status"])
-            
+
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
             if result.returncode == 0:
                 console.print("[green]✅ Backend canister is responding[/green]")
@@ -176,13 +186,19 @@ class RealmsShell:
         dfx_version = self.get_dfx_version()
 
         # Display welcome message with version info
-        console.print(f"[bold blue]🏛️  Realms Interactive Shell[/bold blue]")
-        console.print(f"[dim]Python {python_version} ({python_implementation}) on {platform.system()}[/dim]")
+        console.print("[bold blue]🏛️  Realms Interactive Shell[/bold blue]")
+        console.print(
+            f"[dim]Python {python_version} ({python_implementation}) on {platform.system()}[/dim]"
+        )
         console.print(f"[dim]DFX: {dfx_version}[/dim]")
         console.print(f"[bold]Canister:[/bold] [cyan]{self.canister_name}[/cyan]")
-        console.print(f"[bold]Network:[/bold] [cyan]{self.network if self.network else 'local'}[/cyan]")
+        console.print(
+            f"[bold]Network:[/bold] [cyan]{self.network if self.network else 'local'}[/cyan]"
+        )
         console.print("[dim]Type ':q' to quit, ':help' for help[/dim]")
-        console.print("[dim]Arrow keys ↑↓ can be used to navigate command history[/dim]")
+        console.print(
+            "[dim]Arrow keys ↑↓ can be used to navigate command history[/dim]"
+        )
         console.print()
 
         # Check canister status on startup
@@ -222,9 +238,15 @@ class RealmsShell:
 
 
 def shell_command(
-    network: Optional[str] = typer.Option(None, "--network", "-n", help="Network to use (local, ic, etc.)"),
-    canister: str = typer.Option("realm_backend", "--canister", "-c", help="Canister name to connect to"),
-    file: Optional[str] = typer.Option(None, "--file", "-f", help="Execute Python file instead of interactive shell")
+    network: Optional[str] = typer.Option(
+        None, "--network", "-n", help="Network to use (local, ic, etc.)"
+    ),
+    canister: str = typer.Option(
+        "realm_backend", "--canister", "-c", help="Canister name to connect to"
+    ),
+    file: Optional[str] = typer.Option(
+        None, "--file", "-f", help="Execute Python file instead of interactive shell"
+    ),
 ) -> None:
     """Start an interactive Python shell connected to the Realms backend canister or execute a Python file."""
     # If file is provided, execute it instead of interactive shell
@@ -232,25 +254,31 @@ def shell_command(
         console.print(f"[bold blue]📄 Executing Python file: {file}[/bold blue]\n")
         execute_python_file(file, canister, network)
         return
-    
-    console.print(f"[bold blue]🚀 Starting Realms Shell[/bold blue]\n")
-    
+
+    console.print("[bold blue]🚀 Starting Realms Shell[/bold blue]\n")
+
     # Check if dfx is available
     try:
         subprocess.run(["dfx", "--version"], capture_output=True, check=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
-        console.print("[red]❌ dfx not found. Please install dfx and ensure it's in your PATH.[/red]")
+        console.print(
+            "[red]❌ dfx not found. Please install dfx and ensure it's in your PATH.[/red]"
+        )
         raise typer.Exit(1)
-    
+
     # Check if dfx replica is running (for local network)
     if not network or network == "local":
         try:
-            result = subprocess.run(["dfx", "ping"], capture_output=True, text=True, timeout=5)
+            result = subprocess.run(
+                ["dfx", "ping"], capture_output=True, text=True, timeout=5
+            )
             if result.returncode != 0:
-                console.print("[yellow]⚠️  dfx replica doesn't seem to be running. You may need to run 'dfx start'.[/yellow]")
+                console.print(
+                    "[yellow]⚠️  dfx replica doesn't seem to be running. You may need to run 'dfx start'.[/yellow]"
+                )
         except Exception:
             console.print("[yellow]⚠️  Could not check dfx replica status.[/yellow]")
-    
+
     # Create and run the shell
     shell = RealmsShell(canister_name=canister, network=network)
     shell.run_shell()
@@ -260,29 +288,31 @@ def execute_python_file(file_path: str, canister: str, network: Optional[str]) -
     """Execute a Python file on the Realms backend canister."""
     import os
     from pathlib import Path
-    
+
     # Check if file exists
     if not os.path.exists(file_path):
         console.print(f"[red]❌ File not found: {file_path}[/red]")
         raise typer.Exit(1)
-    
+
     # Read the file content
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             code_content = f.read()
     except Exception as e:
         console.print(f"[red]❌ Error reading file: {e}[/red]")
         raise typer.Exit(1)
-    
+
     if not code_content.strip():
         console.print(f"[yellow]⚠️  File is empty: {file_path}[/yellow]")
         return
-    
-    console.print(f"[dim]Executing {len(code_content)} characters of Python code...[/dim]")
-    
+
+    console.print(
+        f"[dim]Executing {len(code_content)} characters of Python code...[/dim]"
+    )
+
     # Create shell instance and execute the code
     shell = RealmsShell(canister_name=canister, network=network)
-    
+
     try:
         result = shell.execute(code_content)
         if result:

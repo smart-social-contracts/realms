@@ -1,4 +1,4 @@
-from kybra_simple_db import Entity, OneToMany, String, TimestampedMixin, OneToOne
+from kybra_simple_db import Entity, OneToMany, OneToOne, String, TimestampedMixin
 from kybra_simple_logging import get_logger
 
 logger = get_logger("entity.codex")

@@ -15,7 +15,7 @@ from pathlib import Path
 # Add the cli directory to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / "cli"))
 
-from realms_cli.commands.init import init_command
+# from realms_cli.commands.init import init_command
 from realms_cli.commands.deploy import deploy_command
 from realms_cli.models import RealmConfig
 from realms_cli.utils import load_config, save_config, console, display_success_panel, display_info_panel
@@ -30,15 +30,19 @@ def demo_init_command():
     console.print(f"[dim]Demo directory: {demo_dir}[/dim]\n")
     
     try:
-        # Simulate init command with non-interactive mode
-        init_command(
-            name="Digital Government Services",
-            realm_id="gov_services_demo",
-            admin_principal="rdmx6-jaaaa-aaaaa-aaadq-cai",
-            network="local",
-            interactive=False,
-            output_dir=str(demo_dir)
-        )
+        from realms_cli.utils import save_config
+        basic_config = {
+            "realm": {
+                "id": "gov_services_demo",
+                "name": "Digital Government Services",
+                "description": "Demo government services realm",
+                "admin_principal": "rdmx6-jaaaa-aaaaa-aaadq-cai"
+            },
+            "deployment": {
+                "network": "local"
+            }
+        }
+        save_config(basic_config, str(demo_dir / "realm_config.json"))
         
         # Show what was created
         console.print("\n[bold green]📁 Project Structure Created:[/bold green]")

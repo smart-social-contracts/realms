@@ -19,6 +19,18 @@ from pathlib import Path
 from typing import Dict, List, Any
 import hashlib
 
+# Import GGG entities
+try:
+    from src.realm_backend.ggg.user_profile import UserProfile, Profiles
+    from src.realm_backend.ggg.user import User
+    from src.realm_backend.ggg.treasury import Treasury
+except ImportError:
+    # Fallback for when running outside the main project
+    UserProfile = None
+    Profiles = None
+    User = None
+    Treasury = None
+
 # Realistic data pools
 FIRST_NAMES = [
     "Alice", "Bob", "Charlie", "Diana", "Edward", "Fiona", "George", "Helen",
@@ -228,21 +240,62 @@ class RealmGenerator:
         disputes = self.generate_disputes(params.get('disputes', 10))
         mandates = self.generate_mandates()
         
+        # Create user profiles (with fallback for when GGG classes unavailable)
+        if UserProfile and Profiles:
+            user_profile_admin = UserProfile(
+                name=Profiles.ADMIN[0],
+                allowed_to=",".join(Profiles.ADMIN[1]),
+                description="Admin user profile",
+            )
+
+            user_profile_member = UserProfile(
+                name=Profiles.MEMBER[0],
+                allowed_to=",".join(Profiles.MEMBER[1]),
+                description="Member user profile",
+            )
+            
+            user_profiles = [user_profile_admin, user_profile_member]
+        else:
+            # Fallback data structure when GGG classes aren't available
+            user_profiles = [
+                {
+                    "name": "admin",
+                    "allowed_to": "all",
+                    "description": "Admin user profile"
+                },
+                {
+                    "name": "member", 
+                    "allowed_to": "",
+                    "description": "Member user profile"
+                }
+            ]
+
+        # Create a system user to represent the realm in transfers
+        if User and user_profiles:
+            system_user = User(name="system", profiles=[user_profiles[0]])  # Admin profile
+        else:
+            system_user = {"name": "system", "profiles": ["admin"]}
+
         # Create realm metadata
         realm = {
             "name": params.get('realm_name', 'Generated Demo Realm'),
             "description": f"Auto-generated realm with {len(users)} users, {len(organizations)} organizations"
         }
         
-        # Create treasury
-        treasury = {
-            "name": f"{realm['name']} Treasury",
-            "vault_principal_id": self.generate_principal_id()
-        }
+        # Create the Treasury
+        if Treasury:
+            treasury = Treasury(name="New Geneva Treasury", vault_principal_id="abc123")
+        else:
+            treasury = {
+                "name": "New Geneva Treasury",
+                "vault_principal_id": "abc123"
+            }
         
         return {
             "realm": realm,
             "treasury": treasury,
+            "user_profiles": user_profiles,
+            "system_user": system_user,
             "users": users,
             "humans": humans,
             "citizens": citizens,

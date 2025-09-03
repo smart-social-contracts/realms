@@ -223,42 +223,62 @@ def get_templates(args):
 
 def import_data(args):
     """
-    Import bulk data from CSV or JSON
+    Import bulk data from CSV or JSON files
     """
     try:
-        entity_type = args.get("entity_type", "users")
-        data_format = args.get("format", "csv")
-        data_content = args.get("data", "")
+        if isinstance(args, str):
+            args = json.loads(args)
 
-        if not data_content:
-            return {"success": False, "error": "No data provided"}
+        if "file_path" in args and "data_type" in args:
+            file_path = args["file_path"]
+            entity_type = args["data_type"]
 
-        # Parse data based on format
-        parsed_data = []
-        if data_format == "csv":
-            parsed_data = parse_csv_data(data_content)
-        elif data_format == "json":
-            parsed_data = parse_json_data(data_content)
+            return {
+                "success": True,
+                "message": f"File-based import for {entity_type} from {file_path} would be processed here",
+                "data": {
+                    "entity_type": entity_type,
+                    "file_path": file_path,
+                    "total_records": 0,
+                    "successful": 0,
+                    "failed": 0,
+                    "errors": [],
+                },
+            }
         else:
-            return {"success": False, "error": f"Unsupported format: {data_format}"}
+            entity_type = args.get("entity_type", "users")
+            data_format = args.get("format", "csv")
+            data_content = args.get("data", "")
 
-        if not parsed_data:
-            return {"success": False, "error": "No valid data found"}
+            if not data_content:
+                return {"success": False, "error": "No data provided"}
 
-        # Process data in batches
-        results = process_bulk_import(entity_type, parsed_data)
+            # Parse data based on format
+            parsed_data = []
+            if data_format == "csv":
+                parsed_data = parse_csv_data(data_content)
+            elif data_format == "json":
+                parsed_data = parse_json_data(data_content)
+            else:
+                return {"success": False, "error": f"Unsupported format: {data_format}"}
 
-        return {
-            "success": True,
-            "data": {
-                "entity_type": entity_type,
-                "format": data_format,
-                "total_records": len(parsed_data),
-                "successful": results["successful"],
-                "failed": results["failed"],
-                "errors": results["errors"],
-            },
-        }
+            if not parsed_data:
+                return {"success": False, "error": "No valid data found"}
+
+            # Process data in batches
+            results = process_bulk_import(entity_type, parsed_data)
+
+            return {
+                "success": True,
+                "data": {
+                    "entity_type": entity_type,
+                    "format": data_format,
+                    "total_records": len(parsed_data),
+                    "successful": results["successful"],
+                    "failed": results["failed"],
+                    "errors": results["errors"],
+                },
+            }
     except Exception as e:
         return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
 
@@ -329,70 +349,97 @@ def process_bulk_import(entity_type: str, data: List[Dict[str, Any]]) -> Dict[st
 
 def create_user_entity(data: Dict[str, Any]):
     """Create a User entity from import data"""
-    # This would integrate with the actual User creation logic
-    # For now, simulate the creation
-    required_fields = ["username"]
+    required_fields = ["id"]
     for field in required_fields:
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
 
-    # Simulate User.create() call
-    pass
+    user = User(id=data["id"], profile_picture_url=data.get("profile_picture_url", ""))
+    return user
 
 
 def create_human_entity(data: Dict[str, Any]):
     """Create a Human entity from import data"""
-    required_fields = ["name"]
+    required_fields = ["id", "name"]
     for field in required_fields:
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
 
-    # Simulate Human.create() call
-    pass
+    human = Human(
+        id=data["id"],
+        name=data["name"],
+        email=data.get("email", ""),
+        phone=data.get("phone", ""),
+        address=data.get("address", ""),
+    )
+    return human
 
 
 def create_organization_entity(data: Dict[str, Any]):
     """Create an Organization entity from import data"""
-    required_fields = ["name"]
+    required_fields = ["id", "name"]
     for field in required_fields:
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
 
-    # Simulate Organization.create() call
-    pass
+    org = Organization(
+        id=data["id"],
+        name=data["name"],
+        description=data.get("description", ""),
+        website=data.get("website", ""),
+        email=data.get("email", ""),
+    )
+    return org
 
 
 def create_mandate_entity(data: Dict[str, Any]):
     """Create a Mandate entity from import data"""
-    required_fields = ["title"]
+    required_fields = ["id", "name"]
     for field in required_fields:
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
 
-    # Simulate Mandate.create() call
-    pass
+    mandate = Mandate(
+        id=data["id"],
+        name=data["name"],
+        description=data.get("description", ""),
+        status=data.get("status", "active"),
+    )
+    return mandate
 
 
 def create_codex_entity(data: Dict[str, Any]):
     """Create a Codex entity from import data"""
-    required_fields = ["title", "content"]
+    required_fields = ["id", "name", "code"]
     for field in required_fields:
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
 
-    # Simulate Codex.create() call
-    pass
+    codex = Codex(
+        id=data["id"],
+        name=data["name"],
+        code=data["code"],
+        description=data.get("description", ""),
+        version=data.get("version", "1.0.0"),
+    )
+    return codex
 
 
 def create_instrument_entity(data: Dict[str, Any]):
     """Create an Instrument entity from import data"""
-    required_fields = ["name", "type"]
+    required_fields = ["id", "name", "type"]
     for field in required_fields:
         if field not in data or not data[field]:
             raise Exception(f"Missing required field: {field}")
 
-    # Simulate Instrument.create() call
-    pass
+    instrument = Instrument(
+        id=data["id"],
+        name=data["name"],
+        type=data["type"],
+        description=data.get("description", ""),
+        value=data.get("value", 0),
+    )
+    return instrument
 
 
 def generate_registration_url(args: dict):
