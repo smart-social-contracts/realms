@@ -1,7 +1,8 @@
 {
   "realm": {
-    "id": "local-realm",
+    "id": "local_realm",
     "name": "Local Development Realm",
+    "description": "Local development environment for testing Realms functionality",
     "admin_principal": "2vxsx-fae"
   },
   "deployment": {
