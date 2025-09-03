@@ -280,13 +280,13 @@ def package_extension_command(extension_id: str, output_dir: Optional[str] = Non
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             if manifest_path and os.path.exists(manifest_path):
                 zipf.write(manifest_path, "manifest.json")
-                console.print(f"[blue]Added manifest.json[/blue]")
+                console.print("[blue]Added manifest.json[/blue]")
             else:
                 temp_manifest_path = os.path.join(temp_dir, "manifest.json")
                 with open(temp_manifest_path, 'w') as f:
                     json.dump(manifest, f, indent=2)
                 zipf.write(temp_manifest_path, "manifest.json")
-                console.print(f"[blue]Added generated manifest.json[/blue]")
+                console.print("[blue]Added generated manifest.json[/blue]")
             
             if "backend" in locations:
                 backend_src = locations["backend"]
@@ -341,14 +341,14 @@ def install_extension_command(package_path: str):
         try:
             with zipfile.ZipFile(package_path, 'r') as zipf:
                 zipf.extractall(temp_dir)
-            console.print(f"[blue]Extracted package to temporary directory[/blue]")
+            console.print("[blue]Extracted package to temporary directory[/blue]")
         except Exception as e:
             console.print(f"[red]Failed to extract package: {e}[/red]")
             return False
         
         manifest_path = os.path.join(temp_dir, "manifest.json")
         if not os.path.exists(manifest_path):
-            console.print(f"[red]No manifest.json found in package[/red]")
+            console.print("[red]No manifest.json found in package[/red]")
             return False
             
         try:
@@ -409,7 +409,7 @@ def install_extension_command(package_path: str):
             os.makedirs(frontend_lib_target, exist_ok=True)
             
             shutil.copy2(manifest_path, os.path.join(frontend_lib_target, "manifest.json"))
-            console.print(f"[blue]Copied manifest.json to frontend extension directory[/blue]")
+            console.print("[blue]Copied manifest.json to frontend extension directory[/blue]")
             
             for root, _, files in os.walk(frontend_lib_source):
                 for file in files:
