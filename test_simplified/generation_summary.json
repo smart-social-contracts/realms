@@ -1,0 +1,28 @@
+{
+  "generation_completed": "2025-09-03T22:23:37.012224",
+  "seed_used": 12345,
+  "parameters": {
+    "citizens": 5,
+    "organizations": 2,
+    "transactions": 10,
+    "disputes": 3,
+    "seed": 12345,
+    "output_dir": "test_simplified",
+    "realm_name": "Generated Demo Realm"
+  },
+  "files_created": {
+    "data_file": "test_simplified/realm_data.json",
+    "codex_files": [
+      "test_simplified/tax_collection_codex.py",
+      "test_simplified/social_benefits_codex.py",
+      "test_simplified/governance_automation_codex.py"
+    ]
+  },
+  "statistics": {
+    "total_users": 6,
+    "total_organizations": 2,
+    "total_transactions": 10,
+    "total_disputes": 3,
+    "total_mandates": 6
+  }
+}

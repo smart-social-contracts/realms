@@ -93,14 +93,21 @@ def create(
 @app.command("extension")
 def extension(
     action: str = typer.Argument(
-        ..., help="Action to perform: list, install-from-source"
+        ...,
+        help="Action to perform: list, install-from-source, package, install, uninstall",
+    ),
+    extension_id: Optional[str] = typer.Option(
+        None, "--extension-id", help="Extension ID for package/uninstall operations"
+    ),
+    package_path: Optional[str] = typer.Option(
+        None, "--package-path", help="Path to extension package for install operation"
     ),
     source_dir: str = typer.Option(
         "extensions", "--source-dir", help="Source directory for extensions"
     ),
 ) -> None:
     """Manage Realm extensions."""
-    extension_command(action, source_dir)
+    extension_command(action, extension_id, package_path, source_dir)
 
 
 @app.command("import")

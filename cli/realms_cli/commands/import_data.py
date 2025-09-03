@@ -54,7 +54,7 @@ def import_data_command(
         args = {
             "entity_type": entity_type,
             "format": format,
-            "data": json.dumps(data),
+            "data": data,
             "batch_size": batch_size,
         }
 

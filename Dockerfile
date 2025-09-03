@@ -11,6 +11,10 @@ COPY requirements-dev.txt ./requirements-dev.txt
 COPY package-lock.json ./package-lock.json
 COPY package.json ./package.json
 COPY ./scripts/setup_docker_dev_env.sh ./scripts/setup_docker_dev_env.sh
+
+# Copy CLI directory before setup script runs (needed for pip install -e cli/)
+COPY cli ./cli
+
 RUN ./scripts/setup_docker_dev_env.sh
 
 # Install playwright UI testing framework and dependencies
@@ -24,6 +28,7 @@ COPY tsconfig.json ./tsconfig.json
 COPY dfx.json ./dfx.json
 COPY canister_ids.json ./canister_ids.json
 COPY pyproject.toml ./pyproject.toml
+COPY realm_config.json ./realm_config.json
 
 # Source code
 COPY scripts ./scripts

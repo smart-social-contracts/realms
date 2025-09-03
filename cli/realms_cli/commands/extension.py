@@ -177,6 +177,428 @@ def list_extensions_command():
     console.print(table)
 
 
+def update_extension_imports(extension_id, action="add"):
+    """Update the extension_imports.py file"""
+    paths = get_project_paths()
+    imports_file = os.path.join(
+        paths["backend_dir"], "extension_packages", "extension_imports.py"
+    )
+
+    if not os.path.exists(imports_file):
+        os.makedirs(os.path.dirname(imports_file), exist_ok=True)
+        with open(imports_file, "w") as f:
+            f.write("")
+        console.print(f"[blue]Created extension imports file: {imports_file}[/blue]")
+
+    with open(imports_file, "r") as f:
+        content = f.read()
+
+    import_line = f"import extension_packages.{extension_id}.entry"
+
+    if action == "add":
+        if import_line in content:
+            console.print(
+                f"[yellow]Import for {extension_id} already exists in extension_imports.py[/yellow]"
+            )
+            return True
+
+        if content and not content.endswith("\n"):
+            import_line = "\n" + import_line
+
+        if content:
+            import_line += "\n"
+
+        with open(imports_file, "a") as f:
+            f.write(import_line)
+        console.print(
+            f"[green]Added import for {extension_id} to extension_imports.py[/green]"
+        )
+
+    elif action == "remove":
+        if import_line not in content:
+            console.print(
+                f"[yellow]No import for {extension_id} found in extension_imports.py[/yellow]"
+            )
+            return True
+
+        lines = content.splitlines()
+        new_lines = [line for line in lines if line.strip() != import_line]
+        new_content = "\n".join(new_lines)
+
+        if new_content and not new_content.endswith("\n"):
+            new_content += "\n"
+
+        with open(imports_file, "w") as f:
+            f.write(new_content)
+        console.print(
+            f"[green]Removed import for {extension_id} from extension_imports.py[/green]"
+        )
+
+    return True
+
+
+def package_extension_command(extension_id: str, output_dir: Optional[str] = None):
+    """Package an extension into a zip file"""
+    try:
+        validate_extension_id(extension_id)
+    except ValueError as e:
+        console.print(f"[red]Error: {str(e)}[/red]")
+        return False
+
+    locations = find_extension_locations(extension_id)
+
+    paths = get_project_paths()
+    if not output_dir:
+        output_dir = paths["project_root"]
+
+    zip_filename = f"{extension_id}.zip"
+    zip_path = os.path.join(output_dir, zip_filename)
+
+    console.print(f"[blue]Packaging extension {extension_id}[/blue]")
+
+    custom_route_path = os.path.join(paths["frontend_dir"], "src/routes", extension_id)
+    if os.path.exists(custom_route_path):
+        locations["frontend_custom_routes"] = paths["frontend_dir"]
+        console.print(f"[blue]Detected custom route: {custom_route_path}[/blue]")
+
+    if not locations:
+        console.print(
+            f"[red]Extension '{extension_id}' not found or has no components[/red]"
+        )
+        return False
+
+    manifest = None
+    manifest_path = None
+    if "backend" in locations:
+        manifest_path = os.path.join(locations["backend"], "manifest.json")
+        if os.path.exists(manifest_path):
+            try:
+                with open(manifest_path, "r") as f:
+                    manifest = json.load(f)
+            except Exception as e:
+                console.print(f"[red]Failed to load manifest: {e}[/red]")
+                return False
+
+    if not manifest:
+        manifest = {
+            "name": extension_id,
+            "version": "1.0.0",
+            "description": f"{extension_id} extension",
+            "author": "Smart Social Contracts",
+            "permissions": [],
+        }
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+            if manifest_path and os.path.exists(manifest_path):
+                zipf.write(manifest_path, "manifest.json")
+                console.print("[blue]Added manifest.json[/blue]")
+            else:
+                temp_manifest_path = os.path.join(temp_dir, "manifest.json")
+                with open(temp_manifest_path, "w") as f:
+                    json.dump(manifest, f, indent=2)
+                zipf.write(temp_manifest_path, "manifest.json")
+                console.print("[blue]Added generated manifest.json[/blue]")
+
+            if "backend" in locations:
+                backend_src = locations["backend"]
+                for root, _, files in os.walk(backend_src):
+                    for file in files:
+                        if file.endswith(".py") or file == "manifest.json":
+                            file_path = os.path.join(root, file)
+                            rel_path = os.path.relpath(file_path, backend_src)
+                            zipf.write(file_path, os.path.join("backend", rel_path))
+                            console.print(f"[blue]Added backend/{rel_path}[/blue]")
+
+            if "frontend_lib" in locations:
+                frontend_lib_src = locations["frontend_lib"]
+                for root, _, files in os.walk(frontend_lib_src):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        rel_path = os.path.relpath(file_path, frontend_lib_src)
+                        zipf.write(
+                            file_path,
+                            os.path.join(
+                                f"frontend/lib/extensions/{extension_id}", rel_path
+                            ),
+                        )
+                        console.print(
+                            f"[blue]Added frontend/lib/extensions/{extension_id}/{rel_path}[/blue]"
+                        )
+
+            if "frontend_route" in locations:
+                frontend_route_src = locations["frontend_route"]
+                for root, _, files in os.walk(frontend_route_src):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        rel_path = os.path.relpath(file_path, frontend_route_src)
+                        zipf.write(
+                            file_path,
+                            os.path.join(
+                                f"frontend/routes/(sidebar)/extensions/{extension_id}",
+                                rel_path,
+                            ),
+                        )
+                        console.print(
+                            f"[blue]Added frontend/routes/(sidebar)/extensions/{extension_id}/{rel_path}[/blue]"
+                        )
+
+            if "i18n" in locations:
+                i18n_src = locations["i18n"]
+                for root, _, files in os.walk(i18n_src):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        rel_path = os.path.relpath(file_path, i18n_src)
+                        zipf.write(
+                            file_path,
+                            os.path.join(
+                                f"frontend/i18n/locales/extensions/{extension_id}",
+                                rel_path,
+                            ),
+                        )
+                        console.print(
+                            f"[blue]Added frontend/i18n/locales/extensions/{extension_id}/{rel_path}[/blue]"
+                        )
+
+    console.print(f"[green]Extension packaged successfully: {zip_path}[/green]")
+    return True
+
+
+def install_extension_command(package_path: str):
+    """Install an extension from a package"""
+    paths = get_project_paths()
+
+    if not os.path.exists(package_path):
+        console.print(f"[red]Package file not found: {package_path}[/red]")
+        return False
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        try:
+            with zipfile.ZipFile(package_path, "r") as zipf:
+                zipf.extractall(temp_dir)
+            console.print("[blue]Extracted package to temporary directory[/blue]")
+        except Exception as e:
+            console.print(f"[red]Failed to extract package: {e}[/red]")
+            return False
+
+        manifest_path = os.path.join(temp_dir, "manifest.json")
+        if not os.path.exists(manifest_path):
+            console.print("[red]No manifest.json found in package[/red]")
+            return False
+
+        try:
+            with open(manifest_path, "r") as f:
+                manifest = json.load(f)
+        except Exception as e:
+            console.print(f"[red]Failed to read manifest: {e}[/red]")
+            return False
+
+        extension_id = manifest.get("name", "")
+        if not extension_id:
+            console.print("[red]No extension ID found in manifest[/red]")
+            return False
+
+        try:
+            validate_extension_id(extension_id)
+        except ValueError as e:
+            console.print(f"[red]Error: {str(e)}[/red]")
+            return False
+
+        backend_source = os.path.join(temp_dir, "backend")
+        if os.path.exists(backend_source) and os.listdir(backend_source):
+            backend_target = os.path.join(
+                paths["backend_dir"], "extension_packages", extension_id
+            )
+
+            if os.path.exists(backend_target):
+                shutil.rmtree(backend_target)
+
+            os.makedirs(backend_target, exist_ok=True)
+
+            shutil.copy2(manifest_path, os.path.join(backend_target, "manifest.json"))
+
+            for root, _, files in os.walk(backend_source):
+                for file in files:
+                    src_file = os.path.join(root, file)
+                    rel_path = os.path.relpath(src_file, backend_source)
+                    dst_file = os.path.join(backend_target, rel_path)
+
+                    os.makedirs(os.path.dirname(dst_file), exist_ok=True)
+                    shutil.copy2(src_file, dst_file)
+                    console.print(f"[blue]Installed backend file: {rel_path}[/blue]")
+
+            init_file = os.path.join(backend_target, "__init__.py")
+            if not os.path.exists(init_file):
+                with open(init_file, "w") as f:
+                    f.write(f'"""\n{extension_id} extension package.\n"""\n')
+                console.print(
+                    f"[blue]Created __init__.py file for {extension_id}[/blue]"
+                )
+
+            update_extension_imports(extension_id, "add")
+            console.print(f"[green]Installed backend files for {extension_id}[/green]")
+
+        frontend_lib_source = os.path.join(
+            temp_dir, "frontend/lib/extensions", extension_id
+        )
+        if os.path.exists(frontend_lib_source) and os.listdir(frontend_lib_source):
+            frontend_lib_target = os.path.join(
+                paths["frontend_dir"], "src/lib/extensions", extension_id
+            )
+
+            if os.path.exists(frontend_lib_target):
+                shutil.rmtree(frontend_lib_target)
+
+            os.makedirs(frontend_lib_target, exist_ok=True)
+
+            shutil.copy2(
+                manifest_path, os.path.join(frontend_lib_target, "manifest.json")
+            )
+            console.print(
+                "[blue]Copied manifest.json to frontend extension directory[/blue]"
+            )
+
+            for root, _, files in os.walk(frontend_lib_source):
+                for file in files:
+                    src_file = os.path.join(root, file)
+                    rel_path = os.path.relpath(src_file, frontend_lib_source)
+                    dst_file = os.path.join(frontend_lib_target, rel_path)
+
+                    os.makedirs(os.path.dirname(dst_file), exist_ok=True)
+                    shutil.copy2(src_file, dst_file)
+                    console.print(
+                        f"[blue]Installed frontend lib file: {rel_path}[/blue]"
+                    )
+
+            console.print(
+                f"[green]Installed frontend lib files for {extension_id}[/green]"
+            )
+
+        frontend_route_source = os.path.join(
+            temp_dir, "frontend/routes/(sidebar)/extensions", extension_id
+        )
+        if os.path.exists(frontend_route_source) and os.listdir(frontend_route_source):
+            frontend_route_target = os.path.join(
+                paths["frontend_dir"], "src/routes/(sidebar)/extensions", extension_id
+            )
+
+            if os.path.exists(frontend_route_target):
+                shutil.rmtree(frontend_route_target)
+
+            os.makedirs(frontend_route_target, exist_ok=True)
+
+            for root, _, files in os.walk(frontend_route_source):
+                for file in files:
+                    src_file = os.path.join(root, file)
+                    rel_path = os.path.relpath(src_file, frontend_route_source)
+                    dst_file = os.path.join(frontend_route_target, rel_path)
+
+                    os.makedirs(os.path.dirname(dst_file), exist_ok=True)
+                    shutil.copy2(src_file, dst_file)
+                    console.print(
+                        f"[blue]Installed frontend route file: {rel_path}[/blue]"
+                    )
+
+            console.print(
+                f"[green]Installed frontend route files for {extension_id}[/green]"
+            )
+
+        i18n_source = os.path.join(
+            temp_dir, "frontend/i18n/locales/extensions", extension_id
+        )
+        if os.path.exists(i18n_source) and os.listdir(i18n_source):
+            i18n_target = os.path.join(
+                paths["frontend_dir"], "src/lib/i18n/locales/extensions", extension_id
+            )
+
+            if os.path.exists(i18n_target):
+                shutil.rmtree(i18n_target)
+
+            os.makedirs(i18n_target, exist_ok=True)
+
+            for root, _, files in os.walk(i18n_source):
+                for file in files:
+                    src_file = os.path.join(root, file)
+                    rel_path = os.path.relpath(src_file, i18n_source)
+                    dst_file = os.path.join(i18n_target, rel_path)
+
+                    os.makedirs(os.path.dirname(dst_file), exist_ok=True)
+                    shutil.copy2(src_file, dst_file)
+                    console.print(f"[blue]Installed i18n file: {rel_path}[/blue]")
+
+            console.print(f"[green]Installed i18n files for {extension_id}[/green]")
+
+    console.print(f"[green]Extension {extension_id} installed successfully[/green]")
+    return True
+
+
+def uninstall_extension_command(extension_id: str):
+    """Uninstall an extension"""
+    try:
+        validate_extension_id(extension_id)
+    except ValueError as e:
+        console.print(f"[red]Error: {str(e)}[/red]")
+        return False
+
+    locations = find_extension_locations(extension_id)
+    paths = get_extension_paths(extension_id)
+
+    if not locations and not any(os.path.exists(path) for path in paths.values()):
+        console.print(
+            f"[red]Extension {extension_id} not found or already uninstalled[/red]"
+        )
+        return False
+
+    if "backend" in locations:
+        try:
+            shutil.rmtree(locations["backend"])
+            console.print(f"[green]Removed backend files for {extension_id}[/green]")
+
+            update_extension_imports(extension_id, "remove")
+        except Exception as e:
+            console.print(f"[red]Failed to remove backend files: {e}[/red]")
+
+    if "frontend_lib" in locations or os.path.exists(paths["frontend_lib"]):
+        try:
+            if os.path.exists(paths["frontend_lib"]):
+                shutil.rmtree(paths["frontend_lib"])
+                console.print(
+                    f"[green]Removed frontend library files for {extension_id}[/green]"
+                )
+        except Exception as e:
+            console.print(f"[red]Failed to remove frontend library files: {e}[/red]")
+
+    if "frontend_route" in locations or os.path.exists(paths["frontend_route"]):
+        try:
+            if os.path.exists(paths["frontend_route"]):
+                shutil.rmtree(paths["frontend_route"])
+                console.print(
+                    f"[green]Removed frontend route files for {extension_id}[/green]"
+                )
+        except Exception as e:
+            console.print(f"[red]Failed to remove frontend route files: {e}[/red]")
+
+    if "i18n" in locations or os.path.exists(paths["i18n"]):
+        try:
+            if os.path.exists(paths["i18n"]):
+                shutil.rmtree(paths["i18n"])
+                console.print(f"[green]Removed i18n files for {extension_id}[/green]")
+        except Exception as e:
+            console.print(f"[red]Failed to remove i18n files: {e}[/red]")
+
+    if "frontend_custom_routes" in locations:
+        try:
+            shutil.rmtree(locations["frontend_custom_routes"])
+            console.print(
+                f"[green]Removed custom route files for {extension_id}[/green]"
+            )
+        except Exception as e:
+            console.print(f"[red]Failed to remove custom route files: {e}[/red]")
+
+    console.print(f"[green]Extension {extension_id} uninstalled successfully[/green]")
+    return True
+
+
 def install_from_source_command(source_dir: str = "extensions"):
     """Package all extensions from source and install them"""
     paths = get_project_paths()
@@ -275,7 +697,14 @@ def install_from_source_command(source_dir: str = "extensions"):
 
 def extension_command(
     action: str = typer.Argument(
-        ..., help="Action to perform: list, install-from-source"
+        ...,
+        help="Action to perform: list, install-from-source, package, install, uninstall",
+    ),
+    extension_id: Optional[str] = typer.Option(
+        None, "--extension-id", help="Extension ID for package/uninstall operations"
+    ),
+    package_path: Optional[str] = typer.Option(
+        None, "--package-path", help="Path to extension package for install operation"
     ),
     source_dir: str = typer.Option(
         "extensions", "--source-dir", help="Source directory for extensions"
@@ -287,7 +716,30 @@ def extension_command(
         list_extensions_command()
     elif action == "install-from-source":
         install_from_source_command(source_dir)
+    elif action == "package":
+        if not extension_id:
+            console.print(
+                "[red]Error: --extension-id is required for package action[/red]"
+            )
+            raise typer.Exit(1)
+        package_extension_command(extension_id)
+    elif action == "install":
+        if not package_path:
+            console.print(
+                "[red]Error: --package-path is required for install action[/red]"
+            )
+            raise typer.Exit(1)
+        install_extension_command(package_path)
+    elif action == "uninstall":
+        if not extension_id:
+            console.print(
+                "[red]Error: --extension-id is required for uninstall action[/red]"
+            )
+            raise typer.Exit(1)
+        uninstall_extension_command(extension_id)
     else:
         console.print(f"[red]Unknown action: {action}[/red]")
-        console.print("[yellow]Available actions: list, install-from-source[/yellow]")
+        console.print(
+            "[yellow]Available actions: list, install-from-source, package, install, uninstall[/yellow]"
+        )
         raise typer.Exit(1)

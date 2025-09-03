@@ -1,6 +1,8 @@
 """Deploy command for deploying Realms projects."""
 
+import base64
 import json
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -69,6 +71,9 @@ def deploy_command(
         display_error_panel("Configuration Error", str(e))
         raise typer.Exit(1)
 
+    # Store config file path for relative path resolution
+    config_file_path = Path(config_file) if config_file else None
+
     # Override network if specified
     if network:
         config.deployment.network = network
@@ -92,7 +97,7 @@ def deploy_command(
 
         # Post-deployment actions
         if not skip_post_deployment and config.post_deployment:
-            _execute_post_deployment_actions(config, project_root)
+            _execute_post_deployment_actions(config, project_root, config_file_path)
 
         # Success message
         _show_deployment_success(config)
@@ -189,7 +194,9 @@ def _show_deployment_plan(
                 console.print(f"  {i}. {action.name or action.type}")
 
 
-def _execute_post_deployment_actions(config: RealmConfig, project_root: Path) -> None:
+def _execute_post_deployment_actions(
+    config: RealmConfig, project_root: Path, config_file_path: Path = None
+) -> None:
     """Execute post-deployment actions."""
 
     if not config.post_deployment:
@@ -226,7 +233,8 @@ def _execute_post_deployment_actions(config: RealmConfig, project_root: Path) ->
             progress.update(task, description=f"Running: {action_name}")
 
             try:
-                _execute_single_action(action, config, project_root)
+                config_file_dir = config_file_path.parent if config_file_path else None
+                _execute_single_action(action, config, project_root, config_file_dir)
                 progress.advance(task)
             except Exception as e:
                 if action.ignore_failure:
@@ -318,7 +326,10 @@ def _execute_simple_command(
 
 
 def _execute_single_action(
-    action: PostDeploymentAction, config: RealmConfig, project_root: Path
+    action: PostDeploymentAction,
+    config: RealmConfig,
+    project_root: Path,
+    config_file_dir: Path = None,
 ) -> None:
     """Execute a single post-deployment action."""
 
@@ -339,8 +350,34 @@ def _execute_single_action(
                     )
 
                 args = action.args.copy() if action.args else {}
-                if "data_file" in args:
-                    data_file_path = project_root / args["data_file"]
+
+                # Handle file content reading for import_data function
+                if action.function_name == "import_data" and "file_path" in args:
+                    file_path = args["file_path"]
+                    # Resolve file path relative to config file directory if provided
+                    if config_file_dir and not Path(file_path).is_absolute():
+                        data_file_path = config_file_dir / file_path
+                    else:
+                        data_file_path = project_root / file_path
+                    if data_file_path.exists():
+                        with open(data_file_path, "r") as f:
+                            file_data = json.load(f)
+                        # Remove file_path and send actual data
+                        del args["file_path"]
+                        args["data"] = file_data  # Send as actual data, not JSON string
+                    else:
+                        raise FileNotFoundError(
+                            f"Data file not found: {data_file_path}"
+                        )
+
+                # Handle generic data_file parameter for other functions
+                elif "data_file" in args:
+                    data_file = args["data_file"]
+                    # Resolve file path relative to config file directory if provided
+                    if config_file_dir and not Path(data_file).is_absolute():
+                        data_file_path = config_file_dir / data_file
+                    else:
+                        data_file_path = project_root / data_file
                     if data_file_path.exists():
                         with open(data_file_path, "r") as f:
                             file_data = json.load(f)
@@ -348,7 +385,7 @@ def _execute_single_action(
                         del args["data_file"]
 
                 args_json = json.dumps(args) if args else "{}"
-                # Escape quotes in JSON string for Candid
+                # Escape quotes properly for Candid
                 escaped_args = args_json.replace('"', '\\"')
 
                 run_command(

@@ -24,11 +24,9 @@ EXTENSION_NAMES = [
 
 def test_extensions():
     for name in EXTENSION_NAMES:
-        run_command(
-            f"realms-cli extension uninstall --extension-id {name} || true"
-        )
+        run_command(f"realms extension uninstall --extension-id {name} || true")
 
-    current_list = run_command("realms-cli extension list")
+    current_list = run_command("realms extension list")
     if "No extensions installed" not in current_list:
         lines = current_list.strip().split("\n")
         for line in lines[2:]:  # Skip header lines
@@ -36,40 +34,38 @@ def test_extensions():
                 extension_id = line.split()[0]
                 if extension_id and extension_id != "ID":
                     run_command(
-                        f"realms-cli extension uninstall --extension-id {extension_id} || true"
+                        f"realms extension uninstall --extension-id {extension_id} || true"
                     )
 
-    run_command("realms-cli extension install-from-source")
+    run_command("realms extension install-from-source")
 
-    list_after = run_command("realms-cli extension list")
+    list_after = run_command("realms extension list")
     for name in EXTENSION_NAMES:
         assert_in(list_after, name)
 
     for name in EXTENSION_NAMES:
-        run_command(f"realms-cli extension package --extension-id {name}")
+        run_command(f"realms extension package --extension-id {name}")
 
     for name in EXTENSION_NAMES:
         assert_file_exists(f"{name}.zip")
 
     for name in EXTENSION_NAMES:
-        run_command(f"realms-cli extension uninstall --extension-id {name}")
+        run_command(f"realms extension uninstall --extension-id {name}")
 
-    list_after_uninstall = run_command("realms-cli extension list")
+    list_after_uninstall = run_command("realms extension list")
     assert_in(list_after_uninstall, "No extensions installed")
 
     frontend_only_extensions = ["market_place", "public_dashboard", "metrics"]
 
     for name in EXTENSION_NAMES:
-        run_command(
-            f"realms-cli extension install --package-path {name}.zip"
-        )
+        run_command(f"realms extension install --package-path {name}.zip")
         if name not in frontend_only_extensions:
             assert_file_exists(f"src/realm_backend/extension_packages/{name}/entry.py")
             assert_file_exists(
                 f"src/realm_backend/extension_packages/{name}/manifest.json"
             )
 
-    list_after_install = run_command("realms-cli extension list")
+    list_after_install = run_command("realms extension list")
     for name in EXTENSION_NAMES:
         assert_in(list_after_install, name)
 
@@ -83,9 +79,9 @@ def test_extensions():
 
     # Test uninstalling again
     for name in EXTENSION_NAMES:
-        run_command(f"realms-cli extension uninstall --extension-id {name}")
+        run_command(f"realms extension uninstall --extension-id {name}")
 
-    list_after_uninstall = run_command("realms-cli extension list")
+    list_after_uninstall = run_command("realms extension list")
     assert_in(list_after_uninstall, "No extensions installed")
 
     print_ok("Tests OK")

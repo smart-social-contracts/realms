@@ -131,7 +131,7 @@ jobs:
       - name: Run Playwright tests
         run: |
           docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} bash -c "
-          scripts/deploy_local.sh &&
+          realms deploy &&
           cd src/realm_frontend &&
           npx playwright test specs/workflows.spec.ts specs/multilingual.spec.ts --reporter=line"
     

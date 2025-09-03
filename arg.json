@@ -1,0 +1,5 @@
+{
+    "extension_name": "admin_dashboard",
+    "function_name": "import_data",
+    "args": "{\"entity_type\": \"instruments\", \"format\": \"json\", \"data\": [{\"name\": \"Bitcoin\", \"principal_id\": \"f79hw4dw6smwknvac4yclwmlqlc-cai\", \"metadata\": \"{\\\"symbol\\\": \\\"BTC\\\", \\\"type\\\": \\\"token\\\"}\"}, {\"name\": \"Ethereum\", \"principal_id\": \"k5d2wi7d2s2n8qutn2vqe7nms9l-cai\", \"metadata\": \"{\\\"symbol\\\": \\\"ETH\\\", \\\"type\\\": \\\"token\\\"}\"}, {\"name\": \"Realm Token\", \"principal_id\": \"8hysbdhh6ljp7rat76tc8e5gp4m-cai\", \"metadata\": \"{\\\"symbol\\\": \\\"RLM\\\", \\\"type\\\": \\\"token\\\"}\"}, {\"name\": \"Governance Token\", \"principal_id\": \"7ja9ka5rhl8nixtty6kiborxiop-cai\", \"metadata\": \"{\\\"symbol\\\": \\\"GOV\\\", \\\"type\\\": \\\"token\\\"}\"}, {\"name\": \"Utility Token\", \"principal_id\": \"bqoaut2swbh8sq4iq4kzkbxe2ay-cai\", \"metadata\": \"{\\\"symbol\\\": \\\"UTL\\\", \\\"type\\\": \\\"token\\\"}\"}, {\"name\": \"Service Credit\", \"principal_id\": \"95an9m8t488rld3weqgzuptyxi1-cai\", \"metadata\": \"{\\\"symbol\\\": \\\"SVC\\\", \\\"type\\\": \\\"token\\\"}\"}], \"batch_size\": 100}"
+}
