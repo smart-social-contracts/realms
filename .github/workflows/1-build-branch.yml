@@ -81,7 +81,6 @@ jobs:
           docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} ./scripts/run_linters.sh --fix
           # Then verify all issues are fixed
           docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} ./scripts/run_linters.sh
-      
 
   test-extensions:
     runs-on: ubuntu-latest
