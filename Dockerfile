@@ -28,6 +28,7 @@ COPY tsconfig.json ./tsconfig.json
 COPY dfx.json ./dfx.json
 COPY canister_ids.json ./canister_ids.json
 COPY pyproject.toml ./pyproject.toml
+COPY realm_config.json ./realm_config.json
 
 # Source code
 COPY scripts ./scripts
