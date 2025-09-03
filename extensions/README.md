@@ -192,17 +192,11 @@ From the project root directory:
 
 ```bash
 # List all installed extensions
-python scripts/realm-extension-cli.py list
-
-# Package your extension
-python scripts/realm-extension-cli.py package --extension-id your_extension_name
-
-# Install an extension package
-python scripts/realm-extension-cli.py install --package-path your_extension.zip
+realms-cli extension list
 
 # Install all extensions from source
-./scripts/install_extensions.sh
+realms-cli extension install-from-source
 
-# Uninstall an extension
-python scripts/realm-extension-cli.py uninstall --extension-id your_extension_name
+# Create a new realm with demo data for testing
+realms-cli create --citizens 25 --organizations 3 --transactions 50
 ```

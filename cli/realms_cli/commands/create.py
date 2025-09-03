@@ -32,28 +32,56 @@ def create_command(
 ) -> None:
     """Create a new realm with optional random data generation."""
 
-    if not random:
-        display_error_panel("Error", "Only --random mode is currently supported")
-        raise typer.Exit(1)
-
-    console.print("[bold blue]🏗️  Creating Random Realm[/bold blue]\n")
-
     try:
-        realm_data = _generate_random_realm_data(
-            citizens=citizens,
-            organizations=organizations,
-            transactions=transactions,
-            disputes=disputes,
-            seed=seed,
-            realm_name=realm_name,
-        )
+        if random:
+            console.print("[bold blue]🏗️  Creating Random Realm[/bold blue]\n")
 
-        output_path = Path(output_dir)
-        _create_realm_folder_structure(output_path, realm_data, network, realm_name)
+            realm_data = _generate_random_realm_data(
+                citizens=citizens,
+                organizations=organizations,
+                transactions=transactions,
+                disputes=disputes,
+                seed=seed,
+                realm_name=realm_name,
+            )
 
-        console.print(
-            f"[green]✅ Random realm created successfully in: {output_path.absolute()}[/green]"
-        )
+            output_path = Path(output_dir)
+            _create_realm_folder_structure(output_path, realm_data, network, realm_name)
+
+            console.print(
+                f"[green]✅ Random realm created successfully in: {output_path.absolute()}[/green]"
+            )
+
+            success_message = (
+                f"Random realm '{realm_name}' has been created successfully.\n\n"
+                f"📁 Location: {output_path.absolute()}\n"
+                f"👥 Citizens: {citizens}\n"
+                f"🏢 Organizations: {organizations}\n"
+                f"💰 Transactions: {transactions}\n"
+                f"⚖️  Disputes: {disputes}\n\n"
+                f"Next steps:\n"
+                f"1. Review the generated configuration in realm_config.json\n"
+                f"2. Deploy with: realms deploy --file {output_dir}/realm_config.json\n"
+                f"3. The realm will be automatically populated with demo data"
+            )
+        else:
+            console.print("[bold blue]🏗️  Creating Basic Realm[/bold blue]\n")
+
+            output_path = Path(output_dir)
+            _create_basic_realm_structure(output_path, network, realm_name)
+
+            console.print(
+                f"[green]✅ Basic realm created successfully in: {output_path.absolute()}[/green]"
+            )
+
+            success_message = (
+                f"Basic realm '{realm_name}' has been created successfully.\n\n"
+                f"📁 Location: {output_path.absolute()}\n\n"
+                f"Next steps:\n"
+                f"1. Review the generated configuration in realm_config.json\n"
+                f"2. Deploy with: realms deploy --file {output_dir}/realm_config.json\n"
+                f"3. Manually add data or use extensions to populate the realm"
+            )
 
         if deploy:
             console.print("\n[bold blue]🚀 Deploying Realm[/bold blue]")
@@ -62,16 +90,7 @@ def create_command(
 
         display_success_panel(
             "Realm Creation Complete! 🎉",
-            f"Random realm '{realm_name}' has been created successfully.\n\n"
-            f"📁 Location: {output_path.absolute()}\n"
-            f"👥 Citizens: {citizens}\n"
-            f"🏢 Organizations: {organizations}\n"
-            f"💰 Transactions: {transactions}\n"
-            f"⚖️  Disputes: {disputes}\n\n"
-            f"Next steps:\n"
-            f"1. Review the generated configuration in realm_config.json\n"
-            f"2. Deploy with: realms deploy --file {output_dir}/realm_config.json\n"
-            f"3. The realm will be automatically populated with demo data",
+            success_message,
         )
 
     except Exception as e:
@@ -94,7 +113,7 @@ def _generate_random_realm_data(
     project_root = get_project_root()
     sys.path.append(str(project_root / "scripts"))
 
-    import realm_generator
+    import realm_generator  # type: ignore
 
     generator = realm_generator.RealmGenerator(seed)
     realm_data = generator.generate_realm_data(
@@ -280,3 +299,40 @@ def _create_codex_files(codexes_dir: Path, realm_data: dict) -> None:
         with open(file_path, "w") as f:
             f.write(content)
         console.print(f"✅ Created codex file: {filename}")
+
+
+def _create_basic_realm_structure(
+    output_path: Path, network: str, realm_name: str
+) -> None:
+    """Create a basic realm folder structure without demo data."""
+
+    console.print(f"📁 Creating basic realm folder structure in {output_path}...")
+
+    output_path.mkdir(exist_ok=True)
+
+    # Create basic realm configuration
+    config = {
+        "realm": {
+            "id": realm_name.lower().replace(" ", "_").replace("-", "_"),
+            "name": realm_name,
+            "description": f"Basic realm: {realm_name}",
+            "admin_principal": "2vxsx-fae",
+            "version": "1.0.0",
+            "tags": ["basic", "empty"],
+        },
+        "deployment": {"network": network, "clean_deploy": True},
+        "extensions": {
+            "initial": [
+                {"name": "admin_dashboard", "source": "local", "enabled": True},
+                {"name": "citizen_dashboard", "source": "local", "enabled": True},
+            ]
+        },
+        "post_deployment": {"actions": []},
+    }
+
+    config_file = output_path / "realm_config.json"
+    with open(config_file, "w") as f:
+        json.dump(config, f, indent=2)
+
+    console.print(f"✅ Created basic realm configuration: {config_file}")
+    console.print("✅ Basic folder structure created successfully")

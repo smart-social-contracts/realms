@@ -8,6 +8,7 @@ from rich.table import Table
 
 from .commands.create import create_command
 from .commands.deploy import deploy_command
+from .commands.extension import extension_command
 from .commands.import_data import import_codex_command, import_data_command
 from .commands.registry import (
     registry_add_command,
@@ -43,7 +44,9 @@ app = typer.Typer(
 
 @app.command("create")
 def create(
-    random: bool = typer.Option(False, "--random", help="Generate random realm data"),
+    random: bool = typer.Option(
+        True, "--random/--no-random", help="Generate random realm data (default: True)"
+    ),
     citizens: int = typer.Option(
         50, "--citizens", help="Number of citizens to generate"
     ),
@@ -72,7 +75,7 @@ def create(
         False, "--deploy", help="Deploy the realm after creation"
     ),
 ) -> None:
-    """Create a new realm with optional random data generation."""
+    """Create a new realm with optional realistic demo data for testing and demonstrations."""
     create_command(
         random,
         citizens,
@@ -85,6 +88,19 @@ def create(
         network,
         deploy,
     )
+
+
+@app.command("extension")
+def extension(
+    action: str = typer.Argument(
+        ..., help="Action to perform: list, install-from-source"
+    ),
+    source_dir: str = typer.Option(
+        "extensions", "--source-dir", help="Source directory for extensions"
+    ),
+) -> None:
+    """Manage Realm extensions."""
+    extension_command(action, source_dir)
 
 
 @app.command("import")
