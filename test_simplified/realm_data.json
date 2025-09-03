@@ -1,0 +1,270 @@
+{
+  "realm": {
+    "name": "Generated Demo Realm",
+    "description": "Auto-generated realm with 6 users, 2 organizations"
+  },
+  "treasury": {
+    "name": "New Geneva Treasury",
+    "vault_principal_id": "abc123"
+  },
+  "user_profiles": [
+    {
+      "name": "admin",
+      "allowed_to": "all",
+      "description": "Admin user profile"
+    },
+    {
+      "name": "member",
+      "allowed_to": "",
+      "description": "Member user profile"
+    }
+  ],
+  "system_user": {
+    "name": "system",
+    "profiles": [
+      "admin"
+    ]
+  },
+  "users": [
+    {
+      "id": "system",
+      "profile_picture_url": ""
+    },
+    {
+      "id": "adrian_young_000",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=AdrianYoung"
+    },
+    {
+      "id": "alice_baker_001",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=AliceBaker"
+    },
+    {
+      "id": "tina_cooper_002",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=TinaCooper"
+    },
+    {
+      "id": "xara_ellis_003",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=XaraEllis"
+    },
+    {
+      "id": "michael_johnson_004",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=MichaelJohnson"
+    }
+  ],
+  "humans": [
+    {
+      "name": "Adrian Young",
+      "date_of_birth": "1956-11-28",
+      "user_id": "adrian_young_000"
+    },
+    {
+      "name": "Alice Baker",
+      "date_of_birth": "1968-07-20",
+      "user_id": "alice_baker_001"
+    },
+    {
+      "name": "Tina Cooper",
+      "date_of_birth": "1993-03-07",
+      "user_id": "tina_cooper_002"
+    },
+    {
+      "name": "Xara Ellis",
+      "date_of_birth": "1974-03-21",
+      "user_id": "xara_ellis_003"
+    },
+    {
+      "name": "Michael Johnson",
+      "date_of_birth": "1996-07-16",
+      "user_id": "michael_johnson_004"
+    }
+  ],
+  "citizens": [
+    {
+      "id": "cit_c51d2b94",
+      "user_id": "adrian_young_000",
+      "residence_permit": "expired",
+      "tax_compliance": "delinquent",
+      "identity_verification": "rejected",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "major_offenses"
+    },
+    {
+      "id": "cit_90de6331",
+      "user_id": "alice_baker_001",
+      "residence_permit": "pending",
+      "tax_compliance": "compliant",
+      "identity_verification": "pending",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "clean"
+    },
+    {
+      "id": "cit_ed0ed90f",
+      "user_id": "tina_cooper_002",
+      "residence_permit": "pending",
+      "tax_compliance": "under_review",
+      "identity_verification": "pending",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "clean"
+    },
+    {
+      "id": "cit_a43f8bea",
+      "user_id": "xara_ellis_003",
+      "residence_permit": "valid",
+      "tax_compliance": "compliant",
+      "identity_verification": "rejected",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "minor_offenses"
+    },
+    {
+      "id": "cit_59a21195",
+      "user_id": "michael_johnson_004",
+      "residence_permit": "expired",
+      "tax_compliance": "compliant",
+      "identity_verification": "pending",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "major_offenses"
+    }
+  ],
+  "organizations": [
+    {
+      "name": "Community Development Trust #001"
+    },
+    {
+      "name": "Community Development Trust #002"
+    }
+  ],
+  "instruments": [
+    {
+      "name": "Bitcoin",
+      "principal_id": "oaxfukxdygn8v6lber01yjp6e9k-cai"
+    },
+    {
+      "name": "Ethereum",
+      "principal_id": "5a8mmnacqn2gazhsewar187tnxe-cai"
+    },
+    {
+      "name": "Realm Token",
+      "principal_id": "fr6mhffdzfx5474j1c1qg7gnggu-cai"
+    },
+    {
+      "name": "Governance Token",
+      "principal_id": "368spex0wu0tiues16c1b2td1f5-cai"
+    },
+    {
+      "name": "Utility Token",
+      "principal_id": "wjpnlvlrbqhea82cd55rjhklnwn-cai"
+    },
+    {
+      "name": "Service Credit",
+      "principal_id": "5pffllhf8b9o5irujtf0b5dhs89-cai"
+    }
+  ],
+  "transfers": [
+    {
+      "from_user_id": "system",
+      "to_user_id": "michael_johnson_004",
+      "instrument_name": "Ethereum",
+      "amount": 9642
+    },
+    {
+      "from_user_id": "xara_ellis_003",
+      "to_user_id": "alice_baker_001",
+      "instrument_name": "Utility Token",
+      "amount": 2683
+    },
+    {
+      "from_user_id": "tina_cooper_002",
+      "to_user_id": "xara_ellis_003",
+      "instrument_name": "Governance Token",
+      "amount": 403
+    },
+    {
+      "from_user_id": "alice_baker_001",
+      "to_user_id": "system",
+      "instrument_name": "Governance Token",
+      "amount": 5793
+    },
+    {
+      "from_user_id": "michael_johnson_004",
+      "to_user_id": "xara_ellis_003",
+      "instrument_name": "Service Credit",
+      "amount": 9737
+    },
+    {
+      "from_user_id": "system",
+      "to_user_id": "tina_cooper_002",
+      "instrument_name": "Governance Token",
+      "amount": 7171
+    },
+    {
+      "from_user_id": "system",
+      "to_user_id": "tina_cooper_002",
+      "instrument_name": "Realm Token",
+      "amount": 6382
+    },
+    {
+      "from_user_id": "alice_baker_001",
+      "to_user_id": "adrian_young_000",
+      "instrument_name": "Governance Token",
+      "amount": 9264
+    },
+    {
+      "from_user_id": "xara_ellis_003",
+      "to_user_id": "system",
+      "instrument_name": "Utility Token",
+      "amount": 1800
+    },
+    {
+      "from_user_id": "tina_cooper_002",
+      "to_user_id": "system",
+      "instrument_name": "Bitcoin",
+      "amount": 2853
+    }
+  ],
+  "disputes": [
+    {
+      "status": "open"
+    },
+    {
+      "status": "open"
+    },
+    {
+      "status": "resolved"
+    }
+  ],
+  "mandates": [
+    {
+      "name": "Tax Collection"
+    },
+    {
+      "name": "Social Benefits"
+    },
+    {
+      "name": "License Management"
+    },
+    {
+      "name": "Land Registry"
+    },
+    {
+      "name": "Voting System"
+    },
+    {
+      "name": "Healthcare Services"
+    }
+  ],
+  "metadata": {
+    "seed": 12345,
+    "parameters": {
+      "citizens": 5,
+      "organizations": 2,
+      "transactions": 10,
+      "disputes": 3,
+      "realm_name": "Generated Demo Realm"
+    }
+  }
+}

@@ -10,7 +10,7 @@ from datetime import datetime
 from io import StringIO
 from typing import Any, Dict, List
 
-from ggg import Codex, Human, Instrument, Mandate, Organization, User
+from ggg import Codex, Human, Instrument, Mandate, Organization, User, UserProfile
 
 from .models import RegistrationCode
 
@@ -19,38 +19,51 @@ def extension_sync_call(method_name: str, args: dict):
     """
     Synchronous extension API calls for admin operations
     """
-    if method_name == "get_admin_stats":
-        return get_admin_statistics()
-    elif method_name == "get_system_health":
-        return get_system_health_check()
-    elif method_name == "get_recent_activity":
-        return get_recent_activity()
-    elif method_name == "get_templates":
-        return get_templates(args)
-    elif method_name == "import_data":
-        return import_data(args)
-    elif method_name == "generate_registration_url":
-        return generate_registration_url(args)
-    elif method_name == "validate_registration_code":
-        return validate_registration_code(args)
-    elif method_name == "get_registration_codes":
-        return get_registration_codes(args)
-    else:
+    # Method mapping with argument requirements
+    methods = {
+        "get_admin_stats": (get_admin_statistics, False),  # (function, requires_args)
+        "get_system_health": (get_system_health_check, False),
+        "get_recent_activity": (get_recent_activity, False),
+        "get_templates": (get_templates, True),
+        "import_data": (import_data, True),
+        "generate_registration_url": (generate_registration_url, True),
+        "validate_registration_code": (validate_registration_code, True),
+        "get_registration_codes": (get_registration_codes, True),
+    }
+    
+    if method_name not in methods:
         return {"success": False, "error": f"Unknown method: {method_name}"}
+    
+    function, requires_args = methods[method_name]
+    
+    try:
+        if requires_args:
+            return function(args)
+        else:
+            return function()
+    except Exception as e:
+        return {"success": False, "error": f"Error calling {method_name}: {str(e)}"}
 
 
 def extension_async_call(method_name: str, args: dict):
     """
     Asynchronous extension API calls for admin operations
     """
-    if method_name == "export_data":
-        return export_system_data(args.get("entity_types", []))
-    elif method_name == "bulk_operation":
-        return perform_bulk_operation(
+    # Async method mapping
+    async_methods = {
+        "export_data": lambda args: export_system_data(args.get("entity_types", [])),
+        "bulk_operation": lambda args: perform_bulk_operation(
             args.get("operation"), args.get("entity_type"), args.get("data")
-        )
-    else:
+        ),
+    }
+    
+    if method_name not in async_methods:
         return {"success": False, "error": f"Unknown async method: {method_name}"}
+    
+    try:
+        return async_methods[method_name](args)
+    except Exception as e:
+        return {"success": False, "error": f"Error calling async {method_name}: {str(e)}"}
 
 
 def get_admin_statistics():
@@ -143,144 +156,114 @@ def perform_bulk_operation(operation, entity_type, data):
 
 def get_templates(args):
     """
-    Get CSV/JSON templates for bulk import
+    Get field schemas for bulk import entities
     """
     try:
         entity_type = args.get("entity_type", "users")
 
-        templates = {
+        # Return field schemas instead of hardcoded templates
+        schemas = {
             "users": {
-                "csv": "username,email,profile_type\nexample_user,user@example.com,member",
-                "json": [
-                    {
-                        "username": "example_user",
-                        "email": "user@example.com",
-                        "profile_type": "member",
-                    }
-                ],
+                "required_fields": ["id"],
+                "optional_fields": ["profile_picture_url"],
+                "description": "User entities with unique identifiers"
+            },
+            "user_profiles": {
+                "required_fields": ["name"],
+                "optional_fields": ["description"],
+                "description": "User profile definitions (admin, member, etc.)"
             },
             "humans": {
-                "csv": "name,email,phone,address\nJohn Doe,john@example.com,+1234567890,123 Main St",
-                "json": [
-                    {
-                        "name": "John Doe",
-                        "email": "john@example.com",
-                        "phone": "+1234567890",
-                        "address": "123 Main St",
-                    }
-                ],
+                "required_fields": ["id", "name"],
+                "optional_fields": ["email", "phone", "address"],
+                "description": "Human entities with personal information"
             },
             "organizations": {
-                "csv": "name,description,website,contact_email\nExample Org,A sample organization,https://example.org,contact@example.org",
-                "json": [
-                    {
-                        "name": "Example Org",
-                        "description": "A sample organization",
-                        "website": "https://example.org",
-                        "contact_email": "contact@example.org",
-                    }
-                ],
+                "required_fields": ["id", "name"],
+                "optional_fields": ["description", "website", "email"],
+                "description": "Organization entities"
             },
             "mandates": {
-                "csv": "title,description,status,priority\nSample Mandate,A sample mandate description,active,high",
-                "json": [
-                    {
-                        "title": "Sample Mandate",
-                        "description": "A sample mandate description",
-                        "status": "active",
-                        "priority": "high",
-                    }
-                ],
+                "required_fields": ["id", "name"],
+                "optional_fields": ["description", "status"],
+                "description": "Mandate entities for governance"
             },
             "codexes": {
-                "csv": "title,content,category,version\nSample Codex,Sample codex content,policy,1.0",
-                "json": [
-                    {
-                        "title": "Sample Codex",
-                        "content": "Sample codex content",
-                        "category": "policy",
-                        "version": "1.0",
-                    }
-                ],
+                "required_fields": ["id", "name", "code"],
+                "optional_fields": ["description", "version"],
+                "description": "Codex entities with executable code"
             },
             "instruments": {
-                "csv": "name,type,description,value\nSample Instrument,contract,A sample instrument,1000",
-                "json": [
-                    {
-                        "name": "Sample Instrument",
-                        "type": "contract",
-                        "description": "A sample instrument",
-                        "value": 1000,
-                    }
-                ],
+                "required_fields": ["id", "name", "type"],
+                "optional_fields": ["description", "value"],
+                "description": "Financial instrument entities"
             },
         }
 
-        return {"success": True, "data": templates.get(entity_type, templates["users"])}
+        return {"success": True, "data": schemas.get(entity_type, schemas["users"])}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
 
 def import_data(args):
     """
-    Import bulk data from CSV or JSON files
+    Import data from direct data input
     """
     try:
+        # Parse args if it's a JSON string
         if isinstance(args, str):
             args = json.loads(args)
+        
+        entity_type = args.get("data_type", args.get("entity_type", "users"))
+        data_format = args.get("format", "json")
+        data_content = args.get("data", "")
 
-        if "file_path" in args and "data_type" in args:
-            file_path = args["file_path"]
-            entity_type = args["data_type"]
+        # Map data_type to entity_type for processing
+        if entity_type == "profiles":
+            entity_type = "user_profiles"
 
-            return {
-                "success": True,
-                "message": f"File-based import for {entity_type} from {file_path} would be processed here",
-                "data": {
-                    "entity_type": entity_type,
-                    "file_path": file_path,
-                    "total_records": 0,
-                    "successful": 0,
-                    "failed": 0,
-                    "errors": [],
-                },
-            }
+        if not data_content:
+            return {"success": False, "error": "No data provided"}
+
+        # Parse data based on format
+        parsed_data = []
+        if data_format == "csv":
+            # Handle CSV data
+            import csv
+            import io
+
+            csv_reader = csv.DictReader(io.StringIO(data_content))
+            parsed_data = list(csv_reader)
         else:
-            entity_type = args.get("entity_type", "users")
-            data_format = args.get("format", "csv")
-            data_content = args.get("data", "")
+            # Handle JSON data
+            try:
+                if isinstance(data_content, str):
+                    parsed_data = json.loads(data_content)
+                else:
+                    parsed_data = data_content
 
-            if not data_content:
-                return {"success": False, "error": "No data provided"}
+                if not isinstance(parsed_data, list):
+                    parsed_data = [parsed_data]
+            except json.JSONDecodeError as e:
+                return {"success": False, "error": f"Invalid JSON data: {str(e)}"}
 
-            # Parse data based on format
-            parsed_data = []
-            if data_format == "csv":
-                parsed_data = parse_csv_data(data_content)
-            elif data_format == "json":
-                parsed_data = parse_json_data(data_content)
-            else:
-                return {"success": False, "error": f"Unsupported format: {data_format}"}
+        # Process data in batches
+        results = process_bulk_import(entity_type, parsed_data)
 
-            if not parsed_data:
-                return {"success": False, "error": "No valid data found"}
+        return {
+            "success": True,
+            "message": f"Successfully imported {len(parsed_data)} {entity_type} records",
+            "data": {
+                "entity_type": entity_type,
+                "total_records": len(parsed_data),
+                "successful": results["successful"],
+                "failed": results["failed"],
+                "errors": results["errors"],
+            },
+        }
 
-            # Process data in batches
-            results = process_bulk_import(entity_type, parsed_data)
-
-            return {
-                "success": True,
-                "data": {
-                    "entity_type": entity_type,
-                    "format": data_format,
-                    "total_records": len(parsed_data),
-                    "successful": results["successful"],
-                    "failed": results["failed"],
-                    "errors": results["errors"],
-                },
-            }
     except Exception as e:
-        return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
+        return {"success": False, "error": str(e)}
 
 
 def parse_csv_data(csv_content: str) -> List[Dict[str, Any]]:
@@ -313,6 +296,26 @@ def process_bulk_import(entity_type: str, data: List[Dict[str, Any]]) -> Dict[st
     failed = 0
     errors = []
 
+    # Entity type to creation function mapping
+    entity_creators = {
+        "users": create_user_entity,
+        "humans": create_human_entity,
+        "organizations": create_organization_entity,
+        "mandates": create_mandate_entity,
+        "codexes": create_codex_entity,
+        "instruments": create_instrument_entity,
+        "user_profiles": create_user_profile_entity,
+    }
+
+    # Get the creation function for this entity type
+    create_function = entity_creators.get(entity_type)
+    if not create_function:
+        return {
+            "successful": 0,
+            "failed": len(data),
+            "errors": [f"Unsupported entity type: {entity_type}"]
+        }
+
     # Process in batches to avoid cycle limits
     batch_size = 50
     for i in range(0, len(data), batch_size):
@@ -320,21 +323,7 @@ def process_bulk_import(entity_type: str, data: List[Dict[str, Any]]) -> Dict[st
 
         for record in batch:
             try:
-                if entity_type == "users":
-                    create_user_entity(record)
-                elif entity_type == "humans":
-                    create_human_entity(record)
-                elif entity_type == "organizations":
-                    create_organization_entity(record)
-                elif entity_type == "mandates":
-                    create_mandate_entity(record)
-                elif entity_type == "codexes":
-                    create_codex_entity(record)
-                elif entity_type == "instruments":
-                    create_instrument_entity(record)
-                else:
-                    raise Exception(f"Unsupported entity type: {entity_type}")
-
+                create_function(record)
                 successful += 1
             except Exception as e:
                 failed += 1
@@ -440,6 +429,21 @@ def create_instrument_entity(data: Dict[str, Any]):
         value=data.get("value", 0),
     )
     return instrument
+
+
+def create_user_profile_entity(data: Dict[str, Any]):
+    """Create a UserProfile entity from import data"""
+    required_fields = ["name"]
+    for field in required_fields:
+        if field not in data or not data[field]:
+            raise Exception(f"Missing required field: {field}")
+
+    profile = UserProfile(
+        id=data["name"],
+        name=data["name"],  # Use id as name for profile identifier
+        description=data.get("description", ""),
+    )
+    return profile
 
 
 def generate_registration_url(args: dict):

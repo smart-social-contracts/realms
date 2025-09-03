@@ -166,8 +166,7 @@ class RealmGenerator:
         for instrument in INSTRUMENTS:
             inst = {
                 "name": instrument["name"],
-                "principal_id": self.generate_principal_id(),
-                "metadata": json.dumps({"symbol": instrument["symbol"], "type": "token"})
+                "principal_id": self.generate_principal_id()
             }
             instruments.append(inst)
             
@@ -199,12 +198,7 @@ class RealmGenerator:
         
         for i in range(count):
             dispute = {
-                "status": random.choice(statuses),
-                "metadata": json.dumps({
-                    "case_id": f"CASE_{i+1:06d}",
-                    "type": random.choice(["contract", "property", "tax", "license", "governance"]),
-                    "priority": random.choice(["low", "medium", "high", "urgent"])
-                })
+                "status": random.choice(statuses)
             }
             disputes.append(dispute)
             
@@ -216,11 +210,7 @@ class RealmGenerator:
         
         for mandate_type in MANDATE_TYPES:
             mandate = {
-                "name": mandate_type["name"],
-                "metadata": json.dumps({
-                    "description": mandate_type["description"],
-                    "authority": "Digital Republic Government"
-                })
+                "name": mandate_type["name"]
             }
             mandates.append(mandate)
             
