@@ -1,0 +1,15 @@
+{
+  "realm": {
+    "id": "local-realm",
+    "name": "Local Development Realm",
+    "admin_principal": "2vxsx-fae"
+  },
+  "deployment": {
+    "network": "local",
+    "port": 8000
+  },
+  "extensions": {},
+  "post_deployment": [
+    "realms create --random --deploy"
+  ]
+}
