@@ -25,6 +25,9 @@ COPY dfx.json ./dfx.json
 COPY canister_ids.json ./canister_ids.json
 COPY pyproject.toml ./pyproject.toml
 
+# Copy CLI directory for installation
+COPY cli ./cli
+
 # Source code
 COPY scripts ./scripts
 COPY src ./src
