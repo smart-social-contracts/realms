@@ -194,7 +194,9 @@ def _show_deployment_plan(
                 console.print(f"  {i}. {action.name or action.type}")
 
 
-def _execute_post_deployment_actions(config: RealmConfig, project_root: Path, config_file_path: Path = None) -> None:
+def _execute_post_deployment_actions(
+    config: RealmConfig, project_root: Path, config_file_path: Path = None
+) -> None:
     """Execute post-deployment actions."""
 
     if not config.post_deployment:
@@ -324,7 +326,10 @@ def _execute_simple_command(
 
 
 def _execute_single_action(
-    action: PostDeploymentAction, config: RealmConfig, project_root: Path, config_file_dir: Path = None
+    action: PostDeploymentAction,
+    config: RealmConfig,
+    project_root: Path,
+    config_file_dir: Path = None,
 ) -> None:
     """Execute a single post-deployment action."""
 
@@ -345,7 +350,7 @@ def _execute_single_action(
                     )
 
                 args = action.args.copy() if action.args else {}
-                
+
                 # Handle file content reading for import_data function
                 if action.function_name == "import_data" and "file_path" in args:
                     file_path = args["file_path"]
@@ -361,8 +366,10 @@ def _execute_single_action(
                         del args["file_path"]
                         args["data"] = file_data  # Send as actual data, not JSON string
                     else:
-                        raise FileNotFoundError(f"Data file not found: {data_file_path}")
-                
+                        raise FileNotFoundError(
+                            f"Data file not found: {data_file_path}"
+                        )
+
                 # Handle generic data_file parameter for other functions
                 elif "data_file" in args:
                     data_file = args["data_file"]
@@ -380,7 +387,7 @@ def _execute_single_action(
                 args_json = json.dumps(args) if args else "{}"
                 # Escape quotes properly for Candid
                 escaped_args = args_json.replace('"', '\\"')
-                
+
                 run_command(
                     [
                         "dfx",

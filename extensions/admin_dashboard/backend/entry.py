@@ -30,12 +30,12 @@ def extension_sync_call(method_name: str, args: dict):
         "validate_registration_code": (validate_registration_code, True),
         "get_registration_codes": (get_registration_codes, True),
     }
-    
+
     if method_name not in methods:
         return {"success": False, "error": f"Unknown method: {method_name}"}
-    
+
     function, requires_args = methods[method_name]
-    
+
     try:
         if requires_args:
             return function(args)
@@ -56,14 +56,17 @@ def extension_async_call(method_name: str, args: dict):
             args.get("operation"), args.get("entity_type"), args.get("data")
         ),
     }
-    
+
     if method_name not in async_methods:
         return {"success": False, "error": f"Unknown async method: {method_name}"}
-    
+
     try:
         return async_methods[method_name](args)
     except Exception as e:
-        return {"success": False, "error": f"Error calling async {method_name}: {str(e)}"}
+        return {
+            "success": False,
+            "error": f"Error calling async {method_name}: {str(e)}",
+        }
 
 
 def get_admin_statistics():
@@ -166,37 +169,37 @@ def get_templates(args):
             "users": {
                 "required_fields": ["id"],
                 "optional_fields": ["profile_picture_url"],
-                "description": "User entities with unique identifiers"
+                "description": "User entities with unique identifiers",
             },
             "user_profiles": {
                 "required_fields": ["name"],
                 "optional_fields": ["description"],
-                "description": "User profile definitions (admin, member, etc.)"
+                "description": "User profile definitions (admin, member, etc.)",
             },
             "humans": {
                 "required_fields": ["id", "name"],
                 "optional_fields": ["email", "phone", "address"],
-                "description": "Human entities with personal information"
+                "description": "Human entities with personal information",
             },
             "organizations": {
                 "required_fields": ["id", "name"],
                 "optional_fields": ["description", "website", "email"],
-                "description": "Organization entities"
+                "description": "Organization entities",
             },
             "mandates": {
                 "required_fields": ["id", "name"],
                 "optional_fields": ["description", "status"],
-                "description": "Mandate entities for governance"
+                "description": "Mandate entities for governance",
             },
             "codexes": {
                 "required_fields": ["id", "name", "code"],
                 "optional_fields": ["description", "version"],
-                "description": "Codex entities with executable code"
+                "description": "Codex entities with executable code",
             },
             "instruments": {
                 "required_fields": ["id", "name", "type"],
                 "optional_fields": ["description", "value"],
-                "description": "Financial instrument entities"
+                "description": "Financial instrument entities",
             },
         }
 
@@ -213,7 +216,7 @@ def import_data(args):
         # Parse args if it's a JSON string
         if isinstance(args, str):
             args = json.loads(args)
-        
+
         entity_type = args.get("data_type", args.get("entity_type", "users"))
         data_format = args.get("format", "json")
         data_content = args.get("data", "")
@@ -313,7 +316,7 @@ def process_bulk_import(entity_type: str, data: List[Dict[str, Any]]) -> Dict[st
         return {
             "successful": 0,
             "failed": len(data),
-            "errors": [f"Unsupported entity type: {entity_type}"]
+            "errors": [f"Unsupported entity type: {entity_type}"],
         }
 
     # Process in batches to avoid cycle limits
