@@ -10,7 +10,7 @@ from datetime import datetime
 from io import StringIO
 from typing import Any, Dict, List
 
-from ggg import Codex, Human, Instrument, Mandate, Organization, Realm, Treasury, User, UserProfile
+from ggg import Codex, Human, Instrument, Mandate, Organization, Realm, Treasury, Transfer, User, UserProfile
 
 from .models import RegistrationCode
 
@@ -475,23 +475,41 @@ def create_treasury_entity(data: Dict[str, Any]):
     treasury = Treasury(
         name=data["name"],
         vault_principal_id=data.get("vault_principal_id", ""),
-        realm=Realm[0],
+        realm=Realm[data["realm"]],
     )
     return treasury
 
 
 def create_realm_entity(data: Dict[str, Any]):
     """Create a Realm entity from import data"""
-    required_fields = ["name"]
-    for field in required_fields:
-        if field not in data or not data[field]:
-            raise Exception(f"Missing required field: {field}")
 
     realm = Realm(
         name=data["name"],
         description=data.get("description", ""),
     )
+
+    treasury_name = data["treasury"]
+    treasury = Treasury[treasury_name]
+    realm.treasury = treasury
+
     return realm
+
+
+def create_transfer_entity(data: Dict[str, Any]):
+    """Create a Transfer entity from import data"""
+    required_fields = ["id", "amount", "from_user", "to_user"]
+    for field in required_fields:
+        if field not in data or not data[field]:
+            raise Exception(f"Missing required field: {field}")
+
+    transfer = Transfer(
+        id=data["id"],
+        amount=data["amount"],
+        from_user=data["from_user"],
+        to_user=data["to_user"],
+        timestamp=data.get("timestamp", datetime.utcnow().isoformat()),
+    )
+    return transfer
 
 
 def generate_registration_url(args: dict):

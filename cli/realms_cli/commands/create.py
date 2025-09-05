@@ -313,7 +313,6 @@ def _create_json_data_files(data_dir: Path, realm_data: dict) -> None:
     # Create realm.json file
     realm_info = realm_data.get("realm", {})
     realm_entity = [{
-        "id": realm_info.get("name", "generated_demo_realm").lower().replace(" ", "_").replace("-", "_"),
         "name": realm_info.get("name", "Generated Demo Realm"),
         "description": realm_info.get("description", "Generated demo realm"),
         "admin_principal": _get_current_dfx_identity(),
@@ -325,7 +324,7 @@ def _create_json_data_files(data_dir: Path, realm_data: dict) -> None:
     treasury_entity = [{
         "name": f"{realm_info.get('name', 'Generated Demo Realm')} Treasury",
         "vault_principal_id": None,
-        "realm": realm_info.get("name", "generated_demo_realm").lower().replace(" ", "_").replace("-", "_"),
+        "realm": realm_info.get("name", "Generated Demo Realm").lower().replace(" ", "_").replace("-", "_"),
     }]
 
     entity_mappings = {
