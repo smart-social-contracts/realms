@@ -10,7 +10,7 @@ from datetime import datetime
 from io import StringIO
 from typing import Any, Dict, List
 
-from ggg import Codex, Human, Instrument, Mandate, Organization, User, UserProfile
+from ggg import Codex, Human, Instrument, Mandate, Organization, Realm, Treasury, User, UserProfile
 
 from .models import RegistrationCode
 
@@ -308,9 +308,11 @@ def process_bulk_import(entity_type: str, data: List[Dict[str, Any]]) -> Dict[st
         "codexes": create_codex_entity,
         "instruments": create_instrument_entity,
         "user_profiles": create_user_profile_entity,
+        "treasury": create_treasury_entity,
+        "realm": create_realm_entity,
+        "transfers": create_transfer_entity,
     }
 
-    # Get the creation function for this entity type
     create_function = entity_creators.get(entity_type)
     if not create_function:
         return {
@@ -326,6 +328,20 @@ def process_bulk_import(entity_type: str, data: List[Dict[str, Any]]) -> Dict[st
 
         for record in batch:
             try:
+                # Handle case where record might be wrapped in an array
+                if isinstance(record, list) and len(record) == 1:
+                    record = record[0]
+                elif isinstance(record, list) and len(record) > 1:
+                    # If multiple records in array, process each one
+                    for sub_record in record:
+                        try:
+                            create_function(sub_record)
+                            successful += 1
+                        except Exception as e:
+                            failed += 1
+                            errors.append(f"Record {sub_record}: {str(e)}")
+                    continue
+                
                 create_function(record)
                 successful += 1
             except Exception as e:
@@ -447,6 +463,35 @@ def create_user_profile_entity(data: Dict[str, Any]):
         description=data.get("description", ""),
     )
     return profile
+
+
+def create_treasury_entity(data: Dict[str, Any]):
+    """Create a Treasury entity from import data"""
+    required_fields = ["name"]
+    for field in required_fields:
+        if field not in data or not data[field]:
+            raise Exception(f"Missing required field: {field}")
+
+    treasury = Treasury(
+        name=data["name"],
+        vault_principal_id=data.get("vault_principal_id", ""),
+        realm=Realm[0],
+    )
+    return treasury
+
+
+def create_realm_entity(data: Dict[str, Any]):
+    """Create a Realm entity from import data"""
+    required_fields = ["name"]
+    for field in required_fields:
+        if field not in data or not data[field]:
+            raise Exception(f"Missing required field: {field}")
+
+    realm = Realm(
+        name=data["name"],
+        description=data.get("description", ""),
+    )
+    return realm
 
 
 def generate_registration_url(args: dict):

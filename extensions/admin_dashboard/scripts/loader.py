@@ -34,6 +34,8 @@ class BulkUploader:
         "mandates",
         "codexes",
         "instruments",
+        "treasury",
+        "realms",
     ]
 
     SUPPORTED_OPERATIONS = ["bulk_upload", "generate_registration_urls"]

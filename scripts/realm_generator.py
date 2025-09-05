@@ -77,6 +77,7 @@ class RealmGenerator:
         self.seed = seed or random.randint(1, 1000000)
         random.seed(self.seed)
         self.generated_data = {}
+        self.realm_id = "0"
         
     def generate_id(self, prefix: str = "") -> str:
         """Generate a unique ID with optional prefix"""
@@ -216,6 +217,47 @@ class RealmGenerator:
             
         return mandates
     
+    def generate_treasury_data(self, realm_name: str) -> Dict[str, Any]:
+        """Generate treasury data matching Treasury entity schema"""
+        # Match the Treasury entity structure exactly:
+        # - name: String(min_length=2, max_length=256) 
+        # - vault_principal_id: String(max_length=64)
+        # - realm: OneToOne("Realm", "treasury")
+        # - TimestampedMixin adds created_at, updated_at
+        
+        treasury_data = {
+            "name": f"{realm_name} Treasury",
+            "vault_principal_id": None,  # Will be set during deployment after vault canister creation
+            "realm": "realm[0]",  # Reference to current realm (realm[0] by default)
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat()
+        }
+        
+        return treasury_data
+
+    def generate_realm_metadata(self, realm_name: str, citizens: int, organizations: int) -> Dict[str, Any]:
+        """Generate realm metadata"""
+        realm_data = {
+            "id": self.realm_id,
+            "name": realm_name,
+            "description": f"Generated demo realm with {citizens} citizens and {organizations} organizations",
+            "created_at": datetime.now().isoformat(),
+            "status": "active",
+            "governance_type": "democratic",
+            "population": citizens,
+            "organization_count": organizations,
+            "treasury_id": str(uuid.uuid4()),  # Will match treasury.json
+            "settings": {
+                "voting_period_days": 7,
+                "proposal_threshold": 0.1,
+                "quorum_percentage": 0.3,
+                "tax_rate": 0.15,
+                "ubi_amount": 1000
+            }
+        }
+        
+        return realm_data
+
     def generate_realm_data(self, **params) -> Dict[str, Any]:
         """Generate complete realm data"""
         print(f"Generating realm data with seed: {self.seed}")
@@ -267,19 +309,10 @@ class RealmGenerator:
             system_user = {"name": "system", "profiles": ["admin"]}
 
         # Create realm metadata
-        realm = {
-            "name": params.get('realm_name', 'Generated Demo Realm'),
-            "description": f"Auto-generated realm with {len(users)} users, {len(organizations)} organizations"
-        }
+        realm = self.generate_realm_metadata(params.get('realm_name', 'Generated Demo Realm'), len(users), len(organizations))
         
         # Create the Treasury
-        if Treasury:
-            treasury = Treasury(name="New Geneva Treasury", vault_principal_id="abc123")
-        else:
-            treasury = {
-                "name": "New Geneva Treasury",
-                "vault_principal_id": "abc123"
-            }
+        treasury = self.generate_treasury_data(params.get('realm_name', 'Generated Demo Realm'))
         
         return {
             "realm": realm,
@@ -628,17 +661,34 @@ def main():
         realm_name=args.realm_name
     )
     
-    # Save JSON data
+    # Generate separate treasury and realm data
+    treasury_data = generator.generate_treasury_data(args.realm_name)
+    realm_metadata = generator.generate_realm_metadata(args.realm_name, args.citizens, args.organizations)
+    
+    # Save main realm data JSON
     json_file = output_dir / "realm_data.json"
     with open(json_file, 'w') as f:
         json.dump(realm_data, f, indent=2)
     
+    # Save treasury JSON
+    treasury_file = output_dir / "treasury.json"
+    with open(treasury_file, 'w') as f:
+        json.dump(treasury_data, f, indent=2)
+    
+    # Save realm metadata JSON
+    realms_file = output_dir / "realms.json"
+    with open(realms_file, 'w') as f:
+        json.dump(realm_metadata, f, indent=2)
+    
     print(f"Generated realm data saved to: {json_file}")
+    print(f"Generated treasury data saved to: {treasury_file}")
+    print(f"Generated realm metadata saved to: {realms_file}")
     print(f"- {len(realm_data['users'])} users")
     print(f"- {len(realm_data['organizations'])} organizations") 
     print(f"- {len(realm_data['transfers'])} transactions")
     print(f"- {len(realm_data['disputes'])} disputes")
     print(f"- {len(realm_data['mandates'])} mandates")
+    print(f"- Treasury vault principal: {treasury_data['vault_principal_id']}")
     
     # Generate codex files
     codex_files = generator.generate_codex_files(output_dir)
@@ -653,6 +703,8 @@ def main():
         "parameters": vars(args),
         "files_created": {
             "data_file": str(json_file),
+            "treasury_file": str(treasury_file),
+            "realms_file": str(realms_file),
             "codex_files": codex_files
         },
         "statistics": {

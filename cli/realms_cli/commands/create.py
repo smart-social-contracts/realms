@@ -2,6 +2,7 @@
 
 import json
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
@@ -16,6 +17,24 @@ from ..utils import (
     get_project_root,
 )
 from .deploy import deploy_command
+
+
+def _get_current_dfx_identity() -> str:
+    """Get the current dfx identity principal."""
+    try:
+        result = subprocess.run(
+            ["dfx", "identity", "get-principal"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        return result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        console.print(f"[red]Error getting dfx identity principal: {e}[/red]")
+        raise typer.Exit(1)
+    except FileNotFoundError:
+        console.print("[red]dfx command not found. Please ensure dfx is installed and in PATH.[/red]")
+        raise typer.Exit(1)
 
 
 def create_command(
@@ -186,7 +205,7 @@ def _create_realm_config(
             "id": realm_info["name"].lower().replace(" ", "_").replace("-", "_"),
             "name": realm_info["name"],
             "description": realm_info["description"],
-            "admin_principal": "2vxsx-fae",
+            "admin_principal": _get_current_dfx_identity(),
             "version": "1.0.0",
             "tags": ["demo", "random-generated", "governance"],
         },
@@ -200,6 +219,26 @@ def _create_realm_config(
         },
         "post_deployment": {
             "actions": [
+                {
+                    "type": "extension_call",
+                    "name": "Import Realm",
+                    "extension_name": "admin_dashboard",
+                    "function_name": "import_data",
+                    "args": {
+                        "file_path": "data/realm.json",
+                        "data_type": "realm",
+                    },
+                },
+                {
+                    "type": "extension_call",
+                    "name": "Import Treasury",
+                    "extension_name": "admin_dashboard",
+                    "function_name": "import_data",
+                    "args": {
+                        "file_path": "data/treasury.json",
+                        "data_type": "treasury",
+                    },
+                },
                 {
                     "type": "extension_call",
                     "name": "Import User Profiles",
@@ -271,7 +310,27 @@ def _create_realm_config(
 def _create_json_data_files(data_dir: Path, realm_data: dict) -> None:
     """Create JSON data files for each entity type."""
 
+    # Create realm.json file
+    realm_info = realm_data.get("realm", {})
+    realm_entity = [{
+        "id": realm_info.get("name", "generated_demo_realm").lower().replace(" ", "_").replace("-", "_"),
+        "name": realm_info.get("name", "Generated Demo Realm"),
+        "description": realm_info.get("description", "Generated demo realm"),
+        "admin_principal": _get_current_dfx_identity(),
+        "version": "1.0.0",
+        "tags": ["demo", "random-generated", "governance"]
+    }]
+
+    # Create treasury.json file
+    treasury_entity = [{
+        "name": f"{realm_info.get('name', 'Generated Demo Realm')} Treasury",
+        "vault_principal_id": None,
+        "realm": realm_info.get("name", "generated_demo_realm").lower().replace(" ", "_").replace("-", "_"),
+    }]
+
     entity_mappings = {
+        "realm.json": realm_entity,
+        "treasury.json": treasury_entity,
         "users.json": realm_data.get("users", []),
         "humans.json": realm_data.get("humans", []),
         "user_profiles.json": realm_data.get("user_profiles", []),
@@ -316,7 +375,7 @@ def _create_basic_realm_structure(
             "id": realm_name.lower().replace(" ", "_").replace("-", "_"),
             "name": realm_name,
             "description": f"Basic realm: {realm_name}",
-            "admin_principal": "2vxsx-fae",
+            "admin_principal": _get_current_dfx_identity(),
             "version": "1.0.0",
             "tags": ["basic", "empty"],
         },

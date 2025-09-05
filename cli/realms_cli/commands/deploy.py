@@ -205,8 +205,9 @@ def _execute_post_deployment_actions(
     # Handle both simple string array and complex action format
     if isinstance(config.post_deployment, list):
         # Simple string array format
+        config_file_dir = config_file_path.parent if config_file_path else None
         _execute_simple_post_deployment_commands(
-            config.post_deployment, config, project_root
+            config.post_deployment, config, project_root, config_file_dir
         )
         return
 
@@ -252,7 +253,7 @@ def _execute_post_deployment_actions(
 
 
 def _execute_simple_post_deployment_commands(
-    commands: List[str], config: RealmConfig, project_root: Path
+    commands: List[str], config: RealmConfig, project_root: Path, config_file_dir: Path = None
 ) -> None:
     """Execute simple post-deployment commands from string array."""
 
@@ -272,7 +273,7 @@ def _execute_simple_post_deployment_commands(
             progress.update(task, description=f"Running: {command}")
 
             try:
-                _execute_simple_command(command, config, project_root)
+                _execute_simple_command(command, config, project_root, config_file_dir)
                 progress.advance(task)
             except Exception as e:
                 console.print(f"[red]Command '{command}' failed: {e}[/red]")
@@ -284,13 +285,13 @@ def _execute_simple_post_deployment_commands(
 
 
 def _execute_simple_command(
-    command: str, config: RealmConfig, project_root: Path
+    command: str, config: RealmConfig, project_root: Path, config_file_dir: Path = None
 ) -> None:
     """Execute a single simple post-deployment command."""
 
     # Handle shell scripts
     if command.endswith(".sh"):
-        script_path = project_root / command
+        script_path = _resolve_file_path(command, config_file_dir, project_root)
         if not script_path.exists():
             raise FileNotFoundError(f"Script not found: {script_path}")
 
@@ -300,7 +301,7 @@ def _execute_simple_command(
     # Handle realms shell -f commands
     if command.startswith("realms shell -f "):
         python_file = command.replace("realms shell -f ", "").strip()
-        python_path = project_root / python_file
+        python_path = _resolve_file_path(python_file, config_file_dir, project_root)
 
         if not python_path.exists():
             raise FileNotFoundError(f"Python file not found: {python_path}")
@@ -323,6 +324,27 @@ def _execute_simple_command(
 
     # Default: treat as shell command
     run_command(command.split(), cwd=project_root)
+
+
+def _resolve_file_path(file_path: str, config_file_dir: Path = None, project_root: Path = None) -> Path:
+    """Resolve file path relative to config file directory, falling back to project root."""
+    path = Path(file_path)
+    
+    # If absolute path, return as-is
+    if path.is_absolute():
+        return path
+    
+    # If config file directory is provided, resolve relative to it
+    if config_file_dir:
+        resolved_path = config_file_dir / file_path
+        if resolved_path.exists():
+            return resolved_path
+    
+    # Fall back to project root
+    if project_root:
+        return project_root / file_path
+    
+    return path
 
 
 def _execute_single_action(
@@ -354,11 +376,8 @@ def _execute_single_action(
                 # Handle file content reading for import_data function
                 if action.function_name == "import_data" and "file_path" in args:
                     file_path = args["file_path"]
-                    # Resolve file path relative to config file directory if provided
-                    if config_file_dir and not Path(file_path).is_absolute():
-                        data_file_path = config_file_dir / file_path
-                    else:
-                        data_file_path = project_root / file_path
+                    data_file_path = _resolve_file_path(file_path, config_file_dir, project_root)
+                    
                     if data_file_path.exists():
                         with open(data_file_path, "r") as f:
                             file_data = json.load(f)
@@ -373,11 +392,8 @@ def _execute_single_action(
                 # Handle generic data_file parameter for other functions
                 elif "data_file" in args:
                     data_file = args["data_file"]
-                    # Resolve file path relative to config file directory if provided
-                    if config_file_dir and not Path(data_file).is_absolute():
-                        data_file_path = config_file_dir / data_file
-                    else:
-                        data_file_path = project_root / data_file
+                    data_file_path = _resolve_file_path(data_file, config_file_dir, project_root)
+                    
                     if data_file_path.exists():
                         with open(data_file_path, "r") as f:
                             file_data = json.load(f)
@@ -407,7 +423,7 @@ def _execute_single_action(
                 if not action.script_path:
                     raise ValueError("script action requires script_path")
 
-                script_path = project_root / action.script_path
+                script_path = _resolve_file_path(action.script_path, config_file_dir, project_root)
                 if not script_path.exists():
                     raise FileNotFoundError(f"Script not found: {script_path}")
 
