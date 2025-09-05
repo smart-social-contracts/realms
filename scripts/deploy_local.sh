@@ -26,10 +26,13 @@ python3 -m kybra --version || {
     pip3 install -r requirements.txt
 }
 
+scripts/download_wasms.sh
+
 lsof -ti:$PORT | xargs kill -9 2>/dev/null || true
 dfx stop 2>/dev/null || true
 dfx start --clean --background --host 127.0.0.1:$PORT --logfile dfx.log
 dfx deploy internet_identity
+dfx deploy vault
 scripts/install_extensions.sh
 dfx deploy realm_registry_backend --yes
 dfx deploy realm_backend --yes
