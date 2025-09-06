@@ -140,40 +140,8 @@ def codex_import(
     import_codex_command(file_path, name, dry_run)
 
 
-@app.command("deploy")
-def deploy(
-    config_file: str = typer.Option(
-        "realm_config.json", "--file", "-f", help="Path to realm configuration file"
-    ),
-    network: Optional[str] = typer.Option(
-        None, "--network", "-n", help="Override network from config"
-    ),
-    skip_extensions: bool = typer.Option(
-        False, "--skip-extensions", help="Skip extension deployment"
-    ),
-    skip_post_deployment: bool = typer.Option(
-        False, "--skip-post-deployment", help="Skip post-deployment actions"
-    ),
-    phases: Optional[List[str]] = typer.Option(
-        None, "--phases", help="Deploy specific extension phases only"
-    ),
-    dry_run: bool = typer.Option(
-        False, "--dry-run", help="Show what would be deployed without executing"
-    ),
-    identity_file: Optional[str] = typer.Option(
-        None, "--identity", help="Path to identity file for authentication"
-    ),
-) -> None:
-    """Deploy a Realms project based on configuration file."""
-    deploy_command(
-        config_file,
-        network,
-        skip_extensions,
-        skip_post_deployment,
-        phases,
-        dry_run,
-        identity_file,
-    )
+# Register deploy command directly from commands module
+app.command("deploy")(deploy_command)
 
 
 @app.command("status")

@@ -45,6 +45,9 @@ def deploy_command(
     skip_post_deployment: bool = typer.Option(
         False, "--skip-post-deployment", help="Skip post-deployment actions"
     ),
+    only_post_deployment: bool = typer.Option(
+        False, "--only-post-deployment", help="Run only post-deployment actions, skip canister deployment"
+    ),
     phases: Optional[List[str]] = typer.Option(
         None, "--phases", help="Deploy specific extension phases only"
     ),
@@ -83,24 +86,32 @@ def deploy_command(
         config.deployment.identity_file = identity_file
 
     if dry_run:
-        _show_deployment_plan(config, phases, skip_extensions, skip_post_deployment)
+        _show_deployment_plan(config, phases, skip_extensions, skip_post_deployment, only_post_deployment)
         return
 
     project_root = get_project_root()
 
     try:
-        # Delegate to appropriate deployment script
-        if config.deployment.network in ["local", "local2"]:
-            _deploy_local(project_root)
-        else:
-            _deploy_ic(config, project_root)
+        # Skip canister deployment if only running post-deployment actions
+        if not only_post_deployment:
+            # Delegate to appropriate deployment script
+            if config.deployment.network in ["local", "local2"]:
+                _deploy_local(project_root)
+            else:
+                _deploy_ic(config, project_root)
 
         # Post-deployment actions
         if not skip_post_deployment and config.post_deployment:
             _execute_post_deployment_actions(config, project_root, config_file_path)
 
         # Success message
-        _show_deployment_success(config)
+        if only_post_deployment:
+            display_success_panel(
+                "Post-deployment Actions Completed! 🎉",
+                f"All post-deployment actions for realm '{config.realm.name}' have been executed successfully."
+            )
+        else:
+            _show_deployment_success(config)
 
     except Exception as e:
         display_error_panel("Deployment Failed", str(e))
@@ -151,6 +162,7 @@ def _show_deployment_plan(
     phases: Optional[List[str]],
     skip_extensions: bool,
     skip_post_deployment: bool,
+    only_post_deployment: bool = False,
 ) -> None:
     """Show what would be deployed in dry-run mode."""
 
