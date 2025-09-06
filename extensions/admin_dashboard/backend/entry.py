@@ -10,9 +10,13 @@ from datetime import datetime
 from io import StringIO
 from typing import Any, Dict, List
 
-from ggg import Codex, Human, Instrument, Mandate, Organization, Realm, Treasury, Transfer, User, UserProfile
+import ggg
 
 from .models import RegistrationCode
+
+from kybra_simple_logging import get_logger
+
+logger = get_logger("extensions.admin_dashboard")
 
 
 def extension_sync_call(method_name: str, args: dict):
@@ -21,10 +25,6 @@ def extension_sync_call(method_name: str, args: dict):
     """
     # Method mapping with argument requirements
     methods = {
-        "get_admin_stats": (get_admin_statistics, False),  # (function, requires_args)
-        "get_system_health": (get_system_health_check, False),
-        "get_recent_activity": (get_recent_activity, False),
-        "get_templates": (get_templates, True),
         "import_data": (import_data, True),
         "generate_registration_url": (generate_registration_url, True),
         "validate_registration_code": (validate_registration_code, True),
@@ -44,168 +44,6 @@ def extension_sync_call(method_name: str, args: dict):
     except Exception as e:
         return {"success": False, "error": f"Error calling {method_name}: {str(e)}"}
 
-
-def extension_async_call(method_name: str, args: dict):
-    """
-    Asynchronous extension API calls for admin operations
-    """
-    # Async method mapping
-    async_methods = {
-        "export_data": lambda args: export_system_data(args.get("entity_types", [])),
-        "bulk_operation": lambda args: perform_bulk_operation(
-            args.get("operation"), args.get("entity_type"), args.get("data")
-        ),
-    }
-
-    if method_name not in async_methods:
-        return {"success": False, "error": f"Unknown async method: {method_name}"}
-
-    try:
-        return async_methods[method_name](args)
-    except Exception as e:
-        return {
-            "success": False,
-            "error": f"Error calling async {method_name}: {str(e)}",
-        }
-
-
-def get_admin_statistics():
-    """
-    Get comprehensive system statistics for admin dashboard
-    """
-    try:
-        # This would integrate with the main backend to get real statistics
-        # For now, return a structure that matches what the frontend expects
-        return {
-            "success": True,
-            "data": {
-                "total_entities": 0,
-                "total_transfers": 0,
-                "total_transfer_volume": 0,
-                "active_mandates": 0,
-                "scheduled_tasks": 0,
-                "open_disputes": 0,
-                "active_proposals": 0,
-                "total_votes": 0,
-            },
-        }
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-def get_system_health_check():
-    """
-    Perform system health checks for admin monitoring
-    """
-    try:
-        return {
-            "success": True,
-            "data": {
-                "status": "healthy",
-                "uptime": "99.9%",
-                "last_backup": "2024-01-20T10:00:00Z",
-                "database_status": "connected",
-                "canister_cycles": "sufficient",
-            },
-        }
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-def get_recent_activity():
-    """
-    Get recent system activity for admin monitoring
-    """
-    try:
-        return {"success": True, "data": {"activities": []}}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-def export_system_data(entity_types):
-    """
-    Export system data for backup or analysis
-    """
-    try:
-        return {
-            "success": True,
-            "data": {
-                "export_id": "export_123",
-                "status": "initiated",
-                "entity_types": entity_types,
-            },
-        }
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-def perform_bulk_operation(operation, entity_type, data):
-    """
-    Perform bulk operations on entities
-    """
-    try:
-        return {
-            "success": True,
-            "data": {
-                "operation": operation,
-                "entity_type": entity_type,
-                "processed": len(data) if data else 0,
-                "status": "completed",
-            },
-        }
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-def get_templates(args):
-    """
-    Get field schemas for bulk import entities
-    """
-    try:
-        entity_type = args.get("entity_type", "users")
-
-        # Return field schemas instead of hardcoded templates
-        schemas = {
-            "users": {
-                "required_fields": ["id"],
-                "optional_fields": ["profile_picture_url"],
-                "description": "User entities with unique identifiers",
-            },
-            "user_profiles": {
-                "required_fields": ["name"],
-                "optional_fields": ["description"],
-                "description": "User profile definitions (admin, member, etc.)",
-            },
-            "humans": {
-                "required_fields": ["id", "name"],
-                "optional_fields": ["email", "phone", "address"],
-                "description": "Human entities with personal information",
-            },
-            "organizations": {
-                "required_fields": ["id", "name"],
-                "optional_fields": ["description", "website", "email"],
-                "description": "Organization entities",
-            },
-            "mandates": {
-                "required_fields": ["id", "name"],
-                "optional_fields": ["description", "status"],
-                "description": "Mandate entities for governance",
-            },
-            "codexes": {
-                "required_fields": ["id", "name", "code"],
-                "optional_fields": ["description", "version"],
-                "description": "Codex entities with executable code",
-            },
-            "instruments": {
-                "required_fields": ["id", "name", "type"],
-                "optional_fields": ["description", "value"],
-                "description": "Financial instrument entities",
-            },
-        }
-
-        return {"success": True, "data": schemas.get(entity_type, schemas["users"])}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
 
 
 def import_data(args):
@@ -269,52 +107,16 @@ def import_data(args):
         return {"success": False, "error": str(e)}
 
 
-def parse_csv_data(csv_content: str) -> List[Dict[str, Any]]:
-    """Parse CSV content into list of dictionaries"""
-    try:
-        csv_file = StringIO(csv_content)
-        reader = csv.DictReader(csv_file)
-        return [row for row in reader]
-    except Exception as e:
-        raise Exception(f"CSV parsing error: {str(e)}")
-
-
-def parse_json_data(json_content: str) -> List[Dict[str, Any]]:
-    """Parse JSON content into list of dictionaries"""
-    try:
-        data = json.loads(json_content)
-        if isinstance(data, list):
-            return data
-        elif isinstance(data, dict):
-            return [data]
-        else:
-            raise Exception("JSON must be an object or array of objects")
-    except json.JSONDecodeError as e:
-        raise Exception(f"JSON parsing error: {str(e)}")
-
-
 def process_bulk_import(entity_type: str, data: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Process bulk import data and create entities"""
     successful = 0
     failed = 0
     errors = []
 
-    # Entity type to creation function mapping
-    entity_creators = {
-        "users": create_user_entity,
-        "humans": create_human_entity,
-        "organizations": create_organization_entity,
-        "mandates": create_mandate_entity,
-        "codexes": create_codex_entity,
-        "instruments": create_instrument_entity,
-        "user_profiles": create_user_profile_entity,
-        "treasury": create_treasury_entity,
-        "realm": create_realm_entity,
-        "transfers": create_transfer_entity,
-    }
-
-    create_function = entity_creators.get(entity_type)
-    if not create_function:
+    logger.info(f"entity_type: {entity_type}")
+    entity = getattr(ggg, entity_type)
+    logger.info(f"entity: {entity}")
+    if not entity:
         return {
             "successful": 0,
             "failed": len(data),
@@ -335,14 +137,14 @@ def process_bulk_import(entity_type: str, data: List[Dict[str, Any]]) -> Dict[st
                     # If multiple records in array, process each one
                     for sub_record in record:
                         try:
-                            create_function(sub_record)
+                            create_entity(entity, sub_record)
                             successful += 1
                         except Exception as e:
                             failed += 1
                             errors.append(f"Record {sub_record}: {str(e)}")
                     continue
                 
-                create_function(record)
+                create_entity(entity, record)
                 successful += 1
             except Exception as e:
                 failed += 1
@@ -355,161 +157,8 @@ def process_bulk_import(entity_type: str, data: List[Dict[str, Any]]) -> Dict[st
     }
 
 
-def create_user_entity(data: Dict[str, Any]):
-    """Create a User entity from import data"""
-    required_fields = ["id"]
-    for field in required_fields:
-        if field not in data or not data[field]:
-            raise Exception(f"Missing required field: {field}")
-
-    user = User(id=data["id"], profile_picture_url=data.get("profile_picture_url", ""))
-    return user
-
-
-def create_human_entity(data: Dict[str, Any]):
-    """Create a Human entity from import data"""
-    required_fields = ["id", "name"]
-    for field in required_fields:
-        if field not in data or not data[field]:
-            raise Exception(f"Missing required field: {field}")
-
-    human = Human(
-        id=data["id"],
-        name=data["name"],
-        email=data.get("email", ""),
-        phone=data.get("phone", ""),
-        address=data.get("address", ""),
-    )
-    return human
-
-
-def create_organization_entity(data: Dict[str, Any]):
-    """Create an Organization entity from import data"""
-    required_fields = ["id", "name"]
-    for field in required_fields:
-        if field not in data or not data[field]:
-            raise Exception(f"Missing required field: {field}")
-
-    org = Organization(
-        id=data["id"],
-        name=data["name"],
-        description=data.get("description", ""),
-        website=data.get("website", ""),
-        email=data.get("email", ""),
-    )
-    return org
-
-
-def create_mandate_entity(data: Dict[str, Any]):
-    """Create a Mandate entity from import data"""
-    required_fields = ["id", "name"]
-    for field in required_fields:
-        if field not in data or not data[field]:
-            raise Exception(f"Missing required field: {field}")
-
-    mandate = Mandate(
-        id=data["id"],
-        name=data["name"],
-        description=data.get("description", ""),
-        status=data.get("status", "active"),
-    )
-    return mandate
-
-
-def create_codex_entity(data: Dict[str, Any]):
-    """Create a Codex entity from import data"""
-    required_fields = ["id", "name", "code"]
-    for field in required_fields:
-        if field not in data or not data[field]:
-            raise Exception(f"Missing required field: {field}")
-
-    codex = Codex(
-        id=data["id"],
-        name=data["name"],
-        code=data["code"],
-        description=data.get("description", ""),
-        version=data.get("version", "1.0.0"),
-    )
-    return codex
-
-
-def create_instrument_entity(data: Dict[str, Any]):
-    """Create an Instrument entity from import data"""
-    required_fields = ["id", "name", "type"]
-    for field in required_fields:
-        if field not in data or not data[field]:
-            raise Exception(f"Missing required field: {field}")
-
-    instrument = Instrument(
-        id=data["id"],
-        name=data["name"],
-        type=data["type"],
-        description=data.get("description", ""),
-        value=data.get("value", 0),
-    )
-    return instrument
-
-
-def create_user_profile_entity(data: Dict[str, Any]):
-    """Create a UserProfile entity from import data"""
-    required_fields = ["name"]
-    for field in required_fields:
-        if field not in data or not data[field]:
-            raise Exception(f"Missing required field: {field}")
-
-    profile = UserProfile(
-        id=data["name"],
-        name=data["name"],  # Use id as name for profile identifier
-        description=data.get("description", ""),
-    )
-    return profile
-
-
-def create_treasury_entity(data: Dict[str, Any]):
-    """Create a Treasury entity from import data"""
-    required_fields = ["name"]
-    for field in required_fields:
-        if field not in data or not data[field]:
-            raise Exception(f"Missing required field: {field}")
-
-    treasury = Treasury(
-        name=data["name"],
-        vault_principal_id=data.get("vault_principal_id", ""),
-        realm=Realm[data["realm"]],
-    )
-    return treasury
-
-
-def create_realm_entity(data: Dict[str, Any]):
-    """Create a Realm entity from import data"""
-
-    realm = Realm(
-        name=data["name"],
-        description=data.get("description", ""),
-    )
-
-    treasury_name = data["treasury"]
-    treasury = Treasury[treasury_name]
-    realm.treasury = treasury
-
-    return realm
-
-
-def create_transfer_entity(data: Dict[str, Any]):
-    """Create a Transfer entity from import data"""
-    required_fields = ["id", "amount", "from_user", "to_user"]
-    for field in required_fields:
-        if field not in data or not data[field]:
-            raise Exception(f"Missing required field: {field}")
-
-    transfer = Transfer(
-        id=data["id"],
-        amount=data["amount"],
-        from_user=data["from_user"],
-        to_user=data["to_user"],
-        timestamp=data.get("timestamp", datetime.utcnow().isoformat()),
-    )
-    return transfer
+def create_entity(entity, data: Dict[str, Any]):
+    return entity(**data)
 
 
 def generate_registration_url(args: dict):
