@@ -226,25 +226,6 @@
   
   $: filteredData = filterData(data, searchTerm);
   
-  // Bulk import functions
-  async function loadTemplate() {
-    try {
-      const result = await backend.extension_sync_call('admin_dashboard', 'get_templates', {
-        entity_type: selectedEntityType
-      });
-      
-      if (result.success) {
-        templates = result.data;
-        importData = selectedFormat === 'csv' ? templates.csv : JSON.stringify(templates.json, null, 2);
-      } else {
-        error = `Template load error: ${result.error}`;
-      }
-    } catch (err) {
-      console.error('Error loading template:', err);
-      error = `Template load error: ${err.message}`;
-    }
-  }
-  
   async function importBulkData() {
     if (!importData.trim()) {
       error = 'Please provide data to import';
@@ -616,12 +597,6 @@
             
             <!-- Template Actions -->
             <div class="flex flex-wrap gap-2">
-              <button 
-                on:click={loadTemplate}
-                class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition-colors"
-              >
-                📋 {$_('extensions.admin_dashboard.load_template') || 'Load Template'}
-              </button>
               <button 
                 on:click={clearImportData}
                 class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 focus:ring-4 focus:ring-gray-300 transition-colors"
