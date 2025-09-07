@@ -3,6 +3,7 @@ Admin Dashboard Backend Extension Entry Point
 Provides administrative operations and data aggregation for the GGG system.
 """
 
+import base64
 import csv
 import json
 import traceback
@@ -158,6 +159,11 @@ def process_bulk_import(entity_type: str, data: List[Dict[str, Any]]) -> Dict[st
 
 
 def create_entity(entity, data: Dict[str, Any]):
+    if entity == 'Codex':
+        obj = Codex()
+        obj.name = data['name']
+        obj.code = base64.b64decode(data['code'])
+        return obj
     return entity(**data)
 
 

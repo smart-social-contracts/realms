@@ -113,8 +113,8 @@ def extension(
 @app.command("import")
 def import_data(
     file_path: str = typer.Argument(..., help="Path to JSON data file"),
-    entity_type: str = typer.Option(
-        ..., "--type", help="Entity type (users, organizations, instruments, etc.)"
+    entity_type: Optional[str] = typer.Option(
+        None, "--type", help="Entity type (codex for Python files, or json entity type)"
     ),
     format: str = typer.Option("json", "--format", help="Data format (json)"),
     batch_size: int = typer.Option(100, "--batch-size", help="Batch size for import"),
@@ -122,22 +122,10 @@ def import_data(
         False, "--dry-run", help="Show what would be imported without executing"
     ),
 ) -> None:
-    """Import JSON data into the realm."""
+    """Import data into the realm. Supports JSON data and Python codex files."""
     import_data_command(file_path, entity_type, format, batch_size, dry_run)
 
 
-@app.command("codex")
-def codex_import(
-    file_path: str = typer.Argument(..., help="Path to Python codex file"),
-    name: Optional[str] = typer.Option(
-        None, "--name", help="Codex name (defaults to filename)"
-    ),
-    dry_run: bool = typer.Option(
-        False, "--dry-run", help="Show what would be imported without executing"
-    ),
-) -> None:
-    """Import Python codex file into the realm."""
-    import_codex_command(file_path, name, dry_run)
 
 
 # Register deploy command directly from commands module

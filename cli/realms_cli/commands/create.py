@@ -122,8 +122,18 @@ def create_command(
     upload_script_content = f'''#!/bin/bash
 set -e
 
-realms import generated_realm/realm_data.json
-realms codex generated_realm/*.py
+echo "📥 Uploading realm data..."
+realms import realm_data.json
+
+echo "📜 Uploading codex files..."
+for codex_file in *_codex.py; do
+    if [ -f "$codex_file" ]; then
+        echo "  Importing $(basename $codex_file)..."
+        realms import "$codex_file" --type codex
+    fi
+done
+
+echo "✅ Data upload completed!"
 '''
     
     upload_script = scripts_dir / "3-upload-data.sh"
