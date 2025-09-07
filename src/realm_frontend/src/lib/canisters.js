@@ -10,25 +10,13 @@ let importsInitialized = false;
 async function initializeImports() {
 	if (importsInitialized) return;
 
-	if (isDevelopmentMode()) {
-		console.log('🔧 DEV MODE: Loading dummy backend implementations');
-		const declarationsModule = await import('./dummy-implementations/declarations-dummy.js');
-		const dfinityModule = await import('./dummy-implementations/dfinity-dummy.js');
-		const backendModule = await import('./dummy-implementations/backend-dummy.js');
+	console.log('🏭 Loading IC backend implementations');
+	const declarationsModule = await import('declarations/realm_backend');
+	const agentModule = await import('@dfinity/agent');
 
-		createActor = declarationsModule.createActor;
-		canisterId = declarationsModule.canisterId;
-		HttpAgent = dfinityModule.DummyHttpAgent;
-		dummyBackend = backendModule.dummyBackend;
-	} else {
-		console.log('🏭 PROD MODE: Loading IC backend implementations');
-		const declarationsModule = await import('declarations/realm_backend');
-		const agentModule = await import('@dfinity/agent');
-
-		createActor = declarationsModule.createActor;
-		canisterId = declarationsModule.canisterId;
-		HttpAgent = agentModule.HttpAgent;
-	}
+	createActor = declarationsModule.createActor;
+	canisterId = declarationsModule.canisterId;
+	HttpAgent = agentModule.HttpAgent;
 
 	importsInitialized = true;
 }
@@ -64,7 +52,7 @@ async function initializeBackendStore() {
 
 	await initializeImports();
 
-	const actor = isDevelopmentMode() ? dummyBackend : createActor(canisterId);
+	const actor = createActor(canisterId);
 	backendStore.set(actor);
 }
 

@@ -111,6 +111,262 @@ export class DummyBackend {
     };
   }
 
+  // Entity fetch methods for Admin Dashboard
+  async get_users(page_num = 0, page_size = 10) {
+    console.log('🔧 DEV MODE: get_users called', { page_num, page_size });
+    const mockUsers = [
+      '{"_id": "1", "id": "system", "profile_picture_url": "", "_type": "User", "timestamp_created": "2025-09-07 16:08:44.940"}',
+      '{"_id": "2", "id": "laura_foster_000", "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=LauraFoster", "_type": "User", "timestamp_created": "2025-09-07 16:08:46.475"}',
+      '{"_id": "3", "id": "edward_clark_001", "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=EdwardClark", "_type": "User", "timestamp_created": "2025-09-07 16:08:46.475"}',
+      '{"_id": "4", "id": "carlos_young_002", "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=CarlosYoung", "_type": "User", "timestamp_created": "2025-09-07 16:08:46.475"}',
+      '{"_id": "5", "id": "rachel_fisher_006", "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=RachelFisher", "_type": "User", "timestamp_created": "2025-09-07 16:08:49.444"}'
+    ];
+    
+    return {
+      success: true,
+      data: {
+        UsersList: {
+          users: mockUsers,
+          pagination: {
+            page_num: page_num,
+            page_size: page_size,
+            total_items_count: 52,
+            total_pages: Math.ceil(52 / page_size)
+          }
+        }
+      }
+    };
+  }
+
+  async get_mandates(page_num = 0, page_size = 10) {
+    console.log('🔧 DEV MODE: get_mandates called', { page_num, page_size });
+    const mockMandates = [
+      '{"_id": "1", "name": "Tax Collection", "metadata": null, "_type": "Mandate", "timestamp_created": "2025-09-07 16:10:57.089"}',
+      '{"_id": "2", "name": "Social Benefits", "metadata": null, "_type": "Mandate", "timestamp_created": "2025-09-07 16:10:57.089"}',
+      '{"_id": "3", "name": "License Management", "metadata": null, "_type": "Mandate", "timestamp_created": "2025-09-07 16:10:58.503"}',
+      '{"_id": "4", "name": "Land Registry", "metadata": null, "_type": "Mandate", "timestamp_created": "2025-09-07 16:10:58.503"}',
+      '{"_id": "5", "name": "Voting System", "metadata": null, "_type": "Mandate", "timestamp_created": "2025-09-07 16:10:58.503"}',
+      '{"_id": "6", "name": "Healthcare Services", "metadata": null, "_type": "Mandate", "timestamp_created": "2025-09-07 16:10:59.930"}'
+    ];
+    
+    return {
+      success: true,
+      data: {
+        MandatesList: {
+          mandates: mockMandates,
+          pagination: {
+            page_num: page_num,
+            page_size: page_size,
+            total_items_count: 6,
+            total_pages: Math.ceil(6 / page_size)
+          }
+        }
+      }
+    };
+  }
+
+  async get_tasks(page_num = 0, page_size = 10) {
+    console.log('🔧 DEV MODE: get_tasks called', { page_num, page_size });
+    return {
+      success: true,
+      data: {
+        TasksList: {
+          tasks: [],
+          pagination: {
+            page_num: page_num,
+            page_size: page_size,
+            total_items_count: 0,
+            total_pages: 0
+          }
+        }
+      }
+    };
+  }
+
+  async get_transfers(page_num = 0, page_size = 10) {
+    console.log('🔧 DEV MODE: get_transfers called', { page_num, page_size });
+    return {
+      success: true,
+      data: {
+        TransfersList: {
+          transfers: [],
+          pagination: {
+            page_num: page_num,
+            page_size: page_size,
+            total_items_count: 0,
+            total_pages: 0
+          }
+        }
+      }
+    };
+  }
+
+  async get_instruments(page_num = 0, page_size = 10) {
+    console.log('🔧 DEV MODE: get_instruments called', { page_num, page_size });
+    return {
+      success: true,
+      data: {
+        InstrumentsList: {
+          instruments: [],
+          pagination: {
+            page_num: page_num,
+            page_size: page_size,
+            total_items_count: 0,
+            total_pages: 0
+          }
+        }
+      }
+    };
+  }
+
+  async get_codexes(page_num = 0, page_size = 10) {
+    console.log('🔧 DEV MODE: get_codexes called', { page_num, page_size });
+    return {
+      success: true,
+      data: {
+        CodexesList: {
+          codexes: [],
+          pagination: {
+            page_num: page_num,
+            page_size: page_size,
+            total_items_count: 0,
+            total_pages: 0
+          }
+        }
+      }
+    };
+  }
+
+  async get_organizations(page_num = 0, page_size = 10) {
+    console.log('🔧 DEV MODE: get_organizations called', { page_num, page_size });
+    return {
+      success: true,
+      data: {
+        OrganizationsList: {
+          organizations: [],
+          pagination: {
+            page_num: page_num,
+            page_size: page_size,
+            total_items_count: 0,
+            total_pages: 0
+          }
+        }
+      }
+    };
+  }
+
+  async get_disputes(page_num = 0, page_size = 10) {
+    console.log('🔧 DEV MODE: get_disputes called', { page_num, page_size });
+    return {
+      success: true,
+      data: {
+        DisputesList: {
+          disputes: [],
+          pagination: {
+            page_num: page_num,
+            page_size: page_size,
+            total_items_count: 0,
+            total_pages: 0
+          }
+        }
+      }
+    };
+  }
+
+  async get_licenses(page_num = 0, page_size = 10) {
+    console.log('🔧 DEV MODE: get_licenses called', { page_num, page_size });
+    return {
+      success: true,
+      data: {
+        LicensesList: {
+          licenses: [],
+          pagination: {
+            page_num: page_num,
+            page_size: page_size,
+            total_items_count: 0,
+            total_pages: 0
+          }
+        }
+      }
+    };
+  }
+
+  async get_trades(page_num = 0, page_size = 10) {
+    console.log('🔧 DEV MODE: get_trades called', { page_num, page_size });
+    return {
+      success: true,
+      data: {
+        TradesList: {
+          trades: [],
+          pagination: {
+            page_num: page_num,
+            page_size: page_size,
+            total_items_count: 0,
+            total_pages: 0
+          }
+        }
+      }
+    };
+  }
+
+  async get_realms(page_num = 0, page_size = 10) {
+    console.log('🔧 DEV MODE: get_realms called', { page_num, page_size });
+    const mockRealms = [
+      '{"_id": "1", "name": "Nova Republic", "description": "A progressive digital sovereign realm", "_type": "Realm", "timestamp_created": "2025-09-07 16:08:44.940"}'
+    ];
+    
+    return {
+      success: true,
+      data: {
+        RealmsList: {
+          realms: mockRealms,
+          pagination: {
+            page_num: page_num,
+            page_size: page_size,
+            total_items_count: 1,
+            total_pages: 1
+          }
+        }
+      }
+    };
+  }
+
+  async get_proposals(page_num = 0, page_size = 10) {
+    console.log('🔧 DEV MODE: get_proposals called', { page_num, page_size });
+    return {
+      success: true,
+      data: {
+        ProposalsList: {
+          proposals: [],
+          pagination: {
+            page_num: page_num,
+            page_size: page_size,
+            total_items_count: 0,
+            total_pages: 0
+          }
+        }
+      }
+    };
+  }
+
+  async get_votes(page_num = 0, page_size = 10) {
+    console.log('🔧 DEV MODE: get_votes called', { page_num, page_size });
+    return {
+      success: true,
+      data: {
+        VotesList: {
+          votes: [],
+          pagination: {
+            page_num: page_num,
+            page_size: page_size,
+            total_items_count: 0,
+            total_pages: 0
+          }
+        }
+      }
+    };
+  }
+
   async get_organizations() {
     console.log('🔧 DEV MODE: get_organizations called');
     return [

@@ -80,31 +80,61 @@
   
   // Function to fetch data for a specific entity type
   async function fetchEntityData(entityType) {
+    console.log('🔧 AdminDashboard: fetchEntityData called for:', entityType);
+    
     try {
       loading = true;
       error = null;
       
       const config = entityConfigs.find(c => c.name === entityType);
+      console.log('🔧 AdminDashboard: Found config for', entityType, ':', config);
+      
       if (!config) {
+        console.log('🔧 AdminDashboard: No config found for entityType:', entityType);
         error = `No configuration found for entity type: ${entityType}`;
         loading = false;
         return;
       }
       
+      console.log('🔧 AdminDashboard: Calling config.fetch with page:', config.page(), 'perPage:', config.perPage());
       let result = await config.fetch(config.page(), config.perPage());
+      console.log('🔧 AdminDashboard: Fetch result:', result);
+      console.log('🔧 AdminDashboard: Result type:', typeof result);
+      console.log('🔧 AdminDashboard: Result keys:', result ? Object.keys(result) : 'null');
       
+      // Handle both success/data format and direct data format
+      let actualData = null;
       if (result && result.success && result.data) {
+        actualData = result.data;
+        console.log('🔧 AdminDashboard: Using result.data format');
+      } else if (result && typeof result === 'object') {
+        actualData = result;
+        console.log('🔧 AdminDashboard: Using direct result format');
+      }
+      
+      if (actualData) {
         const pathParts = config.dataPath.split('.');
-        let entityData = result.data;
+        let entityData = actualData;
+        
+        console.log('🔧 AdminDashboard: Data path:', config.dataPath);
+        console.log('🔧 AdminDashboard: Path parts:', pathParts);
+        console.log('🔧 AdminDashboard: Starting with actualData:', actualData);
         
         for (const part of pathParts) {
-          if (entityData && entityData[part]) {
+          console.log('🔧 AdminDashboard: Processing path part:', part);
+          console.log('🔧 AdminDashboard: Current entityData:', entityData);
+          
+          if (entityData && entityData[part] !== undefined) {
             entityData = entityData[part];
+            console.log('🔧 AdminDashboard: Found part, new entityData:', entityData);
           } else {
+            console.log('🔧 AdminDashboard: Part not found, setting to null');
             entityData = null;
             break;
           }
         }
+        
+        console.log('🔧 AdminDashboard: Final entityData:', entityData);
         
         if (entityData && Array.isArray(entityData) && entityData.length > 0) {
           const parsedData = entityData.map(item => {
@@ -122,7 +152,7 @@
           
           if (config.paginationPath) {
             const paginationParts = config.paginationPath.split('.');
-            let paginationData = result.data;
+            let paginationData = actualData;
             
             for (const part of paginationParts) {
               if (paginationData && paginationData[part]) {
@@ -157,8 +187,8 @@
       }
       
     } catch (err) {
-      console.error(`Error fetching ${entityType} data:`, err);
-      error = `Data fetch error for ${entityType}: ${err.message}`;
+      console.error(`Error fetching ${entityType}:`, err);
+      error = `Error fetching ${entityType}: ${err.message}`;
     } finally {
       loading = false;
     }
@@ -267,10 +297,15 @@
   }
   
   onMount(() => {
+    console.log('🔧 AdminDashboard: Component mounted, activeTab:', activeTab);
     if (activeTab === 'overview') {
+      console.log('🔧 AdminDashboard: Calling handleTabChange for overview');
       handleTabChange('overview');
     } else if (allEntityTypes.includes(activeTab)) {
+      console.log('🔧 AdminDashboard: Calling fetchEntityData for:', activeTab);
       fetchEntityData(activeTab);
+    } else {
+      console.log('🔧 AdminDashboard: No initial data fetch needed');
     }
   });
 </script>
