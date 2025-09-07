@@ -57,14 +57,23 @@ def deploy_command(
                 
                 console.print(f"🔧 Running {script_name}...")
                 console.print(f"[dim]Script path: {script_path}[/dim]")
-                console.print(f"[dim]Working directory: {Path.cwd()}[/dim]")
+                
+                # Determine working directory based on script
+                if script_name == "3-upload-data.sh":
+                    # Run upload script from the realm folder where data files are located
+                    working_dir = folder_path
+                else:
+                    # Run other scripts from project root
+                    working_dir = Path.cwd()
+                
+                console.print(f"[dim]Working directory: {working_dir}[/dim]")
                 
                 # Make sure script is executable
                 script_path.chmod(0o755)
                 
                 result = subprocess.run(
                     [str(script_path.resolve())],
-                    cwd=Path.cwd(),
+                    cwd=working_dir,
                     text=True
                 )
                 
