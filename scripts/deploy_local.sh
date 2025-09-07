@@ -33,7 +33,6 @@ dfx stop 2>/dev/null || true
 dfx start --clean --background --host 127.0.0.1:$PORT --logfile dfx.log
 dfx deploy internet_identity
 dfx deploy vault
-scripts/install_extensions.sh
 dfx deploy realm_registry_backend --yes
 dfx deploy realm_backend --yes
 dfx generate realm_registry_backend
