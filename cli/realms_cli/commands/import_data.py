@@ -189,9 +189,12 @@ def import_codex_command(
             "entity_type": "Codex",
             "format": "json",
             "data": {
-                "name": codex_name,
-                "code": base64_content,
-                "encoding": "base64",
+                "class": "Codex",
+                "data": {
+                    "name": codex_name,
+                    "code": base64_content,
+                    "encoding": "base64",
+                },
             },
             "batch_size": 1,
         }

@@ -281,7 +281,6 @@ class RealmGenerator:
             "governance_type": "democratic",
             "population": citizens,
             "organization_count": organizations,
-            "treasury_id": str(uuid.uuid4()),  # Will match treasury.json
             "settings": {
                 "voting_period_days": 7,
                 "proposal_threshold": 0.1,

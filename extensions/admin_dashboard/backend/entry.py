@@ -56,13 +56,11 @@ def import_data(args):
         if isinstance(args, str):
             args = json.loads(args)
 
-        entity_type = args.get("data_type", args.get("entity_type", "users"))
         data_format = args.get("format", "json")
         data_content = args.get("data", "")
 
-        # Map data_type to entity_type for processing
-        if entity_type == "profiles":
-            entity_type = "user_profiles"
+        logger.info(f"data_content: {data_content}")
+        logger.info(f"data_format: {data_format}")
 
         if not data_content:
             return {"success": False, "error": "No data provided"}
@@ -90,13 +88,13 @@ def import_data(args):
                 return {"success": False, "error": f"Invalid JSON data: {str(e)}"}
 
         # Process data in batches
-        results = process_bulk_import(entity_type, parsed_data)
+        logger.info(f"parsed_data: {parsed_data}")
+        results = process_bulk_import(parsed_data)
 
         return {
             "success": True,
-            "message": f"Successfully imported {len(parsed_data)} {entity_type} records",
+            "message": f"Successfully imported records",
             "data": {
-                "entity_type": entity_type,
                 "total_records": len(parsed_data),
                 "successful": results["successful"],
                 "failed": results["failed"],
@@ -105,51 +103,33 @@ def import_data(args):
         }
 
     except Exception as e:
+        logger.error(f"Error processing import data: {e}\n{traceback.format_exc()}")
         return {"success": False, "error": str(e)}
 
 
-def process_bulk_import(entity_type: str, data: List[Dict[str, Any]]) -> Dict[str, Any]:
+def process_bulk_import(data: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Process bulk import data and create entities"""
     successful = 0
     failed = 0
     errors = []
 
-    logger.info(f"entity_type: {entity_type}")
-    entity = getattr(ggg, entity_type)
-    logger.info(f"entity: {entity}")
-    if not entity:
-        return {
-            "successful": 0,
-            "failed": len(data),
-            "errors": [f"Unsupported entity type: {entity_type}"],
-        }
+    logger.info(f"data: {data}")
 
-    # Process in batches to avoid cycle limits
-    batch_size = 50
-    for i in range(0, len(data), batch_size):
-        batch = data[i : i + batch_size]
+    for record in data:
+        try:
+            entity_type = record.get("class")
+            logger.info(f"entity_type: {entity_type}")
+            
+            entity = getattr(ggg, entity_type)
+            logger.info(f"entity: {entity}")
 
-        for record in batch:
-            try:
-                # Handle case where record might be wrapped in an array
-                if isinstance(record, list) and len(record) == 1:
-                    record = record[0]
-                elif isinstance(record, list) and len(record) > 1:
-                    # If multiple records in array, process each one
-                    for sub_record in record:
-                        try:
-                            create_entity(entity, sub_record)
-                            successful += 1
-                        except Exception as e:
-                            failed += 1
-                            errors.append(f"Record {sub_record}: {str(e)}")
-                    continue
-                
-                create_entity(entity, record)
-                successful += 1
-            except Exception as e:
-                failed += 1
-                errors.append(f"Record {record}: {str(e)}")
+            entity_data = record['data']
+            
+            create_entity(entity, entity_data)
+            successful += 1
+        except Exception as e:
+            failed += 1
+            errors.append(f"Record {record}: {str(e)}")
 
     return {
         "successful": successful,
