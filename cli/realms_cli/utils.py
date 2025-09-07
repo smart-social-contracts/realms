@@ -26,7 +26,17 @@ def run_command(
 ) -> subprocess.CompletedProcess:
     """Run a shell command with proper error handling."""
     try:
-        console.print(f"[dim]Running: {' '.join(command)}[/dim]")
+        # Format command for copy-paste with proper quoting
+        formatted_command = []
+        for arg in command:
+            if ' ' in arg or '"' in arg or "'" in arg:
+                # Use single quotes and escape any single quotes inside
+                escaped_arg = arg.replace("'", "'\"'\"'")
+                formatted_command.append(f"'{escaped_arg}'")
+            else:
+                formatted_command.append(arg)
+        
+        console.print(f"[dim]Running: {' '.join(formatted_command)}[/dim]")
 
         result = subprocess.run(
             command,
