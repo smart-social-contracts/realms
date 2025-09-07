@@ -50,5 +50,6 @@
   "citizen_votes": "Citizen Votes",
   "democratic_participation": "Democratic participation",
   "no_data_found": "No GGG Data Found",
-  "load_demo_data": "Click \"Load Demo Data\" to populate the system with sample governance data"
+  "load_demo_data": "Click \"Load Demo Data\" to populate the system with sample governance data",
+  "registration_urls": "Registration URLs"
 }

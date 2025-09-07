@@ -39,5 +39,6 @@
   "total_records": "总记录数",
   "successful": "成功",
   "failed": "失败",
-  "errors": "错误"
+  "errors": "错误",
+  "registration_urls": "注册链接"
 }
