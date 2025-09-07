@@ -31,7 +31,7 @@ def deploy_command(
         # Deploy using generated realm folder scripts
         console.print(f"📁 Using generated realm folder: {folder}")
         
-        folder_path = Path(folder)
+        folder_path = Path(folder).resolve()
         if not folder_path.exists():
             console.print(f"[red]❌ Folder not found: {folder}[/red]")
             raise typer.Exit(1)
@@ -56,10 +56,15 @@ def deploy_command(
                     continue
                 
                 console.print(f"🔧 Running {script_name}...")
+                console.print(f"[dim]Script path: {script_path}[/dim]")
+                console.print(f"[dim]Working directory: {Path.cwd()}[/dim]")
+                
+                # Make sure script is executable
+                script_path.chmod(0o755)
+                
                 result = subprocess.run(
-                    [str(script_path)],
-                    cwd=scripts_dir,
-                    capture_output=True,
+                    [str(script_path.resolve())],
+                    cwd=Path.cwd(),
                     text=True
                 )
                 
@@ -103,7 +108,6 @@ def deploy_command(
                 result = subprocess.run(
                     ["./scripts/deploy_local.sh"],
                     cwd=Path.cwd(),
-                    capture_output=True,
                     text=True
                 )
                 
