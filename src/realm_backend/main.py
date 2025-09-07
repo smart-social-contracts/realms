@@ -71,7 +71,7 @@ from kybra import (
 from kybra_simple_db import Database
 from kybra_simple_logging import get_logger
 
-storage = StableBTreeMap[str, str](memory_id=1, max_key_size=100, max_value_size=5000)
+storage = StableBTreeMap[str, str](memory_id=1, max_key_size=100, max_value_size=10000)
 Database.init(db_storage=storage, audit_enabled=True)
 
 logger = get_logger("main")

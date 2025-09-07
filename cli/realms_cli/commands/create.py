@@ -119,6 +119,30 @@ def create_command(
         console.print(f"   ❌ Source file not found: {source_deploy}")
     
     # 3. Create a simple upload data script
+
+    pre_adjustments_script_content = '''
+#!/usr/bin/env python3
+
+import subprocess, os
+s = os.path.dirname(os.path.abspath(__file__))
+
+print("🚀 Running adjustments.py...")
+v = subprocess.check_output(['dfx', 'canister', 'id', 'vault'], cwd=os.path.dirname(os.path.dirname(s))).decode().strip()
+print(f"v: {v}")
+
+print("Replacig vault principal id...")
+
+with open(os.path.join(s, "adjustments.py"), 'r') as f:
+	content = f.read().replace('<VAULT_PRINCIPAL_ID>', v)
+with open(os.path.join(s, "adjustments.py"), 'w') as f:
+	f.write(content)
+
+print(f"✅ Replaced with: {v}")
+
+# Run the adjustments script
+subprocess.run(['realms', 'shell', '--file', 'generated_realm/scripts/adjustments.py'], cwd=os.path.dirname(os.path.dirname(s)))
+'''.strip()
+
     upload_script_content = f'''#!/bin/bash
 set -e
 
@@ -136,11 +160,37 @@ done
 echo "✅ Data upload completed!"
 '''
     
+    pre_adjustments_script = scripts_dir / "4-run-adjustments.py"
+    pre_adjustments_script.write_text(pre_adjustments_script_content)
+    pre_adjustments_script.chmod(0o755)
+    console.print(f"   ✅ {pre_adjustments_script.name}")
+    
     upload_script = scripts_dir / "3-upload-data.sh"
     upload_script.write_text(upload_script_content)
     upload_script.chmod(0o755)
     console.print(f"   ✅ {upload_script.name}")
-    
+
+
+    adjustments_content = '''
+from kybra import ic
+from ggg import Realm, Treasury, UserProfile, User, Codex
+
+ic.print("Setting treasury vault principal...")
+
+ic.print("len(Realm.instances()) = %d" % len(Realm.instances()))
+ic.print("len(Treasury.instances()) = %d" % len(Treasury.instances()))
+ic.print("len(UserProfile.instances()) = %d" % len(UserProfile.instances()))
+ic.print("len(User.instances()) = %d" % len(User.instances()))
+ic.print("len(Codex.instances()) = %d" % len(Codex.instances()))
+
+for codex in Codex.instances():
+    ic.print(f"{codex.name}: {len(codex.code)}")
+'''.strip()
+
+    adjustments_script = scripts_dir / "adjustments.py"
+    adjustments_script.write_text(adjustments_content)
+    console.print(f"   ✅ {adjustments_script.name}")   
+
     console.print(f"\n[green]🎉 Realm '{realm_name}' created successfully![/green]")
     console.print(f"\n[bold]Next Steps:[/bold]")
     console.print(f"realms deploy --folder {output_dir}")
