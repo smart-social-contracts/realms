@@ -128,6 +128,7 @@ def process_bulk_import(data: List[Dict[str, Any]]) -> Dict[str, Any]:
             create_entity(entity, entity_data)
             successful += 1
         except Exception as e:
+            logger.error(f"Error creating entity: {str(e)}\n{traceback.format_exc()}")
             failed += 1
             errors.append(f"Record {record}: {str(e)}")
 

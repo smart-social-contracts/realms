@@ -177,6 +177,11 @@ from ggg import Realm, Treasury, UserProfile, User, Codex
 
 ic.print("Setting treasury vault principal...")
 
+vault_principal_id = "<VAULT_PRINCIPAL_ID>"
+treasury = Treasury()
+treasury.vault_principal_id = vault_principal_id
+
+
 ic.print("len(Realm.instances()) = %d" % len(Realm.instances()))
 ic.print("len(Treasury.instances()) = %d" % len(Treasury.instances()))
 ic.print("len(UserProfile.instances()) = %d" % len(UserProfile.instances()))
