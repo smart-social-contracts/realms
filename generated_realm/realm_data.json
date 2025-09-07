@@ -1,0 +1,2532 @@
+[
+  {
+    "class": "Realm",
+    "data": {
+      "id": "0",
+      "name": "Generated Demo Realm",
+      "description": "Generated demo realm with 51 citizens and 5 organizations",
+      "created_at": "2025-09-07T17:54:17.127930",
+      "status": "active",
+      "governance_type": "democratic",
+      "population": 51,
+      "organization_count": 5,
+      "settings": {
+        "voting_period_days": 7,
+        "proposal_threshold": 0.1,
+        "quorum_percentage": 0.3,
+        "tax_rate": 0.15,
+        "ubi_amount": 1000
+      }
+    }
+  },
+  {
+    "class": "Treasury",
+    "data": {
+      "name": "Generated Demo Realm Treasury",
+      "vault_principal_id": null,
+      "realm": "0",
+      "created_at": "2025-09-07T17:54:17.127971",
+      "updated_at": "2025-09-07T17:54:17.127973"
+    }
+  },
+  {
+    "class": "UserProfile",
+    "data": {
+      "name": "admin",
+      "allowed_to": "all",
+      "description": "Admin user profile"
+    }
+  },
+  {
+    "class": "UserProfile",
+    "data": {
+      "name": "member",
+      "allowed_to": "",
+      "description": "Member user profile"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "name": "system",
+      "profiles": [
+        "admin"
+      ]
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "system",
+      "profile_picture_url": ""
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "laura_foster_000",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=LauraFoster"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "edward_clark_001",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=EdwardClark"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "carlos_young_002",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=CarlosYoung"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "edward_rodriguez_003",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=EdwardRodriguez"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "ulrich_taylor_004",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=UlrichTaylor"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "george_xavier_005",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=GeorgeXavier"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "rachel_fisher_006",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=RachelFisher"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "samuel_brown_007",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=SamuelBrown"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "ulrich_xavier_008",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=UlrichXavier"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "fiona_duncan_009",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=FionaDuncan"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "ulrich_parker_010",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=UlrichParker"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "charlie_garcia_011",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=CharlieGarcia"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "george_harris_012",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=GeorgeHarris"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "tina_zhang_013",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=TinaZhang"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "tina_xavier_014",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=TinaXavier"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "delia_young_015",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=DeliaYoung"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "ulrich_xavier_016",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=UlrichXavier"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "george_miller_017",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=GeorgeMiller"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "quinn_xavier_018",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=QuinnXavier"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "yuki_underwood_019",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=YukiUnderwood"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "yuki_duncan_020",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=YukiDuncan"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "quinn_anderson_021",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=QuinnAnderson"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "oliver_parker_022",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=OliverParker"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "oliver_valdez_023",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=OliverValdez"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "delia_fisher_024",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=DeliaFisher"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "fatima_anderson_025",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=FatimaAnderson"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "laura_quinn_026",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=LauraQuinn"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "george_parker_027",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=GeorgeParker"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "kevin_adams_028",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=KevinAdams"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "patricia_harris_029",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=PatriciaHarris"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "diana_fisher_030",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=DianaFisher"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "quinn_davis_031",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=QuinnDavis"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "bob_fisher_032",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=BobFisher"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "helen_quinn_033",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=HelenQuinn"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "kevin_lee_034",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=KevinLee"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "helen_wilson_035",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=HelenWilson"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "quinn_quinn_036",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=QuinnQuinn"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "ivan_harris_037",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=IvanHarris"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "edward_rodriguez_038",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=EdwardRodriguez"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "diana_underwood_039",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=DianaUnderwood"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "edward_young_040",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=EdwardYoung"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "diana_garcia_041",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=DianaGarcia"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "tina_foster_042",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=TinaFoster"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "rachel_ellis_043",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=RachelEllis"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "yuki_anderson_044",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=YukiAnderson"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "diana_brown_045",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=DianaBrown"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "diana_duncan_046",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=DianaDuncan"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "samuel_valdez_047",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=SamuelValdez"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "tina_clark_048",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=TinaClark"
+    }
+  },
+  {
+    "class": "User",
+    "data": {
+      "id": "fiona_garcia_049",
+      "profile_picture_url": "https://api.dicebear.com/7.x/personas/svg?seed=FionaGarcia"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Laura Foster",
+      "date_of_birth": "1969-03-06",
+      "user_id": "laura_foster_000"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Edward Clark",
+      "date_of_birth": "1986-08-13",
+      "user_id": "edward_clark_001"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Carlos Young",
+      "date_of_birth": "1993-08-04",
+      "user_id": "carlos_young_002"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Edward Rodriguez",
+      "date_of_birth": "1975-06-28",
+      "user_id": "edward_rodriguez_003"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Ulrich Taylor",
+      "date_of_birth": "1955-08-28",
+      "user_id": "ulrich_taylor_004"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "George Xavier",
+      "date_of_birth": "1997-05-16",
+      "user_id": "george_xavier_005"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Rachel Fisher",
+      "date_of_birth": "1987-08-16",
+      "user_id": "rachel_fisher_006"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Samuel Brown",
+      "date_of_birth": "1947-03-25",
+      "user_id": "samuel_brown_007"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Ulrich Xavier",
+      "date_of_birth": "1962-04-16",
+      "user_id": "ulrich_xavier_008"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Fiona Duncan",
+      "date_of_birth": "2002-12-26",
+      "user_id": "fiona_duncan_009"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Ulrich Parker",
+      "date_of_birth": "1951-09-16",
+      "user_id": "ulrich_parker_010"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Charlie Garcia",
+      "date_of_birth": "1994-01-13",
+      "user_id": "charlie_garcia_011"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "George Harris",
+      "date_of_birth": "1988-01-16",
+      "user_id": "george_harris_012"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Tina Zhang",
+      "date_of_birth": "1990-07-24",
+      "user_id": "tina_zhang_013"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Tina Xavier",
+      "date_of_birth": "1991-04-13",
+      "user_id": "tina_xavier_014"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Delia Young",
+      "date_of_birth": "1989-06-23",
+      "user_id": "delia_young_015"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Ulrich Xavier",
+      "date_of_birth": "2007-08-03",
+      "user_id": "ulrich_xavier_016"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "George Miller",
+      "date_of_birth": "1947-10-01",
+      "user_id": "george_miller_017"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Quinn Xavier",
+      "date_of_birth": "1976-06-09",
+      "user_id": "quinn_xavier_018"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Yuki Underwood",
+      "date_of_birth": "1951-07-30",
+      "user_id": "yuki_underwood_019"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Yuki Duncan",
+      "date_of_birth": "1945-10-04",
+      "user_id": "yuki_duncan_020"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Quinn Anderson",
+      "date_of_birth": "1966-03-10",
+      "user_id": "quinn_anderson_021"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Oliver Parker",
+      "date_of_birth": "2006-02-12",
+      "user_id": "oliver_parker_022"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Oliver Valdez",
+      "date_of_birth": "1982-04-13",
+      "user_id": "oliver_valdez_023"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Delia Fisher",
+      "date_of_birth": "1987-04-23",
+      "user_id": "delia_fisher_024"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Fatima Anderson",
+      "date_of_birth": "1987-04-26",
+      "user_id": "fatima_anderson_025"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Laura Quinn",
+      "date_of_birth": "1964-09-01",
+      "user_id": "laura_quinn_026"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "George Parker",
+      "date_of_birth": "1974-03-03",
+      "user_id": "george_parker_027"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Kevin Adams",
+      "date_of_birth": "1975-07-26",
+      "user_id": "kevin_adams_028"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Patricia Harris",
+      "date_of_birth": "1962-08-09",
+      "user_id": "patricia_harris_029"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Diana Fisher",
+      "date_of_birth": "1950-08-07",
+      "user_id": "diana_fisher_030"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Quinn Davis",
+      "date_of_birth": "1957-03-19",
+      "user_id": "quinn_davis_031"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Bob Fisher",
+      "date_of_birth": "2000-03-07",
+      "user_id": "bob_fisher_032"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Helen Quinn",
+      "date_of_birth": "1948-07-01",
+      "user_id": "helen_quinn_033"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Kevin Lee",
+      "date_of_birth": "1981-11-23",
+      "user_id": "kevin_lee_034"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Helen Wilson",
+      "date_of_birth": "1969-04-27",
+      "user_id": "helen_wilson_035"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Quinn Quinn",
+      "date_of_birth": "1984-09-11",
+      "user_id": "quinn_quinn_036"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Ivan Harris",
+      "date_of_birth": "1954-07-17",
+      "user_id": "ivan_harris_037"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Edward Rodriguez",
+      "date_of_birth": "1964-10-07",
+      "user_id": "edward_rodriguez_038"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Diana Underwood",
+      "date_of_birth": "1954-04-30",
+      "user_id": "diana_underwood_039"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Edward Young",
+      "date_of_birth": "1978-07-21",
+      "user_id": "edward_young_040"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Diana Garcia",
+      "date_of_birth": "2007-09-01",
+      "user_id": "diana_garcia_041"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Tina Foster",
+      "date_of_birth": "1984-04-05",
+      "user_id": "tina_foster_042"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Rachel Ellis",
+      "date_of_birth": "1958-08-03",
+      "user_id": "rachel_ellis_043"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Yuki Anderson",
+      "date_of_birth": "2004-11-21",
+      "user_id": "yuki_anderson_044"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Diana Brown",
+      "date_of_birth": "1986-08-01",
+      "user_id": "diana_brown_045"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Diana Duncan",
+      "date_of_birth": "1956-03-03",
+      "user_id": "diana_duncan_046"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Samuel Valdez",
+      "date_of_birth": "1973-12-31",
+      "user_id": "samuel_valdez_047"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Tina Clark",
+      "date_of_birth": "1951-04-06",
+      "user_id": "tina_clark_048"
+    }
+  },
+  {
+    "class": "Human",
+    "data": {
+      "name": "Fiona Garcia",
+      "date_of_birth": "1977-06-02",
+      "user_id": "fiona_garcia_049"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_4543773b",
+      "user_id": "laura_foster_000",
+      "residence_permit": "valid",
+      "tax_compliance": "under_review",
+      "identity_verification": "verified",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "minor_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_5f3d81d2",
+      "user_id": "edward_clark_001",
+      "residence_permit": "expired",
+      "tax_compliance": "delinquent",
+      "identity_verification": "rejected",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "major_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_b8b979d1",
+      "user_id": "carlos_young_002",
+      "residence_permit": "expired",
+      "tax_compliance": "delinquent",
+      "identity_verification": "verified",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "major_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_7b8d218d",
+      "user_id": "edward_rodriguez_003",
+      "residence_permit": "valid",
+      "tax_compliance": "delinquent",
+      "identity_verification": "pending",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "major_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_bc0eef96",
+      "user_id": "ulrich_taylor_004",
+      "residence_permit": "pending",
+      "tax_compliance": "compliant",
+      "identity_verification": "pending",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "minor_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_283f1b84",
+      "user_id": "george_xavier_005",
+      "residence_permit": "expired",
+      "tax_compliance": "compliant",
+      "identity_verification": "rejected",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "major_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_f21e733c",
+      "user_id": "rachel_fisher_006",
+      "residence_permit": "valid",
+      "tax_compliance": "under_review",
+      "identity_verification": "verified",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "minor_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_48df893d",
+      "user_id": "samuel_brown_007",
+      "residence_permit": "valid",
+      "tax_compliance": "under_review",
+      "identity_verification": "pending",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "major_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_dfeb4cbe",
+      "user_id": "ulrich_xavier_008",
+      "residence_permit": "pending",
+      "tax_compliance": "compliant",
+      "identity_verification": "pending",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "clean"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_30f53294",
+      "user_id": "fiona_duncan_009",
+      "residence_permit": "expired",
+      "tax_compliance": "delinquent",
+      "identity_verification": "rejected",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "minor_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_d5e99d49",
+      "user_id": "ulrich_parker_010",
+      "residence_permit": "pending",
+      "tax_compliance": "compliant",
+      "identity_verification": "verified",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "major_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_c2321abd",
+      "user_id": "charlie_garcia_011",
+      "residence_permit": "pending",
+      "tax_compliance": "delinquent",
+      "identity_verification": "verified",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "clean"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_437d370d",
+      "user_id": "george_harris_012",
+      "residence_permit": "expired",
+      "tax_compliance": "under_review",
+      "identity_verification": "verified",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "minor_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_2780222b",
+      "user_id": "tina_zhang_013",
+      "residence_permit": "expired",
+      "tax_compliance": "under_review",
+      "identity_verification": "verified",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "minor_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_42aba325",
+      "user_id": "tina_xavier_014",
+      "residence_permit": "expired",
+      "tax_compliance": "compliant",
+      "identity_verification": "verified",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "clean"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_474d4639",
+      "user_id": "delia_young_015",
+      "residence_permit": "expired",
+      "tax_compliance": "compliant",
+      "identity_verification": "verified",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "major_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_9c59fae1",
+      "user_id": "ulrich_xavier_016",
+      "residence_permit": "expired",
+      "tax_compliance": "compliant",
+      "identity_verification": "verified",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "clean"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_dc7a3e47",
+      "user_id": "george_miller_017",
+      "residence_permit": "expired",
+      "tax_compliance": "under_review",
+      "identity_verification": "verified",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "clean"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_477a18d7",
+      "user_id": "quinn_xavier_018",
+      "residence_permit": "expired",
+      "tax_compliance": "delinquent",
+      "identity_verification": "rejected",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "major_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_31164b41",
+      "user_id": "yuki_underwood_019",
+      "residence_permit": "pending",
+      "tax_compliance": "delinquent",
+      "identity_verification": "verified",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "minor_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_ffdc7962",
+      "user_id": "yuki_duncan_020",
+      "residence_permit": "pending",
+      "tax_compliance": "under_review",
+      "identity_verification": "rejected",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "clean"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_aa3885ce",
+      "user_id": "quinn_anderson_021",
+      "residence_permit": "valid",
+      "tax_compliance": "under_review",
+      "identity_verification": "pending",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "minor_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_d0766aad",
+      "user_id": "oliver_parker_022",
+      "residence_permit": "expired",
+      "tax_compliance": "delinquent",
+      "identity_verification": "verified",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "clean"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_b3997487",
+      "user_id": "oliver_valdez_023",
+      "residence_permit": "pending",
+      "tax_compliance": "under_review",
+      "identity_verification": "rejected",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "major_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_d03837b4",
+      "user_id": "delia_fisher_024",
+      "residence_permit": "valid",
+      "tax_compliance": "compliant",
+      "identity_verification": "pending",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "minor_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_4ffc3ec9",
+      "user_id": "fatima_anderson_025",
+      "residence_permit": "pending",
+      "tax_compliance": "delinquent",
+      "identity_verification": "verified",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "major_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_b477f4ff",
+      "user_id": "laura_quinn_026",
+      "residence_permit": "expired",
+      "tax_compliance": "compliant",
+      "identity_verification": "rejected",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "clean"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_60005b76",
+      "user_id": "george_parker_027",
+      "residence_permit": "valid",
+      "tax_compliance": "compliant",
+      "identity_verification": "pending",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "minor_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_08980a3b",
+      "user_id": "kevin_adams_028",
+      "residence_permit": "valid",
+      "tax_compliance": "delinquent",
+      "identity_verification": "pending",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "clean"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_95fd8b4e",
+      "user_id": "patricia_harris_029",
+      "residence_permit": "pending",
+      "tax_compliance": "delinquent",
+      "identity_verification": "pending",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "major_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_bab8ab7d",
+      "user_id": "diana_fisher_030",
+      "residence_permit": "expired",
+      "tax_compliance": "delinquent",
+      "identity_verification": "verified",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "minor_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_42e6757f",
+      "user_id": "quinn_davis_031",
+      "residence_permit": "pending",
+      "tax_compliance": "delinquent",
+      "identity_verification": "rejected",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "minor_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_c56f9004",
+      "user_id": "bob_fisher_032",
+      "residence_permit": "expired",
+      "tax_compliance": "delinquent",
+      "identity_verification": "rejected",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "major_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_5fb10b2a",
+      "user_id": "helen_quinn_033",
+      "residence_permit": "valid",
+      "tax_compliance": "compliant",
+      "identity_verification": "pending",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "major_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_693825f8",
+      "user_id": "kevin_lee_034",
+      "residence_permit": "valid",
+      "tax_compliance": "compliant",
+      "identity_verification": "verified",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "clean"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_e82cac17",
+      "user_id": "helen_wilson_035",
+      "residence_permit": "pending",
+      "tax_compliance": "delinquent",
+      "identity_verification": "verified",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "clean"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_0a89f758",
+      "user_id": "quinn_quinn_036",
+      "residence_permit": "valid",
+      "tax_compliance": "delinquent",
+      "identity_verification": "verified",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "minor_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_6f48db9e",
+      "user_id": "ivan_harris_037",
+      "residence_permit": "valid",
+      "tax_compliance": "under_review",
+      "identity_verification": "pending",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "minor_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_ee6c5bb5",
+      "user_id": "edward_rodriguez_038",
+      "residence_permit": "pending",
+      "tax_compliance": "compliant",
+      "identity_verification": "verified",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "major_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_24ca52e2",
+      "user_id": "diana_underwood_039",
+      "residence_permit": "expired",
+      "tax_compliance": "compliant",
+      "identity_verification": "verified",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "clean"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_ea0977a9",
+      "user_id": "edward_young_040",
+      "residence_permit": "valid",
+      "tax_compliance": "delinquent",
+      "identity_verification": "rejected",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "clean"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_529e8780",
+      "user_id": "diana_garcia_041",
+      "residence_permit": "valid",
+      "tax_compliance": "compliant",
+      "identity_verification": "verified",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "major_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_3664d7a6",
+      "user_id": "tina_foster_042",
+      "residence_permit": "valid",
+      "tax_compliance": "under_review",
+      "identity_verification": "verified",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "clean"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_bfdd7a8c",
+      "user_id": "rachel_ellis_043",
+      "residence_permit": "pending",
+      "tax_compliance": "compliant",
+      "identity_verification": "rejected",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "minor_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_595a6a41",
+      "user_id": "yuki_anderson_044",
+      "residence_permit": "expired",
+      "tax_compliance": "delinquent",
+      "identity_verification": "rejected",
+      "voting_eligibility": "eligible",
+      "public_benefits_eligibility": "conditional",
+      "criminal_record": "minor_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_7b7d0689",
+      "user_id": "diana_brown_045",
+      "residence_permit": "expired",
+      "tax_compliance": "under_review",
+      "identity_verification": "verified",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "major_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_e615da28",
+      "user_id": "diana_duncan_046",
+      "residence_permit": "valid",
+      "tax_compliance": "delinquent",
+      "identity_verification": "rejected",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "major_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_2e7e1ab0",
+      "user_id": "samuel_valdez_047",
+      "residence_permit": "pending",
+      "tax_compliance": "compliant",
+      "identity_verification": "rejected",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "clean"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_fd7ae079",
+      "user_id": "tina_clark_048",
+      "residence_permit": "expired",
+      "tax_compliance": "delinquent",
+      "identity_verification": "verified",
+      "voting_eligibility": "suspended",
+      "public_benefits_eligibility": "eligible",
+      "criminal_record": "major_offenses"
+    }
+  },
+  {
+    "class": "Citizen",
+    "data": {
+      "id": "cit_d1e1ca9b",
+      "user_id": "fiona_garcia_049",
+      "residence_permit": "valid",
+      "tax_compliance": "compliant",
+      "identity_verification": "pending",
+      "voting_eligibility": "ineligible",
+      "public_benefits_eligibility": "ineligible",
+      "criminal_record": "minor_offenses"
+    }
+  },
+  {
+    "class": "Organization",
+    "data": {
+      "name": "Healthcare Partners #001"
+    }
+  },
+  {
+    "class": "Organization",
+    "data": {
+      "name": "Housing Development Co #002"
+    }
+  },
+  {
+    "class": "Organization",
+    "data": {
+      "name": "Education Foundation #003"
+    }
+  },
+  {
+    "class": "Organization",
+    "data": {
+      "name": "Infrastructure Management #004"
+    }
+  },
+  {
+    "class": "Organization",
+    "data": {
+      "name": "Technology Innovations #005"
+    }
+  },
+  {
+    "class": "Instrument",
+    "data": {
+      "name": "Bitcoin",
+      "principal_id": "r672xovj60w0qmornmdtmrfxbuh-cai"
+    }
+  },
+  {
+    "class": "Instrument",
+    "data": {
+      "name": "Ethereum",
+      "principal_id": "kou9ofe4ylog3qgfv9psjfziw2a-cai"
+    }
+  },
+  {
+    "class": "Instrument",
+    "data": {
+      "name": "Realm Token",
+      "principal_id": "dyne8ta7lyjedhzonzsdjfw281u-cai"
+    }
+  },
+  {
+    "class": "Instrument",
+    "data": {
+      "name": "Governance Token",
+      "principal_id": "yj29fswuza9icwbhglwzond5vlw-cai"
+    }
+  },
+  {
+    "class": "Instrument",
+    "data": {
+      "name": "Utility Token",
+      "principal_id": "9d3r3ozzavloyfyytjjjcz58sc8-cai"
+    }
+  },
+  {
+    "class": "Instrument",
+    "data": {
+      "name": "Service Credit",
+      "principal_id": "5390eacsinia1luhy43zha68313-cai"
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "delia_fisher_024",
+      "to_user_id": "tina_xavier_014",
+      "instrument_name": "Bitcoin",
+      "amount": 3091
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "oliver_parker_022",
+      "to_user_id": "fiona_duncan_009",
+      "instrument_name": "Ethereum",
+      "amount": 9827
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "tina_foster_042",
+      "to_user_id": "kevin_lee_034",
+      "instrument_name": "Bitcoin",
+      "amount": 5386
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "diana_duncan_046",
+      "to_user_id": "kevin_adams_028",
+      "instrument_name": "Ethereum",
+      "amount": 469
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "george_xavier_005",
+      "to_user_id": "george_harris_012",
+      "instrument_name": "Realm Token",
+      "amount": 3032
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "laura_foster_000",
+      "to_user_id": "oliver_parker_022",
+      "instrument_name": "Service Credit",
+      "amount": 5677
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "edward_rodriguez_038",
+      "to_user_id": "rachel_fisher_006",
+      "instrument_name": "Bitcoin",
+      "amount": 728
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "laura_foster_000",
+      "to_user_id": "kevin_lee_034",
+      "instrument_name": "Utility Token",
+      "amount": 9050
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "quinn_davis_031",
+      "to_user_id": "ivan_harris_037",
+      "instrument_name": "Service Credit",
+      "amount": 5511
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "kevin_lee_034",
+      "to_user_id": "diana_duncan_046",
+      "instrument_name": "Utility Token",
+      "amount": 4349
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "ivan_harris_037",
+      "to_user_id": "diana_duncan_046",
+      "instrument_name": "Utility Token",
+      "amount": 446
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "tina_xavier_014",
+      "to_user_id": "diana_fisher_030",
+      "instrument_name": "Utility Token",
+      "amount": 9481
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "samuel_brown_007",
+      "to_user_id": "samuel_valdez_047",
+      "instrument_name": "Ethereum",
+      "amount": 9342
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "delia_young_015",
+      "to_user_id": "ulrich_xavier_008",
+      "instrument_name": "Governance Token",
+      "amount": 4638
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "diana_fisher_030",
+      "to_user_id": "laura_foster_000",
+      "instrument_name": "Service Credit",
+      "amount": 652
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "helen_quinn_033",
+      "to_user_id": "yuki_underwood_019",
+      "instrument_name": "Utility Token",
+      "amount": 7566
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "edward_clark_001",
+      "to_user_id": "ulrich_xavier_016",
+      "instrument_name": "Utility Token",
+      "amount": 7491
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "diana_garcia_041",
+      "to_user_id": "diana_duncan_046",
+      "instrument_name": "Utility Token",
+      "amount": 3668
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "tina_foster_042",
+      "to_user_id": "helen_quinn_033",
+      "instrument_name": "Bitcoin",
+      "amount": 3345
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "carlos_young_002",
+      "to_user_id": "tina_xavier_014",
+      "instrument_name": "Utility Token",
+      "amount": 8458
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "tina_foster_042",
+      "to_user_id": "edward_rodriguez_038",
+      "instrument_name": "Utility Token",
+      "amount": 3978
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "fiona_garcia_049",
+      "to_user_id": "rachel_ellis_043",
+      "instrument_name": "Realm Token",
+      "amount": 4958
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "edward_young_040",
+      "to_user_id": "george_harris_012",
+      "instrument_name": "Bitcoin",
+      "amount": 7201
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "george_parker_027",
+      "to_user_id": "system",
+      "instrument_name": "Ethereum",
+      "amount": 4022
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "helen_quinn_033",
+      "to_user_id": "ulrich_parker_010",
+      "instrument_name": "Bitcoin",
+      "amount": 9036
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "yuki_underwood_019",
+      "to_user_id": "diana_underwood_039",
+      "instrument_name": "Bitcoin",
+      "amount": 6819
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "oliver_parker_022",
+      "to_user_id": "samuel_brown_007",
+      "instrument_name": "Realm Token",
+      "amount": 2563
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "laura_foster_000",
+      "to_user_id": "rachel_fisher_006",
+      "instrument_name": "Utility Token",
+      "amount": 6130
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "edward_young_040",
+      "to_user_id": "yuki_underwood_019",
+      "instrument_name": "Ethereum",
+      "amount": 9589
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "ulrich_xavier_008",
+      "to_user_id": "ulrich_taylor_004",
+      "instrument_name": "Governance Token",
+      "amount": 991
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "carlos_young_002",
+      "to_user_id": "edward_clark_001",
+      "instrument_name": "Governance Token",
+      "amount": 5052
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "helen_wilson_035",
+      "to_user_id": "bob_fisher_032",
+      "instrument_name": "Governance Token",
+      "amount": 2645
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "edward_rodriguez_003",
+      "to_user_id": "ulrich_taylor_004",
+      "instrument_name": "Ethereum",
+      "amount": 4014
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "ulrich_xavier_016",
+      "to_user_id": "george_xavier_005",
+      "instrument_name": "Utility Token",
+      "amount": 7963
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "oliver_parker_022",
+      "to_user_id": "bob_fisher_032",
+      "instrument_name": "Governance Token",
+      "amount": 6127
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "edward_rodriguez_003",
+      "to_user_id": "tina_foster_042",
+      "instrument_name": "Governance Token",
+      "amount": 4505
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "yuki_duncan_020",
+      "to_user_id": "george_parker_027",
+      "instrument_name": "Bitcoin",
+      "amount": 2223
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "fiona_garcia_049",
+      "to_user_id": "yuki_duncan_020",
+      "instrument_name": "Bitcoin",
+      "amount": 9100
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "fiona_duncan_009",
+      "to_user_id": "yuki_anderson_044",
+      "instrument_name": "Ethereum",
+      "amount": 2602
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "samuel_valdez_047",
+      "to_user_id": "tina_zhang_013",
+      "instrument_name": "Governance Token",
+      "amount": 8120
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "george_miller_017",
+      "to_user_id": "ivan_harris_037",
+      "instrument_name": "Service Credit",
+      "amount": 1074
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "helen_quinn_033",
+      "to_user_id": "edward_clark_001",
+      "instrument_name": "Governance Token",
+      "amount": 8702
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "quinn_xavier_018",
+      "to_user_id": "yuki_duncan_020",
+      "instrument_name": "Service Credit",
+      "amount": 7430
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "delia_young_015",
+      "to_user_id": "charlie_garcia_011",
+      "instrument_name": "Bitcoin",
+      "amount": 2146
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "edward_rodriguez_038",
+      "to_user_id": "laura_quinn_026",
+      "instrument_name": "Service Credit",
+      "amount": 6279
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "fatima_anderson_025",
+      "to_user_id": "diana_garcia_041",
+      "instrument_name": "Service Credit",
+      "amount": 4834
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "patricia_harris_029",
+      "to_user_id": "george_miller_017",
+      "instrument_name": "Bitcoin",
+      "amount": 6062
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "diana_duncan_046",
+      "to_user_id": "tina_xavier_014",
+      "instrument_name": "Governance Token",
+      "amount": 4694
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "laura_quinn_026",
+      "to_user_id": "tina_clark_048",
+      "instrument_name": "Service Credit",
+      "amount": 9619
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "laura_quinn_026",
+      "to_user_id": "george_parker_027",
+      "instrument_name": "Utility Token",
+      "amount": 1748
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "fatima_anderson_025",
+      "to_user_id": "fiona_garcia_049",
+      "instrument_name": "Bitcoin",
+      "amount": 3536
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "samuel_brown_007",
+      "to_user_id": "rachel_fisher_006",
+      "instrument_name": "Governance Token",
+      "amount": 5254
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "ulrich_xavier_016",
+      "to_user_id": "george_miller_017",
+      "instrument_name": "Realm Token",
+      "amount": 7906
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "tina_zhang_013",
+      "to_user_id": "laura_foster_000",
+      "instrument_name": "Ethereum",
+      "amount": 4194
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "yuki_anderson_044",
+      "to_user_id": "rachel_ellis_043",
+      "instrument_name": "Bitcoin",
+      "amount": 4226
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "quinn_xavier_018",
+      "to_user_id": "tina_xavier_014",
+      "instrument_name": "Realm Token",
+      "amount": 1159
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "edward_young_040",
+      "to_user_id": "ulrich_xavier_016",
+      "instrument_name": "Realm Token",
+      "amount": 421
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "laura_quinn_026",
+      "to_user_id": "bob_fisher_032",
+      "instrument_name": "Bitcoin",
+      "amount": 2209
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "ulrich_parker_010",
+      "to_user_id": "oliver_valdez_023",
+      "instrument_name": "Governance Token",
+      "amount": 194
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "edward_clark_001",
+      "to_user_id": "oliver_parker_022",
+      "instrument_name": "Governance Token",
+      "amount": 9267
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "edward_young_040",
+      "to_user_id": "bob_fisher_032",
+      "instrument_name": "Bitcoin",
+      "amount": 6646
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "oliver_parker_022",
+      "to_user_id": "laura_foster_000",
+      "instrument_name": "Governance Token",
+      "amount": 9700
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "kevin_lee_034",
+      "to_user_id": "samuel_valdez_047",
+      "instrument_name": "Service Credit",
+      "amount": 3325
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "quinn_davis_031",
+      "to_user_id": "quinn_quinn_036",
+      "instrument_name": "Bitcoin",
+      "amount": 9900
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "fatima_anderson_025",
+      "to_user_id": "charlie_garcia_011",
+      "instrument_name": "Service Credit",
+      "amount": 7155
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "edward_rodriguez_003",
+      "to_user_id": "fiona_garcia_049",
+      "instrument_name": "Governance Token",
+      "amount": 6753
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "quinn_davis_031",
+      "to_user_id": "laura_foster_000",
+      "instrument_name": "Governance Token",
+      "amount": 7152
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "carlos_young_002",
+      "to_user_id": "edward_rodriguez_038",
+      "instrument_name": "Governance Token",
+      "amount": 3276
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "samuel_valdez_047",
+      "to_user_id": "rachel_fisher_006",
+      "instrument_name": "Ethereum",
+      "amount": 1878
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "fiona_duncan_009",
+      "to_user_id": "fatima_anderson_025",
+      "instrument_name": "Realm Token",
+      "amount": 6580
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "diana_garcia_041",
+      "to_user_id": "helen_quinn_033",
+      "instrument_name": "Service Credit",
+      "amount": 6283
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "george_harris_012",
+      "to_user_id": "fiona_duncan_009",
+      "instrument_name": "Realm Token",
+      "amount": 2914
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "yuki_duncan_020",
+      "to_user_id": "oliver_valdez_023",
+      "instrument_name": "Realm Token",
+      "amount": 4595
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "helen_quinn_033",
+      "to_user_id": "quinn_quinn_036",
+      "instrument_name": "Utility Token",
+      "amount": 2021
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "delia_young_015",
+      "to_user_id": "fiona_duncan_009",
+      "instrument_name": "Ethereum",
+      "amount": 3001
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "charlie_garcia_011",
+      "to_user_id": "oliver_parker_022",
+      "instrument_name": "Realm Token",
+      "amount": 375
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "charlie_garcia_011",
+      "to_user_id": "ulrich_xavier_008",
+      "instrument_name": "Service Credit",
+      "amount": 4166
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "george_parker_027",
+      "to_user_id": "ivan_harris_037",
+      "instrument_name": "Ethereum",
+      "amount": 8014
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "diana_brown_045",
+      "to_user_id": "yuki_underwood_019",
+      "instrument_name": "Governance Token",
+      "amount": 1217
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "quinn_anderson_021",
+      "to_user_id": "diana_underwood_039",
+      "instrument_name": "Bitcoin",
+      "amount": 4956
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "diana_fisher_030",
+      "to_user_id": "ulrich_xavier_008",
+      "instrument_name": "Governance Token",
+      "amount": 2290
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "bob_fisher_032",
+      "to_user_id": "charlie_garcia_011",
+      "instrument_name": "Bitcoin",
+      "amount": 6521
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "samuel_valdez_047",
+      "to_user_id": "kevin_lee_034",
+      "instrument_name": "Ethereum",
+      "amount": 7287
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "tina_zhang_013",
+      "to_user_id": "george_parker_027",
+      "instrument_name": "Ethereum",
+      "amount": 4032
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "delia_young_015",
+      "to_user_id": "yuki_anderson_044",
+      "instrument_name": "Bitcoin",
+      "amount": 6157
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "george_miller_017",
+      "to_user_id": "diana_brown_045",
+      "instrument_name": "Realm Token",
+      "amount": 1500
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "kevin_lee_034",
+      "to_user_id": "charlie_garcia_011",
+      "instrument_name": "Service Credit",
+      "amount": 9080
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "oliver_parker_022",
+      "to_user_id": "samuel_brown_007",
+      "instrument_name": "Utility Token",
+      "amount": 8299
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "ivan_harris_037",
+      "to_user_id": "bob_fisher_032",
+      "instrument_name": "Governance Token",
+      "amount": 1602
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "diana_garcia_041",
+      "to_user_id": "laura_quinn_026",
+      "instrument_name": "Ethereum",
+      "amount": 5047
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "ulrich_xavier_016",
+      "to_user_id": "fiona_duncan_009",
+      "instrument_name": "Service Credit",
+      "amount": 2784
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "quinn_davis_031",
+      "to_user_id": "carlos_young_002",
+      "instrument_name": "Realm Token",
+      "amount": 2939
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "tina_zhang_013",
+      "to_user_id": "ulrich_taylor_004",
+      "instrument_name": "Governance Token",
+      "amount": 2275
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "ulrich_parker_010",
+      "to_user_id": "quinn_anderson_021",
+      "instrument_name": "Ethereum",
+      "amount": 75
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "george_xavier_005",
+      "to_user_id": "bob_fisher_032",
+      "instrument_name": "Service Credit",
+      "amount": 1372
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "rachel_ellis_043",
+      "to_user_id": "quinn_xavier_018",
+      "instrument_name": "Service Credit",
+      "amount": 1403
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "bob_fisher_032",
+      "to_user_id": "diana_brown_045",
+      "instrument_name": "Bitcoin",
+      "amount": 9366
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "ulrich_parker_010",
+      "to_user_id": "george_miller_017",
+      "instrument_name": "Service Credit",
+      "amount": 8044
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "ulrich_taylor_004",
+      "to_user_id": "kevin_adams_028",
+      "instrument_name": "Governance Token",
+      "amount": 7644
+    }
+  },
+  {
+    "class": "Transfer",
+    "data": {
+      "from_user_id": "oliver_valdez_023",
+      "to_user_id": "charlie_garcia_011",
+      "instrument_name": "Ethereum",
+      "amount": 9401
+    }
+  },
+  {
+    "class": "Dispute",
+    "data": {
+      "status": "open"
+    }
+  },
+  {
+    "class": "Dispute",
+    "data": {
+      "status": "closed"
+    }
+  },
+  {
+    "class": "Dispute",
+    "data": {
+      "status": "appealed"
+    }
+  },
+  {
+    "class": "Dispute",
+    "data": {
+      "status": "investigating"
+    }
+  },
+  {
+    "class": "Dispute",
+    "data": {
+      "status": "closed"
+    }
+  },
+  {
+    "class": "Dispute",
+    "data": {
+      "status": "resolved"
+    }
+  },
+  {
+    "class": "Dispute",
+    "data": {
+      "status": "appealed"
+    }
+  },
+  {
+    "class": "Dispute",
+    "data": {
+      "status": "resolved"
+    }
+  },
+  {
+    "class": "Dispute",
+    "data": {
+      "status": "appealed"
+    }
+  },
+  {
+    "class": "Dispute",
+    "data": {
+      "status": "resolved"
+    }
+  },
+  {
+    "class": "Mandate",
+    "data": {
+      "name": "Tax Collection"
+    }
+  },
+  {
+    "class": "Mandate",
+    "data": {
+      "name": "Social Benefits"
+    }
+  },
+  {
+    "class": "Mandate",
+    "data": {
+      "name": "License Management"
+    }
+  },
+  {
+    "class": "Mandate",
+    "data": {
+      "name": "Land Registry"
+    }
+  },
+  {
+    "class": "Mandate",
+    "data": {
+      "name": "Voting System"
+    }
+  },
+  {
+    "class": "Mandate",
+    "data": {
+      "name": "Healthcare Services"
+    }
+  }
+]

@@ -34,4 +34,4 @@ src/realm_frontend/static/photos/
 src/realm_frontend/static/videos/
 
 # Generated realm folder
-generated_realm
+# generated_realm

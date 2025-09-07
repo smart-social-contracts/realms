@@ -1,9 +1,7 @@
 export const isDevelopmentMode = () => {
-  return (
-    import.meta.env.VITE_DEV_DUMMY_MODE === 'true'
-  );
+  return false; // Always use production mode - no dummy backend
 };
 
-export const isProductionMode = () => !isDevelopmentMode();
+export const isProductionMode = () => true;
 
-console.log(`Running in ${isDevelopmentMode() ? 'DEVELOPMENT' : 'PRODUCTION'} mode`);
+console.log('Running in PRODUCTION mode - using real backend canister');
