@@ -99,8 +99,7 @@
     try {
       const config = entityConfigs.find(c => c.name === entityType);
       if (!config) {
-        error = `No configuration found for entity type: ${entityType}`;
-        return;
+        throw new Error(`No configuration found for entity type: ${entityType}`);
       }
       
       let result = await config.fetch(config.page(), config.perPage());
@@ -108,60 +107,62 @@
       
       // Extract actual data from response
       let actualData = result?.success ? result.data : result;
+      
       if (!actualData) {
+        console.log(`🔧 AdminDashboard: No data found for ${entityType}, setting empty array`);
         data = {...data, [entityType]: []};
-        return;
-      }
-      
-      // Navigate to entity data using config path
-      let entityData = actualData;
-      const pathParts = config.dataPath.split('.');
-      
-      for (const part of pathParts) {
-        if (entityData && entityData[part] !== undefined) {
-          entityData = entityData[part];
-        } else {
-          entityData = null;
-          break;
-        }
-      }
-      
-      // Parse and store entity data
-      if (entityData && Array.isArray(entityData)) {
-        const parsedData = entityData.map(item => {
-          if (typeof item === 'string') {
-            try {
-              return JSON.parse(item);
-            } catch (e) {
-              return item;
-            }
-          }
-          return item;
-        });
-        
-        console.log(`🔧 AdminDashboard: Loaded ${parsedData.length} ${entityType} entities`);
-        data = {...data, [entityType]: parsedData};
-        
-        // Set pagination if available
-        if (config.paginationPath) {
-          const paginationParts = config.paginationPath.split('.');
-          let paginationData = actualData;
-          
-          for (const part of paginationParts) {
-            if (paginationData && paginationData[part]) {
-              paginationData = paginationData[part];
-            } else {
-              paginationData = null;
-              break;
-            }
-          }
-          
-          if (paginationData) {
-            setPaginationForEntity(entityType, paginationData);
-          }
-        }
       } else {
-        data = {...data, [entityType]: []};
+        // Navigate to entity data using config path
+        let entityData = actualData;
+        const pathParts = config.dataPath.split('.');
+        
+        for (const part of pathParts) {
+          if (entityData && entityData[part] !== undefined) {
+            entityData = entityData[part];
+          } else {
+            entityData = null;
+            break;
+          }
+        }
+        
+        // Parse and store entity data
+        if (entityData && Array.isArray(entityData)) {
+          const parsedData = entityData.map(item => {
+            if (typeof item === 'string') {
+              try {
+                return JSON.parse(item);
+              } catch (e) {
+                return item;
+              }
+            }
+            return item;
+          });
+          
+          console.log(`🔧 AdminDashboard: Loaded ${parsedData.length} ${entityType} entities`);
+          data = {...data, [entityType]: parsedData};
+          
+          // Set pagination if available
+          if (config.paginationPath) {
+            const paginationParts = config.paginationPath.split('.');
+            let paginationData = actualData;
+            
+            for (const part of paginationParts) {
+              if (paginationData && paginationData[part]) {
+                paginationData = paginationData[part];
+              } else {
+                paginationData = null;
+                break;
+              }
+            }
+            
+            if (paginationData) {
+              setPaginationForEntity(entityType, paginationData);
+            }
+          }
+        } else {
+          console.log(`🔧 AdminDashboard: Entity data not found or not array for ${entityType}`);
+          data = {...data, [entityType]: []};
+        }
       }
     } catch (err) {
       console.error(`🔧 AdminDashboard: Error fetching ${entityType}:`, err);
