@@ -94,6 +94,7 @@
     console.log('🔧 AdminDashboard: Fetching data for:', entityType);
     
     loading = true;
+    console.log('🔧 AdminDashboard: Set loading to true');
     error = null;
     
     try {
@@ -170,6 +171,7 @@
       data = {...data, [entityType]: []};
     } finally {
       loading = false;
+      console.log('🔧 AdminDashboard: Set loading to false in finally block');
     }
   }
   
