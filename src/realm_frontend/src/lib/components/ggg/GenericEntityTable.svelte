@@ -7,13 +7,22 @@
     console.log(`Page change requested for ${entityType} to page ${page}`);
   };
   
-  console.log('entityType', entityType);
-  console.log('items', items);
-  console.log('loading', loading);
-  console.log('pagination', pagination);
+  console.log('🔧 GenericEntityTable: entityType', entityType);
+  console.log('🔧 GenericEntityTable: items received', items);
+  console.log('🔧 GenericEntityTable: items length', items?.length);
+  console.log('🔧 GenericEntityTable: loading', loading);
+  console.log('🔧 GenericEntityTable: pagination', pagination);
   
   // Alias for backward compatibility
   $: entities = items;
+  
+  // Reactive logging to track changes
+  $: if (entities) {
+    console.log('🔧 GenericEntityTable: entities updated for', entityType, 'length:', entities.length);
+    if (entities.length > 0) {
+      console.log('🔧 GenericEntityTable: first entity:', entities[0]);
+    }
+  }
   
   // Dynamically determine columns based on entity structure
   $: columns = entities.length > 0 ? 

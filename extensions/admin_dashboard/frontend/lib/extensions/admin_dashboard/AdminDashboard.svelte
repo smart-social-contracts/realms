@@ -25,6 +25,17 @@
   let importLoading = false;
   let templates = {};
   
+  // Reactive statement to track data changes
+  $: {
+    console.log('🔧 AdminDashboard: Data object changed:', data);
+    console.log('🔧 AdminDashboard: Available entity types:', Object.keys(data));
+    console.log('🔧 AdminDashboard: Current activeTab:', activeTab);
+    if (data[activeTab]) {
+      console.log('🔧 AdminDashboard: Data for activeTab:', data[activeTab]);
+      console.log('🔧 AdminDashboard: Data length for activeTab:', data[activeTab].length);
+    }
+  }
+
   // Pagination state for all entities
   let usersPage = 0, usersPerPage = 5, usersPagination = null;
   let mandatesPage = 0, mandatesPerPage = 5, mandatesPagination = null;
@@ -114,12 +125,10 @@
       
       if (actualData) {
         const pathParts = config.dataPath.split('.');
-        let entityData = actualData;
-        
-        console.log('🔧 AdminDashboard: Data path:', config.dataPath);
         console.log('🔧 AdminDashboard: Path parts:', pathParts);
         console.log('🔧 AdminDashboard: Starting with actualData:', actualData);
         
+        let entityData = actualData;
         for (const part of pathParts) {
           console.log('🔧 AdminDashboard: Processing path part:', part);
           console.log('🔧 AdminDashboard: Current entityData:', entityData);
@@ -151,7 +160,11 @@
           console.log('🔧 AdminDashboard: Parsed data for', entityType, ':', parsedData);
           console.log('🔧 AdminDashboard: Sample parsed item:', parsedData[0]);
           
+          // Store the parsed data in the reactive data object
           data = {...data, [entityType]: parsedData};
+          console.log('🔧 AdminDashboard: Updated data object:', data);
+          console.log('🔧 AdminDashboard: Data for', entityType, 'in data object:', data[entityType]);
+          console.log('🔧 AdminDashboard: Total entity types in data:', Object.keys(data));
           
           if (config.paginationPath) {
             const paginationParts = config.paginationPath.split('.');
@@ -487,6 +500,10 @@
             onPageChange={handleTransfersPageChange}
           />
         {:else if activeTab === 'users'}
+          {#if data[activeTab]}
+            {console.log('🔧 AdminDashboard: Rendering users table with data:', data[activeTab])}
+            {console.log('🔧 AdminDashboard: Data length:', data[activeTab].length)}
+          {/if}
           <GenericEntityTable 
             entityType="users"
             items={filteredData[activeTab] || data[activeTab] || []}
@@ -495,6 +512,11 @@
             onPageChange={handleUsersPageChange}
           />
         {:else if activeTab === 'mandates'}
+          {#if data[activeTab]}
+            {console.log('🔧 AdminDashboard: Rendering mandates table with data:', data[activeTab])}
+            {console.log('🔧 AdminDashboard: Data length:', data[activeTab].length)}
+            {console.log('🔧 AdminDashboard: First item:', data[activeTab][0])}
+          {/if}
           <GenericEntityTable 
             entityType="mandates"
             items={filteredData[activeTab] || data[activeTab] || []}
