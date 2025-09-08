@@ -7,6 +7,8 @@ import base64
 
 import typer
 
+from ..main import MAX_BATCH_SIZE
+
 from ..utils import (
     console,
     display_error_panel,
@@ -20,14 +22,15 @@ def import_data_command(
     file_path: str,
     entity_type: str,
     format: str = "json",
-    batch_size: int = 3,
+    batch_size: int = MAX_BATCH_SIZE,
     dry_run: bool = False,
+    network: str = "local",
 ) -> None:
     """Import data into the realm. Supports JSON data and Python codex files."""
 
     # Handle codex files separately
     if entity_type == "codex":
-        return import_codex_command(file_path, dry_run=dry_run)
+        return import_codex_command(file_path, dry_run=dry_run, network=network)
 
     console.print(
         f"[bold blue]📥 Importing {entity_type} data from {file_path}[/bold blue]\n"
@@ -57,7 +60,6 @@ def import_data_command(
 
         project_root = get_project_root()
 
-        batch_size = 3
         for i in range(0, len(data), batch_size):
             chunk = data[i:i + batch_size]
 
@@ -80,7 +82,7 @@ def import_data_command(
                     "extension_sync_call",
                     f'(record {{ extension_name = "admin_dashboard"; function_name = "import_data"; args = "{escaped_args}"; }})',
                     "--network",
-                    "local",
+                    network,
                 ],
                 cwd=project_root
             )
@@ -139,7 +141,7 @@ def import_data_command(
 
 
 def import_codex_command(
-    file_path: str, codex_name: Optional[str] = None, dry_run: bool = False
+    file_path: str, codex_name: Optional[str] = None, dry_run: bool = False, network: str = "local"
 ) -> None:
     """Import Python codex file into the realm."""
 
@@ -211,7 +213,7 @@ def import_codex_command(
                 "extension_sync_call",
                 f'(record {{ extension_name = "admin_dashboard"; function_name = "import_data"; args = "{escaped_args}"; }})',
                 "--network",
-                "local",
+                network,
             ],
             cwd=project_root
         )

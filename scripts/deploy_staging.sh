@@ -3,16 +3,10 @@
 set -e  # Exit on error
 set -x
 
-IDENTITY_FILE="$1"
-NETWORK="${2:-staging}"  # Default to staging if not specified
+# Get network from first argument, default to staging
+NETWORK="${1:-staging}"
 
 echo "Deploying to network: $NETWORK"
-
-if [ -n "$IDENTITY_FILE" ]; then
-  echo "Using identity file: $IDENTITY_FILE"
-  dfx identity import --force --storage-mode plaintext github-actions "$IDENTITY_FILE"
-  dfx identity use github-actions
-fi
 
 echo "Checking kybra installation..."
 python3 -m kybra --version || {

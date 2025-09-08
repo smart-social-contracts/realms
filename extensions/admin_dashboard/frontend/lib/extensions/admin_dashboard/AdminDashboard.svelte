@@ -148,6 +148,9 @@
             return item;
           });
           
+          console.log('🔧 AdminDashboard: Parsed data for', entityType, ':', parsedData);
+          console.log('🔧 AdminDashboard: Sample parsed item:', parsedData[0]);
+          
           data = {...data, [entityType]: parsedData};
           
           if (config.paginationPath) {

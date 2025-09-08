@@ -120,40 +120,61 @@ def create_command(
     
     # 3. Create a simple upload data script
 
-    pre_adjustments_script_content = '''
+    pre_adjustments_script_content = f'''
 #!/usr/bin/env python3
 
-import subprocess, os
+import subprocess, os, sys
 s = os.path.dirname(os.path.abspath(__file__))
 
-print("🚀 Running adjustments.py...")
-v = subprocess.check_output(['dfx', 'canister', 'id', 'vault'], cwd=os.path.dirname(os.path.dirname(s))).decode().strip()
-print(f"v: {v}")
+# Get network from command line argument or default to local
+network = sys.argv[1] if len(sys.argv) > 1 else 'local'
+print(f"🚀 Running adjustments.py for network: {{network}}")
 
-print("Replacig vault principal id...")
+# Build dfx command with network parameter
+dfx_cmd = ['dfx', 'canister', 'id', 'vault']
+if network != 'local':
+    dfx_cmd.extend(['--network', network])
+
+v = subprocess.check_output(dfx_cmd, cwd=os.path.dirname(os.path.dirname(s))).decode().strip()
+print(f"v: {{v}}")
+
+print("Replacing vault principal id...")
 
 with open(os.path.join(s, "adjustments.py"), 'r') as f:
 	content = f.read().replace('<VAULT_PRINCIPAL_ID>', v)
 with open(os.path.join(s, "adjustments.py"), 'w') as f:
 	f.write(content)
 
-print(f"✅ Replaced with: {v}")
+print(f"✅ Replaced with: {{v}}")
 
-# Run the adjustments script
-subprocess.run(['realms', 'shell', '--file', 'generated_realm/scripts/adjustments.py'], cwd=os.path.dirname(os.path.dirname(s)))
+# Run the adjustments script with network parameter
+realms_cmd = ['realms', 'shell', '--file', 'generated_realm/scripts/adjustments.py']
+if network != 'local':
+    realms_cmd.extend(['--network', network])
+subprocess.run(realms_cmd, cwd=os.path.dirname(os.path.dirname(s)))
 '''.strip()
 
     upload_script_content = f'''#!/bin/bash
 set -e
 
+# Get network from command line argument or default to local
+NETWORK="${{1:-local}}"
+echo "📥 Uploading realm data for network: $NETWORK..."
+
+# Build realms command with network parameter
+REALMS_CMD="realms import"
+if [ "$NETWORK" != "local" ]; then
+    REALMS_CMD="realms import --network $NETWORK"
+fi
+
 echo "📥 Uploading realm data..."
-realms import realm_data.json
+$REALMS_CMD realm_data.json
 
 echo "📜 Uploading codex files..."
 for codex_file in *_codex.py; do
     if [ -f "$codex_file" ]; then
         echo "  Importing $(basename $codex_file)..."
-        realms import "$codex_file" --type codex
+        $REALMS_CMD "$codex_file" --type codex
     fi
 done
 

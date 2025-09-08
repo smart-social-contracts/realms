@@ -1,5 +1,7 @@
 """Main CLI application for Realms."""
 
+MAX_BATCH_SIZE = 100
+
 from typing import List, Optional
 
 import typer
@@ -117,13 +119,14 @@ def import_data(
         None, "--type", help="Entity type (codex for Python files, or json entity type)"
     ),
     format: str = typer.Option("json", "--format", help="Data format (json)"),
-    batch_size: int = typer.Option(100, "--batch-size", help="Batch size for import"),
+    batch_size: int = typer.Option(MAX_BATCH_SIZE, "--batch-size", help="Batch size for import"),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Show what would be imported without executing"
     ),
+    network: str = typer.Option("local", "--network", help="Network to use for import"),
 ) -> None:
     """Import data into the realm. Supports JSON data and Python codex files."""
-    import_data_command(file_path, entity_type, format, batch_size, dry_run)
+    import_data_command(file_path, entity_type, format, batch_size, dry_run, network)
 
 
 

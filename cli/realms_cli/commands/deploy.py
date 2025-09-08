@@ -41,11 +41,12 @@ def deploy_command(
             console.print(f"[red]❌ Scripts directory not found: {scripts_dir}[/red]")
             raise typer.Exit(1)
         
-        # Run the three scripts in sequence
+        # Run the scripts in sequence
         scripts = [
             "1-install-extensions.sh",
             "2-deploy-canisters.sh", 
-            "3-upload-data.sh"
+            "3-upload-data.sh",
+            "4-run-adjustments.py"
         ]
         
         try:
@@ -58,21 +59,28 @@ def deploy_command(
                 console.print(f"🔧 Running {script_name}...")
                 console.print(f"[dim]Script path: {script_path}[/dim]")
                 
-                # Determine working directory based on script
+                # Determine working directory and command based on script
                 if script_name == "3-upload-data.sh":
                     # Run upload script from the realm folder where data files are located
                     working_dir = folder_path
+                    cmd = [str(script_path.resolve())]
+                elif script_name == "4-run-adjustments.py":
+                    # Run Python script from the realm folder and pass network parameter
+                    working_dir = folder_path
+                    cmd = ["python", str(script_path.resolve()), network]
                 else:
                     # Run other scripts from project root
                     working_dir = Path.cwd()
+                    cmd = [str(script_path.resolve())]
                 
                 console.print(f"[dim]Working directory: {working_dir}[/dim]")
+                console.print(f"[dim]Command: {' '.join(cmd)}[/dim]")
                 
                 # Make sure script is executable
                 script_path.chmod(0o755)
                 
                 result = subprocess.run(
-                    [str(script_path.resolve())],
+                    cmd,
                     cwd=working_dir,
                     text=True
                 )
@@ -112,13 +120,22 @@ def deploy_command(
     else:
         # Default deployment using deploy_local.sh
         try:
-            if network == "local":
-                console.print("🔧 Running local deployment script...")
-                result = subprocess.run(
-                    ["./scripts/deploy_local.sh"],
-                    cwd=Path.cwd(),
-                    text=True
-                )
+            if network in ["local", "staging", "mainnet", "ic"]:
+
+                if network == "local":
+                    console.print("🔧 Running local deployment script...")
+                    result = subprocess.run(
+                        ["./scripts/deploy_local.sh"],
+                        cwd=Path.cwd(),
+                        text=True
+                    )
+                elif network in ["staging", "mainnet", "ic"]:
+                    console.print("🔧 Running staging deployment script...")
+                    result = subprocess.run(
+                        ["./scripts/deploy_staging.sh"],
+                        cwd=Path.cwd(),
+                        text=True
+                    )
                 
                 if result.returncode == 0:
                     console.print("[green]✅ Deployment completed successfully[/green]")
@@ -127,7 +144,7 @@ def deploy_command(
                     console.print("[red]❌ Deployment failed[/red]")
                     console.print(f"[red]{result.stderr}[/red]")
                     raise typer.Exit(1)
-            else:
+            else: 
                 console.print(f"[yellow]⚠️  Network '{network}' deployment not yet implemented[/yellow]")
                 console.print("[dim]Currently only 'local' network is supported[/dim]")
                 
