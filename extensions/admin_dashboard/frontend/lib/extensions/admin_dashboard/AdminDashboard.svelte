@@ -91,19 +91,15 @@
   
   // Simplified function to fetch data for a specific entity type
   async function fetchEntityData(entityType) {
-    console.log('🚨🚨🚨 DEVIN DEBUG: fetchEntityData called with:', entityType);
     console.log('🔧 AdminDashboard: Fetching data for:', entityType);
-    console.log('🔧 AdminDashboard: Function entry - loading state before:', loading);
+    
+    loading = true;
+    error = null;
     
     try {
-      loading = true;
-      console.log('🔧 AdminDashboard: Loading set to true for:', entityType);
-      error = null;
-      
       const config = entityConfigs.find(c => c.name === entityType);
       if (!config) {
         error = `No configuration found for entity type: ${entityType}`;
-        loading = false;
         return;
       }
       
@@ -114,7 +110,6 @@
       let actualData = result?.success ? result.data : result;
       if (!actualData) {
         data = {...data, [entityType]: []};
-        loading = false;
         return;
       }
       
@@ -145,50 +140,35 @@
         });
         
         console.log(`🔧 AdminDashboard: Loaded ${parsedData.length} ${entityType} entities`);
-        
         data = {...data, [entityType]: parsedData};
-        console.log('🔧 AdminDashboard: Data assignment completed for', entityType);
-        console.log('🔧 AdminDashboard: Function continuing after data assignment for', entityType);
         
         // Set pagination if available
-        console.log('🔧 AdminDashboard: About to process pagination for', entityType);
-        try {
-          if (config.paginationPath) {
-            const paginationParts = config.paginationPath.split('.');
-            let paginationData = actualData;
-            
-            for (const part of paginationParts) {
-              if (paginationData && paginationData[part]) {
-                paginationData = paginationData[part];
-              } else {
-                paginationData = null;
-                break;
-              }
-            }
-            
-            if (paginationData) {
-              setPaginationForEntity(entityType, paginationData);
+        if (config.paginationPath) {
+          const paginationParts = config.paginationPath.split('.');
+          let paginationData = actualData;
+          
+          for (const part of paginationParts) {
+            if (paginationData && paginationData[part]) {
+              paginationData = paginationData[part];
+            } else {
+              paginationData = null;
+              break;
             }
           }
-          console.log('🔧 AdminDashboard: Pagination processing completed for', entityType);
-        } catch (paginationError) {
-          console.error('🔧 AdminDashboard: Error during pagination processing:', paginationError);
+          
+          if (paginationData) {
+            setPaginationForEntity(entityType, paginationData);
+          }
         }
       } else {
         data = {...data, [entityType]: []};
       }
-      
-      console.log('🔧 AdminDashboard: About to set loading to false for', entityType);
-      // Set loading to false after successful data processing
-      loading = false;
-      console.log('🔧 AdminDashboard: Loading set to false for', entityType, '(success path)');
     } catch (err) {
       console.error(`🔧 AdminDashboard: Error fetching ${entityType}:`, err);
       error = `Error fetching ${entityType}: ${err.message}`;
       data = {...data, [entityType]: []};
     } finally {
       loading = false;
-      console.log('🔧 AdminDashboard: Loading set to false for', entityType);
     }
   }
   
