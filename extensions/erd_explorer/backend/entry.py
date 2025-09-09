@@ -3,131 +3,200 @@ ERD Explorer Extension Backend
 Provides entity relationship data and metadata for the ERD visualization
 """
 
+import inspect
+
+from api.ggg_entities import (
+    list_codexes,
+    list_disputes,
+    list_instruments,
+    list_licenses,
+    list_mandates,
+    list_organizations,
+    list_proposals,
+    list_realms,
+    list_tasks,
+    list_trades,
+    list_transfers,
+    list_users,
+    list_votes,
+)
+from ggg.balance import Balance
+from ggg.citizen import Citizen
+from ggg.codex import Codex
+from ggg.contract import Contract
+from ggg.dispute import Dispute
+from ggg.human import Human
+from ggg.identity import Identity
+from ggg.instrument import Instrument
+from ggg.land import Land
+from ggg.license import License
+from ggg.mandate import Mandate
+from ggg.organization import Organization
+from ggg.proposal import Proposal
+from ggg.realm import Realm
+from ggg.task import Task
+from ggg.task_executions import TaskExecution
+from ggg.task_schedule import TaskSchedule
+from ggg.trade import Trade
+from ggg.transfer import Transfer
+from ggg.treasury import Treasury
+from ggg.user import User
+from ggg.user_profile import UserProfile
+from ggg.vote import Vote
+from kybra_simple_db import (
+    Boolean,
+    Entity,
+    Float,
+    Integer,
+    ManyToMany,
+    ManyToOne,
+    OneToMany,
+    OneToOne,
+    String,
+    TimestampedMixin,
+)
+
+
+def extract_entity_schema():
+    """
+    Dynamically extracts entity schema from GGG class definitions
+    """
+    # Get all entity classes
+    entity_classes = [
+        User,
+        Realm,
+        Human,
+        Identity,
+        Citizen,
+        Organization,
+        Codex,
+        Task,
+        Transfer,
+        Trade,
+        Instrument,
+        Mandate,
+        Dispute,
+        License,
+        Proposal,
+        Vote,
+        Treasury,
+        Balance,
+        Land,
+        UserProfile,
+        TaskSchedule,
+        TaskExecution,
+        Contract,
+    ]
+
+    entities = {}
+
+    for entity_class in entity_classes:
+        class_name = entity_class.__name__
+        fields = []
+        relationships = {}
+
+        # Get all class attributes
+        for attr_name in dir(entity_class):
+            if attr_name.startswith("_"):
+                continue
+
+            attr = getattr(entity_class, attr_name)
+
+            # Check if it's a field type
+            if isinstance(attr, (String, Integer, Boolean, Float)):
+                fields.append(attr_name)
+
+            # Check if it's a relationship
+            elif isinstance(attr, (OneToOne, OneToMany, ManyToOne, ManyToMany)):
+                rel_type = type(attr).__name__
+                target = attr.target if hasattr(attr, "target") else "Unknown"
+                related_name = (
+                    attr.related_name if hasattr(attr, "related_name") else None
+                )
+
+                # Clean target name if it's a list
+                if isinstance(target, list) and len(target) > 0:
+                    target = target[0]
+
+                relationships[attr_name] = {
+                    "type": rel_type,
+                    "target": target,
+                    "field": related_name,
+                }
+
+        # Add default fields from TimestampedMixin if present
+        if issubclass(entity_class, TimestampedMixin):
+            fields.extend(["created_at", "updated_at"])
+
+        # Always include id field
+        if "id" not in fields:
+            fields.insert(0, "id")
+
+        entities[class_name] = {"fields": fields, "relationships": relationships}
+
+    return {"entities": entities}
+
+
 def get_entity_schema():
     """
-    Returns the complete entity schema with relationships
+    Returns the complete entity schema with relationships extracted from class definitions
     """
-    return {
-        "entities": {
-            "Realm": {
-                "fields": ["id", "name", "description", "created_at", "updated_at"],
-                "relationships": {
-                    "treasury": {"type": "OneToOne", "target": "Treasury", "field": "realm"}
-                }
-            },
-            "User": {
-                "fields": ["id", "profile_picture_url", "created_at", "updated_at"],
-                "relationships": {
-                    "profiles": {"type": "ManyToMany", "target": "UserProfile", "field": "users"},
-                    "human": {"type": "OneToOne", "target": "Human", "field": "user"},
-                    "citizen": {"type": "OneToOne", "target": "Citizen", "field": "user"},
-                    "transfers_from": {"type": "OneToMany", "target": "Transfer", "field": "from_user"},
-                    "transfers_to": {"type": "OneToMany", "target": "Transfer", "field": "to_user"},
-                    "trades_a": {"type": "OneToMany", "target": "Trade", "field": "user_a"},
-                    "trades_b": {"type": "OneToMany", "target": "Trade", "field": "user_b"},
-                    "owned_lands": {"type": "OneToMany", "target": "Land", "field": "owner_user"}
-                }
-            },
-            "Human": {
-                "fields": ["id", "name", "date_of_birth", "created_at", "updated_at"],
-                "relationships": {
-                    "user": {"type": "OneToOne", "target": "User", "field": "human"},
-                    "identities": {"type": "OneToMany", "target": "Identity", "field": "human"}
-                }
-            },
-            "Identity": {
-                "fields": ["id", "type", "metadata", "created_at", "updated_at"],
-                "relationships": {
-                    "human": {"type": "ManyToOne", "target": "Human", "field": "identities"}
-                }
-            },
-            "Citizen": {
-                "fields": ["id", "created_at", "updated_at"],
-                "relationships": {
-                    "user": {"type": "OneToOne", "target": "User", "field": "citizen"}
-                }
-            },
-            "Organization": {
-                "fields": ["id", "name", "created_at", "updated_at"],
-                "relationships": {}
-            },
-            "Codex": {
-                "fields": ["id", "name", "code", "url", "checksum", "created_at", "updated_at"],
-                "relationships": {
-                    "call": {"type": "OneToOne", "target": "Call", "field": "codex"}
-                }
-            },
-            "Task": {
-                "fields": ["id", "name", "description", "created_at", "updated_at"],
-                "relationships": {}
-            },
-            "Transfer": {
-                "fields": ["id", "amount", "created_at", "updated_at"],
-                "relationships": {
-                    "from_user": {"type": "ManyToOne", "target": "User", "field": "transfers_from"},
-                    "to_user": {"type": "ManyToOne", "target": "User", "field": "transfers_to"}
-                }
-            },
-            "Trade": {
-                "fields": ["id", "created_at", "updated_at"],
-                "relationships": {
-                    "user_a": {"type": "ManyToOne", "target": "User", "field": "trades_a"},
-                    "user_b": {"type": "ManyToOne", "target": "User", "field": "trades_b"}
-                }
-            },
-            "Instrument": {
-                "fields": ["id", "name", "symbol", "created_at", "updated_at"],
-                "relationships": {}
-            },
-            "Mandate": {
-                "fields": ["id", "name", "created_at", "updated_at"],
-                "relationships": {}
-            },
-            "Dispute": {
-                "fields": ["id", "case_id", "created_at", "updated_at"],
-                "relationships": {}
-            },
-            "License": {
-                "fields": ["id", "name", "created_at", "updated_at"],
-                "relationships": {}
-            },
-            "Proposal": {
-                "fields": ["id", "title", "created_at", "updated_at"],
-                "relationships": {}
-            },
-            "Vote": {
-                "fields": ["id", "choice", "created_at", "updated_at"],
-                "relationships": {}
-            },
-            "Treasury": {
-                "fields": ["id", "created_at", "updated_at"],
-                "relationships": {
-                    "realm": {"type": "OneToOne", "target": "Realm", "field": "treasury"}
-                }
-            }
-        }
-    }
+    return extract_entity_schema()
 
-def get_entity_counts():
+
+def get_entity_data(entity_type, page_num=0, page_size=10):
     """
-    Returns mock entity counts for visualization
+    Returns actual entity data from the database
     """
-    return {
-        "Realm": 1,
-        "User": 150,
-        "Human": 150,
-        "Identity": 300,
-        "Citizen": 120,
-        "Organization": 25,
-        "Codex": 8,
-        "Task": 12,
-        "Transfer": 450,
-        "Trade": 75,
-        "Instrument": 6,
-        "Mandate": 5,
-        "Dispute": 3,
-        "License": 18,
-        "Proposal": 7,
-        "Vote": 42,
-        "Treasury": 1
-    }
+    try:
+        entity_map = {
+            "User": list_users,
+            "Codex": list_codexes,
+            "Dispute": list_disputes,
+            "Instrument": list_instruments,
+            "License": list_licenses,
+            "Mandate": list_mandates,
+            "Organization": list_organizations,
+            "Proposal": list_proposals,
+            "Realm": list_realms,
+            "Task": list_tasks,
+            "Trade": list_trades,
+            "Transfer": list_transfers,
+            "Vote": list_votes,
+        }
+
+        if entity_type in entity_map:
+            result = entity_map[entity_type](page_num, page_size)
+            # Convert entity objects to dictionaries
+            items = []
+            for item in result["items"]:
+                if hasattr(item, "to_dict"):
+                    items.append(item.to_dict())
+                else:
+                    items.append(str(item))
+
+            return {
+                "items": items,
+                "page_num": result["page_num"],
+                "page_size": result["page_size"],
+                "total_items_count": result["total_items_count"],
+                "total_pages": result["total_pages"],
+            }
+        else:
+            # For entities without list functions, return empty result
+            return {
+                "items": [],
+                "page_num": page_num,
+                "page_size": page_size,
+                "total_items_count": 0,
+                "total_pages": 0,
+            }
+    except Exception as e:
+        # Return empty result if there's an error
+        return {
+            "items": [],
+            "page_num": page_num,
+            "page_size": page_size,
+            "total_items_count": 0,
+            "total_pages": 0,
+        }

@@ -1,120 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { _ } from 'svelte-i18n';
+  import { backend } from '$lib/canisters';
   
-  // Entity relationship data (hardcoded for now)
-  let entities = {
-    "Realm": {
-      "fields": ["id", "name", "description", "created_at", "updated_at"],
-      "relationships": {
-        "treasury": {"type": "OneToOne", "target": "Treasury", "field": "realm"}
-      },
-      "count": 1,
-      "position": { x: 400, y: 50 },
-      "expanded": false
-    },
-    "User": {
-      "fields": ["id", "profile_picture_url", "created_at", "updated_at"],
-      "relationships": {
-        "profiles": {"type": "ManyToMany", "target": "UserProfile", "field": "users"},
-        "human": {"type": "OneToOne", "target": "Human", "field": "user"},
-        "citizen": {"type": "OneToOne", "target": "Citizen", "field": "user"},
-        "transfers_from": {"type": "OneToMany", "target": "Transfer", "field": "from_user"},
-        "transfers_to": {"type": "OneToMany", "target": "Transfer", "field": "to_user"},
-        "trades_a": {"type": "OneToMany", "target": "Trade", "field": "user_a"},
-        "trades_b": {"type": "OneToMany", "target": "Trade", "field": "user_b"},
-        "owned_lands": {"type": "OneToMany", "target": "Land", "field": "owner_user"}
-      },
-      "count": 150,
-      "position": { x: 200, y: 200 },
-      "expanded": false
-    },
-    "Human": {
-      "fields": ["id", "name", "date_of_birth", "created_at", "updated_at"],
-      "relationships": {
-        "user": {"type": "OneToOne", "target": "User", "field": "human"},
-        "identities": {"type": "OneToMany", "target": "Identity", "field": "human"}
-      },
-      "count": 150,
-      "position": { x: 50, y: 350 },
-      "expanded": false
-    },
-    "Identity": {
-      "fields": ["id", "type", "metadata", "created_at", "updated_at"],
-      "relationships": {
-        "human": {"type": "ManyToOne", "target": "Human", "field": "identities"}
-      },
-      "count": 300,
-      "position": { x: 250, y: 500 },
-      "expanded": false
-    },
-    "Citizen": {
-      "fields": ["id", "created_at", "updated_at"],
-      "relationships": {
-        "user": {"type": "OneToOne", "target": "User", "field": "citizen"}
-      },
-      "count": 120,
-      "position": { x: 350, y: 350 },
-      "expanded": false
-    },
-    "Organization": {
-      "fields": ["id", "name", "created_at", "updated_at"],
-      "relationships": {},
-      "count": 25,
-      "position": { x: 500, y: 200 },
-      "expanded": false
-    },
-    "Codex": {
-      "fields": ["id", "name", "code", "url", "checksum", "created_at", "updated_at"],
-      "relationships": {
-        "call": {"type": "OneToOne", "target": "Call", "field": "codex"}
-      },
-      "count": 8,
-      "position": { x: 600, y: 100 },
-      "expanded": false
-    },
-    "Transfer": {
-      "fields": ["id", "amount", "created_at", "updated_at"],
-      "relationships": {
-        "from_user": {"type": "ManyToOne", "target": "User", "field": "transfers_from"},
-        "to_user": {"type": "ManyToOne", "target": "User", "field": "transfers_to"}
-      },
-      "count": 450,
-      "position": { x: 400, y: 400 },
-      "expanded": false
-    },
-    "Treasury": {
-      "fields": ["id", "created_at", "updated_at"],
-      "relationships": {
-        "realm": {"type": "OneToOne", "target": "Realm", "field": "treasury"}
-      },
-      "count": 1,
-      "position": { x: 600, y: 50 },
-      "expanded": false
-    }
-  };
-
-  // Sample data for entity instances (hardcoded for now)
-  let sampleData = {
-    "Realm": [
-      { id: "realm_1", name: "Demo Realm", description: "A demonstration realm", created_at: "2024-01-01" },
-    ],
-    "User": [
-      { id: "user_1", profile_picture_url: "https://example.com/pic1.jpg", created_at: "2024-01-01" },
-      { id: "user_2", profile_picture_url: "https://example.com/pic2.jpg", created_at: "2024-01-02" },
-      { id: "user_3", profile_picture_url: "https://example.com/pic3.jpg", created_at: "2024-01-03" },
-    ],
-    "Human": [
-      { id: "human_1", name: "Alice Johnson", date_of_birth: "1990-05-15", created_at: "2024-01-01" },
-      { id: "human_2", name: "Bob Smith", date_of_birth: "1985-08-22", created_at: "2024-01-02" },
-      { id: "human_3", name: "Carol Davis", date_of_birth: "1992-12-03", created_at: "2024-01-03" },
-    ],
-    "Identity": [
-      { id: "identity_1", type: "passport", metadata: "US-123456789", created_at: "2024-01-01" },
-      { id: "identity_2", type: "driver_license", metadata: "DL-987654321", created_at: "2024-01-02" },
-      { id: "identity_3", type: "national_id", metadata: "NID-456789123", created_at: "2024-01-03" },
-    ]
-  };
+  // Entity relationship data loaded from backend
+  let entities = {};
+  let entityData = {};
+  let loading = true;
+  let error = null;
 
   let selectedEntity = null;
   let selectedRecord = null;
@@ -126,6 +18,73 @@
   // SVG dimensions
   let svgWidth = 800;
   let svgHeight = 600;
+
+  // Load entity schema from backend
+  async function loadEntitySchema() {
+    try {
+      loading = true;
+      const response = await backend.extension_sync_call({
+        extension_name: 'erd_explorer',
+        function_name: 'get_entity_schema',
+        args: '{}'
+      });
+      
+      if (response && response.entities) {
+        // Add UI properties to entities
+        let xOffset = 100;
+        let yOffset = 100;
+        let entitiesPerRow = 4;
+        let currentRow = 0;
+        let currentCol = 0;
+        
+        Object.entries(response.entities).forEach(([entityName, entityData]) => {
+          entities[entityName] = {
+            ...entityData,
+            position: { 
+              x: xOffset + (currentCol * 200), 
+              y: yOffset + (currentRow * 150) 
+            },
+            expanded: false
+          };
+          
+          currentCol++;
+          if (currentCol >= entitiesPerRow) {
+            currentCol = 0;
+            currentRow++;
+          }
+        });
+        
+        entities = { ...entities };
+      }
+      loading = false;
+    } catch (err) {
+      console.error('Failed to load entity schema:', err);
+      error = 'Failed to load entity schema';
+      loading = false;
+    }
+  }
+
+  // Load entity data from backend
+  async function loadEntityData(entityType: string, page: number = 0) {
+    try {
+      const response = await backend.extension_sync_call({
+        extension_name: 'erd_explorer',
+        function_name: 'get_entity_data',
+        args: JSON.stringify({
+          entity_type: entityType,
+          page_num: page,
+          page_size: pageSize
+        })
+      });
+      
+      if (response) {
+        entityData[entityType] = response;
+        entityData = { ...entityData };
+      }
+    } catch (err) {
+      console.error(`Failed to load ${entityType} data:`, err);
+    }
+  }
 
   function handleEntityClick(entityName: string) {
     if (selectedEntity === entityName) {
@@ -139,6 +98,9 @@
       entities[entityName].expanded = true;
       selectedRecord = null;
       currentPage = 1;
+      
+      // Load data for this entity
+      loadEntityData(entityName, 0);
     }
     entities = { ...entities }; // Trigger reactivity
   }
@@ -202,21 +164,34 @@
   }
 
   function getPaginatedData(entityName: string) {
-    const data = sampleData[entityName] || [];
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    return data.slice(startIndex, endIndex);
+    const data = entityData[entityName]?.items || [];
+    return data;
   }
 
   function getTotalPages(entityName: string) {
-    const data = sampleData[entityName] || [];
-    return Math.ceil(data.length / pageSize);
+    const data = entityData[entityName];
+    return data?.total_pages || 0;
   }
 
-  onMount(() => {
-    // Initialize with Realm as the starting point
-    selectedEntity = 'Realm';
-    entities['Realm'].expanded = true;
+  function getTotalCount(entityName: string) {
+    const data = entityData[entityName];
+    return data?.total_items_count || 0;
+  }
+
+  async function changePage(entityName: string, newPage: number) {
+    currentPage = newPage;
+    await loadEntityData(entityName, newPage - 1);
+  }
+
+  onMount(async () => {
+    await loadEntitySchema();
+    // Initialize with first entity if available
+    const entityNames = Object.keys(entities);
+    if (entityNames.length > 0) {
+      selectedEntity = entityNames[0];
+      entities[entityNames[0]].expanded = true;
+      await loadEntityData(entityNames[0], 0);
+    }
   });
 </script>
 
@@ -230,86 +205,107 @@
     </p>
   </div>
 
-  <div class="explorer-container">
-    <!-- ERD Visualization Panel -->
-    <div class="erd-panel">
-      <div class="panel-header">
-        <h2 class="text-lg font-semibold text-gray-800">Entity Relationship Diagram</h2>
-        <div class="legend">
-          <div class="legend-item">
-            <div class="legend-color" style="background-color: #4F46E5;"></div>
-            <span>OneToOne</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-color" style="background-color: #059669;"></div>
-            <span>OneToMany</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-color" style="background-color: #DC2626;"></div>
-            <span>ManyToOne</span>
-          </div>
-          <div class="legend-item">
-            <div class="legend-color" style="background-color: #7C2D12;"></div>
-            <span>ManyToMany</span>
-          </div>
-        </div>
-      </div>
-      
-      <div class="erd-canvas">
-        <svg width={svgWidth} height={svgHeight} class="erd-svg">
-          <!-- Define arrow markers -->
-          <defs>
-            <marker id="arrowhead-OneToOne" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-              <polygon points="0 0, 10 3.5, 0 7" fill="#4F46E5" />
-            </marker>
-            <marker id="arrowhead-OneToMany" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-              <polygon points="0 0, 10 3.5, 0 7" fill="#059669" />
-            </marker>
-            <marker id="arrowhead-ManyToOne" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-              <polygon points="0 0, 10 3.5, 0 7" fill="#DC2626" />
-            </marker>
-            <marker id="arrowhead-ManyToMany" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-              <polygon points="0 0, 10 3.5, 0 7" fill="#7C2D12" />
-            </marker>
-          </defs>
-          
-          <!-- Relationship lines -->
-          {#each Object.entries(entities) as [entityName, entity]}
-            {#each Object.entries(entity.relationships) as [relName, rel]}
-              {@html drawRelationshipLine(entityName, rel.target, rel.type)}
-            {/each}
-          {/each}
-          
-          <!-- Entity nodes -->
-          {#each Object.entries(entities) as [entityName, entity]}
-            <g class="entity-node" 
-               transform="translate({entity.position.x}, {entity.position.y})"
-               on:mousedown={(e) => startDrag(e, entityName)}>
-              
-              <rect width="150" height="80" 
-                    fill={getEntityColor(entityName)}
-                    stroke={selectedEntity === entityName ? '#1F2937' : '#E5E7EB'}
-                    stroke-width={selectedEntity === entityName ? 3 : 1}
-                    rx="8" 
-                    class="entity-rect cursor-pointer"
-                    on:click={() => handleEntityClick(entityName)} />
-              
-              <text x="75" y="25" text-anchor="middle" class="entity-title" fill="white">
-                {entityName}
-              </text>
-              
-              <text x="75" y="45" text-anchor="middle" class="entity-count" fill="white" opacity="0.8">
-                {entity.count} records
-              </text>
-              
-              <text x="75" y="65" text-anchor="middle" class="entity-action" fill="white" opacity="0.9">
-                Click to explore
-              </text>
-            </g>
-          {/each}
-        </svg>
+  {#if loading}
+    <div class="loading-container">
+      <div class="text-center">
+        <div class="spinner"></div>
+        <p class="text-gray-600 mt-4">Loading entity schema...</p>
       </div>
     </div>
+  {:else if error}
+    <div class="error-container">
+      <div class="text-center text-red-600">
+        <p>Error: {error}</p>
+        <button class="btn-primary mt-4" on:click={loadEntitySchema}>Retry</button>
+      </div>
+    </div>
+  {:else}
+    <div class="explorer-container">
+      <!-- ERD Visualization Panel -->
+      <div class="erd-panel">
+        <div class="panel-header">
+          <h2 class="text-lg font-semibold text-gray-800">Entity Relationship Diagram</h2>
+          <div class="legend">
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: #4F46E5;"></div>
+              <span>OneToOne</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: #059669;"></div>
+              <span>OneToMany</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: #DC2626;"></div>
+              <span>ManyToOne</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background-color: #7C2D12;"></div>
+              <span>ManyToMany</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="erd-canvas">
+          <svg width={svgWidth} height={svgHeight} class="erd-svg">
+            <!-- Define arrow markers -->
+            <defs>
+              <marker id="arrowhead-OneToOne" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                <polygon points="0 0, 10 3.5, 0 7" fill="#4F46E5" />
+              </marker>
+              <marker id="arrowhead-OneToMany" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                <polygon points="0 0, 10 3.5, 0 7" fill="#059669" />
+              </marker>
+              <marker id="arrowhead-ManyToOne" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                <polygon points="0 0, 10 3.5, 0 7" fill="#DC2626" />
+              </marker>
+              <marker id="arrowhead-ManyToMany" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                <polygon points="0 0, 10 3.5, 0 7" fill="#7C2D12" />
+              </marker>
+            </defs>
+            
+            <!-- Relationship lines -->
+            {#each Object.entries(entities) as [entityName, entity]}
+              {#each Object.entries(entity.relationships || {}) as [relName, rel]}
+                {@html drawRelationshipLine(entityName, rel.target, rel.type)}
+              {/each}
+            {/each}
+            
+            <!-- Entity nodes -->
+            {#each Object.entries(entities) as [entityName, entity]}
+              <g class="entity-node" 
+                 role="button"
+                 tabindex="0"
+                 transform="translate({entity.position.x}, {entity.position.y})"
+                 on:mousedown={(e) => startDrag(e, entityName)}
+                 on:keydown={(e) => e.key === 'Enter' && handleEntityClick(entityName)}>
+                
+                <rect width="150" height="80" 
+                      role="button"
+                      tabindex="0"
+                      fill={getEntityColor(entityName)}
+                      stroke={selectedEntity === entityName ? '#1F2937' : '#E5E7EB'}
+                      stroke-width={selectedEntity === entityName ? 3 : 1}
+                      rx="8" 
+                      class="entity-rect cursor-pointer"
+                      on:click={() => handleEntityClick(entityName)}
+                      on:keydown={(e) => e.key === 'Enter' && handleEntityClick(entityName)} />
+                
+                <text x="75" y="25" text-anchor="middle" class="entity-title" fill="white">
+                  {entityName}
+                </text>
+                
+                <text x="75" y="45" text-anchor="middle" class="entity-count" fill="white" opacity="0.8">
+                  {getTotalCount(entityName) || 0} records
+                </text>
+                
+                <text x="75" y="65" text-anchor="middle" class="entity-action" fill="white" opacity="0.9">
+                  Click to explore
+                </text>
+              </g>
+            {/each}
+          </svg>
+        </div>
+      </div>
 
     <!-- Data Panel -->
     <div class="data-panel">
@@ -317,7 +313,7 @@
         <div class="panel-header">
           <h2 class="text-lg font-semibold text-gray-800">
             {selectedEntity} Data
-            <span class="text-sm text-gray-500">({entities[selectedEntity].count} total)</span>
+            <span class="text-sm text-gray-500">({getTotalCount(selectedEntity)} total)</span>
           </h2>
         </div>
 
@@ -351,11 +347,11 @@
               </div>
             {/if}
 
-            <!-- Sample Data Table -->
+            <!-- Entity Data Table -->
             <div class="data-table-section">
-              <h3 class="text-md font-medium text-gray-700 mb-2">Sample Data</h3>
+              <h3 class="text-md font-medium text-gray-700 mb-2">Entity Data</h3>
               
-              {#if sampleData[selectedEntity] && sampleData[selectedEntity].length > 0}
+              {#if getPaginatedData(selectedEntity).length > 0}
                 <div class="table-container">
                   <table class="data-table">
                     <thead>
@@ -370,7 +366,9 @@
                       {#each getPaginatedData(selectedEntity) as record}
                         <tr class="table-row" 
                             class:selected={selectedRecord === record}
-                            on:click={() => handleRecordClick(record)}>
+                            on:click={() => handleRecordClick(record)}
+                            on:keydown={(e) => e.key === 'Enter' && handleRecordClick(record)}
+                            tabindex="0">
                           {#each entities[selectedEntity].fields.slice(0, 4) as field}
                             <td>{record[field] || '-'}</td>
                           {/each}
@@ -391,7 +389,7 @@
                     <button 
                       class="page-btn" 
                       disabled={currentPage === 1}
-                      on:click={() => currentPage = Math.max(1, currentPage - 1)}>
+                      on:click={() => changePage(selectedEntity, Math.max(1, currentPage - 1))}>
                       Previous
                     </button>
                     
@@ -402,14 +400,14 @@
                     <button 
                       class="page-btn"
                       disabled={currentPage === getTotalPages(selectedEntity)}
-                      on:click={() => currentPage = Math.min(getTotalPages(selectedEntity), currentPage + 1)}>
+                      on:click={() => changePage(selectedEntity, Math.min(getTotalPages(selectedEntity), currentPage + 1))}>
                       Next
                     </button>
                   </div>
                 {/if}
               {:else}
                 <div class="no-data">
-                  <p class="text-gray-500">No sample data available for {selectedEntity}</p>
+                  <p class="text-gray-500">No data available for {selectedEntity}</p>
                 </div>
               {/if}
             </div>
@@ -425,25 +423,26 @@
         </div>
       {/if}
     </div>
-  </div>
-
-  <!-- Selected Record Details -->
-  {#if selectedRecord}
-    <div class="record-details">
-      <div class="panel-header">
-        <h2 class="text-lg font-semibold text-gray-800">Record Details</h2>
-        <button class="close-btn" on:click={() => selectedRecord = null}>×</button>
-      </div>
-      
-      <div class="record-content">
-        {#each Object.entries(selectedRecord) as [key, value]}
-          <div class="record-field">
-            <span class="field-label">{key}:</span>
-            <span class="field-value">{value}</span>
-          </div>
-        {/each}
-      </div>
     </div>
+
+    <!-- Selected Record Details -->
+    {#if selectedRecord}
+      <div class="record-details">
+        <div class="panel-header">
+          <h2 class="text-lg font-semibold text-gray-800">Record Details</h2>
+          <button class="close-btn" on:click={() => selectedRecord = null}>×</button>
+        </div>
+        
+        <div class="record-content">
+          {#each Object.entries(selectedRecord) as [key, value]}
+            <div class="record-field">
+              <span class="field-label">{key}:</span>
+              <span class="field-value">{value}</span>
+            </div>
+          {/each}
+        </div>
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -457,6 +456,40 @@
 
   .header {
     margin-bottom: 1rem;
+  }
+
+  .loading-container, .error-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 400px;
+  }
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .btn-primary {
+    background: #3B82F6;
+    color: white;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .btn-primary:hover {
+    background: #2563EB;
   }
 
   .explorer-container {
@@ -559,7 +592,9 @@
   }
 
   .relationships-list {
-    space-y: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
   }
 
   .relationship-item {
