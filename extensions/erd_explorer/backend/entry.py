@@ -134,9 +134,13 @@ def extract_entity_schema():
             # Check if it's a relationship
             elif isinstance(attr, (OneToOne, OneToMany, ManyToOne, ManyToMany)):
                 rel_type = type(attr).__name__
-                target = attr.target if hasattr(attr, "target") else "Unknown"
+                target = (
+                    attr.entity_types
+                    if hasattr(attr, "entity_types") and attr.entity_types
+                    else "Unknown"
+                )
                 related_name = (
-                    attr.related_name if hasattr(attr, "related_name") else None
+                    attr.reverse_name if hasattr(attr, "reverse_name") else None
                 )
 
                 # Clean target name if it's a list
@@ -175,11 +179,12 @@ def get_entity_data(args):
     """
     # Parse arguments from JSON string
     import json
+
     parsed_args = json.loads(args) if isinstance(args, str) else args
     entity_type = parsed_args.get("entity_type", "User")
     page_num = parsed_args.get("page_num", 0)
     page_size = parsed_args.get("page_size", 10)
-    
+
     try:
         entity_map = {
             "User": list_users,

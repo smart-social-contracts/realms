@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 import time
+import venv
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -17,12 +18,121 @@ from rich.text import Text
 console = Console()
 
 
+def find_python_310() -> Optional[str]:
+    """Find Python 3.10 executable on the system."""
+    # Common Python 3.10 executable names to try
+    python_candidates = [
+        "python3.10",
+        "python3",
+        "python",
+    ]
+    
+    for candidate in python_candidates:
+        try:
+            result = subprocess.run([
+                candidate, "-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+            ], capture_output=True, text=True, check=True)
+            
+            version = result.stdout.strip()
+            if version == "3.10":
+                # Get full path to the executable
+                which_result = subprocess.run([
+                    "which", candidate
+                ], capture_output=True, text=True, check=True)
+                return which_result.stdout.strip()
+                
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            continue
+    
+    # Try pyenv if available
+    try:
+        result = subprocess.run([
+            "pyenv", "which", "python3.10"
+        ], capture_output=True, text=True, check=True)
+        return result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+    
+    return None
+
+
+def ensure_project_venv(project_dir: Path) -> Path:
+    """Ensure a project-specific virtual environment exists with required dependencies."""
+    venv_dir = project_dir / ".realms-venv"
+    
+    if not venv_dir.exists():
+        console.print(f"[yellow]🔧 Creating project virtual environment at {venv_dir}[/yellow]")
+        
+        # Check if Python 3.10 is available
+        python_executable = find_python_310()
+        if not python_executable:
+            console.print("[red]❌ Python 3.10 is required but not found[/red]")
+            console.print("[yellow]💡 Please install Python 3.10 or use pyenv to manage Python versions[/yellow]")
+            raise RuntimeError("Python 3.10 is required for project virtual environment")
+        
+        console.print(f"[dim]Using Python: {python_executable}[/dim]")
+        
+        # Create virtual environment with specific Python version
+        subprocess.run([
+            python_executable, "-m", "venv", str(venv_dir)
+        ], check=True)
+        
+        # Install requirements if they exist
+        requirements_file = project_dir / "requirements.txt"
+        if requirements_file.exists():
+            console.print("[yellow]📦 Installing project dependencies...[/yellow]")
+            pip_path = venv_dir / "bin" / "pip"
+            if sys.platform == "win32":
+                pip_path = venv_dir / "Scripts" / "pip.exe"
+            
+            subprocess.run([
+                str(pip_path), "install", "-r", str(requirements_file)
+            ], check=True)
+            
+        # Install development requirements if they exist
+        dev_requirements_file = project_dir / "requirements-dev.txt"
+        if dev_requirements_file.exists():
+            console.print("[yellow]📦 Installing development dependencies...[/yellow]")
+            pip_path = venv_dir / "bin" / "pip"
+            if sys.platform == "win32":
+                pip_path = venv_dir / "Scripts" / "pip.exe"
+            
+            subprocess.run([
+                str(pip_path), "install", "-r", str(dev_requirements_file)
+            ], check=True)
+    
+    return venv_dir
+
+
+def get_project_python_env(project_dir: Path) -> Dict[str, str]:
+    """Get environment variables for subprocess execution with project venv."""
+    venv_dir = ensure_project_venv(project_dir)
+    
+    # Get current environment
+    env = os.environ.copy()
+    
+    # Update PATH to include venv binaries
+    bin_dir = venv_dir / "bin"
+    if sys.platform == "win32":
+        bin_dir = venv_dir / "Scripts"
+    
+    current_path = env.get("PATH", "")
+    env["PATH"] = f"{bin_dir}:{current_path}"
+    env["VIRTUAL_ENV"] = str(venv_dir)
+    
+    # Remove any existing PYTHONPATH to avoid conflicts
+    env.pop("PYTHONPATH", None)
+    
+    return env
+
+
 def run_command(
     command: List[str],
     cwd: Optional[str] = None,
     capture_output: bool = False,
     check: bool = True,
     env: Optional[Dict[str, str]] = None,
+    use_project_venv: bool = False,
 ) -> subprocess.CompletedProcess:
     """Run a shell command with proper error handling."""
     try:
@@ -37,6 +147,17 @@ def run_command(
                 formatted_command.append(arg)
         
         console.print(f"[dim]Running: {' '.join(formatted_command)}[/dim]")
+
+        # Use project venv environment if requested
+        if use_project_venv and cwd:
+            project_dir = Path(cwd)
+            if not env:
+                env = get_project_python_env(project_dir)
+            else:
+                # Merge with project env, giving priority to passed env
+                project_env = get_project_python_env(project_dir)
+                project_env.update(env)
+                env = project_env
 
         result = subprocess.run(
             command,

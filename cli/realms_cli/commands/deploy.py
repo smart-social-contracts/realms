@@ -7,6 +7,8 @@ from typing import Optional
 import typer
 from rich.console import Console
 
+from ..utils import run_command
+
 console = Console()
 
 
@@ -79,10 +81,10 @@ def deploy_command(
                 # Make sure script is executable
                 script_path.chmod(0o755)
                 
-                result = subprocess.run(
+                result = run_command(
                     cmd,
-                    cwd=working_dir,
-                    text=True
+                    cwd=str(working_dir),
+                    use_project_venv=True
                 )
                 
                 if result.returncode == 0:
@@ -124,17 +126,17 @@ def deploy_command(
 
                 if network == "local":
                     console.print("🔧 Running local deployment script...")
-                    result = subprocess.run(
+                    result = run_command(
                         ["./scripts/deploy_local.sh"],
-                        cwd=Path.cwd(),
-                        text=True
+                        cwd=str(Path.cwd()),
+                        use_project_venv=True
                     )
                 elif network in ["staging", "mainnet", "ic"]:
                     console.print("🔧 Running staging deployment script...")
-                    result = subprocess.run(
+                    result = run_command(
                         ["./scripts/deploy_staging.sh"],
-                        cwd=Path.cwd(),
-                        text=True
+                        cwd=str(Path.cwd()),
+                        use_project_venv=True
                     )
                 
                 if result.returncode == 0:

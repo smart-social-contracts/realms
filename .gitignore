@@ -1,6 +1,7 @@
 .dfx
 .kybra
 venv
+.realms-venv
 dist
 node_modules
 .svelte-kit
