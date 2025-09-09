@@ -7,8 +7,7 @@ import base64
 
 import typer
 
-from ..main import MAX_BATCH_SIZE
-
+from ..constants import MAX_BATCH_SIZE
 from ..utils import (
     console,
     display_error_panel,

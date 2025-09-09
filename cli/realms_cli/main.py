@@ -1,7 +1,5 @@
 """Main CLI application for Realms."""
 
-MAX_BATCH_SIZE = 100
-
 from typing import List, Optional
 
 import typer
@@ -9,9 +7,11 @@ from rich.console import Console
 from rich.table import Table
 
 from .commands.create import create_command
+from .commands.db import db_command
 from .commands.deploy import deploy_command
 from .commands.extension import extension_command
 from .commands.import_data import import_codex_command, import_data_command
+from .constants import MAX_BATCH_SIZE
 from .commands.registry import (
     registry_add_command,
     registry_count_command,
@@ -436,6 +436,19 @@ def realm_unset() -> None:
         console.print("[dim]Will use network context or defaults[/dim]")
     else:
         console.print("[yellow]No realm context set[/yellow]")
+
+
+@app.command("db")
+def db(
+    network: Optional[str] = typer.Option(
+        None, "--network", "-n", help="Network to use (overrides context)"
+    ),
+    canister: Optional[str] = typer.Option(
+        None, "--canister", "-c", help="Canister name to connect to (overrides context)"
+    ),
+) -> None:
+    """Explore the Realm database in an interactive text-based interface."""
+    db_command(network, canister)
 
 
 @app.command("shell")
