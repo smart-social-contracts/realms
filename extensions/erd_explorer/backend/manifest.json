@@ -1,0 +1,9 @@
+{
+  "name": "erd_explorer",
+  "version": "1.0.0",
+  "description": "Backend for ERD Explorer extension",
+  "entry_points": {
+    "get_entity_schema": "get_entity_schema",
+    "get_entity_counts": "get_entity_counts"
+  }
+}

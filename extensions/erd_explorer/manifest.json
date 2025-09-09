@@ -1,0 +1,13 @@
+{
+  "name": "erd_explorer",
+  "version": "1.0.0",
+  "description": "Interactive Entity Relationship Diagram explorer for visualizing and navigating Realms data structure",
+  "categories": ["other"],
+  "profiles": ["admin"],
+  "visibility": {
+    "authentication_required": true,
+    "allowed_profiles": ["admin"],
+    "admin_only": true
+  },
+  "path": "extensions/erd_explorer"
+}
