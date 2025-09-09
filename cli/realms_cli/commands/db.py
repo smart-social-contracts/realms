@@ -324,7 +324,7 @@ class DatabaseExplorer:
                                 )
                         preview_str = ", ".join(preview)
                         if count > 3:
-                            preview_str += f" ... (+{count-3} more)"
+                            preview_str += f" ... (+{count - 3} more)"
                         rel_table.add_row(rel_name, str(count), preview_str)
                     else:
                         rel_table.add_row(rel_name, "0", "[dim]None[/dim]")
