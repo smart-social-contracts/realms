@@ -5,6 +5,7 @@ Provides basic administrative operations for the GGG system.
 
 import json
 import traceback
+
 from kybra_simple_logging import get_logger
 
 logger = get_logger("extensions.simple_admin_dashboard")
@@ -42,6 +43,6 @@ def get_status():
         "data": {
             "extension": "simple_admin_dashboard",
             "status": "active",
-            "version": "1.0.0"
-        }
+            "version": "1.0.0",
+        },
     }
