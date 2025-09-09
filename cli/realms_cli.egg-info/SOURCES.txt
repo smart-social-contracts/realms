@@ -15,6 +15,7 @@ realms_cli.egg-info/requires.txt
 realms_cli.egg-info/top_level.txt
 realms_cli/commands/__init__.py
 realms_cli/commands/create.py
+realms_cli/commands/db.py
 realms_cli/commands/deploy.py
 realms_cli/commands/extension.py
 realms_cli/commands/import_data.py
