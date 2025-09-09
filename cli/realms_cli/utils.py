@@ -18,6 +18,44 @@ from rich.text import Text
 console = Console()
 
 
+def find_python_310() -> Optional[str]:
+    """Find Python 3.10 executable on the system."""
+    # Common Python 3.10 executable names to try
+    python_candidates = [
+        "python3.10",
+        "python3",
+        "python",
+    ]
+    
+    for candidate in python_candidates:
+        try:
+            result = subprocess.run([
+                candidate, "-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+            ], capture_output=True, text=True, check=True)
+            
+            version = result.stdout.strip()
+            if version == "3.10":
+                # Get full path to the executable
+                which_result = subprocess.run([
+                    "which", candidate
+                ], capture_output=True, text=True, check=True)
+                return which_result.stdout.strip()
+                
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            continue
+    
+    # Try pyenv if available
+    try:
+        result = subprocess.run([
+            "pyenv", "which", "python3.10"
+        ], capture_output=True, text=True, check=True)
+        return result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+    
+    return None
+
+
 def ensure_project_venv(project_dir: Path) -> Path:
     """Ensure a project-specific virtual environment exists with required dependencies."""
     venv_dir = project_dir / ".realms-venv"
@@ -25,8 +63,19 @@ def ensure_project_venv(project_dir: Path) -> Path:
     if not venv_dir.exists():
         console.print(f"[yellow]🔧 Creating project virtual environment at {venv_dir}[/yellow]")
         
-        # Create virtual environment
-        venv.create(venv_dir, with_pip=True)
+        # Check if Python 3.10 is available
+        python_executable = find_python_310()
+        if not python_executable:
+            console.print("[red]❌ Python 3.10 is required but not found[/red]")
+            console.print("[yellow]💡 Please install Python 3.10 or use pyenv to manage Python versions[/yellow]")
+            raise RuntimeError("Python 3.10 is required for project virtual environment")
+        
+        console.print(f"[dim]Using Python: {python_executable}[/dim]")
+        
+        # Create virtual environment with specific Python version
+        subprocess.run([
+            python_executable, "-m", "venv", str(venv_dir)
+        ], check=True)
         
         # Install requirements if they exist
         requirements_file = project_dir / "requirements.txt"
