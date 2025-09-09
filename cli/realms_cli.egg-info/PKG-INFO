@@ -259,9 +259,37 @@ Automate setup tasks after deployment:
 - **script**: Run shell scripts
 - **wait**: Add delays between actions
 
-## Development
+## Installation
 
-### Setting up Development Environment
+### Recommended: Using pipx (Isolated Environment)
+
+The easiest way to install the Realms CLI is using `pipx`, which automatically manages isolated Python environments:
+
+```bash
+# Install pipx if you don't have it
+pip install pipx
+
+# Install realms-cli in an isolated environment
+pipx install realms-cli
+
+# Use the CLI tool (no venv activation needed)
+realms --help
+realms create --citizens 50
+```
+
+### Alternative: Using pip with venv
+
+If you prefer manual environment management:
+
+```bash
+python -m venv realms-env
+source realms-env/bin/activate  # On Windows: realms-env\Scripts\activate
+pip install realms-cli
+```
+
+### Development Setup
+
+For contributing to the CLI tool:
 
 ```bash
 git clone https://github.com/smartsocialcontracts/realms
