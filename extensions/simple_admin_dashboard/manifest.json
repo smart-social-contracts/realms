@@ -1,0 +1,12 @@
+{
+  "name": "simple_admin_dashboard",
+  "version": "1.0.0",
+  "description": "Simple administrative dashboard showing user list",
+  "author": "Realms Team",
+  "categories": ["admin"],
+  "permissions": ["admin"],
+  "profiles": ["admin"],
+  "icon": "users",
+  "url_path": null,
+  "show_in_sidebar": true
+}
