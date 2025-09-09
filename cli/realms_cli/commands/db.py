@@ -66,15 +66,78 @@ class DatabaseExplorer:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             if result.returncode == 0:
                 output = result.stdout.strip()
-                if '"items"' in output:
-                    start = output.find("{")
-                    end = output.rfind("}") + 1
-                    if start >= 0 and end > start:
-                        json_str = output[start:end]
-                        return json.loads(json_str)
+                
+                if "users = vec" in output:
+                    start_vec = output.find("users = vec {")
+                    if start_vec >= 0:
+                        brace_count = 0
+                        vec_start = start_vec + len("users = vec {")
+                        vec_end = vec_start
+                        
+                        for i, char in enumerate(output[vec_start:], vec_start):
+                            if char == '{':
+                                brace_count += 1
+                            elif char == '}':
+                                brace_count -= 1
+                                if brace_count < 0:  # Found the closing brace for vec
+                                    vec_end = i
+                                    break
+                        
+                        vec_content = output[vec_start:vec_end]
+                        json_strings = []
+                        
+                        for item in vec_content.split('";'):
+                            item = item.strip()
+                            if item.startswith('"'):
+                                item = item[1:]  # Remove leading quote
+                            if item.endswith('"'):
+                                item = item[:-1]  # Remove trailing quote
+                            if item:
+                                try:
+                                    item = item.replace('\\"', '"')
+                                    parsed_item = json.loads(item)
+                                    json_strings.append(parsed_item)
+                                except json.JSONDecodeError:
+                                    continue
+                        
+                        total_items = 0
+                        total_pages = 1
+                        page_num = 0
+                        page_size = 10
+                        
+                        if "total_items_count" in output:
+                            import re
+                            total_match = re.search(r'total_items_count = (\d+)', output)
+                            if total_match:
+                                total_items = int(total_match.group(1))
+                        
+                        if "total_pages" in output:
+                            pages_match = re.search(r'total_pages = (\d+)', output)
+                            if pages_match:
+                                total_pages = int(pages_match.group(1))
+                        
+                        if "page_num" in output:
+                            page_match = re.search(r'page_num = (\d+)', output)
+                            if page_match:
+                                page_num = int(page_match.group(1))
+                        
+                        if "page_size" in output:
+                            size_match = re.search(r'page_size = (\d+)', output)
+                            if size_match:
+                                page_size = int(size_match.group(1))
+                        
+                        return {
+                            "items": json_strings,
+                            "total_items_count": total_items,
+                            "total_pages": total_pages,
+                            "page_num": page_num,
+                            "page_size": page_size,
+                        }
+                
                 return {
                     "items": [],
                     "total_items_count": 0,
+                    "total_pages": 1,
                     "page_num": 0,
                     "page_size": 10,
                 }
@@ -83,12 +146,13 @@ class DatabaseExplorer:
                 return {
                     "items": [],
                     "total_items_count": 0,
+                    "total_pages": 1,
                     "page_num": 0,
                     "page_size": 10,
                 }
         except Exception as e:
             console.print(f"[red]Error: {str(e)}[/red]")
-            return {"items": [], "total_items_count": 0, "page_num": 0, "page_size": 10}
+            return {"items": [], "total_items_count": 0, "total_pages": 1, "page_num": 0, "page_size": 10}
 
     def list_entities(
         self, entity_type: str, page_num: int = 0, page_size: int = 10
