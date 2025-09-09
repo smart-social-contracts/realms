@@ -164,7 +164,7 @@ subprocess.run(realms_cmd, cwd=os.path.dirname(os.path.dirname(s)))
 set -e
 
 # Get network from command line argument or default to local
-NETWORK="${{1:-local}}"
+NETWORK="${1:-local}"
 echo "📥 Uploading realm data for network: $NETWORK..."
 
 # Build realms command with network parameter
