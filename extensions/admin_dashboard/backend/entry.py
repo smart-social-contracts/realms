@@ -67,10 +67,7 @@ def import_data(args):
         parsed_data = []
         if data_format == "csv":
             # Handle CSV data
-            import csv
-            import io
-
-            csv_reader = csv.DictReader(io.StringIO(data_content))
+            csv_reader = csv.DictReader(StringIO(data_content))
             parsed_data = list(csv_reader)
         else:
             # Handle JSON data
@@ -91,7 +88,7 @@ def import_data(args):
 
         return {
             "success": True,
-            "message": f"Successfully imported records",
+            "message": f"Successfully imported {len(parsed_data)} records",
             "data": {
                 "total_records": len(parsed_data),
                 "successful": results["successful"],
@@ -139,7 +136,7 @@ def process_bulk_import(data: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 def create_entity(entity, data: Dict[str, Any]):
     if entity == "Codex":
-        obj = Codex()
+        obj = ggg.Codex()
         obj.name = data["name"]
         obj.code = base64.b64decode(data["code"])
         return obj
