@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { backend } from '$lib/canisters';
+  import { _ } from 'svelte-i18n';
   
   // Entity relationship data loaded from backend
   let entities = {};
