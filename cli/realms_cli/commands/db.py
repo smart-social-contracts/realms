@@ -19,7 +19,7 @@ console = Console()
 
 ENTITY_TYPES = {
     "users": "Users",
-    "humans": "Humans", 
+    "humans": "Humans",
     "citizens": "Citizens",
     "organizations": "Organizations",
     "mandates": "Mandates",
@@ -35,6 +35,7 @@ ENTITY_TYPES = {
     "votes": "Votes"
 }
 
+
 @dataclass
 class NavigationState:
     """Tracks current navigation state in the database explorer."""
@@ -43,6 +44,7 @@ class NavigationState:
     page_size: int = 10
     current_items: List[Dict] = None
     selected_item: Optional[Dict] = None
+
 
 class DatabaseExplorer:
     """Interactive database explorer for Realm entities."""
@@ -98,7 +100,7 @@ class DatabaseExplorer:
         
         descriptions = {
             "users": "System users with authentication",
-            "citizens": "Citizens with governance rights", 
+            "citizens": "Citizens with governance rights",
             "organizations": "Organizational entities",
             "mandates": "Governance mandates and directives",
             "tasks": "Scheduled and executed tasks",
@@ -214,7 +216,7 @@ class DatabaseExplorer:
             
             console.print(rel_table)
         
-        console.print(f"\n[dim]Commands: [cyan]b[/cyan] back to list | [cyan]q[/cyan] quit[/dim]")
+        console.print("\n[dim]Commands: [cyan]b[/cyan] back to list | [cyan]q[/cyan] quit[/dim]")
         
         self.state.selected_item = item
     
