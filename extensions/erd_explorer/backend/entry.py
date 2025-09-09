@@ -5,6 +5,31 @@ Provides entity relationship data and metadata for the ERD visualization
 
 import inspect
 
+
+def extension_sync_call(method_name: str, args: dict):
+    """
+    Synchronous extension API calls for ERD Explorer operations
+    """
+    # Method mapping with argument requirements
+    methods = {
+        "get_entity_schema": (get_entity_schema, False),
+        "get_entity_data": (get_entity_data, True),
+    }
+
+    if method_name not in methods:
+        return {"success": False, "error": f"Unknown method: {method_name}"}
+
+    function, requires_args = methods[method_name]
+
+    try:
+        if requires_args:
+            return function(args)
+        else:
+            return function()
+    except Exception as e:
+        return {"success": False, "error": f"Error calling {method_name}: {str(e)}"}
+
+
 from api.ggg_entities import (
     list_codexes,
     list_disputes,
@@ -137,17 +162,24 @@ def extract_entity_schema():
     return {"entities": entities}
 
 
-def get_entity_schema():
+def get_entity_schema(args=None):
     """
     Returns the complete entity schema with relationships extracted from class definitions
     """
     return extract_entity_schema()
 
 
-def get_entity_data(entity_type, page_num=0, page_size=10):
+def get_entity_data(args):
     """
     Returns actual entity data from the database
     """
+    # Parse arguments from JSON string
+    import json
+    parsed_args = json.loads(args) if isinstance(args, str) else args
+    entity_type = parsed_args.get("entity_type", "User")
+    page_num = parsed_args.get("page_num", 0)
+    page_size = parsed_args.get("page_size", 10)
+    
     try:
         entity_map = {
             "User": list_users,
