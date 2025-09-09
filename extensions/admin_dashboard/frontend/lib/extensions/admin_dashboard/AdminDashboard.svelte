@@ -89,63 +89,45 @@
     { name: 'votes', fetch: (page_num = 0, page_size = 5) => backend.get_votes(page_num, page_size), dataPath: 'VotesList.votes', paginationPath: 'VotesList.pagination', page: () => votesPage, perPage: () => votesPerPage, pagination: () => votesPagination, onPageChange: handleVotesPageChange }
   ];
   
-  // Function to fetch data for a specific entity type
+  // Simplified function to fetch data for a specific entity type
   async function fetchEntityData(entityType) {
-    console.log('🔧 AdminDashboard: fetchEntityData called for:', entityType);
+    console.log('🔧 AdminDashboard: Fetching data for:', entityType);
+    
+    loading = true;
+    console.log('🔧 AdminDashboard: Set loading to true');
+    error = null;
     
     try {
-      loading = true;
-      error = null;
-      
       const config = entityConfigs.find(c => c.name === entityType);
-      console.log('🔧 AdminDashboard: Found config for', entityType, ':', config);
-      
       if (!config) {
-        console.log('🔧 AdminDashboard: No config found for entityType:', entityType);
-        error = `No configuration found for entity type: ${entityType}`;
-        loading = false;
-        return;
+        throw new Error(`No configuration found for entity type: ${entityType}`);
       }
       
-      console.log('🔧 AdminDashboard: Calling config.fetch with page:', config.page(), 'perPage:', config.perPage());
       let result = await config.fetch(config.page(), config.perPage());
-      console.log('🔧 AdminDashboard: Fetch result:', result);
-      console.log('🔧 AdminDashboard: Result type:', typeof result);
-      console.log('🔧 AdminDashboard: Result keys:', result ? Object.keys(result) : 'null');
+      console.log('🔧 AdminDashboard: Fetch result for', entityType, ':', result);
       
-      // Handle both success/data format and direct data format
-      let actualData = null;
-      if (result && result.success && result.data) {
-        actualData = result.data;
-        console.log('🔧 AdminDashboard: Using result.data format');
-      } else if (result && typeof result === 'object') {
-        actualData = result;
-        console.log('🔧 AdminDashboard: Using direct result format');
-      }
+      // Extract actual data from response
+      let actualData = result?.success ? result.data : result;
       
-      if (actualData) {
-        const pathParts = config.dataPath.split('.');
-        console.log('🔧 AdminDashboard: Path parts:', pathParts);
-        console.log('🔧 AdminDashboard: Starting with actualData:', actualData);
-        
+      if (!actualData) {
+        console.log(`🔧 AdminDashboard: No data found for ${entityType}, setting empty array`);
+        data = {...data, [entityType]: []};
+      } else {
+        // Navigate to entity data using config path
         let entityData = actualData;
+        const pathParts = config.dataPath.split('.');
+        
         for (const part of pathParts) {
-          console.log('🔧 AdminDashboard: Processing path part:', part);
-          console.log('🔧 AdminDashboard: Current entityData:', entityData);
-          
           if (entityData && entityData[part] !== undefined) {
             entityData = entityData[part];
-            console.log('🔧 AdminDashboard: Found part, new entityData:', entityData);
           } else {
-            console.log('🔧 AdminDashboard: Part not found, setting to null');
             entityData = null;
             break;
           }
         }
         
-        console.log('🔧 AdminDashboard: Final entityData:', entityData);
-        
-        if (entityData && Array.isArray(entityData) && entityData.length > 0) {
+        // Parse and store entity data
+        if (entityData && Array.isArray(entityData)) {
           const parsedData = entityData.map(item => {
             if (typeof item === 'string') {
               try {
@@ -157,15 +139,10 @@
             return item;
           });
           
-          console.log('🔧 AdminDashboard: Parsed data for', entityType, ':', parsedData);
-          console.log('🔧 AdminDashboard: Sample parsed item:', parsedData[0]);
-          
-          // Store the parsed data in the reactive data object
+          console.log(`🔧 AdminDashboard: Loaded ${parsedData.length} ${entityType} entities`);
           data = {...data, [entityType]: parsedData};
-          console.log('🔧 AdminDashboard: Updated data object:', data);
-          console.log('🔧 AdminDashboard: Data for', entityType, 'in data object:', data[entityType]);
-          console.log('🔧 AdminDashboard: Total entity types in data:', Object.keys(data));
           
+          // Set pagination if available
           if (config.paginationPath) {
             const paginationParts = config.paginationPath.split('.');
             let paginationData = actualData;
@@ -180,33 +157,39 @@
             }
             
             if (paginationData) {
-              if (entityType === 'users') usersPagination = paginationData;
-              else if (entityType === 'mandates') mandatesPagination = paginationData;
-              else if (entityType === 'tasks') tasksPagination = paginationData;
-              else if (entityType === 'transfers') transfersPagination = paginationData;
-              else if (entityType === 'instruments') instrumentsPagination = paginationData;
-              else if (entityType === 'codexes') codexesPagination = paginationData;
-              else if (entityType === 'organizations') organizationsPagination = paginationData;
-              else if (entityType === 'disputes') disputesPagination = paginationData;
-              else if (entityType === 'licenses') licensesPagination = paginationData;
-              else if (entityType === 'trades') tradesPagination = paginationData;
-              else if (entityType === 'realms') realmsPagination = paginationData;
-              else if (entityType === 'proposals') proposalsPagination = paginationData;
-              else if (entityType === 'votes') votesPagination = paginationData;
+              setPaginationForEntity(entityType, paginationData);
             }
           }
         } else {
+          console.log(`🔧 AdminDashboard: Entity data not found or not array for ${entityType}`);
           data = {...data, [entityType]: []};
         }
-      } else {
-        data = {...data, [entityType]: []};
       }
-      
     } catch (err) {
-      console.error(`Error fetching ${entityType}:`, err);
+      console.error(`🔧 AdminDashboard: Error fetching ${entityType}:`, err);
       error = `Error fetching ${entityType}: ${err.message}`;
+      data = {...data, [entityType]: []};
     } finally {
       loading = false;
+      console.log('🔧 AdminDashboard: Set loading to false in finally block');
+    }
+  }
+  
+  function setPaginationForEntity(entityType, paginationData) {
+    switch(entityType) {
+      case 'users': usersPagination = paginationData; break;
+      case 'mandates': mandatesPagination = paginationData; break;
+      case 'tasks': tasksPagination = paginationData; break;
+      case 'transfers': transfersPagination = paginationData; break;
+      case 'instruments': instrumentsPagination = paginationData; break;
+      case 'codexes': codexesPagination = paginationData; break;
+      case 'organizations': organizationsPagination = paginationData; break;
+      case 'disputes': disputesPagination = paginationData; break;
+      case 'licenses': licensesPagination = paginationData; break;
+      case 'trades': tradesPagination = paginationData; break;
+      case 'realms': realmsPagination = paginationData; break;
+      case 'proposals': proposalsPagination = paginationData; break;
+      case 'votes': votesPagination = paginationData; break;
     }
   }
   
@@ -252,25 +235,11 @@
     };
   }
   
-  function filterData(data, searchTerm) {
-    if (!searchTerm) return data;
-    
-    const filtered = {};
-    Object.entries(data).forEach(([entityType, entities]) => {
-      if (Array.isArray(entities)) {
-        filtered[entityType] = entities.filter(entity =>
-          Object.values(entity).some(value =>
-            String(value).toLowerCase().includes(searchTerm.toLowerCase())
-          )
-        );
-      } else {
-        filtered[entityType] = entities;
-      }
-    });
-    return filtered;
-  }
-  
-  $: filteredData = filterData(data, searchTerm);
+  // Simplified filtering - just filter the current active tab data
+  $: filteredData = searchTerm && data[activeTab] ? 
+    data[activeTab].filter(item => 
+      JSON.stringify(item).toLowerCase().includes(searchTerm.toLowerCase())
+    ) : null;
   
   async function importBulkData() {
     if (!importData.trim()) {
@@ -312,14 +281,14 @@
     error = null;
   }
   
-  onMount(() => {
+  onMount(async () => {
     console.log('🔧 AdminDashboard: Component mounted, activeTab:', activeTab);
     if (activeTab === 'overview') {
       console.log('🔧 AdminDashboard: Calling handleTabChange for overview');
       handleTabChange('overview');
     } else if (allEntityTypes.includes(activeTab)) {
       console.log('🔧 AdminDashboard: Calling fetchEntityData for:', activeTab);
-      fetchEntityData(activeTab);
+      await fetchEntityData(activeTab);
     } else {
       console.log('🔧 AdminDashboard: No initial data fetch needed');
     }
@@ -483,127 +452,9 @@
           </div>
         {/if}
       </div>
-    {:else}
-      <!-- Entity Table View -->
-      <div class="p-6">
-        {#if activeTab === 'codexes'}
-          <CodexViewer 
-            codexes={filteredData[activeTab] || data[activeTab] || []} 
-            {loading} 
-          />
-        {:else if activeTab === 'transfers'}
-          <GenericEntityTable 
-            entityType="transfers"
-            items={data.transfers || []}
-            loading={loading}
-            pagination={transfersPagination}
-            onPageChange={handleTransfersPageChange}
-          />
-        {:else if activeTab === 'users'}
-          {#if data[activeTab]}
-            {console.log('🔧 AdminDashboard: Rendering users table with data:', data[activeTab])}
-            {console.log('🔧 AdminDashboard: Data length:', data[activeTab].length)}
-          {/if}
-          <GenericEntityTable 
-            entityType="users"
-            items={filteredData[activeTab] || data[activeTab] || []}
-            loading={loading}
-            pagination={usersPagination}
-            onPageChange={handleUsersPageChange}
-          />
-        {:else if activeTab === 'mandates'}
-          {#if data[activeTab]}
-            {console.log('🔧 AdminDashboard: Rendering mandates table with data:', data[activeTab])}
-            {console.log('🔧 AdminDashboard: Data length:', data[activeTab].length)}
-            {console.log('🔧 AdminDashboard: First item:', data[activeTab][0])}
-          {/if}
-          <GenericEntityTable 
-            entityType="mandates"
-            items={filteredData[activeTab] || data[activeTab] || []}
-            loading={loading}
-            pagination={mandatesPagination}
-            onPageChange={handleMandatesPageChange}
-          />
-        {:else if activeTab === 'tasks'}
-          <GenericEntityTable 
-            entityType="tasks"
-            items={filteredData[activeTab] || data[activeTab] || []}
-            loading={loading}
-            pagination={tasksPagination}
-            onPageChange={handleTasksPageChange}
-          />
-        {:else if activeTab === 'instruments'}
-          <GenericEntityTable 
-            entityType="instruments"
-            items={filteredData[activeTab] || data[activeTab] || []}
-            loading={loading}
-            pagination={instrumentsPagination}
-            onPageChange={handleInstrumentsPageChange}
-          />
-        {:else if activeTab === 'organizations'}
-          <GenericEntityTable 
-            entityType="organizations"
-            items={filteredData[activeTab] || data[activeTab] || []}
-            loading={loading}
-            pagination={organizationsPagination}
-            onPageChange={handleOrganizationsPageChange}
-          />
-        {:else if activeTab === 'disputes'}
-          <GenericEntityTable 
-            entityType="disputes"
-            items={filteredData[activeTab] || data[activeTab] || []}
-            loading={loading}
-            pagination={disputesPagination}
-            onPageChange={handleDisputesPageChange}
-          />
-        {:else if activeTab === 'licenses'}
-          <GenericEntityTable 
-            entityType="licenses"
-            items={filteredData[activeTab] || data[activeTab] || []}
-            loading={loading}
-            pagination={licensesPagination}
-            onPageChange={handleLicensesPageChange}
-          />
-        {:else if activeTab === 'trades'}
-          <GenericEntityTable 
-            entityType="trades"
-            items={filteredData[activeTab] || data[activeTab] || []}
-            loading={loading}
-            pagination={tradesPagination}
-            onPageChange={handleTradesPageChange}
-          />
-        {:else if activeTab === 'realms'}
-          <GenericEntityTable 
-            entityType="realms"
-            items={filteredData[activeTab] || data[activeTab] || []}
-            loading={loading}
-            pagination={realmsPagination}
-            onPageChange={handleRealmsPageChange}
-          />
-        {:else if activeTab === 'proposals'}
-          <GenericEntityTable 
-            entityType="proposals"
-            items={filteredData[activeTab] || data[activeTab] || []}
-            loading={loading}
-            pagination={proposalsPagination}
-            onPageChange={handleProposalsPageChange}
-          />
-        {:else if activeTab === 'votes'}
-          <GenericEntityTable 
-            entityType="votes"
-            items={filteredData[activeTab] || data[activeTab] || []}
-            loading={loading}
-            pagination={votesPagination}
-            onPageChange={handleVotesPageChange}
-          />
-        {:else}
-          <GenericEntityTable 
-            entityType={activeTab}
-            items={filteredData[activeTab] || data[activeTab] || []}
-            loading={loading}
-          />
-        {/if}
-      </div>
+    {:else if activeTab === 'registration_urls'}
+      <!-- Registration URL Management -->
+      <RegistrationUrlManager />
     {:else if activeTab === 'bulk_import'}
       <!-- Bulk Import Section -->
       <div class="p-6">
@@ -733,6 +584,140 @@
     {:else if activeTab === 'registration_urls'}
       <!-- Registration URL Management -->
       <RegistrationUrlManager />
+    {:else}
+      <!-- Entity Table View -->
+      {console.log('🔧 AdminDashboard: ENTERING ENTITY TABLE VIEW')}
+      {console.log('🔧 AdminDashboard: Template activeTab value:', activeTab)}
+      {console.log('🔧 AdminDashboard: Template loading state:', loading)}
+      {console.log('🔧 AdminDashboard: Template data object keys:', Object.keys(data))}
+      {console.log('🔧 AdminDashboard: Template data[activeTab] exists:', !!data[activeTab])}
+      
+      {#if loading}
+        {console.log('🔧 AdminDashboard: SHOWING LOADING SPINNER')}
+        <div class="flex items-center justify-center h-64">
+          <div class="text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p class="text-gray-600">Loading {activeTab}...</p>
+          </div>
+        </div>
+      {:else}
+        {console.log('🔧 AdminDashboard: SHOWING ENTITY TABLE')}
+        <div class="p-6">
+          {#if activeTab === 'codexes'}
+            <CodexViewer 
+              codexes={filteredData[activeTab] || data[activeTab] || []} 
+              {loading} 
+            />
+          {:else if activeTab === 'transfers'}
+            <GenericEntityTable 
+              entityType="transfers"
+              items={filteredData || data.transfers || []}
+              loading={loading}
+              pagination={transfersPagination}
+              onPageChange={handleTransfersPageChange}
+            />
+          {:else if activeTab === 'users'}
+            {console.log('🔧 AdminDashboard: Template rendering for users tab')}
+            {console.log('🔧 AdminDashboard: data.users exists?', !!data.users)}
+            {console.log('🔧 AdminDashboard: data.users length:', data.users?.length)}
+            {console.log('🔧 AdminDashboard: loading state:', loading)}
+            {console.log('🔧 AdminDashboard: filteredData:', filteredData)}
+            <GenericEntityTable 
+              entityType="users"
+              items={filteredData || data.users || []}
+              loading={loading}
+              pagination={usersPagination}
+              onPageChange={handleUsersPageChange}
+            />
+          {:else if activeTab === 'mandates'}
+            <GenericEntityTable 
+              entityType="mandates"
+              items={filteredData || data.mandates || []}
+              loading={loading}
+              pagination={mandatesPagination}
+              onPageChange={handleMandatesPageChange}
+            />
+          {:else if activeTab === 'tasks'}
+            <GenericEntityTable 
+              entityType="tasks"
+              items={filteredData || data.tasks || []}
+              loading={loading}
+              pagination={tasksPagination}
+              onPageChange={handleTasksPageChange}
+            />
+          {:else if activeTab === 'instruments'}
+            <GenericEntityTable 
+              entityType="instruments"
+              items={filteredData || data.instruments || []}
+              loading={loading}
+              pagination={instrumentsPagination}
+              onPageChange={handleInstrumentsPageChange}
+            />
+          {:else if activeTab === 'organizations'}
+            <GenericEntityTable 
+              entityType="organizations"
+              items={filteredData || data.organizations || []}
+              loading={loading}
+              pagination={organizationsPagination}
+              onPageChange={handleOrganizationsPageChange}
+            />
+          {:else if activeTab === 'disputes'}
+            <GenericEntityTable 
+              entityType="disputes"
+              items={filteredData || data.disputes || []}
+              loading={loading}
+              pagination={disputesPagination}
+              onPageChange={handleDisputesPageChange}
+            />
+          {:else if activeTab === 'licenses'}
+            <GenericEntityTable 
+              entityType="licenses"
+              items={filteredData || data.licenses || []}
+              loading={loading}
+              pagination={licensesPagination}
+              onPageChange={handleLicensesPageChange}
+            />
+          {:else if activeTab === 'trades'}
+            <GenericEntityTable 
+              entityType="trades"
+              items={filteredData || data.trades || []}
+              loading={loading}
+              pagination={tradesPagination}
+              onPageChange={handleTradesPageChange}
+            />
+          {:else if activeTab === 'realms'}
+            <GenericEntityTable 
+              entityType="realms"
+              items={filteredData || data.realms || []}
+              loading={loading}
+              pagination={realmsPagination}
+              onPageChange={handleRealmsPageChange}
+            />
+          {:else if activeTab === 'proposals'}
+            <GenericEntityTable 
+              entityType="proposals"
+              items={filteredData || data.proposals || []}
+              loading={loading}
+              pagination={proposalsPagination}
+              onPageChange={handleProposalsPageChange}
+            />
+          {:else if activeTab === 'votes'}
+            <GenericEntityTable 
+              entityType="votes"
+              items={filteredData || data.votes || []}
+              loading={loading}
+              pagination={votesPagination}
+              onPageChange={handleVotesPageChange}
+            />
+          {:else}
+            <GenericEntityTable 
+              entityType={activeTab}
+              items={filteredData || data[activeTab] || []}
+              loading={loading}
+            />
+          {/if}
+        </div>
+      {/if}
     {/if}
   </div>
 </div>
