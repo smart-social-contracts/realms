@@ -12,10 +12,9 @@ from io import StringIO
 from typing import Any, Dict, List
 
 import ggg
+from kybra_simple_logging import get_logger
 
 from .models import RegistrationCode
-
-from kybra_simple_logging import get_logger
 
 logger = get_logger("extensions.admin_dashboard")
 
@@ -46,7 +45,6 @@ def extension_sync_call(method_name: str, args: dict):
         return {"success": False, "error": f"Error calling {method_name}: {str(e)}"}
 
 
-
 def import_data(args):
     """
     Import data from direct data input
@@ -69,10 +67,7 @@ def import_data(args):
         parsed_data = []
         if data_format == "csv":
             # Handle CSV data
-            import csv
-            import io
-
-            csv_reader = csv.DictReader(io.StringIO(data_content))
+            csv_reader = csv.DictReader(StringIO(data_content))
             parsed_data = list(csv_reader)
         else:
             # Handle JSON data
@@ -93,7 +88,7 @@ def import_data(args):
 
         return {
             "success": True,
-            "message": f"Successfully imported records",
+            "message": "Successfully imported records",
             "data": {
                 "total_records": len(parsed_data),
                 "successful": results["successful"],
@@ -119,12 +114,12 @@ def process_bulk_import(data: List[Dict[str, Any]]) -> Dict[str, Any]:
         try:
             entity_type = record.get("class")
             logger.info(f"entity_type: {entity_type}")
-            
+
             entity = getattr(ggg, entity_type)
             logger.info(f"entity: {entity}")
 
-            entity_data = record['data']
-            
+            entity_data = record["data"]
+
             create_entity(entity, entity_data)
             successful += 1
         except Exception as e:
@@ -140,10 +135,10 @@ def process_bulk_import(data: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 def create_entity(entity, data: Dict[str, Any]):
-    if entity == 'Codex':
-        obj = Codex()
-        obj.name = data['name']
-        obj.code = base64.b64decode(data['code'])
+    if entity == "Codex":
+        obj = ggg.Codex()
+        obj.name = data["name"]
+        obj.code = base64.b64decode(data["code"])
         return obj
     return entity(**data)
 
