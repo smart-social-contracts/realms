@@ -11,7 +11,6 @@ from .commands.db import db_command
 from .commands.deploy import deploy_command
 from .commands.extension import extension_command
 from .commands.import_data import import_codex_command, import_data_command
-from .constants import MAX_BATCH_SIZE
 from .commands.registry import (
     registry_add_command,
     registry_count_command,
@@ -21,6 +20,7 @@ from .commands.registry import (
     registry_search_command,
 )
 from .commands.shell import shell_command
+from .constants import MAX_BATCH_SIZE
 from .utils import (
     check_dependencies,
     display_info_panel,
@@ -119,7 +119,9 @@ def import_data(
         None, "--type", help="Entity type (codex for Python files, or json entity type)"
     ),
     format: str = typer.Option("json", "--format", help="Data format (json)"),
-    batch_size: int = typer.Option(MAX_BATCH_SIZE, "--batch-size", help="Batch size for import"),
+    batch_size: int = typer.Option(
+        MAX_BATCH_SIZE, "--batch-size", help="Batch size for import"
+    ),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Show what would be imported without executing"
     ),
@@ -127,8 +129,6 @@ def import_data(
 ) -> None:
     """Import data into the realm. Supports JSON data and Python codex files."""
     import_data_command(file_path, entity_type, format, batch_size, dry_run, network)
-
-
 
 
 # Register deploy command directly from commands module

@@ -1,9 +1,9 @@
 """Import command for loading JSON data and codex files into Realms."""
 
+import base64
 import json
 from pathlib import Path
 from typing import Optional
-import base64
 
 import typer
 
@@ -60,9 +60,11 @@ def import_data_command(
         project_root = get_project_root()
 
         for i in range(0, len(data), batch_size):
-            chunk = data[i:i + batch_size]
+            chunk = data[i : i + batch_size]
 
-            console.print(f"📊 Sending chunk {i // batch_size + 1}/{len(data) // batch_size}")
+            console.print(
+                f"📊 Sending chunk {i // batch_size + 1}/{len(data) // batch_size}"
+            )
 
             args = {
                 "format": format,
@@ -83,51 +85,68 @@ def import_data_command(
                     "--network",
                     network,
                 ],
-                cwd=project_root
+                cwd=project_root,
             )
 
             # Parse the dfx response to check for backend errors
             if result and result.stdout:
                 try:
                     # Extract the response field from the dfx output
-                    import re
                     import ast
-                    
+                    import re
+
                     # Look for the response field in the dfx output
-                    response_match = re.search(r'response = "(.+?)";', result.stdout, re.DOTALL)
+                    response_match = re.search(
+                        r'response = "(.+?)";', result.stdout, re.DOTALL
+                    )
                     if response_match:
                         response_str = response_match.group(1)
                         # Unescape the response string
-                        response_str = response_str.replace("\\'", "'").replace('\\"', '"')
-                        
+                        response_str = response_str.replace("\\'", "'").replace(
+                            '\\"', '"'
+                        )
+
                         # Parse the backend response safely
                         try:
                             backend_response = ast.literal_eval(response_str)
                         except (ValueError, SyntaxError):
                             # Fallback to eval if literal_eval fails
                             backend_response = eval(response_str)
-                        
+
                         if isinstance(backend_response, dict):
                             # Check if the import actually failed by looking at the detailed results
-                            if not backend_response.get('success', True):
-                                error_msg = backend_response.get('error', 'Unknown backend error')
+                            if not backend_response.get("success", True):
+                                error_msg = backend_response.get(
+                                    "error", "Unknown backend error"
+                                )
                                 raise Exception(f"Backend import failed: {error_msg}")
-                            
+
                             # Check if there were failed records even if top-level success is True
-                            data = backend_response.get('data', {})
+                            data = backend_response.get("data", {})
                             if isinstance(data, dict):
-                                failed_count = data.get('failed', 0)
-                                successful_count = data.get('successful', 0)
-                                errors = data.get('errors', [])
-                                
+                                failed_count = data.get("failed", 0)
+                                successful_count = data.get("successful", 0)
+                                errors = data.get("errors", [])
+
                                 if failed_count > 0:
-                                    error_details = '\n'.join(errors) if errors else f"{failed_count} records failed to import"
-                                    raise Exception(f"Import partially failed: {successful_count} successful, {failed_count} failed.\nErrors:\n{error_details}")
-                                
+                                    error_details = (
+                                        "\n".join(errors)
+                                        if errors
+                                        else f"{failed_count} records failed to import"
+                                    )
+                                    raise Exception(
+                                        f"Import partially failed: {successful_count} successful, {failed_count} failed.\nErrors:\n{error_details}"
+                                    )
+
                 except Exception as parse_error:
                     # If we can't parse the response, check if there's an obvious error
-                    if "success': False" in result.stdout or "failed': 1" in result.stdout:
-                        raise Exception("Backend import failed - check logs for details")
+                    if (
+                        "success': False" in result.stdout
+                        or "failed': 1" in result.stdout
+                    ):
+                        raise Exception(
+                            "Backend import failed - check logs for details"
+                        )
 
         display_success_panel(
             "Import Complete! 🎉",
@@ -140,7 +159,10 @@ def import_data_command(
 
 
 def import_codex_command(
-    file_path: str, codex_name: Optional[str] = None, dry_run: bool = False, network: str = "local"
+    file_path: str,
+    codex_name: Optional[str] = None,
+    dry_run: bool = False,
+    network: str = "local",
 ) -> None:
     """Import Python codex file into the realm."""
 
@@ -214,7 +236,7 @@ def import_codex_command(
                 "--network",
                 network,
             ],
-            cwd=project_root
+            cwd=project_root,
         )
 
         display_success_panel(
