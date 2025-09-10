@@ -236,13 +236,12 @@ for codex in Codex.instances():
         try:
             # Call deploy_command with the generated realm folder
             deploy_command(
-                config_file=None,
-                folder=output_dir,
-                network=network,
-                clean=False
+                config_file=None, folder=output_dir, network=network, clean=False
             )
         except typer.Exit as e:
-            console.print(f"[red]❌ Auto-deployment failed with exit code: {e.exit_code}[/red]")
+            console.print(
+                f"[red]❌ Auto-deployment failed with exit code: {e.exit_code}[/red]"
+            )
             raise
         except Exception as e:
             console.print(f"[red]❌ Auto-deployment failed: {e}[/red]")
