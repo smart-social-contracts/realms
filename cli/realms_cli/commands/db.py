@@ -1,37 +1,22 @@
 """Database explorer command for interactive Realm database exploration."""
 
 import json
+import re
 import subprocess
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 import typer
-from prompt_toolkit import prompt
-from prompt_toolkit.shortcuts import confirm
+from prompt_toolkit.application import Application
+from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.layout.containers import HSplit, Window
+from prompt_toolkit.layout.controls import FormattedTextControl
+from prompt_toolkit.layout.layout import Layout
 from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
-from rich.text import Text
 
 from ..utils import get_effective_network_and_canister
 
 console = Console()
-
-ENTITY_TYPES = {
-    "users": "Users",
-    "organizations": "Organizations",
-    "mandates": "Mandates",
-    "tasks": "Tasks",
-    "codexes": "Codexes",
-    "instruments": "Instruments",
-    "trades": "Trades",
-    "transfers": "Transfers",
-    "realms": "Realms",
-    "licenses": "Licenses",
-    "disputes": "Disputes",
-    "proposals": "Proposals",
-    "votes": "Votes",
-}
 
 
 @dataclass
@@ -43,15 +28,41 @@ class NavigationState:
     page_size: int = 10
     current_items: List[Dict] = None
     selected_item: Optional[Dict] = None
+    cursor_position: int = 0
+    view_mode: str = "entity_list"
+    navigation_stack: List[Dict] = None
+
+    def __post_init__(self):
+        if self.current_items is None:
+            self.current_items = []
+        if self.navigation_stack is None:
+            self.navigation_stack = []
 
 
-class DatabaseExplorer:
+class CursorDatabaseExplorer:
     """Interactive database explorer for Realm entities."""
 
     def __init__(self, network: str, canister: str):
         self.network = network
         self.canister = canister
         self.state = NavigationState()
+        self.app = None
+
+        self.entity_types = [
+            "users",
+            "organizations",
+            "mandates",
+            "tasks",
+            "transfers",
+            "trades",
+            "instruments",
+            "codexes",
+            "disputes",
+            "licenses",
+            "realms",
+            "proposals",
+            "votes",
+        ]
 
     def call_backend(self, method: str, args: str = "") -> Dict[str, Any]:
         """Call backend canister method and return parsed result."""
@@ -67,75 +78,98 @@ class DatabaseExplorer:
             if result.returncode == 0:
                 output = result.stdout.strip()
 
-                if "users = vec" in output:
-                    start_vec = output.find("users = vec {")
-                    if start_vec >= 0:
-                        brace_count = 0
-                        vec_start = start_vec + len("users = vec {")
-                        vec_end = vec_start
+                if method == "status":
+                    return {"success": True, "data": output}
 
-                        for i, char in enumerate(output[vec_start:], vec_start):
-                            if char == "{":
-                                brace_count += 1
-                            elif char == "}":
-                                brace_count -= 1
-                                if brace_count < 0:  # Found the closing brace for vec
-                                    vec_end = i
-                                    break
+                entity_patterns = [
+                    r"users = vec \{",
+                    r"organizations = vec \{",
+                    r"mandates = vec \{",
+                    r"tasks = vec \{",
+                    r"transfers = vec \{",
+                    r"trades = vec \{",
+                    r"instruments = vec \{",
+                    r"codexes = vec \{",
+                    r"disputes = vec \{",
+                    r"licenses = vec \{",
+                    r"realms = vec \{",
+                    r"proposals = vec \{",
+                    r"votes = vec \{",
+                ]
 
-                        vec_content = output[vec_start:vec_end]
-                        json_strings = []
+                vec_field = None
+                start_vec = -1
 
-                        for item in vec_content.split('";'):
-                            item = item.strip()
-                            if item.startswith('"'):
-                                item = item[1:]  # Remove leading quote
-                            if item.endswith('"'):
-                                item = item[:-1]  # Remove trailing quote
-                            if item:
-                                try:
-                                    item = item.replace('\\"', '"')
-                                    parsed_item = json.loads(item)
-                                    json_strings.append(parsed_item)
-                                except json.JSONDecodeError:
-                                    continue
+                for pattern in entity_patterns:
+                    match = re.search(pattern, output)
+                    if match:
+                        vec_field = pattern.split(" = vec")[0]
+                        start_vec = match.start()
+                        break
 
-                        total_items = 0
-                        total_pages = 1
-                        page_num = 0
-                        page_size = 10
+                if start_vec >= 0:
+                    brace_count = 0
+                    vec_start = start_vec + len(f"{vec_field} = vec {{")
+                    vec_end = vec_start
 
-                        if "total_items_count" in output:
-                            import re
+                    for i, char in enumerate(output[vec_start:], vec_start):
+                        if char == "{":
+                            brace_count += 1
+                        elif char == "}":
+                            brace_count -= 1
+                            if brace_count < 0:
+                                vec_end = i
+                                break
 
-                            total_match = re.search(
-                                r"total_items_count = (\d+)", output
-                            )
-                            if total_match:
-                                total_items = int(total_match.group(1))
+                    vec_content = output[vec_start:vec_end]
+                    json_strings = []
 
-                        if "total_pages" in output:
-                            pages_match = re.search(r"total_pages = (\d+)", output)
-                            if pages_match:
-                                total_pages = int(pages_match.group(1))
+                    for item in vec_content.split('";'):
+                        item = item.strip()
+                        if item.startswith('"'):
+                            item = item[1:]
+                        if item.endswith('"'):
+                            item = item[:-1]
+                        if item:
+                            try:
+                                item = item.replace('\\"', '"')
+                                parsed_item = json.loads(item)
+                                json_strings.append(parsed_item)
+                            except json.JSONDecodeError:
+                                continue
 
-                        if "page_num" in output:
-                            page_match = re.search(r"page_num = (\d+)", output)
-                            if page_match:
-                                page_num = int(page_match.group(1))
+                    total_items = 0
+                    total_pages = 1
+                    page_num = 0
+                    page_size = 10
 
-                        if "page_size" in output:
-                            size_match = re.search(r"page_size = (\d+)", output)
-                            if size_match:
-                                page_size = int(size_match.group(1))
+                    if "total_items_count" in output:
+                        total_match = re.search(r"total_items_count = (\d+)", output)
+                        if total_match:
+                            total_items = int(total_match.group(1))
 
-                        return {
-                            "items": json_strings,
-                            "total_items_count": total_items,
-                            "total_pages": total_pages,
-                            "page_num": page_num,
-                            "page_size": page_size,
-                        }
+                    if "total_pages" in output:
+                        pages_match = re.search(r"total_pages = (\d+)", output)
+                        if pages_match:
+                            total_pages = int(pages_match.group(1))
+
+                    if "page_num" in output:
+                        page_match = re.search(r"page_num = (\d+)", output)
+                        if page_match:
+                            page_num = int(page_match.group(1))
+
+                    if "page_size" in output:
+                        size_match = re.search(r"page_size = (\d+)", output)
+                        if size_match:
+                            page_size = int(size_match.group(1))
+
+                    return {
+                        "items": json_strings,
+                        "total_items_count": total_items,
+                        "total_pages": total_pages,
+                        "page_num": page_num,
+                        "page_size": page_size,
+                    }
 
                 return {
                     "items": [],
@@ -145,22 +179,22 @@ class DatabaseExplorer:
                     "page_size": 10,
                 }
             else:
-                console.print(f"[red]Error calling backend: {result.stderr}[/red]")
                 return {
                     "items": [],
                     "total_items_count": 0,
                     "total_pages": 1,
                     "page_num": 0,
                     "page_size": 10,
+                    "error": result.stderr,
                 }
         except Exception as e:
-            console.print(f"[red]Error: {str(e)}[/red]")
             return {
                 "items": [],
                 "total_items_count": 0,
                 "total_pages": 1,
                 "page_num": 0,
                 "page_size": 10,
+                "error": str(e),
             }
 
     def list_entities(
@@ -171,245 +205,275 @@ class DatabaseExplorer:
         args = f"({page_num}, {page_size})"
         return self.call_backend(method, args)
 
-    def show_entity_list_menu(self):
-        """Show the main entity type selection menu."""
-        console.clear()
-        console.print("[bold blue]🏛️  Realm Database Explorer[/bold blue]\n")
-        console.print(
-            f"[dim]Network: {self.network}, Canister: {self.canister}[/dim]\n"
-        )
+    def create_key_bindings(self):
+        """Create key bindings for cursor navigation."""
+        kb = KeyBindings()
 
-        table = Table(
-            title="Available Entity Types",
-            show_header=True,
-            header_style="bold magenta",
-        )
-        table.add_column("Key", style="cyan", width=12)
-        table.add_column("Entity Type", style="green")
-        table.add_column("Description", style="dim")
+        @kb.add("up")
+        def move_up(event):
+            if self.state.cursor_position > 0:
+                self.state.cursor_position -= 1
 
-        descriptions = {
-            "users": "System users with authentication",
-            "organizations": "Organizational entities",
-            "mandates": "Governance mandates and directives",
-            "tasks": "Scheduled and executed tasks",
-            "transfers": "Asset transfers between users",
-            "trades": "Completed trade transactions",
-            "proposals": "Governance proposals",
-            "votes": "Voting records",
-        }
+        @kb.add("down")
+        def move_down(event):
+            max_pos = len(self.state.current_items) - 1
+            if self.state.cursor_position < max_pos:
+                self.state.cursor_position += 1
 
-        for key, name in ENTITY_TYPES.items():
-            desc = descriptions.get(key, "")
-            table.add_row(key, name, desc)
+        @kb.add("enter")
+        def select_item(event):
+            self.handle_selection()
 
-        console.print(table)
-        console.print(
-            "\n[dim]Commands: [cyan]<entity_key>[/cyan] to explore, [cyan]q[/cyan] to quit[/dim]"
-        )
+        @kb.add("left")
+        @kb.add("backspace")
+        def go_back(event):
+            self.handle_back_navigation()
 
-    def show_entity_records(self, entity_type: str, page_num: int = 0):
-        """Show paginated records for an entity type."""
-        console.clear()
+        @kb.add("right")
+        def drill_into_relationship(event):
+            if self.state.view_mode == "record_detail":
+                self.handle_relationship_drilling()
 
-        data = self.list_entities(entity_type, page_num, self.state.page_size)
-        items = data.get("items", [])
-        total_count = data.get("total_items_count", 0)
-        total_pages = data.get("total_pages", 1)
+        @kb.add("pageup")
+        def page_up(event):
+            if self.state.page_num > 0:
+                self.state.page_num -= 1
+                self.refresh_data()
 
-        self.state.entity_type = entity_type
-        self.state.page_num = page_num
-        self.state.current_items = items
+        @kb.add("pagedown")
+        def page_down(event):
+            if (
+                hasattr(self.state, "total_pages")
+                and self.state.page_num < self.state.total_pages - 1
+            ):
+                self.state.page_num += 1
+                self.refresh_data()
 
-        console.print(f"[bold blue]{ENTITY_TYPES[entity_type]}[/bold blue]")
-        console.print(
-            f"[dim]Page {page_num + 1} of {total_pages} | Total: {total_count} records[/dim]\n"
-        )
+        @kb.add("q")
+        @kb.add("c-c")
+        def quit_app(event):
+            event.app.exit()
 
-        if not items:
-            console.print("[yellow]No records found[/yellow]")
+        return kb
+
+    def handle_selection(self):
+        """Handle item selection based on current view mode."""
+        if self.state.view_mode == "entity_list":
+            if self.state.cursor_position < len(self.entity_types):
+                selected_entity = self.entity_types[self.state.cursor_position]
+                self.state.entity_type = selected_entity
+                self.state.view_mode = "record_list"
+                self.state.cursor_position = 0
+                self.refresh_data()
+        elif self.state.view_mode == "record_list":
+            if self.state.cursor_position < len(self.state.current_items):
+                self.state.selected_item = self.state.current_items[
+                    self.state.cursor_position
+                ]
+                self.state.view_mode = "record_detail"
+                self.state.cursor_position = 0
+        elif self.state.view_mode == "record_detail":
+            self.handle_relationship_drilling()
+
+    def handle_back_navigation(self):
+        """Handle back navigation including relationship drilling."""
+        if self.state.navigation_stack:
+            previous_state = self.state.navigation_stack.pop()
+            self.state.entity_type = previous_state["entity_type"]
+            self.state.selected_item = previous_state["selected_item"]
+            self.state.cursor_position = previous_state["cursor_position"]
+            self.state.view_mode = previous_state["view_mode"]
+            if "current_items" in previous_state:
+                self.state.current_items = previous_state["current_items"]
+        else:
+            if self.state.view_mode == "record_detail":
+                self.state.view_mode = "record_list"
+                self.state.selected_item = None
+                self.state.cursor_position = 0
+            elif self.state.view_mode == "record_list":
+                self.state.view_mode = "entity_list"
+                self.state.entity_type = ""
+                self.state.cursor_position = 0
+                self.state.current_items = self.entity_types
+
+    def handle_relationship_drilling(self):
+        """Navigate into relationships using cursor keys."""
+        if self.state.view_mode != "record_detail" or not self.state.selected_item:
             return
 
-        table = Table(show_header=True, header_style="bold magenta")
-        table.add_column("#", style="dim", width=4)
+        relations = self.state.selected_item.get("relations", {})
 
-        if items:
-            first_item = items[0]
-            for key in first_item.keys():
-                if key not in [
-                    "relations",
-                    "timestamp_created",
-                    "timestamp_updated",
-                    "creator",
-                    "updater",
-                    "owner",
-                ]:
-                    table.add_column(key.replace("_", " ").title(), style="cyan")
+        if not relations:
+            return
 
-        for i, item in enumerate(items):
-            row = [str(i)]
-            for key in item.keys():
-                if key not in [
-                    "relations",
-                    "timestamp_created",
-                    "timestamp_updated",
-                    "creator",
-                    "updater",
-                    "owner",
-                ]:
-                    value = str(item.get(key, ""))
-                    if len(value) > 30:
-                        value = value[:27] + "..."
-                    row.append(value)
-            table.add_row(*row)
+        rel_names = list(relations.keys())
+        if self.state.cursor_position < len(rel_names):
+            rel_name = rel_names[self.state.cursor_position]
+            rel_items = relations[rel_name]
 
-        console.print(table)
+            if isinstance(rel_items, list) and rel_items:
+                self.state.navigation_stack.append(
+                    {
+                        "entity_type": self.state.entity_type,
+                        "selected_item": self.state.selected_item,
+                        "cursor_position": self.state.cursor_position,
+                        "view_mode": self.state.view_mode,
+                        "current_items": self.state.current_items,
+                    }
+                )
 
-        nav_options = []
-        if page_num > 0:
-            nav_options.append("[cyan]p[/cyan] previous page")
-        if page_num < total_pages - 1:
-            nav_options.append("[cyan]n[/cyan] next page")
-        nav_options.extend(
-            [
-                "[cyan]<number>[/cyan] view record details",
-                "[cyan]b[/cyan] back to entity list",
-                "[cyan]q[/cyan] quit",
-            ]
+                self.state.current_items = rel_items
+                self.state.cursor_position = 0
+                self.state.view_mode = "record_list"
+                self.state.entity_type = rel_items[0].get("_type", "Related")
+
+    def refresh_data(self):
+        """Refresh current data based on state."""
+        if self.state.view_mode == "entity_list":
+            self.state.current_items = self.entity_types
+        elif self.state.view_mode == "record_list" and self.state.entity_type:
+            result = self.list_entities(
+                self.state.entity_type, self.state.page_num, self.state.page_size
+            )
+            if "error" not in result:
+                self.state.current_items = result["items"]
+                self.state.total_pages = result.get("total_pages", 1)
+
+    def render_entity_list(self):
+        """Render the entity selection menu."""
+        lines = []
+        lines.append("Realm Database Explorer")
+        lines.append("Select an entity type to explore:")
+        lines.append("")
+
+        descriptions = {
+            "users": "System users and their profiles",
+            "organizations": "Organizational entities and structures",
+            "mandates": "Governance mandates and authorizations",
+            "tasks": "Scheduled and executed tasks",
+            "transfers": "Asset transfers between entities",
+            "trades": "Completed trading transactions",
+            "instruments": "Financial and governance instruments",
+            "codexes": "Executable code and logic",
+            "disputes": "Conflict resolution records",
+            "licenses": "Permissions and authorizations",
+            "realms": "Realm configurations and metadata",
+            "proposals": "Governance proposals and voting",
+            "votes": "Individual voting records",
+        }
+
+        for i, entity_type in enumerate(self.entity_types):
+            cursor = "> " if i == self.state.cursor_position else "  "
+            desc = descriptions.get(entity_type, "")
+            lines.append(f"{cursor}{i+1:2}. {entity_type.title():<15} - {desc}")
+
+        lines.append("")
+        lines.append("Commands: Up/Down navigate | Enter select | q quit")
+
+        return "\n".join(lines)
+
+    def render_record_list(self):
+        """Render the record list view."""
+        lines = []
+        lines.append(f"{self.state.entity_type.title()} List")
+
+        if hasattr(self.state, "total_pages"):
+            current_page = self.state.page_num + 1
+            lines.append(f"Page {current_page} of {self.state.total_pages}")
+
+        lines.append("")
+
+        for i, item in enumerate(self.state.current_items):
+            cursor = "> " if i == self.state.cursor_position else "  "
+            item_id = item.get("_id", "N/A")
+            name = (
+                item.get("name") or item.get("title") or item.get("username") or "N/A"
+            )
+            lines.append(f"{cursor}{i+1:2}. {item_id:<20} {name}")
+
+        lines.append("")
+        lines.append(
+            "Commands: Up/Down navigate | Enter view details | Left back | PgUp/PgDn pages | q quit"
         )
 
-        console.print(f"\n[dim]Commands: {' | '.join(nav_options)}[/dim]")
+        return "\n".join(lines)
 
-    def show_record_details(self, item: Dict[str, Any]):
-        """Show detailed view of a single record with relationships."""
-        console.clear()
+    def render_record_detail(self):
+        """Render the detailed record view."""
+        if not self.state.selected_item:
+            return "No item selected"
 
-        entity_type = item.get("_type", "Unknown")
-        entity_id = item.get("_id", "Unknown")
+        lines = []
+        item = self.state.selected_item
+        item_type = self.state.entity_type.title().rstrip("s")
+        item_id = item.get("_id", "N/A")
 
-        console.print(f"[bold blue]{entity_type} Details[/bold blue]")
-        console.print(f"[dim]ID: {entity_id}[/dim]\n")
+        lines.append(f"{item_type} Details")
+        lines.append(f"ID: {item_id}")
+        lines.append("")
 
-        props_table = Table(
-            title="Properties", show_header=True, header_style="bold magenta"
-        )
-        props_table.add_column("Property", style="cyan", width=20)
-        props_table.add_column("Value", style="green")
-
+        lines.append("Properties:")
         for key, value in item.items():
-            if key not in ["relations", "_type"]:
-                props_table.add_row(key, str(value))
-
-        console.print(props_table)
+            if key not in ["_id", "relations"] and not key.startswith("_"):
+                lines.append(f"  {key}: {value}")
 
         relations = item.get("relations", {})
         if relations:
-            console.print("\n")
-            rel_table = Table(
-                title="Relationships", show_header=True, header_style="bold magenta"
-            )
-            rel_table.add_column("Relationship", style="cyan", width=20)
-            rel_table.add_column("Count", style="yellow", width=8)
-            rel_table.add_column("Related Items", style="green")
+            lines.append("")
+            lines.append("Relationships:")
+            rel_names = list(relations.keys())
+            for i, rel_name in enumerate(rel_names):
+                cursor = "> " if i == self.state.cursor_position else "  "
+                rel_items = relations[rel_name]
+                count = len(rel_items) if isinstance(rel_items, list) else 1
+                lines.append(f"{cursor}  {rel_name}: {count} items")
 
-            for rel_name, rel_items in relations.items():
-                if isinstance(rel_items, list):
-                    count = len(rel_items)
-                    if count > 0:
-                        preview = []
-                        for rel_item in rel_items[:3]:
-                            if isinstance(rel_item, dict):
-                                preview.append(
-                                    f"{rel_item.get('_type', 'Unknown')}#{rel_item.get('_id', '?')}"
-                                )
-                        preview_str = ", ".join(preview)
-                        if count > 3:
-                            preview_str += f" ... (+{count - 3} more)"
-                        rel_table.add_row(rel_name, str(count), preview_str)
-                    else:
-                        rel_table.add_row(rel_name, "0", "[dim]None[/dim]")
-
-            console.print(rel_table)
-
-        console.print(
-            "\n[dim]Commands: [cyan]b[/cyan] back to list | [cyan]q[/cyan] quit[/dim]"
+        lines.append("")
+        lines.append(
+            "Commands: Up/Down navigate relationships | Right drill into | Left back | q quit"
         )
 
-        self.state.selected_item = item
+        return "\n".join(lines)
+
+    def create_layout(self):
+        """Create the prompt_toolkit layout based on current state."""
+        if self.state.view_mode == "entity_list":
+            content = self.render_entity_list()
+        elif self.state.view_mode == "record_list":
+            content = self.render_record_list()
+        elif self.state.view_mode == "record_detail":
+            content = self.render_record_detail()
+        else:
+            content = "Unknown view mode"
+
+        return Layout(
+            HSplit(
+                [
+                    Window(content=FormattedTextControl(text=content), wrap_lines=True),
+                ]
+            )
+        )
 
     def run(self):
-        """Main interactive loop."""
-        console.print("[bold blue]🚀 Starting Database Explorer[/bold blue]\n")
-
+        """Main interactive loop using prompt_toolkit Application."""
         try:
             self.call_backend("status")
-            console.print("[green]✅ Connected to backend canister[/green]\n")
+            print("Connected to backend canister\n")
         except Exception:
-            console.print("[red]❌ Could not connect to backend canister[/red]")
-            console.print(
-                "[yellow]Make sure the canister is running and accessible[/yellow]\n"
-            )
+            print("Could not connect to backend canister")
+            return
 
-        while True:
-            try:
-                if not self.state.entity_type:
-                    self.show_entity_list_menu()
-                    choice = prompt("Select entity type: ").strip().lower()
+        self.state.current_items = self.entity_types
+        kb = self.create_key_bindings()
 
-                    if choice == "q":
-                        break
-                    elif choice in ENTITY_TYPES:
-                        self.state.entity_type = choice
-                        self.state.page_num = 0
-                    else:
-                        console.print("[red]Invalid choice. Try again.[/red]")
-                        continue
+        self.app = Application(
+            layout=self.create_layout(),
+            key_bindings=kb,
+            full_screen=True,
+            refresh_interval=0.1,
+        )
 
-                elif self.state.selected_item is None:
-                    self.show_entity_records(
-                        self.state.entity_type, self.state.page_num
-                    )
-                    choice = prompt("Command: ").strip().lower()
-
-                    if choice == "q":
-                        break
-                    elif choice == "b":
-                        self.state.entity_type = ""
-                        self.state.selected_item = None
-                    elif (
-                        choice == "n"
-                        and self.state.page_num
-                        < len(self.state.current_items) // self.state.page_size
-                    ):
-                        self.state.page_num += 1
-                    elif choice == "p" and self.state.page_num > 0:
-                        self.state.page_num -= 1
-                    elif choice.isdigit():
-                        idx = int(choice)
-                        if 0 <= idx < len(self.state.current_items):
-                            self.state.selected_item = self.state.current_items[idx]
-                        else:
-                            console.print("[red]Invalid record number[/red]")
-                    else:
-                        console.print("[red]Invalid command[/red]")
-
-                else:
-                    self.show_record_details(self.state.selected_item)
-                    choice = prompt("Command: ").strip().lower()
-
-                    if choice == "q":
-                        break
-                    elif choice == "b":
-                        self.state.selected_item = None
-                    else:
-                        console.print("[red]Invalid command[/red]")
-
-            except KeyboardInterrupt:
-                console.print("\n[dim]Use 'q' to quit[/dim]")
-            except EOFError:
-                break
-
-        console.print("[bold blue]Goodbye![/bold blue]")
+        self.app.run()
 
 
 def db_command(
@@ -420,10 +484,10 @@ def db_command(
         None, "--canister", "-c", help="Canister name to connect to (overrides context)"
     ),
 ) -> None:
-    """Explore the Realm database in an interactive text-based interface."""
+    """Explore the Realm database in an interactive text-based interface with cursor navigation."""
     effective_network, effective_canister = get_effective_network_and_canister(
         network, canister
     )
 
-    explorer = DatabaseExplorer(effective_network, effective_canister)
+    explorer = CursorDatabaseExplorer(effective_network, effective_canister)
     explorer.run()
