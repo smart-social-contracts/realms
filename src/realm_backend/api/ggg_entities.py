@@ -295,13 +295,13 @@ def list_treasuries(page_num: int, page_size: int) -> Dict[str, Any]:
 
         # Load realm relationships for each treasury
         for treasury in treasuries:
-            if hasattr(treasury, 'realm') and treasury.realm:
+            if hasattr(treasury, "realm") and treasury.realm:
                 # Force load the realm relationship
-                treasury._relations['realm'] = [treasury.realm]
+                treasury._relations["realm"] = [treasury.realm]
 
         logger.info(f"Listing treasuries from {from_id} with page size {page_size}")
         logger.info(f"Treasuries[0]: {treasuries[0].to_dict()}")
-        
+
         count = Treasury.count()
         return {
             "items": treasuries,

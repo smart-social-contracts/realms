@@ -544,7 +544,9 @@ def get_votes(page_num: nat, page_size: nat) -> RealmResponse:
 def get_treasuries(page_num: nat, page_size: nat) -> RealmResponse:
     try:
         treasuries_data = list_treasuries(page_num=page_num, page_size=page_size)
-        treasuries_json = [json.dumps(treasury.to_dict()) for treasury in treasuries_data["items"]]
+        treasuries_json = [
+            json.dumps(treasury.to_dict()) for treasury in treasuries_data["items"]
+        ]
         pagination = PaginationInfo(
             page_num=treasuries_data["page_num"],
             page_size=treasuries_data["page_size"],
@@ -554,7 +556,9 @@ def get_treasuries(page_num: nat, page_size: nat) -> RealmResponse:
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                TreasuriesList=TreasuriesListRecord(treasuries=treasuries_json, pagination=pagination)
+                TreasuriesList=TreasuriesListRecord(
+                    treasuries=treasuries_json, pagination=pagination
+                )
             ),
         )
     except Exception as e:
