@@ -78,7 +78,7 @@ class CursorDatabaseExplorer:
 
         # Cache for relationship mappings discovered from GGG models
         self._relationship_cache = None
-        self._ggg_classes = None
+        self._ggg_classes = self._discover_ggg_classes()
 
 
     def call_backend(self, method: str, args: str = "") -> Dict[str, Any]:
@@ -90,7 +90,21 @@ class CursorDatabaseExplorer:
             cmd.extend(["--network", self.network])
         cmd.extend([self.canister, method])
         if args:
-            cmd.append(args)
+            # Format args as Candid tuple with proper types
+            if isinstance(args, (list, tuple)):
+                # Handle list/tuple of arguments
+                formatted_parts = []
+                for arg in args:
+                    if isinstance(arg, str):
+                        formatted_parts.append(f'"{arg}"')
+                    else:
+                        formatted_parts.append(str(arg))
+                candid_args = f"({', '.join(formatted_parts)})"
+            else:
+                # Handle string args - assume it's already formatted or a single value
+                candid_args = f'("{args}")'
+            
+            cmd.append(f"'{candid_args}'")
 
         logger.debug(f"cmd: {' '.join(cmd)}")
 
@@ -185,8 +199,32 @@ class CursorDatabaseExplorer:
         self, entity_type: str, page_num: int = 0, page_size: int = 10
     ) -> Dict[str, Any]:
         """List entities of given type with pagination."""
-        method = f"get_objects"
-        args = f"({entity_type}, {page_num}, {page_size})"
+        # Map entity class names to their corresponding backend methods
+        method_mapping = {
+            "Codex": "get_codexes",
+            "User": "get_users", 
+            "Transfer": "get_transfers",
+            "Mandate": "get_mandates",
+            "Task": "get_tasks",
+            "Instrument": "get_instruments",
+            "Organization": "get_organizations",
+            "Dispute": "get_disputes",
+            "License": "get_licenses",
+            "Realm": "get_realms",
+            "Trade": "get_trades",
+            "Proposal": "get_proposals",
+            "Vote": "get_votes",
+            "Treasury": "get_treasuries"
+        }
+        
+        method = method_mapping.get(entity_type, "get_objects")
+        if method == "get_objects":
+            # Fallback to generic method with class name
+            args = [entity_type, page_num, page_size]
+        else:
+            # Use specific method with just pagination
+            args = [page_num, page_size]
+            
         return self.call_backend(method, args)
 
     def create_key_bindings(self):
@@ -378,7 +416,7 @@ class CursorDatabaseExplorer:
 
     def _discover_ggg_classes(self):
         """Dynamically discover GGG entity classes."""
-        if self._ggg_classes is not None:
+        if getattr(self, "_ggg_classes", None) is not None:
             return self._ggg_classes
 
         classes = []
@@ -549,7 +587,7 @@ class CursorDatabaseExplorer:
         elif self.state.view_mode == "record_list" and self.state.entity_type:
             logger.info(f"Fetching data for entity type: {self.state.entity_type}")
             result = self.list_entities(
-                self.state.entity_type, self.state.page_num, self.state.page_size
+                self.state.entity_type.__name__, self.state.page_num, self.state.page_size
             )
             logger.info(f"Backend result: {result}")
             if "error" not in result and "items" in result:
@@ -568,10 +606,11 @@ class CursorDatabaseExplorer:
         lines.append("Select an entity type to explore:")
         lines.append("")
 
-        for i, entity_type in enumerate(self._ggg_classes):
+
+        for i, class_obj     in enumerate(self._ggg_classes):
             cursor = "> " if i == self.state.cursor_position else "  "
-            desc = ENTITY_DESCRIPTIONS.get(entity_type, "")
-            lines.append(f"{cursor}{i + 1:2}. {entity_type.title():<15} - {desc}")
+            desc = ENTITY_DESCRIPTIONS.get(class_obj.__name__, "")
+            lines.append(f"{cursor}{i + 1:2}. {class_obj.__name__.title():<15} - {desc}")
 
         lines.append("")
         lines.append("Commands: Up/Down navigate | Enter select | q quit")
@@ -581,7 +620,7 @@ class CursorDatabaseExplorer:
     def render_record_list(self):
         """Render the record list view."""
         lines = []
-        lines.append(f"{self.state.entity_type.title()} List")
+        lines.append(f"{self.state.entity_type.__name__} List")
 
         if hasattr(self.state, "total_pages"):
             current_page = self.state.page_num + 1
@@ -757,9 +796,17 @@ def db_command(
     ),
 ) -> None:
     """Explore the Realm database in an interactive text-based interface with cursor navigation."""
+
+    logger.debug("db_command")
+    logger.debug(f"network: {network}")
+    logger.debug(f"canister: {canister}")
+
     effective_network, effective_canister = get_effective_network_and_canister(
         network, canister
     )
+
+    logger.debug(f"Effective network: {effective_network}")
+    logger.debug(f"Effective canister: {effective_canister}")
 
     explorer = CursorDatabaseExplorer(effective_network, effective_canister)
     explorer.run()
