@@ -213,32 +213,38 @@ class CursorDatabaseExplorer:
         def move_up(event):
             if self.state.cursor_position > 0:
                 self.state.cursor_position -= 1
+                event.app.invalidate()
 
         @kb.add("down")
         def move_down(event):
             max_pos = len(self.state.current_items) - 1
             if self.state.cursor_position < max_pos:
                 self.state.cursor_position += 1
+                event.app.invalidate()
 
         @kb.add("enter")
         def select_item(event):
             self.handle_selection()
+            event.app.invalidate()
 
         @kb.add("left")
         @kb.add("backspace")
         def go_back(event):
             self.handle_back_navigation()
+            event.app.invalidate()
 
         @kb.add("right")
         def drill_into_relationship(event):
             if self.state.view_mode == "record_detail":
                 self.handle_relationship_drilling()
+                event.app.invalidate()
 
         @kb.add("pageup")
         def page_up(event):
             if self.state.page_num > 0:
                 self.state.page_num -= 1
                 self.refresh_data()
+                event.app.invalidate()
 
         @kb.add("pagedown")
         def page_down(event):
@@ -248,6 +254,7 @@ class CursorDatabaseExplorer:
             ):
                 self.state.page_num += 1
                 self.refresh_data()
+                event.app.invalidate()
 
         @kb.add("q")
         @kb.add("c-c")
@@ -466,12 +473,23 @@ class CursorDatabaseExplorer:
         self.state.current_items = self.entity_types
         kb = self.create_key_bindings()
 
+        def get_layout():
+            return self.create_layout()
+
         self.app = Application(
-            layout=self.create_layout(),
+            layout=get_layout(),
             key_bindings=kb,
             full_screen=True,
             refresh_interval=0.1,
         )
+
+        original_invalidate = self.app.invalidate
+
+        def invalidate():
+            self.app.layout = get_layout()
+            original_invalidate()
+
+        self.app.invalidate = invalidate
 
         self.app.run()
 
