@@ -50,9 +50,11 @@ class CursorDatabaseExplorer:
 
         self.entity_types = [
             "users",
+            "humans",
             "organizations",
             "mandates",
             "tasks",
+            "task_schedules",
             "transfers",
             "trades",
             "instruments",
@@ -62,6 +64,8 @@ class CursorDatabaseExplorer:
             "realms",
             "proposals",
             "votes",
+            "treasuries",
+            "user_profiles",
         ]
 
     def call_backend(self, method: str, args: str = "") -> Dict[str, Any]:
@@ -83,9 +87,11 @@ class CursorDatabaseExplorer:
 
                 entity_patterns = [
                     r"users = vec \{",
+                    r"humans = vec \{",
                     r"organizations = vec \{",
                     r"mandates = vec \{",
                     r"tasks = vec \{",
+                    r"schedules = vec \{",
                     r"transfers = vec \{",
                     r"trades = vec \{",
                     r"instruments = vec \{",
@@ -95,6 +101,8 @@ class CursorDatabaseExplorer:
                     r"realms = vec \{",
                     r"proposals = vec \{",
                     r"votes = vec \{",
+                    r"treasuries = vec \{",
+                    r"user_profiles = vec \{",
                 ]
 
                 vec_field = None
@@ -308,7 +316,7 @@ class CursorDatabaseExplorer:
         if self.state.view_mode != "record_detail" or not self.state.selected_item:
             return
 
-        relations = self.state.selected_item.get("relations", {})
+        relations = self.get_all_relationships(self.state.selected_item)
 
         if not relations:
             return
@@ -334,6 +342,45 @@ class CursorDatabaseExplorer:
                 self.state.view_mode = "record_list"
                 self.state.entity_type = rel_items[0].get("_type", "Related")
 
+    def get_all_relationships(self, item):
+        """Extract both explicit relations and inferred relationships from ID fields."""
+        relations = item.get("relations", {}).copy()
+        
+        relationship_fields = {
+            "from_user_id": "users",
+            "to_user_id": "users",
+            "user_id": "users",
+            "creator_id": "users",
+            "owner_id": "users",
+            "human_id": "humans",
+            "organization_id": "organizations",
+            "mandate_id": "mandates",
+            "task_id": "tasks",
+            "task_schedule_id": "task_schedules",
+            "proposal_id": "proposals",
+            "vote_id": "votes",
+            "instrument_id": "instruments",
+            "transfer_id": "transfers",
+            "trade_id": "trades",
+            "dispute_id": "disputes",
+            "license_id": "licenses",
+            "realm_id": "realms",
+            "codex_id": "codexes",
+            "treasury_id": "treasuries",
+            "user_profile_id": "user_profiles"
+        }
+        
+        for field_name, entity_type in relationship_fields.items():
+            if field_name in item and item[field_name]:
+                related_item = {
+                    "_id": item[field_name],
+                    "_type": entity_type.rstrip("s").title(),
+                    "name": f"Referenced {entity_type.rstrip('s').title()}"
+                }
+                relations[field_name.replace("_id", "")] = [related_item]
+        
+        return relations
+
     def refresh_data(self):
         """Refresh current data based on state."""
         if self.state.view_mode == "entity_list":
@@ -355,9 +402,11 @@ class CursorDatabaseExplorer:
 
         descriptions = {
             "users": "System users and their profiles",
+            "humans": "Human entities and identity records",
             "organizations": "Organizational entities and structures",
             "mandates": "Governance mandates and authorizations",
             "tasks": "Scheduled and executed tasks",
+            "task_schedules": "Task scheduling configurations",
             "transfers": "Asset transfers between entities",
             "trades": "Completed trading transactions",
             "instruments": "Financial and governance instruments",
@@ -367,6 +416,8 @@ class CursorDatabaseExplorer:
             "realms": "Realm configurations and metadata",
             "proposals": "Governance proposals and voting",
             "votes": "Individual voting records",
+            "treasuries": "Treasury and vault management",
+            "user_profiles": "User profile configurations and permissions",
         }
 
         for i, entity_type in enumerate(self.entity_types):
@@ -424,7 +475,7 @@ class CursorDatabaseExplorer:
             if key not in ["_id", "relations"] and not key.startswith("_"):
                 lines.append(f"  {key}: {value}")
 
-        relations = item.get("relations", {})
+        relations = self.get_all_relationships(item)
         if relations:
             lines.append("")
             lines.append("Relationships:")
