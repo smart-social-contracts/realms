@@ -68,7 +68,7 @@ class CursorDatabaseExplorer:
         self.canister = canister
         self.state = NavigationState()
         self.app = None
-        
+
         self.entity_types = self._discover_entity_types()
 
     def call_backend(self, method: str, args: str = "") -> Dict[str, Any]:
@@ -115,14 +115,16 @@ class CursorDatabaseExplorer:
         """Parse Candid response using structured approach instead of fragile regex."""
         try:
             json_strings = []
-            
+
             vec_start = candid_output.find("vec {")
             if vec_start >= 0:
                 brace_count = 0
                 vec_content_start = vec_start + 5  # len("vec {")
                 vec_content_end = vec_content_start
-                
-                for i, char in enumerate(candid_output[vec_content_start:], vec_content_start):
+
+                for i, char in enumerate(
+                    candid_output[vec_content_start:], vec_content_start
+                ):
                     if char == "{":
                         brace_count += 1
                     elif char == "}":
@@ -130,9 +132,9 @@ class CursorDatabaseExplorer:
                             vec_content_end = i
                             break
                         brace_count -= 1
-                
+
                 vec_content = candid_output[vec_content_start:vec_content_end]
-                
+
                 for item in vec_content.split('";'):
                     item = item.strip()
                     if item.startswith('"'):
@@ -146,12 +148,12 @@ class CursorDatabaseExplorer:
                             json_strings.append(parsed_item)
                         except json.JSONDecodeError:
                             continue
-            
+
             total_items = self._extract_number(candid_output, "total_items_count")
             total_pages = self._extract_number(candid_output, "total_pages")
             page_num = self._extract_number(candid_output, "page_num")
             page_size = self._extract_number(candid_output, "page_size")
-            
+
             return {
                 "items": json_strings,
                 "total_items_count": total_items,
@@ -176,9 +178,11 @@ class CursorDatabaseExplorer:
             if start >= 0:
                 start += len(pattern)
                 end = start
-                while end < len(text) and (text[end].isdigit() or text[end] == '_'):
+                while end < len(text) and (text[end].isdigit() or text[end] == "_"):
                     end += 1
-                number_str = text[start:end].replace('_', '')  # Remove Candid number suffixes
+                number_str = text[start:end].replace(
+                    "_", ""
+                )  # Remove Candid number suffixes
                 return int(number_str) if number_str else 0
             return 0
         except (ValueError, IndexError):
@@ -187,16 +191,28 @@ class CursorDatabaseExplorer:
     def _discover_entity_types(self) -> List[str]:
         """Discover available entity types by checking backend API methods."""
         known_entities = [
-            "users", "organizations", "mandates", "tasks", "transfers",
-            "trades", "instruments", "codexes", "disputes", "licenses",
-            "realms", "proposals", "votes"
+            "users",
+            "organizations",
+            "mandates",
+            "tasks",
+            "transfers",
+            "trades",
+            "instruments",
+            "codexes",
+            "disputes",
+            "licenses",
+            "realms",
+            "proposals",
+            "votes",
         ]
 
         available_entities = []
         for entity_type in known_entities:
             try:
                 result = self.call_backend(f"get_{entity_type}", "(0, 1)")
-                if "error" not in result or "method does not exist" not in str(result.get("error", "")):
+                if "error" not in result or "method does not exist" not in str(
+                    result.get("error", "")
+                ):
                     available_entities.append(entity_type)
             except Exception:
                 continue
