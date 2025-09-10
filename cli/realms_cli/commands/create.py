@@ -10,6 +10,8 @@ from typing import Optional
 import typer
 from rich.console import Console
 
+from .deploy import deploy_command
+
 console = Console()
 
 
@@ -228,6 +230,17 @@ for codex in Codex.instances():
 
     if deploy:
         console.print("\n[yellow]🚀 Auto-deployment requested...[/yellow]")
-        console.print(
-            "[dim]Note: Auto-deployment not yet implemented. Please run the scripts manually.[/dim]"
-        )
+        try:
+            # Call deploy_command with the generated realm folder
+            deploy_command(
+                config_file=None,
+                folder=output_dir,
+                network=network,
+                clean=False
+            )
+        except typer.Exit as e:
+            console.print(f"[red]❌ Auto-deployment failed with exit code: {e.exit_code}[/red]")
+            raise
+        except Exception as e:
+            console.print(f"[red]❌ Auto-deployment failed: {e}[/red]")
+            raise typer.Exit(1)
