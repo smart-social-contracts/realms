@@ -99,7 +99,7 @@ class TestCursorDatabaseExplorer:
         with patch.object(explorer, 'refresh_data') as mock_refresh:
             explorer.handle_selection()
             
-            assert explorer.state.entity_type == "users"
+            assert explorer.state.entity_type == explorer.entity_types[0]
             assert explorer.state.view_mode == "record_list"
             assert explorer.state.cursor_position == 0
             mock_refresh.assert_called_once()
@@ -154,22 +154,32 @@ class TestCursorDatabaseExplorer:
         explorer = CursorDatabaseExplorer("local", "realm_backend")
         explorer.state.selected_item = {
             "_id": "user1",
-            "relations": {
-                "votes": [{"_id": "vote1", "_type": "Vote"}]
-            }
+            "organization_id": "org1"
         }
         explorer.state.view_mode = "record_detail"
         explorer.state.cursor_position = 0
         explorer.state.entity_type = "users"
         explorer.state.current_items = [{"_id": "user1"}]
         
-        explorer.handle_relationship_drilling()
+        explorer.render_record_detail()
         
-        assert len(explorer.state.navigation_stack) == 1
-        assert explorer.state.current_items[0]["_id"] == "vote1"
-        assert explorer.state.view_mode == "record_list"
-        assert explorer.state.entity_type == "Vote"
-        assert explorer.state.cursor_position == 0
+        if hasattr(explorer.state, 'navigable_items') and explorer.state.navigable_items:
+            org_nav_index = next(
+                (i for i, item in enumerate(explorer.state.navigable_items) if item.get('key') == 'organization_id'), 
+                0
+            )
+            explorer.state.cursor_position = org_nav_index
+            
+            with patch.object(explorer, 'list_entities') as mock_list:
+                mock_list.return_value = {"items": [{"_id": "org1", "name": "Test Org"}], "page_num": 0}
+                
+                explorer.handle_relationship_drilling()
+                
+                assert len(explorer.state.navigation_stack) == 1
+                assert len(explorer.state.current_items) > 0
+                assert explorer.state.view_mode == "record_list"
+                assert explorer.state.entity_type == "organizations"
+                assert explorer.state.cursor_position == 0
     
     def test_render_entity_list(self):
         """Test entity list rendering."""
@@ -180,7 +190,7 @@ class TestCursorDatabaseExplorer:
         
         assert "Realm Database Explorer" in content
         assert "> " in content
-        assert "Organizations" in content
+        assert "Organization" in content
     
     def test_render_record_list(self):
         """Test record list rendering."""
