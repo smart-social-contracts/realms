@@ -19,6 +19,27 @@ from ..utils import get_effective_network_and_canister
 console = Console()
 
 
+ENTITY_DESCRIPTIONS = {
+    "users": "System users and their profiles",
+    "humans": "Human entities and identity records",
+    "organizations": "Organizational entities and structures",
+    "mandates": "Governance mandates and authorizations",
+    "tasks": "Scheduled and executed tasks",
+    "task_schedules": "Task scheduling configurations",
+    "transfers": "Asset transfers between entities",
+    "trades": "Completed trading transactions",
+    "instruments": "Financial and governance instruments",
+    "codexes": "Executable code and logic",
+    "disputes": "Conflict resolution records",
+    "licenses": "Permissions and authorizations",
+    "realms": "Realm configurations and metadata",
+    "proposals": "Governance proposals and voting",
+    "votes": "Individual voting records",
+    "treasuries": "Treasury and vault management",
+    "user_profiles": "User profile configurations and permissions",
+}
+
+
 @dataclass
 class NavigationState:
     """Tracks current navigation state in the database explorer."""
@@ -48,21 +69,7 @@ class CursorDatabaseExplorer:
         self.state = NavigationState()
         self.app = None
 
-        self.entity_types = [
-            "users",
-            "organizations",
-            "mandates",
-            "tasks",
-            "transfers",
-            "trades",
-            "instruments",
-            "codexes",
-            "disputes",
-            "licenses",
-            "realms",
-            "proposals",
-            "votes",
-        ]
+        self.entity_types = self._discover_entity_types()
 
     def call_backend(self, method: str, args: str = "") -> Dict[str, Any]:
         """Call backend canister method and return parsed result."""
@@ -81,103 +88,10 @@ class CursorDatabaseExplorer:
                 if method == "status":
                     return {"success": True, "data": output}
 
-                entity_patterns = [
-                    r"users = vec \{",
-                    r"organizations = vec \{",
-                    r"mandates = vec \{",
-                    r"tasks = vec \{",
-                    r"transfers = vec \{",
-                    r"trades = vec \{",
-                    r"instruments = vec \{",
-                    r"codexes = vec \{",
-                    r"disputes = vec \{",
-                    r"licenses = vec \{",
-                    r"realms = vec \{",
-                    r"proposals = vec \{",
-                    r"votes = vec \{",
-                ]
+                if output.startswith("(") and output.endswith(")"):
+                    output = output[1:-1]
 
-                vec_field = None
-                start_vec = -1
-
-                for pattern in entity_patterns:
-                    match = re.search(pattern, output)
-                    if match:
-                        vec_field = pattern.split(" = vec")[0]
-                        start_vec = match.start()
-                        break
-
-                if start_vec >= 0:
-                    brace_count = 0
-                    vec_start = start_vec + len(f"{vec_field} = vec {{")
-                    vec_end = vec_start
-
-                    for i, char in enumerate(output[vec_start:], vec_start):
-                        if char == "{":
-                            brace_count += 1
-                        elif char == "}":
-                            brace_count -= 1
-                            if brace_count < 0:
-                                vec_end = i
-                                break
-
-                    vec_content = output[vec_start:vec_end]
-                    json_strings = []
-
-                    for item in vec_content.split('";'):
-                        item = item.strip()
-                        if item.startswith('"'):
-                            item = item[1:]
-                        if item.endswith('"'):
-                            item = item[:-1]
-                        if item:
-                            try:
-                                item = item.replace('\\"', '"')
-                                parsed_item = json.loads(item)
-                                json_strings.append(parsed_item)
-                            except json.JSONDecodeError:
-                                continue
-
-                    total_items = 0
-                    total_pages = 1
-                    page_num = 0
-                    page_size = 10
-
-                    if "total_items_count" in output:
-                        total_match = re.search(r"total_items_count = (\d+)", output)
-                        if total_match:
-                            total_items = int(total_match.group(1))
-
-                    if "total_pages" in output:
-                        pages_match = re.search(r"total_pages = (\d+)", output)
-                        if pages_match:
-                            total_pages = int(pages_match.group(1))
-
-                    if "page_num" in output:
-                        page_match = re.search(r"page_num = (\d+)", output)
-                        if page_match:
-                            page_num = int(page_match.group(1))
-
-                    if "page_size" in output:
-                        size_match = re.search(r"page_size = (\d+)", output)
-                        if size_match:
-                            page_size = int(size_match.group(1))
-
-                    return {
-                        "items": json_strings,
-                        "total_items_count": total_items,
-                        "total_pages": total_pages,
-                        "page_num": page_num,
-                        "page_size": page_size,
-                    }
-
-                return {
-                    "items": [],
-                    "total_items_count": 0,
-                    "total_pages": 1,
-                    "page_num": 0,
-                    "page_size": 10,
-                }
+                return self._parse_candid_response(output)
             else:
                 return {
                     "items": [],
@@ -196,6 +110,114 @@ class CursorDatabaseExplorer:
                 "page_size": 10,
                 "error": str(e),
             }
+
+    def _parse_candid_response(self, candid_output: str) -> Dict[str, Any]:
+        """Parse Candid response using structured approach instead of fragile regex."""
+        try:
+            json_strings = []
+
+            vec_start = candid_output.find("vec {")
+            if vec_start >= 0:
+                brace_count = 0
+                vec_content_start = vec_start + 5  # len("vec {")
+                vec_content_end = vec_content_start
+
+                for i, char in enumerate(
+                    candid_output[vec_content_start:], vec_content_start
+                ):
+                    if char == "{":
+                        brace_count += 1
+                    elif char == "}":
+                        if brace_count == 0:
+                            vec_content_end = i
+                            break
+                        brace_count -= 1
+
+                vec_content = candid_output[vec_content_start:vec_content_end]
+
+                for item in vec_content.split('";'):
+                    item = item.strip()
+                    if item.startswith('"'):
+                        item = item[1:]
+                    if item.endswith('"'):
+                        item = item[:-1]
+                    if item:
+                        try:
+                            item = item.replace('\\"', '"')
+                            parsed_item = json.loads(item)
+                            json_strings.append(parsed_item)
+                        except json.JSONDecodeError:
+                            continue
+
+            total_items = self._extract_number(candid_output, "total_items_count")
+            total_pages = self._extract_number(candid_output, "total_pages")
+            page_num = self._extract_number(candid_output, "page_num")
+            page_size = self._extract_number(candid_output, "page_size")
+
+            return {
+                "items": json_strings,
+                "total_items_count": total_items,
+                "total_pages": total_pages,
+                "page_num": page_num,
+                "page_size": page_size,
+            }
+        except Exception:
+            return {
+                "items": [],
+                "total_items_count": 0,
+                "total_pages": 1,
+                "page_num": 0,
+                "page_size": 10,
+            }
+
+    def _extract_number(self, text: str, field_name: str) -> int:
+        """Extract a number field from Candid text using simple string operations."""
+        try:
+            pattern = f"{field_name} = "
+            start = text.find(pattern)
+            if start >= 0:
+                start += len(pattern)
+                end = start
+                while end < len(text) and (text[end].isdigit() or text[end] == "_"):
+                    end += 1
+                number_str = text[start:end].replace(
+                    "_", ""
+                )  # Remove Candid number suffixes
+                return int(number_str) if number_str else 0
+            return 0
+        except (ValueError, IndexError):
+            return 0
+
+    def _discover_entity_types(self) -> List[str]:
+        """Discover available entity types by checking backend API methods."""
+        known_entities = [
+            "users",
+            "organizations",
+            "mandates",
+            "tasks",
+            "transfers",
+            "trades",
+            "instruments",
+            "codexes",
+            "disputes",
+            "licenses",
+            "realms",
+            "proposals",
+            "votes",
+        ]
+
+        available_entities = []
+        for entity_type in known_entities:
+            try:
+                result = self.call_backend(f"get_{entity_type}", "(0, 1)")
+                if "error" not in result or "method does not exist" not in str(
+                    result.get("error", "")
+                ):
+                    available_entities.append(entity_type)
+            except Exception:
+                continue
+
+        return available_entities if available_entities else known_entities
 
     def list_entities(
         self, entity_type: str, page_num: int = 0, page_size: int = 10
@@ -308,7 +330,7 @@ class CursorDatabaseExplorer:
         if self.state.view_mode != "record_detail" or not self.state.selected_item:
             return
 
-        relations = self.state.selected_item.get("relations", {})
+        relations = self.get_all_relationships(self.state.selected_item)
 
         if not relations:
             return
@@ -334,6 +356,45 @@ class CursorDatabaseExplorer:
                 self.state.view_mode = "record_list"
                 self.state.entity_type = rel_items[0].get("_type", "Related")
 
+    def get_all_relationships(self, item):
+        """Extract both explicit relations and inferred relationships from ID fields."""
+        relations = item.get("relations", {}).copy()
+
+        relationship_fields = {
+            "from_user_id": "users",
+            "to_user_id": "users",
+            "user_id": "users",
+            "creator_id": "users",
+            "owner_id": "users",
+            "human_id": "humans",
+            "organization_id": "organizations",
+            "mandate_id": "mandates",
+            "task_id": "tasks",
+            "task_schedule_id": "task_schedules",
+            "proposal_id": "proposals",
+            "vote_id": "votes",
+            "instrument_id": "instruments",
+            "transfer_id": "transfers",
+            "trade_id": "trades",
+            "dispute_id": "disputes",
+            "license_id": "licenses",
+            "realm_id": "realms",
+            "codex_id": "codexes",
+            "treasury_id": "treasuries",
+            "user_profile_id": "user_profiles",
+        }
+
+        for field_name, entity_type in relationship_fields.items():
+            if field_name in item and item[field_name]:
+                related_item = {
+                    "_id": item[field_name],
+                    "_type": entity_type.rstrip("s").title(),
+                    "name": f"Referenced {entity_type.rstrip('s').title()}",
+                }
+                relations[field_name.replace("_id", "")] = [related_item]
+
+        return relations
+
     def refresh_data(self):
         """Refresh current data based on state."""
         if self.state.view_mode == "entity_list":
@@ -353,25 +414,9 @@ class CursorDatabaseExplorer:
         lines.append("Select an entity type to explore:")
         lines.append("")
 
-        descriptions = {
-            "users": "System users and their profiles",
-            "organizations": "Organizational entities and structures",
-            "mandates": "Governance mandates and authorizations",
-            "tasks": "Scheduled and executed tasks",
-            "transfers": "Asset transfers between entities",
-            "trades": "Completed trading transactions",
-            "instruments": "Financial and governance instruments",
-            "codexes": "Executable code and logic",
-            "disputes": "Conflict resolution records",
-            "licenses": "Permissions and authorizations",
-            "realms": "Realm configurations and metadata",
-            "proposals": "Governance proposals and voting",
-            "votes": "Individual voting records",
-        }
-
         for i, entity_type in enumerate(self.entity_types):
             cursor = "> " if i == self.state.cursor_position else "  "
-            desc = descriptions.get(entity_type, "")
+            desc = ENTITY_DESCRIPTIONS.get(entity_type, "")
             lines.append(f"{cursor}{i + 1:2}. {entity_type.title():<15} - {desc}")
 
         lines.append("")
@@ -424,7 +469,7 @@ class CursorDatabaseExplorer:
             if key not in ["_id", "relations"] and not key.startswith("_"):
                 lines.append(f"  {key}: {value}")
 
-        relations = item.get("relations", {})
+        relations = self.get_all_relationships(item)
         if relations:
             lines.append("")
             lines.append("Relationships:")
