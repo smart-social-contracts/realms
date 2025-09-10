@@ -25,6 +25,7 @@ def get_logger(name: str) -> logging.Logger:
     logger.setLevel(logging.INFO)
     return logger
 
+
 def find_python_310() -> Optional[str]:
     """Find Python 3.10 executable on the system."""
     # Common Python 3.10 executable names to try
