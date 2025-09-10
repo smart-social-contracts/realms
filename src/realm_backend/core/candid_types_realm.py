@@ -36,6 +36,10 @@ class UserGetRecord(Record):
 
 
 # New GGG response records
+class ObjectsListRecord(Record):
+    objects: Vec[text]  # JSON string of object data
+    pagination: PaginationInfo
+
 class UsersListRecord(Record):
     users: Vec[text]  # JSON string of user data
     pagination: PaginationInfo

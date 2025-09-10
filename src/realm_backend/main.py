@@ -223,6 +223,31 @@ def update_my_profile_picture(profile_picture_url: str) -> RealmResponse:
 
 
 @query
+def get_objects(class_name: text, page_num: nat, page_size: nat) -> RealmResponse:
+    try:
+        logger.info(f"Listing {class_name} objects for page {page_num} with page size {page_size}")
+        result = list_objects(class_name, page_num=page_num, page_size=page_size)
+        objects = result["items"]
+        objects_json = [json.dumps(obj.to_dict()) for obj in objects]
+        pagination = PaginationInfo(
+            page_num=result["page_num"],
+            page_size=result["page_size"],
+            total_items_count=result["total_items_count"],
+            total_pages=result["total_pages"],
+        )
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                ObjectsList=ObjectsListRecord(objects=objects_json, pagination=pagination)
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error listing users: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+
+@query
 def get_users(page_num: nat, page_size: nat) -> RealmResponse:
     try:
         logger.info(f"Listing users for page {page_num} with page size {page_size}")

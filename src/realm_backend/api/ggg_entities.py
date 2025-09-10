@@ -22,6 +22,26 @@ from kybra_simple_logging import get_logger
 logger = get_logger("api.ggg_entities")
 
 
+def list_objects(class_name: str, page_num: int, page_size: int) -> Dict[str, Any]:
+    """List objects in the system with pagination."""
+    try:
+        from_id = page_num * page_size + 1
+        logger.info(f"Listing objects from {from_id} with page size {page_size}")
+        class_object = globals()[class_name]
+        objects = class_object.load_some(from_id=from_id, count=page_size)
+        count = class_object.count()
+        return {
+            "items": objects,
+            "page_num": page_num,
+            "page_size": page_size,
+            "total_items_count": count,
+            "total_pages": math.ceil(count / page_size),
+        }
+    except Exception as e:
+        logger.error(f"Error listing objects: {str(e)}")
+        raise
+
+
 def list_users(page_num: int, page_size: int) -> Dict[str, Any]:
     """List users in the system with pagination."""
     try:
