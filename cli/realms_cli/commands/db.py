@@ -365,7 +365,7 @@ class CursorDatabaseExplorer:
         for i, entity_type in enumerate(self.entity_types):
             cursor = "> " if i == self.state.cursor_position else "  "
             desc = descriptions.get(entity_type, "")
-            lines.append(f"{cursor}{i+1:2}. {entity_type.title():<15} - {desc}")
+            lines.append(f"{cursor}{i + 1:2}. {entity_type.title():<15} - {desc}")
 
         lines.append("")
         lines.append("Commands: Up/Down navigate | Enter select | q quit")
@@ -389,7 +389,7 @@ class CursorDatabaseExplorer:
             name = (
                 item.get("name") or item.get("title") or item.get("username") or "N/A"
             )
-            lines.append(f"{cursor}{i+1:2}. {item_id:<20} {name}")
+            lines.append(f"{cursor}{i + 1:2}. {item_id:<20} {name}")
 
         lines.append("")
         lines.append(
