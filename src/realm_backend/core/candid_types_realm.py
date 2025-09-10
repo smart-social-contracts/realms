@@ -101,6 +101,11 @@ class VotesListRecord(Record):
     pagination: PaginationInfo
 
 
+class TreasuriesListRecord(Record):
+    treasuries: Vec[text]  # JSON string of treasury data
+    pagination: PaginationInfo
+
+
 class ExtensionsListRecord(Record):
     extensions: Vec[text]
 
@@ -121,6 +126,7 @@ class RealmResponseData(Variant):
     RealmsList: RealmsListRecord
     ProposalsList: ProposalsListRecord
     VotesList: VotesListRecord
+    TreasuriesList: TreasuriesListRecord
     ExtensionsList: ExtensionsListRecord
     Error: text
     Message: text

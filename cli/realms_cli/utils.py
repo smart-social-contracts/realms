@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 import time
+import logging
 import venv
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -17,6 +18,12 @@ from rich.text import Text
 
 console = Console()
 
+
+def get_logger(name: str) -> logging.Logger:
+    """Get a logger instance with the specified name."""
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    return logger
 
 def find_python_310() -> Optional[str]:
     """Find Python 3.10 executable on the system."""

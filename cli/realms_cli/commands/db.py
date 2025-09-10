@@ -3,8 +3,12 @@
 import json
 import re
 import subprocess
+import sys
+import os
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
+import importlib
+import inspect
 
 import typer
 from prompt_toolkit.application import Application
@@ -15,6 +19,9 @@ from prompt_toolkit.layout.layout import Layout
 from rich.console import Console
 
 from ..utils import get_effective_network_and_canister
+from ..utils import get_logger
+
+logger = get_logger("db")
 
 console = Console()
 
@@ -68,6 +75,10 @@ class CursorDatabaseExplorer:
         self.canister = canister
         self.state = NavigationState()
         self.app = None
+        
+        # Cache for relationship mappings discovered from GGG models
+        self._relationship_cache = None
+        self._entity_models_cache = None
 
         self.entity_types = self._discover_entity_types()
 
@@ -189,10 +200,15 @@ class CursorDatabaseExplorer:
             return 0
 
     def _discover_entity_types(self) -> List[str]:
-        """Discover available entity types by checking backend API methods."""
-        known_entities = [
+        """Discover available entity types by checking GGG models and backend API methods."""
+        # First, try to get entity types from GGG models
+        models = self._discover_ggg_models()
+        entity_types_from_models = list(models.keys()) if models else []
+        
+        # Fallback list for when GGG model discovery fails
+        fallback_entities = [
             "users",
-            "organizations",
+            "organizations", 
             "mandates",
             "tasks",
             "transfers",
@@ -204,10 +220,19 @@ class CursorDatabaseExplorer:
             "realms",
             "proposals",
             "votes",
+            "treasuries",  # Add missing entities
+            "humans",
+            "citizens",
+            "identities",
+            "user_profiles",
+            "task_schedules",
         ]
+        
+        # Use GGG models if available, otherwise use fallback
+        candidate_entities = entity_types_from_models if entity_types_from_models else fallback_entities
 
         available_entities = []
-        for entity_type in known_entities:
+        for entity_type in candidate_entities:
             try:
                 result = self.call_backend(f"get_{entity_type}", "(0, 1)")
                 if "error" not in result or "method does not exist" not in str(
@@ -215,9 +240,9 @@ class CursorDatabaseExplorer:
                 ):
                     available_entities.append(entity_type)
             except Exception:
-                continue
+                logger.error(f"Error checking entity type {entity_type}")
 
-        return available_entities if available_entities else known_entities
+        return available_entities if available_entities else fallback_entities
 
     def list_entities(
         self, entity_type: str, page_num: int = 0, page_size: int = 10
@@ -330,59 +355,235 @@ class CursorDatabaseExplorer:
         if self.state.view_mode != "record_detail" or not self.state.selected_item:
             return
 
-        relations = self.get_all_relationships(self.state.selected_item)
-
-        if not relations:
+        # Use the new navigable items structure
+        if not hasattr(self.state, 'navigable_items') or not self.state.navigable_items:
             return
 
-        rel_names = list(relations.keys())
-        if self.state.cursor_position < len(rel_names):
-            rel_name = rel_names[self.state.cursor_position]
-            rel_items = relations[rel_name]
+        if self.state.cursor_position >= len(self.state.navigable_items):
+            return
 
+        nav_item = self.state.navigable_items[self.state.cursor_position]
+        
+        # Only navigate if it's a navigable item
+        if nav_item['type'] not in ['relationship_field', 'relationship']:
+            return
+
+        # Save current state for back navigation
+        self.state.navigation_stack.append({
+            "entity_type": self.state.entity_type,
+            "selected_item": self.state.selected_item,
+            "cursor_position": self.state.cursor_position,
+            "view_mode": self.state.view_mode,
+            "current_items": self.state.current_items,
+        })
+
+        if nav_item['type'] == 'relationship_field':
+            # Navigate to a single related entity by ID
+            related_entity_type = nav_item['related_type']
+            related_id = nav_item['value']
+            
+            # Try to fetch the related entity
+            try:
+                result = self.call_backend(f"get_{related_entity_type}", f"(0, 100)")
+                if "items" in result:
+                    # Find the specific item by ID
+                    related_items = [item for item in result["items"] if item.get("_id") == str(related_id)]
+                    if related_items:
+                        self.state.current_items = related_items
+                        self.state.cursor_position = 0
+                        self.state.view_mode = "record_list"
+                        self.state.entity_type = related_entity_type
+                        return
+            except Exception:
+                pass
+            
+            # Fallback: create a placeholder item
+            placeholder_item = {
+                "_id": str(related_id),
+                "_type": related_entity_type.rstrip('s').title(),
+                "name": f"Referenced {related_entity_type.rstrip('s').title()}",
+            }
+            self.state.current_items = [placeholder_item]
+            self.state.cursor_position = 0
+            self.state.view_mode = "record_list"
+            self.state.entity_type = related_entity_type
+            
+        elif nav_item['type'] == 'relationship':
+            # Navigate to multiple related entities
+            rel_items = nav_item['value']
             if isinstance(rel_items, list) and rel_items:
-                self.state.navigation_stack.append(
-                    {
-                        "entity_type": self.state.entity_type,
-                        "selected_item": self.state.selected_item,
-                        "cursor_position": self.state.cursor_position,
-                        "view_mode": self.state.view_mode,
-                        "current_items": self.state.current_items,
-                    }
-                )
-
                 self.state.current_items = rel_items
                 self.state.cursor_position = 0
                 self.state.view_mode = "record_list"
                 self.state.entity_type = rel_items[0].get("_type", "Related")
 
+    def _discover_ggg_models(self):
+        """Dynamically discover GGG entity models and their relationships."""
+        if self._entity_models_cache is not None:
+            return self._entity_models_cache
+            
+        models = {}
+        
+        # Add the GGG module path to sys.path if not already there
+        ggg_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src', 'realm_backend')
+        ggg_path = os.path.abspath(ggg_path)
+        if ggg_path not in sys.path:
+            sys.path.insert(0, ggg_path)
+        
+        # Also add the project root to handle kybra_simple_db imports
+        project_root = os.path.join(os.path.dirname(__file__), '..', '..', '..')
+        project_root = os.path.abspath(project_root)
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+        
+        try:
+            # Import the GGG module
+            ggg_module = importlib.import_module('ggg')
+            
+            # Get all exported classes from the __all__ list
+            for class_name in getattr(ggg_module, '__all__', []):
+                try:
+                    cls = getattr(ggg_module, class_name)
+                    if inspect.isclass(cls) and hasattr(cls, '__name__'):
+                        # Convert class name to entity type (e.g., User -> users)
+                        entity_type = self._class_name_to_entity_type(class_name)
+                        models[entity_type] = cls
+                except AttributeError:
+                    continue
+                    
+        except ImportError as e:
+            # Silently fall back to common patterns if GGG models can't be imported
+            pass
+            
+        self._entity_models_cache = models
+        return models
+    
+    def _class_name_to_entity_type(self, class_name: str) -> str:
+        """Convert class name to entity type (e.g., User -> users, TaskSchedule -> task_schedules)."""
+        # Handle special cases
+        if class_name == 'TaskSchedule':
+            return 'task_schedules'
+        elif class_name == 'UserProfile':
+            return 'user_profiles'
+        
+        # Convert CamelCase to snake_case and pluralize
+        import re
+        snake_case = re.sub('([A-Z]+)([A-Z][a-z])', r'\1_\2', class_name)
+        snake_case = re.sub('([a-z\d])([A-Z])', r'\1_\2', snake_case).lower()
+        
+        # Simple pluralization
+        if snake_case.endswith('y'):
+            return snake_case[:-1] + 'ies'
+        elif snake_case.endswith(('s', 'sh', 'ch', 'x', 'z')):
+            return snake_case + 'es'
+        else:
+            return snake_case + 's'
+    
+    def _discover_relationship_fields(self):
+        """Discover relationship field mappings from GGG models."""
+        if self._relationship_cache is not None:
+            return self._relationship_cache
+            
+        relationship_fields = {}
+        models = self._discover_ggg_models()
+        
+        for entity_type, model_class in models.items():
+            try:
+                # Inspect the model class for relationship fields
+                for attr_name in dir(model_class):
+                    attr = getattr(model_class, attr_name, None)
+                    if attr is None or attr_name.startswith('_'):
+                        continue
+                        
+                    # Check if it's a relationship field from kybra_simple_db
+                    attr_type = type(attr).__name__
+                    if attr_type in ['ManyToOne', 'OneToOne', 'OneToMany', 'ManyToMany']:
+                        try:
+                            # Get the related model name and back reference from the relationship
+                            related_model = None
+                            back_ref = None
+                            
+                            # Try different ways to get relationship info
+                            if hasattr(attr, '_args') and len(attr._args) >= 1:
+                                related_model = attr._args[0]
+                                if len(attr._args) >= 2:
+                                    back_ref = attr._args[1]
+                            elif hasattr(attr, 'args') and len(attr.args) >= 1:
+                                related_model = attr.args[0]
+                                if len(attr.args) >= 2:
+                                    back_ref = attr.args[1]
+                            
+                            if isinstance(related_model, str):
+                                # Convert model name to entity type
+                                related_entity_type = self._class_name_to_entity_type(related_model)
+                                
+                                # Handle different relationship types
+                                if attr_type == 'ManyToOne':
+                                    # This model has a foreign key to the related model
+                                    # e.g., Transfer.from_user -> ManyToOne("User", "transfers_from")
+                                    # means Transfer has from_user_id field
+                                    field_pattern = f"{attr_name}_id"
+                                    relationship_fields[field_pattern] = related_entity_type
+                                    
+                                elif attr_type == 'OneToOne':
+                                    # Similar to ManyToOne for foreign key fields
+                                    field_pattern = f"{attr_name}_id"
+                                    relationship_fields[field_pattern] = related_entity_type
+                                    
+                                elif attr_type in ['OneToMany', 'ManyToMany'] and back_ref:
+                                    # This is a reverse relationship
+                                    # e.g., User.transfers_from -> OneToMany("Transfer", "from_user")
+                                    # means Transfer has from_user_id field pointing to User
+                                    field_pattern = f"{back_ref}_id"
+                                    relationship_fields[field_pattern] = entity_type
+                                    
+                        except Exception:
+                            # Skip problematic relationship definitions
+                            continue
+                                
+            except Exception:
+                # Skip problematic models
+                continue
+        
+        # Add some common patterns that might not be captured by introspection
+        common_patterns = {
+            'user_id': 'users',
+            'creator_id': 'users', 
+            'owner_id': 'users',
+            'from_user_id': 'users',
+            'to_user_id': 'users',
+            'human_id': 'humans',
+            'organization_id': 'organizations',
+            'mandate_id': 'mandates',
+            'task_id': 'tasks', 
+            'task_schedule_id': 'task_schedules',
+            'proposal_id': 'proposals',
+            'vote_id': 'votes',
+            'instrument_id': 'instruments',
+            'transfer_id': 'transfers',
+            'trade_id': 'trades',
+            'dispute_id': 'disputes',
+            'license_id': 'licenses',
+            'realm_id': 'realms',
+            'codex_id': 'codexes',
+            'treasury_id': 'treasuries',
+            'user_profile_id': 'user_profiles',
+        }
+        
+        # Merge common patterns, but don't override discovered relationships
+        for pattern, entity_type in common_patterns.items():
+            if pattern not in relationship_fields:
+                relationship_fields[pattern] = entity_type
+        
+        self._relationship_cache = relationship_fields
+        return relationship_fields
+
     def get_all_relationships(self, item):
         """Extract both explicit relations and inferred relationships from ID fields."""
         relations = item.get("relations", {}).copy()
 
-        relationship_fields = {
-            "from_user_id": "users",
-            "to_user_id": "users",
-            "user_id": "users",
-            "creator_id": "users",
-            "owner_id": "users",
-            "human_id": "humans",
-            "organization_id": "organizations",
-            "mandate_id": "mandates",
-            "task_id": "tasks",
-            "task_schedule_id": "task_schedules",
-            "proposal_id": "proposals",
-            "vote_id": "votes",
-            "instrument_id": "instruments",
-            "transfer_id": "transfers",
-            "trade_id": "trades",
-            "dispute_id": "disputes",
-            "license_id": "licenses",
-            "realm_id": "realms",
-            "codex_id": "codexes",
-            "treasury_id": "treasuries",
-            "user_profile_id": "user_profiles",
-        }
+        # Get dynamically discovered relationship fields
+        relationship_fields = self._discover_relationship_fields()
 
         for field_name, entity_type in relationship_fields.items():
             if field_name in item and item[field_name]:
@@ -400,12 +601,19 @@ class CursorDatabaseExplorer:
         if self.state.view_mode == "entity_list":
             self.state.current_items = self.entity_types
         elif self.state.view_mode == "record_list" and self.state.entity_type:
+            logger.info(f"Fetching data for entity type: {self.state.entity_type}")
             result = self.list_entities(
                 self.state.entity_type, self.state.page_num, self.state.page_size
             )
-            if "error" not in result:
+            logger.info(f"Backend result: {result}")
+            if "error" not in result and "items" in result:
                 self.state.current_items = result["items"]
                 self.state.total_pages = result.get("total_pages", 1)
+                logger.info(f"Loaded {len(result['items'])} items")
+            else:
+                logger.error(f"Failed to load data: {result}")
+                self.state.current_items = []
+                self.state.total_pages = 1
 
     def render_entity_list(self):
         """Render the entity selection menu."""
@@ -437,11 +645,15 @@ class CursorDatabaseExplorer:
 
         for i, item in enumerate(self.state.current_items):
             cursor = "> " if i == self.state.cursor_position else "  "
-            item_id = item.get("_id", "N/A")
-            name = (
-                item.get("name") or item.get("title") or item.get("username") or "N/A"
-            )
-            lines.append(f"{cursor}{i + 1:2}. {item_id:<20} {name}")
+            if isinstance(item, dict):
+                item_id = item.get("_id", "N/A")
+                name = (
+                    item.get("name") or item.get("title") or item.get("username") or "N/A"
+                )
+                lines.append(f"{cursor}{i + 1:2}. {item_id:<20} {name}")
+            else:
+                # Handle string items (entity type names)
+                lines.append(f"{cursor}{i + 1:2}. {item}")
 
         lines.append("")
         lines.append(
@@ -464,25 +676,63 @@ class CursorDatabaseExplorer:
         lines.append(f"ID: {item_id}")
         lines.append("")
 
-        lines.append("Properties:")
+        # Get relationship fields for navigation
+        relationship_fields = self._discover_relationship_fields()
+        
+        # Combine properties and navigable relationships
+        navigable_items = []
+        
+        # Add regular properties
         for key, value in item.items():
             if key not in ["_id", "relations"] and not key.startswith("_"):
-                lines.append(f"  {key}: {value}")
-
+                if key in relationship_fields and value:
+                    # This is a navigable relationship field
+                    related_entity_type = relationship_fields[key]
+                    navigable_items.append({
+                        'type': 'relationship_field',
+                        'key': key,
+                        'value': value,
+                        'related_type': related_entity_type,
+                        'display': f"{key}: {value} → {related_entity_type.rstrip('s').title()}"
+                    })
+                else:
+                    # Regular property
+                    navigable_items.append({
+                        'type': 'property',
+                        'key': key,
+                        'value': value,
+                        'display': f"{key}: {value}"
+                    })
+        
+        # Add explicit relationships
         relations = self.get_all_relationships(item)
-        if relations:
-            lines.append("")
-            lines.append("Relationships:")
-            rel_names = list(relations.keys())
-            for i, rel_name in enumerate(rel_names):
-                cursor = "> " if i == self.state.cursor_position else "  "
-                rel_items = relations[rel_name]
+        for rel_name, rel_items in relations.items():
+            # Skip if this relationship is already shown as a property field
+            rel_field_name = f"{rel_name}_id"
+            if not any(nav_item['key'] == rel_field_name for nav_item in navigable_items if nav_item['type'] == 'relationship_field'):
                 count = len(rel_items) if isinstance(rel_items, list) else 1
-                lines.append(f"{cursor}  {rel_name}: {count} items")
+                navigable_items.append({
+                    'type': 'relationship',
+                    'key': rel_name,
+                    'value': rel_items,
+                    'display': f"{rel_name}: {count} items"
+                })
+
+        # Render all items with navigation support
+        lines.append("Properties & Relationships:")
+        for i, nav_item in enumerate(navigable_items):
+            cursor = "> " if i == self.state.cursor_position else "  "
+            if nav_item['type'] in ['relationship_field', 'relationship']:
+                lines.append(f"{cursor}  {nav_item['display']} [navigable]")
+            else:
+                lines.append(f"{cursor}  {nav_item['display']}")
+
+        # Store navigable items for navigation
+        self.state.navigable_items = navigable_items
 
         lines.append("")
         lines.append(
-            "Commands: Up/Down navigate relationships | Right drill into | Left back | q quit"
+            "Commands: Up/Down navigate | Right drill into relationships | Left back | q quit"
         )
 
         return "\n".join(lines)

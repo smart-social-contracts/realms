@@ -16,6 +16,7 @@ from api.ggg_entities import (
     list_tasks,
     list_trades,
     list_transfers,
+    list_treasuries,
     list_users,
     list_votes,
 )
@@ -39,6 +40,7 @@ from core.candid_types_realm import (
     TasksListRecord,
     TradesListRecord,
     TransfersListRecord,
+    TreasuriesListRecord,
     UserGetRecord,
     UsersListRecord,
     VotesListRecord,
@@ -535,6 +537,28 @@ def get_votes(page_num: nat, page_size: nat) -> RealmResponse:
         )
     except Exception as e:
         logger.error(f"Error listing votes: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_treasuries(page_num: nat, page_size: nat) -> RealmResponse:
+    try:
+        treasuries_data = list_treasuries(page_num=page_num, page_size=page_size)
+        treasuries_json = [json.dumps(treasury.to_dict()) for treasury in treasuries_data["items"]]
+        pagination = PaginationInfo(
+            page_num=treasuries_data["page_num"],
+            page_size=treasuries_data["page_size"],
+            total_items_count=treasuries_data["total_items_count"],
+            total_pages=treasuries_data["total_pages"],
+        )
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                TreasuriesList=TreasuriesListRecord(treasuries=treasuries_json, pagination=pagination)
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error listing treasuries: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 

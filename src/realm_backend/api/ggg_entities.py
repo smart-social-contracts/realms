@@ -14,6 +14,7 @@ from ggg.task import Task
 from ggg.task_schedule import TaskSchedule
 from ggg.trade import Trade
 from ggg.transfer import Transfer
+from ggg.treasury import Treasury
 from ggg.user import User
 from ggg.vote import Vote
 from kybra_simple_logging import get_logger
@@ -283,4 +284,32 @@ def list_votes(page_num: int, page_size: int) -> Dict[str, Any]:
         }
     except Exception as e:
         logger.error(f"Error listing votes: {str(e)}")
+        raise
+
+
+def list_treasuries(page_num: int, page_size: int) -> Dict[str, Any]:
+    """List all treasuries in the system."""
+    try:
+        from_id = page_num * page_size + 1
+        treasuries = Treasury.load_some(from_id=from_id, count=page_size)
+
+        # Load realm relationships for each treasury
+        for treasury in treasuries:
+            if hasattr(treasury, 'realm') and treasury.realm:
+                # Force load the realm relationship
+                treasury._relations['realm'] = [treasury.realm]
+
+        logger.info(f"Listing treasuries from {from_id} with page size {page_size}")
+        logger.info(f"Treasuries[0]: {treasuries[0].to_dict()}")
+        
+        count = Treasury.count()
+        return {
+            "items": treasuries,
+            "page_num": page_num,
+            "page_size": page_size,
+            "total_items_count": count,
+            "total_pages": math.ceil(count / page_size),
+        }
+    except Exception as e:
+        logger.error(f"Error listing treasuries: {str(e)}")
         raise

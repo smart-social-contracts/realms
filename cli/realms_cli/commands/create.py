@@ -209,6 +209,9 @@ vault_principal_id = "<VAULT_PRINCIPAL_ID>"
 treasury = Treasury()
 treasury.vault_principal_id = vault_principal_id
 
+realm = Realm.instances()[0]
+realm.treasury = treasury
+realm.save()
 
 ic.print("len(Realm.instances()) = %d" % len(Realm.instances()))
 ic.print("len(Treasury.instances()) = %d" % len(Treasury.instances()))
