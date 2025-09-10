@@ -3,6 +3,7 @@ MANIFEST.in
 README.md
 pyproject.toml
 realms_cli/__init__.py
+realms_cli/constants.py
 realms_cli/logging_config.py
 realms_cli/main.py
 realms_cli/models.py
