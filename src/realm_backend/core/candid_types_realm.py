@@ -134,6 +134,7 @@ class RealmResponseData(Variant):
     ExtensionsList: ExtensionsListRecord
     Error: text
     Message: text
+    ObjectsList: ObjectsListRecord
 
 
 class RealmResponse(Record):

@@ -104,12 +104,12 @@ class CursorDatabaseExplorer:
                 # Handle string args - assume it's already formatted or a single value
                 candid_args = f'("{args}")'
             
-            cmd.append(f"'{candid_args}'")
+            cmd.append(candid_args)
 
         logger.debug(f"cmd: {' '.join(cmd)}")
 
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
             logger.debug(f"result: {result}")
             if result.returncode == 0:
                 output = result.stdout.strip()
@@ -200,30 +200,8 @@ class CursorDatabaseExplorer:
     ) -> Dict[str, Any]:
         """List entities of given type with pagination."""
         # Map entity class names to their corresponding backend methods
-        method_mapping = {
-            "Codex": "get_codexes",
-            "User": "get_users", 
-            "Transfer": "get_transfers",
-            "Mandate": "get_mandates",
-            "Task": "get_tasks",
-            "Instrument": "get_instruments",
-            "Organization": "get_organizations",
-            "Dispute": "get_disputes",
-            "License": "get_licenses",
-            "Realm": "get_realms",
-            "Trade": "get_trades",
-            "Proposal": "get_proposals",
-            "Vote": "get_votes",
-            "Treasury": "get_treasuries"
-        }
-        
-        method = method_mapping.get(entity_type, "get_objects")
-        if method == "get_objects":
-            # Fallback to generic method with class name
-            args = [entity_type, page_num, page_size]
-        else:
-            # Use specific method with just pagination
-            args = [page_num, page_size]
+        method = "get_objects"
+        args = [entity_type, page_num, page_size]
             
         return self.call_backend(method, args)
 
@@ -657,7 +635,7 @@ class CursorDatabaseExplorer:
 
         lines = []
         item = self.state.selected_item
-        item_type = self.state.entity_type.title().rstrip("s")
+        item_type = self.state.entity_type.__name__
         item_id = item.get("_id", "N/A")
 
         lines.append(f"{item_type} Details")

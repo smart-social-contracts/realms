@@ -1,4 +1,5 @@
 import math
+import traceback
 from typing import Any, Dict, List, Optional
 
 from ggg.codex import Codex
@@ -28,8 +29,11 @@ def list_objects(class_name: str, page_num: int, page_size: int) -> Dict[str, An
         from_id = page_num * page_size + 1
         logger.info(f"Listing objects from {from_id} with page size {page_size}")
         class_object = globals()[class_name]
+        logger.info(f"Class object: {class_object}")
         objects = class_object.load_some(from_id=from_id, count=page_size)
+        logger.info(f"Objects: {objects}")
         count = class_object.count()
+        logger.info(f"Count: {count}")
         return {
             "items": objects,
             "page_num": page_num,
@@ -38,5 +42,5 @@ def list_objects(class_name: str, page_num: int, page_size: int) -> Dict[str, An
             "total_pages": math.ceil(count / page_size),
         }
     except Exception as e:
-        logger.error(f"Error listing objects: {str(e)}")
-        raise
+        logger.error(traceback.format_exc())
+    return {}

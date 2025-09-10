@@ -211,12 +211,13 @@ def update_my_profile_picture(profile_picture_url: str) -> RealmResponse:
 
 
 @query
-def get_objects(class_name: text, page_num: nat, page_size: nat) -> RealmResponse:
+def get_objects(class_name: str, page_num: nat, page_size: nat) -> RealmResponse:
     try:
         logger.info(f"Listing {class_name} objects for page {page_num} with page size {page_size}")
         result = list_objects(class_name, page_num=page_num, page_size=page_size)
         objects = result["items"]
-        objects_json = [json.dumps(obj.to_dict()) for obj in objects]
+        objects_json = [json.dumps(obj.to_dict()) for obj in objects] 
+        logger.info(f"Objects JSON: {objects_json}")
         pagination = PaginationInfo(
             page_num=result["page_num"],
             page_size=result["page_size"],
