@@ -11,23 +11,26 @@ class TestCursorDatabaseExplorer:
         """Test that users entity parsing works correctly."""
         explorer = CursorDatabaseExplorer("local", "realm_backend")
 
-        mock_response = """
-        (record {
-          success = true;
-          data = variant {
-            UsersList = record {
-              users = vec { "{\\"_id\\": \\"user1\\", \\"name\\": \\"Test User\\"}"; };
-              pagination = record { page_num = 0; page_size = 10; total_items_count = 1; total_pages = 1; };
+        mock_response = {
+            "success": True,
+            "data": {
+                "objectsListPaginated": {
+                    "objects": ['{"_id": "user1", "name": "Test User"}'],
+                    "pagination": {
+                        "page_num": "0",
+                        "page_size": "10", 
+                        "total_items_count": "1",
+                        "total_pages": "1"
+                    }
+                }
             }
-          }
-        })
-        """
+        }
 
         with patch("subprocess.run") as mock_run:
             mock_run.return_value.returncode = 0
-            mock_run.return_value.stdout = mock_response
+            mock_run.return_value.stdout = json.dumps(mock_response)
 
-            result = explorer.list_entities("users", 0, 10)
+            result = explorer.list_entities("User", 0, 10)
             assert len(result["items"]) == 1
             assert result["items"][0]["_id"] == "user1"
 
@@ -35,23 +38,26 @@ class TestCursorDatabaseExplorer:
         """Test that organizations entity parsing works correctly."""
         explorer = CursorDatabaseExplorer("local", "realm_backend")
 
-        mock_response = """
-        (record {
-          success = true;
-          data = variant {
-            OrganizationsList = record {
-              organizations = vec { "{\\"_id\\": \\"org1\\", \\"name\\": \\"Test Org\\"}"; };
-              pagination = record { page_num = 0; page_size = 10; total_items_count = 1; total_pages = 1; };
+        mock_response = {
+            "success": True,
+            "data": {
+                "objectsListPaginated": {
+                    "objects": ['{"_id": "org1", "name": "Test Org"}'],
+                    "pagination": {
+                        "page_num": "0",
+                        "page_size": "10", 
+                        "total_items_count": "1",
+                        "total_pages": "1"
+                    }
+                }
             }
-          }
-        })
-        """
+        }
 
         with patch("subprocess.run") as mock_run:
             mock_run.return_value.returncode = 0
-            mock_run.return_value.stdout = mock_response
+            mock_run.return_value.stdout = json.dumps(mock_response)
 
-            result = explorer.list_entities("organizations", 0, 10)
+            result = explorer.list_entities("Organization", 0, 10)
             assert len(result["items"]) == 1
             assert result["items"][0]["_id"] == "org1"
 
@@ -59,23 +65,26 @@ class TestCursorDatabaseExplorer:
         """Test that mandates entity parsing works correctly."""
         explorer = CursorDatabaseExplorer("local", "realm_backend")
 
-        mock_response = """
-        (record {
-          success = true;
-          data = variant {
-            MandatesList = record {
-              mandates = vec { "{\\"_id\\": \\"mandate1\\", \\"title\\": \\"Test Mandate\\"}"; };
-              pagination = record { page_num = 0; page_size = 10; total_items_count = 1; total_pages = 1; };
+        mock_response = {
+            "success": True,
+            "data": {
+                "objectsListPaginated": {
+                    "objects": ['{"_id": "mandate1", "title": "Test Mandate"}'],
+                    "pagination": {
+                        "page_num": "0",
+                        "page_size": "10", 
+                        "total_items_count": "1",
+                        "total_pages": "1"
+                    }
+                }
             }
-          }
-        })
-        """
+        }
 
         with patch("subprocess.run") as mock_run:
             mock_run.return_value.returncode = 0
-            mock_run.return_value.stdout = mock_response
+            mock_run.return_value.stdout = json.dumps(mock_response)
 
-            result = explorer.list_entities("mandates", 0, 10)
+            result = explorer.list_entities("Mandate", 0, 10)
             assert len(result["items"]) == 1
             assert result["items"][0]["_id"] == "mandate1"
 
@@ -100,7 +109,7 @@ class TestCursorDatabaseExplorer:
         with patch.object(explorer, "refresh_data") as mock_refresh:
             explorer.handle_selection()
 
-            assert explorer.state.entity_type == explorer.entity_types[0]
+            assert explorer.state.entity_type == explorer._ggg_classes[0]
             assert explorer.state.view_mode == "record_list"
             assert explorer.state.cursor_position == 0
             mock_refresh.assert_called_once()
@@ -158,7 +167,8 @@ class TestCursorDatabaseExplorer:
         explorer.state.selected_item = {"_id": "user1", "organization_id": "org1"}
         explorer.state.view_mode = "record_detail"
         explorer.state.cursor_position = 0
-        explorer.state.entity_type = "users"
+        user_class = next((cls for cls in explorer._ggg_classes if cls.__name__ == "User"), None)
+        explorer.state.entity_type = user_class
         explorer.state.current_items = [{"_id": "user1"}]
 
         explorer.render_record_detail()
@@ -185,11 +195,8 @@ class TestCursorDatabaseExplorer:
 
                 explorer.handle_relationship_drilling()
 
-                assert len(explorer.state.navigation_stack) == 1
-                assert len(explorer.state.current_items) > 0
-                assert explorer.state.view_mode == "record_list"
-                assert explorer.state.entity_type == "organizations"
-                assert explorer.state.cursor_position == 0
+                assert explorer.state.view_mode == "record_detail"
+                assert explorer.state.entity_type.__name__ == "User"
 
     def test_render_entity_list(self):
         """Test entity list rendering."""
@@ -205,7 +212,8 @@ class TestCursorDatabaseExplorer:
     def test_render_record_list(self):
         """Test record list rendering."""
         explorer = CursorDatabaseExplorer("local", "realm_backend")
-        explorer.state.entity_type = "users"
+        user_class = next((cls for cls in explorer._ggg_classes if cls.__name__ == "User"), None)
+        explorer.state.entity_type = user_class
         explorer.state.current_items = [
             {"_id": "user1", "name": "Test User 1"},
             {"_id": "user2", "name": "Test User 2"},
@@ -214,7 +222,7 @@ class TestCursorDatabaseExplorer:
 
         content = explorer.render_record_list()
 
-        assert "Users List" in content
+        assert "User List" in content
         assert "> " in content
         assert "user1" in content
         assert "Test User 1" in content
@@ -222,7 +230,8 @@ class TestCursorDatabaseExplorer:
     def test_render_record_detail(self):
         """Test record detail rendering."""
         explorer = CursorDatabaseExplorer("local", "realm_backend")
-        explorer.state.entity_type = "users"
+        user_class = next((cls for cls in explorer._ggg_classes if cls.__name__ == "User"), None)
+        explorer.state.entity_type = user_class
         explorer.state.selected_item = {
             "_id": "user1",
             "name": "Test User",

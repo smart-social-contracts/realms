@@ -80,9 +80,8 @@ class CursorDatabaseExplorer:
         self._relationship_cache = None
         self._ggg_classes = self._discover_ggg_classes()
 
-
     def call_backend(self, method: str, args: str = "") -> Dict[str, Any]:
-        logger.debug(f"call_backend")
+        logger.debug("call_backend")
 
         """Call backend canister method and return parsed result."""
         cmd = ["dfx", "canister", "call", "--output", "json"]
@@ -128,7 +127,7 @@ class CursorDatabaseExplorer:
                     # Fallback to Candid parsing for backward compatibility
                     if output.startswith("(") and output.endswith(")"):
                         output = output[1:-1]
-                    return self._parse_candid_response(output)
+                    return self._parse_json_response({"error": "Failed to parse JSON", "items": []})
             else:
                 return {
                     "items": [],
@@ -150,57 +149,64 @@ class CursorDatabaseExplorer:
             }
 
     def _parse_json_response(self, json_response: Any) -> Dict[str, Any]:
-        """Parse JSON response from dfx --output json."""
+        """Parse JSON response from the new unified API format."""
         try:
-            # Handle different possible JSON response structures
-            if isinstance(json_response, dict):
-                # Direct response structure
-                if "items" in json_response:
-                    return json_response
-                # Single item response - wrap in items array
-                return {
-                    "items": [json_response],
-                    "total_items_count": 1,
-                    "total_pages": 1,
-                    "page_num": 0,
-                    "page_size": 1,
-                }
-            elif isinstance(json_response, list):
-                # Array response - wrap in pagination structure
-                return {
-                    "items": json_response,
-                    "total_items_count": len(json_response),
-                    "total_pages": 1,
-                    "page_num": 0,
-                    "page_size": len(json_response),
-                }
-            else:
-                # Scalar response
-                return {
-                    "items": [],
-                    "total_items_count": 0,
-                    "total_pages": 1,
-                    "page_num": 0,
-                    "page_size": 10,
-                    "data": json_response,
-                }
-        except Exception:
-            logger.error(traceback.format_exc())
-            return {
-                "items": [],
-                "total_items_count": 0,
-                "total_pages": 1,
-                "page_num": 0,
-                "page_size": 10,
-            }
+            if not json_response.get("success", False):
+                error_msg = json_response.get("data", {}).get("error", "Unknown error")
+                return {"error": error_msg, "items": []}
 
-    
+            data = json_response.get("data", {})
+            
+            if "objectsListPaginated" in data:
+                paginated_data = data["objectsListPaginated"]
+                objects_json = paginated_data.get("objects", [])
+                pagination = paginated_data.get("pagination", {})
+                
+                items = []
+                for obj_json in objects_json:
+                    try:
+                        item = json.loads(obj_json)
+                        items.append(item)
+                    except json.JSONDecodeError:
+                        logger.error(f"Failed to parse object JSON: {obj_json}")
+                        continue
+                
+                return {
+                    "items": items,
+                    "page_num": int(pagination.get("page_num", 0)),
+                    "page_size": int(pagination.get("page_size", 10)),
+                    "total_items_count": int(pagination.get("total_items_count", 0)),
+                    "total_pages": int(pagination.get("total_pages", 1)),
+                }
+            
+            elif "objectsList" in data:
+                objects_data = data["objectsList"]
+                objects_json = objects_data.get("objects", [])
+                
+                items = []
+                for obj_json in objects_json:
+                    try:
+                        item = json.loads(obj_json)
+                        items.append(item)
+                    except json.JSONDecodeError:
+                        logger.error(f"Failed to parse object JSON: {obj_json}")
+                        continue
+                
+                return {"items": items}
+            
+            else:
+                logger.error(f"Unexpected response format: {data}")
+                return {"error": "Unexpected response format", "items": []}
+                
+        except Exception as e:
+            logger.error(f"Error parsing JSON response: {e}")
+            return {"error": str(e), "items": []}
+
     def list_entities(
         self, entity_type: str, page_num: int = 0, page_size: int = 10
     ) -> Dict[str, Any]:
         """List entities of given type with pagination."""
-        # Map entity class names to their corresponding backend methods
-        method = "get_objects"
+        method = "get_objects_paginated"
         args = [entity_type, page_num, page_size]
             
         return self.call_backend(method, args)
@@ -291,8 +297,6 @@ class CursorDatabaseExplorer:
         """Handle back navigation including relationship drilling."""
 
         logger.debug('handle_back_navigation')
-
-
         logger.debug(f'self.state.navigation_stack = {self.state.navigation_stack}')
 
         if self.state.navigation_stack:
@@ -437,6 +441,13 @@ class CursorDatabaseExplorer:
                         self.state.entity_type = cls
                         break
 
+    def _class_name_to_entity_type(self, class_name: str) -> str:
+        """Convert class name to entity type (e.g., User -> user, TaskSchedule -> task_schedule)."""
+        # Convert CamelCase to snake_case without pluralization
+        snake_case = re.sub("([A-Z]+)([A-Z][a-z])", r"\1_\2", class_name)
+        snake_case = re.sub(r"([a-z\d])([A-Z])", r"\1_\2", snake_case).lower()
+        return snake_case
+
     def _discover_ggg_classes(self):
         """Dynamically discover GGG entity classes."""
         if getattr(self, "_ggg_classes", None) is not None:
@@ -552,7 +563,8 @@ class CursorDatabaseExplorer:
                                     # e.g., User.transfers_from -> OneToMany("Transfer", "from_user")
                                     # means Transfer has from_user_id field pointing to User
                                     field_pattern = f"{back_ref}_id"
-                                    relationship_fields[field_pattern] = entity_type
+                                    current_entity_type = self._class_name_to_entity_type(class_obj.__name__)
+                                    relationship_fields[field_pattern] = current_entity_type
 
                         except Exception:
                             # Skip problematic relationship definitions
@@ -619,8 +631,7 @@ class CursorDatabaseExplorer:
         lines.append("Select an entity type to explore:")
         lines.append("")
 
-
-        for i, class_obj     in enumerate(self._ggg_classes):
+        for i, class_obj in enumerate(self._ggg_classes):
             cursor = "> " if i == self.state.cursor_position else "  "
             desc = ENTITY_DESCRIPTIONS.get(class_obj.__name__, "")
             lines.append(f"{cursor}{i + 1:2}. {class_obj.__name__.title():<15} - {desc}")
