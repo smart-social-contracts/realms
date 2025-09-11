@@ -223,7 +223,14 @@ class CursorDatabaseExplorer:
 
         @kb.add("down")
         def move_down(event):
-            max_pos = len(self.state.current_items) - 1
+            # Calculate max position based on current view mode
+            if self.state.view_mode == "record_detail":
+                # In record detail mode, cursor should be bounded by navigable items
+                max_pos = len(getattr(self.state, 'navigable_items', [])) - 1
+            else:
+                # In other modes, use current_items
+                max_pos = len(self.state.current_items) - 1
+            
             if self.state.cursor_position < max_pos:
                 self.state.cursor_position += 1
                 event.app.invalidate()
