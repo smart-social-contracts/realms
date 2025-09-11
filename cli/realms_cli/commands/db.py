@@ -352,45 +352,90 @@ class CursorDatabaseExplorer:
             related_entity_type = nav_item["related_type"]
             related_id = nav_item["value"]
 
+            logger.debug(f"Drilling into relationship field: {nav_item['key']} -> {related_entity_type} ID {related_id}")
+
             # Try to fetch the related entity
             try:
-                result = self.call_backend(f"get_{related_entity_type}", "(0, 100)")
-                if "items" in result:
-                    # Find the specific item by ID
-                    related_items = [
-                        item
-                        for item in result["items"]
-                        if item.get("_id") == str(related_id)
-                    ]
-                    if related_items:
-                        self.state.current_items = related_items
-                        self.state.cursor_position = 0
-                        self.state.view_mode = "record_list"
-                        self.state.entity_type = related_entity_type
-                        return
-            except Exception:
+                # Find the corresponding class for the entity type
+                related_class = None
+                for cls in self._ggg_classes:
+                    if self._class_name_to_entity_type(cls.__name__) == related_entity_type:
+                        related_class = cls
+                        break
+                
+                if related_class:
+                    result = self.list_entities(related_class.__name__, 0, 100)
+                    if "items" in result and result["items"]:
+                        # Find the specific item by ID
+                        related_items = [
+                            item
+                            for item in result["items"]
+                            if item.get("_id") == str(related_id)
+                        ]
+                        if related_items:
+                            self.state.current_items = related_items
+                            self.state.cursor_position = 0
+                            self.state.view_mode = "record_list"
+                            self.state.entity_type = related_class
+                            return
+                        else:
+                            logger.debug(f"No item found with ID {related_id} in {related_entity_type}")
+                    else:
+                        logger.debug(f"No items returned for {related_entity_type}")
+                else:
+                    logger.debug(f"No class found for entity type {related_entity_type}")
+            except Exception as e:
+                logger.error(f"Error fetching related entity: {e}")
                 logger.error(traceback.format_exc())
-                pass
 
             # Fallback: create a placeholder item
             placeholder_item = {
                 "_id": str(related_id),
                 "_type": related_entity_type.rstrip("s").title(),
                 "name": f"Referenced {related_entity_type.rstrip('s').title()}",
+                "error": "Could not fetch details"
             }
             self.state.current_items = [placeholder_item]
             self.state.cursor_position = 0
             self.state.view_mode = "record_list"
-            self.state.entity_type = related_entity_type
+            # Find the class for this entity type
+            for cls in self._ggg_classes:
+                if self._class_name_to_entity_type(cls.__name__) == related_entity_type:
+                    self.state.entity_type = cls
+                    break
 
         elif nav_item["type"] == "relationship":
             # Navigate to multiple related entities
             rel_items = nav_item["value"]
+            logger.debug(f"Drilling into relationship: {nav_item['key']} with {len(rel_items) if isinstance(rel_items, list) else 1} items")
+            
             if isinstance(rel_items, list) and rel_items:
                 self.state.current_items = rel_items
                 self.state.cursor_position = 0
                 self.state.view_mode = "record_list"
-                self.state.entity_type = rel_items[0].get("_type", "Related")
+                
+                # Determine entity type from the first item
+                first_item_type = rel_items[0].get("_type", "Related")
+                for cls in self._ggg_classes:
+                    if cls.__name__ == first_item_type or self._class_name_to_entity_type(cls.__name__) == first_item_type.lower():
+                        self.state.entity_type = cls
+                        break
+                else:
+                    # Fallback - use a generic type
+                    class GenericType:
+                        __name__ = first_item_type
+                    self.state.entity_type = GenericType
+            elif not isinstance(rel_items, list):
+                # Single item wrapped in list
+                self.state.current_items = [rel_items]
+                self.state.cursor_position = 0
+                self.state.view_mode = "record_list"
+                
+                item_type = rel_items.get("_type", "Related")
+                for cls in self._ggg_classes:
+                    if cls.__name__ == item_type:
+                        self.state.entity_type = cls
+                        break
 
     def _discover_ggg_classes(self):
         """Dynamically discover GGG entity classes."""
@@ -436,16 +481,6 @@ class CursorDatabaseExplorer:
 
         logger.debug(f'self._ggg_classes = {self._ggg_classes}')
         return classes
-
-    def _class_name_to_entity_type(self, class_name: str) -> str:
-        """Convert class name to entity type (e.g., User -> user, TaskSchedule -> task_schedule)."""
-        # Convert CamelCase to snake_case without pluralization
-        snake_case = re.sub("([A-Z]+)([A-Z][a-z])", r"\1_\2", class_name)
-        snake_case = re.sub(r"([a-z\d])([A-Z])", r"\1_\2", snake_case).lower()
-
-        logger.debug(f'class_name => snake_case = {class_name} => {snake_case}')
-
-        return snake_case
 
     def _discover_relationship_fields(self):
         """Discover relationship field mappings from GGG models."""

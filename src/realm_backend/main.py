@@ -6,32 +6,20 @@ import api
 from api.extensions import list_extensions
 from api.ggg_entities import (
     list_objects,
+    list_objects_paginated,
 )
 from api.status import get_status
 from api.user import user_get, user_register, user_update_profile_picture
 from core.candid_types_realm import (
-    CodexesListRecord,
-    DisputesListRecord,
     ExtensionCallArgs,
     ExtensionCallResponse,
-    InstrumentsListRecord,
-    LicensesListRecord,
-    MandatesListRecord,
-    OrganizationsListRecord,
     PaginationInfo,
-    ProposalsListRecord,
     RealmResponse,
     RealmResponseData,
-    RealmsListRecord,
     StatusRecord,
-    TasksListRecord,
-    TradesListRecord,
-    TransfersListRecord,
-    TreasuriesListRecord,
     UserGetRecord,
-    UsersListRecord,
-    VotesListRecord,
     ObjectsListRecord,
+    ObjectsListRecordPaginated,
 )
 from ggg import Codex
 from kybra import (
@@ -109,11 +97,11 @@ def status() -> RealmResponse:
     try:
         logger.info("Status query executed")
         return RealmResponse(
-            success=True, data=RealmResponseData(Status=StatusRecord(**get_status()))
+            success=True, data=RealmResponseData(status=StatusRecord(**get_status()))
         )
     except Exception as e:
         logger.error(f"Error getting status: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
 @query
@@ -134,7 +122,7 @@ def join_realm(profile: str) -> RealmResponse:
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                UserGet=UserGetRecord(
+                UserGet=UserGetRecord( # TODO: fix this
                     principal=Principal.from_str(user["principal"]),
                     profiles=profiles,
                     profile_picture_url=user.get("profile_picture_url", ""),
@@ -143,7 +131,7 @@ def join_realm(profile: str) -> RealmResponse:
         )
     except Exception as e:
         logger.error(f"Error registering user: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
 @query
@@ -211,10 +199,31 @@ def update_my_profile_picture(profile_picture_url: str) -> RealmResponse:
 
 
 @query
-def get_objects(class_name: str, page_num: nat, page_size: nat) -> RealmResponse:
+def get_objects_paginated(class_name: str, page_num: nat, page_size: nat) -> RealmResponse:
+    """
+    Example:
+    $ dfx canister call --output json ulvla-h7777-77774-qaacq-cai get_objects_paginated '("Realm", 0, 10)'
+{
+  "data": {
+    "objectsListPaginated": {
+      "objects": [
+        "{\"timestamp_created\": \"2025-09-10 11:28:41.147\", \"timestamp_updated\": \"2025-09-10 11:28:41.147\", \"creator\": \"system\", \"updater\": \"system\", \"owner\": \"system\", \"_type\": \"Realm\", \"_id\": \"1\", \"name\": \"Generated Demo Realm\", \"description\": \"Generated demo realm with 51 citizens and 5 organizations\", \"id\": \"0\", \"created_at\": \"2025-09-10T13:23:57.099332\", \"status\": \"active\", \"governance_type\": \"democratic\", \"population\": 51, \"organization_count\": 5, \"settings\": {\"voting_period_days\": 7, \"proposal_threshold\": 0.1, \"quorum_percentage\": 0.3, \"tax_rate\": 0.15, \"ubi_amount\": 1000}, \"relations\": {\"treasury\": [{\"_type\": \"Treasury\", \"_id\": \"2\"}]}}"
+      ],
+      "pagination": {
+        "page_num": "0",
+        "page_size": "10",
+        "total_items_count": "1",
+        "total_pages": "1"
+      }
+    }
+  },
+  "success": true
+}
+    """
+
     try:
         logger.info(f"Listing {class_name} objects for page {page_num} with page size {page_size}")
-        result = list_objects(class_name, page_num=page_num, page_size=page_size)
+        result = list_objects_paginated(class_name, page_num=page_num, page_size=page_size)
         objects = result["items"]
         objects_json = [json.dumps(obj.to_dict()) for obj in objects] 
         logger.info(f"Objects JSON: {objects_json}")
@@ -227,12 +236,49 @@ def get_objects(class_name: str, page_num: nat, page_size: nat) -> RealmResponse
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                ObjectsList=ObjectsListRecord(objects=objects_json, pagination=pagination)
+                objectsListPaginated=ObjectsListRecordPaginated(objects=objects_json, pagination=pagination)
             ),
         )
     except Exception as e:
         logger.error(f"Error listing users: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
+
+@query
+def get_objects(params: Vec[Tuple[str,str]]) -> RealmResponse:
+    """ Example:
+
+ dfx canister call --output json ulvla-h7777-77774-qaacq-cai get_objects '(
+  vec { record { 0 = "User"; 1 = "1" } }
+)'
+{
+  "data": {
+    "objectsList": {
+      "objects": [
+        "{\"timestamp_created\": \"2025-09-10 11:28:41.147\", \"timestamp_updated\": \"2025-09-10 11:28:41.147\", \"creator\": \"system\", \"updater\": \"system\", \"owner\": \"system\", \"_type\": \"User\", \"_id\": \"1\", \"id\": \"system\", \"profile_picture_url\": \"\"}"
+      ]
+    }
+  },
+  "success": true
+}
+    """
+
+    try:
+        logger.info(f"Listing objects")
+        result = list_objects(params)
+        objects = result
+        objects_json = [json.dumps(obj.to_dict()) for obj in objects] 
+        logger.info(f"Objects JSON: {objects_json}")
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                objectsList=ObjectsListRecord(objects=objects_json)
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error listing objects: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+
 
 
 

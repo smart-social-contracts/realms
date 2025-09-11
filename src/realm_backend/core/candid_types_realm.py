@@ -36,105 +36,21 @@ class UserGetRecord(Record):
 
 
 # New GGG response records
-class ObjectsListRecord(Record):
+class ObjectsListRecordPaginated(Record):
     objects: Vec[text]  # JSON string of object data
     pagination: PaginationInfo
 
-class UsersListRecord(Record):
-    users: Vec[text]  # JSON string of user data
-    pagination: PaginationInfo
-
-
-class MandatesListRecord(Record):
-    mandates: Vec[text]  # JSON string of mandate data
-    pagination: PaginationInfo
-
-
-class TasksListRecord(Record):
-    tasks: Vec[text]  # JSON string of task data
-    pagination: PaginationInfo
-
-
-class TransfersListRecord(Record):
-    transfers: Vec[text]  # JSON string of transfer data
-    pagination: PaginationInfo
-
-
-class InstrumentsListRecord(Record):
-    instruments: Vec[text]  # JSON string of instrument data
-    pagination: PaginationInfo
-
-
-class CodexesListRecord(Record):
-    codexes: Vec[text]  # JSON string of codex data
-    pagination: PaginationInfo
-
-
-class OrganizationsListRecord(Record):
-    organizations: Vec[text]  # JSON string of organization data
-    pagination: PaginationInfo
-
-
-class DisputesListRecord(Record):
-    disputes: Vec[text]  # JSON string of dispute data
-    pagination: PaginationInfo
-
-
-class LicensesListRecord(Record):
-    licenses: Vec[text]  # JSON string of license data
-    pagination: PaginationInfo
-
-
-class TradesListRecord(Record):
-    trades: Vec[text]  # JSON string of trade data
-    pagination: PaginationInfo
-
-
-class RealmsListRecord(Record):
-    realms: Vec[text]  # JSON string of realm data
-    pagination: PaginationInfo
-
-
-class ProposalsListRecord(Record):
-    proposals: Vec[text]  # JSON string of proposal data
-    pagination: PaginationInfo
-
-
-class VotesListRecord(Record):
-    votes: Vec[text]  # JSON string of vote data
-    pagination: PaginationInfo
-
-
-class TreasuriesListRecord(Record):
-    treasuries: Vec[text]  # JSON string of treasury data
-    pagination: PaginationInfo
-
-
+class ObjectsListRecord(Record):
+    objects: Vec[text]  # JSON string of object data
 class ExtensionsListRecord(Record):
     extensions: Vec[text]
 
-
 class RealmResponseData(Variant):
-    Status: StatusRecord
-    UserGet: UserGetRecord
-    UsersList: UsersListRecord
-    MandatesList: MandatesListRecord
-    TasksList: TasksListRecord
-    TransfersList: TransfersListRecord
-    InstrumentsList: InstrumentsListRecord
-    CodexesList: CodexesListRecord
-    OrganizationsList: OrganizationsListRecord
-    DisputesList: DisputesListRecord
-    LicensesList: LicensesListRecord
-    TradesList: TradesListRecord
-    RealmsList: RealmsListRecord
-    ProposalsList: ProposalsListRecord
-    VotesList: VotesListRecord
-    TreasuriesList: TreasuriesListRecord
-    ExtensionsList: ExtensionsListRecord
-    Error: text
-    Message: text
-    ObjectsList: ObjectsListRecord
+    status: StatusRecord
+    error: text
+    message: text
+    objectsList: ObjectsListRecord
+    objectsListPaginated: ObjectsListRecordPaginated
 
 
 class RealmResponse(Record):

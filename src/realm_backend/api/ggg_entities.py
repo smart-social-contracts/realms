@@ -23,7 +23,27 @@ from kybra_simple_logging import get_logger
 logger = get_logger("api.ggg_entities")
 
 
-def list_objects(class_name: str, page_num: int, page_size: int) -> Dict[str, Any]:
+def list_objects(params: tuple[str,str]) -> List[Any]:
+    """List objects in the system."""
+    try:
+        ret = []
+        for param in params:
+            try:
+                class_name = param[0]
+                id = param[1]
+                class_object = globals()[class_name]
+                object = class_object[id]
+                ret.append(object)
+            except Exception as e:
+                logger.error(traceback.format_exc())
+        return ret
+    except Exception as e:
+        logger.error(traceback.format_exc())
+        ret.append(None)
+    return []
+
+
+def list_objects_paginated(class_name: str, page_num: int, page_size: int) -> Dict[str, Any]:
     """List objects in the system with pagination."""
     try:
         from_id = page_num * page_size + 1
