@@ -235,22 +235,22 @@ class CursorDatabaseExplorer:
                 self.state.cursor_position += 1
                 event.app.invalidate()
 
-        @kb.add("enter")
+        @kb.add("right")
         def select_item(event):
             self.handle_selection()
             event.app.invalidate()
+
+        @kb.add("enter")
+        def drill_into_relationship(event):
+            if self.state.view_mode == "record_detail":
+                self.handle_relationship_drilling()
+                event.app.invalidate()
 
         @kb.add("left")
         @kb.add("backspace")
         def go_back(event):
             self.handle_back_navigation()
             event.app.invalidate()
-
-        @kb.add("right")
-        def drill_into_relationship(event):
-            if self.state.view_mode == "record_detail":
-                self.handle_relationship_drilling()
-                event.app.invalidate()
 
         @kb.add("pageup")
         def page_up(event):
@@ -699,7 +699,7 @@ class CursorDatabaseExplorer:
             lines.append(f"{cursor}{i + 1:2}. {class_obj.__name__.title():<15} - {desc}")
 
         lines.append("")
-        lines.append("Commands: Up/Down navigate | Enter select | q quit")
+        lines.append("Commands: Up/Down navigate | Right select | q quit")
 
         return "\n".join(lines)
 
@@ -731,7 +731,7 @@ class CursorDatabaseExplorer:
 
         lines.append("")
         lines.append(
-            "Commands: Up/Down navigate | Enter view details | Left back | PgUp/PgDn pages | q quit"
+            "Commands: Up/Down navigate | Right view details | Left back | PgUp/PgDn pages | q quit"
         )
 
         return "\n".join(lines)
@@ -816,7 +816,7 @@ class CursorDatabaseExplorer:
 
         lines.append("")
         lines.append(
-            "Commands: Up/Down navigate | Right drill into relationships | Left back | q quit"
+            "Commands: Up/Down navigate | Enter drill into relationships | Left back | q quit"
         )
 
         return "\n".join(lines)

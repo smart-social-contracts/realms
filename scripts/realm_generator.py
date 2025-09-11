@@ -208,9 +208,9 @@ class RealmGenerator:
             transfer = {
                 "class": "Transfer",
                 "data": {
-                    "from_user_id": from_user["data"]["id"],
-                    "to_user_id": to_user["data"]["id"],
-                    "instrument_name": instrument["data"]["name"],
+                    "from_user": from_user["data"]["id"],
+                    "to_user": to_user["data"]["id"],
+                    "instrument": instrument["data"]["name"],
                     "amount": random.randint(1, 10000)
                 }
             }
