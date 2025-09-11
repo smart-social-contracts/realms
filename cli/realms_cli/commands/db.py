@@ -421,32 +421,87 @@ class CursorDatabaseExplorer:
             logger.debug(f"Drilling into relationship: {nav_item['key']} with {len(rel_items) if isinstance(rel_items, list) else 1} items")
             
             if isinstance(rel_items, list) and rel_items:
-                self.state.current_items = rel_items
-                self.state.cursor_position = 0
-                self.state.view_mode = "record_list"
-                
                 # Determine entity type from the first item
                 first_item_type = rel_items[0].get("_type", "Related")
+                related_class = None
                 for cls in self._ggg_classes:
                     if cls.__name__ == first_item_type or self._class_name_to_entity_type(cls.__name__) == first_item_type.lower():
-                        self.state.entity_type = cls
+                        related_class = cls
                         break
+                
+                if related_class:
+                    # Try to fetch full entity details for each related item
+                    full_items = []
+                    try:
+                        result = self.list_entities(related_class.__name__, 0, 100)
+                        if "items" in result and result["items"]:
+                            # Match related items with full entity data
+                            for rel_item in rel_items:
+                                rel_id = rel_item.get("_id")
+                                if rel_id:
+                                    full_item = next(
+                                        (item for item in result["items"] if item.get("_id") == str(rel_id)),
+                                        rel_item  # Fallback to minimal data if not found
+                                    )
+                                    full_items.append(full_item)
+                                else:
+                                    full_items.append(rel_item)
+                        else:
+                            full_items = rel_items
+                    except Exception as e:
+                        logger.error(f"Error fetching full entity details: {e}")
+                        full_items = rel_items
+                    
+                    self.state.current_items = full_items
+                    self.state.cursor_position = 0
+                    self.state.view_mode = "record_list"
+                    self.state.entity_type = related_class
                 else:
-                    # Fallback - use a generic type
+                    # Fallback - use minimal data with generic type
+                    self.state.current_items = rel_items
+                    self.state.cursor_position = 0
+                    self.state.view_mode = "record_list"
+                    
                     class GenericType:
                         __name__ = first_item_type
                     self.state.entity_type = GenericType
+                    
             elif not isinstance(rel_items, list):
                 # Single item wrapped in list
-                self.state.current_items = [rel_items]
-                self.state.cursor_position = 0
-                self.state.view_mode = "record_list"
-                
                 item_type = rel_items.get("_type", "Related")
+                related_class = None
                 for cls in self._ggg_classes:
                     if cls.__name__ == item_type:
-                        self.state.entity_type = cls
+                        related_class = cls
                         break
+                
+                if related_class:
+                    # Try to fetch full entity details for the single item
+                    rel_id = rel_items.get("_id")
+                    full_item = rel_items  # Default fallback
+                    
+                    if rel_id:
+                        try:
+                            result = self.list_entities(related_class.__name__, 0, 100)
+                            if "items" in result and result["items"]:
+                                found_item = next(
+                                    (item for item in result["items"] if item.get("_id") == str(rel_id)),
+                                    None
+                                )
+                                if found_item:
+                                    full_item = found_item
+                        except Exception as e:
+                            logger.error(f"Error fetching full entity details: {e}")
+                    
+                    self.state.current_items = [full_item]
+                    self.state.cursor_position = 0
+                    self.state.view_mode = "record_list"
+                    self.state.entity_type = related_class
+                else:
+                    # Fallback
+                    self.state.current_items = [rel_items]
+                    self.state.cursor_position = 0
+                    self.state.view_mode = "record_list"
 
     def _class_name_to_entity_type(self, class_name: str) -> str:
         """Convert class name to entity type (e.g., User -> user, TaskSchedule -> task_schedule)."""
