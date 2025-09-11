@@ -22,7 +22,18 @@ console = Console()
 def get_logger(name: str) -> logging.Logger:
     """Get a logger instance with the specified name."""
     logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
+
+    # save to file
+    file_handler = logging.FileHandler("realms_cli.log")
+    file_handler.setLevel(logging.DEBUG)
+    logger.addHandler(file_handler)
+
+    # # print warnings and errors to console
+    # console_handler = logging.StreamHandler()
+    # console_handler.setLevel(logging.WARNING)
+    # logger.addHandler(console_handler)
+
     return logger
 
 

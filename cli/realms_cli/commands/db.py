@@ -5,6 +5,7 @@ import inspect
 import json
 import os
 import re
+import traceback
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -77,31 +78,57 @@ class CursorDatabaseExplorer:
 
         # Cache for relationship mappings discovered from GGG models
         self._relationship_cache = None
-        self._entity_models_cache = None
+        self._ggg_classes = self._discover_ggg_classes()
 
-        self.entity_types = self._discover_entity_types()
 
     def call_backend(self, method: str, args: str = "") -> Dict[str, Any]:
+        logger.debug(f"call_backend")
+
         """Call backend canister method and return parsed result."""
-        cmd = ["dfx", "canister", "call"]
+        cmd = ["dfx", "canister", "call", "--output", "json"]
         if self.network != "local":
             cmd.extend(["--network", self.network])
-        cmd.extend(["--query", self.canister, method])
+        cmd.extend([self.canister, method])
         if args:
-            cmd.append(args)
+            # Format args as Candid tuple with proper types
+            if isinstance(args, (list, tuple)):
+                # Handle list/tuple of arguments
+                formatted_parts = []
+                for arg in args:
+                    if isinstance(arg, str):
+                        formatted_parts.append(f'"{arg}"')
+                    else:
+                        formatted_parts.append(str(arg))
+                candid_args = f"({', '.join(formatted_parts)})"
+            else:
+                # Handle string args - assume it's already formatted or a single value
+                candid_args = f'("{args}")'
+            
+            cmd.append(candid_args)
+
+        logger.debug(f"cmd: {' '.join(cmd)}")
 
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+            logger.debug(f"result: {result}")
             if result.returncode == 0:
                 output = result.stdout.strip()
 
                 if method == "status":
                     return {"success": True, "data": output}
 
-                if output.startswith("(") and output.endswith(")"):
-                    output = output[1:-1]
-
-                return self._parse_candid_response(output)
+                # Parse JSON response
+                try:
+                    json_response = json.loads(output)
+                    ret = self._parse_json_response(json_response)
+                    logger.debug(f"Backend result: {ret}")
+                    return ret
+                except json.JSONDecodeError:
+                    logger.error(traceback.format_exc())
+                    # Fallback to Candid parsing for backward compatibility
+                    if output.startswith("(") and output.endswith(")"):
+                        output = output[1:-1]
+                    return self._parse_candid_response(output)
             else:
                 return {
                     "items": [],
@@ -112,6 +139,7 @@ class CursorDatabaseExplorer:
                     "error": result.stderr,
                 }
         except Exception as e:
+            logger.error(traceback.format_exc())
             return {
                 "items": [],
                 "total_items_count": 0,
@@ -121,57 +149,43 @@ class CursorDatabaseExplorer:
                 "error": str(e),
             }
 
-    def _parse_candid_response(self, candid_output: str) -> Dict[str, Any]:
-        """Parse Candid response using structured approach instead of fragile regex."""
+    def _parse_json_response(self, json_response: Any) -> Dict[str, Any]:
+        """Parse JSON response from dfx --output json."""
         try:
-            json_strings = []
-
-            vec_start = candid_output.find("vec {")
-            if vec_start >= 0:
-                brace_count = 0
-                vec_content_start = vec_start + 5  # len("vec {")
-                vec_content_end = vec_content_start
-
-                for i, char in enumerate(
-                    candid_output[vec_content_start:], vec_content_start
-                ):
-                    if char == "{":
-                        brace_count += 1
-                    elif char == "}":
-                        if brace_count == 0:
-                            vec_content_end = i
-                            break
-                        brace_count -= 1
-
-                vec_content = candid_output[vec_content_start:vec_content_end]
-
-                for item in vec_content.split('";'):
-                    item = item.strip()
-                    if item.startswith('"'):
-                        item = item[1:]
-                    if item.endswith('"'):
-                        item = item[:-1]
-                    if item:
-                        try:
-                            item = item.replace('\\"', '"')
-                            parsed_item = json.loads(item)
-                            json_strings.append(parsed_item)
-                        except json.JSONDecodeError:
-                            continue
-
-            total_items = self._extract_number(candid_output, "total_items_count")
-            total_pages = self._extract_number(candid_output, "total_pages")
-            page_num = self._extract_number(candid_output, "page_num")
-            page_size = self._extract_number(candid_output, "page_size")
-
-            return {
-                "items": json_strings,
-                "total_items_count": total_items,
-                "total_pages": total_pages,
-                "page_num": page_num,
-                "page_size": page_size,
-            }
+            # Handle different possible JSON response structures
+            if isinstance(json_response, dict):
+                # Direct response structure
+                if "items" in json_response:
+                    return json_response
+                # Single item response - wrap in items array
+                return {
+                    "items": [json_response],
+                    "total_items_count": 1,
+                    "total_pages": 1,
+                    "page_num": 0,
+                    "page_size": 1,
+                }
+            elif isinstance(json_response, list):
+                # Array response - wrap in pagination structure
+                return {
+                    "items": json_response,
+                    "total_items_count": len(json_response),
+                    "total_pages": 1,
+                    "page_num": 0,
+                    "page_size": len(json_response),
+                }
+            else:
+                # Scalar response
+                return {
+                    "items": [],
+                    "total_items_count": 0,
+                    "total_pages": 1,
+                    "page_num": 0,
+                    "page_size": 10,
+                    "data": json_response,
+                }
         except Exception:
+            logger.error(traceback.format_exc())
             return {
                 "items": [],
                 "total_items_count": 0,
@@ -180,77 +194,15 @@ class CursorDatabaseExplorer:
                 "page_size": 10,
             }
 
-    def _extract_number(self, text: str, field_name: str) -> int:
-        """Extract a number field from Candid text using simple string operations."""
-        try:
-            pattern = f"{field_name} = "
-            start = text.find(pattern)
-            if start >= 0:
-                start += len(pattern)
-                end = start
-                while end < len(text) and (text[end].isdigit() or text[end] == "_"):
-                    end += 1
-                number_str = text[start:end].replace(
-                    "_", ""
-                )  # Remove Candid number suffixes
-                return int(number_str) if number_str else 0
-            return 0
-        except (ValueError, IndexError):
-            return 0
-
-    def _discover_entity_types(self) -> List[str]:
-        """Discover available entity types by checking GGG models and backend API methods."""
-        # First, try to get entity types from GGG models
-        models = self._discover_ggg_models()
-        entity_types_from_models = list(models.keys()) if models else []
-
-        # Fallback list for when GGG model discovery fails
-        fallback_entities = [
-            "users",
-            "organizations",
-            "mandates",
-            "tasks",
-            "transfers",
-            "trades",
-            "instruments",
-            "codexes",
-            "disputes",
-            "licenses",
-            "realms",
-            "proposals",
-            "votes",
-            "treasuries",  # Add missing entities
-            "humans",
-            "citizens",
-            "identities",
-            "user_profiles",
-            "task_schedules",
-        ]
-
-        # Use GGG models if available, otherwise use fallback
-        candidate_entities = (
-            entity_types_from_models if entity_types_from_models else fallback_entities
-        )
-
-        available_entities = []
-        for entity_type in candidate_entities:
-            try:
-                result = self.call_backend(f"get_{entity_type}", "(0, 1)")
-                if "error" not in result or "method does not exist" not in str(
-                    result.get("error", "")
-                ):
-                    available_entities.append(entity_type)
-            except Exception:
-                logger.error(f"Error checking entity type {entity_type}")
-
-        return available_entities if available_entities else fallback_entities
-
+    
     def list_entities(
         self, entity_type: str, page_num: int = 0, page_size: int = 10
     ) -> Dict[str, Any]:
         """List entities of given type with pagination."""
-        method = f"get_{entity_type}"
-        args = f"({page_num}, {page_size})"
+        # Map entity class names to their corresponding backend methods
+        method = "get_objects"
+        args = [entity_type, page_num, page_size]
+            
         return self.call_backend(method, args)
 
     def create_key_bindings(self):
@@ -313,9 +265,14 @@ class CursorDatabaseExplorer:
 
     def handle_selection(self):
         """Handle item selection based on current view mode."""
+
+        logger.debug('handle_selection')
+
+        logger.debug(f'self.state.view_mode = {self.state.view_mode}')
+
         if self.state.view_mode == "entity_list":
-            if self.state.cursor_position < len(self.entity_types):
-                selected_entity = self.entity_types[self.state.cursor_position]
+            if self.state.cursor_position < len(self._ggg_classes):
+                selected_entity = self._ggg_classes[self.state.cursor_position]
                 self.state.entity_type = selected_entity
                 self.state.view_mode = "record_list"
                 self.state.cursor_position = 0
@@ -332,6 +289,12 @@ class CursorDatabaseExplorer:
 
     def handle_back_navigation(self):
         """Handle back navigation including relationship drilling."""
+
+        logger.debug('handle_back_navigation')
+
+
+        logger.debug(f'self.state.navigation_stack = {self.state.navigation_stack}')
+
         if self.state.navigation_stack:
             previous_state = self.state.navigation_stack.pop()
             self.state.entity_type = previous_state["entity_type"]
@@ -349,9 +312,13 @@ class CursorDatabaseExplorer:
                 self.state.view_mode = "entity_list"
                 self.state.entity_type = ""
                 self.state.cursor_position = 0
-                self.state.current_items = self.entity_types
+                self.state.current_items = self._ggg_classes
 
     def handle_relationship_drilling(self):
+        logger.debug('handle_relationship_drilling')
+
+        logger.debug(f'self.state.view_mode = {self.state.view_mode}')
+
         """Navigate into relationships using cursor keys."""
         if self.state.view_mode != "record_detail" or not self.state.selected_item:
             return
@@ -385,51 +352,97 @@ class CursorDatabaseExplorer:
             related_entity_type = nav_item["related_type"]
             related_id = nav_item["value"]
 
+            logger.debug(f"Drilling into relationship field: {nav_item['key']} -> {related_entity_type} ID {related_id}")
+
             # Try to fetch the related entity
             try:
-                result = self.call_backend(f"get_{related_entity_type}", "(0, 100)")
-                if "items" in result:
-                    # Find the specific item by ID
-                    related_items = [
-                        item
-                        for item in result["items"]
-                        if item.get("_id") == str(related_id)
-                    ]
-                    if related_items:
-                        self.state.current_items = related_items
-                        self.state.cursor_position = 0
-                        self.state.view_mode = "record_list"
-                        self.state.entity_type = related_entity_type
-                        return
-            except Exception:
-                pass
+                # Find the corresponding class for the entity type
+                related_class = None
+                for cls in self._ggg_classes:
+                    if self._class_name_to_entity_type(cls.__name__) == related_entity_type:
+                        related_class = cls
+                        break
+                
+                if related_class:
+                    result = self.list_entities(related_class.__name__, 0, 100)
+                    if "items" in result and result["items"]:
+                        # Find the specific item by ID
+                        related_items = [
+                            item
+                            for item in result["items"]
+                            if item.get("_id") == str(related_id)
+                        ]
+                        if related_items:
+                            self.state.current_items = related_items
+                            self.state.cursor_position = 0
+                            self.state.view_mode = "record_list"
+                            self.state.entity_type = related_class
+                            return
+                        else:
+                            logger.debug(f"No item found with ID {related_id} in {related_entity_type}")
+                    else:
+                        logger.debug(f"No items returned for {related_entity_type}")
+                else:
+                    logger.debug(f"No class found for entity type {related_entity_type}")
+            except Exception as e:
+                logger.error(f"Error fetching related entity: {e}")
+                logger.error(traceback.format_exc())
 
             # Fallback: create a placeholder item
             placeholder_item = {
                 "_id": str(related_id),
                 "_type": related_entity_type.rstrip("s").title(),
                 "name": f"Referenced {related_entity_type.rstrip('s').title()}",
+                "error": "Could not fetch details"
             }
             self.state.current_items = [placeholder_item]
             self.state.cursor_position = 0
             self.state.view_mode = "record_list"
-            self.state.entity_type = related_entity_type
+            # Find the class for this entity type
+            for cls in self._ggg_classes:
+                if self._class_name_to_entity_type(cls.__name__) == related_entity_type:
+                    self.state.entity_type = cls
+                    break
 
         elif nav_item["type"] == "relationship":
             # Navigate to multiple related entities
             rel_items = nav_item["value"]
+            logger.debug(f"Drilling into relationship: {nav_item['key']} with {len(rel_items) if isinstance(rel_items, list) else 1} items")
+            
             if isinstance(rel_items, list) and rel_items:
                 self.state.current_items = rel_items
                 self.state.cursor_position = 0
                 self.state.view_mode = "record_list"
-                self.state.entity_type = rel_items[0].get("_type", "Related")
+                
+                # Determine entity type from the first item
+                first_item_type = rel_items[0].get("_type", "Related")
+                for cls in self._ggg_classes:
+                    if cls.__name__ == first_item_type or self._class_name_to_entity_type(cls.__name__) == first_item_type.lower():
+                        self.state.entity_type = cls
+                        break
+                else:
+                    # Fallback - use a generic type
+                    class GenericType:
+                        __name__ = first_item_type
+                    self.state.entity_type = GenericType
+            elif not isinstance(rel_items, list):
+                # Single item wrapped in list
+                self.state.current_items = [rel_items]
+                self.state.cursor_position = 0
+                self.state.view_mode = "record_list"
+                
+                item_type = rel_items.get("_type", "Related")
+                for cls in self._ggg_classes:
+                    if cls.__name__ == item_type:
+                        self.state.entity_type = cls
+                        break
 
-    def _discover_ggg_models(self):
-        """Dynamically discover GGG entity models and their relationships."""
-        if self._entity_models_cache is not None:
-            return self._entity_models_cache
+    def _discover_ggg_classes(self):
+        """Dynamically discover GGG entity classes."""
+        if getattr(self, "_ggg_classes", None) is not None:
+            return self._ggg_classes
 
-        models = {}
+        classes = []
 
         # Add the GGG module path to sys.path if not already there
         ggg_path = os.path.join(
@@ -454,26 +467,20 @@ class CursorDatabaseExplorer:
                 try:
                     cls = getattr(ggg_module, class_name)
                     if inspect.isclass(cls) and hasattr(cls, "__name__"):
-                        # Convert class name to entity type (e.g., User -> users)
-                        entity_type = self._class_name_to_entity_type(class_name)
-                        models[entity_type] = cls
+                        classes.append(cls)
                 except AttributeError:
+                    logger.error(traceback.format_exc())
                     continue
 
         except ImportError as e:
             # Silently fall back to common patterns if GGG models can't be imported
+            logger.error(traceback.format_exc())
             pass
 
-        self._entity_models_cache = models
-        return models
+        self._ggg_classes = classes
 
-    def _class_name_to_entity_type(self, class_name: str) -> str:
-        """Convert class name to entity type (e.g., User -> user, TaskSchedule -> task_schedule)."""
-        # Convert CamelCase to snake_case without pluralization
-        snake_case = re.sub("([A-Z]+)([A-Z][a-z])", r"\1_\2", class_name)
-        snake_case = re.sub(r"([a-z\d])([A-Z])", r"\1_\2", snake_case).lower()
-
-        return snake_case
+        logger.debug(f'self._ggg_classes = {self._ggg_classes}')
+        return classes
 
     def _discover_relationship_fields(self):
         """Discover relationship field mappings from GGG models."""
@@ -481,13 +488,13 @@ class CursorDatabaseExplorer:
             return self._relationship_cache
 
         relationship_fields = {}
-        models = self._discover_ggg_models()
+        classes = self._discover_ggg_classes()
 
-        for entity_type, model_class in models.items():
+        for class_obj in classes:
             try:
                 # Inspect the model class for relationship fields
-                for attr_name in dir(model_class):
-                    attr = getattr(model_class, attr_name, None)
+                for attr_name in dir(class_obj):
+                    attr = getattr(class_obj, attr_name, None)
                     if attr is None or attr_name.startswith("_"):
                         continue
 
@@ -549,43 +556,18 @@ class CursorDatabaseExplorer:
 
                         except Exception:
                             # Skip problematic relationship definitions
+                            logger.error(traceback.format_exc())
                             continue
 
             except Exception:
                 # Skip problematic models
+                logger.error(traceback.format_exc())
                 continue
 
-        # Add some common patterns that might not be captured by introspection
-        common_patterns = {
-            "user_id": "users",
-            "creator_id": "users",
-            "owner_id": "users",
-            "from_user_id": "users",
-            "to_user_id": "users",
-            "human_id": "humans",
-            "organization_id": "organizations",
-            "mandate_id": "mandates",
-            "task_id": "tasks",
-            "task_schedule_id": "task_schedules",
-            "proposal_id": "proposals",
-            "vote_id": "votes",
-            "instrument_id": "instruments",
-            "transfer_id": "transfers",
-            "trade_id": "trades",
-            "dispute_id": "disputes",
-            "license_id": "licenses",
-            "realm_id": "realms",
-            "codex_id": "codexes",
-            "treasury_id": "treasuries",
-            "user_profile_id": "user_profiles",
-        }
-
-        # Merge common patterns, but don't override discovered relationships
-        for pattern, entity_type in common_patterns.items():
-            if pattern not in relationship_fields:
-                relationship_fields[pattern] = entity_type
-
         self._relationship_cache = relationship_fields
+
+        logger.debug(f'self._relationship_cache = {self._relationship_cache}')
+
         return relationship_fields
 
     def get_all_relationships(self, item):
@@ -608,12 +590,17 @@ class CursorDatabaseExplorer:
 
     def refresh_data(self):
         """Refresh current data based on state."""
+
+        logger.debug('refresh_data')
+
+        logger.debug(f'self.state.view_mode = {self.state.view_mode}')
+
         if self.state.view_mode == "entity_list":
-            self.state.current_items = self.entity_types
+            self.state.current_items = self._ggg_classes
         elif self.state.view_mode == "record_list" and self.state.entity_type:
             logger.info(f"Fetching data for entity type: {self.state.entity_type}")
             result = self.list_entities(
-                self.state.entity_type, self.state.page_num, self.state.page_size
+                self.state.entity_type.__name__, self.state.page_num, self.state.page_size
             )
             logger.info(f"Backend result: {result}")
             if "error" not in result and "items" in result:
@@ -632,10 +619,11 @@ class CursorDatabaseExplorer:
         lines.append("Select an entity type to explore:")
         lines.append("")
 
-        for i, entity_type in enumerate(self.entity_types):
+
+        for i, class_obj     in enumerate(self._ggg_classes):
             cursor = "> " if i == self.state.cursor_position else "  "
-            desc = ENTITY_DESCRIPTIONS.get(entity_type, "")
-            lines.append(f"{cursor}{i + 1:2}. {entity_type.title():<15} - {desc}")
+            desc = ENTITY_DESCRIPTIONS.get(class_obj.__name__, "")
+            lines.append(f"{cursor}{i + 1:2}. {class_obj.__name__.title():<15} - {desc}")
 
         lines.append("")
         lines.append("Commands: Up/Down navigate | Enter select | q quit")
@@ -645,7 +633,7 @@ class CursorDatabaseExplorer:
     def render_record_list(self):
         """Render the record list view."""
         lines = []
-        lines.append(f"{self.state.entity_type.title()} List")
+        lines.append(f"{self.state.entity_type.__name__} List")
 
         if hasattr(self.state, "total_pages"):
             current_page = self.state.page_num + 1
@@ -682,7 +670,7 @@ class CursorDatabaseExplorer:
 
         lines = []
         item = self.state.selected_item
-        item_type = self.state.entity_type.title().rstrip("s")
+        item_type = self.state.entity_type.__name__
         item_id = item.get("_id", "N/A")
 
         lines.append(f"{item_type} Details")
@@ -783,12 +771,12 @@ class CursorDatabaseExplorer:
         """Main interactive loop using prompt_toolkit Application."""
         try:
             self.call_backend("status")
-            print("Connected to backend canister\n")
+            logger.debug("Connected to backend canister\n")
         except Exception:
-            print("Could not connect to backend canister")
+            logger.debug("Could not connect to backend canister")
             return
 
-        self.state.current_items = self.entity_types
+        self.state.current_items = self._ggg_classes
         kb = self.create_key_bindings()
 
         def get_layout():
@@ -821,9 +809,17 @@ def db_command(
     ),
 ) -> None:
     """Explore the Realm database in an interactive text-based interface with cursor navigation."""
+
+    logger.debug("db_command")
+    logger.debug(f"network: {network}")
+    logger.debug(f"canister: {canister}")
+
     effective_network, effective_canister = get_effective_network_and_canister(
         network, canister
     )
+
+    logger.debug(f"Effective network: {effective_network}")
+    logger.debug(f"Effective canister: {effective_canister}")
 
     explorer = CursorDatabaseExplorer(effective_network, effective_canister)
     explorer.run()
