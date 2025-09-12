@@ -27,9 +27,14 @@ class Operations:
 
 
 class Profiles:
-    ADMIN = ["admin", [Operations.ALL]]
-    MEMBER = ["member", []]
-
+    ADMIN = {
+        "name": "admin",
+        "allowed_to": ','.join([Operations.ALL])
+    }
+    MEMBER = {
+        "name": "member", 
+        "allowed_to": ','.join([])
+    }
 
 class UserProfile(Entity, TimestampedMixin):
     __alias__ = "name"

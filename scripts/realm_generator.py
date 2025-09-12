@@ -18,18 +18,29 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Any
 import hashlib
+import sys
+import os
 
-# Import GGG entities
-try:
-    from src.realm_backend.ggg.user_profile import UserProfile, Profiles
-    from src.realm_backend.ggg.user import User
-    from src.realm_backend.ggg.treasury import Treasury
-except ImportError:
-    # Fallback for when running outside the main project
-    UserProfile = None
-    Profiles = None
-    User = None
-    Treasury = None
+# Add the src directory to the Python path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src/realm_backend'))
+
+from ggg import (
+    UserProfile,
+    Profiles,
+    User,
+    Treasury,
+    Realm,
+    Instrument,
+    Transfer,
+    Organization,
+    Citizen,
+    Human,
+    Dispute,
+    Mandate,
+    Identity,
+    Proposal
+)
+
 
 # Realistic data pools
 FIRST_NAMES = [
@@ -73,8 +84,8 @@ MANDATE_TYPES = [
 ]
 
 class RealmGenerator:
-    def __init__(self, seed: int = None):
-        self.seed = seed or random.randint(1, 1000000)
+    def __init__(self, seed: int = random.randint(1, 1000000)):
+        self.seed = seed
         random.seed(self.seed)
         self.generated_data = {}
         self.realm_id = "0"
@@ -88,111 +99,104 @@ class RealmGenerator:
         chars = "abcdefghijklmnopqrstuvwxyz0123456789"
         return ''.join(random.choices(chars, k=27)) + "-cai"
     
-    def generate_users(self, count: int) -> List[Dict[str, Any]]:
+    def generate_users(self, count: int) -> List[User]:
         """Generate realistic user data"""
         users = []
         
         # Always create system user first
-        system_user = {
-            "class": "User",
-            "data": {
-                "id": "system",
-                "profile_picture_url": ""
-            }
-        }
+        system_user = User(
+            id="system",
+            user_profile=Profiles.ADMIN["name"]
+        )
+        
         users.append(system_user)
         
         for i in range(count):
-            first_name = random.choice(FIRST_NAMES)
-            last_name = random.choice(LAST_NAMES)
             
-            user = {
-                "class": "User",
-                "data": {
-                    "id": f"{first_name.lower()}_{last_name.lower()}_{i:03d}",
-                    "profile_picture_url": f"https://api.dicebear.com/7.x/personas/svg?seed={first_name}{last_name}"
-                }
-            }
+            user = User(
+                id=f"user_{i:03d}",
+                profile_picture_url=f"https://api.dicebear.com/7.x/personas/svg?seed={random.randint(1, 1000000)}",
+                user_profile=Profiles.MEMBER["name"]
+            )   
             users.append(user)
             
         return users
     
-    def generate_humans(self, users: List[Dict]) -> List[Dict[str, Any]]:
+    def generate_humans(self, users: List[User]) -> List[Human]:
         """Generate human data linked to users"""
         humans = []
         
         for user in users[1:]:  # Skip system user
-            print(user)
-            first_name = user["data"]["id"].split("_")[0].title()
-            last_name = user["data"]["id"].split("_")[1].title()
+            human = Human(
+                name=f"{random.choice(FIRST_NAMES)} {random.choice(LAST_NAMES)}",
+                date_of_birth=(datetime.now() - timedelta(days=random.randint(18*365, 80*365))).strftime("%Y-%m-%d"),
+                user_id=user.id
+            )
             
-            human = {
-                "class": "Human",
-                "data": {
-                    "name": f"{first_name} {last_name}",
-                    "date_of_birth": (datetime.now() - timedelta(days=random.randint(18*365, 80*365))).strftime("%Y-%m-%d"),
-                    "user_id": user["data"]["id"]
-                }
-            }
             humans.append(human)
-            
+        
         return humans
+
+    def generate_identities(self, users: List[User]) -> List[Identity]:
+        """Generate identity data linked to users"""
+        identities = []
+        
+        for user in users:
+            identity = Identity(
+                user_id=user.id,
+                metadata=f"{uuid.uuid4().hex[:8]}-{uuid.uuid4().hex[:8]}"
+            )
+            
+            identities.append(identity)
+        
+        return identities
     
-    def generate_citizens(self, humans: List[Dict]) -> List[Dict[str, Any]]:
-        """Generate citizen data linked to humans"""
+    def generate_citizens(self, users: List[User]) -> List[Citizen]:
+        """Generate citizen data linked to users"""
         citizens = []
         
-        for human in humans:
-            citizen = {
-                "class": "Citizen",
-                "data": {
-                    "id": self.generate_id("cit_"),
-                    "user_id": human["data"]["user_id"],    
-                    "residence_permit": random.choice(["valid", "expired", "pending"]),
-                    "tax_compliance": random.choice(["compliant", "delinquent", "under_review"]),
-                    "identity_verification": random.choice(["verified", "pending", "rejected"]),
-                    "voting_eligibility": random.choice(["eligible", "ineligible", "suspended"]),
-                    "public_benefits_eligibility": random.choice(["eligible", "ineligible", "conditional"]),
-                    "criminal_record": random.choice(["clean", "minor_offenses", "major_offenses"]) 
-                }
-            }
+        for user in users:
+            citizen = Citizen(
+                id=self.generate_id("cit_"),
+                user=user,    
+                residence_permit=random.choice(["valid", "expired", "pending"]),
+                tax_compliance=random.choice(["compliant", "delinquent", "under_review"]),
+                identity_verification=random.choice(["verified", "pending", "rejected"]),
+                voting_eligibility=random.choice(["eligible", "ineligible", "suspended"]),
+                public_benefits_eligibility=random.choice(["eligible", "ineligible", "conditional"]),
+                criminal_record=random.choice(["clean", "minor_offenses", "major_offenses"]) 
+            )
             citizens.append(citizen)
             
         return citizens
     
-    def generate_organizations(self, count: int) -> List[Dict[str, Any]]:
+    def generate_organizations(self, count: int) -> List[Organization]:
         """Generate organization data"""
         organizations = []
         
         for i in range(count):
             org_name = random.choice(ORGANIZATIONS)
-            org = {
-                "class": "Organization",
-                "data": {
-                    "name": f"{org_name} #{i+1:03d}"
-                }
-            }
+            org = Organization(
+                name=f"{org_name} #{i+1:03d}"
+            )
             organizations.append(org)
             
         return organizations
     
-    def generate_instruments(self) -> List[Dict[str, Any]]:
+    def generate_instruments(self) -> List[Instrument]:
         """Generate financial instruments"""
         instruments = []
         
         for instrument in INSTRUMENTS:
-            inst = {
-                "class": "Instrument",
-                "data": {
-                    "name": instrument["name"],
-                    "principal_id": self.generate_principal_id()
-                }
-            }
+            inst = Instrument(
+                name=instrument["name"],
+                principal_id=self.generate_principal_id()
+            )
             instruments.append(inst)
             
         return instruments
     
-    def generate_transfers(self, users: List[Dict], instruments: List[Dict], count: int) -> List[Dict[str, Any]]:
+    def generate_transfers(self, users: List[User], instruments: List[Instrument], count: int) -> List[Transfer]:
         """Generate transfer transactions"""
         transfers = []
         
@@ -202,179 +206,129 @@ class RealmGenerator:
 
             print('users', users)
 
-            to_user = random.choice([u for u in users if u["data"]["id"] != from_user["data"]["id"]])
+            to_user = random.choice([u for u in users if u.id != from_user.id])
             instrument = random.choice(instruments)
             
-            transfer = {
-                "class": "Transfer",
-                "data": {
-                    "from_user": from_user["data"]["id"],
-                    "to_user": to_user["data"]["id"],
-                    "instrument": instrument["data"]["name"],
-                    "amount": random.randint(1, 10000)
-                }
-            }
+            transfer = Transfer(
+                from_user=from_user,
+                to_user=to_user,
+                instrument=instrument,
+                amount=random.randint(1, 10000)
+            )
             transfers.append(transfer)
             
         return transfers
     
-    def generate_disputes(self, count: int) -> List[Dict[str, Any]]:
+    def generate_disputes(self, count: int) -> List[Dispute]:
         """Generate dispute cases"""
         disputes = []
         statuses = ["open", "investigating", "resolved", "closed", "appealed"]
         
         for i in range(count):
-            dispute = {
-                "class": "Dispute",
-                "data": {
-                    "status": random.choice(statuses)
-                }
-            }
+            dispute = Dispute(
+                status=random.choice(statuses)
+            )
             disputes.append(dispute)
             
         return disputes
     
-    def generate_mandates(self) -> List[Dict[str, Any]]:
+    def generate_mandates(self) -> List[Mandate]:
         """Generate government mandates"""
         mandates = []
         
         for mandate_type in MANDATE_TYPES:
-            mandate = {
-                "class": "Mandate",
-                "data": {
-                    "name": mandate_type["name"]
-                }
-            }
+            mandate = Mandate(
+                name=mandate_type["name"]
+            )
             mandates.append(mandate)
             
         return mandates
     
-    def generate_treasury_data(self, realm_name: str) -> Dict[str, Any]:
+    def generate_treasury_data(self, realm: Realm) -> Treasury:
         """Generate treasury data matching Treasury entity schema"""
         # Match the Treasury entity structure exactly:
         # - name: String(min_length=2, max_length=256) 
         # - vault_principal_id: String(max_length=64)
         # - realm: OneToOne("Realm", "treasury")
         # - TimestampedMixin adds created_at, updated_at
+
+        print("Realm:", type(realm))
         
-        treasury_data = {
-            "class": "Treasury",
-            "data": {
-                "name": f"{realm_name} Treasury",
-                "vault_principal_id": None,  # Will be set during deployment after vault canister creation
-                "realm": "0",  # Reference to current realm (realm[0] by default)
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
-            }
-        }
+        treasury_data = Treasury(
+            name=f"{realm.name} Treasury",
+            vault_principal_id=None,  # Will be set during deployment after vault canister creation
+            realm=realm,  # Reference to current realm (realm[0] by default)
+            created_at=datetime.now().isoformat(),
+            updated_at=datetime.now().isoformat()
+        )
         
         return treasury_data
 
-    def generate_realm_metadata(self, realm_name: str, citizens: int, organizations: int) -> Dict[str, Any]:
+    def generate_realm_metadata(self, realm_name: str, citizens: int, organizations: int) -> Realm:
         """Generate realm metadata"""
-        realm_data = {
-            "id": self.realm_id,
-            "name": realm_name,
-            "description": f"Generated demo realm with {citizens} citizens and {organizations} organizations",
-            "created_at": datetime.now().isoformat(),
-            "status": "active",
-            "governance_type": "democratic",
-            "population": citizens,
-            "organization_count": organizations,
-            "settings": {
-                "voting_period_days": 7,
+        realm = Realm(
+            id=self.realm_id,
+            name=realm_name,
+            description=f"Generated demo realm with {citizens} citizens and {organizations} organizations",
+            created_at=datetime.now().isoformat(),
+            status="active",
+            governance_type="democratic",
+            population=citizens,
+            organization_count=organizations,
+            settings={
+                "voting_period_days": 7,    
                 "proposal_threshold": 0.1,
                 "quorum_percentage": 0.3,
                 "tax_rate": 0.15,
                 "ubi_amount": 1000
             }
-        }
+        )
         
-        return {
-            "class": "Realm",
-            "data": realm_data
-        }
+        return realm
 
-    def generate_realm_data(self, **params) -> Dict[str, Any]:
+    def generate_realm_data(self, **params) -> List:
         """Generate complete realm data"""
         print(f"Generating realm data with seed: {self.seed}")
         
         # Generate entities
-        users = self.generate_users(params.get('citizens', 50))
+        users = self.generate_users(params.get('users', 50))
         humans = self.generate_humans(users)
-        citizens = self.generate_citizens(humans)
+        identities = self.generate_identities(users)
+        citizens = self.generate_citizens(users)
         organizations = self.generate_organizations(params.get('organizations', 5))
         instruments = self.generate_instruments()
         transfers = self.generate_transfers(users, instruments, params.get('transactions', 100))
         disputes = self.generate_disputes(params.get('disputes', 10))
         mandates = self.generate_mandates()
         
-        # Create user profiles (with fallback for when GGG classes unavailable)
-        if UserProfile and Profiles:
-            user_profile_admin = UserProfile(
-                name=Profiles.ADMIN[0],
-                allowed_to=",".join(Profiles.ADMIN[1]),
-                description="Admin user profile",
-            )
+        # Create user profiles
+        user_profile_admin = UserProfile(
+            name=Profiles.ADMIN["name"],
+            allowed_to=",".join(Profiles.ADMIN["allowed_to"]),
+            description="Admin user profile",
+        )
 
-            user_profile_member = UserProfile(
-                name=Profiles.MEMBER[0],
-                allowed_to=",".join(Profiles.MEMBER[1]),
-                description="Member user profile",
-            )
-            
-            user_profiles = [user_profile_admin, user_profile_member]
-        else:
-            # Fallback data structure when GGG classes aren't available
-            user_profiles = [
-                {
-                    "class": "UserProfile",
-                    "data": {
-                        "name": "admin",
-                        "allowed_to": "all",
-                        "description": "Admin user profile"
-                    }
-                },
-                {
-                    "class": "UserProfile",
-                    "data": {
-                        "name": "member", 
-                        "allowed_to": "",
-                        "description": "Member user profile"
-                    }
-                }
-            ]
+        user_profile_member = UserProfile(
+            name=Profiles.MEMBER["name"],
+            allowed_to=",".join(Profiles.MEMBER["allowed_to"]),
+            description="Member user profile",
+        )
+        
+        user_profiles = [user_profile_admin, user_profile_member]
+        
 
-        # Create a system user to represent the realm in transfers
-        if User and user_profiles:
-            system_user = {
-                "class": "User",
-                "data": {
-                    "name": "system",
-                    "profiles": [user_profiles[0]]
-                }
-            }
-        else:
-            system_user = {
-                "class": "User",
-                "data": {
-                    "name": "system",
-                    "profiles": ["admin"]
-                }
-            }
-
-        # Create realm metadata
+        # # Create realm metadata
         realm = self.generate_realm_metadata(params.get('realm_name', 'Generated Demo Realm'), len(users), len(organizations))
         
-        # Create the Treasury
-        treasury = self.generate_treasury_data(params.get('realm_name', 'Generated Demo Realm'))
+        # # Create the Treasury
+        treasury = self.generate_treasury_data(realm)
         
         ret = []
         ret += [realm] 
         ret += [treasury]
         ret += user_profiles 
-        ret += [system_user]
         ret += users
+        ret += identities
         ret += humans
         ret += citizens
         ret += organizations
@@ -712,25 +666,22 @@ def main():
         realm_name=args.realm_name
     )
     
-    # Generate separate treasury and realm data
-    treasury_data = generator.generate_treasury_data(args.realm_name)
-    realm_metadata = generator.generate_realm_metadata(args.realm_name, args.citizens, args.organizations)
-    
     # Save main realm data JSON
 
     json_file = output_dir / "realm_data.json"
+
+    # print('realm_data', realm_data)
+    # for obj in realm_data:
+    #     print(obj.to_dict())
+    #     print(obj.__dict__)
+    
+    realm_data = [{
+        "class": obj.__class__.__name__,    
+        "data": obj.to_dict()
+    } for obj in realm_data]
+    
     with open(json_file, 'w') as f:
         json.dump(realm_data, f, indent=2)
-
-    # # Save treasury JSON
-    # treasury_file = output_dir / "treasury.json"
-    # with open(treasury_file, 'w') as f:
-    #     json.dump(treasury_data, f, indent=2)
-    
-    # # Save realm metadata JSON
-    # realms_file = output_dir / "realms.json"
-    # with open(realms_file, 'w') as f:
-    #     json.dump(realm_metadata, f, indent=2)
     
     print(f"Generated realm data saved to: {json_file}")
     
