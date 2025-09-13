@@ -1,0 +1,30 @@
+{
+    "include": [
+        "scripts",
+        "cli",
+        "src/realm_backend",
+        "tests"
+    ],
+    "exclude": [
+        "**/node_modules",
+        "**/__pycache__",
+        "src/realm_backend/extension_packages"
+    ],
+    "extraPaths": [
+        "./src/realm_backend",
+        "./cli"
+    ],
+    "venvPath": ".",
+    "venv": "venv",
+    "pythonVersion": "3.8",
+    "typeCheckingMode": "basic",
+    "useLibraryCodeForTypes": true,
+    "autoSearchPaths": true,
+    "stubPath": "./typings",
+    "reportMissingImports": "warning",
+    "reportMissingTypeStubs": "none",
+    "reportImportCycles": "none",
+    "reportUnknownMemberType": "none",
+    "reportUnknownArgumentType": "none",
+    "reportUnknownVariableType": "none"
+}

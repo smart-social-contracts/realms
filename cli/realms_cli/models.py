@@ -102,7 +102,7 @@ class PostDeploymentAction(BaseModel):
 
 class SimplePostDeploymentAction(BaseModel):
     """Simple command-based post-deployment action."""
-    
+
     name: str = Field(..., description="Human-readable name for the action")
     command: str = Field(..., description="Shell command to execute")
     ignore_failure: bool = Field(
@@ -183,7 +183,9 @@ class RealmConfig(BaseModel):
     tasks: Dict[str, TaskConfig] = Field(
         default_factory=dict, description="Task definitions"
     )
-    post_deployment: Optional[Union[PostDeploymentConfig, List[str], List[SimplePostDeploymentAction]]] = Field(
+    post_deployment: Optional[
+        Union[PostDeploymentConfig, List[str], List[SimplePostDeploymentAction]]
+    ] = Field(
         None,
         description="Post-deployment configuration (complex actions, simple commands, or command objects)",
     )

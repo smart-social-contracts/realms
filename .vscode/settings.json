@@ -1,0 +1,30 @@
+{
+    "python.analysis.extraPaths": [
+        "./src/realm_backend",
+        "./cli"
+    ],
+    "python.defaultInterpreterPath": "./venv/bin/python",
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.typeCheckingMode": "basic",
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": true,
+    "python.formatting.provider": "black",
+    "python.analysis.autoSearchPaths": true,
+    "python.analysis.diagnosticMode": "workspace",
+    "python.analysis.stubPath": "./typings",
+    "python.analysis.packageIndexDepths": [
+        {
+            "name": "kybra",
+            "depth": 2
+        },
+        {
+            "name": "kybra_simple_db",
+            "depth": 2
+        },
+        {
+            "name": "kybra_simple_logging",
+            "depth": 2
+        }
+    ]
+}

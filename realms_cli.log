@@ -1,0 +1,140 @@
+db_command
+network: None
+canister: ulvla-h7777-77774-qaacq-cai
+Effective network: local
+Effective canister: ulvla-h7777-77774-qaacq-cai
+self._ggg_classes = [<class 'ggg.codex.Codex'>, <class 'ggg.contract.Contract'>, <class 'ggg.dispute.Dispute'>, <class 'ggg.instrument.Instrument'>, <class 'ggg.land.Land'>, <class 'ggg.land.LandType'>, <class 'ggg.license.License'>, <class 'ggg.mandate.Mandate'>, <class 'ggg.organization.Organization'>, <class 'ggg.permission.Permission'>, <class 'ggg.proposal.Proposal'>, <class 'ggg.realm.Realm'>, <class 'ggg.task.Task'>, <class 'ggg.task_schedule.TaskSchedule'>, <class 'ggg.trade.Trade'>, <class 'ggg.user.User'>, <class 'ggg.user_profile.UserProfile'>, <class 'ggg.user_profile.Profiles'>, <class 'ggg.user_profile.Operations'>, <class 'ggg.vote.Vote'>, <class 'ggg.transfer.Transfer'>, <class 'ggg.human.Human'>, <class 'ggg.citizen.Citizen'>, <class 'ggg.identity.Identity'>, <class 'ggg.treasury.Treasury'>]
+call_backend
+cmd: dfx canister call --output json ulvla-h7777-77774-qaacq-cai status
+result: CompletedProcess(args=['dfx', 'canister', 'call', '--output', 'json', 'ulvla-h7777-77774-qaacq-cai', 'status'], returncode=0, stdout='{\n  "data": {\n    "status": {\n      "codexes_count": "3",\n      "commit": "COMMIT_HASH_PLACEHOLDER",\n      "demo_mode": false,\n      "disputes_count": "10",\n      "extensions": [\n        "extension_manifests",\n        "vault_manager",\n        "llm_chat",\n        "test_bench",\n        "justice_litigation",\n        "demo_loader",\n        "notifications",\n        "citizen_dashboard",\n        "land_registry",\n        "passport_verification",\n        "voting",\n        "bulk_importer",\n        "admin_dashboard",\n        "erd_explorer",\n        "extension_imports",\n        "registry"\n      ],\n      "instruments_count": "6",\n      "licenses_count": "0",\n      "mandates_count": "6",\n      "organizations_count": "5",\n      "proposals_count": "0",\n      "realms_count": "1",\n      "status": "ok",\n      "tasks_count": "0",\n      "trades_count": "0",\n      "transfers_count": "0",\n      "users_count": "51",\n      "version": "VERSION_PLACEHOLDER",\n      "votes_count": "0"\n    }\n  },\n  "success": true\n}\n', stderr='')
+Connected to backend canister
+
+handle_selection
+self.state.view_mode = entity_list
+refresh_data
+self.state.view_mode = record_list
+Fetching data for entity type: <class 'ggg.citizen.Citizen'>
+call_backend
+cmd: dfx canister call --output json ulvla-h7777-77774-qaacq-cai get_objects_paginated ("Citizen", 0, 10)
+result: CompletedProcess(args=['dfx', 'canister', 'call', '--output', 'json', 'ulvla-h7777-77774-qaacq-cai', 'get_objects_paginated', '("Citizen", 0, 10)'], returncode=255, stdout='', stderr='\x1b[31mError: \x1b(B\x1b[mFailed query call.\n\x1b[33mCaused by: \x1b(B\x1b[mThe replica returned a rejection error: reject code CanisterError, reject message Error from Canister ulvla-h7777-77774-qaacq-cai: Canister called `ic0.trap` with message: \'TypeError: Enum variant does not exist\'\nCanister Backtrace:\nic_cdk::api::trap\n<core::result::Result<T,alloc::string::String> as realm_backend::UnwrapOrTrap<T>>::unwrap_or_trap\nrealm_backend::__canister_method__cdk_user_defined_get_objects_paginated::{{closure}}\nic_cdk::futures::spawn\ncanister_query get_objects_paginated\ncanister_query get_objects_paginated.command_export\n.\nConsider gracefully handling failures from this canister or altering the canister to handle exceptions. See documentation: https://internetcomputer.org/docs/current/references/execution-errors#trapped-explicitly, error code Some("IC0503")\n')
+Backend result: {'items': [], 'total_items_count': 0, 'total_pages': 1, 'page_num': 0, 'page_size': 10, 'error': '\x1b[31mError: \x1b(B\x1b[mFailed query call.\n\x1b[33mCaused by: \x1b(B\x1b[mThe replica returned a rejection error: reject code CanisterError, reject message Error from Canister ulvla-h7777-77774-qaacq-cai: Canister called `ic0.trap` with message: \'TypeError: Enum variant does not exist\'\nCanister Backtrace:\nic_cdk::api::trap\n<core::result::Result<T,alloc::string::String> as realm_backend::UnwrapOrTrap<T>>::unwrap_or_trap\nrealm_backend::__canister_method__cdk_user_defined_get_objects_paginated::{{closure}}\nic_cdk::futures::spawn\ncanister_query get_objects_paginated\ncanister_query get_objects_paginated.command_export\n.\nConsider gracefully handling failures from this canister or altering the canister to handle exceptions. See documentation: https://internetcomputer.org/docs/current/references/execution-errors#trapped-explicitly, error code Some("IC0503")\n'}
+Failed to load data: {'items': [], 'total_items_count': 0, 'total_pages': 1, 'page_num': 0, 'page_size': 10, 'error': '\x1b[31mError: \x1b(B\x1b[mFailed query call.\n\x1b[33mCaused by: \x1b(B\x1b[mThe replica returned a rejection error: reject code CanisterError, reject message Error from Canister ulvla-h7777-77774-qaacq-cai: Canister called `ic0.trap` with message: \'TypeError: Enum variant does not exist\'\nCanister Backtrace:\nic_cdk::api::trap\n<core::result::Result<T,alloc::string::String> as realm_backend::UnwrapOrTrap<T>>::unwrap_or_trap\nrealm_backend::__canister_method__cdk_user_defined_get_objects_paginated::{{closure}}\nic_cdk::futures::spawn\ncanister_query get_objects_paginated\ncanister_query get_objects_paginated.command_export\n.\nConsider gracefully handling failures from this canister or altering the canister to handle exceptions. See documentation: https://internetcomputer.org/docs/current/references/execution-errors#trapped-explicitly, error code Some("IC0503")\n'}
+handle_back_navigation
+self.state.navigation_stack = []
+handle_selection
+self.state.view_mode = entity_list
+refresh_data
+self.state.view_mode = record_list
+Fetching data for entity type: <class 'ggg.treasury.Treasury'>
+call_backend
+cmd: dfx canister call --output json ulvla-h7777-77774-qaacq-cai get_objects_paginated ("Treasury", 0, 10)
+result: CompletedProcess(args=['dfx', 'canister', 'call', '--output', 'json', 'ulvla-h7777-77774-qaacq-cai', 'get_objects_paginated', '("Treasury", 0, 10)'], returncode=0, stdout='{\n  "data": {\n    "objectsListPaginated": {\n      "objects": [\n        "{\\"timestamp_created\\": \\"2025-09-11 10:33:18.392\\", \\"timestamp_updated\\": \\"2025-09-11 10:33:18.392\\", \\"creator\\": \\"system\\", \\"updater\\": \\"system\\", \\"owner\\": \\"system\\", \\"_type\\": \\"Treasury\\", \\"_id\\": \\"2\\", \\"name\\": null, \\"vault_principal_id\\": \\"uzt4z-lp777-77774-qaabq-cai\\", \\"relations\\": {\\"realm\\": [{\\"_type\\": \\"Realm\\", \\"_id\\": \\"1\\"}]}}"\n      ],\n      "pagination": {\n        "page_num": "0",\n        "page_size": "10",\n        "total_items_count": "2",\n        "total_pages": "1"\n      }\n    }\n  },\n  "success": true\n}\n', stderr='')
+Backend result: {'items': [{'timestamp_created': '2025-09-11 10:33:18.392', 'timestamp_updated': '2025-09-11 10:33:18.392', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Treasury', '_id': '2', 'name': None, 'vault_principal_id': 'uzt4z-lp777-77774-qaabq-cai', 'relations': {'realm': [{'_type': 'Realm', '_id': '1'}]}}], 'page_num': 0, 'page_size': 10, 'total_items_count': 2, 'total_pages': 1}
+Backend result: {'items': [{'timestamp_created': '2025-09-11 10:33:18.392', 'timestamp_updated': '2025-09-11 10:33:18.392', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Treasury', '_id': '2', 'name': None, 'vault_principal_id': 'uzt4z-lp777-77774-qaabq-cai', 'relations': {'realm': [{'_type': 'Realm', '_id': '1'}]}}], 'page_num': 0, 'page_size': 10, 'total_items_count': 2, 'total_pages': 1}
+Loaded 1 items
+handle_selection
+self.state.view_mode = record_list
+self._relationship_cache = {}
+handle_selection
+self.state.view_mode = record_detail
+handle_relationship_drilling
+self.state.view_mode = record_detail
+Drilling into relationship: realm with 1 items
+call_backend
+cmd: dfx canister call --output json ulvla-h7777-77774-qaacq-cai get_objects_paginated ("Realm", 0, 100)
+result: CompletedProcess(args=['dfx', 'canister', 'call', '--output', 'json', 'ulvla-h7777-77774-qaacq-cai', 'get_objects_paginated', '("Realm", 0, 100)'], returncode=0, stdout='{\n  "data": {\n    "objectsListPaginated": {\n      "objects": [\n        "{\\"timestamp_created\\": \\"2025-09-11 10:33:02.850\\", \\"timestamp_updated\\": \\"2025-09-11 10:33:02.850\\", \\"creator\\": \\"system\\", \\"updater\\": \\"system\\", \\"owner\\": \\"system\\", \\"_type\\": \\"Realm\\", \\"_id\\": \\"1\\", \\"name\\": \\"Generated Demo Realm\\", \\"description\\": \\"Generated demo realm with 51 citizens and 5 organizations\\", \\"id\\": \\"0\\", \\"created_at\\": \\"2025-09-11T12:28:34.557529\\", \\"status\\": \\"active\\", \\"governance_type\\": \\"democratic\\", \\"population\\": 51, \\"organization_count\\": 5, \\"settings\\": {\\"voting_period_days\\": 7, \\"proposal_threshold\\": 0.1, \\"quorum_percentage\\": 0.3, \\"tax_rate\\": 0.15, \\"ubi_amount\\": 1000}, \\"relations\\": {\\"treasury\\": [{\\"_type\\": \\"Treasury\\", \\"_id\\": \\"2\\"}]}}"\n      ],\n      "pagination": {\n        "page_num": "0",\n        "page_size": "100",\n        "total_items_count": "1",\n        "total_pages": "1"\n      }\n    }\n  },\n  "success": true\n}\n', stderr='')
+Backend result: {'items': [{'timestamp_created': '2025-09-11 10:33:02.850', 'timestamp_updated': '2025-09-11 10:33:02.850', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Realm', '_id': '1', 'name': 'Generated Demo Realm', 'description': 'Generated demo realm with 51 citizens and 5 organizations', 'id': '0', 'created_at': '2025-09-11T12:28:34.557529', 'status': 'active', 'governance_type': 'democratic', 'population': 51, 'organization_count': 5, 'settings': {'voting_period_days': 7, 'proposal_threshold': 0.1, 'quorum_percentage': 0.3, 'tax_rate': 0.15, 'ubi_amount': 1000}, 'relations': {'treasury': [{'_type': 'Treasury', '_id': '2'}]}}], 'page_num': 0, 'page_size': 100, 'total_items_count': 1, 'total_pages': 1}
+handle_selection
+self.state.view_mode = record_list
+handle_selection
+self.state.view_mode = record_detail
+handle_relationship_drilling
+self.state.view_mode = record_detail
+Drilling into relationship: treasury with 1 items
+call_backend
+cmd: dfx canister call --output json ulvla-h7777-77774-qaacq-cai get_objects_paginated ("Treasury", 0, 100)
+result: CompletedProcess(args=['dfx', 'canister', 'call', '--output', 'json', 'ulvla-h7777-77774-qaacq-cai', 'get_objects_paginated', '("Treasury", 0, 100)'], returncode=0, stdout='{\n  "data": {\n    "objectsListPaginated": {\n      "objects": [\n        "{\\"timestamp_created\\": \\"2025-09-11 10:33:18.392\\", \\"timestamp_updated\\": \\"2025-09-11 10:33:18.392\\", \\"creator\\": \\"system\\", \\"updater\\": \\"system\\", \\"owner\\": \\"system\\", \\"_type\\": \\"Treasury\\", \\"_id\\": \\"2\\", \\"name\\": null, \\"vault_principal_id\\": \\"uzt4z-lp777-77774-qaabq-cai\\", \\"relations\\": {\\"realm\\": [{\\"_type\\": \\"Realm\\", \\"_id\\": \\"1\\"}]}}"\n      ],\n      "pagination": {\n        "page_num": "0",\n        "page_size": "100",\n        "total_items_count": "2",\n        "total_pages": "1"\n      }\n    }\n  },\n  "success": true\n}\n', stderr='')
+Backend result: {'items': [{'timestamp_created': '2025-09-11 10:33:18.392', 'timestamp_updated': '2025-09-11 10:33:18.392', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Treasury', '_id': '2', 'name': None, 'vault_principal_id': 'uzt4z-lp777-77774-qaabq-cai', 'relations': {'realm': [{'_type': 'Realm', '_id': '1'}]}}], 'page_num': 0, 'page_size': 100, 'total_items_count': 2, 'total_pages': 1}
+handle_back_navigation
+self.state.navigation_stack = [{'entity_type': <class 'ggg.treasury.Treasury'>, 'selected_item': {'timestamp_created': '2025-09-11 10:33:18.392', 'timestamp_updated': '2025-09-11 10:33:18.392', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Treasury', '_id': '2', 'name': None, 'vault_principal_id': 'uzt4z-lp777-77774-qaabq-cai', 'relations': {'realm': [{'_type': 'Realm', '_id': '1'}]}}, 'cursor_position': 7, 'view_mode': 'record_detail', 'current_items': [{'timestamp_created': '2025-09-11 10:33:18.392', 'timestamp_updated': '2025-09-11 10:33:18.392', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Treasury', '_id': '2', 'name': None, 'vault_principal_id': 'uzt4z-lp777-77774-qaabq-cai', 'relations': {'realm': [{'_type': 'Realm', '_id': '1'}]}}]}, {'entity_type': <class 'ggg.realm.Realm'>, 'selected_item': {'timestamp_created': '2025-09-11 10:33:02.850', 'timestamp_updated': '2025-09-11 10:33:02.850', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Realm', '_id': '1', 'name': 'Generated Demo Realm', 'description': 'Generated demo realm with 51 citizens and 5 organizations', 'id': '0', 'created_at': '2025-09-11T12:28:34.557529', 'status': 'active', 'governance_type': 'democratic', 'population': 51, 'organization_count': 5, 'settings': {'voting_period_days': 7, 'proposal_threshold': 0.1, 'quorum_percentage': 0.3, 'tax_rate': 0.15, 'ubi_amount': 1000}, 'relations': {'treasury': [{'_type': 'Treasury', '_id': '2'}]}}, 'cursor_position': 14, 'view_mode': 'record_detail', 'current_items': [{'timestamp_created': '2025-09-11 10:33:02.850', 'timestamp_updated': '2025-09-11 10:33:02.850', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Realm', '_id': '1', 'name': 'Generated Demo Realm', 'description': 'Generated demo realm with 51 citizens and 5 organizations', 'id': '0', 'created_at': '2025-09-11T12:28:34.557529', 'status': 'active', 'governance_type': 'democratic', 'population': 51, 'organization_count': 5, 'settings': {'voting_period_days': 7, 'proposal_threshold': 0.1, 'quorum_percentage': 0.3, 'tax_rate': 0.15, 'ubi_amount': 1000}, 'relations': {'treasury': [{'_type': 'Treasury', '_id': '2'}]}}]}]
+handle_back_navigation
+self.state.navigation_stack = [{'entity_type': <class 'ggg.treasury.Treasury'>, 'selected_item': {'timestamp_created': '2025-09-11 10:33:18.392', 'timestamp_updated': '2025-09-11 10:33:18.392', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Treasury', '_id': '2', 'name': None, 'vault_principal_id': 'uzt4z-lp777-77774-qaabq-cai', 'relations': {'realm': [{'_type': 'Realm', '_id': '1'}]}}, 'cursor_position': 7, 'view_mode': 'record_detail', 'current_items': [{'timestamp_created': '2025-09-11 10:33:18.392', 'timestamp_updated': '2025-09-11 10:33:18.392', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Treasury', '_id': '2', 'name': None, 'vault_principal_id': 'uzt4z-lp777-77774-qaabq-cai', 'relations': {'realm': [{'_type': 'Realm', '_id': '1'}]}}]}]
+handle_back_navigation
+self.state.navigation_stack = []
+handle_back_navigation
+self.state.navigation_stack = []
+handle_back_navigation
+self.state.navigation_stack = []
+handle_selection
+self.state.view_mode = entity_list
+refresh_data
+self.state.view_mode = record_list
+Fetching data for entity type: <class 'ggg.trade.Trade'>
+call_backend
+cmd: dfx canister call --output json ulvla-h7777-77774-qaacq-cai get_objects_paginated ("Trade", 0, 10)
+result: CompletedProcess(args=['dfx', 'canister', 'call', '--output', 'json', 'ulvla-h7777-77774-qaacq-cai', 'get_objects_paginated', '("Trade", 0, 10)'], returncode=0, stdout='{\n  "data": {\n    "objectsListPaginated": {\n      "objects": [],\n      "pagination": {\n        "page_num": "0",\n        "page_size": "10",\n        "total_items_count": "0",\n        "total_pages": "0"\n      }\n    }\n  },\n  "success": true\n}\n', stderr='')
+Backend result: {'items': [], 'page_num': 0, 'page_size': 10, 'total_items_count': 0, 'total_pages': 0}
+Backend result: {'items': [], 'page_num': 0, 'page_size': 10, 'total_items_count': 0, 'total_pages': 0}
+Loaded 0 items
+handle_back_navigation
+self.state.navigation_stack = []
+handle_selection
+self.state.view_mode = entity_list
+refresh_data
+self.state.view_mode = record_list
+Fetching data for entity type: <class 'ggg.transfer.Transfer'>
+call_backend
+cmd: dfx canister call --output json ulvla-h7777-77774-qaacq-cai get_objects_paginated ("Transfer", 0, 10)
+result: CompletedProcess(args=['dfx', 'canister', 'call', '--output', 'json', 'ulvla-h7777-77774-qaacq-cai', 'get_objects_paginated', '("Transfer", 0, 10)'], returncode=0, stdout='{\n  "data": {\n    "objectsListPaginated": {\n      "objects": [],\n      "pagination": {\n        "page_num": "0",\n        "page_size": "10",\n        "total_items_count": "0",\n        "total_pages": "0"\n      }\n    }\n  },\n  "success": true\n}\n', stderr='')
+Backend result: {'items': [], 'page_num': 0, 'page_size': 10, 'total_items_count': 0, 'total_pages': 0}
+Backend result: {'items': [], 'page_num': 0, 'page_size': 10, 'total_items_count': 0, 'total_pages': 0}
+Loaded 0 items
+handle_back_navigation
+self.state.navigation_stack = []
+handle_selection
+self.state.view_mode = entity_list
+refresh_data
+self.state.view_mode = record_list
+Fetching data for entity type: <class 'ggg.instrument.Instrument'>
+call_backend
+cmd: dfx canister call --output json ulvla-h7777-77774-qaacq-cai get_objects_paginated ("Instrument", 0, 10)
+result: CompletedProcess(args=['dfx', 'canister', 'call', '--output', 'json', 'ulvla-h7777-77774-qaacq-cai', 'get_objects_paginated', '("Instrument", 0, 10)'], returncode=0, stdout='{\n  "data": {\n    "objectsListPaginated": {\n      "objects": [\n        "{\\"timestamp_created\\": \\"2025-09-11 10:33:07.759\\", \\"timestamp_updated\\": \\"2025-09-11 10:33:07.759\\", \\"creator\\": \\"system\\", \\"updater\\": \\"system\\", \\"owner\\": \\"system\\", \\"_type\\": \\"Instrument\\", \\"_id\\": \\"1\\", \\"name\\": \\"Bitcoin\\", \\"principal_id\\": \\"prj6a7tey5cwr4c42m73spgg5dl-cai\\", \\"metadata\\": null}",\n        "{\\"timestamp_created\\": \\"2025-09-11 10:33:07.759\\", \\"timestamp_updated\\": \\"2025-09-11 10:33:07.759\\", \\"creator\\": \\"system\\", \\"updater\\": \\"system\\", \\"owner\\": \\"system\\", \\"_type\\": \\"Instrument\\", \\"_id\\": \\"2\\", \\"name\\": \\"Ethereum\\", \\"principal_id\\": \\"7p9dltrvw0ioywnu5bf5kyugh6w-cai\\", \\"metadata\\": null}",\n        "{\\"timestamp_created\\": \\"2025-09-11 10:33:07.759\\", \\"timestamp_updated\\": \\"2025-09-11 10:33:07.759\\", \\"creator\\": \\"system\\", \\"updater\\": \\"system\\", \\"owner\\": \\"system\\", \\"_type\\": \\"Instrument\\", \\"_id\\": \\"3\\", \\"name\\": \\"Realm Token\\", \\"principal_id\\": \\"isgl4vtwjpqvw5mybd6dcqxbeei-cai\\", \\"metadata\\": null}",\n        "{\\"timestamp_created\\": \\"2025-09-11 10:33:07.759\\", \\"timestamp_updated\\": \\"2025-09-11 10:33:07.759\\", \\"creator\\": \\"system\\", \\"updater\\": \\"system\\", \\"owner\\": \\"system\\", \\"_type\\": \\"Instrument\\", \\"_id\\": \\"4\\", \\"name\\": \\"Governance Token\\", \\"principal_id\\": \\"ybud43sjjhsfoq0ct2e3ta9k4jc-cai\\", \\"metadata\\": null}",\n        "{\\"timestamp_created\\": \\"2025-09-11 10:33:07.759\\", \\"timestamp_updated\\": \\"2025-09-11 10:33:07.759\\", \\"creator\\": \\"system\\", \\"updater\\": \\"system\\", \\"owner\\": \\"system\\", \\"_type\\": \\"Instrument\\", \\"_id\\": \\"5\\", \\"name\\": \\"Utility Token\\", \\"principal_id\\": \\"vcso6mrqxiaxq0v5zlb2smd7aiy-cai\\", \\"metadata\\": null}",\n        "{\\"timestamp_created\\": \\"2025-09-11 10:33:07.759\\", \\"timestamp_updated\\": \\"2025-09-11 10:33:07.759\\", \\"creator\\": \\"system\\", \\"updater\\": \\"system\\", \\"owner\\": \\"system\\", \\"_type\\": \\"Instrument\\", \\"_id\\": \\"6\\", \\"name\\": \\"Service Credit\\", \\"principal_id\\": \\"o42zjqv1fhryh804jo80x1986na-cai\\", \\"metadata\\": null}"\n      ],\n      "pagination": {\n        "page_num": "0",\n        "page_size": "10",\n        "total_items_count": "6",\n        "total_pages": "1"\n      }\n    }\n  },\n  "success": true\n}\n', stderr='')
+Backend result: {'items': [{'timestamp_created': '2025-09-11 10:33:07.759', 'timestamp_updated': '2025-09-11 10:33:07.759', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Instrument', '_id': '1', 'name': 'Bitcoin', 'principal_id': 'prj6a7tey5cwr4c42m73spgg5dl-cai', 'metadata': None}, {'timestamp_created': '2025-09-11 10:33:07.759', 'timestamp_updated': '2025-09-11 10:33:07.759', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Instrument', '_id': '2', 'name': 'Ethereum', 'principal_id': '7p9dltrvw0ioywnu5bf5kyugh6w-cai', 'metadata': None}, {'timestamp_created': '2025-09-11 10:33:07.759', 'timestamp_updated': '2025-09-11 10:33:07.759', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Instrument', '_id': '3', 'name': 'Realm Token', 'principal_id': 'isgl4vtwjpqvw5mybd6dcqxbeei-cai', 'metadata': None}, {'timestamp_created': '2025-09-11 10:33:07.759', 'timestamp_updated': '2025-09-11 10:33:07.759', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Instrument', '_id': '4', 'name': 'Governance Token', 'principal_id': 'ybud43sjjhsfoq0ct2e3ta9k4jc-cai', 'metadata': None}, {'timestamp_created': '2025-09-11 10:33:07.759', 'timestamp_updated': '2025-09-11 10:33:07.759', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Instrument', '_id': '5', 'name': 'Utility Token', 'principal_id': 'vcso6mrqxiaxq0v5zlb2smd7aiy-cai', 'metadata': None}, {'timestamp_created': '2025-09-11 10:33:07.759', 'timestamp_updated': '2025-09-11 10:33:07.759', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Instrument', '_id': '6', 'name': 'Service Credit', 'principal_id': 'o42zjqv1fhryh804jo80x1986na-cai', 'metadata': None}], 'page_num': 0, 'page_size': 10, 'total_items_count': 6, 'total_pages': 1}
+Backend result: {'items': [{'timestamp_created': '2025-09-11 10:33:07.759', 'timestamp_updated': '2025-09-11 10:33:07.759', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Instrument', '_id': '1', 'name': 'Bitcoin', 'principal_id': 'prj6a7tey5cwr4c42m73spgg5dl-cai', 'metadata': None}, {'timestamp_created': '2025-09-11 10:33:07.759', 'timestamp_updated': '2025-09-11 10:33:07.759', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Instrument', '_id': '2', 'name': 'Ethereum', 'principal_id': '7p9dltrvw0ioywnu5bf5kyugh6w-cai', 'metadata': None}, {'timestamp_created': '2025-09-11 10:33:07.759', 'timestamp_updated': '2025-09-11 10:33:07.759', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Instrument', '_id': '3', 'name': 'Realm Token', 'principal_id': 'isgl4vtwjpqvw5mybd6dcqxbeei-cai', 'metadata': None}, {'timestamp_created': '2025-09-11 10:33:07.759', 'timestamp_updated': '2025-09-11 10:33:07.759', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Instrument', '_id': '4', 'name': 'Governance Token', 'principal_id': 'ybud43sjjhsfoq0ct2e3ta9k4jc-cai', 'metadata': None}, {'timestamp_created': '2025-09-11 10:33:07.759', 'timestamp_updated': '2025-09-11 10:33:07.759', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Instrument', '_id': '5', 'name': 'Utility Token', 'principal_id': 'vcso6mrqxiaxq0v5zlb2smd7aiy-cai', 'metadata': None}, {'timestamp_created': '2025-09-11 10:33:07.759', 'timestamp_updated': '2025-09-11 10:33:07.759', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Instrument', '_id': '6', 'name': 'Service Credit', 'principal_id': 'o42zjqv1fhryh804jo80x1986na-cai', 'metadata': None}], 'page_num': 0, 'page_size': 10, 'total_items_count': 6, 'total_pages': 1}
+Loaded 6 items
+handle_selection
+self.state.view_mode = record_list
+handle_back_navigation
+self.state.navigation_stack = []
+handle_back_navigation
+self.state.navigation_stack = []
+handle_back_navigation
+self.state.navigation_stack = []
+handle_selection
+self.state.view_mode = entity_list
+refresh_data
+self.state.view_mode = record_list
+Fetching data for entity type: <class 'ggg.transfer.Transfer'>
+call_backend
+cmd: dfx canister call --output json ulvla-h7777-77774-qaacq-cai get_objects_paginated ("Transfer", 0, 10)
+result: CompletedProcess(args=['dfx', 'canister', 'call', '--output', 'json', 'ulvla-h7777-77774-qaacq-cai', 'get_objects_paginated', '("Transfer", 0, 10)'], returncode=0, stdout='{\n  "data": {\n    "objectsListPaginated": {\n      "objects": [],\n      "pagination": {\n        "page_num": "0",\n        "page_size": "10",\n        "total_items_count": "0",\n        "total_pages": "0"\n      }\n    }\n  },\n  "success": true\n}\n', stderr='')
+Backend result: {'items': [], 'page_num': 0, 'page_size': 10, 'total_items_count': 0, 'total_pages': 0}
+Backend result: {'items': [], 'page_num': 0, 'page_size': 10, 'total_items_count': 0, 'total_pages': 0}
+Loaded 0 items
+handle_selection
+self.state.view_mode = record_list
+handle_back_navigation
+self.state.navigation_stack = []
+handle_selection
+self.state.view_mode = entity_list
+refresh_data
+self.state.view_mode = record_list
+Fetching data for entity type: <class 'ggg.transfer.Transfer'>
+call_backend
+cmd: dfx canister call --output json ulvla-h7777-77774-qaacq-cai get_objects_paginated ("Transfer", 0, 10)
+result: CompletedProcess(args=['dfx', 'canister', 'call', '--output', 'json', 'ulvla-h7777-77774-qaacq-cai', 'get_objects_paginated', '("Transfer", 0, 10)'], returncode=0, stdout='{\n  "data": {\n    "objectsListPaginated": {\n      "objects": [],\n      "pagination": {\n        "page_num": "0",\n        "page_size": "10",\n        "total_items_count": "0",\n        "total_pages": "0"\n      }\n    }\n  },\n  "success": true\n}\n', stderr='')
+Backend result: {'items': [], 'page_num': 0, 'page_size': 10, 'total_items_count': 0, 'total_pages': 0}
+Backend result: {'items': [], 'page_num': 0, 'page_size': 10, 'total_items_count': 0, 'total_pages': 0}
+Loaded 0 items
+handle_back_navigation
+self.state.navigation_stack = []
