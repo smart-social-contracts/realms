@@ -227,7 +227,7 @@ $ dfx canister call --output json ulvla-h7777-77774-qaacq-cai get_objects_pagina
         logger.info(f"Listing {class_name} objects for page {page_num} with page size {page_size}")
         result = list_objects_paginated(class_name, page_num=page_num, page_size=page_size)
         objects = result["items"]
-        objects_json = [json.dumps(obj.to_dict()) for obj in objects] 
+        objects_json = [json.dumps(obj.serialize()) for obj in objects] 
         logger.info(f"Objects JSON: {objects_json}")
         pagination = PaginationInfo(
             page_num=result["page_num"],
@@ -270,7 +270,7 @@ $ dfx canister call --output json ulvla-h7777-77774-qaacq-cai get_objects '(
         logger.info(f"Listing objects")
         result = list_objects(params)
         objects = result
-        objects_json = [json.dumps(obj.to_dict()) for obj in objects] 
+        objects_json = [json.dumps(obj.serialize()) for obj in objects] 
         logger.info(f"Objects JSON: {objects_json}")
         return RealmResponse(
             success=True,

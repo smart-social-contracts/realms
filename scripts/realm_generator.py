@@ -672,13 +672,10 @@ def main():
 
     # print('realm_data', realm_data)
     # for obj in realm_data:
-    #     print(obj.to_dict())
+    #     print(obj.serialize())
     #     print(obj.__dict__)
     
-    realm_data = [{
-        "class": obj.__class__.__name__,    
-        "data": obj.to_dict()
-    } for obj in realm_data]
+    realm_data = [obj.serialize() for obj in realm_data]
     
     with open(json_file, 'w') as f:
         json.dump(realm_data, f, indent=2)

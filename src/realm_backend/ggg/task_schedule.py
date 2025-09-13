@@ -20,7 +20,7 @@ class TaskSchedule(Entity, TimestampedMixin):
     repeat_every = Integer()
     last_run_at = Integer()
 
-    def to_dict(self):
+    def serialize(self):
         """Convert TaskSchedule to dictionary for JSON serialization"""
         return {
             "name": self.name,
@@ -32,7 +32,7 @@ class TaskSchedule(Entity, TimestampedMixin):
 
     def __json__(self):
         """Make TaskSchedule JSON serializable"""
-        return self.to_dict()
+        return self.serialize()
 
     def __str__(self):
         """String representation for debugging"""

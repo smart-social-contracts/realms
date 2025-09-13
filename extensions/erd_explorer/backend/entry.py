@@ -180,8 +180,8 @@ def get_entity_data(args):
             # Convert entity objects to dictionaries
             items = []
             for item in result["items"]:
-                if hasattr(item, "to_dict"):
-                    items.append(item.to_dict())
+                if hasattr(item, "serialize"):
+                    items.append(item.serialize())
                 else:
                     items.append(str(item))
 
