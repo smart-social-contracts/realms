@@ -57,8 +57,8 @@ def import_data(args):
         data_format = args.get("format", "json")
         data_content = args.get("data", "")
 
-        logger.info(f"data_content: {data_content}")
-        logger.info(f"data_format: {data_format}")
+        logger.debug(f"data_content: {data_content}")
+        logger.debug(f"data_format: {data_format}")
 
         if not data_content:
             return {"success": False, "error": "No data provided"}
@@ -87,7 +87,7 @@ def import_data(args):
                 return {"success": False, "error": f"Invalid JSON data: {str(e)}"}
 
         # Process data in batches
-        logger.info(f"parsed_data: {parsed_data}")
+        logger.debug(f"parsed_data: {parsed_data}")
         results = process_bulk_import(parsed_data)
 
         return {
@@ -112,7 +112,7 @@ def process_bulk_import(data: List[Dict[str, Any]]) -> Dict[str, Any]:
     failed = 0
     errors = []
 
-    logger.info(f"data: {data}")
+    logger.debug(f"data: {data}")
 
     for record in data:
         try:

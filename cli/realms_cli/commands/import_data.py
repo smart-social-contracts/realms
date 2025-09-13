@@ -93,9 +93,10 @@ def import_data_command(
             # Parse the dfx response to check for backend errors
             if result and result.stdout:
                 console.print(result.stdout)
-                console.print(result.stderr)
-        
-        display_error_panel("Import Failed", result.stderr)
+                if result.stderr:
+                    console.print(result.stderr)
+                    display_error_panel("Import Failed", result.stderr)
+                    raise typer.Exit(1)
                 
         display_success_panel(
             "Import Complete! 🎉",

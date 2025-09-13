@@ -319,7 +319,7 @@ def post_upgrade_() -> void:
 @update
 def extension_sync_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
     try:
-        logger.info(
+        logger.debug(
             f"Sync calling extension '{args['extension_name']}' entry point '{args['function_name']}' with args {args['args']}"
         )
 
@@ -327,7 +327,7 @@ def extension_sync_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
             args["extension_name"], args["function_name"], args["args"]
         )
 
-        logger.info(
+        logger.debug(
             f"Got extension result from {args['extension_name']} function {args['function_name']}: {extension_result}, type: {type(extension_result)}"
         )
 
@@ -341,7 +341,7 @@ def extension_sync_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
 @update
 def extension_async_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse]:
     try:
-        logger.info(
+        logger.debug(
             f"Async calling extension '{args['extension_name']}' entry point '{args['function_name']}' with args {args['args']}"
         )
 
@@ -350,7 +350,7 @@ def extension_async_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse
         )
         extension_result = yield extension_coroutine
 
-        logger.info(
+        logger.debug(
             f"Got extension result from {args['extension_name']} function {args['function_name']}: {extension_result}, type: {type(extension_result)}"
         )
 
