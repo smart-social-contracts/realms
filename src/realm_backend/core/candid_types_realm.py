@@ -40,10 +40,14 @@ class ObjectsListRecordPaginated(Record):
     objects: Vec[text]  # JSON string of object data
     pagination: PaginationInfo
 
+
 class ObjectsListRecord(Record):
     objects: Vec[text]  # JSON string of object data
+
+
 class ExtensionsListRecord(Record):
     extensions: Vec[text]
+
 
 class RealmResponseData(Variant):
     status: StatusRecord

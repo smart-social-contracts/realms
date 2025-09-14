@@ -27,19 +27,14 @@ class Operations:
 
 
 class Profiles:
-    ADMIN = {
-        "name": "admin",
-        "allowed_to": [Operations.ALL]
-    }
-    MEMBER = {
-        "name": "member", 
-        "allowed_to": []
-    }
+    ADMIN = {"name": "admin", "allowed_to": [Operations.ALL]}
+    MEMBER = {"name": "member", "allowed_to": []}
+
 
 OPERATIONS_SEPARATOR = ","
 
+
 class UserProfile(Entity, TimestampedMixin):
-    
 
     __alias__ = "name"
     name = String(max_length=256)
@@ -58,7 +53,6 @@ class UserProfile(Entity, TimestampedMixin):
         if operation in self.allowed_to:
             self.allowed_to.remove(operation)
         self.allowed_to = OPERATIONS_SEPARATOR.join(self.allowed_to)
-    
+
     def is_allowed(self, operation: str) -> bool:
         return operation in str(self.allowed_to or "").split(OPERATIONS_SEPARATOR)
-        

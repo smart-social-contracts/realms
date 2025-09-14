@@ -55,7 +55,6 @@ def get_status() -> dict[str, Any]:
 
     realm_name = realms[0].name if realms else "None"
 
-
     # Get installed extensions
     extension_names = []
     import extension_packages.extension_imports

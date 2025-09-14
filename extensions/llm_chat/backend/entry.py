@@ -70,9 +70,8 @@ def get_realm_data(args) -> RealmData:
 
     try:
         # TODO: implement this
-       
-        combined_data = {
-        }
+
+        combined_data = {}
 
         return RealmData(
             json=json.dumps(combined_data),

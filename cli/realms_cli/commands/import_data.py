@@ -88,23 +88,33 @@ def import_data_command(
                     "json",
                 ],
                 cwd=project_root,
+                capture_output=True,
             )
 
             # Parse the dfx response to check for backend errors
             if result and result.stdout:
-                console.print(result.stdout)
-                if result.stderr:
-                    console.print(result.stderr)
-                    display_error_panel("Import Failed", result.stderr)
+                if "'success': True" in result.stdout:
+                    display_success_panel("Import Chunk Complete! 🎉", result.stdout)
+                else:
+                    display_error_panel("Backend Import Chunk Failed", result.stdout)
                     raise typer.Exit(1)
+     
+            elif result and result.stderr:
+                # dfx command had stderr output
+                display_error_panel("Backend Import Chunk Failed", result.stderr)
+                raise typer.Exit(1)
+            else:
+                # dfx command failed completely
+                display_error_panel("Backend Import Data Failed", "dfx command failed with no output")
+                raise typer.Exit(1)
                 
         display_success_panel(
-            "Import Complete! 🎉",
-            f"Successfully imported {len(data)} {entity_type} records from {file_path}",
+            "Import Data Complete! 🎉",
+            f"Successfully imported {len(data)} records from {file_path}",
         )
 
     except Exception as e:
-        display_error_panel("Import Failed", str(e))
+        display_error_panel("Backend Import Data Failed", str(e))
         raise typer.Exit(1)
 
 

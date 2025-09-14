@@ -1,7 +1,7 @@
 import json
-import pytest
 from unittest.mock import Mock, patch
 
+import pytest
 from realms_cli.commands.db import CursorDatabaseExplorer, NavigationState
 
 

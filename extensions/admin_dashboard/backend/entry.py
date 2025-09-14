@@ -12,8 +12,9 @@ from io import StringIO
 from typing import Any, Dict, List
 
 import ggg
-from kybra_simple_logging import get_logger
 from kybra_simple_db import Entity
+from kybra_simple_logging import get_logger
+
 from .models import RegistrationCode
 
 logger = get_logger("extensions.admin_dashboard")
@@ -123,7 +124,7 @@ def process_bulk_import(data: List[Dict[str, Any]]) -> Dict[str, Any]:
             # d = [
             #     {
             #         'timestamp_created': '2025-09-12 23:17:07.522',
-            #         'timestamp_updated': '2025-09-12 23:17:07.522', 
+            #         'timestamp_updated': '2025-09-12 23:17:07.522',
             #         'creator': 'system', 'updater': 'system', 'owner': 'system',
             #         '_type': 'Realm', '_id': '1',
             #         'name': 'Generated Demo Realm',
@@ -138,8 +139,7 @@ def process_bulk_import(data: List[Dict[str, Any]]) -> Dict[str, Any]:
             #         'treasury': '1'}, {'timestamp_created': '2025-09-12 23:17:07.522', 'timestamp_updated': '2025-09-12 23:17:07.522', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Treasury', '_id': '1', 'name': 'Generated Demo Realm Treasury', 'vault_principal_id': None, 'created_at': '2025-09-12T23:17:07.522258', 'updated_at': '2025-09-12T23:17:07.522261', 'realm': '1'}, {'timestamp_created': '2025-09-12 23:17:07.521', 'timestamp_updated': '2025-09-12 23:17:07.521', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'UserProfile', '_id': '1', 'name': 'admin', 'description': 'Admin user profile', 'allowed_to': 'a,l,l'}, {'timestamp_created': '2025-09-12 23:17:07.521', 'timestamp_updated': '2025-09-12 23:17:07.521', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'UserProfile', '_id': '2', 'name': 'member', 'description': 'Member user profile', 'allowed_to': ''
             #         }
             #     ]
-            
-            
+
             entity = Entity.deserialize(record)
             entity_type = record["_type"]
             if entity_type == "Codex":

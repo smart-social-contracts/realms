@@ -172,8 +172,7 @@ def get_entity_data(args):
 
     try:
         # TODO: implement this
-        entity_map = {
-        }
+        entity_map = {}
 
         if entity_type in entity_map:
             result = entity_map[entity_type](page_num, page_size)
