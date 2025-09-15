@@ -1,7 +1,8 @@
 {
     "python.analysis.extraPaths": [
         "./src/realm_backend",
-        "./cli"
+        "./cli",
+        "./venv/lib/python3.11/site-packages"
     ],
     "python.defaultInterpreterPath": "./venv/bin/python",
     "python.analysis.autoImportCompletions": true,
@@ -26,5 +27,10 @@
             "name": "kybra_simple_logging",
             "depth": 2
         }
+    ],
+    "python.analysis.include": [
+        "./src/**",
+        "./cli/**",
+        "./venv/lib/python3.11/site-packages/**"
     ]
 }

@@ -13,6 +13,7 @@
     "extraPaths": [
         "./src/realm_backend",
         "./cli"
+        "./extensions/admin_dashboard"
     ],
     "venvPath": ".",
     "venv": "venv",

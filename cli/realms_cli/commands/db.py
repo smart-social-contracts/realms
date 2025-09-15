@@ -286,7 +286,9 @@ class CursorDatabaseExplorer:
 
         if self.state.view_mode == "entity_list":
             if self.state.cursor_position < len(self._ggg_classes):
-                selected_entity = self._ggg_classes[self.state.cursor_position]
+                # Get sorted classes to match the display order
+                sorted_classes = sorted(self._ggg_classes, key=lambda cls: cls.__name__)
+                selected_entity = sorted_classes[self.state.cursor_position]
                 self.state.entity_type = selected_entity
                 self.state.view_mode = "record_list"
                 self.state.cursor_position = 0
@@ -671,7 +673,7 @@ class CursorDatabaseExplorer:
         logger.debug(f'self.state.view_mode = {self.state.view_mode}')
 
         if self.state.view_mode == "entity_list":
-            self.state.current_items = self._ggg_classes
+            self.state.current_items = sorted(self._ggg_classes, key=lambda cls: cls.__name__)
         elif self.state.view_mode == "record_list" and self.state.entity_type:
             logger.info(f"Fetching data for entity type: {self.state.entity_type}")
             result = self.list_entities(
@@ -707,10 +709,28 @@ class CursorDatabaseExplorer:
         lines.append("Select an entity type to explore:")
         lines.append("")
 
-        for i, class_obj in enumerate(self._ggg_classes):
-            cursor = "> " if i == self.state.cursor_position else "  "
-            count = self._entity_counts.get(class_obj.__name__, 0)
-            lines.append(f"{cursor}{i + 1:2}. {class_obj.__name__:<15} {count}")
+        # Sort classes alphabetically
+        sorted_classes = sorted(self._ggg_classes, key=lambda cls: cls.__name__)
+        
+        # Calculate columns (3 columns for better layout)
+        num_cols = 3
+        num_rows = (len(sorted_classes) + num_cols - 1) // num_cols
+        
+        for row in range(num_rows):
+            line_parts = []
+            for col in range(num_cols):
+                idx = row + col * num_rows
+                if idx < len(sorted_classes):
+                    class_obj = sorted_classes[idx]
+                    cursor = "> " if idx == self.state.cursor_position else "  "
+                    count = self._entity_counts.get(class_obj.__name__, 0)
+                    # Format: "  EntityName (count)"
+                    part = f"{cursor}{class_obj.__name__} ({count})"
+                    line_parts.append(f"{part:<25}")
+                else:
+                    line_parts.append(" " * 25)
+            
+            lines.append("".join(line_parts).rstrip())
 
         lines.append("")
         lines.append("Commands: Up/Down navigate | Right select | q quit")
