@@ -79,6 +79,7 @@ class CursorDatabaseExplorer:
         # Cache for relationship mappings discovered from GGG models
         self._relationship_cache = None
         self._ggg_classes = self._discover_ggg_classes()
+        self._entity_counts = {}
 
     def call_backend(self, method: str, args: str = "") -> Dict[str, Any]:
         logger.debug("call_backend")
@@ -686,6 +687,19 @@ class CursorDatabaseExplorer:
                 self.state.current_items = []
                 self.state.total_pages = 1
 
+    def _fetch_entity_counts(self):
+        """Fetch entity counts once and cache them."""
+        if self._entity_counts:
+            return  # Already cached
+            
+        for class_obj in self._ggg_classes:
+            try:
+                result = self.list_entities(class_obj.__name__, 0, 1)
+                count = result.get("total_items_count", 0) if "error" not in result else 0
+                self._entity_counts[class_obj.__name__] = count
+            except Exception:
+                self._entity_counts[class_obj.__name__] = 0
+
     def render_entity_list(self):
         """Render the entity selection menu."""
         lines = []
@@ -695,8 +709,8 @@ class CursorDatabaseExplorer:
 
         for i, class_obj in enumerate(self._ggg_classes):
             cursor = "> " if i == self.state.cursor_position else "  "
-            desc = ENTITY_DESCRIPTIONS.get(class_obj.__name__, "")
-            lines.append(f"{cursor}{i + 1:2}. {class_obj.__name__.title():<15} - {desc}")
+            count = self._entity_counts.get(class_obj.__name__, 0)
+            lines.append(f"{cursor}{i + 1:2}. {class_obj.__name__:<15} {count}")
 
         lines.append("")
         lines.append("Commands: Up/Down navigate | Right select | q quit")
@@ -849,6 +863,9 @@ class CursorDatabaseExplorer:
             logger.debug("Could not connect to backend canister")
             return
 
+        # Fetch entity counts once at startup
+        self._fetch_entity_counts()
+        
         self.state.current_items = self._ggg_classes
         kb = self.create_key_bindings()
 
