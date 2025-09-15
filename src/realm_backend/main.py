@@ -33,6 +33,7 @@ from kybra import (
     Record,
     StableBTreeMap,
     TimerId,
+    Tuple,
     Variant,
     Vec,
     blob,
@@ -62,11 +63,12 @@ class HttpRequest(Record):
     body: blob
 
 
-from kybra.canisters.management import (
-    HttpResponse,
-    HttpTransformArgs,
-    management_canister,
-)
+# Temporarily commented out to resolve compilation issues
+# from kybra.canisters.management import (
+#     HttpResponse,
+#     HttpTransformArgs,
+#     management_canister,
+# )
 
 Header = Tuple[str, str]
 
@@ -376,112 +378,112 @@ def http_request_core(data):
     }
 
 
-@query
-def transform_response(args: HttpTransformArgs) -> HttpResponse:
-    """Transform function for HTTP responses from extensions"""
-    logger.info("🔄 Transforming HTTP response")
-    http_response = args["response"]
-    logger.info(f"📊 Original response status: {http_response['status']}")
-    logger.info(f"📄 Response body size: {len(http_response['body'])} bytes")
-    logger.info("🧹 Clearing response headers for security")
-    http_response["headers"] = []
-    return http_response
+# @query
+# def transform_response(args: HttpTransformArgs) -> HttpResponse:
+#     """Transform function for HTTP responses from extensions"""
+#     logger.info("🔄 Transforming HTTP response")
+#     http_response = args["response"]
+#     logger.info(f"📊 Original response status: {http_response['status']}")
+#     logger.info(f"📄 Response body size: {len(http_response['body'])} bytes")
+#     logger.info("🧹 Clearing response headers for security")
+#     http_response["headers"] = []
+#     return http_response
 
 
-@query
-def http_transform(args: HttpTransformArgs) -> HttpResponse:
-    """Transform function for HTTP requests - removes headers for consensus"""
-    http_response = args["response"]
-    http_response["headers"] = []
-    return http_response
+# @query
+# def http_transform(args: HttpTransformArgs) -> HttpResponse:
+#     """Transform function for HTTP requests - removes headers for consensus"""
+#     http_response = args["response"]
+#     http_response["headers"] = []
+#     return http_response
 
 
-@update
-def set_timer(delay: Duration) -> TimerId:
-    ic.call_self("timer_callback")
-    return ic.set_timer(delay, timer_callback)
+# @update
+# def set_timer(delay: Duration) -> TimerId:
+#     ic.call_self("timer_callback")
+#     return ic.set_timer(delay, timer_callback)
 
 
 def timer_callback():
     ic.print("timer_callback")
 
 
-@update
-def fire_download(codex_id: str) -> str:
-    logger.info("Firing download for codex: " + codex_id)
-    ic.set_timer(1, lambda: run_download)
+# @update
+# def fire_download(codex_id: str) -> str:
+#     logger.info("Firing download for codex: " + codex_id)
+#     ic.set_timer(1, lambda: run_download)
 
 
-@update
-async def run_download() -> Async[None]:
-    codex_id = "test"
-    logger.info("Downloading code for codex: " + codex_id)
-    c = Codex[codex_id]
-    success, message = yield download_file_from_url(c.url)
-    logger.info("Success: " + str(success))
-    logger.info("Downloaded code: " + message)
+# @update
+# async def run_download() -> Async[None]:
+#     codex_id = "test"
+#     logger.info("Downloading code for codex: " + codex_id)
+#     c = Codex[codex_id]
+#     success, message = yield download_file_from_url(c.url)
+#     logger.info("Success: " + str(success))
+#     logger.info("Downloaded code: " + message)
 
 
-@update
-def download_file_from_url(url: str) -> Async[Tuple[bool, str]]:
-    """
-    Download file from a URL.
-
-    Returns:
-        Tuple of (success: bool, result: str)
-        - If success=True, result contains the downloaded file content
-        - If success=False, result contains the error message
-    """
-
-    try:
-        ic.print(f"Downloading code from URL: {url}")
-
-        # Make HTTP request to download the code
-        http_result: CallResult[HttpResponse] = yield management_canister.http_request(
-            {
-                "url": url,
-                "max_response_bytes": 1024 * 1024,  # 1MB limit for security
-                "method": {"get": None},
-                "headers": [
-                    {"name": "User-Agent", "value": "Realms-Codex-Downloader/1.0"}
-                ],
-                "body": None,
-                "transform": {
-                    "function": (ic.id(), "http_transform"),
-                    "context": bytes(),
-                },
-            }
-        ).with_cycles(15_000_000_000)
-
-        def handle_response(response: HttpResponse) -> Tuple[bool, str]:
-            try:
-                # Decode the response body
-                code_content = response["body"].decode("utf-8")
-                ic.print(f"Successfully downloaded {len(code_content)} bytes")
-
-                downloaded_content[url] = code_content
-                return True, code_content
-
-            except UnicodeDecodeError as e:
-                error_msg = f"Failed to decode response as UTF-8: {str(e)}"
-                ic.print(error_msg)
-                return False, error_msg
-            except Exception as e:
-                error_msg = f"Error processing response: {str(e)}"
-                ic.print(error_msg)
-                return False, error_msg
-
-        def handle_error(err: str) -> Tuple[bool, str]:
-            error_msg = f"HTTP request failed: {err}"
-            ic.print(error_msg)
-            return False, error_msg
-
-        return match(http_result, {"Ok": handle_response, "Err": handle_error})
-
-    except Exception as e:
-        error_msg = f"Unexpected error downloading code: {str(e)}"
-        ic.print(error_msg)
-        return False, error_msg
+# @update
+# def download_file_from_url(url: str) -> Async[Tuple[bool, str]]:
+#     """
+#     Download file from a URL.
+# 
+#     Returns:
+#         Tuple of (success: bool, result: str)
+#         - If success=True, result contains the downloaded file content
+#         - If success=False, result contains the error message
+#     """
+# 
+#     try:
+#         ic.print(f"Downloading code from URL: {url}")
+# 
+#         # Make HTTP request to download the code
+#         http_result: CallResult[HttpResponse] = yield management_canister.http_request(
+#             {
+#                 "url": url,
+#                 "max_response_bytes": 1024 * 1024,  # 1MB limit for security
+#                 "method": {"get": None},
+#                 "headers": [
+#                     {"name": "User-Agent", "value": "Realms-Codex-Downloader/1.0"}
+#                 ],
+#                 "body": None,
+#                 "transform": {
+#                     "function": (ic.id(), "http_transform"),
+#                     "context": bytes(),
+#                 },
+#             }
+#         ).with_cycles(15_000_000_000)
+# 
+#         def handle_response(response: HttpResponse) -> Tuple[bool, str]:
+#             try:
+#                 # Decode the response body
+#                 code_content = response["body"].decode("utf-8")
+#                 ic.print(f"Successfully downloaded {len(code_content)} bytes")
+# 
+#                 downloaded_content[url] = code_content
+#                 return True, code_content
+# 
+#             except UnicodeDecodeError as e:
+#                 error_msg = f"Failed to decode response as UTF-8: {str(e)}"
+#                 ic.print(error_msg)
+#                 return False, error_msg
+#             except Exception as e:
+#                 error_msg = f"Error processing response: {str(e)}"
+#                 ic.print(error_msg)
+#                 return False, error_msg
+# 
+#         def handle_error(err: str) -> Tuple[bool, str]:
+#             error_msg = f"HTTP request failed: {err}"
+#             ic.print(error_msg)
+#             return False, error_msg
+# 
+#         return match(http_result, {"Ok": handle_response, "Err": handle_error})
+# 
+#     except Exception as e:
+#         error_msg = f"Unexpected error downloading code: {str(e)}"
+#         ic.print(error_msg)
+#         return False, error_msg
 
 
 def verify_checksum(content: str, expected_checksum: str) -> Tuple[bool, str]:
@@ -520,55 +522,55 @@ def verify_checksum(content: str, expected_checksum: str) -> Tuple[bool, str]:
         return False, f"Error verifying checksum: {str(e)}"
 
 
-@query
-def http_request(req: HttpRequest) -> HttpResponse:
-    """Handle HTTP requests to the canister. Only for unauthenticated read operations."""
-
-    try:
-        method = req["method"]
-        url = req["url"]
-
-        logger.info(f"HTTP {method} request to {url}")
-
-        not_found = HttpResponse(
-            status_code=404,
-            headers=[],
-            body=bytes("Not found", "ascii"),
-            streaming_strategy=None,
-            upgrade=False,
-        )
-
-        if method == "GET":
-            url_path = url.split("/")
-
-            if url_path[0] != "api":
-                return not_found
-
-            if url_path[1] != "v1":
-                return not_found
-
-            if url_path[2] == "status":
-                return http_request_core(get_status())
-
-            # if url_path[2] == "extensions":
-            #     if len(url_path) < 4:
-            #         # List all extensions
-            #         extensions_list = list_extensions()
-            #         return http_request_core({"extensions": extensions_list})
-
-            # Note: We no longer need to handle extension-specific HTTP endpoints here
-            # as we have proper canister methods now
-
-        return not_found
-    except Exception as e:
-        logger.error(f"Error handling HTTP request: {str(e)}\n{traceback.format_exc()}")
-        return {
-            "status_code": 500,
-            "headers": [],
-            "body": bytes(traceback.format_exc(), "ascii"),
-            "streaming_strategy": None,
-            "upgrade": False,
-        }
+# @query
+# def http_request(req: HttpRequest) -> HttpResponse:
+#     """Handle HTTP requests to the canister. Only for unauthenticated read operations."""
+# 
+#     try:
+#         method = req["method"]
+#         url = req["url"]
+# 
+#         logger.info(f"HTTP {method} request to {url}")
+# 
+#         not_found = HttpResponse(
+#             status_code=404,
+#             headers=[],
+#             body=bytes("Not found", "ascii"),
+#             streaming_strategy=None,
+#             upgrade=False,
+#         )
+# 
+#         if method == "GET":
+#             url_path = url.split("/")
+# 
+#             if url_path[0] != "api":
+#                 return not_found
+# 
+#             if url_path[1] != "v1":
+#                 return not_found
+# 
+#             if url_path[2] == "status":
+#                 return http_request_core(get_status())
+# 
+#             # if url_path[2] == "extensions":
+#             #     if len(url_path) < 4:
+#             #         # List all extensions
+#             #         extensions_list = list_extensions()
+#             #         return http_request_core({"extensions": extensions_list})
+# 
+#             # Note: We no longer need to handle extension-specific HTTP endpoints here
+#             # as we have proper canister methods now
+# 
+#         return not_found
+#     except Exception as e:
+#         logger.error(f"Error handling HTTP request: {str(e)}\n{traceback.format_exc()}")
+#         return {
+#             "status_code": 500,
+#             "headers": [],
+#             "body": bytes(traceback.format_exc(), "ascii"),
+#             "streaming_strategy": None,
+#             "upgrade": False,
+#         }
 
 
 @update

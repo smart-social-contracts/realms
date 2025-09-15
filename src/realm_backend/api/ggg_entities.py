@@ -18,6 +18,8 @@ from ggg.transfer import Transfer
 from ggg.treasury import Treasury
 from ggg.user import User
 from ggg.vote import Vote
+from ggg.user_profile import UserProfile
+
 from kybra_simple_logging import get_logger
 
 logger = get_logger("api.ggg_entities")

@@ -162,7 +162,6 @@ def import_codex_command(
             "data": [
                 {
                     "_type": "Codex",
-                    "_id": codex_name,
                     "name": codex_name,
                     "code": base64_content
                 }
