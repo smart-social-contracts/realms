@@ -19,4 +19,4 @@ def realm_get(principal: str) -> dict[str, Any]:
 
 
 def realm_list() -> dict[str, Any]:
-    return {"realms": [realm.to_dict() for realm in Realm.instances()]}
+    return {"realms": [realm.serialize() for realm in Realm.instances()]}

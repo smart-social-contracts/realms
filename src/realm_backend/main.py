@@ -5,43 +5,21 @@ from typing import Optional, Tuple
 import api
 from api.extensions import list_extensions
 from api.ggg_entities import (
-    list_codexes,
-    list_disputes,
-    list_instruments,
-    list_licenses,
-    list_mandates,
-    list_organizations,
-    list_proposals,
-    list_realms,
-    list_tasks,
-    list_trades,
-    list_transfers,
-    list_users,
-    list_votes,
+    list_objects,
+    list_objects_paginated,
 )
 from api.status import get_status
 from api.user import user_get, user_register, user_update_profile_picture
 from core.candid_types_realm import (
-    CodexesListRecord,
-    DisputesListRecord,
     ExtensionCallArgs,
     ExtensionCallResponse,
-    InstrumentsListRecord,
-    LicensesListRecord,
-    MandatesListRecord,
-    OrganizationsListRecord,
+    ObjectsListRecord,
+    ObjectsListRecordPaginated,
     PaginationInfo,
-    ProposalsListRecord,
     RealmResponse,
     RealmResponseData,
-    RealmsListRecord,
     StatusRecord,
-    TasksListRecord,
-    TradesListRecord,
-    TransfersListRecord,
     UserGetRecord,
-    UsersListRecord,
-    VotesListRecord,
 )
 from ggg import Codex
 from kybra import (
@@ -55,6 +33,7 @@ from kybra import (
     Record,
     StableBTreeMap,
     TimerId,
+    Tuple,
     Variant,
     Vec,
     blob,
@@ -84,11 +63,12 @@ class HttpRequest(Record):
     body: blob
 
 
-from kybra.canisters.management import (
-    HttpResponse,
-    HttpTransformArgs,
-    management_canister,
-)
+# Temporarily commented out to resolve compilation issues
+# from kybra.canisters.management import (
+#     HttpResponse,
+#     HttpTransformArgs,
+#     management_canister,
+# )
 
 Header = Tuple[str, str]
 
@@ -119,11 +99,11 @@ def status() -> RealmResponse:
     try:
         logger.info("Status query executed")
         return RealmResponse(
-            success=True, data=RealmResponseData(Status=StatusRecord(**get_status()))
+            success=True, data=RealmResponseData(status=StatusRecord(**get_status()))
         )
     except Exception as e:
         logger.error(f"Error getting status: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
 @query
@@ -144,7 +124,7 @@ def join_realm(profile: str) -> RealmResponse:
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                UserGet=UserGetRecord(
+                UserGet=UserGetRecord(  # TODO: fix this
                     principal=Principal.from_str(user["principal"]),
                     profiles=profiles,
                     profile_picture_url=user.get("profile_picture_url", ""),
@@ -153,7 +133,7 @@ def join_realm(profile: str) -> RealmResponse:
         )
     except Exception as e:
         logger.error(f"Error registering user: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
 @query
@@ -221,12 +201,42 @@ def update_my_profile_picture(profile_picture_url: str) -> RealmResponse:
 
 
 @query
-def get_users(page_num: nat, page_size: nat) -> RealmResponse:
+def get_objects_paginated(
+    class_name: str, page_num: nat, page_size: nat
+) -> RealmResponse:
+    """
+        Example:
+    $ dfx canister call --output json ulvla-h7777-77774-qaacq-cai get_objects_paginated '("User", 0, 3)'
+    {
+      "data": {
+        "objectsListPaginated": {
+          "objects": [
+            "{\"timestamp_created\": \"2025-09-10 11:28:41.147\", \"timestamp_updated\": \"2025-09-10 11:28:41.147\", \"creator\": \"system\", \"updater\": \"system\", \"owner\": \"system\", \"_type\": \"User\", \"_id\": \"1\", \"id\": \"system\", \"profile_picture_url\": \"\"}",
+            "{\"timestamp_created\": \"2025-09-10 11:28:41.147\", \"timestamp_updated\": \"2025-09-10 11:28:41.147\", \"creator\": \"system\", \"updater\": \"system\", \"owner\": \"system\", \"_type\": \"User\", \"_id\": \"2\", \"id\": \"fiona_rodriguez_000\", \"profile_picture_url\": \"https://api.dicebear.com/7.x/personas/svg?seed=FionaRodriguez\"}",
+            "{\"timestamp_created\": \"2025-09-10 11:28:41.147\", \"timestamp_updated\": \"2025-09-10 11:28:41.147\", \"creator\": \"system\", \"updater\": \"system\", \"owner\": \"system\", \"_type\": \"User\", \"_id\": \"3\", \"id\": \"george_brown_001\", \"profile_picture_url\": \"https://api.dicebear.com/7.x/personas/svg?seed=GeorgeBrown\"}"
+          ],
+          "pagination": {
+            "page_num": "0",
+            "page_size": "3",
+            "total_items_count": "51",
+            "total_pages": "17"
+          }
+        }
+      },
+      "success": true
+    }
+    """
+
     try:
-        logger.info(f"Listing users for page {page_num} with page size {page_size}")
-        result = list_users(page_num=page_num, page_size=page_size)
-        users = result["items"]
-        users_json = [json.dumps(user.to_dict()) for user in users]
+        logger.info(
+            f"Listing {class_name} objects for page {page_num} with page size {page_size}"
+        )
+        result = list_objects_paginated(
+            class_name, page_num=page_num, page_size=page_size
+        )
+        objects = result["items"]
+        objects_json = [json.dumps(obj.serialize()) for obj in objects]
+        logger.info(f"Objects JSON: {objects_json}")
         pagination = PaginationInfo(
             page_num=result["page_num"],
             page_size=result["page_size"],
@@ -236,7 +246,9 @@ def get_users(page_num: nat, page_size: nat) -> RealmResponse:
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                UsersList=UsersListRecord(users=users_json, pagination=pagination)
+                objectsListPaginated=ObjectsListRecordPaginated(
+                    objects=objects_json, pagination=pagination
+                )
             ),
         )
     except Exception as e:
@@ -245,296 +257,37 @@ def get_users(page_num: nat, page_size: nat) -> RealmResponse:
 
 
 @query
-def get_mandates(page_num: nat, page_size: nat) -> RealmResponse:
+def get_objects(params: Vec[Tuple[str, str]]) -> RealmResponse:
+    """Example:
+
+    $ dfx canister call --output json ulvla-h7777-77774-qaacq-cai get_objects '(
+      vec { record { 0 = "User"; 1 = "1" };  record { 0 = "Realm"; 1 = "1" }; }
+    )'
+    {
+      "data": {
+        "objectsList": {
+          "objects": [
+            "{\"timestamp_created\": \"2025-09-10 11:28:41.147\", \"timestamp_updated\": \"2025-09-10 11:28:41.147\", \"creator\": \"system\", \"updater\": \"system\", \"owner\": \"system\", \"_type\": \"User\", \"_id\": \"1\", \"id\": \"system\", \"profile_picture_url\": \"\"}",
+            "{\"timestamp_created\": \"2025-09-10 11:28:41.147\", \"timestamp_updated\": \"2025-09-10 11:28:41.147\", \"creator\": \"system\", \"updater\": \"system\", \"owner\": \"system\", \"_type\": \"Realm\", \"_id\": \"1\", \"name\": \"Generated Demo Realm\", \"description\": \"Generated demo realm with 51 citizens and 5 organizations\", \"id\": \"0\", \"created_at\": \"2025-09-10T13:23:57.099332\", \"status\": \"active\", \"governance_type\": \"democratic\", \"population\": 51, \"organization_count\": 5, \"settings\": {\"voting_period_days\": 7, \"proposal_threshold\": 0.1, \"quorum_percentage\": 0.3, \"tax_rate\": 0.15, \"ubi_amount\": 1000}, \"relations\": {\"treasury\": [{\"_type\": \"Treasury\", \"_id\": \"2\"}]}}"
+          ]
+        }
+      },
+      "success": true
+    }
+    """
+
     try:
-        mandates_data = list_mandates(page_num=page_num, page_size=page_size)
-        mandates_json = [
-            json.dumps(mandate.to_dict()) for mandate in mandates_data["items"]
-        ]
-        pagination = PaginationInfo(
-            page_num=mandates_data["page_num"],
-            page_size=mandates_data["page_size"],
-            total_items_count=mandates_data["total_items_count"],
-            total_pages=mandates_data["total_pages"],
-        )
+        logger.info(f"Listing objects")
+        result = list_objects(params)
+        objects = result
+        objects_json = [json.dumps(obj.serialize()) for obj in objects]
+        logger.info(f"Objects JSON: {objects_json}")
         return RealmResponse(
             success=True,
-            data=RealmResponseData(
-                MandatesList=MandatesListRecord(
-                    mandates=mandates_json, pagination=pagination
-                )
-            ),
+            data=RealmResponseData(objectsList=ObjectsListRecord(objects=objects_json)),
         )
     except Exception as e:
-        logger.error(f"Error listing mandates: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@query
-def get_tasks(page_num: nat, page_size: nat) -> RealmResponse:
-    try:
-        tasks_data = list_tasks(page_num=page_num, page_size=page_size)
-        tasks_json = [json.dumps(task.to_dict()) for task in tasks_data["items"]]
-        pagination = PaginationInfo(
-            page_num=tasks_data["page_num"],
-            page_size=tasks_data["page_size"],
-            total_items_count=tasks_data["total_items_count"],
-            total_pages=tasks_data["total_pages"],
-        )
-        return RealmResponse(
-            success=True,
-            data=RealmResponseData(
-                TasksList=TasksListRecord(tasks=tasks_json, pagination=pagination)
-            ),
-        )
-    except Exception as e:
-        logger.error(f"Error listing tasks: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@query
-def get_transfers(page_num: nat, page_size: nat) -> RealmResponse:
-    try:
-        logger.info(f"Listing transfers for page {page_num} with page size {page_size}")
-        result = list_transfers(page_num=page_num, page_size=page_size)
-        transfers = result["items"]
-        transfers_json = [json.dumps(transfer.to_dict()) for transfer in transfers]
-        pagination = PaginationInfo(
-            page_num=result["page_num"],
-            page_size=result["page_size"],
-            total_items_count=result["total_items_count"],
-            total_pages=result["total_pages"],
-        )
-        return RealmResponse(
-            success=True,
-            data=RealmResponseData(
-                TransfersList=TransfersListRecord(
-                    transfers=transfers_json, pagination=pagination
-                )
-            ),
-        )
-    except Exception as e:
-        logger.error(f"Error listing transfers: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@query
-def get_instruments(page_num: nat, page_size: nat) -> RealmResponse:
-    try:
-        instruments_data = list_instruments(page_num=page_num, page_size=page_size)
-        instruments_json = [
-            json.dumps(instrument.to_dict()) for instrument in instruments_data["items"]
-        ]
-        pagination = PaginationInfo(
-            page_num=instruments_data["page_num"],
-            page_size=instruments_data["page_size"],
-            total_items_count=instruments_data["total_items_count"],
-            total_pages=instruments_data["total_pages"],
-        )
-        return RealmResponse(
-            success=True,
-            data=RealmResponseData(
-                InstrumentsList=InstrumentsListRecord(
-                    instruments=instruments_json, pagination=pagination
-                )
-            ),
-        )
-    except Exception as e:
-        logger.error(f"Error listing instruments: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@query
-def get_codexes(page_num: nat, page_size: nat) -> RealmResponse:
-    try:
-        codexes_data = list_codexes(page_num=page_num, page_size=page_size)
-        codexes_json = [json.dumps(codex.to_dict()) for codex in codexes_data["items"]]
-        pagination = PaginationInfo(
-            page_num=codexes_data["page_num"],
-            page_size=codexes_data["page_size"],
-            total_items_count=codexes_data["total_items_count"],
-            total_pages=codexes_data["total_pages"],
-        )
-        return RealmResponse(
-            success=True,
-            data=RealmResponseData(
-                CodexesList=CodexesListRecord(
-                    codexes=codexes_json, pagination=pagination
-                )
-            ),
-        )
-    except Exception as e:
-        logger.error(f"Error listing codexes: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@query
-def get_organizations(page_num: nat, page_size: nat) -> RealmResponse:
-    try:
-        organizations_data = list_organizations(page_num=page_num, page_size=page_size)
-        organizations_json = [
-            json.dumps(org.to_dict()) for org in organizations_data["items"]
-        ]
-        pagination = PaginationInfo(
-            page_num=organizations_data["page_num"],
-            page_size=organizations_data["page_size"],
-            total_items_count=organizations_data["total_items_count"],
-            total_pages=organizations_data["total_pages"],
-        )
-        return RealmResponse(
-            success=True,
-            data=RealmResponseData(
-                OrganizationsList=OrganizationsListRecord(
-                    organizations=organizations_json, pagination=pagination
-                )
-            ),
-        )
-    except Exception as e:
-        logger.error(f"Error listing organizations: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@query
-def get_disputes(page_num: nat, page_size: nat) -> RealmResponse:
-    try:
-        disputes_data = list_disputes(page_num=page_num, page_size=page_size)
-        disputes_json = [
-            json.dumps(dispute.to_dict()) for dispute in disputes_data["items"]
-        ]
-        pagination = PaginationInfo(
-            page_num=disputes_data["page_num"],
-            page_size=disputes_data["page_size"],
-            total_items_count=disputes_data["total_items_count"],
-            total_pages=disputes_data["total_pages"],
-        )
-        return RealmResponse(
-            success=True,
-            data=RealmResponseData(
-                DisputesList=DisputesListRecord(
-                    disputes=disputes_json, pagination=pagination
-                )
-            ),
-        )
-    except Exception as e:
-        logger.error(f"Error listing disputes: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@query
-def get_licenses(page_num: nat, page_size: nat) -> RealmResponse:
-    try:
-        licenses_data = list_licenses(page_num=page_num, page_size=page_size)
-        licenses_json = [
-            json.dumps(license.to_dict()) for license in licenses_data["items"]
-        ]
-        pagination = PaginationInfo(
-            page_num=licenses_data["page_num"],
-            page_size=licenses_data["page_size"],
-            total_items_count=licenses_data["total_items_count"],
-            total_pages=licenses_data["total_pages"],
-        )
-        return RealmResponse(
-            success=True,
-            data=RealmResponseData(
-                LicensesList=LicensesListRecord(
-                    licenses=licenses_json, pagination=pagination
-                )
-            ),
-        )
-    except Exception as e:
-        logger.error(f"Error listing licenses: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@query
-def get_realms(page_num: nat, page_size: nat) -> RealmResponse:
-    try:
-        realms_data = list_realms(page_num=page_num, page_size=page_size)
-        realms_json = [json.dumps(realm.to_dict()) for realm in realms_data["items"]]
-        pagination = PaginationInfo(
-            page_num=realms_data["page_num"],
-            page_size=realms_data["page_size"],
-            total_items_count=realms_data["total_items_count"],
-            total_pages=realms_data["total_pages"],
-        )
-        return RealmResponse(
-            success=True,
-            data=RealmResponseData(
-                RealmsList=RealmsListRecord(realms=realms_json, pagination=pagination)
-            ),
-        )
-    except Exception as e:
-        logger.error(f"Error listing realms: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@query
-def get_trades(page_num: nat, page_size: nat) -> RealmResponse:
-    try:
-        trades_data = list_trades(page_num=page_num, page_size=page_size)
-        trades_json = [json.dumps(trade.to_dict()) for trade in trades_data["items"]]
-        pagination = PaginationInfo(
-            page_num=trades_data["page_num"],
-            page_size=trades_data["page_size"],
-            total_items_count=trades_data["total_items_count"],
-            total_pages=trades_data["total_pages"],
-        )
-        return RealmResponse(
-            success=True,
-            data=RealmResponseData(
-                TradesList=TradesListRecord(trades=trades_json, pagination=pagination)
-            ),
-        )
-    except Exception as e:
-        logger.error(f"Error listing trades: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@query
-def get_proposals(page_num: nat, page_size: nat) -> RealmResponse:
-    try:
-        proposals_data = list_proposals(page_num=page_num, page_size=page_size)
-        proposals_json = [
-            json.dumps(proposal.to_dict()) for proposal in proposals_data["items"]
-        ]
-        pagination = PaginationInfo(
-            page_num=proposals_data["page_num"],
-            page_size=proposals_data["page_size"],
-            total_items_count=proposals_data["total_items_count"],
-            total_pages=proposals_data["total_pages"],
-        )
-        return RealmResponse(
-            success=True,
-            data=RealmResponseData(
-                ProposalsList=ProposalsListRecord(
-                    proposals=proposals_json, pagination=pagination
-                )
-            ),
-        )
-    except Exception as e:
-        logger.error(f"Error listing proposals: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
-
-
-@query
-def get_votes(page_num: nat, page_size: nat) -> RealmResponse:
-    try:
-        votes_data = list_votes(page_num=page_num, page_size=page_size)
-        votes_json = [json.dumps(vote.to_dict()) for vote in votes_data["items"]]
-        pagination = PaginationInfo(
-            page_num=votes_data["page_num"],
-            page_size=votes_data["page_size"],
-            total_items_count=votes_data["total_items_count"],
-            total_pages=votes_data["total_pages"],
-        )
-        return RealmResponse(
-            success=True,
-            data=RealmResponseData(
-                VotesList=VotesListRecord(votes=votes_json, pagination=pagination)
-            ),
-        )
-    except Exception as e:
-        logger.error(f"Error listing votes: {str(e)}\n{traceback.format_exc()}")
+        logger.error(f"Error listing objects: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
 
 
@@ -572,7 +325,7 @@ def post_upgrade_() -> void:
 @update
 def extension_sync_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
     try:
-        logger.info(
+        logger.debug(
             f"Sync calling extension '{args['extension_name']}' entry point '{args['function_name']}' with args {args['args']}"
         )
 
@@ -580,7 +333,7 @@ def extension_sync_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
             args["extension_name"], args["function_name"], args["args"]
         )
 
-        logger.info(
+        logger.debug(
             f"Got extension result from {args['extension_name']} function {args['function_name']}: {extension_result}, type: {type(extension_result)}"
         )
 
@@ -594,7 +347,7 @@ def extension_sync_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
 @update
 def extension_async_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse]:
     try:
-        logger.info(
+        logger.debug(
             f"Async calling extension '{args['extension_name']}' entry point '{args['function_name']}' with args {args['args']}"
         )
 
@@ -603,7 +356,7 @@ def extension_async_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse
         )
         extension_result = yield extension_coroutine
 
-        logger.info(
+        logger.debug(
             f"Got extension result from {args['extension_name']} function {args['function_name']}: {extension_result}, type: {type(extension_result)}"
         )
 
@@ -625,112 +378,112 @@ def http_request_core(data):
     }
 
 
-@query
-def transform_response(args: HttpTransformArgs) -> HttpResponse:
-    """Transform function for HTTP responses from extensions"""
-    logger.info("🔄 Transforming HTTP response")
-    http_response = args["response"]
-    logger.info(f"📊 Original response status: {http_response['status']}")
-    logger.info(f"📄 Response body size: {len(http_response['body'])} bytes")
-    logger.info("🧹 Clearing response headers for security")
-    http_response["headers"] = []
-    return http_response
+# @query
+# def transform_response(args: HttpTransformArgs) -> HttpResponse:
+#     """Transform function for HTTP responses from extensions"""
+#     logger.info("🔄 Transforming HTTP response")
+#     http_response = args["response"]
+#     logger.info(f"📊 Original response status: {http_response['status']}")
+#     logger.info(f"📄 Response body size: {len(http_response['body'])} bytes")
+#     logger.info("🧹 Clearing response headers for security")
+#     http_response["headers"] = []
+#     return http_response
 
 
-@query
-def http_transform(args: HttpTransformArgs) -> HttpResponse:
-    """Transform function for HTTP requests - removes headers for consensus"""
-    http_response = args["response"]
-    http_response["headers"] = []
-    return http_response
+# @query
+# def http_transform(args: HttpTransformArgs) -> HttpResponse:
+#     """Transform function for HTTP requests - removes headers for consensus"""
+#     http_response = args["response"]
+#     http_response["headers"] = []
+#     return http_response
 
 
-@update
-def set_timer(delay: Duration) -> TimerId:
-    ic.call_self("timer_callback")
-    return ic.set_timer(delay, timer_callback)
+# @update
+# def set_timer(delay: Duration) -> TimerId:
+#     ic.call_self("timer_callback")
+#     return ic.set_timer(delay, timer_callback)
 
 
 def timer_callback():
     ic.print("timer_callback")
 
 
-@update
-def fire_download(codex_id: str) -> str:
-    logger.info("Firing download for codex: " + codex_id)
-    ic.set_timer(1, lambda: run_download)
+# @update
+# def fire_download(codex_id: str) -> str:
+#     logger.info("Firing download for codex: " + codex_id)
+#     ic.set_timer(1, lambda: run_download)
 
 
-@update
-async def run_download() -> Async[None]:
-    codex_id = "test"
-    logger.info("Downloading code for codex: " + codex_id)
-    c = Codex[codex_id]
-    success, message = yield download_file_from_url(c.url)
-    logger.info("Success: " + str(success))
-    logger.info("Downloaded code: " + message)
+# @update
+# async def run_download() -> Async[None]:
+#     codex_id = "test"
+#     logger.info("Downloading code for codex: " + codex_id)
+#     c = Codex[codex_id]
+#     success, message = yield download_file_from_url(c.url)
+#     logger.info("Success: " + str(success))
+#     logger.info("Downloaded code: " + message)
 
 
-@update
-def download_file_from_url(url: str) -> Async[Tuple[bool, str]]:
-    """
-    Download file from a URL.
-
-    Returns:
-        Tuple of (success: bool, result: str)
-        - If success=True, result contains the downloaded file content
-        - If success=False, result contains the error message
-    """
-
-    try:
-        ic.print(f"Downloading code from URL: {url}")
-
-        # Make HTTP request to download the code
-        http_result: CallResult[HttpResponse] = yield management_canister.http_request(
-            {
-                "url": url,
-                "max_response_bytes": 1024 * 1024,  # 1MB limit for security
-                "method": {"get": None},
-                "headers": [
-                    {"name": "User-Agent", "value": "Realms-Codex-Downloader/1.0"}
-                ],
-                "body": None,
-                "transform": {
-                    "function": (ic.id(), "http_transform"),
-                    "context": bytes(),
-                },
-            }
-        ).with_cycles(15_000_000_000)
-
-        def handle_response(response: HttpResponse) -> Tuple[bool, str]:
-            try:
-                # Decode the response body
-                code_content = response["body"].decode("utf-8")
-                ic.print(f"Successfully downloaded {len(code_content)} bytes")
-
-                downloaded_content[url] = code_content
-                return True, code_content
-
-            except UnicodeDecodeError as e:
-                error_msg = f"Failed to decode response as UTF-8: {str(e)}"
-                ic.print(error_msg)
-                return False, error_msg
-            except Exception as e:
-                error_msg = f"Error processing response: {str(e)}"
-                ic.print(error_msg)
-                return False, error_msg
-
-        def handle_error(err: str) -> Tuple[bool, str]:
-            error_msg = f"HTTP request failed: {err}"
-            ic.print(error_msg)
-            return False, error_msg
-
-        return match(http_result, {"Ok": handle_response, "Err": handle_error})
-
-    except Exception as e:
-        error_msg = f"Unexpected error downloading code: {str(e)}"
-        ic.print(error_msg)
-        return False, error_msg
+# @update
+# def download_file_from_url(url: str) -> Async[Tuple[bool, str]]:
+#     """
+#     Download file from a URL.
+# 
+#     Returns:
+#         Tuple of (success: bool, result: str)
+#         - If success=True, result contains the downloaded file content
+#         - If success=False, result contains the error message
+#     """
+# 
+#     try:
+#         ic.print(f"Downloading code from URL: {url}")
+# 
+#         # Make HTTP request to download the code
+#         http_result: CallResult[HttpResponse] = yield management_canister.http_request(
+#             {
+#                 "url": url,
+#                 "max_response_bytes": 1024 * 1024,  # 1MB limit for security
+#                 "method": {"get": None},
+#                 "headers": [
+#                     {"name": "User-Agent", "value": "Realms-Codex-Downloader/1.0"}
+#                 ],
+#                 "body": None,
+#                 "transform": {
+#                     "function": (ic.id(), "http_transform"),
+#                     "context": bytes(),
+#                 },
+#             }
+#         ).with_cycles(15_000_000_000)
+# 
+#         def handle_response(response: HttpResponse) -> Tuple[bool, str]:
+#             try:
+#                 # Decode the response body
+#                 code_content = response["body"].decode("utf-8")
+#                 ic.print(f"Successfully downloaded {len(code_content)} bytes")
+# 
+#                 downloaded_content[url] = code_content
+#                 return True, code_content
+# 
+#             except UnicodeDecodeError as e:
+#                 error_msg = f"Failed to decode response as UTF-8: {str(e)}"
+#                 ic.print(error_msg)
+#                 return False, error_msg
+#             except Exception as e:
+#                 error_msg = f"Error processing response: {str(e)}"
+#                 ic.print(error_msg)
+#                 return False, error_msg
+# 
+#         def handle_error(err: str) -> Tuple[bool, str]:
+#             error_msg = f"HTTP request failed: {err}"
+#             ic.print(error_msg)
+#             return False, error_msg
+# 
+#         return match(http_result, {"Ok": handle_response, "Err": handle_error})
+# 
+#     except Exception as e:
+#         error_msg = f"Unexpected error downloading code: {str(e)}"
+#         ic.print(error_msg)
+#         return False, error_msg
 
 
 def verify_checksum(content: str, expected_checksum: str) -> Tuple[bool, str]:
@@ -769,55 +522,55 @@ def verify_checksum(content: str, expected_checksum: str) -> Tuple[bool, str]:
         return False, f"Error verifying checksum: {str(e)}"
 
 
-@query
-def http_request(req: HttpRequest) -> HttpResponse:
-    """Handle HTTP requests to the canister. Only for unauthenticated read operations."""
-
-    try:
-        method = req["method"]
-        url = req["url"]
-
-        logger.info(f"HTTP {method} request to {url}")
-
-        not_found = HttpResponse(
-            status_code=404,
-            headers=[],
-            body=bytes("Not found", "ascii"),
-            streaming_strategy=None,
-            upgrade=False,
-        )
-
-        if method == "GET":
-            url_path = url.split("/")
-
-            if url_path[0] != "api":
-                return not_found
-
-            if url_path[1] != "v1":
-                return not_found
-
-            if url_path[2] == "status":
-                return http_request_core(get_status())
-
-            # if url_path[2] == "extensions":
-            #     if len(url_path) < 4:
-            #         # List all extensions
-            #         extensions_list = list_extensions()
-            #         return http_request_core({"extensions": extensions_list})
-
-            # Note: We no longer need to handle extension-specific HTTP endpoints here
-            # as we have proper canister methods now
-
-        return not_found
-    except Exception as e:
-        logger.error(f"Error handling HTTP request: {str(e)}\n{traceback.format_exc()}")
-        return {
-            "status_code": 500,
-            "headers": [],
-            "body": bytes(traceback.format_exc(), "ascii"),
-            "streaming_strategy": None,
-            "upgrade": False,
-        }
+# @query
+# def http_request(req: HttpRequest) -> HttpResponse:
+#     """Handle HTTP requests to the canister. Only for unauthenticated read operations."""
+# 
+#     try:
+#         method = req["method"]
+#         url = req["url"]
+# 
+#         logger.info(f"HTTP {method} request to {url}")
+# 
+#         not_found = HttpResponse(
+#             status_code=404,
+#             headers=[],
+#             body=bytes("Not found", "ascii"),
+#             streaming_strategy=None,
+#             upgrade=False,
+#         )
+# 
+#         if method == "GET":
+#             url_path = url.split("/")
+# 
+#             if url_path[0] != "api":
+#                 return not_found
+# 
+#             if url_path[1] != "v1":
+#                 return not_found
+# 
+#             if url_path[2] == "status":
+#                 return http_request_core(get_status())
+# 
+#             # if url_path[2] == "extensions":
+#             #     if len(url_path) < 4:
+#             #         # List all extensions
+#             #         extensions_list = list_extensions()
+#             #         return http_request_core({"extensions": extensions_list})
+# 
+#             # Note: We no longer need to handle extension-specific HTTP endpoints here
+#             # as we have proper canister methods now
+# 
+#         return not_found
+#     except Exception as e:
+#         logger.error(f"Error handling HTTP request: {str(e)}\n{traceback.format_exc()}")
+#         return {
+#             "status_code": 500,
+#             "headers": [],
+#             "body": bytes(traceback.format_exc(), "ascii"),
+#             "streaming_strategy": None,
+#             "upgrade": False,
+#         }
 
 
 @update

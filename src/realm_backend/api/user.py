@@ -40,7 +40,7 @@ def user_get(principal: str) -> dict[str, Any]:
 
 def user_list() -> dict[str, Any]:
     logger.info("Listing users")
-    return {"users": [user.to_dict() for user in User.instances()]}
+    return {"users": [user.serialize() for user in User.instances()]}
 
 
 def user_update_profile_picture(

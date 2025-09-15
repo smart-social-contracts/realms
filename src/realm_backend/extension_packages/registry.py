@@ -11,23 +11,23 @@ def get_func(extension_name: str, function_name: str):
     logger = get_logger("registry")
 
     try:
-        logger.info(
+        logger.debug(
             f"🔍 Getting function '{function_name}' from extension '{extension_name}'"
         )
         module_path = f"extension_packages.{extension_name}.entry"
-        logger.info(f"📦 Module path: {module_path}")
+        logger.debug(f"📦 Module path: {module_path}")
 
         module = sys.modules[module_path]
-        logger.info(f"📋 Module loaded: {module}")
-        logger.info(f"📋 Module type: {type(module)}")
+        logger.debug(f"📋 Module loaded: {module}")
+        logger.debug(f"📋 Module type: {type(module)}")
 
-        logger.info(f"🔍 Getting attribute '{function_name}' from module")
-        logger.info(f"🔍 function_name type: {type(function_name)}")
-        logger.info(f"🔍 function_name value: {repr(function_name)}")
+        logger.debug(f"🔍 Getting attribute '{function_name}' from module")
+        logger.debug(f"🔍 function_name type: {type(function_name)}")
+        logger.debug(f"🔍 function_name value: {repr(function_name)}")
 
         func = getattr(module, function_name)
-        logger.info(f"✅ Function retrieved: {func}")
-        logger.info(f"✅ Function type: {type(func)}")
+        logger.debug(f"✅ Function retrieved: {func}")
+        logger.debug(f"✅ Function type: {type(func)}")
 
         return func
 

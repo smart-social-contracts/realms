@@ -1,15 +1,6 @@
 import json
 import traceback
 
-# Import functions from api.ggg_entities instead of main
-from api.ggg_entities import (
-    list_instruments,
-    list_mandates,
-    list_organizations,
-    list_tasks,
-    list_transfers,
-    list_users,
-)
 from kybra import Opt, Principal, Record, Vec, blob, ic, nat64, text
 
 
@@ -78,70 +69,9 @@ def get_realm_data(args) -> RealmData:
     organizations_data = "[]"
 
     try:
-        # Get users data directly from api.ggg_entities
-        try:
-            users_result = list_users()
-            if users_result and "users" in users_result:
-                users_data = json.dumps(users_result["users"])
-            ic.print(f"Retrieved users data: {len(users_data)} bytes")
-        except Exception as e:
-            ic.print(f"Error getting users data: {str(e)}")
-            ic.print(traceback.format_exc())
+        # TODO: implement this
 
-        # Get mandates data
-        try:
-            mandates_result = list_mandates()
-            if mandates_result and "mandates" in mandates_result:
-                mandates_data = json.dumps(mandates_result["mandates"])
-            ic.print(f"Retrieved mandates data: {len(mandates_data)} bytes")
-        except Exception as e:
-            ic.print(f"Error getting mandates data: {str(e)}")
-
-        # Get tasks data
-        try:
-            tasks_result = list_tasks()
-            if tasks_result and "tasks" in tasks_result:
-                tasks_data = json.dumps(tasks_result["tasks"])
-            ic.print(f"Retrieved tasks data: {len(tasks_data)} bytes")
-        except Exception as e:
-            ic.print(f"Error getting tasks data: {str(e)}")
-
-        # Get transfers data
-        try:
-            transfers_result = list_transfers()
-            if transfers_result and "transfers" in transfers_result:
-                transfers_data = json.dumps(transfers_result["transfers"])
-            ic.print(f"Retrieved transfers data: {len(transfers_data)} bytes")
-        except Exception as e:
-            ic.print(f"Error getting transfers data: {str(e)}")
-
-        # Get instruments data
-        try:
-            instruments_result = list_instruments()
-            if instruments_result and "instruments" in instruments_result:
-                instruments_data = json.dumps(instruments_result["instruments"])
-            ic.print(f"Retrieved instruments data: {len(instruments_data)} bytes")
-        except Exception as e:
-            ic.print(f"Error getting instruments data: {str(e)}")
-
-        # Get organizations data
-        try:
-            organizations_result = list_organizations()
-            if organizations_result and "organizations" in organizations_result:
-                organizations_data = json.dumps(organizations_result["organizations"])
-            ic.print(f"Retrieved organizations data: {len(organizations_data)} bytes")
-        except Exception as e:
-            ic.print(f"Error getting organizations data: {str(e)}")
-
-        # Return the collected data
-        combined_data = {
-            "users": json.loads(users_data),
-            "mandates": json.loads(mandates_data),
-            "tasks": json.loads(tasks_data),
-            "transfers": json.loads(transfers_data),
-            "instruments": json.loads(instruments_data),
-            "organizations": json.loads(organizations_data),
-        }
+        combined_data = {}
 
         return RealmData(
             json=json.dumps(combined_data),

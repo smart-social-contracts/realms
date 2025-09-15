@@ -12,6 +12,7 @@ from io import StringIO
 from typing import Any, Dict, List
 
 import ggg
+from kybra_simple_db import Entity
 from kybra_simple_logging import get_logger
 
 from .models import RegistrationCode
@@ -57,8 +58,8 @@ def import_data(args):
         data_format = args.get("format", "json")
         data_content = args.get("data", "")
 
-        logger.info(f"data_content: {data_content}")
-        logger.info(f"data_format: {data_format}")
+        logger.debug(f"data_content: {data_content}")
+        logger.debug(f"data_format: {data_format}")
 
         if not data_content:
             return {"success": False, "error": "No data provided"}
@@ -87,7 +88,7 @@ def import_data(args):
                 return {"success": False, "error": f"Invalid JSON data: {str(e)}"}
 
         # Process data in batches
-        logger.info(f"parsed_data: {parsed_data}")
+        logger.debug(f"parsed_data: {parsed_data}")
         results = process_bulk_import(parsed_data)
 
         return {
@@ -112,19 +113,41 @@ def process_bulk_import(data: List[Dict[str, Any]]) -> Dict[str, Any]:
     failed = 0
     errors = []
 
-    logger.info(f"data: {data}")
+    logger.debug(f"data: {data}")
 
     for record in data:
         try:
-            entity_type = record.get("class")
-            logger.info(f"entity_type: {entity_type}")
 
-            entity = getattr(ggg, entity_type)
-            logger.info(f"entity: {entity}")
+            entity = Entity.deserialize(record)
 
-            entity_data = record["data"]
+            # Example data
+            # d = [
+            #     {
+            #         'timestamp_created': '2025-09-12 23:17:07.522',
+            #         'timestamp_updated': '2025-09-12 23:17:07.522',
+            #         'creator': 'system', 'updater': 'system', 'owner': 'system',
+            #         '_type': 'Realm', '_id': '1',
+            #         'name': 'Generated Demo Realm',
+            #         'description': 'Generated demo realm with 51 citizens and 5 organizations',
+            #         'id': '0',
+            #         'created_at': '2025-09-12T23:17:07.522028',
+            #         'status': 'active',
+            #         'governance_type': 'democratic',
+            #         'population': 51,
+            #         'organization_count': 5,
+            #         'settings': {'voting_period_days': 7, 'proposal_threshold': 0.1, 'quorum_percentage': 0.3, 'tax_rate': 0.15, 'ubi_amount': 1000},
+            #         'treasury': '1'}, {'timestamp_created': '2025-09-12 23:17:07.522', 'timestamp_updated': '2025-09-12 23:17:07.522', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'Treasury', '_id': '1', 'name': 'Generated Demo Realm Treasury', 'vault_principal_id': None, 'created_at': '2025-09-12T23:17:07.522258', 'updated_at': '2025-09-12T23:17:07.522261', 'realm': '1'}, {'timestamp_created': '2025-09-12 23:17:07.521', 'timestamp_updated': '2025-09-12 23:17:07.521', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'UserProfile', '_id': '1', 'name': 'admin', 'description': 'Admin user profile', 'allowed_to': 'a,l,l'}, {'timestamp_created': '2025-09-12 23:17:07.521', 'timestamp_updated': '2025-09-12 23:17:07.521', 'creator': 'system', 'updater': 'system', 'owner': 'system', '_type': 'UserProfile', '_id': '2', 'name': 'member', 'description': 'Member user profile', 'allowed_to': ''
+            #         }
+            #     ]
 
-            create_entity(entity, entity_data)
+            entity = Entity.deserialize(record)
+            entity_type = record["_type"]
+            if entity_type == "Codex":
+                if record["code"].startswith("base64:"):
+                    entity.code = base64.b64decode(record["code"][7:]).decode()
+                else:
+                    entity.code = record["code"]
+
             successful += 1
         except Exception as e:
             logger.error(f"Error creating entity: {str(e)}\n{traceback.format_exc()}")
@@ -138,22 +161,13 @@ def process_bulk_import(data: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
-def create_entity(entity, data: Dict[str, Any]):
-    if entity == "Codex":
-        obj = ggg.Codex()
-        obj.name = data["name"]
-        obj.code = base64.b64decode(data["code"])
-        return obj
-    return entity(**data)
-
-
 def generate_registration_url(args: dict):
     """Generate a registration URL for a user"""
     try:
         user_id = args.get("user_id")
         created_by = args.get("created_by", "admin")
         frontend_url = args.get("frontend_url", "https://localhost:3000")
-        email = args.get("email")
+        email = args["email"]
         expires_in_hours = args.get("expires_in_hours", 24)
 
         if not user_id:

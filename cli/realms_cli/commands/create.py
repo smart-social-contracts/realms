@@ -10,6 +10,8 @@ from typing import Optional
 import typer
 from rich.console import Console
 
+from .deploy import deploy_command
+
 console = Console()
 
 
@@ -27,77 +29,83 @@ def create_command(
 ) -> None:
     """Create a new realm with optional realistic demo data and deployment scripts."""
     console.print(f"[bold blue]🏛️  Creating Realm: {realm_name}[/bold blue]\n")
-    
+
     # Create output directory
     output_path = Path(output_dir)
     output_path.mkdir(exist_ok=True)
-    
+
     # Create scripts subdirectory
     scripts_dir = output_path / "scripts"
     scripts_dir.mkdir(exist_ok=True)
-    
+
     console.print(f"📁 Output directory: {output_path.absolute()}")
     console.print(f"📁 Scripts directory: {scripts_dir.absolute()}")
-    
+
     if random:
-        console.print(f"🎲 Generating random data...")
+        console.print("🎲 Generating random data...")
         console.print(f"   👥 Citizens: {citizens}")
         console.print(f"   🏢 Organizations: {organizations}")
         console.print(f"   💰 Transactions: {transactions}")
         console.print(f"   ⚖️  Disputes: {disputes}")
         if seed:
             console.print(f"   🌱 Seed: {seed}")
-        
+
         # Call the realm_generator.py script
         try:
             cmd = [
                 sys.executable,
                 "scripts/realm_generator.py",
-                "--citizens", str(citizens),
-                "--organizations", str(organizations),
-                "--transactions", str(transactions),
-                "--disputes", str(disputes),
-                "--output-dir", str(output_path),
-                "--realm-name", realm_name,
+                "--citizens",
+                str(citizens),
+                "--organizations",
+                str(organizations),
+                "--transactions",
+                str(transactions),
+                "--disputes",
+                str(disputes),
+                "--output-dir",
+                str(output_path),
+                "--realm-name",
+                realm_name,
             ]
-            
+
             if seed:
                 cmd.extend(["--seed", str(seed)])
-            
+
             console.print(f"[dim]Running: {' '.join(cmd)}[/dim]")
             result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path.cwd())
-            
+
             if result.returncode != 0:
-                console.print(f"[red]❌ Error generating realm data:[/red]")
+                console.print("[red]❌ Error generating realm data:[/red]")
                 console.print(f"[red]{result.stderr}[/red]")
                 if result.stdout:
                     console.print(f"Output: {result.stdout}")
                 raise typer.Exit(1)
-            
+
             console.print("[green]✅ Realm data generated successfully[/green]")
-            
+
         except Exception as e:
             console.print(f"[red]❌ Error running realm generator: {e}[/red]")
             raise typer.Exit(1)
     else:
         console.print("📋 Creating empty realm structure...")
-        
+
         # Create minimal realm data structure
         minimal_data = []
-        
+
         # Save minimal data
         json_file = output_path / "realm_data.json"
-        with open(json_file, 'w') as f:
+        with open(json_file, "w") as f:
             json.dump(minimal_data, f, indent=2)
-        
-        console.print(f"✅ Empty realm structure created")
-    
+
+        console.print("✅ Empty realm structure created")
+
     # Copy deployment scripts from existing files
     console.print("\n🔧 Copying deployment scripts...")
-    
+
     # Get the project root directory (assuming we're in cli/ subdirectory)
     project_root = Path.cwd()
-    
+
     # 1. Copy install_extensions.sh as 1-install-extensions.sh
     source_install = project_root / "scripts" / "install_extensions.sh"
     target_install = scripts_dir / "1-install-extensions.sh"
@@ -107,7 +115,7 @@ def create_command(
         console.print(f"   ✅ {target_install.name}")
     else:
         console.print(f"   ❌ Source file not found: {source_install}")
-    
+
     # 2. Copy deploy_local.sh as 2-deploy-canisters.sh
     source_deploy = project_root / "scripts" / "deploy_local.sh"
     target_deploy = scripts_dir / "2-deploy-canisters.sh"
@@ -117,10 +125,10 @@ def create_command(
         console.print(f"   ✅ {target_deploy.name}")
     else:
         console.print(f"   ❌ Source file not found: {source_deploy}")
-    
+
     # 3. Create a simple upload data script
 
-    pre_adjustments_script_content = f'''
+    pre_adjustments_script_content = """
 #!/usr/bin/env python3
 
 import subprocess, os, sys
@@ -141,9 +149,9 @@ print(f"v: {{v}}")
 print("Replacing vault principal id...")
 
 with open(os.path.join(s, "adjustments.py"), 'r') as f:
-	content = f.read().replace('<VAULT_PRINCIPAL_ID>', v)
+    content = f.read().replace('<VAULT_PRINCIPAL_ID>', v)
 with open(os.path.join(s, "adjustments.py"), 'w') as f:
-	f.write(content)
+    f.write(content)
 
 print(f"✅ Replaced with: {{v}}")
 
@@ -152,13 +160,13 @@ realms_cmd = ['realms', 'shell', '--file', 'generated_realm/scripts/adjustments.
 if network != 'local':
     realms_cmd.extend(['--network', network])
 subprocess.run(realms_cmd, cwd=os.path.dirname(os.path.dirname(s)))
-'''.strip()
+""".strip()
 
-    upload_script_content = f'''#!/bin/bash
+    upload_script_content = """#!/bin/bash
 set -e
 
 # Get network from command line argument or default to local
-NETWORK="${{1:-local}}"
+NETWORK="${1:-local}"
 echo "📥 Uploading realm data for network: $NETWORK..."
 
 # Build realms command with network parameter
@@ -179,22 +187,21 @@ for codex_file in *_codex.py; do
 done
 
 echo "✅ Data upload completed!"
-'''
-    
+"""
+
     pre_adjustments_script = scripts_dir / "4-run-adjustments.py"
     pre_adjustments_script.write_text(pre_adjustments_script_content)
     pre_adjustments_script.chmod(0o755)
     console.print(f"   ✅ {pre_adjustments_script.name}")
-    
+
     upload_script = scripts_dir / "3-upload-data.sh"
     upload_script.write_text(upload_script_content)
     upload_script.chmod(0o755)
     console.print(f"   ✅ {upload_script.name}")
 
-
-    adjustments_content = '''
+    adjustments_content = """
 from kybra import ic
-from ggg import Realm, Treasury, UserProfile, User, Codex
+from ggg import Realm, Treasury, UserProfile, User, Codex, Instrument, Transfer
 
 ic.print("Setting treasury vault principal...")
 
@@ -202,26 +209,41 @@ vault_principal_id = "<VAULT_PRINCIPAL_ID>"
 treasury = Treasury()
 treasury.vault_principal_id = vault_principal_id
 
+realm = Realm.instances()[0]
+realm.treasury = treasury
 
 ic.print("len(Realm.instances()) = %d" % len(Realm.instances()))
 ic.print("len(Treasury.instances()) = %d" % len(Treasury.instances()))
 ic.print("len(UserProfile.instances()) = %d" % len(UserProfile.instances()))
 ic.print("len(User.instances()) = %d" % len(User.instances()))
 ic.print("len(Codex.instances()) = %d" % len(Codex.instances()))
+ic.print("len(Instrument.instances()) = %d" % len(Instrument.instances()))
+ic.print("len(Transfer.instances()) = %d" % len(Transfer.instances()))
 
 for codex in Codex.instances():
     ic.print(f"{codex.name}: {len(codex.code)}")
-'''.strip()
+""".strip()
 
     adjustments_script = scripts_dir / "adjustments.py"
     adjustments_script.write_text(adjustments_content)
-    console.print(f"   ✅ {adjustments_script.name}")   
+    console.print(f"   ✅ {adjustments_script.name}")
 
     console.print(f"\n[green]🎉 Realm '{realm_name}' created successfully![/green]")
-    console.print(f"\n[bold]Next Steps:[/bold]")
+    console.print("\n[bold]Next Steps:[/bold]")
     console.print(f"realms deploy --folder {output_dir}")
-    
-    
+
     if deploy:
-        console.print(f"\n[yellow]🚀 Auto-deployment requested...[/yellow]")
-        console.print(f"[dim]Note: Auto-deployment not yet implemented. Please run the scripts manually.[/dim]")
+        console.print("\n[yellow]🚀 Auto-deployment requested...[/yellow]")
+        try:
+            # Call deploy_command with the generated realm folder
+            deploy_command(
+                config_file=None, folder=output_dir, network=network, clean=False
+            )
+        except typer.Exit as e:
+            console.print(
+                f"[red]❌ Auto-deployment failed with exit code: {e.exit_code}[/red]"
+            )
+            raise
+        except Exception as e:
+            console.print(f"[red]❌ Auto-deployment failed: {e}[/red]")
+            raise typer.Exit(1)

@@ -20,6 +20,7 @@ from ggg import (
     Trade,
     Transfer,
     User,
+    UserProfile,
     Vote,
 )
 from kybra_simple_logging import get_logger
@@ -51,15 +52,10 @@ def get_status() -> dict[str, Any]:
     trades_count = Trade.count()
     proposals_count = Proposal.count()
     votes_count = Vote.count()
+    realms = Realm.instances()
+    user_profiles_count = UserProfile.count()
 
-    # Get realm name - use the first realm if any exist
-    realm_name = "Unnamed Realm"  # Default name
-    try:
-        realms = Realm.instances()
-        if realms:
-            realm_name = realms[0].name
-    except Exception as e:
-        logger.warning(f"Could not retrieve realm name: {e}")
+    realm_name = realms[0].name if realms else "None"
 
     # Get installed extensions
     extension_names = []
@@ -103,6 +99,7 @@ def get_status() -> dict[str, Any]:
         "transfers_count": transfers_count,
         "instruments_count": instruments_count,
         "codexes_count": codexes_count,
+        "user_profiles_count": user_profiles_count,
         "disputes_count": disputes_count,
         "licenses_count": licenses_count,
         "trades_count": trades_count,

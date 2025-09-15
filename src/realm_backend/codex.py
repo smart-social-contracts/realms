@@ -31,7 +31,7 @@ def mandate_1_tax_payment():
                 cursor = 1
             continue
 
-        logger.info("user[" + str(cursor) + "]: " + str(user.to_dict()))
+        logger.info("user[" + str(cursor) + "]: " + str(user.serialize()))
 
         num_users_processed += 1
         cursor += 1

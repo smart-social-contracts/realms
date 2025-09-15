@@ -9,16 +9,16 @@ logger = get_logger("core.extensions")
 
 
 def call_extension_function(extension_name: str, function_name: str, args: str):
-    logger.info(f"Calling extension '{extension_name}' function '{function_name}'")
+    logger.debug(f"Calling extension '{extension_name}' function '{function_name}'")
 
     try:
         from extension_packages.registry import get_func
 
         func = get_func(extension_name, function_name)
-        logger.info(f"Got function from registry: {func}")
+        logger.debug(f"Got function from registry: {func}")
 
         result = func(args)
-        logger.info(f"Got result from function: {result}")
+        logger.debug(f"Got result from function: {result}")
 
     except Exception as e:
         logger.error(f"Error calling extension function: {e}\n{traceback.format_exc()}")
@@ -30,10 +30,10 @@ def call_extension_function(extension_name: str, function_name: str, args: str):
 def extension_async_call(
     extension_name: str, function_name: str, args: str
 ) -> Async[Any]:
-    logger.info(f"Async calling extension {extension_name}...")
+    logger.debug(f"Async calling extension {extension_name}...")
 
     result_coroutine = call_extension_function(extension_name, function_name, args)
-    logger.info(
+    logger.debug(
         f"Got coroutine from extension {extension_name} function {function_name}: {result_coroutine}"
     )
 

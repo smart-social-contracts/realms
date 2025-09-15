@@ -21,6 +21,6 @@ def organization_get(principal: str) -> dict[str, Any]:
 def organization_list() -> dict[str, Any]:
     return {
         "organizations": [
-            organization.to_dict() for organization in Organization.instances()
+            organization.serialize() for organization in Organization.instances()
         ]
     }

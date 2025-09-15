@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -18,6 +19,24 @@ from rich.text import Text
 console = Console()
 
 
+def get_logger(name: str) -> logging.Logger:
+    """Get a logger instance with the specified name."""
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+
+    # save to file
+    file_handler = logging.FileHandler("realms_cli.log")
+    file_handler.setLevel(logging.DEBUG)
+    logger.addHandler(file_handler)
+
+    # # print warnings and errors to console
+    # console_handler = logging.StreamHandler()
+    # console_handler.setLevel(logging.WARNING)
+    # logger.addHandler(console_handler)
+
+    return logger
+
+
 def find_python_310() -> Optional[str]:
     """Find Python 3.10 executable on the system."""
     # Common Python 3.10 executable names to try
@@ -26,57 +45,68 @@ def find_python_310() -> Optional[str]:
         "python3",
         "python",
     ]
-    
+
     for candidate in python_candidates:
         try:
-            result = subprocess.run([
-                candidate, "-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
-            ], capture_output=True, text=True, check=True)
-            
+            result = subprocess.run(
+                [
+                    candidate,
+                    "-c",
+                    "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')",
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+
             version = result.stdout.strip()
             if version == "3.10":
                 # Get full path to the executable
-                which_result = subprocess.run([
-                    "which", candidate
-                ], capture_output=True, text=True, check=True)
+                which_result = subprocess.run(
+                    ["which", candidate], capture_output=True, text=True, check=True
+                )
                 return which_result.stdout.strip()
-                
+
         except (subprocess.CalledProcessError, FileNotFoundError):
             continue
-    
+
     # Try pyenv if available
     try:
-        result = subprocess.run([
-            "pyenv", "which", "python3.10"
-        ], capture_output=True, text=True, check=True)
+        result = subprocess.run(
+            ["pyenv", "which", "python3.10"], capture_output=True, text=True, check=True
+        )
         return result.stdout.strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         pass
-    
+
     return None
 
 
 def ensure_project_venv(project_dir: Path) -> Path:
     """Ensure a project-specific virtual environment exists with required dependencies."""
     venv_dir = project_dir / ".realms-venv"
-    
+
     if not venv_dir.exists():
-        console.print(f"[yellow]🔧 Creating project virtual environment at {venv_dir}[/yellow]")
-        
+        console.print(
+            f"[yellow]🔧 Creating project virtual environment at {venv_dir}[/yellow]"
+        )
+
         # Check if Python 3.10 is available
         python_executable = find_python_310()
         if not python_executable:
             console.print("[red]❌ Python 3.10 is required but not found[/red]")
-            console.print("[yellow]💡 Please install Python 3.10 or use pyenv to manage Python versions[/yellow]")
-            raise RuntimeError("Python 3.10 is required for project virtual environment")
-        
+            console.print(
+                "[yellow]💡 Please install Python 3.10 or use pyenv to manage Python versions[/yellow]"
+            )
+            raise RuntimeError(
+                "Python 3.10 is required for project virtual environment"
+            )
+
         console.print(f"[dim]Using Python: {python_executable}[/dim]")
-        
+
         # Create virtual environment with specific Python version
-        subprocess.run([
-            python_executable, "-m", "venv", str(venv_dir)
-        ], check=True)
-        
+        subprocess.run([python_executable, "-m", "venv", str(venv_dir)], check=True)
+
         # Install requirements if they exist
         requirements_file = project_dir / "requirements.txt"
         if requirements_file.exists():
@@ -84,11 +114,11 @@ def ensure_project_venv(project_dir: Path) -> Path:
             pip_path = venv_dir / "bin" / "pip"
             if sys.platform == "win32":
                 pip_path = venv_dir / "Scripts" / "pip.exe"
-            
-            subprocess.run([
-                str(pip_path), "install", "-r", str(requirements_file)
-            ], check=True)
-            
+
+            subprocess.run(
+                [str(pip_path), "install", "-r", str(requirements_file)], check=True
+            )
+
         # Install development requirements if they exist
         dev_requirements_file = project_dir / "requirements-dev.txt"
         if dev_requirements_file.exists():
@@ -96,33 +126,33 @@ def ensure_project_venv(project_dir: Path) -> Path:
             pip_path = venv_dir / "bin" / "pip"
             if sys.platform == "win32":
                 pip_path = venv_dir / "Scripts" / "pip.exe"
-            
-            subprocess.run([
-                str(pip_path), "install", "-r", str(dev_requirements_file)
-            ], check=True)
-    
+
+            subprocess.run(
+                [str(pip_path), "install", "-r", str(dev_requirements_file)], check=True
+            )
+
     return venv_dir
 
 
 def get_project_python_env(project_dir: Path) -> Dict[str, str]:
     """Get environment variables for subprocess execution with project venv."""
     venv_dir = ensure_project_venv(project_dir)
-    
+
     # Get current environment
     env = os.environ.copy()
-    
+
     # Update PATH to include venv binaries
     bin_dir = venv_dir / "bin"
     if sys.platform == "win32":
         bin_dir = venv_dir / "Scripts"
-    
+
     current_path = env.get("PATH", "")
     env["PATH"] = f"{bin_dir}:{current_path}"
     env["VIRTUAL_ENV"] = str(venv_dir)
-    
+
     # Remove any existing PYTHONPATH to avoid conflicts
     env.pop("PYTHONPATH", None)
-    
+
     return env
 
 
@@ -139,13 +169,13 @@ def run_command(
         # Format command for copy-paste with proper quoting
         formatted_command = []
         for arg in command:
-            if ' ' in arg or '"' in arg or "'" in arg:
+            if " " in arg or '"' in arg or "'" in arg:
                 # Use single quotes and escape any single quotes inside
                 escaped_arg = arg.replace("'", "'\"'\"'")
                 formatted_command.append(f"'{escaped_arg}'")
             else:
                 formatted_command.append(arg)
-        
+
         console.print(f"[dim]Running: {' '.join(formatted_command)}[/dim]")
 
         # Use project venv environment if requested

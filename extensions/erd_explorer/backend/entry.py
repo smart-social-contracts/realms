@@ -30,21 +30,6 @@ def extension_sync_call(method_name: str, args: dict):
         return {"success": False, "error": f"Error calling {method_name}: {str(e)}"}
 
 
-from api.ggg_entities import (
-    list_codexes,
-    list_disputes,
-    list_instruments,
-    list_licenses,
-    list_mandates,
-    list_organizations,
-    list_proposals,
-    list_realms,
-    list_tasks,
-    list_trades,
-    list_transfers,
-    list_users,
-    list_votes,
-)
 from ggg.balance import Balance
 from ggg.citizen import Citizen
 from ggg.codex import Codex
@@ -186,29 +171,16 @@ def get_entity_data(args):
     page_size = parsed_args.get("page_size", 10)
 
     try:
-        entity_map = {
-            "User": list_users,
-            "Codex": list_codexes,
-            "Dispute": list_disputes,
-            "Instrument": list_instruments,
-            "License": list_licenses,
-            "Mandate": list_mandates,
-            "Organization": list_organizations,
-            "Proposal": list_proposals,
-            "Realm": list_realms,
-            "Task": list_tasks,
-            "Trade": list_trades,
-            "Transfer": list_transfers,
-            "Vote": list_votes,
-        }
+        # TODO: implement this
+        entity_map = {}
 
         if entity_type in entity_map:
             result = entity_map[entity_type](page_num, page_size)
             # Convert entity objects to dictionaries
             items = []
             for item in result["items"]:
-                if hasattr(item, "to_dict"):
-                    items.append(item.to_dict())
+                if hasattr(item, "serialize"):
+                    items.append(item.serialize())
                 else:
                     items.append(str(item))
 
