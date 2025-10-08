@@ -163,8 +163,13 @@ def run_command(
     check: bool = True,
     env: Optional[Dict[str, str]] = None,
     use_project_venv: bool = False,
+    logger: Optional[logging.Logger] = None,
 ) -> subprocess.CompletedProcess:
-    """Run a shell command with proper error handling."""
+    """Run a shell command with proper error handling.
+    
+    Args:
+        logger: If provided, output will be written to the logger instead of console.
+    """
     try:
         # Format command for copy-paste with proper quoting
         formatted_command = []
@@ -176,7 +181,10 @@ def run_command(
             else:
                 formatted_command.append(arg)
 
-        console.print(f"[dim]Running: {' '.join(formatted_command)}[/dim]")
+        if logger:
+            logger.info(f"Running: {' '.join(formatted_command)}")
+        else:
+            console.print(f"[dim]Running: {' '.join(formatted_command)}[/dim]")
 
         # Use project venv environment if requested
         if use_project_venv and cwd:
@@ -189,32 +197,86 @@ def run_command(
                 project_env.update(env)
                 env = project_env
 
-        result = subprocess.run(
-            command,
-            cwd=cwd,
-            capture_output=capture_output,
-            text=True,
-            check=check,
-            env=env,
-        )
+        # Stream output in real-time when logger is provided
+        if logger:
+            # Use Popen to stream output line by line
+            process = subprocess.Popen(
+                command,
+                cwd=cwd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,  # Merge stderr into stdout
+                text=True,
+                env=env,
+                bufsize=1,  # Line buffered
+                universal_newlines=True
+            )
+            
+            stdout_lines = []
+            # Read and log output in real-time
+            for line in process.stdout:
+                line = line.rstrip()
+                if line:
+                    logger.info(line)
+                    stdout_lines.append(line)
+            
+            # Wait for process to complete
+            returncode = process.wait()
+            
+            # Create a CompletedProcess-like object
+            result = subprocess.CompletedProcess(
+                command,
+                returncode,
+                stdout='\n'.join(stdout_lines) if stdout_lines else '',
+                stderr=''
+            )
+            
+            if check and returncode != 0:
+                raise subprocess.CalledProcessError(returncode, command, result.stdout, '')
+            
+            return result
+        else:
+            # Original behavior when no logger
+            should_capture = capture_output
+            
+            result = subprocess.run(
+                command,
+                cwd=cwd,
+                capture_output=should_capture,
+                text=True,
+                check=check,
+                env=env,
+            )
 
-        if capture_output and result.stdout:
-            console.print(f"[dim]{result.stdout}[/dim]")
+            # Write output to console
+            if should_capture and result.stdout:
+                console.print(f"[dim]{result.stdout}[/dim]")
 
-        return result
+            return result
 
     except subprocess.CalledProcessError as e:
-        console.print(f"[red]Command failed: {' '.join(command)}[/red]")
-        if e.stdout:
-            console.print(f"[red]stdout: {e.stdout}[/red]")
-        if e.stderr:
-            console.print(f"[red]stderr: {e.stderr}[/red]")
+        error_msg = f"Command failed: {' '.join(command)}"
+        if logger:
+            logger.error(error_msg)
+            if e.stdout:
+                logger.error(f"stdout: {e.stdout}")
+            if e.stderr:
+                logger.error(f"stderr: {e.stderr}")
+        else:
+            console.print(f"[red]{error_msg}[/red]")
+            if e.stdout:
+                console.print(f"[red]stdout: {e.stdout}[/red]")
+            if e.stderr:
+                console.print(f"[red]stderr: {e.stderr}[/red]")
         raise
     except FileNotFoundError:
-        console.print(f"[red]Command not found: {command[0]}[/red]")
-        console.print(
-            "[yellow]Make sure the required tools are installed and in your PATH[/yellow]"
-        )
+        error_msg = f"Command not found: {command[0]}"
+        info_msg = "Make sure the required tools are installed and in your PATH"
+        if logger:
+            logger.error(error_msg)
+            logger.info(info_msg)
+        else:
+            console.print(f"[red]{error_msg}[/red]")
+            console.print(f"[yellow]{info_msg}[/yellow]")
         raise
 
 

@@ -7,7 +7,7 @@ from typing import Optional
 import typer
 from rich.console import Console
 
-from ..utils import run_command
+from ..utils import get_logger, run_command
 
 console = Console()
 
@@ -25,6 +25,12 @@ def deploy_command(
     clean: bool = typer.Option(False, "--clean", help="Clean deployment (restart dfx)"),
 ) -> None:
     """Deploy a realm to the specified network."""
+    # Create logger for capturing script output
+    logger = get_logger("deploy")
+    logger.info("=" * 60)
+    logger.info(f"Starting deployment to {network}")
+    logger.info("=" * 60)
+    
     console.print(f"[bold blue]🚀 Deploying Realm to {network}[/bold blue]\n")
 
     if folder:
@@ -81,20 +87,17 @@ def deploy_command(
                 # Make sure script is executable
                 script_path.chmod(0o755)
 
-                result = run_command(cmd, cwd=str(working_dir), use_project_venv=True)
+                result = run_command(cmd, cwd=str(working_dir), use_project_venv=True, logger=logger)
 
                 if result.returncode == 0:
                     console.print(
                         f"[green]✅ {script_name} completed successfully[/green]"
                     )
-                    if result.stdout:
-                        console.print(result.stdout)
+                    logger.info(f"{script_name} completed successfully")
                 else:
                     console.print(f"[red]❌ {script_name} failed[/red]")
-                    if result.stderr:
-                        console.print(f"[red]{result.stderr}[/red]")
-                    if result.stdout:
-                        console.print(result.stdout)
+                    console.print(f"[yellow]Check realms_cli.log for details[/yellow]")
+                    logger.error(f"{script_name} failed")
                     raise typer.Exit(1)
 
                 console.print("")  # Add spacing between scripts
@@ -102,6 +105,10 @@ def deploy_command(
             console.print(
                 "[green]🎉 All deployment scripts completed successfully![/green]"
             )
+            console.print(
+                "[dim]Full deployment log saved to realms_cli.log[/dim]"
+            )
+            logger.info("All deployment scripts completed successfully")
 
         except Exception as e:
             console.print(f"[red]❌ Error during script execution: {e}[/red]")
@@ -130,6 +137,7 @@ def deploy_command(
                         ["./scripts/deploy_local.sh"],
                         cwd=str(Path.cwd()),
                         use_project_venv=True,
+                        logger=logger,
                     )
                 elif network in ["staging", "mainnet", "ic"]:
                     console.print("🔧 Running staging deployment script...")
@@ -137,14 +145,17 @@ def deploy_command(
                         ["./scripts/deploy_staging.sh"],
                         cwd=str(Path.cwd()),
                         use_project_venv=True,
+                        logger=logger,
                     )
 
                 if result.returncode == 0:
                     console.print("[green]✅ Deployment completed successfully[/green]")
-                    console.print(result.stdout)
+                    console.print("[dim]Full deployment log saved to realms_cli.log[/dim]")
+                    logger.info("Deployment completed successfully")
                 else:
                     console.print("[red]❌ Deployment failed[/red]")
-                    console.print(f"[red]{result.stderr}[/red]")
+                    console.print("[yellow]Check realms_cli.log for details[/yellow]")
+                    logger.error("Deployment failed")
                     raise typer.Exit(1)
             else:
                 console.print(
