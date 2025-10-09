@@ -159,7 +159,7 @@ def get_my_user_status() -> RealmResponse:
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                user=UserGetRecord(
+                userGet=UserGetRecord(
                     principal=Principal.from_str(user["principal"]),
                     profiles=profiles,
                     profile_picture_url=user["profile_picture_url"],

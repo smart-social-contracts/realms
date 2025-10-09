@@ -107,7 +107,7 @@ export async function loadExtensionTranslations() {
             }
           });
           
-          console.log(`Loaded translations for extension: ${extensionId}, locale: ${code}, translations: ${JSON.stringify(translations)}`);
+          // console.log(`Loaded translations for extension: ${extensionId}, locale: ${code}, translations: ${JSON.stringify(translations)}`);
         } catch (err) {
           console.error(`Failed to load extension translation: ${path} for locale: ${code}`, err);
         }
