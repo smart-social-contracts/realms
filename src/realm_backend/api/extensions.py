@@ -33,12 +33,12 @@ def list_extensions(principal: str) -> RealmResponse:
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                ExtensionsList=ExtensionsListRecord(extensions=extensions_json)
+                extensionsList=ExtensionsListRecord(extensions=extensions_json)
             ),
         )
     except Exception as e:
         logger.error(f"Error listing extensions: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
 def extension_sync_call(extension_name: str, function_name: str, args: str) -> Any:

@@ -51,6 +51,7 @@ class ExtensionsListRecord(Record):
 
 class RealmResponseData(Variant):
     status: StatusRecord
+    user: UserGetRecord
     error: text
     message: text
     objectsList: ObjectsListRecord

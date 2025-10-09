@@ -124,7 +124,7 @@ def join_realm(profile: str) -> RealmResponse:
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                UserGet=UserGetRecord(  # TODO: fix this
+                user=UserGetRecord(  # TODO: fix this
                     principal=Principal.from_str(user["principal"]),
                     profiles=profiles,
                     profile_picture_url=user.get("profile_picture_url", ""),
@@ -148,7 +148,7 @@ def get_my_user_status() -> RealmResponse:
         logger.info(f"User: {user}")
         if not user["success"]:
             return RealmResponse(
-                success=False, data=RealmResponseData(Error=user["error"])
+                success=False, data=RealmResponseData(error=user["error"])
             )
 
         profiles = Vec[text]()
@@ -159,7 +159,7 @@ def get_my_user_status() -> RealmResponse:
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                UserGet=UserGetRecord(
+                user=UserGetRecord(
                     principal=Principal.from_str(user["principal"]),
                     profiles=profiles,
                     profile_picture_url=user["profile_picture_url"],
@@ -168,7 +168,7 @@ def get_my_user_status() -> RealmResponse:
         )
     except Exception as e:
         logger.error(f"Error getting user: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
 @update
@@ -177,13 +177,13 @@ def update_my_profile_picture(profile_picture_url: str) -> RealmResponse:
         result = user_update_profile_picture(ic.caller().to_str(), profile_picture_url)
         if not result["success"]:
             return RealmResponse(
-                success=False, data=RealmResponseData(Error=result["error"])
+                success=False, data=RealmResponseData(error=result["error"])
             )
 
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                UserGet=UserGetRecord(
+                user=UserGetRecord(
                     principal=ic.caller(),
                     profiles=Vec[text](),
                     profile_picture_url=result["profile_picture_url"],
@@ -194,7 +194,7 @@ def update_my_profile_picture(profile_picture_url: str) -> RealmResponse:
         logger.error(
             f"Error updating profile picture: {str(e)}\n{traceback.format_exc()}"
         )
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
 # New GGG API endpoints
@@ -253,7 +253,7 @@ def get_objects_paginated(
         )
     except Exception as e:
         logger.error(f"Error listing users: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
 @query
@@ -288,7 +288,7 @@ def get_objects(params: Vec[Tuple[str, str]]) -> RealmResponse:
         )
     except Exception as e:
         logger.error(f"Error listing objects: {str(e)}\n{traceback.format_exc()}")
-        return RealmResponse(success=False, data=RealmResponseData(Error=str(e)))
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
 @update

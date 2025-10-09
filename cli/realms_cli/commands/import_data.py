@@ -19,7 +19,7 @@ from ..utils import (
 
 def import_data_command(
     file_path: str,
-    entity_type: str,
+    entity_type: str = None,
     format: str = "json",
     batch_size: int = MAX_BATCH_SIZE,
     dry_run: bool = False,
@@ -32,7 +32,7 @@ def import_data_command(
         return import_codex_command(file_path, dry_run=dry_run, network=network)
 
     console.print(
-        f"[bold blue]📥 Importing {entity_type} data from {file_path}[/bold blue]\n"
+        f"[bold blue]📥 Importing data from {file_path}[/bold blue]\n"
     )
 
     try:
@@ -43,10 +43,12 @@ def import_data_command(
         with open(data_file, "r") as f:
             data = json.load(f)
 
+        console.print(type(data))
+
         if not isinstance(data, list):
             raise ValueError("JSON data must be an array of objects")
 
-        console.print(f"📊 Found {len(data)} {entity_type} records to import")
+        console.print(f"📊 Found {len(data)} records to import")
 
         # TODO:
         # if dry_run:
