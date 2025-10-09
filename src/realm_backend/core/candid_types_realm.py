@@ -56,6 +56,7 @@ class RealmResponseData(Variant):
     message: text
     objectsList: ObjectsListRecord
     objectsListPaginated: ObjectsListRecordPaginated
+    extensionsList: ExtensionsListRecord
 
 
 class RealmResponse(Record):
