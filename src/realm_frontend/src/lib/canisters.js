@@ -136,3 +136,9 @@ export async function initBackendWithIdentity() {
 		return backend;
 	}
 }
+
+// Debug helper: expose backend globally in browser console
+if (typeof window !== 'undefined') {
+	window.__debug_backend = backend;
+	console.log('🔍 Debug: backend available as window.__debug_backend');
+}

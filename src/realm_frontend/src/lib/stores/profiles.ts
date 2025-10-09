@@ -10,7 +10,7 @@ import { isAuthenticated } from './auth';
 interface BackendResponse {
     success: boolean;
     data?: {
-        UserGet?: {
+        userGet?: {
             principal: string;
             profiles: string[];
         };
@@ -124,9 +124,11 @@ export async function loadUserProfiles() {
         }
         
         const response = await backend.get_my_user_status();
+
+        console.log("User profiles response:", response);
         
-        if (response && response.success && response.data && response.data.UserGet) {
-            const profiles = response.data.UserGet.profiles || [];
+        if (response && response.success && response.data && response.data.userGet) {
+            const profiles = response.data.userGet.profiles || [];
             profileState.update(state => ({
                 ...state,
                 profiles,

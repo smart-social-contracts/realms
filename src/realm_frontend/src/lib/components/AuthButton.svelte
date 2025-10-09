@@ -98,8 +98,8 @@
 	async function loadUserProfilePicture() {
 		try {
 			const response = await backend.get_my_user_status();
-			if (response && response.success && response.data && response.data.UserGet) {
-				userProfilePictureUrl = response.data.UserGet.profile_picture_url || '';
+			if (response && response.success && response.data && response.data.userGet) {
+				userProfilePictureUrl = response.data.userGet.profile_picture_url || '';
 			}
 		} catch (error) {
 			console.error('Error loading user profile picture:', error);

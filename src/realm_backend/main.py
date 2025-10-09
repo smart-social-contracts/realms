@@ -124,7 +124,7 @@ def join_realm(profile: str) -> RealmResponse:
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                user=UserGetRecord(  # TODO: fix this
+                userGet=UserGetRecord(  # TODO: fix this
                     principal=Principal.from_str(user["principal"]),
                     profiles=profiles,
                     profile_picture_url=user.get("profile_picture_url", ""),
@@ -183,7 +183,7 @@ def update_my_profile_picture(profile_picture_url: str) -> RealmResponse:
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                user=UserGetRecord(
+                userGet=UserGetRecord(
                     principal=ic.caller(),
                     profiles=Vec[text](),
                     profile_picture_url=result["profile_picture_url"],

@@ -11,14 +11,13 @@
 	let message = '';
 
 	onMount(async () => {
-		await loadCurrentProfilePicture();
 	});
 
 	async function loadCurrentProfilePicture() {
 		try {
 			const response = await backend.get_my_user_status();
-			if (response && response.success && response.data && response.data.UserGet) {
-				profilePictureUrl = response.data.UserGet.profile_picture_url || '';
+			if (response && response.success && response.data && response.data.userGet) {
+				profilePictureUrl = response.data.userGet.profile_picture_url || '';
 			}
 		} catch (error) {
 			console.error('Error loading profile picture:', error);

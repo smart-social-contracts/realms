@@ -23,7 +23,6 @@
 
 	onMount(async () => {
 		console.log("Settings page mounted");
-		
 		// Fetch user status
 		try {
 			console.log("Backend:", backend);
@@ -36,16 +35,15 @@
 			const response = await backend.get_my_user_status();
 			console.log("Backend response:", response);
 			
-			if (response && response.success && response.data && response.data.UserGet) {
-				principal = response.data.UserGet.principal;
-				profiles = response.data.UserGet.profiles || [];
-				avatar = response.data.UserGet.avatar;
+			if (response && response.success && response.data && response.data.userGet) {
+				principal = response.data.userGet.principal;
+				profiles = response.data.userGet.profiles || [];
+				avatar = response.data.userGet.avatar;
 			} else {
 				console.error("Invalid backend response format:", response);
 				throw new Error('Could not fetch user status: Invalid response format.');
 			}
 		} catch (e: any) {
-			console.error("Error getting user status:", e);
 			userStatusError = e.message || 'Failed to fetch user status.';
 		} finally {
 			loadingUserStatus = false;
