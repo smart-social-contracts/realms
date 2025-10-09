@@ -31,8 +31,9 @@
 		// Initialize theme system
 		initializeTheme();
 		
-		// Wait for locale to be ready
-		await waitLocale();
+		// Wait for locale to be ready with a timeout fallback
+		const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 5000));
+		await Promise.race([waitLocale(), timeoutPromise]);
 		i18nReady = true;
 		
 		// Restore user's preferred language from localStorage or cookie
