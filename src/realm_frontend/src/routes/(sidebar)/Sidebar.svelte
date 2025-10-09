@@ -142,9 +142,9 @@
 			console.log('Response success:', response?.success);
 			console.log('Response data:', response?.data);
 			
-			if (response.success && response.data.ExtensionsList) {
-				console.log('Extensions list:', response.data.ExtensionsList.extensions);
-				const extensionData = response.data.ExtensionsList.extensions.map(ext => JSON.parse(ext));
+			if (response.success && response.data.extensionsList) {
+				console.log('Extensions list:', response.data.extensionsList.extensions);
+				const extensionData = response.data.extensionsList.extensions.map(ext => JSON.parse(ext));
 				console.log('Raw extension data:', extensionData);
 				
 				extensions = extensionData.map(ext => ({
