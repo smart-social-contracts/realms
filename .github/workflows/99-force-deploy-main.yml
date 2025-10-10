@@ -28,19 +28,6 @@ jobs:
           echo "deploy_commit=$DEPLOY_COMMIT" >> $GITHUB_OUTPUT
           echo "Deploying commit: $DEPLOY_COMMIT"
 
-      - name: Insert commit hash and datetime
-        run: |
-          COMMIT_HASH=$(git rev-parse HEAD)
-          sed -i "s/COMMIT_HASH_PLACEHOLDER/$COMMIT_HASH/g" src/realm_backend/api/status.py
-          sed -i "s/COMMIT_HASH_PLACEHOLDER/$COMMIT_HASH/g" src/realm_frontend/src/app.html
-
-          COMMIT_DATETIME=$(git log --format="%cd" --date=iso8601 -1)
-          sed -i "s/COMMIT_DATETIME_PLACEHOLDER/$COMMIT_DATETIME/g" src/realm_frontend/src/app.html
-
-          VERSION=$(cat version.txt)
-          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" src/realm_backend/api/status.py
-          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" src/realm_frontend/src/app.html
-
       - name: Deploy to staging
         run: |
           # Store identity in a temporary file
@@ -51,10 +38,7 @@ jobs:
           docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ steps.commit.outputs.deploy_commit }}
           
           # Deploy using realms CLI with staging network
-          # Mount the current workspace to use updated source files with commit metadata
           docker run --rm \
-            -v "$(pwd):/workspace" \
-            -w /workspace \
             -v "$(pwd)/identity.pem:/app/identity.pem" \
             -e DFX_WARNING="-mainnet_plaintext_identity" \
             ghcr.io/${{ github.repository_owner }}/realms:${{ steps.commit.outputs.deploy_commit }} \

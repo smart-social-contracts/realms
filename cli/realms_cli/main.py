@@ -76,6 +76,9 @@ def create(
     deploy: bool = typer.Option(
         False, "--deploy", help="Deploy the realm after creation"
     ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="Path to identity PEM file or identity name for dfx"
+    ),
 ) -> None:
     """Create a new realm with optional realistic demo data for testing and demonstrations."""
     create_command(
@@ -89,6 +92,7 @@ def create(
         realm_name,
         network,
         deploy,
+        identity,
     )
 
 
@@ -126,9 +130,12 @@ def import_data(
         False, "--dry-run", help="Show what would be imported without executing"
     ),
     network: str = typer.Option("local", "--network", help="Network to use for import"),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="Path to identity PEM file or identity name for dfx"
+    ),
 ) -> None:
     """Import data into the realm. Supports JSON data and Python codex files."""
-    import_data_command(file_path, entity_type, format, batch_size, dry_run, network)
+    import_data_command(file_path, entity_type, format, batch_size, dry_run, network, identity)
 
 
 # Register deploy command directly from commands module

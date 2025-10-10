@@ -1,5 +1,6 @@
 """Deploy command for deploying realms to different networks."""
 
+import os
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -23,12 +24,17 @@ def deploy_command(
         "local", "--network", "-n", help="Target network for deployment"
     ),
     clean: bool = typer.Option(False, "--clean", help="Clean deployment (restart dfx)"),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="Path to identity PEM file or identity name for dfx"
+    ),
 ) -> None:
     """Deploy a realm to the specified network."""
     # Create logger for capturing script output
     logger = get_logger("deploy")
     logger.info("=" * 60)
     logger.info(f"Starting deployment to {network}")
+    if identity:
+        logger.info(f"Using identity: {identity}")
     logger.info("=" * 60)
     
     console.print(f"[bold blue]🚀 Deploying Realm to {network}[/bold blue]\n")
@@ -91,7 +97,14 @@ def deploy_command(
                 # Make sure script is executable
                 script_path.chmod(0o755)
 
-                result = run_command(cmd, cwd=str(working_dir), use_project_venv=True, logger=logger)
+                # Prepare environment with identity if specified
+                env = None
+                if identity:
+                    env = os.environ.copy()
+                    # Pass identity via environment variable so all dfx commands pick it up
+                    env["DFX_IDENTITY"] = identity
+                
+                result = run_command(cmd, cwd=str(working_dir), use_project_venv=True, logger=logger, env=env)
 
                 if result.returncode == 0:
                     console.print(
@@ -137,19 +150,31 @@ def deploy_command(
 
                 if network == "local":
                     console.print("🔧 Running local deployment script...")
+                    env = None
+                    if identity:
+                        env = os.environ.copy()
+                        env["DFX_IDENTITY"] = identity
+                    
                     result = run_command(
                         ["./scripts/deploy_local.sh"],
                         cwd=str(Path.cwd()),
                         use_project_venv=True,
                         logger=logger,
+                        env=env,
                     )
                 elif network in ["staging", "mainnet", "ic"]:
                     console.print("🔧 Running staging deployment script...")
+                    env = None
+                    if identity:
+                        env = os.environ.copy()
+                        env["DFX_IDENTITY"] = identity
+                    
                     result = run_command(
                         ["./scripts/deploy_staging.sh"],
                         cwd=str(Path.cwd()),
                         use_project_venv=True,
                         logger=logger,
+                        env=env,
                     )
 
                 if result.returncode == 0:

@@ -24,12 +24,13 @@ def import_data_command(
     batch_size: int = MAX_BATCH_SIZE,
     dry_run: bool = False,
     network: str = "local",
+    identity: Optional[str] = None,
 ) -> None:
     """Import data into the realm. Supports JSON data and Python codex files."""
 
     # Handle codex files separately
     if entity_type == "codex":
-        return import_codex_command(file_path, dry_run=dry_run, network=network)
+        return import_codex_command(file_path, dry_run=dry_run, network=network, identity=identity)
 
     console.print(
         f"[bold blue]📥 Importing data from {file_path}[/bold blue]\n"
@@ -76,19 +77,24 @@ def import_data_command(
             args_json = json.dumps(args)
             escaped_args = args_json.replace('"', '\\"')
 
+            cmd = [
+                "dfx",
+                "canister",
+                "call",
+                "realm_backend",
+                "extension_sync_call",
+                f'(record {{ extension_name = "admin_dashboard"; function_name = "import_data"; args = "{escaped_args}"; }})',
+                "--network",
+                network,
+                "--output",
+                "json",
+            ]
+            
+            if identity:
+                cmd.extend(["--identity", identity])
+            
             result = run_command(
-                [
-                    "dfx",
-                    "canister",
-                    "call",
-                    "realm_backend",
-                    "extension_sync_call",
-                    f'(record {{ extension_name = "admin_dashboard"; function_name = "import_data"; args = "{escaped_args}"; }})',
-                    "--network",
-                    network,
-                    "--output",
-                    "json",
-                ],
+                cmd,
                 cwd=project_root,
                 capture_output=True,
             )
@@ -125,6 +131,7 @@ def import_codex_command(
     codex_name: Optional[str] = None,
     dry_run: bool = False,
     network: str = "local",
+    identity: Optional[str] = None,
 ) -> None:
     """Import Python codex file into the realm.
 
@@ -173,17 +180,22 @@ def import_codex_command(
         args_json = json.dumps(args)
         escaped_args = args_json.replace('"', '\\"')
 
+        cmd = [
+            "dfx",
+            "canister",
+            "call",
+            "realm_backend",
+            "extension_sync_call",
+            f'(record {{ extension_name = "admin_dashboard"; function_name = "import_data"; args = "{escaped_args}"; }})',
+            "--network",
+            network,
+        ]
+        
+        if identity:
+            cmd.extend(["--identity", identity])
+        
         result = run_command(
-            [
-                "dfx",
-                "canister",
-                "call",
-                "realm_backend",
-                "extension_sync_call",
-                f'(record {{ extension_name = "admin_dashboard"; function_name = "import_data"; args = "{escaped_args}"; }})',
-                "--network",
-                network,
-            ],
+            cmd,
             cwd=project_root,
         )
 

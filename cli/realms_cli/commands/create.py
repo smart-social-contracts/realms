@@ -26,6 +26,7 @@ def create_command(
     realm_name: str,
     network: str,
     deploy: bool,
+    identity: Optional[str] = None,
 ) -> None:
     """Create a new realm with optional realistic demo data and deployment scripts."""
     console.print(f"[bold blue]🏛️  Creating Realm: {realm_name}[/bold blue]\n")
@@ -256,7 +257,7 @@ for codex in Codex.instances():
         try:
             # Call deploy_command with the generated realm folder
             deploy_command(
-                config_file=None, folder=output_dir, network=network, clean=False
+                config_file=None, folder=output_dir, network=network, clean=False, identity=identity
             )
         except typer.Exit as e:
             console.print(
