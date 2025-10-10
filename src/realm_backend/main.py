@@ -1,6 +1,5 @@
 import json
 import traceback
-from typing import Optional, Tuple
 
 import api
 from api.extensions import list_extensions
@@ -277,7 +276,7 @@ def get_objects(params: Vec[Tuple[str, str]]) -> RealmResponse:
     """
 
     try:
-        logger.info(f"Listing objects")
+        logger.info("Listing objects")
         result = list_objects(params)
         objects = result
         objects_json = [json.dumps(obj.serialize()) for obj in objects]
@@ -428,16 +427,16 @@ def timer_callback():
 # def download_file_from_url(url: str) -> Async[Tuple[bool, str]]:
 #     """
 #     Download file from a URL.
-# 
+#
 #     Returns:
 #         Tuple of (success: bool, result: str)
 #         - If success=True, result contains the downloaded file content
 #         - If success=False, result contains the error message
 #     """
-# 
+#
 #     try:
 #         ic.print(f"Downloading code from URL: {url}")
-# 
+#
 #         # Make HTTP request to download the code
 #         http_result: CallResult[HttpResponse] = yield management_canister.http_request(
 #             {
@@ -454,16 +453,16 @@ def timer_callback():
 #                 },
 #             }
 #         ).with_cycles(15_000_000_000)
-# 
+#
 #         def handle_response(response: HttpResponse) -> Tuple[bool, str]:
 #             try:
 #                 # Decode the response body
 #                 code_content = response["body"].decode("utf-8")
 #                 ic.print(f"Successfully downloaded {len(code_content)} bytes")
-# 
+#
 #                 downloaded_content[url] = code_content
 #                 return True, code_content
-# 
+#
 #             except UnicodeDecodeError as e:
 #                 error_msg = f"Failed to decode response as UTF-8: {str(e)}"
 #                 ic.print(error_msg)
@@ -472,14 +471,14 @@ def timer_callback():
 #                 error_msg = f"Error processing response: {str(e)}"
 #                 ic.print(error_msg)
 #                 return False, error_msg
-# 
+#
 #         def handle_error(err: str) -> Tuple[bool, str]:
 #             error_msg = f"HTTP request failed: {err}"
 #             ic.print(error_msg)
 #             return False, error_msg
-# 
+#
 #         return match(http_result, {"Ok": handle_response, "Err": handle_error})
-# 
+#
 #     except Exception as e:
 #         error_msg = f"Unexpected error downloading code: {str(e)}"
 #         ic.print(error_msg)
@@ -525,13 +524,13 @@ def verify_checksum(content: str, expected_checksum: str) -> Tuple[bool, str]:
 # @query
 # def http_request(req: HttpRequest) -> HttpResponse:
 #     """Handle HTTP requests to the canister. Only for unauthenticated read operations."""
-# 
+#
 #     try:
 #         method = req["method"]
 #         url = req["url"]
-# 
+#
 #         logger.info(f"HTTP {method} request to {url}")
-# 
+#
 #         not_found = HttpResponse(
 #             status_code=404,
 #             headers=[],
@@ -539,28 +538,28 @@ def verify_checksum(content: str, expected_checksum: str) -> Tuple[bool, str]:
 #             streaming_strategy=None,
 #             upgrade=False,
 #         )
-# 
+#
 #         if method == "GET":
 #             url_path = url.split("/")
-# 
+#
 #             if url_path[0] != "api":
 #                 return not_found
-# 
+#
 #             if url_path[1] != "v1":
 #                 return not_found
-# 
+#
 #             if url_path[2] == "status":
 #                 return http_request_core(get_status())
-# 
+#
 #             # if url_path[2] == "extensions":
 #             #     if len(url_path) < 4:
 #             #         # List all extensions
 #             #         extensions_list = list_extensions()
 #             #         return http_request_core({"extensions": extensions_list})
-# 
+#
 #             # Note: We no longer need to handle extension-specific HTTP endpoints here
 #             # as we have proper canister methods now
-# 
+#
 #         return not_found
 #     except Exception as e:
 #         logger.error(f"Error handling HTTP request: {str(e)}\n{traceback.format_exc()}")
@@ -626,7 +625,7 @@ def test_mixed_sync_async_task() -> void:
 
         async_call = Call()
         async_call.is_async = True
-        async_call._function_def = download_file_from_url
+        # async_call._function_def = download_file_from_url  # TODO: temporarily disabled
         async_call._function_params = [url]
         step1 = TaskStep(call=async_call, run_next_after=10)
 
