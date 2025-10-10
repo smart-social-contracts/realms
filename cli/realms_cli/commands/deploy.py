@@ -68,16 +68,20 @@ def deploy_command(
                 console.print(f"[dim]Script path: {script_path}[/dim]")
 
                 # Determine working directory and command based on script
-                if script_name == "3-upload-data.sh":
+                if script_name == "2-deploy-canisters.sh":
+                    # Run deployment script with network parameter
+                    working_dir = Path.cwd()
+                    cmd = [str(script_path.resolve()), network]
+                elif script_name == "3-upload-data.sh":
                     # Run upload script from the realm folder where data files are located
                     working_dir = folder_path
-                    cmd = [str(script_path.resolve())]
+                    cmd = [str(script_path.resolve()), network]
                 elif script_name == "4-run-adjustments.py":
                     # Run Python script from the realm folder and pass network parameter
                     working_dir = folder_path
                     cmd = ["python", str(script_path.resolve()), network]
                 else:
-                    # Run other scripts from project root
+                    # Run other scripts from project root (like install-extensions.sh)
                     working_dir = Path.cwd()
                     cmd = [str(script_path.resolve())]
 

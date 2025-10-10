@@ -116,15 +116,34 @@ def create_command(
     else:
         console.print(f"   ❌ Source file not found: {source_install}")
 
-    # 2. Copy deploy_local.sh as 2-deploy-canisters.sh
-    source_deploy = project_root / "scripts" / "deploy_local.sh"
+    # 2. Create network-aware deployment wrapper script
+    deploy_wrapper_content = """#!/bin/bash
+set -e
+set -x
+
+# Get network from command line argument or default to local
+NETWORK="${1:-local}"
+echo "🚀 Deploying canisters to network: $NETWORK..."
+
+# Determine which deployment script to use
+if [ "$NETWORK" = "local" ] || [ "$NETWORK" = "local2" ]; then
+    echo "Using local deployment script..."
+    bash scripts/deploy_local.sh
+elif [ "$NETWORK" = "staging" ] || [ "$NETWORK" = "ic" ]; then
+    echo "Using staging/IC deployment script..."
+    bash scripts/deploy_staging.sh "$NETWORK"
+else
+    echo "❌ Unknown network: $NETWORK"
+    echo "Supported networks: local, local2, staging, ic"
+    exit 1
+fi
+
+echo "✅ Deployment to $NETWORK completed!"
+"""
     target_deploy = scripts_dir / "2-deploy-canisters.sh"
-    if source_deploy.exists():
-        shutil.copy2(source_deploy, target_deploy)
-        target_deploy.chmod(0o755)
-        console.print(f"   ✅ {target_deploy.name}")
-    else:
-        console.print(f"   ❌ Source file not found: {source_deploy}")
+    target_deploy.write_text(deploy_wrapper_content)
+    target_deploy.chmod(0o755)
+    console.print(f"   ✅ {target_deploy.name}")
 
     # 3. Create a simple upload data script
 
