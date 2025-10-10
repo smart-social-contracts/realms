@@ -42,7 +42,7 @@ jobs:
             -v "$(pwd)/identity.pem:/app/identity.pem" \
             -e DFX_WARNING="-mainnet_plaintext_identity" \
             ghcr.io/${{ github.repository_owner }}/realms:${{ steps.commit.outputs.deploy_commit }} \
-            bash -c "realms create --random --network staging --deploy && realms deploy --network staging --identity /app/identity.pem"
+            bash -c "dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && dfx identity use my-identity && realms create --random --network staging --deploy"
           
           # Clean up
           rm identity.pem
