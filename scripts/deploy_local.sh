@@ -36,9 +36,12 @@ dfx start --clean --background --log file --logfile dfx.log --host 127.0.0.1:$PO
 echo "Waiting for dfx to initialize..."
 sleep 3
 dfx deploy internet_identity
-dfx deploy vault
 dfx deploy realm_registry_backend --yes
 dfx deploy realm_backend --yes
+
+# Deploy vault in test mode
+dfx deploy vault --argument "(null, opt principal \"$(dfx canister id realm_backend)\", opt 100, opt 10, opt true)"
+
 dfx generate realm_registry_backend
 dfx generate realm_backend
 npm install --legacy-peer-deps
