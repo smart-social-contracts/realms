@@ -4,6 +4,8 @@
 
 from kybra import ic
 from ggg import Treasury
+from pprint import pformat
+import json
 
 def async_task():
     """Async task must be defined with this exact name"""
@@ -19,7 +21,9 @@ def async_task():
     ic.print(f"Checking vault status for treasury: {treasury.name}")
     
     # This yield makes an async call to the vault canister
+    ic.print("treasury.vault_principal_id: %s" % treasury.vault_principal_id)
     result = yield treasury.get_vault_status()
+    result = json.loads(result)
     
-    ic.print(f"Vault status retrieved: {result}")
+    ic.print(f"Vault status retrieved: {pformat(result)}")
     return result
