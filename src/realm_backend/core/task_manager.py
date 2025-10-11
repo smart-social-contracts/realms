@@ -28,7 +28,7 @@ class Call(Entity, TimestampedMixin):
     _function_params = None
 
     is_async = Boolean()
-    codex = OneToOne("Codex", "call")
+    codex = ManyToOne("Codex", "calls")
     task_step = OneToOne("TaskStep", "call")
 
     def _function(self):
@@ -48,8 +48,28 @@ class Call(Entity, TimestampedMixin):
 
     def _async_function(self) -> Async:
         logger.info("Executing async call")
-        result = yield self._function_def(*self._function_params)
-        return result
+        if self.codex:
+            logger.info("Executing async codex")
+            # Execute codex code in globals context
+            safe_globals = globals().copy()
+            import ggg
+            import kybra
+            safe_globals.update({"ggg": ggg, "kybra": kybra})
+            
+            # Execute the codex code (defines async_task function)
+            exec(self.codex.code, safe_globals)
+            
+            # Call the async_task function
+            async_task = safe_globals.get('async_task')
+            if async_task and callable(async_task):
+                result = yield from async_task()
+                return result
+            else:
+                logger.error("async_task function not found in codex")
+                return None
+        else:
+            result = yield self._function_def(*self._function_params)
+            return result
 
 
 class TaskStep(Entity, TimestampedMixin):
@@ -74,6 +94,7 @@ class TaskStep(Entity, TimestampedMixin):
 
 class Task(GGGTask):
     steps = OneToMany("TaskStep", "task")
+    schedules = OneToMany("TaskSchedule", "task")
     status = String()
     step_to_execute = Integer()
 
@@ -107,17 +128,14 @@ class TaskManager:
             def async_timer_callback() -> Async[void]:
                 logger.info(f"Executing async timer callback for {step.call}")
                 try:
-                    if step.call._function_params:
-                        result = yield step.call._function_def(
-                            *step.call._function_params
-                        )
-                    else:
-                        result = yield step.call._function_def()
+                    # Use _function() which handles both codex and function-based calls
+                    result = yield step.call._function()()
                     logger.info(f"Async timer callback completed with result: {result}")
                     step.status = TaskStatus.COMPLETED.value
                     self._check_and_schedule_next_step(task)
                 except Exception as e:
                     logger.error(f"Async timer callback failed: {e}")
+                    logger.error(traceback.format_exc())
                     step.status = TaskStatus.FAILED.value
                     task.status = TaskStatus.FAILED.value
 
@@ -178,10 +196,19 @@ class TaskManager:
                                 f"Skipping disabled schedule for task {task.name}"
                             )
                             continue
-                        if (
-                            schedule.run_at < now
-                            or schedule.last_run_at + schedule.repeat_every < now
-                        ):
+
+                        should_execute = False
+
+                        # Execute if run_at is not set or is in the past
+                        if not schedule.run_at or schedule.run_at < now:
+                            should_execute = True
+
+                        # Execute if repeat_every is set and it's time for another run
+                        if schedule.last_run_at and schedule.repeat_every:
+                            if schedule.last_run_at + schedule.repeat_every < now:
+                                should_execute = True
+
+                        if should_execute:
                             logger.info(
                                 f"Scheduling task {task.name} for immediate execution"
                             )
