@@ -41,9 +41,12 @@ class Call(Entity, TimestampedMixin):
         logger.info("Executing sync call")
         if self.codex:
             logger.info("Executing codex")
-            run_code(self.codex.code)
+            result = run_code(self.codex.code)
+            # Store result for execute_code() to retrieve
+            self._result = result
         else:
             result = self._function_def(*self._function_params)
+            self._result = result
             return result
 
     def _async_function(self) -> Async:
@@ -63,12 +66,15 @@ class Call(Entity, TimestampedMixin):
             async_task = safe_globals.get('async_task')
             if async_task and callable(async_task):
                 result = yield from async_task()
+                # Store result for status checking
+                self._result = result
                 return result
             else:
                 logger.error("async_task function not found in codex")
                 return None
         else:
             result = yield self._function_def(*self._function_params)
+            self._result = result
             return result
 
 
