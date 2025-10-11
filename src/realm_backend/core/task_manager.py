@@ -44,6 +44,13 @@ class Call(Entity, TimestampedMixin):
             result = run_code(self.codex.code)
             # Store result for execute_code() to retrieve
             self._result = result
+            # Log captured output
+            if result.get("logs"):
+                logger.info(f"Captured logs: {result['logs']}")
+            if result.get("success"):
+                logger.info(f"Execution successful, result: {result.get('result')}")
+            else:
+                logger.error(f"Execution failed: {result.get('error')}")
         else:
             result = self._function_def(*self._function_params)
             self._result = result

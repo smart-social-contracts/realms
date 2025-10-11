@@ -14,10 +14,14 @@ def run_code(source_code: str, locals={}):
     safe_globals = globals().copy()
 
     import ggg
+    import kybra
+    from kybra import ic
 
     safe_globals.update(
         {
             "ggg": ggg,
+            "kybra": kybra,
+            "ic": ic,
         }
     )
     safe_locals = {}
