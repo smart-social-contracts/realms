@@ -19,7 +19,7 @@ from .commands.registry import (
     registry_remove_command,
     registry_search_command,
 )
-from .commands.shell import shell_command
+from .commands.run import run_command
 from .constants import MAX_BATCH_SIZE
 from .utils import (
     check_dependencies,
@@ -458,8 +458,8 @@ def db(
     db_command(network, canister)
 
 
-@app.command("shell")
-def shell(
+@app.command("run")
+def run(
     network: Optional[str] = typer.Option(
         None, "--network", "-n", help="Network to use (overrides context)"
     ),
@@ -489,7 +489,7 @@ def shell(
         # If timeout specified without --wait flag, enable waiting
         actual_wait = wait_timeout
     
-    shell_command(effective_network, effective_canister, file, actual_wait)
+    run_command(effective_network, effective_canister, file, actual_wait)
 
 
 # Create network subcommand group
