@@ -20,6 +20,7 @@ from .commands.registry import (
     registry_search_command,
 )
 from .commands.run import run_command
+from .commands.shell import shell_command
 from .constants import MAX_BATCH_SIZE
 from .utils import (
     check_dependencies,
@@ -458,6 +459,26 @@ def db(
     db_command(network, canister)
 
 
+@app.command("shell")
+def shell(
+    network: Optional[str] = typer.Option(
+        None, "--network", "-n", help="Network to use (overrides context)"
+    ),
+    canister: Optional[str] = typer.Option(
+        None, "--canister", "-c", help="Canister name to connect to (overrides context)"
+    ),
+    file: Optional[str] = typer.Option(
+        None, "--file", "-f", help="Execute Python file instead of interactive shell"
+    ),
+) -> None:
+    """Start an interactive Python shell connected to the Realms backend canister or execute a Python file."""
+    # Get effective network and canister from context
+    effective_network, effective_canister = get_effective_network_and_canister(
+        network, canister
+    )
+    shell_command(effective_network, effective_canister, file)
+
+
 @app.command("run")
 def run(
     network: Optional[str] = typer.Option(
@@ -476,7 +497,7 @@ def run(
         None, "--wait-timeout", help="Custom timeout in seconds for async task waiting"
     ),
 ) -> None:
-    """Start an interactive Python shell connected to the Realms backend canister or execute a Python file."""
+    """Start an interactive Python shell connected to the Realms backend canister or execute a Python file (with async task waiting support)."""
     # Get effective network and canister from context
     effective_network, effective_canister = get_effective_network_and_canister(
         network, canister

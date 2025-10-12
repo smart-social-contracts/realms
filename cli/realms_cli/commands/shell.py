@@ -1,12 +1,10 @@
 """Shell command for interactive Python console in realm backend canister."""
 
 import ast
-import json
 import platform
 import re
 import subprocess
 import sys
-import time
 from typing import Optional
 
 import typer
@@ -42,7 +40,7 @@ class RealmsShell:
             cmd.extend(["--network", self.network])
 
         # Add the rest of the command
-        cmd.extend([self.canister_name, "execute_code", f'("{escaped_code}")'])
+        cmd.extend([self.canister_name, "execute_code_shell", f'("{escaped_code}")'])
 
         try:
             # Execute the dfx command
@@ -128,46 +126,6 @@ class RealmsShell:
             return f"Error calling canister: {e.stderr}"
         except Exception as e:
             return f"Error: {str(e)}"
-
-    def poll_task_status(self, task_id: str) -> dict:
-        """
-        Poll the status of an async task by calling get_task_status.
-        Returns a dictionary with task status information.
-        """
-        # Prepare the dfx command
-        cmd = ["dfx", "canister", "call"]
-
-        # Add network parameter if provided
-        if self.network:
-            cmd.extend(["--network", self.network])
-
-        # Add the rest of the command
-        cmd.extend([self.canister_name, "get_task_status", f'("{task_id}")'])
-
-        try:
-            # Execute the dfx command
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-
-            # Parse the output - extract JSON from the tuple format
-            output = result.stdout.strip()
-            # Match tuple format with optional trailing comma: ("content") or ("content",)
-            tuple_match = re.search(r'\(\s*"(.*)"\s*,?\s*\)', output, re.DOTALL)
-            
-            if tuple_match:
-                json_str = tuple_match.group(1)
-                # Unescape the JSON string - handle \n and \" escape sequences
-                json_str = json_str.replace('\\n', '\n').replace('\\"', '"')
-                return json.loads(json_str)
-            else:
-                # Debug: return the raw output to see what we're getting
-                return {"error": f"Failed to parse task status response. Raw output: {output[:200]}"}
-                
-        except subprocess.CalledProcessError as e:
-            return {"error": f"Error calling canister: {e.stderr}"}
-        except json.JSONDecodeError as e:
-            return {"error": f"JSON decode error: {str(e)}"}
-        except Exception as e:
-            return {"error": f"Error polling task status: {str(e)}"}
 
     def get_dfx_version(self) -> str:
         """Get the installed dfx version."""
@@ -280,16 +238,21 @@ class RealmsShell:
 
 
 def shell_command(
-    network: Optional[str] = None,
-    canister: str = "realm_backend",
-    file: Optional[str] = None,
-    wait: Optional[int] = None,
+    network: Optional[str] = typer.Option(
+        None, "--network", "-n", help="Network to use (local, ic, etc.)"
+    ),
+    canister: str = typer.Option(
+        "realm_backend", "--canister", "-c", help="Canister name to connect to"
+    ),
+    file: Optional[str] = typer.Option(
+        None, "--file", "-f", help="Execute Python file instead of interactive shell"
+    ),
 ) -> None:
     """Start an interactive Python shell connected to the Realms backend canister or execute a Python file."""
     # If file is provided, execute it instead of interactive shell
     if file:
         console.print(f"[bold blue]📄 Executing Python file: {file}[/bold blue]\n")
-        execute_python_file(file, canister, network, wait)
+        execute_python_file(file, canister, network)
         return
 
     console.print("[bold blue]🚀 Starting Realms Shell[/bold blue]\n")
@@ -321,7 +284,7 @@ def shell_command(
     shell.run_shell()
 
 
-def execute_python_file(file_path: str, canister: str, network: Optional[str], wait: Optional[int] = None) -> None:
+def execute_python_file(file_path: str, canister: str, network: Optional[str]) -> None:
     """Execute a Python file on the Realms backend canister."""
     import os
     from pathlib import Path
@@ -354,68 +317,6 @@ def execute_python_file(file_path: str, canister: str, network: Optional[str], w
         result = shell.execute(code_content)
         if result:
             console.print(result)
-            
-            # If wait flag is set, check if this is an async task and poll for completion
-            if wait is not None:
-                try:
-                    # Extract JSON from tuple format if needed
-                    json_str = result
-                    # Check if result is in tuple format: ("json_content")
-                    tuple_match = re.search(r'\(\s*"(.*)"\s*,?\s*\)', result, re.DOTALL)
-                    if tuple_match:
-                        json_str = tuple_match.group(1)
-                        # Unescape the JSON string - handle both \n escape sequences
-                        json_str = json_str.replace('\\n', '\n').replace('\\"', '"')
-                    
-                    # Try to parse the result as JSON to check if it's an async task
-                    result_data = json.loads(json_str)
-                    
-                    if result_data.get("type") == "async" and "task_id" in result_data:
-                        task_id = result_data["task_id"]
-                        
-                        # Use provided timeout or default to 600 seconds (10 minutes)
-                        timeout_seconds = wait if wait > 0 else 600
-                        console.print(f"\n[cyan]⏳ Waiting for async task {task_id} to complete (timeout: {timeout_seconds}s)...[/cyan]")
-                        
-                        # Poll the task status
-                        poll_interval = 2  # seconds
-                        max_polls = timeout_seconds // poll_interval
-                        polls = 0
-                        
-                        while polls < max_polls:
-                            time.sleep(poll_interval)
-                            status_data = shell.poll_task_status(task_id)
-                            
-                            if "error" in status_data:
-                                console.print(f"[red]❌ Error polling task: {status_data['error']}[/red]")
-                                break
-                            
-                            status = status_data.get("status", "unknown")
-                            console.print(f"[dim]Status: {status}[/dim]", end="\r")
-                            
-                            if status == "completed":
-                                console.print(f"\n[green]✅ Task completed successfully[/green]")
-                                if "result" in status_data:
-                                    console.print(f"Result: {status_data['result']}")
-                                break
-                            elif status == "failed":
-                                console.print(f"\n[red]❌ Task failed[/red]")
-                                if "error" in status_data:
-                                    console.print(f"Error: {status_data['error']}")
-                                break
-                            
-                            polls += 1
-                        
-                        if polls >= max_polls:
-                            console.print(f"\n[yellow]⚠️  Timeout waiting for task completion[/yellow]")
-                    else:
-                        # Sync task, nothing to wait for
-                        console.print(f"[dim]Task completed synchronously (no waiting needed)[/dim]")
-                        
-                except json.JSONDecodeError:
-                    # Not JSON, probably sync execution
-                    console.print(f"[dim]Task completed synchronously (no waiting needed)[/dim]")
-        
         console.print(f"[green]✅ Successfully executed {Path(file_path).name}[/green]")
     except Exception as e:
         console.print(f"[red]❌ Error executing file: {e}[/red]")
