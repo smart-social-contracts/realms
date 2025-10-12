@@ -469,13 +469,27 @@ def shell(
     file: Optional[str] = typer.Option(
         None, "--file", "-f", help="Execute Python file instead of interactive shell"
     ),
+    wait: bool = typer.Option(
+        False, "--wait", "-w", help="Wait for async tasks to complete (default 600s timeout)"
+    ),
+    wait_timeout: Optional[int] = typer.Option(
+        None, "--wait-timeout", help="Custom timeout in seconds for async task waiting"
+    ),
 ) -> None:
     """Start an interactive Python shell connected to the Realms backend canister or execute a Python file."""
     # Get effective network and canister from context
     effective_network, effective_canister = get_effective_network_and_canister(
         network, canister
     )
-    shell_command(effective_network, effective_canister, file)
+    # Determine the actual wait timeout
+    actual_wait = None
+    if wait:
+        actual_wait = wait_timeout if wait_timeout is not None else 600
+    elif wait_timeout is not None:
+        # If timeout specified without --wait flag, enable waiting
+        actual_wait = wait_timeout
+    
+    shell_command(effective_network, effective_canister, file, actual_wait)
 
 
 # Create network subcommand group
