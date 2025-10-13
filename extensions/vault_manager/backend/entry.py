@@ -82,6 +82,11 @@ class TransactionSummaryRecord(Record):
     scan_end_tx_id: nat
 
 
+class TestModeRecord(Record):
+    test_mode_enabled: bool
+    tx_id: nat
+
+
 class ResponseData(Variant, total=False):
     TransactionId: TransactionIdRecord
     TransactionSummary: TransactionSummaryRecord
@@ -90,6 +95,7 @@ class ResponseData(Variant, total=False):
     Stats: StatsRecord
     Error: text
     Message: text
+    TestMode: TestModeRecord
 
 
 class Response(Record):

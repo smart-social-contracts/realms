@@ -51,31 +51,15 @@ class Treasury(Entity, TimestampedMixin):
 
             args = json.dumps({
                 "vault_canister_id": self.vault_principal_id,
-                "principal_id": ic.id().to_str(),
-            })
-
-            balance = yield extension_async_call("vault_manager", "get_balance", args)
-
-            args = json.dumps({
-                "vault_canister_id": self.vault_principal_id,
                 "principal_id": ic.id().to_str()
             })
 
-            transactions = yield extension_async_call("vault_manager", "get_transactions", args)
+            # balance = yield extension_async_call("vault_manager", "get_balance", args)
+            transactions = yield extension_async_call("vault_manager", "_get_transactions", args)
 
-            # Parse responses
-            try:
-                balance_data = json.loads(balance)
-                transactions_data = json.loads(transactions)
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse vault responses: {e}")
-                return json.dumps({
-                    "success": False,
-                    "error": f"Failed to parse vault responses: {str(e)}"
-                })
 
-            logger.info('balance_data     : %s' % pformat(balance_data))
-            logger.info('transactions_data: %s' % pformat(transactions_data))
+            # logger.info('balance_data     : %s' % pformat(balance_data))
+            logger.info('transactions_data: %s' % pformat(transactions))
 
             # # Check if responses are successful
             # if not balance_data.get("success"):
