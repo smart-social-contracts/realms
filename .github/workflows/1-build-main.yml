@@ -156,7 +156,8 @@ jobs:
             -v "$(pwd)/identity.pem:/app/identity.pem" \
             -e DFX_WARNING="-mainnet_plaintext_identity" \
             ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} \
-            bash -c "realms create --random --network staging --deploy && realms deploy --network staging --identity /app/identity.pem"
+            bash -c "realms create --random --network staging --deploy && \
+                     realms deploy --network staging --identity /app/identity.pem"
           
           # Clean up
           rm identity.pem
