@@ -156,7 +156,7 @@ s = os.path.dirname(os.path.abspath(__file__))
 
 # Get network from command line argument or default to local
 network = sys.argv[1] if len(sys.argv) > 1 else 'local'
-print(f"🚀 Running adjustments.py for network: {{network}}")
+print(f"🚀 Running adjustments.py for network: {network}")
 
 # Build dfx command with network parameter
 dfx_cmd = ['dfx', 'canister', 'id', 'vault']
@@ -164,7 +164,15 @@ if network != 'local':
     dfx_cmd.extend(['--network', network])
 
 v = subprocess.check_output(dfx_cmd, cwd=os.path.dirname(os.path.dirname(s))).decode().strip()
-print(f"v: {{v}}")
+print(f"vault: {v}")
+
+# Get realm_backend canister principal ID
+realm_backend_cmd = ['dfx', 'canister', 'id', 'realm_backend']
+if network != 'local':
+    realm_backend_cmd.extend(['--network', network])
+
+rb = subprocess.check_output(realm_backend_cmd, cwd=os.path.dirname(os.path.dirname(s))).decode().strip()
+print(f"realm_backend: {rb}")
 
 print("Replacing vault principal id...")
 
@@ -173,7 +181,18 @@ with open(os.path.join(s, "adjustments.py"), 'r') as f:
 with open(os.path.join(s, "adjustments.py"), 'w') as f:
     f.write(content)
 
-print(f"✅ Replaced with: {{v}}")
+print(f"✅ Replaced with: {v}")
+
+# Set mock transaction for testing
+print("Setting mock transaction in test mode...")
+mock_tx_cmd = [
+    'dfx', 'canister', 'call', 'vault', 'test_mode_set_mock_transaction',
+    f'(principal "aaaaa-aa", principal "{rb}", 100003 : nat, "transfer", null)'
+]
+if network != 'local':
+    mock_tx_cmd.extend(['--network', network])
+subprocess.run(mock_tx_cmd, cwd=os.path.dirname(os.path.dirname(s)))
+print("✅ Mock transaction set")
 
 # Run the adjustments script with network parameter
 realms_cmd = ['realms', 'shell', '--file', 'generated_realm/scripts/adjustments.py']

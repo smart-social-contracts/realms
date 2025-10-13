@@ -42,7 +42,7 @@ def convert_principals_to_strings(obj):
 class TransactionRecord(Record):
     id: nat
     amount: int
-    timestamp: nat64
+    timestamp: nat
 
 
 class BalanceRecord(Record):
@@ -223,6 +223,79 @@ def get_status(args: str) -> Async[str]:
         return json.dumps(
             {"success": False, "error": f"{str(e)}\n{traceback.format_exc()}"}
         )
+
+
+def _get_transactions(args: str) -> Async[list]:
+    """Internal helper to get transactions and return as list of dicts."""
+    logger.info(f"vault_manager._get_transactions called with args: {args}")
+
+    try:
+        # Parse args from JSON string if provided
+        if args:
+            params = json.loads(args) if isinstance(args, str) else args
+        else:
+            params = {}
+
+        # Get vault canister ID from parameters (required)
+        vault_canister_id = params.get("vault_canister_id")
+        if not vault_canister_id:
+            logger.error("vault_canister_id parameter is required")
+            return []
+
+        principal_id = params.get("principal_id")
+        if not principal_id:
+            logger.error("principal_id parameter is required")
+            return []
+
+        # Get a reference to the vault canister
+        try:
+            vault = Vault(Principal.from_str(vault_canister_id))
+        except Exception as e:
+            logger.error(f"Invalid vault canister ID: {vault_canister_id}, error: {str(e)}")
+            return []
+
+        # Call the vault method with the user's principal ID
+        try:
+            principal = Principal.from_str(principal_id)
+            result: CallResult[Response] = yield vault.get_transactions(principal)
+        except Exception as e:
+            logger.error(f"Error calling vault.get_transactions: {str(e)}")
+            return []
+
+        # Handle the result and extract transactions as simple list
+        if result.Ok is not None:
+            response = result.Ok
+            if response["success"]:
+                # Extract transactions from ResponseData
+                response_data = response["data"]
+                if "Transactions" in response_data:
+                    transactions = response_data["Transactions"]
+                    # Convert to simple list of dicts
+                    transactions_list = [
+                        {
+                            "id": int(tx["id"]),
+                            "amount": int(tx["amount"]),
+                            "timestamp": int(tx["timestamp"])
+                        }
+                        for tx in transactions
+                    ]
+                    logger.info(f'Successfully extracted {len(transactions_list)} transactions')
+                    return transactions_list
+                else:
+                    return []
+            else:
+                # Response indicates failure - return empty array
+                response_data = response["data"]
+                error_msg = response_data.get("Error", "Unknown error") if "Error" in response_data else "Unknown error"
+                logger.error(f"Vault returned error: {error_msg}")
+                return []
+        else:
+            error_msg = str(result.Err) if result.Err is not None else "Unknown error"
+            logger.error(f"Call failed: {error_msg}")
+            return []
+    except Exception as e:
+        logger.error(f"Error in _get_transactions: {str(e)}\n{traceback.format_exc()}")
+        return []
 
 
 def get_transactions(args: str) -> Async[str]:

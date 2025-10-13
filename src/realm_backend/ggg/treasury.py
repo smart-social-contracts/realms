@@ -54,12 +54,11 @@ class Treasury(Entity, TimestampedMixin):
                 "principal_id": ic.id().to_str()
             })
 
-            # balance = yield extension_async_call("vault_manager", "get_balance", args)
-            transactions = yield extension_async_call("vault_manager", "_get_transactions", args)
+            # Get transactions from vault (returns list of transaction dicts)
+            transactions_list = yield extension_async_call("vault_manager", "_get_transactions", args)
 
-
-            # logger.info('balance_data     : %s' % pformat(balance_data))
-            logger.info('transactions_data: %s' % pformat(transactions))
+            logger.info(f"Retrieved {len(transactions_list)} transactions for treasury '{self.name}'")
+            logger.info('transactions_list: %s' % pformat(transactions_list))
 
             # # Check if responses are successful
             # if not balance_data.get("success"):
