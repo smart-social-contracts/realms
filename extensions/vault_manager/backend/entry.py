@@ -303,57 +303,16 @@ def get_transactions(args: str) -> Async[str]:
     logger.info(f"vault_manager.get_transactions called with args: {args}")
 
     try:
-        # Parse args from JSON string if provided
-        if args:
-            params = json.loads(args) if isinstance(args, str) else args
-        else:
-            params = {}
-
-        # Get vault canister ID from parameters (required)
-        vault_canister_id = params.get("vault_canister_id")
-        if not vault_canister_id:
-            return json.dumps(
-                {"success": False, "error": "vault_canister_id parameter is required"}
-            )
-
-        # Get a reference to the vault canister
-        try:
-            vault = Vault(Principal.from_str(vault_canister_id))
-        except Exception as e:
-            logger.error(
-                f"Invalid vault canister ID: {vault_canister_id}, error: {str(e)}"
-            )
-            return json.dumps(
-                {"success": False, "error": f"Invalid vault canister ID: {str(e)}"}
-            )
-
-        # Call the vault method with the user's principal ID
-        try:
-            principal_id = params.get("principal_id")
-            if not principal_id:
-                return json.dumps(
-                    {"success": False, "error": "principal_id parameter is required"}
-                )
-
-            principal = Principal.from_str(principal_id)
-            result: CallResult[Response] = yield vault.get_transactions(principal)
-        except Exception as e:
-            logger.error(f"Error calling vault.get_transactions: {str(e)}")
-            return json.dumps(
-                {"success": False, "error": f"Error calling transactions: {str(e)}"}
-            )
-
-        # Handle the result
-        if result.Ok is not None:
-            response = result.Ok
-            # Convert Principal objects to strings before JSON serialization
-            serializable_data = convert_principals_to_strings(
-                {"success": response["success"], "data": response["data"]}
-            )
-            return json.dumps(serializable_data)
-        else:
-            error_msg = str(result.Err) if result.Err is not None else "Unknown error"
-            return json.dumps({"success": False, "error": error_msg})
+        # Use the internal helper function to get transactions
+        transactions_list = yield _get_transactions(args)
+        
+        # Wrap the result in the expected response format
+        return json.dumps({
+            "success": True,
+            "data": {
+                "Transactions": transactions_list
+            }
+        })
 
     except Exception as e:
         logger.error(f"Error in get_transactions: {str(e)}\n{traceback.format_exc()}")
