@@ -3,8 +3,10 @@ Vault Manager extension entry point
 """
 
 import json
+import os
 import traceback
 from typing import Any, Dict
+from ggg import Treasury
 
 from kybra import (
     Async,
@@ -316,6 +318,24 @@ def get_transactions(args: str) -> Async[str]:
 
     except Exception as e:
         logger.error(f"Error in get_transactions: {str(e)}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+def get_vault_canister_id(args: str) -> str:
+    """Return the configured vault canister ID"""
+    logger.info("vault_manager.get_vault_canister_id called")
+    try:
+
+        vault_principal_id = Treasury.instances()[0].vault_principal_id
+        logger.info(f"Vault principal ID: {vault_principal_id}")
+        return json.dumps({
+            "success": True,
+            "data": {
+                "canister_id": vault_principal_id
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error in get_vault_canister_id: {str(e)}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})
 
 

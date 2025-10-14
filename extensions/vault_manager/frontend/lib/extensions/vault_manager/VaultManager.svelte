@@ -12,6 +12,10 @@
 	import { backend } from '$lib/canisters';
 	import { _ } from 'svelte-i18n';
 	
+	// Canister IDs - will be loaded from declarations
+	let backendCanisterId = "";
+	let vaultCanisterIdFromDeclarations = "";
+	
 	// Component state
 	let loading = true;
 	let error = '';
@@ -25,13 +29,11 @@
 	// Principal ID management
 	let userPrincipalId = $principal || "";
 	
-	// Vault canister ID management - Demo data populated
-	let vaultCanisterId = "rdmx6-jaaaa-aaaah-qcaiq-cai"; // Demo ckBTC vault canister ID
-	let vaultCanisterInputValue = vaultCanisterId;
-	let vaultCanisterError = '';
+	// Vault canister ID management
+	let vaultCanisterId = ""; // Will be set from declarations or demo mode
 	
 	// Demo vault data - populated with realistic ckBTC values
-	let demoMode = true;
+	let demoMode = false;
 	let demoBalanceData = {
 		balance: 250000000, // 2.5 ckBTC (in satoshis)
 		token: "ckBTC",
@@ -148,7 +150,7 @@
 		try {
 			// Prepare call parameters
 			const callParams = { 
-				principal_id: vaultCanisterId, // Use the vault canister ID as the principal, same as CLI example
+				principal_id: backendCanisterId, // Use the vault canister ID as the principal, same as CLI example
 				vault_canister_id: vaultCanisterId
 			};
 			
@@ -277,16 +279,15 @@
 		}
 		
 		try {
-			// Prepare call parameters
+			// Prepare call parameters - using backend canister as the principal to query
 			const callParams = { 
-				principal_id: vaultCanisterId, // Use the vault canister ID directly as the principal
+				principal_id: backendCanisterId,
 				vault_canister_id: vaultCanisterId
 			};
 			
-			// Log the request details
 			console.log('Calling get_transactions with parameters:', callParams);
 			
-			// Use the extension_async_call API method to get transactions directly from the vault canister
+			// Call the refactored get_transactions endpoint
 			const response = await backend.extension_async_call({
 				extension_name: "vault_manager",
 				function_name: "get_transactions",
@@ -296,37 +297,34 @@
 			console.log('Transactions response:', response);
 			
 			if (response.success) {
-				// Parse the JSON response
 				const data = JSON.parse(response.response);
 				console.log('Parsed transactions data:', data);
 				
 				if (data.success && data.data && data.data.Transactions && Array.isArray(data.data.Transactions)) {
-					// Format transactions for the UI using the Transactions array
+					// Map the simplified transaction format from backend
+					// Backend returns: [{id: int, amount: int, timestamp: int}, ...]
 					transactions = data.data.Transactions.map((tx) => {
-						// Convert timestamps to milliseconds by dividing by 1,000,000 (nanoseconds to milliseconds)
+						// Convert nanoseconds to milliseconds
 						const timestamp = parseInt(tx.timestamp) / 1000000;
 						
-						// Safely handle amount field - ensure it exists and is a string
-						const txAmount = tx.amount ? String(tx.amount) : "0";
-						
-						// Determine if this is an incoming or outgoing transaction
-						const isIncoming = !txAmount.startsWith("-");
-						const amount = isIncoming ? txAmount : txAmount.substring(1); // Remove minus sign if outgoing
+						// Determine transaction direction based on amount sign
+						const amount = parseInt(tx.amount) || 0;
+						const isIncoming = amount > 0;
+						const absoluteAmount = Math.abs(amount);
 						
 						return {
-							id: tx.id || "unknown",
-							from_principal: isIncoming ? "system" : userPrincipalId,
-							to_principal: isIncoming ? userPrincipalId : "recipient",
-							amount: parseInt(amount) || 0,
+							id: String(tx.id) || "unknown",
+							from_principal: isIncoming ? "external" : vaultCanisterId,
+							to_principal: isIncoming ? vaultCanisterId : "external",
+							amount: absoluteAmount,
 							token: "ckBTC",
 							timestamp: timestamp,
 							status: "completed"
 						};
 					});
 					totalTransactions = transactions.length;
-					console.log('Transactions set:', transactions);
+					console.log(`Loaded ${transactions.length} transactions`);
 				} else {
-					// No transactions found or error
 					console.log('No transactions found or error:', data.error);
 					transactions = [];
 					totalTransactions = 0;
@@ -394,22 +392,22 @@
 		loading = true;
 		error = '';
 		
-		// Validate canister ID
-		if (!vaultCanisterInputValue || vaultCanisterInputValue.trim() === '') {
-			vaultCanisterError = 'Please enter a valid vault canister ID';
-			loading = false;
-			return;
-		}
-		
-		// Set actual values from inputs
-		vaultCanisterId = vaultCanisterInputValue;
-		userPrincipalId = $principal || ""; // Always use authenticated principal
-
 		try {
 			if (demoMode) {
 				// Use demo data for development/testing
+				// Set demo vault canister ID
+				vaultCanisterId = "aaaa-aa";
 				await loadDemoData();
 			} else {
+				// Use canister IDs from declarations
+				if (!vaultCanisterId || !backendCanisterId) {
+					error = 'Canister IDs not loaded from declarations. Please refresh the page.';
+					loading = false;
+					return;
+				}
+				
+				userPrincipalId = $principal || ""; // Always use authenticated principal
+				
 				// Run all data fetching in parallel
 				await Promise.all([getBalance(), getVaultStatus(), getTransactions()]);
 			}
@@ -444,11 +442,47 @@
 	
 	// Initialize the component
 	onMount(async () => {
-		// Only load data if vault canister ID is already set
-		if (vaultCanisterId) {
+		// Load canister IDs from declarations
+		try {
+			const realmBackendModule = await import('declarations/realm_backend');
+			backendCanisterId = realmBackendModule.canisterId;
+			console.log('Loaded realm_backend canister ID:', backendCanisterId);
+			
+			// Load vault canister ID from backend
+			try {
+				const response = await backend.extension_sync_call({
+					extension_name: "vault_manager",
+					function_name: "get_vault_canister_id",
+					args: "{}"
+				});
+				
+				console.log('Vault canister ID response:', response);
+				
+				if (response.success) {
+					const data = JSON.parse(response.response);
+					if (data.success && data.data && data.data.canister_id) {
+						const vaultId = data.data.canister_id;
+						vaultCanisterIdFromDeclarations = vaultId;
+						vaultCanisterId = vaultId;
+						console.log('Loaded vault canister ID from backend:', vaultId);
+					} else {
+						console.error('Invalid vault canister ID response:', data);
+					}
+				} else {
+					console.error('Failed to get vault canister ID:', response);
+				}
+			} catch (e) {
+				console.error('Error loading vault canister ID from backend:', e);
+			}
+		} catch (e) {
+			console.error('Error loading canister IDs from declarations:', e);
+		}
+		
+		// Auto-load data if we have canister IDs (either demo mode or from declarations)
+		if (demoMode || (backendCanisterId && vaultCanisterId)) {
 			await loadData();
 		} else {
-			loading = false; // Stop loading state since we're waiting for user input
+			loading = false; // Stop loading state if canister IDs couldn't be loaded
 		}
 	});
 </script>
@@ -475,7 +509,17 @@
 				<Button 
 					size="xs" 
 					color={demoMode ? "red" : "blue"} 
-					on:click={() => { demoMode = !demoMode; if (demoMode) loadData(); }}
+					on:click={() => { 
+						demoMode = !demoMode; 
+						if (demoMode) {
+							// Auto-load demo data when enabling demo mode
+							loadData();
+						} else {
+							// Restore vault canister ID from declarations and reload
+							vaultCanisterId = vaultCanisterIdFromDeclarations;
+							loadData();
+						}	
+					}}
 				>
 					{demoMode ? "Disable Demo" : "Enable Demo"}
 				</Button>
@@ -486,32 +530,10 @@
 				</p>
 			{:else}
 				<p class="text-sm text-blue-700 dark:text-blue-300">
-					Connect to a real ckBTC vault canister. Enter the canister ID below.
+					Connected to vault canister: <span class="font-mono font-semibold">{vaultCanisterId || 'Loading...'}</span>
 				</p>
 			{/if}
 		</div>
-		
-		<!-- Vault Canister ID input - disabled in demo mode -->
-		<div class="mb-4">
-			<Input 
-				type="text" 
-				id="vault-canister-id" 
-				placeholder={demoMode ? "Demo vault: rdmx6-jaaaa-aaaah-qcaiq-cai" : "Enter vault canister ID"} 
-				label="Vault Canister ID" 
-				bind:value={vaultCanisterInputValue} 
-				disabled={demoMode}
-				on:keydown={(e) => e.key === 'Enter' && loadData()}
-			/>
-			{#if vaultCanisterError}
-				<p class="text-red-600 text-sm mt-1">{vaultCanisterError}</p>
-			{/if}
-		</div>
-		
-		{#if vaultCanisterId && vaultCanisterId !== vaultCanisterInputValue && !demoMode}
-			<div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
-				Current Vault: {vaultCanisterId}
-			</div>
-		{/if}
 		
 		<Button color="primary" on:click={loadData}>
 			{#if loading}
@@ -720,8 +742,15 @@
 				</span>
 				<div class="space-y-4">
 					<div class="flex justify-between items-center mb-4">
-						<h3 class="text-xl font-semibold">Transaction History</h3>
-						<Button color="alternative" size="sm" on:click={getTransactions} disabled={loading}>
+						<div class="flex items-center gap-3">
+							<h3 class="text-xl font-semibold">Transaction History</h3>
+							{#if demoMode}
+								<span class="px-3 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full">
+									📊 Demo Data
+								</span>
+							{/if}
+						</div>
+						<Button color="alternative" size="sm" on:click={getTransactions} disabled={loading || demoMode}>
 							{#if loading}
 								<div class="flex items-center">
 									<span class="animate-spin inline-block w-4 h-4 border-2 border-t-transparent border-primary-500 rounded-full mr-2"></span>
