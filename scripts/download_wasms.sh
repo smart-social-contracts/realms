@@ -4,7 +4,7 @@ set -x
 
 WASM_FOLDER=".wasm"
 
-VAULT_VERSION="0.1.4"
+VAULT_VERSION="0.2.0"
 VAULT_URL="https://github.com/smart-social-contracts/kybra-simple-vault/releases/download/v${VAULT_VERSION}/"
 LEDGER_SUITE_URL="https://github.com/dfinity/ic/releases/download/ledger-suite-icrc-2025-02-27"
 mkdir -p $WASM_FOLDER
