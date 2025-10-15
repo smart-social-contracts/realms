@@ -210,8 +210,9 @@ class RealmGenerator:
             instrument = random.choice(instruments)
             
             transfer = Transfer(
-                from_user=from_user,
-                to_user=to_user,
+                id=self.generate_id("tr_"),
+                principal_from=from_user.id,
+                principal_to=to_user.id,
                 instrument=instrument,
                 amount=random.randint(1, 10000)
             )

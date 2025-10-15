@@ -576,14 +576,14 @@ def verify_checksum(content: str, expected_checksum: str) -> Tuple[bool, str]:
 def execute_code(code: str) -> str:
     """
     Executes Python code (sync or async) via TaskManager.
-    
+
     For sync code: executes inline and returns result immediately
     For async code: schedules task and returns task ID for polling
-    
+
     Examples:
         # Sync code
         result = 2 + 2
-        
+
         # Async code
         def async_task():
             result = yield some_async_operation()
@@ -591,39 +591,40 @@ def execute_code(code: str) -> str:
     """
     import json
     import traceback
-    from core.task_manager import Call, Task, TaskStep, TaskManager
+
+    from core.task_manager import Call, Task, TaskManager, TaskStep
     from ggg import Codex
     from ggg.task_schedule import TaskSchedule
-    
+
     try:
         # Detect if code is async (contains 'yield' or defines 'async_task')
-        is_async = 'yield' in code or 'async_task' in code
-        
+        is_async = "yield" in code or "async_task" in code
+
         # Create temporary codex
         temp_name = f"_shell_{int(ic.time())}"
         codex = Codex(name=temp_name, code=code)
-        
+
         # Create call
         call = Call(is_async=is_async, codex=codex)
-        
+
         # Create task
         step = TaskStep(call=call)
         task = Task(name=f"Shell Task {temp_name}", steps=[step])
-        
+
         # Create schedule (immediate execution)
         schedule = TaskSchedule(
             task=task,
             run_at=0,  # Execute immediately
             repeat_every=0,
             last_run_at=0,
-            disabled=False
+            disabled=False,
         )
-        
+
         # Execute via TaskManager
         manager = TaskManager()
         manager.add_task(task)
         manager.run()
-        
+
         # Format response
         if is_async:
             # Async task will complete in timer callback
@@ -631,20 +632,16 @@ def execute_code(code: str) -> str:
                 "type": "async",
                 "task_id": task._id,
                 "status": task.status,
-                "message": "Async task scheduled. Check logs for results or use get_task_status() to poll."
+                "message": "Async task scheduled. Check logs for results or use get_task_status() to poll.",
             }
             return json.dumps(response, indent=2)
         else:
             # Sync task should be completed
             # Get result from call if available
-            result = getattr(call, '_result', None)
-            
-            response = {
-                "type": "sync",
-                "status": task.status,
-                "task_id": task._id
-            }
-            
+            result = getattr(call, "_result", None)
+
+            response = {"type": "sync", "status": task.status, "task_id": task._id}
+
             if result is not None:
                 if isinstance(result, dict):
                     response["result"] = result
@@ -652,19 +649,18 @@ def execute_code(code: str) -> str:
                     response["result"] = str(result)
             else:
                 response["message"] = "Code executed successfully (no return value)"
-                
+
             return json.dumps(response, indent=2)
-                
+
     except Exception as e:
         ic.print(f"Error in execute_code: {e}")
         ic.print(traceback.format_exc())
         response = {
             "type": "error",
             "error": str(e),
-            "traceback": traceback.format_exc()
+            "traceback": traceback.format_exc(),
         }
         return json.dumps(response, indent=2)
-
 
 
 @update
@@ -708,7 +704,7 @@ def execute_code_shell(code: str) -> str:
 def get_task_status(task_id: str) -> str:
     """
     Poll task status and get results for async tasks.
-    
+
     Returns JSON with:
     - task_id: The task identifier
     - status: pending, running, completed, or failed
@@ -716,39 +712,32 @@ def get_task_status(task_id: str) -> str:
     - error: Error message (if failed)
     """
     import json
+
     from core.task_manager import Task
-    
+
     try:
         task = Task[task_id]
-        
-        response = {
-            "task_id": task_id,
-            "status": task.status,
-            "name": task.name
-        }
-        
+
+        response = {"task_id": task_id, "status": task.status, "name": task.name}
+
         # Get the first step's call to check for results
         if task.steps:
             step = list(task.steps)[0]
-            result = getattr(step.call, '_result', None)
-            
+            result = getattr(step.call, "_result", None)
+
             if result is not None:
                 if isinstance(result, dict):
                     response["result"] = result
                 else:
                     response["result"] = str(result)
-        
+
         return json.dumps(response, indent=2)
-        
+
     except KeyError:
-        response = {
-            "error": f"Task with ID '{task_id}' not found"
-        }
+        response = {"error": f"Task with ID '{task_id}' not found"}
         return json.dumps(response, indent=2)
     except Exception as e:
-        response = {
-            "error": str(e)
-        }
+        response = {"error": str(e)}
         return json.dumps(response, indent=2)
 
 

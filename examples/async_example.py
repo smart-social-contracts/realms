@@ -26,11 +26,13 @@ def async_task():
         ic.print("treasury.vault_principal_id: %s" % treasury.vault_principal_id)
         
         # Multiple refresh calls to simulate longer processing
-        ic.print("Processing... step 1/3")
+        ic.print("Refreshing... step 1/3")
         yield treasury.refresh()
-        ic.print("Processing... step 2/3")
-        yield treasury.refresh()
-        ic.print("Processing... step 3/3")
+
+        ic.print("Sending... step 2/3")
+        
+        yield treasury.send(ic.id().to_str(), 1)
+        ic.print("Refreshing... step 3/3")
         yield treasury.refresh()
         
         ic.print("Vault status retrieved")

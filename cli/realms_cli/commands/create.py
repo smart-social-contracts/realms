@@ -245,7 +245,8 @@ from ggg import Realm, Treasury, UserProfile, User, Codex, Instrument, Transfer
 ic.print("Setting treasury vault principal...")
 
 vault_principal_id = "<VAULT_PRINCIPAL_ID>"
-treasury = Treasury()
+treasuries = Treasury.instances()
+treasury = treasuries[0] if treasuries else Treasury()
 treasury.vault_principal_id = vault_principal_id
 
 realm = Realm.instances()[0]

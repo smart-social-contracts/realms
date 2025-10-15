@@ -64,13 +64,14 @@ class Call(Entity, TimestampedMixin):
             safe_globals = globals().copy()
             import ggg
             import kybra
+
             safe_globals.update({"ggg": ggg, "kybra": kybra})
-            
+
             # Execute the codex code (defines async_task function)
             exec(self.codex.code, safe_globals)
-            
+
             # Call the async_task function
-            async_task = safe_globals.get('async_task')
+            async_task = safe_globals.get("async_task")
             if async_task and callable(async_task):
                 result = yield from async_task()
                 # Store result for status checking

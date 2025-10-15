@@ -17,8 +17,8 @@ logger = get_logger("entity.transfer")
 class Transfer(Entity, TimestampedMixin):
     __alias__ = "id"
     id = String()
-    trade = OneToOne("Trade", "transfer")
-    from_user = ManyToOne("User", "transfers_from")
-    to_user = ManyToOne("User", "transfers_to")
+    # trade = OneToOne("Trade", "transfer")
+    principal_from = String()
+    principal_to = String()
     instrument = ManyToOne("Instrument", "transfers")
     amount = Integer()
