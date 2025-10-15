@@ -60,6 +60,8 @@ class Treasury(Entity, TimestampedMixin):
                 }
             )
 
+            yield extension_async_call("vault_manager", "_refresh", args)
+
             # Get transactions from vault (returns list of transaction dicts)
             transactions_list = yield extension_async_call(
                 "vault_manager", "_get_transactions", args

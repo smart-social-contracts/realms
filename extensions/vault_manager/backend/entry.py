@@ -119,6 +119,9 @@ class Vault(Service):
     @service_update
     def transfer(self, principal: Principal, amount: nat) -> Async[Response]: ...
 
+    @service_update
+    def refresh(self) -> Async[Response]: ...
+
 
 def _get_balance(args: str) -> Async[Dict[str, Any]]:
     """Internal helper to get balance and return as dict."""
@@ -499,4 +502,35 @@ def transfer(args: str) -> Async[str]:
 
     except Exception as e:
         logger.error(f"Error in transfer: {str(e)}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+def _refresh(args: str) -> Async:
+    # Parse args from JSON string if provided
+    if args:
+        params = json.loads(args) if isinstance(args, str) else args
+    else:
+        params = {}
+
+    # Get vault canister ID from parameters (required)
+    vault_canister_id = params.get("vault_canister_id")
+    if not vault_canister_id:
+        logger.error("vault_canister_id parameter is required")
+        return {}
+
+    vault = Vault(Principal.from_str(vault_canister_id))
+    yield vault.update_transaction_history()
+
+
+def refresh(args: str) -> Async[str]:
+    try:
+        yield _refresh(args)
+
+        return json.dumps(
+            {"success": True}
+        )
+    except Exception as e:
+        logger.error(
+            f"Error in refresh: {str(e)}\n{traceback.format_exc()}"
+        )
         return json.dumps({"success": False, "error": str(e)})
