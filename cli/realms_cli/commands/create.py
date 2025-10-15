@@ -10,7 +10,7 @@ from typing import Optional
 import typer
 from rich.console import Console
 
-from .deploy import deploy_command
+from .deploy import _deploy_realm_internal
 
 console = Console()
 
@@ -190,16 +190,19 @@ with open(os.path.join(s, "adjustments.py"), 'w') as f:
 
 print(f"✅ Replaced with: {v}")
 
-# Set mock transaction for testing
-print("Setting mock transaction in test mode...")
-mock_tx_cmd = [
-    'dfx', 'canister', 'call', 'vault', 'test_mode_set_mock_transaction',
-    f'(principal "aaaaa-aa", principal "{rb}", 100003 : nat, "transfer", null)'
-]
-if network != 'local':
-    mock_tx_cmd.extend(['--network', network])
-run_dfx_command(mock_tx_cmd)
-print("✅ Mock transaction set")
+# Set mock transaction for testing (on networks where test mode is enabled)
+if network in ['local', 'staging']:
+    print("Setting mock transaction in test mode...")
+    mock_tx_cmd = [
+        'dfx', 'canister', 'call', 'vault', 'test_mode_set_mock_transaction',
+        f'(principal "aaaaa-aa", principal "{rb}", 100003 : nat, "transfer", null)'
+    ]
+    if network != 'local':
+        mock_tx_cmd.extend(['--network', network])
+    run_dfx_command(mock_tx_cmd)
+    print("✅ Mock transaction set")
+else:
+    print("⏭️  Skipping mock transaction setup (test mode not enabled on this network)")
 
 # Run the adjustments script with network parameter
 realms_cmd = ['realms', 'shell', '--file', 'generated_realm/scripts/adjustments.py']
@@ -282,8 +285,8 @@ for codex in Codex.instances():
     if deploy:
         console.print("\n[yellow]🚀 Auto-deployment requested...[/yellow]")
         try:
-            # Call deploy_command with the generated realm folder
-            deploy_command(
+            # Call internal deployment function directly to ensure network parameter is passed
+            _deploy_realm_internal(
                 config_file=None, folder=output_dir, network=network, clean=False, identity=identity
             )
         except typer.Exit as e:

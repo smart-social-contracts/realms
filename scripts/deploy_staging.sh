@@ -21,7 +21,7 @@ echo "Deploying all canisters to $NETWORK"
 dfx deploy --network "$NETWORK" --yes realm_registry_backend --mode=reinstall
 dfx deploy --network "$NETWORK" --yes realm_backend --mode=reinstall
 
-dfx deploy vault --network "$NETWORK" --yes --argument "(null, opt principal \"$(dfx canister id realm_backend)\", null, null, opt true)"
+dfx deploy vault --network "$NETWORK" --yes --argument "(null, opt principal \"$(dfx canister id realm_backend --network $NETWORK)\", opt 100, opt 10, opt true)"
 
 dfx generate realm_registry_backend
 dfx generate realm_backend

@@ -13,22 +13,14 @@ from ..utils import get_logger, run_command
 console = Console()
 
 
-def deploy_command(
-    config_file: Optional[str] = typer.Option(
-        None, "--file", "-f", help="Path to realm configuration file"
-    ),
-    folder: Optional[str] = typer.Option(
-        None, "--folder", help="Path to generated realm folder with scripts"
-    ),
-    network: str = typer.Option(
-        "local", "--network", "-n", help="Target network for deployment"
-    ),
-    clean: bool = typer.Option(False, "--clean", help="Clean deployment (restart dfx)"),
-    identity: Optional[str] = typer.Option(
-        None, "--identity", help="Path to identity PEM file or identity name for dfx"
-    ),
+def _deploy_realm_internal(
+    config_file: Optional[str],
+    folder: Optional[str],
+    network: str,
+    clean: bool,
+    identity: Optional[str],
 ) -> None:
-    """Deploy a realm to the specified network."""
+    """Internal deployment logic (can be called directly from Python)."""
     # Create logger for capturing script output
     logger = get_logger("deploy")
     logger.info("=" * 60)
@@ -72,6 +64,7 @@ def deploy_command(
 
                 console.print(f"🔧 Running {script_name}...")
                 console.print(f"[dim]Script path: {script_path}[/dim]")
+                console.print(f"[dim]Network: {network}[/dim]")
 
                 # Determine working directory and command based on script
                 if script_name == "2-deploy-canisters.sh":
@@ -195,3 +188,26 @@ def deploy_command(
         except Exception as e:
             console.print(f"[red]❌ Error during deployment: {e}[/red]")
             raise typer.Exit(1)
+
+
+def deploy_command(
+    config_file: Optional[str] = typer.Option(
+        None, "--file", "-f", help="Path to realm configuration file"
+    ),
+    folder: Optional[str] = typer.Option(
+        None, "--folder", help="Path to generated realm folder with scripts"
+    ),
+    network: str = typer.Option(
+        "local", "--network", "-n", help="Target network for deployment"
+    ),
+    clean: bool = typer.Option(False, "--clean", help="Clean deployment (restart dfx)"),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="Path to identity PEM file or identity name for dfx"
+    ),
+) -> None:
+    """Deploy a realm to the specified network."""
+    _deploy_realm_internal(config_file, folder, network, clean, identity)
+
+
+if __name__ == "__main__":
+    typer.run(deploy_command)
