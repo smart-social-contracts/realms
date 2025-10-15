@@ -130,9 +130,24 @@ jobs:
       
       - name: Run Playwright tests
         run: |
-          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} bash -c "
+          docker run --rm \
+            -v "$(pwd)/test-logs:/app/test-logs" \
+            ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} bash -c "
           realms deploy &&
-          src/realm_frontend/run-e2e-tests.sh specs/workflows.spec.ts --reporter=line"
+          src/realm_frontend/run-e2e-tests.sh specs/workflows.spec.ts --reporter=line &&
+          mkdir -p /app/test-logs &&
+          cp -f dfx.log /app/test-logs/ 2>/dev/null || true &&
+          cp -f dfx2.log /app/test-logs/ 2>/dev/null || true &&
+          cp -f realms_cli.log /app/test-logs/ 2>/dev/null || true &&
+          cp -f src/realm_frontend/test-results/*.* /app/test-logs/ 2>/dev/null || true"
+      
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-test-logs-main
+          path: test-logs/
+          retention-days: 7
 
   deploy-staging:
     runs-on: ubuntu-latest
@@ -154,10 +169,23 @@ jobs:
           # Deploy using realms CLI with staging network
           docker run --rm \
             -v "$(pwd)/identity.pem:/app/identity.pem" \
+            -v "$(pwd)/deploy-logs:/app/deploy-logs" \
             -e DFX_WARNING="-mainnet_plaintext_identity" \
             ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} \
             bash -c "realms create --random --network staging --deploy && \
-                     realms deploy --network staging --identity /app/identity.pem"
+                     realms deploy --network staging --identity /app/identity.pem && \
+                     mkdir -p /app/deploy-logs && \
+                     cp -f dfx.log /app/deploy-logs/ 2>/dev/null || true && \
+                     cp -f dfx2.log /app/deploy-logs/ 2>/dev/null || true && \
+                     cp -f realms_cli.log /app/deploy-logs/ 2>/dev/null || true"
           
           # Clean up
           rm identity.pem
+      
+      - name: Upload deployment logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: staging-deployment-logs
+          path: deploy-logs/
+          retention-days: 7

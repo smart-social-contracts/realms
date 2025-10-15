@@ -130,7 +130,21 @@ jobs:
       
       - name: Run Playwright tests
         run: |
-          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} bash -c "
+          docker run --rm \
+            -v "$(pwd)/test-logs:/app/test-logs" \
+            ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} bash -c "
           realms deploy &&
-          src/realm_frontend/run-e2e-tests.sh specs/workflows.spec.ts specs/multilingual.spec.ts --reporter=line"
-    
+          src/realm_frontend/run-e2e-tests.sh specs/workflows.spec.ts specs/multilingual.spec.ts --reporter=line &&
+          mkdir -p /app/test-logs &&
+          cp -f dfx.log /app/test-logs/ 2>/dev/null || true &&
+          cp -f dfx2.log /app/test-logs/ 2>/dev/null || true &&
+          cp -f realms_cli.log /app/test-logs/ 2>/dev/null || true &&
+          cp -f src/realm_frontend/test-results/*.* /app/test-logs/ 2>/dev/null || true"
+      
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-test-logs-branch
+          path: test-logs/
+          retention-days: 7

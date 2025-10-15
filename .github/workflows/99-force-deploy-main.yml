@@ -40,9 +40,22 @@ jobs:
           # Deploy using realms CLI with staging network
           docker run --rm \
             -v "$(pwd)/identity.pem:/app/identity.pem" \
+            -v "$(pwd)/deploy-logs:/app/deploy-logs" \
             -e DFX_WARNING="-mainnet_plaintext_identity" \
             ghcr.io/${{ github.repository_owner }}/realms:${{ steps.commit.outputs.deploy_commit }} \
-            bash -c "dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && dfx identity use my-identity && realms create --random --network staging --deploy"
+            bash -c "dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && dfx identity use my-identity && realms create --random --network staging --deploy && \
+                     mkdir -p /app/deploy-logs && \
+                     cp -f dfx.log /app/deploy-logs/ 2>/dev/null || true && \
+                     cp -f dfx2.log /app/deploy-logs/ 2>/dev/null || true && \
+                     cp -f realms_cli.log /app/deploy-logs/ 2>/dev/null || true"
           
           # Clean up
           rm identity.pem
+      
+      - name: Upload deployment logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: force-deploy-logs
+          path: deploy-logs/
+          retention-days: 7
