@@ -254,7 +254,7 @@ def _get_status(args: str) -> Async[Dict[str, Any]]:
                     stats = response_data["Stats"]
                     # Convert to simple dict
                     status_dict = convert_principals_to_strings(stats)
-                    logger.info(f"Successfully extracted vault status")
+                    logger.info("Successfully extracted vault status")
                     return status_dict
                 else:
                     return {}
