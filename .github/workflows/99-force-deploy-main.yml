@@ -54,7 +54,7 @@ jobs:
       
       - name: Upload deployment logs
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: force-deploy-logs
           path: deploy-logs/
