@@ -158,20 +158,27 @@ s = os.path.dirname(os.path.abspath(__file__))
 network = sys.argv[1] if len(sys.argv) > 1 else 'local'
 print(f"🚀 Running adjustments.py for network: {network}")
 
+def run_dfx_command(dfx_cmd):
+    print(f"Running dfx command: {' '.join(dfx_cmd)}")
+    result = subprocess.run(dfx_cmd, cwd=os.path.dirname(os.path.dirname(s)), capture_output=True)
+    if result.returncode != 0:
+        raise Exception(f"Failed to run dfx command: {' '.join(dfx_cmd)}")
+    result = result.stdout.decode().strip()
+    print(f"Result: {result}")
+    return result
+
 # Build dfx command with network parameter
 dfx_cmd = ['dfx', 'canister', 'id', 'vault']
 if network != 'local':
     dfx_cmd.extend(['--network', network])
-
-v = subprocess.check_output(dfx_cmd, cwd=os.path.dirname(os.path.dirname(s))).decode().strip()
+v = run_dfx_command(dfx_cmd)
 print(f"vault: {v}")
 
 # Get realm_backend canister principal ID
 realm_backend_cmd = ['dfx', 'canister', 'id', 'realm_backend']
 if network != 'local':
     realm_backend_cmd.extend(['--network', network])
-
-rb = subprocess.check_output(realm_backend_cmd, cwd=os.path.dirname(os.path.dirname(s))).decode().strip()
+rb = run_dfx_command(realm_backend_cmd)
 print(f"realm_backend: {rb}")
 
 print("Replacing vault principal id...")
@@ -191,14 +198,14 @@ mock_tx_cmd = [
 ]
 if network != 'local':
     mock_tx_cmd.extend(['--network', network])
-subprocess.run(mock_tx_cmd, cwd=os.path.dirname(os.path.dirname(s)))
+run_dfx_command(mock_tx_cmd)
 print("✅ Mock transaction set")
 
 # Run the adjustments script with network parameter
 realms_cmd = ['realms', 'shell', '--file', 'generated_realm/scripts/adjustments.py']
 if network != 'local':
     realms_cmd.extend(['--network', network])
-subprocess.run(realms_cmd, cwd=os.path.dirname(os.path.dirname(s)))
+run_dfx_command(realms_cmd)
 """.strip()
 
     upload_script_content = """#!/bin/bash
