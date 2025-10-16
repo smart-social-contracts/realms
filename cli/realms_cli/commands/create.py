@@ -167,42 +167,6 @@ def run_dfx_command(dfx_cmd):
     print(f"Result: {result}")
     return result
 
-# Build dfx command with network parameter
-dfx_cmd = ['dfx', 'canister', 'id', 'vault']
-if network != 'local':
-    dfx_cmd.extend(['--network', network])
-v = run_dfx_command(dfx_cmd)
-print(f"vault: {v}")
-
-# Get realm_backend canister principal ID
-realm_backend_cmd = ['dfx', 'canister', 'id', 'realm_backend']
-if network != 'local':
-    realm_backend_cmd.extend(['--network', network])
-rb = run_dfx_command(realm_backend_cmd)
-print(f"realm_backend: {rb}")
-
-print("Replacing vault principal id...")
-
-with open(os.path.join(s, "adjustments.py"), 'r') as f:
-    content = f.read().replace('<VAULT_PRINCIPAL_ID>', v)
-with open(os.path.join(s, "adjustments.py"), 'w') as f:
-    f.write(content)
-
-print(f"✅ Replaced with: {v}")
-
-# Set mock transaction for testing (on networks where test mode is enabled)
-if network in ['local', 'staging']:
-    print("Setting mock transaction in test mode...")
-    mock_tx_cmd = [
-        'dfx', 'canister', 'call', 'vault', 'test_mode_set_mock_transaction',
-        f'(principal "aaaaa-aa", principal "{rb}", 100003 : nat, "transfer", null)'
-    ]
-    if network != 'local':
-        mock_tx_cmd.extend(['--network', network])
-    run_dfx_command(mock_tx_cmd)
-    print("✅ Mock transaction set")
-else:
-    print("⏭️  Skipping mock transaction setup (test mode not enabled on this network)")
 
 # Run the adjustments script with network parameter
 realms_cmd = ['realms', 'shell', '--file', 'generated_realm/scripts/adjustments.py']
@@ -251,13 +215,6 @@ echo "✅ Data upload completed!"
     adjustments_content = """
 from kybra import ic
 from ggg import Realm, Treasury, UserProfile, User, Codex, Instrument, Transfer
-
-ic.print("Setting treasury vault principal...")
-
-vault_principal_id = "<VAULT_PRINCIPAL_ID>"
-treasuries = Treasury.instances()
-treasury = treasuries[0] if treasuries else Treasury()
-treasury.vault_principal_id = vault_principal_id
 
 realm = Realm.instances()[0]
 realm.treasury = treasury

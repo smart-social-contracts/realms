@@ -31,11 +31,6 @@
       "type": "assets",
       "workspace": "realm_frontend"
     },
-    "vault": {
-      "type": "custom",
-      "wasm": ".wasm/vault.wasm",
-      "candid": ".wasm/vault.did"
-    },
     "realm_registry_backend": {
       "build": "python -m kybra realm_registry_backend src/realm_registry_backend/main.py",
       "candid": "src/realm_registry_backend/realm_registry_backend.did",
