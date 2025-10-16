@@ -8,7 +8,7 @@ def main():
     parser.add_argument("--network", default="local")
     network = parser.parse_args().network
     
-    canisters = ["vault", "realm_registry_backend", "realm_backend", "realm_registry_frontend", "realm_frontend"]
+    canisters = ["realm_registry_backend", "realm_backend", "realm_registry_frontend", "realm_frontend"]
     if network == "local":
         canisters.append("internet_identity")
     

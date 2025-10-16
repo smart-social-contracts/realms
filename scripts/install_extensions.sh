@@ -8,7 +8,6 @@ set -x
 
 echo "Installing extensions..."
 
-# Use the realm-extension-cli.py to install extensions from source
-python scripts/realm-extension-cli.py install-from-source --source-dir extensions
+realms extension install-from-source --source-dir extensions
 
 echo "Extensions installed successfully"
