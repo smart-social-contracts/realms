@@ -290,6 +290,76 @@ def get_objects(params: Vec[Tuple[str, str]]) -> RealmResponse:
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
+def create_foundational_objects() -> void:
+    """Create the foundational objects required for every realm to operate."""
+    from ggg import Identity, Profiles, Realm, Treasury, User, UserProfile
+    
+    logger.info("Creating foundational objects...")
+    
+    # Check if foundational objects already exist (for upgrades)
+    if len(Realm.instances()) > 0:
+        logger.info("Foundational objects already exist, skipping creation")
+        return
+    
+    try:
+        # 1. Create user profiles
+        admin_profile = UserProfile(
+            name=Profiles.ADMIN["name"],
+            allowed_to=",".join(Profiles.ADMIN["allowed_to"]),
+            description="Admin user profile",
+        )
+        
+        member_profile = UserProfile(
+            name=Profiles.MEMBER["name"],
+            allowed_to=",".join(Profiles.MEMBER["allowed_to"]),
+            description="Member user profile",
+        )
+        
+        logger.info("Created user profiles: admin, member")
+        
+        # 2. Create system user
+        system_user = User(
+            id="system",
+            profile_picture_url="",
+        )
+        # Link system user to admin profile
+        system_user.profiles.add(admin_profile)
+        
+        logger.info("Created system user")
+        
+        # 3. Create identity for system user
+        import uuid
+        system_identity = Identity(
+            type="system",
+            metadata=f"{uuid.uuid4().hex[:8]}-{uuid.uuid4().hex[:8]}",
+        )
+        
+        logger.info("Created system identity")
+        
+        # 4. Create realm
+        realm = Realm(
+            name="Default Realm",
+            description="A realm for digital governance and coordination",
+            principal_id="",
+        )
+        
+        logger.info("Created realm")
+        
+        # 5. Create treasury linked to realm
+        treasury = Treasury(
+            name=f"{realm.name} Treasury",
+            vault_principal_id=None,  # Will be set during vault deployment
+            realm=realm,
+        )
+        
+        logger.info("Created treasury")
+        logger.info("✅ All foundational objects created successfully")
+        
+    except Exception as e:
+        logger.error(f"❌ Error creating foundational objects: {str(e)}\n{traceback.format_exc()}")
+        raise
+
+
 @update
 def initialize() -> void:
     # Register all entity types from ggg
@@ -305,6 +375,9 @@ def initialize() -> void:
             logger.error(
                 f"Error registering entity type {name}: {str(e)}\n{traceback.format_exc()}"
             )
+    
+    # Create foundational objects after entity registration
+    create_foundational_objects()
 
 
 @init

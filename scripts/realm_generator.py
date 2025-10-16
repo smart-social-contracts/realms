@@ -287,11 +287,31 @@ class RealmGenerator:
         
         return realm
 
-    def generate_realm_data(self, **params) -> List:
-        """Generate complete realm data"""
-        print(f"Generating realm data with seed: {self.seed}")
+    def generate_minimal_realm_data(self, realm_name: str = "Generated Demo Realm") -> List:
+        """Generate minimal realm data.
         
-        # Generate entities
+        Note: Foundational objects (Realm, Treasury, UserProfiles, System User, Identity)
+        are now auto-created by the backend during canister initialization.
+        This returns an empty list for backwards compatibility.
+        """
+        print(f"Minimal realm data generation...")
+        print("Note: Foundational objects are auto-created by the backend canister.")
+        print("No additional data needed for minimal realm.")
+        
+        # Return empty list - foundational objects are created by backend
+        return []
+    
+    def generate_realm_data(self, **params) -> List:
+        """Generate additional realm data (users, organizations, etc.).
+        
+        Note: Foundational objects (Realm, Treasury, UserProfiles, System User, Identity)
+        are now auto-created by the backend during canister initialization.
+        This function only generates additional/optional data.
+        """
+        print(f"Generating additional realm data with seed: {self.seed}")
+        print("Note: Foundational objects (Realm, Treasury, UserProfiles, System User) are auto-created by backend.")
+        
+        # Generate additional entities
         users = self.generate_users(params.get('users', 50))
         humans = self.generate_humans(users)
         identities = self.generate_identities(users)
@@ -302,32 +322,8 @@ class RealmGenerator:
         disputes = self.generate_disputes(params.get('disputes', 10))
         mandates = self.generate_mandates()
         
-        # Create user profiles
-        user_profile_admin = UserProfile(
-            name=Profiles.ADMIN["name"],
-            allowed_to=",".join(Profiles.ADMIN["allowed_to"]),
-            description="Admin user profile",
-        )
-
-        user_profile_member = UserProfile(
-            name=Profiles.MEMBER["name"],
-            allowed_to=",".join(Profiles.MEMBER["allowed_to"]),
-            description="Member user profile",
-        )
-        
-        user_profiles = [user_profile_admin, user_profile_member]
-        
-
-        # # Create realm metadata
-        realm = self.generate_realm_metadata(params.get('realm_name', 'Generated Demo Realm'), len(users), len(organizations))
-        
-        # # Create the Treasury
-        treasury = self.generate_treasury_data(realm)
-        
+        # Return only additional data (not foundational objects)
         ret = []
-        ret += [realm] 
-        ret += [treasury]
-        ret += user_profiles 
         ret += users
         ret += identities
         ret += humans
@@ -659,6 +655,7 @@ def main():
     
     # Generate data
     generator = RealmGenerator(args.seed)
+    
     realm_data = generator.generate_realm_data(
         citizens=args.citizens,
         organizations=args.organizations,
@@ -683,12 +680,11 @@ def main():
     
     print(f"Generated realm data saved to: {json_file}")
     
-    # Generate codex files
+    # Generate codex files only for full realm generation
     codex_files = generator.generate_codex_files(output_dir)
     print(f"\nGenerated {len(codex_files)} codex files:")
     for file in codex_files:
         print(f"- {file}")
-   
     print(f"Seed used: {generator.seed} (use this seed to reproduce the same data)")
 
 if __name__ == "__main__":

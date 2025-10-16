@@ -48,7 +48,7 @@ app = typer.Typer(
 @app.command("create")
 def create(
     random: bool = typer.Option(
-        True, "--random/--no-random", help="Generate random realm data (default: True)"
+        False, "--random/--no-random", help="Generate random realm data (default: False)"
     ),
     citizens: int = typer.Option(
         50, "--citizens", help="Number of citizens to generate"
@@ -81,7 +81,7 @@ def create(
         None, "--identity", help="Path to identity PEM file or identity name for dfx"
     ),
 ) -> None:
-    """Create a new realm with optional realistic demo data for testing and demonstrations."""
+    """Create a new realm. Use --random flag to generate demo data for testing and demonstrations."""
     create_command(
         random,
         citizens,

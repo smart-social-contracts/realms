@@ -1,6 +1,5 @@
 """Create command for generating new realms with demo data and deployment scripts."""
 
-import json
 import shutil
 import subprocess
 import sys
@@ -28,7 +27,7 @@ def create_command(
     deploy: bool,
     identity: Optional[str] = None,
 ) -> None:
-    """Create a new realm with optional realistic demo data and deployment scripts."""
+    """Create a new realm with deployment scripts. Use random=True to generate realistic demo data."""
     console.print(f"[bold blue]🏛️  Creating Realm: {realm_name}[/bold blue]\n")
 
     # Create output directory
@@ -88,18 +87,6 @@ def create_command(
         except Exception as e:
             console.print(f"[red]❌ Error running realm generator: {e}[/red]")
             raise typer.Exit(1)
-    else:
-        console.print("📋 Creating empty realm structure...")
-
-        # Create minimal realm data structure
-        minimal_data = []
-
-        # Save minimal data
-        json_file = output_path / "realm_data.json"
-        with open(json_file, "w") as f:
-            json.dump(minimal_data, f, indent=2)
-
-        console.print("✅ Empty realm structure created")
 
     # Copy deployment scripts from existing files
     console.print("\n🔧 Copying deployment scripts...")
@@ -216,8 +203,8 @@ echo "✅ Data upload completed!"
 from kybra import ic
 from ggg import Realm, Treasury, UserProfile, User, Codex, Instrument, Transfer
 
-realm = Realm.instances()[0]
-realm.treasury = treasury
+# realm = Realm.instances()[0]
+# realm.treasury = treasury
 
 ic.print("len(Realm.instances()) = %d" % len(Realm.instances()))
 ic.print("len(Treasury.instances()) = %d" % len(Treasury.instances()))
