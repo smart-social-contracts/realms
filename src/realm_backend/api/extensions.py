@@ -8,12 +8,21 @@ from core.candid_types_realm import (
     RealmResponse,
     RealmResponseData,
 )
-from extension_packages.extension_manifests import get_all_extension_manifests
 from ggg.user import User
 from kybra import Async, query, update
 from kybra_simple_logging import get_logger
 
 logger = get_logger("api.extensions")
+
+
+def get_all_extension_manifests():
+    """Lazy import of extension manifests to avoid init failure when no extensions installed"""
+    try:
+        from extension_packages.extension_manifests import get_all_extension_manifests as _get_manifests
+        return _get_manifests()
+    except ImportError:
+        logger.warning("No extension_manifests.py found - no extensions installed")
+        return {}
 
 
 @query
