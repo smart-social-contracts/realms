@@ -175,8 +175,13 @@ if [ "$NETWORK" != "local" ]; then
     REALMS_CMD="realms import --network $NETWORK"
 fi
 
-echo "📥 Uploading realm data..."
-$REALMS_CMD realm_data.json
+# Check if realm_data.json exists and has content
+if [ -f "realm_data.json" ] && [ -s "realm_data.json" ]; then
+    echo "📥 Uploading realm data..."
+    $REALMS_CMD realm_data.json
+else
+    echo "ℹ️  No realm data to upload (realm_data.json is empty or missing)"
+fi
 
 echo "📜 Uploading codex files..."
 for codex_file in *_codex.py; do
