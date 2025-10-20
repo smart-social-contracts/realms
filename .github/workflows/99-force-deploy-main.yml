@@ -43,11 +43,15 @@ jobs:
             -v "$(pwd)/deploy-logs:/app/deploy-logs" \
             -e DFX_WARNING="-mainnet_plaintext_identity" \
             ghcr.io/${{ github.repository_owner }}/realms:${{ steps.commit.outputs.deploy_commit }} \
-            bash -c "dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && dfx identity use my-identity && realms create --random --network staging --deploy && \
+            bash -c "(dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
+                     dfx identity use my-identity && \
+                     realms create --random --network staging --deploy); \
+                     EXIT_CODE=\$?; \
                      mkdir -p /app/deploy-logs && \
                      cp -f dfx.log /app/deploy-logs/ 2>/dev/null || true && \
                      cp -f dfx2.log /app/deploy-logs/ 2>/dev/null || true && \
-                     cp -f realms_cli.log /app/deploy-logs/ 2>/dev/null || true"
+                     cp -f realms_cli.log /app/deploy-logs/ 2>/dev/null || true; \
+                     exit \$EXIT_CODE"
           
           # Clean up
           rm identity.pem

@@ -147,10 +147,12 @@ jobs:
           docker run --rm \
             -v "$(pwd)/extension-logs:/app/extension-logs" \
             ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} bash -c "
-          ./tests/test_extensions.py &&
-          mkdir -p /app/extension-logs &&
-          cp -f dfx.log /app/extension-logs/ 2>/dev/null || true &&
-          cp -f realms_cli.log /app/extension-logs/ 2>/dev/null || true"
+          ./tests/test_extensions.py; \
+          EXIT_CODE=\$?; \
+          mkdir -p /app/extension-logs && \
+          cp -f dfx.log /app/extension-logs/ 2>/dev/null || true && \
+          cp -f realms_cli.log /app/extension-logs/ 2>/dev/null || true; \
+          exit \$EXIT_CODE"
       
       - name: Upload extension test logs
         if: always()
@@ -186,14 +188,16 @@ jobs:
           docker run --rm \
             -v "$(pwd)/test-logs:/app/test-logs" \
             ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} bash -c "
-          realms create --random &&
-          realms deploy --folder generated_realm &&
-          src/realm_frontend/run-e2e-tests.sh specs/workflows.spec.ts specs/multilingual.spec.ts --reporter=line &&
-          mkdir -p /app/test-logs &&
-          cp -f dfx.log /app/test-logs/ 2>/dev/null || true &&
-          cp -f dfx2.log /app/test-logs/ 2>/dev/null || true &&
-          cp -f realms_cli.log /app/test-logs/ 2>/dev/null || true &&
-          cp -f src/realm_frontend/test-results/*.* /app/test-logs/ 2>/dev/null || true"
+          (realms create --random && \
+          realms deploy --folder generated_realm && \
+          src/realm_frontend/run-e2e-tests.sh specs/workflows.spec.ts specs/multilingual.spec.ts --reporter=line); \
+          EXIT_CODE=\$?; \
+          mkdir -p /app/test-logs && \
+          cp -f dfx.log /app/test-logs/ 2>/dev/null || true && \
+          cp -f dfx2.log /app/test-logs/ 2>/dev/null || true && \
+          cp -f realms_cli.log /app/test-logs/ 2>/dev/null || true && \
+          cp -f src/realm_frontend/test-results/*.* /app/test-logs/ 2>/dev/null || true; \
+          exit \$EXIT_CODE"
       
       - name: Upload test logs
         if: always()
