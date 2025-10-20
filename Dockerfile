@@ -35,3 +35,5 @@ COPY scripts ./scripts
 COPY src ./src
 COPY tests ./tests
 COPY extensions ./extensions
+
+RUN touch src/realm_backend/extension_packages/extension_imports.py
