@@ -27,9 +27,9 @@ python3 -m kybra --version || {
 
 scripts/download_wasms.sh
 
-# lsof -ti:$PORT | xargs kill -9 2>/dev/null || true
-# dfx stop 2>/dev/null || true
-# dfx start --clean --background --log file --logfile dfx.log --host 127.0.0.1:$PORT >dfx2.log 2>&1
+lsof -ti:$PORT | xargs kill -9 2>/dev/null || true
+dfx stop 2>/dev/null || true
+dfx start --clean --background --log file --logfile dfx.log --host 127.0.0.1:$PORT >dfx2.log 2>&1
 
 # Wait for dfx to fully initialize
 echo "Waiting for dfx to initialize..."
