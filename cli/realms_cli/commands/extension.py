@@ -44,11 +44,22 @@ def get_project_paths():
     }
 
 
-def get_extension_paths(extension_id):
+def get_extension_paths(extension_id, source_dir=None):
     """Get all paths for an extension"""
     validate_extension_id(extension_id)
     paths = get_project_paths()
-
+    
+    if source_dir:
+        # When packaging from source, use the source directory structure
+        return {
+            "backend": os.path.join(source_dir, "backend"),
+            "frontend_lib": os.path.join(source_dir, "frontend/lib/extensions", extension_id),
+            "frontend_route": os.path.join(source_dir, "frontend/routes/(sidebar)/extensions", extension_id),
+            "i18n": os.path.join(source_dir, "frontend/i18n/locales/extensions", extension_id),
+            "source": source_dir,
+        }
+    
+    # Default paths in realm project structure
     return {
         "backend": os.path.join(
             paths["backend_dir"], "extension_packages", extension_id
@@ -66,9 +77,9 @@ def get_extension_paths(extension_id):
     }
 
 
-def find_extension_locations(extension_id):
+def find_extension_locations(extension_id, source_dir=None):
     """Find where an extension is located"""
-    paths = get_extension_paths(extension_id)
+    paths = get_extension_paths(extension_id, source_dir)
     locations = {}
 
     # Check each location
@@ -237,7 +248,7 @@ def update_extension_imports(extension_id, action="add"):
     return True
 
 
-def package_extension_command(extension_id: str, output_dir: Optional[str] = None):
+def package_extension_command(extension_id: str, output_dir: Optional[str] = None, source_dir: Optional[str] = None):
     """Package an extension into a zip file"""
     try:
         validate_extension_id(extension_id)
@@ -245,7 +256,7 @@ def package_extension_command(extension_id: str, output_dir: Optional[str] = Non
         console.print(f"[red]Error: {str(e)}[/red]")
         return False
 
-    locations = find_extension_locations(extension_id)
+    locations = find_extension_locations(extension_id, source_dir)
 
     paths = get_project_paths()
     if not output_dir:
@@ -722,7 +733,7 @@ def extension_command(
                 "[red]Error: --extension-id is required for package action[/red]"
             )
             raise typer.Exit(1)
-        package_extension_command(extension_id)
+        package_extension_command(extension_id, source_dir=source_dir)
     elif action == "install":
         if not package_path:
             console.print(
