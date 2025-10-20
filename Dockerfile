@@ -35,6 +35,3 @@ COPY scripts ./scripts
 COPY src ./src
 COPY tests ./tests
 COPY extensions ./extensions
-
-RUN realms create --random
-RUN realms deploy --folder generated_realm

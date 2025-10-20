@@ -55,19 +55,18 @@ jobs:
           tags: ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}
           load: true
       
-      - name: Extract build artifacts from Docker image
+      - name: Verify Docker image
         if: always()
         run: |
           mkdir -p build-logs
-          # Create a temporary container to extract files
-          CONTAINER_ID=$(docker create ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }})
-          # Copy log files from the container
-          docker cp $CONTAINER_ID:/app/dfx.log build-logs/ 2>/dev/null || echo "dfx.log not found"
-          docker cp $CONTAINER_ID:/app/dfx2.log build-logs/ 2>/dev/null || echo "dfx2.log not found"
-          docker cp $CONTAINER_ID:/app/realms_cli.log build-logs/ 2>/dev/null || echo "realms_cli.log not found"
-          docker cp $CONTAINER_ID:/app/generated_realm build-logs/ 2>/dev/null || echo "generated_realm not found"
-          # Clean up the temporary container
-          docker rm $CONTAINER_ID
+          # Check if the image was built successfully
+          if docker image inspect ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} >/dev/null 2>&1; then
+            echo "✅ Docker image built successfully"
+            docker images | grep ${{ github.sha }} || true
+          else
+            echo "❌ Docker image build failed"
+            echo "Docker build failed" > build-logs/build-failed.txt
+          fi
       
       - name: Save build metadata
         if: always()
@@ -187,7 +186,8 @@ jobs:
           docker run --rm \
             -v "$(pwd)/test-logs:/app/test-logs" \
             ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} bash -c "
-          realms deploy &&
+          realms create --random
+          realms deploy --folder generated_realm
           src/realm_frontend/run-e2e-tests.sh specs/workflows.spec.ts --reporter=line &&
           mkdir -p /app/test-logs &&
           cp -f dfx.log /app/test-logs/ 2>/dev/null || true &&
@@ -226,8 +226,8 @@ jobs:
             -v "$(pwd)/deploy-logs:/app/deploy-logs" \
             -e DFX_WARNING="-mainnet_plaintext_identity" \
             ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} \
-            bash -c "realms create --random --network staging --deploy && \
-                     realms deploy --network staging --identity /app/identity.pem && \
+            bash -c "realms create --random && \
+                     realms deploy --folder generated_realm --network staging --identity /app/identity.pem && \
                      mkdir -p /app/deploy-logs && \
                      cp -f dfx.log /app/deploy-logs/ 2>/dev/null || true && \
                      cp -f dfx2.log /app/deploy-logs/ 2>/dev/null || true && \
