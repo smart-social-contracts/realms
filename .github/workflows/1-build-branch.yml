@@ -53,6 +53,37 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}
+          load: true
+      
+      - name: Extract build artifacts from Docker image
+        if: always()
+        run: |
+          mkdir -p build-logs
+          # Create a temporary container to extract files
+          CONTAINER_ID=$(docker create ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }})
+          # Copy log files from the container
+          docker cp $CONTAINER_ID:/app/dfx.log build-logs/ 2>/dev/null || echo "dfx.log not found"
+          docker cp $CONTAINER_ID:/app/dfx2.log build-logs/ 2>/dev/null || echo "dfx2.log not found"
+          docker cp $CONTAINER_ID:/app/realms_cli.log build-logs/ 2>/dev/null || echo "realms_cli.log not found"
+          docker cp $CONTAINER_ID:/app/generated_realm build-logs/ 2>/dev/null || echo "generated_realm not found"
+          # Clean up the temporary container
+          docker rm $CONTAINER_ID
+      
+      - name: Save build metadata
+        if: always()
+        run: |
+          echo "Commit: ${{ github.sha }}" > build-logs/build-info.txt
+          echo "Image: ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}" >> build-logs/build-info.txt
+          echo "Branch: ${{ github.ref_name }}" >> build-logs/build-info.txt
+          echo "Timestamp: $(date -u)" >> build-logs/build-info.txt
+      
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-branch
+          path: build-logs/
+          retention-days: 7
 
   test:
     runs-on: ubuntu-latest
@@ -77,10 +108,19 @@ jobs:
       
       - name: Run linting checks
         run: |
+          mkdir -p lint-logs
           # First fix formatting issues
-          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} ./scripts/run_linters.sh --fix
+          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} ./scripts/run_linters.sh --fix > lint-logs/lint-fix.log 2>&1 || true
           # Then verify all issues are fixed
-          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} ./scripts/run_linters.sh
+          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} ./scripts/run_linters.sh > lint-logs/lint-check.log 2>&1 || true
+      
+      - name: Upload lint logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-logs-branch
+          path: lint-logs/
+          retention-days: 7
 
   test-extensions:
     runs-on: ubuntu-latest
@@ -105,7 +145,21 @@ jobs:
       
       - name: Run extension tests
         run: |
-          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} bash -c "./tests/test_extensions.py"
+          docker run --rm \
+            -v "$(pwd)/extension-logs:/app/extension-logs" \
+            ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} bash -c "
+          ./tests/test_extensions.py &&
+          mkdir -p /app/extension-logs &&
+          cp -f dfx.log /app/extension-logs/ 2>/dev/null || true &&
+          cp -f realms_cli.log /app/extension-logs/ 2>/dev/null || true"
+      
+      - name: Upload extension test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-test-logs-branch
+          path: extension-logs/
+          retention-days: 7
 
   test-ui-e2e:
     runs-on: ubuntu-latest
