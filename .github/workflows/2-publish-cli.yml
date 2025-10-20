@@ -21,8 +21,8 @@ jobs:
         
     - name: Verify version consistency
       run: |
-        # Extract version from pyproject.toml
-        PYPROJECT_VERSION=$(grep -Po '(?<=version = ")[^"]*' cli/pyproject.toml)
+        # Extract version from pyproject.toml (match only 'version = ' not 'python_version = ')
+        PYPROJECT_VERSION=$(grep -Po '^version = "\K[^"]*' cli/pyproject.toml)
         # Extract version from __init__.py
         INIT_VERSION=$(grep -Po '(?<=__version__ = ")[^"]*' cli/realms_cli/__init__.py)
         
