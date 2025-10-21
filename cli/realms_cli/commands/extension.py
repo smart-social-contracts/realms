@@ -661,6 +661,8 @@ def install_from_source_command(source_dir: str = "extensions"):
                 os.makedirs(paths["backend"], exist_ok=True)
                 shutil.copytree(backend_source, paths["backend"], dirs_exist_ok=True)
                 console.print("  [green]✓[/green] Backend files copied")
+                update_extension_imports(ext_id, "add")
+                console.print("  [green]✓[/green] Extension imports updated")
 
             # Copy frontend files if they exist
             frontend_source = os.path.join(source_path, "frontend")
