@@ -8,7 +8,7 @@ from typing import Optional
 import typer
 from rich.console import Console
 
-from ..utils import get_logger, run_command
+from ..utils import get_logger, get_scripts_path, is_repo_mode, run_command, run_in_docker
 
 console = Console()
 
@@ -137,38 +137,61 @@ def _deploy_realm_internal(
         console.print("[yellow]⚠️  Config file deployment not yet implemented[/yellow]")
 
     else:
-        # Default deployment using deploy_local.sh
+        # Default deployment using deploy_local.sh or deploy_staging.sh
         try:
+            scripts_path = get_scripts_path()
+            
             if network in ["local", "staging", "mainnet", "ic"]:
 
                 if network == "local":
                     console.print("🔧 Running local deployment script...")
+                    deploy_script = scripts_path / "deploy_local.sh"
                     env = None
                     if identity:
                         env = os.environ.copy()
                         env["DFX_IDENTITY"] = identity
                     
-                    result = run_command(
-                        ["./scripts/deploy_local.sh"],
-                        cwd=str(Path.cwd()),
-                        use_project_venv=True,
-                        logger=logger,
-                        env=env,
-                    )
+                    # Run in Docker if in image mode, otherwise run locally
+                    if is_repo_mode():
+                        result = run_command(
+                            [str(deploy_script)],
+                            cwd=str(Path.cwd()),
+                            use_project_venv=True,
+                            logger=logger,
+                            env=env,
+                        )
+                    else:
+                        console.print("[dim]Running in Docker image mode...[/dim]")
+                        result = run_in_docker(
+                            ["bash", str(deploy_script)],
+                            working_dir=Path.cwd(),
+                            env=env,
+                        )
+                        
                 elif network in ["staging", "mainnet", "ic"]:
                     console.print("🔧 Running staging deployment script...")
+                    deploy_script = scripts_path / "deploy_staging.sh"
                     env = None
                     if identity:
                         env = os.environ.copy()
                         env["DFX_IDENTITY"] = identity
                     
-                    result = run_command(
-                        ["./scripts/deploy_staging.sh"],
-                        cwd=str(Path.cwd()),
-                        use_project_venv=True,
-                        logger=logger,
-                        env=env,
-                    )
+                    # Run in Docker if in image mode, otherwise run locally
+                    if is_repo_mode():
+                        result = run_command(
+                            [str(deploy_script)],
+                            cwd=str(Path.cwd()),
+                            use_project_venv=True,
+                            logger=logger,
+                            env=env,
+                        )
+                    else:
+                        console.print("[dim]Running in Docker image mode...[/dim]")
+                        result = run_in_docker(
+                            ["bash", str(deploy_script)],
+                            working_dir=Path.cwd(),
+                            env=env,
+                        )
 
                 if result.returncode == 0:
                     console.print("[green]✅ Deployment completed successfully[/green]")

@@ -42,6 +42,7 @@ app = typer.Typer(
     help="CLI tool for deploying and managing Realms",
     add_completion=False,
     rich_markup_mode="rich",
+    invoke_without_command=True,
 )
 
 
@@ -582,6 +583,7 @@ def version() -> None:
 
 @app.callback()
 def main(
+    ctx: typer.Context,
     verbose: bool = typer.Option(
         False, "--verbose", "-v", help="Enable verbose output"
     ),

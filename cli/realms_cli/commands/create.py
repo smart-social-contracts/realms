@@ -9,6 +9,7 @@ from typing import Optional
 import typer
 from rich.console import Console
 
+from ..utils import get_scripts_path, is_repo_mode, run_in_docker
 from .deploy import _deploy_realm_internal
 
 console = Console()
@@ -52,9 +53,12 @@ def create_command(
 
         # Call the realm_generator.py script
         try:
+            scripts_path = get_scripts_path()
+            generator_script = scripts_path / "realm_generator.py"
+            
             cmd = [
-                sys.executable,
-                "scripts/realm_generator.py",
+                "python3",
+                str(generator_script),
                 "--citizens",
                 str(citizens),
                 "--organizations",
@@ -73,7 +77,13 @@ def create_command(
                 cmd.extend(["--seed", str(seed)])
 
             console.print(f"[dim]Running: {' '.join(cmd)}[/dim]")
-            result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path.cwd())
+            
+            # Run in Docker if in image mode, otherwise run locally
+            if is_repo_mode():
+                result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path.cwd())
+            else:
+                console.print("[dim]Running in Docker image mode...[/dim]")
+                result = run_in_docker(cmd, working_dir=Path.cwd())
 
             if result.returncode != 0:
                 console.print("[red]❌ Error generating realm data:[/red]")
@@ -91,11 +101,11 @@ def create_command(
     # Copy deployment scripts from existing files
     console.print("\n🔧 Copying deployment scripts...")
 
-    # Get the project root directory (assuming we're in cli/ subdirectory)
-    project_root = Path.cwd()
+    # Get scripts path (auto-detects repo vs image mode)
+    scripts_path = get_scripts_path()
 
     # 1. Copy install_extensions.sh as 1-install-extensions.sh
-    source_install = project_root / "scripts" / "install_extensions.sh"
+    source_install = scripts_path / "install_extensions.sh"
     target_install = scripts_dir / "1-install-extensions.sh"
     if source_install.exists():
         shutil.copy2(source_install, target_install)
