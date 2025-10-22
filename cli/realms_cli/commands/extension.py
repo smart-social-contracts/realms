@@ -248,8 +248,15 @@ def update_extension_imports(extension_id, action="add"):
     return True
 
 
-def package_extension_command(extension_id: str, output_dir: Optional[str] = None, source_dir: Optional[str] = None):
-    """Package an extension into a zip file"""
+def package_extension_command(extension_id: str, output_dir: Optional[str] = None, output_path: Optional[str] = None, source_dir: Optional[str] = None):
+    """Package an extension into a zip file
+    
+    Args:
+        extension_id: ID of the extension to package
+        output_dir: Directory to save the zip file (used if output_path not specified)
+        output_path: Full path for the output zip file (overrides output_dir)
+        source_dir: Source directory containing the extension
+    """
     try:
         validate_extension_id(extension_id)
     except ValueError as e:
@@ -259,11 +266,15 @@ def package_extension_command(extension_id: str, output_dir: Optional[str] = Non
     locations = find_extension_locations(extension_id, source_dir)
 
     paths = get_project_paths()
-    if not output_dir:
-        output_dir = paths["project_root"]
-
-    zip_filename = f"{extension_id}.zip"
-    zip_path = os.path.join(output_dir, zip_filename)
+    
+    # Determine output path
+    if output_path:
+        zip_path = output_path
+    else:
+        if not output_dir:
+            output_dir = paths["project_root"]
+        zip_filename = f"{extension_id}.zip"
+        zip_path = os.path.join(output_dir, zip_filename)
 
     console.print(f"[blue]Packaging extension {extension_id}[/blue]")
 
@@ -717,7 +728,7 @@ def extension_command(
         None, "--extension-id", help="Extension ID for package/uninstall operations"
     ),
     package_path: Optional[str] = typer.Option(
-        None, "--package-path", help="Path to extension package for install operation"
+        None, "--package-path", help="Path for package file (full output path for package action, or package file to install for install action)"
     ),
     source_dir: str = typer.Option(
         "extensions", "--source-dir", help="Source directory for extensions"
@@ -735,7 +746,7 @@ def extension_command(
                 "[red]Error: --extension-id is required for package action[/red]"
             )
             raise typer.Exit(1)
-        package_extension_command(extension_id, source_dir=source_dir)
+        package_extension_command(extension_id, output_path=package_path, source_dir=source_dir)
     elif action == "install":
         if not package_path:
             console.print(
