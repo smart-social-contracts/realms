@@ -214,8 +214,8 @@
 			// RULE 1: Skip if show_in_sidebar is explicitly set to false
 			if (ext.show_in_sidebar === false) return false;
 			
-			// Skip if path is explicitly set to null (hide from sidebar)
-			if (ext.path === null) return false;
+			// Note: url_path can be null (which means use default /extensions/{name} route)
+			// We don't filter based on url_path being null
 			
 			// RULE 2: If user is neither admin nor member, only show llm_chat and public_dashboard
 			if (!userProfiles || userProfiles.length === 0 || 

@@ -665,6 +665,7 @@ def install_from_source_command(source_dir: str = "extensions"):
 
             source_path = os.path.join(extensions_source_dir, ext_id)
             paths = get_extension_paths(ext_id)
+            project_paths = get_project_paths()
 
             # Copy backend files if they exist
             backend_source = os.path.join(source_path, "backend")
@@ -687,7 +688,7 @@ def install_from_source_command(source_dir: str = "extensions"):
                     )
                     console.print("  [green]✓[/green] Frontend lib files copied")
 
-                # Copy route files
+                # Copy route files (standard sidebar location)
                 route_source = os.path.join(
                     frontend_source, "routes", "(sidebar)", "extensions", ext_id
                 )
@@ -697,6 +698,35 @@ def install_from_source_command(source_dir: str = "extensions"):
                         route_source, paths["frontend_route"], dirs_exist_ok=True
                     )
                     console.print("  [green]✓[/green] Frontend route files copied")
+
+                # Copy custom top-level route files (e.g., /welcome)
+                custom_route_source = os.path.join(frontend_source, "routes", ext_id)
+                if os.path.exists(custom_route_source):
+                    custom_route_target = os.path.join(
+                        project_paths["frontend_dir"],
+                        "src/routes",
+                        ext_id
+                    )
+                    os.makedirs(custom_route_target, exist_ok=True)
+                    shutil.copytree(
+                        custom_route_source, custom_route_target, dirs_exist_ok=True
+                    )
+                    console.print("  [green]✓[/green] Custom route files copied")
+
+                # Copy static files if they exist (e.g., photos, videos)
+                static_source = os.path.join(frontend_source, "static")
+                if os.path.exists(static_source):
+                    static_target = os.path.join(
+                        project_paths["frontend_dir"],
+                        "static",
+                        "extensions",
+                        ext_id
+                    )
+                    os.makedirs(static_target, exist_ok=True)
+                    shutil.copytree(
+                        static_source, static_target, dirs_exist_ok=True
+                    )
+                    console.print("  [green]✓[/green] Static files copied")
 
                 # Copy i18n files
                 i18n_source = os.path.join(

@@ -28,10 +28,7 @@ src/realm_backend/extension_packages/
 src/realm_frontend/src/lib/extensions/
 src/realm_frontend/src/routes/(sidebar)/extensions/
 src/realm_frontend/src/lib/i18n/locales/extensions/
-# TODO: this should be reviewed to make it more generalized
-src/realm_frontend/src/routes/welcome/  
-src/realm_frontend/static/photos/
-src/realm_frontend/static/videos/
+src/realm_frontend/static/extensions/
 
 # Generated realm folder
 generated_realm/
