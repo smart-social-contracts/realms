@@ -29,7 +29,6 @@ npm run build --workspace realm_registry_frontend
 dfx deploy --network "$NETWORK" --yes realm_registry_frontend
 npm run prebuild --workspace realm_frontend
 npm run build --workspace realm_frontend
-sh scripts/update_config.sh
 dfx deploy --network "$NETWORK" --yes realm_frontend
 
 echo "Verifying deployment on $NETWORK"
