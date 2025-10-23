@@ -21,7 +21,7 @@ def get_all_extension_manifests():
         from extension_packages.extension_manifests import get_all_extension_manifests as _get_manifests
         return _get_manifests()
     except ImportError:
-        logger.warning("No extension_manifests.py found - no extensions installed")
+        logger.error("No extension_manifests.py found - no extensions installed")
         return {}
 
 
