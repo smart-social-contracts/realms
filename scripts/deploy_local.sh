@@ -3,6 +3,9 @@
 set -e
 set -x
 
+echo "Local deployment"
+echo "Date/Time: $(date '+%Y-%m-%d %H:%M:%S')"
+
 if whereis git | grep -q "/"; then
     BRANCH_NAME=$(git branch --show-current 2>/dev/null || echo "main")
 

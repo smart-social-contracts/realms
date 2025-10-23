@@ -7,6 +7,7 @@ set -x
 NETWORK="${1:-staging}"
 
 echo "Deploying to network: $NETWORK"
+echo "Date/Time: $(date '+%Y-%m-%d %H:%M:%S')"
 
 echo "Checking kybra installation..."
 python3 -m kybra --version || {
@@ -20,6 +21,8 @@ echo "Deploying all canisters to $NETWORK"
 
 dfx deploy --network "$NETWORK" --yes realm_registry_backend --mode=reinstall
 dfx deploy --network "$NETWORK" --yes realm_backend --mode=reinstall
+dfx canister start --network "$NETWORK" realm_backend
+dfx canister start --network "$NETWORK" realm_registry_backend
 
 dfx generate realm_registry_backend
 dfx generate realm_backend
