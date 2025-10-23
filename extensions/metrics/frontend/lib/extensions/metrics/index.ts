@@ -1,16 +1,22 @@
-// Export the main component as default for dynamic loading
-import MetricsComponent from './Metrics.svelte';
-export default MetricsComponent;
+import Metrics from './Metrics.svelte';
 
-import TaxAllocationChart from './TaxAllocationChart.svelte';
-import AssetPortfolioChart from './AssetPortfolioChart.svelte';
-import TaxContributionTreemap from './TaxContributionTreemap.svelte';
-import MonthlyCashFlow from './MonthlyCashFlow.svelte';
-
-export {
-    TaxAllocationChart,
-    AssetPortfolioChart,
-    TaxContributionTreemap,
-    MonthlyCashFlow
+export const metadata = {
+  "name": "metrics",
+  "version": "1.0.0",
+  "description": "Analytics and metrics dashboard for realm performance",
+  "author": "Smart Social Contracts",
+  "permissions": [],
+  "profiles": [
+    "member",
+    "admin"
+  ],
+  "categories": [
+    "oversight"
+  ],
+  "icon": "analytics",
+  "doc_url": null,
+  "url_path": null,
+  "show_in_sidebar": true
 };
 
+export default Metrics;

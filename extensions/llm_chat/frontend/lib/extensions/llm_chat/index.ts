@@ -1,5 +1,23 @@
-// Export the component as default for dynamic loading
-import LLMChatComponent from './LLMChat.svelte';
-export default LLMChatComponent;
+import LLMChat from './LLMChat.svelte';
 
-   
+export const metadata = {
+  "name": "llm_chat",
+  "version": "0.1.0",
+  "description": "AI-powered assistant for governance and legal questions",
+  "author": "Smart Social Contracts Team",
+  "permissions": [],
+  "profiles": [
+    "member",
+    "admin"
+  ],
+  "categories": [
+    "oversight"
+  ],
+  "icon": "brain",
+  "doc_url": "https://github.com/smart-social-contracts/realms/tree/main/extensions/llm_chat",
+  "url_path": null,
+  "show_in_sidebar": true,
+  "hideFooter": true
+};
+
+export default LLMChat;
