@@ -37,3 +37,15 @@ COPY tests ./tests
 COPY extensions ./extensions
 
 RUN touch src/realm_backend/extension_packages/extension_imports.py
+
+# Generate extension manifests (create empty file with proper structure for Docker build)
+RUN echo '"""' > src/realm_backend/extension_packages/extension_manifests.py && \
+    echo 'Static extension manifest registry for Kybra canister environment.' >> src/realm_backend/extension_packages/extension_manifests.py && \
+    echo 'This file will be regenerated during deployment.' >> src/realm_backend/extension_packages/extension_manifests.py && \
+    echo '"""' >> src/realm_backend/extension_packages/extension_manifests.py && \
+    echo '' >> src/realm_backend/extension_packages/extension_manifests.py && \
+    echo 'EXTENSION_MANIFESTS = {}' >> src/realm_backend/extension_packages/extension_manifests.py && \
+    echo '' >> src/realm_backend/extension_packages/extension_manifests.py && \
+    echo 'def get_all_extension_manifests() -> dict:' >> src/realm_backend/extension_packages/extension_manifests.py && \
+    echo '    """Get all extension manifests"""' >> src/realm_backend/extension_packages/extension_manifests.py && \
+    echo '    return EXTENSION_MANIFESTS' >> src/realm_backend/extension_packages/extension_manifests.py
