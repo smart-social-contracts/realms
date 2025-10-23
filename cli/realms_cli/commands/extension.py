@@ -732,6 +732,16 @@ def install_from_source_command(source_dir: str = "extensions"):
                 console.print("  [green]✓[/green] Backend files copied")
                 update_extension_imports(ext_id, "add")
                 console.print("  [green]✓[/green] Extension imports updated")
+            
+            # Copy root-level manifest.json to backend directory (if not already there)
+            root_manifest = os.path.join(source_path, "manifest.json")
+            if os.path.exists(root_manifest):
+                # Create backend dir if it doesn't exist (for frontend-only extensions)
+                os.makedirs(paths["backend"], exist_ok=True)
+                backend_manifest = os.path.join(paths["backend"], "manifest.json")
+                if not os.path.exists(backend_manifest):
+                    shutil.copy2(root_manifest, backend_manifest)
+                    console.print("  [green]✓[/green] Manifest copied to backend")
 
             # Copy frontend files if they exist
             frontend_source = os.path.join(source_path, "frontend")
