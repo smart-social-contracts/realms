@@ -226,7 +226,7 @@ gh release create v1.0.0 my_extension-1.0.0.zip \
 
 ### Extension Examples
 
-- **vault_manager** - Treasury and token management
+- **vault** - Treasury and token management
   - Repository: https://github.com/smart-social-contracts/realms-extension-vault
   - Features: ckBTC balance tracking, transfers, ICRC integration
 
@@ -364,7 +364,7 @@ After creating your realm, you can extend its functionality:
 
 ```bash
 # Install treasury management
-realms extension install vault_manager
+realms extension install vault
 
 # Install governance extensions
 realms extension install voting

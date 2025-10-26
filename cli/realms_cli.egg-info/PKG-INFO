@@ -222,7 +222,7 @@ Realms projects are configured via `realm_config.json`:
       {"name": "citizen_dashboard", "enabled": true}
     ],
     "q1": [
-      {"name": "vault_manager", "enabled": true}
+      {"name": "vault", "enabled": true}
     ]
   },
   "post_deployment": {

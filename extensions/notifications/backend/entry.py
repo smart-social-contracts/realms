@@ -48,7 +48,7 @@ notifications_storage: List[Dict[str, Any]] = [
         "timestamp": "1 hour ago",
         "read": True,
         "icon": "wallet",
-        "href": "/extensions/vault_manager",
+        "href": "/extensions/vault",
         "color": "purple",
     },
     {

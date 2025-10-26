@@ -35,7 +35,7 @@
         "enabled": true
       },
       {
-        "name": "vault_manager",
+        "name": "vault",
         "source": "local",
         "enabled": true
       }
