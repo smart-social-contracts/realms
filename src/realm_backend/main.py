@@ -379,22 +379,47 @@ def initialize() -> void:
     # Create foundational objects after entity registration
     create_foundational_objects()
 
-    # Initialize vault extension
-    # First register vault entity types
-    logger.info("Registering vault entity types...")
-    from extension_packages.vault.entry import register_entities as register_vault_entities
-    try:
-        register_vault_entities()
-    except Exception as e:
-        logger.error(f"❌ Error registering vault entities: {str(e)}\n{traceback.format_exc()}")
+    # Initialize all installed extensions
+    logger.info("Discovering and initializing extensions...")
     
-    # Then initialize vault via extension call
-    logger.info("Initializing vault extension...")
     try:
-        result = api.extensions.extension_sync_call("vault", "initialize", "{}")
-        logger.info(f"✅ Vault extension initialized: {result}")
+        # Get all installed extension manifests
+        extension_manifests = api.extensions.get_all_extension_manifests()
+        extension_ids = list(extension_manifests.keys())
+        logger.info(f"Found {len(extension_ids)} installed extensions: {extension_ids}")
+        
+        # Initialize each extension
+        for extension_id in extension_ids:
+            logger.info(f"Processing extension: {extension_id}")
+            
+            # Step 1: Try to register extension entity types
+            try:
+                logger.info(f"  → Attempting to register entity types for {extension_id}...")
+                extension_module = __import__(f"extension_packages.{extension_id}.entry", fromlist=['register_entities'])
+                
+                if hasattr(extension_module, 'register_entities'):
+                    extension_module.register_entities()
+                    logger.info(f"  ✅ Successfully registered entity types for {extension_id}")
+                else:
+                    logger.info(f"  ℹ️  No register_entities function found for {extension_id}")
+            except ImportError:
+                logger.info(f"  ℹ️  No entry module found for {extension_id}")
+            except Exception as e:
+                logger.error(f"  ❌ Error registering entity types for {extension_id}: {str(e)}\n{traceback.format_exc()}")
+            
+            # Step 2: Try to call extension initialize function
+            try:
+                logger.info(f"  → Attempting to initialize {extension_id}...")
+                result = api.extensions.extension_sync_call(extension_id, "initialize", "{}")
+                logger.info(f"  ✅ Successfully initialized {extension_id}: {result}")
+            except Exception as e:
+                # Some extensions may not have an initialize function, which is fine
+                logger.info(f"  ℹ️  Extension {extension_id} has no initialize function or initialization skipped: {str(e)}")
+        
+        logger.info(f"✅ Extension initialization complete. Processed {len(extension_ids)} extensions.")
+        
     except Exception as e:
-        logger.error(f"❌ Error initializing vault extension: {str(e)}\n{traceback.format_exc()}")
+        logger.error(f"❌ Error during extension initialization: {str(e)}\n{traceback.format_exc()}")
 
 
 @init
