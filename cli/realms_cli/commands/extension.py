@@ -348,21 +348,26 @@ def package_extension_command(extension_id: str, output_dir: Optional[str] = Non
                             f"[blue]Added frontend/lib/extensions/{extension_id}/{rel_path}[/blue]"
                         )
 
-            if "frontend_route" in locations:
-                frontend_route_src = locations["frontend_route"]
-                for root, _, files in os.walk(frontend_route_src):
+            # Package routes with flexible structure
+            # Check for routes in the extension source
+            if source_dir:
+                routes_source = os.path.join(source_dir, "frontend", "routes")
+            else:
+                # Check default project structure for custom routes
+                routes_source = os.path.join(paths["project_root"], "extensions", extension_id, "frontend", "routes")
+            
+            if os.path.exists(routes_source):
+                for root, _, files in os.walk(routes_source):
                     for file in files:
                         file_path = os.path.join(root, file)
-                        rel_path = os.path.relpath(file_path, frontend_route_src)
+                        # Preserve the full directory structure from routes/
+                        rel_path = os.path.relpath(file_path, routes_source)
                         zipf.write(
                             file_path,
-                            os.path.join(
-                                f"frontend/routes/(sidebar)/extensions/{extension_id}",
-                                rel_path,
-                            ),
+                            os.path.join("frontend/routes", rel_path),
                         )
                         console.print(
-                            f"[blue]Added frontend/routes/(sidebar)/extensions/{extension_id}/{rel_path}[/blue]"
+                            f"[blue]Added frontend/routes/{rel_path}[/blue]"
                         )
 
             if "i18n" in locations:
@@ -496,31 +501,25 @@ def install_extension_command(package_path: str):
                 f"[green]Installed frontend lib files for {extension_id}[/green]"
             )
 
-        frontend_route_source = os.path.join(
-            temp_dir, "frontend/routes/(sidebar)/extensions", extension_id
-        )
-        if os.path.exists(frontend_route_source) and os.listdir(frontend_route_source):
-            frontend_route_target = os.path.join(
-                paths["frontend_dir"], "src/routes/(sidebar)/extensions", extension_id
-            )
-
-            if os.path.exists(frontend_route_target):
-                shutil.rmtree(frontend_route_target)
-
-            os.makedirs(frontend_route_target, exist_ok=True)
-
-            for root, _, files in os.walk(frontend_route_source):
+        # Install routes with flexible structure
+        # Copy all routes from frontend/routes/ to src/routes/ preserving structure
+        routes_source = os.path.join(temp_dir, "frontend/routes")
+        if os.path.exists(routes_source):
+            routes_target = os.path.join(paths["frontend_dir"], "src/routes")
+            
+            for root, _, files in os.walk(routes_source):
                 for file in files:
                     src_file = os.path.join(root, file)
-                    rel_path = os.path.relpath(src_file, frontend_route_source)
-                    dst_file = os.path.join(frontend_route_target, rel_path)
-
+                    # Get relative path from routes_source
+                    rel_path = os.path.relpath(src_file, routes_source)
+                    dst_file = os.path.join(routes_target, rel_path)
+                    
                     os.makedirs(os.path.dirname(dst_file), exist_ok=True)
                     shutil.copy2(src_file, dst_file)
                     console.print(
                         f"[blue]Installed frontend route file: {rel_path}[/blue]"
                     )
-
+            
             console.print(
                 f"[green]Installed frontend route files for {extension_id}[/green]"
             )
@@ -755,30 +754,39 @@ def install_from_source_command(source_dir: str = "extensions"):
                     )
                     console.print("  [green]✓[/green] Frontend lib files copied")
 
-                # Copy route files (standard sidebar location)
-                route_source = os.path.join(
-                    frontend_source, "routes", "(sidebar)", "extensions", ext_id
-                )
-                if os.path.exists(route_source):
-                    os.makedirs(paths["frontend_route"], exist_ok=True)
-                    shutil.copytree(
-                        route_source, paths["frontend_route"], dirs_exist_ok=True
-                    )
-                    console.print("  [green]✓[/green] Frontend route files copied")
-
-                # Copy custom top-level route files (e.g., /welcome)
-                custom_route_source = os.path.join(frontend_source, "routes", ext_id)
-                if os.path.exists(custom_route_source):
-                    custom_route_target = os.path.join(
+                # Copy ALL routes preserving directory structure
+                # This allows extensions to define routes at any location:
+                # - frontend/routes/(sidebar)/admin/ → src/routes/(sidebar)/admin/
+                # - frontend/routes/(sidebar)/extensions/{ext_id}/ → src/routes/(sidebar)/extensions/{ext_id}/
+                # - frontend/routes/{ext_id}/ → src/routes/{ext_id}/
+                # - Any other structure the extension needs
+                routes_source = os.path.join(frontend_source, "routes")
+                if os.path.exists(routes_source):
+                    routes_target = os.path.join(
                         project_paths["frontend_dir"],
-                        "src/routes",
-                        ext_id
+                        "src/routes"
                     )
-                    os.makedirs(custom_route_target, exist_ok=True)
-                    shutil.copytree(
-                        custom_route_source, custom_route_target, dirs_exist_ok=True
-                    )
-                    console.print("  [green]✓[/green] Custom route files copied")
+                    # Walk through the routes directory and copy all files preserving structure
+                    for root, dirs, files in os.walk(routes_source):
+                        # Calculate relative path from routes_source
+                        rel_path = os.path.relpath(root, routes_source)
+                        
+                        # Determine target directory
+                        if rel_path == ".":
+                            target_dir = routes_target
+                        else:
+                            target_dir = os.path.join(routes_target, rel_path)
+                        
+                        # Create target directory
+                        os.makedirs(target_dir, exist_ok=True)
+                        
+                        # Copy all files in this directory
+                        for file in files:
+                            src_file = os.path.join(root, file)
+                            dst_file = os.path.join(target_dir, file)
+                            shutil.copy2(src_file, dst_file)
+                    
+                    console.print("  [green]✓[/green] Frontend route files copied")
 
                 # Copy static files if they exist (e.g., photos, videos)
                 static_source = os.path.join(frontend_source, "static")

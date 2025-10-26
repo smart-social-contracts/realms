@@ -4,7 +4,6 @@
   
   import GenericEntityTable from '$lib/components/ggg/GenericEntityTable.svelte';
   import CodexViewer from '$lib/components/ggg/CodexViewer.svelte';
-  import MetricsComponent from '$lib/extensions/metrics/Metrics.svelte';
   
   let activeTab = 'dashboard';
   let loading = false;
@@ -413,15 +412,7 @@
           <h2 class="text-2xl font-bold mb-6">System Overview</h2>
         {/if}
         
-        <!-- Treasury Budget Metrics -->
-        <div class="mb-8 bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-6 border border-blue-200">
-          <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
-            🏦 <span class="ml-2">Treasury Portfolio</span>
-          </h3>
-          
-          <!-- Budget Visualization Metrics -->
-          <MetricsComponent />
-        </div>
+        <!-- Treasury Budget Metrics section removed - install metrics extension for visualization -->
 
         <!-- Dynamic Treasury Data (if available) -->
         {#if data.instruments && data.transfers}
