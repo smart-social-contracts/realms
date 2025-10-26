@@ -126,7 +126,7 @@ def another_function(args: str) -> Async[str]:
 
 ```bash
 # Clone realms at specific version
-git clone https://github.com/smart-social-contracts/realms.git
+git clone --recurse-submodules https://github.com/smart-social-contracts/realms.git
 cd realms
 git checkout v1.2.3  # Use specific release
 
