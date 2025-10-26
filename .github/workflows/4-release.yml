@@ -72,27 +72,42 @@ jobs:
           # Store new version for later use
           echo "NEW_VERSION=${NEW_VERSION}" >> $GITHUB_OUTPUT
       
-      # Pull the latest Docker image
-      - name: Pull Docker image
+      # Pull and tag the base Docker image
+      - name: Pull and tag Docker image
         run: |
-          # Pull the Docker image that was already built in the build stage
-          docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}
+          # Pull the base Docker image (without extensions)
+          docker pull ghcr.io/${{ github.repository_owner }}/realms:latest
+          
+          # Tag with version number
+          docker tag ghcr.io/${{ github.repository_owner }}/realms:latest \
+            ghcr.io/${{ github.repository_owner }}/realms:v${{ steps.bump_version.outputs.NEW_VERSION }}
+          
+          # Push the versioned tag
+          docker push ghcr.io/${{ github.repository_owner }}/realms:v${{ steps.bump_version.outputs.NEW_VERSION }}
       
       - name: Extract canister artifacts
         run: |
           # Create directory to ensure it exists for mounting
           mkdir -p artifacts
 
-          # Extract artifacts from the known path in the Docker container
+          # Build canisters in the Docker container and extract artifacts
           docker run --rm \
             -v "$(pwd)/artifacts:/artifacts" \
-            ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} \
-            bash -c "cp /app/.dfx/local/canisters/realm_backend/realm_backend.wasm.gz /artifacts/ && \
-                    cp /app/.dfx/local/canisters/realm_backend/service.did /artifacts/realm_backend.did"
+            ghcr.io/${{ github.repository_owner }}/realms:latest \
+            bash -c "dfx start --background --clean && \
+                    dfx canister create --all && \
+                    dfx build --all && \
+                    cp .dfx/local/canisters/realm_backend/realm_backend.wasm.gz /artifacts/ && \
+                    cp .dfx/local/canisters/realm_backend/service.did /artifacts/realm_backend.did && \
+                    cp .dfx/local/canisters/realm_registry_backend/realm_registry_backend.wasm.gz /artifacts/ && \
+                    cp .dfx/local/canisters/realm_registry_backend/service.did /artifacts/realm_registry_backend.did && \
+                    dfx stop"
           
           # Move artifacts to the root directory for the release
           mv artifacts/realm_backend.wasm.gz ./
           mv artifacts/realm_backend.did ./
+          mv artifacts/realm_registry_backend.wasm.gz ./
+          mv artifacts/realm_registry_backend.did ./
       
       # Push changes
       - name: Push changes
@@ -115,16 +130,42 @@ jobs:
           files: |
             realm_backend.wasm.gz
             realm_backend.did
+            realm_registry_backend.wasm.gz
+            realm_registry_backend.did
           body: |
             # Release v${{ steps.bump_version.outputs.NEW_VERSION }}
             
-            This release contains the compiled WASM and Candid (DID) files for the Internet Computer canisters.
+            This release includes:
             
-            ## Included Canisters
-            - realm_backend
+            ## 📦 Release Assets
+            
+            ### 🐳 Docker Image (Base - No Extensions)
+            ```bash
+            docker pull ghcr.io/${{ github.repository_owner }}/realms:v${{ steps.bump_version.outputs.NEW_VERSION }}
+            # or use :latest for the most recent release
+            docker pull ghcr.io/${{ github.repository_owner }}/realms:latest
+            ```
+            
+            ### 🔧 Canister Artifacts (WASM + DID)
+            - `realm_backend.wasm.gz` + `realm_backend.did` - Main backend canister
+            - `realm_registry_backend.wasm.gz` + `realm_registry_backend.did` - Registry backend canister
+            
+            ### 📁 Source Code
+            - Source code (zip)
+            - Source code (tar.gz)
             
             ## Installation
-            Download the appropriate files and deploy using `dfx deploy` or your preferred deployment method.
+            
+            **Deploy Canisters:**
+            ```bash
+            # Download the .wasm.gz and .did files
+            dfx deploy --network ic
+            ```
+            
+            **Run Docker Image:**
+            ```bash
+            docker run -it ghcr.io/${{ github.repository_owner }}/realms:v${{ steps.bump_version.outputs.NEW_VERSION }}
+            ```
             
             ## Commit
             ${{ github.sha }}
