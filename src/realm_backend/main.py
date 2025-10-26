@@ -379,6 +379,23 @@ def initialize() -> void:
     # Create foundational objects after entity registration
     create_foundational_objects()
 
+    # Initialize vault extension
+    # First register vault entity types
+    logger.info("Registering vault entity types...")
+    from extension_packages.vault.entry import register_entities as register_vault_entities
+    try:
+        register_vault_entities()
+    except Exception as e:
+        logger.error(f"❌ Error registering vault entities: {str(e)}\n{traceback.format_exc()}")
+    
+    # Then initialize vault via extension call
+    logger.info("Initializing vault extension...")
+    try:
+        result = api.extensions.extension_sync_call("vault", "initialize", "{}")
+        logger.info(f"✅ Vault extension initialized: {result}")
+    except Exception as e:
+        logger.error(f"❌ Error initializing vault extension: {str(e)}\n{traceback.format_exc()}")
+
 
 @init
 def init_() -> void:

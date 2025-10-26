@@ -160,7 +160,7 @@ def find_python_310() -> Optional[str]:
 
 def ensure_project_venv(project_dir: Path) -> Path:
     """Ensure a project-specific virtual environment exists with required dependencies."""
-    venv_dir = project_dir / ".realms-venv"
+    venv_dir = project_dir / "venv"
 
     if not venv_dir.exists():
         console.print(
