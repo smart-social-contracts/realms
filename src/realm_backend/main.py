@@ -388,38 +388,100 @@ def initialize() -> void:
         extension_ids = list(extension_manifests.keys())
         logger.info(f"Found {len(extension_ids)} installed extensions: {extension_ids}")
         
+        # Track status for each extension
+        extension_status = {}
+        
         # Initialize each extension
         for extension_id in extension_ids:
-            logger.info(f"Processing extension: {extension_id}")
+            status = {
+                'has_entities': False,
+                'has_initialize': False,
+                'entity_error': False,
+                'init_error': False
+            }
             
             # Step 1: Try to register extension entity types
             try:
-                logger.info(f"  → Attempting to register entity types for {extension_id}...")
                 extension_module = __import__(f"extension_packages.{extension_id}.entry", fromlist=['register_entities'])
                 
                 if hasattr(extension_module, 'register_entities'):
                     extension_module.register_entities()
-                    logger.info(f"  ✅ Successfully registered entity types for {extension_id}")
-                else:
-                    logger.info(f"  ℹ️  No register_entities function found for {extension_id}")
+                    status['has_entities'] = True
             except ImportError:
-                logger.info(f"  ℹ️  No entry module found for {extension_id}")
+                # No entry module - that's fine
+                pass
             except Exception as e:
-                logger.error(f"  ❌ Error registering entity types for {extension_id}: {str(e)}\n{traceback.format_exc()}")
+                logger.warning(f"Error registering entity types for {extension_id}: {str(e)}")
+                status['entity_error'] = True
             
             # Step 2: Try to call extension initialize function
             try:
-                logger.info(f"  → Attempting to initialize {extension_id}...")
                 result = api.extensions.extension_sync_call(extension_id, "initialize", "{}")
-                logger.info(f"  ✅ Successfully initialized {extension_id}: {result}")
+                status['has_initialize'] = True
             except Exception as e:
-                # Some extensions may not have an initialize function, which is fine
-                logger.info(f"  ℹ️  Extension {extension_id} has no initialize function or initialization skipped: {str(e)}")
+                # Log the actual error message to help debug
+                error_msg = str(e)
+                logger.info(f"  [DEBUG] Extension {extension_id} initialize exception: {error_msg}")
+                
+                # Check if it's a real error or just missing function
+                # Common indicators that the function simply doesn't exist:
+                missing_function_indicators = [
+                    "not found",
+                    "no function",
+                    "has no",
+                    "does not have",
+                    "no attribute",
+                    "'initialize'",
+                    "attributeerror"
+                ]
+                
+                is_missing_function = any(indicator in error_msg.lower() for indicator in missing_function_indicators)
+                
+                if not is_missing_function:
+                    # This seems like a real error, not just a missing function
+                    logger.warning(f"Error initializing {extension_id}: {error_msg}")
+                    status['init_error'] = True
+                # Otherwise it's just a missing function (optional), status stays False
+            
+            extension_status[extension_id] = status
         
-        logger.info(f"✅ Extension initialization complete. Processed {len(extension_ids)} extensions.")
+        # Print summary as a table
+        logger.info("")
+        logger.info("="*70)
+        logger.info("📊 EXTENSION INITIALIZATION SUMMARY")
+        logger.info("="*70)
+        logger.info(f"Total extensions: {len(extension_ids)}")
+        logger.info("")
+        logger.info(f"{'Extension Name':<30} {'Entity Registration':<25} {'Initialize'}")
+        logger.info("-"*70)
+        
+        for ext_id in sorted(extension_ids):
+            status = extension_status[ext_id]
+            
+            # Format entity registration status
+            if status['entity_error']:
+                entity_status = "❌ Error"
+            elif status['has_entities']:
+                entity_status = "✅ Yes"
+            else:
+                entity_status = "➖ No"
+            
+            # Format initialize status
+            if status['init_error']:
+                init_status = "❌ Error"
+            elif status['has_initialize']:
+                init_status = "✅ Yes"
+            else:
+                init_status = "➖ No"
+            
+            logger.info(f"{ext_id:<30} {entity_status:<25} {init_status}")
+        
+        logger.info("="*70)
+        logger.info("✅ Extension initialization complete.")
+        logger.info("")
         
     except Exception as e:
-        logger.error(f"❌ Error during extension initialization: {str(e)}\n{traceback.format_exc()}")
+        logger.error(f"❌ Critical error during extension initialization: {str(e)}\n{traceback.format_exc()}")
 
 
 @init
