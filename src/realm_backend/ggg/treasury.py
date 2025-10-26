@@ -167,4 +167,3 @@ class Treasury(Entity, TimestampedMixin):
     #     except Exception as e:
     #         logger.error(
     #             f"Error refreshing treasury: {str(e)}\n{traceback.format_exc()}"
-    #         )
