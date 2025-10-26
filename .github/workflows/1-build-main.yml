@@ -47,27 +47,51 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Build and push Docker image
+      - name: Build and push base Docker image (without extensions)
         uses: docker/build-push-action@v4
         with:
           context: .
+          file: ./Dockerfile
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}
             ghcr.io/${{ github.repository_owner }}/realms:latest
-          load: true
+          target: base
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
       
-      - name: Verify Docker image
+      - name: Build and push demo Docker image (with extensions)
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/realms:demo-latest
+          target: demo
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Verify Docker images
         if: always()
         run: |
           mkdir -p build-logs
-          # Check if the image was built successfully
+          # Check if the base image was built successfully
           if docker image inspect ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} >/dev/null 2>&1; then
-            echo "✅ Docker image built successfully"
+            echo "✅ Base Docker image built successfully"
             docker images | grep ${{ github.sha }} || true
           else
-            echo "❌ Docker image build failed"
-            echo "Docker build failed" > build-logs/build-failed.txt
+            echo "❌ Base Docker image build failed"
+            echo "Base Docker build failed" > build-logs/build-failed.txt
+          fi
+          # Check if the demo image was built successfully
+          if docker image inspect ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} >/dev/null 2>&1; then
+            echo "✅ Demo Docker image built successfully"
+            docker images | grep demo-${{ github.sha }} || true
+          else
+            echo "❌ Demo Docker image build failed"
+            echo "Demo Docker build failed" > build-logs/demo-build-failed.txt
           fi
       
       - name: Save build metadata
@@ -148,7 +172,7 @@ jobs:
         run: |
           docker run --rm \
             -v "$(pwd)/extension-logs:/app/extension-logs" \
-            ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} bash -c "
+            ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} bash -c "
           ./tests/test_extensions.py; \
           EXIT_CODE=\$?; \
           mkdir -p /app/extension-logs && \

@@ -1,4 +1,4 @@
-FROM ghcr.io/smart-social-contracts/icp-dev-env:db60540
+FROM ghcr.io/smart-social-contracts/icp-dev-env:db60540 AS base
 
 WORKDIR /app
 
@@ -34,7 +34,6 @@ COPY realm_config.json ./realm_config.json
 COPY scripts ./scripts
 COPY src ./src
 COPY tests ./tests
-COPY extensions ./extensions
 
 RUN touch src/realm_backend/extension_packages/extension_imports.py
 
@@ -49,3 +48,7 @@ RUN echo '"""' > src/realm_backend/extension_packages/extension_manifests.py && 
     echo 'def get_all_extension_manifests() -> dict:' >> src/realm_backend/extension_packages/extension_manifests.py && \
     echo '    """Get all extension manifests"""' >> src/realm_backend/extension_packages/extension_manifests.py && \
     echo '    return EXTENSION_MANIFESTS' >> src/realm_backend/extension_packages/extension_manifests.py
+
+# Demo stage: extends base and adds extensions folder for testing/demos
+FROM base AS demo
+COPY extensions ./extensions
