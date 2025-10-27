@@ -26,13 +26,30 @@ def create_command(
     realm_name: str,
     network: str,
     deploy: bool,
+    no_extensions: bool,
     identity: Optional[str] = None,
 ) -> None:
     """Create a new realm with deployment scripts. Use random=True to generate realistic demo data."""
     console.print(f"[bold blue]🏛️  Creating Realm: {realm_name}[/bold blue]\n")
+    if no_extensions:
+        console.print("[yellow]⚠️  Creating base realm without extensions[/yellow]\n")
 
-    # Create output directory
+    # Check if output directory already exists and contains files
     output_path = Path(output_dir)
+    if output_path.exists():
+        # Check if directory is not empty
+        if any(output_path.iterdir()):
+            console.print(f"[red]❌ Error: Destination folder already exists and is not empty:[/red]")
+            console.print(f"[red]   {output_path.absolute()}[/red]")
+            console.print("\n[yellow]Please either:[/yellow]")
+            console.print("   • Choose a different output directory with --output-dir")
+            console.print("   • Remove or rename the existing folder")
+            console.print("   • Clear the folder contents")
+            raise typer.Exit(1)
+        else:
+            console.print(f"[dim]ℹ️  Using existing empty directory: {output_path.absolute()}[/dim]")
+    
+    # Create output directory
     output_path.mkdir(exist_ok=True)
 
     # Create scripts subdirectory
@@ -99,20 +116,34 @@ def create_command(
             raise typer.Exit(1)
 
     # Copy deployment scripts from existing files
-    console.print("\n🔧 Copying deployment scripts...")
+    console.print("\n🔧 Generating deployment scripts...")
 
     # Get scripts path (auto-detects repo vs image mode)
     scripts_path = get_scripts_path()
 
-    # 1. Copy install_extensions.sh as 1-install-extensions.sh
-    source_install = scripts_path / "install_extensions.sh"
+    # 1. Create install_extensions.sh script (or skip if no_extensions)
     target_install = scripts_dir / "1-install-extensions.sh"
-    if source_install.exists():
-        shutil.copy2(source_install, target_install)
+    
+    if no_extensions:
+        # Create a no-op script that just echoes a message
+        install_script_content = """#!/bin/bash
+set -e
+
+echo "⚠️  No extensions configured for this realm"
+echo "✅ Skipping extension installation"
+"""
+        target_install.write_text(install_script_content)
         target_install.chmod(0o755)
-        console.print(f"   ✅ {target_install.name}")
+        console.print(f"   ✅ {target_install.name} (no-op)")
     else:
-        console.print(f"   ❌ Source file not found: {source_install}")
+        # Copy the actual install_extensions.sh script
+        source_install = scripts_path / "install_extensions.sh"
+        if source_install.exists():
+            shutil.copy2(source_install, target_install)
+            target_install.chmod(0o755)
+            console.print(f"   ✅ {target_install.name}")
+        else:
+            console.print(f"   ❌ Source file not found: {source_install}")
 
     # 2. Create network-aware deployment wrapper script
     deploy_wrapper_content = """#!/bin/bash
@@ -122,6 +153,14 @@ set -x
 # Get network from command line argument or default to local
 NETWORK="${1:-local}"
 echo "🚀 Deploying canisters to network: $NETWORK..."
+
+# Clear Kybra build cache to ensure extensions are included in backend build
+# This is critical after installing extensions
+if [ -d ".kybra" ]; then
+    echo "🧹 Clearing Kybra build cache to include newly installed extensions..."
+    rm -rf .kybra/realm_backend
+    echo "   ✅ Cache cleared"
+fi
 
 # Determine which deployment script to use
 if [ "$NETWORK" = "local" ] || [ "$NETWORK" = "local2" ]; then
@@ -175,9 +214,14 @@ run_dfx_command(realms_cmd)
     upload_script_content = """#!/bin/bash
 set -e
 
+# NOTE: This script requires the admin_dashboard extension to be installed
+# The 'realms import' command uses the admin_dashboard extension backend
+# to import data into the realm canister
+
 # Get network from command line argument or default to local
 NETWORK="${1:-local}"
 echo "📥 Uploading realm data for network: $NETWORK..."
+echo "⚠️  Note: This requires the admin_dashboard extension to be installed"
 
 # Build realms command with network parameter
 REALMS_CMD="realms import"
@@ -238,6 +282,12 @@ for codex in Codex.instances():
     console.print(f"   ✅ {adjustments_script.name}")
 
     console.print(f"\n[green]🎉 Realm '{realm_name}' created successfully![/green]")
+    
+    if no_extensions and random:
+        console.print("\n[yellow]⚠️  Important Note:[/yellow]")
+        console.print("   The data upload script (3-upload-data.sh) requires the [bold]admin_dashboard[/bold] extension.")
+        console.print("   To upload data, you must first install extensions or manually load the data.")
+    
     console.print("\n[bold]Next Steps:[/bold]")
     console.print(f"realms deploy --folder {output_dir}")
 

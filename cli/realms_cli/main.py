@@ -78,6 +78,9 @@ def create(
     deploy: bool = typer.Option(
         False, "--deploy", help="Deploy the realm after creation"
     ),
+    no_extensions: bool = typer.Option(
+        False, "--no-extensions", help="Create a base realm without installing extensions"
+    ),
     identity: Optional[str] = typer.Option(
         None, "--identity", help="Path to identity PEM file or identity name for dfx"
     ),
@@ -94,6 +97,7 @@ def create(
         realm_name,
         network,
         deploy,
+        no_extensions,
         identity,
     )
 
