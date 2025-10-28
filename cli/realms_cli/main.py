@@ -117,9 +117,12 @@ def extension(
     source_dir: str = typer.Option(
         "extensions", "--source-dir", help="Source directory for extensions"
     ),
+    all_extensions: bool = typer.Option(
+        False, "--all", help="Uninstall all extensions (only for uninstall action)"
+    ),
 ) -> None:
     """Manage Realm extensions."""
-    extension_command(action, extension_id, package_path, source_dir)
+    extension_command(action, extension_id, package_path, source_dir, all_extensions)
 
 
 @app.command("import")

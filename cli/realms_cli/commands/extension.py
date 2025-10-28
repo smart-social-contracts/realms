@@ -628,6 +628,66 @@ def uninstall_extension_command(extension_id: str):
     return True
 
 
+def uninstall_all_extensions_command():
+    """Uninstall all installed extensions"""
+    paths = get_project_paths()
+    backend_ext_dir = os.path.join(paths["backend_dir"], "extension_packages")
+    frontend_ext_dir = os.path.join(paths["frontend_dir"], "src/lib/extensions")
+
+    extensions = set()
+
+    # Find all backend extensions
+    if os.path.exists(backend_ext_dir):
+        for item in os.listdir(backend_ext_dir):
+            if os.path.isdir(
+                os.path.join(backend_ext_dir, item)
+            ) and not item.startswith("__"):
+                try:
+                    validate_extension_id(item)
+                    extensions.add(item)
+                except ValueError:
+                    pass
+
+    # Find all frontend extensions
+    if os.path.exists(frontend_ext_dir):
+        for item in os.listdir(frontend_ext_dir):
+            if os.path.isdir(
+                os.path.join(frontend_ext_dir, item)
+            ) and not item.startswith("__"):
+                try:
+                    validate_extension_id(item)
+                    extensions.add(item)
+                except ValueError:
+                    pass
+
+    if not extensions:
+        console.print("[yellow]No extensions found to uninstall[/yellow]")
+        return True
+
+    console.print(f"[blue]Found {len(extensions)} extension(s) to uninstall[/blue]")
+    
+    success_count = 0
+    failed_count = 0
+    
+    for ext_id in sorted(extensions):
+        console.print(f"\n[blue]Uninstalling {ext_id}...[/blue]")
+        if uninstall_extension_command(ext_id):
+            success_count += 1
+        else:
+            failed_count += 1
+
+    console.print(
+        f"\n[green]Uninstallation complete: {success_count} succeeded, {failed_count} failed[/green]"
+    )
+    
+    # Regenerate manifests and registry after uninstalling all
+    if success_count > 0:
+        generate_extension_manifests()
+        generate_extension_registry()
+    
+    return failed_count == 0
+
+
 def generate_extension_registry():
     """Generate registry.py that maps extension functions for the backend"""
     paths = get_project_paths()
@@ -946,6 +1006,9 @@ def extension_command(
     source_dir: str = typer.Option(
         "extensions", "--source-dir", help="Source directory for extensions"
     ),
+    all_extensions: bool = typer.Option(
+        False, "--all", help="Uninstall all extensions (only for uninstall action)"
+    ),
 ) -> None:
     """Manage Realm extensions."""
 
@@ -971,12 +1034,15 @@ def extension_command(
             raise typer.Exit(1)
         install_extension_command(package_path)
     elif action == "uninstall":
-        if not extension_id:
+        if all_extensions:
+            uninstall_all_extensions_command()
+        elif extension_id:
+            uninstall_extension_command(extension_id)
+        else:
             console.print(
-                "[red]Error: --extension-id is required for uninstall action[/red]"
+                "[red]Error: Either --extension-id or --all is required for uninstall action[/red]"
             )
             raise typer.Exit(1)
-        uninstall_extension_command(extension_id)
     else:
         console.print(f"[red]Unknown action: {action}[/red]")
         console.print(
