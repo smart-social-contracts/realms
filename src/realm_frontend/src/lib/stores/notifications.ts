@@ -56,7 +56,7 @@ export async function loadNotifications() {
                 timestamp: '1 hour ago',
                 read: true,
                 icon: 'wallet',
-                href: '/extensions/vault_manager',
+                href: '/extensions/vault',
                 color: 'purple'
             }
         ];

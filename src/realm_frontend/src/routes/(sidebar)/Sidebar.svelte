@@ -67,12 +67,9 @@
 	$: {
 		if ($locale) {
 			console.log('Sidebar: Current locale:', $locale);
-			// Debug translation for Vault Manager
-			const vaultManagerTranslation = $_('extensions.vault_manager.sidebar');
-			console.log('Sidebar: Vault Manager translation key result:', vaultManagerTranslation);
 		}
 	}
-
+	
 	const closeDrawer = () => {
 		drawerHidden = true;
 	};

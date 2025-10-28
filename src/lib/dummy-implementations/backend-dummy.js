@@ -1,5 +1,5 @@
 const mockExtensionData = {
-  vault_manager: {
+  vault: {
     balance: 150000000, // 1.5 ckBTC in satoshis
     token: 'ckBTC',
     transactions: [
