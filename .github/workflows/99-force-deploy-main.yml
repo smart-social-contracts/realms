@@ -34,15 +34,15 @@ jobs:
           echo "${{ secrets.IC_IDENTITY_PEM }}" > identity.pem
           chmod 600 identity.pem
           
-          # Pull the image that was built (NOTE: we assume it was built in a previous workflow!)
-          docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ steps.commit.outputs.deploy_commit }}
+          # Pull the demo image (includes extensions)
+          docker pull ghcr.io/${{ github.repository_owner }}/realms:demo-${{ steps.commit.outputs.deploy_commit }}
           
           # Deploy using realms CLI with staging network
           docker run --rm \
             -v "$(pwd)/identity.pem:/app/identity.pem" \
             -v "$(pwd)/deploy-logs:/app/deploy-logs" \
             -e DFX_WARNING="-mainnet_plaintext_identity" \
-            ghcr.io/${{ github.repository_owner }}/realms:${{ steps.commit.outputs.deploy_commit }} \
+            ghcr.io/${{ github.repository_owner }}/realms:demo-${{ steps.commit.outputs.deploy_commit }} \
             bash -c "(dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
                      dfx identity use my-identity && \
                      realms create --random --network staging --deploy); \
