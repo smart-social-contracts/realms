@@ -37,7 +37,7 @@ try:
 
         expected_categories = {
             "public_services": ["citizen_dashboard"],
-            "finances": ["vault_manager"],
+            "finances": ["vault"],
             "identity": ["passport_verification"],
         }
 
