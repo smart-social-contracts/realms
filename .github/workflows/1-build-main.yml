@@ -57,8 +57,8 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}
             ghcr.io/${{ github.repository_owner }}/realms:latest
           target: base
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          no-cache: true
+          # Cache disabled to ensure reliable, reproducible builds without stale artifacts
       
       - name: Build and push demo Docker image (with extensions)
         uses: docker/build-push-action@v4
@@ -70,8 +70,8 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}
             ghcr.io/${{ github.repository_owner }}/realms:demo-latest
           target: demo
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          no-cache: true
+          # Cache disabled to ensure reliable, reproducible builds without stale artifacts
       
       - name: Verify Docker images
         if: always()
