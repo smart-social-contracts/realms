@@ -9,11 +9,11 @@
   
   // Available photos
   const photos = [
-    '/photos/Sucre, Bolivia.jpg',
-    '/photos/Bönigen, Switzerland.jpg',
-    '/photos/Hoi An, Vietnam.jpg',
-    '/photos/Varanasi, India.jpg', 
-    '/photos/Requena, Spain.jpg'
+    '/extensions/welcome/photos/Sucre, Bolivia.jpg',
+    '/extensions/welcome/photos/Bönigen, Switzerland.jpg',
+    '/extensions/welcome/photos/Hoi An, Vietnam.jpg',
+    '/extensions/welcome/photos/Varanasi, India.jpg', 
+    '/extensions/welcome/photos/Requena, Spain.jpg'
    ];
   
   // Check for mobile viewport and setup photo carousel
