@@ -48,30 +48,32 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Build and push base Docker image (without extensions)
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/realms:latest
-          target: base
-          no-cache: true
-          # Cache disabled to ensure reliable, reproducible builds without stale artifacts
+        run: |
+          # Build base image with no cache for reliable, reproducible builds
+          docker build \
+            --no-cache \
+            --target base \
+            -t ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} \
+            -t ghcr.io/${{ github.repository_owner }}/realms:latest \
+            .
+          
+          # Push both tags
+          docker push ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}
+          docker push ghcr.io/${{ github.repository_owner }}/realms:latest
       
       - name: Build and push demo Docker image (with extensions)
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/realms:demo-latest
-          target: demo
-          no-cache: true
-          # Cache disabled to ensure reliable, reproducible builds without stale artifacts
+        run: |
+          # Build demo image with no cache for reliable, reproducible builds
+          docker build \
+            --no-cache \
+            --target demo \
+            -t ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
+            -t ghcr.io/${{ github.repository_owner }}/realms:demo-latest \
+            .
+          
+          # Push both tags
+          docker push ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}
+          docker push ghcr.io/${{ github.repository_owner }}/realms:demo-latest
       
       - name: Verify Docker images
         if: always()

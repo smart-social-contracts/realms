@@ -48,26 +48,28 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Build and push base Docker image (without extensions)
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}
-          target: base
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        run: |
+          # Build base image with no cache for reliable, reproducible builds
+          docker build \
+            --no-cache \
+            --target base \
+            -t ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} \
+            .
+          
+          # Push image
+          docker push ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}
       
       - name: Build and push demo Docker image (with extensions)
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}
-          target: demo
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        run: |
+          # Build demo image with no cache for reliable, reproducible builds
+          docker build \
+            --no-cache \
+            --target demo \
+            -t ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
+            .
+          
+          # Push image
+          docker push ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}
       
       - name: Verify Docker images
         if: always()
