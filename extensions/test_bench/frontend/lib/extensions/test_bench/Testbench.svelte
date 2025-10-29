@@ -12,14 +12,6 @@
 
 	// Import backend directly without using await in top-level
 	import { backend } from '$lib/canisters';
-	import { isDevelopmentMode } from '$lib/dev-mode.js';
-
-	let Some;
-	if (!isDevelopmentMode()) {
-		import('@dfinity/candid').then(module => { Some = module.Some; });
-	} else {
-		Some = (value) => ({ Some: value });
-	}
 
 	let greeting = '';
 
