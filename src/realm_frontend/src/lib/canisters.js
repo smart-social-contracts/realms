@@ -1,10 +1,8 @@
 import { building } from '$app/environment';
 import { writable, get } from 'svelte/store';
 import { authClient, initializeAuthClient } from '$lib/auth';
-import { isDevelopmentMode } from './dev-mode.js';
 
 let createActor, canisterId, HttpAgent;
-let dummyBackend;
 let importsInitialized = false;
 
 async function initializeImports() {
@@ -85,11 +83,6 @@ export async function initBackendWithIdentity() {
 		console.log('Initializing backend with authenticated identity...');
 
 		await initializeImports();
-
-		if (isDevelopmentMode()) {
-			console.log('🔧 DEV MODE: Using dummy backend, skipping identity initialization');
-			return dummyBackend;
-		}
 
 		// Make sure we're using the shared auth client
 		const client = authClient || (await initializeAuthClient());
