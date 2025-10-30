@@ -293,14 +293,14 @@ def get_objects(params: Vec[Tuple[str, str]]) -> RealmResponse:
 def create_foundational_objects() -> void:
     """Create the foundational objects required for every realm to operate."""
     from ggg import Identity, Profiles, Realm, Treasury, User, UserProfile
-    
+
     logger.info("Creating foundational objects...")
-    
+
     # Check if foundational objects already exist (for upgrades)
     if len(Realm.instances()) > 0:
         logger.info("Foundational objects already exist, skipping creation")
         return
-    
+
     try:
         # 1. Create user profiles
         admin_profile = UserProfile(
@@ -308,15 +308,15 @@ def create_foundational_objects() -> void:
             allowed_to=",".join(Profiles.ADMIN["allowed_to"]),
             description="Admin user profile",
         )
-        
+
         member_profile = UserProfile(
             name=Profiles.MEMBER["name"],
             allowed_to=",".join(Profiles.MEMBER["allowed_to"]),
             description="Member user profile",
         )
-        
+
         logger.info("Created user profiles: admin, member")
-        
+
         # 2. Create system user
         system_user = User(
             id="system",
@@ -324,39 +324,42 @@ def create_foundational_objects() -> void:
         )
         # Link system user to admin profile
         system_user.profiles.add(admin_profile)
-        
+
         logger.info("Created system user")
-        
+
         # 3. Create identity for system user
         import uuid
+
         system_identity = Identity(
             type="system",
             metadata=f"{uuid.uuid4().hex[:8]}-{uuid.uuid4().hex[:8]}",
         )
-        
+
         logger.info("Created system identity")
-        
+
         # 4. Create realm
         realm = Realm(
             name="Default Realm",
             description="A realm for digital governance and coordination",
             principal_id="",
         )
-        
+
         logger.info("Created realm")
-        
+
         # 5. Create treasury linked to realm
         treasury = Treasury(
             name=f"{realm.name} Treasury",
             vault_principal_id=None,  # Will be set during vault deployment
             realm=realm,
         )
-        
+
         logger.info("Created treasury")
         logger.info("✅ All foundational objects created successfully")
-        
+
     except Exception as e:
-        logger.error(f"❌ Error creating foundational objects: {str(e)}\n{traceback.format_exc()}")
+        logger.error(
+            f"❌ Error creating foundational objects: {str(e)}\n{traceback.format_exc()}"
+        )
         raise
 
 
@@ -375,54 +378,63 @@ def initialize() -> void:
             logger.error(
                 f"Error registering entity type {name}: {str(e)}\n{traceback.format_exc()}"
             )
-    
+
     # Create foundational objects after entity registration
     create_foundational_objects()
 
     # Initialize all installed extensions
     logger.info("Discovering and initializing extensions...")
-    
+
     try:
         # Get all installed extension manifests
         extension_manifests = api.extensions.get_all_extension_manifests()
         extension_ids = list(extension_manifests.keys())
         logger.info(f"Found {len(extension_ids)} installed extensions: {extension_ids}")
-        
+
         # Track status for each extension
         extension_status = {}
-        
+
         # Initialize each extension
         for extension_id in extension_ids:
             status = {
-                'has_entities': False,
-                'has_initialize': False,
-                'entity_error': False,
-                'init_error': False
+                "has_entities": False,
+                "has_initialize": False,
+                "entity_error": False,
+                "init_error": False,
             }
-            
+
             # Step 1: Try to register extension entity types
             try:
-                extension_module = __import__(f"extension_packages.{extension_id}.entry", fromlist=['register_entities'])
-                
-                if hasattr(extension_module, 'register_entities'):
+                extension_module = __import__(
+                    f"extension_packages.{extension_id}.entry",
+                    fromlist=["register_entities"],
+                )
+
+                if hasattr(extension_module, "register_entities"):
                     extension_module.register_entities()
-                    status['has_entities'] = True
+                    status["has_entities"] = True
             except ImportError:
                 # No entry module - that's fine
                 pass
             except Exception as e:
-                logger.warning(f"Error registering entity types for {extension_id}: {str(e)}")
-                status['entity_error'] = True
-            
+                logger.warning(
+                    f"Error registering entity types for {extension_id}: {str(e)}"
+                )
+                status["entity_error"] = True
+
             # Step 2: Try to call extension initialize function
             try:
-                result = api.extensions.extension_sync_call(extension_id, "initialize", "{}")
-                status['has_initialize'] = True
+                result = api.extensions.extension_sync_call(
+                    extension_id, "initialize", "{}"
+                )
+                status["has_initialize"] = True
             except Exception as e:
                 # Log the actual error message to help debug
                 error_msg = str(e)
-                logger.info(f"  [DEBUG] Extension {extension_id} initialize exception: {error_msg}")
-                
+                logger.info(
+                    f"  [DEBUG] Extension {extension_id} initialize exception: {error_msg}"
+                )
+
                 # Check if it's a real error or just missing function
                 # Common indicators that the function simply doesn't exist:
                 missing_function_indicators = [
@@ -432,56 +444,63 @@ def initialize() -> void:
                     "does not have",
                     "no attribute",
                     "'initialize'",
-                    "attributeerror"
+                    "attributeerror",
                 ]
-                
-                is_missing_function = any(indicator in error_msg.lower() for indicator in missing_function_indicators)
-                
+
+                is_missing_function = any(
+                    indicator in error_msg.lower()
+                    for indicator in missing_function_indicators
+                )
+
                 if not is_missing_function:
                     # This seems like a real error, not just a missing function
                     logger.warning(f"Error initializing {extension_id}: {error_msg}")
-                    status['init_error'] = True
+                    status["init_error"] = True
                 # Otherwise it's just a missing function (optional), status stays False
-            
+
             extension_status[extension_id] = status
-        
+
         # Print summary as a table
         logger.info("")
-        logger.info("="*70)
+        logger.info("=" * 70)
         logger.info("📊 EXTENSION INITIALIZATION SUMMARY")
-        logger.info("="*70)
+        logger.info("=" * 70)
         logger.info(f"Total extensions: {len(extension_ids)}")
         logger.info("")
-        logger.info(f"{'Extension Name':<30} {'Entity Registration':<25} {'Initialize'}")
-        logger.info("-"*70)
-        
+        logger.info(
+            f"{'Extension Name':<30} {'Entity Registration':<25} {'Initialize'}"
+        )
+        logger.info("-" * 70)
+
         for ext_id in sorted(extension_ids):
             status = extension_status[ext_id]
-            
+
             # Format entity registration status
-            if status['entity_error']:
+            if status["entity_error"]:
                 entity_status = "❌ Error"
-            elif status['has_entities']:
+            elif status["has_entities"]:
                 entity_status = "✅ Yes"
             else:
                 entity_status = "➖ No"
-            
+
             # Format initialize status
-            if status['init_error']:
+            if status["init_error"]:
                 init_status = "❌ Error"
-            elif status['has_initialize']:
+            elif status["has_initialize"]:
                 init_status = "✅ Yes"
             else:
                 init_status = "➖ No"
-            
+
             logger.info(f"{ext_id:<30} {entity_status:<25} {init_status}")
-        
-        logger.info("="*70)
+
+        logger.info("=" * 70)
         logger.info("✅ Extension initialization complete.")
         logger.info("")
-        
+
     except Exception as e:
-        logger.error(f"❌ Critical error during extension initialization: {str(e)}\n{traceback.format_exc()}")
+        logger.error(
+            f"❌ Critical error during extension initialization: {str(e)}\n{traceback.format_exc()}"
+        )
 
 
 @init

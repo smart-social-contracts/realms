@@ -2,11 +2,11 @@ import json
 import traceback
 from pprint import pformat
 
+from core.extensions import extension_async_call
 from ggg import Transfer
 from kybra import Async, ic
 from kybra_simple_db import Entity, Integer, OneToOne, String, TimestampedMixin
 from kybra_simple_logging import get_logger
-from core.extensions import extension_async_call
 
 logger = get_logger("entity.treasury")
 
@@ -24,9 +24,7 @@ class Treasury(Entity, TimestampedMixin):
             result = yield extension_async_call("vault", "refresh", "{}")
             result_data = json.loads(result)
             if not result_data.get("success"):
-                logger.error(
-                    f"Failed to refresh vault: {result_data.get('error')}"
-                )
+                logger.error(f"Failed to refresh vault: {result_data.get('error')}")
                 return
             summary = result_data["data"]["TransactionSummary"]
             logger.info(
@@ -37,9 +35,6 @@ class Treasury(Entity, TimestampedMixin):
             logger.error(
                 f"Error refreshing treasury '{self.name}': {str(e)}\n{traceback.format_exc()}"
             )
-
-
-
 
     # def send(self, to_principal: str, amount: int) -> Async[str]:
     #     """Send tokens from treasury to a principal using embedded vault extension"""
@@ -57,12 +52,12 @@ class Treasury(Entity, TimestampedMixin):
     #     )
 
     #     result = yield extension_async_call("vault", "transfer", args)
-        
+
     #     # Update balance after successful transfer
     #     result_data = json.loads(result)
     #     if result_data.get("success"):
     #         yield self.sync_balance()
-        
+
     #     return result
 
     # def sync_balance(self) -> Async[None]:
