@@ -207,7 +207,7 @@ jobs:
         run: |
           # Wait up to 5 minutes for the Docker image to be available
           for i in {1..30}; do
-            if docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}; then
+            if docker pull ghcr.io/${{ github.repository_owner }}/realms-demo:${{ github.sha }}; then
               echo "Docker image is available"
               break
             else
@@ -220,7 +220,7 @@ jobs:
         run: |
           docker run --rm \
             -v "$(pwd)/test-logs:/app/test-logs" \
-            ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} bash -c "
+            ghcr.io/${{ github.repository_owner }}/realms-demo:${{ github.sha }} bash -c "
           (realms create --random && \
           realms deploy --folder generated_realm && \
           src/realm_frontend/run-e2e-tests.sh specs/workflows.spec.ts --reporter=line); \
