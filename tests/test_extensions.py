@@ -20,6 +20,7 @@ EXTENSION_NAMES = [
     "voting",
     "admin_dashboard",
     "erd_explorer",
+    "welcome",
 ]
 
 
