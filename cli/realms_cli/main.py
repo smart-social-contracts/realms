@@ -28,6 +28,7 @@ from .utils import (
     get_current_network,
     get_current_realm,
     get_effective_network_and_canister,
+    get_project_root,
     resolve_realm_details,
     set_current_network,
     set_current_realm,
@@ -452,6 +453,193 @@ def realm_unset() -> None:
         console.print("[dim]Will use network context or defaults[/dim]")
     else:
         console.print("[yellow]No realm context set[/yellow]")
+
+
+@realm_app.command("status")
+def realm_status(
+    network: Optional[str] = typer.Option(
+        None, "--network", "-n", help="Network to use (overrides context)"
+    ),
+) -> None:
+    """Show canister IDs and URLs for the realm."""
+    console.print("[bold blue]🏛️  Realm Status[/bold blue]\n")
+
+    # Get effective network
+    effective_network, _ = get_effective_network_and_canister(network, None)
+    console.print(f"[dim]Network: {effective_network}[/dim]\n")
+
+    # Load canister IDs
+    try:
+        import json
+        import subprocess
+        from pathlib import Path
+
+        project_root = get_project_root()
+        
+        # Initialize variables for local network
+        local_port = "8000"  # Default port
+        candid_ui_id = None
+        
+        # For local network, get canister IDs dynamically from dfx
+        if effective_network == "local":
+            # Get list of canisters from dfx.json
+            dfx_json_path = project_root / "dfx.json"
+            if not dfx_json_path.exists():
+                console.print(
+                    "[yellow]⚠️  dfx.json not found in project root[/yellow]"
+                )
+                console.print(
+                    "[dim]Make sure you're in a Realms project directory[/dim]"
+                )
+                raise typer.Exit(1)
+            
+            with open(dfx_json_path, "r") as f:
+                dfx_config = json.load(f)
+            
+            canister_names = list(dfx_config.get("canisters", {}).keys())
+            
+            # Get network configuration for port
+            networks_config = dfx_config.get("networks", {})
+            local_network_config = networks_config.get("local", {})
+            bind_address = local_network_config.get("bind", "127.0.0.1:8000")
+            # Extract port from bind address (format: "127.0.0.1:8000")
+            local_port = bind_address.split(":")[-1] if ":" in bind_address else "8000"
+            
+            # Fetch canister IDs dynamically
+            canister_ids = {}
+            for canister_name in canister_names:
+                try:
+                    result = subprocess.run(
+                        ["dfx", "canister", "id", canister_name],
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                        timeout=5
+                    )
+                    canister_id = result.stdout.strip()
+                    canister_ids[canister_name] = {"local": canister_id}
+                except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                    # Canister not deployed yet, skip it
+                    continue
+            
+            # Get Candid UI canister ID for backend URLs
+            candid_ui_id = None
+            try:
+                result = subprocess.run(
+                    ["dfx", "canister", "id", "__Candid_UI"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    timeout=5
+                )
+                candid_ui_id = result.stdout.strip()
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                # Candid UI not available, will fall back to default
+                pass
+            
+            if not canister_ids:
+                console.print(
+                    "[yellow]⚠️  No canisters deployed on local network[/yellow]"
+                )
+                console.print(
+                    "[dim]Deploy canisters first with: dfx deploy[/dim]"
+                )
+                raise typer.Exit(1)
+        else:
+            # For non-local networks, read from canister_ids.json
+            canister_ids_path = project_root / "canister_ids.json"
+
+            if not canister_ids_path.exists():
+                console.print(
+                    "[yellow]⚠️  canister_ids.json not found in project root[/yellow]"
+                )
+                console.print(
+                    "[dim]Make sure you're in a Realms project directory or deploy first[/dim]"
+                )
+                raise typer.Exit(1)
+
+            with open(canister_ids_path, "r") as f:
+                canister_ids = json.load(f)
+
+            # Check if network has any canisters
+            has_canisters = False
+            for canister_name in canister_ids:
+                if effective_network in canister_ids[canister_name]:
+                    has_canisters = True
+                    break
+
+            if not has_canisters:
+                console.print(
+                    f"[yellow]⚠️  No canisters found for network: {effective_network}[/yellow]"
+                )
+                console.print("[dim]Available networks:[/dim]")
+                networks = set()
+                for canister_data in canister_ids.values():
+                    networks.update(canister_data.keys())
+                for net in sorted(networks):
+                    console.print(f"  - {net}")
+                raise typer.Exit(1)
+
+        # Create table
+        table = Table(title=f"Realm Canisters on {effective_network.upper()}")
+        table.add_column("Canister", style="cyan", no_wrap=True)
+        table.add_column("Canister ID", style="green")
+        table.add_column("URL", style="blue")
+
+        # Add rows for each canister
+        for canister_name, network_ids in sorted(canister_ids.items()):
+            if effective_network in network_ids:
+                canister_id = network_ids[effective_network]
+
+                # Determine if this is a backend or frontend canister
+                is_backend = "backend" in canister_name.lower()
+
+                # Construct URL based on network and canister type
+                if is_backend:
+                    # Backend canisters use Candid UI
+                    if effective_network == "ic":
+                        candid_ui = "a4gq6-oaaaa-aaaab-qaa4q-cai"
+                        url = f"https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.ic0.app/?id={canister_id}"
+                    elif effective_network == "staging":
+                        candid_ui = "a4gq6-oaaaa-aaaab-qaa4q-cai"
+                        url = f"https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id={canister_id}"
+                    elif effective_network == "local":
+                        # For local, use dynamically fetched Candid UI and port
+                        if candid_ui_id:
+                            url = f"http://127.0.0.1:{local_port}/?canisterId={candid_ui_id}&id={canister_id}"
+                        else:
+                            # Fallback if Candid UI not found
+                            url = f"http://127.0.0.1:{local_port}/?canisterId=<candid-ui>&id={canister_id}"
+                    else:
+                        # Other networks, use staging format
+                        url = f"https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id={canister_id}"
+                else:
+                    # Frontend canisters use direct URLs
+                    if effective_network == "ic":
+                        url = f"https://{canister_id}.ic0.app"
+                    elif effective_network == "staging":
+                        url = f"https://{canister_id}.icp0.io"
+                    elif effective_network == "local":
+                        # Use recommended format for local
+                        url = f"http://{canister_id}.localhost:{local_port}/"
+                    else:
+                        url = f"https://{canister_id}.icp0.io"
+
+                table.add_row(canister_name, canister_id, url)
+
+        console.print(table)
+
+        # Add helpful notes
+        console.print(
+            f"\n[dim]💡 Frontend canisters can be accessed directly via their URLs[/dim]"
+        )
+        console.print(
+            f"[dim]💡 Use 'realms realm extension' to call backend extension functions[/dim]"
+        )
+
+    except Exception as e:
+        console.print(f"[red]❌ Error reading canister IDs: {e}[/red]")
+        raise typer.Exit(1)
 
 
 @app.command("db")
