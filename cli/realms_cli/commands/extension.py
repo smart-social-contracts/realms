@@ -585,6 +585,10 @@ def install_extension_command(package_path: str):
 
             console.print(f"[green]Installed i18n files for {extension_id}[/green]")
 
+    # Regenerate manifests and registry after installation
+    generate_extension_manifests()
+    generate_extension_registry()
+
     console.print(f"[green]Extension {extension_id} installed successfully[/green]")
     return True
 
