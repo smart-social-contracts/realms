@@ -32,9 +32,9 @@ def validate_extension_id(extension_id):
 
 def get_project_paths():
     """Get standard project paths for extension management"""
-    # Navigate up from cli/realms_cli/commands to project root
-    current_dir = Path(__file__).parent.parent.parent.parent
-    project_root = current_dir.resolve()
+    # Use current working directory as project root
+    # This allows the CLI to work from any Realms project directory
+    project_root = Path.cwd()
 
     return {
         "project_root": str(project_root),
@@ -156,6 +156,30 @@ def list_extensions_command():
                         f"[yellow]Skipping extension with invalid ID: {item}[/yellow]"
                     )
 
+    # Check i18n-only extensions
+    i18n_ext_dir = os.path.join(paths["frontend_dir"], "src/lib/i18n/locales/extensions")
+    if os.path.exists(i18n_ext_dir):
+        for item in os.listdir(i18n_ext_dir):
+            if os.path.isdir(
+                os.path.join(i18n_ext_dir, item)
+            ) and not item.startswith("__"):
+                try:
+                    validate_extension_id(item)
+                    
+                    # Only add if not already discovered
+                    if item not in extensions:
+                        extensions[item] = {
+                            "id": item,
+                            "version": "unknown",
+                            "description": "",
+                            "has_backend": False,
+                            "has_frontend": False,
+                        }
+                except ValueError:
+                    console.print(
+                        f"[yellow]Skipping extension with invalid ID: {item}[/yellow]"
+                    )
+
     if not extensions:
         console.print("[yellow]No extensions installed[/yellow]")
         return
@@ -173,6 +197,10 @@ def list_extensions_command():
             components.append("backend")
         if ext["has_frontend"]:
             components.append("frontend")
+        
+        # If no backend or frontend, it's i18n-only
+        if not components:
+            components.append("i18n")
 
         table.add_row(
             ext_id,
