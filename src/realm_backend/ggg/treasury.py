@@ -36,29 +36,23 @@ class Treasury(Entity, TimestampedMixin):
                 f"Error refreshing treasury '{self.name}': {str(e)}\n{traceback.format_exc()}"
             )
 
-    # def send(self, to_principal: str, amount: int) -> Async[str]:
-    #     """Send tokens from treasury to a principal using embedded vault extension"""
+    def send(self, to_principal: str, amount: int) -> Async[str]:
+        """Send tokens from treasury to a principal using embedded vault extension"""
 
-    #     logger.info(f"Treasury '{self.name}' sending {amount} tokens to {to_principal}")
+        logger.info(f"Treasury '{self.name}' sending {amount} tokens to {to_principal}")
 
-    #     from core.extensions import extension_async_call
+        from core.extensions import extension_async_call
 
-    #     # Use embedded vault extension API
-    #     args = json.dumps(
-    #         {
-    #             "to_principal": to_principal,
-    #             "amount": amount,
-    #         }
-    #     )
+        # Use embedded vault extension API
+        args = json.dumps(
+            {
+                "to_principal": to_principal,
+                "amount": amount,
+            }
+        )
 
-    #     result = yield extension_async_call("vault", "transfer", args)
-
-    #     # Update balance after successful transfer
-    #     result_data = json.loads(result)
-    #     if result_data.get("success"):
-    #         yield self.sync_balance()
-
-    #     return result
+        result = yield extension_async_call("vault", "transfer", args)
+        return result
 
     # def sync_balance(self) -> Async[None]:
     #     """Sync treasury balance from embedded vault extension"""

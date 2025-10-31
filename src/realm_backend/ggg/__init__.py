@@ -22,6 +22,7 @@ from .realm import Realm
 from .task import Task
 from .task_schedule import TaskSchedule
 from .trade import Trade
+from .balance import Balance
 from .transfer import Transfer
 from .treasury import Treasury
 from .user import User
@@ -35,6 +36,7 @@ __all__ = [
     "Instrument",
     "Land",
     "LandType",
+    "Balance",
     "License",
     "Mandate",
     "Organization",
