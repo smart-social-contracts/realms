@@ -201,11 +201,24 @@ def update_my_profile_picture(profile_picture_url: str) -> RealmResponse:
 
 @query
 def get_objects_paginated(
-    class_name: str, page_num: nat, page_size: nat
+    class_name: str, page_num: nat, page_size: nat, order: str = "asc"
 ) -> RealmResponse:
     """
-        Example:
-    $ dfx canister call --output json ulvla-h7777-77774-qaacq-cai get_objects_paginated '("User", 0, 3)'
+    Get paginated list of objects with optional ordering.
+    
+    Args:
+        class_name: Name of the entity class (e.g., "User", "Transfer", "Mandate")
+        page_num: Page number (0-indexed)
+        page_size: Number of items per page
+        order: Sort order - "asc" for ascending (oldest first) or "desc" for descending (newest first)
+    
+    Example (ascending):
+    $ dfx canister call --output json canister_id get_objects_paginated '("User", 0, 3, "asc")'
+    
+    Example (descending):
+    $ dfx canister call --output json canister_id get_objects_paginated '("User", 0, 3, "desc")'
+    
+    Response:
     {
       "data": {
         "objectsListPaginated": {
@@ -228,10 +241,10 @@ def get_objects_paginated(
 
     try:
         logger.info(
-            f"Listing {class_name} objects for page {page_num} with page size {page_size}"
+            f"Listing {class_name} objects for page {page_num} with page size {page_size}, order: {order}"
         )
         result = list_objects_paginated(
-            class_name, page_num=page_num, page_size=page_size
+            class_name, page_num=page_num, page_size=page_size, order=order
         )
         objects = result["items"]
         objects_json = [json.dumps(obj.serialize()) for obj in objects]
