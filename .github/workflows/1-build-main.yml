@@ -50,7 +50,7 @@ jobs:
           docker system prune -f --filter "until=24h"
           echo "✅ Docker environment cleaned"
       
-      - name: Build and push base Docker image (without extensions)
+      - name: Build and push base Docker images
         run: |
           # Build base image with no cache for reliable, reproducible builds
           docker build \
@@ -65,12 +65,7 @@ jobs:
           docker push ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}
           docker push ghcr.io/${{ github.repository_owner }}/realms:latest
       
-      - name: Build and push demo Docker image (with extensions)
-        run: |
-          # Build demo image with no cache for reliable, reproducible builds
           docker build \
-            --no-cache \
-            --pull \
             --target demo \
             -t ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
             -t ghcr.io/${{ github.repository_owner }}/realms:demo-latest \
@@ -79,6 +74,28 @@ jobs:
           # Push both tags
           docker push ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}
           docker push ghcr.io/${{ github.repository_owner }}/realms:demo-latest
+
+          docker build \
+            --pull \
+            --target test \
+            -t ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }} \
+            -t ghcr.io/${{ github.repository_owner }}/realms:test-latest \
+            .
+          
+          # Push both tags
+          docker push ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }}
+          docker push ghcr.io/${{ github.repository_owner }}/realms:test-latest
+
+          docker build \
+            --pull \
+            --target ui-test \
+            -t ghcr.io/${{ github.repository_owner }}/realms:ui-test-${{ github.sha }} \
+            -t ghcr.io/${{ github.repository_owner }}/realms:ui-test-latest \
+            .
+          
+          # Push both tags
+          docker push ghcr.io/${{ github.repository_owner }}/realms:ui-test-${{ github.sha }}
+          docker push ghcr.io/${{ github.repository_owner }}/realms:ui-test-latest
       
       - name: Verify Docker images
         if: always()
@@ -92,6 +109,7 @@ jobs:
             echo "❌ Base Docker image build failed"
             echo "Base Docker build failed" > build-logs/build-failed.txt
           fi
+
           # Check if the demo image was built successfully
           if docker image inspect ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} >/dev/null 2>&1; then
             echo "✅ Demo Docker image built successfully"
@@ -99,6 +117,24 @@ jobs:
           else
             echo "❌ Demo Docker image build failed"
             echo "Demo Docker build failed" > build-logs/demo-build-failed.txt
+          fi
+
+          # Check if the test image was built successfully
+          if docker image inspect ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }} >/dev/null 2>&1; then
+            echo "✅ Test Docker image built successfully"
+            docker images | grep test-${{ github.sha }} || true
+          else
+            echo "❌ Test Docker image build failed"
+            echo "Test Docker build failed" > build-logs/test-build-failed.txt
+          fi
+
+          # Check if the ui-test image was built successfully
+          if docker image inspect ghcr.io/${{ github.repository_owner }}/realms:ui-test-${{ github.sha }} >/dev/null 2>&1; then
+            echo "✅ UI Test Docker image built successfully"
+            docker images | grep ui-test-${{ github.sha }} || true
+          else
+            echo "❌ UI Test Docker image build failed"
+            echo "UI Test Docker build failed" > build-logs/ui-test-build-failed.txt
           fi
       
       - name: Save build metadata
@@ -129,7 +165,7 @@ jobs:
         run: |
           # Wait up to 5 minutes for the Docker image to be available
           for i in {1..30}; do
-            if docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}; then
+            if docker pull ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }}; then
               echo "Docker image is available"
               break
             else
@@ -142,9 +178,9 @@ jobs:
         run: |
           mkdir -p lint-logs
           # First fix formatting issues
-          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} ./scripts/run_linters.sh --fix > lint-logs/lint-fix.log 2>&1 || true
+          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }} ./scripts/run_linters.sh --fix > lint-logs/lint-fix.log 2>&1 || true
           # Then verify all issues are fixed
-          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} ./scripts/run_linters.sh > lint-logs/lint-check.log 2>&1 || true
+          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }} ./scripts/run_linters.sh > lint-logs/lint-check.log 2>&1 || true
       
       - name: Upload lint logs
         if: always()
@@ -166,7 +202,7 @@ jobs:
         run: |
           # Wait up to 5 minutes for the Docker image to be available
           for i in {1..30}; do
-            if docker pull ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}; then
+            if docker pull ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }}; then
               echo "Docker image is available"
               break
             else
@@ -179,7 +215,7 @@ jobs:
         run: |
           docker run --rm \
             -v "$(pwd)/extension-logs:/app/extension-logs" \
-            ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} bash -c "
+            ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }} bash -c "
           ./tests/test_extensions.py; \
           EXIT_CODE=\$?; \
           mkdir -p /app/extension-logs && \
@@ -207,7 +243,7 @@ jobs:
         run: |
           # Wait up to 5 minutes for the Docker image to be available
           for i in {1..30}; do
-            if docker pull ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}; then
+            if docker pull ghcr.io/${{ github.repository_owner }}/realms:ui-test-${{ github.sha }}; then
               echo "Docker image is available"
               break
             else
@@ -220,10 +256,10 @@ jobs:
         run: |
           docker run --rm \
             -v "$(pwd)/test-logs:/app/test-logs" \
-            ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} bash -c "
+            ghcr.io/${{ github.repository_owner }}/realms:ui-test-${{ github.sha }} bash -c "
           (realms create --random && \
           realms deploy --folder generated_realm && \
-          src/realm_frontend/run-e2e-tests.sh specs/workflows.spec.ts --reporter=line); \
+          src/realm_frontend/run-e2e-tests.sh specs/workflows.spec.ts specs/multilingual.spec.ts --reporter=line); \
           EXIT_CODE=\$?; \
           mkdir -p /app/test-logs && \
           cp -f dfx.log /app/test-logs/ 2>/dev/null || true && \
@@ -255,14 +291,14 @@ jobs:
           chmod 600 identity.pem
           
           # Pull the image that was tested
-          docker pull ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}
+          docker pull ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}
           
           # Deploy using realms CLI with staging network
           docker run --rm \
             -v "$(pwd)/identity.pem:/app/identity.pem" \
             -v "$(pwd)/deploy-logs:/app/deploy-logs" \
             -e DFX_WARNING="-mainnet_plaintext_identity" \
-            ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} \
+            ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
             bash -c "(realms create --random && \
                      realms deploy --folder generated_realm --network staging --identity /app/identity.pem); \
                      EXIT_CODE=\$?; \

@@ -2,9 +2,6 @@ FROM ghcr.io/smart-social-contracts/icp-dev-env:db60540 AS base
 
 WORKDIR /app
 
-COPY scripts/download_wasms.sh ./scripts/download_wasms.sh
-RUN ./scripts/download_wasms.sh
-
 # Dependencies
 COPY requirements.txt ./requirements.txt
 COPY requirements-dev.txt ./requirements-dev.txt
@@ -17,9 +14,6 @@ COPY cli ./cli
 
 RUN ./scripts/setup_docker_dev_env.sh
 
-# Install playwright UI testing framework and dependencies
-COPY ./src/realm_frontend/package.json ./src/realm_frontend/package.json
-RUN cd src/realm_frontend && npm install --legacy-peer-deps && npx --no -- playwright install --with-deps
 
 # Configuration files
 COPY .flake8 ./.flake8
@@ -52,3 +46,10 @@ RUN echo '"""' > src/realm_backend/extension_packages/extension_manifests.py && 
 # Demo stage: extends base and adds extensions folder for testing/demos
 FROM base AS demo
 COPY extensions ./extensions
+
+FROM demo AS test
+
+FROM test AS ui-test
+# Install playwright UI testing framework and dependencies
+COPY ./src/realm_frontend/package.json ./src/realm_frontend/package.json
+RUN cd src/realm_frontend && npm install --legacy-peer-deps && npx --no -- playwright install --with-deps
