@@ -16,6 +16,8 @@ logger = get_logger("entity.balance")
 
 
 class Balance(Entity, TimestampedMixin):
+    __alias__ = "id"
+    id = String()
     user = ManyToOne("User", "balances")
     instrument = ManyToOne("Instrument", "balances")
     amount = Integer()

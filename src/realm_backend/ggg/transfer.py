@@ -1,9 +1,7 @@
 from kybra_simple_db import (
     Entity,
     Integer,
-    ManyToMany,
     ManyToOne,
-    OneToOne,
     String,
     TimestampedMixin,
 )
@@ -22,3 +20,4 @@ class Transfer(Entity, TimestampedMixin):
     principal_to = String()
     instrument = ManyToOne("Instrument", "transfers")
     amount = Integer()
+    timestamp = String()
