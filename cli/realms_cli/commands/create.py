@@ -185,7 +185,7 @@ echo "✅ Deployment to $NETWORK completed!"
 
     # 3. Create a simple upload data script
 
-    pre_adjustments_script_content = """
+    pre_adjustments_script_content = f"""
 #!/usr/bin/env python3
 
 import subprocess, os, sys
@@ -193,20 +193,20 @@ s = os.path.dirname(os.path.abspath(__file__))
 
 # Get network from command line argument or default to local
 network = sys.argv[1] if len(sys.argv) > 1 else 'local'
-print(f"🚀 Running adjustments.py for network: {network}")
+print(f"🚀 Running adjustments.py for network: {{network}}")
 
 def run_dfx_command(dfx_cmd):
-    print(f"Running dfx command: {' '.join(dfx_cmd)}")
+    print(f"Running dfx command: {{' '.join(dfx_cmd)}}")
     result = subprocess.run(dfx_cmd, cwd=os.path.dirname(os.path.dirname(s)), capture_output=True)
     if result.returncode != 0:
-        raise Exception(f"Failed to run dfx command: {' '.join(dfx_cmd)}")
+        raise Exception(f"Failed to run dfx command: {{' '.join(dfx_cmd)}}")
     result = result.stdout.decode().strip()
-    print(f"Result: {result}")
+    print(f"Result: {{result}}")
     return result
 
 
 # Run the adjustments script with network parameter
-realms_cmd = ['realms', 'shell', '--file', f'{REALM_FOLDER}/scripts/adjustments.py']
+realms_cmd = ['realms', 'shell', '--file', '{output_dir}/scripts/adjustments.py']
 if network != 'local':
     realms_cmd.extend(['--network', network])
 run_dfx_command(realms_cmd)
