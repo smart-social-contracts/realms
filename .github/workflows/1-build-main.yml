@@ -50,52 +50,49 @@ jobs:
           docker system prune -f --filter "until=24h"
           echo "✅ Docker environment cleaned"
       
-      - name: Build and push base Docker images
-        run: |
-          # Build base image with no cache for reliable, reproducible builds
-          docker build \
-            --no-cache \
-            --pull \
-            --target base \
-            -t ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} \
-            -t ghcr.io/${{ github.repository_owner }}/realms:latest \
-            .
-          
-          # Push both tags
-          docker push ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}
-          docker push ghcr.io/${{ github.repository_owner }}/realms:latest
+      - name: Build and push base image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          target: base
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/realms:latest
+          no-cache: true
+          pull: true
       
-          docker build \
-            --target demo \
-            -t ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
-            -t ghcr.io/${{ github.repository_owner }}/realms:demo-latest \
-            .
-          
-          # Push both tags
-          docker push ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}
-          docker push ghcr.io/${{ github.repository_owner }}/realms:demo-latest
+      - name: Build and push demo image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          target: demo
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/realms:demo-latest
 
-          docker build \
-            --pull \
-            --target test \
-            -t ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }} \
-            -t ghcr.io/${{ github.repository_owner }}/realms:test-latest \
-            .
-          
-          # Push both tags
-          docker push ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }}
-          docker push ghcr.io/${{ github.repository_owner }}/realms:test-latest
+      - name: Build and push test image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          target: test
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/realms:test-latest
+          pull: true
 
-          docker build \
-            --pull \
-            --target ui-test \
-            -t ghcr.io/${{ github.repository_owner }}/realms:ui-test-${{ github.sha }} \
-            -t ghcr.io/${{ github.repository_owner }}/realms:ui-test-latest \
-            .
-          
-          # Push both tags
-          docker push ghcr.io/${{ github.repository_owner }}/realms:ui-test-${{ github.sha }}
-          docker push ghcr.io/${{ github.repository_owner }}/realms:ui-test-latest
+      - name: Build and push ui-test image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          target: ui-test
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/realms:ui-test-${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/realms:ui-test-latest
+          pull: true
       
       - name: Verify Docker images
         if: always()
