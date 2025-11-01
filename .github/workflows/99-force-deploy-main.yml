@@ -1,4 +1,4 @@
-name: 99. Force Deploy (main)
+name: Force Deploy (main)
 
 on:
   workflow_dispatch:
