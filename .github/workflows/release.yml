@@ -59,7 +59,7 @@ jobs:
           
           # Calculate new version with Python
           CURRENT_VERSION=$(cat version.txt)
-          NEW_VERSION=$(python -c "import semver; v=semver.VersionInfo.parse('${CURRENT_VERSION}'); print(v.bump_${{ github.event.inputs.release_type || 'patch' }})())")
+          NEW_VERSION=$(python -c "import semver; v=semver.VersionInfo.parse('${CURRENT_VERSION}'); print(v.bump_${{ github.event.inputs.release_type || 'patch' }}())")
           
           # Update version file
           echo "${NEW_VERSION}" > version.txt
