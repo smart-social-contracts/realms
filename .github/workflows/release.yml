@@ -1,7 +1,7 @@
 name: Create Release
 
 on:
-  workflow_dispatch:  # Allows manual triggering only
+  workflow_dispatch:
     inputs:
       release_type:
         description: 'Type of release (patch, minor, major)'
@@ -12,14 +12,9 @@ on:
           - patch
           - minor
           - major
-      create_github_release:
-        description: 'Create GitHub Release'
-        required: false
-        default: true
-        type: boolean
 
 jobs:
-  deploy:
+  release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -48,7 +43,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install bumpversion semver
+          pip install bumpversion semver build twine
       
       # Bump version
       - name: Bump version
@@ -64,18 +59,22 @@ jobs:
           
           # Calculate new version with Python
           CURRENT_VERSION=$(cat version.txt)
-          NEW_VERSION=$(python -c "import semver; v=semver.VersionInfo.parse('${CURRENT_VERSION}'); print(v.bump_${{ github.event.inputs.release_type }}())")
+          NEW_VERSION=$(python -c "import semver; v=semver.VersionInfo.parse('${CURRENT_VERSION}'); print(v.bump_${{ github.event.inputs.release_type || 'patch' }})())")
           
           # Update version file
           echo "${NEW_VERSION}" > version.txt
           
+          # Update CLI version
+          sed -i "s/version = \".*\"/version = \"${NEW_VERSION}\"/" cli/pyproject.toml
+          sed -i "s/__version__ = \".*\"/__version__ = \"${NEW_VERSION}\"/" cli/realms_cli/__init__.py
+          
           # Store new version for later use
           echo "NEW_VERSION=${NEW_VERSION}" >> $GITHUB_OUTPUT
       
-      # Pull and tag the base Docker image
-      - name: Pull and tag Docker image
+      # Pull and tag the Docker images
+      - name: Pull and tag Docker images
         run: |
-          # Pull the base Docker image (without extensions)
+          # Pull the latest Docker image
           docker pull ghcr.io/${{ github.repository_owner }}/realms:latest
           
           # Tag with version number
@@ -84,13 +83,15 @@ jobs:
           
           # Push the versioned tag
           docker push ghcr.io/${{ github.repository_owner }}/realms:v${{ steps.bump_version.outputs.NEW_VERSION }}
+          
+          echo "✅ Docker image tagged and pushed: v${{ steps.bump_version.outputs.NEW_VERSION }}"
       
       - name: Extract canister artifacts
         run: |
-          # Create directory to ensure it exists for mounting
+          # Create directory for artifacts
           mkdir -p artifacts
 
-          # Build canisters in the Docker container and extract artifacts
+          # Build canisters and extract WASM/DID files
           docker run --rm \
             -v "$(pwd)/artifacts:/artifacts" \
             ghcr.io/${{ github.repository_owner }}/realms:latest \
@@ -103,25 +104,52 @@ jobs:
                     cp .dfx/local/canisters/realm_registry_backend/service.did /artifacts/realm_registry_backend.did && \
                     dfx stop"
           
-          # Move artifacts to the root directory for the release
+          # Move artifacts to root for release
           mv artifacts/realm_backend.wasm.gz ./
           mv artifacts/realm_backend.did ./
           mv artifacts/realm_registry_backend.wasm.gz ./
           mv artifacts/realm_registry_backend.did ./
+          
+          echo "✅ Canister artifacts extracted"
       
-      # Push changes
-      - name: Push changes
+      - name: Build and publish CLI to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
-          git add version.txt
-          git commit -m "Bump version to $(cat version.txt)"
-          git tag -a "v$(cat version.txt)" -m "Release v$(cat version.txt)"
+          cd cli
+          
+          # Verify version consistency
+          PYPROJECT_VERSION=$(grep -Po '^version = "\K[^"]*' pyproject.toml)
+          INIT_VERSION=$(grep -Po '(?<=__version__ = ")[^"]*' realms_cli/__init__.py)
+          
+          echo "Version in pyproject.toml: $PYPROJECT_VERSION"
+          echo "Version in __init__.py: $INIT_VERSION"
+          
+          if [ "$PYPROJECT_VERSION" != "$INIT_VERSION" ]; then
+            echo "ERROR: Version mismatch"
+            exit 1
+          fi
+          
+          # Build and publish
+          python -m build
+          twine check dist/*
+          twine upload dist/*
+          
+          echo "✅ CLI published to PyPI: v${{ steps.bump_version.outputs.NEW_VERSION }}"
+      
+      # Commit version changes
+      - name: Commit and push version changes
+        run: |
+          git add version.txt cli/pyproject.toml cli/realms_cli/__init__.py
+          git commit -m "Bump version to ${{ steps.bump_version.outputs.NEW_VERSION }}"
+          git tag -a "v${{ steps.bump_version.outputs.NEW_VERSION }}" -m "Release v${{ steps.bump_version.outputs.NEW_VERSION }}"
           git remote set-url origin https://${{ secrets.PAT_GITHUB }}@github.com/${{ github.repository }}.git
           git push origin
           git push origin --tags
       
-      # Create a GitHub release
-      - name: Create Release
-        if: ${{ github.event.inputs.create_github_release == 'true' }}
+      # Create GitHub release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.bump_version.outputs.NEW_VERSION }}
@@ -139,7 +167,7 @@ jobs:
             
             ## 📦 Release Assets
             
-            ### 🐳 Docker Image (Base - No Extensions)
+            ### 🐳 Docker Image
             ```bash
             docker pull ghcr.io/${{ github.repository_owner }}/realms:v${{ steps.bump_version.outputs.NEW_VERSION }}
             # or use :latest for the most recent release
@@ -149,6 +177,11 @@ jobs:
             ### 🔧 Canister Artifacts (WASM + DID)
             - `realm_backend.wasm.gz` + `realm_backend.did` - Main backend canister
             - `realm_registry_backend.wasm.gz` + `realm_registry_backend.did` - Registry backend canister
+            
+            ### 📦 CLI Tool (PyPI)
+            ```bash
+            pip install --upgrade realms-cli==${{ steps.bump_version.outputs.NEW_VERSION }}
+            ```
             
             ### 📁 Source Code
             - Source code (zip)
@@ -165,6 +198,11 @@ jobs:
             **Run Docker Image:**
             ```bash
             docker run -it ghcr.io/${{ github.repository_owner }}/realms:v${{ steps.bump_version.outputs.NEW_VERSION }}
+            ```
+            
+            **Install CLI:**
+            ```bash
+            pip install realms-cli==${{ steps.bump_version.outputs.NEW_VERSION }}
             ```
             
             ## Commit
