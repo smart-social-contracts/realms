@@ -44,12 +44,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Clean Docker environment
-        run: |
-          # Remove any dangling images/layers to prevent cache contamination
-          docker system prune -f --filter "until=24h"
-          echo "✅ Docker environment cleaned"
-      
       - name: Build and push base image
         uses: docker/build-push-action@v4
         with:
