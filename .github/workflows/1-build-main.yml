@@ -260,8 +260,9 @@ jobs:
             -v "$(pwd)/deploy-logs:/app/deploy-logs" \
             -e DFX_WARNING="-mainnet_plaintext_identity" \
             ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
-            bash -c "(realms create --random && \
-                     realms deploy --folder generated_realm --network staging --identity /app/identity.pem); \
+            bash -c "(dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
+                     dfx identity use my-identity && \
+                     realms create --random --network staging --deploy); \
                      EXIT_CODE=\$?; \
                      mkdir -p /app/deploy-logs && \
                      cp -f dfx.log /app/deploy-logs/ 2>/dev/null || true && \
