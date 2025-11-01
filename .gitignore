@@ -31,7 +31,7 @@ src/realm_frontend/src/lib/i18n/locales/extensions/
 src/realm_frontend/static/extensions/
 
 # Generated realm folder
-generated_realm/
+.realm/
 
 # CLI build artifacts
 cli/build/

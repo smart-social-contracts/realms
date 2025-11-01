@@ -21,7 +21,7 @@ from .commands.registry import (
 )
 from .commands.run import run_command
 from .commands.shell import shell_command
-from .constants import MAX_BATCH_SIZE
+from .constants import MAX_BATCH_SIZE, REALM_FOLDER
 from .utils import (
     check_dependencies,
     display_info_panel,
@@ -68,7 +68,7 @@ def create(
         None, "--seed", help="Random seed for reproducible generation"
     ),
     output_dir: str = typer.Option(
-        "generated_realm", "--output-dir", help="Output directory"
+        REALM_FOLDER, "--output-dir", help="Output directory"
     ),
     realm_name: str = typer.Option(
         "Generated Demo Realm", "--realm-name", help="Name of the realm"

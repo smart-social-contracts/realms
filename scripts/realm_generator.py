@@ -24,6 +24,10 @@ import os
 # Add the src directory to the Python path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src/realm_backend'))
 
+# Add the CLI directory to the Python path to access constants
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'cli'))
+
+from realms_cli.constants import REALM_FOLDER
 from ggg import (
     UserProfile,
     Profiles,
@@ -644,7 +648,7 @@ def main():
     parser.add_argument("--transactions", type=int, default=100, help="Number of transactions to generate")
     parser.add_argument("--disputes", type=int, default=10, help="Number of disputes to generate")
     parser.add_argument("--seed", type=int, help="Random seed for reproducible generation")
-    parser.add_argument("--output-dir", type=str, default="generated_realm", help="Output directory")
+    parser.add_argument("--output-dir", type=str, default=REALM_FOLDER, help="Output directory")
     parser.add_argument("--realm-name", type=str, default="Generated Demo Realm", help="Name of the realm")
     
     args = parser.parse_args()

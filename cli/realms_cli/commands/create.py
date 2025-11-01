@@ -9,6 +9,7 @@ from typing import Optional
 import typer
 from rich.console import Console
 
+from ..constants import REALM_FOLDER
 from ..utils import get_scripts_path, is_repo_mode, run_in_docker
 from .deploy import _deploy_realm_internal
 
@@ -205,7 +206,7 @@ def run_dfx_command(dfx_cmd):
 
 
 # Run the adjustments script with network parameter
-realms_cmd = ['realms', 'shell', '--file', 'generated_realm/scripts/adjustments.py']
+realms_cmd = ['realms', 'shell', '--file', f'{REALM_FOLDER}/scripts/adjustments.py']
 if network != 'local':
     realms_cmd.extend(['--network', network])
 run_dfx_command(realms_cmd)
