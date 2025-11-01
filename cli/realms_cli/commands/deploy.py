@@ -8,6 +8,7 @@ from typing import Optional
 import typer
 from rich.console import Console
 
+from ..constants import REALM_FOLDER
 from ..utils import get_logger, get_scripts_path, is_repo_mode, run_command, run_in_docker
 
 console = Console()
@@ -229,6 +230,13 @@ def deploy_command(
     ),
 ) -> None:
     """Deploy a realm to the specified network."""
+    # If no folder specified, check if default .realm folder exists and use it
+    if folder is None and not config_file:
+        default_folder = Path(REALM_FOLDER)
+        if default_folder.exists() and default_folder.is_dir():
+            folder = REALM_FOLDER
+            console.print(f"[dim]ℹ️  No folder specified, using default: {folder}[/dim]")
+    
     _deploy_realm_internal(config_file, folder, network, clean, identity)
 
 

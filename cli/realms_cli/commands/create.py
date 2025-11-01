@@ -290,7 +290,7 @@ for codex in Codex.instances():
         console.print("   To upload data, you must first install extensions or manually load the data.")
     
     console.print("\n[bold]Next Steps:[/bold]")
-    console.print(f"realms deploy --folder {output_dir}")
+    console.print("realms deploy")
 
     if deploy:
         console.print("\n[yellow]🚀 Auto-deployment requested...[/yellow]")
