@@ -161,19 +161,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       
-      - name: Wait for Docker image to be available
-        run: |
-          # Wait up to 5 minutes for the Docker image to be available
-          for i in {1..30}; do
-            if docker pull ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }}; then
-              echo "Docker image is available"
-              break
-            else
-              echo "Waiting for Docker image... (attempt $i/30)"
-              sleep 10
-            fi
-          done
-      
       - name: Run linting checks
         run: |
           mkdir -p lint-logs
@@ -197,19 +184,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      
-      - name: Wait for Docker image to be available
-        run: |
-          # Wait up to 5 minutes for the Docker image to be available
-          for i in {1..30}; do
-            if docker pull ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }}; then
-              echo "Docker image is available"
-              break
-            else
-              echo "Waiting for Docker image... (attempt $i/30)"
-              sleep 10
-            fi
-          done
       
       - name: Run extension tests
         run: |
@@ -238,19 +212,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      
-      - name: Wait for Docker image to be available
-        run: |
-          # Wait up to 5 minutes for the Docker image to be available
-          for i in {1..30}; do
-            if docker pull ghcr.io/${{ github.repository_owner }}/realms:ui-test-${{ github.sha }}; then
-              echo "Docker image is available"
-              break
-            else
-              echo "Waiting for Docker image... (attempt $i/30)"
-              sleep 10
-            fi
-          done
       
       - name: Run Playwright tests
         run: |
