@@ -299,7 +299,7 @@ jobs:
     # Manual release creation - only enabled if staging deployment succeeds
     runs-on: ubuntu-latest
     needs: deploy-staging
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true'
+    if: github.event.inputs.create_release == true
     permissions:
       contents: write
       packages: write
