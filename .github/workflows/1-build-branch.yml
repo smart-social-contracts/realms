@@ -1,4 +1,4 @@
-name: 1. Build and Test (branch)
+name: Branch Pipeline - Build & Test
 
 on:
   push:
@@ -145,6 +145,7 @@ jobs:
           path: build-logs/
           retention-days: 7
 
+  # All test jobs run in parallel after successful build
   test:
     runs-on: ubuntu-latest
     needs: build
