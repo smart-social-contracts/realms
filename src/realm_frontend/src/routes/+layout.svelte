@@ -64,8 +64,17 @@
 	{:else}
 		<div class="loading">
 			<div class="loading-content">
-				<div class="spinner"></div>
-				<p>Loading Realms GOS...</p>
+				<div class="logo-container">
+					<img
+						src="/images/logo_sphere_only.svg"
+						alt="Realms GOS"
+						class="logo"
+					/>
+					<div class="shimmer"></div>
+				</div>
+				<div class="loading-bar">
+					<div class="loading-bar-progress"></div>
+				</div>
 			</div>
 		</div>
 	{/if}
@@ -83,32 +92,103 @@
 		justify-content: center;
 		align-items: center;
 		height: 100vh;
-		background: var(--color-bg-primary, #ffffff);
+		background: #ffffff;
+		position: relative;
+		overflow: hidden;
 	}
 	
 	.loading-content {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 1.5rem;
+		gap: 2.5rem;
+		position: relative;
+		z-index: 10;
 	}
 	
-	.loading-content p {
-		font-size: var(--font-size-lg, 18px);
-		color: var(--color-text-secondary, #666);
-		margin: 0;
+	.logo-container {
+		position: relative;
+		width: 120px;
+		height: 120px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		animation: pulse 2s ease-in-out infinite;
 	}
 	
-	.spinner {
-		width: 40px;
-		height: 40px;
-		border: 4px solid var(--color-gray-200, #e5e5e5);
-		border-top-color: var(--color-gray-700, #404040);
-		border-radius: 50%;
-		animation: spin 0.8s linear infinite;
+	.logo {
+		width: 100%;
+		height: auto;
+		position: relative;
+		z-index: 2;
 	}
 	
-	@keyframes spin {
-		to { transform: rotate(360deg); }
+	.shimmer {
+		position: absolute;
+		top: 0;
+		left: -100%;
+		width: 100%;
+		height: 100%;
+		background: linear-gradient(
+			90deg,
+			transparent 0%,
+			rgba(255, 255, 255, 0.4) 50%,
+			transparent 100%
+		);
+		animation: shimmer 2.5s infinite;
+		z-index: 3;
+	}
+	
+	.loading-bar {
+		width: 200px;
+		height: 2px;
+		background: #e5e5e5;
+		border-radius: 2px;
+		overflow: hidden;
+		position: relative;
+	}
+	
+	.loading-bar-progress {
+		position: absolute;
+		top: 0;
+		left: 0;
+		height: 100%;
+		width: 50%;
+		background: linear-gradient(
+			90deg,
+			transparent 0%,
+			#404040 50%,
+			transparent 100%
+		);
+		animation: progress 1.5s ease-in-out infinite;
+	}
+	
+	@keyframes pulse {
+		0%, 100% {
+			opacity: 1;
+			transform: scale(1);
+		}
+		50% {
+			opacity: 0.85;
+			transform: scale(0.98);
+		}
+	}
+	
+	@keyframes shimmer {
+		0% {
+			left: -100%;
+		}
+		100% {
+			left: 100%;
+		}
+	}
+	
+	@keyframes progress {
+		0% {
+			left: -50%;
+		}
+		100% {
+			left: 100%;
+		}
 	}
 </style>
