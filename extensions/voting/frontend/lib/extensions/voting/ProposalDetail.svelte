@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
-	import { Card, Button, Badge, Modal, Alert } from 'flowbite-svelte';
-	import { CloseOutline, LinkOutline, CalendarMonthOutline, UserCircleSolid, CodeBranchOutline } from 'flowbite-svelte-icons';
+	import { Card, Button, Badge, Alert } from 'flowbite-svelte';
+	import { LinkOutline, CalendarMonthOutline, UserCircleSolid, CodeBranchOutline } from 'flowbite-svelte-icons';
 	import { _ } from 'svelte-i18n';
 	import VotingCard from './VotingCard.svelte';
 	
@@ -34,22 +34,7 @@
 	}
 </script>
 
-<Modal open={true} size="xl" class="w-full max-w-7xl">
-	<div class="flex items-center justify-between p-4 md:p-5 border-b rounded-t">
-		<h3 class="text-xl font-semibold text-gray-900">
-			{$_('extensions.voting.detail.title')}
-		</h3>
-		<Button 
-			color="alternative" 
-			size="sm"
-			on:click={handleClose}
-		>
-			<CloseOutline class="w-4 h-4" />
-		</Button>
-	</div>
-	
-	<div class="p-4 md:p-5">
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
 			<!-- Left Column: Proposal Details -->
 			<div class="space-y-6 overflow-y-auto max-h-[70vh]">
 				<!-- Proposal Header -->
@@ -304,6 +289,4 @@
 					</div>
 				</div>
 			</div>
-		</div>
-	</div>
-</Modal>
+</div>

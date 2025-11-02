@@ -1,18 +1,15 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { Card, Badge, Button, Spinner, Table, TableHead, TableHeadCell, TableBody, TableBodyRow, TableBodyCell } from 'flowbite-svelte';
 	import { EyeSolid, ClockSolid, UserSolid } from 'flowbite-svelte-icons';
 	import { _ } from 'svelte-i18n';
 	import VotingCard from './VotingCard.svelte';
-	import ProposalDetail from './ProposalDetail.svelte';
 	
 	export let proposals = [];
 	export let loading = false;
 	
 	const dispatch = createEventDispatcher();
-	
-	let selectedProposal = null;
-	let showDetail = false;
 	
 	function getStatusColor(status: string) {
 		switch (status) {
@@ -31,8 +28,7 @@
 	}
 	
 	function handleViewDetails(proposal) {
-		selectedProposal = proposal;
-		showDetail = true;
+		goto(`/extensions/voting/${proposal.id}`);
 	}
 	
 	function handleVote(event) {
@@ -51,14 +47,7 @@
 		<p class="text-gray-400 text-sm mt-2">{$_('extensions.voting.no_proposals_hint')}</p>
 	</div>
 {:else}
-	{#if showDetail && selectedProposal}
-		<ProposalDetail 
-			proposal={selectedProposal}
-			on:close={() => { showDetail = false; selectedProposal = null; }}
-			on:vote={handleVote}
-		/>
-	{:else}
-		<!-- Desktop Table View -->
+	<!-- Desktop Table View -->
 		<div class="hidden lg:block">
 			<Table hoverable={true} class="w-full">
 				<TableHead>
@@ -196,5 +185,4 @@
 				</Card>
 			{/each}
 		</div>
-	{/if}
 {/if}
