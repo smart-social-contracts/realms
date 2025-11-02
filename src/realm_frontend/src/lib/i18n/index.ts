@@ -120,7 +120,7 @@ export async function loadExtensionTranslations() {
   }
 }
 
-export function initI18n() {
+export async function initI18n() {
   init({
     fallbackLocale: "en",
     initialLocale: browser ? getPreferredLocale() : "en"
@@ -128,6 +128,8 @@ export function initI18n() {
 
   console.log('i18n initialized in realm_frontend');
   
-  // Load all extension translations
-  loadExtensionTranslations();
+  // Load all extension translations and wait for them
+  await loadExtensionTranslations();
+  
+  console.log('All translations (core + extensions) loaded');
 }
