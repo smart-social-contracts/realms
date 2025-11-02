@@ -196,6 +196,29 @@ jobs:
           path: extension-logs/
           retention-days: 7
 
+  test-backend-integration:
+    runs-on: ubuntu-latest
+    needs: build
+    if: "!contains(github.event.head_commit.message, 'Bump version')"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Run integration tests
+        run: |
+          ./scripts/run_integration_tests.sh \
+            "ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }}" \
+            "realms-api-test-${{ github.sha }}" \
+            10
+      
+      - name: Upload integration test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-logs
+          path: integration-test-logs/
+          retention-days: 7
+
   test-ui-e2e:
     runs-on: ubuntu-latest
     needs: build
@@ -230,7 +253,7 @@ jobs:
 
   deploy-staging:
     runs-on: ubuntu-latest
-    needs: [test, test-extensions, test-ui-e2e]
+    needs: [test, test-extensions, test-backend-integration, test-ui-e2e]
     if: "!contains(github.event.head_commit.message, 'Bump version')"
     steps:
       - name: Checkout code
