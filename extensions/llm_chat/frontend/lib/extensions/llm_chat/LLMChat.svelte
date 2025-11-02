@@ -387,7 +387,7 @@
 						<div class="flex items-start space-x-4 max-w-[85%]">
 							<!-- Ashoka Avatar -->
 							<div class="flex-shrink-0 w-12 h-12 rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-600 shadow-lg">
-								<img src="/photos/ashoka.png" alt="Ashoka AI Assistant" class="w-full h-full object-cover" />
+								<img src="/extensions/llm_chat/photos/ashoka.png" alt="Ashoka AI Assistant" class="w-full h-full object-cover" />
 							</div>
 							
 							<!-- Welcome Chat Bubble -->
@@ -416,7 +416,7 @@
 								{#if !message.isUser}
 									<!-- Ashoka AI Avatar -->
 									<div class="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-600 shadow-md">
-										<img src="/photos/ashoka.png" alt="Ashoka AI Assistant" class="w-full h-full object-cover" />
+										<img src="/extensions/llm_chat/photos/ashoka.png" alt="Ashoka AI Assistant" class="w-full h-full object-cover" />
 									</div>
 								{/if}
 								
@@ -442,7 +442,7 @@
 							<div class="flex items-start space-x-4 max-w-[85%]">
 								<!-- Ashoka AI Avatar -->
 								<div class="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-600 shadow-md">
-									<img src="/photos/ashoka.png" alt="Ashoka AI Assistant" class="w-full h-full object-cover" />
+									<img src="/extensions/llm_chat/photos/ashoka.png" alt="Ashoka AI Assistant" class="w-full h-full object-cover" />
 								</div>
 								<div class="flex-1">
 									<div class="flex items-center space-x-3 text-gray-600 dark:text-gray-400">
