@@ -7,7 +7,7 @@ from typing import Tuple
 
 
 def dfx_call(
-    canister: str, method: str, args: str = "()", output_json: bool = False
+    canister: str, method: str, args: str = "()", output_json: bool = False, is_update: bool = False
 ) -> Tuple[str, int]:
     """Call a canister method via dfx.
     
@@ -16,6 +16,7 @@ def dfx_call(
         method: Method name to call
         args: Candid-encoded arguments
         output_json: Whether to use --output json flag
+        is_update: Whether this is an update call (default: query)
         
     Returns:
         Tuple of (stdout, exit_code)
@@ -23,7 +24,8 @@ def dfx_call(
     cmd = ["dfx", "canister", "call", canister, method]
     if args:
         cmd.append(args)
-    cmd.append("--query")  # Most realm_backend methods are queries
+    if not is_update:
+        cmd.append("--query")  # Most realm_backend methods are queries
     if output_json:
         cmd.extend(["--output", "json"])
     
@@ -31,13 +33,14 @@ def dfx_call(
     return result.stdout, result.returncode
 
 
-def dfx_call_json(canister: str, method: str, args: str = "()") -> dict:
+def dfx_call_json(canister: str, method: str, args: str = "()", is_update: bool = False) -> dict:
     """Call a canister method and parse JSON response.
     
     Args:
         canister: Canister name
         method: Method name to call
         args: Candid-encoded arguments
+        is_update: Whether this is an update call (default: query)
         
     Returns:
         Parsed JSON response
@@ -45,7 +48,7 @@ def dfx_call_json(canister: str, method: str, args: str = "()") -> dict:
     Raises:
         RuntimeError: If call fails or JSON parsing fails
     """
-    output, code = dfx_call(canister, method, args, output_json=True)
+    output, code = dfx_call(canister, method, args, output_json=True, is_update=is_update)
     
     if code != 0:
         raise RuntimeError(f"dfx call failed with code {code}: {output}")

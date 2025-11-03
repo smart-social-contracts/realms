@@ -97,12 +97,25 @@ python3 tests/integration/test_status_api.py
   - `test_list_invalid_entity_type()` - Error handling
   - `test_pagination_parameters()` - Pagination support
 
+- **test_task_manager_api.py**: Task execution and scheduling
+  - `test_execute_sync_code()` - Synchronous code execution
+  - `test_execute_sync_code_with_result()` - Code execution with return values
+  - `test_execute_code_with_error()` - Error handling in code execution
+  - `test_execute_async_code()` - Asynchronous task execution
+  - `test_get_task_status()` - Task status polling
+  - `test_execute_code_with_ggg_entities()` - Code using GGG entities
+  - `test_execute_multiple_tasks_sequentially()` - Multiple task execution
+  - `test_execute_code_with_logging()` - Code with log output
+  - `test_task_status_format()` - Task status response format
+
 ## Helper Utilities
 
 ### `fixtures/dfx_helpers.py`
 
-- `dfx_call(canister, method, args)` - Make dfx call, return (output, code)
-- `dfx_call_json(canister, method, args)` - Make dfx call, parse JSON response
+- `dfx_call(canister, method, args, is_update=False)` - Make dfx call, return (output, code)
+  - Set `is_update=True` for update calls (default: query)
+- `dfx_call_json(canister, method, args, is_update=False)` - Make dfx call, parse JSON response
+  - Set `is_update=True` for update calls (default: query)
 - `assert_success(output, message)` - Assert call succeeded
 - `assert_contains(output, substring, message)` - Assert output contains text
 
@@ -147,10 +160,17 @@ See `.github/workflows/ci-main.yml` for the full workflow.
 Example:
 ```python
 def test_my_endpoint():
-    """Test my custom endpoint."""
+    """Test my custom endpoint (query call)."""
     output, code = dfx_call("realm_backend", "my_method", '()')
     assert code == 0
     assert_success(output)
+
+def test_my_update_endpoint():
+    """Test my custom update endpoint."""
+    # For update calls, set is_update=True
+    output, code = dfx_call("realm_backend", "my_update_method", '("arg")', is_update=True)
+    assert code == 0
+    assert_contains(output, "success")
 ```
 
 ## Requirements
