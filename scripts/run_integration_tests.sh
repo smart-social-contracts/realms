@@ -45,80 +45,26 @@ else
     log_info "Will copy test files after container start (CI mode)"
 fi
 
-# Start container with deployed realm
-log_info "Starting container with realm deployment..."
+# Start container (let realms deploy handle dfx startup)
+log_info "Starting container..."
 docker run -d \
   --name "$CONTAINER_NAME" \
   $VOLUME_ARGS \
   "$DOCKER_IMAGE" \
-  bash -c "dfx start --clean --background && \
-           realms create --random --citizens $CITIZENS_COUNT && \
-           realms deploy && \
-           sleep infinity"
+  sleep infinity
 
-# Wait for deployment to complete
-log_info "Waiting for realm deployment..."
-TIMEOUT=300  # Increased timeout for full deployment
-ELAPSED=0
+# Deploy realm (this will block until complete - handles dfx startup internally)
+log_info "Creating and deploying realm (this takes ~2-3 minutes)..."
+if ! docker exec "$CONTAINER_NAME" bash -c "realms create --random --citizens $CITIZENS_COUNT && realms deploy"; then
+    log_error "Realm deployment failed"
+    log_info "Checking logs..."
+    docker exec "$CONTAINER_NAME" tail -100 realms_cli.log 2>/dev/null || true
+    docker exec "$CONTAINER_NAME" tail -50 dfx.log 2>/dev/null || true
+    docker rm -f "$CONTAINER_NAME"
+    exit 1
+fi
 
-# First, wait for canister ID to exist
-while ! docker exec "$CONTAINER_NAME" dfx canister id realm_backend 2>/dev/null; do
-    sleep 2
-    ELAPSED=$((ELAPSED + 2))
-    if [ $ELAPSED -ge $TIMEOUT ]; then
-        log_error "Deployment timed out after ${TIMEOUT}s"
-        docker logs "$CONTAINER_NAME"
-        docker rm -f "$CONTAINER_NAME"
-        exit 1
-    fi
-    echo -n "."
-done
-echo
-
-# Then verify canister is actually callable (deployment complete)
-log_info "Verifying canister is ready..."
-log_info "Waiting for Wasm compilation and deployment to complete (this takes ~2-3 minutes)..."
-RETRY_COUNT=0
-MAX_RETRIES=60  # Increased to handle full build time (2 minutes)
-
-while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    # Try to call status and check if it succeeds (exit code 0)
-    OUTPUT=$(docker exec "$CONTAINER_NAME" dfx canister call realm_backend status --query 2>&1)
-    EXIT_CODE=$?
-    
-    # Check if call succeeded AND returned valid JSON response with success field
-    if [ $EXIT_CODE -eq 0 ] && echo "$OUTPUT" | grep -qE '"success".*true|success.*=.*true'; then
-        log_success "Realm deployed and ready for testing"
-        break
-    fi
-    
-    # Check for specific error indicating canister is still building
-    if echo "$OUTPUT" | grep -q "has no wasm module"; then
-        # Still building, this is expected
-        :
-    elif echo "$OUTPUT" | grep -q "Cannot find canister id"; then
-        # Still creating canister, this is expected
-        :
-    else
-        # Some other error - log it for debugging
-        if [ $((RETRY_COUNT % 10)) -eq 0 ] && [ $RETRY_COUNT -gt 0 ]; then
-            log_info "Still waiting... (attempt $RETRY_COUNT/$MAX_RETRIES)"
-        fi
-    fi
-    
-    RETRY_COUNT=$((RETRY_COUNT + 1))
-    if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-        log_error "Canister not responding after $((MAX_RETRIES * 2)) seconds"
-        log_info "Last error: $OUTPUT"
-        log_info "Checking deployment logs..."
-        docker exec "$CONTAINER_NAME" tail -100 realms_cli.log
-        docker rm -f "$CONTAINER_NAME"
-        exit 1
-    fi
-    sleep 2
-    echo -n "."
-done
-echo
+log_success "Realm deployed successfully!"
 
 # Copy test files into container if not using volumes
 if [ "$USE_VOLUMES" != "true" ]; then
