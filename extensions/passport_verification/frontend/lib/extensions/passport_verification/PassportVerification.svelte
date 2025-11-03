@@ -201,7 +201,7 @@
         Passport verification was not successful. Please try again.
       </P>
 
-      <Button on:click={resetVerification} class={extensionStyles.button.primary}>
+      <Button on:click={resetVerification} class={cn(styles.button.primary())}>
         Try Again
       </Button>
       
@@ -215,7 +215,7 @@
         {errorMessage}
       </P>
 
-      <Button on:click={resetVerification} class={extensionStyles.button.primary}>
+      <Button on:click={resetVerification} class={cn(styles.button.primary())}>
         Try Again
       </Button>
     {/if}

@@ -4,7 +4,6 @@ from urllib.parse import quote
 from kybra import Async, CallResult, ic, match, query, update
 from kybra.canisters.management import (
     HttpResponse,
-    HttpTransformArgs,
     management_canister,
 )
 from kybra_simple_logging import get_logger
@@ -12,18 +11,6 @@ from kybra_simple_logging import get_logger
 logger = get_logger("passport_verification")
 
 RARIMO_API_BASE = "https://api.app.rarime.com"
-
-# @query
-# def transform_response(args: HttpTransformArgs) -> HttpResponse:
-#     """Transform function for HTTP responses"""
-#     logger.info(f"🔄 Transforming HTTP response")
-#     http_response = args["response"]
-#     logger.info(f"📊 Original response status: {http_response['status']}")
-#     logger.info(f"📄 Response body size: {len(http_response['body'])} bytes")
-#     logger.info(f"🧹 Clearing response headers for security")
-#     http_response["headers"] = []
-#     return http_response
-
 
 def get_session_id(args: str) -> str:
     return ic.caller().to_str()
@@ -70,10 +57,7 @@ def get_verification_link(args: str) -> Async[str]:
             "method": {"post": None},
             "headers": [{"name": "Content-Type", "value": "application/json"}],
             "body": json.dumps(payload).encode("utf-8"),
-            "transform": {
-                "function": (ic.id(), "transform_response"),
-                "context": bytes(),
-            },
+            "transform": None,
         }
     ).with_cycles(100_000_000)
 
@@ -121,10 +105,7 @@ def check_verification_status(args: str) -> Async[str]:
             "method": {"get": None},
             "headers": [],
             "body": bytes(),
-            "transform": {
-                "function": (ic.id(), "transform_response"),
-                "context": bytes(),
-            },
+            "transform": None,
         }
     ).with_cycles(100_000_000)
 
