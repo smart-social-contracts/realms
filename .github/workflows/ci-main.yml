@@ -268,7 +268,7 @@ jobs:
 
   deploy-staging:
     runs-on: ubuntu-latest
-    needs: [test, test-extensions, test-backend-integration, test-realm-registry, test-ui-e2e]
+    needs: [linting, test-extensions, test-backend-integration, test-realm-registry, test-ui-e2e]
     if: "!contains(github.event.head_commit.message, 'Bump version')"
     steps:
       - name: Checkout code
