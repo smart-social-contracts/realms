@@ -1,3 +1,0 @@
-"""
-notifications extension package.
-"""
