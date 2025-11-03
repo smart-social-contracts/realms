@@ -29,6 +29,7 @@ def create_command(
     deploy: bool,
     no_extensions: bool,
     identity: Optional[str] = None,
+    mode: str = "upgrade",
 ) -> None:
     """Create a new realm with deployment scripts. Use random=True to generate realistic demo data."""
     console.print(f"[bold blue]🏛️  Creating Realm: {realm_name}[/bold blue]\n")
@@ -153,7 +154,9 @@ set -x
 
 # Get network from command line argument or default to local
 NETWORK="${1:-local}"
-echo "🚀 Deploying canisters to network: $NETWORK..."
+# Get mode from second argument or default to upgrade
+MODE="${2:-upgrade}"
+echo "🚀 Deploying canisters to network: $NETWORK with mode: $MODE..."
 
 # Clear Kybra build cache to ensure extensions are included in backend build
 # This is critical after installing extensions
@@ -166,17 +169,17 @@ fi
 # Determine which deployment script to use
 if [ "$NETWORK" = "local" ] || [ "$NETWORK" = "local2" ]; then
     echo "Using local deployment script..."
-    bash scripts/deploy_local.sh
+    bash scripts/deploy_local.sh "$MODE"
 elif [ "$NETWORK" = "staging" ] || [ "$NETWORK" = "ic" ]; then
     echo "Using staging/IC deployment script..."
-    bash scripts/deploy_staging.sh "$NETWORK"
+    bash scripts/deploy_staging.sh "$NETWORK" "$MODE"
 else
     echo "❌ Unknown network: $NETWORK"
     echo "Supported networks: local, local2, staging, ic"
     exit 1
 fi
 
-echo "✅ Deployment to $NETWORK completed!"
+echo "✅ Deployment to $NETWORK with mode $MODE completed!"
 """
     target_deploy = scripts_dir / "2-deploy-canisters.sh"
     target_deploy.write_text(deploy_wrapper_content)
@@ -297,7 +300,7 @@ for codex in Codex.instances():
         try:
             # Call internal deployment function directly to ensure network parameter is passed
             _deploy_realm_internal(
-                config_file=None, folder=output_dir, network=network, clean=False, identity=identity
+                config_file=None, folder=output_dir, network=network, clean=False, identity=identity, mode=mode
             )
         except typer.Exit as e:
             console.print(

@@ -20,12 +20,14 @@ def _deploy_realm_internal(
     network: str,
     clean: bool,
     identity: Optional[str],
+    mode: str = "upgrade",
 ) -> None:
     """Internal deployment logic (can be called directly from Python)."""
     # Create logger for capturing script output
     logger = get_logger("deploy")
     logger.info("=" * 60)
     logger.info(f"Starting deployment to {network}")
+    logger.info(f"Deploy mode: {mode}")
     if identity:
         logger.info(f"Using identity: {identity}")
     logger.info("=" * 60)
@@ -69,9 +71,9 @@ def _deploy_realm_internal(
 
                 # Determine working directory and command based on script
                 if script_name == "2-deploy-canisters.sh":
-                    # Run deployment script with network parameter
+                    # Run deployment script with network and mode parameters
                     working_dir = Path.cwd()
-                    cmd = [str(script_path.resolve()), network]
+                    cmd = [str(script_path.resolve()), network, mode]
                 elif script_name == "3-upload-data.sh":
                     # Run upload script from the realm folder where data files are located
                     working_dir = folder_path
@@ -155,7 +157,7 @@ def _deploy_realm_internal(
                     # Run in Docker if in image mode, otherwise run locally
                     if is_repo_mode():
                         result = run_command(
-                            [str(deploy_script)],
+                            [str(deploy_script), mode],
                             cwd=str(Path.cwd()),
                             use_project_venv=True,
                             logger=logger,
@@ -164,7 +166,7 @@ def _deploy_realm_internal(
                     else:
                         console.print("[dim]Running in Docker image mode...[/dim]")
                         result = run_in_docker(
-                            ["bash", str(deploy_script)],
+                            ["bash", str(deploy_script), mode],
                             working_dir=Path.cwd(),
                             env=env,
                         )
@@ -180,7 +182,7 @@ def _deploy_realm_internal(
                     # Run in Docker if in image mode, otherwise run locally
                     if is_repo_mode():
                         result = run_command(
-                            [str(deploy_script)],
+                            [str(deploy_script), network, mode],
                             cwd=str(Path.cwd()),
                             use_project_venv=True,
                             logger=logger,
@@ -189,7 +191,7 @@ def _deploy_realm_internal(
                     else:
                         console.print("[dim]Running in Docker image mode...[/dim]")
                         result = run_in_docker(
-                            ["bash", str(deploy_script)],
+                            ["bash", str(deploy_script), network, mode],
                             working_dir=Path.cwd(),
                             env=env,
                         )
@@ -228,6 +230,9 @@ def deploy_command(
     identity: Optional[str] = typer.Option(
         None, "--identity", help="Path to identity PEM file or identity name for dfx"
     ),
+    mode: str = typer.Option(
+        "upgrade", "--mode", "-m", help="Deploy mode: 'upgrade' or 'reinstall' (wipes stable memory)"
+    ),
 ) -> None:
     """Deploy a realm to the specified network."""
     # If no folder specified, check if default .realm folder exists and use it
@@ -237,7 +242,7 @@ def deploy_command(
             folder = REALM_FOLDER
             console.print(f"[dim]ℹ️  No folder specified, using default: {folder}[/dim]")
     
-    _deploy_realm_internal(config_file, folder, network, clean, identity)
+    _deploy_realm_internal(config_file, folder, network, clean, identity, mode)
 
 
 if __name__ == "__main__":

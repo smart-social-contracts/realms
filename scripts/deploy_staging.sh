@@ -5,8 +5,10 @@ set -x
 
 # Get network from first argument, default to staging
 NETWORK="${1:-staging}"
+# Get mode from second argument, default to upgrade
+MODE="${2:-upgrade}"
 
-echo "Deploying to network: $NETWORK"
+echo "Deploying to network: $NETWORK with mode: $MODE"
 echo "Date/Time: $(date '+%Y-%m-%d %H:%M:%S')"
 
 echo "Checking kybra installation..."
@@ -17,10 +19,10 @@ python3 -m kybra --version || {
 
 scripts/download_wasms.sh
 
-echo "Deploying all canisters to $NETWORK"
+echo "Deploying all canisters to $NETWORK with mode $MODE"
 
-dfx deploy --network "$NETWORK" --yes realm_registry_backend --mode=upgrade
-dfx deploy --network "$NETWORK" --yes realm_backend --mode=upgrade
+dfx deploy --network "$NETWORK" --yes realm_registry_backend --mode=$MODE
+dfx deploy --network "$NETWORK" --yes realm_backend --mode=$MODE
 dfx canister start --network "$NETWORK" realm_backend
 dfx canister start --network "$NETWORK" realm_registry_backend
 

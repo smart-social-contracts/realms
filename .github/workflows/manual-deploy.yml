@@ -11,6 +11,14 @@ on:
         description: 'Commit SHA to deploy (leave empty for latest main)'
         required: false
         default: ''
+      mode:
+        description: 'Deploy mode (upgrade or reinstall)'
+        required: false
+        type: choice
+        options:
+          - upgrade
+          - reinstall
+        default: upgrade
 
 jobs:
   deploy-staging:
@@ -37,7 +45,7 @@ jobs:
           # Pull the demo image (includes extensions)
           docker pull ghcr.io/${{ github.repository_owner }}/realms:demo-${{ steps.commit.outputs.deploy_commit }}
           
-          # Deploy using realms CLI with staging network
+          # Deploy using realms CLI with staging network and specified mode
           docker run --rm \
             -v "$(pwd)/identity.pem:/app/identity.pem" \
             -v "$(pwd)/deploy-logs:/app/deploy-logs" \
@@ -45,7 +53,7 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/realms:demo-${{ steps.commit.outputs.deploy_commit }} \
             bash -c "(dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
                      dfx identity use my-identity && \
-                     realms create --random --network staging --deploy); \
+                     realms create --random --network staging --deploy --mode ${{ github.event.inputs.mode }}); \
                      EXIT_CODE=\$?; \
                      mkdir -p /app/deploy-logs && \
                      cp -f dfx.log /app/deploy-logs/ 2>/dev/null || true && \

@@ -3,7 +3,9 @@
 set -e
 set -x
 
-echo "Local deployment"
+# Get mode from first argument or default to upgrade
+MODE="${1:-upgrade}"
+echo "Local deployment with mode: $MODE"
 echo "Date/Time: $(date '+%Y-%m-%d %H:%M:%S')"
 
 if whereis git | grep -q "/"; then
@@ -38,8 +40,8 @@ dfx start --clean --background --log file --logfile dfx.log --host 127.0.0.1:$PO
 echo "Waiting for dfx to initialize..."
 sleep 3
 dfx deploy internet_identity
-dfx deploy realm_registry_backend --yes
-dfx deploy realm_backend --yes
+dfx deploy realm_registry_backend --yes --mode=$MODE
+dfx deploy realm_backend --yes --mode=$MODE
 
 dfx generate realm_registry_backend
 dfx generate realm_backend

@@ -85,6 +85,9 @@ def create(
     identity: Optional[str] = typer.Option(
         None, "--identity", help="Path to identity PEM file or identity name for dfx"
     ),
+    mode: str = typer.Option(
+        "upgrade", "--mode", "-m", help="Deploy mode: 'upgrade' or 'reinstall' (wipes stable memory)"
+    ),
 ) -> None:
     """Create a new realm. Use --random flag to generate demo data for testing and demonstrations."""
     create_command(
@@ -100,6 +103,7 @@ def create(
         deploy,
         no_extensions,
         identity,
+        mode,
     )
 
 
