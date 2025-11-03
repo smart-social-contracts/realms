@@ -24,8 +24,8 @@ scripts/download_wasms.sh
 
 echo "Deploying all canisters to $NETWORK"
 dfx deploy --network "$NETWORK" --yes vault
-dfx deploy --network "$NETWORK" --yes realm_registry_backend --mode=reinstall
-dfx deploy --network "$NETWORK" --yes realm_backend --mode=reinstall
+dfx deploy --network "$NETWORK" --yes realm_registry_backend --mode=upgrade
+dfx deploy --network "$NETWORK" --yes realm_backend --mode=upgrade
 dfx generate realm_registry_backend
 dfx generate realm_backend
 npm install --legacy-peer-deps
