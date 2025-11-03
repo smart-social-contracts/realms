@@ -156,7 +156,7 @@ set -x
 NETWORK="${1:-local}"
 # Get mode from second argument or default to upgrade
 MODE="${2:-upgrade}"
-echo "🚀 Deploying canisters to network: $NETWORK with mode: $MODE..."
+echo "🚀 Deploying canisters to network: $NETWORK..."
 
 # Clear Kybra build cache to ensure extensions are included in backend build
 # This is critical after installing extensions
@@ -168,10 +168,11 @@ fi
 
 # Determine which deployment script to use
 if [ "$NETWORK" = "local" ] || [ "$NETWORK" = "local2" ]; then
+    # For local deployment, mode is not used (dfx start --clean requires install mode)
     echo "Using local deployment script..."
-    bash scripts/deploy_local.sh "$MODE"
+    bash scripts/deploy_local.sh
 elif [ "$NETWORK" = "staging" ] || [ "$NETWORK" = "ic" ]; then
-    echo "Using staging/IC deployment script..."
+    echo "Using staging/IC deployment script with mode: $MODE..."
     bash scripts/deploy_staging.sh "$NETWORK" "$MODE"
 else
     echo "❌ Unknown network: $NETWORK"
@@ -179,7 +180,7 @@ else
     exit 1
 fi
 
-echo "✅ Deployment to $NETWORK with mode $MODE completed!"
+echo "✅ Deployment to $NETWORK completed!"
 """
     target_deploy = scripts_dir / "2-deploy-canisters.sh"
     target_deploy.write_text(deploy_wrapper_content)

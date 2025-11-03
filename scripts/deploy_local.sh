@@ -40,8 +40,12 @@ dfx start --clean --background --log file --logfile dfx.log --host 127.0.0.1:$PO
 echo "Waiting for dfx to initialize..."
 sleep 3
 dfx deploy internet_identity
-dfx deploy realm_registry_backend --yes --mode=$MODE
-dfx deploy realm_backend --yes --mode=$MODE
+
+# For local deployment, let dfx choose the mode automatically
+# because we use --clean which wipes everything, so mode=upgrade would fail
+echo "Deploying backend canisters (dfx will auto-select install/upgrade mode)..."
+dfx deploy realm_registry_backend --yes
+dfx deploy realm_backend --yes
 
 dfx generate realm_registry_backend
 dfx generate realm_backend

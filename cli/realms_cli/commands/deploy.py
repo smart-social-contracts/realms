@@ -72,6 +72,7 @@ def _deploy_realm_internal(
                 # Determine working directory and command based on script
                 if script_name == "2-deploy-canisters.sh":
                     # Run deployment script with network and mode parameters
+                    # Note: mode only applies to production networks (staging/ic)
                     working_dir = Path.cwd()
                     cmd = [str(script_path.resolve()), network, mode]
                 elif script_name == "3-upload-data.sh":
@@ -148,6 +149,7 @@ def _deploy_realm_internal(
 
                 if network == "local":
                     console.print("🔧 Running local deployment script...")
+                    console.print("[dim]Note: Local deployment uses dfx start --clean, so mode is auto-selected[/dim]")
                     deploy_script = scripts_path / "deploy_local.sh"
                     env = None
                     if identity:
@@ -155,9 +157,10 @@ def _deploy_realm_internal(
                         env["DFX_IDENTITY"] = identity
                     
                     # Run in Docker if in image mode, otherwise run locally
+                    # Note: mode parameter not used for local (dfx auto-selects based on --clean)
                     if is_repo_mode():
                         result = run_command(
-                            [str(deploy_script), mode],
+                            [str(deploy_script)],
                             cwd=str(Path.cwd()),
                             use_project_venv=True,
                             logger=logger,
@@ -166,13 +169,13 @@ def _deploy_realm_internal(
                     else:
                         console.print("[dim]Running in Docker image mode...[/dim]")
                         result = run_in_docker(
-                            ["bash", str(deploy_script), mode],
+                            ["bash", str(deploy_script)],
                             working_dir=Path.cwd(),
                             env=env,
                         )
                         
                 elif network in ["staging", "mainnet", "ic"]:
-                    console.print("🔧 Running staging deployment script...")
+                    console.print(f"🔧 Running staging deployment script with mode: {mode}...")
                     deploy_script = scripts_path / "deploy_staging.sh"
                     env = None
                     if identity:
