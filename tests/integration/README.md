@@ -8,16 +8,36 @@ These tests call canister methods directly via dfx to verify API functionality. 
 
 ## Running Tests
 
-### In Docker (like CI):
+### In Docker (recommended for local development):
 
-**Simple approach - use the automated script:**
+**Fast mode with volume mounting (default):**
 ```bash
-# Run everything (setup container, deploy realm, run tests, cleanup)
+# Uses volume mounting - instant test updates, no copying
+./scripts/run_integration_tests.sh
+
+# Or specify parameters:
 ./scripts/run_integration_tests.sh \
   "ghcr.io/smart-social-contracts/realms:latest" \
   "realms-test" \
-  10
+  10 \
+  true
 ```
+
+**Copy mode (like CI):**
+```bash
+# Copies tests into container - use when volume mounting doesn't work
+./scripts/run_integration_tests.sh \
+  "ghcr.io/smart-social-contracts/realms:latest" \
+  "realms-test" \
+  10 \
+  false
+```
+
+**Parameters:**
+1. Docker image (default: `ghcr.io/smart-social-contracts/realms:latest`)
+2. Container name (default: `realms-api-test`)
+3. Number of citizens (default: `10`)
+4. Use volume mounts (default: `true` for local, `false` for CI)
 
 **Manual approach:**
 ```bash
@@ -103,11 +123,17 @@ The script:
 1. Starts a Docker container with the test image
 2. Deploys a realm inside the container (`realms create && realms deploy`)
 3. Keeps the container running with `sleep infinity`
-4. **Copies test files** from host into container (`docker cp tests/integration`)
+4. **Mounts or copies test files**:
+   - **Local dev (default)**: Uses volume mounting (`-v $(pwd)/tests:/app/tests:ro`) for instant updates
+   - **CI mode**: Copies test files (`docker cp tests/integration`) after container starts
 5. Executes tests via `docker exec`
 6. Collects logs and cleans up
 
-**Note:** The script automatically copies test files from your local directory into the container, so tests don't need to be baked into the Docker image.
+**Benefits of volume mounting (local dev):**
+- ✅ **Instant test updates** - edit test files and re-run immediately
+- ✅ **No copying overhead** - tests are always in sync
+- ✅ **Faster iteration** - perfect for TDD workflow
+- ✅ **Saves CI time** - CI uses copy mode to avoid Docker-in-Docker volume issues
 
 See `.github/workflows/ci-main.yml` for the full workflow.
 

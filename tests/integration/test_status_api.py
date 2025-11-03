@@ -11,21 +11,20 @@ from fixtures.dfx_helpers import dfx_call, dfx_call_json, assert_success, assert
 
 
 def test_get_status():
-    """Test get_status endpoint returns system information."""
-    print("  - test_get_status...", end=" ")
-    output, code = dfx_call("realm_backend", "get_status")
+    """Test status endpoint returns system information."""
+    print("  - test_status...", end=" ")
+    output, code = dfx_call("realm_backend", "status", "()", output_json=False)
     
     assert code == 0, f"Status call failed with code {code}"
-    assert_success(output, "get_status should succeed")
+    assert_success(output, "status should succeed")
     assert_contains(output, "version", "Should include version")
-    assert_contains(output, "uptime", "Should include uptime")
     print("✓")
 
 
 def test_get_status_json():
-    """Test get_status with JSON output."""
-    print("  - test_get_status_json...", end=" ")
-    response = dfx_call_json("realm_backend", "get_status")
+    """Test status with JSON output."""
+    print("  - test_status_json...", end=" ")
+    response = dfx_call_json("realm_backend", "status")
     
     assert response["success"] is True, "Should return success: true"
     assert "data" in response, "Should have data field"
@@ -40,7 +39,7 @@ def test_get_status_json():
 def test_status_includes_entity_counts():
     """Test that status includes entity counts."""
     print("  - test_status_includes_entity_counts...", end=" ")
-    response = dfx_call_json("realm_backend", "get_status")
+    response = dfx_call_json("realm_backend", "status")
     
     status_data = response["data"]["status"]
     

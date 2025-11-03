@@ -20,7 +20,10 @@ def dfx_call(
     Returns:
         Tuple of (stdout, exit_code)
     """
-    cmd = ["dfx", "canister", "call", canister, method, args]
+    cmd = ["dfx", "canister", "call", canister, method]
+    if args:
+        cmd.append(args)
+    cmd.append("--query")  # Most realm_backend methods are queries
     if output_json:
         cmd.extend(["--output", "json"])
     

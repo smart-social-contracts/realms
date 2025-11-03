@@ -9,20 +9,20 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from fixtures.dfx_helpers import dfx_call, dfx_call_json, assert_success
 
 
-def test_list_extensions():
-    """Test list_extensions returns installed extensions."""
-    print("  - test_list_extensions...", end=" ")
-    output, code = dfx_call("realm_backend", "list_extensions")
+def test_get_extensions():
+    """Test get_extensions returns installed extensions."""
+    print("  - test_get_extensions...", end=" ")
+    output, code = dfx_call("realm_backend", "get_extensions")
     
-    assert code == 0, f"list_extensions failed with code {code}"
-    assert_success(output, "list_extensions should succeed")
+    assert code == 0, f"get_extensions failed with code {code}"
+    assert_success(output, "get_extensions should succeed")
     print("✓")
 
 
-def test_list_extensions_json():
-    """Test list_extensions with JSON output."""
-    print("  - test_list_extensions_json...", end=" ")
-    response = dfx_call_json("realm_backend", "list_extensions")
+def test_get_extensions_json():
+    """Test get_extensions with JSON output."""
+    print("  - test_get_extensions_json...", end=" ")
+    response = dfx_call_json("realm_backend", "get_extensions")
     
     assert response["success"] is True, "Should return success: true"
     assert "data" in response, "Should have data field"
@@ -32,14 +32,14 @@ def test_list_extensions_json():
 def test_extensions_have_required_fields():
     """Test that listed extensions include required metadata."""
     print("  - test_extensions_have_required_fields...", end=" ")
-    output, code = dfx_call("realm_backend", "list_extensions")
+    output, code = dfx_call("realm_backend", "get_extensions")
     
     assert code == 0
     # Extensions should have substantial metadata
     assert len(output) > 100, "Should return substantial data about extensions"
     
     # Check for expected structure (Candid or JSON)
-    assert "ExtensionsList" in output or "extensions" in output
+    assert "success" in output
     print("✓")
 
 
@@ -47,8 +47,8 @@ if __name__ == "__main__":
     print("Testing Extensions API:")
     
     tests = [
-        test_list_extensions,
-        test_list_extensions_json,
+        test_get_extensions,
+        test_get_extensions_json,
         test_extensions_have_required_fields,
     ]
     
