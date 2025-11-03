@@ -213,6 +213,20 @@ jobs:
           path: integration-test-logs/
           retention-days: 7
 
+  test-realm-registry:
+    runs-on: ubuntu-latest
+    needs: build
+    if: "!contains(github.event.head_commit.message, 'Bump version')"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Run realm registry tests
+        run: |
+          docker run --rm \
+            ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }} \
+            python3 tests/backend/test_realm_registry.py
+
   test-ui-e2e:
     runs-on: ubuntu-latest
     needs: build
