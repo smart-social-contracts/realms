@@ -89,7 +89,7 @@
   
   async function createPassportIdentity(verificationData: any) {
     try {
-      const response = await backend.extension_async_call({
+      const response = await backend.extension_sync_call({
         extension_name: "passport_verification",
         function_name: "create_passport_identity",
         args: JSON.stringify(verificationData)

@@ -120,8 +120,7 @@ def check_verification_status(args: str) -> Async[str]:
     )
 
 
-@update
-def create_passport_identity(args: str) -> Async[str]:
+def create_passport_identity(args: str) -> str:
     """Create passport identity after successful verification"""
     try:
         session_id = get_session_id(args)
@@ -147,7 +146,7 @@ def create_passport_identity(args: str) -> Async[str]:
             "success": True,
             "session_id": session_id,
             "identity_created": True,
-            "timestamp": ic.time(),
+            "timestamp": str(ic.time()),
             "verification_data": verification_data,
         }
 
@@ -161,4 +160,5 @@ def create_passport_identity(args: str) -> Async[str]:
         import traceback
 
         logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            
         return json.dumps({"success": False, "error": str(e)})
