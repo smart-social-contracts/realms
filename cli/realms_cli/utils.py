@@ -358,6 +358,12 @@ def run_command(
 
 def check_dependencies() -> bool:
     """Check if required dependencies are available."""
+    # In Docker mode, all dependencies are in the container
+    if not is_repo_mode():
+        console.print("  ℹ️  Running in Docker mode - dependencies available in container")
+        return True
+    
+    # Only check dependencies in repo mode
     required_tools = ["dfx", "npm", "python3"]
     missing_tools = []
 

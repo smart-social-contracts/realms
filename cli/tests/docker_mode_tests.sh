@@ -74,10 +74,19 @@ if [ -d "scripts" ]; then
 fi
 echo ""
 
-echo "🧪 Test 6: Test status command"
-# Status command checks project structure
-realms status || echo "  ℹ️  Status command executed (may show warnings if not fully deployed)"
-echo "✅ Status command works"
+echo "🧪 Test 6: Test status command (no dependency errors in Docker mode)"
+# Status command should not complain about missing dfx/npm in Docker mode
+output=$(realms status 2>&1)
+echo "$output"
+
+if echo "$output" | grep -q "Missing required dependencies"; then
+    echo "❌ Status command complains about missing dependencies (should skip check in Docker mode)"
+    exit 1
+elif echo "$output" | grep -q "Running in Docker mode - dependencies available in container"; then
+    echo "✅ Status command correctly detects Docker mode and skips host dependency checks"
+else
+    echo "✅ Status command works without dependency errors"
+fi
 echo ""
 
 echo "🧪 Test 7: Test deploy command accessibility"
@@ -96,8 +105,9 @@ echo ""
 echo "Summary:"
 echo "  ✅ realms-cli installs from pip"
 echo "  ✅ Correctly detects Docker mode"
+echo "  ✅ No host dependencies required (dfx/npm/etc.)"
 echo "  ✅ CLI commands are accessible"
 echo "  ✅ Realm creation with demo data works"
 echo "  ✅ Generated files verified"
-echo "  ✅ Status command works"
+echo "  ✅ Status command works without errors"
 echo "  ✅ Deploy command available"

@@ -14,6 +14,8 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.history import InMemoryHistory
 from rich.console import Console
 
+from ..utils import is_repo_mode
+
 console = Console()
 
 
@@ -294,14 +296,15 @@ def run_command(
 
     console.print("[bold blue]🚀 Starting Realms Interactive Console[/bold blue]\n")
 
-    # Check if dfx is available
-    try:
-        subprocess.run(["dfx", "--version"], capture_output=True, check=True)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        console.print(
-            "[red]❌ dfx not found. Please install dfx and ensure it's in your PATH.[/red]"
-        )
-        raise typer.Exit(1)
+    # Check if dfx is available (only in repo mode - in Docker mode it's in the container)
+    if is_repo_mode():
+        try:
+            subprocess.run(["dfx", "--version"], capture_output=True, check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            console.print(
+                "[red]❌ dfx not found. Please install dfx and ensure it's in your PATH.[/red]"
+            )
+            raise typer.Exit(1)
 
     # Check if dfx replica is running (for local network)
     if not network or network == "local":
