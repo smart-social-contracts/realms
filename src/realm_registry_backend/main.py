@@ -43,7 +43,8 @@ from kybra import (
 from kybra_simple_db import Database
 from kybra_simple_logging import get_logger
 
-# Storage for realm records
+# Storage for the ORM (used internally by Database class)
+# Direct storage access is not needed - use Entity classes instead
 storage = StableBTreeMap[str, str](memory_id=1, max_key_size=100, max_value_size=2000)
 Database.init(db_storage=storage, audit_enabled=True)
 
@@ -60,7 +61,7 @@ def init_canister() -> void:
 def list_realms() -> Vec[RealmRecord]:
     """List all registered realms"""
     try:
-        realms_data = list_registered_realms(storage)
+        realms_data = list_registered_realms()
         return realms_data
     except Exception as e:
         logger.error(f"Error in list_realms: {str(e)}")
@@ -71,7 +72,7 @@ def list_realms() -> Vec[RealmRecord]:
 def add_realm(realm_id: text, name: text, url: text) -> AddRealmResult:
     """Add a new realm to the registry"""
     try:
-        result = add_registered_realm(storage, realm_id, name, url)
+        result = add_registered_realm(realm_id, name, url)
         if result["success"]:
             return {"Ok": result["message"]}
         else:
@@ -85,7 +86,7 @@ def add_realm(realm_id: text, name: text, url: text) -> AddRealmResult:
 def get_realm(realm_id: text) -> GetRealmResult:
     """Get a specific realm by ID"""
     try:
-        result = get_registered_realm(storage, realm_id)
+        result = get_registered_realm(realm_id)
         if result["success"]:
             return {"Ok": result["realm"]}
         else:
@@ -99,7 +100,7 @@ def get_realm(realm_id: text) -> GetRealmResult:
 def remove_realm(realm_id: text) -> AddRealmResult:
     """Remove a realm from the registry"""
     try:
-        result = remove_registered_realm(storage, realm_id)
+        result = remove_registered_realm(realm_id)
         if result["success"]:
             return {"Ok": result["message"]}
         else:
@@ -113,7 +114,7 @@ def remove_realm(realm_id: text) -> AddRealmResult:
 def search_realms(query: text) -> Vec[RealmRecord]:
     """Search realms by name or ID"""
     try:
-        results = search_registered_realms(storage, query)
+        results = search_registered_realms(query)
         return results
     except Exception as e:
         logger.error(f"Error in search_realms: {str(e)}")
@@ -124,7 +125,7 @@ def search_realms(query: text) -> Vec[RealmRecord]:
 def realm_count() -> nat64:
     """Get the total number of registered realms"""
     try:
-        count = count_registered_realms(storage)
+        count = count_registered_realms()
         return nat64(count)
     except Exception as e:
         logger.error(f"Error in realm_count: {str(e)}")

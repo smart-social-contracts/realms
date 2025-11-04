@@ -1,25 +1,22 @@
 """Registry API functions for managing realm registrations."""
 
-import json
-import time
 from typing import List, Optional
 
 from kybra import ic
 from kybra_simple_logging import get_logger
+from realm_registry_backend.core.models import RealmRecord
 
 logger = get_logger("registry")
 
 
-def list_registered_realms(storage) -> List[dict]:
+def list_registered_realms() -> List[dict]:
     """List all registered realms"""
     logger.info("Listing all registered realms")
 
     try:
-        realms_list = []
-        for key, value in storage.items():
-            if key.startswith("realm_"):
-                realm_data = json.loads(value)
-                realms_list.append(realm_data)
+        # Load all realm records using ORM
+        realms = RealmRecord.instances()
+        realms_list = [realm.to_dict() for realm in realms]
 
         # Sort by created_at timestamp (newest first)
         realms_list.sort(key=lambda r: r.get("created_at", 0), reverse=True)
@@ -31,7 +28,7 @@ def list_registered_realms(storage) -> List[dict]:
         return []
 
 
-def add_registered_realm(storage, realm_id: str, name: str, url: str = "") -> dict:
+def add_registered_realm(realm_id: str, name: str, url: str = "") -> dict:
     """Add a new realm to the registry"""
     logger.info(f"Adding realm to registry: {realm_id}")
 
@@ -44,26 +41,20 @@ def add_registered_realm(storage, realm_id: str, name: str, url: str = "") -> di
             return {"success": False, "error": "Realm name cannot be empty"}
 
         # Check if realm already exists
-        realm_key = f"realm_{realm_id}"
-        existing_realm = storage.get(realm_key)
+        existing_realm = RealmRecord[realm_id.strip()]
         if existing_realm is not None:
             return {
                 "success": False,
                 "error": f"Realm with ID '{realm_id}' already exists",
             }
 
-        # Create the realm record
-        realm_record = {
-            "id": realm_id,
-            "name": name.strip(),
-            "url": url.strip() if url else "",
-            "created_at": float(
-                ic.time() / 1_000_000_000
-            ),  # Convert nanoseconds to seconds
-        }
-
-        # Store the realm
-        storage.insert(realm_key, json.dumps(realm_record))
+        # Create realm record using ORM (auto-saves on creation)
+        realm = RealmRecord(
+            id=realm_id.strip(),
+            name=name.strip(),
+            url=url.strip() if url else "",
+            created_at=float(ic.time() / 1_000_000_000),  # Convert nanoseconds to seconds
+        )
 
         logger.info(f"Successfully added realm: {realm_id} - {name}")
         return {"success": True, "message": f"Realm '{realm_id}' added successfully"}
@@ -73,35 +64,35 @@ def add_registered_realm(storage, realm_id: str, name: str, url: str = "") -> di
         return {"success": False, "error": f"Failed to add realm: {str(e)}"}
 
 
-def get_registered_realm(storage, realm_id: str) -> dict:
+def get_registered_realm(realm_id: str) -> dict:
     """Get a specific realm by ID"""
     logger.info(f"Getting realm: {realm_id}")
 
     try:
-        realm_key = f"realm_{realm_id}"
-        realm_data = storage.get(realm_key)
-        if realm_data is None:
+        # Load realm using ORM
+        realm = RealmRecord[realm_id]
+        if realm is None:
             return {"success": False, "error": f"Realm with ID '{realm_id}' not found"}
 
-        realm = json.loads(realm_data)
-        return {"success": True, "realm": realm}
+        return {"success": True, "realm": realm.to_dict()}
 
     except Exception as e:
         logger.error(f"Error getting realm {realm_id}: {str(e)}")
         return {"success": False, "error": f"Failed to get realm: {str(e)}"}
 
 
-def remove_registered_realm(storage, realm_id: str) -> dict:
+def remove_registered_realm(realm_id: str) -> dict:
     """Remove a realm from the registry"""
     logger.info(f"Removing realm: {realm_id}")
 
     try:
-        realm_key = f"realm_{realm_id}"
-        existing_realm = storage.get(realm_key)
+        # Load realm using ORM
+        existing_realm = RealmRecord[realm_id]
         if existing_realm is None:
             return {"success": False, "error": f"Realm with ID '{realm_id}' not found"}
 
-        storage.remove(realm_key)
+        # Delete using ORM
+        existing_realm.delete()
         logger.info(f"Successfully removed realm: {realm_id}")
         return {"success": True, "message": f"Realm '{realm_id}' removed successfully"}
 
@@ -110,25 +101,25 @@ def remove_registered_realm(storage, realm_id: str) -> dict:
         return {"success": False, "error": f"Failed to remove realm: {str(e)}"}
 
 
-def search_registered_realms(storage, query: str) -> List[dict]:
+def search_registered_realms(query: str) -> List[dict]:
     """Search realms by name or ID (case-insensitive)"""
     logger.info(f"Searching realms with query: {query}")
 
     try:
         if not query or not query.strip():
-            return list_registered_realms(storage)
+            return list_registered_realms()
 
         query_lower = query.lower().strip()
         matching_realms = []
 
-        for key, value in storage.items():
-            if key.startswith("realm_"):
-                realm_data = json.loads(value)
-                if (
-                    query_lower in realm_data["id"].lower()
-                    or query_lower in realm_data["name"].lower()
-                ):
-                    matching_realms.append(realm_data)
+        # Load all realms using ORM
+        all_realms = RealmRecord.instances()
+        for realm in all_realms:
+            if (
+                query_lower in realm.id.lower()
+                or query_lower in realm.name.lower()
+            ):
+                matching_realms.append(realm.to_dict())
 
         # Sort by created_at timestamp (newest first)
         matching_realms.sort(key=lambda r: r.get("created_at", 0), reverse=True)
@@ -141,15 +132,13 @@ def search_registered_realms(storage, query: str) -> List[dict]:
         return []
 
 
-def count_registered_realms(storage) -> int:
+def count_registered_realms() -> int:
     """Get the total number of registered realms"""
     logger.info("Getting realm count")
 
     try:
-        count = 0
-        for key in storage.keys():
-            if key.startswith("realm_"):
-                count += 1
+        # Count all realms using ORM
+        count = len(list(RealmRecord.instances()))
         logger.info(f"Total registered realms: {count}")
         return count
 
