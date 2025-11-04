@@ -24,25 +24,10 @@
 
 	let greeting = '';
 
-	// Mock data for charts
-	const mockUserData = [
-		['01 Jan', '03 Jan', '05 Jan', '07 Jan', '09 Jan', '11 Jan', '13 Jan', '15 Jan', '17 Jan', '19 Jan', '21 Jan'],
-		[120, 145, 160, 175, 185, 190, 210, 250, 290, 310, 350]
-	];
-	
-	const mockOrgData = [
-		['01 Jan', '03 Jan', '05 Jan', '07 Jan', '09 Jan', '11 Jan', '13 Jan', '15 Jan', '17 Jan', '19 Jan', '21 Jan'],
-		[5, 5, 6, 6, 7, 8, 8, 9, 10, 12, 15]
-	];
-	
-	const mockAssetData = [
-		['01 Jan', '03 Jan', '05 Jan', '07 Jan', '09 Jan', '11 Jan', '13 Jan', '15 Jan', '17 Jan', '19 Jan', '21 Jan'],
-		[22000000, 22200000, 22500000, 22800000, 23000000, 23400000, 23800000, 24000000, 24500000, 24800000, 25000000]
-	];
-
-	const statsDatesValues = writable<[string[], number[]]>(mockUserData);
-	const orgsDatesValues = writable<[string[], number[]]>(mockOrgData);
-	const assetsDatesValues = writable<[string[], number[]]>(mockAssetData);
+	// Initialize with empty data
+	const statsDatesValues = writable<[string[], number[]]>([[], []]);
+	const orgsDatesValues = writable<[string[], number[]]>([[], []]);
+	const assetsDatesValues = writable<[string[], number[]]>([[], []]);
 
 	function onSubmit(event) {
 		const name = event.target.name.value;

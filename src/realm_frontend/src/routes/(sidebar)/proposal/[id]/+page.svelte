@@ -47,78 +47,6 @@
     return 'Invalid date';
   }
 
-  // Generate mock Python codex using ggg module
-  function generateMockCodex() {
-    return `# Governance Codex - Budget Allocation Proposal
-from ggg import Realm, Treasury, Mandate, Task, Transfer
-from ggg.instruments import Token, Vault
-from ggg.governance import Proposal, Vote
-
-def execute_budget_allocation(realm: Realm, amount: int):
-    """
-    Execute budget allocation for community development fund
-    """
-    treasury = realm.get_treasury()
-    community_vault = treasury.get_vault("community_development")
-    
-    # Create mandate for budget allocation
-    mandate = Mandate(
-        title="Community Development Budget Q1 2024",
-        description="Allocate 50,000 tokens for community initiatives",
-        realm_id=realm.id
-    )
-    
-    # Create transfer task
-    task = Task(
-        mandate_id=mandate.id,
-        task_type="transfer",
-        parameters={
-            "from_vault": "treasury_main",
-            "to_vault": "community_development", 
-            "amount": amount,
-            "token_type": "REALM"
-        }
-    )
-    
-    # Execute transfer if proposal passes
-    if task.execute():
-        return Transfer(
-            from_vault=treasury.main_vault,
-            to_vault=community_vault,
-            amount=amount,
-            status="completed"
-        )
-    
-    return None`;
-  }
-
-  // Generate mock AI assistant opinions
-  function generateMockAIOpinions() {
-    return [
-      {
-        assistant: "Ashoka",
-        opinion: "This proposal demonstrates strong fiscal responsibility with clear allocation targets. The 50,000 token budget for community development aligns with historical spending patterns and projected growth needs.",
-        sentiment: "positive",
-        confidence: 0.87,
-        key_points: [
-          "Budget amount is within reasonable bounds (2.5% of treasury)",
-          "Clear execution mechanism with proper vault management",
-          "Transparent reporting requirements included"
-        ]
-      },
-      {
-        assistant: "Minerva", 
-        opinion: "While the proposal has merit, I recommend adding more specific milestones and success metrics. The current framework lacks measurable outcomes for community impact assessment.",
-        sentiment: "neutral",
-        confidence: 0.73,
-        key_points: [
-          "Missing quantitative success metrics",
-          "Timeline could be more granular",
-          "Consider adding quarterly review checkpoints"
-        ]
-      }
-    ];
-  }
 
   // Calculate provisional result based on current votes
   function calculateProvisionalResult(proposal) {
@@ -261,36 +189,6 @@ def execute_budget_allocation(realm: Realm, amount: int):
   $: quorumNeeded = quorumRequired - 
     (voteStats.approvalCount + voteStats.rejectionCount);
 
-  // Generate complete mock proposal data
-  function generateMockProposal(proposalId) {
-    const now = new Date();
-    const deadline = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000)); // 7 days from now
-    const created = new Date(now.getTime() - (3 * 24 * 60 * 60 * 1000)); // 3 days ago
-    
-    return {
-      id: proposalId,
-      title: 'Community Development Budget Allocation Q1 2024',
-      description: 'This proposal requests allocation of 50,000 REALM tokens from the treasury for community development initiatives including developer grants, educational programs, and infrastructure improvements. The budget will be managed by the Community Council with quarterly reporting requirements.',
-      status: 'Voting',
-      vote_counts: {
-        Yay: 1247,
-        Nay: 423,
-        Abstain: 156,
-        Null: 89
-      },
-      tokens_total: 2500,
-      quorum: 40,
-      timestamp_created: created.getTime(),
-      deadline: deadline.getTime(),
-      extension_code: {
-        source_code: generateMockCodex()
-      },
-      author: 'alice@example.com',
-      forum_url: 'https://forum.realm.gov/proposals/' + proposalId,
-      discussion_url: 'https://discourse.realm.gov/t/proposal-' + proposalId,
-      ai_opinions: generateMockAIOpinions()
-    };
-  }
 
   async function loadProposalData() {
     if (!id) {
@@ -304,18 +202,8 @@ def execute_budget_allocation(realm: Realm, amount: int):
       console.log('Proposal data:', proposal);
       
       if (!proposal) {
-        console.log('No proposal found, using mock data');
-        // Use mock data when proposal not found
-        const mockProposal = generateMockProposal(id);
-        proposalData = {
-          ...mockProposal,
-          created_formatted: formatTimestamp(mockProposal.timestamp_created),
-          deadline_formatted: formatTimestamp(mockProposal.deadline),
-          time_remaining: getTimeRemaining(mockProposal.deadline),
-          source_code: mockProposal.extension_code.source_code,
-          provisional_result: calculateProvisionalResult(mockProposal),
-          detailed_status: getDetailedStatus(mockProposal)
-        };
+        console.log('No proposal found');
+        error = 'Proposal not found';
         return;
       }
       
@@ -327,35 +215,20 @@ def execute_budget_allocation(realm: Realm, amount: int):
         created_formatted: formatTimestamp(proposal.timestamp_created),
         deadline_formatted: formatTimestamp(proposal.deadline),
         time_remaining: getTimeRemaining(proposal.deadline),
-        source_code: proposal.extension_code?.source_code || generateMockCodex(),
-        // Mock data for new fields
-        author: proposal.author || 'alice@example.com',
-        forum_url: proposal.forum_url || 'https://forum.realm.gov/proposals/' + id,
-        discussion_url: proposal.discussion_url || 'https://discourse.realm.gov/t/proposal-' + id,
-        ai_opinions: proposal.ai_opinions || generateMockAIOpinions(),
+        source_code: proposal.extension_code?.source_code || '',
+        author: proposal.author || '',
+        forum_url: proposal.forum_url || '',
+        discussion_url: proposal.discussion_url || '',
+        ai_opinions: proposal.ai_opinions || [],
         provisional_result: calculateProvisionalResult(proposal),
         detailed_status: getDetailedStatus(proposal)
       };
       
       console.log('Processed proposal data:', proposalData);
     } catch (err) {
-      console.error('Error loading proposal data:', err);
-      console.log('Backend unavailable, using mock data for demonstration');
-      
-      // Fallback to mock data when backend is unavailable
-      const mockProposal = generateMockProposal(id);
-      proposalData = {
-        ...mockProposal,
-        created_formatted: formatTimestamp(mockProposal.timestamp_created),
-        deadline_formatted: formatTimestamp(mockProposal.deadline),
-        time_remaining: getTimeRemaining(mockProposal.deadline),
-        source_code: mockProposal.extension_code.source_code,
-        provisional_result: calculateProvisionalResult(mockProposal),
-        detailed_status: getDetailedStatus(mockProposal)
-      };
-      
-      // Clear error since we're showing mock data
-      error = null;
+      error = err instanceof Error ? err.message : 'Failed to load proposal';
+      console.error('Error loading proposal:', err);
+      proposalData = null;
     }
   }
 

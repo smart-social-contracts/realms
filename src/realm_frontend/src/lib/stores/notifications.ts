@@ -23,45 +23,15 @@ export async function loadNotifications() {
             function_name: 'get_notifications',
             args: '{}'
         });
-        const notificationData = JSON.parse(response);
+        // Response might already be parsed by IC Candid, check type
+        const notificationData = typeof response === 'string' ? JSON.parse(response) : response;
         notifications.set(notificationData.notifications || []);
         unreadCount.set(notificationData.unread_count || 0);
     } catch (error) {
         console.error('Failed to load notifications:', error);
-        const sampleNotifications = [
-            {
-                id: '1',
-                title: 'Welcome to Realms',
-                message: 'Your account has been successfully created and verified.',
-                timestamp: 'a few moments ago',
-                read: false,
-                icon: 'users',
-                href: '/dashboard',
-                color: 'green'
-            },
-            {
-                id: '2',
-                title: 'New Task Assignment',
-                message: 'You have been assigned a new governance task that requires your attention.',
-                timestamp: '10 minutes ago',
-                read: false,
-                icon: 'clipboard',
-                href: '/ggg',
-                color: 'blue'
-            },
-            {
-                id: '3',
-                title: 'Vault Transaction',
-                message: 'A transfer of 100 tokens has been completed successfully.',
-                timestamp: '1 hour ago',
-                read: true,
-                icon: 'wallet',
-                href: '/extensions/vault',
-                color: 'purple'
-            }
-        ];
-        notifications.set(sampleNotifications);
-        unreadCount.set(sampleNotifications.filter(n => !n.read).length);
+        // Set empty data on error
+        notifications.set([]);
+        unreadCount.set(0);
     }
 }
 

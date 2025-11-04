@@ -19,11 +19,8 @@
 
 	let organizationData = null;
 
-	// Dummy token prices in USD for demonstration
-	const dummyPrices: Record<string, number> = {
-		'BTC': 43000,
-		'ETH': 2300,
-		'USDT': 1,
+	// Token prices would come from an oracle or price feed
+	const tokenPrices: Record<string, number> = {
 		'USDC': 1,
 		'DAI': 1,
 		'BNB': 320,
@@ -153,8 +150,8 @@
 
 					console.log(`Total balance for ${symbol}:`, totalBalance);
 
-					// Use dummy price from our mapping, or default price if not found
-					const price = dummyPrices[symbol] || DEFAULT_PRICE;
+					// Use price from mapping, or default price if not found
+					const price = tokenPrices[symbol] || DEFAULT_PRICE;
 					const value = totalBalance * price;
 
 					console.log(`Calculated value for ${symbol}: ${value} (price: ${price})`);

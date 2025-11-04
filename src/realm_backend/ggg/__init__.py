@@ -15,12 +15,15 @@ from .instrument import Instrument
 from .land import Land, LandType
 from .license import License
 from .mandate import Mandate
+from .notification import Notification
 from .organization import Organization
 from .permission import Permission
 from .proposal import Proposal
 from .realm import Realm
+from .service import Service
 from .task import Task
 from .task_schedule import TaskSchedule
+from .tax_record import TaxRecord
 from .trade import Trade
 from .balance import Balance
 from .transfer import Transfer
@@ -39,12 +42,15 @@ __all__ = [
     "Balance",
     "License",
     "Mandate",
+    "Notification",
     "Organization",
     "Permission",
     "Proposal",
     "Realm",
+    "Service",
     "Task",
     "TaskSchedule",
+    "TaxRecord",
     "Trade",
     "User",
     "UserProfile",
