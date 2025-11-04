@@ -19,6 +19,8 @@ class User(Entity, TimestampedMixin):
     profiles = ManyToMany(["UserProfile"], "users")
     human = OneToOne("Human", "user")
     citizen = OneToOne("Citizen", "user")
+    proposals = OneToMany("Proposal", "proposer")
+    votes = OneToMany("Vote", "voter")
     # transfers_from = OneToMany("Transfer", "from_user")
     # transfers_to = OneToMany("Transfer", "to_user")
     # trades_a = OneToMany("Trade", "user_a")

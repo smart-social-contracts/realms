@@ -1,5 +1,6 @@
 """Create command for generating new realms with demo data and deployment scripts."""
 
+import json
 import shutil
 import subprocess
 import sys
@@ -57,6 +58,16 @@ def create_command(
     # Create scripts subdirectory
     scripts_dir = output_path / "scripts"
     scripts_dir.mkdir(exist_ok=True)
+
+    # Create realm manifest file
+    manifest_path = output_path / "manifest.json"
+    manifest_data = {
+        "name": realm_name
+    }
+    with open(manifest_path, "w") as f:
+        json.dump(manifest_data, f, indent=2)
+        f.write("\n")  # Add trailing newline
+    console.print(f"📄 Created realm manifest: {manifest_path.absolute()}")
 
     console.print(f"📁 Output directory: {output_path.absolute()}")
     console.print(f"📁 Scripts directory: {scripts_dir.absolute()}")
@@ -249,6 +260,34 @@ for codex_file in *_codex.py; do
         $REALMS_CMD "$codex_file" --type codex
     fi
 done
+
+# Automatically discover and import extension data files
+echo "🔌 Discovering extension data files..."
+EXTENSION_DATA_COUNT=0
+
+# Look for data files in extensions/*/data/*.json
+if [ -d "../extensions" ]; then
+    for extension_dir in ../extensions/*/; do
+        if [ -d "${extension_dir}data" ]; then
+            extension_name=$(basename "$extension_dir")
+            echo "  Checking extension: $extension_name"
+            
+            for data_file in "${extension_dir}data/"*.json; do
+                if [ -f "$data_file" ]; then
+                    echo "    📥 Importing $(basename "$data_file")..."
+                    $REALMS_CMD "$data_file"
+                    EXTENSION_DATA_COUNT=$((EXTENSION_DATA_COUNT + 1))
+                fi
+            done
+        fi
+    done
+fi
+
+if [ $EXTENSION_DATA_COUNT -eq 0 ]; then
+    echo "  ℹ️  No extension data files found"
+else
+    echo "  ✅ Imported $EXTENSION_DATA_COUNT extension data file(s)"
+fi
 
 echo "✅ Data upload completed!"
 """
