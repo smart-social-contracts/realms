@@ -10,8 +10,11 @@ import sys
 import time
 from unittest.mock import MagicMock, patch
 
-# Add the src directory to the path
+# Add paths to match Kybra's import resolution
+# Add src for realm_registry_backend package imports
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../src"))
+# Add realm_registry_backend for top-level 'core' and 'api' imports (matching canister environment)
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../src/realm_registry_backend"))
 
 # Mock the ic module before importing registry functions
 import kybra

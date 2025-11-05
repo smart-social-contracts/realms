@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from kybra import ic
 from kybra_simple_logging import get_logger
-from ..core.models import RealmRecord
+from core.models import RealmRecord
 
 logger = get_logger("registry")
 
