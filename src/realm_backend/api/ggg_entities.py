@@ -2,6 +2,7 @@ import math
 import traceback
 from typing import Any, Dict, List, Optional
 
+from ggg.balance import Balance
 from ggg.codex import Codex
 from ggg.dispute import Dispute
 from ggg.human import Human
