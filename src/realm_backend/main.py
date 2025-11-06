@@ -141,6 +141,12 @@ def get_my_principal() -> text:
 
 
 @query
+def get_canister_id() -> text:
+    """Return this canister's principal ID"""
+    return ic.id().to_str()
+
+
+@query
 def get_my_user_status() -> RealmResponse:
     try:
         user = user_get(ic.caller().to_str())
