@@ -213,14 +213,26 @@ class TaskManager:
 
                         should_execute = False
 
-                        # Execute if run_at is not set or is in the past
-                        if not schedule.run_at or schedule.run_at < now:
-                            should_execute = True
-
-                        # Execute if repeat_every is set and it's time for another run
-                        if schedule.last_run_at and schedule.repeat_every:
-                            if schedule.last_run_at + schedule.repeat_every < now:
+                        # Determine if task should execute based on run_at and repeat_every
+                        if schedule.run_at and schedule.run_at > now:
+                            # Future scheduled time - don't execute yet
+                            should_execute = False
+                        elif schedule.run_at and schedule.run_at <= now:
+                            # Past or current time - execute if not already run
+                            if not schedule.last_run_at or schedule.last_run_at == 0:
                                 should_execute = True
+                        elif not schedule.run_at or schedule.run_at == 0:
+                            # No specific run time - check if it should run immediately
+                            if not schedule.last_run_at or schedule.last_run_at == 0:
+                                # Never run before - execute immediately
+                                should_execute = True
+
+                        # Check if it's time for a recurring execution
+                        if schedule.repeat_every and schedule.repeat_every > 0:
+                            if schedule.last_run_at and schedule.last_run_at > 0:
+                                # Already run at least once - check if interval has passed
+                                if now >= schedule.last_run_at + schedule.repeat_every:
+                                    should_execute = True
 
                         if should_execute:
                             logger.info(
