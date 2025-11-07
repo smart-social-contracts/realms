@@ -192,6 +192,17 @@ class TaskManager:
             else:
                 logger.info(f"Task {task.name} completed all steps")
                 task.status = TaskStatus.COMPLETED.value
+                
+                # Check if this is a recurring task and reset it
+                for schedule in task.schedules:
+                    if schedule.repeat_every and schedule.repeat_every > 0:
+                        logger.info(f"Task {task.name} is recurring, resetting for next execution")
+                        task.status = TaskStatus.PENDING.value
+                        task.step_to_execute = 0
+                        # Reset all step statuses
+                        for step in task.steps:
+                            step.status = TaskStatus.PENDING.value
+                        break
         except Exception as e:
             logger.error(
                 f"Error checking next step for task {task.name}: {traceback.format_exc()}"
@@ -239,9 +250,12 @@ class TaskManager:
                                 f"Scheduling task {task.name} for immediate execution"
                             )
                             schedule.last_run_at = now
-                            step = list(task.steps)[
-                                task.step_to_execute
-                            ]  # TODO: fix this
+                            # Get first step (step_to_execute should be 0 at start)
+                            if task.step_to_execute >= len(task.steps):
+                                logger.error(f"Task {task.name} step_to_execute out of bounds")
+                                continue
+                            
+                            step = list(task.steps)[task.step_to_execute]
                             logger.info(
                                 f"Starting task {task.name} - executing step {task.step_to_execute}/{len(task.steps)}"
                             )

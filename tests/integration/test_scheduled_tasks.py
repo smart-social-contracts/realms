@@ -24,30 +24,39 @@ def test_create_scheduled_task():
     """Test creating a task scheduled for future execution."""
     print("  - test_create_scheduled_task...", end=" ")
     
-    # Create a codex with simple code
-    code = "result = 'scheduled task executed'"
-    create_codex_code = f'''from ggg import Codex
+    try:
+        # Create a codex with simple code
+        code = "result = 'scheduled task executed'"
+        create_codex_code = f'''from ggg import Codex
 codex = Codex(name="test_scheduled", code="{code}")
 result = codex._id'''
-    
-    escaped_code = create_codex_code.replace('"', '\\"').replace('\n', '\\n')
-    args = f'("{escaped_code}")'
-    
-    output, exit_code = dfx_call("realm_backend", "execute_code", args, is_update=True)
-    assert exit_code == 0, "Failed to create codex"
-    assert_contains(output, "task_id", "Should create task")
-    print("✓")
+        
+        escaped_code = create_codex_code.replace('"', '\\"').replace('\n', '\\n')
+        args = f'("{escaped_code}")'
+        
+        output, exit_code = dfx_call("realm_backend", "execute_code", args, is_update=True)
+        print(f"\n    [DEBUG] exit_code={exit_code}")
+        print(f"    [DEBUG] output={output[:200]}..." if len(output) > 200 else f"    [DEBUG] output={output}")
+        
+        assert exit_code == 0, f"Failed to create codex. Exit code: {exit_code}, Output: {output}"
+        assert_contains(output, "task_id", "Should create task")
+        print("    ✓")
+    except Exception as e:
+        print(f"\n    [ERROR] {str(e)}")
+        raise
 
 
 def test_task_with_future_run_at():
     """Test task scheduled to run at a specific future time."""
     print("  - test_task_with_future_run_at...", end=" ")
     
-    # Create a task scheduled for 5 seconds in the future
-    current_time = int(time.time())
-    future_time = current_time + 5
-    
-    code = f'''from ggg import Codex
+    try:
+        # Create a task scheduled for 5 seconds in the future
+        current_time = int(time.time())
+        future_time = current_time + 5
+        print(f"\n    [DEBUG] current_time={current_time}, future_time={future_time}")
+        
+        code = f'''from ggg import Codex
 from ggg.task import Task
 from ggg.task_schedule import TaskSchedule
 from core.task_manager import Call, TaskStep, TaskManager
@@ -73,21 +82,28 @@ schedule = TaskSchedule(
 )
 
 result = {{"task_id": task._id, "schedule_id": schedule._id}}'''
-    
-    escaped_code = code.replace('"', '\\"').replace('\n', '\\n')
-    args = f'("{escaped_code}")'
-    
-    output, exit_code = dfx_call("realm_backend", "execute_code", args, is_update=True)
-    assert exit_code == 0, "Failed to create scheduled task"
-    assert_contains(output, "task_id", "Should create task")
-    print("✓")
+        
+        escaped_code = code.replace('"', '\\"').replace('\n', '\\n')
+        args = f'("{escaped_code}")'
+        
+        output, exit_code = dfx_call("realm_backend", "execute_code", args, is_update=True)
+        print(f"    [DEBUG] exit_code={exit_code}")
+        print(f"    [DEBUG] output={output[:200]}..." if len(output) > 200 else f"    [DEBUG] output={output}")
+        
+        assert exit_code == 0, f"Failed to create scheduled task. Exit code: {exit_code}, Output: {output}"
+        assert_contains(output, "task_id", "Should create task")
+        print("    ✓")
+    except Exception as e:
+        print(f"\n    [ERROR] {str(e)}")
+        raise
 
 
 def test_recurring_task():
     """Test task that repeats every N seconds."""
     print("  - test_recurring_task...", end=" ")
     
-    code = '''from ggg import Codex
+    try:
+        code = '''from ggg import Codex
 from ggg.task import Task
 from ggg.task_schedule import TaskSchedule
 from core.task_manager import Call, TaskStep, TaskManager
@@ -113,21 +129,28 @@ schedule = TaskSchedule(
 )
 
 result = {"task_id": task._id, "schedule_id": schedule._id, "repeat_every": schedule.repeat_every}'''
-    
-    escaped_code = code.replace('"', '\\"').replace('\n', '\\n')
-    args = f'("{escaped_code}")'
-    
-    output, exit_code = dfx_call("realm_backend", "execute_code", args, is_update=True)
-    assert exit_code == 0, "Failed to create recurring task"
-    assert_contains(output, "task_id", "Should create task")
-    print("✓")
+        
+        escaped_code = code.replace('"', '\\"').replace('\n', '\\n')
+        args = f'("{escaped_code}")'
+        
+        output, exit_code = dfx_call("realm_backend", "execute_code", args, is_update=True)
+        print(f"\n    [DEBUG] exit_code={exit_code}")
+        print(f"    [DEBUG] output={output[:200]}..." if len(output) > 200 else f"    [DEBUG] output={output}")
+        
+        assert exit_code == 0, f"Failed to create recurring task. Exit code: {exit_code}, Output: {output}"
+        assert_contains(output, "task_id", "Should create task")
+        print("    ✓")
+    except Exception as e:
+        print(f"\n    [ERROR] {str(e)}")
+        raise
 
 
 def test_disabled_schedule():
     """Test that disabled schedules don't execute."""
     print("  - test_disabled_schedule...", end=" ")
     
-    code = '''from ggg import Codex
+    try:
+        code = '''from ggg import Codex
 from ggg.task import Task
 from ggg.task_schedule import TaskSchedule
 from core.task_manager import Call, TaskStep
@@ -154,20 +177,27 @@ schedule = TaskSchedule(
 
 result = {"task_id": task._id, "schedule_id": schedule._id, "disabled": schedule.disabled}'''
     
-    escaped_code = code.replace('"', '\\"').replace('\n', '\\n')
-    args = f'("{escaped_code}")'
-    
-    output, exit_code = dfx_call("realm_backend", "execute_code", args, is_update=True)
-    assert exit_code == 0, "Failed to create disabled schedule"
-    assert_contains(output, "disabled", "Should indicate schedule is disabled")
-    print("✓")
+        escaped_code = code.replace('"', '\\"').replace('\n', '\\n')
+        args = f'("{escaped_code}")'
+        
+        output, exit_code = dfx_call("realm_backend", "execute_code", args, is_update=True)
+        print(f"\n    [DEBUG] exit_code={exit_code}")
+        print(f"    [DEBUG] output={output[:200]}..." if len(output) > 200 else f"    [DEBUG] output={output}")
+        
+        assert exit_code == 0, f"Failed to create disabled schedule. Exit code: {exit_code}, Output: {output}"
+        assert_contains(output, "disabled", "Should indicate schedule is disabled")
+        print("    ✓")
+    except Exception as e:
+        print(f"\n    [ERROR] {str(e)}")
+        raise
 
 
 def test_multi_step_task():
     """Test task with multiple sequential steps."""
     print("  - test_multi_step_task...", end=" ")
     
-    code = '''from ggg import Codex
+    try:
+        code = '''from ggg import Codex
 from ggg.task import Task
 from ggg.task_schedule import TaskSchedule
 from core.task_manager import Call, TaskStep, TaskManager
@@ -202,21 +232,28 @@ schedule = TaskSchedule(
 
 result = {"task_id": task._id, "steps_count": len(list(task.steps))}'''
     
-    escaped_code = code.replace('"', '\\"').replace('\n', '\\n')
-    args = f'("{escaped_code}")'
-    
-    output, exit_code = dfx_call("realm_backend", "execute_code", args, is_update=True)
-    assert exit_code == 0, "Failed to create multi-step task"
-    assert_contains(output, "task_id", "Should create task")
-    print("✓")
+        escaped_code = code.replace('"', '\\"').replace('\n', '\\n')
+        args = f'("{escaped_code}")'
+        
+        output, exit_code = dfx_call("realm_backend", "execute_code", args, is_update=True)
+        print(f"\n    [DEBUG] exit_code={exit_code}")
+        print(f"    [DEBUG] output={output[:200]}..." if len(output) > 200 else f"    [DEBUG] output={output}")
+        
+        assert exit_code == 0, f"Failed to create multi-step task. Exit code: {exit_code}, Output: {output}"
+        assert_contains(output, "task_id", "Should create task")
+        print("    ✓")
+    except Exception as e:
+        print(f"\n    [ERROR] {str(e)}")
+        raise
 
 
 def test_task_schedule_persistence():
     """Test that TaskSchedule entities are persisted."""
     print("  - test_task_schedule_persistence...", end=" ")
     
-    # First create a scheduled task
-    create_code = '''from ggg import Codex
+    try:
+        # First create a scheduled task
+        create_code = '''from ggg import Codex
 from ggg.task import Task
 from ggg.task_schedule import TaskSchedule
 from core.task_manager import Call, TaskStep
@@ -236,32 +273,40 @@ schedule = TaskSchedule(
 )
 
 result = {"schedule_id": schedule._id}'''
-    
-    escaped_code = create_code.replace('"', '\\"').replace('\n', '\\n')
-    args = f'("{escaped_code}")'
-    
-    output, exit_code = dfx_call("realm_backend", "execute_code", args, is_update=True)
-    assert exit_code == 0, "Failed to create persistent schedule"
-    
-    # Now query all TaskSchedule entities
-    query_code = '''from ggg.task_schedule import TaskSchedule
+        
+        escaped_code = create_code.replace('"', '\\"').replace('\n', '\\n')
+        args = f'("{escaped_code}")'
+        
+        output, exit_code = dfx_call("realm_backend", "execute_code", args, is_update=True)
+        print(f"\n    [DEBUG] Create - exit_code={exit_code}")
+        print(f"    [DEBUG] Create - output={output[:150]}..." if len(output) > 150 else f"    [DEBUG] Create - output={output}")
+        assert exit_code == 0, f"Failed to create persistent schedule. Exit code: {exit_code}, Output: {output}"
+        
+        # Now query all TaskSchedule entities
+        query_code = '''from ggg.task_schedule import TaskSchedule
 schedules = list(TaskSchedule.all())
 result = {"count": len(schedules), "has_persistent": any(s.name == "persistent_schedule" for s in schedules)}'''
-    
-    escaped_query = query_code.replace('"', '\\"').replace('\n', '\\n')
-    query_args = f'("{escaped_query}")'
-    
-    output, exit_code = dfx_call("realm_backend", "execute_code", query_args, is_update=True)
-    assert exit_code == 0, "Failed to query schedules"
-    # Should find at least one schedule
-    print("✓")
+        
+        escaped_query = query_code.replace('"', '\\"').replace('\n', '\\n')
+        query_args = f'("{escaped_query}")'
+        
+        output, exit_code = dfx_call("realm_backend", "execute_code", query_args, is_update=True)
+        print(f"    [DEBUG] Query - exit_code={exit_code}")
+        print(f"    [DEBUG] Query - output={output[:150]}..." if len(output) > 150 else f"    [DEBUG] Query - output={output}")
+        assert exit_code == 0, f"Failed to query schedules. Exit code: {exit_code}, Output: {output}"
+        # Should find at least one schedule
+        print("    ✓")
+    except Exception as e:
+        print(f"\n    [ERROR] {str(e)}")
+        raise
 
 
 def test_task_manager_integration():
     """Test TaskManager can handle scheduled tasks."""
     print("  - test_task_manager_integration...", end=" ")
     
-    code = '''from ggg import Codex
+    try:
+        code = '''from ggg import Codex
 from ggg.task import Task
 from ggg.task_schedule import TaskSchedule
 from core.task_manager import Call, TaskStep, TaskManager
@@ -289,23 +334,31 @@ manager.run()
 
 result = {"task_added": True, "task_id": task._id}'''
     
-    escaped_code = code.replace('"', '\\"').replace('\n', '\\n')
-    args = f'("{escaped_code}")'
-    
-    output, exit_code = dfx_call("realm_backend", "execute_code", args, is_update=True)
-    assert exit_code == 0, "Failed to run task through TaskManager"
-    assert_contains(output, "task_id", "Should execute task via TaskManager")
-    print("✓")
+        escaped_code = code.replace('"', '\\"').replace('\n', '\\n')
+        args = f'("{escaped_code}")'
+        
+        output, exit_code = dfx_call("realm_backend", "execute_code", args, is_update=True)
+        print(f"\n    [DEBUG] exit_code={exit_code}")
+        print(f"    [DEBUG] output={output[:200]}..." if len(output) > 200 else f"    [DEBUG] output={output}")
+        
+        assert exit_code == 0, f"Failed to run task through TaskManager. Exit code: {exit_code}, Output: {output}"
+        assert_contains(output, "task_id", "Should execute task via TaskManager")
+        print("    ✓")
+    except Exception as e:
+        print(f"\n    [ERROR] {str(e)}")
+        raise
 
 
 def test_schedule_with_past_run_at():
     """Test that schedules with past run_at execute immediately."""
     print("  - test_schedule_with_past_run_at...", end=" ")
     
-    # Use a timestamp in the past
-    past_time = int(time.time()) - 3600  # 1 hour ago
-    
-    code = f'''from ggg import Codex
+    try:
+        # Use a timestamp in the past
+        past_time = int(time.time()) - 3600  # 1 hour ago
+        print(f"\n    [DEBUG] past_time={past_time}")
+        
+        code = f'''from ggg import Codex
 from ggg.task import Task
 from ggg.task_schedule import TaskSchedule
 from core.task_manager import Call, TaskStep
@@ -327,19 +380,26 @@ schedule = TaskSchedule(
 
 result = {{"task_id": task._id, "run_at": schedule.run_at}}'''
     
-    escaped_code = code.replace('"', '\\"').replace('\n', '\\n')
-    args = f'("{escaped_code}")'
-    
-    output, exit_code = dfx_call("realm_backend", "execute_code", args, is_update=True)
-    assert exit_code == 0, "Failed to create task with past run_at"
-    print("✓")
+        escaped_code = code.replace('"', '\\"').replace('\n', '\\n')
+        args = f'("{escaped_code}")'
+        
+        output, exit_code = dfx_call("realm_backend", "execute_code", args, is_update=True)
+        print(f"    [DEBUG] exit_code={exit_code}")
+        print(f"    [DEBUG] output={output[:200]}..." if len(output) > 200 else f"    [DEBUG] output={output}")
+        
+        assert exit_code == 0, f"Failed to create task with past run_at. Exit code: {exit_code}, Output: {output}"
+        print("    ✓")
+    except Exception as e:
+        print(f"\n    [ERROR] {str(e)}")
+        raise
 
 
 def test_update_schedule_properties():
     """Test updating schedule properties like run_at and repeat_every."""
     print("  - test_update_schedule_properties...", end=" ")
     
-    code = '''from ggg import Codex
+    try:
+        code = '''from ggg import Codex
 from ggg.task import Task
 from ggg.task_schedule import TaskSchedule
 from core.task_manager import Call, TaskStep
@@ -371,20 +431,27 @@ result = {
     "disabled": schedule.disabled
 }'''
     
-    escaped_code = code.replace('"', '\\"').replace('\n', '\\n')
-    args = f'("{escaped_code}")'
-    
-    output, exit_code = dfx_call("realm_backend", "execute_code", args, is_update=True)
-    assert exit_code == 0, "Failed to update schedule properties"
-    assert_contains(output, "schedule_id", "Should update schedule")
-    print("✓")
+        escaped_code = code.replace('"', '\\"').replace('\n', '\\n')
+        args = f'("{escaped_code}")'
+        
+        output, exit_code = dfx_call("realm_backend", "execute_code", args, is_update=True)
+        print(f"\n    [DEBUG] exit_code={exit_code}")
+        print(f"    [DEBUG] output={output[:200]}..." if len(output) > 200 else f"    [DEBUG] output={output}")
+        
+        assert exit_code == 0, f"Failed to update schedule properties. Exit code: {exit_code}, Output: {output}"
+        assert_contains(output, "schedule_id", "Should update schedule")
+        print("    ✓")
+    except Exception as e:
+        print(f"\n    [ERROR] {str(e)}")
+        raise
 
 
 def test_async_multi_step_task():
     """Test multi-step task with async operations."""
     print("  - test_async_multi_step_task...", end=" ")
     
-    code = '''from ggg import Codex
+    try:
+        code = '''from ggg import Codex
 from ggg.task import Task
 from ggg.task_schedule import TaskSchedule
 from core.task_manager import Call, TaskStep
@@ -421,13 +488,19 @@ schedule = TaskSchedule(
 
 result = {"task_id": task._id, "steps": len(list(task.steps))}'''
     
-    escaped_code = code.replace('"', '\\"').replace('\n', '\\n')
-    args = f'("{escaped_code}")'
-    
-    output, exit_code = dfx_call("realm_backend", "execute_code", args, is_update=True)
-    assert exit_code == 0, "Failed to create async multi-step task"
-    assert_contains(output, "task_id", "Should create async multi-step task")
-    print("✓")
+        escaped_code = code.replace('"', '\\"').replace('\n', '\\n')
+        args = f'("{escaped_code}")'
+        
+        output, exit_code = dfx_call("realm_backend", "execute_code", args, is_update=True)
+        print(f"\n    [DEBUG] exit_code={exit_code}")
+        print(f"    [DEBUG] output={output[:200]}..." if len(output) > 200 else f"    [DEBUG] output={output}")
+        
+        assert exit_code == 0, f"Failed to create async multi-step task. Exit code: {exit_code}, Output: {output}"
+        assert_contains(output, "task_id", "Should create async multi-step task")
+        print("    ✓")
+    except Exception as e:
+        print(f"\n    [ERROR] {str(e)}")
+        raise
 
 
 if __name__ == "__main__":
