@@ -16,7 +16,8 @@ def user_register(principal: str, profile: str) -> dict[str, Any]:
             raise Exception(f"Profile {profile} not found")
         user = User(id=principal, profiles=[user_profile])
     else:
-        raise Exception("User already registered")
+        # User already exists - return their existing data
+        logger.info(f"User {principal} already registered, returning existing data")
 
     return {
         "principal": user.id,
