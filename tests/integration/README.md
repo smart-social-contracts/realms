@@ -58,6 +58,7 @@ docker exec realms-test bash tests/integration/run_tests.sh
 
 # Or run specific test file
 docker exec realms-test python3 tests/integration/test_status_api.py
+docker exec realms-test python3 tests/integration/test_scheduled_tasks.py
 
 # Cleanup
 docker rm -f realms-test
@@ -76,6 +77,7 @@ bash tests/integration/run_tests.sh
 
 # Or run specific test
 python3 tests/integration/test_status_api.py
+python3 tests/integration/test_scheduled_tasks.py
 ```
 
 ## Test Structure
@@ -107,6 +109,18 @@ python3 tests/integration/test_status_api.py
   - `test_execute_multiple_tasks_sequentially()` - Multiple task execution
   - `test_execute_code_with_logging()` - Code with log output
   - `test_task_status_format()` - Task status response format
+
+- **test_scheduled_tasks.py**: Scheduled and recurring tasks
+  - `test_create_scheduled_task()` - Create tasks with schedules
+  - `test_task_with_future_run_at()` - Tasks scheduled for future execution
+  - `test_recurring_task()` - Tasks with repeat_every interval
+  - `test_disabled_schedule()` - Verify disabled schedules don't execute
+  - `test_multi_step_task()` - Tasks with multiple sequential steps
+  - `test_task_schedule_persistence()` - TaskSchedule entity persistence
+  - `test_task_manager_integration()` - TaskManager execution logic
+  - `test_schedule_with_past_run_at()` - Past timestamps trigger immediate execution
+  - `test_update_schedule_properties()` - Update schedule properties
+  - `test_async_multi_step_task()` - Async operations in multi-step tasks
 
 ## Helper Utilities
 

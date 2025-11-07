@@ -74,6 +74,23 @@ Tests task execution and scheduling.
 
 **Coverage:** 9/9 tests passing
 
+### ✅ test_scheduled_tasks.py
+Tests scheduled and recurring task functionality.
+
+**Tests:**
+- `test_create_scheduled_task()` - Task creation with schedules
+- `test_task_with_future_run_at()` - Tasks scheduled for future execution
+- `test_recurring_task()` - Tasks with repeat_every interval
+- `test_disabled_schedule()` - Disabled schedules don't execute
+- `test_multi_step_task()` - Tasks with multiple sequential steps
+- `test_task_schedule_persistence()` - TaskSchedule entity persistence
+- `test_task_manager_integration()` - TaskManager execution logic
+- `test_schedule_with_past_run_at()` - Past timestamps execute immediately
+- `test_update_schedule_properties()` - Schedule property updates
+- `test_async_multi_step_task()` - Async multi-step task execution
+
+**Coverage:** 10/10 tests passing
+
 ## Running Tests
 
 ### All integration tests:
@@ -85,6 +102,7 @@ bash tests/integration/run_tests.sh
 ```bash
 python3 tests/integration/test_db_command.py
 python3 tests/integration/test_shell_command.py
+python3 tests/integration/test_scheduled_tasks.py
 ```
 
 ### In Docker (CI mode):
@@ -102,13 +120,14 @@ See `.github/workflows/ci-main.yml` for the full CI configuration.
 
 ## Total Coverage
 
-**Integration Tests:** 31/31 passing ✅
+**Integration Tests:** 41/41 passing ✅
 - DB command: 4 tests
 - Shell/Run command: 7 tests  
 - Status API: 3 tests
 - Extensions API: 3 tests
 - GGG Entities API: 5 tests
 - Task Manager API: 9 tests
+- Scheduled Tasks: 10 tests
 
 ## Implicitly Tested Commands
 
