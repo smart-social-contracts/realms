@@ -208,7 +208,7 @@ class CursorDatabaseExplorer:
     ) -> Dict[str, Any]:
         """List entities of given type with pagination."""
         method = "get_objects_paginated"
-        args = [entity_type, page_num, page_size]
+        args = [entity_type, page_num, page_size, "asc"]
             
         return self.call_backend(method, args)
 
