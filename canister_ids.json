@@ -1,10 +1,8 @@
 {
   "realm_backend": {
-    "ic": "wxfhb-tqaaa-aaaah-aq2qq-cai",
     "staging": "h5vpp-qyaaa-aaaac-qai3a-cai"
   },
   "realm_frontend": {
-    "ic": "ctydg-piaaa-aaaah-aqzga-cai",
     "staging": "gzya5-jyaaa-aaaac-qai5a-cai"
   },
   "realm_registry_backend": {
@@ -12,9 +10,5 @@
   },
   "realm_registry_frontend": {
     "staging": "2zaor-5yaaa-aaaac-qbxaa-cai"
-  },
-  "vault": {
-    "ic": "ekdcf-yiaaa-aaaah-ardsq-cai",
-    "staging": "mfqpd-zaaaa-aaaac-qci7a-cai"
   }
 }
