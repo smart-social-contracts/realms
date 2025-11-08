@@ -316,7 +316,7 @@ class RealmGenerator:
         print("Note: Foundational objects (Realm, Treasury, UserProfiles, System User) are auto-created by backend.")
         
         # Generate additional entities
-        users = self.generate_users(params.get('users', 50))
+        users = self.generate_users(params.get('citizens', 50))
         humans = self.generate_humans(users)
         identities = self.generate_identities(users)
         citizens = self.generate_citizens(users)

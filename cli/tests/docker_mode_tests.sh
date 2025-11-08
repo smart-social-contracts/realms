@@ -72,6 +72,18 @@ if [ -d "scripts" ]; then
     echo "  ✅ Found: scripts/ directory"
     echo "     Files: $(ls scripts/ | wc -l)"
 fi
+
+# Verify correct citizen count in generated data
+if [ -f "realm_data.json" ]; then
+    echo "  📊 Verifying data generation..."
+    CITIZEN_COUNT=$(grep -o '"id": "user_' realm_data.json | wc -l)
+    if [ "$CITIZEN_COUNT" -eq "5" ]; then
+        echo "  ✅ Correct number of citizens generated (5)"
+    else
+        echo "  ❌ Wrong citizen count: expected 5, got $CITIZEN_COUNT"
+        exit 1
+    fi
+fi
 echo ""
 
 echo "🧪 Test 6: Test status command (no dependency errors in Docker mode)"

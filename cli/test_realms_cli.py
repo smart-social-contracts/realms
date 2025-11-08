@@ -138,6 +138,36 @@ def test_project_scaffolding():
         return False
 
 
+def test_realm_generator_parameters():
+    """Test that realm_generator correctly uses citizens parameter."""
+    print("🧪 Testing realm generator parameters...")
+    
+    try:
+        scripts_path = Path(__file__).parent.parent / "scripts"
+        sys.path.insert(0, str(scripts_path))
+        from realm_generator import RealmGenerator
+        
+        # Test that citizens parameter is correctly used
+        generator = RealmGenerator(seed=42)
+        test_data = generator.generate_realm_data(citizens=10, organizations=2)
+        
+        # Count users (should be 10 + 1 system user = 11)
+        users = [item for item in test_data if hasattr(item, '__class__') and item.__class__.__name__ == 'User']
+        
+        if len(users) == 11:  # 10 citizens + 1 system user
+            print(f"✅ Realm generator correctly uses citizens parameter (10 citizens + 1 system user = {len(users)} users)")
+            return True
+        else:
+            print(f"❌ Expected 11 users, got {len(users)}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Realm generator test failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 def main():
     """Run all tests."""
     print("🏛️  Realms CLI Test Suite\n")
@@ -147,6 +177,7 @@ def main():
         test_config_validation,
         test_config_file_operations,
         test_project_scaffolding,
+        test_realm_generator_parameters,
     ]
 
     passed = 0
