@@ -18,6 +18,9 @@ from ..utils import is_repo_mode
 
 console = Console()
 
+# Configuration constants for async task polling
+DEFAULT_TASK_TIMEOUT_SECONDS = 60
+DEFAULT_POLL_INTERVAL_SECONDS = 2
 
 class RealmsShell:
     """Interactive Python shell for Realms backend canister."""
@@ -376,12 +379,12 @@ def execute_python_file(file_path: str, canister: str, network: Optional[str], w
                     if result_data.get("type") == "async" and "task_id" in result_data:
                         task_id = result_data["task_id"]
                         
-                        # Use provided timeout or default to 600 seconds (10 minutes)
-                        timeout_seconds = wait if wait > 0 else 600
+                        # Use provided timeout or default
+                        timeout_seconds = wait if wait > 0 else DEFAULT_TASK_TIMEOUT_SECONDS
                         console.print(f"\n[cyan]⏳ Waiting for async task {task_id} to complete (timeout: {timeout_seconds}s)...[/cyan]")
                         
                         # Poll the task status
-                        poll_interval = 2  # seconds
+                        poll_interval = DEFAULT_POLL_INTERVAL_SECONDS
                         max_polls = timeout_seconds // poll_interval
                         polls = 0
                         
