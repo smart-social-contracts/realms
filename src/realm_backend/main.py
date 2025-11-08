@@ -827,6 +827,7 @@ def execute_code(code: str) -> str:
 
         # Create schedule (immediate execution)
         schedule = TaskSchedule(
+            name=f"Shell Schedule {temp_name}",
             task=task,
             run_at=0,  # Execute immediately
             repeat_every=0,
