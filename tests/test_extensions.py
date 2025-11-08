@@ -17,6 +17,7 @@ def get_extension_names():
         if os.path.isdir(os.path.join(extensions_dir, name))
         and not name.startswith(".")
         and not name.startswith("__")
+        and os.path.exists(os.path.join(extensions_dir, name, "manifest.json"))
     ]
 
 
