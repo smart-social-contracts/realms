@@ -702,13 +702,10 @@ def run(
     effective_network, effective_canister = get_effective_network_and_canister(
         network, canister
     )
-    # Determine the actual wait timeout
+    # Determine the actual wait timeout (0 signals to use default in run_command)
     actual_wait = None
-    if wait:
-        actual_wait = wait_timeout if wait_timeout is not None else 600
-    elif wait_timeout is not None:
-        # If timeout specified without --wait flag, enable waiting
-        actual_wait = wait_timeout
+    if wait or wait_timeout is not None:
+        actual_wait = wait_timeout if wait_timeout is not None else 0
     
     run_command(effective_network, effective_canister, file, actual_wait)
 
