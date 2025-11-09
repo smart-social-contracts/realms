@@ -11,6 +11,7 @@ from .commands.db import db_command
 from .commands.deploy import deploy_command
 from .commands.extension import extension_command
 from .commands.import_data import import_codex_command, import_data_command
+from .commands.ps import ps_kill_command, ps_logs_command, ps_ls_command
 from .commands.registry import (
     registry_add_command,
     registry_count_command,
@@ -696,6 +697,12 @@ def run(
     wait_timeout: Optional[int] = typer.Option(
         None, "--wait-timeout", help="Custom timeout in seconds for async task waiting"
     ),
+    every: Optional[int] = typer.Option(
+        None, "--every", help="Schedule task to run every N seconds (creates recurring task)"
+    ),
+    after: Optional[int] = typer.Option(
+        None, "--after", help="Delay first run by N seconds (default: 5s)"
+    ),
 ) -> None:
     """Start an interactive Python shell connected to the Realms backend canister or execute a Python file (with async task waiting support)."""
     # Get effective network and canister from context
@@ -707,7 +714,7 @@ def run(
     if wait or wait_timeout is not None:
         actual_wait = wait_timeout if wait_timeout is not None else 0
     
-    run_command(effective_network, effective_canister, file, actual_wait)
+    run_command(effective_network, effective_canister, file, actual_wait, every, after)
 
 
 # Create network subcommand group
@@ -765,6 +772,67 @@ def network_unset() -> None:
         console.print("[yellow]Already using default network: local[/yellow]")
 
 
+# Create ps subcommand group
+ps_app = typer.Typer(name="ps", help="Manage scheduled tasks")
+app.add_typer(ps_app, name="ps")
+
+
+@ps_app.command("ls")
+def ps_ls(
+    network: Optional[str] = typer.Option(
+        None, "--network", "-n", help="Network to use (overrides context)"
+    ),
+    canister: Optional[str] = typer.Option(
+        None, "--canister", "-c", help="Canister name (overrides context)"
+    ),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Show detailed information"
+    ),
+) -> None:
+    """List all scheduled tasks."""
+    effective_network, effective_canister = get_effective_network_and_canister(
+        network, canister
+    )
+    ps_ls_command(effective_network, effective_canister, verbose)
+
+
+@ps_app.command("kill")
+def ps_kill(
+    task_id: str = typer.Argument(help="Task ID (full or partial) to stop"),
+    network: Optional[str] = typer.Option(
+        None, "--network", "-n", help="Network to use (overrides context)"
+    ),
+    canister: Optional[str] = typer.Option(
+        None, "--canister", "-c", help="Canister name (overrides context)"
+    ),
+) -> None:
+    """Stop a scheduled task."""
+    effective_network, effective_canister = get_effective_network_and_canister(
+        network, canister
+    )
+    ps_kill_command(task_id, effective_network, effective_canister)
+
+
+@ps_app.command("logs")
+def ps_logs(
+    task_id: str = typer.Argument(help="Task ID (full or partial) to view logs"),
+    network: Optional[str] = typer.Option(
+        None, "--network", "-n", help="Network to use (overrides context)"
+    ),
+    canister: Optional[str] = typer.Option(
+        None, "--canister", "-c", help="Canister name (overrides context)"
+    ),
+    tail: int = typer.Option(
+        20, "--tail", "-t", help="Number of recent executions to show"
+    ),
+) -> None:
+    """View execution logs for a task."""
+    effective_network, effective_canister = get_effective_network_and_canister(
+        network, canister
+    )
+    ps_logs_command(task_id, effective_network, effective_canister, tail)
+
+
 @app.command("version")
 def version() -> None:
     """Show version information."""
@@ -801,6 +869,12 @@ def main(
 
     if verbose:
         console.print("[dim]Verbose mode enabled[/dim]")
+    
+    # If no command was provided, show error and help suggestion
+    if ctx.invoked_subcommand is None:
+        console.print("[red]Error: No command provided.[/red]")
+        console.print("\n💡 Try running [cyan]realms --help[/cyan] to see available commands.")
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":

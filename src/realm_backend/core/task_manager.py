@@ -1,3 +1,29 @@
+"""Task Scheduling Framework
+
+Timer-based task scheduling for the Internet Computer supporting one-time and
+recurring tasks with multi-step workflows.
+
+Core Entities:
+  Codex → Call → TaskStep → Task → TaskSchedule
+  
+Execution Flow:
+  1. create_scheduled_task() → TaskManager._update_timers()
+  2. ic.set_timer() schedules first step
+  3. Timer fires → executes code → _check_and_schedule_next_step()
+  4. For recurring: sets timer for next cycle (self-perpetuating, no heartbeat)
+
+Key Use Case - Sync/Async Separation:
+  IC canisters cannot mix sync and async in same function. TaskSteps solve this:
+    Step 1 (Sync): Local computation
+    Step 2 (Async): Inter-canister call with yield
+    Step 3 (Sync): Process results
+  
+Other Uses:
+  - Sequential workflows with delays
+  - State machines (vesting, proposals)
+  - Retry chains with fallbacks
+"""
+
 import traceback
 from enum import Enum
 from typing import Callable, List
@@ -22,6 +48,9 @@ from kybra_simple_logging import get_logger
 
 logger = get_logger("core.task_manager")
 
+
+def get_now() -> int:
+    return int(round(ic.time() / 1e9))
 
 class Call(Entity, TimestampedMixin):
     _function_def = None
@@ -158,6 +187,7 @@ class TaskManager:
 
             def sync_timer_callback() -> void:
                 logger.info(f"Executing sync timer callback for {step.call}")
+                logger.info(f"step.call.task_step.task.name: {step.call.task_step.task.name}")
                 try:
                     step.call._function()()
                     step.status = TaskStatus.COMPLETED.value
@@ -192,17 +222,42 @@ class TaskManager:
             else:
                 logger.info(f"Task {task.name} completed all steps")
                 task.status = TaskStatus.COMPLETED.value
+
+                now = get_now()
                 
-                # Check if this is a recurring task and reset it
+                # Check if this is a recurring task and schedule next execution
                 for schedule in task.schedules:
                     if schedule.repeat_every and schedule.repeat_every > 0:
-                        logger.info(f"Task {task.name} is recurring, resetting for next execution")
+                        logger.info(f"Task {task.name} is recurring, scheduling next execution in {schedule.repeat_every}s")
                         task.status = TaskStatus.PENDING.value
                         task.step_to_execute = 0
                         # Reset all step statuses
                         for step in task.steps:
                             step.status = TaskStatus.PENDING.value
-                        break
+                        step = list(task.steps)[task.step_to_execute]
+                        callback_function = self._create_timer_callback(step, task)
+
+                        if schedule.last_run_at:
+                            in_seconds = max(schedule.last_run_at + 2 * schedule.repeat_every - now, 0)
+                        else:
+                            in_seconds = schedule.repeat_every
+
+                        logger.info(f"schedule.last_run_at : {schedule.last_run_at}")
+                        logger.info(f"schedule.repeat_every: {schedule.repeat_every}")
+                        logger.info(f"now                  : {now}")
+                        logger.info(f"in_seconds           : {in_seconds}")
+
+                        schedule.last_run_at = now
+
+                        if schedule.disabled:
+                            logger.info(f"Skipping disabled schedule for task {task.name}")
+                            continue
+                        
+                        logger.info(f"Scheduling time in {in_seconds} seconds")
+                        step.timer_id = ic.set_timer(
+                            Duration(in_seconds), callback_function
+                        )
+                        
         except Exception as e:
             logger.error(
                 f"Error checking next step for task {task.name}: {traceback.format_exc()}"
@@ -210,12 +265,27 @@ class TaskManager:
 
     def _update_timers(self) -> void:
         logger.info("Updating timers")
-        for task in self.tasks:
+        # Load tasks from database (not just in-memory list)
+        # This ensures recurring callbacks can find tasks
+        all_tasks = list(Task.instances()) if Task.count() > 0 else self.tasks
+        logger.info(f"Found {len(all_tasks)} tasks in database")
+
+        now = get_now()
+        logger.info(f"Current time: {now}")
+
+        for task in all_tasks:
+            logger.info(f"Checking task {task.name}: {task.status}")
             if task.status == TaskStatus.PENDING.value:
                 for schedule in task.schedules:
                     try:
-                        now = int(ic.time() / 1e9)
-                        logger.info(f"Current time: {now}")
+
+                        logger.info(f"Checking schedule {schedule.name}:\n"
+                        f"Disabled: {schedule.disabled}\n"
+                        f"run_at: {schedule.run_at}\n"
+                        f"repeat_every: {schedule.repeat_every}\n"
+                        f"last_run_at: {schedule.last_run_at}")
+                        
+                        
                         if schedule.disabled:
                             logger.info(
                                 f"Skipping disabled schedule for task {task.name}"
@@ -226,15 +296,24 @@ class TaskManager:
 
                         # Determine if task should execute based on run_at and repeat_every
                         if schedule.run_at and schedule.run_at > now:
+                            logger.info(
+                                f"Skipping schedule because run_at is in the future"
+                            )
                             # Future scheduled time - don't execute yet
                             should_execute = False
                         elif schedule.run_at and schedule.run_at <= now:
                             # Past or current time - execute if not already run
                             if not schedule.last_run_at or schedule.last_run_at == 0:
+                                logger.info(
+                                    f"Executing schedule because run_at is in the past"
+                                )
                                 should_execute = True
                         elif not schedule.run_at or schedule.run_at == 0:
                             # No specific run time - check if it should run immediately
                             if not schedule.last_run_at or schedule.last_run_at == 0:
+                                logger.info(
+                                    f"Executing schedule because last_run_at is not set"
+                                )
                                 # Never run before - execute immediately
                                 should_execute = True
 
@@ -243,13 +322,16 @@ class TaskManager:
                             if schedule.last_run_at and schedule.last_run_at > 0:
                                 # Already run at least once - check if interval has passed
                                 if now >= schedule.last_run_at + schedule.repeat_every:
+                                    logger.info(
+                                        f"Executing schedule because interval has passed"
+                                    )
                                     should_execute = True
 
                         if should_execute:
                             logger.info(
                                 f"Scheduling task {task.name} for immediate execution"
                             )
-                            schedule.last_run_at = now
+                            
                             # Get first step (step_to_execute should be 0 at start)
                             if task.step_to_execute >= len(task.steps):
                                 logger.error(f"Task {task.name} step_to_execute out of bounds")

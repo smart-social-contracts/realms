@@ -136,36 +136,43 @@ class RealmsShell:
 
     def poll_task_status(self, task_id: str) -> dict:
         """
-        Poll the status of an async task by calling get_task_status.
+        Poll the status of an async task using get_objects.
         Returns a dictionary with task status information.
         """
-        # Prepare the dfx command
-        cmd = ["dfx", "canister", "call"]
+        # Prepare the dfx command using get_objects to query the Task entity
+        cmd = [
+            "dfx", "canister", "call",
+            self.canister_name, "get_objects",
+            f'(vec {{ record {{ 0 = "Task"; 1 = "{task_id}" }}; }})',
+            "--output", "json"
+        ]
 
         # Add network parameter if provided
         if self.network:
-            cmd.extend(["--network", self.network])
-
-        # Add the rest of the command
-        cmd.extend([self.canister_name, "get_task_status", f'("{task_id}")'])
+            cmd.insert(3, "--network")
+            cmd.insert(4, self.network)
 
         try:
             # Execute the dfx command
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
 
-            # Parse the output - extract JSON from the tuple format
-            output = result.stdout.strip()
-            # Match tuple format with optional trailing comma: ("content") or ("content",)
-            tuple_match = re.search(r'\(\s*"(.*)"\s*,?\s*\)', output, re.DOTALL)
+            # Parse the JSON response
+            response = json.loads(result.stdout)
             
-            if tuple_match:
-                json_str = tuple_match.group(1)
-                # Unescape the JSON string - handle \n and \" escape sequences
-                json_str = json_str.replace('\\n', '\n').replace('\\"', '"')
-                return json.loads(json_str)
+            # Extract task data from response
+            if response.get('data', {}).get('objectsList', {}).get('objects'):
+                objects = response['data']['objectsList']['objects']
+                if objects and len(objects) > 0:
+                    task_data = json.loads(objects[0])
+                    return {
+                        "task_id": task_id,
+                        "status": task_data.get("status", "unknown"),
+                        "name": task_data.get("name", "unknown")
+                    }
+                else:
+                    return {"error": f"Task with ID '{task_id}' not found"}
             else:
-                # Debug: return the raw output to see what we're getting
-                return {"error": f"Failed to parse task status response. Raw output: {output[:200]}"}
+                return {"error": "Failed to parse task status response"}
                 
         except subprocess.CalledProcessError as e:
             return {"error": f"Error calling canister: {e.stderr}"}
@@ -289,10 +296,18 @@ def run_command(
     canister: str = "realm_backend",
     file: Optional[str] = None,
     wait: Optional[int] = None,
+    every: Optional[int] = None,
+    after: Optional[int] = None,
 ) -> None:
     """Start an interactive Python shell connected to the Realms backend canister or execute a Python file."""
     # If file is provided, execute it instead of interactive shell
     if file:
+        # If scheduling options are provided, schedule the task
+        if every is not None or after is not None:
+            console.print(f"[bold blue]📅 Scheduling Python file: {file}[/bold blue]\n")
+            schedule_python_file(file, canister, network, every, after)
+            return
+        
         console.print(f"[bold blue]📄 Executing Python file: {file}[/bold blue]\n")
         execute_python_file(file, canister, network, wait)
         return
@@ -425,4 +440,93 @@ def execute_python_file(file_path: str, canister: str, network: Optional[str], w
         console.print(f"[green]✅ Successfully executed {Path(file_path).name}[/green]")
     except Exception as e:
         console.print(f"[red]❌ Error executing file: {e}[/red]")
+        raise typer.Exit(1)
+
+
+def schedule_python_file(file_path: str, canister: str, network: Optional[str], every: Optional[int], after: Optional[int]) -> None:
+    """Schedule a Python file to run at intervals on the Realms backend canister."""
+    import os
+    import base64
+    import json
+    from pathlib import Path
+
+    # Check if file exists
+    if not os.path.exists(file_path):
+        console.print(f"[red]❌ File not found: {file_path}[/red]")
+        raise typer.Exit(1)
+
+    # Read the file content
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            codex_code = f.read()
+    except Exception as e:
+        console.print(f"[red]❌ Error reading file: {e}[/red]")
+        raise typer.Exit(1)
+
+    if not codex_code.strip():
+        console.print(f"[yellow]⚠️  File is empty: {file_path}[/yellow]")
+        return
+
+    # Prepare parameters
+    file_name = Path(file_path).stem
+    delay = after if after is not None else 0
+    interval = every if every is not None else 0
+    
+    # Base64 encode the code for safe transmission
+    encoded_code = base64.b64encode(codex_code.encode('utf-8')).decode('ascii')
+
+    console.print(f"[dim]Setting up scheduled task...[/dim]")
+    console.print(f"[cyan]File:[/cyan] {file_path}")
+    console.print(f"[cyan]First run:[/cyan] in {delay} seconds")
+    if interval > 0:
+        console.print(f"[cyan]Repeat every:[/cyan] {interval} seconds ({interval // 60}m {interval % 60}s)")
+    else:
+        console.print(f"[cyan]Repeat:[/cyan] one-time execution")
+    console.print()
+
+    # Call the backend API endpoint
+    cmd = ["dfx", "canister", "call"]
+    
+    if network:
+        cmd.extend(["--network", network])
+    
+    cmd.extend([
+        canister,
+        "create_scheduled_task",
+        f'("{file_name}", "{encoded_code}", {interval}, {delay})'
+    ])
+    
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
+        
+        # Parse response
+        output = result.stdout.strip()
+        if output.startswith('(') and output.endswith(')'):
+            inner = output[1:-1].strip()
+            if inner.endswith(','):
+                inner = inner[:-1].strip()
+            if inner.startswith('"') and inner.endswith('"'):
+                json_str = inner[1:-1]
+                json_str = json_str.replace('\\n', '\n').replace('\\"', '"').replace('\\\\', '\\')
+                data = json.loads(json_str)
+                
+                if data.get('success'):
+                    console.print(f"[green]✅ Scheduled task: {data['task_id']}[/green]")
+                    console.print(f"[dim]   Task name: {data['task_name']}[/dim]")
+                    console.print(f"[dim]   Schedule ID: {data['schedule_id']}[/dim]")
+                    console.print(f"[dim]   First run at: {data['run_at']}[/dim]")
+                    console.print(f"[dim]   Repeat every: {data['repeat_every']}s[/dim]")
+                    console.print(f"\n[dim]Use 'realms ps ls' to view scheduled tasks[/dim]")
+                else:
+                    console.print(f"[red]❌ Error: {data.get('error', 'Unknown error')}[/red]")
+                    raise typer.Exit(1)
+        
+    except subprocess.CalledProcessError as e:
+        console.print(f"[red]❌ Error calling backend: {e.stderr}[/red]")
+        raise typer.Exit(1)
+    except json.JSONDecodeError as e:
+        console.print(f"[red]❌ Failed to parse response: {e}[/red]")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"[red]❌ Error scheduling task: {e}[/red]")
         raise typer.Exit(1)

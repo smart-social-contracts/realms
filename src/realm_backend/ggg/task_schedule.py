@@ -33,7 +33,10 @@ class TaskSchedule(Entity, TimestampedMixin):
     def serialize(self):
         """Convert TaskSchedule to dictionary for JSON serialization"""
         return {
+            "_id": str(self._id),
+            "_type": "TaskSchedule",
             "name": self.name,
+            "task_id": str(self.task._id) if hasattr(self, 'task') and self.task else None,
             "disabled": self.disabled,
             "run_at": self.run_at,
             "repeat_every": self.repeat_every,

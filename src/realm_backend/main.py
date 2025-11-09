@@ -1,3 +1,4 @@
+import base64
 import json
 import traceback
 
@@ -20,7 +21,9 @@ from core.candid_types_realm import (
     StatusRecord,
     UserGetRecord,
 )
+from core.task_manager import Call, Task, TaskStep, TaskManager
 from ggg import Codex
+from ggg.task_schedule import TaskSchedule
 from kybra import (
     Async,
     CallResult,
@@ -36,6 +39,7 @@ from kybra import (
     Variant,
     Vec,
     blob,
+    heartbeat,
     ic,
     init,
     match,
@@ -915,45 +919,132 @@ def execute_code_shell(code: str) -> str:
     return stdout.getvalue() + stderr.getvalue()
 
 
-@query
-def get_task_status(task_id: str) -> str:
-    """
-    Poll task status and get results for async tasks.
+# get_task_status removed - use get_objects_paginated("Task", ...) instead
 
+# list_scheduled_tasks removed - use get_objects_paginated("Task", ...) and get_objects_paginated("TaskSchedule", ...) instead
+
+
+@update
+def stop_task(task_id: str) -> str:
+    """
+    Stop a scheduled task by disabling its schedules and marking it as cancelled.
+    
+    Args:
+        task_id: Full or partial task ID to stop
+    
     Returns JSON with:
-    - task_id: The task identifier
-    - status: pending, running, completed, or failed
-    - result: The task result (if completed)
-    - error: Error message (if failed)
+    - success: Boolean indicating success
+    - task_id: The stopped task ID
+    - name: The task name
+    - error: Error message if failed
     """
     import json
 
-    from core.task_manager import Task
+    from ggg.task import Task
 
     try:
-        task = Task[task_id]
-
-        response = {"task_id": task_id, "status": task.status, "name": task.name}
-
-        # Get the first step's call to check for results
-        if task.steps:
-            step = list(task.steps)[0]
-            result = getattr(step.call, "_result", None)
-
-            if result is not None:
-                if isinstance(result, dict):
-                    response["result"] = result
-                else:
-                    response["result"] = str(result)
-
-        return json.dumps(response, indent=2)
-
-    except KeyError:
-        response = {"error": f"Task with ID '{task_id}' not found"}
-        return json.dumps(response, indent=2)
+        # Try to find task by partial or full ID
+        found_task = None
+        for task in Task.instances():
+            if task._id.startswith(task_id) or task._id == task_id:
+                found_task = task
+                break
+        
+        if found_task:
+            # Mark task as cancelled
+            if hasattr(found_task, "status"):
+                found_task.status = "cancelled"
+            
+            # Disable all schedules
+            for schedule in found_task.schedules:
+                schedule.disabled = True
+            
+            logger.info(f"Stopped task: {found_task.name} ({found_task._id})")
+            return json.dumps({
+                "success": True,
+                "task_id": found_task._id,
+                "name": found_task.name
+            }, indent=2)
+        else:
+            return json.dumps({
+                "success": False,
+                "error": f"Task not found: {task_id}"
+            }, indent=2)
+            
     except Exception as e:
-        response = {"error": str(e)}
-        return json.dumps(response, indent=2)
+        logger.error(f"Error stopping task: {e}")
+        return json.dumps({
+            "success": False,
+            "error": str(e)
+        }, indent=2)
+
+
+@query
+def get_task_logs(task_id: str, limit: nat = 20) -> str:
+    """
+    Get execution logs for a specific task.
+    
+    Args:
+        task_id: Full or partial task ID
+        limit: Maximum number of recent executions to return (default: 20)
+    
+    Returns JSON with:
+    - success: Boolean indicating success
+    - task_id: The task ID
+    - task_name: The task name
+    - status: Current task status
+    - executions: Array of recent execution records
+    - error: Error message if failed
+    """
+    import json
+
+    from ggg.task import Task
+
+    try:
+        # Try to find task by partial or full ID
+        found_task = None
+        for task in Task.instances():
+            if task._id.startswith(task_id) or task._id == task_id:
+                found_task = task
+                break
+        
+        if found_task:
+            # Get executions
+            executions = list(found_task.executions) if hasattr(found_task, 'executions') else []
+            
+            # Format execution data
+            execution_data = []
+            for execution in executions[-limit:]:
+                exec_info = {
+                    "started_at": execution.timestamp_created,
+                    "status": getattr(execution, "status", "unknown")
+                }
+                if hasattr(execution, "result"):
+                    exec_info["result"] = execution.result
+                if hasattr(execution, "error"):
+                    exec_info["error"] = execution.error
+                execution_data.append(exec_info)
+            
+            return json.dumps({
+                "success": True,
+                "task_id": found_task._id,
+                "task_name": found_task.name,
+                "status": getattr(found_task, "status", "unknown"),
+                "executions": execution_data,
+                "total_executions": len(executions)
+            }, indent=2)
+        else:
+            return json.dumps({
+                "success": False,
+                "error": f"Task not found: {task_id}"
+            }, indent=2)
+            
+    except Exception as e:
+        logger.error(f"Error getting task logs: {e}")
+        return json.dumps({
+            "success": False,
+            "error": str(e)
+        }, indent=2)
 
 
 downloaded_content: dict = {}
@@ -1013,4 +1104,94 @@ downloaded_content: dict = {}
 
 #         ic.print("Mixed sync/async task test initiated...")
 #     except Exception as e:
+#         logger.error(traceback.format_exc())
+
+
+@update
+def create_scheduled_task(name: str, code: str, repeat_every: nat, run_after: nat = 5) -> str:
+    """
+    Create a new scheduled task from Python code.
+    
+    Args:
+        name: Task name
+        code: Python code to execute (base64 encoded)
+        repeat_every: Interval in seconds (0 for one-time execution)
+        run_after: Delay before first execution in seconds (default: 5)
+    
+    Returns JSON with:
+    - success: Boolean indicating success
+    - task_id: The created task ID
+    - schedule_id: The schedule ID
+    - error: Error message if failed
+    """
+    try:
+        # Decode the base64 encoded code
+        decoded_code = base64.b64decode(code).decode('utf-8')
+        
+        # Create codex
+        temp_name = f"_scheduled_{name}_{int(ic.time())}"
+        codex = Codex(name=temp_name, code=decoded_code)
+        
+        # Create call and step
+        call = Call(is_async=False, codex=codex)
+        step = TaskStep(call=call, run_next_after=0)
+        
+        # Create task (using TaskManager Task, not GGG Task)
+        task = Task(name=name, steps=[step])
+        
+        # Create schedule
+        current_time = int(ic.time() / 1_000_000_000)
+        schedule = TaskSchedule(
+            name=f"schedule_{name}",
+            task=task,
+            run_at=current_time + run_after,
+            repeat_every=repeat_every,
+            last_run_at=0,
+            disabled=False
+        )
+        
+        # Register with TaskManager
+        manager = TaskManager()
+        manager.add_task(task)
+        
+        # Extract serializable data
+        task_id = str(task._id)
+        task_name = str(task.name)
+        schedule_id = str(schedule._id)
+        run_at = int(schedule.run_at)
+        repeat_every = int(schedule.repeat_every)
+        
+        logger.info(f"Created scheduled task: {task_name} (ID: {task_id})")
+
+        TaskManager().run()
+        
+        return json.dumps({
+            "success": True,
+            "task_id": task_id,
+            "task_name": task_name,
+            "schedule_id": schedule_id,
+            "run_at": run_at,
+            "repeat_every": repeat_every
+        }, indent=2)
+        
+    except Exception as e:
+        logger.error(f"Error creating scheduled task: {e}")
+        logger.error(traceback.format_exc())
+        return json.dumps({
+            "success": False,
+            "error": str(e)
+        }, indent=2)
+
+
+# @heartbeat
+# def check_scheduled_tasks() -> void:
+#     """
+#     Heartbeat function that runs automatically to check and execute scheduled tasks.
+#     This is called periodically by the Internet Computer to process task schedules.
+#     """
+#     try:
+#         task_manager = TaskManager()
+#         task_manager._update_timers()
+#     except Exception as e:
+#         logger.error(f"Error in heartbeat checking scheduled tasks: {e}")
 #         logger.error(traceback.format_exc())
