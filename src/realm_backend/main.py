@@ -1016,13 +1016,13 @@ def get_task_logs(task_id: str, limit: nat = 20) -> str:
             execution_data = []
             for execution in executions[-limit:]:
                 exec_info = {
-                    "started_at": execution.timestamp_created,
+                    "started_at": getattr(execution, "_timestamp_created", 0),
                     "status": getattr(execution, "status", "unknown")
                 }
-                if hasattr(execution, "result"):
-                    exec_info["result"] = execution.result
-                if hasattr(execution, "error"):
-                    exec_info["error"] = execution.error
+                if hasattr(execution, "logs") and execution.logs:
+                    exec_info["logs"] = str(execution.logs)
+                if hasattr(execution, "result") and execution.result:
+                    exec_info["result"] = str(execution.result)
                 execution_data.append(exec_info)
             
             return json.dumps({
@@ -1040,10 +1040,10 @@ def get_task_logs(task_id: str, limit: nat = 20) -> str:
             }, indent=2)
             
     except Exception as e:
-        logger.error(f"Error getting task logs: {e}")
+        logger.error(f"Error getting task logs: {traceback.format_exc()}")
         return json.dumps({
             "success": False,
-            "error": str(e)
+            "error": traceback.format_exc()
         }, indent=2)
 
 

@@ -32,6 +32,7 @@ from execution import run_code
 from ggg.codex import Codex
 from ggg.status import TaskStatus
 from ggg.task import Task as GGGTask
+from ggg.task_executions import TaskExecution
 from ggg.task_schedule import TaskSchedule  # as GGGTaskSchedule
 from kybra import Async, Duration, TimerId, ic, void
 from kybra_simple_db import (
@@ -138,6 +139,7 @@ class TaskStep(Entity, TimestampedMixin):
 class Task(GGGTask):
     steps = OneToMany("TaskStep", "task")
     schedules = OneToMany("TaskSchedule", "task")
+    executions = OneToMany("TaskExecution", "task")
     status = String()
     step_to_execute = Integer()
 
@@ -170,15 +172,39 @@ class TaskManager:
 
             def async_timer_callback() -> Async[void]:
                 logger.info(f"Executing async timer callback for {step.call}")
+                execution = None
                 try:
+                    # Create execution record
+                    execution = TaskExecution(
+                        name=f"{task.name}_execution",
+                        task=task,
+                        status="running",
+                        logs="",
+                        result=""
+                    )
+                    
                     # Use _function() which handles both codex and function-based calls
                     result = yield step.call._function()()
                     logger.info(f"Async timer callback completed with result: {result}")
+                    
+                    # Update execution record with result
+                    if execution:
+                        execution.status = "completed"
+                        execution.result = str(result) if result else "completed"
+                        execution.logs = f"Execution completed successfully"
+                    
                     step.status = TaskStatus.COMPLETED.value
                     self._check_and_schedule_next_step(task)
                 except Exception as e:
                     logger.error(f"Async timer callback failed: {e}")
                     logger.error(traceback.format_exc())
+                    
+                    # Update execution record with error
+                    if execution:
+                        execution.status = "failed"
+                        execution.result = "failed"
+                        execution.logs = f"Error: {str(e)}\n{traceback.format_exc()}"
+                    
                     step.status = TaskStatus.FAILED.value
                     task.status = TaskStatus.FAILED.value
 
@@ -188,12 +214,45 @@ class TaskManager:
             def sync_timer_callback() -> void:
                 logger.info(f"Executing sync timer callback for {step.call}")
                 logger.info(f"step.call.task_step.task.name: {step.call.task_step.task.name}")
+                execution = None
                 try:
+                    # Create execution record
+                    execution = TaskExecution(
+                        name=f"{task.name}_execution",
+                        task=task,
+                        status="running",
+                        logs="",
+                        result=""
+                    )
+                    
+                    # Execute the task
                     step.call._function()()
+                    
+                    # Get result if available (from Call._sync_function)
+                    result = getattr(step.call, '_result', None)
+                    
+                    # Update execution record with result
+                    if execution:
+                        if result and isinstance(result, dict):
+                            execution.status = "completed"
+                            execution.logs = result.get('logs', '') or 'Execution completed'
+                            execution.result = str(result.get('result', 'completed'))
+                        else:
+                            execution.status = "completed"
+                            execution.result = "completed"
+                            execution.logs = "Execution completed successfully"
+                    
                     step.status = TaskStatus.COMPLETED.value
                     self._check_and_schedule_next_step(task)
                 except Exception as e:
                     logger.error(f"Sync timer callback failed: {e}")
+                    
+                    # Update execution record with error
+                    if execution:
+                        execution.status = "failed"
+                        execution.result = "failed"
+                        execution.logs = f"Error: {str(e)}\n{traceback.format_exc()}"
+                    
                     step.status = TaskStatus.FAILED.value
                     task.status = TaskStatus.FAILED.value
 

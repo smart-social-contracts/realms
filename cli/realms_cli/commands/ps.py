@@ -72,10 +72,10 @@ def call_canister_endpoint(canister: str, method: str, args: str = "()", network
             
             # Extract string content between quotes
             if inner.startswith('"') and inner.endswith('"'):
-                json_str = inner[1:-1]  # Remove surrounding quotes
-                # Unescape the JSON string
-                json_str = json_str.replace('\\n', '\n').replace('\\"', '"').replace('\\\\', '\\')
-                return json.loads(json_str)
+                # Use json.loads twice: once to unwrap the outer quotes,
+                # and once to parse the actual JSON content
+                json_string = json.loads(inner)  # Unwrap outer quotes
+                return json.loads(json_string)    # Parse the JSON
         
         return {"error": "Failed to parse response"}
         
@@ -383,8 +383,14 @@ def ps_logs_command(
             result_str = str(execution['result'])[:100]
             console.print(f"      Result: {result_str}")
         
-        if "error" in execution:
-            console.print(f"      [red]Error: {execution['error']}[/red]")
+        if "logs" in execution and execution['logs']:
+            # Show first 300 chars of logs
+            logs_str = str(execution['logs'])[:300]
+            # Check if this is an error log (contains "Error:" or "failed")
+            if "Error:" in logs_str or "failed" in execution.get('status', ''):
+                console.print(f"      [red]Logs: {logs_str}[/red]")
+            else:
+                console.print(f"      Logs: [dim]{logs_str}[/dim]")
         
         console.print()
     
