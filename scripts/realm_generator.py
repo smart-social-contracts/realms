@@ -42,7 +42,10 @@ from ggg import (
     Dispute,
     Mandate,
     Identity,
-    Proposal
+    Proposal,
+    Codex,
+    Task,
+    TaskSchedule
 )
 
 
@@ -249,6 +252,45 @@ class RealmGenerator:
             
         return mandates
     
+    def generate_scheduled_task(self) -> tuple:
+        """Generate a scheduled task for the satoshi transfer codex
+        
+        Returns tuple of (codex, task, task_schedule)
+        Note: Codex code will be loaded from the generated file during upload
+        """
+        import json
+        from datetime import datetime
+        
+        # Create Codex entity (code will be set during import)
+        codex = Codex(
+            name="Satoshi Transfer",
+            description="Sends 1 satoshi every 60 seconds",
+            code=""  # Will be populated when codex file is imported
+        )
+        
+        # Create Task that references the codex
+        task = Task(
+            name="Satoshi Transfer Task",
+            metadata=json.dumps({
+                "description": "Automated satoshi transfer every 60 seconds",
+                "codex_name": "Satoshi Transfer",
+                "target_principal": "64fpo-jgpms-fpewi-hrskb-f3n6u-3z5fy-bv25f-zxjzg-q5m55-xmfpq-hqe",
+                "amount": 1
+            })
+        )
+        
+        # Create TaskSchedule to run every 60 seconds
+        task_schedule = TaskSchedule(
+            name="Satoshi Transfer Schedule",
+            task=task,
+            repeat_every=60,  # Run every 60 seconds
+            run_at=0,  # Start immediately
+            last_run_at=0,  # Not run yet
+            disabled=False  # Enabled by default
+        )
+        
+        return (codex, task, task_schedule)
+    
     def generate_treasury_data(self, realm: Realm) -> Treasury:
         """Generate treasury data matching Treasury entity schema"""
         # Match the Treasury entity structure exactly:
@@ -326,6 +368,9 @@ class RealmGenerator:
         disputes = self.generate_disputes(params.get('disputes', 10))
         mandates = self.generate_mandates()
         
+        # Generate scheduled task for satoshi transfer
+        codex, task, task_schedule = self.generate_scheduled_task()
+        
         # Return only additional data (not foundational objects)
         ret = []
         ret += users
@@ -337,6 +382,9 @@ class RealmGenerator:
         ret += transfers
         ret += disputes
         ret += mandates
+        ret.append(codex)
+        ret.append(task)
+        ret.append(task_schedule)
         return ret
     
     def generate_codex_files(self, output_dir: Path) -> List[str]:
