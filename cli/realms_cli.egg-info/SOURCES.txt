@@ -21,6 +21,7 @@ realms_cli/commands/deploy.py
 realms_cli/commands/extension.py
 realms_cli/commands/import_data.py
 realms_cli/commands/init.py
+realms_cli/commands/ps.py
 realms_cli/commands/registry.py
 realms_cli/commands/run.py
 realms_cli/commands/shell.py

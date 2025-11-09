@@ -9,8 +9,8 @@ class TaskExecution(Entity, TimestampedMixin):
     name = String(max_length=256)
     task = ManyToOne("Task", "executions")
     status = String(max_length=50)  # "completed", "failed", "running"
-    logs = String()
-    result = String()
+    logs = String(max_length=5000)  # Increased for detailed error logs and tracebacks
+    result = String(max_length=5000)  # Increased for larger results
     # codex_code = String()
 
     def __repr__(self) -> str:
