@@ -29,9 +29,12 @@ def test_execute_sync_code():
     escaped_code = code.replace('"', '\\"')
     args = f'("{escaped_code}")'
     
+    print(f"\n    Command: dfx canister call realm_backend execute_code '{args}'")
     output, code = dfx_call("realm_backend", "execute_code", args, is_update=True)
+    print(f"    Exit code: {code}")
+    print(f"    Output: {output[:200]}...")
     
-    assert code == 0, f"execute_code failed with code {code}"
+    assert code == 0, f"execute_code failed with code {code}, output: {output}"
     assert_contains(output, "sync", "Should indicate sync execution")
     # Sync tasks also return "running" and complete via timer callbacks
     assert_contains(output, "task_id", "Should return task ID")
@@ -47,9 +50,12 @@ def test_execute_sync_code_with_result():
     escaped_code = code.replace('"', '\\"')
     args = f'("{escaped_code}")'
     
+    print(f"\n    Command: dfx canister call realm_backend execute_code '{args}'")
     output, code = dfx_call("realm_backend", "execute_code", args, is_update=True)
+    print(f"    Exit code: {code}")
+    print(f"    Output: {output[:200]}...")
     
-    assert code == 0, f"execute_code failed"
+    assert code == 0, f"execute_code failed with code {code}, output: {output}"
     # Should return sync type and task info
     assert_contains(output, "sync", "Should indicate sync execution")
     assert_contains(output, "task_id", "Should include task ID")
@@ -87,9 +93,12 @@ def test_execute_async_code():
     escaped_code = code.replace('"', '\\"').replace('\n', '\\n')
     args = f'("{escaped_code}")'
     
+    print(f"\n    Command: dfx canister call realm_backend execute_code '{args[:100]}...'")
     output, code = dfx_call("realm_backend", "execute_code", args, is_update=True)
+    print(f"    Exit code: {code}")
+    print(f"    Output: {output[:200]}...")
     
-    assert code == 0, f"execute_code failed with code {code}"
+    assert code == 0, f"execute_code failed with code {code}, output: {output}"
     assert_contains(output, "async", "Should indicate async execution")
     assert_contains(output, "task_id", "Should return task ID for polling")
     print("✓")
@@ -104,8 +113,11 @@ def test_get_task_status():
     escaped_code = code.replace('"', '\\"')
     execute_args = f'("{escaped_code}")'
     
+    print(f"\n    Command: dfx canister call realm_backend execute_code '{execute_args}'")
     output, exit_code = dfx_call("realm_backend", "execute_code", execute_args, is_update=True)
-    assert exit_code == 0, "Failed to execute code"
+    print(f"    Exit code: {exit_code}")
+    print(f"    Output: {output[:200]}...")
+    assert exit_code == 0, f"Failed to execute code, exit_code: {exit_code}, output: {output}"
     
     # Extract task_id from response
     # The output will be in Candid format, parse it
@@ -114,10 +126,13 @@ def test_get_task_status():
         # Use a placeholder ID format
         status_args = '("1")'  # Assuming sequential IDs
         
+        print(f"\n    Command: dfx canister call realm_backend get_task_status '{status_args}'")
         output, code = dfx_call("realm_backend", "get_task_status", status_args)
+        print(f"    Exit code: {code}")
+        print(f"    Output: {output[:200]}...")
         
         # The call should work (may return not found, which is ok)
-        assert code == 0, f"get_task_status failed with code {code}"
+        assert code == 0, f"get_task_status failed with code {code}, output: {output}"
         print("✓")
     else:
         # If no task_id in sync execution, that's expected
@@ -190,14 +205,17 @@ def test_task_status_format():
     
     # Query status for a task (may or may not exist)
     args = '("1")'
+    print(f"\n    Command: dfx canister call realm_backend get_task_status '{args}'")
     output, code = dfx_call("realm_backend", "get_task_status", args)
+    print(f"    Exit code: {code}")
+    print(f"    Output: {output[:200]}...")
     
     # Should not crash, should return structured response
-    assert code == 0, f"get_task_status failed with code {code}"
+    assert code == 0, f"get_task_status failed with code {code}, output: {output}"
     
     # Should contain either task data or error message
     has_task_info = "task_id" in output or "status" in output or "error" in output
-    assert has_task_info, "Should return structured task status response"
+    assert has_task_info, f"Should return structured task status response. Got: {output[:300]}"
     
     print("✓")
 
@@ -223,13 +241,18 @@ if __name__ == "__main__":
     
     print("Running tests:")
     failed = 0
+    failed_tests = []
     for test in tests:
         try:
             test()
         except Exception as e:
             print(f"✗")
             print(f"    Error: {e}")
+            import traceback
+            print(f"    Traceback:")
+            traceback.print_exc()
             failed += 1
+            failed_tests.append((test.__name__, str(e)))
     
     print("\n" + "=" * 60)
     if failed == 0:
@@ -238,5 +261,8 @@ if __name__ == "__main__":
         sys.exit(0)
     else:
         print(f"❌ {failed} test(s) failed")
+        print("\nFailed tests:")
+        for test_name, error in failed_tests:
+            print(f"  - {test_name}: {error}")
         print("=" * 60)
         sys.exit(1)
