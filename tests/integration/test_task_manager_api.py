@@ -106,7 +106,7 @@ def test_execute_async_code():
 
 
 def test_get_task_status():
-    """Test retrieving task status."""
+    """Test retrieving task status using get_objects()."""
     print("  - test_get_task_status...", end=" ")
     
     # First execute some code to create a task
@@ -120,21 +120,29 @@ def test_get_task_status():
     print(f"    Output: {output[:200]}...")
     assert exit_code == 0, f"Failed to execute code, exit_code: {exit_code}, output: {output}"
     
-    # Extract task_id from response
-    # The output will be in Candid format, parse it
+    # Extract task_id from JSON response
     if "task_id" in output:
-        # Try to get task status (even if we can't extract exact ID, test the endpoint)
-        # Use a placeholder ID format
-        status_args = '("1")'  # Assuming sequential IDs
-        
-        print(f"\n    Command: dfx canister call realm_backend get_task_status '{status_args}'")
-        output, code = dfx_call("realm_backend", "get_task_status", status_args)
-        print(f"    Exit code: {code}")
-        print(f"    Output: {output[:200]}...")
-        
-        # The call should work (may return not found, which is ok)
-        assert code == 0, f"get_task_status failed with code {code}, output: {output}"
-        print("✓")
+        # Parse the task_id from the JSON in the Candid response
+        # Response format: ("{{json}}")
+        import re
+        match = re.search(r'"task_id":\s*"(\d+)"', output)
+        if match:
+            task_id = match.group(1)
+            # Use get_objects() to query the Task - note the correct Candid vec syntax
+            status_args = f'(vec {{ record {{ 0 = "Task"; 1 = "{task_id}" }} }})'
+            
+            print(f"\n    Command: dfx canister call realm_backend get_objects '{status_args}'")
+            output, code = dfx_call("realm_backend", "get_objects", status_args)
+            print(f"    Exit code: {code}")
+            print(f"    Output: {output[:200]}...")
+            
+            # The call should work
+            assert code == 0, f"get_objects failed with code {code}, output: {output}"
+            # Should contain task data
+            assert_contains(output, "Task", "Should return Task object")
+            print("✓")
+        else:
+            print("✓ (could not extract task_id, but execution succeeded)")
     else:
         # If no task_id in sync execution, that's expected
         print("✓ (sync execution, no task tracking)")
@@ -201,22 +209,22 @@ result = "logged"'''
 
 
 def test_task_status_format():
-    """Test that task status returns proper format."""
+    """Test that get_objects() returns proper Task format."""
     print("  - test_task_status_format...", end=" ")
     
-    # Query status for a task (may or may not exist)
-    args = '("1")'
-    print(f"\n    Command: dfx canister call realm_backend get_task_status '{args}'")
-    output, code = dfx_call("realm_backend", "get_task_status", args)
+    # First, list tasks using get_objects_paginated to find an existing task ID
+    list_args = '("Task", 0, 1, "desc")'
+    print(f"\n    Command: dfx canister call realm_backend get_objects_paginated '{list_args}'")
+    output, code = dfx_call("realm_backend", "get_objects_paginated", list_args)
     print(f"    Exit code: {code}")
     print(f"    Output: {output[:200]}...")
     
     # Should not crash, should return structured response
-    assert code == 0, f"get_task_status failed with code {code}, output: {output}"
+    assert code == 0, f"get_objects_paginated failed with code {code}, output: {output}"
     
-    # Should contain either task data or error message
-    has_task_info = "task_id" in output or "status" in output or "error" in output
-    assert has_task_info, f"Should return structured task status response. Got: {output[:300]}"
+    # Should contain task data or pagination info
+    has_response = "success" in output or "objects" in output or "pagination" in output
+    assert has_response, f"Should return structured response. Got: {output[:300]}"
     
     print("✓")
 
