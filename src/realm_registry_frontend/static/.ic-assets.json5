@@ -1,5 +1,17 @@
 [
     {
+        // Explicitly allow .well-known directory for domain verification
+        "match": ".well-known",
+        "ignore": false
+    },
+    {
+        "match": ".well-known/*",
+        "ignore": false,
+        "headers": {
+            "Content-Type": "text/plain",
+        }
+    },
+    {
         "match": "**/*",
 
         // Provides a base set of security headers that will work for most dapps.
