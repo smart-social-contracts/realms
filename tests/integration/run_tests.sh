@@ -34,11 +34,13 @@ for test_file in test_*.py; do
     # Capture output and exit code, save to log file
     LOG_FILE="$LOGS_DIR/${test_file%.py}.log"
     
-    # Run test and capture output to both log file and variable
-    # Use PIPESTATUS to get the exit code of python3, not tee
-    set +e  # Don't exit on error
-    output=$(python3 "$test_file" 2>&1 | tee "$LOG_FILE")
-    test_exit_code=${PIPESTATUS[0]}  # Get exit code of python3, not tee
+    # Run test, save output to log file, and capture exit code
+    # Use pipefail so the pipeline fails if python3 fails (not just tee)
+    set +e          # Don't exit on error
+    set -o pipefail # Fail if any command in pipeline fails
+    python3 "$test_file" 2>&1 | tee "$LOG_FILE"
+    test_exit_code=$?
+    set +o pipefail # Reset pipefail
     set -e
     
     END_TIME=$(date +%s)
@@ -56,16 +58,16 @@ for test_file in test_*.py; do
     else
         test_results["$test_file"]="FAILED"
         FAILED=$((FAILED + 1))
-        echo "❌ $test_file failed (${DURATION}s)"
+        echo "❌ $test_file failed (${DURATION}s) - exit code: $test_exit_code"
         
         # Add to GitHub summary if in CI
         if [ -n "$GITHUB_STEP_SUMMARY" ]; then
             echo "| \`$test_file\` | ❌ FAILED | ${DURATION}s |" >> "$GITHUB_STEP_SUMMARY"
             # Create annotation for failure
-            echo "::error file=tests/integration/$test_file::Test suite failed"
-            # Show first few lines of error output
+            echo "::error file=tests/integration/$test_file::Test suite failed with exit code $test_exit_code"
+            # Show error output from log file
             echo "::group::$test_file error output"
-            echo "$output" | head -n 20
+            tail -n 50 "$LOG_FILE"
             echo "::endgroup::"
         fi
     fi

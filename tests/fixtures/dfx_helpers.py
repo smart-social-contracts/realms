@@ -29,8 +29,15 @@ def dfx_call(
     if output_json:
         cmd.extend(["--output", "json"])
     
-    # Log the full command
-    cmd_str = " ".join(cmd)
+    # Log the full command with proper quoting for args
+    cmd_display = ["dfx", "canister", "call", canister, method]
+    if args:
+        cmd_display.append(f'"{args}"')  # Add quotes around args for display
+    if not is_update:
+        cmd_display.append("--query")
+    if output_json:
+        cmd_display.extend(["--output", "json"])
+    cmd_str = " ".join(cmd_display)
     print(f"    [DFX CMD] {cmd_str}")
     
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -38,14 +45,17 @@ def dfx_call(
     # Log exit code
     print(f"    [DFX EXIT CODE] {result.returncode}")
     
-    # Log output length and first part of output
-    output_preview = result.stdout[:200] if result.stdout else "(empty)"
-    print(f"    [DFX STDOUT] {len(result.stdout)} bytes: {output_preview}{'...' if len(result.stdout) > 200 else ''}")
+    # Log full stdout (no truncation)
+    if result.stdout:
+        print(f"    [DFX STDOUT] {len(result.stdout)} bytes:")
+        print(result.stdout)
+    else:
+        print(f"    [DFX STDOUT] (empty)")
     
-    # Log stderr if present
+    # Log full stderr if present (no truncation)
     if result.stderr:
-        stderr_preview = result.stderr[:200]
-        print(f"    [DFX STDERR] {stderr_preview}{'...' if len(result.stderr) > 200 else ''}")
+        print(f"    [DFX STDERR]:")
+        print(result.stderr)
     
     return result.stdout, result.returncode
 
