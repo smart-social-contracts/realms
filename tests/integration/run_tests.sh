@@ -8,6 +8,10 @@ echo "Running Backend Integration Tests"
 echo "======================================"
 echo
 
+# Create logs directory
+LOGS_DIR="../../integration-test-logs"
+mkdir -p "$LOGS_DIR"
+
 # Array to store test results
 declare -A test_results
 FAILED=0
@@ -27,8 +31,9 @@ for test_file in test_*.py; do
     echo "Running $test_file..."
     START_TIME=$(date +%s)
     
-    # Capture output and exit code
-    if output=$(python3 "$test_file" 2>&1); then
+    # Capture output and exit code, save to log file
+    LOG_FILE="$LOGS_DIR/${test_file%.py}.log"
+    if output=$(python3 "$test_file" 2>&1 | tee "$LOG_FILE"); then
         test_results["$test_file"]="PASSED"
         PASSED=$((PASSED + 1))
         END_TIME=$(date +%s)
@@ -76,10 +81,37 @@ echo "  Passed: $PASSED ✅"
 echo "  Failed: $FAILED ❌"
 echo "======================================"
 
+# Create summary file
+SUMMARY_FILE="$LOGS_DIR/test-summary.txt"
+cat > "$SUMMARY_FILE" <<EOF
+====================================
+Integration Test Results Summary
+====================================
+Total Tests: $((PASSED + FAILED))
+Passed: $PASSED ✅
+Failed: $FAILED ❌
+
+Test Details:
+EOF
+
+# Add individual test results to summary
+for test_file in test_*.py; do
+    status="${test_results[$test_file]}"
+    if [ "$status" = "PASSED" ]; then
+        echo "  ✅ $test_file - PASSED" >> "$SUMMARY_FILE"
+    else
+        echo "  ❌ $test_file - FAILED" >> "$SUMMARY_FILE"
+    fi
+done
+
+echo "" >> "$SUMMARY_FILE"
+echo "Individual test logs are available in integration-test-logs/ directory" >> "$SUMMARY_FILE"
+
 if [ $FAILED -eq 0 ]; then
     echo "✅ All test suites passed!"
     exit 0
 else
     echo "❌ $FAILED test suite(s) failed"
+    echo "📋 Check $LOGS_DIR/ for detailed logs"
     exit 1
 fi
