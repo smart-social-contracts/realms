@@ -33,11 +33,20 @@ for test_file in test_*.py; do
     
     # Capture output and exit code, save to log file
     LOG_FILE="$LOGS_DIR/${test_file%.py}.log"
-    if output=$(python3 "$test_file" 2>&1 | tee "$LOG_FILE"); then
+    
+    # Run test and capture output to both log file and variable
+    # Use PIPESTATUS to get the exit code of python3, not tee
+    set +e  # Don't exit on error
+    output=$(python3 "$test_file" 2>&1 | tee "$LOG_FILE")
+    test_exit_code=${PIPESTATUS[0]}  # Get exit code of python3, not tee
+    set -e
+    
+    END_TIME=$(date +%s)
+    DURATION=$((END_TIME - START_TIME))
+    
+    if [ $test_exit_code -eq 0 ]; then
         test_results["$test_file"]="PASSED"
         PASSED=$((PASSED + 1))
-        END_TIME=$(date +%s)
-        DURATION=$((END_TIME - START_TIME))
         echo "✅ $test_file passed (${DURATION}s)"
         
         # Add to GitHub summary if in CI
@@ -47,8 +56,6 @@ for test_file in test_*.py; do
     else
         test_results["$test_file"]="FAILED"
         FAILED=$((FAILED + 1))
-        END_TIME=$(date +%s)
-        DURATION=$((END_TIME - START_TIME))
         echo "❌ $test_file failed (${DURATION}s)"
         
         # Add to GitHub summary if in CI
