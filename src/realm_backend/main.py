@@ -829,11 +829,6 @@ def execute_code(code: str) -> str:
         step = TaskStep(call=call)
         task = Task(name=f"Shell Task {temp_name}", steps=[step])
         
-        # IMPORTANT: Save task to database BEFORE execution
-        # TaskExecution needs a valid task._id for the ManyToOne relationship
-        # Without this, TaskExecution creation fails with relationship constraint error
-        task.save()
-
         # Create schedule (immediate execution)
         schedule = TaskSchedule(
             name=f"Shell Schedule {temp_name}",
