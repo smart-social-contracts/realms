@@ -9,6 +9,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import traceback
 
 
 def run_command(cmd, input_data=None, timeout=30):
@@ -210,9 +211,13 @@ def main():
             test()
         except AssertionError as e:
             print(f"❌ FAILED: {e}")
+            print(f"    Traceback:")
+            traceback.print_exc()
             failed += 1
         except Exception as e:
             print(f"❌ ERROR: {e}")
+            print(f"    Traceback:")
+            traceback.print_exc()
             failed += 1
         print()
     

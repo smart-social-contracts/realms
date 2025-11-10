@@ -3,6 +3,7 @@
 
 import sys
 import os
+import traceback
 
 # Add fixtures to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -73,6 +74,8 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"✗")
             print(f"    Error: {e}")
+            print(f"    Traceback:")
+            traceback.print_exc()
             failed += 1
     
     print()
