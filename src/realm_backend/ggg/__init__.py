@@ -20,6 +20,7 @@ from .organization import Organization
 from .permission import Permission
 from .proposal import Proposal
 from .realm import Realm
+from .registry import Registry
 from .service import Service
 from .task import Task
 from .task_schedule import TaskSchedule
@@ -47,6 +48,7 @@ __all__ = [
     "Permission",
     "Proposal",
     "Realm",
+    "Registry",
     "Service",
     "Task",
     "TaskSchedule",

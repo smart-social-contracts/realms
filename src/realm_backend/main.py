@@ -10,6 +10,7 @@ from api.ggg_entities import (
 )
 from api.status import get_status
 from api.user import user_get, user_register, user_update_profile_picture
+from api.registry import register_realm, get_registry_info
 from core.candid_types_realm import (
     ExtensionCallArgs,
     ExtensionCallResponse,
@@ -1180,6 +1181,65 @@ def create_scheduled_task(name: str, code: str, repeat_every: nat, run_after: na
         return json.dumps({
             "success": False,
             "error": str(e)
+        }, indent=2)
+
+
+@update
+def register_realm_with_registry(
+    registry_canister_id: text,
+    realm_id: text,
+    realm_name: text,
+    frontend_url: text = ""
+) -> Async[text]:
+    """
+    Register this realm with the central registry.
+    
+    Makes an inter-canister call to the realm_registry_backend to register
+    this realm in the global registry.
+    
+    Args:
+        registry_canister_id: Canister ID of the realm registry backend
+        realm_id: Unique ID for this realm
+        realm_name: Display name for this realm
+        frontend_url: Frontend canister URL (optional, will auto-derive if empty)
+    
+    Returns:
+        JSON string with success status and message
+    """
+    try:
+        result = yield register_realm(
+            registry_canister_id,
+            realm_id,
+            realm_name,
+            frontend_url
+        )
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error in register_realm_with_registry: {e}")
+        logger.error(traceback.format_exc())
+        return json.dumps({
+            "success": False,
+            "error": str(e)
+        }, indent=2)
+
+
+@query
+def get_realm_registry_info() -> text:
+    """
+    Get information about registries this realm is registered with.
+    
+    Returns:
+        JSON string with list of registries
+    """
+    try:
+        result = get_registry_info()
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error in get_realm_registry_info: {e}")
+        return json.dumps({
+            "success": False,
+            "error": str(e),
+            "registries": []
         }, indent=2)
 
 

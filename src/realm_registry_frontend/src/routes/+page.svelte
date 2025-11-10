@@ -1,8 +1,9 @@
 <script>
   import { onMount } from 'svelte';
-  import { backend } from "$lib/canisters";
+  import { browser } from '$app/environment';
   import QRCode from 'qrcode';
 
+  let backend;
   let realms = [];
   let loading = true;
   let error = null;
@@ -17,7 +18,12 @@
   let qrCodeDataUrl = '';
 
   onMount(async () => {
-    await loadRealms();
+    if (browser) {
+      // Only import backend in browser context
+      const { backend: b } = await import("$lib/canisters");
+      backend = b;
+      await loadRealms();
+    }
   });
 
   async function loadRealms() {

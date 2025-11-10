@@ -4,6 +4,7 @@ from typing import List, Optional
 
 import typer
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
 from .commands.create import create_command
@@ -320,16 +321,111 @@ realm_app.add_typer(registry_app, name="registry")
 
 @registry_app.command("add")
 def registry_add(
-    realm_id: str = typer.Option(..., "--id", help="Unique realm identifier"),
-    name: str = typer.Option(..., "--name", help="Human-readable realm name"),
-    url: str = typer.Option("", "--url", help="Realm URL or canister ID"),
+    realm_id: str = typer.Option(..., "--realm-id", help="Unique realm identifier"),
+    realm_name: str = typer.Option(..., "--realm-name", help="Human-readable realm name"),
+    frontend_url: str = typer.Option("", "--frontend-url", help="Frontend canister URL (optional, will auto-derive)"),
     network: str = typer.Option("local", "--network", "-n", help="Network to use"),
-    canister_id: Optional[str] = typer.Option(
-        None, "--canister-id", help="Registry canister ID"
+    registry_canister_id: str = typer.Option(
+        "realm_registry_backend",
+        "--registry-canister",
+        help="Registry canister ID or name"
     ),
 ) -> None:
-    """Add a new realm to the registry."""
-    registry_add_command(realm_id, name, url, network, canister_id)
+    """
+    Add this realm to the central registry.
+    
+    Calls the registry backend's add_realm function to register this realm.
+    If frontend_url is not provided, it will be auto-derived from the realm_frontend canister ID.
+    
+    Example:
+        realms registry add \\
+            --realm-id "my_demo_realm" \\
+            --realm-name "My Demo Governance Realm" \\
+            --network local
+    """
+    import json
+    import subprocess
+    
+    console.print(Panel.fit(
+        "[bold cyan]🌐 Registering Realm with Central Registry[/bold cyan]",
+        border_style="cyan"
+    ))
+    
+    # Auto-derive frontend URL if not provided
+    if not frontend_url:
+        try:
+            result = subprocess.run(
+                ["dfx", "canister", "id", "realm_frontend", "--network", network],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=5
+            )
+            canister_id = result.stdout.strip()
+            
+            # Format URL based on network
+            if network == "ic":
+                frontend_url = f"{canister_id}.ic0.app"
+            elif network == "staging":
+                frontend_url = f"{canister_id}.icp0.io"
+            else:  # local
+                frontend_url = f"{canister_id}.localhost:8000"
+                
+            console.print(f"[dim]Auto-derived frontend URL: {frontend_url}[/dim]")
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            console.print("[yellow]⚠️  Could not auto-derive frontend URL, using empty string[/yellow]")
+            frontend_url = ""
+    
+    console.print(f"\n[cyan]Realm ID:[/cyan] {realm_id}")
+    console.print(f"[cyan]Realm Name:[/cyan] {realm_name}")
+    console.print(f"[cyan]Frontend URL:[/cyan] {frontend_url}")
+    console.print(f"[dim]Network:[/dim] {network}\n")
+    
+    # Call registry directly
+    args = [f'("{realm_id}", "{realm_name}", "{frontend_url}")']
+    cmd = ["dfx", "canister", "call", "--network", network, registry_canister_id, "add_realm"]
+    cmd.extend(args)
+    
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, check=True, timeout=30
+        )
+        
+        # Parse the Candid output
+        output = result.stdout.strip()
+        if output.startswith("(") and output.endswith(")"):
+            output = output[1:-1]
+        
+        if "Ok" in output:
+            console.print(Panel(
+                f"[green]✅ Successfully registered realm with registry![/green]\n\n"
+                f"[cyan]Realm ID:[/cyan] {realm_id}\n"
+                f"[cyan]Realm Name:[/cyan] {realm_name}\n"
+                f"[cyan]Frontend URL:[/cyan] {frontend_url}",
+                border_style="green",
+                title="Registration Complete"
+            ))
+        elif "Err" in output:
+            error_msg = output.split('"')[1] if '"' in output else output
+            console.print(Panel(
+                f"[red]❌ Registration failed[/red]\n\n"
+                f"[yellow]Error:[/yellow] {error_msg}",
+                border_style="red",
+                title="Registration Failed"
+            ))
+            raise typer.Exit(1)
+        else:
+            console.print(f"[yellow]⚠️  Unexpected response:[/yellow] {output}")
+            
+    except subprocess.CalledProcessError as e:
+        console.print(f"[red]❌ Error: {e.stderr.strip()}[/red]")
+        raise typer.Exit(1)
+    except subprocess.TimeoutExpired:
+        console.print("[red]❌ Command timed out[/red]")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"[red]❌ Unexpected error: {str(e)}[/red]")
+        raise typer.Exit(1)
 
 
 @registry_app.command("list")

@@ -30,7 +30,7 @@ Requires-Dist: click>=8.0.0
 Requires-Dist: prompt-toolkit>=3.0.0
 Requires-Dist: kybra==0.7.*
 Requires-Dist: kybra-simple-logging==0.2.*
-Requires-Dist: kybra-simple-db>=0.3.2
+Requires-Dist: kybra-simple-db>=0.4.0
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0.0; extra == "dev"
 Requires-Dist: pytest-cov>=4.0.0; extra == "dev"

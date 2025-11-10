@@ -24,6 +24,7 @@ realms_cli/commands/init.py
 realms_cli/commands/ps.py
 realms_cli/commands/registry.py
 realms_cli/commands/run.py
+realms_cli/commands/self_register.py
 realms_cli/commands/shell.py
 tests/test_db_explorer.py
 tests/test_models.py
