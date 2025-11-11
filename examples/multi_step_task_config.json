@@ -1,0 +1,19 @@
+{
+  "name": "Data Processing Pipeline",
+  "every": 30,
+  "after": 10,
+  "steps": [
+    {
+      "file": "step1_fetch_data.py",
+      "run_next_after": 0
+    },
+    {
+      "file": "step2_process_data.py",
+      "run_next_after": 5
+    },
+    {
+      "file": "step3_save_results.py",
+      "run_next_after": 2
+    }
+  ]
+}

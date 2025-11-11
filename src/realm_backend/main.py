@@ -1199,6 +1199,126 @@ def create_scheduled_task(name: str, code: str, repeat_every: nat, run_after: na
 
 
 @update
+def create_multi_step_scheduled_task(
+    name: str,
+    steps_config: str,
+    repeat_every: nat,
+    run_after: nat = 5,
+) -> str:
+    """
+    Create a multi-step scheduled task from multiple code snippets.
+    
+    Args:
+        name: Task name
+        steps_config: JSON array of step configurations:
+            [
+                {
+                    "code": "<base64-encoded-code>",
+                    "run_next_after": seconds (optional, default 0)
+                },
+                ...
+            ]
+        repeat_every: Interval in seconds (0 for one-time execution)
+        run_after: Delay before first execution in seconds (default: 5)
+    
+    Returns JSON with:
+    - success: Boolean indicating success
+    - task_id: The created task ID
+    - task_name: The task name
+    - schedule_id: The schedule ID
+    - steps_count: Number of steps in the task
+    - run_at: Scheduled execution time
+    - repeat_every: Repeat interval
+    - error: Error message if failed
+    
+    Note: is_async is automatically detected based on code content
+          (presence of 'yield' or 'async_task')
+    """
+    try:
+        # Parse steps configuration
+        steps_data = json.loads(steps_config)
+        
+        if not steps_data or len(steps_data) == 0:
+            raise ValueError("At least one step is required")
+        
+        # Create TaskStep objects
+        task_steps = []
+        for idx, step_config in enumerate(steps_data):
+            # Decode base64 code
+            try:
+                decoded_code = base64.b64decode(step_config["code"]).decode("utf-8")
+            except Exception as e:
+                raise ValueError(f"Invalid base64 code in step {idx}: {e}")
+            
+            # Create codex for this step
+            codex_name = f"_{name}_step_{idx}_{int(ic.time())}"
+            codex = Codex(name=codex_name, code=decoded_code)
+            
+            # Create call - is_async will be auto-detected by Call._function()
+            # Set to False initially, auto-detection will override if needed
+            call = Call(is_async=False, codex=codex)
+            
+            # Get run_next_after delay (default to 0)
+            run_next_after = step_config.get("run_next_after", 0)
+            
+            # Create step
+            step = TaskStep(call=call, run_next_after=run_next_after)
+            task_steps.append(step)
+            
+            logger.info(
+                f"Created step {idx}: codex={codex_name}, "
+                f"run_next_after={run_next_after}s"
+            )
+        
+        # Create task with multiple steps
+        task = Task(name=name, steps=task_steps)
+        
+        # Create schedule
+        current_time = int(ic.time() / 1_000_000_000)
+        schedule = TaskSchedule(
+            name=f"schedule_{name}",
+            task=task,
+            run_at=0,
+            repeat_every=repeat_every,
+            last_run_at=0,
+            disabled=False,
+        )
+        
+        # Register with TaskManager
+        manager = TaskManager()
+        manager.add_task(task)
+        
+        logger.info(
+            f"Created multi-step task: {name} (ID: {task._id}) "
+            f"with {len(task_steps)} steps"
+        )
+        
+        # Trigger task manager to process the schedule
+        TaskManager().run()
+        
+        return json.dumps(
+            {
+                "success": True,
+                "task_id": str(task._id),
+                "task_name": str(task.name),
+                "schedule_id": str(schedule._id),
+                "steps_count": len(task_steps),
+                "run_at": int(schedule.run_at),
+                "repeat_every": int(schedule.repeat_every),
+            },
+            indent=2,
+        )
+
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in steps_config: {e}")
+        return json.dumps({"success": False, "error": f"Invalid JSON: {str(e)}"})
+    except Exception as e:
+        logger.error(f"Error creating multi-step task: {e}")
+        logger.error(traceback.format_exc())
+        return json.dumps({"success": False, "error": str(e)}, indent=2)
+
+
+@update
 def register_realm_with_registry(
     registry_canister_id: text,
     realm_id: text,

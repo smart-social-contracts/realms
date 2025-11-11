@@ -291,6 +291,166 @@ class RealmsShell:
         console.print("[bold blue]Goodbye![/bold blue]")
 
 
+def schedule_multi_step_task_from_config(
+    config_path: str, 
+    canister: str, 
+    network: Optional[str]
+) -> None:
+    """Schedule a multi-step task from a JSON config file."""
+    import os
+    import json
+    import base64
+    from pathlib import Path
+    
+    # Check if config file exists
+    if not os.path.exists(config_path):
+        console.print(f"[red]❌ Config file not found: {config_path}[/red]")
+        raise typer.Exit(1)
+    
+    # Read and parse config
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+    except json.JSONDecodeError as e:
+        console.print(f"[red]❌ Invalid JSON in config file: {e}[/red]")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"[red]❌ Error reading config file: {e}[/red]")
+        raise typer.Exit(1)
+    
+    # Validate required fields
+    required = ['name', 'steps']
+    for field in required:
+        if field not in config:
+            console.print(f"[red]❌ Missing required field in config: {field}[/red]")
+            raise typer.Exit(1)
+    
+    if not config['steps'] or len(config['steps']) == 0:
+        console.print(f"[red]❌ Config must contain at least one step[/red]")
+        raise typer.Exit(1)
+    
+    # Process each step
+    console.print(f"[bold blue]📋 Processing multi-step task: {config['name']}[/bold blue]")
+    console.print(f"[cyan]Steps:[/cyan] {len(config['steps'])}\n")
+    
+    steps_config = []
+    config_dir = Path(config_path).parent
+    
+    for idx, step in enumerate(config['steps']):
+        if 'file' not in step:
+            console.print(f"[red]❌ Step {idx} missing 'file' field[/red]")
+            raise typer.Exit(1)
+        
+        # Resolve step file path (relative to config file)
+        step_file = step['file']
+        if not os.path.isabs(step_file):
+            step_file = config_dir / step_file
+        else:
+            step_file = Path(step_file)
+        
+        if not step_file.exists():
+            console.print(f"[red]❌ Step {idx} file not found: {step_file}[/red]")
+            raise typer.Exit(1)
+        
+        # Read step code
+        try:
+            with open(step_file, 'r', encoding='utf-8') as f:
+                code = f.read()
+        except Exception as e:
+            console.print(f"[red]❌ Error reading step {idx} file: {e}[/red]")
+            raise typer.Exit(1)
+        
+        if not code.strip():
+            console.print(f"[yellow]⚠️  Step {idx} file is empty: {step_file}[/yellow]")
+        
+        # Base64 encode
+        encoded_code = base64.b64encode(code.encode('utf-8')).decode('ascii')
+        
+        # Detect async (for display purposes only - backend will auto-detect)
+        is_async = "yield" in code or "async_task" in code
+        async_marker = "[async]" if is_async else "[sync]"
+        
+        # Get run_next_after delay
+        run_next_after = step.get('run_next_after', 0)
+        
+        steps_config.append({
+            'code': encoded_code,
+            'run_next_after': run_next_after
+        })
+        
+        console.print(f"  {idx + 1}. {step_file.name} {async_marker} → wait {run_next_after}s")
+    
+    console.print()
+    
+    # Prepare backend call parameters
+    task_name = config['name']
+    repeat_every = config.get('every', 0)
+    run_after = config.get('after', 5)
+    
+    console.print(f"[cyan]First run:[/cyan] in {run_after} seconds")
+    if repeat_every > 0:
+        console.print(f"[cyan]Repeat every:[/cyan] {repeat_every} seconds ({repeat_every // 60}m {repeat_every % 60}s)")
+    else:
+        console.print(f"[cyan]Repeat:[/cyan] one-time execution")
+    console.print()
+    
+    # Convert steps config to JSON string
+    steps_json = json.dumps(steps_config)
+    # Escape for shell
+    steps_json_escaped = steps_json.replace('"', '\\"')
+    
+    # Call backend
+    cmd = ["dfx", "canister", "call"]
+    
+    if network:
+        cmd.extend(["--network", network])
+    
+    cmd.extend([
+        canister,
+        "create_multi_step_scheduled_task",
+        f'("{task_name}", "{steps_json_escaped}", {repeat_every}, {run_after})'
+    ])
+    
+    try:
+        console.print(f"[dim]Calling backend to create multi-step task...[/dim]")
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
+        
+        # Parse response
+        output = result.stdout.strip()
+        if output.startswith('(') and output.endswith(')'):
+            inner = output[1:-1].strip()
+            if inner.endswith(','):
+                inner = inner[:-1].strip()
+            if inner.startswith('"') and inner.endswith('"'):
+                json_str = inner[1:-1]
+                json_str = json_str.replace('\\n', '\n').replace('\\"', '"').replace('\\\\', '\\')
+                data = json.loads(json_str)
+                
+                if data.get('success'):
+                    console.print(f"[green]✅ Multi-step task created successfully![/green]")
+                    console.print(f"[dim]   Task ID: {data['task_id']}[/dim]")
+                    console.print(f"[dim]   Task name: {data['task_name']}[/dim]")
+                    console.print(f"[dim]   Schedule ID: {data['schedule_id']}[/dim]")
+                    console.print(f"[dim]   Steps: {data['steps_count']}[/dim]")
+                    console.print(f"[dim]   First run at: {data['run_at']}[/dim]")
+                    console.print(f"[dim]   Repeat every: {data['repeat_every']}s[/dim]")
+                    console.print(f"\n[dim]Use 'realms ps ls' to view scheduled tasks[/dim]")
+                else:
+                    console.print(f"[red]❌ Error: {data.get('error', 'Unknown error')}[/red]")
+                    raise typer.Exit(1)
+        
+    except subprocess.CalledProcessError as e:
+        console.print(f"[red]❌ Error calling backend: {e.stderr}[/red]")
+        raise typer.Exit(1)
+    except json.JSONDecodeError as e:
+        console.print(f"[red]❌ Failed to parse response: {e}[/red]")
+        console.print(f"[dim]Raw output: {output}[/dim]")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"[red]❌ Error scheduling multi-step task: {e}[/red]")
+        raise typer.Exit(1)
+
+
 def run_command(
     network: Optional[str] = None,
     canister: str = "realm_backend",
@@ -298,8 +458,14 @@ def run_command(
     wait: Optional[int] = None,
     every: Optional[int] = None,
     after: Optional[int] = None,
+    config: Optional[str] = None,
 ) -> None:
     """Start an interactive Python shell connected to the Realms backend canister or execute a Python file."""
+    # If config is provided, create multi-step task from config file
+    if config:
+        schedule_multi_step_task_from_config(config, canister, network)
+        return
+    
     # If file is provided, execute it instead of interactive shell
     if file:
         # If scheduling options are provided, schedule the task
