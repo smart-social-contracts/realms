@@ -267,6 +267,20 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }} \
             python3 tests/backend/test_realm_registry.py
 
+  test-tasks:
+    runs-on: ubuntu-latest
+    needs: build
+    if: "!contains(github.event.head_commit.message, 'Bump version')"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Run multi-step task tests
+        run: |
+          docker run --rm \
+            ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }} \
+            python3 tests/backend/test_multi_step_tasks.py
+
   test-ui-e2e:
     runs-on: ubuntu-latest
     needs: build
@@ -301,7 +315,7 @@ jobs:
 
   deploy-staging:
     runs-on: ubuntu-latest
-    needs: [linting, test-extensions, test-backend-integration, test-realm-registry, test-ui-e2e, test-cli-docker-mode]
+    needs: [linting, test-extensions, test-backend-integration, test-realm-registry, test-tasks, test-ui-e2e, test-cli-docker-mode]
     if: "!contains(github.event.head_commit.message, 'Bump version')"
     steps:
       - name: Checkout code

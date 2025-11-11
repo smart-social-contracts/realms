@@ -705,6 +705,207 @@ def download_file_from_url(url: str) -> Async[Tuple[bool, str]]:
         return False, error_msg
 
 
+@update
+def download_file(
+    url: str,
+    codex_name: str,
+    callback_code: Optional[str] = None,
+    checksum: Optional[str] = None,
+) -> str:
+    """
+    Convenient wrapper to download a file from a URL and save it to a Codex.
+    
+    This function creates a two-step task:
+    1. Step 1 (async): Download the file from the URL
+    2. Step 2 (sync): Verify checksum (if provided) and save content to a Codex
+    
+    The downloaded content is stored in `downloaded_content[url]` dictionary
+    and can be accessed by the callback code.
+    
+    Args:
+        url: The URL to download from
+        codex_name: Name for the Codex where the downloaded content will be saved
+        callback_code: Optional Python code to process the downloaded content.
+                      The code can access the downloaded content via:
+                      `from main import downloaded_content; content = downloaded_content['<url>']`
+                      If None, a default callback saves content to the specified Codex.
+        checksum: Optional checksum in format "sha256:hash" to verify downloaded content.
+                 If verification fails, the content will not be saved to the Codex.
+    
+    Returns:
+        JSON string with task information:
+        - success: Boolean
+        - task_id: The created task ID
+        - task_name: The task name
+        - url: The URL being downloaded
+        - codex_name: The name of the Codex where content will be saved
+        - checksum: The checksum used for verification (if provided)
+        - error: Error message if failed
+    
+    Example usage from a Codex:
+        from main import download_file
+        
+        # Download and save to a Codex
+        download_file(
+            "https://example.com/data.json",
+            "my_downloaded_data"
+        )
+        
+        # Download with checksum verification
+        download_file(
+            "https://example.com/code.py",
+            "verified_code",
+            checksum="sha256:abc123..."
+        )
+        
+        # Download with custom processing
+        callback = '''
+from main import downloaded_content
+from ggg import Codex
+import json
+
+content = downloaded_content['https://example.com/data.json']
+data = json.loads(content)
+ic.print(f"Processing {len(data)} items...")
+# ... custom processing logic ...
+codex = Codex(name="processed_data", code=str(data))
+ic.print(f"Saved to codex {codex._id}")
+'''
+        download_file(
+            "https://example.com/data.json",
+            "raw_data",
+            callback
+        )
+    """
+    try:
+        task_name = f"download_{codex_name}_{int(ic.time())}"
+        
+        # Step 1: Async download
+        download_codex = Codex(
+            name=f"_{task_name}_download",
+            code=f'''
+from main import download_file_from_url
+
+def async_task():
+    ic.print("[Step 1/2] Downloading file from URL: {url}")
+    url = "{url}"
+    result = yield download_file_from_url(url)
+    success, content = result
+    if success:
+        ic.print(f"[Step 1/2] ✅ Downloaded {{len(content)}} bytes")
+    else:
+        ic.print(f"[Step 1/2] ❌ Download failed: {{content}}")
+    return result
+'''.strip()
+        )
+        
+        async_call = Call(is_async=True, codex=download_codex)
+        step1 = TaskStep(call=async_call, run_next_after=0)
+        
+        # Step 2: Sync callback to save to Codex
+        if callback_code is None:
+            # Default callback: verify checksum (if provided) and save to specified Codex
+            checksum_verification = ""
+            if checksum:
+                checksum_verification = f'''
+    # Verify checksum
+    from main import verify_checksum
+    checksum = "{checksum}"
+    is_valid, error_msg = verify_checksum(content, checksum)
+    
+    if not is_valid:
+        ic.print(f"[Step 2/2] ❌ Checksum verification failed: {{error_msg}}")
+        ic.print("[Step 2/2] ❌ Content NOT saved due to checksum mismatch")
+        raise Exception(f"Checksum verification failed: {{error_msg}}")
+    
+    ic.print("[Step 2/2] ✅ Checksum verification passed")
+'''
+            
+            callback_code = f'''
+from main import downloaded_content
+from ggg import Codex
+
+url = "{url}"
+codex_name = "{codex_name}"
+
+if url in downloaded_content:
+    content = downloaded_content[url]
+    ic.print("[Step 2/2] ✅ Download verification successful")
+    ic.print(f"[Step 2/2] Content length: {{len(content)}} bytes")
+    {checksum_verification}
+    # Save to Codex
+    codex = Codex[codex_name]
+    if not codex:
+        codex = Codex(name=codex_name)
+    codex.code = content
+    
+    ic.print(f"[Step 2/2] ✅ Saved to Codex '{{codex_name}}' (ID: {{codex._id}})")
+    
+    if len(content) > 0:
+        preview = content[:100].replace("\\n", " ")
+        ic.print(f"[Step 2/2] Preview: {{preview}}...")
+else:
+    ic.print("[Step 2/2] ❌ ERROR: Content not found in downloaded_content")
+'''.strip()
+        
+        callback_codex = Codex(
+            name=f"_{task_name}_callback",
+            code=callback_code
+        )
+        
+        sync_call = Call(is_async=False, codex=callback_codex)
+        step2 = TaskStep(call=sync_call, run_next_after=0)
+        
+        # Create task with both steps
+        task = Task(name=task_name, steps=[step1, step2])
+        
+        # Create schedule for immediate execution
+        schedule = TaskSchedule(
+            name=f"schedule_{task_name}",
+            task=task,
+            run_at=0,  # Execute immediately
+            repeat_every=0,  # One-time execution
+            last_run_at=0,
+            disabled=False,
+        )
+        
+        # Register with TaskManager
+        manager = TaskManager()
+        manager.add_task(task)
+        
+        logger.info(
+            f"Created download task: {task_name} (ID: {task._id}) for URL: {url} -> Codex: {codex_name}"
+        )
+        
+        # Trigger task manager
+        TaskManager().run()
+        
+        response_data = {
+            "success": True,
+            "task_id": str(task._id),
+            "task_name": str(task.name),
+            "url": url,
+            "codex_name": codex_name,
+            "message": "Download task created and scheduled"
+        }
+        
+        if checksum:
+            response_data["checksum"] = checksum
+        
+        return json.dumps(response_data, indent=2)
+        
+    except Exception as e:
+        logger.error(f"Error creating download task: {e}")
+        logger.error(traceback.format_exc())
+        return json.dumps(
+            {
+                "success": False,
+                "error": str(e)
+            },
+            indent=2
+        )
+
+
 def verify_checksum(content: str, expected_checksum: str) -> Tuple[bool, str]:
     """
     Verify the SHA-256 checksum of content.
