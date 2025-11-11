@@ -67,12 +67,12 @@ class HttpRequest(Record):
     body: blob
 
 
-# Temporarily commented out to resolve compilation issues
-# from kybra.canisters.management import (
-#     HttpResponse,
-#     HttpTransformArgs,
-#     management_canister,
-# )
+# Import management canister for HTTP requests
+from kybra.canisters.management import (
+    HttpResponse,
+    HttpTransformArgs,
+    management_canister,
+)
 
 Header = Tuple[str, str]
 
@@ -609,12 +609,12 @@ def http_request_core(data):
 #     return http_response
 
 
-# @query
-# def http_transform(args: HttpTransformArgs) -> HttpResponse:
-#     """Transform function for HTTP requests - removes headers for consensus"""
-#     http_response = args["response"]
-#     http_response["headers"] = []
-#     return http_response
+@query
+def http_transform(args: HttpTransformArgs) -> HttpResponse:
+    """Transform function for HTTP requests - removes headers for consensus"""
+    http_response = args["response"]
+    http_response["headers"] = []
+    return http_response
 
 
 # @update
@@ -643,66 +643,66 @@ def timer_callback():
 #     logger.info("Downloaded code: " + message)
 
 
-# @update
-# def download_file_from_url(url: str) -> Async[Tuple[bool, str]]:
-#     """
-#     Download file from a URL.
-#
-#     Returns:
-#         Tuple of (success: bool, result: str)
-#         - If success=True, result contains the downloaded file content
-#         - If success=False, result contains the error message
-#     """
-#
-#     try:
-#         ic.print(f"Downloading code from URL: {url}")
-#
-#         # Make HTTP request to download the code
-#         http_result: CallResult[HttpResponse] = yield management_canister.http_request(
-#             {
-#                 "url": url,
-#                 "max_response_bytes": 1024 * 1024,  # 1MB limit for security
-#                 "method": {"get": None},
-#                 "headers": [
-#                     {"name": "User-Agent", "value": "Realms-Codex-Downloader/1.0"}
-#                 ],
-#                 "body": None,
-#                 "transform": {
-#                     "function": (ic.id(), "http_transform"),
-#                     "context": bytes(),
-#                 },
-#             }
-#         ).with_cycles(15_000_000_000)
-#
-#         def handle_response(response: HttpResponse) -> Tuple[bool, str]:
-#             try:
-#                 # Decode the response body
-#                 code_content = response["body"].decode("utf-8")
-#                 ic.print(f"Successfully downloaded {len(code_content)} bytes")
-#
-#                 downloaded_content[url] = code_content
-#                 return True, code_content
-#
-#             except UnicodeDecodeError as e:
-#                 error_msg = f"Failed to decode response as UTF-8: {str(e)}"
-#                 ic.print(error_msg)
-#                 return False, error_msg
-#             except Exception as e:
-#                 error_msg = f"Error processing response: {str(e)}"
-#                 ic.print(error_msg)
-#                 return False, error_msg
-#
-#         def handle_error(err: str) -> Tuple[bool, str]:
-#             error_msg = f"HTTP request failed: {err}"
-#             ic.print(error_msg)
-#             return False, error_msg
-#
-#         return match(http_result, {"Ok": handle_response, "Err": handle_error})
-#
-#     except Exception as e:
-#         error_msg = f"Unexpected error downloading code: {str(e)}"
-#         ic.print(error_msg)
-#         return False, error_msg
+@update
+def download_file_from_url(url: str) -> Async[Tuple[bool, str]]:
+    """
+    Download file from a URL.
+
+    Returns:
+        Tuple of (success: bool, result: str)
+        - If success=True, result contains the downloaded file content
+        - If success=False, result contains the error message
+    """
+
+    try:
+        ic.print(f"Downloading code from URL: {url}")
+
+        # Make HTTP request to download the code
+        http_result: CallResult[HttpResponse] = yield management_canister.http_request(
+            {
+                "url": url,
+                "max_response_bytes": 1024 * 1024,  # 1MB limit for security
+                "method": {"get": None},
+                "headers": [
+                    {"name": "User-Agent", "value": "Realms-Codex-Downloader/1.0"}
+                ],
+                "body": None,
+                "transform": {
+                    "function": (ic.id(), "http_transform"),
+                    "context": bytes(),
+                },
+            }
+        ).with_cycles(15_000_000_000)
+
+        def handle_response(response: HttpResponse) -> Tuple[bool, str]:
+            try:
+                # Decode the response body
+                code_content = response["body"].decode("utf-8")
+                ic.print(f"Successfully downloaded {len(code_content)} bytes")
+
+                downloaded_content[url] = code_content
+                return True, code_content
+
+            except UnicodeDecodeError as e:
+                error_msg = f"Failed to decode response as UTF-8: {str(e)}"
+                ic.print(error_msg)
+                return False, error_msg
+            except Exception as e:
+                error_msg = f"Error processing response: {str(e)}"
+                ic.print(error_msg)
+                return False, error_msg
+
+        def handle_error(err: str) -> Tuple[bool, str]:
+            error_msg = f"HTTP request failed: {err}"
+            ic.print(error_msg)
+            return False, error_msg
+
+        return match(http_result, {"Ok": handle_response, "Err": handle_error})
+
+    except Exception as e:
+        error_msg = f"Unexpected error downloading code: {str(e)}"
+        ic.print(error_msg)
+        return False, error_msg
 
 
 def verify_checksum(content: str, expected_checksum: str) -> Tuple[bool, str]:
@@ -1051,61 +1051,74 @@ def get_task_logs(task_id: str, limit: nat = 20) -> str:
 downloaded_content: dict = {}
 
 
-# @update
-# def test_mixed_sync_async_task() -> void:
-#     try:
-#         """Test function to verify TaskManager can handle mixed sync/async steps in sequence"""
-#         ic.print("Setting up mixed sync/async task test")
+@update
+def test_mixed_sync_async_task() -> void:
+    try:
+        """Test function to verify TaskManager can handle mixed sync/async steps in sequence"""
+        ic.print("Setting up mixed sync/async task test")
 
-#         url = "https://raw.githubusercontent.com/smart-social-contracts/realms/refs/heads/main/src/realm_backend/codex.py"
+        url = "https://raw.githubusercontent.com/smart-social-contracts/realms/3d863b4d8a7d8c72490537d44a4e05363752ae3c/src/realm_backend/codex.py"
 
-#         async_call = Call()
-#         async_call.is_async = True
-#         # async_call._function_def = download_file_from_url  # TODO: temporarily disabled
-#         async_call._function_params = [url]
-#         step1 = TaskStep(call=async_call, run_next_after=10)
+        # Step 1: Async HTTP download with codex
+        async_call = Call()
+        async_call.is_async = True
+        download_codex = Codex()
+        download_codex.code = f'''
+from main import download_file_from_url
 
-#         sync_call = Call()
-#         sync_call.is_async = False
-#         codex = Codex()
-#         codex.code = """
-# from main import downloaded_content
+def async_task():
+    ic.print("=== DOWNLOAD STEP ===")
+    ic.print("Downloading file from URL: {url}")
+    url = "{url}"
+    result = yield download_file_from_url(url)
+    ic.print(f"Download result for {{url}}: {{result[0]}}")
+    return result
+'''.strip()
+        async_call.codex = download_codex
+        step1 = TaskStep(call=async_call, run_next_after=10)
 
-# content = downloaded_content['{url}']
+        sync_call = Call()
+        sync_call.is_async = False
+        codex = Codex()
+        codex.code = f"""
+from main import downloaded_content
+from ggg import Codex
 
-# codex = Codex["the_code"]
-# if not codex:
-#     codex = Codex()
-#     codex.name = "the_code"
-# codex.code = content
+content = downloaded_content['{url}']
 
-# ic.print("=== VERIFICATION STEP ===")
-# ic.print(f"Downloaded content length: len(content)")
-# if len(content) > 0:
-#     ic.print("✅ SUCCESS: File was downloaded successfully!")
-#     if "def " in downloaded_content:
-#         ic.print("✅ SUCCESS: Content contains Python code (found 'def')")
-#     else:
-#         ic.print("❌ WARNING: Content doesn't appear to be Python code")
-#     preview = downloaded_content[:100].replace("\\n", " ")
-#     ic.print("Content preview: " + preview + "...")
-# else:
-#     ic.print("❌ FAILURE: No content was downloaded!")
-# ic.print("=== VERIFICATION COMPLETE ===")""".strip()
-#         sync_call.codex = codex
-#         step2 = TaskStep(call=sync_call)
+codex = Codex["the_code"]
+if not codex:
+    codex = Codex()
+    codex.name = "the_code"
+codex.code = content
 
-#         task = Task(name="test_mixed_steps", steps=[step1, step2])
-#         schedule = TaskSchedule(run_at=0, repeat_every=30)
-#         task.schedules = [schedule]
+ic.print("=== VERIFICATION STEP ===")
+ic.print(f"Downloaded content length: {{len(content)}}")
+if len(content) > 0:
+    ic.print("✅ SUCCESS: File was downloaded successfully!")
+    if "def " in content:
+        ic.print("✅ SUCCESS: Content contains Python code (found 'def')")
+    else:
+        ic.print("❌ WARNING: Content doesn't appear to be Python code")
+    preview = content[:100].replace("\\n", " ")
+    ic.print("Content preview: " + preview + "...")
+else:
+    ic.print("❌ FAILURE: No content was downloaded!")
+ic.print("=== VERIFICATION COMPLETE ===")""".strip()
+        sync_call.codex = codex
+        step2 = TaskStep(call=sync_call)
 
-#         task_manager = TaskManager()
-#         task_manager.add_task(task)
-#         task_manager.run()
+        task = Task(name="test_mixed_steps", steps=[step1, step2])
+        schedule = TaskSchedule(name=f"test_schedule_{ic.time()}", task=task, run_at=0, repeat_every=30)
+        task.schedules = [schedule]
 
-#         ic.print("Mixed sync/async task test initiated...")
-#     except Exception as e:
-#         logger.error(traceback.format_exc())
+        task_manager = TaskManager()
+        task_manager.add_task(task)
+        task_manager.run()
+
+        ic.print("Mixed sync/async task test initiated...")
+    except Exception as e:
+        logger.error(traceback.format_exc())
 
 
 @update
@@ -1145,7 +1158,8 @@ def create_scheduled_task(name: str, code: str, repeat_every: nat, run_after: na
         schedule = TaskSchedule(
             name=f"schedule_{name}",
             task=task,
-            run_at=current_time + run_after,
+            # run_at=current_time + run_after,
+            run_at=0,
             repeat_every=repeat_every,
             last_run_at=0,
             disabled=False
