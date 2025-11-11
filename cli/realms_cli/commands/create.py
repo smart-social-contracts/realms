@@ -203,7 +203,7 @@ echo "✅ Deployment to $NETWORK completed!"
     pre_adjustments_script_content = f"""
 #!/usr/bin/env python3
 
-import subprocess, os, sys
+import subprocess, os, sys, json, time
 s = os.path.dirname(os.path.abspath(__file__))
 
 # Get network from command line argument or default to local
@@ -219,6 +219,44 @@ def run_dfx_command(dfx_cmd):
     print(f"Result: {{result}}")
     return result
 
+
+# Register realm with registry (if not already registered)
+try:
+    print(f"\\n🌐 Checking realm registration...")
+    
+    # Load manifest to get realm name
+    manifest_path = os.path.join(os.path.dirname(s), 'manifest.json')
+    with open(manifest_path, 'r') as f:
+        manifest = json.load(f)
+    realm_name = manifest.get('name', 'Generated Realm')
+    
+    # Generate a unique realm ID based on name and timestamp
+    realm_id = f"{{realm_name.lower().replace(' ', '_')}}_{int(time.time())}"
+    
+    print(f"   Realm Name: {{realm_name}}")
+    print(f"   Realm ID: {{realm_id}}")
+    print(f"   Network: {{network}}")
+    
+    # Check if realm is already registered
+    check_cmd = ['realms', 'realm', 'registry', 'get', '--id', realm_id, '--network', network]
+    check_result = subprocess.run(check_cmd, cwd=os.path.dirname(os.path.dirname(s)), capture_output=True)
+    
+    if check_result.returncode != 0:
+        # Realm not registered, register it
+        print(f"   Registering realm with central registry...")
+        register_cmd = ['realms', 'realm', 'registry', 'add', 
+                       '--realm-id', realm_id,
+                       '--realm-name', realm_name,
+                       '--network', network]
+        register_result = subprocess.run(register_cmd, cwd=os.path.dirname(os.path.dirname(s)))
+        if register_result.returncode == 0:
+            print(f"   ✅ Realm registered successfully!")
+        else:
+            print(f"   ⚠️  Failed to register realm (continuing anyway)")
+    else:
+        print(f"   ℹ️  Realm already registered")
+except Exception as e:
+    print(f"   ⚠️  Could not register realm: {{e}} (continuing anyway)")
 
 # Run the adjustments script with network parameter
 realms_cmd = ['realms', 'shell', '--file', '{output_dir}/scripts/adjustments.py']
