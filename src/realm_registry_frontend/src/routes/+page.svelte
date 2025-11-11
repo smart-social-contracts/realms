@@ -17,12 +17,39 @@
   let copiedLink = null;
   let qrCodeDataUrl = '';
 
+  // Get commit hash from meta tag
+  let commitHash = '';
+  // Get commit datetime from meta tag
+  let commitDatetime = '';
+  // Get version from meta tag
+  let version = '';
+
   onMount(async () => {
     if (browser) {
       // Only import backend in browser context
       const { backend: b } = await import("$lib/canisters");
       backend = b;
       await loadRealms();
+      
+      // Get version info from meta tags
+      const commitHashMeta = document.querySelector('meta[name="commit-hash"]');
+      if (commitHashMeta) {
+        commitHash = commitHashMeta.getAttribute('content') || '';
+        // Format to show only first 7 characters if it's a full hash
+        if (commitHash && commitHash !== 'COMMIT_HASH_PLACEHOLDER' && commitHash.length > 7) {
+          commitHash = commitHash.substring(0, 7);
+        }
+      }
+      
+      const commitDatetimeMeta = document.querySelector('meta[name="commit-datetime"]');
+      if (commitDatetimeMeta) {
+        commitDatetime = commitDatetimeMeta.getAttribute('content') || '';
+      }
+      
+      const versionMeta = document.querySelector('meta[name="version"]');
+      if (versionMeta) {
+        version = versionMeta.getAttribute('content') || '';
+      }
     }
   });
 
@@ -330,16 +357,7 @@
     <!-- Built on Internet Computer section -->
     <div class="footer-ic">
       <a href="https://internetcomputer.org" target="_blank" rel="noopener noreferrer" class="ic-link">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="ic-logo">
-          <circle cx="12" cy="12" r="10" fill="url(#gradient)" />
-          <path d="M8 12h8M12 8v8" stroke="white" stroke-width="2" stroke-linecap="round" />
-          <defs>
-            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" style="stop-color:#667eea" />
-              <stop offset="100%" style="stop-color:#764ba2" />
-            </linearGradient>
-          </defs>
-        </svg>
+        <img src="/images/internet-computer-icp-logo.svg" alt="Internet Computer Logo" width="24" height="24" class="ic-logo" />
         <span>Built on the Internet Computer</span>
       </a>
     </div>
@@ -353,10 +371,16 @@
       </a>
     </div>
     
-    <!-- Version info -->
-    <div class="footer-version">
-      <span>Realm Registry v1.0</span>
-    </div>
+    <!-- Version info with dynamic data -->
+    {#if (version && version !== 'VERSION_PLACEHOLDER') || (commitHash && commitHash !== 'COMMIT_HASH_PLACEHOLDER') || (commitDatetime && commitDatetime !== 'COMMIT_DATETIME_PLACEHOLDER')}
+      <div class="footer-version">
+        <span>
+          Realm Registry {#if version && version !== 'VERSION_PLACEHOLDER'}{version}{/if}
+          {#if commitHash && commitHash !== 'COMMIT_HASH_PLACEHOLDER'}({commitHash}){/if}
+          {#if commitDatetime && commitDatetime !== 'COMMIT_DATETIME_PLACEHOLDER'} - {commitDatetime}{/if}
+        </span>
+      </div>
+    {/if}
   </footer>
 </div>
 
@@ -982,39 +1006,65 @@
   /* Footer Styles */
   .footer {
     margin-top: 3rem;
-    padding: 2rem 0;
+    padding: 1.5rem;
     border-top: 1px solid #E5E5E5;
-    text-align: center;
-    color: #737373;
-    font-size: 0.875rem;
-    background: #FAFAFA;
+    background: #FFFFFF;
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.12), 0 2px 4px -1px rgba(0, 0, 0, 0.08);
   }
 
+  .footer-ic {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 0.75rem;
+  }
+
+  .ic-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #737373;
+    text-decoration: none;
+    transition: color 0.15s ease-in-out;
+    font-size: 0.875rem;
+  }
+
+  .ic-link:hover {
+    color: #171717;
+  }
+
+  .ic-logo {
+    width: 24px;
+    height: 24px;
+  }
 
   .footer-links {
     display: flex;
     justify-content: center;
+    margin-top: 1rem;
   }
 
   .github-link {
-    color: #6c757d;
-    transition: color 0.2s;
+    color: #737373;
+    transition: all 0.15s ease-in-out;
     padding: 0.5rem;
     border-radius: 6px;
+    text-decoration: none;
   }
 
   .github-link:hover {
-    color: #2c3e50;
+    color: #171717;
     background: rgba(0,0,0,0.05);
   }
 
   .footer-version {
     text-align: center;
+    margin-top: 0.75rem;
   }
 
   .footer-version span {
-    font-size: 0.8rem;
-    color: #9ca3af;
+    font-size: 0.75rem;
+    color: #A3A3A3;
   }
 
   @media (max-width: 768px) {
