@@ -62,6 +62,12 @@ class Call(Entity, TimestampedMixin):
     task_step = OneToOne("TaskStep", "call")
 
     def _function(self):
+        if not self.codex or not self.codex.code:
+            raise ValueError("Call must have a codex code")
+
+        # Auto-detect async if codex is present
+        self.is_async = "yield" in self.codex.code or "async_task" in self.codex.code
+        
         if self.is_async:
             return self._async_function
         else:
