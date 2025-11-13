@@ -709,8 +709,8 @@ def download_file_from_url(url: str) -> Async[Tuple[bool, str]]:
 def download_file(
     url: str,
     codex_name: str,
-    callback_code: Optional[str] = None,
-    checksum: Optional[str] = None,
+    callback_code: Opt[str] = None,
+    checksum: Opt[str] = None,
 ) -> str:
     """
     Convenient wrapper to download a file from a URL and save it to a Codex.

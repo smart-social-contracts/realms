@@ -77,7 +77,13 @@ class Call(Entity, TimestampedMixin):
         logger.info("Executing sync call")
         if self.codex:
             logger.info("Executing codex")
-            result = run_code(self.codex.code)
+            # Get task name from task_step -> task
+            task_name = None
+            if self.task_step and self.task_step.task:
+                task_name = self.task_step.task.name
+                logger.info(f"Executing codex for task: {task_name}")
+            
+            result = run_code(self.codex.code, task_name=task_name)
             # Store result for execute_code() to retrieve
             self._result = result
             # Log captured output
@@ -100,8 +106,17 @@ class Call(Entity, TimestampedMixin):
             safe_globals = globals().copy()
             import ggg
             import kybra
+            from execution import create_task_entity_class
 
             safe_globals.update({"ggg": ggg, "kybra": kybra})
+            
+            # Get task name and add TaskEntity if available
+            task_name = None
+            if self.task_step and self.task_step.task:
+                task_name = self.task_step.task.name
+                logger.info(f"Executing async codex for task: {task_name}")
+                safe_globals["TaskEntity"] = create_task_entity_class(task_name)
+                logger.info(f"TaskEntity class added with namespace: task_{task_name}")
 
             # Execute the codex code (defines async_task function)
             exec(self.codex.code, safe_globals)
