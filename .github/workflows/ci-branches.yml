@@ -236,9 +236,10 @@ jobs:
         id: integration_tests
         continue-on-error: true
         run: |
+          CONTAINER_NAME="realms-api-test-${{ github.sha }}-$(echo '${{ matrix.test-group.name }}' | tr ' ' '-')"
           ./scripts/run_integration_tests.sh \
             "ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }}" \
-            "realms-api-test-${{ github.sha }}-${{ matrix.test-group.name }}" \
+            "$CONTAINER_NAME" \
             10 \
             false \
             "${{ matrix.test-group.tests }}"
