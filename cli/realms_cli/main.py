@@ -10,6 +10,7 @@ from rich.table import Table
 from .commands.create import create_command
 from .commands.db import db_command
 from .commands.deploy import deploy_command
+from .commands.export_data import export_data_command
 from .commands.extension import extension_command
 from .commands.import_data import import_codex_command, import_data_command
 from .commands.ps import ps_kill_command, ps_logs_command, ps_ls_command
@@ -152,6 +153,26 @@ def import_data(
 ) -> None:
     """Import data into the realm. Supports JSON data and Python codex files."""
     import_data_command(file_path, entity_type, format, batch_size, dry_run, network, identity)
+
+
+@app.command("export")
+def export_data(
+    output_dir: str = typer.Option(
+        "exported_realm", "--output-dir", help="Output directory for exported data"
+    ),
+    entity_types: Optional[str] = typer.Option(
+        None, "--entity-types", help="Comma-separated list of entity types to export (default: all)"
+    ),
+    network: str = typer.Option("local", "--network", help="Network to use for export"),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="Path to identity PEM file or identity name for dfx"
+    ),
+    include_codexes: bool = typer.Option(
+        True, "--include-codexes/--no-codexes", help="Include codexes in export (default: True)"
+    ),
+) -> None:
+    """Export data from the realm. Saves JSON data and Python codex files."""
+    export_data_command(output_dir, entity_types, network, identity, include_codexes)
 
 
 # Register deploy command directly from commands module
