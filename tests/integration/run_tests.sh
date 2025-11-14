@@ -3,9 +3,15 @@
 
 cd "$(dirname "$0")"
 
+# Parse arguments for specific test files
+SPECIFIC_TESTS="$@"
+
 echo "======================================"
 echo "Running Backend Integration Tests"
 echo "======================================"
+if [ -n "$SPECIFIC_TESTS" ]; then
+    echo "Test filter: $SPECIFIC_TESTS"
+fi
 echo
 
 # Create logs directory
@@ -43,8 +49,29 @@ if [ -n "$GITHUB_STEP_SUMMARY" ]; then
     echo "|-----------|--------|----------|" >> "$GITHUB_STEP_SUMMARY"
 fi
 
+# Determine which test files to run
+if [ -n "$SPECIFIC_TESTS" ]; then
+    # Run only specified test files
+    TEST_FILE_LIST="$SPECIFIC_TESTS"
+else
+    # Run all test files
+    TEST_FILE_LIST=$(ls test_*.py 2>/dev/null || echo "")
+fi
+
+if [ -z "$TEST_FILE_LIST" ]; then
+    echo "❌ No test files found"
+    exit 1
+fi
+
 # Run each test file
-for test_file in test_*.py; do
+for test_file in $TEST_FILE_LIST; do
+    # Check if file exists (in case of specific tests)
+    if [ ! -f "$test_file" ]; then
+        echo "❌ Test file not found: $test_file"
+        FAILED=$((FAILED + 1))
+        continue
+    fi
+    
     echo "Running $test_file..."
     START_TIME=$(date +%s)
     

@@ -218,32 +218,43 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     if: "!contains(github.event.head_commit.message, 'Bump version')"
+    strategy:
+      fail-fast: false
+      matrix:
+        test-group:
+          - name: "API Basics"
+            tests: "test_status_api.py test_extensions_api.py test_ggg_entities_api.py"
+          - name: "Task Management"
+            tests: "test_task_manager_api.py test_scheduled_tasks.py test_multi_step_tasks.py"
+          - name: "System Operations"
+            tests: "test_db_command.py test_shell_command.py"
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
       
-      - name: Run integration tests
+      - name: Run integration tests (${{ matrix.test-group.name }})
         id: integration_tests
         continue-on-error: true
         run: |
           ./scripts/run_integration_tests.sh \
             "ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }}" \
-            "realms-api-test-${{ github.sha }}" \
+            "realms-api-test-${{ github.sha }}-${{ matrix.test-group.name }}" \
             10 \
-            false
+            false \
+            "${{ matrix.test-group.tests }}"
       
       - name: Upload integration test logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: integration-test-logs-branch
+          name: integration-test-logs-branch-${{ matrix.test-group.name }}
           path: integration-test-logs/
           retention-days: 7
       
       - name: Check test results
         if: steps.integration_tests.outcome == 'failure'
         run: |
-          echo "::error::Integration tests failed. Check the job summary for details."
+          echo "::error::Integration tests (${{ matrix.test-group.name }}) failed. Check the job summary for details."
           exit 1
 
   test-realm-registry:

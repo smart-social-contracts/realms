@@ -27,6 +27,7 @@ DOCKER_IMAGE="${1:-ghcr.io/smart-social-contracts/realms:latest}"
 CONTAINER_NAME="${2:-realms-api-test}"
 CITIZENS_COUNT="${3:-10}"
 USE_VOLUMES="${4:-true}"  # Default to volume mounting for speed
+TEST_FILES="${5:-}"  # Optional: specific test files to run (space-separated)
 
 log_info "Starting integration test setup..."
 log_info "Docker image: $DOCKER_IMAGE"
@@ -85,11 +86,19 @@ if [ "$USE_VOLUMES" != "true" ]; then
 fi
 
 # Run integration tests
-log_info "Running integration tests..."
-set +e  # Don't exit on test failure
-docker exec "$CONTAINER_NAME" bash tests/integration/run_tests.sh
-TEST_EXIT_CODE=$?
-set -e
+if [ -n "$TEST_FILES" ]; then
+    log_info "Running specific integration tests: $TEST_FILES"
+    set +e  # Don't exit on test failure
+    docker exec "$CONTAINER_NAME" bash tests/integration/run_tests.sh "$TEST_FILES"
+    TEST_EXIT_CODE=$?
+    set -e
+else
+    log_info "Running all integration tests..."
+    set +e  # Don't exit on test failure
+    docker exec "$CONTAINER_NAME" bash tests/integration/run_tests.sh
+    TEST_EXIT_CODE=$?
+    set -e
+fi
 
 if [ $TEST_EXIT_CODE -eq 127 ]; then
     log_error "Test runner script not found or not executable"
