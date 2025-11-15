@@ -28,6 +28,7 @@ test-results
 src/realm_backend/extension_packages/
 src/realm_frontend/src/lib/extensions/
 src/realm_frontend/src/routes/(sidebar)/extensions/
+src/realm_frontend/src/routes/(sidebar)/admin/
 src/realm_frontend/src/lib/i18n/locales/extensions/
 src/realm_frontend/static/extensions/
 
