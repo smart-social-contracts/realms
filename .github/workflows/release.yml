@@ -74,17 +74,19 @@ jobs:
       # Pull and tag the Docker images
       - name: Pull and tag Docker images
         run: |
+          mkdir -p release-logs
+          
           # Pull the latest Docker image
-          docker pull ghcr.io/${{ github.repository_owner }}/realms:latest
+          docker pull ghcr.io/${{ github.repository_owner }}/realms:latest 2>&1 | tee release-logs/docker-pull.log
           
           # Tag with version number
           docker tag ghcr.io/${{ github.repository_owner }}/realms:latest \
-            ghcr.io/${{ github.repository_owner }}/realms:v${{ steps.bump_version.outputs.NEW_VERSION }}
+            ghcr.io/${{ github.repository_owner }}/realms:v${{ steps.bump_version.outputs.NEW_VERSION }} 2>&1 | tee -a release-logs/docker-tag.log
           
           # Push the versioned tag
-          docker push ghcr.io/${{ github.repository_owner }}/realms:v${{ steps.bump_version.outputs.NEW_VERSION }}
+          docker push ghcr.io/${{ github.repository_owner }}/realms:v${{ steps.bump_version.outputs.NEW_VERSION }} 2>&1 | tee release-logs/docker-push.log
           
-          echo "✅ Docker image tagged and pushed: v${{ steps.bump_version.outputs.NEW_VERSION }}"
+          echo "✅ Docker image tagged and pushed: v${{ steps.bump_version.outputs.NEW_VERSION }}" | tee -a release-logs/docker-push.log
       
       - name: Extract canister artifacts
         run: |
@@ -94,12 +96,15 @@ jobs:
           # Build canisters and extract WASM/DID files
           docker run --rm \
             -v "$(pwd)/artifacts:/artifacts" \
+            -v "$(pwd)/release-logs:/logs" \
             ghcr.io/${{ github.repository_owner }}/realms:latest \
             bash -c "realms create && realms deploy && \
                     cp .dfx/local/canisters/realm_backend/realm_backend.wasm.gz /artifacts/ && \
                     cp .dfx/local/canisters/realm_backend/service.did /artifacts/realm_backend.did && \
                     cp .dfx/local/canisters/realm_registry_backend/realm_registry_backend.wasm.gz /artifacts/ && \
-                    cp .dfx/local/canisters/realm_registry_backend/service.did /artifacts/realm_registry_backend.did"
+                    cp .dfx/local/canisters/realm_registry_backend/service.did /artifacts/realm_registry_backend.did && \
+                    cp -f dfx.log /logs/canister-extraction-dfx.log 2>/dev/null || true && \
+                    cp -f realms_cli.log /logs/canister-extraction-cli.log 2>/dev/null || true"
           
           # Move artifacts to root for release
           mv artifacts/realm_backend.wasm.gz ./
@@ -107,7 +112,7 @@ jobs:
           mv artifacts/realm_registry_backend.wasm.gz ./
           mv artifacts/realm_registry_backend.did ./
           
-          echo "✅ Canister artifacts extracted"
+          echo "✅ Canister artifacts extracted" | tee -a release-logs/canister-extraction.log
       
       - name: Build and publish CLI to PyPI
         env:
@@ -120,30 +125,40 @@ jobs:
           PYPROJECT_VERSION=$(grep -Po '^version = "\K[^"]*' pyproject.toml)
           INIT_VERSION=$(grep -Po '(?<=__version__ = ")[^"]*' realms_cli/__init__.py)
           
-          echo "Version in pyproject.toml: $PYPROJECT_VERSION"
-          echo "Version in __init__.py: $INIT_VERSION"
+          echo "Version in pyproject.toml: $PYPROJECT_VERSION" | tee -a ../release-logs/pypi-publish.log
+          echo "Version in __init__.py: $INIT_VERSION" | tee -a ../release-logs/pypi-publish.log
           
           if [ "$PYPROJECT_VERSION" != "$INIT_VERSION" ]; then
-            echo "ERROR: Version mismatch"
+            echo "ERROR: Version mismatch" | tee -a ../release-logs/pypi-publish.log
             exit 1
           fi
           
           # Build and publish
-          python -m build
-          twine check dist/*
-          twine upload dist/*
+          python -m build 2>&1 | tee -a ../release-logs/pypi-build.log
+          twine check dist/* 2>&1 | tee -a ../release-logs/pypi-check.log
+          twine upload dist/* 2>&1 | tee -a ../release-logs/pypi-upload.log
           
-          echo "✅ CLI published to PyPI: v${{ steps.bump_version.outputs.NEW_VERSION }}"
+          echo "✅ CLI published to PyPI: v${{ steps.bump_version.outputs.NEW_VERSION }}" | tee -a ../release-logs/pypi-publish.log
       
       # Commit version changes
       - name: Commit and push version changes
         run: |
-          git add version.txt cli/pyproject.toml cli/realms_cli/__init__.py
-          git commit -m "Bump version to ${{ steps.bump_version.outputs.NEW_VERSION }}"
-          git tag -a "v${{ steps.bump_version.outputs.NEW_VERSION }}" -m "Release v${{ steps.bump_version.outputs.NEW_VERSION }}"
+          git add version.txt cli/pyproject.toml cli/realms_cli/__init__.py 2>&1 | tee release-logs/git-add.log
+          git commit -m "Bump version to ${{ steps.bump_version.outputs.NEW_VERSION }}" 2>&1 | tee release-logs/git-commit.log
+          git tag -a "v${{ steps.bump_version.outputs.NEW_VERSION }}" -m "Release v${{ steps.bump_version.outputs.NEW_VERSION }}" 2>&1 | tee -a release-logs/git-tag.log
           git remote set-url origin https://${{ secrets.PAT_GITHUB }}@github.com/${{ github.repository }}.git
-          git push origin
-          git push origin --tags
+          git push origin 2>&1 | tee release-logs/git-push.log
+          git push origin --tags 2>&1 | tee release-logs/git-push-tags.log
+          
+          echo "✅ Version changes committed and pushed" | tee -a release-logs/git-push.log
+      
+      - name: Upload release logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-logs
+          path: release-logs/
+          retention-days: 7
       
       # Create GitHub release
       - name: Create GitHub Release
