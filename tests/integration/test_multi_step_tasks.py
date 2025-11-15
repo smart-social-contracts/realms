@@ -38,6 +38,7 @@ def test_download_file_with_checksum_verification():
             "dfx", "canister", "call", "realm_backend", "download_file",
             f'("{url}", "{codex_name}", null, opt "{checksum}")'
         ]
+        print("cmd: ", ' '.join(cmd))
         
         result = subprocess.run(
             cmd,
@@ -76,45 +77,66 @@ def test_download_file_with_checksum_verification():
                 print(f"   Task ID: {data['task_id']}")
                 print(f"   Task Name: {data['task_name']}")
                 
-                # Wait for the task to complete
-                print(f"\n⏳ Waiting 15 seconds for task to complete...")
-                time.sleep(15)
+                # Poll for task completion
+                print(f"\n⏳ Polling for task completion (checking every 5s for up to 60s)...")
+                max_wait_time = 60  # seconds
+                poll_interval = 5   # seconds
+                elapsed_time = 0
+                codex_found = False
                 
-                # Verify the file was downloaded and saved to Codex
-                print(f"\n🔍 Verifying Codex '{codex_name}' was created...")
                 verify_cmd = [
-                    "dfx", "canister", "call", "realm_backend", "execute_code",
-                    f'''("
-from ggg import Codex
-
-codex = Codex['{codex_name}']
-if codex:
-    ic.print(f'✅ Codex found: {{codex.name}}')
-    ic.print(f'Content length: {{len(codex.code)}} bytes')
-    ic.print(f'First 100 chars: {{codex.code[:100]}}')
-else:
-    ic.print('❌ Codex not found!')
-")'''
+                    "dfx", "canister", "call", "--output", "json",
+                    "realm_backend", "get_objects",
+                    f'''(vec {{ record {{ 0 = "Codex"; 1 = "{codex_name}" }}; }})'''
                 ]
                 
-                verify_result = subprocess.run(
-                    verify_cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                    check=True
-                )
+                while elapsed_time < max_wait_time:
+                    time.sleep(poll_interval)
+                    elapsed_time += poll_interval
+                    
+                    print(f"   📍 Checking at {elapsed_time}s...")
+                    
+                    try:
+                        verify_result = subprocess.run(
+                            verify_cmd,
+                            capture_output=True,
+                            text=True,
+                            timeout=30,
+                            check=True
+                        )
+                        
+                        # Parse JSON response
+                        response = json.loads(verify_result.stdout)
+                        
+                        if response.get('success') is True:
+                            # Codex found - extract data
+                            objects = response['data']['objectsList']['objects']
+                            if objects:
+                                codex_data = json.loads(objects[0])
+                                print(f"\n📋 Verification output:")
+                                print(f"   ✅ Codex found: {codex_data['name']}")
+                                print(f"   Content length: {len(codex_data['code'])} bytes")
+                                print(f"   First 100 chars: {codex_data['code'][:100]}")
+                                print(f"\n🎉 TEST PASSED: File downloaded, checksum verified, and saved to Codex!")
+                                print(f"   ⏱️  Task completed in ~{elapsed_time} seconds")
+                                codex_found = True
+                                break
+                        else:
+                            # Codex not found yet
+                            error = response.get('data', {}).get('error', 'Unknown error')
+                            print(f"   ⏳ Not ready yet: {error}")
+                            continue
+                    except (subprocess.CalledProcessError, json.JSONDecodeError, KeyError) as e:
+                        print(f"   ⚠️  Check failed: {str(e)[:100]}")
+                        continue
                 
-                print(f"\n📋 Verification output:")
-                print(verify_result.stdout)
-                
-                # Check if verification was successful
-                if "✅ Codex found" in verify_result.stdout:
-                    print(f"\n🎉 TEST PASSED: File downloaded, checksum verified, and saved to Codex!")
-                    return True
-                else:
-                    print(f"\n❌ TEST FAILED: Codex was not created")
+                if not codex_found:
+                    print(f"\n❌ TEST FAILED: Codex was not created after {max_wait_time} seconds")
+                    print(f"\n📋 Last verification output:")
+                    print(verify_result.stdout if 'verify_result' in locals() else "No output")
                     return False
+                
+                return True
         
         else:
             print(f"❌ Unexpected response format: {output}")
