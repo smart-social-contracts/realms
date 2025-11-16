@@ -21,7 +21,7 @@ def user_register(principal: str, profile: str) -> dict[str, Any]:
     else:
         # Add profile only if not already assigned
         if user_profile not in user.profiles:
-            user.profiles.append(user_profile)
+            user.profiles.add(user_profile)
             logger.info(f"Added profile {profile} to existing user {principal}")
         else:
             logger.info(f"User {principal} already has profile {profile}")
