@@ -9,15 +9,22 @@ logger = get_logger("api.user")
 
 def user_register(principal: str, profile: str) -> dict[str, Any]:
     logger.info(f"Registering user {principal} with profile {profile}")
+    
+    user_profile = UserProfile[profile]
+    if not user_profile:
+        raise ValueError(f"Profile {profile} not found")
+    
     user = User[principal]
     if not user:
-        user_profile = UserProfile[profile]
-        if not user_profile:
-            raise Exception(f"Profile {profile} not found")
         user = User(id=principal, profiles=[user_profile])
+        logger.info(f"Created new user {principal} with profile {profile}")
     else:
-        # User already exists - return their existing data
-        logger.info(f"User {principal} already registered, returning existing data")
+        # Add profile only if not already assigned
+        if user_profile not in user.profiles:
+            user.profiles.append(user_profile)
+            logger.info(f"Added profile {profile} to existing user {principal}")
+        else:
+            logger.info(f"User {principal} already has profile {profile}")
 
     return {
         "principal": user.id,
