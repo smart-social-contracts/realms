@@ -1,4 +1,5 @@
 import base64
+import importlib
 import json
 import traceback
 
@@ -420,6 +421,51 @@ def initialize() -> void:
 
         # Initialize each extension
         for extension_id in extension_ids:
+
+            extension_manifest = extension_manifests.get(extension_id, {})
+            entity_method_overrides = extension_manifest.get('entity_method_overrides', [])
+
+            if not entity_method_overrides:
+                logger.info(f"No method overrides found for {extension_id}")
+            else:
+                logger.info(f"Loading {len(entity_method_overrides)} method override(s) for {extension_id}")
+                for override in entity_method_overrides:
+                    try:
+                        entity_name = override.get('entity')
+                        method_name = override.get('method')
+                        impl_path = override.get('implementation')
+
+                        # Validate manifest data
+                        if not all([entity_name, method_name, impl_path]):
+                            logger.warning(f"Invalid override in {extension_id}: missing entity/method/implementation")
+                            continue
+
+                        # Get entity class
+                        entity_class = getattr(ggg, entity_name, None)
+                        if not entity_class:
+                            logger.warning(f"Entity '{entity_name}' not found in ggg module")
+                            continue
+                        
+                        # Import implementation
+                        parts = impl_path.split(".")
+                        module_path = f"extension_packages.{extension_id}.{'.'.join(parts[:-1])}"
+                        func_name = parts[-1]
+                        
+                        impl_module = importlib.import_module(module_path)
+                        impl_func = getattr(impl_module, func_name, None)
+                        
+                        if not impl_func:
+                            logger.warning(f"Function '{func_name}' not found in {module_path}")
+                            continue
+                        
+                        # Bind method to entity
+                        setattr(entity_class, method_name, impl_func)
+                        logger.info(f"  ✓ {entity_name}.{method_name}() -> {extension_id}.{impl_path}")
+                        
+                    except Exception as e:
+                        logger.error(f"Error binding method override in {extension_id}: {str(e)}")
+                        logger.error(traceback.format_exc())
+
             status = {
                 "has_entities": False,
                 "has_initialize": False,

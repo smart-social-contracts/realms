@@ -18,6 +18,11 @@ class Transfer(Entity, TimestampedMixin):
     # trade = OneToOne("Trade", "transfer")
     principal_from = String()
     principal_to = String()
-    instrument = ManyToOne("Instrument", "transfers")
+    instrument = String()
     amount = Integer()
     timestamp = String()
+    tags = String()
+    status = String()
+
+    def execute(self):
+        raise NotImplementedError("Transfer execution is not implemented")

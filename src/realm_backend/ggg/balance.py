@@ -19,7 +19,9 @@ class Balance(Entity, TimestampedMixin):
     __alias__ = "id"
     id = String()
     user = ManyToOne("User", "balances")
-    instrument = ManyToOne("Instrument", "balances")
+    instrument = String()
     amount = Integer()
     transfers = OneToMany("Transfer", "balance")
-    tag = String()
+
+    def refresh(self):
+        raise NotImplementedError("Balance refresh is not implemented")

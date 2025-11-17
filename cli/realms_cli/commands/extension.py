@@ -13,6 +13,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 from typing import List, Optional
+from pprint import pformat
 
 import typer
 from rich.console import Console
@@ -844,10 +845,11 @@ EXTENSION_MANIFESTS = {
 '''
     
     for ext_id, manifest in manifests.items():
-        content += f'    "{ext_id}": {{\n'
-        for key, value in manifest.items():
-            content += f'        "{key}": {repr(value)},\n'
-        content += '    },\n\n'
+        # Use pformat for readable formatting, then indent properly
+        formatted = pformat(manifest, width=100, compact=False)
+        # Add proper indentation (4 spaces for extension level)
+        indented = '\n'.join('    ' + line for line in formatted.split('\n'))
+        content += f'    "{ext_id}": {indented},\n\n'
     
     content += '''}\n\n
 def get_all_extension_manifests() -> dict:
@@ -927,15 +929,14 @@ def install_from_source_command(source_dir: str = "extensions"):
                 update_extension_imports(ext_id, "add")
                 console.print("  [green]✓[/green] Extension imports updated")
             
-            # Copy root-level manifest.json to backend directory (if not already there)
+            # Copy root-level manifest.json to backend directory (always overwrite to get updates)
             root_manifest = os.path.join(source_path, "manifest.json")
             if os.path.exists(root_manifest):
                 # Create backend dir if it doesn't exist (for frontend-only extensions)
                 os.makedirs(paths["backend"], exist_ok=True)
                 backend_manifest = os.path.join(paths["backend"], "manifest.json")
-                if not os.path.exists(backend_manifest):
-                    shutil.copy2(root_manifest, backend_manifest)
-                    console.print("  [green]✓[/green] Manifest copied to backend")
+                shutil.copy2(root_manifest, backend_manifest)  # Always copy to get updates
+                console.print("  [green]✓[/green] Manifest copied to backend")
 
             # Copy frontend files if they exist
             frontend_source = os.path.join(source_path, "frontend")
