@@ -220,8 +220,11 @@ class RealmGenerator:
                 id=self.generate_id("tr_"),
                 principal_from=from_user.id,
                 principal_to=to_user.id,
-                instrument=instrument,
-                amount=random.randint(1, 10000)
+                instrument=instrument.name,
+                amount=random.randint(1, 10000),
+                timestamp=datetime.now().isoformat(),
+                transfer_type="internal",
+                status="completed"
             )
             transfers.append(transfer)
             

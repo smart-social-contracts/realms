@@ -8,5 +8,4 @@ class Instrument(Entity, TimestampedMixin):
     name = String(max_length=256)
     principal_id = String(max_length=256)
     metadata = String(max_length=256)
-    transfers = OneToMany("Transfer", "instrument")
     __alias__ = "name"
