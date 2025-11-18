@@ -434,6 +434,7 @@ def initialize() -> void:
                         entity_name = override.get('entity')
                         method_name = override.get('method')
                         impl_path = override.get('implementation')
+                        method_type = override.get('type', 'method')  # default to instance method
 
                         # Validate manifest data
                         if not all([entity_name, method_name, impl_path]):
@@ -458,9 +459,16 @@ def initialize() -> void:
                             logger.warning(f"Function '{func_name}' not found in {module_path}")
                             continue
                         
-                        # Bind method to entity
-                        setattr(entity_class, method_name, impl_func)
-                        logger.info(f"  ✓ {entity_name}.{method_name}() -> {extension_id}.{impl_path}")
+                        # Bind method to entity (wrap as classmethod if specified)
+                        if method_type == 'classmethod':
+                            setattr(entity_class, method_name, classmethod(impl_func))
+                            logger.info(f"  ✓ {entity_name}.{method_name}() [classmethod] -> {extension_id}.{impl_path}")
+                        elif method_type == 'staticmethod':
+                            setattr(entity_class, method_name, staticmethod(impl_func))
+                            logger.info(f"  ✓ {entity_name}.{method_name}() [staticmethod] -> {extension_id}.{impl_path}")
+                        else:
+                            setattr(entity_class, method_name, impl_func)
+                            logger.info(f"  ✓ {entity_name}.{method_name}() -> {extension_id}.{impl_path}")
                         
                     except Exception as e:
                         logger.error(f"Error binding method override in {extension_id}: {str(e)}")
