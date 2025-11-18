@@ -2,9 +2,29 @@
 line-length = 88
 target-version = ['py38']
 include = '\.pyi?$'
-exclude = 'src/realm_backend/extension_packages'
+exclude = '''
+/(
+    \.git
+  | \.realm
+  | \.realms
+  | __pycache__
+  | venv
+  | build
+  | dist
+  | extensions
+  | src/realm_backend/extension_packages
+)/
+'''
 
 [tool.isort]
 profile = "black"
 multi_line_output = 3
-skip = "src/realm_backend/extension_packages"
+skip_glob = [
+    "src/realm_backend/extension_packages",
+    "extensions/**",
+    "**/.realm/**",
+    "**/.realms/**",
+    "**/venv/**",
+    "**/build/**",
+    "**/dist/**"
+]
