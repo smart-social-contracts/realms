@@ -12,8 +12,9 @@ from pathlib import Path
 src_path = Path(__file__).parent.parent.parent / "src" / "realm_backend"
 sys.path.insert(0, str(src_path))
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Mock kybra before importing anything that uses it
 sys.modules["kybra"] = MagicMock()
@@ -36,7 +37,9 @@ def test_create_task_entity_class():
 
     # Check namespace is set correctly
     assert ProcessingState.__namespace__ == "task_tax_collection"
-    assert ProcessingState.get_full_type_name() == "task_tax_collection::ProcessingState"
+    assert (
+        ProcessingState.get_full_type_name() == "task_tax_collection::ProcessingState"
+    )
 
 
 def test_task_entity_isolation():
@@ -91,7 +94,7 @@ result = MyState.__namespace__
 def test_batch_processing_pattern():
     """Test typical batch processing pattern with TaskEntity"""
     from core.execution import create_task_entity_class
-    from kybra_simple_db import String, Integer
+    from kybra_simple_db import Integer, String
 
     TaskEntity = create_task_entity_class("batch_test")
 
@@ -122,7 +125,7 @@ def test_batch_processing_pattern():
 def test_multiple_state_entities():
     """Test using multiple TaskEntity subclasses for different purposes"""
     from core.execution import create_task_entity_class
-    from kybra_simple_db import String, Integer
+    from kybra_simple_db import Integer, String
 
     TaskEntity = create_task_entity_class("multi_state_test")
 
@@ -193,8 +196,9 @@ result = {
 
 def test_task_entity_with_json_storage():
     """Test storing complex data as JSON in TaskEntity"""
-    from core.execution import run_code
     import json
+
+    from core.execution import run_code
 
     codex_code = """
 from kybra_simple_db import String

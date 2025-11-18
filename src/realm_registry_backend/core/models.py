@@ -8,14 +8,14 @@ logger = get_logger("models")
 
 class RealmRecord(Entity, TimestampedMixin):
     """Entity representing a registered realm in the registry."""
-    
+
     __alias__ = "id"
-    
+
     id = String()
     name = String()
     url = String(max_length=512)
     created_at = Float()
-    
+
     def to_dict(self) -> dict:
         """Convert realm record to dictionary format."""
         return {

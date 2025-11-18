@@ -9,11 +9,11 @@ logger = get_logger("api.user")
 
 def user_register(principal: str, profile: str) -> dict[str, Any]:
     logger.info(f"Registering user {principal} with profile {profile}")
-    
+
     user_profile = UserProfile[profile]
     if not user_profile:
         raise ValueError(f"Profile {profile} not found")
-    
+
     user = User[principal]
     if not user:
         user = User(id=principal, profiles=[user_profile])

@@ -7,17 +7,21 @@ from typing import Tuple
 
 
 def dfx_call(
-    canister: str, method: str, args: str = "()", output_json: bool = False, is_update: bool = False
+    canister: str,
+    method: str,
+    args: str = "()",
+    output_json: bool = False,
+    is_update: bool = False,
 ) -> Tuple[str, int]:
     """Call a canister method via dfx.
-    
+
     Args:
         canister: Canister name (e.g., "realm_backend")
         method: Method name to call
         args: Candid-encoded arguments
         output_json: Whether to use --output json flag
         is_update: Whether this is an update call (default: query)
-        
+
     Returns:
         Tuple of (stdout, exit_code)
     """
@@ -28,7 +32,7 @@ def dfx_call(
         cmd.append("--query")  # Most realm_backend methods are queries
     if output_json:
         cmd.extend(["--output", "json"])
-    
+
     # Log the full command with proper quoting for args
     cmd_display = ["dfx", "canister", "call", canister, method]
     if args:
@@ -39,49 +43,53 @@ def dfx_call(
         cmd_display.extend(["--output", "json"])
     cmd_str = " ".join(cmd_display)
     print(f"    [DFX CMD] {cmd_str}")
-    
+
     result = subprocess.run(cmd, capture_output=True, text=True)
-    
+
     # Log exit code
     print(f"    [DFX EXIT CODE] {result.returncode}")
-    
+
     # Log full stdout (no truncation)
     if result.stdout:
         print(f"    [DFX STDOUT] {len(result.stdout)} bytes:")
         print(result.stdout)
     else:
         print(f"    [DFX STDOUT] (empty)")
-    
+
     # Log full stderr if present (no truncation)
     if result.stderr:
         print(f"    [DFX STDERR]:")
         print(result.stderr)
-    
+
     return result.stdout, result.returncode
 
 
-def dfx_call_json(canister: str, method: str, args: str = "()", is_update: bool = False) -> dict:
+def dfx_call_json(
+    canister: str, method: str, args: str = "()", is_update: bool = False
+) -> dict:
     """Call a canister method and parse JSON response.
-    
+
     Args:
         canister: Canister name
         method: Method name to call
         args: Candid-encoded arguments
         is_update: Whether this is an update call (default: query)
-        
+
     Returns:
         Parsed JSON response
-        
+
     Raises:
         RuntimeError: If call fails or JSON parsing fails
     """
     print(f"    [DFX JSON CALL] {canister}.{method}({args})")
-    output, code = dfx_call(canister, method, args, output_json=True, is_update=is_update)
-    
+    output, code = dfx_call(
+        canister, method, args, output_json=True, is_update=is_update
+    )
+
     if code != 0:
         print(f"    [ERROR] dfx call failed with exit code {code}")
         raise RuntimeError(f"dfx call failed with code {code}: {output}")
-    
+
     try:
         parsed = json.loads(output)
         print(f"    [JSON PARSED] Successfully parsed JSON response")
@@ -93,11 +101,11 @@ def dfx_call_json(canister: str, method: str, args: str = "()", is_update: bool 
 
 def assert_success(output: str, message: str = "") -> None:
     """Assert that dfx call was successful.
-    
+
     Args:
         output: Output from dfx call
         message: Optional error message
-        
+
     Raises:
         AssertionError: If call was not successful
     """
@@ -110,16 +118,18 @@ def assert_success(output: str, message: str = "") -> None:
 
 def assert_contains(output: str, substring: str, message: str = "") -> None:
     """Assert that output contains substring.
-    
+
     Args:
         output: Output to check
         substring: Substring to find
         message: Optional error message
-        
+
     Raises:
         AssertionError: If substring not found
     """
     if substring not in output:
-        error_msg = f"Expected '{substring}' in output{': ' + message if message else ''}"
+        error_msg = (
+            f"Expected '{substring}' in output{': ' + message if message else ''}"
+        )
         error_msg += f"\nGot output: {output}"
         raise AssertionError(error_msg)

@@ -14,10 +14,13 @@ from unittest.mock import MagicMock, patch
 # Add src for realm_registry_backend package imports
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../src"))
 # Add realm_registry_backend for top-level 'core' and 'api' imports (matching canister environment)
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../src/realm_registry_backend"))
+sys.path.append(
+    os.path.join(os.path.dirname(__file__), "../../src/realm_registry_backend")
+)
 
 # Mock the ic module before importing registry functions
 import kybra
+
 mock_ic = MagicMock()
 mock_ic.time.return_value = int(time.time() * 1_000_000_000)  # Convert to nanoseconds
 kybra.ic = mock_ic
@@ -25,27 +28,29 @@ kybra.ic = mock_ic
 # Mock the Database before importing
 from kybra_simple_db import Database
 
+
 class MockStorage:
     """Mock storage for testing without requiring a real canister environment"""
-    
+
     def __init__(self):
         self.data = {}
-    
+
     def get(self, key):
         return self.data.get(key)
-    
+
     def insert(self, key, value):
         self.data[key] = value
-    
+
     def remove(self, key):
         if key in self.data:
             del self.data[key]
-    
+
     def items(self):
         return self.data.items()
-    
+
     def keys(self):
         return self.data.keys()
+
 
 # Initialize mock database
 mock_storage = MockStorage()
@@ -96,12 +101,16 @@ def test_add_realm():
         clear_database()
 
         # Test adding a valid realm
-        result = add_registered_realm("test-realm-1", "Test Realm 1", "https://test1.com")
+        result = add_registered_realm(
+            "test-realm-1", "Test Realm 1", "https://test1.com"
+        )
         assert result["success"], f"Failed to add realm: {result.get('error')}"
         assert "test-realm-1" in result["message"]
 
         # Test adding duplicate realm
-        result = add_registered_realm("test-realm-1", "Test Realm 1 Duplicate", "https://test1.com")
+        result = add_registered_realm(
+            "test-realm-1", "Test Realm 1 Duplicate", "https://test1.com"
+        )
         assert not result["success"], "Should not allow duplicate realm IDs"
         assert "already exists" in result["error"]
 
@@ -218,15 +227,21 @@ def test_search_realms():
 
         # Test search by ID
         results = search_registered_realms("test-realm")
-        assert len(results) == 1, f"Expected 1 result for 'test-realm', got {len(results)}"
+        assert (
+            len(results) == 1
+        ), f"Expected 1 result for 'test-realm', got {len(results)}"
 
         # Test empty search (should return all)
         results = search_registered_realms("")
-        assert len(results) == 3, f"Expected 3 results for empty query, got {len(results)}"
+        assert (
+            len(results) == 3
+        ), f"Expected 3 results for empty query, got {len(results)}"
 
         # Test no matches
         results = search_registered_realms("nonexistent")
-        assert len(results) == 0, f"Expected 0 results for 'nonexistent', got {len(results)}"
+        assert (
+            len(results) == 0
+        ), f"Expected 0 results for 'nonexistent', got {len(results)}"
 
         print_success("search_realms tests passed")
         return True

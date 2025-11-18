@@ -6,7 +6,7 @@ logger = get_logger("entity.service")
 
 class Service(Entity, TimestampedMixin):
     """Public service entity for citizen services"""
-    
+
     __alias__ = "service_id"
     service_id = String(max_length=64)
     name = String(max_length=256)

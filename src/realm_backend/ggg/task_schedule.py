@@ -20,8 +20,16 @@ class TaskSchedule(Entity, TimestampedMixin):
     repeat_every = Integer()
     last_run_at = Integer()
 
-    def __init__(self, name: str, task, run_at: int = 0, repeat_every: int = 0, 
-                 last_run_at: int = 0, disabled: bool = False, **kwargs):
+    def __init__(
+        self,
+        name: str,
+        task,
+        run_at: int = 0,
+        repeat_every: int = 0,
+        last_run_at: int = 0,
+        disabled: bool = False,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.name = name
         self.task = task
@@ -36,7 +44,9 @@ class TaskSchedule(Entity, TimestampedMixin):
             "_id": str(self._id),
             "_type": "TaskSchedule",
             "name": self.name,
-            "task_id": str(self.task._id) if hasattr(self, 'task') and self.task else None,
+            "task_id": (
+                str(self.task._id) if hasattr(self, "task") and self.task else None
+            ),
             "disabled": self.disabled,
             "run_at": self.run_at,
             "repeat_every": self.repeat_every,

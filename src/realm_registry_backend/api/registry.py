@@ -2,9 +2,9 @@
 
 from typing import List, Optional
 
+from core.models import RealmRecord
 from kybra import ic
 from kybra_simple_logging import get_logger
-from core.models import RealmRecord
 
 logger = get_logger("registry")
 
@@ -53,7 +53,9 @@ def add_registered_realm(realm_id: str, name: str, url: str = "") -> dict:
             id=realm_id.strip(),
             name=name.strip(),
             url=url.strip() if url else "",
-            created_at=float(ic.time() / 1_000_000_000),  # Convert nanoseconds to seconds
+            created_at=float(
+                ic.time() / 1_000_000_000
+            ),  # Convert nanoseconds to seconds
         )
 
         logger.info(f"Successfully added realm: {realm_id} - {name}")
@@ -115,10 +117,7 @@ def search_registered_realms(query: str) -> List[dict]:
         # Load all realms using ORM
         all_realms = RealmRecord.instances()
         for realm in all_realms:
-            if (
-                query_lower in realm.id.lower()
-                or query_lower in realm.name.lower()
-            ):
+            if query_lower in realm.id.lower() or query_lower in realm.name.lower():
                 matching_realms.append(realm.to_dict())
 
         # Sort by created_at timestamp (newest first)

@@ -6,7 +6,7 @@ logger = get_logger("entity.tax_record")
 
 class TaxRecord(Entity, TimestampedMixin):
     """Tax record entity for citizen tax information"""
-    
+
     __alias__ = "tax_id"
     tax_id = String(max_length=64)
     tax_type = String(max_length=128)

@@ -32,7 +32,7 @@ logger = get_logger("api.status")
 def get_status() -> dict[str, Any]:
     """
     Get current system status and health information
-    
+
     Optimized to minimize instruction count for query calls.
 
     Returns:
@@ -71,12 +71,16 @@ def get_status() -> dict[str, Any]:
     extension_names = []
     try:
         import extension_packages.extension_imports
+
         # Only get unique extension names from already loaded modules
-        extension_names = list({
-            module_name.split(".")[1] 
-            for module_name in sys.modules 
-            if module_name.startswith("extension_packages.") and len(module_name.split(".")) > 1
-        })
+        extension_names = list(
+            {
+                module_name.split(".")[1]
+                for module_name in sys.modules
+                if module_name.startswith("extension_packages.")
+                and len(module_name.split(".")) > 1
+            }
+        )
     except Exception as e:
         logger.warning(f"Could not list extensions: {e}")
 

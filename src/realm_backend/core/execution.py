@@ -10,33 +10,34 @@ logger = get_logger("execution")
 
 def create_task_entity_class(task_name):
     """Create a TaskEntity base class that automatically uses task name as namespace.
-    
+
     Args:
         task_name: Name of the task to use as namespace prefix
-        
+
     Returns:
         A class that can be used as base for entities with automatic namespacing
     """
     from kybra_simple_db import Entity, TimestampedMixin
-    
+
     class TaskEntity(Entity, TimestampedMixin):
         """Base class for task-scoped entities with automatic namespacing.
-        
+
         Usage in codex:
             class MyState(TaskEntity):
                 key = String()
                 value = String()
-        
+
         The entity will be stored with namespace: task_{task_name}::MyState
         """
+
         __namespace__ = f"task_{task_name}"
-    
+
     return TaskEntity
 
 
 def run_code(source_code, locals={}, task_name=None):
     """Execute Python code with optional task-scoped entity support.
-    
+
     Args:
         source_code: Python code to execute
         locals: Local variables to make available
@@ -57,12 +58,12 @@ def run_code(source_code, locals={}, task_name=None):
             "ic": ic,
         }
     )
-    
+
     # Add TaskEntity if task_name is provided
     if task_name:
         safe_globals["TaskEntity"] = create_task_entity_class(task_name)
         logger.info(f"TaskEntity class added with namespace: task_{task_name}")
-    
+
     safe_locals = {}
     safe_locals.update(locals)
 

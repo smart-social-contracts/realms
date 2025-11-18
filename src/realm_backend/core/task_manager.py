@@ -5,7 +5,7 @@ recurring tasks with multi-step workflows.
 
 Core Entities:
   Codex → Call → TaskStep → Task → TaskSchedule
-  
+
 Execution Flow:
   1. create_scheduled_task() → TaskManager._update_timers()
   2. ic.set_timer() schedules first step
@@ -17,7 +17,7 @@ Key Use Case - Sync/Async Separation:
     Step 1 (Sync): Local computation
     Step 2 (Async): Inter-canister call with yield
     Step 3 (Sync): Process results
-  
+
 Other Uses:
   - Sequential workflows with delays
   - State machines (vesting, proposals)
@@ -53,6 +53,7 @@ logger = get_logger("core.task_manager")
 def get_now() -> int:
     return int(round(ic.time() / 1e9))
 
+
 class Call(Entity, TimestampedMixin):
     _function_def = None
     _function_params = None
@@ -67,7 +68,7 @@ class Call(Entity, TimestampedMixin):
 
         # Auto-detect async if codex is present
         self.is_async = "yield" in self.codex.code or "async_task" in self.codex.code
-        
+
         if self.is_async:
             return self._async_function
         else:
@@ -82,7 +83,7 @@ class Call(Entity, TimestampedMixin):
             if self.task_step and self.task_step.task:
                 task_name = self.task_step.task.name
                 logger.info(f"Executing codex for task: {task_name}")
-            
+
             result = run_code(self.codex.code, task_name=task_name)
             # Store result for execute_code() to retrieve
             self._result = result
@@ -109,7 +110,7 @@ class Call(Entity, TimestampedMixin):
             from execution import create_task_entity_class
 
             safe_globals.update({"ggg": ggg, "kybra": kybra})
-            
+
             # Get task name and add TaskEntity if available
             task_name = None
             if self.task_step and self.task_step.task:
@@ -202,30 +203,36 @@ class TaskManager:
                             task=task,
                             status="running",
                             logs="",
-                            result=""
+                            result="",
                         )
                     except Exception as exec_error:
-                        logger.warning(f"Failed to create TaskExecution record: {exec_error}")
-                    
+                        logger.warning(
+                            f"Failed to create TaskExecution record: {exec_error}"
+                        )
+
                     # Use _function() which handles both codex and function-based calls
                     result = yield step.call._function()()
                     logger.info(f"Async timer callback completed with result: {result}")
-                    
+
                     # Update execution record with result (defensive)
                     if execution:
                         try:
                             execution.status = "completed"
-                            execution.result = str(result)[:4999] if result else "completed"
+                            execution.result = (
+                                str(result)[:4999] if result else "completed"
+                            )
                             execution.logs = "Execution completed successfully"
                         except Exception as exec_error:
-                            logger.warning(f"Failed to update TaskExecution record: {exec_error}")
-                    
+                            logger.warning(
+                                f"Failed to update TaskExecution record: {exec_error}"
+                            )
+
                     step.status = TaskStatus.COMPLETED.value
                     self._check_and_schedule_next_step(task)
                 except Exception as e:
                     logger.error(f"Async timer callback failed: {e}")
                     logger.error(traceback.format_exc())
-                    
+
                     # Update execution record with error (defensive)
                     if execution:
                         try:
@@ -234,8 +241,10 @@ class TaskManager:
                             error_log = f"Error: {str(e)}\n{traceback.format_exc()}"
                             execution.logs = error_log[:4999]  # Truncate to max length
                         except Exception as exec_error:
-                            logger.warning(f"Failed to update TaskExecution error: {exec_error}")
-                    
+                            logger.warning(
+                                f"Failed to update TaskExecution error: {exec_error}"
+                            )
+
                     step.status = TaskStatus.FAILED.value
                     task.status = TaskStatus.FAILED.value
 
@@ -244,7 +253,9 @@ class TaskManager:
 
             def sync_timer_callback() -> void:
                 logger.info(f"Executing sync timer callback for {step.call}")
-                logger.info(f"step.call.task_step.task.name: {step.call.task_step.task.name}")
+                logger.info(
+                    f"step.call.task_step.task.name: {step.call.task_step.task.name}"
+                )
                 execution = None
                 try:
                     # Create execution record (defensive - don't fail if this errors)
@@ -254,37 +265,43 @@ class TaskManager:
                             task=task,
                             status="running",
                             logs="",
-                            result=""
+                            result="",
                         )
                     except Exception as exec_error:
-                        logger.warning(f"Failed to create TaskExecution record: {exec_error}")
-                    
+                        logger.warning(
+                            f"Failed to create TaskExecution record: {exec_error}"
+                        )
+
                     # Execute the task
                     step.call._function()()
-                    
+
                     # Get result if available (from Call._sync_function)
-                    result = getattr(step.call, '_result', None)
-                    
+                    result = getattr(step.call, "_result", None)
+
                     # Update execution record with result (defensive)
                     if execution:
                         try:
                             if result and isinstance(result, dict):
                                 execution.status = "completed"
-                                logs = result.get('logs', '') or 'Execution completed'
+                                logs = result.get("logs", "") or "Execution completed"
                                 execution.logs = logs[:4999]  # Truncate to max length
-                                execution.result = str(result.get('result', 'completed'))[:4999]
+                                execution.result = str(
+                                    result.get("result", "completed")
+                                )[:4999]
                             else:
                                 execution.status = "completed"
                                 execution.result = "completed"
                                 execution.logs = "Execution completed successfully"
                         except Exception as exec_error:
-                            logger.warning(f"Failed to update TaskExecution record: {exec_error}")
-                    
+                            logger.warning(
+                                f"Failed to update TaskExecution record: {exec_error}"
+                            )
+
                     step.status = TaskStatus.COMPLETED.value
                     self._check_and_schedule_next_step(task)
                 except Exception as e:
                     logger.error(f"Sync timer callback failed: {e}")
-                    
+
                     # Update execution record with error (defensive)
                     if execution:
                         try:
@@ -293,8 +310,10 @@ class TaskManager:
                             error_log = f"Error: {str(e)}\n{traceback.format_exc()}"
                             execution.logs = error_log[:4999]  # Truncate to max length
                         except Exception as exec_error:
-                            logger.warning(f"Failed to update TaskExecution error: {exec_error}")
-                    
+                            logger.warning(
+                                f"Failed to update TaskExecution error: {exec_error}"
+                            )
+
                     step.status = TaskStatus.FAILED.value
                     task.status = TaskStatus.FAILED.value
 
@@ -325,11 +344,13 @@ class TaskManager:
                 task.status = TaskStatus.COMPLETED.value
 
                 now = get_now()
-                
+
                 # Check if this is a recurring task and schedule next execution
                 for schedule in task.schedules:
                     if schedule.repeat_every and schedule.repeat_every > 0:
-                        logger.info(f"Task {task.name} is recurring, scheduling next execution in {schedule.repeat_every}s")
+                        logger.info(
+                            f"Task {task.name} is recurring, scheduling next execution in {schedule.repeat_every}s"
+                        )
                         task.status = TaskStatus.PENDING.value
                         task.step_to_execute = 0
                         # Reset all step statuses
@@ -339,7 +360,10 @@ class TaskManager:
                         callback_function = self._create_timer_callback(step, task)
 
                         if schedule.last_run_at:
-                            in_seconds = max(schedule.last_run_at + 2 * schedule.repeat_every - now, 0)
+                            in_seconds = max(
+                                schedule.last_run_at + 2 * schedule.repeat_every - now,
+                                0,
+                            )
                         else:
                             in_seconds = schedule.repeat_every
 
@@ -351,14 +375,16 @@ class TaskManager:
                         schedule.last_run_at = now
 
                         if schedule.disabled:
-                            logger.info(f"Skipping disabled schedule for task {task.name}")
+                            logger.info(
+                                f"Skipping disabled schedule for task {task.name}"
+                            )
                             continue
-                        
+
                         logger.info(f"Scheduling time in {in_seconds} seconds")
                         step.timer_id = ic.set_timer(
                             Duration(in_seconds), callback_function
                         )
-                        
+
         except Exception as e:
             logger.error(
                 f"Error checking next step for task {task.name}: {traceback.format_exc()}"
@@ -380,13 +406,14 @@ class TaskManager:
                 for schedule in task.schedules:
                     try:
 
-                        logger.info(f"Checking schedule {schedule.name}:\n"
-                        f"Disabled: {schedule.disabled}\n"
-                        f"run_at: {schedule.run_at}\n"
-                        f"repeat_every: {schedule.repeat_every}\n"
-                        f"last_run_at: {schedule.last_run_at}")
-                        
-                        
+                        logger.info(
+                            f"Checking schedule {schedule.name}:\n"
+                            f"Disabled: {schedule.disabled}\n"
+                            f"run_at: {schedule.run_at}\n"
+                            f"repeat_every: {schedule.repeat_every}\n"
+                            f"last_run_at: {schedule.last_run_at}"
+                        )
+
                         if schedule.disabled:
                             logger.info(
                                 f"Skipping disabled schedule for task {task.name}"
@@ -432,12 +459,14 @@ class TaskManager:
                             logger.info(
                                 f"Scheduling task {task.name} for immediate execution"
                             )
-                            
+
                             # Get first step (step_to_execute should be 0 at start)
                             if task.step_to_execute >= len(task.steps):
-                                logger.error(f"Task {task.name} step_to_execute out of bounds")
+                                logger.error(
+                                    f"Task {task.name} step_to_execute out of bounds"
+                                )
                                 continue
-                            
+
                             step = list(task.steps)[task.step_to_execute]
                             logger.info(
                                 f"Starting task {task.name} - executing step {task.step_to_execute}/{len(task.steps)}"

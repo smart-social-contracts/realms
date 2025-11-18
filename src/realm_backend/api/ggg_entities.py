@@ -48,7 +48,7 @@ def list_objects_paginated(
     class_name: str, page_num: int, page_size: int, order: str = "asc"
 ) -> Dict[str, Any]:
     """List objects in the system with pagination.
-    
+
     Args:
         class_name: Name of the entity class to query
         page_num: Page number (0-indexed)
@@ -59,27 +59,31 @@ def list_objects_paginated(
         class_object = globals()[class_name]
         count = class_object.count()
         logger.info(f"Total count: {count}")
-        
+
         if order == "desc":
             # For descending order with efficient loading:
             # Assume IDs are mostly sequential. Load from calculated position.
             # Page 0: from_id = count - page_size + 1 (e.g., 94 for 103 total, size 10)
             # Page 1: from_id = count - 2*page_size + 1 (e.g., 84)
             from_id = max(1, count - ((page_num + 1) * page_size) + 1)
-            
-            logger.info(f"Listing objects (desc): loading {page_size} items from ID {from_id}")
+
+            logger.info(
+                f"Listing objects (desc): loading {page_size} items from ID {from_id}"
+            )
             objects = class_object.load_some(from_id=from_id, count=page_size)
-            
+
             # Reverse to show newest first
             objects.reverse()
         else:
             # For ascending order, use standard pagination
             from_id = page_num * page_size + 1
-            logger.info(f"Listing objects (asc) from {from_id} with page size {page_size}")
+            logger.info(
+                f"Listing objects (asc) from {from_id} with page size {page_size}"
+            )
             objects = class_object.load_some(from_id=from_id, count=page_size)
-        
+
         logger.info(f"Loaded {len(objects)} objects")
-        
+
         return {
             "items": objects,
             "page_num": page_num,

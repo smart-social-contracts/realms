@@ -2,6 +2,7 @@
 Python implementation of the Generalized Global Governance (GGG) standard
 """
 
+from .balance import Balance
 from .citizen import Citizen
 from .codex import Codex
 
@@ -26,7 +27,6 @@ from .task import Task
 from .task_schedule import TaskSchedule
 from .tax_record import TaxRecord
 from .trade import Trade
-from .balance import Balance
 from .transfer import Transfer
 from .treasury import Treasury
 from .user import User

@@ -10,38 +10,39 @@ logger = get_logger("core.extensions")
 
 def create_extension_entity_class(extension_name):
     """Create an ExtensionEntity base class that automatically uses extension name as namespace.
-    
+
     Args:
         extension_name: Name of the extension to use as namespace prefix
-        
+
     Returns:
         A class that can be used as base for entities with automatic namespacing
-    
+
     Example:
         # In your extension backend/entry.py:
         from core.extensions import create_extension_entity_class
-        
+
         ExtensionEntity = create_extension_entity_class("my_extension")
-        
+
         class AppConfig(ExtensionEntity):
             __alias__ = "key"
             key = String()
             value = String()
-        
+
         # Usage:
         config = AppConfig["setting_name"]
         if not config:
             config = AppConfig(key="setting_name", value="...")
     """
     from kybra_simple_db import Entity, TimestampedMixin
-    
+
     class ExtensionEntity(Entity, TimestampedMixin):
         """Base class for extension-scoped entities with automatic namespacing.
-        
+
         The entity will be stored with namespace: ext_{extension_name}::EntityClass
         """
+
         __namespace__ = f"ext_{extension_name}"
-    
+
     return ExtensionEntity
 
 

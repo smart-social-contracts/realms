@@ -9,9 +9,9 @@ from api.ggg_entities import (
     list_objects,
     list_objects_paginated,
 )
+from api.registry import get_registry_info, register_realm
 from api.status import get_status
 from api.user import user_get, user_register, user_update_profile_picture
-from api.registry import register_realm, get_registry_info
 from core.candid_types_realm import (
     ExtensionCallArgs,
     ExtensionCallResponse,
@@ -23,7 +23,7 @@ from core.candid_types_realm import (
     StatusRecord,
     UserGetRecord,
 )
-from core.task_manager import Call, Task, TaskStep, TaskManager
+from core.task_manager import Call, Task, TaskManager, TaskStep
 from ggg import Codex
 from ggg.task_schedule import TaskSchedule
 from kybra import (
@@ -217,19 +217,19 @@ def get_objects_paginated(
 ) -> RealmResponse:
     """
     Get paginated list of objects with optional ordering.
-    
+
     Args:
         class_name: Name of the entity class (e.g., "User", "Transfer", "Mandate")
         page_num: Page number (0-indexed)
         page_size: Number of items per page
         order: Sort order - "asc" for ascending (oldest first) or "desc" for descending (newest first)
-    
+
     Example (ascending):
     $ dfx canister call --output json canister_id get_objects_paginated '("User", 0, 3, "asc")'
-    
+
     Example (descending):
     $ dfx canister call --output json canister_id get_objects_paginated '("User", 0, 3, "desc")'
-    
+
     Response:
     {
       "data": {
@@ -423,55 +423,77 @@ def initialize() -> void:
         for extension_id in extension_ids:
 
             extension_manifest = extension_manifests.get(extension_id, {})
-            entity_method_overrides = extension_manifest.get('entity_method_overrides', [])
+            entity_method_overrides = extension_manifest.get(
+                "entity_method_overrides", []
+            )
 
             if not entity_method_overrides:
                 logger.info(f"No method overrides found for {extension_id}")
             else:
-                logger.info(f"Loading {len(entity_method_overrides)} method override(s) for {extension_id}")
+                logger.info(
+                    f"Loading {len(entity_method_overrides)} method override(s) for {extension_id}"
+                )
                 for override in entity_method_overrides:
                     try:
-                        entity_name = override.get('entity')
-                        method_name = override.get('method')
-                        impl_path = override.get('implementation')
-                        method_type = override.get('type', 'method')  # default to instance method
+                        entity_name = override.get("entity")
+                        method_name = override.get("method")
+                        impl_path = override.get("implementation")
+                        method_type = override.get(
+                            "type", "method"
+                        )  # default to instance method
 
                         # Validate manifest data
                         if not all([entity_name, method_name, impl_path]):
-                            logger.warning(f"Invalid override in {extension_id}: missing entity/method/implementation")
+                            logger.warning(
+                                f"Invalid override in {extension_id}: missing entity/method/implementation"
+                            )
                             continue
 
                         # Get entity class
                         entity_class = getattr(ggg, entity_name, None)
                         if not entity_class:
-                            logger.warning(f"Entity '{entity_name}' not found in ggg module")
+                            logger.warning(
+                                f"Entity '{entity_name}' not found in ggg module"
+                            )
                             continue
-                        
+
                         # Import implementation
                         parts = impl_path.split(".")
-                        module_path = f"extension_packages.{extension_id}.{'.'.join(parts[:-1])}"
+                        module_path = (
+                            f"extension_packages.{extension_id}.{'.'.join(parts[:-1])}"
+                        )
                         func_name = parts[-1]
-                        
+
                         impl_module = importlib.import_module(module_path)
                         impl_func = getattr(impl_module, func_name, None)
-                        
+
                         if not impl_func:
-                            logger.warning(f"Function '{func_name}' not found in {module_path}")
+                            logger.warning(
+                                f"Function '{func_name}' not found in {module_path}"
+                            )
                             continue
-                        
+
                         # Bind method to entity (wrap as classmethod if specified)
-                        if method_type == 'classmethod':
+                        if method_type == "classmethod":
                             setattr(entity_class, method_name, classmethod(impl_func))
-                            logger.info(f"  ✓ {entity_name}.{method_name}() [classmethod] -> {extension_id}.{impl_path}")
-                        elif method_type == 'staticmethod':
+                            logger.info(
+                                f"  ✓ {entity_name}.{method_name}() [classmethod] -> {extension_id}.{impl_path}"
+                            )
+                        elif method_type == "staticmethod":
                             setattr(entity_class, method_name, staticmethod(impl_func))
-                            logger.info(f"  ✓ {entity_name}.{method_name}() [staticmethod] -> {extension_id}.{impl_path}")
+                            logger.info(
+                                f"  ✓ {entity_name}.{method_name}() [staticmethod] -> {extension_id}.{impl_path}"
+                            )
                         else:
                             setattr(entity_class, method_name, impl_func)
-                            logger.info(f"  ✓ {entity_name}.{method_name}() -> {extension_id}.{impl_path}")
-                        
+                            logger.info(
+                                f"  ✓ {entity_name}.{method_name}() -> {extension_id}.{impl_path}"
+                            )
+
                     except Exception as e:
-                        logger.error(f"Error binding method override in {extension_id}: {str(e)}")
+                        logger.error(
+                            f"Error binding method override in {extension_id}: {str(e)}"
+                        )
                         logger.error(traceback.format_exc())
 
             status = {
@@ -767,77 +789,77 @@ def download_file(
     checksum: Opt[str] = None,
 ) -> str:
     """
-    Convenient wrapper to download a file from a URL and save it to a Codex.
-    
-    This function creates a two-step task:
-    1. Step 1 (async): Download the file from the URL
-    2. Step 2 (sync): Verify checksum (if provided) and save content to a Codex
-    
-    The downloaded content is stored in `downloaded_content[url]` dictionary
-    and can be accessed by the callback code.
-    
-    Args:
-        url: The URL to download from
-        codex_name: Name for the Codex where the downloaded content will be saved
-        callback_code: Optional Python code to process the downloaded content.
-                      The code can access the downloaded content via:
-                      `from main import downloaded_content; content = downloaded_content['<url>']`
-                      If None, a default callback saves content to the specified Codex.
-        checksum: Optional checksum in format "sha256:hash" to verify downloaded content.
-                 If verification fails, the content will not be saved to the Codex.
-    
-    Returns:
-        JSON string with task information:
-        - success: Boolean
-        - task_id: The created task ID
-        - task_name: The task name
-        - url: The URL being downloaded
-        - codex_name: The name of the Codex where content will be saved
-        - checksum: The checksum used for verification (if provided)
-        - error: Error message if failed
-    
-    Example usage from a Codex:
-        from main import download_file
-        
-        # Download and save to a Codex
-        download_file(
-            "https://example.com/data.json",
-            "my_downloaded_data"
-        )
-        
-        # Download with checksum verification
-        download_file(
-            "https://example.com/code.py",
-            "verified_code",
-            checksum="sha256:abc123..."
-        )
-        
-        # Download with custom processing
-        callback = '''
-from main import downloaded_content
-from ggg import Codex
-import json
+        Convenient wrapper to download a file from a URL and save it to a Codex.
 
-content = downloaded_content['https://example.com/data.json']
-data = json.loads(content)
-ic.print(f"Processing {len(data)} items...")
-# ... custom processing logic ...
-codex = Codex(name="processed_data", code=str(data))
-ic.print(f"Saved to codex {codex._id}")
-'''
-        download_file(
-            "https://example.com/data.json",
-            "raw_data",
-            callback
-        )
+        This function creates a two-step task:
+        1. Step 1 (async): Download the file from the URL
+        2. Step 2 (sync): Verify checksum (if provided) and save content to a Codex
+
+        The downloaded content is stored in `downloaded_content[url]` dictionary
+        and can be accessed by the callback code.
+
+        Args:
+            url: The URL to download from
+            codex_name: Name for the Codex where the downloaded content will be saved
+            callback_code: Optional Python code to process the downloaded content.
+                          The code can access the downloaded content via:
+                          `from main import downloaded_content; content = downloaded_content['<url>']`
+                          If None, a default callback saves content to the specified Codex.
+            checksum: Optional checksum in format "sha256:hash" to verify downloaded content.
+                     If verification fails, the content will not be saved to the Codex.
+
+        Returns:
+            JSON string with task information:
+            - success: Boolean
+            - task_id: The created task ID
+            - task_name: The task name
+            - url: The URL being downloaded
+            - codex_name: The name of the Codex where content will be saved
+            - checksum: The checksum used for verification (if provided)
+            - error: Error message if failed
+
+        Example usage from a Codex:
+            from main import download_file
+
+            # Download and save to a Codex
+            download_file(
+                "https://example.com/data.json",
+                "my_downloaded_data"
+            )
+
+            # Download with checksum verification
+            download_file(
+                "https://example.com/code.py",
+                "verified_code",
+                checksum="sha256:abc123..."
+            )
+
+            # Download with custom processing
+            callback = '''
+    from main import downloaded_content
+    from ggg import Codex
+    import json
+
+    content = downloaded_content['https://example.com/data.json']
+    data = json.loads(content)
+    ic.print(f"Processing {len(data)} items...")
+    # ... custom processing logic ...
+    codex = Codex(name="processed_data", code=str(data))
+    ic.print(f"Saved to codex {codex._id}")
+    '''
+            download_file(
+                "https://example.com/data.json",
+                "raw_data",
+                callback
+            )
     """
     try:
         task_name = f"download_{codex_name}_{int(ic.time())}"
-        
+
         # Step 1: Async download
         download_codex = Codex(
             name=f"_{task_name}_download",
-            code=f'''
+            code=f"""
 from main import download_file_from_url
 
 def async_task():
@@ -850,18 +872,18 @@ def async_task():
     else:
         ic.print(f"[Step 1/2] ❌ Download failed: {{content}}")
     return result
-'''.strip()
+""".strip(),
         )
-        
+
         async_call = Call(is_async=True, codex=download_codex)
         step1 = TaskStep(call=async_call, run_next_after=0)
-        
+
         # Step 2: Sync callback to save to Codex
         if callback_code is None:
             # Default callback: verify checksum (if provided) and save to specified Codex
             checksum_verification = ""
             if checksum:
-                checksum_verification = f'''
+                checksum_verification = f"""
     # Verify checksum
     from main import verify_checksum
     checksum = "{checksum}"
@@ -873,9 +895,9 @@ def async_task():
         raise Exception(f"Checksum verification failed: {{error_msg}}")
     
     ic.print("[Step 2/2] ✅ Checksum verification passed")
-'''
-            
-            callback_code = f'''
+"""
+
+            callback_code = f"""
 from main import downloaded_content
 from ggg import Codex
 
@@ -900,19 +922,16 @@ if url in downloaded_content:
         ic.print(f"[Step 2/2] Preview: {{preview}}...")
 else:
     ic.print("[Step 2/2] ❌ ERROR: Content not found in downloaded_content")
-'''.strip()
-        
-        callback_codex = Codex(
-            name=f"_{task_name}_callback",
-            code=callback_code
-        )
-        
+""".strip()
+
+        callback_codex = Codex(name=f"_{task_name}_callback", code=callback_code)
+
         sync_call = Call(is_async=False, codex=callback_codex)
         step2 = TaskStep(call=sync_call, run_next_after=0)
-        
+
         # Create task with both steps
         task = Task(name=task_name, steps=[step1, step2])
-        
+
         # Create schedule for immediate execution
         schedule = TaskSchedule(
             name=f"schedule_{task_name}",
@@ -922,42 +941,36 @@ else:
             last_run_at=0,
             disabled=False,
         )
-        
+
         # Register with TaskManager
         manager = TaskManager()
         manager.add_task(task)
-        
+
         logger.info(
             f"Created download task: {task_name} (ID: {task._id}) for URL: {url} -> Codex: {codex_name}"
         )
-        
+
         # Trigger task manager
         TaskManager().run()
-        
+
         response_data = {
             "success": True,
             "task_id": str(task._id),
             "task_name": str(task.name),
             "url": url,
             "codex_name": codex_name,
-            "message": "Download task created and scheduled"
+            "message": "Download task created and scheduled",
         }
-        
+
         if checksum:
             response_data["checksum"] = checksum
-        
+
         return json.dumps(response_data, indent=2)
-        
+
     except Exception as e:
         logger.error(f"Error creating download task: {e}")
         logger.error(traceback.format_exc())
-        return json.dumps(
-            {
-                "success": False,
-                "error": str(e)
-            },
-            indent=2
-        )
+        return json.dumps({"success": False, "error": str(e)}, indent=2)
 
 
 def verify_checksum(content: str, expected_checksum: str) -> Tuple[bool, str]:
@@ -1084,7 +1097,7 @@ def execute_code(code: str) -> str:
         # Create task
         step = TaskStep(call=call)
         task = Task(name=f"Shell Task {temp_name}", steps=[step])
-        
+
         # Create schedule (immediate execution)
         schedule = TaskSchedule(
             name=f"Shell Schedule {temp_name}",
@@ -1184,10 +1197,10 @@ def execute_code_shell(code: str) -> str:
 def stop_task(task_id: str) -> str:
     """
     Stop a scheduled task by disabling its schedules and marking it as cancelled.
-    
+
     Args:
         task_id: Full or partial task ID to stop
-    
+
     Returns JSON with:
     - success: Boolean indicating success
     - task_id: The stopped task ID
@@ -1205,45 +1218,40 @@ def stop_task(task_id: str) -> str:
             if task._id.startswith(task_id) or task._id == task_id:
                 found_task = task
                 break
-        
+
         if found_task:
             # Mark task as cancelled
             if hasattr(found_task, "status"):
                 found_task.status = "cancelled"
-            
+
             # Disable all schedules
             for schedule in found_task.schedules:
                 schedule.disabled = True
-            
+
             logger.info(f"Stopped task: {found_task.name} ({found_task._id})")
-            return json.dumps({
-                "success": True,
-                "task_id": found_task._id,
-                "name": found_task.name
-            }, indent=2)
+            return json.dumps(
+                {"success": True, "task_id": found_task._id, "name": found_task.name},
+                indent=2,
+            )
         else:
-            return json.dumps({
-                "success": False,
-                "error": f"Task not found: {task_id}"
-            }, indent=2)
-            
+            return json.dumps(
+                {"success": False, "error": f"Task not found: {task_id}"}, indent=2
+            )
+
     except Exception as e:
         logger.error(f"Error stopping task: {e}")
-        return json.dumps({
-            "success": False,
-            "error": str(e)
-        }, indent=2)
+        return json.dumps({"success": False, "error": str(e)}, indent=2)
 
 
 @query
 def get_task_logs(task_id: str, limit: nat = 20) -> str:
     """
     Get execution logs for a specific task.
-    
+
     Args:
         task_id: Full or partial task ID
         limit: Maximum number of recent executions to return (default: 20)
-    
+
     Returns JSON with:
     - success: Boolean indicating success
     - task_id: The task ID
@@ -1263,44 +1271,45 @@ def get_task_logs(task_id: str, limit: nat = 20) -> str:
             if task._id.startswith(task_id) or task._id == task_id:
                 found_task = task
                 break
-        
+
         if found_task:
             # Get executions
-            executions = list(found_task.executions) if hasattr(found_task, 'executions') else []
-            
+            executions = (
+                list(found_task.executions) if hasattr(found_task, "executions") else []
+            )
+
             # Format execution data
             execution_data = []
             for execution in executions[-limit:]:
                 exec_info = {
                     "started_at": getattr(execution, "_timestamp_created", 0),
-                    "status": getattr(execution, "status", "unknown")
+                    "status": getattr(execution, "status", "unknown"),
                 }
                 if hasattr(execution, "logs") and execution.logs:
                     exec_info["logs"] = str(execution.logs)
                 if hasattr(execution, "result") and execution.result:
                     exec_info["result"] = str(execution.result)
                 execution_data.append(exec_info)
-            
-            return json.dumps({
-                "success": True,
-                "task_id": found_task._id,
-                "task_name": found_task.name,
-                "status": getattr(found_task, "status", "unknown"),
-                "executions": execution_data,
-                "total_executions": len(executions)
-            }, indent=2)
+
+            return json.dumps(
+                {
+                    "success": True,
+                    "task_id": found_task._id,
+                    "task_name": found_task.name,
+                    "status": getattr(found_task, "status", "unknown"),
+                    "executions": execution_data,
+                    "total_executions": len(executions),
+                },
+                indent=2,
+            )
         else:
-            return json.dumps({
-                "success": False,
-                "error": f"Task not found: {task_id}"
-            }, indent=2)
-            
+            return json.dumps(
+                {"success": False, "error": f"Task not found: {task_id}"}, indent=2
+            )
+
     except Exception as e:
         logger.error(f"Error getting task logs: {traceback.format_exc()}")
-        return json.dumps({
-            "success": False,
-            "error": traceback.format_exc()
-        }, indent=2)
+        return json.dumps({"success": False, "error": traceback.format_exc()}, indent=2)
 
 
 downloaded_content: dict = {}
@@ -1318,7 +1327,7 @@ def test_mixed_sync_async_task() -> void:
         async_call = Call()
         async_call.is_async = True
         download_codex = Codex()
-        download_codex.code = f'''
+        download_codex.code = f"""
 from main import download_file_from_url
 
 def async_task():
@@ -1328,7 +1337,7 @@ def async_task():
     result = yield download_file_from_url(url)
     ic.print(f"Download result for {{url}}: {{result[0]}}")
     return result
-'''.strip()
+""".strip()
         async_call.codex = download_codex
         step1 = TaskStep(call=async_call, run_next_after=10)
 
@@ -1364,7 +1373,9 @@ ic.print("=== VERIFICATION COMPLETE ===")""".strip()
         step2 = TaskStep(call=sync_call)
 
         task = Task(name="test_mixed_steps", steps=[step1, step2])
-        schedule = TaskSchedule(name=f"test_schedule_{ic.time()}", task=task, run_at=0, repeat_every=30)
+        schedule = TaskSchedule(
+            name=f"test_schedule_{ic.time()}", task=task, run_at=0, repeat_every=30
+        )
         task.schedules = [schedule]
 
         task_manager = TaskManager()
@@ -1377,16 +1388,18 @@ ic.print("=== VERIFICATION COMPLETE ===")""".strip()
 
 
 @update
-def create_scheduled_task(name: str, code: str, repeat_every: nat, run_after: nat = 5) -> str:
+def create_scheduled_task(
+    name: str, code: str, repeat_every: nat, run_after: nat = 5
+) -> str:
     """
     Create a new scheduled task from Python code.
-    
+
     Args:
         name: Task name
         code: Python code to execute (base64 encoded)
         repeat_every: Interval in seconds (0 for one-time execution)
         run_after: Delay before first execution in seconds (default: 5)
-    
+
     Returns JSON with:
     - success: Boolean indicating success
     - task_id: The created task ID
@@ -1395,19 +1408,19 @@ def create_scheduled_task(name: str, code: str, repeat_every: nat, run_after: na
     """
     try:
         # Decode the base64 encoded code
-        decoded_code = base64.b64decode(code).decode('utf-8')
-        
+        decoded_code = base64.b64decode(code).decode("utf-8")
+
         # Create codex
         temp_name = f"_scheduled_{name}_{int(ic.time())}"
         codex = Codex(name=temp_name, code=decoded_code)
-        
+
         # Create call and step
         call = Call(is_async=False, codex=codex)
         step = TaskStep(call=call, run_next_after=0)
-        
+
         # Create task (using TaskManager Task, not GGG Task)
         task = Task(name=name, steps=[step])
-        
+
         # Create schedule
         current_time = int(ic.time() / 1_000_000_000)
         schedule = TaskSchedule(
@@ -1417,40 +1430,40 @@ def create_scheduled_task(name: str, code: str, repeat_every: nat, run_after: na
             run_at=0,
             repeat_every=repeat_every,
             last_run_at=0,
-            disabled=False
+            disabled=False,
         )
-        
+
         # Register with TaskManager
         manager = TaskManager()
         manager.add_task(task)
-        
+
         # Extract serializable data
         task_id = str(task._id)
         task_name = str(task.name)
         schedule_id = str(schedule._id)
         run_at = int(schedule.run_at)
         repeat_every = int(schedule.repeat_every)
-        
+
         logger.info(f"Created scheduled task: {task_name} (ID: {task_id})")
 
         TaskManager().run()
-        
-        return json.dumps({
-            "success": True,
-            "task_id": task_id,
-            "task_name": task_name,
-            "schedule_id": schedule_id,
-            "run_at": run_at,
-            "repeat_every": repeat_every
-        }, indent=2)
-        
+
+        return json.dumps(
+            {
+                "success": True,
+                "task_id": task_id,
+                "task_name": task_name,
+                "schedule_id": schedule_id,
+                "run_at": run_at,
+                "repeat_every": repeat_every,
+            },
+            indent=2,
+        )
+
     except Exception as e:
         logger.error(f"Error creating scheduled task: {e}")
         logger.error(traceback.format_exc())
-        return json.dumps({
-            "success": False,
-            "error": str(e)
-        }, indent=2)
+        return json.dumps({"success": False, "error": str(e)}, indent=2)
 
 
 @update
@@ -1462,7 +1475,7 @@ def create_multi_step_scheduled_task(
 ) -> str:
     """
     Create a multi-step scheduled task from multiple code snippets.
-    
+
     Args:
         name: Task name
         steps_config: JSON array of step configurations:
@@ -1475,7 +1488,7 @@ def create_multi_step_scheduled_task(
             ]
         repeat_every: Interval in seconds (0 for one-time execution)
         run_after: Delay before first execution in seconds (default: 5)
-    
+
     Returns JSON with:
     - success: Boolean indicating success
     - task_id: The created task ID
@@ -1485,17 +1498,17 @@ def create_multi_step_scheduled_task(
     - run_at: Scheduled execution time
     - repeat_every: Repeat interval
     - error: Error message if failed
-    
+
     Note: is_async is automatically detected based on code content
           (presence of 'yield' or 'async_task')
     """
     try:
         # Parse steps configuration
         steps_data = json.loads(steps_config)
-        
+
         if not steps_data or len(steps_data) == 0:
             raise ValueError("At least one step is required")
-        
+
         # Create TaskStep objects
         task_steps = []
         for idx, step_config in enumerate(steps_data):
@@ -1504,30 +1517,30 @@ def create_multi_step_scheduled_task(
                 decoded_code = base64.b64decode(step_config["code"]).decode("utf-8")
             except Exception as e:
                 raise ValueError(f"Invalid base64 code in step {idx}: {e}")
-            
+
             # Create codex for this step
             codex_name = f"_{name}_step_{idx}_{int(ic.time())}"
             codex = Codex(name=codex_name, code=decoded_code)
-            
+
             # Create call - is_async will be auto-detected by Call._function()
             # Set to False initially, auto-detection will override if needed
             call = Call(is_async=False, codex=codex)
-            
+
             # Get run_next_after delay (default to 0)
             run_next_after = step_config.get("run_next_after", 0)
-            
+
             # Create step
             step = TaskStep(call=call, run_next_after=run_next_after)
             task_steps.append(step)
-            
+
             logger.info(
                 f"Created step {idx}: codex={codex_name}, "
                 f"run_next_after={run_next_after}s"
             )
-        
+
         # Create task with multiple steps
         task = Task(name=name, steps=task_steps)
-        
+
         # Create schedule
         current_time = int(ic.time() / 1_000_000_000)
         schedule = TaskSchedule(
@@ -1538,19 +1551,19 @@ def create_multi_step_scheduled_task(
             last_run_at=0,
             disabled=False,
         )
-        
+
         # Register with TaskManager
         manager = TaskManager()
         manager.add_task(task)
-        
+
         logger.info(
             f"Created multi-step task: {name} (ID: {task._id}) "
             f"with {len(task_steps)} steps"
         )
-        
+
         # Trigger task manager to process the schedule
         TaskManager().run()
-        
+
         return json.dumps(
             {
                 "success": True,
@@ -1578,45 +1591,39 @@ def register_realm_with_registry(
     registry_canister_id: text,
     realm_id: text,
     realm_name: text,
-    frontend_url: text = ""
+    frontend_url: text = "",
 ) -> Async[text]:
     """
     Register this realm with the central registry.
-    
+
     Makes an inter-canister call to the realm_registry_backend to register
     this realm in the global registry.
-    
+
     Args:
         registry_canister_id: Canister ID of the realm registry backend
         realm_id: Unique ID for this realm
         realm_name: Display name for this realm
         frontend_url: Frontend canister URL (optional, will auto-derive if empty)
-    
+
     Returns:
         JSON string with success status and message
     """
     try:
         result = yield register_realm(
-            registry_canister_id,
-            realm_id,
-            realm_name,
-            frontend_url
+            registry_canister_id, realm_id, realm_name, frontend_url
         )
         return json.dumps(result, indent=2)
     except Exception as e:
         logger.error(f"Error in register_realm_with_registry: {e}")
         logger.error(traceback.format_exc())
-        return json.dumps({
-            "success": False,
-            "error": str(e)
-        }, indent=2)
+        return json.dumps({"success": False, "error": str(e)}, indent=2)
 
 
 @query
 def get_realm_registry_info() -> text:
     """
     Get information about registries this realm is registered with.
-    
+
     Returns:
         JSON string with list of registries
     """
@@ -1625,11 +1632,9 @@ def get_realm_registry_info() -> text:
         return json.dumps(result, indent=2)
     except Exception as e:
         logger.error(f"Error in get_realm_registry_info: {e}")
-        return json.dumps({
-            "success": False,
-            "error": str(e),
-            "registries": []
-        }, indent=2)
+        return json.dumps(
+            {"success": False, "error": str(e), "registries": []}, indent=2
+        )
 
 
 # @heartbeat

@@ -6,7 +6,7 @@ logger = get_logger("entity.proposal")
 
 class Proposal(Entity, TimestampedMixin):
     """Governance proposal entity for voting system"""
-    
+
     __alias__ = "proposal_id"
     proposal_id = String(max_length=64)
     title = String(max_length=256)

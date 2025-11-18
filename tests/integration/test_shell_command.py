@@ -31,53 +31,59 @@ def run_command(cmd, input_data=None, timeout=30):
 def test_shell_command_help():
     """Test shell command help output."""
     print("🧪 Testing: shell --help")
-    
+
     stdout, stderr, code = run_command("realms shell --help")
-    
+
     assert code == 0, f"shell --help failed with code {code}"
-    assert "shell" in stdout.lower() or "interactive" in stdout.lower(), \
-        "Help output missing shell/interactive information"
-    
+    assert (
+        "shell" in stdout.lower() or "interactive" in stdout.lower()
+    ), "Help output missing shell/interactive information"
+
     print("✅ PASSED: shell --help works")
 
 
 def test_run_command_help():
     """Test run command help output."""
     print("🧪 Testing: run --help")
-    
+
     stdout, stderr, code = run_command("realms run --help")
-    
+
     assert code == 0, f"run --help failed with code {code}"
-    assert "shell" in stdout.lower() or "execute" in stdout.lower(), \
-        "Help output missing shell/execute information"
-    
+    assert (
+        "shell" in stdout.lower() or "execute" in stdout.lower()
+    ), "Help output missing shell/execute information"
+
     print("✅ PASSED: run --help works")
 
 
 def test_run_command_with_simple_code():
     """Test run command with simple Python code execution."""
     print("🧪 Testing: run --file with simple code")
-    
+
     # Create a temporary Python file with simple code
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-        f.write("""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+        f.write(
+            """
 # Simple test to verify Python execution
 result = 2 + 2
 # Code executes in canister - no direct print output
-""")
+"""
+        )
         temp_file = f.name
-    
+
     try:
         stdout, stderr, code = run_command(f"realms run --file {temp_file}")
-        
+
         assert code == 0, f"run --file failed with code {code}. Stderr: {stderr}"
         # Check for successful execution indicator
-        assert "Successfully executed" in stdout, \
-            f"Expected success message not found. Output:\n{stdout}\nStderr:\n{stderr}"
+        assert (
+            "Successfully executed" in stdout
+        ), f"Expected success message not found. Output:\n{stdout}\nStderr:\n{stderr}"
         # Check for JSON response indicating code was executed
-        assert '"status":' in stdout or 'status' in stdout, \
-            f"Expected status in output. Output:\n{stdout}"
-        
+        assert (
+            '"status":' in stdout or "status" in stdout
+        ), f"Expected status in output. Output:\n{stdout}"
+
         print("✅ PASSED: run --file executes simple code")
     finally:
         os.unlink(temp_file)
@@ -86,29 +92,35 @@ result = 2 + 2
 def test_run_command_with_ggg_imports():
     """Test run command can import GGG entities."""
     print("🧪 Testing: run --file with GGG imports")
-    
+
     # Create a temporary Python file that imports GGG entities
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-        f.write("""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+        f.write(
+            """
 # Test GGG entity imports - code runs in canister
 from ggg.user import User
 from ggg.organization import Organization
 # If imports fail, execution will error out
 user_class_name = User.__name__
 org_class_name = Organization.__name__
-""")
+"""
+        )
         temp_file = f.name
-    
+
     try:
         stdout, stderr, code = run_command(f"realms run --file {temp_file}", timeout=45)
-        
-        assert code == 0, f"run --file with GGG imports failed with code {code}. Stderr: {stderr}"
+
+        assert (
+            code == 0
+        ), f"run --file with GGG imports failed with code {code}. Stderr: {stderr}"
         # Check for successful execution - if imports failed, command would have errored
-        assert "Successfully executed" in stdout, \
-            f"GGG imports failed - no success message. Output:\n{stdout}\nStderr:\n{stderr}"
-        assert '"status":' in stdout or 'status' in stdout, \
-            f"Expected status in output. Output:\n{stdout}"
-        
+        assert (
+            "Successfully executed" in stdout
+        ), f"GGG imports failed - no success message. Output:\n{stdout}\nStderr:\n{stderr}"
+        assert (
+            '"status":' in stdout or "status" in stdout
+        ), f"Expected status in output. Output:\n{stdout}"
+
         print("✅ PASSED: run --file can import GGG entities")
     finally:
         os.unlink(temp_file)
@@ -117,10 +129,11 @@ org_class_name = Organization.__name__
 def test_run_command_with_entity_query():
     """Test run command can query entities from the deployed realm."""
     print("🧪 Testing: run --file with entity query")
-    
+
     # Create a temporary Python file that queries entities
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-        f.write("""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+        f.write(
+            """
 # Test entity querying - code runs in canister
 from ggg.user import User
 
@@ -128,19 +141,24 @@ from ggg.user import User
 users = User.load_all()
 # If query fails, execution will error out
 user_count = len(users)
-""")
+"""
+        )
         temp_file = f.name
-    
+
     try:
         stdout, stderr, code = run_command(f"realms run --file {temp_file}", timeout=45)
-        
-        assert code == 0, f"run --file with entity query failed with code {code}. Stderr: {stderr}"
+
+        assert (
+            code == 0
+        ), f"run --file with entity query failed with code {code}. Stderr: {stderr}"
         # Check for successful execution - if query failed, command would have errored
-        assert "Successfully executed" in stdout, \
-            f"Entity query failed - no success message. Output:\n{stdout}\nStderr:\n{stderr}"
-        assert '"status":' in stdout or 'status' in stdout, \
-            f"Expected status in output. Output:\n{stdout}"
-        
+        assert (
+            "Successfully executed" in stdout
+        ), f"Entity query failed - no success message. Output:\n{stdout}\nStderr:\n{stderr}"
+        assert (
+            '"status":' in stdout or "status" in stdout
+        ), f"Expected status in output. Output:\n{stdout}"
+
         print("✅ PASSED: run --file can query entities")
     finally:
         os.unlink(temp_file)
@@ -149,18 +167,21 @@ user_count = len(users)
 def test_run_command_with_network_option():
     """Test run command with network option."""
     print("🧪 Testing: run --network local --file")
-    
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-        f.write('# Test network option\nresult = 1 + 1\n')
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+        f.write("# Test network option\nresult = 1 + 1\n")
         temp_file = f.name
-    
+
     try:
-        stdout, stderr, code = run_command(f"realms run --network local --file {temp_file}")
-        
+        stdout, stderr, code = run_command(
+            f"realms run --network local --file {temp_file}"
+        )
+
         assert code == 0, f"run --network failed with code {code}. Stderr: {stderr}"
-        assert "Successfully executed" in stdout, \
-            f"Expected success message not found. Output:\n{stdout}"
-        
+        assert (
+            "Successfully executed" in stdout
+        ), f"Expected success message not found. Output:\n{stdout}"
+
         print("✅ PASSED: run --network option works")
     finally:
         os.unlink(temp_file)
@@ -169,21 +190,28 @@ def test_run_command_with_network_option():
 def test_shell_interactive_mode_exits():
     """Test that shell command can start and exit gracefully."""
     print("🧪 Testing: shell interactive mode startup/exit")
-    
+
     # Send 'exit()' to quit the interactive shell
-    stdout, stderr, code = run_command("realms shell", input_data="exit()\n", timeout=20)
-    
+    stdout, stderr, code = run_command(
+        "realms shell", input_data="exit()\n", timeout=20
+    )
+
     # Code 0 or 1 is acceptable (depends on how the shell exits)
-    assert code in [0, 1], f"shell command failed with unexpected code {code}. Stderr: {stderr}"
-    
+    assert code in [
+        0,
+        1,
+    ], f"shell command failed with unexpected code {code}. Stderr: {stderr}"
+
     # Should show Python shell prompt or startup message
     shell_indicators = [">>>", "Python", "InteractiveConsole"]
-    has_shell = any(indicator in stdout or indicator in stderr for indicator in shell_indicators)
-    
+    has_shell = any(
+        indicator in stdout or indicator in stderr for indicator in shell_indicators
+    )
+
     # If we don't see shell indicators, at least it shouldn't crash
     if not has_shell:
         print("⚠️  WARNING: Shell indicators not found, but command didn't crash")
-    
+
     print("✅ PASSED: shell command starts and exits")
 
 
@@ -193,7 +221,7 @@ def main():
     print("Shell/Run Command Integration Tests")
     print("=" * 60)
     print()
-    
+
     tests = [
         test_shell_command_help,
         test_run_command_help,
@@ -203,9 +231,9 @@ def main():
         test_run_command_with_network_option,
         test_shell_interactive_mode_exits,
     ]
-    
+
     failed = 0
-    
+
     for test in tests:
         try:
             test()
@@ -220,7 +248,7 @@ def main():
             traceback.print_exc()
             failed += 1
         print()
-    
+
     print("=" * 60)
     if failed == 0:
         print("✅ All shell/run command tests passed!")
