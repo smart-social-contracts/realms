@@ -22,6 +22,7 @@ class Balance(Entity, TimestampedMixin):
     instrument = String()
     amount = Integer()
     transfers = OneToMany("Transfer", "balance")
+    tag = String()
 
     def refresh(self):
         raise NotImplementedError("Balance refresh is not implemented")
