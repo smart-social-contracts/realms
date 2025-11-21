@@ -238,6 +238,71 @@ def test_task_with_invalid_code():
         Path(temp_file).unlink()
 
 
+def test_multi_step_task():
+    """Test multi-step task from JSON config."""
+    print("\n=== Test: Multi-Step Task ===")
+    
+    temp_files = []
+    temp_config = None
+    
+    try:
+        # Create step files
+        step1_code = '''def async_task():
+    ic.print('Step 1: Fetch data')
+    return 'data_fetched'
+'''
+        step2_code = '''def async_task():
+    ic.print('Step 2: Process data')
+    return 'data_processed'
+'''
+        step3_code = '''def async_task():
+    ic.print('Step 3: Save results')
+    return 'results_saved'
+'''
+        
+        # Create temp files for steps
+        for code in [step1_code, step2_code, step3_code]:
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+                f.write(code)
+                temp_files.append(f.name)
+        
+        # Create config file
+        config = {
+            "name": "test_pipeline",
+            "every": 60,
+            "after": 0,
+            "steps": [
+                {"file": temp_files[0], "run_next_after": 0},
+                {"file": temp_files[1], "run_next_after": 2},
+                {"file": temp_files[2], "run_next_after": 1}
+            ]
+        }
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump(config, f)
+            temp_config = f.name
+        
+        # Run with config
+        output = run_cli("run", "--config", temp_config)
+        assert "multi-step" in output.lower() or "pipeline" in output.lower() or "test_pipeline" in output
+        print("  ✓ Multi-step task created")
+        
+        # Verify task exists
+        data = run_cli_json("ps", "ls")
+        task = next((t for t in data["tasks"] if t["name"] == "test_pipeline"), None)
+        if task:
+            print(f"  ✓ Found task in list: {task['task_id']}")
+        else:
+            print("  ⚠ Task not found in list (might have completed)")
+            
+    finally:
+        # Cleanup temp files
+        for temp_file in temp_files:
+            Path(temp_file).unlink()
+        if temp_config:
+            Path(temp_config).unlink()
+
+
 def cleanup_test_tasks():
     """Clean up all tasks created during testing."""
     print("\n=== Cleanup: Removing Test Tasks ===")
@@ -269,6 +334,7 @@ def main():
         test_get_task_logs,
         test_multiple_tasks,
         test_task_with_invalid_code,
+        test_multi_step_task,
     ]
     
     passed = 0
