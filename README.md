@@ -331,8 +331,52 @@ def async_task():
 
 See `examples/sync_example.py` and `examples/async_example.py` for working examples.
 
+---
 
+## Scheduled Tasks
 
+Schedule Python code to run automatically at regular intervals:
+
+```bash
+# Run once
+realms run --file examples/my_task.py
+
+# Run every 10 seconds
+realms run --file examples/my_task.py --every 10
+
+# Manage tasks
+realms ps ls                    # List all tasks
+realms ps ls -o json            # JSON output for scripts
+realms ps kill <task_id>        # Stop a task
+realms ps logs <task_id>        # View execution logs
+```
+
+### Task Requirements
+
+**Sync tasks** (no yield):
+```python
+def async_task():
+    ic.print('Simple task')
+    return 'ok'
+```
+
+**Async tasks** (with yield):
+```python
+def async_task():
+    from ggg import Treasury
+    treasury = Treasury.instances()[0]
+    result = yield treasury.refresh()
+    return 'ok'
+```
+
+### Testing
+
+Run integration tests:
+```bash
+python tests/backend/test_task_management_api.py
+```
+
+---
 
 ## Creating a New Realm
 

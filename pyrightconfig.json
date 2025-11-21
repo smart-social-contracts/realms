@@ -8,13 +8,15 @@
     "exclude": [
         "**/node_modules",
         "**/__pycache__",
-        "src/realm_backend/extension_packages"
+        "src/realm_backend/extension_packages",
+        "examples"
     ],
     "extraPaths": [
         "./src/realm_backend",
         "./cli",
         "./extensions/vault/backend",
-        "./extensions/admin_dashboard/backend"
+        "./extensions/admin_dashboard/backend",
+        "./examples"
     ],
     "venvPath": ".",
     "venv": "venv",
