@@ -346,7 +346,6 @@ realms run --file examples/my_task.py --every 10
 
 # Manage tasks
 realms ps ls                    # List all tasks
-realms ps ls -o json            # JSON output for scripts
 realms ps kill <task_id>        # Stop a task
 realms ps logs <task_id>        # View execution logs
 ```
@@ -368,14 +367,6 @@ def async_task():
     result = yield treasury.refresh()
     return 'ok'
 ```
-
-### Testing
-
-Run integration tests:
-```bash
-python tests/backend/test_task_management_api.py
-```
-
 ---
 
 ## Creating a New Realm
