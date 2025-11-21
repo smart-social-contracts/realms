@@ -91,9 +91,11 @@ def ps_ls_command(
     network: Optional[str] = None,
     canister: str = "realm_backend",
     verbose: bool = False,
+    output_format: str = "table",
 ) -> None:
     """List all scheduled and running tasks."""
-    console.print("[bold blue]📋 Scheduled Tasks & Schedules[/bold blue]\n")
+    if output_format != "json":
+        console.print("[bold blue]📋 Scheduled Tasks & Schedules[/bold blue]\n")
     
     try:
         # Query all Tasks using get_objects_paginated
@@ -117,11 +119,19 @@ def ps_ls_command(
         )
         
         if tasks_result.returncode != 0:
-            console.print(f"[red]❌ Error querying tasks: {tasks_result.stderr}[/red]")
+            error_msg = f"Error querying tasks: {tasks_result.stderr}"
+            if output_format == "json":
+                print(json.dumps({"error": error_msg}, indent=2))
+            else:
+                console.print(f"[red]❌ {error_msg}[/red]")
             raise typer.Exit(1)
         
         if schedules_result.returncode != 0:
-            console.print(f"[red]❌ Error querying schedules: {schedules_result.stderr}[/red]")
+            error_msg = f"Error querying schedules: {schedules_result.stderr}"
+            if output_format == "json":
+                print(json.dumps({"error": error_msg}, indent=2))
+            else:
+                console.print(f"[red]❌ {error_msg}[/red]")
             raise typer.Exit(1)
         
         # Parse responses
@@ -198,13 +208,20 @@ def ps_ls_command(
     
     except Exception as e:
         import traceback
-        console.print(f"[red]❌ Error: {str(e)}[/red]")
-        console.print(f"[dim]{traceback.format_exc()}[/dim]")
+        error_msg = str(e)
+        if output_format == "json":
+            print(json.dumps({"error": error_msg, "traceback": traceback.format_exc()}, indent=2))
+        else:
+            console.print(f"[red]❌ Error: {error_msg}[/red]")
+            console.print(f"[dim]{traceback.format_exc()}[/dim]")
         raise typer.Exit(1)
     
     if not tasks:
-        console.print("[yellow]No scheduled tasks found[/yellow]")
-        console.print("[dim]Create tasks with: realms run --file <file> --every <seconds>[/dim]")
+        if output_format == "json":
+            print(json.dumps({"tasks": [], "total_tasks": 0, "total_schedules": 0}, indent=2))
+        else:
+            console.print("[yellow]No scheduled tasks found[/yellow]")
+            console.print("[dim]Create tasks with: realms run --file <file> --every <seconds>[/dim]")
         return
     
     # Group tasks by task_id to show all schedules
@@ -212,6 +229,16 @@ def ps_ls_command(
     tasks_by_id = defaultdict(list)
     for task in tasks:
         tasks_by_id[task["task_id"]].append(task)
+    
+    # If JSON output requested, print and return
+    if output_format == "json":
+        output_data = {
+            "total_tasks": len(tasks_by_id),
+            "total_schedules": len(tasks),
+            "tasks": tasks
+        }
+        print(json.dumps(output_data, indent=2))
+        return
     
     # Create table with more detailed information
     table = Table(title=f"Tasks: {len(tasks_by_id)} | Schedules: {len(tasks)}")
@@ -313,9 +340,11 @@ def ps_kill_command(
     task_id: str,
     network: Optional[str] = None,
     canister: str = "realm_backend",
+    output_format: str = "table",
 ) -> None:
     """Stop a scheduled task."""
-    console.print(f"[bold blue]❌ Stopping Task: {task_id}[/bold blue]\n")
+    if output_format != "json":
+        console.print(f"[bold blue]❌ Stopping Task: {task_id}[/bold blue]\n")
     
     # Call backend API endpoint
     response = call_canister_endpoint(
@@ -327,11 +356,22 @@ def ps_kill_command(
     
     if "error" in response or not response.get("success"):
         error_msg = response.get("error", "Unknown error")
-        console.print(f"[red]❌ Error: {error_msg}[/red]")
+        if output_format == "json":
+            print(json.dumps({"success": False, "error": error_msg}, indent=2))
+        else:
+            console.print(f"[red]❌ Error: {error_msg}[/red]")
         raise typer.Exit(1)
     
-    console.print(f"[green]✅ Stopped task: {response['name']} ({response['task_id'][:8]})[/green]")
-    console.print(f"\n[dim]💡 Use 'realms ps ls' to verify[/dim]")
+    if output_format == "json":
+        print(json.dumps({
+            "success": True,
+            "task_id": response['task_id'],
+            "name": response['name'],
+            "message": "Task stopped successfully"
+        }, indent=2))
+    else:
+        console.print(f"[green]✅ Stopped task: {response['name']} ({response['task_id'][:8]})[/green]")
+        console.print(f"\n[dim]💡 Use 'realms ps ls' to verify[/dim]")
 
 
 def ps_logs_command(
@@ -339,9 +379,11 @@ def ps_logs_command(
     network: Optional[str] = None,
     canister: str = "realm_backend",
     tail: int = 20,
+    output_format: str = "table",
 ) -> None:
     """View execution logs for a task."""
-    console.print(f"[bold blue]📑 Task Logs: {task_id}[/bold blue]\n")
+    if output_format != "json":
+        console.print(f"[bold blue]📑 Task Logs: {task_id}[/bold blue]\n")
     
     # Call backend API endpoint
     response = call_canister_endpoint(
@@ -353,8 +395,22 @@ def ps_logs_command(
     
     if "error" in response or not response.get("success"):
         error_msg = response.get("error", "Unknown error")
-        console.print(f"[red]❌ Error: {error_msg}[/red]")
+        if output_format == "json":
+            print(json.dumps({"success": False, "error": error_msg}, indent=2))
+        else:
+            console.print(f"[red]❌ Error: {error_msg}[/red]")
         raise typer.Exit(1)
+    
+    if output_format == "json":
+        print(json.dumps({
+            "success": True,
+            "task_id": response['task_id'],
+            "task_name": response['task_name'],
+            "status": response['status'],
+            "total_executions": response['total_executions'],
+            "executions": response.get("executions", [])
+        }, indent=2))
+        return
     
     console.print(f"[bold]Task:[/bold] {response['task_name']} ({response['task_id'][:8]})")
     console.print(f"[bold]Status:[/bold] {response['status']}")

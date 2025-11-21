@@ -908,12 +908,15 @@ def ps_ls(
     verbose: bool = typer.Option(
         False, "--verbose", "-v", help="Show detailed information"
     ),
+    output: str = typer.Option(
+        "table", "--output", "-o", help="Output format: 'table' or 'json'"
+    ),
 ) -> None:
     """List all scheduled tasks."""
     effective_network, effective_canister = get_effective_network_and_canister(
         network, canister
     )
-    ps_ls_command(effective_network, effective_canister, verbose)
+    ps_ls_command(effective_network, effective_canister, verbose, output)
 
 
 @ps_app.command("kill")
@@ -925,12 +928,15 @@ def ps_kill(
     canister: Optional[str] = typer.Option(
         None, "--canister", "-c", help="Canister name (overrides context)"
     ),
+    output: str = typer.Option(
+        "table", "--output", "-o", help="Output format: 'table' or 'json'"
+    ),
 ) -> None:
     """Stop a scheduled task."""
     effective_network, effective_canister = get_effective_network_and_canister(
         network, canister
     )
-    ps_kill_command(task_id, effective_network, effective_canister)
+    ps_kill_command(task_id, effective_network, effective_canister, output)
 
 
 @ps_app.command("logs")
@@ -945,12 +951,15 @@ def ps_logs(
     tail: int = typer.Option(
         20, "--tail", "-t", help="Number of recent executions to show"
     ),
+    output: str = typer.Option(
+        "table", "--output", "-o", help="Output format: 'table' or 'json'"
+    ),
 ) -> None:
     """View execution logs for a task."""
     effective_network, effective_canister = get_effective_network_and_canister(
         network, canister
     )
-    ps_logs_command(task_id, effective_network, effective_canister, tail)
+    ps_logs_command(task_id, effective_network, effective_canister, tail, output)
 
 
 @app.command("version")
