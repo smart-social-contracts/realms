@@ -165,11 +165,14 @@ class Task(GGGTask):
     status = String()
     step_to_execute = Integer()
 
-    def __init__(self, steps: List[TaskStep], **kwargs):
+    def __init__(self, steps: List[TaskStep] = None, **kwargs):
         super().__init__(**kwargs)
-        self.steps = steps
         self.status = TaskStatus.PENDING.value
         self.step_to_execute = 0
+        # Set up relationships after entity is saved
+        if steps:
+            for step in steps:
+                step.task = self
 
     def __repr__(self) -> str:
         return f"Task(name={self.name}, steps={self.steps}, schedules={self.schedules}, status={self.status}, step_to_execute={self.step_to_execute})"

@@ -1407,6 +1407,10 @@ def create_scheduled_task(
     - error: Error message if failed
     """
     try:
+
+        from core.task_manager import Call, Task, TaskManager, TaskStep
+        from ggg.task_schedule import TaskSchedule
+        
         # Decode the base64 encoded code
         decoded_code = base64.b64decode(code).decode("utf-8")
 
@@ -1414,8 +1418,12 @@ def create_scheduled_task(
         temp_name = f"_scheduled_{name}_{int(ic.time())}"
         codex = Codex(name=temp_name, code=decoded_code)
 
+        # Auto-detect if code is async
+        is_async = "yield" in decoded_code or "async_task" in decoded_code
+        logger.info(f"Auto-detected is_async={is_async} for task {name}")
+
         # Create call and step
-        call = Call(is_async=False, codex=codex)
+        call = Call(is_async=is_async, codex=codex)
         step = TaskStep(call=call, run_next_after=0)
 
         # Create task (using TaskManager Task, not GGG Task)
