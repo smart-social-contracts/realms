@@ -3,7 +3,7 @@ Python implementation of the Generalized Global Governance (GGG) standard
 """
 
 from .balance import Balance
-from .citizen import Citizen
+from .member import Member
 from .codex import Codex
 
 # Import constants separately if needed
@@ -38,6 +38,7 @@ __all__ = [
     "Contract",
     "Dispute",
     "Instrument",
+    "Invoice",
     "Land",
     "LandType",
     "Balance",
@@ -61,7 +62,7 @@ __all__ = [
     "Vote",
     "Transfer",
     "Human",
-    "Citizen",
+    "Member",
     "Identity",
     "Treasury",
 ]
