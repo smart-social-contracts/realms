@@ -12,7 +12,7 @@ echo ""
 docker run --rm \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -v "$SCRIPT_DIR/docker_mode_tests.sh:/tests/docker_mode_tests.sh:ro" \
-    -v "$SCRIPT_DIR/../:/cli:ro" \
+    -v "$SCRIPT_DIR/../:/cli" \
     python:3.10-slim \
     bash /tests/docker_mode_tests.sh
 
