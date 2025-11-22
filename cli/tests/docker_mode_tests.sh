@@ -43,7 +43,7 @@ cd /tmp
 realms create \
     --realm-name "Test Realm" \
     --network local \
-    --citizens 5 \
+    --members 5 \
     --output-dir test_realm \
     --random
 
@@ -78,7 +78,7 @@ if [ -f "realm_data.json" ]; then
     echo "  📊 Verifying data generation..."
     CITIZEN_COUNT=$(grep -o '"id": "user_' realm_data.json | wc -l)
     if [ "$CITIZEN_COUNT" -eq "5" ]; then
-        echo "  ✅ Correct number of citizens generated (5)"
+        echo "  ✅ Correct number of members generated (5)"
     else
         echo "  ❌ Wrong citizen count: expected 5, got $CITIZEN_COUNT"
         exit 1

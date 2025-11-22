@@ -25,7 +25,7 @@ log_error() {
 # Configuration
 DOCKER_IMAGE="${1:-ghcr.io/smart-social-contracts/realms:latest}"
 CONTAINER_NAME="${2:-realms-api-test}"
-CITIZENS_COUNT="${3:-10}"
+MEMBERS_COUNT="${3:-10}"
 USE_VOLUMES="${4:-true}"  # Default to volume mounting for speed
 TEST_FILES="${5:-}"  # Optional: specific test files to run (space-separated)
 
@@ -56,7 +56,7 @@ docker run -d \
 
 # Deploy realm (this will block until complete - handles dfx startup internally)
 log_info "Creating and deploying realm (this takes ~2-3 minutes)..."
-if ! docker exec "$CONTAINER_NAME" bash -c "realms create --random --citizens $CITIZENS_COUNT && realms deploy"; then
+if ! docker exec "$CONTAINER_NAME" bash -c "realms create --random --members $MEMBERS_COUNT && realms deploy"; then
     log_error "Realm deployment failed"
     log_info "Checking logs..."
     docker exec "$CONTAINER_NAME" tail -100 realms_cli.log 2>/dev/null || true
