@@ -78,16 +78,35 @@ class Call(Entity, TimestampedMixin):
         logger.info("Executing sync call")
         if self.codex:
             logger.info("Executing codex")
-            # Get task name from task_step -> task
+            # Get task name and ID from task_step -> task
             task_name = None
+            task_id = None
+            task_logger = None
+            
             if self.task_step and self.task_step.task:
                 task_name = self.task_step.task.name
-                logger.info(f"Executing codex for task: {task_name}")
+                task_id = str(self.task_step.task._id)
+                logger.info(f"Executing codex for task: {task_name} (ID: {task_id})")
+                
+                # Create task-specific logger using kybra-simple-logging
+                from kybra_simple_logging import get_logger as get_task_logger
+                task_logger = get_task_logger(f"task_{task_id}")
+                task_logger.info(f"Starting sync execution for task: {task_name}")
 
-            result = run_code(self.codex.code, task_name=task_name)
+            result = run_code(self.codex.code, task_name=task_name, task_logger=task_logger)
             # Store result for execute_code() to retrieve
             self._result = result
-            # Log captured output
+            
+            # Log to task logger if available
+            if task_logger:
+                if result.get("success"):
+                    task_logger.info(f"Execution completed successfully")
+                    if result.get('result'):
+                        task_logger.info(f"Result: {result.get('result')}")
+                else:
+                    task_logger.error(f"Execution failed: {result.get('error')}")
+            
+            # Also log captured output
             if result.get("logs"):
                 logger.info(f"Captured logs: {result['logs']}")
             if result.get("success"):
@@ -111,13 +130,26 @@ class Call(Entity, TimestampedMixin):
 
             safe_globals.update({"ggg": ggg, "kybra": kybra})
 
-            # Get task name and add TaskEntity if available
+            # Get task name and ID, add TaskEntity and TaskLogger if available
             task_name = None
+            task_id = None
+            task_logger = None
+            
             if self.task_step and self.task_step.task:
                 task_name = self.task_step.task.name
-                logger.info(f"Executing async codex for task: {task_name}")
+                task_id = str(self.task_step.task._id)
+                logger.info(f"Executing async codex for task: {task_name} (ID: {task_id})")
+                
+                # Add TaskEntity
                 safe_globals["TaskEntity"] = create_task_entity_class(task_name)
                 logger.info(f"TaskEntity class added with namespace: task_{task_name}")
+                
+                # Create and add task-specific logger using kybra-simple-logging
+                from kybra_simple_logging import get_logger as get_task_logger
+                task_logger = get_task_logger(f"task_{task_id}")
+                task_logger.info(f"Starting async execution for task: {task_name}")
+                safe_globals["logger"] = task_logger
+                safe_globals["log"] = task_logger  # Alias for convenience
 
             # Execute the codex code (defines async_task function)
             exec(self.codex.code, safe_globals)
@@ -126,11 +158,19 @@ class Call(Entity, TimestampedMixin):
             async_task = safe_globals.get("async_task")
             if async_task and callable(async_task):
                 result = yield from async_task()
+                
+                # Log completion
+                if task_logger:
+                    task_logger.info(f"Async execution completed: {result}")
+                
                 # Store result for status checking
                 self._result = result
                 return result
             else:
-                logger.error("async_task function not found in codex")
+                error_msg = "async_task function not found in codex"
+                logger.error(error_msg)
+                if task_logger:
+                    task_logger.error(error_msg)
                 return None
         else:
             result = yield self._function_def(*self._function_params)

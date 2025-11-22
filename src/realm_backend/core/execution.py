@@ -35,13 +35,14 @@ def create_task_entity_class(task_name):
     return TaskEntity
 
 
-def run_code(source_code, locals={}, task_name=None):
+def run_code(source_code, locals={}, task_name=None, task_logger=None):
     """Execute Python code with optional task-scoped entity support.
 
     Args:
         source_code: Python code to execute
         locals: Local variables to make available
         task_name: Optional task name for TaskEntity namespacing
+        task_logger: Optional task-specific logger for isolated logging
     """
     logger.info("running code: ************************ %s" % source_code)
     # Use current globals to ensure built-ins and proper scope
@@ -58,6 +59,11 @@ def run_code(source_code, locals={}, task_name=None):
             "ic": ic,
         }
     )
+
+    # Add task-specific logger if provided
+    if task_logger:
+        safe_globals["logger"] = task_logger
+        safe_globals["log"] = task_logger  # Alias for convenience
 
     # Add TaskEntity if task_name is provided
     if task_name:

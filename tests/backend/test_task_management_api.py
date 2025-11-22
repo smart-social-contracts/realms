@@ -193,6 +193,41 @@ def test_get_task_logs():
         Path(temp_file).unlink()
 
 
+def test_task_specific_logging():
+    """Test task-specific logger functionality with kybra-simple-logging."""
+    print("\n=== Test: Task-Specific Logging ===")
+    
+    code = '''def async_task():
+    # Logger is auto-injected, no import needed
+    logger.info('Task-specific log message')
+    logger.debug('Debug details')
+    return 'logged'
+'''
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        f.write(code)
+        temp_file = f.name
+    
+    try:
+        output = run_cli("run", "--file", temp_file, "--every", "60")
+        assert "Scheduled task" in output
+        print("  ✓ Task with logger created (no import required)")
+        
+        # Wait for execution
+        import time
+        time.sleep(3)
+        
+        # Verify task exists
+        data = run_cli_json("ps", "ls")
+        if data["total_tasks"] > 0:
+            task_id = data["tasks"][0]["task_id"]
+            print(f"  ✓ Task executed with ID: {task_id}")
+            print("  ℹ See test_task_logging.py for comprehensive logging tests")
+        else:
+            print("  ⚠ No tasks found after execution")
+    finally:
+        Path(temp_file).unlink()
+
+
 def test_multiple_tasks():
     """Test creating multiple concurrent tasks."""
     print("\n=== Test: Multiple Concurrent Tasks ===")
@@ -332,6 +367,7 @@ def main():
         test_list_and_stop_task,
         test_task_with_ggg_entities,
         test_get_task_logs,
+        test_task_specific_logging,
         test_multiple_tasks,
         test_task_with_invalid_code,
         test_multi_step_task,

@@ -53,7 +53,7 @@ from kybra import (
     void,
 )
 from kybra_simple_db import Database
-from kybra_simple_logging import get_logger
+from kybra_simple_logging import get_logger, get_logs
 
 storage = StableBTreeMap[str, str](memory_id=1, max_key_size=100, max_value_size=10000)
 Database.init(db_storage=storage, audit_enabled=True)
@@ -1310,6 +1310,54 @@ def get_task_logs(task_id: str, limit: nat = 20) -> str:
     except Exception as e:
         logger.error(f"Error getting task logs: {traceback.format_exc()}")
         return json.dumps({"success": False, "error": traceback.format_exc()}, indent=2)
+
+
+@query
+def get_task_logs_by_name(task_name: str) -> str:
+    """
+    Get in-memory logs for a specific task by task name.
+    
+    This retrieves the actual execution logs from the task-specific logger,
+    not the execution history. Logs are stored in memory only via kybra-simple-logging.
+    
+    Args:
+        task_name: Exact task name or partial task ID
+    
+    Returns:
+        Plain text log output as a single string with all log lines
+    """
+    from ggg.task import Task
+    
+    try:
+        # Try to find task by name or partial ID
+        found_task = None
+        for task in Task.instances():
+            if task.name == task_name or str(task._id).startswith(task_name) or str(task._id) == task_name:
+                found_task = task
+                break
+        
+        if not found_task:
+            return f"Error: Task not found: {task_name}"
+        
+        task_id = str(found_task._id)
+        logger_name = f"task_{task_id}"
+        
+        # Get logs from kybra-simple-logging in-memory storage
+        logs = get_logs(logger_name=logger_name)
+        
+        if logs:
+            # Format logs as plain text
+            log_lines = [
+                f"{log['timestamp']} {log['level']:8} {log['message']}"
+                for log in logs
+            ]
+            return "\n".join(log_lines)
+        else:
+            return f"No logs found for task: {found_task.name} (ID: {task_id[:8]}...)\nLogs may not have been generated yet."
+    
+    except Exception as e:
+        logger.error(f"Error getting task logs by name: {e}")
+        return f"Error retrieving logs: {str(e)}"
 
 
 downloaded_content: dict = {}

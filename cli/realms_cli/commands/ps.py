@@ -374,16 +374,137 @@ def ps_kill_command(
         console.print(f"\n[dim]💡 Use 'realms ps ls' to verify[/dim]")
 
 
+def ps_logs_continuous(
+    task_id: str,
+    network: Optional[str],
+    canister: str,
+    follow: bool,
+    output_file: Optional[str],
+) -> None:
+    """View continuous task logs using get_task_logs_by_name endpoint."""
+    import subprocess
+    
+    # Build the dfx command to call get_task_logs_by_name
+    cmd = ["dfx", "canister", "call"]
+    
+    if network:
+        cmd.extend(["--network", network])
+    
+    cmd.extend([canister, "get_task_logs_by_name", f'("{task_id}")'])
+    
+    try:
+        # Get logs
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
+        
+        # Parse the output - it's a simple string response in tuple format
+        output = result.stdout.strip()
+        
+        # Extract the log content from tuple format: ("log content")
+        if output.startswith('(') and output.endswith(')'):
+            # Remove outer parentheses
+            inner = output[1:-1].strip()
+            
+            # Remove trailing comma if present
+            if inner.endswith(','):
+                inner = inner[:-1].strip()
+            
+            # Extract string content between quotes
+            if inner.startswith('"') and inner.endswith('"'):
+                import json
+                try:
+                    # Use json.loads to properly unescape the string
+                    log_content = json.loads(inner)
+                except json.JSONDecodeError:
+                    # Fallback to basic unescaping
+                    log_content = inner[1:-1].replace('\\n', '\n').replace('\\"', '"')
+            else:
+                log_content = inner
+        else:
+            log_content = output
+        
+        # Write to file if requested
+        if output_file:
+            with open(output_file, 'w' if not follow else 'a') as f:
+                f.write(log_content)
+                f.write('\n')
+            console.print(f"[green]✅ Logs written to {output_file}[/green]")
+        
+        # Print to console
+        if not output_file or follow:
+            console.print(f"[bold blue]📋 Task Logs: {task_id}[/bold blue]\n")
+            console.print(log_content)
+            console.print()
+        
+        # Follow mode - continuously poll for updates
+        if follow:
+            console.print("[dim]Following logs (Ctrl+C to stop)...[/dim]\n")
+            last_log_count = len(log_content.split('\n'))
+            
+            try:
+                while True:
+                    time.sleep(2)  # Poll every 2 seconds
+                    
+                    # Get logs again
+                    result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
+                    output = result.stdout.strip()
+                    
+                    # Parse again
+                    if output.startswith('(') and output.endswith(')'):
+                        inner = output[1:-1].strip()
+                        if inner.endswith(','):
+                            inner = inner[:-1].strip()
+                        if inner.startswith('"') and inner.endswith('"'):
+                            try:
+                                log_content = json.loads(inner)
+                            except json.JSONDecodeError:
+                                log_content = inner[1:-1].replace('\\n', '\n').replace('\\"', '"')
+                        else:
+                            log_content = inner
+                    else:
+                        log_content = output
+                    
+                    # Print only new lines
+                    lines = log_content.split('\n')
+                    if len(lines) > last_log_count:
+                        new_lines = lines[last_log_count:]
+                        for line in new_lines:
+                            console.print(line)
+                            if output_file:
+                                with open(output_file, 'a') as f:
+                                    f.write(line + '\n')
+                        last_log_count = len(lines)
+            
+            except KeyboardInterrupt:
+                console.print("\n[dim]Stopped following logs[/dim]")
+        
+    except subprocess.CalledProcessError as e:
+        console.print(f"[red]❌ Error calling canister: {e.stderr}[/red]")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"[red]❌ Error retrieving logs: {str(e)}[/red]")
+        raise typer.Exit(1)
+
+
 def ps_logs_command(
     task_id: str,
     network: Optional[str] = None,
     canister: str = "realm_backend",
     tail: int = 20,
     output_format: str = "table",
+    follow: bool = False,
+    output_file: Optional[str] = None,
 ) -> None:
     """View execution logs for a task."""
+    
+    # Use new get_task_logs_by_name endpoint for continuous logs
+    if follow or output_file:
+        return ps_logs_continuous(
+            task_id, network, canister, follow, output_file
+        )
+    
+    # Original behavior for --tail (execution history)
     if output_format != "json":
-        console.print(f"[bold blue]📑 Task Logs: {task_id}[/bold blue]\n")
+        console.print(f"[bold blue]📑 Task Execution History: {task_id}[/bold blue]\n")
     
     # Call backend API endpoint
     response = call_canister_endpoint(
@@ -451,3 +572,4 @@ def ps_logs_command(
         console.print()
     
     console.print(f"[dim]💡 Showing last {tail} executions. Use --tail to see more.[/dim]")
+    console.print(f"[dim]💡 Use 'realms ps logs {task_id} --follow' for continuous task logs[/dim]")

@@ -949,17 +949,36 @@ def ps_logs(
         None, "--canister", "-c", help="Canister name (overrides context)"
     ),
     tail: int = typer.Option(
-        20, "--tail", "-t", help="Number of recent executions to show"
+        20, "--tail", "-t", help="Number of recent executions to show (default: 20)"
     ),
     output: str = typer.Option(
         "table", "--output", "-o", help="Output format: 'table' or 'json'"
     ),
+    follow: bool = typer.Option(
+        False, "--follow", "-f", help="Follow logs in real-time (use with Ctrl+C to stop)"
+    ),
+    output_file: Optional[str] = typer.Option(
+        None, "--output-file", help="Write logs to file"
+    ),
 ) -> None:
-    """View execution logs for a task."""
+    """View execution logs for a task.
+    
+    By default, shows execution history (--tail).
+    Use --follow for continuous task-specific logs.
+    Use --output-file to save logs to a file.
+    """
     effective_network, effective_canister = get_effective_network_and_canister(
         network, canister
     )
-    ps_logs_command(task_id, effective_network, effective_canister, tail, output)
+    ps_logs_command(
+        task_id, 
+        effective_network, 
+        effective_canister, 
+        tail, 
+        output,
+        follow,
+        output_file
+    )
 
 
 @app.command("version")
