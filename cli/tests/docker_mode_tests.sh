@@ -17,8 +17,8 @@ else
 fi
 echo ""
 
-echo "📦 Installing realms-cli..."
-pip install -q realms-cli
+echo "📦 Installing realms-cli from local source..."
+pip install -q /cli
 
 echo "✅ Installation complete"
 echo ""
