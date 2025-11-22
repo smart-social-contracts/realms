@@ -25,7 +25,7 @@ from .registry import Registry
 from .service import Service
 from .task import Task
 from .task_schedule import TaskSchedule
-from .tax_record import TaxRecord
+from .invoice import Invoice
 from .trade import Trade
 from .transfer import Transfer
 from .treasury import Treasury

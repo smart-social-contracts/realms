@@ -2,18 +2,18 @@ from kybra import ic
 from ggg import Treasury
 
 def async_task():
-    ic.print('===== RECURRING TASK STARTED =====')
+    logger.info('===== RECURRING TASK STARTED =====')
     
     # Get treasury for a real async operation
     treasuries = Treasury.instances()
     if treasuries:
         treasury = treasuries[0]
-        ic.print(f'Refreshing treasury: {treasury.name}')
+        logger.info(f'Refreshing treasury: {treasury.name}')
         # Yield a real async operation
         result = yield treasury.refresh()
-        ic.print(f'Treasury refreshed: {result}')
+        logger.info(f'Treasury refreshed: {result}')
     else:
-        ic.print('No treasury found, skipping refresh')
+        logger.info('No treasury found, skipping refresh')
     
-    ic.print('===== RECURRING TASK COMPLETED =====')
+    logger.info('===== RECURRING TASK COMPLETED =====')
     return 'ok'
