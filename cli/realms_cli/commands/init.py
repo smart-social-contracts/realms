@@ -54,7 +54,7 @@ See `realm_config.json` for deployment configuration.
 
 This realm includes the following extensions:
 - Admin Dashboard
-- Citizen Dashboard
+- Member Dashboard
 - Voting System
 
 

@@ -26,13 +26,13 @@ user.profiles.add(UserProfile[Profiles.MEMBER["name"]])
 
 **Fields:** `id`, `profile_picture_url`, `profiles` (relation), `balances` (relation)
 
-#### **Citizen**
-User with full citizenship rights and benefits.
+#### **Member**
+User with full membership rights and benefits.
 
 ```python
-from ggg import Citizen, User
+from ggg import Member, User
 
-citizen = Citizen(
+member = Member(
     user=User["alice_2024"],
     is_compliant=True,
     eligible_for_benefits=True,
@@ -526,7 +526,7 @@ user.profiles.add(UserProfile["admin"])
 ```
 User
 ├─ has many: Balances, Votes, Proposals, Notifications
-├─ belongs to: Citizen, Human
+├─ belongs to: Member, Human
 └─ has many-to-many: UserProfiles
 
 Proposal
@@ -548,7 +548,7 @@ Task
 
 ### Create Complete User Identity
 ```python
-from ggg import User, Human, Citizen, Identity, UserProfile, Profiles
+from ggg import User, Human, Member, Identity, UserProfile, Profiles
 
 # 1. Create user account
 user = User(id="alice_2024", profile_picture_url="https://...")
@@ -564,8 +564,8 @@ human = Human(
     user=user
 )
 
-# 4. Grant citizenship
-citizen = Citizen(
+# 4. Grant membership
+member = Member(
     user=user,
     is_compliant=True,
     eligible_for_benefits=True
@@ -649,7 +649,7 @@ schedule = TaskSchedule(
 
 ### Query Patterns
 ```python
-from ggg import User, Citizen
+from ggg import User, Member
 
 # Get all instances
 users = list(User.instances())

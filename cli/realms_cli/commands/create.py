@@ -20,7 +20,7 @@ console = Console()
 
 def create_command(
     random: bool,
-    citizens: int,
+    members: int,
     organizations: int,
     transactions: int,
     disputes: int,
@@ -75,7 +75,7 @@ def create_command(
 
     if random:
         console.print("🎲 Generating random data...")
-        console.print(f"   👥 Citizens: {citizens}")
+        console.print(f"   👥 Members: {members}")
         console.print(f"   🏢 Organizations: {organizations}")
         console.print(f"   💰 Transactions: {transactions}")
         console.print(f"   ⚖️  Disputes: {disputes}")
@@ -90,8 +90,8 @@ def create_command(
             cmd = [
                 "python3",
                 str(generator_script),
-                "--citizens",
-                str(citizens),
+                "--members",
+                str(members),
                 "--organizations",
                 str(organizations),
                 "--transactions",

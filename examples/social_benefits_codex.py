@@ -1,49 +1,49 @@
 """
 Social Benefits Distribution Codex
-Automatically distributes social benefits to eligible citizens
+Automatically distributes social benefits to eligible members
 """
 
-from ggg import User, Citizen, Transfer, Treasury, Instrument
+from ggg import User, Member, Transfer, Treasury, Instrument
 from datetime import datetime
 import json
 
-def check_benefit_eligibility(citizen_id: str) -> dict:
-    """Check if a citizen is eligible for social benefits"""
-    citizen = Citizen.get(citizen_id)
-    if not citizen:
-        return {"eligible": False, "reason": "Citizen not found"}
+def check_benefit_eligibility(member_id: str) -> dict:
+    """Check if a member is eligible for social benefits"""
+    member = Member.get(member_id)
+    if not member:
+        return {"eligible": False, "reason": "Member not found"}
     
     # Eligibility criteria
     criteria = {
-        "residence_permit": citizen.residence_permit == "valid",
-        "tax_compliance": citizen.tax_compliance in ["compliant", "under_review"],
-        "identity_verification": citizen.identity_verification == "verified",
-        "benefits_eligibility": citizen.public_benefits_eligibility == "eligible"
+        "residence_permit": member.residence_permit == "valid",
+        "tax_compliance": member.tax_compliance in ["compliant", "under_review"],
+        "identity_verification": member.identity_verification == "verified",
+        "benefits_eligibility": member.public_benefits_eligibility == "eligible"
     }
     
     eligible = all(criteria.values())
     
     return {
-        "citizen_id": citizen_id,
+        "member_id": member_id,
         "eligible": eligible,
         "criteria_met": criteria,
         "checked_at": datetime.now().isoformat()
     }
 
-def calculate_benefit_amount(citizen_id: str) -> int:
-    """Calculate benefit amount based on citizen status"""
-    citizen = Citizen.get(citizen_id)
-    if not citizen:
+def calculate_benefit_amount(member_id: str) -> int:
+    """Calculate benefit amount based on member status"""
+    member = Member.get(member_id)
+    if not member:
         return 0
     
     # Base benefit amount
     base_amount = 500
     
     # Adjustments based on status
-    if citizen.criminal_record == "clean":
+    if member.criminal_record == "clean":
         base_amount += 100
     
-    if citizen.voting_eligibility == "eligible":
+    if member.voting_eligibility == "eligible":
         base_amount += 50
     
     return base_amount
@@ -52,29 +52,29 @@ def distribute_social_benefits():
     """Main social benefits distribution process"""
     results = []
     
-    # Get all citizens
-    citizens = Citizen.get_all()
+    # Get all members
+    members = Member.get_all()
     
-    for citizen in citizens:
-        eligibility = check_benefit_eligibility(citizen.id)
+    for member in members:
+        eligibility = check_benefit_eligibility(member.id)
         
         if eligibility["eligible"]:
-            benefit_amount = calculate_benefit_amount(citizen.id)
+            benefit_amount = calculate_benefit_amount(member.id)
             
             # Create benefit transfer
             benefit_instrument = Instrument.get_by_name("Service Credit")
             system_user = User.get("system")
             
-            if benefit_instrument and system_user and citizen.user:
+            if benefit_instrument and system_user and member.user:
                 transfer = Transfer(
                     from_user=system_user,
-                    to_user=citizen.user,
+                    to_user=member.user,
                     instrument=benefit_instrument,
                     amount=benefit_amount
                 )
                 
                 results.append({
-                    "citizen_id": citizen.id,
+                    "member_id": member.id,
                     "benefit_amount": benefit_amount,
                     "status": "distributed"
                 })

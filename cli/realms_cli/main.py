@@ -55,8 +55,8 @@ def create(
     random: bool = typer.Option(
         False, "--random/--no-random", help="Generate random realm data (default: False)"
     ),
-    citizens: int = typer.Option(
-        50, "--citizens", help="Number of citizens to generate"
+    members: int = typer.Option(
+        50, "--members", help="Number of members to generate"
     ),
     organizations: int = typer.Option(
         5, "--organizations", help="Number of organizations to generate"
@@ -95,7 +95,7 @@ def create(
     """Create a new realm. Use --random flag to generate demo data for testing and demonstrations."""
     create_command(
         random,
-        citizens,
+        members,
         organizations,
         transactions,
         disputes,

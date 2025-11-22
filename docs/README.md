@@ -63,7 +63,7 @@ Complete documentation for building and deploying governance systems on the Inte
 ```
 Users & Identity          Governance              Finance
 ├─ User                   ├─ Proposal             ├─ Treasury
-├─ Citizen                ├─ Vote                 ├─ Instrument
+├─ Member                 ├─ Vote                 ├─ Instrument
 ├─ Human                  ├─ Mandate              ├─ Balance
 ├─ Identity               └─ Codex                ├─ Transfer
 └─ Organization                                   └─ Trade

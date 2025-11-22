@@ -43,7 +43,7 @@ dfx canister call realm_backend get_objects_paginated '("Proposal", 0, 20, "desc
 ```
 
 **Supported Classes:**
-`User`, `Citizen`, `Human`, `Organization`, `Proposal`, `Vote`, `Mandate`, `Codex`, `Task`, `TaskSchedule`, `Transfer`, `Balance`, `Treasury`, `Instrument`, `Trade`, `Dispute`, `License`, `Realm`, `Registry`, `Service`, `Permission`, `UserProfile`, `Notification`, `Land`, `Contract`, `TaxRecord`
+`User`, `Member`, `Human`, `Organization`, `Proposal`, `Vote`, `Mandate`, `Codex`, `Task`, `TaskSchedule`, `Transfer`, `Balance`, `Treasury`, `Instrument`, `Trade`, `Dispute`, `License`, `Realm`, `Registry`, `Service`, `Permission`, `UserProfile`, `Notification`, `Land`, `Contract`, `TaxRecord`
 
 ---
 

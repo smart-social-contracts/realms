@@ -7,7 +7,7 @@ Generates realistic demo data for Realms including:
 - Python codex files with governance automation scripts
 
 Usage:
-    python realm_generator.py --citizens 100 --organizations 10 --transactions 500 --seed 12345
+    python realm_generator.py --members 100 --organizations 10 --transactions 500 --seed 12345
 """
 
 import argparse
@@ -37,7 +37,7 @@ from ggg import (
     Instrument,
     Transfer,
     Organization,
-    Citizen,
+    Member,
     Human,
     Dispute,
     Mandate,
@@ -158,13 +158,13 @@ class RealmGenerator:
         
         return identities
     
-    def generate_citizens(self, users: List[User]) -> List[Citizen]:
-        """Generate citizen data linked to users"""
-        citizens = []
+    def generate_members(self, users: List[User]) -> List[Member]:
+        """Generate member data linked to users"""
+        members = []
         
         for user in users:
-            citizen = Citizen(
-                id=self.generate_id("cit_"),
+            member = Member(
+                id=self.generate_id("mem_"),
                 user=user,    
                 residence_permit=random.choice(["valid", "expired", "pending"]),
                 tax_compliance=random.choice(["compliant", "delinquent", "under_review"]),
@@ -173,9 +173,9 @@ class RealmGenerator:
                 public_benefits_eligibility=random.choice(["eligible", "ineligible", "conditional"]),
                 criminal_record=random.choice(["clean", "minor_offenses", "major_offenses"]) 
             )
-            citizens.append(citizen)
+            members.append(member)
             
-        return citizens
+        return members
     
     def generate_organizations(self, count: int) -> List[Organization]:
         """Generate organization data"""
@@ -314,16 +314,16 @@ class RealmGenerator:
         
         return treasury_data
 
-    def generate_realm_metadata(self, realm_name: str, citizens: int, organizations: int) -> Realm:
+    def generate_realm_metadata(self, realm_name: str, members: int, organizations: int) -> Realm:
         """Generate realm metadata"""
         realm = Realm(
             id=self.realm_id,
             name=realm_name,
-            description=f"Generated demo realm with {citizens} citizens and {organizations} organizations",
+            description=f"Generated demo realm with {members} members and {organizations} organizations",
             created_at=datetime.now().isoformat(),
             status="active",
             governance_type="democratic",
-            population=citizens,
+            population=members,
             organization_count=organizations,
             settings={
                 "voting_period_days": 7,    
@@ -361,10 +361,10 @@ class RealmGenerator:
         print("Note: Foundational objects (Realm, Treasury, UserProfiles, System User) are auto-created by backend.")
         
         # Generate additional entities
-        users = self.generate_users(params.get('citizens', 50))
+        users = self.generate_users(params.get('members', 50))
         humans = self.generate_humans(users)
         identities = self.generate_identities(users)
-        citizens = self.generate_citizens(users)
+        members = self.generate_members(users)
         organizations = self.generate_organizations(params.get('organizations', 5))
         instruments = self.generate_instruments()
         transfers = self.generate_transfers(users, instruments, params.get('transactions', 100))
@@ -379,7 +379,7 @@ class RealmGenerator:
         ret += users
         ret += identities
         ret += humans
-        ret += citizens
+        ret += members
         ret += organizations
         ret += instruments
         ret += transfers
@@ -397,7 +397,7 @@ class RealmGenerator:
         # Tax Collection Codex
         tax_codex = '''"""
 Tax Collection Automation Codex
-Automatically calculates and processes tax payments for citizens
+Automatically calculates and processes tax payments for members
 """
 
 from ggg import User, Transfer, Treasury, Instrument
@@ -476,57 +476,57 @@ if __name__ == "__main__":
     print(f"Tax collection completed: {len(results)} payments processed")
 '''
         
-        tax_file = output_dir / "tax_collection_codex.py"
-        tax_file.write_text(tax_codex)
-        codex_files.append(str(tax_file))
-        
-        # Social Benefits Codex
-        benefits_codex = '''"""
+    tax_file = output_dir / "tax_collection_codex.py"
+    tax_file.write_text(tax_codex)
+    codex_files.append(str(tax_file))
+    
+    # Social Benefits Codex
+    benefits_codex = '''"""
 Social Benefits Distribution Codex
-Automatically distributes social benefits to eligible citizens
+Automatically distributes social benefits to eligible members
 """
 
-from ggg import User, Citizen, Transfer, Treasury, Instrument
+from ggg import User, Member, Transfer, Treasury, Instrument
 from datetime import datetime
 import json
 
-def check_benefit_eligibility(citizen_id: str) -> dict:
-    """Check if a citizen is eligible for social benefits"""
-    citizen = Citizen.get(citizen_id)
-    if not citizen:
-        return {"eligible": False, "reason": "Citizen not found"}
+def check_benefit_eligibility(member_id: str) -> dict:
+    """Check if a member is eligible for social benefits"""
+    member = Member.get(member_id)
+    if not member:
+        return {"eligible": False, "reason": "Member not found"}
     
     # Eligibility criteria
     criteria = {
-        "residence_permit": citizen.residence_permit == "valid",
-        "tax_compliance": citizen.tax_compliance in ["compliant", "under_review"],
-        "identity_verification": citizen.identity_verification == "verified",
-        "benefits_eligibility": citizen.public_benefits_eligibility == "eligible"
+        "residence_permit": member.residence_permit == "valid",
+        "tax_compliance": member.tax_compliance in ["compliant", "under_review"],
+        "identity_verification": member.identity_verification == "verified",
+        "benefits_eligibility": member.public_benefits_eligibility == "eligible"
     }
     
     eligible = all(criteria.values())
     
     return {
-        "citizen_id": citizen_id,
+        "member_id": member_id,
         "eligible": eligible,
         "criteria_met": criteria,
         "checked_at": datetime.now().isoformat()
     }
 
-def calculate_benefit_amount(citizen_id: str) -> int:
-    """Calculate benefit amount based on citizen status"""
-    citizen = Citizen.get(citizen_id)
-    if not citizen:
+def calculate_benefit_amount(member_id: str) -> int:
+    """Calculate benefit amount based on member status"""
+    member = Member.get(member_id)
+    if not member:
         return 0
     
     # Base benefit amount
     base_amount = 500
     
     # Adjustments based on status
-    if citizen.criminal_record == "clean":
+    if member.criminal_record == "clean":
         base_amount += 100
     
-    if citizen.voting_eligibility == "eligible":
+    if member.voting_eligibility == "eligible":
         base_amount += 50
     
     return base_amount
@@ -535,29 +535,29 @@ def distribute_social_benefits():
     """Main social benefits distribution process"""
     results = []
     
-    # Get all citizens
-    citizens = Citizen.get_all()
+    # Get all members
+    members = Member.get_all()
     
-    for citizen in citizens:
-        eligibility = check_benefit_eligibility(citizen.id)
+    for member in members:
+        eligibility = check_benefit_eligibility(member.id)
         
         if eligibility["eligible"]:
-            benefit_amount = calculate_benefit_amount(citizen.id)
+            benefit_amount = calculate_benefit_amount(member.id)
             
             # Create benefit transfer
             benefit_instrument = Instrument.get_by_name("Service Credit")
             system_user = User.get("system")
             
-            if benefit_instrument and system_user and citizen.user:
+            if benefit_instrument and system_user and member.user:
                 transfer = Transfer(
                     from_user=system_user,
-                    to_user=citizen.user,
+                    to_user=member.user,
                     instrument=benefit_instrument,
                     amount=benefit_amount
                 )
                 
                 results.append({
-                    "citizen_id": citizen.id,
+                    "member_id": member.id,
                     "benefit_amount": benefit_amount,
                     "status": "distributed"
                 })
@@ -656,11 +656,11 @@ def create_sample_proposals():
     proposals = [
         {
             "title": "Increase Social Benefits by 10%",
-            "description": "Proposal to increase monthly social benefits for all eligible citizens by 10% to account for inflation."
+            "description": "Proposal to increase monthly social benefits for all eligible members by 10% to account for inflation."
         },
         {
             "title": "Implement Green Energy Tax Credits",
-            "description": "Provide tax credits for citizens and organizations investing in renewable energy infrastructure."
+            "description": "Provide tax credits for members and organizations investing in renewable energy infrastructure."
         },
         {
             "title": "Digital Identity Verification System",
@@ -694,7 +694,7 @@ if __name__ == "__main__":
 
 def main():
     parser = argparse.ArgumentParser(description="Generate realistic realm demo data")
-    parser.add_argument("--citizens", type=int, default=50, help="Number of citizens to generate")
+    parser.add_argument("--members", type=int, default=50, help="Number of members to generate")
     parser.add_argument("--organizations", type=int, default=5, help="Number of organizations to generate")
     parser.add_argument("--transactions", type=int, default=100, help="Number of transactions to generate")
     parser.add_argument("--disputes", type=int, default=10, help="Number of disputes to generate")
@@ -712,7 +712,7 @@ def main():
     generator = RealmGenerator(args.seed)
     
     realm_data = generator.generate_realm_data(
-        citizens=args.citizens,
+        members=args.members,
         organizations=args.organizations,
         transactions=args.transactions,
         disputes=args.disputes,

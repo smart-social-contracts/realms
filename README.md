@@ -256,7 +256,7 @@ result = yield extension_async_call("my_extension", "my_function", json.dumps({"
 ### Extension API Reference
 
 Extensions can access:
-- **ggg entities** - User, Citizen, Treasury, etc.
+- **ggg entities** - User, Member, Treasury, etc.
 - **kybra** - IC SDK functions
 - **kybra_simple_db** - Database entities
 - **kybra_simple_logging** - Logging utilities
@@ -304,9 +304,9 @@ realms shell --file examples/async_example.py
 
 **Sync code** - Just write normal Python:
 ```python
-from ggg import Citizen
-citizens = Citizen.instances()
-result = len(citizens)  # Optional: set result variable
+from ggg import Member
+members = Member.instances()
+result = len(members)  # Optional: set result variable
 ```
 
 **Async code** - Define an `async_task` function with `yield`:

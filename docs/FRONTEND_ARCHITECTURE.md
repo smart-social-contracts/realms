@@ -76,7 +76,7 @@ src/realm_frontend/
 │   ├── extensions/
 │   │   ├── admin/         # Admin dashboard
 │   │   ├── vault/         # Vault manager
-│   │   ├── citizen/       # Citizen dashboard
+│   │   ├── citizen/       # Member dashboard
 │   │   └── [id]/          # Dynamic extension routes
 │   └── settings           # User settings
 ```

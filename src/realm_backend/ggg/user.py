@@ -18,7 +18,7 @@ class User(Entity, TimestampedMixin):
     profile_picture_url = String(max_length=512)
     profiles = ManyToMany(["UserProfile"], "users")
     human = OneToOne("Human", "user")
-    citizen = OneToOne("Citizen", "user")
+    member = OneToOne("Member", "user")
     proposals = OneToMany("Proposal", "proposer")
     votes = OneToMany("Vote", "voter")
     notifications = OneToMany("Notification", "user")

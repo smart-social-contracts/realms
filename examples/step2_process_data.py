@@ -6,22 +6,22 @@ Auto-detected as sync because it doesn't contain 'yield' or 'async_task'.
 """
 
 from kybra import ic
-from ggg import Citizen
+from ggg import Member
 
 ic.print("🔧 Step 2: Processing data...")
 
-# Example: Count citizens and do some calculations
-citizens = list(Citizen.instances())
-citizen_count = len(citizens)
+# Example: Count members and do some calculations
+members = list(Member.instances())
+member_count = len(members)
 
 # Simulate some data processing
 processed_data = {
-    "total_citizens": citizen_count,
+    "total_members": member_count,
     "timestamp": ic.time(),
     "status": "processed"
 }
 
-ic.print(f"✅ Step 2 complete! Processed data for {citizen_count} citizens")
+ic.print(f"✅ Step 2 complete! Processed data for {member_count} members")
 ic.print(f"   Processed data: {processed_data}")
 
 # Return result for logging

@@ -1,13 +1,13 @@
 from kybra_simple_db import Entity, OneToOne, String, TimestampedMixin
 from kybra_simple_logging import get_logger
 
-logger = get_logger("entity.human")
+logger = get_logger("entity.member")
 
 
-class Citizen(Entity, TimestampedMixin):
+class Member(Entity, TimestampedMixin):
     __alias__ = "id"
     id = String()
-    user = OneToOne("User", "citizen")
+    user = OneToOne("User", "member")
 
     residence_permit: str
     tax_compliance: str

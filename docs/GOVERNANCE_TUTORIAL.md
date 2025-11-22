@@ -40,7 +40,7 @@ proposal = Proposal(
 
 ---
 
-### 2. Citizens Vote
+### 2. Members Vote
 
 ```python
 from ggg import Vote, Proposal, User
@@ -185,7 +185,7 @@ proposal.status = "voting"
 ```python
 from ggg import Vote, Proposal, User
 
-# Citizens cast votes
+# Members cast votes
 def cast_vote(voter_id: str, proposal_id: str, choice: str):
     """Cast a vote with validation"""
     voter = User[voter_id]
@@ -460,15 +460,15 @@ collect_taxes()
 ubi_codex = Codex(
     name="ubi_distribution",
     code="""
-from ggg import Citizen, Balance, Transfer, Realm
+from ggg import Member, Balance, Transfer, Realm
 
 def distribute_ubi():
     realm = Realm["1"]
     settings = eval(realm.settings)
     ubi_amount = settings.get("ubi_amount", 1000)
     
-    for citizen in Citizen.instances():
-        if not citizen.eligible_for_benefits:
+    for member in Member.instances():
+        if not member.eligible_for_benefits:
             continue
         
         user = citizen.user
@@ -518,7 +518,7 @@ proposal = Proposal(
     required_threshold=0.60
 )
 
-# 2. Citizens vote
+# 2. Members vote
 Vote(proposal=proposal, voter=User["alice_2024"], vote_choice="yes")
 Vote(proposal=proposal, voter=User["bob_2024"], vote_choice="yes")
 Vote(proposal=proposal, voter=User["carol_2024"], vote_choice="no")

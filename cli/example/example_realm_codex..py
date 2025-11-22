@@ -6,7 +6,7 @@ print("Creating codex")
 
 c = Codex()
 c.name = "Subsidy Distribution System"
-c.description = "Automated distribution of subsidies and benefits to eligible citizens"
+c.description = "Automated distribution of subsidies and benefits to eligible members"
 c.url = "https://raw.githubusercontent.com/smart-social-contracts/realms/refs/heads/main/src/realm_backend/codex.py"
 c.checksum = "sha256:e45a166550a08eb872e3c14f517dc5b200cae354ee44cc07779d250dbbf4e575"
 
@@ -43,7 +43,7 @@ if success:
     print("Creating task")
     task = Task()
     task.name = "Subsidy Distribution System"
-    task.description = "Automated distribution of subsidies and benefits to eligible citizens"
+    task.description = "Automated distribution of subsidies and benefits to eligible members"
     task.codex = c
     
     print("Running task")

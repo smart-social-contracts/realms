@@ -27,12 +27,12 @@ Create new realm with optional demo data.
 realms create
 
 # With demo data
-realms create --random --citizens 100 --organizations 10
+realms create --random --members 100 --organizations 10
 
 # Custom configuration
 realms create \
   --realm-name "My Governance Realm" \
-  --citizens 50 \
+  --members 50 \
   --organizations 5 \
   --transactions 200 \
   --disputes 10 \
@@ -49,7 +49,7 @@ realms create --no-extensions
 
 **Options:**
 - `--random` - Generate demo data
-- `--citizens N` - Number of citizens (default: 50)
+- `--members N` - Number of members (default: 50)
 - `--organizations N` - Number of organizations (default: 5)
 - `--transactions N` - Number of transactions (default: 100)
 - `--disputes N` - Number of disputes (default: 10)
