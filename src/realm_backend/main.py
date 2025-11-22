@@ -1313,7 +1313,11 @@ def get_task_logs(task_id: str, limit: nat = 20) -> str:
 
 
 @query
-def get_task_logs_by_name(task_name: str) -> str:
+def get_task_logs_by_name(
+    task_name: str,
+    from_entry: nat = 0,
+    max_entries: nat = 100,
+) -> str:
     """
     Get in-memory logs for a specific task by task name.
     
@@ -1322,11 +1326,14 @@ def get_task_logs_by_name(task_name: str) -> str:
     
     Args:
         task_name: Exact task name or partial task ID
+        from_entry: Start index for pagination (default: 0)
+        max_entries: Maximum number of log entries to return (default: 100, max: 1000)
     
     Returns:
-        Plain text log output as a single string with all log lines
+        JSON string with array of log entries: [{"timestamp": ..., "level": ..., "message": ...}, ...]
     """
     from ggg.task import Task
+    import json
     
     try:
         # Try to find task by name or partial ID
@@ -1337,23 +1344,24 @@ def get_task_logs_by_name(task_name: str) -> str:
                 break
         
         if not found_task:
-            return f"Error: Task not found: {task_name}"
+            return json.dumps([])
         
         task_id = str(found_task._id)
         logger_name = f"task_{task_id}"
         
-        # Get logs from kybra-simple-logging in-memory storage
-        logs = get_logs(logger_name=logger_name)
+        # Limit max_entries to prevent too large responses
+        safe_max_entries = min(int(max_entries), 1000)
+        safe_from_entry = int(from_entry) if from_entry else None
         
-        if logs:
-            # Format logs as plain text
-            log_lines = [
-                f"{log['timestamp']} {log['level']:8} {log['message']}"
-                for log in logs
-            ]
-            return "\n".join(log_lines)
-        else:
-            return f"No logs found for task: {found_task.name} (ID: {task_id[:8]}...)\nLogs may not have been generated yet."
+        # Get logs from kybra-simple-logging in-memory storage with pagination
+        logs = get_logs(
+            logger_name=logger_name,
+            from_entry=safe_from_entry,
+            max_entries=safe_max_entries
+        )
+        
+        # Return raw logs as JSON string for CLI to format
+        return json.dumps(logs) if logs else json.dumps([])
     
     except Exception as e:
         logger.error(f"Error getting task logs by name: {e}")

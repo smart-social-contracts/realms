@@ -374,15 +374,41 @@ def ps_kill_command(
         console.print(f"\n[dim]💡 Use 'realms ps ls' to verify[/dim]")
 
 
+def format_log_entry(log: dict) -> str:
+    """Format a single log entry with human-readable timestamp.
+    
+    Args:
+        log: Dict with 'timestamp' (nanoseconds), 'level', 'message'
+    
+    Returns:
+        Formatted log line: "YYYY-MM-DD HH:MM:SS.XXX LEVEL    message"
+    """
+    from datetime import datetime
+    
+    # Convert nanosecond timestamp to datetime
+    timestamp_ns = log['timestamp']
+    timestamp_s = timestamp_ns / 1_000_000_000  # Convert to seconds
+    dt = datetime.fromtimestamp(timestamp_s)
+    formatted_time = dt.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]  # Keep 3 decimal places (milliseconds)
+    
+    level = log['level']
+    message = log['message']
+    
+    return f"{formatted_time} {level:8} {message}"
+
+
 def ps_logs_continuous(
     task_id: str,
     network: Optional[str],
     canister: str,
     follow: bool,
     output_file: Optional[str],
+    limit: int = 100,
+    from_entry: int = 0,
 ) -> None:
     """View continuous task logs using get_task_logs_by_name endpoint."""
     import subprocess
+    import json
     
     # Build the dfx command to call get_task_logs_by_name
     cmd = ["dfx", "canister", "call"]
@@ -390,89 +416,98 @@ def ps_logs_continuous(
     if network:
         cmd.extend(["--network", network])
     
-    cmd.extend([canister, "get_task_logs_by_name", f'("{task_id}")'])
+    # Add pagination parameters
+    cmd.extend([canister, "get_task_logs_by_name", f'("{task_id}", {from_entry}, {limit})'])
     
     try:
         # Get logs
         result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
         
-        # Parse the output - it's a simple string response in tuple format
+        # Parse the output - it's a JSON array in tuple format: ("[{...}, {...}]")
         output = result.stdout.strip()
         
-        # Extract the log content from tuple format: ("log content")
+        # Extract JSON from Candid tuple format
+        logs_data = []
         if output.startswith('(') and output.endswith(')'):
-            # Remove outer parentheses
             inner = output[1:-1].strip()
-            
-            # Remove trailing comma if present
             if inner.endswith(','):
                 inner = inner[:-1].strip()
-            
-            # Extract string content between quotes
             if inner.startswith('"') and inner.endswith('"'):
-                import json
                 try:
-                    # Use json.loads to properly unescape the string
-                    log_content = json.loads(inner)
-                except json.JSONDecodeError:
-                    # Fallback to basic unescaping
-                    log_content = inner[1:-1].replace('\\n', '\n').replace('\\"', '"')
-            else:
-                log_content = inner
-        else:
-            log_content = output
+                    # Parse the JSON string
+                    json_str = json.loads(inner)
+                    logs_data = json.loads(json_str)
+                except (json.JSONDecodeError, TypeError):
+                    console.print(f"[yellow]⚠ Could not parse logs as JSON[/yellow]")
+                    logs_data = []
+        
+        # Format logs with human-readable timestamps
+        if not isinstance(logs_data, list):
+            logs_data = []
         
         # Write to file if requested
         if output_file:
             with open(output_file, 'w' if not follow else 'a') as f:
-                f.write(log_content)
-                f.write('\n')
+                for log in logs_data:
+                    formatted_line = format_log_entry(log)
+                    f.write(formatted_line + '\n')
             console.print(f"[green]✅ Logs written to {output_file}[/green]")
         
         # Print to console
         if not output_file or follow:
             console.print(f"[bold blue]📋 Task Logs: {task_id}[/bold blue]\n")
-            console.print(log_content)
+            if logs_data:
+                for log in logs_data:
+                    formatted_line = format_log_entry(log)
+                    console.print(formatted_line)
+            else:
+                console.print("[dim]No logs found[/dim]")
             console.print()
         
         # Follow mode - continuously poll for updates
         if follow:
             console.print("[dim]Following logs (Ctrl+C to stop)...[/dim]\n")
-            last_log_count = len(log_content.split('\n'))
+            last_log_count = len(logs_data)
+            current_from = from_entry
             
             try:
                 while True:
                     time.sleep(2)  # Poll every 2 seconds
                     
+                    # Update from_entry to get only new logs
+                    current_from = last_log_count
+                    follow_cmd = ["dfx", "canister", "call"]
+                    if network:
+                        follow_cmd.extend(["--network", network])
+                    # In follow mode, always start from last known position
+                    follow_cmd.extend([canister, "get_task_logs_by_name", f'("{task_id}", {current_from}, {limit})'])
+                    
                     # Get logs again
-                    result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
+                    result = subprocess.run(follow_cmd, capture_output=True, text=True, check=True, timeout=30)
                     output = result.stdout.strip()
                     
                     # Parse again
+                    logs_data = []
                     if output.startswith('(') and output.endswith(')'):
                         inner = output[1:-1].strip()
                         if inner.endswith(','):
                             inner = inner[:-1].strip()
                         if inner.startswith('"') and inner.endswith('"'):
                             try:
-                                log_content = json.loads(inner)
-                            except json.JSONDecodeError:
-                                log_content = inner[1:-1].replace('\\n', '\n').replace('\\"', '"')
-                        else:
-                            log_content = inner
-                    else:
-                        log_content = output
+                                json_str = json.loads(inner)
+                                logs_data = json.loads(json_str)
+                            except (json.JSONDecodeError, TypeError):
+                                logs_data = []
                     
-                    # Print only new lines
-                    lines = log_content.split('\n')
-                    if len(lines) > last_log_count:
-                        new_lines = lines[last_log_count:]
-                        for line in new_lines:
-                            console.print(line)
+                    # Check if there are new logs
+                    if isinstance(logs_data, list) and logs_data:
+                        for log in logs_data:
+                            formatted_line = format_log_entry(log)
+                            console.print(formatted_line)
                             if output_file:
                                 with open(output_file, 'a') as f:
-                                    f.write(line + '\n')
-                        last_log_count = len(lines)
+                                    f.write(formatted_line + '\n')
+                        last_log_count += len(logs_data)
             
             except KeyboardInterrupt:
                 console.print("\n[dim]Stopped following logs[/dim]")
@@ -493,13 +528,15 @@ def ps_logs_command(
     output_format: str = "table",
     follow: bool = False,
     output_file: Optional[str] = None,
+    limit: int = 100,
+    from_entry: int = 0,
 ) -> None:
     """View execution logs for a task."""
     
     # Use new get_task_logs_by_name endpoint for continuous logs
     if follow or output_file:
         return ps_logs_continuous(
-            task_id, network, canister, follow, output_file
+            task_id, network, canister, follow, output_file, limit, from_entry
         )
     
     # Original behavior for --tail (execution history)

@@ -960,12 +960,19 @@ def ps_logs(
     output_file: Optional[str] = typer.Option(
         None, "--output-file", help="Write logs to file"
     ),
+    limit: int = typer.Option(
+        100, "--limit", "-l", help="Maximum number of log entries to retrieve (default: 100, max: 1000)"
+    ),
+    from_entry: int = typer.Option(
+        0, "--from", help="Start index for pagination (default: 0)"
+    ),
 ) -> None:
     """View execution logs for a task.
     
     By default, shows execution history (--tail).
     Use --follow for continuous task-specific logs.
     Use --output-file to save logs to a file.
+    Use --limit and --from for pagination of large log sets.
     """
     effective_network, effective_canister = get_effective_network_and_canister(
         network, canister
@@ -977,7 +984,9 @@ def ps_logs(
         tail, 
         output,
         follow,
-        output_file
+        output_file,
+        limit,
+        from_entry
     )
 
 
