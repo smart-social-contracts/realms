@@ -476,12 +476,12 @@ if __name__ == "__main__":
     print(f"Tax collection completed: {len(results)} payments processed")
 '''
         
-    tax_file = output_dir / "tax_collection_codex.py"
-    tax_file.write_text(tax_codex)
-    codex_files.append(str(tax_file))
-    
-    # Social Benefits Codex
-    benefits_codex = '''"""
+        tax_file = output_dir / "tax_collection_codex.py"
+        tax_file.write_text(tax_codex)
+        codex_files.append(str(tax_file))
+        
+        # Social Benefits Codex
+        benefits_codex = '''"""
 Social Benefits Distribution Codex
 Automatically distributes social benefits to eligible members
 """
