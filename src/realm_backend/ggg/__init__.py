@@ -53,7 +53,6 @@ __all__ = [
     "Service",
     "Task",
     "TaskSchedule",
-    "TaxRecord",
     "Trade",
     "User",
     "UserProfile",
