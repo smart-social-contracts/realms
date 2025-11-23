@@ -10,6 +10,7 @@ from ggg.instrument import Instrument
 from ggg.license import License
 from ggg.mandate import Mandate
 from ggg.organization import Organization
+from ggg.payment_account import PaymentAccount
 from ggg.proposal import Proposal
 from ggg.realm import Realm
 from ggg.task import Task

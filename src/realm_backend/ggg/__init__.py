@@ -18,6 +18,7 @@ from .license import License
 from .mandate import Mandate
 from .notification import Notification
 from .organization import Organization
+from .payment_account import PaymentAccount
 from .permission import Permission
 from .proposal import Proposal
 from .realm import Realm
@@ -46,6 +47,7 @@ __all__ = [
     "Mandate",
     "Notification",
     "Organization",
+    "PaymentAccount",
     "Permission",
     "Proposal",
     "Realm",

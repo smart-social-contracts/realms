@@ -26,6 +26,7 @@ class User(Entity, TimestampedMixin):
     tax_records = OneToMany("TaxRecord", "user")
     disputes_requested = OneToMany("Dispute", "requester")
     disputes_defendant = OneToMany("Dispute", "defendant")
+    payment_accounts = OneToMany("PaymentAccount", "user")
     # transfers_from = OneToMany("Transfer", "from_user")
     # transfers_to = OneToMany("Transfer", "to_user")
     # trades_a = OneToMany("Trade", "user_a")
