@@ -741,14 +741,40 @@ if __name__ == "__main__":
         # User Registration Hook Codex
         registration_codex = '''"""
 User Registration Hook Codex
-Overrides user_register_posthook to add custom logic after user registration
+Overrides user_register_posthook to add custom logic after user registration.
+Creates a 1 ckBTC invoice expiring in 5 minutes for new users.
 """
 
 from kybra import ic
+from ggg import Invoice
+from datetime import datetime, timedelta
+import uuid
 
 def user_register_posthook(user):
-    """Custom user registration hook."""
-    ic.print('user registration hook executed')
+    """Custom user registration hook - creates welcome invoice."""
+    try:
+        # Generate unique invoice ID
+        invoice_id = f"inv_{uuid.uuid4().hex[:12]}"
+        
+        # Calculate expiry time (5 minutes from now)
+        expiry_time = datetime.now() + timedelta(minutes=5)
+        due_date = expiry_time.isoformat()
+        
+        # Create 1 ckBTC invoice for the new user
+        invoice = Invoice(
+            id=invoice_id,
+            amount=1,  # 1 ckBTC
+            due_date=due_date,
+            status="Pending",
+            user=user,
+            metadata="Welcome bonus - 1 ckBTC invoice"
+        )
+        
+        ic.print(f"✅ Created welcome invoice {invoice_id} for user {user.id} (expires in 5 minutes)")
+        
+    except Exception as e:
+        ic.print(f"❌ Error creating invoice: {e}")
+    
     return
 '''
         

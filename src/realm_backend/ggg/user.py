@@ -31,6 +31,7 @@ class User(Entity, TimestampedMixin):
     disputes_requested = OneToMany("Dispute", "requester")
     disputes_defendant = OneToMany("Dispute", "defendant")
     payment_accounts = OneToMany("PaymentAccount", "user")
+    invoices = OneToMany("Invoice", "user")
     # transfers_from = OneToMany("Transfer", "from_user")
     # transfers_to = OneToMany("Transfer", "to_user")
     # trades_a = OneToMany("Trade", "user_a")
