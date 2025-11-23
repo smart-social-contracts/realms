@@ -910,6 +910,97 @@ class CursorDatabaseExplorer:
         self.app.run()
 
 
+def db_get_command(
+    entity_type: str,
+    entity_id: Optional[str] = None,
+    network: Optional[str] = None,
+    canister: Optional[str] = None,
+) -> None:
+    """Get entities from the database and output as JSON.
+    
+    Args:
+        entity_type: The entity type (e.g., User, Transfer, Mandate)
+        entity_id: Optional specific entity ID to retrieve
+        network: Network to use
+        canister: Canister to connect to
+    """
+    effective_network, effective_canister = get_effective_network_and_canister(
+        network, canister
+    )
+
+    explorer = CursorDatabaseExplorer(effective_network, effective_canister)
+    
+    # Test connection
+    try:
+        explorer.call_backend("status")
+    except Exception as e:
+        console.print(f"[red]Error: Could not connect to backend canister: {e}[/red]")
+        raise typer.Exit(1)
+    
+    # Find the matching class
+    matching_class = None
+    for cls in explorer._ggg_classes:
+        if cls.__name__.lower() == entity_type.lower():
+            matching_class = cls
+            break
+    
+    if not matching_class:
+        # Print available entity types
+        available = [cls.__name__ for cls in explorer._ggg_classes]
+        console.print(f"[red]Error: Entity type '{entity_type}' not found[/red]")
+        console.print(f"[yellow]Available entity types: {', '.join(sorted(available))}[/yellow]")
+        raise typer.Exit(1)
+    
+    # If entity_id is provided, get specific entity
+    if entity_id:
+        result = explorer.list_entities(matching_class.__name__, 0, 1000)
+        if "error" in result:
+            console.print(f"[red]Error: {result['error']}[/red]")
+            raise typer.Exit(1)
+        
+        # Find the specific entity
+        items = result.get("items", [])
+        found_item = None
+        for item in items:
+            if item.get("_id") == entity_id:
+                found_item = item
+                break
+        
+        if not found_item:
+            console.print(f"[red]Error: Entity with ID '{entity_id}' not found[/red]")
+            raise typer.Exit(1)
+        
+        # Output single entity as JSON
+        print(json.dumps(found_item, indent=2))
+    else:
+        # Get all entities (with pagination if needed)
+        all_items = []
+        page_num = 0
+        page_size = 100
+        
+        while True:
+            result = explorer.list_entities(matching_class.__name__, page_num, page_size)
+            if "error" in result:
+                console.print(f"[red]Error: {result['error']}[/red]")
+                raise typer.Exit(1)
+            
+            items = result.get("items", [])
+            if not items:
+                break
+            
+            all_items.extend(items)
+            
+            # Check if there are more pages
+            total_pages = result.get("total_pages", 1)
+            if page_num >= total_pages - 1:
+                break
+            
+            page_num += 1
+        
+        # Output all entities as JSON array
+        print(json.dumps(all_items, indent=2))
+
+
 def db_command(
     network: Optional[str] = typer.Option(
         None, "--network", "-n", help="Network to use (overrides context)"

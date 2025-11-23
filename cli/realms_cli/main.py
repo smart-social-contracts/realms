@@ -8,7 +8,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .commands.create import create_command
-from .commands.db import db_command
+from .commands.db import db_command, db_get_command
 from .commands.deploy import deploy_command
 from .commands.export_data import export_data_command
 from .commands.extension import extension_command
@@ -764,8 +764,14 @@ def realm_status(
         raise typer.Exit(1)
 
 
-@app.command("db")
-def db(
+# Create db subcommand group
+db_app = typer.Typer(name="db", help="Database exploration and querying", invoke_without_command=True)
+app.add_typer(db_app, name="db")
+
+
+@db_app.callback()
+def db_callback(
+    ctx: typer.Context,
     network: Optional[str] = typer.Option(
         None, "--network", "-n", help="Network to use (overrides context)"
     ),
@@ -773,8 +779,33 @@ def db(
         None, "--canister", "-c", help="Canister name to connect to (overrides context)"
     ),
 ) -> None:
-    """Explore the Realm database in an interactive text-based interface."""
-    db_command(network, canister)
+    """Explore the Realm database. Use subcommands for specific operations or run without subcommand for interactive mode."""
+    # Store network and canister in context for subcommands
+    ctx.obj = {"network": network, "canister": canister}
+    
+    # If no subcommand is provided, run interactive explorer
+    if ctx.invoked_subcommand is None:
+        db_command(network, canister)
+
+
+@db_app.command("get")
+def db_get(
+    ctx: typer.Context,
+    entity_type: str = typer.Argument(help="Entity type (e.g., User, Transfer, Mandate)"),
+    entity_id: Optional[str] = typer.Argument(None, help="Optional entity ID to retrieve specific entity"),
+) -> None:
+    """Get entities from the database and output as JSON.
+    
+    Examples:
+        realms db get User              # Get all users
+        realms db get User user1        # Get specific user by ID
+        realms db get Transfer          # Get all transfers
+    """
+    # Get network and canister from context
+    network = ctx.obj.get("network") if ctx.obj else None
+    canister = ctx.obj.get("canister") if ctx.obj else None
+    
+    db_get_command(entity_type, entity_id, network, canister)
 
 
 @app.command("shell")
