@@ -68,6 +68,9 @@ jobs:
           sed -i "s/version = \".*\"/version = \"${NEW_VERSION}\"/" cli/pyproject.toml
           sed -i "s/__version__ = \".*\"/__version__ = \"${NEW_VERSION}\"/" cli/realms_cli/__init__.py
           
+          # Update default Docker image to use the new version tag
+          sed -i "s|DEFAULT_DOCKER_IMAGE = \"ghcr.io/smart-social-contracts/realms:v.*\"|DEFAULT_DOCKER_IMAGE = \"ghcr.io/smart-social-contracts/realms:v${NEW_VERSION}\"|" cli/realms_cli/constants.py
+          
           # Store new version for later use
           echo "NEW_VERSION=${NEW_VERSION}" >> $GITHUB_OUTPUT
       
