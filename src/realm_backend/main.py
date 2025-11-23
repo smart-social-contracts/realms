@@ -560,6 +560,56 @@ def initialize() -> void:
 
             extension_status[extension_id] = status
 
+        # Load entity method overrides from Realm manifest
+        logger.info("\n🔧 Checking for Codex entity method overrides from Realm manifest...")
+        try:
+            from ggg import Codex, Realm
+            import json
+            
+            realm = list(Realm.instances())[0] if Realm.instances() else None
+            logger.info(f"Realm found: {realm.name if realm else 'None'}")
+            
+            if realm:
+                logger.info(f"Has manifest_data: {bool(realm.manifest_data)}")
+                if realm.manifest_data:
+                    logger.info(f"manifest_data length: {len(str(realm.manifest_data))}")
+                    manifest = json.loads(str(realm.manifest_data))
+                    logger.info(f"Parsed manifest keys: {list(manifest.keys())}")
+                    
+                    overrides = manifest.get("entity_method_overrides", [])
+                    logger.info(f"Found {len(overrides)} entity method overrides")
+                    
+                    for o in overrides:
+                        try:
+                            if not all([o.get("entity"), o.get("method"), o.get("implementation")]):
+                                logger.warning(f"Skipping incomplete override: {o}")
+                                continue
+                            entity_class = getattr(ggg, o["entity"], None)
+                            parts = o["implementation"].split(".")
+                            if not entity_class or len(parts) != 3 or parts[0] != "Codex":
+                                logger.warning(f"Invalid override config: entity_class={entity_class}, parts={parts}")
+                                continue
+                            target_codex = Codex[parts[1]]
+                            if not target_codex:
+                                logger.warning(f"Codex not found: {parts[1]}")
+                                continue
+                            ns = {}
+                            exec(str(target_codex.code), ns)
+                            func = ns.get(parts[2])
+                            if not func:
+                                logger.warning(f"Function not found in codex: {parts[2]}")
+                                continue
+                            method_type = o.get("type", "method")
+                            wrapper = classmethod(func) if method_type == "classmethod" else staticmethod(func) if method_type == "staticmethod" else func
+                            setattr(entity_class, o["method"], wrapper)
+                            logger.info(f"  ✓ {o['entity']}.{o['method']}() [{method_type}] -> {o['implementation']}")
+                        except Exception as e:
+                            logger.error(f"Codex override error for {o}: {e}")
+                else:
+                    logger.warning("Realm.manifest_data is empty")
+        except Exception as e:
+            logger.error(f"Failed to load entity method overrides from Realm manifest: {e}")
+
         # Print summary as a table
         logger.info("")
         logger.info("=" * 70)

@@ -255,6 +255,37 @@ class RealmGenerator:
             
         return mandates
     
+    def generate_user_registration_hook_codex(self) -> Codex:
+        """Generate a codex for user registration hook
+        
+        Returns: Codex entity
+        Note: Codex code will be loaded from the generated file during upload
+        Note: entity_method_overrides configuration is stored separately in a Storage entry
+        """
+        codex = Codex(
+            name="user_registration_hook",
+            description="Custom user registration hook",
+            code=""  # Will be populated when codex file is imported
+        )
+        return codex
+    
+    def get_codex_overrides_manifest(self) -> dict:
+        """Get entity method overrides configuration for Realm manifest
+        
+        Returns: Dict containing entity_method_overrides
+        """
+        return {
+            "entity_method_overrides": [
+                {
+                    "entity": "User",
+                    "method": "user_register_posthook",
+                    "type": "staticmethod",
+                    "implementation": "Codex.user_registration_hook.user_register_posthook",
+                    "description": "Custom post-registration hook for new users"
+                }
+            ]
+        }
+    
     def generate_scheduled_task(self) -> tuple:
         """Generate a scheduled task for the satoshi transfer codex
         
@@ -316,6 +347,11 @@ class RealmGenerator:
 
     def generate_realm_metadata(self, realm_name: str, members: int, organizations: int) -> Realm:
         """Generate realm metadata"""
+        import json
+        
+        # Get entity method overrides configuration
+        manifest = self.get_codex_overrides_manifest()
+        
         realm = Realm(
             id=self.realm_id,
             name=realm_name,
@@ -331,7 +367,8 @@ class RealmGenerator:
                 "quorum_percentage": 0.3,
                 "tax_rate": 0.15,
                 "ubi_amount": 1000
-            }
+            },
+            manifest_data=json.dumps(manifest)
         )
         
         return realm
@@ -353,12 +390,19 @@ class RealmGenerator:
     def generate_realm_data(self, **params) -> List:
         """Generate additional realm data (users, organizations, etc.).
         
-        Note: Foundational objects (Realm, Treasury, UserProfiles, System User, Identity)
-        are now auto-created by the backend during canister initialization.
-        This function only generates additional/optional data.
+        Includes Realm with manifest_data containing entity method overrides.
+        Other foundational objects (Treasury, UserProfiles, System User, Identity)
+        are auto-created by the backend during canister initialization.
         """
         print(f"Generating additional realm data with seed: {self.seed}")
-        print("Note: Foundational objects (Realm, Treasury, UserProfiles, System User) are auto-created by backend.")
+        print("Note: Some foundational objects (Treasury, UserProfiles, System User) are auto-created by backend.")
+        
+        # Generate realm with manifest_data
+        realm = self.generate_realm_metadata(
+            realm_name=params.get('realm_name', 'Generated Demo Realm'),
+            members=params.get('members', 50),
+            organizations=params.get('organizations', 5)
+        )
         
         # Generate additional entities
         users = self.generate_users(params.get('members', 50))
@@ -374,8 +418,11 @@ class RealmGenerator:
         # Generate scheduled task for satoshi transfer
         codex, task, task_schedule = self.generate_scheduled_task()
         
-        # Return only additional data (not foundational objects)
-        ret = []
+        # Generate user registration hook codex
+        user_reg_hook_codex = self.generate_user_registration_hook_codex()
+        
+        # Return Realm first, then additional data
+        ret = [realm]
         ret += users
         ret += identities
         ret += humans
@@ -388,6 +435,7 @@ class RealmGenerator:
         ret.append(codex)
         ret.append(task)
         ret.append(task_schedule)
+        ret.append(user_reg_hook_codex)
         return ret
     
     def generate_codex_files(self, output_dir: Path) -> List[str]:
@@ -690,6 +738,24 @@ if __name__ == "__main__":
         governance_file.write_text(governance_codex)
         codex_files.append(str(governance_file))
         
+        # User Registration Hook Codex
+        registration_codex = '''"""
+User Registration Hook Codex
+Overrides user_register_posthook to add custom logic after user registration
+"""
+
+from kybra import ic
+
+def user_register_posthook(user):
+    """Custom user registration hook."""
+    ic.print('user registration hook executed')
+    return
+'''
+        
+        registration_file = output_dir / "user_registration_hook.py"
+        registration_file.write_text(registration_codex)
+        codex_files.append(str(registration_file))
+        
         return codex_files
 
 def main():
@@ -740,7 +806,8 @@ def main():
     print(f"\nGenerated {len(codex_files)} codex files:")
     for file in codex_files:
         print(f"- {file}")
-    print(f"Seed used: {generator.seed} (use this seed to reproduce the same data)")
+    
+    print(f"\nSeed used: {generator.seed} (use this seed to reproduce the same data)")
 
 if __name__ == "__main__":
     main()

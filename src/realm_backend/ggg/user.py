@@ -1,4 +1,8 @@
+from typing import Any
+
 from ggg import Trade, Transfer
+from ggg.user_profile import UserProfile
+
 from kybra_simple_db import (
     Entity,
     ManyToMany,
@@ -32,3 +36,37 @@ class User(Entity, TimestampedMixin):
     # trades_a = OneToMany("Trade", "user_a")
     # trades_b = OneToMany("Trade", "user_b")
     # owned_lands = OneToMany("Land", "owner_user")
+
+    @staticmethod
+    def user_register_posthook(user: "User"):
+        """Hook called after user registration. Can be overridden by extensions."""
+        logger.info(f"Hook called after user registration. User {user.id} registered with profile {user.profiles}")
+        return
+
+
+def user_register(principal: str, profile: str) -> dict[str, Any]:
+    logger.info(f"Registering user {principal} with profile {profile}")
+
+    user_profi = UserProfile[profile]
+    if not user_profi:
+        raise ValueError(f"Profile {profile} not found")
+
+    user = User[principal]
+    if not user:
+        user = User(id=principal, profiles=[user_profi])
+        logger.info(f"Created new user {principal} with profile {profile}")
+    else:
+        # Add profile only if not already assigned
+        if user_profi not in user.profiles:
+            user.profiles.add(user_profi)
+            logger.info(f"Added profile {profile} to existing user {principal}")
+        else:
+            logger.info(f"User {principal} already has profile {profile}")
+
+    User.user_register_posthook(user)  # type: ignore[arg-type]
+
+    return {
+        "principal": user.id,
+        "profiles": [profile.name for profile in user.profiles],
+        "profile_picture_url": user.profile_picture_url or "",
+    }

@@ -1,36 +1,9 @@
 from typing import Any
 
-from ggg.user import User
-from ggg.user_profile import UserProfile
+from ggg.user import User, user_register as ggg_user_register
 from kybra_simple_logging import get_logger
 
 logger = get_logger("api.user")
-
-
-def user_register(principal: str, profile: str) -> dict[str, Any]:
-    logger.info(f"Registering user {principal} with profile {profile}")
-
-    user_profile = UserProfile[profile]
-    if not user_profile:
-        raise ValueError(f"Profile {profile} not found")
-
-    user = User[principal]
-    if not user:
-        user = User(id=principal, profiles=[user_profile])
-        logger.info(f"Created new user {principal} with profile {profile}")
-    else:
-        # Add profile only if not already assigned
-        if user_profile not in user.profiles:
-            user.profiles.add(user_profile)
-            logger.info(f"Added profile {profile} to existing user {principal}")
-        else:
-            logger.info(f"User {principal} already has profile {profile}")
-
-    return {
-        "principal": user.id,
-        "profiles": [profile.name for profile in user.profiles],
-        "profile_picture_url": user.profile_picture_url or "",
-    }
 
 
 def user_get(principal: str) -> dict[str, Any]:
@@ -64,3 +37,17 @@ def user_update_profile_picture(
         "success": True,
         "profile_picture_url": user.profile_picture_url,
     }
+
+
+def user_register(principal: str, profile: str) -> dict[str, Any]:
+    """
+    Register a new user or add a profile to an existing user.
+    
+    Args:
+        principal: User principal ID
+        profile: Profile name to assign to the user
+        
+    Returns:
+        Dictionary with user data including principal, profiles, and profile_picture_url
+    """
+    return ggg_user_register(principal, profile)

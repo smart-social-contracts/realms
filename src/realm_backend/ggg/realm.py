@@ -10,3 +10,4 @@ class Realm(Entity, TimestampedMixin):
     description = String(max_length=256)
     treasury = OneToOne("Treasury", "realm")
     principal_id = String(max_length=64)
+    manifest_data = String()

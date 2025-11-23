@@ -381,10 +381,28 @@ fi
     adjustments_content = """
 from kybra import ic
 from ggg import Realm, Treasury, UserProfile, User, Codex, Instrument, Transfer
+import json
 
-# realm = Realm.instances()[0]
-# realm.treasury = treasury
+# Update Realm with manifest_data containing entity method overrides
+realm = list(Realm.instances())[0] if Realm.instances() else None
+if realm:
+    manifest = {
+        "entity_method_overrides": [
+            {
+                "entity": "User",
+                "method": "user_register_posthook",
+                "type": "staticmethod",
+                "implementation": "Codex.user_registration_hook.user_register_posthook",
+                "description": "Custom post-registration hook for new users"
+            }
+        ]
+    }
+    realm.manifest_data = json.dumps(manifest)
+    ic.print(f"✅ Realm.manifest_data updated with entity method overrides")
+else:
+    ic.print("❌ No Realm found")
 
+# Print entity counts
 ic.print("len(Realm.instances()) = %d" % len(Realm.instances()))
 ic.print("len(Treasury.instances()) = %d" % len(Treasury.instances()))
 ic.print("len(UserProfile.instances()) = %d" % len(UserProfile.instances()))
