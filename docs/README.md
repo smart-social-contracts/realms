@@ -1,10 +1,18 @@
 # Realms Platform Documentation
 
 <p align="center">
-  <img src="../src/realm_frontend/static/images/logo_white_horizontal.png" alt="Realms Logo" width="400"/>
+  <img src="img/logo_horizontal.svg" alt="Realms Logo" width="400"/>
 </p>
 
 Complete documentation for building and deploying governance systems on the Internet Computer.
+
+---
+
+## 📖 Start Here
+
+**New to Realms?** Choose your path:
+- **[Non-Technical Introduction](./NON_TECHNICAL_INTRO.md)** - Understand what Realms is and why it exists
+- **[Technical Introduction](./TECHNICAL_INTRO.md)** - Architecture, APIs, and development guide
 
 ---
 
