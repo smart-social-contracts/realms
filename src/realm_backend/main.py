@@ -1751,6 +1751,54 @@ def get_realm_registry_info() -> text:
         )
 
 
+@update
+def reload_entity_method_overrides() -> str:
+    """
+    Admin function to reload entity method overrides from Realm manifest.
+    This should be called after importing realm data that includes codexes and manifest_data.
+    """
+    try:
+        from ggg import Codex, Realm
+        import ggg
+        import json
+        
+        realm = list(Realm.instances())[0] if Realm.instances() else None
+        if not realm or not realm.manifest_data:
+            return json.dumps({"success": False, "error": "No realm or manifest_data found"})
+        
+        manifest = json.loads(str(realm.manifest_data))
+        overrides = manifest.get("entity_method_overrides", [])
+        
+        loaded_overrides = []
+        for o in overrides:
+            try:
+                if not all([o.get("entity"), o.get("method"), o.get("implementation")]):
+                    continue
+                entity_class = getattr(ggg, o["entity"], None)
+                parts = o["implementation"].split(".")
+                if not entity_class or len(parts) != 3 or parts[0] != "Codex":
+                    continue
+                target_codex = Codex[parts[1]]
+                if not target_codex:
+                    continue
+                ns = {}
+                exec(str(target_codex.code), ns)
+                func = ns.get(parts[2])
+                if not func:
+                    continue
+                method_type = o.get("type", "method")
+                wrapper = classmethod(func) if method_type == "classmethod" else staticmethod(func) if method_type == "staticmethod" else func
+                setattr(entity_class, o["method"], wrapper)
+                loaded_overrides.append(f"{o['entity']}.{o['method']}() -> {o['implementation']}")
+                logger.info(f"  ✓ Reloaded {o['entity']}.{o['method']}() [{method_type}] -> {o['implementation']}")
+            except Exception as e:
+                logger.error(f"Failed to reload override {o}: {e}")
+        
+        return json.dumps({"success": True, "loaded_overrides": loaded_overrides}, indent=2)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)}, indent=2)
+
+
 # @heartbeat
 # def check_scheduled_tasks() -> void:
 #     """

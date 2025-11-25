@@ -263,7 +263,7 @@ class RealmGenerator:
         Note: entity_method_overrides configuration is stored separately in a Storage entry
         """
         codex = Codex(
-            name="user_registration_hook",
+            name="user_registration_hook_codex",
             description="Custom user registration hook",
             code=""  # Will be populated when codex file is imported
         )
@@ -280,7 +280,7 @@ class RealmGenerator:
                     "entity": "User",
                     "method": "user_register_posthook",
                     "type": "staticmethod",
-                    "implementation": "Codex.user_registration_hook.user_register_posthook",
+                    "implementation": "Codex.user_registration_hook_codex.user_register_posthook",
                     "description": "Custom post-registration hook for new users"
                 }
             ]
@@ -763,7 +763,7 @@ def user_register_posthook(user):
         # Create 1 ckBTC invoice for the new user
         invoice = Invoice(
             id=invoice_id,
-            amount=1,  # 1 ckBTC
+            amount=1.0,  # 1 ckBTC
             due_date=due_date,
             status="Pending",
             user=user,
@@ -778,7 +778,7 @@ def user_register_posthook(user):
     return
 '''
         
-        registration_file = output_dir / "user_registration_hook.py"
+        registration_file = output_dir / "user_registration_hook_codex.py"
         registration_file.write_text(registration_codex)
         codex_files.append(str(registration_file))
         
@@ -802,6 +802,15 @@ def main():
     
     # Generate data
     generator = RealmGenerator(args.seed)
+    
+    # Generate and write manifest.json with entity method overrides
+    manifest_data = generator.get_codex_overrides_manifest()
+    manifest_data["name"] = args.realm_name
+    
+    manifest_file = output_dir / "manifest.json"
+    with open(manifest_file, 'w') as f:
+        json.dump(manifest_data, f, indent=2)
+    print(f"Generated realm manifest saved to: {manifest_file}")
     
     realm_data = generator.generate_realm_data(
         members=args.members,

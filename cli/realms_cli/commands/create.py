@@ -60,10 +60,20 @@ def create_command(
     scripts_dir = output_path / "scripts"
     scripts_dir.mkdir(exist_ok=True)
 
-    # Create realm manifest file
+    # Create realm manifest file with entity method overrides
+    # Note: If random=True, realm_generator.py will update this with complete data
     manifest_path = output_path / "manifest.json"
     manifest_data = {
-        "name": realm_name
+        "name": realm_name,
+        "entity_method_overrides": [
+            {
+                "entity": "User",
+                "method": "user_register_posthook",
+                "type": "staticmethod",
+                "implementation": "Codex.user_registration_hook_codex.user_register_posthook",
+                "description": "Custom post-registration hook for new users"
+            }
+        ]
     }
     with open(manifest_path, "w") as f:
         json.dump(manifest_data, f, indent=2)
@@ -264,6 +274,17 @@ realms_cmd = ['realms', 'shell', '--file', '{output_dir}/scripts/adjustments.py'
 if network != 'local':
     realms_cmd.extend(['--network', network])
 run_dfx_command(realms_cmd)
+
+# Reload entity method overrides after adjustments
+print("\\n🔄 Reloading entity method overrides...")
+reload_cmd = ['dfx', 'canister', 'call', 'realm_backend', 'reload_entity_method_overrides']
+if network != 'local':
+    reload_cmd.extend(['--network', network])
+try:
+    result = run_dfx_command(reload_cmd)
+    print(f"   ✅ Entity method overrides reloaded: {{result}}")
+except Exception as e:
+    print(f"   ⚠️  Failed to reload overrides: {{e}}")
 """.strip()
 
     upload_script_content = """#!/bin/bash
@@ -392,7 +413,7 @@ if realm:
                 "entity": "User",
                 "method": "user_register_posthook",
                 "type": "staticmethod",
-                "implementation": "Codex.user_registration_hook.user_register_posthook",
+                "implementation": "Codex.user_registration_hook_codex.user_register_posthook",
                 "description": "Custom post-registration hook for new users"
             }
         ]
