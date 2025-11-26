@@ -60,25 +60,41 @@ def create_command(
     scripts_dir = output_path / "scripts"
     scripts_dir.mkdir(exist_ok=True)
 
-    # Create realm manifest file with entity method overrides
-    # Note: If random=True, realm_generator.py will update this with complete data
+    # Copy realm manifest from examples/demo and update realm name
+    # Note: If random=True, realm_generator.py will overwrite this with its own copy
+    scripts_path = get_scripts_path()
+    repo_root = scripts_path.parent
+    demo_manifest = repo_root / "examples" / "demo" / "manifest.json"
+    
     manifest_path = output_path / "manifest.json"
-    manifest_data = {
-        "name": realm_name,
-        "entity_method_overrides": [
-            {
-                "entity": "User",
-                "method": "user_register_posthook",
-                "type": "staticmethod",
-                "implementation": "Codex.user_registration_hook_codex.user_register_posthook",
-                "description": "Custom post-registration hook for new users"
-            }
-        ]
-    }
-    with open(manifest_path, "w") as f:
-        json.dump(manifest_data, f, indent=2)
-        f.write("\n")  # Add trailing newline
-    console.print(f"📄 Created realm manifest: {manifest_path.absolute()}")
+    
+    if demo_manifest.exists():
+        # Copy from demo and update realm name
+        with open(demo_manifest, 'r') as f:
+            manifest_data = json.load(f)
+        manifest_data["name"] = realm_name
+        with open(manifest_path, "w") as f:
+            json.dump(manifest_data, f, indent=2)
+            f.write("\n")  # Add trailing newline
+        console.print(f"📄 Copied manifest from examples/demo: {manifest_path.absolute()}")
+    else:
+        # Fallback to hardcoded manifest
+        manifest_data = {
+            "name": realm_name,
+            "entity_method_overrides": [
+                {
+                    "entity": "User",
+                    "method": "user_register_posthook",
+                    "type": "staticmethod",
+                    "implementation": "Codex.user_registration_hook_codex.user_register_posthook",
+                    "description": "Custom post-registration hook for new users"
+                }
+            ]
+        }
+        with open(manifest_path, "w") as f:
+            json.dump(manifest_data, f, indent=2)
+            f.write("\n")  # Add trailing newline
+        console.print(f"📄 Created realm manifest: {manifest_path.absolute()}")
 
     console.print(f"📁 Output directory: {output_path.absolute()}")
     console.print(f"📁 Scripts directory: {scripts_dir.absolute()}")
@@ -399,46 +415,28 @@ fi
     upload_script.chmod(0o755)
     console.print(f"   ✅ {upload_script.name}")
 
-    adjustments_content = """
+    # Copy adjustments.py from examples/demo
+    demo_adjustments = repo_root / "examples" / "demo" / "adjustments.py"
+    adjustments_script = scripts_dir / "adjustments.py"
+    
+    if demo_adjustments.exists():
+        shutil.copy2(demo_adjustments, adjustments_script)
+        console.print(f"   ✅ {adjustments_script.name} (copied from examples/demo)")
+    else:
+        console.print(f"   ⚠️  Warning: adjustments.py not found in examples/demo")
+        # Create a minimal fallback version
+        adjustments_content = """
 from kybra import ic
 from ggg import Realm, Treasury, UserProfile, User, Codex, Instrument, Transfer
-import json
-
-# Update Realm with manifest_data containing entity method overrides
-realm = list(Realm.instances())[0] if Realm.instances() else None
-if realm:
-    manifest = {
-        "entity_method_overrides": [
-            {
-                "entity": "User",
-                "method": "user_register_posthook",
-                "type": "staticmethod",
-                "implementation": "Codex.user_registration_hook_codex.user_register_posthook",
-                "description": "Custom post-registration hook for new users"
-            }
-        ]
-    }
-    realm.manifest_data = json.dumps(manifest)
-    ic.print(f"✅ Realm.manifest_data updated with entity method overrides")
-else:
-    ic.print("❌ No Realm found")
 
 # Print entity counts
 ic.print("len(Realm.instances()) = %d" % len(Realm.instances()))
 ic.print("len(Treasury.instances()) = %d" % len(Treasury.instances()))
-ic.print("len(UserProfile.instances()) = %d" % len(UserProfile.instances()))
 ic.print("len(User.instances()) = %d" % len(User.instances()))
 ic.print("len(Codex.instances()) = %d" % len(Codex.instances()))
-ic.print("len(Instrument.instances()) = %d" % len(Instrument.instances()))
-ic.print("len(Transfer.instances()) = %d" % len(Transfer.instances()))
-
-for codex in Codex.instances():
-    ic.print(f"{codex.name}: {len(codex.code)}")
 """.strip()
-
-    adjustments_script = scripts_dir / "adjustments.py"
-    adjustments_script.write_text(adjustments_content)
-    console.print(f"   ✅ {adjustments_script.name}")
+        adjustments_script.write_text(adjustments_content)
+        console.print(f"   ✅ {adjustments_script.name} (created fallback version)")
 
     console.print(f"\n[green]🎉 Realm '{realm_name}' created successfully![/green]")
     

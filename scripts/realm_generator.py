@@ -20,6 +20,7 @@ from typing import Dict, List, Any
 import hashlib
 import sys
 import os
+import shutil
 
 # Add the src directory to the Python path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src/realm_backend'))
@@ -439,351 +440,33 @@ class RealmGenerator:
         return ret
     
     def generate_codex_files(self, output_dir: Path) -> List[str]:
-        """Generate Python codex files"""
+        """Copy Python codex files from examples/demo folder"""
         codex_files = []
         
-        # Tax Collection Codex
-        tax_codex = '''"""
-Tax Collection Automation Codex
-Automatically calculates and processes tax payments for members
-"""
-
-from ggg import User, Transfer, Treasury, Instrument
-from datetime import datetime, timedelta
-import json
-
-def calculate_tax_for_user(user_id: str, tax_year: int = None) -> dict:
-    """Calculate tax owed by a user for a given year"""
-    if tax_year is None:
-        tax_year = datetime.now().year
-    
-    # Get user's transfers for the tax year
-    user = User.get(user_id)
-    if not user:
-        return {"error": "User not found"}
-    
-    # Calculate income from transfers received
-    income_transfers = [t for t in user.transfers_to if 
-                       datetime.fromisoformat(t.created_at).year == tax_year]
-    
-    total_income = sum(t.amount for t in income_transfers)
-    
-    # Progressive tax calculation
-    if total_income <= 10000:
-        tax_rate = 0.10
-    elif total_income <= 50000:
-        tax_rate = 0.20
-    else:
-        tax_rate = 0.30
-    
-    tax_owed = int(total_income * tax_rate)
-    
-    return {
-        "user_id": user_id,
-        "tax_year": tax_year,
-        "total_income": total_income,
-        "tax_rate": tax_rate,
-        "tax_owed": tax_owed,
-        "calculated_at": datetime.now().isoformat()
-    }
-
-def process_tax_collection():
-    """Main tax collection process"""
-    results = []
-    
-    # Get all users
-    users = User.get_all()
-    
-    for user in users:
-        if user.id == "system":
-            continue
+        # Get the path to the examples/demo folder
+        script_dir = Path(__file__).parent
+        repo_root = script_dir.parent
+        examples_demo_dir = repo_root / "examples" / "demo"
+        
+        # List of codex files to copy
+        demo_codex_files = [
+            "tax_collection_codex.py",
+            "social_benefits_codex.py",
+            "governance_automation_codex.py",
+            "user_registration_hook_codex.py"
+        ]
+        
+        # Copy each codex file from examples/demo to output directory
+        for codex_filename in demo_codex_files:
+            source_file = examples_demo_dir / codex_filename
             
-        tax_info = calculate_tax_for_user(user.id)
-        
-        if "error" not in tax_info and tax_info["tax_owed"] > 0:
-            # Create tax payment transfer
-            tax_instrument = Instrument.get_by_name("Realm Token")
-            if tax_instrument:
-                transfer = Transfer(
-                    from_user=user,
-                    to_user=User.get("system"),
-                    instrument=tax_instrument,
-                    amount=tax_info["tax_owed"]
-                )
-                results.append({
-                    "user_id": user.id,
-                    "tax_collected": tax_info["tax_owed"],
-                    "status": "collected"
-                })
-    
-    return results
-
-# Main execution
-if __name__ == "__main__":
-    results = process_tax_collection()
-    print(f"Tax collection completed: {len(results)} payments processed")
-'''
-        
-        tax_file = output_dir / "tax_collection_codex.py"
-        tax_file.write_text(tax_codex)
-        codex_files.append(str(tax_file))
-        
-        # Social Benefits Codex
-        benefits_codex = '''"""
-Social Benefits Distribution Codex
-Automatically distributes social benefits to eligible members
-"""
-
-from ggg import User, Member, Transfer, Treasury, Instrument
-from datetime import datetime
-import json
-
-def check_benefit_eligibility(member_id: str) -> dict:
-    """Check if a member is eligible for social benefits"""
-    member = Member.get(member_id)
-    if not member:
-        return {"eligible": False, "reason": "Member not found"}
-    
-    # Eligibility criteria
-    criteria = {
-        "residence_permit": member.residence_permit == "valid",
-        "tax_compliance": member.tax_compliance in ["compliant", "under_review"],
-        "identity_verification": member.identity_verification == "verified",
-        "benefits_eligibility": member.public_benefits_eligibility == "eligible"
-    }
-    
-    eligible = all(criteria.values())
-    
-    return {
-        "member_id": member_id,
-        "eligible": eligible,
-        "criteria_met": criteria,
-        "checked_at": datetime.now().isoformat()
-    }
-
-def calculate_benefit_amount(member_id: str) -> int:
-    """Calculate benefit amount based on member status"""
-    member = Member.get(member_id)
-    if not member:
-        return 0
-    
-    # Base benefit amount
-    base_amount = 500
-    
-    # Adjustments based on status
-    if member.criminal_record == "clean":
-        base_amount += 100
-    
-    if member.voting_eligibility == "eligible":
-        base_amount += 50
-    
-    return base_amount
-
-def distribute_social_benefits():
-    """Main social benefits distribution process"""
-    results = []
-    
-    # Get all members
-    members = Member.get_all()
-    
-    for member in members:
-        eligibility = check_benefit_eligibility(member.id)
-        
-        if eligibility["eligible"]:
-            benefit_amount = calculate_benefit_amount(member.id)
-            
-            # Create benefit transfer
-            benefit_instrument = Instrument.get_by_name("Service Credit")
-            system_user = User.get("system")
-            
-            if benefit_instrument and system_user and member.user:
-                transfer = Transfer(
-                    from_user=system_user,
-                    to_user=member.user,
-                    instrument=benefit_instrument,
-                    amount=benefit_amount
-                )
-                
-                results.append({
-                    "member_id": member.id,
-                    "benefit_amount": benefit_amount,
-                    "status": "distributed"
-                })
-    
-    return results
-
-# Main execution
-if __name__ == "__main__":
-    results = distribute_social_benefits()
-    print(f"Benefits distribution completed: {len(results)} payments processed")
-'''
-        
-        benefits_file = output_dir / "social_benefits_codex.py"
-        benefits_file.write_text(benefits_codex)
-        codex_files.append(str(benefits_file))
-        
-        # Governance Automation Codex
-        governance_codex = '''"""
-Governance Automation Codex
-Processes proposals and votes for democratic governance
-"""
-
-from ggg import Proposal, Vote, User
-from datetime import datetime, timedelta
-import json
-
-def create_sample_proposal(title: str, description: str) -> str:
-    """Create a new governance proposal"""
-    proposal = Proposal(
-        metadata=json.dumps({
-            "title": title,
-            "description": description,
-            "status": "active",
-            "created_by": "system",
-            "voting_deadline": (datetime.now() + timedelta(days=7)).isoformat(),
-            "votes_for": 0,
-            "votes_against": 0,
-            "total_votes": 0
-        })
-    )
-    
-    return proposal.id
-
-def process_votes():
-    """Process all active proposals and tally votes"""
-    results = []
-    
-    # Get all proposals
-    proposals = Proposal.get_all()
-    
-    for proposal in proposals:
-        metadata = json.loads(proposal.metadata)
-        
-        if metadata.get("status") == "active":
-            # Check if voting deadline has passed
-            deadline = datetime.fromisoformat(metadata["voting_deadline"])
-            
-            if datetime.now() > deadline:
-                # Tally votes and close proposal
-                votes_for = metadata.get("votes_for", 0)
-                votes_against = metadata.get("votes_against", 0)
-                total_votes = votes_for + votes_against
-                
-                # Determine outcome
-                if total_votes > 0:
-                    if votes_for > votes_against:
-                        status = "passed"
-                    else:
-                        status = "rejected"
-                else:
-                    status = "no_votes"
-                
-                # Update proposal
-                metadata["status"] = status
-                metadata["final_tally"] = {
-                    "votes_for": votes_for,
-                    "votes_against": votes_against,
-                    "total_votes": total_votes,
-                    "closed_at": datetime.now().isoformat()
-                }
-                
-                proposal.metadata = json.dumps(metadata)
-                
-                results.append({
-                    "proposal_id": proposal.id,
-                    "title": metadata["title"],
-                    "status": status,
-                    "votes_for": votes_for,
-                    "votes_against": votes_against
-                })
-    
-    return results
-
-def create_sample_proposals():
-    """Create sample governance proposals"""
-    proposals = [
-        {
-            "title": "Increase Social Benefits by 10%",
-            "description": "Proposal to increase monthly social benefits for all eligible members by 10% to account for inflation."
-        },
-        {
-            "title": "Implement Green Energy Tax Credits",
-            "description": "Provide tax credits for members and organizations investing in renewable energy infrastructure."
-        },
-        {
-            "title": "Digital Identity Verification System",
-            "description": "Implement a new digital identity verification system to streamline government services."
-        }
-    ]
-    
-    created_proposals = []
-    for proposal in proposals:
-        proposal_id = create_sample_proposal(proposal["title"], proposal["description"])
-        created_proposals.append(proposal_id)
-    
-    return created_proposals
-
-# Main execution
-if __name__ == "__main__":
-    # Create sample proposals
-    proposals = create_sample_proposals()
-    print(f"Created {len(proposals)} sample proposals")
-    
-    # Process votes
-    results = process_votes()
-    print(f"Processed {len(results)} proposals")
-'''
-        
-        governance_file = output_dir / "governance_automation_codex.py"
-        governance_file.write_text(governance_codex)
-        codex_files.append(str(governance_file))
-        
-        # User Registration Hook Codex
-        registration_codex = '''"""
-User Registration Hook Codex
-Overrides user_register_posthook to add custom logic after user registration.
-Creates a 1 ckBTC invoice expiring in 5 minutes for new users.
-"""
-
-from kybra import ic
-from ggg import Invoice
-from datetime import datetime, timedelta
-
-def user_register_posthook(user):
-    """Custom user registration hook - creates welcome invoice."""
-    try:
-        # Calculate expiry time (5 minutes from now)
-        expiry_time = datetime.now() + timedelta(minutes=5)
-        due_date = expiry_time.isoformat()
-        
-        # Create 1 ckBTC invoice for the new user
-        # Invoice ID is auto-generated and used to derive a unique subaccount
-        invoice = Invoice(
-            amount=1.0,  # 1 ckBTC
-            currency="ckBTC",
-            due_date=due_date,
-            status="Pending",
-            user=user,
-            metadata="Welcome bonus - 1 ckBTC invoice"
-        )
-        
-        # Get the deposit address info
-        vault_principal = ic.id().to_str()
-        subaccount_hex = invoice.get_subaccount_hex()
-        
-        ic.print(f"✅ Created welcome invoice {invoice.id} for user {user.id}")
-        ic.print(f"   Deposit to: {vault_principal} (subaccount: {subaccount_hex[:16]}...)")
-        ic.print(f"   Amount: 1 ckBTC, expires in 5 minutes")
-        
-    except Exception as e:
-        ic.print(f"❌ Error creating invoice: {e}")
-    
-    return
-'''
-        
-        registration_file = output_dir / "user_registration_hook_codex.py"
-        registration_file.write_text(registration_codex)
-        codex_files.append(str(registration_file))
+            if source_file.exists():
+                dest_file = output_dir / codex_filename
+                shutil.copy2(source_file, dest_file)
+                codex_files.append(str(dest_file))
+                print(f"  Copied {codex_filename} from examples/demo")
+            else:
+                print(f"  Warning: {codex_filename} not found in examples/demo")
         
         return codex_files
 
@@ -806,14 +489,33 @@ def main():
     # Generate data
     generator = RealmGenerator(args.seed)
     
-    # Generate and write manifest.json with entity method overrides
-    manifest_data = generator.get_codex_overrides_manifest()
-    manifest_data["name"] = args.realm_name
+    # Copy manifest.json from examples/demo and update realm name
+    script_dir = Path(__file__).parent
+    repo_root = script_dir.parent
+    demo_manifest = repo_root / "examples" / "demo" / "manifest.json"
     
-    manifest_file = output_dir / "manifest.json"
-    with open(manifest_file, 'w') as f:
-        json.dump(manifest_data, f, indent=2)
-    print(f"Generated realm manifest saved to: {manifest_file}")
+    if demo_manifest.exists():
+        # Load the demo manifest
+        with open(demo_manifest, 'r') as f:
+            manifest_data = json.load(f)
+        
+        # Update the realm name
+        manifest_data["name"] = args.realm_name
+        
+        # Write to output directory
+        manifest_file = output_dir / "manifest.json"
+        with open(manifest_file, 'w') as f:
+            json.dump(manifest_data, f, indent=2)
+        print(f"Copied manifest from examples/demo, realm name set to: {args.realm_name}")
+    else:
+        print(f"Warning: Demo manifest not found at {demo_manifest}")
+        # Fallback to programmatic generation
+        manifest_data = generator.get_codex_overrides_manifest()
+        manifest_data["name"] = args.realm_name
+        manifest_file = output_dir / "manifest.json"
+        with open(manifest_file, 'w') as f:
+            json.dump(manifest_data, f, indent=2)
+        print(f"Generated realm manifest saved to: {manifest_file}")
     
     realm_data = generator.generate_realm_data(
         members=args.members,
