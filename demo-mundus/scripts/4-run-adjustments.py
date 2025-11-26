@@ -28,7 +28,7 @@ try:
     realm_name = manifest.get('name', 'Generated Realm')
     
     # Generate a unique realm ID based on name and timestamp
-    realm_id = f"{realm_name.lower().replace(' ', '_')}_1764178481"
+    realm_id = f"{realm_name.lower().replace(' ', '_')}_1764179632"
     
     print(f"   Realm Name: {realm_name}")
     print(f"   Realm ID: {realm_id}")
