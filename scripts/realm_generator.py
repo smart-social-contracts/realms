@@ -519,6 +519,16 @@ def main():
         with open(manifest_file, 'w') as f:
             json.dump(manifest_data, f, indent=2)
         print(f"Copied manifest from examples/demo, realm name set to: {args.realm_name}")
+        
+        # Copy logo if it exists in the demo folder
+        if "logo" in manifest_data:
+            demo_logo = demo_base_dir / manifest_data["logo"]
+            if demo_logo.exists():
+                dest_logo = output_dir / manifest_data["logo"]
+                shutil.copy2(demo_logo, dest_logo)
+                print(f"Copied realm logo: {manifest_data['logo']}")
+            else:
+                print(f"Warning: Logo file {manifest_data['logo']} not found in {demo_base_dir}")
     else:
         print(f"Warning: Demo manifest not found at {demo_manifest}")
         # Fallback to programmatic generation

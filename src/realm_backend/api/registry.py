@@ -15,6 +15,7 @@ def register_realm(
     realm_id: str,
     realm_name: str,
     realm_url: str = "",
+    realm_logo: str = "",
 ) -> Async[Dict]:
     """
     Register this realm with the central realm registry.
@@ -27,6 +28,7 @@ def register_realm(
         realm_id: Unique identifier for this realm
         realm_name: Human-readable name for this realm
         realm_url: Frontend canister URL (optional, will auto-derive if empty)
+        realm_logo: URL or path to realm logo (optional)
 
     Returns:
         Dictionary with success status and message/error
@@ -41,15 +43,15 @@ def register_realm(
             logger.info(f"Auto-derived realm URL: {realm_url}")
 
         # Make inter-canister call to registry backend
-        # The add_realm function signature is: add_realm(realm_id: text, name: text, url: text) -> AddRealmResult
+        # The add_realm function signature is: add_realm(realm_id: text, name: text, url: text, logo: text) -> AddRealmResult
         logger.info(
-            f"Calling registry add_realm with args: ({realm_id}, {realm_name}, {realm_url})"
+            f"Calling registry add_realm with args: ({realm_id}, {realm_name}, {realm_url}, {realm_logo})"
         )
 
         result = yield ic.call(
             canister_id=registry_canister_id,
             method_name="add_realm",
-            args=(realm_id, realm_name, realm_url),
+            args=(realm_id, realm_name, realm_url, realm_logo),
             return_types=(dict,),
         )
 

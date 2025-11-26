@@ -29,7 +29,7 @@ from kybra_simple_logging import get_logger
 logger = get_logger("api.status")
 
 
-def get_status() -> dict[str, Any]:
+def get_status() -> "dict[str, Any]":
     """
     Get current system status and health information
 
@@ -56,13 +56,15 @@ def get_status() -> dict[str, Any]:
     votes_count = Vote.count()
     user_profiles_count = UserProfile.count()
 
-    # Get realm name efficiently - only load first realm, not all realms
+    # Get realm info efficiently - only load first realm, not all realms
     realm_name = "None"
+    realm_logo = ""
     try:
         # Load only the first realm (ID 1) instead of all realms
         first_realm = Realm.load("1")
         if first_realm:
             realm_name = first_realm.name
+            realm_logo = first_realm.logo if hasattr(first_realm, 'logo') else ""
     except Exception:
         # Realm might not exist yet
         pass
@@ -98,6 +100,7 @@ def get_status() -> dict[str, Any]:
         "version": version,
         "status": "ok",
         "realm_name": realm_name,
+        "realm_logo": realm_logo,
         "users_count": users_count,
         "organizations_count": organizations_count,
         "realms_count": realms_count,
