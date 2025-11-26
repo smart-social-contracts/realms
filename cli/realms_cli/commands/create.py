@@ -165,14 +165,42 @@ def create_command(
         console.print(f"📄 Copied mundus manifest: {mundus_manifest_path.absolute()}")
     else:
         console.print(f"[yellow]⚠️  Warning: No demo manifest found at {demo_manifest_path}[/yellow]")
-        # Create a default single-realm config
-        mundus_config = {
-            "realms": ["realm1"],
-            "registries": [],
-            "name": realm_name
-        }
+        console.print("[dim]Creating simple single-realm (backward compatibility mode)[/dim]")
+        # In backward compatibility mode, generate directly to output_path
+        # This is for CLI Docker tests and simple single-realm generation
+        if random:
+            console.print("\n🎲 Generating random data...")
+            console.print(f"   👥 Members: {members}")
+            console.print(f"   🏢 Organizations: {organizations}")
+            console.print(f"   💰 Transactions: {transactions}")
+            console.print(f"   ⚖️  Disputes: {disputes}")
+            if seed:
+                console.print(f"   🌱 Seed: {seed}")
+        
+        # Generate simple realm directly to output_path (no mundus structure)
+        _generate_single_realm(
+            realm_name=realm_name,
+            realm_folder=output_path.name,  # Use output dir name as folder
+            output_path=output_path.parent,  # Parent dir, so output_path/name = original output_path
+            repo_root=repo_root,
+            random=random,
+            members=members,
+            organizations=organizations,
+            transactions=transactions,
+            disputes=disputes,
+            seed=seed,
+        )
+        
+        console.print("\n[green]✅ Simple realm generated successfully[/green]")
+        
+        # Skip deployment handling for simple mode
+        if deploy:
+            console.print("\n[yellow]⚠️  Auto-deploy not supported in simple mode[/yellow]")
+            console.print("[dim]Please deploy manually using dfx[/dim]")
+        
+        return
 
-    # Create realms directory
+    # Multi-realm mundus mode: Create realms directory
     realms_dir = output_path / "realms"
     realms_dir.mkdir(exist_ok=True)
     console.print(f"📁 Output directory: {output_path.absolute()}")
