@@ -209,13 +209,10 @@ if [ "$NETWORK" = "local" ] || [ "$NETWORK" = "local2" ]; then
     # For local deployment, mode is not used (dfx start --clean requires install mode)
     echo "Using local deployment script..."
     bash scripts/deploy_local.sh
-elif [ "$NETWORK" = "staging" ] || [ "$NETWORK" = "ic" ]; then
-    echo "Using staging/IC deployment script with mode: $MODE..."
-    bash scripts/deploy_staging.sh "$NETWORK" "$MODE"
 else
-    echo "❌ Unknown network: $NETWORK"
-    echo "Supported networks: local, local2, staging, ic"
-    exit 1
+    # For all other networks (staging, staging2, staging3, ic, etc.)
+    echo "Using production deployment script for $NETWORK with mode: $MODE..."
+    bash scripts/deploy_staging.sh "$NETWORK" "$MODE"
 fi
 
 echo "✅ Deployment to $NETWORK completed!"

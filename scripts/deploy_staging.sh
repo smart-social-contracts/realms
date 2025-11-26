@@ -1,4 +1,16 @@
 #!/bin/bash
+#
+# Deploy to staging networks with extension installation
+#
+# Usage:
+#   ./scripts/deploy_staging.sh [network] [mode]
+#
+# Examples:
+#   ./scripts/deploy_staging.sh                    # Deploy to staging with upgrade mode
+#   ./scripts/deploy_staging.sh staging2           # Deploy to staging2 with upgrade mode
+#   ./scripts/deploy_staging.sh staging2 reinstall # Deploy to staging2 with reinstall mode
+#   ./scripts/deploy_staging.sh ic                 # Deploy to IC mainnet with upgrade mode
+#
 
 set -e  # Exit on error
 set -x
@@ -16,6 +28,9 @@ python3 -m kybra --version || {
     echo "Kybra not found. Installing requirements..."
     pip3 install -r requirements.txt
 }
+
+echo "Installing extensions..."
+./scripts/install_extensions.sh
 
 scripts/download_wasms.sh
 
@@ -38,3 +53,13 @@ dfx deploy --network "$NETWORK" --yes realm_frontend
 
 echo "Verifying deployment on $NETWORK"
 python scripts/verify_deployment.py --network "$NETWORK"
+
+# Get canister IDs
+FRONTEND_ID=$(dfx canister --network "$NETWORK" id realm_frontend)
+BACKEND_ID=$(dfx canister --network "$NETWORK" id realm_backend)
+
+echo ""
+echo "✅ Deployment complete!"
+echo "🌐 Frontend: https://$FRONTEND_ID.icp0.io"
+echo "📊 Task Monitor: https://$FRONTEND_ID.icp0.io/tasks"
+echo "🔧 Backend: $BACKEND_ID"
