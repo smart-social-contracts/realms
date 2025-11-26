@@ -16,7 +16,7 @@ import random
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 import hashlib
 import sys
 import os
@@ -439,14 +439,18 @@ class RealmGenerator:
         ret.append(user_reg_hook_codex)
         return ret
     
-    def generate_codex_files(self, output_dir: Path) -> List[str]:
-        """Copy Python codex files from examples/demo folder"""
+    def generate_codex_files(self, output_dir: Path, demo_folder: Optional[str] = None) -> List[str]:
+        """Copy Python codex files from examples/demo/{demo_folder} folder"""
         codex_files = []
         
         # Get the path to the examples/demo folder
         script_dir = Path(__file__).parent
         repo_root = script_dir.parent
-        examples_demo_dir = repo_root / "examples" / "demo"
+        
+        if demo_folder:
+            examples_demo_dir = repo_root / "examples" / "demo" / demo_folder
+        else:
+            examples_demo_dir = repo_root / "examples" / "demo"
         
         # List of codex files to copy
         demo_codex_files = [
@@ -464,9 +468,9 @@ class RealmGenerator:
                 dest_file = output_dir / codex_filename
                 shutil.copy2(source_file, dest_file)
                 codex_files.append(str(dest_file))
-                print(f"  Copied {codex_filename} from examples/demo")
+                print(f"  Copied {codex_filename} from {examples_demo_dir}")
             else:
-                print(f"  Warning: {codex_filename} not found in examples/demo")
+                print(f"  Warning: {codex_filename} not found in {examples_demo_dir}")
         
         return codex_files
 
@@ -479,6 +483,7 @@ def main():
     parser.add_argument("--seed", type=int, help="Random seed for reproducible generation")
     parser.add_argument("--output-dir", type=str, default=REALM_FOLDER, help="Output directory")
     parser.add_argument("--realm-name", type=str, default="Generated Demo Realm", help="Name of the realm")
+    parser.add_argument("--demo-folder", type=str, default=None, help="Demo folder name (e.g., realm1, realm2)")
     
     args = parser.parse_args()
     
@@ -489,10 +494,17 @@ def main():
     # Generate data
     generator = RealmGenerator(args.seed)
     
-    # Copy manifest.json from examples/demo and update realm name
+    # Copy manifest.json from examples/demo/{demo_folder} and update realm name
     script_dir = Path(__file__).parent
     repo_root = script_dir.parent
-    demo_manifest = repo_root / "examples" / "demo" / "manifest.json"
+    
+    # Determine the demo folder path
+    if args.demo_folder:
+        demo_base_dir = repo_root / "examples" / "demo" / args.demo_folder
+    else:
+        demo_base_dir = repo_root / "examples" / "demo"
+    
+    demo_manifest = demo_base_dir / "manifest.json"
     
     if demo_manifest.exists():
         # Load the demo manifest
@@ -542,7 +554,7 @@ def main():
     print(f"Generated realm data saved to: {json_file}")
     
     # Generate codex files only for full realm generation
-    codex_files = generator.generate_codex_files(output_dir)
+    codex_files = generator.generate_codex_files(output_dir, args.demo_folder)
     print(f"\nGenerated {len(codex_files)} codex files:")
     for file in codex_files:
         print(f"- {file}")

@@ -1,0 +1,12 @@
+{
+  "name": "Realm 2",
+  "entity_method_overrides": [
+    {
+      "entity": "User",
+      "method": "user_register_posthook",
+      "type": "staticmethod",
+      "implementation": "Codex.user_registration_hook_codex.user_register_posthook",
+      "description": "Custom post-registration hook for new users"
+    }
+  ]
+}
