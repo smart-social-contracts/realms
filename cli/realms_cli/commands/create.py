@@ -79,9 +79,12 @@ def _generate_single_realm(
                 str(realm_output),
                 "--realm-name",
                 realm_name,
-                "--demo-folder",
-                realm_folder,
             ]
+            
+            # Only pass --demo-folder if it exists (for multi-realm mundus with demo folders)
+            demo_realm_dir = repo_root / "examples" / "demo" / realm_folder
+            if demo_realm_dir.exists():
+                cmd.extend(["--demo-folder", realm_folder])
             
             if seed:
                 cmd.extend(["--seed", str(seed)])
