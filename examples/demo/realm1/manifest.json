@@ -1,6 +1,6 @@
 {
   "name": "Realm 1",
-  "logo": "logo.svg",
+  "logo": "realm1_logo.svg",
   "entity_method_overrides": [
     {
       "entity": "User",

@@ -39,8 +39,17 @@ def register_realm(
         # Auto-derive URL if not provided
         if not realm_url:
             # Use the current canister ID as base
-            realm_url = f"{ic.id()}.icp0.io"
+            realm_url = f"https://{ic.id()}.icp0.io"
             logger.info(f"Auto-derived realm URL: {realm_url}")
+        elif not realm_url.startswith("http"):
+            # Add protocol if missing
+            realm_url = f"https://{realm_url}"
+        
+        # Construct full logo URL if it's just a filename
+        if realm_logo and not realm_logo.startswith("http"):
+            # Assume it's a relative path, make it absolute
+            realm_logo = f"{realm_url}/{realm_logo}"
+            logger.info(f"Constructed full logo URL: {realm_logo}")
 
         # Make inter-canister call to registry backend
         # The add_realm function signature is: add_realm(realm_id: text, name: text, url: text, logo: text) -> AddRealmResult

@@ -20,6 +20,11 @@ if realm:
         
         realm.manifest_data = json.dumps(realm_manifest)
         
+        # Update realm name if present in manifest
+        if "name" in manifest:
+            realm.name = manifest["name"]
+            ic.print(f"✅ Realm name set to: {manifest['name']}")
+        
         # Update realm logo if present in manifest
         if "logo" in manifest:
             realm.logo = manifest["logo"]
