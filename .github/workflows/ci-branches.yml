@@ -225,7 +225,7 @@ jobs:
           - name: "API Basics"
             tests: "test_status_api.py test_extensions_api.py test_ggg_entities_api.py"
           - name: "Task Management"
-            tests: "test_task_manager_api.py test_scheduled_tasks.py test_multi_step_tasks.py"
+            tests: "test_task_manager_api.py test_scheduled_tasks.py"
           - name: "System Operations"
             tests: "test_db_command.py test_shell_command.py"
     steps:
@@ -272,19 +272,21 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }} \
             python3 tests/backend/test_realm_registry.py
 
-  test-tasks:
-    runs-on: ubuntu-latest
-    needs: build
-    if: "!contains(github.event.head_commit.message, 'Bump version')"
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      
-      - name: Run multi-step task tests
-        run: |
-          docker run --rm \
-            ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }} \
-            python3 tests/backend/test_multi_step_tasks.py
+  # test-tasks disabled - test_multi_step_tasks.py does not exist
+  # Re-enable when multi-step task tests are implemented
+  # test-tasks:
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   if: "!contains(github.event.head_commit.message, 'Bump version')"
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v3
+  #     
+  #     - name: Run multi-step task tests
+  #       run: |
+  #         docker run --rm \
+  #           ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }} \
+  #           python3 tests/backend/test_multi_step_tasks.py
 
   test-ui-e2e:
     runs-on: ubuntu-latest

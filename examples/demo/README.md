@@ -1,63 +1,104 @@
-# Demo Realm Configuration Files
+# Demo Mundus - Multi-Realm Configuration
 
-This folder contains sample configuration and codex files used by the `realms create` command to generate demo realm instances.
+This folder contains the configuration for a complete demo "mundus" (multi-realm ecosystem) with multiple interconnected realms and a central registry.
 
-## Configuration Files
+## Structure
 
-### `manifest.json`
-Realm configuration with entity method overrides:
-- Defines the realm name (updated dynamically during generation)
-- Specifies entity method overrides (e.g., `user_register_posthook`)
-- Links to custom codex implementations for lifecycle hooks
+```
+examples/demo/
+├── manifest.json          # Top-level manifest defining realms and registries
+├── realm1/               # First demo realm
+│   ├── manifest.json     # Realm-specific configuration
+│   ├── adjustments.py    # Post-deployment script
+│   ├── README.md         # Realm documentation
+│   └── *.py             # Codex files (tax, benefits, governance, etc.)
+├── realm2/               # Second demo realm
+│   └── [same structure as realm1]
+├── realm3/               # Third demo realm
+│   └── [same structure as realm1]
+└── registry/             # Central registry
+    └── manifest.json     # Registry configuration
+```
 
-### `adjustments.py`
-Post-deployment adjustment script:
-- Loads `manifest.json` and applies entity method overrides to the Realm
-- Prints entity counts for verification (Realm, Treasury, Users, Codex, etc.)
-- Runs after data upload to configure the deployed realm canister
+## Top-Level Manifest
 
-## Codex Files
+The `manifest.json` in this folder defines:
+- **realms**: List of realm subdirectories to deploy
+- **registries**: List of registry subdirectories to deploy
+- **name**: Name of the overall mundus
 
-### 1. `tax_collection_codex.py`
-Automated tax collection system with progressive tax rates:
-- Calculates taxes based on user income from transfers
-- Progressive rates: 10% (≤10K), 20% (≤50K), 30% (>50K)
-- Automatically creates tax payment transfers to the system account
-
-### 2. `social_benefits_codex.py`
-Social benefits distribution system:
-- Checks member eligibility based on residence, tax compliance, and identity verification
-- Calculates benefit amounts based on member status
-- Automatically distributes benefits to eligible members
-
-### 3. `governance_automation_codex.py`
-Democratic governance automation:
-- Creates and manages governance proposals
-- Processes votes and determines outcomes
-- Tallies results and closes proposals after voting deadline
-
-### 4. `user_registration_hook_codex.py`
-Custom user registration hook:
-- Overrides the default `user_register_posthook` method
-- Creates a 1 ckBTC welcome invoice for new users
-- Invoice expires in 5 minutes with unique subaccount
+```json
+{
+  "realms": ["realm1", "realm2", "realm3"],
+  "registries": ["registry"],
+  "name": "Demo Mundus"
+}
+```
 
 ## Usage
 
-These files are automatically copied when running:
-```bash
-realms create --random --members 100 --organizations 10
+When running `realms create`, the command reads this manifest and generates:
+
+### Output Structure
+```
+{output_dir}/
+├── realms/
+│   ├── realm1/
+│   │   ├── manifest.json
+│   │   ├── realm_data.json
+│   │   ├── scripts/
+│   │   └── *.py (codex files)
+│   ├── realm2/
+│   │   └── [same structure]
+│   └── realm3/
+│       └── [same structure]
+└── registries/
+    └── registry/
+        └── manifest.json
 ```
 
-The `realm_generator.py` script copies these files from `examples/demo/` to the generated realm directory, where they can be imported into the realm canister.
+### Command Example
+```bash
+# Generate all realms and registry
+realms create --random --members 50 --output-dir ./my-mundus
+
+# This will create:
+# - 3 realms (realm1, realm2, realm3) each with 50 members
+# - 1 registry
+# - All configured according to examples/demo/
+```
+
+## Realm Configuration
+
+Each realm subfolder contains:
+
+### Configuration Files
+- **manifest.json**: Realm name and entity method overrides
+- **adjustments.py**: Post-deployment script that applies manifest settings
+- **README.md**: Documentation specific to that realm
+
+### Codex Files
+- **tax_collection_codex.py**: Progressive tax system
+- **social_benefits_codex.py**: Social benefits distribution
+- **governance_automation_codex.py**: Democratic governance
+- **user_registration_hook_codex.py**: Custom registration hooks
+
+## Registry Configuration
+
+The registry acts as a central coordinator for the mundus, managing:
+- Cross-realm identity verification
+- Shared resources and standards
+- Inter-realm communication
 
 ## Customization
 
-You can modify these files to create your own demo scenarios:
-1. Edit the codex files in this folder
-2. Run `realms create` to generate a new realm with your custom codex files
-3. The updated files will be automatically copied to your new realm
+To customize the demo mundus:
+
+1. **Add/Remove Realms**: Edit `manifest.json` and create corresponding folders
+2. **Modify Realm Settings**: Edit individual realm manifests and codex files
+3. **Change Data Generation**: Adjust command-line parameters (--members, --organizations, etc.)
+4. **Configure Registry**: Edit `registry/manifest.json`
 
 ## Single Source of Truth
 
-These files serve as the canonical examples for realm codex automation. Any changes made here will automatically propagate to all newly created demo realms, ensuring consistency and maintainability.
+This folder serves as the canonical demo configuration. Any changes made here will automatically propagate to all newly created mundus instances via the `realms create` command.

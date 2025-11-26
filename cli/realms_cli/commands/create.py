@@ -18,6 +18,95 @@ from .deploy import _deploy_realm_internal
 console = Console()
 
 
+def _generate_single_realm(
+    realm_name: str,
+    realm_folder: str,
+    output_path: Path,
+    repo_root: Path,
+    random: bool,
+    members: int,
+    organizations: int,
+    transactions: int,
+    disputes: int,
+    seed: Optional[int],
+) -> None:
+    """Generate a single realm with its data and configuration."""
+    console.print(f"\n[bold cyan]  📦 Generating {realm_name}...[/bold cyan]")
+    
+    # Create realm output directory
+    realm_output = output_path / realm_folder
+    realm_output.mkdir(parents=True, exist_ok=True)
+    
+    # Copy manifest from examples/demo/{realm_folder}/
+    demo_realm_dir = repo_root / "examples" / "demo" / realm_folder
+    demo_manifest = demo_realm_dir / "manifest.json"
+    
+    if demo_manifest.exists():
+        # Copy manifest
+        with open(demo_manifest, 'r') as f:
+            manifest_data = json.load(f)
+        
+        # Optionally override name if different
+        if "name" not in manifest_data or manifest_data["name"] != realm_name:
+            manifest_data["name"] = realm_name
+        
+        manifest_path = realm_output / "manifest.json"
+        with open(manifest_path, "w") as f:
+            json.dump(manifest_data, f, indent=2)
+            f.write("\n")
+        console.print(f"     ✅ Copied manifest from {demo_realm_dir}")
+    else:
+        console.print(f"     ⚠️  Warning: No manifest found in {demo_realm_dir}")
+    
+    if random:
+        # Generate random data for this realm
+        try:
+            scripts_path = get_scripts_path()
+            generator_script = scripts_path / "realm_generator.py"
+            
+            cmd = [
+                "python3",
+                str(generator_script),
+                "--members",
+                str(members),
+                "--organizations",
+                str(organizations),
+                "--transactions",
+                str(transactions),
+                "--disputes",
+                str(disputes),
+                "--output-dir",
+                str(realm_output),
+                "--realm-name",
+                realm_name,
+            ]
+            
+            # Only pass --demo-folder if it exists (for multi-realm mundus with demo folders)
+            demo_realm_dir = repo_root / "examples" / "demo" / realm_folder
+            if demo_realm_dir.exists():
+                cmd.extend(["--demo-folder", realm_folder])
+            
+            if seed:
+                cmd.extend(["--seed", str(seed)])
+            
+            # Run in Docker if in image mode, otherwise run locally
+            if is_repo_mode():
+                result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path.cwd())
+            else:
+                result = run_in_docker(cmd, working_dir=Path.cwd())
+            
+            if result.returncode != 0:
+                console.print(f"[red]     ❌ Error generating data for {realm_name}:[/red]")
+                console.print(f"[red]{result.stderr}[/red]")
+                raise typer.Exit(1)
+            
+            console.print(f"[green]     ✅ Generated random data for {realm_name}[/green]")
+        
+        except Exception as e:
+            console.print(f"[red]     ❌ Error: {e}[/red]")
+            raise typer.Exit(1)
+
+
 def create_command(
     random: bool,
     members: int,
@@ -33,10 +122,10 @@ def create_command(
     identity: Optional[str] = None,
     mode: str = "upgrade",
 ) -> None:
-    """Create a new realm with deployment scripts. Use random=True to generate realistic demo data."""
-    console.print(f"[bold blue]🏛️  Creating Realm: {realm_name}[/bold blue]\n")
+    """Create a new realm (or mundus with multiple realms) with deployment scripts."""
+    console.print(f"[bold blue]🏛️  Creating Mundus: {realm_name}[/bold blue]\n")
     if no_extensions:
-        console.print("[yellow]⚠️  Creating base realm without extensions[/yellow]\n")
+        console.print("[yellow]⚠️  Creating base realms without extensions[/yellow]\n")
 
     # Check if output directory already exists and contains files
     output_path = Path(output_dir)
@@ -56,107 +145,135 @@ def create_command(
     # Create output directory
     output_path.mkdir(exist_ok=True)
 
-    # Create scripts subdirectory
-    scripts_dir = output_path / "scripts"
-    scripts_dir.mkdir(exist_ok=True)
-
-    # Copy realm manifest from examples/demo and update realm name
-    # Note: If random=True, realm_generator.py will overwrite this with its own copy
+    # Read the demo manifest to get realms and registries configuration
     scripts_path = get_scripts_path()
     repo_root = scripts_path.parent
-    demo_manifest = repo_root / "examples" / "demo" / "manifest.json"
+    demo_manifest_path = repo_root / "examples" / "demo" / "manifest.json"
     
-    manifest_path = output_path / "manifest.json"
+    mundus_config = None
+    is_simple_mode = False
     
-    if demo_manifest.exists():
-        # Copy from demo and update realm name
-        with open(demo_manifest, 'r') as f:
-            manifest_data = json.load(f)
-        manifest_data["name"] = realm_name
-        with open(manifest_path, "w") as f:
-            json.dump(manifest_data, f, indent=2)
-            f.write("\n")  # Add trailing newline
-        console.print(f"📄 Copied manifest from examples/demo: {manifest_path.absolute()}")
+    if demo_manifest_path.exists():
+        with open(demo_manifest_path, 'r') as f:
+            mundus_config = json.load(f)
+        
+        # Copy mundus manifest to output
+        mundus_manifest_path = output_path / "manifest.json"
+        mundus_config_copy = mundus_config.copy()
+        mundus_config_copy["name"] = realm_name  # Use provided name
+        with open(mundus_manifest_path, "w") as f:
+            json.dump(mundus_config_copy, f, indent=2)
+            f.write("\n")
+        console.print(f"📄 Copied mundus manifest: {mundus_manifest_path.absolute()}")
     else:
-        # Fallback to hardcoded manifest
-        manifest_data = {
-            "name": realm_name,
-            "entity_method_overrides": [
-                {
-                    "entity": "User",
-                    "method": "user_register_posthook",
-                    "type": "staticmethod",
-                    "implementation": "Codex.user_registration_hook_codex.user_register_posthook",
-                    "description": "Custom post-registration hook for new users"
-                }
-            ]
-        }
-        with open(manifest_path, "w") as f:
-            json.dump(manifest_data, f, indent=2)
-            f.write("\n")  # Add trailing newline
-        console.print(f"📄 Created realm manifest: {manifest_path.absolute()}")
-
-    console.print(f"📁 Output directory: {output_path.absolute()}")
-    console.print(f"📁 Scripts directory: {scripts_dir.absolute()}")
-
-    if random:
-        console.print("🎲 Generating random data...")
-        console.print(f"   👥 Members: {members}")
-        console.print(f"   🏢 Organizations: {organizations}")
-        console.print(f"   💰 Transactions: {transactions}")
-        console.print(f"   ⚖️  Disputes: {disputes}")
-        if seed:
-            console.print(f"   🌱 Seed: {seed}")
-
-        # Call the realm_generator.py script
-        try:
-            scripts_path = get_scripts_path()
-            generator_script = scripts_path / "realm_generator.py"
-            
-            cmd = [
-                "python3",
-                str(generator_script),
-                "--members",
-                str(members),
-                "--organizations",
-                str(organizations),
-                "--transactions",
-                str(transactions),
-                "--disputes",
-                str(disputes),
-                "--output-dir",
-                str(output_path),
-                "--realm-name",
-                realm_name,
-            ]
-
+        console.print(f"[yellow]⚠️  Warning: No demo manifest found at {demo_manifest_path}[/yellow]")
+        console.print("[dim]Creating simple single-realm (backward compatibility mode)[/dim]")
+        is_simple_mode = True
+        
+        # In backward compatibility mode, generate directly to output_path
+        # This is for CLI Docker tests and simple single-realm generation
+        if random:
+            console.print("\n🎲 Generating random data...")
+            console.print(f"   👥 Members: {members}")
+            console.print(f"   🏢 Organizations: {organizations}")
+            console.print(f"   💰 Transactions: {transactions}")
+            console.print(f"   ⚖️  Disputes: {disputes}")
             if seed:
-                cmd.extend(["--seed", str(seed)])
+                console.print(f"   🌱 Seed: {seed}")
+        
+        # Generate simple realm directly to output_path (no mundus structure)
+        _generate_single_realm(
+            realm_name=realm_name,
+            realm_folder=output_path.name,  # Use output dir name as folder
+            output_path=output_path.parent,  # Parent dir, so output_path/name = original output_path
+            repo_root=repo_root,
+            random=random,
+            members=members,
+            organizations=organizations,
+            transactions=transactions,
+            disputes=disputes,
+            seed=seed,
+        )
+        
+        console.print("\n[green]✅ Simple realm generated successfully[/green]")
 
-            console.print(f"[dim]Running: {' '.join(cmd)}[/dim]")
-            
-            # Run in Docker if in image mode, otherwise run locally
-            if is_repo_mode():
-                result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path.cwd())
+    if not is_simple_mode:
+        # Multi-realm mundus mode: Create realms directory
+        realms_dir = output_path / "realms"
+        realms_dir.mkdir(exist_ok=True)
+        console.print(f"📁 Output directory: {output_path.absolute()}")
+        console.print(f"📁 Realms directory: {realms_dir.absolute()}")
+
+        # Generate each realm
+        if random:
+            console.print("\n🎲 Generating random data for realms...")
+            console.print(f"   👥 Members per realm: {members}")
+            console.print(f"   🏢 Organizations per realm: {organizations}")
+            console.print(f"   💰 Transactions per realm: {transactions}")
+            console.print(f"   ⚖️  Disputes per realm: {disputes}")
+            if seed:
+                console.print(f"   🌱 Seed: {seed}")
+
+        realms_list = mundus_config.get("realms", [])
+        console.print(f"\n[bold]📦 Generating {len(realms_list)} realm(s)...[/bold]")
+        
+        for realm_folder in realms_list:
+            # Use the folder name as the realm name by default
+            # Read the manifest to get the proper name
+            demo_realm_manifest = repo_root / "examples" / "demo" / realm_folder / "manifest.json"
+            if demo_realm_manifest.exists():
+                with open(demo_realm_manifest, 'r') as f:
+                    realm_manifest = json.load(f)
+                    current_realm_name = realm_manifest.get("name", realm_folder.capitalize())
             else:
-                console.print("[dim]Running in Docker image mode...[/dim]")
-                result = run_in_docker(cmd, working_dir=Path.cwd())
+                current_realm_name = realm_folder.capitalize()
+            
+            _generate_single_realm(
+                realm_name=current_realm_name,
+                realm_folder=realm_folder,
+                output_path=realms_dir,
+                repo_root=repo_root,
+                random=random,
+                members=members,
+                organizations=organizations,
+                transactions=transactions,
+                disputes=disputes,
+                seed=seed,
+            )
 
-            if result.returncode != 0:
-                console.print("[red]❌ Error generating realm data:[/red]")
-                console.print(f"[red]{result.stderr}[/red]")
-                if result.stdout:
-                    console.print(f"Output: {result.stdout}")
-                raise typer.Exit(1)
+        # Generate registries
+        registries_list = mundus_config.get("registries", [])
+        if registries_list:
+            console.print(f"\n[bold]🏛️  Generating {len(registries_list)} registr(y/ies)...[/bold]")
+            registries_dir = output_path / "registries"
+            registries_dir.mkdir(exist_ok=True)
+            
+            for registry_folder in registries_list:
+                console.print(f"\n[bold cyan]  📦 Generating {registry_folder}...[/bold cyan]")
+                registry_output = registries_dir / registry_folder
+                registry_output.mkdir(parents=True, exist_ok=True)
+                
+                # Copy registry manifest
+                demo_registry_dir = repo_root / "examples" / "demo" / registry_folder
+                demo_registry_manifest = demo_registry_dir / "manifest.json"
+                
+                if demo_registry_manifest.exists():
+                    shutil.copy2(demo_registry_manifest, registry_output / "manifest.json")
+                    console.print(f"     ✅ Copied registry manifest")
+                else:
+                    console.print(f"     ⚠️  Warning: No manifest found for {registry_folder}")
 
-            console.print("[green]✅ Realm data generated successfully[/green]")
-
-        except Exception as e:
-            console.print(f"[red]❌ Error running realm generator: {e}[/red]")
-            raise typer.Exit(1)
+        console.print("\n[green]✅ All realms and registries generated successfully[/green]")
+    else:
+        # Simple mode - skip registries
+        pass
 
     # Copy deployment scripts from existing files
     console.print("\n🔧 Generating deployment scripts...")
+
+    # Create scripts subdirectory in output
+    scripts_dir = output_path / "scripts"
+    scripts_dir.mkdir(exist_ok=True)
 
     # Get scripts path (auto-detects repo vs image mode)
     scripts_path = get_scripts_path()
@@ -445,16 +562,61 @@ ic.print("len(Codex.instances()) = %d" % len(Codex.instances()))
         console.print("   The data upload script (3-upload-data.sh) requires the [bold]admin_dashboard[/bold] extension.")
         console.print("   To upload data, you must first install extensions or manually load the data.")
     
-    console.print("\n[bold]Next Steps:[/bold]")
-    console.print("realms deploy")
-
     if deploy:
         console.print("\n[yellow]🚀 Auto-deployment requested...[/yellow]")
         try:
-            # Call internal deployment function directly to ensure network parameter is passed
-            _deploy_realm_internal(
-                config_file=None, folder=output_dir, network=network, clean=False, identity=identity, mode=mode
-            )
+            # Deploy all realms and registries defined in the mundus manifest
+            if mundus_config:
+                import subprocess
+                
+                # Build list of canisters to deploy
+                canisters_to_deploy = []
+                
+                # Add realm canisters
+                for realm_folder in mundus_config.get("realms", []):
+                    canisters_to_deploy.append(f"{realm_folder}_backend")
+                    canisters_to_deploy.append(f"{realm_folder}_frontend")
+                
+                # Add registry canisters
+                for registry_folder in mundus_config.get("registries", []):
+                    # Registry uses realm_registry_backend/frontend naming
+                    if registry_folder == "registry":
+                        canisters_to_deploy.append("realm_registry_backend")
+                        canisters_to_deploy.append("realm_registry_frontend")
+                
+                if canisters_to_deploy:
+                    console.print(f"\n[bold]Deploying {len(canisters_to_deploy)} canisters:[/bold]")
+                    
+                    # Deploy each canister one by one
+                    deployed_count = 0
+                    for canister in canisters_to_deploy:
+                        console.print(f"\n  🚀 Deploying {canister}...")
+                        
+                        # Build dfx deploy command for single canister
+                        cmd = ["dfx", "deploy", canister]
+                        if network and network != "local":
+                            cmd.extend(["--network", network])
+                        if mode == "install":
+                            cmd.append("--mode=install")
+                        
+                        result = subprocess.run(cmd, cwd=Path.cwd(), capture_output=True, text=True)
+                        
+                        if result.returncode != 0:
+                            console.print(f"[red]     ❌ Failed to deploy {canister}[/red]")
+                            console.print(f"[red]{result.stderr}[/red]")
+                            raise typer.Exit(1)
+                        else:
+                            deployed_count += 1
+                            console.print(f"[green]     ✅ {canister} deployed ({deployed_count}/{len(canisters_to_deploy)})[/green]")
+                    
+                    console.print(f"\n[green]✅ All {deployed_count} canisters deployed successfully![/green]")
+                else:
+                    console.print("[yellow]⚠️  No canisters to deploy[/yellow]")
+            else:
+                # Fallback to old single-realm deployment
+                _deploy_realm_internal(
+                    config_file=None, folder=output_dir, network=network, clean=False, identity=identity, mode=mode
+                )
         except typer.Exit as e:
             console.print(
                 f"[red]❌ Auto-deployment failed with exit code: {e.exit_code}[/red]"
@@ -463,3 +625,22 @@ ic.print("len(Codex.instances()) = %d" % len(Codex.instances()))
         except Exception as e:
             console.print(f"[red]❌ Auto-deployment failed: {e}[/red]")
             raise typer.Exit(1)
+    else:
+        console.print("\n[bold]Next Steps:[/bold]")
+        # Show the appropriate deploy command
+        if mundus_config and len(mundus_config.get("realms", [])) > 1:
+            # Multi-realm mundus
+            console.print("Deploy all canisters with one of these options:\n")
+            console.print("[bold]Option 1:[/bold] Use the create command with --deploy flag")
+            console.print("  realms create --deploy --output-dir ./demo-mundus --realm-name \"My Mundus\"\n")
+            console.print("[bold]Option 2:[/bold] Deploy each canister manually:")
+            canisters = []
+            for realm_folder in mundus_config.get("realms", []):
+                canisters.extend([f"{realm_folder}_backend", f"{realm_folder}_frontend"])
+            for registry_folder in mundus_config.get("registries", []):
+                if registry_folder == "registry":
+                    canisters.extend(["realm_registry_backend", "realm_registry_frontend"])
+            for canister in canisters:
+                console.print(f"  dfx deploy {canister}")
+        else:
+            console.print("realms deploy")

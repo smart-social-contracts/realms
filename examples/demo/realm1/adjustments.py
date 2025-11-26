@@ -19,6 +19,12 @@ if realm:
         }
         
         realm.manifest_data = json.dumps(realm_manifest)
+        
+        # Update realm logo if present in manifest
+        if "logo" in manifest:
+            realm.logo = manifest["logo"]
+            ic.print(f"✅ Realm logo set to: {manifest['logo']}")
+        
         ic.print(f"✅ Realm.manifest_data updated with entity method overrides from manifest.json")
     except FileNotFoundError:
         ic.print(f"⚠️  manifest.json not found at {manifest_path}, skipping manifest update")
