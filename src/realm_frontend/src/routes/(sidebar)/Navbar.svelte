@@ -6,6 +6,8 @@
 	import { _ } from 'svelte-i18n';
 	import { isAuthenticated } from '$lib/stores/auth';
 	import { hasJoined, profilesLoading } from '$lib/stores/profiles';
+	import { realmInfo, realmLogo, realmName } from '$lib/stores/realmInfo';
+	import { onMount } from 'svelte';
 	import {
 		DarkMode,
 		Dropdown,
@@ -25,6 +27,11 @@
 	export let fluid = true;
 	export let drawerHidden = false;
 	export let list = false;
+	
+	// Fetch realm info on mount
+	onMount(() => {
+		realmInfo.fetch();
+	});
 </script>
 
 <Navbar {fluid} class="text-black relative z-50" color="default" let:NavContainer style="pointer-events: auto;">
@@ -34,14 +41,14 @@
 	/>
 	<NavBrand href="/" class="{list ? 'w-40' : 'lg:w-60'} relative z-40 cursor-pointer">
 		<img
-			src="/images/logo_horizontal.svg"
+			src={$realmLogo || "/images/logo_horizontal.svg"}
 			class="h-8 sm:h-10 pointer-events-none"
-			alt="Realms Logo"
+			alt={$realmName || "Realms Logo"}
 		/>
 		<span
 			class="ml-px self-center whitespace-nowrap text-xl font-semibold dark:text-white sm:text-2xl pointer-events-none"
 		>
-			<!-- Flowbite -->
+			<!-- {$realmName || ''} -->
 		</span>
 	</NavBrand>
 	<div class="hidden lg:block lg:ps-3">
