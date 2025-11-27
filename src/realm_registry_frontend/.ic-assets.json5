@@ -1,0 +1,8 @@
+[
+  {
+    "match": "**/*",
+    "headers": {
+      "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.icp0.io https://*.ic0.app; font-src 'self' data:; connect-src 'self' https://*.icp0.io https://*.ic0.app; frame-ancestors 'none';"
+    }
+  }
+]

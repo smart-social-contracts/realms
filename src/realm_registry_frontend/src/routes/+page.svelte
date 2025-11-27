@@ -10,7 +10,7 @@
   let searchQuery = '';
   let filteredRealms = [];
   let showAddForm = false;
-  let newRealm = { id: '', name: '', url: '' };
+  let newRealm = { id: '', name: '', url: '', logo: '' };
   let addingRealm = false;
   let selectedRealm = null;
   let showDrawer = false;
@@ -76,10 +76,10 @@
     try {
       addingRealm = true;
       error = null;
-      const result = await backend.add_realm(newRealm.id, newRealm.name, newRealm.url);
+      const result = await backend.add_realm(newRealm.id, newRealm.name, newRealm.url, newRealm.logo);
       
       if (result.Ok) {
-        newRealm = { id: '', name: '', url: '' };
+        newRealm = { id: '', name: '', url: '', logo: '' };
         showAddForm = false;
         await loadRealms();
       } else {
@@ -156,8 +156,18 @@
     selectedRealm = null;
   }
 
+  function ensureProtocol(url) {
+    if (!url) return '';
+    // If URL already has a protocol, return as-is
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    // Otherwise add https://
+    return `https://${url}`;
+  }
+
   function getPublicLink(realm) {
-    return realm.url ? `https://${realm.url}` : `${window.location.origin}/realm/${realm.id}`;
+    return realm.url ? ensureProtocol(realm.url) : `${window.location.origin}/realm/${realm.id}`;
   }
 
   async function copyLink(realm) {
@@ -255,6 +265,12 @@
           bind:value={newRealm.url}
           class="form-input"
         />
+        <input
+          type="text"
+          placeholder="Logo URL (optional)"
+          bind:value={newRealm.logo}
+          class="form-input"
+        />
       </div>
       <div class="form-actions">
         <button 
@@ -302,6 +318,11 @@
         {#each filteredRealms as realm}
           <button class="realm-card" on:click={() => openRealmDetails(realm)} type="button">
             <div class="realm-header">
+              {#if realm.logo}
+                <div class="realm-logo-container">
+                  <img src={realm.logo} alt="{realm.name} logo" class="realm-logo" />
+                </div>
+              {/if}
               <div class="realm-title">
                 <h3 class="realm-name">{realm.name}</h3>
                 <div class="health-indicator" title="Click to view status">
@@ -336,7 +357,7 @@
               {#if realm.url}
                 <button 
                   class="btn btn-primary btn-sm"
-                  on:click={() => window.open(`https://${realm.url}`, '_blank')}
+                  on:click={() => window.open(ensureProtocol(realm.url), '_blank')}
                 >
                   Visit
                 </button>
@@ -703,6 +724,19 @@
 
   .realm-header {
     margin-bottom: 1rem;
+  }
+
+  .realm-logo-container {
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: center;
+  }
+
+  .realm-logo {
+    max-width: 80px;
+    max-height: 80px;
+    object-fit: contain;
+    border-radius: 8px;
   }
 
   .realm-title {

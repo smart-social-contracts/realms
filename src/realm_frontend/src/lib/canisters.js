@@ -9,12 +9,34 @@ async function initializeImports() {
 	if (importsInitialized) return;
 
 	console.log('🏭 Loading IC backend implementations');
-	const declarationsModule = await import('declarations/realm_backend');
+	
+	// Try to load declarations in order of preference
+	const backendNames = ['realm1_backend', 'realm2_backend', 'realm3_backend', 'realm_backend'];
+	let declarationsModule = null;
+	
+	for (const backendName of backendNames) {
+		try {
+			declarationsModule = await import(`declarations/${backendName}`);
+			console.log(`✅ Loaded declarations for ${backendName}`);
+			break;
+		} catch (e) {
+			// Try next backend name
+		}
+	}
+	
+	if (declarationsModule) {
+		createActor = declarationsModule.createActor;
+		canisterId = declarationsModule.canisterId;
+	} else {
+		throw new Error('Could not load backend declarations. Please run: dfx generate');
+	}
+	
 	const agentModule = await import('@dfinity/agent');
-
-	createActor = declarationsModule.createActor;
-	canisterId = declarationsModule.canisterId;
 	HttpAgent = agentModule.HttpAgent;
+
+	if (!canisterId) {
+		throw new Error('Canister ID not found in declarations');
+	}
 
 	importsInitialized = true;
 }

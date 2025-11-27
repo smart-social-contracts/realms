@@ -46,9 +46,9 @@
 			alt={$realmName || "Realms Logo"}
 		/>
 		<span
-			class="ml-px self-center whitespace-nowrap text-xl font-semibold dark:text-white sm:text-2xl pointer-events-none"
+			class="ml-2 self-center whitespace-nowrap text-xl font-semibold dark:text-white sm:text-2xl pointer-events-none"
 		>
-			<!-- {$realmName || ''} -->
+			{$realmName || ''}
 		</span>
 	</NavBrand>
 	<div class="hidden lg:block lg:ps-3">
