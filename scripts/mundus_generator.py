@@ -132,7 +132,10 @@ def create_mundus_dfx_json(mundus_dir: Path, repo_root: Path, realms: list, regi
         new_config["canisters"][f"{realm_id}_backend"] = {
             "build": f"python -m kybra {realm_id}_backend {realm_id}/src/realm_backend/main.py",
             "candid": f"{realm_id}/src/realm_backend/realm_backend.did",
-            "declarations": {"node_compatibility": True},
+            "declarations": {
+                "output": f"{realm_id}/src/realm_frontend/src/declarations",
+                "node_compatibility": True
+            },
             "gzip": True,
             "metadata": [{"name": "candid:service"}],
             "tech_stack": {
@@ -154,7 +157,10 @@ def create_mundus_dfx_json(mundus_dir: Path, repo_root: Path, realms: list, regi
     new_config["canisters"]["realm_registry_backend"] = {
         "build": "python -m kybra realm_registry_backend registry/src/realm_registry_backend/main.py",
         "candid": "registry/src/realm_registry_backend/realm_registry_backend.did",
-        "declarations": {"node_compatibility": True},
+        "declarations": {
+            "output": "registry/src/realm_registry_frontend/src/declarations",
+            "node_compatibility": True
+        },
         "gzip": True,
         "metadata": [{"name": "candid:service"}],
         "tech_stack": {

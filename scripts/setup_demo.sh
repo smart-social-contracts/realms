@@ -3,5 +3,5 @@
 set -e
 set -x
 
-realms create --random
-realms deploy
+realms realm create --random
+realms realm deploy
