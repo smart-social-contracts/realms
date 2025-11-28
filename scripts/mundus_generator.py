@@ -67,47 +67,91 @@ def create_mundus(
     create_mundus_dfx_json(mundus_dir, repo_root, realms, registries)
     print(f"📄 Created unified dfx.json")
     
-    # Create each realm using the existing CLI command
+    # Create src directory for all canisters
+    src_dir = mundus_dir / "src"
+    src_dir.mkdir(exist_ok=True)
+    
+    # Copy extensions once to mundus root (shared by all realms)
+    extensions_src = repo_root / "extensions"
+    extensions_dest = mundus_dir / "extensions"
+    
+    if extensions_src.exists():
+        shutil.copytree(extensions_src, extensions_dest, dirs_exist_ok=True)
+        print(f"\n📁 Copied extensions source to mundus/extensions/")
+    
+    # Copy source code for each realm to flattened structure
     for realm_id in realms:
-        realm_dir = mundus_dir / realm_id
-        
         print(f"\n  📦 Creating {realm_id}...")
         
-        # Read realm manifest to get options
-        realm_manifest_path = repo_root / "examples" / "demo" / realm_id / "manifest.json"
-        realm_options = {}
-        if realm_manifest_path.exists():
-            with open(realm_manifest_path, 'r') as f:
-                realm_manifest = json.load(f)
-                realm_options = realm_manifest.get("options", {}).get("random", {})
+        # Copy backend source
+        backend_src = repo_root / "src" / "realm_backend"
+        backend_dest = src_dir / f"{realm_id}_backend"
         
-        # Build realms realm create command with manifest
-        cmd = [
-            "realms", "realm", "create",
-            "--output-dir", str(realm_dir),
-            "--realm-name", realm_id.replace("_", " ").title(),
-            "--manifest", str(realm_manifest_path)
-        ]
+        if backend_src.exists():
+            shutil.copytree(backend_src, backend_dest, dirs_exist_ok=True)
+            print(f"     ✅ Copied backend to src/{realm_id}_backend/")
         
-        try:
-            subprocess.run(cmd, check=True, capture_output=True, cwd=repo_root)
-        except subprocess.CalledProcessError as e:
-            print(f"     ❌ Error creating {realm_id}: {e}")
-            raise
+        # Copy frontend source
+        frontend_src = repo_root / "src" / "realm_frontend"
+        frontend_dest = src_dir / f"{realm_id}_frontend"
+        
+        if frontend_src.exists():
+            shutil.copytree(frontend_src, frontend_dest, dirs_exist_ok=True)
+            print(f"     ✅ Copied frontend to src/{realm_id}_frontend/")
+        
+        # Install extensions for this realm
+        if extensions_dest.exists():
+            print(f"     🔌 Installing extensions for {realm_id}...")
+            install_cmd = [
+                "realms", "extension", "install-from-source",
+                "--source-dir", str(extensions_dest),
+                "--backend-dir", str(backend_dest),
+                "--frontend-dir", str(frontend_dest)
+            ]
+            
+            try:
+                result = subprocess.run(install_cmd, check=True, capture_output=True, cwd=repo_root, text=True)
+                print(f"     ✅ Extensions installed for {realm_id}")
+            except subprocess.CalledProcessError as e:
+                print(f"     ⚠️  Warning: Extension installation failed for {realm_id}")
+                if e.stderr:
+                    print(f"        {e.stderr.strip()}")
         
         print(f"     ✅ {realm_id} created")
     
-    # Create registry
+    # Create registry in flattened structure
     print(f"\n  📦 Creating registry...")
-    create_registry(mundus_dir, repo_root)
+    
+    # Copy registry backend
+    registry_backend_src = repo_root / "src" / "realm_registry_backend"
+    registry_backend_dest = src_dir / "realm_registry_backend"
+    
+    if registry_backend_src.exists():
+        shutil.copytree(registry_backend_src, registry_backend_dest, dirs_exist_ok=True)
+        print(f"     ✅ Copied backend to src/realm_registry_backend/")
+    
+    # Copy registry frontend
+    registry_frontend_src = repo_root / "src" / "realm_registry_frontend"
+    registry_frontend_dest = src_dir / "realm_registry_frontend"
+    
+    if registry_frontend_src.exists():
+        shutil.copytree(registry_frontend_src, registry_frontend_dest, dirs_exist_ok=True)
+        print(f"     ✅ Copied frontend to src/realm_registry_frontend/")
+    
     print(f"     ✅ Registry created")
     
     print(f"\n✅ Mundus '{mundus_name}' created successfully at: {mundus_dir}\n")
     print(f"📊 Structure:")
-    print(f"  - realm1/ (independent realm)")
-    print(f"  - realm2/ (independent realm)")
-    print(f"  - realm3/ (independent realm)")
-    print(f"  - registry/ (central registry)")
+    print(f"  - extensions/ (shared by all realms)")
+    print(f"  - src/realm1_backend/ (with installed extensions)")
+    print(f"  - src/realm1_frontend/ (with installed extensions)")
+    print(f"  - src/realm2_backend/ (with installed extensions)")
+    print(f"  - src/realm2_frontend/ (with installed extensions)")
+    print(f"  - src/realm3_backend/ (with installed extensions)")
+    print(f"  - src/realm3_frontend/ (with installed extensions)")
+    print(f"  - src/realm_registry_backend/")
+    print(f"  - src/realm_registry_frontend/")
+    print(f"  - dfx.json (unified for all canisters)")
 
 
 def create_mundus_dfx_json(mundus_dir: Path, repo_root: Path, realms: list, registries: list):
@@ -130,10 +174,10 @@ def create_mundus_dfx_json(mundus_dir: Path, repo_root: Path, realms: list, regi
         
         # Backend
         new_config["canisters"][f"{realm_id}_backend"] = {
-            "build": f"python -m kybra {realm_id}_backend {realm_id}/src/realm_backend/main.py",
-            "candid": f"{realm_id}/src/realm_backend/realm_backend.did",
+            "build": f"python -m kybra {realm_id}_backend src/{realm_id}_backend/main.py",
+            "candid": f"src/{realm_id}_backend/realm_backend.did",
             "declarations": {
-                "output": f"{realm_id}/src/realm_frontend/src/declarations",
+                "output": f"src/{realm_id}_frontend/src/declarations",
                 "node_compatibility": True
             },
             "gzip": True,
@@ -148,17 +192,17 @@ def create_mundus_dfx_json(mundus_dir: Path, repo_root: Path, realms: list, regi
         
         # Frontend
         new_config["canisters"][f"{realm_id}_frontend"] = {
-            "source": [f"{realm_id}/src/realm_frontend/dist"],
+            "source": [f"src/{realm_id}_frontend/dist"],
             "type": "assets",
             "workspace": "realm_frontend"
         }
     
     # Add registry backend and frontend
     new_config["canisters"]["realm_registry_backend"] = {
-        "build": "python -m kybra realm_registry_backend registry/src/realm_registry_backend/main.py",
-        "candid": "registry/src/realm_registry_backend/realm_registry_backend.did",
+        "build": "python -m kybra realm_registry_backend src/realm_registry_backend/main.py",
+        "candid": "src/realm_registry_backend/realm_registry_backend.did",
         "declarations": {
-            "output": "registry/src/realm_registry_frontend/src/declarations",
+            "output": "src/realm_registry_frontend/src/declarations",
             "node_compatibility": True
         },
         "gzip": True,
@@ -172,7 +216,7 @@ def create_mundus_dfx_json(mundus_dir: Path, repo_root: Path, realms: list, regi
     }
     
     new_config["canisters"]["realm_registry_frontend"] = {
-        "source": ["registry/src/realm_registry_frontend/dist"],
+        "source": ["src/realm_registry_frontend/dist"],
         "type": "assets",
         "workspace": "realm_registry_frontend"
     }
@@ -186,34 +230,6 @@ def create_mundus_dfx_json(mundus_dir: Path, repo_root: Path, realms: list, regi
         json.dump(new_config, f, indent=2)
 
 
-
-
-def create_registry(mundus_dir: Path, repo_root: Path):
-    """Create the central registry by copying source code."""
-    
-    registry_dir = mundus_dir / "registry"
-    registry_dir.mkdir(exist_ok=True)
-    (registry_dir / "src").mkdir(exist_ok=True)
-    
-    # Copy registry source code
-    registry_backend_src = repo_root / "src" / "realm_registry_backend"
-    registry_frontend_src = repo_root / "src" / "realm_registry_frontend"
-    
-    if registry_backend_src.exists():
-        shutil.copytree(
-            registry_backend_src,
-            registry_dir / "src" / "realm_registry_backend",
-            dirs_exist_ok=True
-        )
-    
-    if registry_frontend_src.exists():
-        shutil.copytree(
-            registry_frontend_src,
-            registry_dir / "src" / "realm_registry_frontend",
-            dirs_exist_ok=True
-        )
-    
-    # No separate dfx.json needed - using unified dfx.json at mundus level
 
 
 def generate_realm_data(
