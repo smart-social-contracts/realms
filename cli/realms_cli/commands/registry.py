@@ -12,7 +12,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from ..utils import get_scripts_path
+from ..utils import get_scripts_path, is_repo_mode, run_in_docker
 
 console = Console()
 
@@ -279,8 +279,29 @@ def _generate_registry_dfx_json(output_path: Path, repo_root: Path) -> None:
     # Read the template dfx.json from repo root
     template_dfx = repo_root / "dfx.json"
 
-    with open(template_dfx, "r") as f:
-        dfx_config = json.load(f)
+    if template_dfx.exists():
+        # Repo mode (or running inside realms image where /app/dfx.json exists)
+        with open(template_dfx, "r") as f:
+            dfx_config = json.load(f)
+    else:
+        if is_repo_mode():
+            # In repo mode, missing dfx.json is a genuine problem
+            console.print(f"[red]❌ Template dfx.json not found at {template_dfx}[/red]")
+            raise typer.Exit(1)
+
+        # Docker mode: pull template from the realms Docker image
+        result = run_in_docker(["cat", "/app/dfx.json"], working_dir=Path.cwd())
+        if result.returncode != 0:
+            console.print("[red]❌ Failed to read template dfx.json from Docker image[/red]")
+            console.print(f"[red]{result.stderr}[/red]")
+            raise typer.Exit(1)
+        try:
+            dfx_config = json.loads(result.stdout)
+        except json.JSONDecodeError as e:
+            console.print(
+                f"[red]❌ Invalid JSON in template dfx.json from Docker image: {e}[/red]"
+            )
+            raise typer.Exit(1)
 
     # Create new config for registry
     new_config = {
