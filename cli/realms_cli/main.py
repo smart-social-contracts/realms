@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from .commands.create import create_command
+from .commands.create import create_command, realm_deploy_command
 from .commands.db import db_command, db_get_command
 from .commands.deploy import deploy_command
 from .commands.export_data import export_data_command
@@ -18,6 +18,8 @@ from .commands.ps import ps_kill_command, ps_logs_command, ps_ls_command
 from .commands.registry import (
     registry_add_command,
     registry_count_command,
+    registry_create_command,
+    registry_deploy_command,
     registry_get_command,
     registry_list_command,
     registry_remove_command,
@@ -49,8 +51,6 @@ app = typer.Typer(
     rich_markup_mode="rich",
     invoke_without_command=True,
 )
-
-
 
 
 @app.command("extension")
@@ -95,7 +95,9 @@ def import_data(
     ),
 ) -> None:
     """Import data into the realm. Supports JSON data and Python codex files."""
-    import_data_command(file_path, entity_type, format, batch_size, dry_run, network, identity)
+    import_data_command(
+        file_path, entity_type, format, batch_size, dry_run, network, identity
+    )
 
 
 @app.command("export")
@@ -104,14 +106,18 @@ def export_data(
         "exported_realm", "--output-dir", help="Output directory for exported data"
     ),
     entity_types: Optional[str] = typer.Option(
-        None, "--entity-types", help="Comma-separated list of entity types to export (default: all)"
+        None,
+        "--entity-types",
+        help="Comma-separated list of entity types to export (default: all)",
     ),
     network: str = typer.Option("local", "--network", help="Network to use for export"),
     identity: Optional[str] = typer.Option(
         None, "--identity", help="Path to identity PEM file or identity name for dfx"
     ),
     include_codexes: bool = typer.Option(
-        True, "--include-codexes/--no-codexes", help="Include codexes in export (default: True)"
+        True,
+        "--include-codexes/--no-codexes",
+        help="Include codexes in export (default: True)",
     ),
 ) -> None:
     """Export data from the realm. Saves JSON data and Python codex files."""
@@ -209,7 +215,9 @@ def mundus_create(
         "Demo Mundus", "--mundus-name", help="Name of the mundus"
     ),
     manifest: Optional[str] = typer.Option(
-        None, "--manifest", help="Path to mundus manifest.json (default: examples/demo/manifest.json)"
+        None,
+        "--manifest",
+        help="Path to mundus manifest.json (default: examples/demo/manifest.json)",
     ),
     network: str = typer.Option(
         "local", "--network", help="Target network for deployment"
@@ -221,7 +229,10 @@ def mundus_create(
         None, "--identity", help="Path to identity PEM file or identity name for dfx"
     ),
     mode: str = typer.Option(
-        "upgrade", "--mode", "-m", help="Deploy mode: 'upgrade' or 'reinstall' (wipes stable memory)"
+        "upgrade",
+        "--mode",
+        "-m",
+        help="Deploy mode: 'upgrade' or 'reinstall' (wipes stable memory)",
     ),
 ) -> None:
     """Create a new multi-realm mundus from a manifest."""
@@ -269,7 +280,9 @@ def realm_create(
         "Generated Demo Realm", "--realm-name", help="Name of the realm"
     ),
     manifest: Optional[str] = typer.Option(
-        None, "--manifest", help="Path to realm manifest.json (uses examples/demo/realm1/manifest.json if not specified and no flags provided)"
+        None,
+        "--manifest",
+        help="Path to realm manifest.json (uses examples/demo/realm1/manifest.json if not specified and no flags provided)",
     ),
     random: bool = typer.Option(
         False, "--random/--no-random", help="Generate random realm data"
@@ -278,16 +291,22 @@ def realm_create(
         None, "--members", help="Number of members to generate (overrides manifest)"
     ),
     organizations: Optional[int] = typer.Option(
-        None, "--organizations", help="Number of organizations to generate (overrides manifest)"
+        None,
+        "--organizations",
+        help="Number of organizations to generate (overrides manifest)",
     ),
     transactions: Optional[int] = typer.Option(
-        None, "--transactions", help="Number of transactions to generate (overrides manifest)"
+        None,
+        "--transactions",
+        help="Number of transactions to generate (overrides manifest)",
     ),
     disputes: Optional[int] = typer.Option(
         None, "--disputes", help="Number of disputes to generate (overrides manifest)"
     ),
     seed: Optional[int] = typer.Option(
-        None, "--seed", help="Random seed for reproducible generation (overrides manifest)"
+        None,
+        "--seed",
+        help="Random seed for reproducible generation (overrides manifest)",
     ),
     network: str = typer.Option(
         "local", "--network", help="Target network for deployment"
@@ -299,7 +318,10 @@ def realm_create(
         None, "--identity", help="Path to identity PEM file or identity name for dfx"
     ),
     mode: str = typer.Option(
-        "upgrade", "--mode", "-m", help="Deploy mode: 'upgrade' or 'reinstall' (wipes stable memory)"
+        "upgrade",
+        "--mode",
+        "-m",
+        help="Deploy mode: 'upgrade' or 'reinstall' (wipes stable memory)",
     ),
 ) -> None:
     """Create a new realm. Use --manifest for template or flags for custom configuration."""
@@ -318,6 +340,25 @@ def realm_create(
         identity,
         mode,
     )
+
+
+@realm_app.command("deploy")
+def realm_deploy(
+    realm_dir: str = typer.Option(
+        REALM_FOLDER, "--realm-dir", help="Path to realm directory"
+    ),
+    network: str = typer.Option(
+        "local", "--network", help="Target network for deployment"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="Path to identity PEM file or identity name for dfx"
+    ),
+    mode: str = typer.Option(
+        "upgrade", "--mode", "-m", help="Deploy mode: 'upgrade' or 'reinstall'"
+    ),
+) -> None:
+    """Deploy a realm by running its deployment scripts."""
+    realm_deploy_command(realm_dir, network, identity, mode)
 
 
 @realm_app.command("extension")
@@ -398,7 +439,69 @@ def realm_extension(
         raise typer.Exit(1)
 
 
-# Create registry subcommand group
+# Create top-level registry subcommand group for create/deploy
+top_registry_app = typer.Typer(
+    name="registry", help="Registry canister operations (create, deploy)"
+)
+app.add_typer(top_registry_app, name="registry")
+
+
+@top_registry_app.command("create")
+def top_registry_create(
+    output_dir: str = typer.Option(
+        ".realms/registry", "--output-dir", help="Output directory for registry"
+    ),
+    registry_name: str = typer.Option(
+        "Demo Registry", "--registry-name", help="Name of the registry"
+    ),
+    manifest: Optional[str] = typer.Option(
+        None, "--manifest", help="Path to registry manifest.json"
+    ),
+    network: str = typer.Option(
+        "local", "--network", help="Target network for deployment"
+    ),
+    deploy: bool = typer.Option(
+        False, "--deploy", help="Deploy the registry after creation"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="Path to identity PEM file or identity name for dfx"
+    ),
+    mode: str = typer.Option(
+        "upgrade", "--mode", "-m", help="Deploy mode: 'upgrade' or 'reinstall'"
+    ),
+) -> None:
+    """Create a new registry with folder structure, dfx.json and deployment scripts."""
+    registry_create_command(
+        output_dir,
+        registry_name,
+        manifest,
+        network,
+        deploy,
+        identity,
+        mode,
+    )
+
+
+@top_registry_app.command("deploy")
+def top_registry_deploy(
+    registry_dir: str = typer.Option(
+        ".realms/registry", "--registry-dir", help="Path to registry directory"
+    ),
+    network: str = typer.Option(
+        "local", "--network", help="Target network for deployment"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="Path to identity PEM file or identity name for dfx"
+    ),
+    mode: str = typer.Option(
+        "upgrade", "--mode", "-m", help="Deploy mode: 'upgrade' or 'reinstall'"
+    ),
+) -> None:
+    """Deploy a registry by running its deployment scripts."""
+    registry_deploy_command(registry_dir, network, identity, mode)
+
+
+# Create registry subcommand group under realm_app for realm registry operations
 registry_app = typer.Typer(name="registry", help="Realm registry operations")
 realm_app.add_typer(registry_app, name="registry")
 
@@ -406,13 +509,17 @@ realm_app.add_typer(registry_app, name="registry")
 @registry_app.command("add")
 def registry_add(
     realm_id: str = typer.Option(..., "--realm-id", help="Unique realm identifier"),
-    realm_name: str = typer.Option(..., "--realm-name", help="Human-readable realm name"),
-    frontend_url: str = typer.Option("", "--frontend-url", help="Frontend canister URL (optional, will auto-derive)"),
+    realm_name: str = typer.Option(
+        ..., "--realm-name", help="Human-readable realm name"
+    ),
+    frontend_url: str = typer.Option(
+        "", "--frontend-url", help="Frontend canister URL (optional, will auto-derive)"
+    ),
     network: str = typer.Option("local", "--network", "-n", help="Network to use"),
     registry_canister_id: str = typer.Option(
         "realm_registry_backend",
         "--registry-canister",
-        help="Registry canister ID or name"
+        help="Registry canister ID or name",
     ),
 ) -> None:
     """
@@ -429,12 +536,14 @@ def registry_add(
     """
     import json
     import subprocess
-    
-    console.print(Panel.fit(
-        "[bold cyan]🌐 Registering Realm with Central Registry[/bold cyan]",
-        border_style="cyan"
-    ))
-    
+
+    console.print(
+        Panel.fit(
+            "[bold cyan]🌐 Registering Realm with Central Registry[/bold cyan]",
+            border_style="cyan",
+        )
+    )
+
     # Auto-derive frontend URL if not provided
     if not frontend_url:
         try:
@@ -443,10 +552,10 @@ def registry_add(
                 capture_output=True,
                 text=True,
                 check=True,
-                timeout=5
+                timeout=5,
             )
             canister_id = result.stdout.strip()
-            
+
             # Format URL based on network
             if network == "ic":
                 frontend_url = f"{canister_id}.ic0.app"
@@ -454,53 +563,67 @@ def registry_add(
                 frontend_url = f"{canister_id}.icp0.io"
             else:  # local
                 frontend_url = f"{canister_id}.localhost:8000"
-                
+
             console.print(f"[dim]Auto-derived frontend URL: {frontend_url}[/dim]")
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
-            console.print("[yellow]⚠️  Could not auto-derive frontend URL, using empty string[/yellow]")
+            console.print(
+                "[yellow]⚠️  Could not auto-derive frontend URL, using empty string[/yellow]"
+            )
             frontend_url = ""
-    
+
     console.print(f"\n[cyan]Realm ID:[/cyan] {realm_id}")
     console.print(f"[cyan]Realm Name:[/cyan] {realm_name}")
     console.print(f"[cyan]Frontend URL:[/cyan] {frontend_url}")
     console.print(f"[dim]Network:[/dim] {network}\n")
-    
+
     # Call registry directly
     args = [f'("{realm_id}", "{realm_name}", "{frontend_url}")']
-    cmd = ["dfx", "canister", "call", "--network", network, registry_canister_id, "add_realm"]
+    cmd = [
+        "dfx",
+        "canister",
+        "call",
+        "--network",
+        network,
+        registry_canister_id,
+        "add_realm",
+    ]
     cmd.extend(args)
-    
+
     try:
         result = subprocess.run(
             cmd, capture_output=True, text=True, check=True, timeout=30
         )
-        
+
         # Parse the Candid output
         output = result.stdout.strip()
         if output.startswith("(") and output.endswith(")"):
             output = output[1:-1]
-        
+
         if "Ok" in output:
-            console.print(Panel(
-                f"[green]✅ Successfully registered realm with registry![/green]\n\n"
-                f"[cyan]Realm ID:[/cyan] {realm_id}\n"
-                f"[cyan]Realm Name:[/cyan] {realm_name}\n"
-                f"[cyan]Frontend URL:[/cyan] {frontend_url}",
-                border_style="green",
-                title="Registration Complete"
-            ))
+            console.print(
+                Panel(
+                    f"[green]✅ Successfully registered realm with registry![/green]\n\n"
+                    f"[cyan]Realm ID:[/cyan] {realm_id}\n"
+                    f"[cyan]Realm Name:[/cyan] {realm_name}\n"
+                    f"[cyan]Frontend URL:[/cyan] {frontend_url}",
+                    border_style="green",
+                    title="Registration Complete",
+                )
+            )
         elif "Err" in output:
             error_msg = output.split('"')[1] if '"' in output else output
-            console.print(Panel(
-                f"[red]❌ Registration failed[/red]\n\n"
-                f"[yellow]Error:[/yellow] {error_msg}",
-                border_style="red",
-                title="Registration Failed"
-            ))
+            console.print(
+                Panel(
+                    f"[red]❌ Registration failed[/red]\n\n"
+                    f"[yellow]Error:[/yellow] {error_msg}",
+                    border_style="red",
+                    title="Registration Failed",
+                )
+            )
             raise typer.Exit(1)
         else:
             console.print(f"[yellow]⚠️  Unexpected response:[/yellow] {output}")
-            
+
     except subprocess.CalledProcessError as e:
         console.print(f"[red]❌ Error: {e.stderr.strip()}[/red]")
         raise typer.Exit(1)
@@ -660,36 +783,34 @@ def realm_status(
         from pathlib import Path
 
         project_root = get_project_root()
-        
+
         # Initialize variables for local network
         local_port = "8000"  # Default port
         candid_ui_id = None
-        
+
         # For local network, get canister IDs dynamically from dfx
         if effective_network == "local":
             # Get list of canisters from dfx.json
             dfx_json_path = project_root / "dfx.json"
             if not dfx_json_path.exists():
-                console.print(
-                    "[yellow]⚠️  dfx.json not found in project root[/yellow]"
-                )
+                console.print("[yellow]⚠️  dfx.json not found in project root[/yellow]")
                 console.print(
                     "[dim]Make sure you're in a Realms project directory[/dim]"
                 )
                 raise typer.Exit(1)
-            
+
             with open(dfx_json_path, "r") as f:
                 dfx_config = json.load(f)
-            
+
             canister_names = list(dfx_config.get("canisters", {}).keys())
-            
+
             # Get network configuration for port
             networks_config = dfx_config.get("networks", {})
             local_network_config = networks_config.get("local", {})
             bind_address = local_network_config.get("bind", "127.0.0.1:8000")
             # Extract port from bind address (format: "127.0.0.1:8000")
             local_port = bind_address.split(":")[-1] if ":" in bind_address else "8000"
-            
+
             # Fetch canister IDs dynamically
             canister_ids = {}
             for canister_name in canister_names:
@@ -699,14 +820,14 @@ def realm_status(
                         capture_output=True,
                         text=True,
                         check=True,
-                        timeout=5
+                        timeout=5,
                     )
                     canister_id = result.stdout.strip()
                     canister_ids[canister_name] = {"local": canister_id}
                 except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
                     # Canister not deployed yet, skip it
                     continue
-            
+
             # Get Candid UI canister ID for backend URLs
             candid_ui_id = None
             try:
@@ -715,20 +836,18 @@ def realm_status(
                     capture_output=True,
                     text=True,
                     check=True,
-                    timeout=5
+                    timeout=5,
                 )
                 candid_ui_id = result.stdout.strip()
             except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
                 # Candid UI not available, will fall back to default
                 pass
-            
+
             if not canister_ids:
                 console.print(
                     "[yellow]⚠️  No canisters deployed on local network[/yellow]"
                 )
-                console.print(
-                    "[dim]Deploy canisters first with: dfx deploy[/dim]"
-                )
+                console.print("[dim]Deploy canisters first with: dfx deploy[/dim]")
                 raise typer.Exit(1)
         else:
             # For non-local networks, read from canister_ids.json
@@ -828,7 +947,9 @@ def realm_status(
 
 
 # Create db subcommand group
-db_app = typer.Typer(name="db", help="Database exploration and querying", invoke_without_command=True)
+db_app = typer.Typer(
+    name="db", help="Database exploration and querying", invoke_without_command=True
+)
 app.add_typer(db_app, name="db")
 
 
@@ -845,7 +966,7 @@ def db_callback(
     """Explore the Realm database. Use subcommands for specific operations or run without subcommand for interactive mode."""
     # Store network and canister in context for subcommands
     ctx.obj = {"network": network, "canister": canister}
-    
+
     # If no subcommand is provided, run interactive explorer
     if ctx.invoked_subcommand is None:
         db_command(network, canister)
@@ -854,11 +975,15 @@ def db_callback(
 @db_app.command("get")
 def db_get(
     ctx: typer.Context,
-    entity_type: str = typer.Argument(help="Entity type (e.g., User, Transfer, Mandate)"),
-    entity_id: Optional[str] = typer.Argument(None, help="Optional entity ID to retrieve specific entity"),
+    entity_type: str = typer.Argument(
+        help="Entity type (e.g., User, Transfer, Mandate)"
+    ),
+    entity_id: Optional[str] = typer.Argument(
+        None, help="Optional entity ID to retrieve specific entity"
+    ),
 ) -> None:
     """Get entities from the database and output as JSON.
-    
+
     Examples:
         realms db get User              # Get all users
         realms db get User user1        # Get specific user by ID
@@ -867,7 +992,7 @@ def db_get(
     # Get network and canister from context
     network = ctx.obj.get("network") if ctx.obj else None
     canister = ctx.obj.get("canister") if ctx.obj else None
-    
+
     db_get_command(entity_type, entity_id, network, canister)
 
 
@@ -903,13 +1028,18 @@ def run(
         None, "--file", "-f", help="Execute Python file instead of interactive shell"
     ),
     wait: bool = typer.Option(
-        False, "--wait", "-w", help="Wait for async tasks to complete (default 600s timeout)"
+        False,
+        "--wait",
+        "-w",
+        help="Wait for async tasks to complete (default 600s timeout)",
     ),
     wait_timeout: Optional[int] = typer.Option(
         None, "--wait-timeout", help="Custom timeout in seconds for async task waiting"
     ),
     every: Optional[int] = typer.Option(
-        None, "--every", help="Schedule task to run every N seconds (creates recurring task)"
+        None,
+        "--every",
+        help="Schedule task to run every N seconds (creates recurring task)",
     ),
     after: Optional[int] = typer.Option(
         None, "--after", help="Delay first run by N seconds (default: 5s)"
@@ -927,8 +1057,10 @@ def run(
     actual_wait = None
     if wait or wait_timeout is not None:
         actual_wait = wait_timeout if wait_timeout is not None else 0
-    
-    run_command(effective_network, effective_canister, file, actual_wait, every, after, config)
+
+    run_command(
+        effective_network, effective_canister, file, actual_wait, every, after, config
+    )
 
 
 # Create network subcommand group
@@ -1049,20 +1181,26 @@ def ps_logs(
         "table", "--output", "-o", help="Output format: 'table' or 'json'"
     ),
     follow: bool = typer.Option(
-        False, "--follow", "-f", help="Follow logs in real-time (use with Ctrl+C to stop)"
+        False,
+        "--follow",
+        "-f",
+        help="Follow logs in real-time (use with Ctrl+C to stop)",
     ),
     output_file: Optional[str] = typer.Option(
         None, "--output-file", help="Write logs to file"
     ),
     limit: int = typer.Option(
-        100, "--limit", "-l", help="Maximum number of log entries to retrieve (default: 100, max: 1000)"
+        100,
+        "--limit",
+        "-l",
+        help="Maximum number of log entries to retrieve (default: 100, max: 1000)",
     ),
     from_entry: int = typer.Option(
         0, "--from", help="Start index for pagination (default: 0)"
     ),
 ) -> None:
     """View execution logs for a task.
-    
+
     By default, shows execution history (--tail).
     Use --follow for continuous task-specific logs.
     Use --output-file to save logs to a file.
@@ -1072,15 +1210,15 @@ def ps_logs(
         network, canister
     )
     ps_logs_command(
-        task_id, 
-        effective_network, 
-        effective_canister, 
-        tail, 
+        task_id,
+        effective_network,
+        effective_canister,
+        tail,
         output,
         follow,
         output_file,
         limit,
-        from_entry
+        from_entry,
     )
 
 
@@ -1120,11 +1258,13 @@ def main(
 
     if verbose:
         console.print("[dim]Verbose mode enabled[/dim]")
-    
+
     # If no command was provided, show error and help suggestion
     if ctx.invoked_subcommand is None:
         console.print("[red]Error: No command provided.[/red]")
-        console.print("\n💡 Try running [cyan]realms --help[/cyan] to see available commands.")
+        console.print(
+            "\n💡 Try running [cyan]realms --help[/cyan] to see available commands."
+        )
         raise typer.Exit(code=1)
 
 
