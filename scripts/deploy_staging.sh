@@ -22,19 +22,27 @@ scripts/download_wasms.sh
 echo "Deploying all canisters to $NETWORK with mode $MODE"
 
 dfx deploy --network "$NETWORK" --yes realm_registry_backend --mode=$MODE
-dfx deploy --network "$NETWORK" --yes realm_backend --mode=$MODE
-dfx canister start --network "$NETWORK" realm_backend
+dfx deploy --network "$NETWORK" --yes realm1_backend --mode=$MODE
+dfx deploy --network "$NETWORK" --yes realm2_backend --mode=$MODE
+dfx deploy --network "$NETWORK" --yes realm3_backend --mode=$MODE
+dfx canister start --network "$NETWORK" realm1_backend
+dfx canister start --network "$NETWORK" realm2_backend
+dfx canister start --network "$NETWORK" realm3_backend
 dfx canister start --network "$NETWORK" realm_registry_backend
 
 dfx generate realm_registry_backend
-dfx generate realm_backend
+dfx generate realm1_backend
+dfx generate realm2_backend
+dfx generate realm3_backend
 npm install --legacy-peer-deps
 npm run prebuild --workspace realm_registry_frontend
 npm run build --workspace realm_registry_frontend
 dfx deploy --network "$NETWORK" --yes realm_registry_frontend
 npm run prebuild --workspace realm_frontend
 npm run build --workspace realm_frontend
-dfx deploy --network "$NETWORK" --yes realm_frontend
+dfx deploy --network "$NETWORK" --yes realm1_frontend
+dfx deploy --network "$NETWORK" --yes realm2_frontend
+dfx deploy --network "$NETWORK" --yes realm3_frontend
 
 echo "Verifying deployment on $NETWORK"
 python scripts/verify_deployment.py --network "$NETWORK"
