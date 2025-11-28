@@ -199,13 +199,20 @@ def create_command(
         cmd.extend(["--seed", str(realm_options["seed"])])
     
     try:
-        subprocess.run(cmd, check=True, cwd=repo_root)
+        # Suppress debug output from realm_generator (ggg.user.User objects)
+        result = subprocess.run(cmd, check=True, cwd=repo_root, capture_output=True, text=True)
+        # Only show important output (skip debug lines)
+        for line in result.stdout.split('\n'):
+            if line and not 'ggg.user.User object at' in line and not 'from_user' in line and not 'users [' in line:
+                console.print(f"[dim]{line}[/dim]")
     except subprocess.CalledProcessError as e:
         console.print(f"[red]❌ Error creating realm: {e}[/red]")
+        if e.stderr:
+            console.print(f"[red]{e.stderr}[/red]")
         raise typer.Exit(1)
     
     # Generate deployment scripts after data generation
-    _generate_deployment_scripts(output_path, network, realm_name, random, no_extensions=False)
+    _generate_deployment_scripts(output_path, network, realm_name, random, repo_root, no_extensions=False)
     
     console.print(f"\n[green]✅ Realm created successfully at: {output_path.absolute()}[/green]")
 
@@ -215,6 +222,7 @@ def _generate_deployment_scripts(
     network: str,
     realm_name: str,
     has_random_data: bool,
+    repo_root: Path,
     no_extensions: bool = False
 ):
     """Deployment script generation - kept for reference but not used."""
@@ -349,11 +357,20 @@ try:
 except Exception as e:
     print(f"   ⚠️  Could not register realm: {{e}} (continuing anyway)")
 
-# Run the adjustments script with network parameter
-realms_cmd = ['realms', 'shell', '--file', '{output_dir}/scripts/adjustments.py']
-if network != 'local':
-    realms_cmd.extend(['--network', network])
-run_dfx_command(realms_cmd)
+# Run the adjustments script with network parameter  
+adjustments_path = os.path.join(s, 'adjustments.py')
+if os.path.exists(adjustments_path):
+    print(f"\\n📝 Running adjustments script...")
+    realms_cmd = ['realms', 'shell', '--file', adjustments_path]
+    if network != 'local':
+        realms_cmd.extend(['--network', network])
+    try:
+        run_dfx_command(realms_cmd)
+        print(f"   ✅ Adjustments completed")
+    except Exception as e:
+        print(f"   ⚠️  Adjustments failed: {{e}} (continuing anyway)")
+else:
+    print(f"\\n⚠️  No adjustments.py found, skipping...")
 
 # Reload entity method overrides after adjustments
 print("\\n🔄 Reloading entity method overrides...")
