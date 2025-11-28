@@ -80,12 +80,6 @@ if [ "$NETWORK" = "local" ]; then
     # Wait for initialization
     echo "⏳ Waiting for dfx to initialize..."
     sleep 3
-    
-    # Deploy Internet Identity if it exists in dfx.json
-    if grep -q "internet_identity" dfx.json 2>/dev/null; then
-        echo "🆔 Deploying Internet Identity..."
-        dfx deploy internet_identity || echo "⚠️  Internet Identity deployment skipped"
-    fi
 fi
 
 # Get all backend canisters from dfx.json
@@ -105,10 +99,27 @@ else
     echo "   Found: $BACKENDS"
 fi
 
-# Deploy backends
+# Deploy Internet Identity FIRST (if present)
 echo ""
+if echo "$BACKENDS" | grep -q "internet_identity"; then
+    echo "🔑 Deploying Internet Identity first..."
+    if [ "$NETWORK" = "local" ]; then
+        dfx deploy internet_identity --yes
+    else
+        dfx deploy --network "$NETWORK" --yes internet_identity --mode="$MODE"
+    fi
+    dfx canister start --network "$NETWORK" internet_identity 2>/dev/null || true
+    echo ""
+fi
+
+# Deploy other backends
 echo "🔨 Deploying backend canisters..."
 for canister in $BACKENDS; do
+    # Skip internet_identity since we already deployed it
+    if [ "$canister" = "internet_identity" ]; then
+        continue
+    fi
+    
     echo "   📦 Deploying $canister..."
     if [ "$NETWORK" = "local" ]; then
         # For local, let dfx decide mode (clean = install, otherwise upgrade)
@@ -228,11 +239,7 @@ if [ "$NETWORK" = "local" ]; then
 fi
 
 echo ""
-echo "🔧 Generating TypeScript declarations..."
-dfx generate
-
-echo ""
-echo "✅ All done! Frontend ready at: http://localhost:$PORT/"
+echo "✅ All done!"
 echo ""
 
 exit 0
