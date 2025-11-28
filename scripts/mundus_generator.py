@@ -10,6 +10,7 @@ This script creates a mundus (multi-realm universe) with:
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -102,20 +103,41 @@ def create_mundus(
         # Install extensions for this realm
         if extensions_dest.exists():
             print(f"     🔌 Installing extensions for {realm_id}...")
+            
+            # Create a temporary realm structure for extension installation
+            # The extension installer expects src/ to be in the current directory
+            realm_temp_dir = mundus_dir / f"_temp_{realm_id}"
+            realm_temp_dir.mkdir(exist_ok=True)
+            
+            # Create src symlinks
+            realm_temp_src = realm_temp_dir / "src"
+            realm_temp_src.mkdir(exist_ok=True)
+            
+            # Symlink backend and frontend into temp src/
+            temp_backend = realm_temp_src / "realm_backend"
+            temp_frontend = realm_temp_src / "realm_frontend"
+            
+            if not temp_backend.exists():
+                os.symlink(backend_dest, temp_backend)
+            if not temp_frontend.exists():
+                os.symlink(frontend_dest, temp_frontend)
+            
             install_cmd = [
                 "realms", "extension", "install-from-source",
-                "--source-dir", str(extensions_dest),
-                "--backend-dir", str(backend_dest),
-                "--frontend-dir", str(frontend_dest)
+                "--source-dir", str(extensions_dest)
             ]
             
             try:
-                result = subprocess.run(install_cmd, check=True, capture_output=True, cwd=repo_root, text=True)
+                result = subprocess.run(install_cmd, check=True, capture_output=True, cwd=realm_temp_dir, text=True)
                 print(f"     ✅ Extensions installed for {realm_id}")
             except subprocess.CalledProcessError as e:
                 print(f"     ⚠️  Warning: Extension installation failed for {realm_id}")
                 if e.stderr:
                     print(f"        {e.stderr.strip()}")
+            finally:
+                # Clean up temp directory
+                if realm_temp_dir.exists():
+                    shutil.rmtree(realm_temp_dir)
         
         print(f"     ✅ {realm_id} created")
     

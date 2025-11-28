@@ -9,7 +9,6 @@
       "args": [
         "mundus",
         "create",
-        "--random",
         "--deploy"
       ],
       "cwd": "${workspaceFolder}",
