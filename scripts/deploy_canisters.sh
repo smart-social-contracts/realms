@@ -140,6 +140,12 @@ if [ -n "$BACKENDS" ]; then
         echo "   Generating for $canister..."
         dfx generate "$canister"
     done
+    
+    # Copy declarations to frontend src for Vite build
+    if [ -d "src/declarations" ] && [ -d "src/realm_frontend/src" ]; then
+        echo "   📋 Copying declarations to frontend/src..."
+        cp -r src/declarations src/realm_frontend/src/
+    fi
 fi
 
 # Install npm dependencies if package.json exists
