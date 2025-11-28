@@ -18,6 +18,8 @@ from .commands.ps import ps_kill_command, ps_logs_command, ps_ls_command
 from .commands.registry import (
     registry_add_command,
     registry_count_command,
+    registry_create_command,
+    registry_deploy_command,
     registry_get_command,
     registry_list_command,
     registry_remove_command,
@@ -568,6 +570,27 @@ def registry_count(
 ) -> None:
     """Get the total number of realms."""
     registry_count_command(network, canister_id)
+
+
+@registry_app.command("create")
+def registry_create(
+    registry_name: Optional[str] = typer.Option(None, "--name", help="Registry name"),
+    output_dir: str = typer.Option(".realms", "--output-dir", "-o", help="Base output directory"),
+    network: str = typer.Option("local", "--network", "-n", help="Network to deploy to"),
+) -> None:
+    """Create a new registry instance."""
+    registry_create_command(registry_name, output_dir, network)
+
+
+@registry_app.command("deploy")
+def registry_deploy(
+    folder: str = typer.Option(..., "--folder", "-f", help="Path to registry directory"),
+    network: str = typer.Option("local", "--network", "-n", help="Network to deploy to"),
+    mode: str = typer.Option("upgrade", "--mode", "-m", help="Deployment mode (upgrade, reinstall)"),
+    identity: Optional[str] = typer.Option(None, "--identity", help="Identity file for IC deployment"),
+) -> None:
+    """Deploy a registry instance."""
+    registry_deploy_command(folder, network, mode, identity)
 
 
 # Realm context management commands
