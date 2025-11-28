@@ -285,13 +285,14 @@ fi
 # Use the generic deployment script
 SCRIPT_DIR="$( cd "$( dirname "${{BASH_SOURCE[0]}}" )" && pwd )"
 REALM_DIR="$( dirname "$SCRIPT_DIR" )"
+DEPLOY_SCRIPT="$SCRIPT_DIR/../../../scripts/deploy_canisters.sh"
 
 # Find the deploy_canisters.sh script
-if [ -f "../../../scripts/deploy_canisters.sh" ]; then
-    bash ../../../scripts/deploy_canisters.sh "$REALM_DIR" "$NETWORK" "$MODE"
+if [ -f "$DEPLOY_SCRIPT" ]; then
+    bash "$DEPLOY_SCRIPT" "$REALM_DIR" "$NETWORK" "$MODE"
 else
     echo "❌ Error: deploy_canisters.sh not found"
-    echo "   Expected at: ../../../scripts/deploy_canisters.sh"
+    echo "   Expected at: $DEPLOY_SCRIPT"
     exit 1
 fi
 """
