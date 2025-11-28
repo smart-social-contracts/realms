@@ -74,8 +74,8 @@ if [ "$NETWORK" = "local" ]; then
     lsof -ti:$PORT | xargs kill -9 2>/dev/null || true
     dfx stop 2>/dev/null || true
     
-    # Start dfx
-    dfx start --clean --background --log file --logfile dfx.log --host 127.0.0.1:$PORT
+    # Start dfx (redirect output to avoid stdout inheritance issues)
+    dfx start --clean --background --log file --logfile dfx.log --host 127.0.0.1:$PORT >/dev/null 2>&1
     
     # Wait for initialization
     echo "⏳ Waiting for dfx to initialize..."
