@@ -10,7 +10,9 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 
-console = Console()
+from .create import create_command
+from .registry import registry_create_command
+from ..utils import console, generate_output_dir_name, get_project_root
 
 
 def mundus_create_command(
@@ -22,53 +24,196 @@ def mundus_create_command(
     identity: Optional[str],
     mode: str,
 ) -> None:
-    """Create a new multi-realm mundus from a manifest."""
+    """Create a new multi-realm mundus by calling realm and registry commands."""
     
     console.print(Panel.fit(
         "[bold cyan]🌍 Creating Mundus (Multi-Realm Universe)[/bold cyan]",
         border_style="cyan"
     ))
     
-    # Import here to avoid circular dependencies
-    from ..utils import get_project_root
-    
     project_root = get_project_root()
-    output_path = Path(output_dir)
     
-    # Ensure output directory is .realms/mundus
-    if not output_dir.endswith('.realms/mundus'):
-        output_path = project_root / '.realms' / 'mundus'
-    
-    # Run mundus_generator.py
-    cmd = [
-        "python",
-        str(project_root / "scripts" / "mundus_generator.py"),
-        "--output-dir", str(output_path),
-        "--mundus-name", mundus_name,
-    ]
-    
+    # Load manifest
     if manifest:
-        cmd.extend(["--manifest", manifest])
+        manifest_path = Path(manifest)
+    else:
+        # Use default demo mundus manifest
+        manifest_path = project_root / "examples" / "demo" / "mundus_manifest.json"
     
-    console.print(f"[dim]Running: {' '.join(cmd)}[/dim]\n")
-    
-    try:
-        result = subprocess.run(
-            cmd,
-            cwd=project_root,
-            check=True,
-            capture_output=False
-        )
-        
-        console.print(f"\n[green]✅ Mundus created successfully at:[/green] [cyan]{output_path}[/cyan]")
-        
-        if deploy:
-            console.print("\n[bold yellow]🚀 Starting deployment...[/bold yellow]\n")
-            mundus_deploy_command(str(output_path), network, identity, mode)
-            
-    except subprocess.CalledProcessError as e:
-        console.print(f"[red]❌ Error creating mundus: {e}[/red]")
+    if not manifest_path.exists():
+        console.print(f"[red]❌ Manifest not found: {manifest_path}[/red]")
         raise typer.Exit(1)
+    
+    with open(manifest_path, 'r') as f:
+        mundus_config = json.load(f)
+    
+    # Generate mundus directory with timestamp
+    dir_name = generate_output_dir_name("mundus", mundus_name)
+    base_dir = Path(output_dir)
+    mundus_dir = base_dir / dir_name
+    
+    mundus_dir.mkdir(parents=True, exist_ok=True)
+    console.print(f"📁 Mundus directory: {mundus_dir}\n")
+    
+    # Save mundus manifest
+    mundus_manifest_path = mundus_dir / "manifest.json"
+    with open(mundus_manifest_path, 'w') as f:
+        json.dump(mundus_config, f, indent=2)
+    console.print(f"📄 Saved mundus manifest\n")
+    
+    # Get realms from manifest
+    realms = mundus_config.get("realms", [])
+    console.print(f"🌍 Creating {len(realms)} realm(s) + 1 registry...\n")
+    
+    created_realms = []
+    
+    # Create each realm
+    for i, realm_config in enumerate(realms, 1):
+        realm_name = realm_config.get("name", f"Realm{i}")
+        console.print(f"  📦 Creating realm: {realm_name}...")
+        
+        # Call create_command for each realm (it will create timestamped directory)
+        # We pass the mundus directory as the base output_dir
+        try:
+            # Temporarily change to project root for realm creation
+            orig_dir = os.getcwd()
+            os.chdir(project_root)
+            
+            create_command(
+                output_dir=str(mundus_dir),
+                realm_name=realm_name,
+                manifest=None,  # Use realm config from mundus manifest
+                random=realm_config.get("random", False),
+                members=realm_config.get("members"),
+                organizations=realm_config.get("organizations"),
+                transactions=realm_config.get("transactions"),
+                disputes=realm_config.get("disputes"),
+                seed=realm_config.get("seed"),
+                network=network,
+                deploy=False,  # Don't deploy individual realms yet
+            )
+            
+            # Find the created realm directory (most recent realm_* directory)
+            realm_dirs = sorted(mundus_dir.glob("realm_*"), key=lambda p: p.stat().st_mtime)
+            if realm_dirs:
+                created_realms.append(realm_dirs[-1])
+                console.print(f"     ✅ {realm_name} created\n")
+            
+        finally:
+            os.chdir(orig_dir)
+    
+    # Create registry
+    console.print(f"  📋 Creating registry...")
+    try:
+        orig_dir = os.getcwd()
+        os.chdir(project_root)
+        
+        registry_dir = registry_create_command(
+            registry_name=mundus_config.get("registry", {}).get("name", "MainRegistry"),
+            output_dir=str(mundus_dir),
+            network=network,
+        )
+        console.print(f"     ✅ Registry created\n")
+        
+    finally:
+        os.chdir(orig_dir)
+    
+    # Create mundus deployment orchestration script
+    _create_mundus_deploy_script(mundus_dir, created_realms, registry_dir, network)
+    
+    console.print(f"\n[green]✅ Mundus '{mundus_name}' created successfully at:[/green] [cyan]{mundus_dir}[/cyan]\n")
+    console.print(f"[yellow]📝 Next steps:[/yellow]")
+    console.print(f"   1. Deploy: realms mundus deploy --folder {mundus_dir}")
+    console.print(f"   2. Or run: cd {mundus_dir} && bash scripts/deploy-all.sh\n")
+    
+    if deploy:
+        console.print("\n[bold yellow]🚀 Starting deployment...[/bold yellow]\n")
+        mundus_deploy_command(str(mundus_dir), network, identity, mode)
+
+
+def _create_mundus_deploy_script(
+    mundus_dir: Path,
+    realm_dirs: list,
+    registry_dir: Path,
+    network: str
+) -> None:
+    """Create orchestration script to deploy all realms and registry."""
+    
+    scripts_dir = mundus_dir / "scripts"
+    scripts_dir.mkdir(exist_ok=True)
+    
+    script_content = f"""#!/bin/bash
+# Mundus deployment orchestration script
+# Deploys all realms and registry in sequence
+
+set -e
+
+NETWORK="${{1:-{network}}}"
+MODE="${{2:-upgrade}}"
+
+echo "╭────────────────────────────────────────╮"
+echo "│ 🌍 Deploying Mundus                    │"
+echo "╰────────────────────────────────────────╯"
+echo "📡 Network: $NETWORK"
+echo "🔄 Mode: $MODE"
+echo ""
+
+# Get the mundus directory
+MUNDUS_DIR="$( cd "$( dirname "${{BASH_SOURCE[0]}}" )/.." && pwd )"
+
+# Deploy registry first
+echo "📋 Deploying registry..."
+REGISTRY_DIR=$(find "$MUNDUS_DIR" -maxdepth 1 -type d -name "registry_*" | head -1)
+if [ -n "$REGISTRY_DIR" ]; then
+    echo "   Directory: $REGISTRY_DIR"
+    if [ -f "$REGISTRY_DIR/scripts/2-deploy-canisters.sh" ]; then
+        bash "$REGISTRY_DIR/scripts/2-deploy-canisters.sh" "$NETWORK" "$MODE"
+        echo "   ✅ Registry deployed"
+    else
+        echo "   ⚠️  Registry deployment script not found"
+    fi
+else
+    echo "   ⚠️  No registry directory found"
+fi
+
+echo ""
+
+# Deploy all realms
+echo "🏛️  Deploying realms..."
+REALM_COUNT=0
+for REALM_DIR in "$MUNDUS_DIR"/realm_*/; do
+    if [ -d "$REALM_DIR" ]; then
+        REALM_NAME=$(basename "$REALM_DIR")
+        echo "   📦 Deploying $REALM_NAME..."
+        
+        # Run realm deployment scripts
+        if [ -f "$REALM_DIR/scripts/1-install-extensions.sh" ]; then
+            bash "$REALM_DIR/scripts/1-install-extensions.sh" || echo "      ⚠️  Extension installation failed"
+        fi
+        
+        if [ -f "$REALM_DIR/scripts/2-deploy-canisters.sh" ]; then
+            bash "$REALM_DIR/scripts/2-deploy-canisters.sh" "$NETWORK" "$MODE"
+            echo "      ✅ $REALM_NAME deployed"
+            REALM_COUNT=$((REALM_COUNT + 1))
+        else
+            echo "      ⚠️  Deployment script not found"
+        fi
+        
+        echo ""
+    fi
+done
+
+echo "╭────────────────────────────────────────╮"
+echo "│ ✅ Mundus Deployment Complete          │"
+echo "╰────────────────────────────────────────╯"
+echo "📊 Deployed: $REALM_COUNT realm(s) + 1 registry"
+echo ""
+"""
+    
+    deploy_script = scripts_dir / "deploy-all.sh"
+    deploy_script.write_text(script_content)
+    deploy_script.chmod(0o755)
+    console.print(f"   ✅ Created orchestration script: scripts/deploy-all.sh")
 
 
 def mundus_deploy_command(
@@ -77,7 +222,7 @@ def mundus_deploy_command(
     identity: Optional[str],
     mode: str,
 ) -> None:
-    """Deploy all realms and registry in a mundus using unified dfx.json."""
+    """Deploy all realms and registry in a mundus by running orchestration script."""
     
     console.print(Panel.fit(
         f"[bold cyan]🚀 Deploying Mundus to {network}[/bold cyan]",
@@ -89,40 +234,29 @@ def mundus_deploy_command(
         console.print(f"[red]❌ Mundus directory not found: {mundus_dir}[/red]")
         raise typer.Exit(1)
     
-    # Check if unified dfx.json exists
-    dfx_json_path = mundus_path / "dfx.json"
-    if not dfx_json_path.exists():
-        console.print(f"[red]❌ dfx.json not found in mundus directory[/red]")
+    # Check if orchestration script exists
+    deploy_script = mundus_path / "scripts" / "deploy-all.sh"
+    if not deploy_script.exists():
+        console.print(f"[red]❌ Deployment script not found: {deploy_script}[/red]")
         console.print(f"[yellow]Run 'realms mundus create' first to generate the mundus structure[/yellow]")
         raise typer.Exit(1)
     
-    # Change to mundus directory so logs and dfx operations happen there
-    original_cwd = os.getcwd()
-    os.chdir(mundus_path)
+    console.print(f"📁 Mundus: {mundus_path}")
+    console.print(f"📡 Network: {network}")
+    console.print(f"🔄 Mode: {mode}\n")
+    
+    # Run orchestration script
+    cmd = ["bash", str(deploy_script), network, mode]
+    
+    if identity:
+        console.print(f"[yellow]⚠️  Identity parameter not yet supported for mundus deployment[/yellow]")
     
     try:
-        # Ensure dfx is running for local network
-        if network == "local":
-            _ensure_dfx_running(mundus_path)
-        
-        # Read dfx.json to get canister list
-        with open(dfx_json_path, 'r') as f:
-            dfx_config = json.load(f)
-        
-        canisters = list(dfx_config.get("canisters", {}).keys())
-        total_canisters = len(canisters)
-        
-        console.print(f"[cyan]Found {total_canisters} canisters to deploy[/cyan]\n")
-        
-        # Deploy all canisters using unified dfx
-        # dfx deploy will handle declarations generation and frontend building
-        console.print("[bold]📦 Deploying all canisters...[/bold]")
-        _deploy_all_canisters(mundus_path, network, identity, mode)
-        
-        console.print(f"\n[bold green]✅ All {total_canisters} canisters deployed successfully![/bold green]")
-    finally:
-        # Restore original working directory
-        os.chdir(original_cwd)
+        subprocess.run(cmd, cwd=mundus_path, check=True)
+        console.print(f"\n[bold green]✅ Mundus deployed successfully![/bold green]")
+    except subprocess.CalledProcessError as e:
+        console.print(f"\n[red]❌ Deployment failed with exit code {e.returncode}[/red]")
+        raise typer.Exit(1)
 
 
 def _deploy_canister(realm_dir: Path, canister_name: str, network: str, identity: Optional[str], mode: str) -> None:
