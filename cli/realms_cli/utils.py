@@ -4,10 +4,12 @@ import hashlib
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 import time
 import venv
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -19,6 +21,52 @@ from rich.text import Text
 from .constants import DOCKER_IMAGE
 
 console = Console()
+
+
+def generate_timestamp() -> str:
+    """Generate timestamp string for directory naming.
+    
+    Returns:
+        Timestamp string in format YYYYMMDD_HHMMSS
+    """
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+
+def sanitize_name(name: str) -> str:
+    """Sanitize a name for use in directory/file names.
+    
+    Args:
+        name: Name to sanitize
+        
+    Returns:
+        Sanitized name with only alphanumeric and underscores
+    """
+    # Replace spaces and hyphens with underscores
+    name = name.replace(" ", "_").replace("-", "_")
+    # Remove any non-alphanumeric characters except underscores
+    name = re.sub(r'[^a-zA-Z0-9_]', '', name)
+    # Remove multiple consecutive underscores
+    name = re.sub(r'_+', '_', name)
+    # Remove leading/trailing underscores
+    name = name.strip('_')
+    return name
+
+
+def generate_output_dir_name(prefix: str, name: Optional[str] = None) -> str:
+    """Generate output directory name with timestamp.
+    
+    Args:
+        prefix: Prefix (e.g., 'realm', 'registry', 'mundus')
+        name: Optional name to include
+        
+    Returns:
+        Directory name in format: prefix_Name_YYYYMMDD_HHMMSS or prefix_YYYYMMDD_HHMMSS
+    """
+    timestamp = generate_timestamp()
+    if name:
+        sanitized_name = sanitize_name(name)
+        return f"{prefix}_{sanitized_name}_{timestamp}"
+    return f"{prefix}_{timestamp}"
 
 
 def get_logger(name: str, log_dir: Optional[Path] = None) -> logging.Logger:
