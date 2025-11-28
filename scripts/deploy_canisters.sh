@@ -91,10 +91,16 @@ fi
 # Get all backend canisters from dfx.json
 echo ""
 echo "📦 Detecting backend canisters..."
-BACKENDS=$(dfx canister list 2>/dev/null | grep -E "backend|registry.*backend" | awk '{print $1}' || echo "")
+# Parse dfx.json to find backend canisters (those with type "custom")
+if command -v jq &> /dev/null; then
+    BACKENDS=$(jq -r '.canisters | to_entries[] | select(.value.type == "custom") | .key' dfx.json 2>/dev/null || echo "")
+else
+    # Fallback: use grep to find backend canisters
+    BACKENDS=$(grep -o '"[^"]*_backend"' dfx.json 2>/dev/null | tr -d '"' || echo "")
+fi
 
 if [ -z "$BACKENDS" ]; then
-    echo "⚠️  No backend canisters found"
+    echo "⚠️  No backend canisters found in dfx.json"
 else
     echo "   Found: $BACKENDS"
 fi
@@ -135,10 +141,16 @@ fi
 # Get all frontend canisters
 echo ""
 echo "🎨 Detecting frontend canisters..."
-FRONTENDS=$(dfx canister list 2>/dev/null | grep -E "frontend|registry.*frontend" | awk '{print $1}' || echo "")
+# Parse dfx.json to find frontend canisters (those with type "assets")
+if command -v jq &> /dev/null; then
+    FRONTENDS=$(jq -r '.canisters | to_entries[] | select(.value.type == "assets") | .key' dfx.json 2>/dev/null || echo "")
+else
+    # Fallback: use grep to find frontend canisters
+    FRONTENDS=$(grep -o '"[^"]*_frontend"' dfx.json 2>/dev/null | tr -d '"' || echo "")
+fi
 
 if [ -z "$FRONTENDS" ]; then
-    echo "⚠️  No frontend canisters found"
+    echo "⚠️  No frontend canisters found in dfx.json"
 else
     echo "   Found: $FRONTENDS"
 fi
