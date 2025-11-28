@@ -217,7 +217,15 @@ def create_command(
         cmd.extend(["--seed", str(realm_options["seed"])])
 
     try:
-        subprocess.run(cmd, check=True, cwd=repo_root)
+        # Run in Docker if in image mode, otherwise run locally
+        if is_repo_mode():
+            subprocess.run(cmd, check=True, cwd=repo_root)
+        else:
+            result = run_in_docker(cmd, working_dir=Path.cwd())
+            if result.returncode != 0:
+                console.print(f"[red]❌ Error creating realm:[/red]")
+                console.print(f"[red]{result.stderr}[/red]")
+                raise typer.Exit(1)
         console.print(f"\n[green]✅ Realm data generated successfully[/green]")
     except subprocess.CalledProcessError as e:
         console.print(f"[red]❌ Error creating realm: {e}[/red]")
