@@ -1,0 +1,54 @@
+{
+  "title": "Tresor-Manager",
+  "configuration": {
+    "title": "Tresor-Konfiguration",
+    "canister_id_label": "Tresor-Canister-ID",
+    "canister_id_placeholder": "Tresor-Canister-ID eingeben",
+    "load_vault": "Tresor laden",
+    "current_vault": "Aktueller Tresor",
+    "error_invalid_id": "Bitte geben Sie eine gültige Tresor-Canister-ID ein"
+  },
+  "tabs": {
+    "overview": "Übersicht",
+    "transfer": "Übertragung",
+    "transactions": "Transaktionen",
+    "accounts": "Konten"
+  },
+  "overview": {
+    "refresh_data": "Daten aktualisieren",
+    "balance_info": "Saldo-Informationen",
+    "total_supply": "Gesamtangebot",
+    "active_accounts": "Aktive Konten",
+    "total_transactions": "Gesamttransaktionen"
+  },
+  "transfer": {
+    "title": "Token übertragen",
+    "recipient_label": "Empfängeradresse (Principal-ID)",
+    "recipient_placeholder": "Empfänger-Principal-ID eingeben",
+    "amount_label": "Betrag",
+    "amount_placeholder": "0,00",
+    "memo_label": "Memo (Optional)",
+    "memo_placeholder": "Notiz zu dieser Übertragung hinzufügen",
+    "submit": "Token übertragen",
+    "success": "Übertragung erfolgreich abgeschlossen!"
+  },
+  "transactions": {
+    "title": "Transaktionsverlauf",
+    "refresh": "Aktualisieren"
+  },
+  "accounts": {
+    "title": "Kontosalden",
+    "no_accounts": "Keine Konten gefunden.",
+    "principal_id": "Principal-ID",
+    "balance": "Saldo (ckBTC)"
+  },
+  "loading": "Laden...",
+  "loading_vault": "Tresor-Daten werden geladen...",
+  "error_prefix": "Fehler:",
+  "ledger_canisters": {
+    "title": "Unterstützte Ledger-Canister",
+    "ckbtc_ledger": "ckBTC-Ledger",
+    "ckbtc_indexer": "ckBTC-Indexer",
+    "copy_tooltip": "Klicken zum Kopieren"
+  }
+}

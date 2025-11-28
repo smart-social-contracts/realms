@@ -1,0 +1,201 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Realms Extension Test Configuration",
+  "description": "Configuration schema for extension testing infrastructure",
+  "type": "object",
+  "required": ["extension_id", "test_type"],
+  "properties": {
+    "extension_id": {
+      "type": "string",
+      "description": "Unique identifier for the extension",
+      "pattern": "^[a-z_]+$"
+    },
+    "test_type": {
+      "type": "string",
+      "description": "Type of testing to perform",
+      "enum": ["full", "backend_only", "e2e_only", "minimal", "linting_only"],
+      "default": "full"
+    },
+    "realm_config": {
+      "type": "object",
+      "description": "Configuration for realm creation during tests",
+      "properties": {
+        "citizens": {
+          "type": "integer",
+          "description": "Number of citizens to generate",
+          "minimum": 0,
+          "default": 5
+        },
+        "organizations": {
+          "type": "integer",
+          "description": "Number of organizations to generate",
+          "minimum": 0,
+          "default": 2
+        },
+        "random": {
+          "type": "boolean",
+          "description": "Whether to use random data generation",
+          "default": false
+        },
+        "seed": {
+          "type": "integer",
+          "description": "Random seed for reproducible data generation"
+        }
+      }
+    },
+    "test_canisters": {
+      "type": "object",
+      "description": "Configuration for extension-specific test canisters",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether to deploy test canisters",
+          "default": false
+        },
+        "dfx_json": {
+          "type": "string",
+          "description": "Path to dfx.json with test canister definitions",
+          "default": "tests/dfx.json"
+        },
+        "deploy_script": {
+          "type": "string",
+          "description": "Path to custom deployment script for test canisters"
+        },
+        "init_script": {
+          "type": "string",
+          "description": "Path to initialization script to run after deployment"
+        }
+      }
+    },
+    "backend_tests": {
+      "type": "object",
+      "description": "Configuration for backend integration tests",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether to run backend tests",
+          "default": true
+        },
+        "pre_setup": {
+          "type": "string",
+          "description": "Script to run before tests (e.g., data seeding)"
+        },
+        "test_files": {
+          "type": "array",
+          "description": "List of test files to execute",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "test_directory": {
+          "type": "string",
+          "description": "Directory containing test files",
+          "default": "tests"
+        }
+      }
+    },
+    "e2e_tests": {
+      "type": "object",
+      "description": "Configuration for end-to-end browser tests",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether to run E2E tests",
+          "default": false
+        },
+        "base_path": {
+          "type": "string",
+          "description": "Base URL path for the extension",
+          "pattern": "^/.*"
+        },
+        "specs": {
+          "type": "string",
+          "description": "Glob pattern for test spec files",
+          "default": "tests/e2e/specs/**/*.spec.ts"
+        },
+        "config": {
+          "type": "string",
+          "description": "Path to Playwright configuration file",
+          "default": "tests/e2e/playwright.config.ts"
+        },
+        "warmup": {
+          "type": "boolean",
+          "description": "Whether to warmup the extension page before tests",
+          "default": true
+        }
+      }
+    },
+    "linting": {
+      "type": "object",
+      "description": "Configuration for code quality checks",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether to run linting",
+          "default": true
+        },
+        "black": {
+          "type": "boolean",
+          "description": "Run Black formatter checks",
+          "default": true
+        },
+        "isort": {
+          "type": "boolean",
+          "description": "Run isort import checks",
+          "default": true
+        },
+        "flake8": {
+          "type": "boolean",
+          "description": "Run flake8 linting",
+          "default": true
+        },
+        "mypy": {
+          "type": "boolean",
+          "description": "Run mypy type checking",
+          "default": false
+        },
+        "custom_rules": {
+          "type": "string",
+          "description": "Path to custom linter configuration file"
+        }
+      }
+    },
+    "docker": {
+      "type": "object",
+      "description": "Docker configuration for test execution",
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "Docker image to use for tests",
+          "default": "ghcr.io/smart-social-contracts/realms:ui-test-latest"
+        },
+        "container_name_prefix": {
+          "type": "string",
+          "description": "Prefix for test container names"
+        },
+        "port_mapping": {
+          "type": "object",
+          "description": "Port mapping for test services",
+          "properties": {
+            "host_port": {
+              "type": "integer",
+              "default": 8001
+            },
+            "container_port": {
+              "type": "integer",
+              "default": 8000
+            }
+          }
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "description": "Environment variables for test execution",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  }
+}

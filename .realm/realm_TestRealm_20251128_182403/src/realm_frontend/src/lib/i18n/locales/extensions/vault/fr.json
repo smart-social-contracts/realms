@@ -1,0 +1,54 @@
+{
+  "title": "Gestionnaire de Coffre",
+  "configuration": {
+    "title": "Configuration du Coffre",
+    "canister_id_label": "ID du Canister de Coffre",
+    "canister_id_placeholder": "Entrez l'ID du canister de coffre",
+    "load_vault": "Charger le Coffre",
+    "current_vault": "Coffre Actuel",
+    "error_invalid_id": "Veuillez entrer un ID de canister de coffre valide"
+  },
+  "tabs": {
+    "overview": "Aperçu",
+    "transfer": "Transfert",
+    "transactions": "Transactions",
+    "accounts": "Comptes"
+  },
+  "overview": {
+    "refresh_data": "Actualiser les Données",
+    "balance_info": "Informations de Solde",
+    "total_supply": "Offre Totale",
+    "active_accounts": "Comptes actifs",
+    "total_transactions": "Transactions totales"
+  },
+  "transfer": {
+    "title": "Transférer des Tokens",
+    "recipient_label": "Adresse du Destinataire (ID Principal)",
+    "recipient_placeholder": "Entrez l'ID principal du destinataire",
+    "amount_label": "Montant",
+    "amount_placeholder": "0,00",
+    "memo_label": "Mémo (Optionnel)",
+    "memo_placeholder": "Ajouter une note sur ce transfert",
+    "submit": "Transférer des Tokens",
+    "success": "Transfert terminé avec succès !"
+  },
+  "transactions": {
+    "title": "Historique des Transactions",
+    "refresh": "Actualiser"
+  },
+  "accounts": {
+    "title": "Soldes des Comptes",
+    "no_accounts": "Aucun compte trouvé.",
+    "principal_id": "ID Principal",
+    "balance": "Solde (ckBTC)"
+  },
+  "loading": "Chargement...",
+  "loading_vault": "Chargement des données du coffre...",
+  "error_prefix": "Erreur :",
+  "ledger_canisters": {
+    "title": "Canisters de Registre Pris en Charge",
+    "ckbtc_ledger": "Registre ckBTC",
+    "ckbtc_indexer": "Indexeur ckBTC",
+    "copy_tooltip": "Cliquer pour copier"
+  }
+}

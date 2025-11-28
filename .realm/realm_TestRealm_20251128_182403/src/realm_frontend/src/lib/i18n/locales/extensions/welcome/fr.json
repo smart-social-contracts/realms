@@ -1,0 +1,46 @@
+{
+  "name": "Bienvenue",
+  "description": "Page d'accueil pour Realms GOS",
+  "sidebar": "Bienvenue",
+  "title": "Realms GOS",
+  "page_title": "Realms GOS",
+  "hero": {
+    "title": "Realms GOS - Le Système d'Exploitation de Gouvernance",
+    "subtitle_1": "• Lancez une administration publique complète en quelques secondes",
+    "subtitle_2": "• Entièrement auditable. Entièrement transparent. Alimenté par l'IA",
+    "subtitle_3": "• Conçu pour éliminer la corruption et les inefficacités",
+    "try_sandbox": "Essayez le bac à sable"
+  },
+  "built_with": {
+    "text": "Construit sur le",
+    "with_love": "avec ❤️ depuis 🇨🇭"
+  },
+  "mission": {
+    "title": "La Gouvernance Comme Elle Devrait Être",
+    "description": "<b>Realms</b> est une plateforme logicielle décentralisée pour l'administration publique — un Système d'Exploitation de Gouvernance (GOS) conçu pour fournir des services publics essentiels tels que la justice, le bien-être social, les registres de propriété, et plus encore. Des petites villes aux nations entières, il permet aux communautés de concevoir, gérer et faire évoluer leurs propres systèmes de gouvernance — libres de la corruption et des inefficacités de la bureaucratie traditionnelle."
+  },
+  "principles": {
+    "title": "Principes de conception",
+    "transparency": {
+      "title": "Transparence",
+      "description": "La transparence construit la confiance entre le gouvernement et le public, car les utilisateurs peuvent voir comment les processus sont exécutés et où les ressources, comme l'argent des impôts, sont allouées. La transparence aide également à prévenir la corruption et renforce la légitimité des institutions."
+    },
+    "efficiency": {
+      "title": "Efficacité",
+      "description": "L'efficacité implique de fournir des services efficacement tout en minimisant les coûts et en réduisant le gaspillage. Cela favorise un fort sentiment d'équité, renforçant la confiance du public dans le système de gouvernance. En conséquence, les utilisateurs sont plus susceptibles de soutenir et de respecter les obligations fiscales, réduisant l'évasion fiscale et promouvant une plus grande responsabilité civique."
+    },
+    "diversity": {
+      "title": "Diversité",
+      "description": "La diversité dans la gouvernance assure qu'une large gamme de perspectives soit représentée. Cela conduit à des politiques plus inclusives et équitables qui répondent aux différents besoins sociétaux, favorisant la cohésion sociale et réduisant la marginalisation."
+    },
+    "resilience": {
+      "title": "Résilience",
+      "description": "La résilience permet aux systèmes de gouvernance de répondre aux crises, de s'adapter aux changements et de se remettre des revers, tels que les chocs économiques ou les catastrophes naturelles. Un système de gouvernance résilient assure la stabilité et la continuité, même en temps de stress, protégeant le bien-être sociétal à long terme."
+    }
+  },
+  "alt_text": {
+    "background": "Arrière-plan {index}",
+    "internet_computer_logo": "Logo Internet Computer",
+    "realms_logo": "Logo Realms"
+  }
+}

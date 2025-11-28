@@ -1,0 +1,68 @@
+{
+  "$schema": "./test_config.schema.json",
+  "extension_id": "vault",
+  "test_type": "full",
+  
+  "realm_config": {
+    "citizens": 5,
+    "organizations": 2,
+    "random": false
+  },
+  
+  "test_canisters": {
+    "enabled": true,
+    "dfx_json": "tests/dfx.json",
+    "deploy_script": "tests/deploy_test_canisters.py",
+    "init_script": "tests/init_vault_canisters.py",
+    "canister_id_replacements": [
+      {
+        "canister_name": "ckbtc_ledger",
+        "placeholder": "PLACEHOLDER_LEDGER_ID"
+      },
+      {
+        "canister_name": "ckbtc_indexer",
+        "placeholder": "PLACEHOLDER_INDEXER_ID"
+      }
+    ]
+  },
+  
+  "backend_tests": {
+    "enabled": true,
+    "pre_setup": "tests/init_vault_canisters.py",
+    "test_files": [
+      "tests/test_vault.py",
+      "tests/test_vault_refresh.py"
+    ]
+  },
+  
+  "e2e_tests": {
+    "enabled": true,
+    "base_path": "/extensions/vault",
+    "specs": "tests/e2e/specs/**/*.spec.ts",
+    "config": "tests/e2e/playwright.config.ts",
+    "warmup": true
+  },
+  
+  "linting": {
+    "enabled": true,
+    "black": true,
+    "isort": true,
+    "flake8": true,
+    "mypy": false,
+    "custom_rules": ".flake8"
+  },
+  
+  "docker": {
+    "image": "ghcr.io/smart-social-contracts/realms:ui-test-latest",
+    "container_name_prefix": "vault-test",
+    "port_mapping": {
+      "host_port": 8001,
+      "container_port": 8000
+    }
+  },
+  
+  "environment": {
+    "NUM_ADDITIONAL_TRANSACTIONS": "100",
+    "PLAYWRIGHT_BASE_URL": "http://localhost:8000"
+  }
+}

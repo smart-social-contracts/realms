@@ -1,0 +1,82 @@
+{
+  "name": "Member Dashboard",
+  "description": "Access public services, view tax information, and manage personal data",
+  "sidebar": "Member Dashboard",
+  "title": "Member Dashboard",
+  "summary": "Dashboard Overview",
+  "services": "Public Services",
+  "taxes": "Tax Information",
+  "personal_data": "Personal Data",
+  "no_data": "No dashboard information available at this time.",
+  "loading": "Loading dashboard...",
+  "dashboard_overview": "Dashboard Overview",
+  "welcome_back": "Welcome back, {name}",
+  "last_updated": "Last updated: {date}",
+  "services_count": "{count} Active services",
+  "approaching_deadlines": "{count} approaching deadlines",
+  "tax_records": "{count} Tax records",
+  "overdue_payments": "{count} overdue payments",
+  "data_records": "{count} Data records",
+  "recently_updated": "{count} recently updated",
+  "tabs": {
+    "public_services": "Public Services",
+    "my_taxes": "My Taxes",
+    "personal_data": "Personal Data",
+    "payment_accounts": "Payment Accounts"
+  },
+  "services_list": {
+    "title": "My Public Services",
+    "request_new": "Request New Service",
+    "loading": "Loading services...",
+    "no_services": "No public services available at this time.",
+    "table": {
+      "service_name": "Service Name",
+      "status": "Status",
+      "due_date": "Due Date",
+      "provider": "Provider",
+      "actions": "Actions",
+      "details": "Details",
+      "approaching": "Approaching"
+    }
+  },
+  "service_status": {
+    "available": "Available",
+    "unavailable": "Unavailable",
+    "maintenance": "Under Maintenance",
+    "active": "Active",
+    "pending": "Pending",
+    "expired": "Expired",
+    "suspended": "Suspended"
+  },
+  "tax_status": {
+    "paid": "Paid",
+    "pending": "Pending",
+    "overdue": "Overdue"
+  },
+  "privacy": {
+    "show": "Show Data",
+    "hide": "Hide Data",
+    "manage": "Manage Privacy Settings"
+  },
+  "settings": {
+    "profile_picture": "Profile Picture"
+  },
+  "payment_accounts": "Payment Accounts",
+  "add_payment_account": "Add Payment Account",
+  "no_payment_accounts": "No payment accounts configured yet",
+  "payment_accounts_description": "Add payment accounts to receive transfers from the realm treasury or other users",
+  "account_label": "Account Label",
+  "account_label_placeholder": "e.g., My ICP Wallet",
+  "network": "Network",
+  "currency": "Currency",
+  "address": "Address",
+  "address_placeholder": "Enter your address or principal ID",
+  "save": "Save",
+  "cancel": "Cancel",
+  "remove": "Remove",
+  "verified": "Verified",
+  "created_at": "Created",
+  "confirm_remove_payment_account": "Are you sure you want to remove this payment account?",
+  "configure_accounts": "Configure payment accounts",
+  "manage_addresses": "Manage your addresses"
+}

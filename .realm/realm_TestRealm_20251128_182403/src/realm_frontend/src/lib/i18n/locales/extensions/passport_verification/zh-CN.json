@@ -1,0 +1,10 @@
+{
+  "sidebar": "护照验证",
+  "title": "护照验证",
+  "description": "使用零知识证明的安全身份验证",
+  "get_verification_link": "获取验证链接",
+  "check_status": "检查状态",
+  "verification_complete": "验证完成",
+  "verification_pending": "验证待处理",
+  "verification_failed": "验证失败"
+}

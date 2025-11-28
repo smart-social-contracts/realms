@@ -1,0 +1,68 @@
+{
+  "common": {
+    "welcome": "欢迎来到 Realms",
+    "loading": "加载中...",
+    "error": "发生错误",
+    "home": "首页",
+    "settings": "设置",
+    "login": "登录",
+    "logout": "退出登录",
+    "profile": "个人资料",
+    "search": "搜索",
+    "join": "加入",
+    "switch_user": "切换用户",
+    "identities": "我的身份",
+    "main_menu": "主菜单"
+  },
+  "navigation": {
+    "dashboard": "仪表板",
+    "explore": "探索",
+    "about": "关于",
+    "admin_dashboard": "管理员仪表板",
+    "extensions_marketplace": "扩展市场",
+    "citizen_dashboard": "公民仪表板",
+    "vault_manager": "保险库管理器"
+  },
+  "buttons": {
+    "save": "保存",
+    "cancel": "取消",
+    "submit": "提交",
+    "edit": "编辑",
+    "delete": "删除",
+    "login": "登录",
+    "join": "加入",
+    "switch_user": "切换用户"
+  },
+  "settings": {
+    "title": "用户设置",
+    "select_language": "选择语言",
+    "language_description": "选择界面显示语言",
+    "time_zone": "时区",
+    "save_all": "保存全部",
+    "profile_picture": "头像"
+  },
+  "notifications": {
+    "title": "通知"
+  },
+  "demo_banner": {
+    "title": "演示模式已激活",
+    "description": "此应用程序正在演示模式下运行，使用示例数据。显示的功能和数据仅用于演示目的。",
+    "dismiss_label": "关闭演示模式通知"
+  },
+  "categories": {
+    "public_services": "公共服务",
+    "finances": "财务管理",
+    "oversight": "监督与分析",
+    "system": "系统管理",
+    "other": "其他"
+  },
+  "extensions": {
+    "market_place": {
+      "sidebar": "扩展市场",
+      "title": "扩展市场",
+      "description": "浏览并安装扩展",
+      "required_permissions": "所需权限",
+      "open_extension": "打开扩展"
+    }
+  }
+}

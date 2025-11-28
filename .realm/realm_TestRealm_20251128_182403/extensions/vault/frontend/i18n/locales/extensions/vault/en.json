@@ -1,0 +1,65 @@
+{
+  "name": "Vault Manager",
+  "description": "Manage vault configurations, canister IDs, and vault operations",
+  "sidebar": "Vault Manager",
+  "title": "Vault Manager",
+  "configuration": {
+    "title": "Vault Configuration",
+    "canister_id_label": "Vault Canister ID",
+    "canister_id_placeholder": "Enter vault canister ID",
+    "load_vault": "Load Vault",
+    "current_vault": "Current Vault",
+    "error_invalid_id": "Please enter a valid vault canister ID"
+  },
+  "tabs": {
+    "overview": "Overview",
+    "transfer": "Transfer",
+    "transactions": "Transactions",
+    "accounts": "Accounts"
+  },
+  "overview": {
+    "refresh_data": "Refresh Data",
+    "balance_info": "Balance Information",
+    "total_supply": "Total Supply",
+    "active_accounts": "Active accounts",
+    "total_transactions": "Total transactions"
+  },
+  "transfer": {
+    "title": "Transfer Tokens",
+    "recipient_label": "Recipient Address (Principal ID)",
+    "recipient_placeholder": "Enter recipient principal ID",
+    "amount_label": "Amount",
+    "amount_placeholder": "0.00",
+    "memo_label": "Memo (Optional)",
+    "memo_placeholder": "Add a note about this transfer",
+    "submit": "Transfer Tokens",
+    "success": "Transfer completed successfully!"
+  },
+  "transactions": {
+    "title": "Transaction History",
+    "refresh": "Refresh"
+  },
+  "accounts": {
+    "title": "Account Balances",
+    "no_accounts": "No accounts found.",
+    "principal_id": "Principal ID",
+    "balance": "Balance (ckBTC)"
+  },
+  "loading": "Loading...",
+  "loading_vault": "Loading vault data...",
+  "error_prefix": "Error:",
+  "ledger_canisters": {
+    "title": "Supported Ledger Canisters",
+    "ckbtc_ledger": "ckBTC Ledger",
+    "ckbtc_indexer": "ckBTC Indexer",
+    "copy_tooltip": "Click to copy"
+  },
+  "vault_balance": {
+    "title": "Vault Total Balance",
+    "refresh": "Refresh",
+    "querying": "Querying...",
+    "refresh_tooltip": "Query ledger for current balance",
+    "description": "This is the vault's total balance on the ckBTC ledger",
+    "satoshis": "satoshis"
+  }
+}

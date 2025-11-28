@@ -1,0 +1,18 @@
+{
+  "name": "测试台",
+  "description": "扩展API和系统功能的测试环境",
+  "sidebar": "测试台",
+  "title": "测试台扩展",
+  "extension_api_testing": "扩展API测试",
+  "call_testbench_api": "调用测试台扩展API",
+  "authentication": "身份验证",
+  "greeting_test": "问候测试",
+  "enter_name": "请输入您的姓名：",
+  "submit_greeting": "提交问候",
+  "universe_data": "宇宙数据",
+  "get_universe_data": "获取宇宙数据",
+  "universe_data_label": "宇宙数据：",
+  "snapshot_data": "快照数据",
+  "get_snapshots": "获取快照",
+  "snapshots_label": "快照："
+}

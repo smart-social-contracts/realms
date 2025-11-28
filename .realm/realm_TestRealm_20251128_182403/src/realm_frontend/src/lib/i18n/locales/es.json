@@ -1,0 +1,43 @@
+{
+  "common": {
+    "welcome": "Bienvenido a Realms",
+    "loading": "Cargando...",
+    "error": "Se produjo un error",
+    "home": "Inicio",
+    "settings": "Configuración",
+    "login": "Iniciar sesión",
+    "logout": "Cerrar sesión",
+    "profile": "Perfil",
+    "search": "Buscar",
+    "join": "Unirse",
+    "switch_user": "Cambiar usuario",
+    "identities": "Mis Identidades",
+    "main_menu": "Menú Principal"
+  },
+  "navigation": {
+    "dashboard": "Panel",
+    "explore": "Explorar",
+    "about": "Acerca de",
+    "admin_dashboard": "Panel de Administración",
+    "extensions_marketplace": "Mercado de Extensiones",
+    "citizen_dashboard": "Panel Ciudadano",
+    "vault_manager": "Gestor de Bóveda"
+  },
+  "buttons": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "submit": "Enviar",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "login": "Iniciar sesión",
+    "join": "Unirse",
+    "switch_user": "Cambiar usuario"
+  },
+  "settings": {
+    "title": "Configuración de Usuario",
+    "select_language": "Seleccionar Idioma",
+    "language_description": "Elige tu idioma preferido para la interfaz",
+    "time_zone": "Zona Horaria",
+    "save_all": "Guardar todo"
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "name": "公民仪表板",
+  "description": "访问公共服务、查看税务信息并管理个人数据",
+  "sidebar": "公民仪表板",
+  "title": "公民仪表板",
+  "summary": "仪表板概览",
+  "services": "公共服务",
+  "taxes": "税务信息",
+  "personal_data": "个人数据",
+  "no_data": "目前没有可用的仪表板信息。",
+  "loading": "正在加载仪表板...",
+  "dashboard_overview": "仪表板概览",
+  "welcome_back": "欢迎回来，{name}",
+  "last_updated": "最后更新：{date}",
+  "services_count": "{count} 个活跃服务",
+  "approaching_deadlines": "{count} 个即将到期",
+  "tax_records": "{count} 个税务记录",
+  "overdue_payments": "{count} 个逾期付款",
+  "data_records": "{count} 个数据记录",
+  "recently_updated": "{count} 个最近更新",
+  "tabs": {
+    "public_services": "公共服务",
+    "my_taxes": "我的税务",
+    "personal_data": "个人数据",
+    "payment_accounts": "支付账户"
+  },
+  "services_list": {
+    "title": "我的公共服务",
+    "request_new": "申请新服务",
+    "loading": "正在加载服务...",
+    "no_services": "目前没有可用的公共服务。",
+    "table": {
+      "service_name": "服务名称",
+      "status": "状态",
+      "due_date": "到期日期",
+      "provider": "提供商",
+      "actions": "操作",
+      "details": "详情",
+      "approaching": "即将到期"
+    }
+  },
+  "service_status": {
+    "available": "可用",
+    "unavailable": "不可用",
+    "maintenance": "维护中",
+    "active": "活跃",
+    "pending": "待处理",
+    "expired": "已过期",
+    "suspended": "已暂停"
+  },
+  "tax_status": {
+    "paid": "已支付",
+    "pending": "待处理",
+    "overdue": "逾期"
+  },
+  "privacy": {
+    "show": "显示数据",
+    "hide": "隐藏数据",
+    "manage": "管理隐私设置"
+  },
+  "payment_accounts": "支付账户",
+  "add_payment_account": "添加支付账户",
+  "no_payment_accounts": "尚未配置支付账户",
+  "payment_accounts_description": "添加支付账户以从域金库或其他用户接收转账",
+  "account_label": "账户标签",
+  "account_label_placeholder": "例如：我的ICP钱包",
+  "network": "网络",
+  "currency": "货币",
+  "address": "地址",
+  "address_placeholder": "输入您的地址或主体ID",
+  "save": "保存",
+  "cancel": "取消",
+  "remove": "删除",
+  "verified": "已验证",
+  "created_at": "创建于",
+  "confirm_remove_payment_account": "确定要删除此支付账户吗？",
+  "configure_accounts": "配置支付账户",
+  "manage_addresses": "管理您的地址"
+}

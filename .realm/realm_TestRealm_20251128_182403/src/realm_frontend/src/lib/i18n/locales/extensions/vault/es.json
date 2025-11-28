@@ -1,0 +1,54 @@
+{
+  "title": "Gestor de Bóveda",
+  "configuration": {
+    "title": "Configuración de Bóveda",
+    "canister_id_label": "ID del Canister de Bóveda",
+    "canister_id_placeholder": "Ingrese el ID del canister de bóveda",
+    "load_vault": "Cargar Bóveda",
+    "current_vault": "Bóveda Actual",
+    "error_invalid_id": "Por favor ingrese un ID de canister de bóveda válido"
+  },
+  "tabs": {
+    "overview": "Resumen",
+    "transfer": "Transferencia",
+    "transactions": "Transacciones",
+    "accounts": "Cuentas"
+  },
+  "overview": {
+    "refresh_data": "Actualizar Datos",
+    "balance_info": "Información de Saldo",
+    "total_supply": "Suministro Total",
+    "active_accounts": "Cuentas activas",
+    "total_transactions": "Transacciones totales"
+  },
+  "transfer": {
+    "title": "Transferir Tokens",
+    "recipient_label": "Dirección del Destinatario (ID Principal)",
+    "recipient_placeholder": "Ingrese el ID principal del destinatario",
+    "amount_label": "Cantidad",
+    "amount_placeholder": "0,00",
+    "memo_label": "Memo (Opcional)",
+    "memo_placeholder": "Agregar una nota sobre esta transferencia",
+    "submit": "Transferir Tokens",
+    "success": "¡Transferencia completada exitosamente!"
+  },
+  "transactions": {
+    "title": "Historial de Transacciones",
+    "refresh": "Actualizar"
+  },
+  "accounts": {
+    "title": "Saldos de Cuentas",
+    "no_accounts": "No se encontraron cuentas.",
+    "principal_id": "ID Principal",
+    "balance": "Saldo (ckBTC)"
+  },
+  "loading": "Cargando...",
+  "loading_vault": "Cargando datos de la bóveda...",
+  "error_prefix": "Error:",
+  "ledger_canisters": {
+    "title": "Canisters de Libro Mayor Soportados",
+    "ckbtc_ledger": "Libro Mayor ckBTC",
+    "ckbtc_indexer": "Indexador ckBTC",
+    "copy_tooltip": "Clic para copiar"
+  }
+}

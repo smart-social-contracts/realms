@@ -1,0 +1,83 @@
+name: Vault Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'vault/**'
+      - '.github/workflows/vault-test.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'vault/**'
+      - '.github/workflows/vault-test.yml'
+  workflow_dispatch:
+
+jobs:
+  lint-and-unit-tests:
+    name: Linting & Unit Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Install pipx
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install pipx
+        python -m pipx ensurepath
+        
+    - name: Install dependencies
+      run: |
+        cd vault
+        pip install -r requirements.txt
+        pip install black isort flake8
+        
+    - name: Run linters
+      run: |
+        cd vault
+        bash ../_shared/testing/scripts/run_linters.sh --config .flake8
+        
+    - name: Run unit tests
+      run: |
+        cd vault
+        bash ../_shared/testing/scripts/run_tests.sh
+        
+    - name: Upload test logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: vault-unit-test-logs
+        path: vault/test-logs/
+        retention-days: 7
+        if-no-files-found: warn
+    
+    - name: Upload E2E test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: vault-e2e-test-results
+        path: |
+          vault/tests/e2e/test-results/
+          vault/tests/e2e/playwright-report/
+        retention-days: 7
+        if-no-files-found: warn
+    
+    - name: Upload canister logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: vault-canister-logs
+        path: |
+          vault/dfx.log
+          vault/dfx2.log
+          vault/realms_cli.log
+        retention-days: 7
+        if-no-files-found: warn
+

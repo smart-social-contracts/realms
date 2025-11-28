@@ -1,0 +1,44 @@
+{
+  "common": {
+    "welcome": "Benvenuto su Realms",
+    "loading": "Caricamento...",
+    "error": "Si è verificato un errore",
+    "home": "Home",
+    "settings": "Impostazioni",
+    "login": "Accedi",
+    "logout": "Disconnetti",
+    "profile": "Profilo",
+    "search": "Cerca",
+    "join": "Unisciti",
+    "switch_user": "Cambia utente",
+    "identities": "Le Mie Identità",
+    "main_menu": "Menu Principale"
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "explore": "Esplora",
+    "about": "Chi siamo",
+    "admin_dashboard": "Dashboard Admin",
+    "extensions_marketplace": "Marketplace Estensioni",
+    "citizen_dashboard": "Dashboard Cittadino",
+    "vault_manager": "Gestore Vault"
+  },
+  "buttons": {
+    "save": "Salva",
+    "cancel": "Annulla",
+    "submit": "Invia",
+    "edit": "Modifica",
+    "delete": "Elimina",
+    "login": "Accedi",
+    "join": "Unisciti",
+    "switch_user": "Cambia utente"
+  },
+  "settings": {
+    "title": "Impostazioni Utente",
+    "select_language": "Seleziona Lingua",
+    "language_description": "Scegli la tua lingua di visualizzazione preferita per l'interfaccia",
+    "time_zone": "Fuso Orario",
+    "save_all": "Salva tutto",
+    "profile_picture": "Immagine Profilo"
+  }
+}     

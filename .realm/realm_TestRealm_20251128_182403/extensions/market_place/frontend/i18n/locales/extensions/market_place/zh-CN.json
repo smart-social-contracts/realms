@@ -1,0 +1,17 @@
+{
+  "sidebar": "扩展市场",
+  "title": "扩展市场",
+  "description": "浏览和管理您领域的扩展。发现新功能并安装扩展以增强您的治理平台。",
+  "required_permissions": "所需权限",
+  "open_extension": "打开扩展",
+  "loading": "正在加载扩展...",
+  "error_loading": "加载扩展时出错",
+  "try_again": "重试",
+  "installed": "已安装",
+  "available": "可用",
+  "install": "安装",
+  "author": "作者",
+  "profiles": "配置文件",
+  "version": "版本",
+  "categories": "类别"
+}

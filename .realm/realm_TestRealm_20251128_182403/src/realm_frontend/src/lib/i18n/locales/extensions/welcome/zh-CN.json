@@ -1,0 +1,46 @@
+{
+  "name": "欢迎",
+  "description": "Realms GOS 欢迎页面",
+  "sidebar": "欢迎",
+  "title": "Realms GOS",
+  "page_title": "Realms GOS",
+  "hero": {
+    "title": "Realms GOS - 治理操作系统",
+    "subtitle_1": "• 几秒钟内启动完整的公共管理系统",
+    "subtitle_2": "• 完全可审计。完全透明。AI驱动",
+    "subtitle_3": "• 专为消除腐败和低效而设计",
+    "try_sandbox": "试用沙盒"
+  },
+  "built_with": {
+    "text": "构建于",
+    "with_love": "用 ❤️ 来自 🇨🇭"
+  },
+  "mission": {
+    "title": "治理应有的样子",
+    "description": "<b>Realms</b> 是一个用于公共管理的去中心化软件平台——一个治理操作系统（GOS），旨在提供司法、社会福利、财产登记等基本公共服务。从小镇到整个国家，它赋予社区设计、运行和发展自己的治理系统的能力——摆脱传统官僚主义的腐败和低效。"
+  },
+  "principles": {
+    "title": "设计原则",
+    "transparency": {
+      "title": "透明度",
+      "description": "透明度在政府和公众之间建立信任，因为用户可以看到流程是如何执行的，以及资源（如税收）是如何分配的。透明度还有助于防止腐败并加强机构的合法性。"
+    },
+    "efficiency": {
+      "title": "效率",
+      "description": "效率涉及有效地提供服务，同时最大限度地降低成本和减少浪费。这培养了强烈的公平感，增强了公众对治理系统的信心。因此，用户更有可能支持和遵守税收义务，减少逃税并促进更大的公民责任。"
+    },
+    "diversity": {
+      "title": "多样性",
+      "description": "治理中的多样性确保代表广泛的观点。这导致更具包容性和公平性的政策，满足不同的社会需求，促进社会凝聚力并减少边缘化。"
+    },
+    "resilience": {
+      "title": "韧性",
+      "description": "韧性使治理系统能够应对危机、适应变化并从挫折中恢复，如经济冲击或自然灾害。有韧性的治理系统确保稳定性和连续性，即使在压力时期也能保护长期的社会福祉。"
+    }
+  },
+  "alt_text": {
+    "background": "背景 {index}",
+    "internet_computer_logo": "互联网计算机标志",
+    "realms_logo": "Realms 标志"
+  }
+}

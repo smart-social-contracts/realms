@@ -1,0 +1,12 @@
+import extension_packages.voting.entry
+import extension_packages.passport_verification.entry
+from extension_packages.member_dashboard.entry import *
+import extension_packages.llm_chat.entry
+import extension_packages.notifications.entry
+import extension_packages.erd_explorer.entry
+import extension_packages.justice_litigation.entry
+import extension_packages.vault.entry
+import extension_packages.test_bench.entry
+import extension_packages.land_registry.entry
+import extension_packages.admin_dashboard.entry
+import extension_packages.member_dashboard.entry

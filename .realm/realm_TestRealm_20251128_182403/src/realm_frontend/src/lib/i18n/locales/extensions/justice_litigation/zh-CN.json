@@ -1,0 +1,22 @@
+{
+  "name": "司法诉讼",
+  "description": "管理法律案件、跟踪诉讼进展并访问法庭文件",
+  "sidebar": "司法诉讼",
+  "title": "司法诉讼系统",
+  "loading_data": "正在加载诉讼数据...",
+  "profile": "个人资料",
+  "total_cases": "总案件数",
+  "refresh_data": "刷新数据",
+  "all_litigations": "所有诉讼",
+  "my_litigations": "我的诉讼",
+  "create_litigation": "创建诉讼",
+  "statistics": "统计数据",
+  "pending": "待处理",
+  "resolved": "已解决",
+  "cases": "案件",
+  "documents": "文件",
+  "hearings": "听证会",
+  "status": "状态",
+  "no_cases": "未找到案件",
+  "loading": "正在加载案件..."
+}

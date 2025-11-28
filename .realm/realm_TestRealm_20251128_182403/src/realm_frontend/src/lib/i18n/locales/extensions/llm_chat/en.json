@@ -1,0 +1,17 @@
+{
+  "name": "AI Assistance",
+  "description": "Governance AI assistant for intelligent conversations",
+  "sidebar": "AI Assistance",
+  "title": "Governance AI Assistance",
+  "start_conversation": "Start a conversation with the LLM!",
+  "welcome_authenticated": "Welcome back! What would you like to discuss?",
+  "welcome_visitor": "Welcome! I'm Ashoka, your AI Assistant. I can help you answer any questions about this realm.",
+  "message_placeholder": "Type your message...",
+  "no_response": "No response from LLM",
+  "error_response": "Failed to get response from LLM. Please try again.",
+  "loading": "Loading...",
+  "suggestions_title": "Try asking:",
+  "suggestion_1": "What is a realm?",
+  "suggestion_2": "What is an AI governance assistant?",
+  "suggestion_3": "Why should I join this realm?"
+}

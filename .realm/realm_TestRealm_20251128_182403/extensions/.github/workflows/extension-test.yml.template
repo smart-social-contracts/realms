@@ -1,0 +1,74 @@
+# TEMPLATE: Extension Test Workflow
+# 
+# Instructions:
+# 1. Copy this file to {extension-name}-test.yml
+# 2. Replace all {EXTENSION_NAME} placeholders with the actual extension name
+# 3. Adjust test commands as needed for the specific extension
+# 4. Ensure the extension has:
+#    - requirements.txt (or requirements-dev.txt)
+#    - run_tests.sh or similar test script
+#    - .flake8 config (optional, can inherit from root)
+
+name: {EXTENSION_NAME} Test
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - '{EXTENSION_NAME}/**'
+      - '.github/workflows/{EXTENSION_NAME}-test.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - '{EXTENSION_NAME}/**'
+      - '.github/workflows/{EXTENSION_NAME}-test.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Install pipx
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install pipx
+        python -m pipx ensurepath
+        
+    - name: Install dependencies
+      run: |
+        cd {EXTENSION_NAME}
+        pip install -r requirements.txt
+        pip install black isort flake8
+        
+    - name: Run linters
+      run: |
+        cd {EXTENSION_NAME}
+        echo "Running black..."
+        black backend tests --check
+        echo "Running isort..."
+        isort backend tests --check-only
+        echo "Running flake8..."
+        flake8 backend
+        flake8 tests --extend-ignore=F401,W291,F841
+        
+    - name: Run tests
+      run: |
+        cd {EXTENSION_NAME}
+        bash run_tests.sh
+        
+    - name: Upload test logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: {EXTENSION_NAME}-test-logs
+        path: {EXTENSION_NAME}/test-logs/
+        retention-days: 7
+        if-no-files-found: warn

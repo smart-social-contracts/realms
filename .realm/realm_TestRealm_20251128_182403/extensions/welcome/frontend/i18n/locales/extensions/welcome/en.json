@@ -1,0 +1,46 @@
+{
+  "name": "Welcome",
+  "description": "Welcome page for Realms GOS",
+  "sidebar": "Welcome",
+  "title": "Realms GOS",
+  "page_title": "Realms GOS",
+  "hero": {
+    "title": "Realms GOS - The Governance Operating System",
+    "subtitle_1": "• Launch a full public administration in seconds",
+    "subtitle_2": "• Fully auditable. Fully transparent. AI-powered",
+    "subtitle_3": "• Engineered to eliminate corruption and inefficiencies",
+    "try_sandbox": "Try the sandbox"
+  },
+  "built_with": {
+    "text": "Built on the",
+    "with_love": "with ❤️ from 🇨🇭"
+  },
+  "mission": {
+    "title": "Governance as It Should Be",
+    "description": "<b>Realms</b> is a decentralized software platform for public administration — a Governance Operating System (GOS) designed to deliver essential public services such as justice, social welfare, property registries, and more. From small towns to entire nations, it empowers communities to design, run, and evolve their own governance systems — free from the corruption and inefficiencies of traditional bureaucracy."
+  },
+  "principles": {
+    "title": "Design principles",
+    "transparency": {
+      "title": "Transparency",
+      "description": "Transparency builds trust between the government and the public, as users can see how processes are executed and where resources, such as tax money, are allocated. Transparency also helps prevent corruption and strengthens the legitimacy of institutions."
+    },
+    "efficiency": {
+      "title": "Efficiency",
+      "description": "Efficiency involves delivering services effectively while minimizing costs and reducing waste. This fosters a strong sense of fairness, reinforcing public confidence in the governance system. As a result, users are more likely to support and comply with tax obligations, reducing tax evasion and promoting greater civic responsibility."
+    },
+    "diversity": {
+      "title": "Diversity",
+      "description": "Diversity in governance ensures that a wide range of perspectives are represented. This leads to more inclusive and equitable policies that cater to different societal needs, fostering social cohesion and reducing marginalization."
+    },
+    "resilience": {
+      "title": "Resilience",
+      "description": "Resilience enables governance systems to respond to crises, adapt to changes, and recover from setbacks, such as economic shocks or natural disasters. A resilient governance system ensures stability and continuity, even in times of stress, protecting long-term societal wellbeing."
+    }
+  },
+  "alt_text": {
+    "background": "Background {index}",
+    "internet_computer_logo": "Internet Computer Logo",
+    "realms_logo": "Realms Logo"
+  }
+}

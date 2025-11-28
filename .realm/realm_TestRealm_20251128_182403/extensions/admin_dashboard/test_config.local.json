@@ -1,0 +1,31 @@
+{
+  "$schema": "../_shared/testing/config/test_config.schema.json",
+  "extension_id": "admin_dashboard",
+  "test_type": "backend_only",
+  
+  "realm_config": {
+    "citizens": 5,
+    "organizations": 2,
+    "random": false
+  },
+  
+  "test_canisters": {
+    "enabled": false
+  },
+  
+  "backend_tests": {
+    "enabled": true,
+    "test_files": [
+      "tests/test_admin_simple.py"
+    ],
+    "test_directory": "tests"
+  },
+  
+  "e2e_tests": {
+    "enabled": false
+  },
+  
+  "linting": {
+    "enabled": false
+  }
+}

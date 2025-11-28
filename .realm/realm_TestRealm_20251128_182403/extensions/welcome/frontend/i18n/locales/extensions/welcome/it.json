@@ -1,0 +1,46 @@
+{
+  "name": "Benvenuto",
+  "description": "Pagina di benvenuto per Realms GOS",
+  "sidebar": "Benvenuto",
+  "title": "Realms GOS",
+  "page_title": "Realms GOS",
+  "hero": {
+    "title": "Realms GOS - Il Sistema Operativo di Governance",
+    "subtitle_1": "• Lancia un'amministrazione pubblica completa in secondi",
+    "subtitle_2": "• Completamente verificabile. Completamente trasparente. Alimentato dall'IA",
+    "subtitle_3": "• Progettato per eliminare corruzione e inefficienze",
+    "try_sandbox": "Prova la sandbox"
+  },
+  "built_with": {
+    "text": "Costruito sul",
+    "with_love": "con ❤️ dalla 🇨🇭"
+  },
+  "mission": {
+    "title": "Governance Come Dovrebbe Essere",
+    "description": "<b>Realms</b> è una piattaforma software decentralizzata per l'amministrazione pubblica — un Sistema Operativo di Governance (GOS) progettato per fornire servizi pubblici essenziali come giustizia, welfare sociale, registri di proprietà e altro. Dalle piccole città alle nazioni intere, consente alle comunità di progettare, gestire ed evolvere i propri sistemi di governance — liberi dalla corruzione e dalle inefficienze della burocrazia tradizionale."
+  },
+  "principles": {
+    "title": "Principi di progettazione",
+    "transparency": {
+      "title": "Trasparenza",
+      "description": "La trasparenza costruisce fiducia tra il governo e il pubblico, poiché gli utenti possono vedere come vengono eseguiti i processi e dove vengono allocate le risorse, come il denaro delle tasse. La trasparenza aiuta anche a prevenire la corruzione e rafforza la legittimità delle istituzioni."
+    },
+    "efficiency": {
+      "title": "Efficienza",
+      "description": "L'efficienza implica fornire servizi efficacemente minimizzando i costi e riducendo gli sprechi. Questo favorisce un forte senso di equità, rafforzando la fiducia pubblica nel sistema di governance. Di conseguenza, gli utenti sono più propensi a sostenere e rispettare gli obblighi fiscali, riducendo l'evasione fiscale e promuovendo una maggiore responsabilità civica."
+    },
+    "diversity": {
+      "title": "Diversità",
+      "description": "La diversità nella governance assicura che sia rappresentata un'ampia gamma di prospettive. Questo porta a politiche più inclusive ed eque che soddisfano diverse esigenze sociali, favorendo la coesione sociale e riducendo la marginalizzazione."
+    },
+    "resilience": {
+      "title": "Resilienza",
+      "description": "La resilienza consente ai sistemi di governance di rispondere alle crisi, adattarsi ai cambiamenti e riprendersi dalle battute d'arresto, come shock economici o disastri naturali. Un sistema di governance resiliente assicura stabilità e continuità, anche in tempi di stress, proteggendo il benessere sociale a lungo termine."
+    }
+  },
+  "alt_text": {
+    "background": "Sfondo {index}",
+    "internet_computer_logo": "Logo Internet Computer",
+    "realms_logo": "Logo Realms"
+  }
+}

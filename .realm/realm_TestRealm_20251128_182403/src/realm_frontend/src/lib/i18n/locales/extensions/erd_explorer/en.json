@@ -1,0 +1,31 @@
+{
+  "sidebar": "ERD Explorer",
+  "title": "ERD Explorer",
+  "description": "Interactive Entity Relationship Diagram explorer for visualizing and navigating Realms data structure",
+  "entity_diagram": "Entity Relationship Diagram",
+  "legend": {
+    "one_to_one": "OneToOne",
+    "one_to_many": "OneToMany",
+    "many_to_one": "ManyToOne",
+    "many_to_many": "ManyToMany"
+  },
+  "data_panel": {
+    "title": "Entity Data",
+    "fields": "Fields",
+    "relationships": "Relationships",
+    "sample_data": "Sample Data",
+    "no_data": "No sample data available",
+    "click_to_expand": "Click on the entity node to expand and view data",
+    "select_entity": "Select an entity from the diagram to view its data"
+  },
+  "table": {
+    "actions": "Actions",
+    "view": "View",
+    "previous": "Previous",
+    "next": "Next",
+    "page_of": "Page {current} of {total}"
+  },
+  "record_details": {
+    "title": "Record Details"
+  }
+}

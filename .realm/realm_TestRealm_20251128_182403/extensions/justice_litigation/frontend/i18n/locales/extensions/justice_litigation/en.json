@@ -1,0 +1,22 @@
+{
+  "name": "Justice Litigation",
+  "description": "Manage legal cases, track litigation progress, and access court documents",
+  "sidebar": "Justice Litigation",
+  "title": "Justice Litigation System",
+  "loading_data": "Loading litigation data...",
+  "profile": "Profile",
+  "total_cases": "Total Cases",
+  "refresh_data": "Refresh Data",
+  "all_litigations": "All Litigations",
+  "my_litigations": "My Litigations",
+  "create_litigation": "Create Litigation",
+  "statistics": "Statistics",
+  "pending": "Pending",
+  "resolved": "Resolved",
+  "cases": "Cases",
+  "documents": "Documents",
+  "hearings": "Hearings",
+  "status": "Status",
+  "no_cases": "No cases found",
+  "loading": "Loading cases..."
+}

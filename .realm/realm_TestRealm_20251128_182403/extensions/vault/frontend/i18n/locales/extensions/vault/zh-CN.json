@@ -1,0 +1,65 @@
+{
+  "name": "保险库管理器",
+  "description": "管理保险库配置、容器ID和保险库操作",
+  "sidebar": "保险库管理器",
+  "title": "保险库管理器",
+  "configuration": {
+    "title": "保险库配置",
+    "canister_id_label": "保险库容器ID",
+    "canister_id_placeholder": "输入保险库容器ID",
+    "load_vault": "加载保险库",
+    "current_vault": "当前保险库",
+    "error_invalid_id": "请输入有效的保险库容器ID"
+  },
+  "tabs": {
+    "overview": "概览",
+    "transfer": "转账",
+    "transactions": "交易记录",
+    "accounts": "账户"
+  },
+  "overview": {
+    "refresh_data": "刷新数据",
+    "balance_info": "余额信息",
+    "total_supply": "总供应量",
+    "active_accounts": "活跃账户",
+    "total_transactions": "总交易数"
+  },
+  "transfer": {
+    "title": "转账代币",
+    "recipient_label": "收款人地址（主体ID）",
+    "recipient_placeholder": "输入收款人主体ID",
+    "amount_label": "金额",
+    "amount_placeholder": "0.00",
+    "memo_label": "备注（可选）",
+    "memo_placeholder": "为此转账添加备注",
+    "submit": "转账代币",
+    "success": "转账成功完成！"
+  },
+  "transactions": {
+    "title": "交易历史",
+    "refresh": "刷新"
+  },
+  "accounts": {
+    "title": "账户余额",
+    "no_accounts": "未找到账户。",
+    "principal_id": "主体ID",
+    "balance": "余额 (ckBTC)"
+  },
+  "loading": "加载中...",
+  "loading_vault": "正在加载保险库数据...",
+  "error_prefix": "错误：",
+  "ledger_canisters": {
+    "title": "支持的账本容器",
+    "ckbtc_ledger": "ckBTC账本",
+    "ckbtc_indexer": "ckBTC索引器",
+    "copy_tooltip": "点击复制"
+  },
+  "vault_balance": {
+    "title": "保险库总余额",
+    "refresh": "刷新",
+    "querying": "查询中...",
+    "refresh_tooltip": "从账本查询当前余额",
+    "description": "这是保险库在ckBTC账本上的总余额",
+    "satoshis": "聪"
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "$schema": "../_shared/testing/config/test_config.schema.json",
+  "extension_id": "admin_dashboard",
+  "test_type": "full",
+  
+  "realm_config": {
+    "random": true
+  },
+  
+  "test_canisters": {
+    "enabled": false
+  },
+  
+  "backend_tests": {
+    "enabled": true,
+    "test_files": [
+      "tests/test_admin_dashboard.py",
+      "tests/test_registration_codes.py",
+      "tests/test_csv_import.py",
+      "tests/test_edge_cases.py"
+    ],
+    "test_directory": "tests"
+  },
+  
+  "e2e_tests": {
+    "enabled": true,
+    "base_path": "/admin",
+    "warmup": true
+  },
+  
+  "linting": {
+    "enabled": true,
+    "black": true,
+    "isort": true,
+    "flake8": true,
+    "mypy": true
+  },
+  
+  "docker": {
+    "image": "ghcr.io/smart-social-contracts/realms:ui-test-latest",
+    "container_name_prefix": "admin-dashboard-test",
+    "port_mapping": {
+      "host_port": 8002,
+      "container_port": 8000
+    }
+  },
+  
+  "environment": {
+    "PLAYWRIGHT_BASE_URL": "http://localhost:8000",
+    "E2E_WARMUP_PATH": "/admin"
+  }
+}

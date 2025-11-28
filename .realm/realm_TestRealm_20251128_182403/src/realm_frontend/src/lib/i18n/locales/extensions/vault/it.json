@@ -1,0 +1,54 @@
+{
+  "title": "Gestore Vault",
+  "configuration": {
+    "title": "Configurazione Vault",
+    "canister_id_label": "ID Canister Vault",
+    "canister_id_placeholder": "Inserisci l'ID del canister vault",
+    "load_vault": "Carica Vault",
+    "current_vault": "Vault Corrente",
+    "error_invalid_id": "Inserisci un ID canister vault valido"
+  },
+  "tabs": {
+    "overview": "Panoramica",
+    "transfer": "Trasferimento",
+    "transactions": "Transazioni",
+    "accounts": "Account"
+  },
+  "overview": {
+    "refresh_data": "Aggiorna Dati",
+    "balance_info": "Informazioni Saldo",
+    "total_supply": "Fornitura Totale",
+    "active_accounts": "Account attivi",
+    "total_transactions": "Transazioni totali"
+  },
+  "transfer": {
+    "title": "Trasferisci Token",
+    "recipient_label": "Indirizzo Destinatario (ID Principale)",
+    "recipient_placeholder": "Inserisci l'ID principale del destinatario",
+    "amount_label": "Importo",
+    "amount_placeholder": "0,00",
+    "memo_label": "Memo (Opzionale)",
+    "memo_placeholder": "Aggiungi una nota su questo trasferimento",
+    "submit": "Trasferisci Token",
+    "success": "Trasferimento completato con successo!"
+  },
+  "transactions": {
+    "title": "Cronologia Transazioni",
+    "refresh": "Aggiorna"
+  },
+  "accounts": {
+    "title": "Saldi Account",
+    "no_accounts": "Nessun account trovato.",
+    "principal_id": "ID Principale",
+    "balance": "Saldo (ckBTC)"
+  },
+  "loading": "Caricamento...",
+  "loading_vault": "Caricamento dati vault...",
+  "error_prefix": "Errore:",
+  "ledger_canisters": {
+    "title": "Canister Ledger Supportati",
+    "ckbtc_ledger": "Ledger ckBTC",
+    "ckbtc_indexer": "Indicizzatore ckBTC",
+    "copy_tooltip": "Clicca per copiare"
+  }
+}

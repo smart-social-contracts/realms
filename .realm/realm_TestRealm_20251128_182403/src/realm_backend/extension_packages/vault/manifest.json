@@ -1,0 +1,54 @@
+{
+  "name": "vault",
+  "version": "0.1.4",
+  "description": "Secure digital asset and token management extension for Realms. Provides treasury functionality with ckBTC support, transaction history tracking, and balance management.",
+  "author": "Smart Social Contracts",
+  "repository": "https://github.com/smart-social-contracts/realms-extension-vault",
+  "license": "MIT",
+  "realms_compatibility": {
+    "min_version": "0.1.0",
+    "max_version": "0.2.x"
+  },
+  "permissions": [
+    "treasury_management"
+  ],
+  "entry_points": [
+    "get_balance",
+    "get_status",
+    "get_transactions",
+    "transfer",
+    "refresh",
+    "get_vault_balance",
+    "refresh_vault_balance"
+  ],
+  "profiles": [
+    "admin"
+  ],
+  "categories": [
+    "finances"
+  ],
+  "icon": "wallet",
+  "doc_url": "https://github.com/smart-social-contracts/realms-extension-vault",
+  "url_path": null,
+  "show_in_sidebar": true,
+  "python_dependencies": [
+    "kybra==0.7.*",
+    "kybra-simple-db>=0.4.0",
+    "kybra-simple-logging==0.2.*"
+  ],
+  "entity_method_overrides": [
+    {
+      "entity": "Transfer",
+      "method": "execute",
+      "implementation": "methods.execute_transfer",
+      "description": "Execute external blockchain transfer via vault"
+    },
+    {
+      "entity": "Balance",
+      "method": "refresh",
+      "type": "classmethod",
+      "implementation": "methods.refresh_balance",
+      "description": "Sync all balances with vault state"
+    }
+  ]
+}

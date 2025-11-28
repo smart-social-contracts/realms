@@ -1,0 +1,17 @@
+{
+  "sidebar": "Extensions Marketplace",
+  "title": "Extensions Marketplace",
+  "description": "Browse and manage extensions for your realm. Discover new functionality and install extensions to enhance your governance platform.",
+  "required_permissions": "Required Permissions",
+  "open_extension": "Open Extension",
+  "loading": "Loading extensions...",
+  "error_loading": "Error Loading Extensions",
+  "try_again": "Try Again",
+  "installed": "Installed",
+  "available": "Available",
+  "install": "Install",
+  "author": "Author",
+  "profiles": "Profiles",
+  "version": "Version",
+  "categories": "Categories"
+}

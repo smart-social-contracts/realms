@@ -1,0 +1,24 @@
+{
+  "extension_id": "member_dashboard",
+  "test_type": "full",
+  "docker": {
+    "image": "ghcr.io/smart-social-contracts/realms:ui-test-latest",
+    "container_name_prefix": "member_dashboard",
+    "port_mapping": {
+      "host_port": 8001,
+      "container_port": 8000
+    }
+  },
+  "e2e_tests": {
+    "enabled": true,
+    "test_dir": "tests/e2e",
+    "base_url": "http://localhost:8000"
+  },
+  "python_tests": {
+    "enabled": true,
+    "test_files": [
+      "tests/test_imports.py",
+      "tests/test_member_dashboard.py"
+    ]
+  }
+}

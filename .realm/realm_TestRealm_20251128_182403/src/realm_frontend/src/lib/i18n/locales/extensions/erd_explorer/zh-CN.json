@@ -1,0 +1,31 @@
+{
+  "sidebar": "ERD 浏览器",
+  "title": "ERD 浏览器",
+  "description": "交互式实体关系图浏览器，用于可视化和导航 Realms 数据结构",
+  "entity_diagram": "实体关系图",
+  "legend": {
+    "one_to_one": "一对一",
+    "one_to_many": "一对多",
+    "many_to_one": "多对一",
+    "many_to_many": "多对多"
+  },
+  "data_panel": {
+    "title": "实体数据",
+    "fields": "字段",
+    "relationships": "关系",
+    "sample_data": "示例数据",
+    "no_data": "没有可用的示例数据",
+    "click_to_expand": "点击实体节点以展开并查看数据",
+    "select_entity": "从图表中选择一个实体以查看其数据"
+  },
+  "table": {
+    "actions": "操作",
+    "view": "查看",
+    "previous": "上一页",
+    "next": "下一页",
+    "page_of": "第 {current} 页，共 {total} 页"
+  },
+  "record_details": {
+    "title": "记录详情"
+  }
+}

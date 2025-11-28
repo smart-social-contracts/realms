@@ -1,0 +1,11 @@
+# Extension Python Dependencies
+# These will be checked during extension installation
+
+kybra==0.7.*
+kybra-simple-logging==0.2.*
+kybra-simple-db==0.5.0
+
+
+# Development dependencies (optional)
+pytest>=7.0.0
+pytest-cov>=4.0.0

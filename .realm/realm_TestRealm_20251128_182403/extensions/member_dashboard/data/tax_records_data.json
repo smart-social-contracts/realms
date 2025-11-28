@@ -1,0 +1,62 @@
+[
+  {
+    "timestamp_created": "2025-01-15 10:00:00.000",
+    "timestamp_updated": "2025-01-15 10:00:00.000",
+    "creator": "system",
+    "updater": "system",
+    "owner": "system",
+    "_type": "Invoice",
+    "_id": "invoice-001",
+    "id": "invoice-001",
+    "amount": 2450.75,
+    "due_date": "2025-03-01T10:00:00Z",
+    "status": "Pending",
+    "user": "3",
+    "metadata": "Income Tax - Annual personal income tax (2024)"
+  },
+  {
+    "timestamp_created": "2025-01-15 10:00:00.000",
+    "timestamp_updated": "2025-01-15 10:00:00.000",
+    "creator": "system",
+    "updater": "system",
+    "owner": "system",
+    "_type": "Invoice",
+    "_id": "invoice-002",
+    "id": "invoice-002",
+    "amount": 650.00,
+    "due_date": "2024-12-31T10:00:00Z",
+    "status": "Overdue",
+    "user": "3",
+    "metadata": "Property Tax - Residential property tax (2024 Q1)"
+  },
+  {
+    "timestamp_created": "2025-01-15 10:00:00.000",
+    "timestamp_updated": "2025-01-15 10:00:00.000",
+    "creator": "system",
+    "updater": "system",
+    "owner": "system",
+    "_type": "Invoice",
+    "_id": "invoice-003",
+    "id": "invoice-003",
+    "amount": 320.50,
+    "due_date": "2024-11-15T10:00:00Z",
+    "status": "Paid",
+    "user": "4",
+    "metadata": "Vehicle Tax - Annual vehicle ownership tax (2024)"
+  },
+  {
+    "timestamp_created": "2025-01-15 10:00:00.000",
+    "timestamp_updated": "2025-01-15 10:00:00.000",
+    "creator": "system",
+    "updater": "system",
+    "owner": "system",
+    "_type": "Invoice",
+    "_id": "invoice-004",
+    "id": "invoice-004",
+    "amount": 1200.00,
+    "due_date": "2025-01-25T10:00:00Z",
+    "status": "Pending",
+    "user": "4",
+    "metadata": "Business Tax - Quarterly business operations tax (2024 Q2)"
+  }
+]

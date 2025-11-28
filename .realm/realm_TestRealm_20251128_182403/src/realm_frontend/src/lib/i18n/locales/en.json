@@ -1,0 +1,68 @@
+{
+  "common": {
+    "welcome": "Welcome to Realms",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "home": "Home",
+    "settings": "Settings",
+    "login": "Log In",
+    "logout": "Logout",
+    "profile": "Profile",
+    "search": "Search",
+    "join": "Join",
+    "switch_user": "Switch User",
+    "identities": "My Identities",
+    "main_menu": "Main menu"
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "explore": "Explore",
+    "about": "About",
+    "admin_dashboard": "Admin Dashboard",
+    "extensions_marketplace": "Extensions Marketplace",
+    "citizen_dashboard": "Citizen Dashboard",
+    "vault_manager": "Vault Manager"
+  },
+  "buttons": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "submit": "Submit",
+    "edit": "Edit",
+    "delete": "Delete",
+    "login": "Log In",
+    "join": "Join",
+    "switch_user": "Switch User"
+  },
+  "settings": {
+    "title": "User Settings",
+    "select_language": "Select Language",
+    "language_description": "Choose your preferred display language for the interface",
+    "time_zone": "Time Zone",
+    "save_all": "Save all",
+    "profile_picture": "Profile Picture"
+  },
+  "notifications": {
+    "title": "Notifications"
+  },
+  "demo_banner": {
+    "title": "Demo Mode Active",
+    "description": "This application is running in demonstration mode with sample data. Features and data shown are for demonstration purposes only.",
+    "dismiss_label": "Dismiss demo mode notice"
+  },
+  "categories": {
+    "public_services": "Public Services",
+    "finances": "Financial Management",
+    "oversight": "Oversight & Analytics",
+    "system": "System Administration",
+    "other": "Other"
+  },
+  "extensions": {
+    "market_place": {
+      "sidebar": "Extensions Marketplace",
+      "title": "Extensions Marketplace",
+      "description": "Browse and install extensions",
+      "required_permissions": "Required Permissions",
+      "open_extension": "Open Extension"
+    }
+  }
+}

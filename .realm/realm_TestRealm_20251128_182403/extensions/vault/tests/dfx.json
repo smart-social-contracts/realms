@@ -1,0 +1,21 @@
+{
+  "canisters": {
+    "ckbtc_ledger": {
+      "type": "custom",
+      "wasm": "artifacts/ledger_suite_icrc/ledger.wasm",
+      "candid": "artifacts/ledger_suite_icrc/ledger.did"
+    },
+    "ckbtc_indexer": {
+      "type": "custom",
+      "wasm": "artifacts/ledger_suite_icrc/indexer.wasm",
+      "candid": "artifacts/ledger_suite_icrc/indexer.did"
+    }
+  },
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:8000",
+      "type": "ephemeral"
+    }
+  },
+  "version": 1
+}

@@ -1,0 +1,87 @@
+{
+  "common": {
+    "welcome": "Willkommen bei Realms",
+    "loading": "Wird geladen...",
+    "error": "Ein Fehler ist aufgetreten",
+    "home": "Startseite",
+    "settings": "Einstellungen",
+    "login": "Anmelden",
+    "logout": "Abmelden",
+    "profile": "Profil",
+    "search": "Suche",
+    "join": "Beitreten",
+    "switch_user": "Benutzer wechseln",
+    "identities": "Meine Identitäten",
+    "main_menu": "Hauptmenü"
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "explore": "Erkunden",
+    "about": "Über uns",
+    "admin_dashboard": "Admin-Dashboard",
+    "extensions_marketplace": "Erweiterungsmarktplatz",
+    "citizen_dashboard": "Bürger-Dashboard",
+    "vault_manager": "Tresor-Manager"
+  },
+  "buttons": {
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "submit": "Absenden",
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "login": "Anmelden",
+    "join": "Beitreten",
+    "switch_user": "Benutzer wechseln"
+  },
+  "settings": {
+    "title": "Benutzereinstellungen",
+    "select_language": "Sprache auswählen",
+    "language_description": "Wählen Sie Ihre bevorzugte Anzeigesprache für die Benutzeroberfläche",
+    "time_zone": "Zeitzone",
+    "save_all": "Alles speichern"
+  },
+  "extensions": {
+    "marketplace": {
+      "title": "Erweiterungsmarktplatz",
+      "description": "Durchsuchen und installieren Sie Erweiterungen, um Ihre Smart Social Contracts-Plattform zu erweitern. Diese modularen Apps fügen neue Funktionen hinzu und gewährleisten gleichzeitig Sicherheit durch unser Berechtigungssystem.",
+      "required_permissions": "Erforderliche Berechtigungen:",
+      "open_extension": "Erweiterung öffnen"
+    },
+    "vault_manager": {
+      "name": "Tresor-Manager",
+      "description": "Verwalten Sie Ihre Tresor-Salden und übertragen Sie Token"
+    },
+    "notifications": {
+      "name": "Benachrichtigungen",
+      "description": "Anzeigen und verwalten Sie Ihre Benachrichtigungen in einer Posteingang-ähnlichen Oberfläche"
+    },
+    "citizen_dashboard": {
+      "name": "Bürger-Dashboard",
+      "description": "Sehen Sie Ihre öffentlichen Dienste, Steuerinformationen und persönlichen Daten an einem Ort"
+    },
+    "justice_litigation": {
+      "name": "Justiz & Rechtsstreitigkeiten",
+      "description": "Verwalten Sie Rechtsfälle und Rechtsstreitverfahren"
+    },
+    "land_registry": {
+      "name": "Grundbuch",
+      "description": "Verwalten Sie Landbesitz und Eigentumsaufzeichnungen"
+    },
+    "llm_chat": {
+      "name": "LLM-Chat",
+      "description": "KI-gestützter Chat-Assistent für Smart Contracts"
+    },
+    "metrics": {
+      "name": "Metriken",
+      "description": "Systemmetriken und Analysen anzeigen"
+    },
+    "public_dashboard": {
+      "name": "Öffentliches Dashboard",
+      "description": "Öffentliches Dashboard für Gemeinschaftsinformationen"
+    },
+    "test_bench": {
+      "name": "Testbank",
+      "description": "Test- und Entwicklungstools"
+    }
+  }
+}        

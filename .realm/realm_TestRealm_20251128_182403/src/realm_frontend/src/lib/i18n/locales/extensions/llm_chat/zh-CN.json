@@ -1,0 +1,17 @@
+{
+  "name": "AI 助手",
+  "description": "治理 AI 助手，用于智能对话",
+  "sidebar": "AI 助手",
+  "title": "治理 AI 助手",
+  "start_conversation": "开始与 LLM 对话！",
+  "welcome_authenticated": "欢迎回来！您想讨论什么？",
+  "welcome_visitor": "欢迎！我是阿育王，您的AI助手。我可以帮助您回答关于此领域的任何问题。",
+  "message_placeholder": "输入您的消息...",
+  "no_response": "LLM 无响应",
+  "error_response": "无法从 LLM 获取响应。请重试。",
+  "loading": "加载中...",
+  "suggestions_title": "试试问：",
+  "suggestion_1": "什么是领域？",
+  "suggestion_2": "什么是AI治理助手？",
+  "suggestion_3": "为什么我应该加入这个领域？"
+}

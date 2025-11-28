@@ -1,0 +1,12 @@
+{
+  "type": "mundus",
+  "realms": [
+    "realm1",
+    "realm2",
+    "realm3"
+  ],
+  "registries": [
+    "registry"
+  ],
+  "name": "TestRealm"
+}

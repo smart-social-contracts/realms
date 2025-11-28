@@ -1,0 +1,46 @@
+{
+  "name": "Willkommen",
+  "description": "Willkommensseite für Realms GOS",
+  "sidebar": "Willkommen",
+  "title": "Realms GOS",
+  "page_title": "Realms GOS",
+  "hero": {
+    "title": "Realms GOS - Das Governance-Betriebssystem",
+    "subtitle_1": "• Starten Sie eine vollständige öffentliche Verwaltung in Sekunden",
+    "subtitle_2": "• Vollständig auditierbar. Vollständig transparent. KI-gesteuert",
+    "subtitle_3": "• Entwickelt, um Korruption und Ineffizienzen zu beseitigen",
+    "try_sandbox": "Sandbox ausprobieren"
+  },
+  "built_with": {
+    "text": "Gebaut auf dem",
+    "with_love": "mit ❤️ aus 🇨🇭"
+  },
+  "mission": {
+    "title": "Governance Wie Sie Sein Sollte",
+    "description": "<b>Realms</b> ist eine dezentrale Softwareplattform für die öffentliche Verwaltung — ein Governance-Betriebssystem (GOS), das darauf ausgelegt ist, wesentliche öffentliche Dienstleistungen wie Justiz, Sozialwesen, Eigentumsregister und mehr zu liefern. Von kleinen Städten bis zu ganzen Nationen ermöglicht es Gemeinschaften, ihre eigenen Governance-Systeme zu entwerfen, zu betreiben und weiterzuentwickeln — frei von der Korruption und den Ineffizienzen traditioneller Bürokratie."
+  },
+  "principles": {
+    "title": "Designprinzipien",
+    "transparency": {
+      "title": "Transparenz",
+      "description": "Transparenz schafft Vertrauen zwischen der Regierung und der Öffentlichkeit, da die Nutzer sehen können, wie Prozesse ausgeführt werden und wo Ressourcen wie Steuergelder zugeteilt werden. Transparenz hilft auch dabei, Korruption zu verhindern und stärkt die Legitimität von Institutionen."
+    },
+    "efficiency": {
+      "title": "Effizienz",
+      "description": "Effizienz bedeutet, Dienstleistungen effektiv zu erbringen und gleichzeitig Kosten zu minimieren und Verschwendung zu reduzieren. Dies fördert ein starkes Gefühl der Fairness und stärkt das öffentliche Vertrauen in das Governance-System. Infolgedessen sind Nutzer eher bereit, Steuerpflichten zu unterstützen und einzuhalten, wodurch Steuerhinterziehung reduziert und größere Bürgerpflicht gefördert wird."
+    },
+    "diversity": {
+      "title": "Vielfalt",
+      "description": "Vielfalt in der Governance stellt sicher, dass eine breite Palette von Perspektiven vertreten ist. Dies führt zu inklusiveren und gerechteren Politiken, die verschiedenen gesellschaftlichen Bedürfnissen gerecht werden, den sozialen Zusammenhalt fördern und Marginalisierung reduzieren."
+    },
+    "resilience": {
+      "title": "Widerstandsfähigkeit",
+      "description": "Widerstandsfähigkeit ermöglicht es Governance-Systemen, auf Krisen zu reagieren, sich an Veränderungen anzupassen und sich von Rückschlägen wie wirtschaftlichen Schocks oder Naturkatastrophen zu erholen. Ein widerstandsfähiges Governance-System gewährleistet Stabilität und Kontinuität, auch in Stresszeiten, und schützt das langfristige gesellschaftliche Wohlbefinden."
+    }
+  },
+  "alt_text": {
+    "background": "Hintergrund {index}",
+    "internet_computer_logo": "Internet Computer Logo",
+    "realms_logo": "Realms Logo"
+  }
+}
