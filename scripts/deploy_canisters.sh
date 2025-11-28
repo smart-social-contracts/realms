@@ -226,3 +226,13 @@ if [ "$NETWORK" = "local" ]; then
     
     echo ""
 fi
+
+echo ""
+echo "🔧 Generating TypeScript declarations..."
+dfx generate
+
+echo ""
+echo "✅ All done! Frontend ready at: http://localhost:$PORT/"
+echo ""
+
+exit 0
