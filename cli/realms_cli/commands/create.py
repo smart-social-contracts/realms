@@ -200,14 +200,23 @@ def create_command(
     
     try:
         subprocess.run(cmd, check=True, cwd=repo_root)
-        console.print(f"\n[green]✅ Realm created successfully at: {output_path.absolute()}[/green]")
     except subprocess.CalledProcessError as e:
         console.print(f"[red]❌ Error creating realm: {e}[/red]")
         raise typer.Exit(1)
+    
+    # Generate deployment scripts after data generation
+    _generate_deployment_scripts(output_path, network, realm_name, random, no_extensions=False)
+    
+    console.print(f"\n[green]✅ Realm created successfully at: {output_path.absolute()}[/green]")
 
 
-# Old code for deployment script generation - now handled by realm_generator.py
-def _old_script_generation():
+def _generate_deployment_scripts(
+    output_path: Path,
+    network: str,
+    realm_name: str,
+    has_random_data: bool,
+    no_extensions: bool = False
+):
     """Deployment script generation - kept for reference but not used."""
     # Copy deployment scripts from existing files
     console.print("\n🔧 Generating deployment scripts...")

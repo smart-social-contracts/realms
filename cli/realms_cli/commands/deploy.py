@@ -56,6 +56,9 @@ def _deploy_realm_internal(
             "4-run-adjustments.py",
         ]
 
+        scripts_executed = 0
+        scripts_found = 0
+        
         try:
             for script_name in scripts:
                 script_path = scripts_dir / script_name
@@ -64,7 +67,8 @@ def _deploy_realm_internal(
                         f"[yellow]⚠️  Script not found: {script_path}[/yellow]"
                     )
                     continue
-
+                
+                scripts_found += 1
                 console.print(f"🔧 Running {script_name}...")
                 console.print(f"[dim]Script path: {script_path}[/dim]")
                 console.print(f"[dim]Network: {network}[/dim]")
@@ -108,6 +112,7 @@ def _deploy_realm_internal(
                         f"[green]✅ {script_name} completed successfully[/green]"
                     )
                     logger.info(f"{script_name} completed successfully")
+                    scripts_executed += 1
                 else:
                     console.print(f"[red]❌ {script_name} failed[/red]")
                     console.print(f"[yellow]Check realms.log for details[/yellow]")
@@ -116,13 +121,27 @@ def _deploy_realm_internal(
 
                 console.print("")  # Add spacing between scripts
 
-            console.print(
-                "[green]🎉 All deployment scripts completed successfully![/green]"
-            )
-            console.print(
-                "[dim]Full deployment log saved to realms.log[/dim]"
-            )
-            logger.info("All deployment scripts completed successfully")
+            # Show appropriate message based on what actually ran
+            if scripts_found == 0:
+                console.print(
+                    "[red]❌ No deployment scripts found![/red]"
+                )
+                console.print(
+                    "[yellow]Run 'realms realm create' to generate a realm with deployment scripts[/yellow]"
+                )
+                raise typer.Exit(1)
+            elif scripts_executed == scripts_found:
+                console.print(
+                    f"[green]🎉 All {scripts_executed} deployment script(s) completed successfully![/green]"
+                )
+                console.print(
+                    "[dim]Full deployment log saved to realms.log[/dim]"
+                )
+                logger.info(f"All {scripts_executed} deployment scripts completed successfully")
+            else:
+                console.print(
+                    f"[yellow]⚠️  Only {scripts_executed}/{scripts_found} scripts executed[/yellow]"
+                )
 
         except Exception as e:
             console.print(f"[red]❌ Error during script execution: {e}[/red]")
