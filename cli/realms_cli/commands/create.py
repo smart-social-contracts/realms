@@ -212,7 +212,7 @@ def create_command(
         raise typer.Exit(1)
     
     # Generate deployment scripts after data generation
-    _generate_deployment_scripts(output_path, network, realm_name, random, repo_root, no_extensions=False)
+    _generate_deployment_scripts(output_path, network, realm_name, random, repo_root, deploy, identity, mode, no_extensions=False)
     
     console.print(f"\n[green]✅ Realm created successfully at: {output_path.absolute()}[/green]")
 
@@ -223,6 +223,9 @@ def _generate_deployment_scripts(
     realm_name: str,
     has_random_data: bool,
     repo_root: Path,
+    deploy: bool,
+    identity: Optional[str],
+    mode: str,
     no_extensions: bool = False
 ):
     """Deployment script generation - kept for reference but not used."""
