@@ -34,7 +34,7 @@ realms --help
 ### Quick Start
 ```bash
 # 1. Create realm with demo data
-realms create --random --citizens 50
+realms realm create --random --citizens 50
 
 # 2. Start local replica
 cd generated_realm
@@ -315,14 +315,14 @@ realms export --entity-types User,Proposal,Vote --network ic
 ### Development
 ```bash
 # Fast iterations, mock data
-realms create --random --citizens 10
+realms realm create --random --citizens 10
 dfx deploy --mode reinstall
 ```
 
 ### Staging
 ```bash
 # Production-like setup
-realms create --realm-name "Staging" --no-extensions
+realms realm create --realm-name "Staging" --no-extensions
 dfx deploy --network staging --mode upgrade
 realms import staging_data.json --network staging
 ```
@@ -330,7 +330,7 @@ realms import staging_data.json --network staging
 ### Production
 ```bash
 # Full production deployment
-realms create --realm-name "Production"
+realms realm create --realm-name "Production"
 dfx deploy --network ic --mode upgrade --with-cycles 10000000000000
 realms import prod_data.json --network ic
 ```

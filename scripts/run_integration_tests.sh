@@ -46,7 +46,7 @@ else
     log_info "Will copy test files after container start (CI mode)"
 fi
 
-# Start container (let realms deploy handle dfx startup)
+# Start container (let realms realm deploy handle dfx startup)
 log_info "Starting container..."
 docker run -d \
   --name "$CONTAINER_NAME" \

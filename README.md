@@ -138,7 +138,7 @@ realms extension install --source /path/to/my-extension/
 
 # Deploy for testing
 dfx start --clean --background
-realms deploy --network local
+realms realm deploy --network local
 
 # Test your extension
 dfx canister call realm_backend extension_call '("my_extension", "my_function", "{\"param\": \"value\"}")'
@@ -151,7 +151,7 @@ dfx canister call realm_backend extension_call '("my_extension", "my_function", 
 pip install realms-cli
 
 # Create a realm
-realms create my-realm --deploy
+realms realm create my-realm --deploy
 
 # Install extension from GitHub release
 realms extension install my_extension \
@@ -161,7 +161,7 @@ realms extension install my_extension \
 realms extension install my_extension@1.0.0
 
 # Deploy
-realms deploy
+realms realm deploy
 ```
 
 ### Managing Extensions
@@ -378,10 +378,10 @@ def async_task():
 pip install realms-cli  # (future - for now: pip install -e cli/)
 
 # Create a new realm
-realms create my-realm --deploy
+realms realm create my-realm --deploy
 
 # Or create with random data for testing
-realms create my-realm --random --deploy
+realms realm create my-realm --random --deploy
 ```
 
 ### Configure Your Realm

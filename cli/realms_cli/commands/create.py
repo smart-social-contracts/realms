@@ -571,7 +571,7 @@ ic.print("len(Codex.instances()) = %d" % len(Codex.instances()))
             # Multi-realm mundus
             console.print("Deploy all canisters with one of these options:\n")
             console.print("[bold]Option 1:[/bold] Use the create command with --deploy flag")
-            console.print("  realms create --deploy --output-dir ./demo-mundus --realm-name \"My Mundus\"\n")
+            console.print("  realms realm create --deploy --output-dir ./demo-mundus --realm-name \"My Mundus\"\n")
             console.print("[bold]Option 2:[/bold] Deploy each canister manually:")
             canisters = []
             for realm_folder in mundus_config.get("realms", []):
@@ -582,4 +582,4 @@ ic.print("len(Codex.instances()) = %d" % len(Codex.instances()))
             for canister in canisters:
                 console.print(f"  dfx deploy {canister}")
         else:
-            console.print("realms deploy")
+            console.print("realms realm deploy")

@@ -46,8 +46,8 @@ docker run -d \
   --name realms-test \
   ghcr.io/smart-social-contracts/realms:latest \
   bash -c "dfx start --clean --background && \
-           realms create --random --citizens 10 && \
-           realms deploy && \
+           realms realm create --random --citizens 10 && \
+           realms realm deploy && \
            sleep infinity"
 
 # Wait for deployment
@@ -69,8 +69,8 @@ docker rm -f realms-test
 ```bash
 # Ensure realm is deployed
 dfx start --clean --background
-realms create --random
-realms deploy
+realms realm create --random
+realms realm deploy
 
 # Run all tests
 bash tests/integration/run_tests.sh
@@ -148,7 +148,7 @@ The GitHub Actions workflow uses `scripts/run_integration_tests.sh`:
 
 The script:
 1. Starts a Docker container with the test image
-2. Deploys a realm inside the container (`realms create && realms deploy`)
+2. Deploys a realm inside the container (`realms realm create && realms realm deploy`)
 3. Keeps the container running with `sleep infinity`
 4. **Mounts or copies test files**:
    - **Local dev (default)**: Uses volume mounting (`-v $(pwd)/tests:/app/tests:ro`) for instant updates
@@ -190,7 +190,7 @@ def test_my_update_endpoint():
 ## Requirements
 
 - dfx installed and in PATH
-- Realm deployed (`realms create && realms deploy`)
+- Realm deployed (`realms realm create && realms realm deploy`)
 - Python 3 (no external dependencies required)
 
 ## Notes

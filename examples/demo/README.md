@@ -37,7 +37,7 @@ The `manifest.json` in this folder defines:
 
 ## Usage
 
-When running `realms create`, the command reads this manifest and generates:
+When running `realms realm create`, the command reads this manifest and generates:
 
 ### Output Structure
 ```
@@ -60,7 +60,7 @@ When running `realms create`, the command reads this manifest and generates:
 ### Command Example
 ```bash
 # Generate all realms and registry
-realms create --random --members 50 --output-dir ./my-mundus
+realms realm create --random --members 50 --output-dir ./my-mundus
 
 # This will create:
 # - 3 realms (realm1, realm2, realm3) each with 50 members
@@ -101,4 +101,4 @@ To customize the demo mundus:
 
 ## Single Source of Truth
 
-This folder serves as the canonical demo configuration. Any changes made here will automatically propagate to all newly created mundus instances via the `realms create` command.
+This folder serves as the canonical demo configuration. Any changes made here will automatically propagate to all newly created mundus instances via the `realms realm create` command.

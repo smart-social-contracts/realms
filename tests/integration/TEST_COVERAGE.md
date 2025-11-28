@@ -132,8 +132,8 @@ See `.github/workflows/ci-main.yml` for the full CI configuration.
 ## Implicitly Tested Commands
 
 The following CLI commands are tested through CI workflows:
-- ✅ `realms create` - Used in integration test setup
-- ✅ `realms deploy` - Used in integration test setup
+- ✅ `realms realm create` - Used in integration test setup
+- ✅ `realms realm deploy` - Used in integration test setup
 - ✅ `realms extension install-from-source` - Used in Docker builds
 - ✅ `realms import` - Used in generated upload scripts
 

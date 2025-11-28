@@ -53,8 +53,8 @@ The system now uses:
 ```bash
 # Ensure realm is deployed
 dfx start --clean --background
-realms create --random
-realms deploy
+realms realm create --random
+realms realm deploy
 
 # Run task manager integration tests
 python3 tests/integration/test_task_manager_api.py

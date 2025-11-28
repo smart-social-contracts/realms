@@ -12,7 +12,7 @@ npx playwright install
 
 2. Deploy the realm (from project root):
 ```bash
-realms deploy
+realms realm deploy
 ```
 
 3. Run E2E tests:

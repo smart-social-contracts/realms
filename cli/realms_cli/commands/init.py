@@ -43,7 +43,7 @@ A Realms governance platform project.
 
 1. Deploy the realm:
    ```bash
-   realms deploy --file realm_config.json
+   realms realm deploy --file realm_config.json
    ```
 
 2. Access your realm at the provided URL after deployment.
@@ -60,7 +60,7 @@ This realm includes the following extensions:
 
 For development and testing, use:
 ```bash
-realms deploy --network local
+realms realm deploy --network local
 ```
 """
 
@@ -69,5 +69,5 @@ def init_command(*args, **kwargs):
     """Placeholder init command - functionality was removed in commit f1a0adb."""
     raise NotImplementedError(
         "The init command was removed to simplify CLI focus on deployment. "
-        "Use 'realms create --random' for generating demo realms or manually create realm_config.json."
+        "Use 'realms realm create --random' for generating demo realms or manually create realm_config.json."
     )

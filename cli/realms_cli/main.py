@@ -1111,7 +1111,7 @@ def main(
 
     Quick start:
     1. Copy and modify example_realm_config.json
-    2. realms deploy --file your_config.json
+    2. realms realm deploy --file your_config.json
     3. realms status
     """
     if version_flag:
