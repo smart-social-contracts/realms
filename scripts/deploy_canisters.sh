@@ -202,12 +202,27 @@ echo ""
 # Show canister URLs for local deployment
 if [ "$NETWORK" = "local" ]; then
     echo "🌐 Canister URLs:"
-    dfx canister list 2>/dev/null | while read -r line; do
-        canister_name=$(echo "$line" | awk '{print $1}')
-        canister_id=$(echo "$line" | awk '{print $2}')
-        if [[ $canister_name == *"frontend"* ]]; then
-            echo "   $canister_name: http://localhost:$PORT/?canisterId=$canister_id"
+    
+    # Get port from dfx replica status or use default
+    if [ -z "$PORT" ]; then
+        PORT=$(dfx info replica-port 2>/dev/null || echo "8000")
+    fi
+    
+    # Show URLs for each frontend canister
+    for canister in $FRONTENDS; do
+        canister_id=$(dfx canister id "$canister" 2>/dev/null || echo "")
+        if [ -n "$canister_id" ]; then
+            echo "   🌐 $canister: http://$canister_id.localhost:$PORT/"
         fi
     done
+    
+    # Show Candid UI for each backend canister
+    for canister in $BACKENDS; do
+        canister_id=$(dfx canister id "$canister" 2>/dev/null || echo "")
+        if [ -n "$canister_id" ]; then
+            echo "   🔧 $canister (Candid UI): http://localhost:$PORT/?canisterId=$canister_id"
+        fi
+    done
+    
     echo ""
 fi
