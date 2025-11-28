@@ -162,19 +162,27 @@ if [ -n "$FRONTENDS" ]; then
     for canister in $FRONTENDS; do
         echo "   🎨 Building $canister..."
         
-        # Find workspace by canister name
-        workspace=""
+        # Find frontend directory by canister name
+        frontend_dir=""
         if [ -d "src/${canister}" ]; then
-            workspace="src/${canister}"
+            frontend_dir="src/${canister}"
         elif [ -d "${canister}" ]; then
-            workspace="${canister}"
+            frontend_dir="${canister}"
         fi
         
-        if [ -n "$workspace" ] && [ -f "$workspace/package.json" ]; then
+        if [ -n "$frontend_dir" ] && [ -f "$frontend_dir/package.json" ]; then
+            # Install dependencies if needed
+            if [ ! -d "$frontend_dir/node_modules" ]; then
+                echo "      📥 Installing npm dependencies..."
+                (cd "$frontend_dir" && npm install --legacy-peer-deps)
+            fi
+            
             # Run prebuild if script exists
-            npm run prebuild --workspace "$workspace" 2>/dev/null || true
+            (cd "$frontend_dir" && npm run prebuild 2>/dev/null) || true
+            
             # Run build
-            npm run build --workspace "$workspace"
+            echo "      🔨 Building frontend..."
+            (cd "$frontend_dir" && npm run build)
         fi
         
         # Deploy frontend

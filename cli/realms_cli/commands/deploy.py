@@ -23,8 +23,11 @@ def _deploy_realm_internal(
     mode: str = "upgrade",
 ) -> None:
     """Internal deployment logic (can be called directly from Python)."""
-    # Create logger for capturing script output
-    logger = get_logger("deploy")
+    # Determine log directory - use folder if provided, otherwise current dir
+    log_dir = Path(folder).absolute() if folder else Path.cwd()
+    
+    # Create logger for capturing script output in the realm folder
+    logger = get_logger("deploy", log_dir=log_dir)
     logger.info("=" * 60)
     logger.info(f"Starting deployment to {network}")
     logger.info(f"Deploy mode: {mode}")
@@ -135,7 +138,7 @@ def _deploy_realm_internal(
                     f"[green]🎉 All {scripts_executed} deployment script(s) completed successfully![/green]"
                 )
                 console.print(
-                    "[dim]Full deployment log saved to realms.log[/dim]"
+                    f"[dim]Full deployment log saved to {log_dir}/realms.log[/dim]"
                 )
                 logger.info(f"All {scripts_executed} deployment scripts completed successfully")
             else:
