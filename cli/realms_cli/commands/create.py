@@ -593,21 +593,6 @@ ic.print("len(Codex.instances()) = %d" % len(Codex.instances()))
             console.print(f"[red]❌ Auto-deployment failed: {e}[/red]")
             raise typer.Exit(1)
     else:
-        console.print("\n[bold]Next Steps:[/bold]")
-        # Show the appropriate deploy command
-        if mundus_config and len(mundus_config.get("realms", [])) > 1:
-            # Multi-realm mundus
-            console.print("Deploy all canisters with one of these options:\n")
-            console.print("[bold]Option 1:[/bold] Use the create command with --deploy flag")
-            console.print("  realms realm create --deploy --output-dir ./demo-mundus --realm-name \"My Mundus\"\n")
-            console.print("[bold]Option 2:[/bold] Deploy each canister manually:")
-            canisters = []
-            for realm_folder in mundus_config.get("realms", []):
-                canisters.extend([f"{realm_folder}_backend", f"{realm_folder}_frontend"])
-            for registry_folder in mundus_config.get("registries", []):
-                if registry_folder == "registry":
-                    canisters.extend(["realm_registry_backend", "realm_registry_frontend"])
-            for canister in canisters:
-                console.print(f"  dfx deploy {canister}")
-        else:
-            console.print("realms realm deploy")
+        console.print("\n[yellow]📝 Next steps:[/yellow]")
+        console.print(f"   1. Deploy: realms realm deploy --folder {output_path}")
+        console.print(f"   2. Or run: cd {output_path} && bash scripts/2-deploy-canisters.sh")
