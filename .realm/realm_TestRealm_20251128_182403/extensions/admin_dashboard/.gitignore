@@ -1,8 +1,0 @@
-# Test artifacts
-test-results/
-playwright-report/
-test_run_*.log
-test_output.log
-
-# Realm deployment directory
-.realms/

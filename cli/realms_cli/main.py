@@ -322,6 +322,31 @@ def realm_create(
     )
 
 
+@realm_app.command("deploy")
+def realm_deploy(
+    folder: Optional[str] = typer.Option(
+        None, "--folder", "-f", help="Path to realm folder to deploy"
+    ),
+    config_file: Optional[str] = typer.Option(
+        None, "--config-file", help="Path to custom dfx.json"
+    ),
+    network: str = typer.Option(
+        "local", "--network", "-n", help="Network to deploy to"
+    ),
+    clean: bool = typer.Option(
+        False, "--clean", help="Clean deployment (wipes state)"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="Identity file or name for IC deployment"
+    ),
+    mode: str = typer.Option(
+        "upgrade", "--mode", "-m", help="Deployment mode (upgrade, reinstall)"
+    ),
+) -> None:
+    """Deploy a realm to the specified network."""
+    deploy_command(config_file, folder, network, clean, identity, mode)
+
+
 @realm_app.command("extension")
 def realm_extension(
     extension_name: str = typer.Argument(help="Extension name"),
