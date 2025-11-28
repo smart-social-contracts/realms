@@ -141,10 +141,11 @@ if [ -n "$BACKENDS" ]; then
         dfx generate "$canister"
     done
     
-    # Copy declarations to frontend src for Vite build
-    if [ -d "src/declarations" ] && [ -d "src/realm_frontend/src" ]; then
-        echo "   📋 Copying declarations to frontend/src..."
-        cp -r src/declarations src/realm_frontend/src/
+    # Copy declarations to frontend static folder for runtime access
+    # Frontend uses dynamic imports that fetch at runtime, not build time
+    if [ -d "src/declarations" ] && [ -d "src/realm_frontend/static" ]; then
+        echo "   📋 Copying declarations to static folder (for runtime imports)..."
+        cp -r src/declarations src/realm_frontend/static/
     fi
 fi
 
