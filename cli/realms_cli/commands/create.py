@@ -243,12 +243,28 @@ def _generate_deployment_scripts(
     with open(template_dfx, 'r') as f:
         dfx_config = json.load(f)
     
-    # Create realm-only dfx.json (only realm_backend and realm_frontend)
+    # Create realm-only dfx.json (realm_backend, realm_frontend, and optional local-only canisters)
+    realm_canisters = {
+        "realm_backend": dfx_config["canisters"]["realm_backend"],
+        "realm_frontend": dfx_config["canisters"]["realm_frontend"],
+    }
+    
+    # For local networks, include additional canisters (Internet Identity, ckBTC, etc.)
+    is_local_network = network.startswith("local")
+    
+    if is_local_network:
+        # Include Internet Identity for local development
+        if "internet_identity" in dfx_config["canisters"]:
+            realm_canisters["internet_identity"] = dfx_config["canisters"]["internet_identity"]
+        
+        # Include any ckBTC-related canisters if they exist
+        for canister_name, canister_config in dfx_config["canisters"].items():
+            if any(keyword in canister_name.lower() for keyword in ["ckbtc", "ledger", "minter", "kyt"]):
+                realm_canisters[canister_name] = canister_config
+                console.print(f"   ✅ Including {canister_name} for local development")
+    
     realm_dfx = {
-        "canisters": {
-            "realm_backend": dfx_config["canisters"]["realm_backend"],
-            "realm_frontend": dfx_config["canisters"]["realm_frontend"],
-        },
+        "canisters": realm_canisters,
         "defaults": dfx_config.get("defaults", {}),
         "networks": dfx_config.get("networks", {}),
         "version": dfx_config.get("version", 1)
