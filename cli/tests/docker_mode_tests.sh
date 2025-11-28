@@ -40,7 +40,7 @@ echo ""
 
 echo "🧪 Test 4: Test realm creation"
 cd /tmp
-realms create \
+realms realm create \
     --realm-name "Test Realm" \
     --network local \
     --members 5 \

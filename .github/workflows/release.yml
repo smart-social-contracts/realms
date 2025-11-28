@@ -101,7 +101,7 @@ jobs:
             -v "$(pwd)/artifacts:/artifacts" \
             -v "$(pwd)/release-logs:/logs" \
             ghcr.io/${{ github.repository_owner }}/realms:latest \
-            bash -c "realms create && realms deploy && \
+            bash -c "realms realm create && realms realm deploy && \
                     cp .dfx/local/canisters/realm_backend/realm_backend.wasm.gz /artifacts/ && \
                     cp .dfx/local/canisters/realm_backend/service.did /artifacts/realm_backend.did && \
                     cp .dfx/local/canisters/realm_registry_backend/realm_registry_backend.wasm.gz /artifacts/ && \

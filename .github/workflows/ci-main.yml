@@ -294,8 +294,8 @@ jobs:
           docker run --rm \
             -v "$(pwd)/test-logs:/app/test-logs" \
             ghcr.io/${{ github.repository_owner }}/realms:ui-test-${{ github.sha }} bash -c "
-          (realms create --random && \
-          realms deploy && \
+          (realms realm create --random && \
+          realms realm deploy && \
           src/realm_frontend/run-e2e-tests.sh specs/workflows.spec.ts specs/multilingual.spec.ts --reporter=line); \
           EXIT_CODE=\$?; \
           mkdir -p /app/test-logs && \
@@ -338,7 +338,7 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
             bash -c "(dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
                      dfx identity use my-identity && \
-                     realms create --random --network staging --deploy); \
+                     realms realm create --random --network staging --deploy); \
                      EXIT_CODE=\$?; \
                      mkdir -p /app/deploy-logs && \
                      cp -f dfx.log /app/deploy-logs/ 2>/dev/null || true && \
