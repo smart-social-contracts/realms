@@ -257,9 +257,9 @@ def _generate_deployment_scripts(
         if "internet_identity" in dfx_config["canisters"]:
             realm_canisters["internet_identity"] = dfx_config["canisters"]["internet_identity"]
         
-        # Include any ckBTC-related canisters if they exist
+        # Include any ICRC-1 ledger canisters if they exist
         for canister_name, canister_config in dfx_config["canisters"].items():
-            if any(keyword in canister_name.lower() for keyword in ["ckbtc", "ledger", "minter", "kyt"]):
+            if any(keyword in canister_name.lower() for keyword in ["icrc1", "ledger"]) and canister_name not in realm_canisters:
                 realm_canisters[canister_name] = canister_config
                 console.print(f"   ✅ Including {canister_name} for local development")
     

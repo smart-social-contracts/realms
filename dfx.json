@@ -49,7 +49,7 @@
       "type": "custom",
       "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz"
     },
-    "ckbtc_ledger": {
+    "icrc1_ledger": {
       "type": "custom",
       "candid": "https://raw.githubusercontent.com/dfinity/ic/master/rs/ledger_suite/icrc1/ledger/ledger.did",
       "wasm": "https://download.dfinity.systems/ic/d87954601e4b22972899e9957e800406a0a6b929/canisters/ic-icrc1-ledger.wasm.gz",
@@ -58,18 +58,7 @@
           "ic": "mxzaz-hqaaa-aaaar-qaada-cai"
         }
       },
-      "init_arg": "(variant { Init = record { token_name = \"ckBTC\"; token_symbol = \"ckBTC\"; minting_account = record { owner = principal \"aaaaa-aa\" }; initial_balances = vec {}; metadata = vec {}; transfer_fee = 10; archive_options = record { trigger_threshold = 2000; num_blocks_to_archive = 1000; controller_id = principal \"aaaaa-aa\" }; feature_flags = opt record { icrc2 = true }; } })"
-    },
-    "ckbtc_minter": {
-      "type": "custom",
-      "candid": "https://raw.githubusercontent.com/dfinity/ic/master/rs/bitcoin/ckbtc/minter/ckbtc_minter.did",
-      "wasm": "https://download.dfinity.systems/ic/d87954601e4b22972899e9957e800406a0a6b929/canisters/ic-ckbtc-minter.wasm.gz",
-      "remote": {
-        "id": {
-          "ic": "mqygn-kiaaa-aaaar-qaadq-cai"
-        }
-      },
-      "init_arg": "(variant { Init = record { btc_network = variant { Regtest }; ledger_id = principal \"mxzaz-hqaaa-aaaar-qaada-cai\"; ecdsa_key_name = \"dfx_test_key\"; retrieve_btc_min_amount = 5000; max_time_in_queue_nanos = 420000000000; min_confirmations = opt 12; mode = variant { GeneralAvailability }; kyt_fee = opt 0; kyt_principal = null; } })"
+      "init_arg": "(variant { Init = record { token_name = \"Realm Token\"; token_symbol = \"REALM\"; minting_account = record { owner = principal \"aaaaa-aa\" }; initial_balances = vec {}; metadata = vec {}; transfer_fee = 10; archive_options = record { trigger_threshold = 2000; num_blocks_to_archive = 1000; controller_id = principal \"aaaaa-aa\" }; feature_flags = opt record { icrc2 = true }; } })"
     }
   },
   "defaults": { 
