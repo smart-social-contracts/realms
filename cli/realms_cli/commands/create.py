@@ -108,24 +108,22 @@ def _generate_single_realm(
 
 
 def create_command(
-    random: bool,
-    members: int,
-    organizations: int,
-    transactions: int,
-    disputes: int,
-    seed: Optional[int],
     output_dir: str,
     realm_name: str,
+    manifest: Optional[str],
+    random: bool,
+    members: Optional[int],
+    organizations: Optional[int],
+    transactions: Optional[int],
+    disputes: Optional[int],
+    seed: Optional[int],
     network: str,
     deploy: bool,
-    no_extensions: bool,
     identity: Optional[str] = None,
     mode: str = "upgrade",
 ) -> None:
-    """Create a new realm (or mundus with multiple realms) with deployment scripts."""
-    console.print(f"[bold blue]🏛️  Creating Mundus: {realm_name}[/bold blue]\n")
-    if no_extensions:
-        console.print("[yellow]⚠️  Creating base realms without extensions[/yellow]\n")
+    """Create a new single realm. Flags override manifest values."""
+    console.print(f"[bold blue]🏛️  Creating Realm: {realm_name}[/bold blue]\n")
 
     # Check if output directory already exists and contains files
     output_path = Path(output_dir)
@@ -145,129 +143,70 @@ def create_command(
     # Create output directory
     output_path.mkdir(exist_ok=True)
 
-    # Read the demo manifest to get realms and registries configuration
     scripts_path = get_scripts_path()
     repo_root = scripts_path.parent
-    demo_manifest_path = repo_root / "examples" / "demo" / "manifest.json"
     
-    mundus_config = None
-    is_simple_mode = False
+    # Determine if we should use manifest or flags
+    has_flags = any([members is not None, organizations is not None, transactions is not None, disputes is not None, seed is not None])
     
-    if demo_manifest_path.exists():
-        with open(demo_manifest_path, 'r') as f:
-            mundus_config = json.load(f)
+    # Load manifest for defaults (if exists)
+    realm_options = {}
+    if not has_flags or manifest is not None:
+        if manifest is None:
+            manifest_path = repo_root / "examples" / "demo" / "realm1" / "manifest.json"
+        else:
+            manifest_path = Path(manifest)
         
-        # Copy mundus manifest to output
-        mundus_manifest_path = output_path / "manifest.json"
-        mundus_config_copy = mundus_config.copy()
-        mundus_config_copy["name"] = realm_name  # Use provided name
-        with open(mundus_manifest_path, "w") as f:
-            json.dump(mundus_config_copy, f, indent=2)
-            f.write("\n")
-        console.print(f"📄 Copied mundus manifest: {mundus_manifest_path.absolute()}")
-    else:
-        console.print(f"[yellow]⚠️  Warning: No demo manifest found at {demo_manifest_path}[/yellow]")
-        console.print("[dim]Creating simple single-realm (backward compatibility mode)[/dim]")
-        is_simple_mode = True
-        
-        # In backward compatibility mode, generate directly to output_path
-        # This is for CLI Docker tests and simple single-realm generation
-        if random:
-            console.print("\n🎲 Generating random data...")
-            console.print(f"   👥 Members: {members}")
-            console.print(f"   🏢 Organizations: {organizations}")
-            console.print(f"   💰 Transactions: {transactions}")
-            console.print(f"   ⚖️  Disputes: {disputes}")
-            if seed:
-                console.print(f"   🌱 Seed: {seed}")
-        
-        # Generate simple realm directly to output_path (no mundus structure)
-        _generate_single_realm(
-            realm_name=realm_name,
-            realm_folder=output_path.name,  # Use output dir name as folder
-            output_path=output_path.parent,  # Parent dir, so output_path/name = original output_path
-            repo_root=repo_root,
-            random=random,
-            members=members,
-            organizations=organizations,
-            transactions=transactions,
-            disputes=disputes,
-            seed=seed,
-        )
-        
-        console.print("\n[green]✅ Simple realm generated successfully[/green]")
+        if manifest_path.exists():
+            with open(manifest_path, 'r') as f:
+                realm_manifest = json.load(f)
+            realm_options = realm_manifest.get("options", {}).get("random", {})
+    
+    # Call realm_generator.py - flags override manifest
+    cmd = [
+        "python",
+        str(repo_root / "scripts" / "realm_generator.py"),
+        "--output-dir", str(output_path),
+        "--realm-name", realm_name,
+    ]
+    
+    # Use flags if provided, otherwise fall back to manifest
+    if members is not None:
+        cmd.extend(["--members", str(members)])
+    elif "members" in realm_options:
+        cmd.extend(["--members", str(realm_options["members"])])
+    
+    if organizations is not None:
+        cmd.extend(["--organizations", str(organizations)])
+    elif "organizations" in realm_options:
+        cmd.extend(["--organizations", str(realm_options["organizations"])])
+    
+    if transactions is not None:
+        cmd.extend(["--transactions", str(transactions)])
+    elif "transactions" in realm_options:
+        cmd.extend(["--transactions", str(realm_options["transactions"])])
+    
+    if disputes is not None:
+        cmd.extend(["--disputes", str(disputes)])
+    elif "disputes" in realm_options:
+        cmd.extend(["--disputes", str(realm_options["disputes"])])
+    
+    if seed is not None:
+        cmd.extend(["--seed", str(seed)])
+    elif "seed" in realm_options:
+        cmd.extend(["--seed", str(realm_options["seed"])])
+    
+    try:
+        subprocess.run(cmd, check=True, cwd=repo_root)
+        console.print(f"\n[green]✅ Realm created successfully at: {output_path.absolute()}[/green]")
+    except subprocess.CalledProcessError as e:
+        console.print(f"[red]❌ Error creating realm: {e}[/red]")
+        raise typer.Exit(1)
 
-    if not is_simple_mode:
-        # Multi-realm mundus mode: Create realms directory
-        realms_dir = output_path / "realms"
-        realms_dir.mkdir(exist_ok=True)
-        console.print(f"📁 Output directory: {output_path.absolute()}")
-        console.print(f"📁 Realms directory: {realms_dir.absolute()}")
 
-        # Generate each realm
-        if random:
-            console.print("\n🎲 Generating random data for realms...")
-            console.print(f"   👥 Members per realm: {members}")
-            console.print(f"   🏢 Organizations per realm: {organizations}")
-            console.print(f"   💰 Transactions per realm: {transactions}")
-            console.print(f"   ⚖️  Disputes per realm: {disputes}")
-            if seed:
-                console.print(f"   🌱 Seed: {seed}")
-
-        realms_list = mundus_config.get("realms", [])
-        console.print(f"\n[bold]📦 Generating {len(realms_list)} realm(s)...[/bold]")
-        
-        for realm_folder in realms_list:
-            # Use the folder name as the realm name by default
-            # Read the manifest to get the proper name
-            demo_realm_manifest = repo_root / "examples" / "demo" / realm_folder / "manifest.json"
-            if demo_realm_manifest.exists():
-                with open(demo_realm_manifest, 'r') as f:
-                    realm_manifest = json.load(f)
-                    current_realm_name = realm_manifest.get("name", realm_folder.capitalize())
-            else:
-                current_realm_name = realm_folder.capitalize()
-            
-            _generate_single_realm(
-                realm_name=current_realm_name,
-                realm_folder=realm_folder,
-                output_path=realms_dir,
-                repo_root=repo_root,
-                random=random,
-                members=members,
-                organizations=organizations,
-                transactions=transactions,
-                disputes=disputes,
-                seed=seed,
-            )
-
-        # Generate registries
-        registries_list = mundus_config.get("registries", [])
-        if registries_list:
-            console.print(f"\n[bold]🏛️  Generating {len(registries_list)} registr(y/ies)...[/bold]")
-            registries_dir = output_path / "registries"
-            registries_dir.mkdir(exist_ok=True)
-            
-            for registry_folder in registries_list:
-                console.print(f"\n[bold cyan]  📦 Generating {registry_folder}...[/bold cyan]")
-                registry_output = registries_dir / registry_folder
-                registry_output.mkdir(parents=True, exist_ok=True)
-                
-                # Copy registry manifest
-                demo_registry_dir = repo_root / "examples" / "demo" / registry_folder
-                demo_registry_manifest = demo_registry_dir / "manifest.json"
-                
-                if demo_registry_manifest.exists():
-                    shutil.copy2(demo_registry_manifest, registry_output / "manifest.json")
-                    console.print(f"     ✅ Copied registry manifest")
-                else:
-                    console.print(f"     ⚠️  Warning: No manifest found for {registry_folder}")
-
-        console.print("\n[green]✅ All realms and registries generated successfully[/green]")
-    else:
-        # Simple mode - skip registries
-        pass
-
+# Old code for deployment script generation - now handled by realm_generator.py
+def _old_script_generation():
+    """Deployment script generation - kept for reference but not used."""
     # Copy deployment scripts from existing files
     console.print("\n🔧 Generating deployment scripts...")
 

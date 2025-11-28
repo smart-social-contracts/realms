@@ -13,6 +13,7 @@ from .commands.deploy import deploy_command
 from .commands.export_data import export_data_command
 from .commands.extension import extension_command
 from .commands.import_data import import_codex_command, import_data_command
+from .commands.mundus import mundus_create_command, mundus_deploy_command
 from .commands.ps import ps_kill_command, ps_logs_command, ps_ls_command
 from .commands.registry import (
     registry_add_command,
@@ -50,64 +51,6 @@ app = typer.Typer(
 )
 
 
-@app.command("create")
-def create(
-    random: bool = typer.Option(
-        False, "--random/--no-random", help="Generate random realm data (default: False)"
-    ),
-    members: int = typer.Option(
-        50, "--members", help="Number of members to generate"
-    ),
-    organizations: int = typer.Option(
-        5, "--organizations", help="Number of organizations to generate"
-    ),
-    transactions: int = typer.Option(
-        100, "--transactions", help="Number of transactions to generate"
-    ),
-    disputes: int = typer.Option(
-        10, "--disputes", help="Number of disputes to generate"
-    ),
-    seed: Optional[int] = typer.Option(
-        None, "--seed", help="Random seed for reproducible generation"
-    ),
-    output_dir: str = typer.Option(
-        REALM_FOLDER, "--output-dir", help="Output directory"
-    ),
-    realm_name: str = typer.Option(
-        "Generated Demo Realm", "--realm-name", help="Name of the realm"
-    ),
-    network: str = typer.Option(
-        "local", "--network", help="Target network for deployment"
-    ),
-    deploy: bool = typer.Option(
-        False, "--deploy", help="Deploy the realm after creation"
-    ),
-    no_extensions: bool = typer.Option(
-        False, "--no-extensions", help="Create a base realm without installing extensions"
-    ),
-    identity: Optional[str] = typer.Option(
-        None, "--identity", help="Path to identity PEM file or identity name for dfx"
-    ),
-    mode: str = typer.Option(
-        "upgrade", "--mode", "-m", help="Deploy mode: 'upgrade' or 'reinstall' (wipes stable memory)"
-    ),
-) -> None:
-    """Create a new realm. Use --random flag to generate demo data for testing and demonstrations."""
-    create_command(
-        random,
-        members,
-        organizations,
-        transactions,
-        disputes,
-        seed,
-        output_dir,
-        realm_name,
-        network,
-        deploy,
-        no_extensions,
-        identity,
-        mode,
-    )
 
 
 @app.command("extension")
@@ -252,9 +195,129 @@ def status(
         console.print("  ❌ dfx replica is not running")
 
 
+# Create mundus subcommand group
+mundus_app = typer.Typer(name="mundus", help="Multi-realm mundus operations")
+app.add_typer(mundus_app, name="mundus")
+
+
+@mundus_app.command("create")
+def mundus_create(
+    output_dir: str = typer.Option(
+        ".realms/mundus", "--output-dir", help="Output directory for mundus"
+    ),
+    mundus_name: str = typer.Option(
+        "Demo Mundus", "--mundus-name", help="Name of the mundus"
+    ),
+    manifest: Optional[str] = typer.Option(
+        None, "--manifest", help="Path to mundus manifest.json (default: examples/demo/manifest.json)"
+    ),
+    network: str = typer.Option(
+        "local", "--network", help="Target network for deployment"
+    ),
+    deploy: bool = typer.Option(
+        False, "--deploy", help="Deploy the mundus after creation"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="Path to identity PEM file or identity name for dfx"
+    ),
+    mode: str = typer.Option(
+        "upgrade", "--mode", "-m", help="Deploy mode: 'upgrade' or 'reinstall' (wipes stable memory)"
+    ),
+) -> None:
+    """Create a new multi-realm mundus from a manifest."""
+    mundus_create_command(
+        output_dir,
+        mundus_name,
+        manifest,
+        network,
+        deploy,
+        identity,
+        mode,
+    )
+
+
+@mundus_app.command("deploy")
+def mundus_deploy(
+    mundus_dir: str = typer.Option(
+        ".realms/mundus", "--mundus-dir", help="Path to mundus directory"
+    ),
+    network: str = typer.Option(
+        "local", "--network", help="Target network for deployment"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="Path to identity PEM file or identity name for dfx"
+    ),
+    mode: str = typer.Option(
+        "upgrade", "--mode", "-m", help="Deploy mode: 'upgrade' or 'reinstall'"
+    ),
+) -> None:
+    """Deploy all realms and registry in an existing mundus."""
+    mundus_deploy_command(mundus_dir, network, identity, mode)
+
+
 # Create realm subcommand group
 realm_app = typer.Typer(name="realm", help="Realm-specific operations")
 app.add_typer(realm_app, name="realm")
+
+
+@realm_app.command("create")
+def realm_create(
+    output_dir: str = typer.Option(
+        REALM_FOLDER, "--output-dir", help="Output directory"
+    ),
+    realm_name: str = typer.Option(
+        "Generated Demo Realm", "--realm-name", help="Name of the realm"
+    ),
+    manifest: Optional[str] = typer.Option(
+        None, "--manifest", help="Path to realm manifest.json (uses examples/demo/realm1/manifest.json if not specified and no flags provided)"
+    ),
+    random: bool = typer.Option(
+        False, "--random/--no-random", help="Generate random realm data"
+    ),
+    members: Optional[int] = typer.Option(
+        None, "--members", help="Number of members to generate (overrides manifest)"
+    ),
+    organizations: Optional[int] = typer.Option(
+        None, "--organizations", help="Number of organizations to generate (overrides manifest)"
+    ),
+    transactions: Optional[int] = typer.Option(
+        None, "--transactions", help="Number of transactions to generate (overrides manifest)"
+    ),
+    disputes: Optional[int] = typer.Option(
+        None, "--disputes", help="Number of disputes to generate (overrides manifest)"
+    ),
+    seed: Optional[int] = typer.Option(
+        None, "--seed", help="Random seed for reproducible generation (overrides manifest)"
+    ),
+    network: str = typer.Option(
+        "local", "--network", help="Target network for deployment"
+    ),
+    deploy: bool = typer.Option(
+        False, "--deploy", help="Deploy the realm after creation"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="Path to identity PEM file or identity name for dfx"
+    ),
+    mode: str = typer.Option(
+        "upgrade", "--mode", "-m", help="Deploy mode: 'upgrade' or 'reinstall' (wipes stable memory)"
+    ),
+) -> None:
+    """Create a new realm. Use --manifest for template or flags for custom configuration."""
+    create_command(
+        output_dir,
+        realm_name,
+        manifest,
+        random,
+        members,
+        organizations,
+        transactions,
+        disputes,
+        seed,
+        network,
+        deploy,
+        identity,
+        mode,
+    )
 
 
 @realm_app.command("extension")

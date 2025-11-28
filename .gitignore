@@ -33,7 +33,7 @@ src/realm_frontend/src/lib/i18n/locales/extensions/
 src/realm_frontend/static/extensions/
 
 # Generated realm folder
-.realm/
+.realms/
 
 # CLI build artifacts
 cli/build/

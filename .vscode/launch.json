@@ -1,0 +1,22 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Realms CLI - Mundus Create",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "realms_cli.main",
+      "args": [
+        "mundus",
+        "create",
+        "--random",
+        "--deploy"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/cli"
+      },
+      "console": "integratedTerminal"
+    }
+  ]
+}

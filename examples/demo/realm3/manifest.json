@@ -1,6 +1,16 @@
 {
+  "type": "realm",
   "name": "Realm 3",
   "logo": "realm3_logo.svg",
+  "options": {
+    "random": {
+      "members": 20,
+      "organizations": 2,
+      "transactions": 30,
+      "disputes": 3,
+      "seed": 3
+    }
+  },
   "entity_method_overrides": [
     {
       "entity": "User",
