@@ -228,11 +228,40 @@ def _generate_deployment_scripts(
     mode: str,
     no_extensions: bool = False
 ):
-    """Deployment script generation - kept for reference but not used."""
-    # Copy deployment scripts from existing files
-    console.print("\n🔧 Generating deployment scripts...")
+    """Generate deployment scripts and dfx.json for independent realm."""
+    console.print("\n🔧 Generating deployment configuration...")
 
-    # Create scripts subdirectory in output
+    # 1. Generate dfx.json for this independent realm
+    console.print("\n📝 Creating dfx.json...")
+    
+    # Load template dfx.json from repo root
+    template_dfx = repo_root / "dfx.json"
+    if not template_dfx.exists():
+        console.print(f"[red]❌ Template dfx.json not found at {template_dfx}[/red]")
+        raise typer.Exit(1)
+    
+    with open(template_dfx, 'r') as f:
+        dfx_config = json.load(f)
+    
+    # Create realm-only dfx.json (only realm_backend and realm_frontend)
+    realm_dfx = {
+        "canisters": {
+            "realm_backend": dfx_config["canisters"]["realm_backend"],
+            "realm_frontend": dfx_config["canisters"]["realm_frontend"],
+        },
+        "defaults": dfx_config.get("defaults", {}),
+        "networks": dfx_config.get("networks", {}),
+        "version": dfx_config.get("version", 1)
+    }
+    
+    # Write dfx.json
+    dfx_json_path = output_path / "dfx.json"
+    with open(dfx_json_path, 'w') as f:
+        json.dump(realm_dfx, f, indent=2)
+    console.print(f"   ✅ dfx.json created")
+
+    # 2. Create scripts subdirectory
+    console.print("\n🔧 Generating deployment scripts...")
     scripts_dir = output_path / "scripts"
     scripts_dir.mkdir(exist_ok=True)
 
