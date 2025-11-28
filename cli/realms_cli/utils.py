@@ -21,13 +21,26 @@ from .constants import DOCKER_IMAGE
 console = Console()
 
 
-def get_logger(name: str) -> logging.Logger:
-    """Get a logger instance with the specified name."""
+def get_logger(name: str, log_dir: Optional[Path] = None) -> logging.Logger:
+    """Get a logger instance with the specified name.
+    
+    Args:
+        name: Logger name
+        log_dir: Optional directory for log file. If None, uses current directory.
+    """
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
 
+    # Determine log file path
+    if log_dir:
+        log_dir = Path(log_dir)
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / "realms.log"
+    else:
+        log_file = Path("realms.log")
+
     # save to file
-    file_handler = logging.FileHandler("realms_cli.log")
+    file_handler = logging.FileHandler(log_file)
     file_handler.setLevel(logging.DEBUG)
     logger.addHandler(file_handler)
 

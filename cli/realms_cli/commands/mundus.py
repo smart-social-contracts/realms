@@ -1,6 +1,7 @@
 """Mundus creation and management commands."""
 
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -83,7 +84,7 @@ def mundus_deploy_command(
         border_style="cyan"
     ))
     
-    mundus_path = Path(mundus_dir)
+    mundus_path = Path(mundus_dir).absolute()
     if not mundus_path.exists():
         console.print(f"[red]❌ Mundus directory not found: {mundus_dir}[/red]")
         raise typer.Exit(1)
@@ -95,25 +96,33 @@ def mundus_deploy_command(
         console.print(f"[yellow]Run 'realms mundus create' first to generate the mundus structure[/yellow]")
         raise typer.Exit(1)
     
-    # Ensure dfx is running for local network
-    if network == "local":
-        _ensure_dfx_running(mundus_path)
+    # Change to mundus directory so logs and dfx operations happen there
+    original_cwd = os.getcwd()
+    os.chdir(mundus_path)
     
-    # Read dfx.json to get canister list
-    with open(dfx_json_path, 'r') as f:
-        dfx_config = json.load(f)
-    
-    canisters = list(dfx_config.get("canisters", {}).keys())
-    total_canisters = len(canisters)
-    
-    console.print(f"[cyan]Found {total_canisters} canisters to deploy[/cyan]\n")
-    
-    # Deploy all canisters using unified dfx
-    # dfx deploy will handle declarations generation and frontend building
-    console.print("[bold]📦 Deploying all canisters...[/bold]")
-    _deploy_all_canisters(mundus_path, network, identity, mode)
-    
-    console.print(f"\n[bold green]✅ All {total_canisters} canisters deployed successfully![/bold green]")
+    try:
+        # Ensure dfx is running for local network
+        if network == "local":
+            _ensure_dfx_running(mundus_path)
+        
+        # Read dfx.json to get canister list
+        with open(dfx_json_path, 'r') as f:
+            dfx_config = json.load(f)
+        
+        canisters = list(dfx_config.get("canisters", {}).keys())
+        total_canisters = len(canisters)
+        
+        console.print(f"[cyan]Found {total_canisters} canisters to deploy[/cyan]\n")
+        
+        # Deploy all canisters using unified dfx
+        # dfx deploy will handle declarations generation and frontend building
+        console.print("[bold]📦 Deploying all canisters...[/bold]")
+        _deploy_all_canisters(mundus_path, network, identity, mode)
+        
+        console.print(f"\n[bold green]✅ All {total_canisters} canisters deployed successfully![/bold green]")
+    finally:
+        # Restore original working directory
+        os.chdir(original_cwd)
 
 
 def _deploy_canister(realm_dir: Path, canister_name: str, network: str, identity: Optional[str], mode: str) -> None:

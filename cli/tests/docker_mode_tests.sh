@@ -102,7 +102,7 @@ fi
 echo ""
 
 echo "🧪 Test 7: Test deploy command accessibility"
-realms deploy --help > /dev/null
+realms realm deploy --help > /dev/null
 echo "✅ Deploy command is accessible"
 echo ""
 

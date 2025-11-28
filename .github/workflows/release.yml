@@ -107,7 +107,7 @@ jobs:
                     cp .dfx/local/canisters/realm_registry_backend/realm_registry_backend.wasm.gz /artifacts/ && \
                     cp .dfx/local/canisters/realm_registry_backend/service.did /artifacts/realm_registry_backend.did && \
                     cp -f dfx.log /logs/canister-extraction-dfx.log 2>/dev/null || true && \
-                    cp -f realms_cli.log /logs/canister-extraction-cli.log 2>/dev/null || true"
+                    cp -f realms.log /logs/canister-extraction-cli.log 2>/dev/null || true"
           
           # Move artifacts to root for release
           mv artifacts/realm_backend.wasm.gz ./

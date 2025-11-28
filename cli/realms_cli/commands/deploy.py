@@ -110,7 +110,7 @@ def _deploy_realm_internal(
                     logger.info(f"{script_name} completed successfully")
                 else:
                     console.print(f"[red]❌ {script_name} failed[/red]")
-                    console.print(f"[yellow]Check realms_cli.log for details[/yellow]")
+                    console.print(f"[yellow]Check realms.log for details[/yellow]")
                     logger.error(f"{script_name} failed")
                     raise typer.Exit(1)
 
@@ -120,7 +120,7 @@ def _deploy_realm_internal(
                 "[green]🎉 All deployment scripts completed successfully![/green]"
             )
             console.print(
-                "[dim]Full deployment log saved to realms_cli.log[/dim]"
+                "[dim]Full deployment log saved to realms.log[/dim]"
             )
             logger.info("All deployment scripts completed successfully")
 
@@ -201,11 +201,11 @@ def _deploy_realm_internal(
 
                 if result.returncode == 0:
                     console.print("[green]✅ Deployment completed successfully[/green]")
-                    console.print("[dim]Full deployment log saved to realms_cli.log[/dim]")
+                    console.print("[dim]Full deployment log saved to realms.log[/dim]")
                     logger.info("Deployment completed successfully")
                 else:
                     console.print("[red]❌ Deployment failed[/red]")
-                    console.print("[yellow]Check realms_cli.log for details[/yellow]")
+                    console.print("[yellow]Check realms.log for details[/yellow]")
                     logger.error("Deployment failed")
                     raise typer.Exit(1)
             else:

@@ -58,7 +58,7 @@ jobs:
                      mkdir -p /app/deploy-logs && \
                      cp -f dfx.log /app/deploy-logs/ 2>/dev/null || true && \
                      cp -f dfx2.log /app/deploy-logs/ 2>/dev/null || true && \
-                     cp -f realms_cli.log /app/deploy-logs/ 2>/dev/null || true; \
+                     cp -f realms.log /app/deploy-logs/ 2>/dev/null || true; \
                      exit \$EXIT_CODE"
           
           # Clean up

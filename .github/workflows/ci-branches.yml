@@ -203,7 +203,7 @@ jobs:
           EXIT_CODE=\$?; \
           mkdir -p /app/extension-logs && \
           cp -f dfx.log /app/extension-logs/ 2>/dev/null || true && \
-          cp -f realms_cli.log /app/extension-logs/ 2>/dev/null || true; \
+          cp -f realms.log /app/extension-logs/ 2>/dev/null || true; \
           exit \$EXIT_CODE"
       
       - name: Upload extension test logs
@@ -308,7 +308,7 @@ jobs:
           mkdir -p /app/test-logs && \
           cp -f dfx.log /app/test-logs/ 2>/dev/null || true && \
           cp -f dfx2.log /app/test-logs/ 2>/dev/null || true && \
-          cp -f realms_cli.log /app/test-logs/ 2>/dev/null || true && \
+          cp -f realms.log /app/test-logs/ 2>/dev/null || true && \
           cp -f src/realm_frontend/test-results/*.* /app/test-logs/ 2>/dev/null || true; \
           exit \$EXIT_CODE"
       
