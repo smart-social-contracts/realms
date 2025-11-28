@@ -45,10 +45,14 @@ dfx deploy internet_identity
 # because we use --clean which wipes everything, so mode=upgrade would fail
 echo "Deploying backend canisters (dfx will auto-select install/upgrade mode)..."
 dfx deploy realm_registry_backend --yes
-dfx deploy realm_backend --yes
+dfx deploy realm1_backend --yes
+dfx deploy realm2_backend --yes
+dfx deploy realm3_backend --yes
 
 dfx generate realm_registry_backend
-dfx generate realm_backend
+dfx generate realm1_backend
+dfx generate realm2_backend
+dfx generate realm3_backend
 npm install --legacy-peer-deps
 npm run prebuild --workspace realm_registry_frontend
 npm run build --workspace realm_registry_frontend
@@ -56,4 +60,6 @@ dfx deploy realm_registry_frontend
 npm run prebuild --workspace realm_frontend
 npm run build --workspace realm_frontend
 sh scripts/update_config.sh
-dfx deploy realm_frontend
+dfx deploy realm1_frontend
+dfx deploy realm2_frontend
+dfx deploy realm3_frontend
