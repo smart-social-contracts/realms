@@ -285,6 +285,11 @@ def mundus_deploy_command(
             import time
             time.sleep(5)  # Wait for dfx to initialize
     
+    # Set environment variable to skip dfx start in individual deployments
+    # since we're managing a shared instance
+    import os
+    os.environ['SKIP_DFX_START'] = 'true'
+    
     # Import deploy commands
     from .deploy import deploy_command as realm_deploy_command
     from .registry import registry_deploy_command
@@ -327,6 +332,10 @@ def mundus_deploy_command(
         except Exception as e:
             console.print(f"[red]   ❌ Failed to deploy {realm_dir.name}: {e}[/red]")
             raise typer.Exit(1)
+    
+    # Clean up environment variable
+    if 'SKIP_DFX_START' in os.environ:
+        del os.environ['SKIP_DFX_START']
     
     console.print(Panel.fit(
         "[bold green]✅ Mundus Deployment Complete[/bold green]",

@@ -74,8 +74,8 @@ if [ -n "$IDENTITY_FILE" ] && [ -f "$IDENTITY_FILE" ]; then
     dfx identity use temp_deploy
 fi
 
-# Start dfx for local network
-if [ "$NETWORK" = "local" ]; then
+# Start dfx for local network (unless SKIP_DFX_START is set for mundus deployments)
+if [ "$NETWORK" = "local" ] && [ "$SKIP_DFX_START" != "true" ]; then
     # Determine port based on branch (if git available)
     if command -v git &> /dev/null && git rev-parse --git-dir > /dev/null 2>&1; then
         BRANCH_NAME=$(git branch --show-current 2>/dev/null || echo "main")
@@ -104,6 +104,8 @@ if [ "$NETWORK" = "local" ]; then
         echo "⏳ Waiting for dfx to initialize..."
         sleep 3
     fi
+elif [ "$SKIP_DFX_START" = "true" ]; then
+    echo "🌐 Using shared dfx instance (mundus mode)"
 fi
 
 # Get all backend canisters from dfx.json
