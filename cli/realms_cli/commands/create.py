@@ -217,7 +217,7 @@ def create_command(
         else:
             # Run in Docker container (pip install mode)
             console.print("[dim]Running realm_generator in Docker container...[/dim]")
-            result = run_in_docker(cmd, working_dir=output_path)
+            result = run_in_docker(cmd, working_dir=output_path.absolute())
             if result.returncode != 0:
                 raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
         
