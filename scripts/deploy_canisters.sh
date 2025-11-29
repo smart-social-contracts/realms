@@ -174,6 +174,18 @@ if [ -n "$BACKENDS" ]; then
         mkdir -p src/realm_frontend/src/lib/declarations
         cp -r src/declarations/* src/realm_frontend/src/lib/declarations/
         
+        # Create symlinks for standard names (frontend expects realm_backend, not realm1_backend)
+        echo "   🔗 Creating standard declaration symlinks..."
+        for canister in $BACKENDS; do
+            # If canister name matches pattern *_backend, create realm_backend symlink
+            if [[ "$canister" == *"_backend" ]] && [[ "$canister" != "realm_backend" ]] && [[ "$canister" != "realm_registry_backend" ]]; then
+                if [ -d "src/realm_frontend/src/lib/declarations/$canister" ]; then
+                    ln -sf "$canister" "src/realm_frontend/src/lib/declarations/realm_backend" 2>/dev/null || true
+                    echo "      🔗 realm_backend -> $canister"
+                fi
+            fi
+        done
+        
         # Replace process.env.CANISTER_ID_* with actual canister IDs
         echo "   🔧 Injecting canister IDs into declarations..."
         for canister in $BACKENDS; do
