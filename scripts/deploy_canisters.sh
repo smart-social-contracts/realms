@@ -167,15 +167,15 @@ if [ -n "$BACKENDS" ]; then
         dfx generate "$canister"
     done
     
-    # Create symlinks in src/declarations for extensions that import from there
-    echo "   🔗 Creating standard declaration symlinks in src/declarations..."
+    # Copy declarations to standard names for frontend compatibility
+    echo "   📋 Copying declarations to standard names for frontend..."
     if [ -d "src/declarations" ]; then
         for canister in $BACKENDS; do
-            # If canister name matches pattern *_backend, create realm_backend symlink
+            # If canister name matches pattern *_backend, copy to realm_backend
             if [[ "$canister" == *"_backend" ]] && [[ "$canister" != "realm_backend" ]] && [[ "$canister" != "realm_registry_backend" ]]; then
                 if [ -d "src/declarations/$canister" ]; then
-                    ln -sf "$canister" "src/declarations/realm_backend" 2>/dev/null || true
-                    echo "      🔗 src/declarations/realm_backend -> $canister"
+                    cp -r "src/declarations/$canister" "src/declarations/realm_backend"
+                    echo "      📋 Copied $canister → realm_backend"
                 fi
             fi
         done
@@ -183,9 +183,8 @@ if [ -n "$BACKENDS" ]; then
     
     # Copy declarations to frontend $lib for Vite bundling
     # Vite will bundle these at build time with proper environment variable substitution
-    # Symlinks created above will be preserved by cp -r
     if [ -d "src/declarations" ] && [ -d "src/realm_frontend/src/lib" ]; then
-        echo "   📋 Copying declarations to $lib for bundling (preserving symlinks)..."
+        echo "   📋 Copying declarations to $lib for bundling..."
         mkdir -p src/realm_frontend/src/lib/declarations
         cp -r src/declarations/* src/realm_frontend/src/lib/declarations/
         
@@ -200,6 +199,17 @@ if [ -n "$BACKENDS" ]; then
                     # Replace process.env.CANISTER_ID_* with actual canister ID
                     sed -i "s|process\.env\.CANISTER_ID_${canister_upper}|\"${canister_id}\"|g" "$decl_file"
                     echo "      ✅ Injected $canister_id into $canister declarations"
+                fi
+                
+                # Also inject into realm_backend if it's a copy of a unique-named backend
+                if [[ "$canister" == *"_backend" ]] && [[ "$canister" != "realm_backend" ]]; then
+                    realm_backend_file="src/realm_frontend/src/lib/declarations/realm_backend/index.js"
+                    if [ -f "$realm_backend_file" ]; then
+                        sed -i "s|process\.env\.CANISTER_ID_${canister_upper}|\"${canister_id}\"|g" "$realm_backend_file"
+                        # Also replace REALM_BACKEND pattern
+                        sed -i "s|process\.env\.CANISTER_ID_REALM_BACKEND|\"${canister_id}\"|g" "$realm_backend_file"
+                        echo "      ✅ Injected $canister_id into realm_backend (standard name)"
+                    fi
                 fi
             fi
         done
