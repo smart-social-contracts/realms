@@ -1,12 +1,27 @@
 {
   "type": "mundus",
   "realms": [
-    "realm1",
-    "realm2",
-    "realm3"
+    {
+      "name": "Realm1",
+      "random": true,
+      "members": 50,
+      "organizations": 5
+    },
+    {
+      "name": "Realm2",
+      "random": true,
+      "members": 30,
+      "organizations": 3
+    },
+    {
+      "name": "Realm3",
+      "random": true,
+      "members": 20,
+      "organizations": 2
+    }
   ],
-  "registries": [
-    "registry"
-  ],
+  "registry": {
+    "name": "MainRegistry"
+  },
   "name": "Demo Mundus"
 }

@@ -38,7 +38,7 @@ def mundus_create_command(
         manifest_path = Path(manifest)
     else:
         # Use default demo mundus manifest
-        manifest_path = project_root / "examples" / "demo" / "mundus_manifest.json"
+        manifest_path = project_root / "examples" / "demo" / "manifest.json"
     
     if not manifest_path.exists():
         console.print(f"[red]❌ Manifest not found: {manifest_path}[/red]")
