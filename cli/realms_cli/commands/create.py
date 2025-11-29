@@ -148,14 +148,15 @@ def create_command(
     scripts_path = get_scripts_path()
     repo_root = scripts_path.parent
     
-    # Validate that repo_root exists and has scripts
-    if not repo_root.exists() or not (repo_root / "scripts" / "realm_generator.py").exists():
+    # Check if we're in repo mode or need to use Docker
+    in_repo_mode = is_repo_mode()
+    if not in_repo_mode:
+        # In Docker/pip install mode - will use Docker container with full repo
+        console.print("[dim]Running in Docker mode (realm_generator will run in container)...[/dim]")
+    elif not repo_root.exists() or not (repo_root / "scripts" / "realm_generator.py").exists():
+        # In repo mode but scripts missing - error
         console.print("[red]❌ Error: Cannot locate realm_generator.py[/red]")
-        console.print("[yellow]This command requires the full Realms repository.[/yellow]")
-        console.print("[yellow]If you installed via pip, please clone the repository:[/yellow]")
-        console.print("[dim]  git clone https://github.com/smartsocialcontracts/realms.git[/dim]")
-        console.print("[dim]  cd realms[/dim]")
-        console.print("[dim]  realms realm create --random[/dim]")
+        console.print("[yellow]Repository structure is incomplete.[/yellow]")
         raise typer.Exit(1)
     
     # Determine if we should use manifest or flags
@@ -210,7 +211,16 @@ def create_command(
     
     try:
         # Suppress debug output from realm_generator (ggg.user.User objects)
-        result = subprocess.run(cmd, check=True, cwd=repo_root, capture_output=True, text=True)
+        if in_repo_mode:
+            # Run locally in repo
+            result = subprocess.run(cmd, check=True, cwd=repo_root, capture_output=True, text=True)
+        else:
+            # Run in Docker container (pip install mode)
+            console.print("[dim]Running realm_generator in Docker container...[/dim]")
+            result = run_in_docker(cmd, working_dir=output_path)
+            if result.returncode != 0:
+                raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
+        
         # Only show important output (skip debug lines)
         for line in result.stdout.split('\n'):
             if line and not 'ggg.user.User object at' in line and not 'from_user' in line and not 'users [' in line:
@@ -222,7 +232,7 @@ def create_command(
         raise typer.Exit(1)
     
     # Generate deployment scripts after data generation
-    _generate_deployment_scripts(output_path, network, realm_name, random, repo_root, deploy, identity, mode, no_extensions=False)
+    _generate_deployment_scripts(output_path, network, realm_name, random, repo_root, deploy, identity, mode, no_extensions=False, in_repo_mode=in_repo_mode)
     
     console.print(f"\n[green]✅ Realm created successfully at: {output_path.absolute()}[/green]")
 
@@ -236,7 +246,8 @@ def _generate_deployment_scripts(
     deploy: bool,
     identity: Optional[str],
     mode: str,
-    no_extensions: bool = False
+    no_extensions: bool = False,
+    in_repo_mode: bool = True
 ):
     """Generate deployment scripts and dfx.json for independent realm."""
     console.print("\n🔧 Generating deployment configuration...")
@@ -244,9 +255,13 @@ def _generate_deployment_scripts(
     # 1. Generate dfx.json for this independent realm
     console.print("\n📝 Creating dfx.json...")
     
-    # Load template dfx.json from repo root
+    # Load template dfx.json from repo root (or use Docker to get it)
     template_dfx = repo_root / "dfx.json"
-    if not template_dfx.exists():
+    if not template_dfx.exists() and not in_repo_mode:
+        console.print("[yellow]⚠️  Running in Docker mode - deployment files will be generated at deploy time[/yellow]")
+        console.print("[dim]Skipping dfx.json generation (will be created when deployed from full repo)[/dim]")
+        return  # Skip deployment script generation in Docker mode
+    elif not template_dfx.exists():
         console.print(f"[red]❌ Template dfx.json not found at {template_dfx}[/red]")
         raise typer.Exit(1)
     
