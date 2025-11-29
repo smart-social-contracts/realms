@@ -244,24 +244,31 @@ def _generate_deployment_scripts(
         dfx_config = json.load(f)
     
     # Create realm-only dfx.json (realm_backend, realm_frontend, and optional local-only canisters)
+    # Use unique canister names based on realm_name to avoid conflicts in mundus deployments
+    sanitized_realm_name = realm_name.lower().replace(" ", "_").replace("-", "_")
+    unique_backend_name = f"{sanitized_realm_name}_backend"
+    unique_frontend_name = f"{sanitized_realm_name}_frontend"
+    
     realm_canisters = {
-        "realm_backend": dfx_config["canisters"]["realm_backend"],
-        "realm_frontend": dfx_config["canisters"]["realm_frontend"],
+        unique_backend_name: dfx_config["canisters"]["realm_backend"],
+        unique_frontend_name: dfx_config["canisters"]["realm_frontend"],
     }
     
     # For local networks, include additional canisters (Internet Identity, ckBTC, etc.)
     is_local_network = network.startswith("local")
     
     if is_local_network:
-        # Include Internet Identity for local development
+        # Include Internet Identity for local development (shared across realms)
         if "internet_identity" in dfx_config["canisters"]:
             realm_canisters["internet_identity"] = dfx_config["canisters"]["internet_identity"]
         
-        # Include any ICRC-1 ledger canisters if they exist
+        # Include any ICRC-1 ledger canisters if they exist (unique per realm)
         for canister_name, canister_config in dfx_config["canisters"].items():
             if any(keyword in canister_name.lower() for keyword in ["icrc1", "ledger"]) and canister_name not in realm_canisters:
-                realm_canisters[canister_name] = canister_config
-                console.print(f"   ✅ Including {canister_name} for local development")
+                # Make ledger unique per realm too
+                unique_ledger_name = f"{sanitized_realm_name}_{canister_name}"
+                realm_canisters[unique_ledger_name] = canister_config
+                console.print(f"   ✅ Including {unique_ledger_name} for local development")
     
     realm_dfx = {
         "canisters": realm_canisters,
