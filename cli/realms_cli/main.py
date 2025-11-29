@@ -95,9 +95,12 @@ def import_data(
     identity: Optional[str] = typer.Option(
         None, "--identity", help="Path to identity PEM file or identity name for dfx"
     ),
+    canister: str = typer.Option(
+        "realm_backend", "--canister", "-c", help="Canister name to import data to (e.g. realm1_backend for mundus)"
+    ),
 ) -> None:
     """Import data into the realm. Supports JSON data and Python codex files."""
-    import_data_command(file_path, entity_type, format, batch_size, dry_run, network, identity)
+    import_data_command(file_path, entity_type, format, batch_size, dry_run, network, identity, canister)
 
 
 @app.command("export")
