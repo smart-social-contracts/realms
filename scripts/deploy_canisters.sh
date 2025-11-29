@@ -141,11 +141,12 @@ if [ -n "$BACKENDS" ]; then
         dfx generate "$canister"
     done
     
-    # Copy declarations to frontend static folder for runtime access
-    # Frontend uses dynamic imports that fetch at runtime, not build time
-    if [ -d "src/declarations" ] && [ -d "src/realm_frontend/static" ]; then
-        echo "   📋 Copying declarations to static folder (for runtime imports)..."
-        cp -r src/declarations src/realm_frontend/static/
+    # Copy declarations to frontend $lib for Vite bundling
+    # Vite will bundle these at build time with proper environment variable substitution
+    if [ -d "src/declarations" ] && [ -d "src/realm_frontend/src/lib" ]; then
+        echo "   📋 Copying declarations to $lib for bundling..."
+        mkdir -p src/realm_frontend/src/lib/declarations
+        cp -r src/declarations/* src/realm_frontend/src/lib/declarations/
         
         # Replace process.env.CANISTER_ID_* with actual canister IDs
         echo "   🔧 Injecting canister IDs into declarations..."
@@ -153,7 +154,7 @@ if [ -n "$BACKENDS" ]; then
             canister_id=$(dfx canister id "$canister" --network "$NETWORK" 2>/dev/null || echo "")
             if [ -n "$canister_id" ]; then
                 canister_upper=$(echo "$canister" | tr '[:lower:]' '[:upper:]')
-                decl_file="src/realm_frontend/static/declarations/$canister/index.js"
+                decl_file="src/realm_frontend/src/lib/declarations/$canister/index.js"
                 if [ -f "$decl_file" ]; then
                     # Replace process.env.CANISTER_ID_* with actual canister ID
                     sed -i "s|process\.env\.CANISTER_ID_${canister_upper}|\"${canister_id}\"|g" "$decl_file"

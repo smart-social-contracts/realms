@@ -10,18 +10,17 @@ async function initializeImports() {
 
 	console.log('🏭 Loading IC backend implementations');
 	
-	// Try to load declarations in order of preference
-	const backendNames = ['realm1_backend', 'realm2_backend', 'realm3_backend', 'realm_backend'];
+	// Import realm_backend declarations directly
+	// This will be bundled by Vite at build time
 	let declarationsModule = null;
-	
-	for (const backendName of backendNames) {
-		try {
-			declarationsModule = await import(`declarations/${backendName}`);
-			console.log(`✅ Loaded declarations for ${backendName}`);
-			break;
-		} catch (e) {
-			// Try next backend name
-		}
+	try {
+		// Use static import path that Vite can analyze at build time
+		const { createActor: ca, canisterId: cid } = await import('$lib/declarations/realm_backend');
+		declarationsModule = { createActor: ca, canisterId: cid };
+		console.log(`✅ Loaded declarations for realm_backend`);
+	} catch (e) {
+		console.error('Failed to load backend declarations:', e);
+		throw new Error('Could not load backend declarations. Please run: dfx generate');
 	}
 	
 	if (declarationsModule) {
