@@ -270,18 +270,35 @@ def mundus_deploy_command(
             console.print(f"🌐 dfx already running on port {port}\n")
         except subprocess.CalledProcessError:
             console.print(f"🌐 Starting shared dfx instance on port {port}...\n")
-            # Start dfx from repo root
-            subprocess.run(
-                ["dfx", "stop"],
-                cwd=repo_root,
-                capture_output=True
-            )
-            subprocess.Popen(
-                ["dfx", "start", "--clean", "--background", "--host", f"127.0.0.1:{port}"],
-                cwd=repo_root,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
+            # Activate venv and start dfx from repo root
+            venv_activate = repo_root / "venv" / "bin" / "activate"
+            
+            # Stop any existing dfx
+            if venv_activate.exists():
+                subprocess.run(
+                    ["bash", "-c", f"source {venv_activate} && dfx stop"],
+                    cwd=repo_root,
+                    capture_output=True
+                )
+            else:
+                subprocess.run(["dfx", "stop"], cwd=repo_root, capture_output=True)
+            
+            # Start dfx with venv activated
+            if venv_activate.exists():
+                subprocess.Popen(
+                    ["bash", "-c", f"source {venv_activate} && dfx start --clean --background --host 127.0.0.1:{port}"],
+                    cwd=repo_root,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+            else:
+                subprocess.Popen(
+                    ["dfx", "start", "--clean", "--background", "--host", f"127.0.0.1:{port}"],
+                    cwd=repo_root,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+            
             import time
             time.sleep(5)  # Wait for dfx to initialize
     
