@@ -253,6 +253,10 @@ if [ -n "$FRONTENDS" ]; then
             frontend_dir="src/${canister}"
         elif [ -d "${canister}" ]; then
             frontend_dir="${canister}"
+        elif [[ "$canister" == *"_frontend" ]] && [ -d "src/realm_frontend" ]; then
+            # For mundus realms with unique frontend names (realm1_frontend, realm2_frontend, etc)
+            # but generic source directory (src/realm_frontend)
+            frontend_dir="src/realm_frontend"
         fi
         
         if [ -n "$frontend_dir" ] && [ -f "$frontend_dir/package.json" ]; then

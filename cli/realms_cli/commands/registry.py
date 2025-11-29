@@ -70,8 +70,9 @@ def registry_add_command(
     realm_id_escaped = f'"{realm_id}"'
     name_escaped = f'"{name}"'
     url_escaped = f'"{url}"'
+    logo_escaped = '""'  # Empty logo for now
 
-    args = [f"({realm_id_escaped}, {name_escaped}, {url_escaped})"]
+    args = [f"({realm_id_escaped}, {name_escaped}, {url_escaped}, {logo_escaped})"]
     result = _run_dfx_command(
         "add_realm", args, network, canister_id or "realm_registry_backend"
     )

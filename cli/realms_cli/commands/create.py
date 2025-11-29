@@ -403,13 +403,13 @@ try:
     print(f"   Network: {{network}}")
     
     # Check if realm is already registered
-    check_cmd = ['realms', 'realm', 'registry', 'get', '--id', realm_id, '--network', network]
+    check_cmd = ['realms', 'registry', 'get', '--id', realm_id, '--network', network]
     check_result = subprocess.run(check_cmd, cwd=os.path.dirname(os.path.dirname(s)), capture_output=True)
     
     if check_result.returncode != 0:
         # Realm not registered, register it
         print(f"   Registering realm with central registry...")
-        register_cmd = ['realms', 'realm', 'registry', 'add', 
+        register_cmd = ['realms', 'registry', 'add', 
                        '--realm-id', realm_id,
                        '--realm-name', realm_name,
                        '--network', network]

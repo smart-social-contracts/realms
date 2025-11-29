@@ -496,7 +496,8 @@ def registry_add(
     console.print(f"[dim]Network:[/dim] {network}\n")
     
     # Call registry directly
-    args = [f'("{realm_id}", "{realm_name}", "{frontend_url}")']
+    # Note: add_realm expects 4 parameters: realm_id, name, url, logo
+    args = [f'("{realm_id}", "{realm_name}", "{frontend_url}", "")']
     cmd = ["dfx", "canister", "call", "--network", network, registry_canister_id, "add_realm"]
     cmd.extend(args)
     
@@ -643,7 +644,7 @@ def realm_set(
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
         console.print(
-            f'[yellow]💡 Add the realm to registry first: realms realm registry add --id {realm_name} --name "Realm Name"[/yellow]'
+            f'[yellow]💡 Add the realm to registry first: realms registry add --id {realm_name} --name "Realm Name"[/yellow]'
         )
         raise typer.Exit(1)
 

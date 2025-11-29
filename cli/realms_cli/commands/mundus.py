@@ -123,7 +123,7 @@ def mundus_create_command(
     
     console.print(f"\n[green]✅ Mundus '{mundus_name}' created successfully at:[/green] [cyan]{mundus_dir}[/cyan]\n")
     console.print(f"[yellow]📝 Next steps:[/yellow]")
-    console.print(f"   1. Deploy: realms mundus deploy --folder {mundus_dir}")
+    console.print(f"   1. Deploy: realms mundus deploy --mundus-dir {mundus_dir}")
     console.print(f"   2. Or run: cd {mundus_dir} && bash scripts/deploy-all.sh\n")
     
     if deploy:
@@ -264,11 +264,24 @@ def mundus_deploy_command(
         except:
             pass
         
-        # Check if dfx is already running
+        # Check if dfx is already running and responsive
+        dfx_running = False
         try:
+            # First check if port is occupied
             subprocess.run(["lsof", "-ti:" + str(port)], check=True, capture_output=True)
-            console.print(f"🌐 dfx already running on port {port}\n")
-        except subprocess.CalledProcessError:
+            # Then verify dfx is actually responsive
+            result = subprocess.run(
+                ["dfx", "ping", "--network", "local"],
+                capture_output=True,
+                timeout=2
+            )
+            if result.returncode == 0:
+                dfx_running = True
+                console.print(f"🌐 dfx already running on port {port}\n")
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            pass
+        
+        if not dfx_running:
             console.print(f"🌐 Starting shared dfx instance on port {port}...\n")
             # Activate venv and start dfx from repo root
             venv_activate = repo_root / "venv" / "bin" / "activate"
