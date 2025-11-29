@@ -148,6 +148,16 @@ def create_command(
     scripts_path = get_scripts_path()
     repo_root = scripts_path.parent
     
+    # Validate that repo_root exists and has scripts
+    if not repo_root.exists() or not (repo_root / "scripts" / "realm_generator.py").exists():
+        console.print("[red]❌ Error: Cannot locate realm_generator.py[/red]")
+        console.print("[yellow]This command requires the full Realms repository.[/yellow]")
+        console.print("[yellow]If you installed via pip, please clone the repository:[/yellow]")
+        console.print("[dim]  git clone https://github.com/smartsocialcontracts/realms.git[/dim]")
+        console.print("[dim]  cd realms[/dim]")
+        console.print("[dim]  realms realm create --random[/dim]")
+        raise typer.Exit(1)
+    
     # Determine if we should use manifest or flags
     has_flags = any([members is not None, organizations is not None, transactions is not None, disputes is not None, seed is not None])
     
