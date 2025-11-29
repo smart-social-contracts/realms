@@ -328,17 +328,26 @@ if [ -d ".kybra" ]; then
     echo "   ✅ Cache cleared"
 fi
 
-# Use the generic deployment script
+# Find the repo root by searching upward for scripts/deploy_canisters.sh
 SCRIPT_DIR="$( cd "$( dirname "${{BASH_SOURCE[0]}}" )" && pwd )"
 REALM_DIR="$( dirname "$SCRIPT_DIR" )"
-DEPLOY_SCRIPT="$SCRIPT_DIR/../../../scripts/deploy_canisters.sh"
 
-# Find the deploy_canisters.sh script
-if [ -f "$DEPLOY_SCRIPT" ]; then
+# Search upward for scripts/deploy_canisters.sh
+SEARCH_DIR="$REALM_DIR"
+DEPLOY_SCRIPT=""
+while [ "$SEARCH_DIR" != "/" ]; do
+    if [ -f "$SEARCH_DIR/scripts/deploy_canisters.sh" ]; then
+        DEPLOY_SCRIPT="$SEARCH_DIR/scripts/deploy_canisters.sh"
+        break
+    fi
+    SEARCH_DIR="$(dirname "$SEARCH_DIR")"
+done
+
+if [ -n "$DEPLOY_SCRIPT" ] && [ -f "$DEPLOY_SCRIPT" ]; then
     bash "$DEPLOY_SCRIPT" "$REALM_DIR" "$NETWORK" "$MODE"
 else
-    echo "❌ Error: deploy_canisters.sh not found"
-    echo "   Expected at: $DEPLOY_SCRIPT"
+    echo "❌ Error: deploy_canisters.sh not found in parent directories"
+    echo "   Searched from: $REALM_DIR"
     exit 1
 fi
 """
