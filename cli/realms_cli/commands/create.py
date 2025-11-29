@@ -252,7 +252,13 @@ def create_command(
         raise typer.Exit(1)
     
     # Generate deployment scripts after data generation
-    _generate_deployment_scripts(output_path, network, realm_name, random, repo_root, deploy, identity, mode, no_extensions=False, in_repo_mode=in_repo_mode)
+    # In Docker mode, skip script generation - users don't have repo files locally
+    # They'll need to use Docker image for deployment
+    if in_repo_mode:
+        _generate_deployment_scripts(output_path, network, realm_name, random, repo_root, deploy, identity, mode, no_extensions=False, in_repo_mode=in_repo_mode)
+    else:
+        console.print(f"\n[yellow]⚠️  Deployment scripts not generated (Docker mode)[/yellow]")
+        console.print("[dim]To deploy this realm, you'll need to use the Realms Docker image or clone the full repository.[/dim]")
     
     console.print(f"\n[green]✅ Realm created successfully at: {output_path.absolute()}[/green]")
 
