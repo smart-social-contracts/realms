@@ -238,6 +238,53 @@ def mundus_deploy_command(
     console.print(f"📡 Network: {network}")
     console.print(f"🔄 Mode: {mode}\n")
     
+    # Start dfx once for local network (shared by all deployments)
+    if network == "local":
+        import subprocess
+        from ..utils import get_project_root
+        
+        # Start dfx from repo root so all deployments can share it
+        repo_root = get_project_root()
+        
+        # Determine port based on branch
+        port = 8006  # Default port for mundus
+        try:
+            branch_name = subprocess.check_output(
+                ["git", "branch", "--show-current"],
+                cwd=repo_root,
+                text=True
+            ).strip()
+            if branch_name == "main":
+                port = 8000
+            else:
+                # Hash branch name to get consistent port
+                import hashlib
+                hash_val = int(hashlib.md5(branch_name.encode()).hexdigest(), 16)
+                port = 8001 + (hash_val % 99)
+        except:
+            pass
+        
+        # Check if dfx is already running
+        try:
+            subprocess.run(["lsof", "-ti:" + str(port)], check=True, capture_output=True)
+            console.print(f"🌐 dfx already running on port {port}\n")
+        except subprocess.CalledProcessError:
+            console.print(f"🌐 Starting shared dfx instance on port {port}...\n")
+            # Start dfx from repo root
+            subprocess.run(
+                ["dfx", "stop"],
+                cwd=repo_root,
+                capture_output=True
+            )
+            subprocess.Popen(
+                ["dfx", "start", "--clean", "--background", "--host", f"127.0.0.1:{port}"],
+                cwd=repo_root,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            import time
+            time.sleep(5)  # Wait for dfx to initialize
+    
     # Import deploy commands
     from .deploy import deploy_command as realm_deploy_command
     from .registry import registry_deploy_command
