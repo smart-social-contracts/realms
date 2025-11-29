@@ -255,14 +255,12 @@ def _generate_deployment_scripts(
     # 1. Generate dfx.json for this independent realm
     console.print("\n📝 Creating dfx.json...")
     
-    # Load template dfx.json from repo root (or use Docker to get it)
+    # Load template dfx.json from repo root
     template_dfx = repo_root / "dfx.json"
-    if not template_dfx.exists() and not in_repo_mode:
-        console.print("[yellow]⚠️  Running in Docker mode - deployment files will be generated at deploy time[/yellow]")
-        console.print("[dim]Skipping dfx.json generation (will be created when deployed from full repo)[/dim]")
-        return  # Skip deployment script generation in Docker mode
-    elif not template_dfx.exists():
+    if not template_dfx.exists():
         console.print(f"[red]❌ Template dfx.json not found at {template_dfx}[/red]")
+        if not in_repo_mode:
+            console.print("[yellow]Expected at /app/dfx.json in Docker image[/yellow]")
         raise typer.Exit(1)
     
     with open(template_dfx, 'r') as f:
