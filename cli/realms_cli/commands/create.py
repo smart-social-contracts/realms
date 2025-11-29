@@ -175,11 +175,21 @@ def create_command(
                 realm_manifest = json.load(f)
             realm_options = realm_manifest.get("options", {}).get("random", {})
     
-    # Call realm_generator.py - flags override manifest
+    # Call realm_generator.py
+    # In Docker mode, paths need to be relative to /workspace mount point
+    if in_repo_mode:
+        generator_path = str(repo_root / "scripts" / "realm_generator.py")
+        output_dir_arg = str(output_path)
+    else:
+        # In Docker, script is at /app/scripts/realm_generator.py
+        # and output_path is mounted at /workspace, so use /workspace as output
+        generator_path = "/app/scripts/realm_generator.py"
+        output_dir_arg = "/workspace"
+    
     cmd = [
         "python",
-        str(repo_root / "scripts" / "realm_generator.py"),
-        "--output-dir", str(output_path),
+        generator_path,
+        "--output-dir", output_dir_arg,
         "--realm-name", realm_name,
     ]
     
@@ -219,6 +229,13 @@ def create_command(
             console.print("[dim]Running realm_generator in Docker container...[/dim]")
             result = run_in_docker(cmd, working_dir=output_path.absolute())
             if result.returncode != 0:
+                console.print(f"[red]❌ realm_generator.py failed with exit code {result.returncode}[/red]")
+                if result.stdout:
+                    console.print("[yellow]stdout:[/yellow]")
+                    console.print(result.stdout)
+                if result.stderr:
+                    console.print("[yellow]stderr:[/yellow]")
+                    console.print(result.stderr)
                 raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
         
         # Only show important output (skip debug lines)
