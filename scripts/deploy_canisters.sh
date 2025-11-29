@@ -280,8 +280,8 @@ if [ "$NETWORK" = "local" ]; then
     
     # Get port from dfx info or detect from running dfx
     if [ -z "$PORT" ]; then
-        # Try to get port from dfx info
-        PORT=$(dfx info replica-port 2>/dev/null)
+        # Try to get port from dfx info (use --webserver-port, not replica-port)
+        PORT=$(dfx info webserver-port 2>/dev/null || dfx info --webserver-port 2>/dev/null)
         
         # If that fails, detect from running process
         if [ -z "$PORT" ]; then
