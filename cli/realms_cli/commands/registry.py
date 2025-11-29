@@ -301,13 +301,25 @@ def registry_create_command(
         dfx_config = json.load(f)
     
     # Create registry-only dfx.json
+    registry_canisters = {
+        "realm_registry_backend": dfx_config["canisters"]["realm_registry_backend"],
+        "realm_registry_frontend": dfx_config["canisters"]["realm_registry_frontend"],
+    }
+    
+    # For local networks, include additional canisters (Internet Identity)
+    is_local_network = network.startswith("local")
+    
+    if is_local_network:
+        # Include Internet Identity for local development
+        if "internet_identity" in dfx_config["canisters"]:
+            registry_canisters["internet_identity"] = dfx_config["canisters"]["internet_identity"]
+            console.print(f"   ✅ Including internet_identity for local development")
+    
     registry_dfx = {
-        "canisters": {
-            "realm_registry_backend": dfx_config["canisters"]["realm_registry_backend"],
-            "realm_registry_frontend": dfx_config["canisters"]["realm_registry_frontend"],
-        },
+        "canisters": registry_canisters,
         "defaults": dfx_config.get("defaults", {}),
         "networks": dfx_config.get("networks", {}),
+        "output_env_file": ".env",
         "version": dfx_config.get("version", 1)
     }
     

@@ -427,7 +427,7 @@ def realm_extension(
 
 # Create registry subcommand group
 registry_app = typer.Typer(name="registry", help="Realm registry operations")
-realm_app.add_typer(registry_app, name="registry")
+app.add_typer(registry_app, name="registry")
 
 
 @registry_app.command("add")
