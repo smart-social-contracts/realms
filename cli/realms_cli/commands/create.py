@@ -146,18 +146,21 @@ def create_command(
     console.print(f"📁 Realm directory: {output_path}\n")
 
     scripts_path = get_scripts_path()
-    repo_root = scripts_path.parent
     
     # Check if we're in repo mode or need to use Docker
     in_repo_mode = is_repo_mode()
     if not in_repo_mode:
         # In Docker/pip install mode - will use Docker container with full repo
+        # repo_root should point to /app in the Docker image
+        repo_root = Path("/app")
         console.print("[dim]Running in Docker mode (realm_generator will run in container)...[/dim]")
-    elif not repo_root.exists() or not (repo_root / "scripts" / "realm_generator.py").exists():
-        # In repo mode but scripts missing - error
-        console.print("[red]❌ Error: Cannot locate realm_generator.py[/red]")
-        console.print("[yellow]Repository structure is incomplete.[/yellow]")
-        raise typer.Exit(1)
+    else:
+        repo_root = scripts_path.parent
+        if not repo_root.exists() or not (repo_root / "scripts" / "realm_generator.py").exists():
+            # In repo mode but scripts missing - error
+            console.print("[red]❌ Error: Cannot locate realm_generator.py[/red]")
+            console.print("[yellow]Repository structure is incomplete.[/yellow]")
+            raise typer.Exit(1)
     
     # Determine if we should use manifest or flags
     has_flags = any([members is not None, organizations is not None, transactions is not None, disputes is not None, seed is not None])
