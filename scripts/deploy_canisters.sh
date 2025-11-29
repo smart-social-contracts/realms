@@ -32,12 +32,33 @@ if [ ! -f "dfx.json" ]; then
     exit 1
 fi
 
+# Activate virtual environment if it exists in repo root
+REPO_ROOT="$WORKING_DIR"
+while [ ! -d "$REPO_ROOT/venv" ] && [ "$REPO_ROOT" != "/" ]; do
+    REPO_ROOT=$(dirname "$REPO_ROOT")
+done
+
+if [ -f "$REPO_ROOT/venv/bin/activate" ]; then
+    echo "🐍 Activating virtual environment..."
+    source "$REPO_ROOT/venv/bin/activate"
+else
+    echo "⚠️  No venv found, using system Python"
+fi
+
 # Check dependencies
 echo "🔍 Checking dependencies..."
 python3 -m kybra --version || {
-    echo "Kybra not found. Installing requirements..."
-    pip3 install -r requirements.txt 2>/dev/null || echo "No requirements.txt found"
+    echo "❌ Kybra not found. Please install: pip install -r requirements.txt"
+    exit 1
 }
+
+# Install canister-specific dependencies if requirements.txt exists in src/
+for backend_dir in src/*_backend; do
+    if [ -f "$backend_dir/requirements.txt" ]; then
+        echo "📦 Installing dependencies for $(basename $backend_dir)..."
+        pip3 install -q -r "$backend_dir/requirements.txt"
+    fi
+done
 
 # Download WASMs if script exists
 if [ -f "../../../scripts/download_wasms.sh" ]; then
