@@ -76,8 +76,6 @@ fi
 
 # Start dfx for local network
 if [ "$NETWORK" = "local" ]; then
-    echo "🌐 Starting local dfx replica..."
-    
     # Determine port based on branch (if git available)
     if command -v git &> /dev/null && git rev-parse --git-dir > /dev/null 2>&1; then
         BRANCH_NAME=$(git branch --show-current 2>/dev/null || echo "main")
@@ -86,21 +84,26 @@ if [ "$NETWORK" = "local" ]; then
         else
             PORT=$((8001 + $(echo $BRANCH_NAME | cksum | cut -d' ' -f1) % 99))
         fi
-        echo "   Branch: $BRANCH_NAME, Port: $PORT"
     else
         PORT=8000
     fi
     
-    # Stop any existing dfx
-    lsof -ti:$PORT | xargs kill -9 2>/dev/null || true
-    dfx stop 2>/dev/null || true
-    
-    # Start dfx (redirect output to avoid stdout inheritance issues)
-    dfx start --clean --background --log file --logfile dfx.log --host 127.0.0.1:$PORT >/dev/null 2>&1
-    
-    # Wait for initialization
-    echo "⏳ Waiting for dfx to initialize..."
-    sleep 3
+    # Check if dfx is already running on this port
+    if lsof -ti:$PORT >/dev/null 2>&1; then
+        echo "🌐 dfx already running on port $PORT (reusing existing instance)"
+    else
+        echo "🌐 Starting local dfx replica on port $PORT..."
+        
+        # Stop any existing dfx processes
+        dfx stop 2>/dev/null || true
+        
+        # Start dfx (redirect output to avoid stdout inheritance issues)
+        dfx start --clean --background --log file --logfile dfx.log --host 127.0.0.1:$PORT >/dev/null 2>&1
+        
+        # Wait for initialization
+        echo "⏳ Waiting for dfx to initialize..."
+        sleep 3
+    fi
 fi
 
 # Get all backend canisters from dfx.json
