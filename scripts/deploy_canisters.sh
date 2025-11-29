@@ -146,6 +146,21 @@ if [ -n "$BACKENDS" ]; then
     if [ -d "src/declarations" ] && [ -d "src/realm_frontend/static" ]; then
         echo "   📋 Copying declarations to static folder (for runtime imports)..."
         cp -r src/declarations src/realm_frontend/static/
+        
+        # Replace process.env.CANISTER_ID_* with actual canister IDs
+        echo "   🔧 Injecting canister IDs into declarations..."
+        for canister in $BACKENDS; do
+            canister_id=$(dfx canister id "$canister" --network "$NETWORK" 2>/dev/null || echo "")
+            if [ -n "$canister_id" ]; then
+                canister_upper=$(echo "$canister" | tr '[:lower:]' '[:upper:]')
+                decl_file="src/realm_frontend/static/declarations/$canister/index.js"
+                if [ -f "$decl_file" ]; then
+                    # Replace process.env.CANISTER_ID_* with actual canister ID
+                    sed -i "s|process\.env\.CANISTER_ID_${canister_upper}|\"${canister_id}\"|g" "$decl_file"
+                    echo "      ✅ Injected $canister_id into $canister declarations"
+                fi
+            fi
+        done
     fi
 fi
 

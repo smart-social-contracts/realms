@@ -267,6 +267,7 @@ def _generate_deployment_scripts(
         "canisters": realm_canisters,
         "defaults": dfx_config.get("defaults", {}),
         "networks": dfx_config.get("networks", {}),
+        "output_env_file": ".env",
         "version": dfx_config.get("version", 1)
     }
     
