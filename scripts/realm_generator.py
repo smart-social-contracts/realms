@@ -368,8 +368,10 @@ class RealmGenerator:
                 "quorum_percentage": 0.3,
                 "tax_rate": 0.15,
                 "ubi_amount": 1000
-            },
-            manifest_data=json.dumps(manifest)
+            }
+            # Note: manifest_data removed to avoid Candid parsing issues during import
+            # The manifest can be uploaded separately after deployment if needed
+            # manifest_data=json.dumps(manifest)
         )
         
         return realm

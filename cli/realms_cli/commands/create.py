@@ -450,29 +450,31 @@ except Exception as e:
     print(f"   ⚠️  Failed to reload overrides: {{e}}")
 """.strip()
 
-    upload_script_content = """#!/bin/bash
+    upload_script_content = f"""#!/bin/bash
 # NOTE: This script requires the admin_dashboard extension to be installed
 # The 'realms import' command uses the admin_dashboard extension backend
 # to import data into the realm canister
 
 # Get network from command line argument or default to local
-NETWORK="${1:-local}"
+NETWORK="${{1:-local}}"
 echo "📥 Uploading realm data for network: $NETWORK..."
 echo "⚠️  Note: This requires the admin_dashboard extension to be installed"
 
 # Track if any uploads succeeded
 UPLOAD_SUCCESS=false
 
-# Build realms command with network parameter
-REALMS_CMD="realms import"
+# Build realms command with network parameter and canister name
+REALMS_CMD="realms import --canister {unique_backend_name}"
 if [ "$NETWORK" != "local" ]; then
-    REALMS_CMD="realms import --network $NETWORK"
+    REALMS_CMD="realms import --network $NETWORK --canister {unique_backend_name}"
 fi
 
 # Check if realm_data.json exists and has content
 if [ -f "realm_data.json" ] && [ -s "realm_data.json" ]; then
     echo "📥 Uploading realm data..."
-    if $REALMS_CMD realm_data.json 2>&1 | tee /tmp/upload.log; then
+    # Run import command and capture exit code properly (don't use tee in conditional)
+    $REALMS_CMD realm_data.json
+    if [ $? -eq 0 ]; then
         echo "  ✅ Realm data uploaded successfully"
         UPLOAD_SUCCESS=true
     else
@@ -488,7 +490,8 @@ CODEX_COUNT=0
 for codex_file in *_codex.py; do
     if [ -f "$codex_file" ]; then
         echo "  Importing $(basename $codex_file)..."
-        if $REALMS_CMD "$codex_file" --type codex; then
+        $REALMS_CMD "$codex_file" --type codex
+        if [ $? -eq 0 ]; then
             echo "    ✅ Imported successfully"
             CODEX_COUNT=$((CODEX_COUNT + 1))
             UPLOAD_SUCCESS=true
@@ -511,14 +514,15 @@ EXTENSION_DATA_COUNT=0
 # Look for data files in extensions/*/data/*.json
 if [ -d "../extensions" ]; then
     for extension_dir in ../extensions/*/; do
-        if [ -d "${extension_dir}data" ]; then
+        if [ -d "${{extension_dir}}data" ]; then
             extension_name=$(basename "$extension_dir")
             echo "  Checking extension: $extension_name"
             
-            for data_file in "${extension_dir}data/"*.json; do
+            for data_file in "${{extension_dir}}data/"*.json; do
                 if [ -f "$data_file" ]; then
                     echo "    📥 Importing $(basename "$data_file")..."
-                    if $REALMS_CMD "$data_file"; then
+                    $REALMS_CMD "$data_file"
+                    if [ $? -eq 0 ]; then
                         echo "      ✅ Imported successfully"
                         EXTENSION_DATA_COUNT=$((EXTENSION_DATA_COUNT + 1))
                         UPLOAD_SUCCESS=true
