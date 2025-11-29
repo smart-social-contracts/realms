@@ -263,9 +263,20 @@ echo ""
 if [ "$NETWORK" = "local" ]; then
     echo "🌐 Canister URLs:"
     
-    # Get port from dfx replica status or use default
+    # Get port from dfx info or detect from running dfx
     if [ -z "$PORT" ]; then
-        PORT=$(dfx info replica-port 2>/dev/null || echo "8000")
+        # Try to get port from dfx info
+        PORT=$(dfx info replica-port 2>/dev/null)
+        
+        # If that fails, detect from running process
+        if [ -z "$PORT" ]; then
+            PORT=$(lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | grep -E "replica|pocket" | grep -oE ":[0-9]+" | grep -oE "[0-9]+" | head -1)
+        fi
+        
+        # Final fallback
+        if [ -z "$PORT" ]; then
+            PORT=8000
+        fi
     fi
     
     # Show URLs for each frontend canister
