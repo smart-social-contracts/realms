@@ -222,7 +222,7 @@ def mundus_deploy_command(
     identity: Optional[str],
     mode: str,
 ) -> None:
-    """Deploy all realms and registry in a mundus by running orchestration script."""
+    """Deploy all realms and registry in a mundus by calling individual deploy commands."""
     
     console.print(Panel.fit(
         f"[bold cyan]🚀 Deploying Mundus to {network}[/bold cyan]",
@@ -234,29 +234,58 @@ def mundus_deploy_command(
         console.print(f"[red]❌ Mundus directory not found: {mundus_dir}[/red]")
         raise typer.Exit(1)
     
-    # Check if orchestration script exists
-    deploy_script = mundus_path / "scripts" / "deploy-all.sh"
-    if not deploy_script.exists():
-        console.print(f"[red]❌ Deployment script not found: {deploy_script}[/red]")
-        console.print(f"[yellow]Run 'realms mundus create' first to generate the mundus structure[/yellow]")
-        raise typer.Exit(1)
-    
     console.print(f"📁 Mundus: {mundus_path}")
     console.print(f"📡 Network: {network}")
     console.print(f"🔄 Mode: {mode}\n")
     
-    # Run orchestration script
-    cmd = ["bash", str(deploy_script), network, mode]
+    # Import deploy commands
+    from .deploy import deploy_command as realm_deploy_command
+    from .registry import registry_deploy_command
     
-    if identity:
-        console.print(f"[yellow]⚠️  Identity parameter not yet supported for mundus deployment[/yellow]")
+    # Deploy registry first
+    registry_dirs = sorted(mundus_path.glob("registry_*"))
+    if registry_dirs:
+        console.print("📋 Deploying registry...")
+        for registry_dir in registry_dirs:
+            try:
+                registry_deploy_command(
+                    folder=str(registry_dir),
+                    network=network,
+                    mode=mode,
+                    identity=identity
+                )
+                console.print(f"   ✅ {registry_dir.name} deployed\n")
+            except Exception as e:
+                console.print(f"[red]   ❌ Failed to deploy {registry_dir.name}: {e}[/red]")
+                raise typer.Exit(1)
     
-    try:
-        subprocess.run(cmd, cwd=mundus_path, check=True)
-        console.print(f"\n[bold green]✅ Mundus deployed successfully![/bold green]")
-    except subprocess.CalledProcessError as e:
-        console.print(f"\n[red]❌ Deployment failed with exit code {e.returncode}[/red]")
-        raise typer.Exit(1)
+    # Deploy all realms
+    realm_dirs = sorted(mundus_path.glob("realm_*"))
+    if not realm_dirs:
+        console.print("[yellow]⚠️  No realms found in mundus directory[/yellow]")
+        return
+    
+    console.print(f"🏛️  Deploying {len(realm_dirs)} realm(s)...\n")
+    
+    for realm_dir in realm_dirs:
+        console.print(f"   📦 Deploying {realm_dir.name}...")
+        try:
+            realm_deploy_command(
+                folder=str(realm_dir),
+                network=network,
+                mode=mode,
+                identity=identity
+            )
+            console.print(f"   ✅ {realm_dir.name} deployed\n")
+        except Exception as e:
+            console.print(f"[red]   ❌ Failed to deploy {realm_dir.name}: {e}[/red]")
+            raise typer.Exit(1)
+    
+    console.print(Panel.fit(
+        "[bold green]✅ Mundus Deployment Complete[/bold green]",
+        border_style="green"
+    ))
+    console.print(f"📊 Deployed: {len(realm_dirs)} realm(s) + {len(registry_dirs)} registry\n")
 
 
 def _deploy_canister(realm_dir: Path, canister_name: str, network: str, identity: Optional[str], mode: str) -> None:
