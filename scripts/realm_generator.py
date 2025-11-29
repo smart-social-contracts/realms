@@ -351,6 +351,8 @@ class RealmGenerator:
         import json
         
         # Get entity method overrides configuration
+        # Note: manifest_data field removed from Realm to avoid Candid parsing issues during import
+        # The manifest can be uploaded separately after deployment if needed
         manifest = self.get_codex_overrides_manifest()
         
         realm = Realm(
@@ -369,9 +371,6 @@ class RealmGenerator:
                 "tax_rate": 0.15,
                 "ubi_amount": 1000
             }
-            # Note: manifest_data removed to avoid Candid parsing issues during import
-            # The manifest can be uploaded separately after deployment if needed
-            # manifest_data=json.dumps(manifest)
         )
         
         return realm
