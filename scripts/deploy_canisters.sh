@@ -167,24 +167,27 @@ if [ -n "$BACKENDS" ]; then
         dfx generate "$canister"
     done
     
-    # Copy declarations to frontend $lib for Vite bundling
-    # Vite will bundle these at build time with proper environment variable substitution
-    if [ -d "src/declarations" ] && [ -d "src/realm_frontend/src/lib" ]; then
-        echo "   📋 Copying declarations to $lib for bundling..."
-        mkdir -p src/realm_frontend/src/lib/declarations
-        cp -r src/declarations/* src/realm_frontend/src/lib/declarations/
-        
-        # Create symlinks for standard names (frontend expects realm_backend, not realm1_backend)
-        echo "   🔗 Creating standard declaration symlinks..."
+    # Create symlinks in src/declarations for extensions that import from there
+    echo "   🔗 Creating standard declaration symlinks in src/declarations..."
+    if [ -d "src/declarations" ]; then
         for canister in $BACKENDS; do
             # If canister name matches pattern *_backend, create realm_backend symlink
             if [[ "$canister" == *"_backend" ]] && [[ "$canister" != "realm_backend" ]] && [[ "$canister" != "realm_registry_backend" ]]; then
-                if [ -d "src/realm_frontend/src/lib/declarations/$canister" ]; then
-                    ln -sf "$canister" "src/realm_frontend/src/lib/declarations/realm_backend" 2>/dev/null || true
-                    echo "      🔗 realm_backend -> $canister"
+                if [ -d "src/declarations/$canister" ]; then
+                    ln -sf "$canister" "src/declarations/realm_backend" 2>/dev/null || true
+                    echo "      🔗 src/declarations/realm_backend -> $canister"
                 fi
             fi
         done
+    fi
+    
+    # Copy declarations to frontend $lib for Vite bundling
+    # Vite will bundle these at build time with proper environment variable substitution
+    # Symlinks created above will be preserved by cp -r
+    if [ -d "src/declarations" ] && [ -d "src/realm_frontend/src/lib" ]; then
+        echo "   📋 Copying declarations to $lib for bundling (preserving symlinks)..."
+        mkdir -p src/realm_frontend/src/lib/declarations
+        cp -r src/declarations/* src/realm_frontend/src/lib/declarations/
         
         # Replace process.env.CANISTER_ID_* with actual canister IDs
         echo "   🔧 Injecting canister IDs into declarations..."
