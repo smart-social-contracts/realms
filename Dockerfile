@@ -27,6 +27,7 @@ COPY realm_config.json ./realm_config.json
 COPY scripts ./scripts
 COPY src ./src
 COPY tests ./tests
+COPY examples ./examples
 
 RUN touch src/realm_backend/extension_packages/extension_imports.py
 
