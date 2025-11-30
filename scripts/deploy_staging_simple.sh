@@ -33,6 +33,13 @@ dfx canister start --network "$NETWORK" realm_backend || true
 dfx generate realm_registry_backend
 dfx generate realm_backend
 
+# Copy declarations to frontend expected locations
+echo "Copying declarations to frontend directories..."
+mkdir -p src/realm_frontend/src/lib/declarations
+mkdir -p src/realm_registry_frontend/src/lib/declarations
+cp -r src/declarations/realm_backend src/realm_frontend/src/lib/declarations/
+cp -r src/declarations/realm_registry_backend src/realm_registry_frontend/src/lib/declarations/
+
 # Build and deploy frontends
 npm install --legacy-peer-deps
 
