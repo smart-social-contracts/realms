@@ -573,8 +573,6 @@ def main():
     print(f"\nSeed used: {generator.seed} (use this seed to reproduce the same data)")
     
     # Copy source code folders to output directory
-    # This is needed for test isolation (parallel tests each get their own copy)
-    # For deployments, create.py will convert these copies to symlinks if needed
     print("\nCopying source code folders...")
     
     # Define folders to copy

@@ -98,29 +98,18 @@ def _deploy_realm_internal(
                     # Note: mode only applies to production networks (staging/ic)
                     working_dir = Path.cwd()
                     cmd = [str(script_path.resolve()), network, mode]
-                    use_venv = True
                 elif script_name == "3-upload-data.sh":
                     # Run upload script from the realm folder where data files are located
                     working_dir = folder_path
                     cmd = [str(script_path.resolve()), network]
-                    use_venv = True
                 elif script_name == "4-run-adjustments.py":
                     # Run Python script from the realm folder and pass network parameter
                     working_dir = folder_path
                     cmd = ["python", str(script_path.resolve()), network]
-                    use_venv = True
-                elif script_name == "1-install-extensions.sh":
-                    # Run install-extensions from the REALM folder so extensions install
-                    # to the realm's src/ directory (not /app/src/)
-                    # Don't use project venv - the realms CLI is system-wide
-                    working_dir = folder_path
-                    cmd = [str(script_path.resolve())]
-                    use_venv = False
                 else:
-                    # Run other scripts from project root
+                    # Run other scripts from project root (like install-extensions.sh)
                     working_dir = Path.cwd()
                     cmd = [str(script_path.resolve())]
-                    use_venv = True
 
                 console.print(f"[dim]Working directory: {working_dir}[/dim]")
                 console.print(f"[dim]Command: {' '.join(cmd)}[/dim]")
@@ -136,7 +125,7 @@ def _deploy_realm_internal(
                     env["DFX_IDENTITY"] = identity
                 
                 try:
-                    result = run_command(cmd, cwd=str(working_dir), use_project_venv=use_venv, logger=logger, env=env)
+                    result = run_command(cmd, cwd=str(working_dir), use_project_venv=True, logger=logger, env=env)
 
                     if result.returncode == 0:
                         console.print(
