@@ -355,6 +355,8 @@ def run_command(
                 if line:
                     logger.info(line)
                     stdout_lines.append(line)
+                    # Also print to stdout so CI can capture it
+                    print(line, flush=True)
             
             # Wait for process to complete
             returncode = process.wait()
