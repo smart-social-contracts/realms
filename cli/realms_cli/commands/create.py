@@ -253,14 +253,32 @@ def create_command(
         raise typer.Exit(1)
     
     # Copy canister_ids.json from manifest's directory if a manifest was specified
+    console.print(f"\n🔍 DEBUG: Checking for canister_ids.json to copy...")
+    console.print(f"   manifest parameter: {manifest}")
+    console.print(f"   output_path: {output_path}")
+    
     if manifest is not None:
         manifest_path = Path(manifest)
+        console.print(f"   manifest_path: {manifest_path}")
+        console.print(f"   manifest exists: {manifest_path.exists()}")
+        
         if manifest_path.exists():
             canister_ids_source = manifest_path.parent / "canister_ids.json"
+            console.print(f"   canister_ids_source: {canister_ids_source}")
+            console.print(f"   canister_ids_source exists: {canister_ids_source.exists()}")
+            
             if canister_ids_source.exists():
                 canister_ids_dest = output_path / "canister_ids.json"
+                console.print(f"   canister_ids_dest: {canister_ids_dest}")
                 shutil.copy2(canister_ids_source, canister_ids_dest)
                 console.print(f"\n✅ Copied canister_ids.json from {canister_ids_source.parent}")
+                console.print(f"   Verifying copy: {canister_ids_dest.exists()}")
+            else:
+                console.print(f"   ⚠️  canister_ids.json NOT FOUND at {canister_ids_source}")
+        else:
+            console.print(f"   ⚠️  Manifest file NOT FOUND at {manifest_path}")
+    else:
+        console.print(f"   ⚠️  No manifest specified")
     
     # Generate deployment scripts after data generation
     # Check if we can generate scripts (either in repo mode or in Docker image with full repo)
