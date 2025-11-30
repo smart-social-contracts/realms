@@ -134,6 +134,20 @@ def _deploy_realm_internal(
                     scripts_executed += 1
                 else:
                     console.print(f"[red]❌ {script_name} failed[/red]")
+                    
+                    # If deployment script failed, check for deployment.log
+                    if script_name == "2-deploy-canisters.sh":
+                        deployment_log = folder_path / "deployment.log"
+                        if deployment_log.exists():
+                            console.print(f"[yellow]📝 Deployment log found, showing last 100 lines:[/yellow]")
+                            try:
+                                with open(deployment_log, 'r') as f:
+                                    lines = f.readlines()
+                                    for line in lines[-100:]:
+                                        console.print(f"[dim]{line.rstrip()}[/dim]")
+                            except Exception as e:
+                                console.print(f"[yellow]Could not read deployment.log: {e}[/yellow]")
+                    
                     console.print(f"[yellow]Check realms.log for details[/yellow]")
                     logger.error(f"{script_name} failed")
                     raise typer.Exit(1)
