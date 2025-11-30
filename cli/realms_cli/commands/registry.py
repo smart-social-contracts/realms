@@ -12,7 +12,6 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .create import create_command
-from .registry import registry_create_command
 from ..utils import console, generate_output_dir_name, get_project_root, display_canister_urls_json
 
 
