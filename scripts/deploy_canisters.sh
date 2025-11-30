@@ -350,6 +350,70 @@ if [ "$NETWORK" = "local" ]; then
     echo ""
 fi
 
+# Create canister ID aliases for testing
+# Tests expect realm_backend and realm_frontend, but we deployed with unique names
+echo ""
+echo "🔗 Creating canister aliases for testing..."
+CANISTER_IDS_FILE=".dfx/$NETWORK/canister_ids.json"
+
+if [ -f "$CANISTER_IDS_FILE" ]; then
+    # Find backend and frontend canisters that match our patterns
+    for canister in $BACKENDS; do
+        if [[ "$canister" == *_backend ]]; then
+            canister_id=$(dfx canister id "$canister" 2>/dev/null || echo "")
+            if [ -n "$canister_id" ]; then
+                # Create realm_backend alias pointing to this ID
+                echo "   Adding alias: realm_backend -> $canister ($canister_id)"
+                # Use jq to add the alias if available, otherwise use Python
+                if command -v jq &> /dev/null; then
+                    temp_file=$(mktemp)
+                    jq ".realm_backend.\"$NETWORK\" = \"$canister_id\"" "$CANISTER_IDS_FILE" > "$temp_file"
+                    mv "$temp_file" "$CANISTER_IDS_FILE"
+                else
+                    python3 -c "
+import json
+with open('$CANISTER_IDS_FILE', 'r') as f:
+    data = json.load(f)
+if 'realm_backend' not in data:
+    data['realm_backend'] = {}
+data['realm_backend']['$NETWORK'] = '$canister_id'
+with open('$CANISTER_IDS_FILE', 'w') as f:
+    json.dump(data, f, indent=2)
+"
+                fi
+            fi
+        fi
+    done
+    
+    for canister in $FRONTENDS; do
+        if [[ "$canister" == *_frontend ]]; then
+            canister_id=$(dfx canister id "$canister" 2>/dev/null || echo "")
+            if [ -n "$canister_id" ]; then
+                # Create realm_frontend alias pointing to this ID
+                echo "   Adding alias: realm_frontend -> $canister ($canister_id)"
+                if command -v jq &> /dev/null; then
+                    temp_file=$(mktemp)
+                    jq ".realm_frontend.\"$NETWORK\" = \"$canister_id\"" "$CANISTER_IDS_FILE" > "$temp_file"
+                    mv "$temp_file" "$CANISTER_IDS_FILE"
+                else
+                    python3 -c "
+import json
+with open('$CANISTER_IDS_FILE', 'r') as f:
+    data = json.load(f)
+if 'realm_frontend' not in data:
+    data['realm_frontend'] = {}
+data['realm_frontend']['$NETWORK'] = '$canister_id'
+with open('$CANISTER_IDS_FILE', 'w') as f:
+    json.dump(data, f, indent=2)
+"
+                fi
+            fi
+        fi
+    done
+else
+    echo "   ⚠️  Canister IDS file not found at $CANISTER_IDS_FILE"
+fi
+
 echo ""
 echo "✅ All done!"
 echo ""
