@@ -305,10 +305,21 @@ def _generate_deployment_scripts(
         dfx_config = json.load(f)
     
     # Create realm-only dfx.json (realm_backend, realm_frontend, and optional local-only canisters)
-    # Use unique canister names based on realm_name to avoid conflicts in mundus deployments
-    sanitized_realm_name = realm_name.lower().replace(" ", "_").replace("-", "_")
-    unique_backend_name = f"{sanitized_realm_name}_backend"
-    unique_frontend_name = f"{sanitized_realm_name}_frontend"
+    # Check if canister_ids.json exists - if so, use standard names to match existing canisters
+    # Otherwise, use unique names to avoid conflicts in mundus deployments
+    canister_ids_file = output_path / "canister_ids.json"
+    
+    if canister_ids_file.exists():
+        # canister_ids.json exists (from manifest) - use standard names to match existing canisters
+        backend_name = "realm_backend"
+        frontend_name = "realm_frontend"
+        console.print(f"   ✅ Using standard canister names from canister_ids.json")
+    else:
+        # No canister_ids.json - generate unique names for local/mundus deployments
+        sanitized_realm_name = realm_name.lower().replace(" ", "_").replace("-", "_")
+        backend_name = f"{sanitized_realm_name}_backend"
+        frontend_name = f"{sanitized_realm_name}_frontend"
+        console.print(f"   ✅ Using unique canister names: {backend_name}, {frontend_name}")
     
     # Deep copy and update canister configs to avoid reference issues
     import copy
@@ -320,8 +331,8 @@ def _generate_deployment_scripts(
     # The workspace field tells dfx where to find package.json, which is at src/realm_frontend/
     
     realm_canisters = {
-        unique_backend_name: backend_config,
-        unique_frontend_name: frontend_config,
+        backend_name: backend_config,
+        frontend_name: frontend_config,
     }
     
     # For local networks, include additional canisters (Internet Identity, ckBTC, etc.)
@@ -332,13 +343,17 @@ def _generate_deployment_scripts(
         if "internet_identity" in dfx_config["canisters"]:
             realm_canisters["internet_identity"] = dfx_config["canisters"]["internet_identity"]
         
-        # Include any ICRC-1 ledger canisters if they exist (unique per realm)
+        # Include any ICRC-1 ledger canisters if they exist
         for canister_name, canister_config in dfx_config["canisters"].items():
             if any(keyword in canister_name.lower() for keyword in ["icrc1", "ledger"]) and canister_name not in realm_canisters:
-                # Make ledger unique per realm too
-                unique_ledger_name = f"{sanitized_realm_name}_{canister_name}"
-                realm_canisters[unique_ledger_name] = canister_config
-                console.print(f"   ✅ Including {unique_ledger_name} for local development")
+                # Use standard name if canister_ids exists, otherwise unique name
+                if canister_ids_file.exists():
+                    ledger_name = canister_name
+                else:
+                    sanitized_realm_name = realm_name.lower().replace(" ", "_").replace("-", "_")
+                    ledger_name = f"{sanitized_realm_name}_{canister_name}"
+                realm_canisters[ledger_name] = canister_config
+                console.print(f"   ✅ Including {ledger_name} for local development")
     
     realm_dfx = {
         "canisters": realm_canisters,
@@ -600,9 +615,9 @@ echo "⚠️  Note: This requires the admin_dashboard extension to be installed"
 UPLOAD_SUCCESS=false
 
 # Build realms command with network parameter and canister name
-REALMS_CMD="realms import --canister {unique_backend_name}"
+REALMS_CMD="realms import --canister {backend_name}"
 if [ "$NETWORK" != "local" ]; then
-    REALMS_CMD="realms import --network $NETWORK --canister {unique_backend_name}"
+    REALMS_CMD="realms import --network $NETWORK --canister {backend_name}"
 fi
 
 # Check if realm_data.json exists and has content
