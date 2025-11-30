@@ -400,34 +400,25 @@ def _generate_deployment_scripts(
     src_link = output_path / "src"
     src_target = repo_root / "src"
     
-    console.print(f"\n🔗 Creating src symlink...")
+    console.print(f"\n🔍 DEBUG: Symlink creation:")
+    console.print(f"   src_link path: {src_link}")
+    console.print(f"   src_link exists: {src_link.exists()}")
+    console.print(f"   src_link is_symlink: {src_link.is_symlink()}")
+    console.print(f"   src_target path: {src_target}")
+    console.print(f"   src_target exists: {src_target.exists()}")
     
-    if src_link.exists() or src_link.is_symlink():
-        if src_link.is_symlink():
-            # Symlink already exists - verify it points to the right place
-            actual_target = os.readlink(src_link)
-            if actual_target == str(src_target):
-                console.print(f"   ✅ Symlink already correct: src -> {src_target}")
-            else:
-                console.print(f"   🔄 Updating symlink from {actual_target} to {src_target}")
-                src_link.unlink()
-                os.symlink(src_target, src_link)
-        else:
-            # It's a real directory/file - this is the bug! Remove it and create symlink
-            console.print(f"   ⚠️  Removing stale src directory (will replace with symlink)")
-            if src_link.is_dir():
-                shutil.rmtree(src_link)
-            else:
-                src_link.unlink()
-            os.symlink(src_target, src_link)
-            console.print(f"   ✅ Created symlink: src -> {src_target}")
-    else:
-        # Doesn't exist at all - create symlink
+    if not src_link.exists():
         if src_target.exists():
             os.symlink(src_target, src_link)
             console.print(f"   ✅ Created symlink: src -> {src_target}")
         else:
             console.print(f"   ⚠️  Warning: Could not find src directory at {src_target}")
+    else:
+        if src_link.is_symlink():
+            actual_target = os.readlink(src_link)
+            console.print(f"   ℹ️  Symlink already exists: src -> {actual_target}")
+        else:
+            console.print(f"   ⚠️  WARNING: src exists but is NOT a symlink (it's a real directory/file!)")
     
     # 2. Create scripts subdirectory
     console.print("\n🔧 Generating deployment scripts...")
