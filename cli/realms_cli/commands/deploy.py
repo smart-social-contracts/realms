@@ -49,11 +49,13 @@ def _deploy_realm_internal(
             )
             if realm_dirs:
                 folder = str(realm_dirs[0])
-                console.print(f"📁 Using generated realm folder: {folder}")
+                console.print(f"[dim]📁 Auto-detected realm folder: {folder}[/dim]")
 
     if folder:
         # Deploy using generated realm folder scripts
-        console.print(f"📁 Using generated realm folder: {folder}")
+        if not folder.startswith(REALM_FOLDER):
+            # User provided explicit folder path
+            console.print(f"📁 Using realm folder: {folder}")
 
         folder_path = Path(folder).resolve()
         if not folder_path.exists():
