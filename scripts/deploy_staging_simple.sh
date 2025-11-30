@@ -11,13 +11,11 @@ MODE="${2:-upgrade}"
 echo "🚀 Deploying to network: $NETWORK with mode: $MODE"
 echo "Date/Time: $(date '+%Y-%m-%d %H:%M:%S')"
 
-# Use the tested realms CLI to deploy
-echo "📦 Deploying realm using realms CLI..."
-realms realm deploy --network "$NETWORK" --mode "$MODE" --folder .
+# Use the existing deployment script (tested in CI)
+echo "📦 Running deployment script..."
+bash scripts/deploy_canisters.sh "$NETWORK" "$MODE"
 
 echo "🎨 Installing extensions..."
 realms extension install-from-source --source-dir extensions --network "$NETWORK"
 
 echo "✅ Deployment complete!"
-echo "Registry backend: $(dfx canister id realm_registry_backend --network $NETWORK)"
-echo "Realm backend: $(dfx canister id realm_backend --network $NETWORK)"
