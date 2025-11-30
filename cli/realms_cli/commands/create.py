@@ -252,6 +252,16 @@ def create_command(
             console.print(f"[red]{e.stderr}[/red]")
         raise typer.Exit(1)
     
+    # Copy canister_ids.json from manifest's directory if a manifest was specified
+    if manifest is not None:
+        manifest_path = Path(manifest)
+        if manifest_path.exists():
+            canister_ids_source = manifest_path.parent / "canister_ids.json"
+            if canister_ids_source.exists():
+                canister_ids_dest = output_path / "canister_ids.json"
+                shutil.copy2(canister_ids_source, canister_ids_dest)
+                console.print(f"\n✅ Copied canister_ids.json from {canister_ids_source.parent}")
+    
     # Generate deployment scripts after data generation
     # Check if we can generate scripts (either in repo mode or in Docker image with full repo)
     can_generate_scripts = in_repo_mode or (repo_root / "dfx.json").exists()

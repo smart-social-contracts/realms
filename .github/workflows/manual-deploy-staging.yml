@@ -45,7 +45,7 @@ jobs:
           # Pull the demo image (includes extensions)
           docker pull ghcr.io/${{ github.repository_owner }}/realms:demo-${{ steps.commit.outputs.deploy_commit }}
           
-          # Deploy to existing fixed-name canisters on staging
+          # Deploy to existing fixed-name canisters on staging using realms CLI
           docker run --rm \
             -v "$(pwd)/identity.pem:/app/identity.pem" \
             -v "$(pwd)/deploy-logs:/app/deploy-logs" \
@@ -53,7 +53,13 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/realms:demo-${{ steps.commit.outputs.deploy_commit }} \
             bash -c "(dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
                      dfx identity use my-identity && \
-                     bash scripts/deploy_staging_simple.sh staging ${{ github.event.inputs.mode }}); \
+                     if [ '${{ github.event.inputs.mode }}' = 'reinstall' ]; then \
+                       echo ' Reinstall mode: deploying with fresh data' && \
+                       realms realm create --manifest examples/demo/realm1/manifest.json --random --network staging --deploy --mode reinstall; \
+                     else \
+                       echo '  Upgrade mode: deploying without data changes' && \
+                       realms realm create --manifest examples/demo/realm1/manifest.json --network staging --deploy --mode upgrade; \
+                     fi); \
                      EXIT_CODE=\$?; \
                      mkdir -p /app/deploy-logs && \
                      cp -f dfx.log /app/deploy-logs/ 2>/dev/null || true && \

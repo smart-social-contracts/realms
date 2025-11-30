@@ -1,10 +1,4 @@
 {
-  "realm_backend": {
-    "staging": "h5vpp-qyaaa-aaaac-qai3a-cai"
-  },
-  "realm_frontend": {
-    "staging": "gzya5-jyaaa-aaaac-qai5a-cai"
-  },
   "realm_registry_backend": {
     "staging": "rhw4p-gqaaa-aaaac-qbw7q-cai"
   },
