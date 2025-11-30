@@ -274,7 +274,7 @@ def realm_create(
         "Generated Demo Realm", "--realm-name", help="Name of the realm"
     ),
     manifest: Optional[str] = typer.Option(
-        None, "--manifest", help="Path to realm manifest.json (uses examples/demo/realm1/manifest.json if not specified and no flags provided)"
+        "examples/demo/realm1/manifest.json", "--manifest", help="Path to realm manifest.json (defaults to realm1 template)"
     ),
     random: bool = typer.Option(
         False, "--random/--no-random", help="Generate random realm data"
