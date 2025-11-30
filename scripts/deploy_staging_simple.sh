@@ -11,12 +11,11 @@ MODE="${2:-upgrade}"
 echo "🚀 Deploying to network: $NETWORK with mode: $MODE using realms CLI"
 echo "Date/Time: $(date '+%Y-%m-%d %H:%M:%S')"
 
-# Step 1: Install extensions (must be done BEFORE deployment so they're compiled into backend)
-echo "📦 Installing extensions into source code..."
-realms extension install-from-source --source-dir extensions
+# Use realms CLI which handles everything:
+# - Installs extensions (1-install-extensions.sh)
+# - Deploys canisters (2-deploy-canisters.sh)
+# - Uploads data (3-upload-data.sh) 
+# - Runs adjustments (4-run-adjustments.py)
+realms realm deploy --folder . --network "$NETWORK" --mode "$MODE"
 
-# Step 2: Deploy using the tested deployment script (handles everything)
-echo "🚀 Deploying canisters using deploy_canisters.sh..."
-bash scripts/deploy_canisters.sh . "$NETWORK" "$MODE"
-
-echo "✅ Deployment complete with extensions!"
+echo "✅ Deployment complete!"
