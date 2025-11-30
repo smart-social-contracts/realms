@@ -1,6 +1,7 @@
 """Create command for generating new realms with demo data and deployment scripts."""
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -334,6 +335,17 @@ def _generate_deployment_scripts(
         json.dump(realm_dfx, f, indent=2)
     console.print(f"   ✅ dfx.json created")
 
+    # Create symlinks to src directories so deploy_canisters.sh can find them
+    # This is crucial: deploy_canisters.sh cd's into the realm directory and expects src/ there
+    src_link = output_path / "src"
+    if not src_link.exists():
+        src_target = repo_root / "src"
+        if src_target.exists():
+            os.symlink(src_target, src_link)
+            console.print(f"   ✅ Created symlink: src -> {src_target}")
+        else:
+            console.print(f"   ⚠️  Warning: Could not find src directory at {src_target}")
+    
     # 2. Create scripts subdirectory
     console.print("\n🔧 Generating deployment scripts...")
     scripts_dir = output_path / "scripts"
