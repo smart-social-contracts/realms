@@ -12,8 +12,9 @@ echo "🚀 Deploying to network: $NETWORK with mode: $MODE"
 echo "Date/Time: $(date '+%Y-%m-%d %H:%M:%S')"
 
 # Use the existing deployment script (tested in CI)
+# deploy_canisters.sh params: WORKING_DIR NETWORK MODE
 echo "📦 Running deployment script..."
-bash scripts/deploy_canisters.sh "$NETWORK" "$MODE"
+bash scripts/deploy_canisters.sh "." "$NETWORK" "$MODE"
 
 echo "🎨 Installing extensions..."
 realms extension install-from-source --source-dir extensions --network "$NETWORK"
