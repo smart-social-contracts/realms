@@ -418,14 +418,19 @@ if [ -n "$DEPLOY_SCRIPT" ] && [ -f "$DEPLOY_SCRIPT" ]; then
     echo "   Args: $REALM_DIR $NETWORK $MODE"
     echo "════════════════════════════════════════════════════════════════"
     
-    # Run with explicit error handling
-    if bash "$DEPLOY_SCRIPT" "$REALM_DIR" "$NETWORK" "$MODE"; then
+    # Run with explicit error handling and stderr redirected to stdout
+    # This ensures all output (including set -x trace) is captured
+    set +e  # Temporarily disable exit on error to capture exit code
+    bash "$DEPLOY_SCRIPT" "$REALM_DIR" "$NETWORK" "$MODE" 2>&1
+    EXIT_CODE=$?
+    set -e  # Re-enable exit on error
+    
+    if [ $EXIT_CODE -eq 0 ]; then
         echo "════════════════════════════════════════════════════════════════"
         echo "✅ Deployment completed successfully"
         echo "════════════════════════════════════════════════════════════════"
         exit 0
     else
-        EXIT_CODE=$?
         echo "════════════════════════════════════════════════════════════════"
         echo "❌ Deployment failed with exit code: $EXIT_CODE"
         echo "════════════════════════════════════════════════════════════════"
