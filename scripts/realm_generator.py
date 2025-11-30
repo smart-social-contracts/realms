@@ -572,11 +572,36 @@ def main():
     
     print(f"\nSeed used: {generator.seed} (use this seed to reproduce the same data)")
     
-    # NOTE: Source code is NOT copied here anymore!
-    # The create.py command will create SYMLINKS to src/ instead of copying.
-    # This ensures that extensions installed AFTER realm creation are visible.
-    # Previously, copying src/ here created stale copies with empty extension_manifests.py
-    print("\nℹ️  Source code will be symlinked by create.py (not copied here)")
+    # Copy source code folders to output directory
+    # This is needed for test isolation (parallel tests each get their own copy)
+    # For deployments, create.py will convert these copies to symlinks if needed
+    print("\nCopying source code folders...")
+    
+    # Define folders to copy
+    folders_to_copy = [
+        ("src/realm_backend", "src/realm_backend"),
+        ("src/realm_frontend", "src/realm_frontend"),
+        ("extensions", "extensions"),
+        ("scripts", "scripts"),
+    ]
+    
+    for src_rel, dest_rel in folders_to_copy:
+        src_folder = repo_root / src_rel
+        dest_folder = output_dir / dest_rel
+        
+        if src_folder.exists():
+            # Create parent directories if needed
+            dest_folder.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Copy the folder
+            if dest_folder.exists():
+                shutil.rmtree(dest_folder)
+            shutil.copytree(src_folder, dest_folder)
+            print(f"  Copied {src_rel} -> {dest_rel}")
+        else:
+            print(f"  Warning: Source folder {src_rel} not found at {src_folder}")
+    
+    print("\nSource code copying complete!")
 
 if __name__ == "__main__":
     main()
