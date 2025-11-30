@@ -8,14 +8,15 @@ NETWORK="${1:-staging}"
 # Get mode from second argument, default to upgrade
 MODE="${2:-upgrade}"
 
-echo "🚀 Deploying to network: $NETWORK with mode: $MODE using realms CLI"
+echo "🚀 Deploying to network: $NETWORK with mode: $MODE"
 echo "Date/Time: $(date '+%Y-%m-%d %H:%M:%S')"
 
-# Use realms CLI which handles everything:
-# - Installs extensions (1-install-extensions.sh)
-# - Deploys canisters (2-deploy-canisters.sh)
-# - Uploads data (3-upload-data.sh) 
-# - Runs adjustments (4-run-adjustments.py)
-realms realm deploy --folder . --network "$NETWORK" --mode "$MODE"
+# Step 1: Install extensions BEFORE deployment (so they compile into backend WASM)
+echo "📦 Installing extensions..."
+realms extension install-from-source --source-dir extensions
 
-echo "✅ Deployment complete!"
+# Step 2: Deploy using tested script (handles kybra, wasms, backends, frontends)
+echo "🚀 Deploying canisters..."
+bash scripts/deploy_canisters.sh . "$NETWORK" "$MODE"
+
+echo "✅ Deployment complete with extensions!"
