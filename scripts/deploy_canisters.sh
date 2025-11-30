@@ -108,6 +108,16 @@ elif [ "$SKIP_DFX_START" = "true" ]; then
     echo "🌐 Using shared dfx instance (mundus mode)"
 fi
 
+# Clear Kybra build cache to ensure fresh builds with latest extensions
+echo ""
+echo "🧹 Clearing Kybra build cache..."
+if [ -d ".kybra" ]; then
+    rm -rf .kybra
+    echo "   ✅ Cleared .kybra cache"
+else
+    echo "   ℹ️  No .kybra cache to clear"
+fi
+
 # Get all backend canisters from dfx.json
 echo ""
 echo "📦 Detecting backend canisters..."
