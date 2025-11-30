@@ -1,24 +1,9 @@
 {
-  "internet_identity": {
-    "staging": "32l3g-aaaaa-aaaac-qcyjq-cai"
-  },
-  "realm1_backend": {
+  "realm_backend": {
     "staging": "h5vpp-qyaaa-aaaac-qai3a-cai"
   },
-  "realm1_frontend": {
+  "realm_frontend": {
     "staging": "gzya5-jyaaa-aaaac-qai5a-cai"
-  },
-  "realm2_backend": {
-    "staging": "3bohd-2yaaa-aaaac-qcyla-cai"
-  },
-  "realm2_frontend": {
-    "staging": "3gpbx-xaaaa-aaaac-qcylq-cai"
-  },
-  "realm3_backend": {
-    "staging": "2lbfz-yiaaa-aaaac-qcyma-cai"
-  },
-  "realm3_frontend": {
-    "staging": "2madn-vqaaa-aaaac-qcymq-cai"
   },
   "realm_registry_backend": {
     "staging": "rhw4p-gqaaa-aaaac-qbw7q-cai"
