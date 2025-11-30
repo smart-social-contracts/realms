@@ -398,13 +398,27 @@ def _generate_deployment_scripts(
     # Create symlinks to src directories so deploy_canisters.sh can find them
     # This is crucial: deploy_canisters.sh cd's into the realm directory and expects src/ there
     src_link = output_path / "src"
+    src_target = repo_root / "src"
+    
+    console.print(f"\n🔍 DEBUG: Symlink creation:")
+    console.print(f"   src_link path: {src_link}")
+    console.print(f"   src_link exists: {src_link.exists()}")
+    console.print(f"   src_link is_symlink: {src_link.is_symlink()}")
+    console.print(f"   src_target path: {src_target}")
+    console.print(f"   src_target exists: {src_target.exists()}")
+    
     if not src_link.exists():
-        src_target = repo_root / "src"
         if src_target.exists():
             os.symlink(src_target, src_link)
             console.print(f"   ✅ Created symlink: src -> {src_target}")
         else:
             console.print(f"   ⚠️  Warning: Could not find src directory at {src_target}")
+    else:
+        if src_link.is_symlink():
+            actual_target = os.readlink(src_link)
+            console.print(f"   ℹ️  Symlink already exists: src -> {actual_target}")
+        else:
+            console.print(f"   ⚠️  WARNING: src exists but is NOT a symlink (it's a real directory/file!)")
     
     # 2. Create scripts subdirectory
     console.print("\n🔧 Generating deployment scripts...")
