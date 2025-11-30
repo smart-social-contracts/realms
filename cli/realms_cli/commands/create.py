@@ -725,58 +725,15 @@ ic.print("len(Codex.instances()) = %d" % len(Codex.instances()))
     if deploy:
         console.print("\n[yellow]🚀 Auto-deployment requested...[/yellow]")
         try:
-            # Deploy all realms and registries defined in the mundus manifest
-            if mundus_config:
-                import subprocess
-                
-                # Build list of canisters to deploy
-                canisters_to_deploy = []
-                
-                # Add realm canisters
-                for realm_folder in mundus_config.get("realms", []):
-                    canisters_to_deploy.append(f"{realm_folder}_backend")
-                    canisters_to_deploy.append(f"{realm_folder}_frontend")
-                
-                # Add registry canisters
-                for registry_folder in mundus_config.get("registries", []):
-                    # Registry uses realm_registry_backend/frontend naming
-                    if registry_folder == "registry":
-                        canisters_to_deploy.append("realm_registry_backend")
-                        canisters_to_deploy.append("realm_registry_frontend")
-                
-                if canisters_to_deploy:
-                    console.print(f"\n[bold]Deploying {len(canisters_to_deploy)} canisters:[/bold]")
-                    
-                    # Deploy each canister one by one
-                    deployed_count = 0
-                    for canister in canisters_to_deploy:
-                        console.print(f"\n  🚀 Deploying {canister}...")
-                        
-                        # Build dfx deploy command for single canister
-                        cmd = ["dfx", "deploy", canister]
-                        if network and network != "local":
-                            cmd.extend(["--network", network])
-                        if mode == "install":
-                            cmd.append("--mode=install")
-                        
-                        result = subprocess.run(cmd, cwd=Path.cwd(), capture_output=True, text=True)
-                        
-                        if result.returncode != 0:
-                            console.print(f"[red]     ❌ Failed to deploy {canister}[/red]")
-                            console.print(f"[red]{result.stderr}[/red]")
-                            raise typer.Exit(1)
-                        else:
-                            deployed_count += 1
-                            console.print(f"[green]     ✅ {canister} deployed ({deployed_count}/{len(canisters_to_deploy)})[/green]")
-                    
-                    console.print(f"\n[green]✅ All {deployed_count} canisters deployed successfully![/green]")
-                else:
-                    console.print("[yellow]⚠️  No canisters to deploy[/yellow]")
-            else:
-                # Fallback to old single-realm deployment
-                _deploy_realm_internal(
-                    config_file=None, folder=output_dir, network=network, clean=False, identity=identity, mode=mode
-                )
+            # Deploy the single realm using the internal deploy function
+            _deploy_realm_internal(
+                config_file=None, 
+                folder=str(output_path),  # Use the generated realm directory
+                network=network, 
+                clean=False, 
+                identity=identity, 
+                mode=mode
+            )
         except typer.Exit as e:
             console.print(
                 f"[red]❌ Auto-deployment failed with exit code: {e.exit_code}[/red]"
