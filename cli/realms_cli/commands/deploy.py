@@ -106,8 +106,13 @@ def _deploy_realm_internal(
                     # Run Python script from the realm folder and pass network parameter
                     working_dir = folder_path
                     cmd = ["python", str(script_path.resolve()), network]
+                elif script_name == "1-install-extensions.sh":
+                    # Run install-extensions from the REALM folder so extensions install
+                    # to the realm's src/ directory (not /app/src/)
+                    working_dir = folder_path
+                    cmd = [str(script_path.resolve())]
                 else:
-                    # Run other scripts from project root (like install-extensions.sh)
+                    # Run other scripts from project root
                     working_dir = Path.cwd()
                     cmd = [str(script_path.resolve())]
 
