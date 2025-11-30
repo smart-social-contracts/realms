@@ -234,11 +234,27 @@ if command -v jq &> /dev/null; then
     FRONTENDS=$(jq -r '.canisters | to_entries[] | select(.value.type == "assets") | .key' dfx.json 2>/dev/null || echo "")
     echo "[DEBUG] jq result for frontends: $FRONTENDS"
 else
-    # Fallback: find canister names that have type "assets"
-    # Strategy: find "type": "assets" then look BACKWARD for the canister name (must contain underscore)
-    echo "[DEBUG] jq not available, using grep fallback"
-    FRONTENDS=$(grep -B 3 '"type"[[:space:]]*:[[:space:]]*"assets"' dfx.json | grep -o '^[[:space:]]*"[a-zA-Z0-9_-]*_[a-zA-Z0-9_-]*"[[:space:]]*:[[:space:]]*{' | sed 's/^[[:space:]]*"//g' | sed 's/"[[:space:]]*:[[:space:]]*{//g' || echo "")
-    echo "[DEBUG] grep fallback result: $FRONTENDS"
+    # Fallback: Simple approach - find canister names containing "frontend"
+    # Pattern matches lines starting with whitespace + quote + name + quote + colon
+    echo "[DEBUG] jq not available, using simple grep fallback"
+    FRONTENDS=$(grep -o '^[[:space:]]*"[a-zA-Z0-9_-]*frontend[a-zA-Z0-9_-]*"[[:space:]]*:' dfx.json | grep -o '"[^"]*"' | tr -d '"' || echo "")
+    echo "[DEBUG] grep found potential frontends: $FRONTENDS"
+    
+    # Verify these are actually asset canisters by checking for "type": "assets" nearby
+    if [ -n "$FRONTENDS" ]; then
+        VERIFIED_FRONTENDS=""
+        for canister in $FRONTENDS; do
+            # Check if this canister has type "assets" in its definition
+            if grep -A 10 "\"$canister\"" dfx.json | grep -q '"type"[[:space:]]*:[[:space:]]*"assets"'; then
+                VERIFIED_FRONTENDS="$VERIFIED_FRONTENDS $canister"
+                echo "[DEBUG]   ✅ $canister has type 'assets'"
+            else
+                echo "[DEBUG]   ❌ $canister does not have type 'assets'"
+            fi
+        done
+        FRONTENDS=$(echo $VERIFIED_FRONTENDS | xargs)
+        echo "[DEBUG] final verified frontends: $FRONTENDS"
+    fi
 fi
 
 if [ -z "$FRONTENDS" ]; then
