@@ -124,16 +124,36 @@ def _deploy_realm_internal(
                     # Pass identity via environment variable so all dfx commands pick it up
                     env["DFX_IDENTITY"] = identity
                 
-                result = run_command(cmd, cwd=str(working_dir), use_project_venv=True, logger=logger, env=env)
+                try:
+                    result = run_command(cmd, cwd=str(working_dir), use_project_venv=True, logger=logger, env=env)
 
-                if result.returncode == 0:
-                    console.print(
-                        f"[green]✅ {script_name} completed successfully[/green]"
-                    )
-                    logger.info(f"{script_name} completed successfully")
-                    scripts_executed += 1
-                else:
-                    console.print(f"[red]❌ {script_name} failed[/red]")
+                    if result.returncode == 0:
+                        console.print(
+                            f"[green]✅ {script_name} completed successfully[/green]"
+                        )
+                        logger.info(f"{script_name} completed successfully")
+                        scripts_executed += 1
+                    else:
+                        console.print(f"[red]❌ {script_name} failed with exit code {result.returncode}[/red]")
+                        
+                        # If deployment script failed, check for deployment.log
+                        if script_name == "2-deploy-canisters.sh":
+                            deployment_log = folder_path / "deployment.log"
+                            if deployment_log.exists():
+                                console.print(f"[yellow]📝 Deployment log found, showing last 100 lines:[/yellow]")
+                                try:
+                                    with open(deployment_log, 'r') as f:
+                                        lines = f.readlines()
+                                        for line in lines[-100:]:
+                                            console.print(f"[dim]{line.rstrip()}[/dim]")
+                                except Exception as e:
+                                    console.print(f"[yellow]Could not read deployment.log: {e}[/yellow]")
+                        
+                        console.print(f"[yellow]Check realms.log for details[/yellow]")
+                        logger.error(f"{script_name} failed")
+                        raise typer.Exit(1)
+                except subprocess.CalledProcessError as e:
+                    console.print(f"[red]❌ {script_name} failed with exit code {e.returncode}[/red]")
                     
                     # If deployment script failed, check for deployment.log
                     if script_name == "2-deploy-canisters.sh":
@@ -145,11 +165,11 @@ def _deploy_realm_internal(
                                     lines = f.readlines()
                                     for line in lines[-100:]:
                                         console.print(f"[dim]{line.rstrip()}[/dim]")
-                            except Exception as e:
-                                console.print(f"[yellow]Could not read deployment.log: {e}[/yellow]")
+                            except Exception as log_e:
+                                console.print(f"[yellow]Could not read deployment.log: {log_e}[/yellow]")
                     
                     console.print(f"[yellow]Check realms.log for details[/yellow]")
-                    logger.error(f"{script_name} failed")
+                    logger.error(f"{script_name} failed: {e}")
                     raise typer.Exit(1)
 
                 console.print("")  # Add spacing between scripts
