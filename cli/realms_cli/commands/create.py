@@ -300,9 +300,18 @@ def _generate_deployment_scripts(
     unique_backend_name = f"{sanitized_realm_name}_backend"
     unique_frontend_name = f"{sanitized_realm_name}_frontend"
     
+    # Deep copy and update canister configs to avoid reference issues
+    import copy
+    backend_config = copy.deepcopy(dfx_config["canisters"]["realm_backend"])
+    frontend_config = copy.deepcopy(dfx_config["canisters"]["realm_frontend"])
+    
+    # IMPORTANT: Keep workspace as "realm_frontend" (not unique name)
+    # because src/ directories are shared via symlink across all realms
+    # The workspace field tells dfx where to find package.json, which is at src/realm_frontend/
+    
     realm_canisters = {
-        unique_backend_name: dfx_config["canisters"]["realm_backend"],
-        unique_frontend_name: dfx_config["canisters"]["realm_frontend"],
+        unique_backend_name: backend_config,
+        unique_frontend_name: frontend_config,
     }
     
     # For local networks, include additional canisters (Internet Identity, ckBTC, etc.)
