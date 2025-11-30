@@ -12,7 +12,7 @@ from rich.panel import Panel
 
 from .create import create_command
 from .registry import registry_create_command
-from ..utils import console, generate_output_dir_name, get_project_root
+from ..utils import console, generate_output_dir_name, get_project_root, display_canister_urls_json, get_canister_urls
 
 
 def mundus_create_command(
@@ -387,6 +387,26 @@ def mundus_deploy_command(
         border_style="green"
     ))
     console.print(f"📊 Deployed: {len(realm_dirs)} realm(s) + {len(registry_dirs)} registry\n")
+    
+    # Display all canister URLs from all deployments
+    console.print("[bold cyan]📋 Mundus Deployment Summary[/bold cyan]\n")
+    all_canisters = {}
+    
+    # Collect registry canisters
+    for registry_dir in registry_dirs:
+        registry_canisters = get_canister_urls(registry_dir, network)
+        for name, info in registry_canisters.items():
+            all_canisters[f"{registry_dir.name}/{name}"] = info
+    
+    # Collect realm canisters
+    for realm_dir in realm_dirs:
+        realm_canisters = get_canister_urls(realm_dir, network)
+        for name, info in realm_canisters.items():
+            all_canisters[f"{realm_dir.name}/{name}"] = info
+    
+    if all_canisters:
+        console.print(json.dumps(all_canisters, indent=2))
+        console.print("")
 
 
 def _deploy_canister(realm_dir: Path, canister_name: str, network: str, identity: Optional[str], mode: str) -> None:

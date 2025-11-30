@@ -771,3 +771,124 @@ def get_effective_network_and_canister(
     effective_canister = explicit_canister or "realm_backend"
 
     return effective_network, effective_canister
+
+
+def get_canister_urls(
+    working_dir: Path,
+    network: str = "local"
+) -> Dict[str, Dict[str, str]]:
+    """Extract canister IDs and URLs from a deployment directory.
+    
+    Args:
+        working_dir: Directory containing dfx.json and .dfx directory
+        network: Network name (local, staging, ic, etc.)
+        
+    Returns:
+        Dictionary mapping canister names to their IDs and URLs
+    """
+    import subprocess
+    
+    canisters = {}
+    working_dir = Path(working_dir).absolute()
+    
+    # Read dfx.json to get list of canisters
+    dfx_json_path = working_dir / "dfx.json"
+    if not dfx_json_path.exists():
+        return canisters
+    
+    try:
+        with open(dfx_json_path, 'r') as f:
+            dfx_config = json.load(f)
+        
+        canister_names = dfx_config.get("canisters", {}).keys()
+        
+        # Determine port for local network
+        port = 8000
+        if network == "local":
+            # Try to detect actual port
+            try:
+                port_result = subprocess.run(
+                    ["dfx", "info", "webserver-port"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    cwd=working_dir
+                )
+                if port_result.returncode == 0 and port_result.stdout.strip():
+                    port = int(port_result.stdout.strip())
+            except:
+                # Fallback: try lsof
+                try:
+                    lsof_result = subprocess.run(
+                        ["lsof", "-iTCP", "-sTCP:LISTEN", "-n", "-P"],
+                        capture_output=True,
+                        text=True,
+                        timeout=5
+                    )
+                    for line in lsof_result.stdout.split('\n'):
+                        if 'replica' in line or 'pocket' in line:
+                            import re
+                            match = re.search(r':(\d+)', line)
+                            if match:
+                                port = int(match.group(1))
+                                break
+                except:
+                    pass
+        
+        # Get canister IDs and construct URLs
+        for canister_name in canister_names:
+            try:
+                id_result = subprocess.run(
+                    ["dfx", "canister", "id", canister_name],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    cwd=working_dir
+                )
+                
+                if id_result.returncode == 0:
+                    canister_id = id_result.stdout.strip()
+                    
+                    # Determine URL based on network - prefer CANISTER_ID.localhost format
+                    canister_info = {"id": canister_id}
+                    
+                    if network == "local":
+                        # Use CANISTER_ID.localhost:PORT format for all canisters
+                        canister_info["url"] = f"http://{canister_id}.localhost:{port}/"
+                    elif network in ["staging", "ic", "mainnet"]:
+                        if "frontend" in canister_name:
+                            canister_info["url"] = f"https://{canister_id}.icp0.io/"
+                        else:
+                            # For backends on IC, use Candid UI
+                            canister_info["url"] = f"https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id={canister_id}"
+                    
+                    canisters[canister_name] = canister_info
+                    
+            except Exception:
+                # Skip canisters we can't get IDs for
+                pass
+    
+    except Exception:
+        pass
+    
+    return canisters
+
+
+def display_canister_urls_json(
+    working_dir: Path,
+    network: str = "local",
+    title: str = "Deployed Canisters"
+) -> None:
+    """Display canister URLs as formatted JSON.
+    
+    Args:
+        working_dir: Directory containing the deployed canisters
+        network: Network name
+        title: Title to display above the JSON
+    """
+    canisters = get_canister_urls(working_dir, network)
+    
+    if canisters:
+        console.print(f"\n[bold cyan]📋 {title}[/bold cyan]")
+        console.print(json.dumps(canisters, indent=2))
+        console.print("")

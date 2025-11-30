@@ -11,10 +11,9 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from ..utils import console, generate_output_dir_name, get_scripts_path
-
-# Re-use console from utils for consistency
-# console = Console() - removed, importing from utils instead
+from .create import create_command
+from .registry import registry_create_command
+from ..utils import console, generate_output_dir_name, get_project_root, display_canister_urls_json
 
 
 def _run_dfx_command(
@@ -425,6 +424,10 @@ def registry_deploy_command(
     try:
         subprocess.run(cmd, check=True)
         console.print(f"\n[green]✅ Registry deployed successfully![/green]")
+        
+        # Display canister URLs as JSON
+        display_canister_urls_json(registry_dir, network, "Registry Deployment Summary")
+        
     except subprocess.CalledProcessError as e:
         console.print(f"\n[red]❌ Deployment failed with exit code {e.returncode}[/red]")
         raise typer.Exit(1)

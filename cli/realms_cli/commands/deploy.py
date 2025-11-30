@@ -9,7 +9,7 @@ import typer
 from rich.console import Console
 
 from ..constants import REALM_FOLDER
-from ..utils import get_logger, get_scripts_path, is_repo_mode, run_command, run_in_docker
+from ..utils import get_logger, get_scripts_path, is_repo_mode, run_command, run_in_docker, display_canister_urls_json
 
 console = Console()
 
@@ -163,6 +163,9 @@ def _deploy_realm_internal(
                     f"[dim]Full deployment log saved to {log_dir}/realms.log[/dim]"
                 )
                 logger.info(f"All {scripts_executed} deployment scripts completed successfully")
+                
+                # Display canister URLs as JSON
+                display_canister_urls_json(folder_path, network, "Realm Deployment Summary")
             else:
                 console.print(
                     f"[yellow]⚠️  Only {scripts_executed}/{scripts_found} scripts executed[/yellow]"
@@ -247,6 +250,9 @@ def _deploy_realm_internal(
                     console.print("[green]✅ Deployment completed successfully[/green]")
                     console.print("[dim]Full deployment log saved to realms.log[/dim]")
                     logger.info("Deployment completed successfully")
+                    
+                    # Display canister URLs as JSON
+                    display_canister_urls_json(Path.cwd(), network, "Realm Deployment Summary")
                 else:
                     console.print("[red]❌ Deployment failed[/red]")
                     console.print("[yellow]Check realms.log for details[/yellow]")
