@@ -36,6 +36,20 @@ def _deploy_realm_internal(
     logger.info("=" * 60)
     
     console.print(f"[bold blue]🚀 Deploying Realm to {network}[/bold blue]\n")
+    
+    # Auto-detect folder if not provided - look for most recent realm folder in REALM_FOLDER
+    if not folder:
+        realm_base = Path(REALM_FOLDER)
+        if realm_base.exists():
+            # Find all realm_* directories and get the most recent one
+            realm_dirs = sorted(
+                [d for d in realm_base.iterdir() if d.is_dir() and d.name.startswith("realm_")],
+                key=lambda x: x.stat().st_mtime,
+                reverse=True
+            )
+            if realm_dirs:
+                folder = str(realm_dirs[0])
+                console.print(f"📁 Using generated realm folder: {folder}")
 
     if folder:
         # Deploy using generated realm folder scripts
