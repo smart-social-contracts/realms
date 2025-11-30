@@ -354,65 +354,76 @@ fi
 # Tests expect realm_backend and realm_frontend, but we deployed with unique names
 echo ""
 echo "🔗 Creating canister aliases for testing..."
-CANISTER_IDS_FILE=".dfx/$NETWORK/canister_ids.json"
 
-if [ -f "$CANISTER_IDS_FILE" ]; then
-    # Find backend and frontend canisters that match our patterns
-    for canister in $BACKENDS; do
-        if [[ "$canister" == *_backend ]]; then
-            canister_id=$(dfx canister id "$canister" 2>/dev/null || echo "")
-            if [ -n "$canister_id" ]; then
-                # Create realm_backend alias pointing to this ID
-                echo "   Adding alias: realm_backend -> $canister ($canister_id)"
-                # Use jq to add the alias if available, otherwise use Python
-                if command -v jq &> /dev/null; then
-                    temp_file=$(mktemp)
-                    jq ".realm_backend.\"$NETWORK\" = \"$canister_id\"" "$CANISTER_IDS_FILE" > "$temp_file"
-                    mv "$temp_file" "$CANISTER_IDS_FILE"
-                else
-                    python3 -c "
-import json
-with open('$CANISTER_IDS_FILE', 'r') as f:
-    data = json.load(f)
-if 'realm_backend' not in data:
-    data['realm_backend'] = {}
-data['realm_backend']['$NETWORK'] = '$canister_id'
-with open('$CANISTER_IDS_FILE', 'w') as f:
-    json.dump(data, f, indent=2)
-"
-                fi
-            fi
-        fi
-    done
+# We need to create aliases in BOTH locations:
+# 1. The working directory's .dfx (where deployment happened)
+# 2. The repo root's .dfx (where tests are run from)
+CANISTER_IDS_FILE=".dfx/$NETWORK/canister_ids.json"
+REPO_CANISTER_IDS_FILE="/app/.dfx/$NETWORK/canister_ids.json"
+
+# Function to add alias to a canister_ids.json file
+add_canister_alias() {
+    local ids_file="$1"
+    local alias_name="$2"
+    local canister_id="$3"
+    local network="$4"
     
-    for canister in $FRONTENDS; do
-        if [[ "$canister" == *_frontend ]]; then
-            canister_id=$(dfx canister id "$canister" 2>/dev/null || echo "")
-            if [ -n "$canister_id" ]; then
-                # Create realm_frontend alias pointing to this ID
-                echo "   Adding alias: realm_frontend -> $canister ($canister_id)"
-                if command -v jq &> /dev/null; then
-                    temp_file=$(mktemp)
-                    jq ".realm_frontend.\"$NETWORK\" = \"$canister_id\"" "$CANISTER_IDS_FILE" > "$temp_file"
-                    mv "$temp_file" "$CANISTER_IDS_FILE"
-                else
-                    python3 -c "
+    if [ ! -f "$ids_file" ]; then
+        echo "   ⚠️  File not found: $ids_file, creating it..."
+        mkdir -p "$(dirname "$ids_file")"
+        echo '{}' > "$ids_file"
+    fi
+    
+    if command -v jq &> /dev/null; then
+        temp_file=$(mktemp)
+        jq ".\"$alias_name\".\"$network\" = \"$canister_id\"" "$ids_file" > "$temp_file"
+        mv "$temp_file" "$ids_file"
+    else
+        python3 -c "
 import json
-with open('$CANISTER_IDS_FILE', 'r') as f:
+with open('$ids_file', 'r') as f:
     data = json.load(f)
-if 'realm_frontend' not in data:
-    data['realm_frontend'] = {}
-data['realm_frontend']['$NETWORK'] = '$canister_id'
-with open('$CANISTER_IDS_FILE', 'w') as f:
+if '$alias_name' not in data:
+    data['$alias_name'] = {}
+data['$alias_name']['$network'] = '$canister_id'
+with open('$ids_file', 'w') as f:
     json.dump(data, f, indent=2)
 "
-                fi
+    fi
+}
+
+# Find backend and frontend canisters that match our patterns
+for canister in $BACKENDS; do
+    if [[ "$canister" == *_backend ]]; then
+        canister_id=$(dfx canister id "$canister" 2>/dev/null || echo "")
+        if [ -n "$canister_id" ]; then
+            echo "   Adding alias: realm_backend -> $canister ($canister_id)"
+            # Add to working directory's canister_ids.json
+            if [ -f "$CANISTER_IDS_FILE" ]; then
+                add_canister_alias "$CANISTER_IDS_FILE" "realm_backend" "$canister_id" "$NETWORK"
             fi
+            # Also add to repo root's canister_ids.json (where tests run from)
+            add_canister_alias "$REPO_CANISTER_IDS_FILE" "realm_backend" "$canister_id" "$NETWORK"
+            echo "      ✅ Created aliases in working dir and /app/.dfx/"
         fi
-    done
-else
-    echo "   ⚠️  Canister IDS file not found at $CANISTER_IDS_FILE"
-fi
+    fi
+done
+
+for canister in $FRONTENDS; do
+    if [[ "$canister" == *_frontend ]]; then
+        canister_id=$(dfx canister id "$canister" 2>/dev/null || echo "")
+        if [ -n "$canister_id" ]; then
+            echo "   Adding alias: realm_frontend -> $canister ($canister_id)"
+            # Add to working directory's canister_ids.json
+            if [ -f "$CANISTER_IDS_FILE" ]; then
+                add_canister_alias "$CANISTER_IDS_FILE" "realm_frontend" "$canister_id" "$NETWORK"
+            fi
+            # Also add to repo root's canister_ids.json (where tests run from)
+            add_canister_alias "$REPO_CANISTER_IDS_FILE" "realm_frontend" "$canister_id" "$NETWORK"
+            echo "      ✅ Created aliases in working dir and /app/.dfx/"
+        fi
+    fi
+done
 
 echo ""
 echo "✅ All done!"
