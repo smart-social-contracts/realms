@@ -53,6 +53,12 @@ npm run prebuild --workspace realm_frontend
 npm run build --workspace realm_frontend
 dfx deploy --network "$NETWORK" --yes realm_frontend
 
+echo "📦 Installing extensions..."
+# Install all extensions from the extensions directory
+realms extension install-from-source --source-dir extensions --network $NETWORK
+
 echo "✅ Deployment complete!"
 echo "Registry backend: $(dfx canister id realm_registry_backend --network $NETWORK)"
 echo "Realm backend: $(dfx canister id realm_backend --network $NETWORK)"
+echo ""
+echo "🎨 Extensions installed and ready to use!"
