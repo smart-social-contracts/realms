@@ -427,6 +427,15 @@ if [ -n "$DEPLOY_SCRIPT" ] && [ -f "$DEPLOY_SCRIPT" ]; then
     echo "   Args: $REALM_DIR $NETWORK $MODE"
     echo "════════════════════════════════════════════════════════════════"
     
+    # Debug: Show what canisters are in dfx.json
+    echo "📋 Canisters in $REALM_DIR/dfx.json:"
+    if command -v jq &> /dev/null && [ -f "$REALM_DIR/dfx.json" ]; then
+        jq -r '.canisters | keys[]' "$REALM_DIR/dfx.json" 2>/dev/null || echo "   (jq failed to parse)"
+    else
+        echo "   (jq not available or dfx.json not found)"
+    fi
+    echo "════════════════════════════════════════════════════════════════"
+    
     # Run with explicit error handling
     # Use stdbuf to disable buffering for immediate output visibility
     set +e  # Temporarily disable exit on error to capture exit code
