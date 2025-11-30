@@ -446,6 +446,9 @@ if [ -n "$DEPLOY_SCRIPT" ] && [ -f "$DEPLOY_SCRIPT" ]; then
     else
         echo "   (jq not available or dfx.json not found)"
     fi
+    echo ""
+    echo "📄 Full dfx.json content (first 50 lines):"
+    head -50 "$REALM_DIR/dfx.json" || echo "   (could not read dfx.json)"
     echo "════════════════════════════════════════════════════════════════"
     
     # Run with explicit error handling
