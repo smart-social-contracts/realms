@@ -234,10 +234,10 @@ if command -v jq &> /dev/null; then
     FRONTENDS=$(jq -r '.canisters | to_entries[] | select(.value.type == "assets") | .key' dfx.json 2>/dev/null || echo "")
     echo "[DEBUG] jq result for frontends: $FRONTENDS"
 else
-    # Fallback: parse JSON manually to get canister keys with type "assets"
-    # This is more complex but avoids false matches from workspace fields
+    # Fallback: find canister names that have type "assets"
+    # Strategy: find "type": "assets" then look BACKWARD for the canister name (must contain underscore)
     echo "[DEBUG] jq not available, using grep fallback"
-    FRONTENDS=$(grep -A 10 '"type"[[:space:]]*:[[:space:]]*"assets"' dfx.json | grep -B 10 '"type"' | grep -o '"[a-zA-Z0-9_-]*"[[:space:]]*:[[:space:]]*{' | sed 's/"//g' | sed 's/[[:space:]]*:[[:space:]]*{//' || echo "")
+    FRONTENDS=$(grep -B 3 '"type"[[:space:]]*:[[:space:]]*"assets"' dfx.json | grep -o '^[[:space:]]*"[a-zA-Z0-9_-]*_[a-zA-Z0-9_-]*"[[:space:]]*:[[:space:]]*{' | sed 's/^[[:space:]]*"//g' | sed 's/"[[:space:]]*:[[:space:]]*{//g' || echo "")
     echo "[DEBUG] grep fallback result: $FRONTENDS"
 fi
 
