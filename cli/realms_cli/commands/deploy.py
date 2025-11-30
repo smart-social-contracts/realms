@@ -274,13 +274,6 @@ def deploy_command(
     ),
 ) -> None:
     """Deploy a realm to the specified network."""
-    # If no folder specified, check if default .realm folder exists and use it
-    if folder is None and not config_file:
-        default_folder = Path(REALM_FOLDER)
-        if default_folder.exists() and default_folder.is_dir():
-            folder = REALM_FOLDER
-            console.print(f"[dim]ℹ️  No folder specified, using default: {folder}[/dim]")
-    
     _deploy_realm_internal(config_file, folder, network, clean, identity, mode)
 
 
