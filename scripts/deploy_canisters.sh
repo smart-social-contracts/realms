@@ -357,9 +357,14 @@ echo "🔗 Creating canister aliases for testing..."
 
 # We need to create aliases in BOTH locations:
 # 1. The working directory's .dfx (where deployment happened)
-# 2. The repo root's .dfx (where tests are run from)
+# 2. The repo root's .dfx (where tests are run from - only in Docker)
 CANISTER_IDS_FILE=".dfx/$NETWORK/canister_ids.json"
-REPO_CANISTER_IDS_FILE="/app/.dfx/$NETWORK/canister_ids.json"
+# Only use /app path if running in Docker environment
+if [ -d "/app" ]; then
+    REPO_CANISTER_IDS_FILE="/app/.dfx/$NETWORK/canister_ids.json"
+else
+    REPO_CANISTER_IDS_FILE=""  # Not in Docker, skip repo root alias
+fi
 
 # Function to add alias to a canister_ids.json file
 add_canister_alias() {
@@ -402,9 +407,13 @@ for canister in $BACKENDS; do
             if [ -f "$CANISTER_IDS_FILE" ]; then
                 add_canister_alias "$CANISTER_IDS_FILE" "realm_backend" "$canister_id" "$NETWORK"
             fi
-            # Also add to repo root's canister_ids.json (where tests run from)
-            add_canister_alias "$REPO_CANISTER_IDS_FILE" "realm_backend" "$canister_id" "$NETWORK"
-            echo "      ✅ Created aliases in working dir and /app/.dfx/"
+            # Also add to repo root's canister_ids.json (where tests run from - Docker only)
+            if [ -n "$REPO_CANISTER_IDS_FILE" ]; then
+                add_canister_alias "$REPO_CANISTER_IDS_FILE" "realm_backend" "$canister_id" "$NETWORK"
+                echo "      ✅ Created aliases in working dir and /app/.dfx/"
+            else
+                echo "      ✅ Created alias in working dir"
+            fi
         fi
     fi
 done
@@ -418,9 +427,13 @@ for canister in $FRONTENDS; do
             if [ -f "$CANISTER_IDS_FILE" ]; then
                 add_canister_alias "$CANISTER_IDS_FILE" "realm_frontend" "$canister_id" "$NETWORK"
             fi
-            # Also add to repo root's canister_ids.json (where tests run from)
-            add_canister_alias "$REPO_CANISTER_IDS_FILE" "realm_frontend" "$canister_id" "$NETWORK"
-            echo "      ✅ Created aliases in working dir and /app/.dfx/"
+            # Also add to repo root's canister_ids.json (where tests run from - Docker only)
+            if [ -n "$REPO_CANISTER_IDS_FILE" ]; then
+                add_canister_alias "$REPO_CANISTER_IDS_FILE" "realm_frontend" "$canister_id" "$NETWORK"
+                echo "      ✅ Created aliases in working dir and /app/.dfx/"
+            else
+                echo "      ✅ Created alias in working dir"
+            fi
         fi
     fi
 done
