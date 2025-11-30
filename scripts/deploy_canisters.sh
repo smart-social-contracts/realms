@@ -140,13 +140,50 @@ fi
 
 # Deploy other backends
 echo "🔨 Deploying backend canisters..."
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "🔍 DEBUG: Deployment Configuration"
+echo "════════════════════════════════════════════════════════════════"
+echo "Network: $NETWORK"
+echo "Mode: $MODE"
+echo "Working Directory: $(pwd)"
+echo ""
+echo "📄 Contents of dfx.json canisters:"
+if [ -f "dfx.json" ]; then
+    jq '.canisters | keys' dfx.json 2>/dev/null || echo "  (jq not available)"
+else
+    echo "  ❌ dfx.json NOT FOUND"
+fi
+echo ""
+echo "📄 Contents of canister_ids.json:"
+if [ -f "canister_ids.json" ]; then
+    cat canister_ids.json
+else
+    echo "  ⚠️  canister_ids.json NOT FOUND"
+fi
+echo ""
+echo "🎯 Backend canisters to deploy: $BACKENDS"
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+
 for canister in $BACKENDS; do
     # Skip internet_identity since we already deployed it
     if [ "$canister" = "internet_identity" ]; then
         continue
     fi
     
-    echo "   📦 Deploying $canister..."
+    # Get canister ID if it exists
+    canister_id=$(dfx canister id "$canister" --network "$NETWORK" 2>/dev/null || echo "")
+    
+    echo "   📦 Deploying canister: $canister"
+    if [ -n "$canister_id" ]; then
+        echo "      🆔 Existing Canister ID: $canister_id (will UPGRADE)"
+    else
+        echo "      ⚠️  No existing canister ID (will CREATE)"
+    fi
+    echo "      🌐 Network: $NETWORK"
+    echo "      🔧 Mode: $MODE"
+    
     if [ "$NETWORK" = "local" ]; then
         # For local, let dfx decide mode (clean = install, otherwise upgrade)
         dfx deploy "$canister" --yes
