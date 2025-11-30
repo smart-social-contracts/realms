@@ -226,12 +226,19 @@ fi
 # Get all frontend canisters
 echo ""
 echo "🎨 Detecting frontend canisters..."
+echo "[DEBUG] dfx.json canisters section:"
+jq '.canisters | keys' dfx.json 2>/dev/null || echo "[DEBUG] jq not available or dfx.json invalid"
+
 # Parse dfx.json to find frontend canisters (those with type "assets")
 if command -v jq &> /dev/null; then
     FRONTENDS=$(jq -r '.canisters | to_entries[] | select(.value.type == "assets") | .key' dfx.json 2>/dev/null || echo "")
+    echo "[DEBUG] jq result for frontends: $FRONTENDS"
 else
-    # Fallback: use grep to find frontend canisters
-    FRONTENDS=$(grep -o '"[^"]*_frontend"' dfx.json 2>/dev/null | tr -d '"' || echo "")
+    # Fallback: parse JSON manually to get canister keys with type "assets"
+    # This is more complex but avoids false matches from workspace fields
+    echo "[DEBUG] jq not available, using grep fallback"
+    FRONTENDS=$(grep -A 10 '"type"[[:space:]]*:[[:space:]]*"assets"' dfx.json | grep -B 10 '"type"' | grep -o '"[a-zA-Z0-9_-]*"[[:space:]]*:[[:space:]]*{' | sed 's/"//g' | sed 's/[[:space:]]*:[[:space:]]*{//' || echo "")
+    echo "[DEBUG] grep fallback result: $FRONTENDS"
 fi
 
 if [ -z "$FRONTENDS" ]; then
