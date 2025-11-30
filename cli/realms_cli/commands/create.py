@@ -256,9 +256,17 @@ def create_command(
     console.print(f"\n🔍 DEBUG: Checking for canister_ids.json to copy...")
     console.print(f"   manifest parameter: {manifest}")
     console.print(f"   output_path: {output_path}")
+    console.print(f"   repo_root: {repo_root}")
+    console.print(f"   in_repo_mode: {in_repo_mode}")
     
     if manifest is not None:
         manifest_path = Path(manifest)
+        
+        # If manifest path is relative, resolve it relative to repo_root
+        if not manifest_path.is_absolute():
+            manifest_path = repo_root / manifest_path
+            console.print(f"   Resolved relative manifest to: {manifest_path}")
+        
         console.print(f"   manifest_path: {manifest_path}")
         console.print(f"   manifest exists: {manifest_path.exists()}")
         
