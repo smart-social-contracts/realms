@@ -188,81 +188,51 @@ def _deploy_realm_internal(
         console.print("[yellow]⚠️  Config file deployment not yet implemented[/yellow]")
 
     else:
-        # Default deployment using deploy_local.sh or deploy_staging.sh
+        # Default deployment using deploy_canisters.sh
         try:
             scripts_path = get_scripts_path()
+            deploy_script = scripts_path / "deploy_canisters.sh"
+            working_dir = str(Path.cwd())
             
-            if network in ["local", "staging", "mainnet", "ic"]:
-
-                if network == "local":
-                    console.print("🔧 Running local deployment script...")
-                    console.print("[dim]Note: Local deployment uses dfx start --clean, so mode is auto-selected[/dim]")
-                    deploy_script = scripts_path / "deploy_local.sh"
-                    env = None
-                    if identity:
-                        env = os.environ.copy()
-                        env["DFX_IDENTITY"] = identity
-                    
-                    # Run in Docker if in image mode, otherwise run locally
-                    # Note: mode parameter not used for local (dfx auto-selects based on --clean)
-                    if is_repo_mode():
-                        result = run_command(
-                            [str(deploy_script)],
-                            cwd=str(Path.cwd()),
-                            use_project_venv=True,
-                            logger=logger,
-                            env=env,
-                        )
-                    else:
-                        console.print("[dim]Running in Docker image mode...[/dim]")
-                        result = run_in_docker(
-                            ["bash", str(deploy_script)],
-                            working_dir=Path.cwd(),
-                            env=env,
-                        )
-                        
-                elif network in ["staging", "mainnet", "ic"]:
-                    console.print(f"🔧 Running staging deployment script with mode: {mode}...")
-                    deploy_script = scripts_path / "deploy_staging.sh"
-                    env = None
-                    if identity:
-                        env = os.environ.copy()
-                        env["DFX_IDENTITY"] = identity
-                    
-                    # Run in Docker if in image mode, otherwise run locally
-                    if is_repo_mode():
-                        result = run_command(
-                            [str(deploy_script), network, mode],
-                            cwd=str(Path.cwd()),
-                            use_project_venv=True,
-                            logger=logger,
-                            env=env,
-                        )
-                    else:
-                        console.print("[dim]Running in Docker image mode...[/dim]")
-                        result = run_in_docker(
-                            ["bash", str(deploy_script), network, mode],
-                            working_dir=Path.cwd(),
-                            env=env,
-                        )
-
-                if result.returncode == 0:
-                    console.print("[green]✅ Deployment completed successfully[/green]")
-                    console.print("[dim]Full deployment log saved to realms.log[/dim]")
-                    logger.info("Deployment completed successfully")
-                    
-                    # Display canister URLs as JSON
-                    display_canister_urls_json(Path.cwd(), network, "Realm Deployment Summary")
-                else:
-                    console.print("[red]❌ Deployment failed[/red]")
-                    console.print("[yellow]Check realms.log for details[/yellow]")
-                    logger.error("Deployment failed")
-                    raise typer.Exit(1)
-            else:
-                console.print(
-                    f"[yellow]⚠️  Network '{network}' deployment not yet implemented[/yellow]"
+            console.print(f"🔧 Running deployment script for network: {network}, mode: {mode}...")
+            
+            env = None
+            if identity:
+                env = os.environ.copy()
+                env["DFX_IDENTITY"] = identity
+            
+            # deploy_canisters.sh args: WORKING_DIR NETWORK MODE [IDENTITY_FILE]
+            cmd_args = [str(deploy_script), working_dir, network, mode]
+            
+            # Run in Docker if in image mode, otherwise run locally
+            if is_repo_mode():
+                result = run_command(
+                    cmd_args,
+                    cwd=working_dir,
+                    use_project_venv=True,
+                    logger=logger,
+                    env=env,
                 )
-                console.print("[dim]Currently only 'local' network is supported[/dim]")
+            else:
+                console.print("[dim]Running in Docker image mode...[/dim]")
+                result = run_in_docker(
+                    ["bash"] + cmd_args,
+                    working_dir=Path.cwd(),
+                    env=env,
+                )
+
+            if result.returncode == 0:
+                console.print("[green]✅ Deployment completed successfully[/green]")
+                console.print("[dim]Full deployment log saved to realms.log[/dim]")
+                logger.info("Deployment completed successfully")
+                
+                # Display canister URLs as JSON
+                display_canister_urls_json(Path.cwd(), network, "Realm Deployment Summary")
+            else:
+                console.print("[red]❌ Deployment failed[/red]")
+                console.print("[yellow]Check realms.log for details[/yellow]")
+                logger.error("Deployment failed")
+                raise typer.Exit(1)
 
         except Exception as e:
             console.print(f"[red]❌ Error during deployment: {e}[/red]")
