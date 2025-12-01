@@ -60,6 +60,13 @@ for backend_dir in src/*_backend; do
     fi
 done
 
+# Clear Kybra build cache to ensure extensions are included in backend build
+if [ -d ".kybra" ]; then
+    echo "🧹 Clearing Kybra build cache..."
+    rm -rf .kybra/realm_backend .kybra/*_backend 2>/dev/null || true
+    echo "   ✅ Cache cleared"
+fi
+
 # Download WASMs if script exists
 if [ -f "../../../scripts/download_wasms.sh" ]; then
     bash ../../../scripts/download_wasms.sh
@@ -74,7 +81,7 @@ if [ -n "$IDENTITY_FILE" ] && [ -f "$IDENTITY_FILE" ]; then
     dfx identity use temp_deploy
 fi
 
-# Start dfx for local network (unless SKIP_DFX_START is set for mundus deployments)
+# Start dfx for local network (unless SKIP_DFX_START is set)
 if [ "$NETWORK" = "local" ] && [ "$SKIP_DFX_START" != "true" ]; then
     # Determine port based on branch (if git available)
     if command -v git &> /dev/null && git rev-parse --git-dir > /dev/null 2>&1; then
@@ -105,7 +112,7 @@ if [ "$NETWORK" = "local" ] && [ "$SKIP_DFX_START" != "true" ]; then
         sleep 3
     fi
 elif [ "$SKIP_DFX_START" = "true" ]; then
-    echo "🌐 Using shared dfx instance (mundus mode)"
+    echo "🌐 Using existing dfx instance (SKIP_DFX_START=true)"
 fi
 
 # Get all backend canisters from dfx.json
@@ -277,8 +284,7 @@ if [ -n "$FRONTENDS" ]; then
         elif [ -d "${canister}" ]; then
             frontend_dir="${canister}"
         elif [[ "$canister" == *"_frontend" ]] && [ -d "src/realm_frontend" ]; then
-            # For mundus realms with unique frontend names (realm1_frontend, realm2_frontend, etc)
-            # but generic source directory (src/realm_frontend)
+            # For realms with unique frontend names but generic source directory
             frontend_dir="src/realm_frontend"
         fi
         
