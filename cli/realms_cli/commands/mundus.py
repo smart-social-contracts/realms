@@ -314,26 +314,24 @@ def mundus_deploy_command(
             
             import time
             time.sleep(5)  # Wait for dfx to initialize
-    
-    # Set environment variable to skip dfx start in individual deployments
-    # since we're managing a shared instance
-    import os
-    os.environ['SKIP_DFX_START'] = 'true'
-    
-    # Create symlinks to shared .dfx directory from repo root
-    from ..utils import get_project_root
-    repo_root = get_project_root()
-    shared_dfx = repo_root / ".dfx"
-    
-    # Symlink .dfx to all deployment directories so they can find the running dfx
-    all_deploy_dirs = list(mundus_path.glob("registry_*")) + list(mundus_path.glob("realm_*"))
-    for deploy_dir in all_deploy_dirs:
-        dfx_link = deploy_dir / ".dfx"
-        if not dfx_link.exists():
-            try:
-                dfx_link.symlink_to(shared_dfx, target_is_directory=True)
-            except:
-                pass  # Ignore if symlink fails
+        
+        # Set environment variable to skip dfx start in individual deployments
+        # since we're managing a shared instance (only for local network)
+        import os
+        os.environ['SKIP_DFX_START'] = 'true'
+        
+        # Create symlinks to shared .dfx directory from repo root (only for local network)
+        shared_dfx = repo_root / ".dfx"
+        
+        # Symlink .dfx to all deployment directories so they can find the running dfx
+        all_deploy_dirs = list(mundus_path.glob("registry_*")) + list(mundus_path.glob("realm_*"))
+        for deploy_dir in all_deploy_dirs:
+            dfx_link = deploy_dir / ".dfx"
+            if not dfx_link.exists():
+                try:
+                    dfx_link.symlink_to(shared_dfx, target_is_directory=True)
+                except:
+                    pass  # Ignore if symlink fails
     
     # Import deploy commands
     from .deploy import deploy_command as realm_deploy_command
