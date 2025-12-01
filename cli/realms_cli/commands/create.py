@@ -384,6 +384,13 @@ def _generate_deployment_scripts(
         else:
             console.print(f"   ⚠️  Warning: Could not find src directory at {src_source}")
     
+    # Copy requirements.txt for venv creation during deployment
+    requirements_source = repo_root / "requirements.txt"
+    requirements_dest = output_path / "requirements.txt"
+    if requirements_source.exists() and not requirements_dest.exists():
+        shutil.copy2(requirements_source, requirements_dest)
+        console.print(f"   ✅ Copied requirements.txt")
+    
     # 2. Create scripts subdirectory
     console.print("\n🔧 Generating deployment scripts...")
     scripts_dir = output_path / "scripts"
