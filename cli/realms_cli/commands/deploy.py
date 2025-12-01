@@ -47,11 +47,22 @@ def _sync_extension_files(realm_folder: Path, console: Console, logger) -> None:
             if dst_backend_ext.exists():
                 shutil.rmtree(dst_backend_ext)
             shutil.copytree(src_backend_ext, dst_backend_ext)
-            console.print("[dim]   ✅ Synced backend extension_packages (16 extensions)[/dim]")
+            console.print("[dim]   ✅ Synced backend extension_packages[/dim]")
             logger.info(f"Synced backend extensions from {src_backend_ext} to {dst_backend_ext}")
         else:
             console.print("[yellow]   ⚠️ No backend extension_packages to sync[/yellow]")
             logger.warning(f"Backend extension_packages not found at {src_backend_ext}")
+        
+        # Also sync i18n files for extensions (JSON only - safe, won't cause vite issues)
+        src_i18n = app_src / "realm_frontend" / "src" / "lib" / "i18n" / "locales" / "extensions"
+        dst_i18n = realm_src / "realm_frontend" / "src" / "lib" / "i18n" / "locales" / "extensions"
+        
+        if src_i18n.exists():
+            if dst_i18n.exists():
+                shutil.rmtree(dst_i18n)
+            shutil.copytree(src_i18n, dst_i18n)
+            console.print("[dim]   ✅ Synced i18n translations[/dim]")
+            logger.info(f"Synced i18n from {src_i18n} to {dst_i18n}")
             
     except Exception as e:
         console.print(f"[yellow]   ⚠️ Warning: Failed to sync extension files: {e}[/yellow]")
