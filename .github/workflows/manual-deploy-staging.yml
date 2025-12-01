@@ -1,10 +1,10 @@
-name: Deploy to Staging
+name: Force Deploy (main)
 
 on:
   workflow_dispatch:
     inputs:
-      target:
-        description: 'What to deploy'
+      type:
+        description: 'Deployment type'
         required: true
         type: choice
         options:
@@ -13,11 +13,11 @@ on:
           - mundus
         default: realm
       commit:
-        description: 'Commit SHA to deploy (leave empty for latest)'
+        description: 'Commit SHA to deploy (leave empty for latest main)'
         required: false
         default: ''
       mode:
-        description: 'Deploy mode'
+        description: 'Deploy mode (upgrade or reinstall)'
         required: false
         type: choice
         options:
@@ -50,32 +50,7 @@ jobs:
           # Pull the demo image (includes extensions)
           docker pull ghcr.io/${{ github.repository_owner }}/realms:demo-${{ steps.commit.outputs.deploy_commit }}
           
-          # Build the deploy command based on target
-          TARGET="${{ github.event.inputs.target }}"
-          MODE="${{ github.event.inputs.mode }}"
-          
-          if [ "$TARGET" = "realm" ]; then
-            # Single realm deployment
-            if [ "$MODE" = "reinstall" ]; then
-              DEPLOY_CMD="realms realm create --manifest examples/demo/realm1/manifest.json --random --network staging --deploy --mode reinstall"
-            else
-              DEPLOY_CMD="realms realm create --manifest examples/demo/realm1/manifest.json --network staging --deploy --mode upgrade"
-            fi
-          elif [ "$TARGET" = "registry" ]; then
-            # Registry deployment - create and deploy
-            DEPLOY_CMD="realms registry create --name 'Demo Registry' --output-dir .realms && realms registry deploy --folder .realms/registry --network staging --mode $MODE"
-          elif [ "$TARGET" = "mundus" ]; then
-            # Full mundus deployment - creates registry + all realms from manifest
-            DEPLOY_CMD="realms mundus create --manifest examples/demo/manifest.json --network staging --deploy --mode $MODE"
-          else
-            echo "Unknown target: $TARGET"
-            exit 1
-          fi
-          
-          echo "🚀 Deploying $TARGET with mode: $MODE"
-          echo "📋 Command: $DEPLOY_CMD"
-          
-          # Deploy using realms CLI
+          # Deploy to existing fixed-name canisters on staging using realms CLI
           docker run --rm \
             -v "$(pwd)/identity.pem:/app/identity.pem" \
             -v "$(pwd)/deploy-logs:/app/deploy-logs" \
@@ -83,9 +58,7 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/realms:demo-${{ steps.commit.outputs.deploy_commit }} \
             bash -c "(dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
                      dfx identity use my-identity && \
-                     echo '🎯 Target: $TARGET' && \
-                     echo '⚙️  Mode: $MODE' && \
-                     $DEPLOY_CMD); \
+                     bash scripts/manual-deploy-staging.sh '${{ github.event.inputs.type }}' '${{ github.event.inputs.mode }}'); \
                      EXIT_CODE=\$?; \
                      mkdir -p /app/deploy-logs && \
                      cp -f dfx.log /app/deploy-logs/ 2>/dev/null || true && \

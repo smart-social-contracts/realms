@@ -253,40 +253,14 @@ def create_command(
         raise typer.Exit(1)
     
     # Copy canister_ids.json from manifest's directory if a manifest was specified
-    console.print(f"\n🔍 DEBUG: Checking for canister_ids.json to copy...")
-    console.print(f"   manifest parameter: {manifest}")
-    console.print(f"   output_path: {output_path}")
-    console.print(f"   repo_root: {repo_root}")
-    console.print(f"   in_repo_mode: {in_repo_mode}")
-    
     if manifest is not None:
         manifest_path = Path(manifest)
-        
-        # If manifest path is relative, resolve it relative to repo_root
-        if not manifest_path.is_absolute():
-            manifest_path = repo_root / manifest_path
-            console.print(f"   Resolved relative manifest to: {manifest_path}")
-        
-        console.print(f"   manifest_path: {manifest_path}")
-        console.print(f"   manifest exists: {manifest_path.exists()}")
-        
         if manifest_path.exists():
             canister_ids_source = manifest_path.parent / "canister_ids.json"
-            console.print(f"   canister_ids_source: {canister_ids_source}")
-            console.print(f"   canister_ids_source exists: {canister_ids_source.exists()}")
-            
             if canister_ids_source.exists():
                 canister_ids_dest = output_path / "canister_ids.json"
-                console.print(f"   canister_ids_dest: {canister_ids_dest}")
                 shutil.copy2(canister_ids_source, canister_ids_dest)
                 console.print(f"\n✅ Copied canister_ids.json from {canister_ids_source.parent}")
-                console.print(f"   Verifying copy: {canister_ids_dest.exists()}")
-            else:
-                console.print(f"   ⚠️  canister_ids.json NOT FOUND at {canister_ids_source}")
-        else:
-            console.print(f"   ⚠️  Manifest file NOT FOUND at {manifest_path}")
-    else:
-        console.print(f"   ⚠️  No manifest specified")
     
     # Generate deployment scripts after data generation
     # Check if we can generate scripts (either in repo mode or in Docker image with full repo)
@@ -398,27 +372,13 @@ def _generate_deployment_scripts(
     # Create symlinks to src directories so deploy_canisters.sh can find them
     # This is crucial: deploy_canisters.sh cd's into the realm directory and expects src/ there
     src_link = output_path / "src"
-    src_target = repo_root / "src"
-    
-    console.print(f"\n🔍 DEBUG: Symlink creation:")
-    console.print(f"   src_link path: {src_link}")
-    console.print(f"   src_link exists: {src_link.exists()}")
-    console.print(f"   src_link is_symlink: {src_link.is_symlink()}")
-    console.print(f"   src_target path: {src_target}")
-    console.print(f"   src_target exists: {src_target.exists()}")
-    
     if not src_link.exists():
+        src_target = repo_root / "src"
         if src_target.exists():
             os.symlink(src_target, src_link)
             console.print(f"   ✅ Created symlink: src -> {src_target}")
         else:
             console.print(f"   ⚠️  Warning: Could not find src directory at {src_target}")
-    else:
-        if src_link.is_symlink():
-            actual_target = os.readlink(src_link)
-            console.print(f"   ℹ️  Symlink already exists: src -> {actual_target}")
-        else:
-            console.print(f"   ⚠️  WARNING: src exists but is NOT a symlink (it's a real directory/file!)")
     
     # 2. Create scripts subdirectory
     console.print("\n🔧 Generating deployment scripts...")

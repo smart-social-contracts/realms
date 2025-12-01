@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -72,6 +73,15 @@ def mundus_create_command(
         realm_name = realm_config.get("name", f"Realm{i}")
         console.print(f"  📦 Creating realm: {realm_name}...")
         
+        # Check if there's an existing realm manifest with canister_ids.json
+        # If so, pass it to create_command so it uses existing canister names
+        realm_folder = realm_name.lower()  # e.g., "Realm1" -> "realm1"
+        realm_manifest_path = manifest_path.parent / realm_folder / "manifest.json"
+        realm_canister_ids = manifest_path.parent / realm_folder / "canister_ids.json"
+        
+        # Use the realm-specific manifest if it exists (has canister_ids.json alongside)
+        use_manifest = str(realm_manifest_path) if realm_manifest_path.exists() else None
+        
         # Call create_command for each realm (it will create timestamped directory)
         # We pass the mundus directory as the base output_dir
         try:
@@ -82,7 +92,7 @@ def mundus_create_command(
             create_command(
                 output_dir=str(mundus_dir),
                 realm_name=realm_name,
-                manifest=None,  # Use realm config from mundus manifest
+                manifest=use_manifest,  # Pass realm manifest if it exists
                 random=realm_config.get("random", False),
                 members=realm_config.get("members"),
                 organizations=realm_config.get("organizations"),
@@ -113,6 +123,14 @@ def mundus_create_command(
             output_dir=str(mundus_dir),
             network=network,
         )
+        
+        # Copy canister_ids.json for registry if it exists in manifest directory
+        registry_canister_ids = manifest_path.parent / "registry" / "canister_ids.json"
+        if registry_canister_ids.exists():
+            registry_ids_dest = registry_dir / "canister_ids.json"
+            shutil.copy2(registry_canister_ids, registry_ids_dest)
+            console.print(f"     ✅ Copied canister_ids.json for existing staging canisters")
+        
         console.print(f"     ✅ Registry created\n")
         
     finally:

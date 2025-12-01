@@ -1,7 +1,6 @@
 """Deploy command for deploying realms to different networks."""
 
 import os
-import shutil
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -13,60 +12,6 @@ from ..constants import REALM_FOLDER
 from ..utils import get_logger, get_scripts_path, is_repo_mode, run_command, run_in_docker, display_canister_urls_json
 
 console = Console()
-
-
-def _sync_extension_files(realm_folder: Path, console: Console, logger) -> None:
-    """
-    Sync BACKEND extension files from /app/src to the realm's src directory.
-    
-    This is needed because:
-    - Extensions install to /app/src/realm_backend/extension_packages/
-    - But the realm builds from its own copied src/ directory
-    - Without syncing, the backend won't see the installed extensions
-    
-    Note: We ONLY sync backend extension_packages (including extension_manifests.py).
-    Frontend extensions are already in place from realm_generator's copy of src/.
-    Syncing frontend files can cause vite build issues with module resolution.
-    """
-    app_src = Path("/app/src")
-    realm_src = realm_folder / "src"
-    
-    if not app_src.exists():
-        # Not running in Docker - skip sync
-        console.print("[dim]   Skipping extension sync (not in Docker)[/dim]")
-        return
-    
-    console.print("[dim]   📦 Syncing backend extension_packages to realm...[/dim]")
-    
-    try:
-        # Sync backend extension packages (includes extension_manifests.py)
-        src_backend_ext = app_src / "realm_backend" / "extension_packages"
-        dst_backend_ext = realm_src / "realm_backend" / "extension_packages"
-        
-        if src_backend_ext.exists():
-            if dst_backend_ext.exists():
-                shutil.rmtree(dst_backend_ext)
-            shutil.copytree(src_backend_ext, dst_backend_ext)
-            console.print("[dim]   ✅ Synced backend extension_packages[/dim]")
-            logger.info(f"Synced backend extensions from {src_backend_ext} to {dst_backend_ext}")
-        else:
-            console.print("[yellow]   ⚠️ No backend extension_packages to sync[/yellow]")
-            logger.warning(f"Backend extension_packages not found at {src_backend_ext}")
-        
-        # Also sync i18n files for extensions (JSON only - safe, won't cause vite issues)
-        src_i18n = app_src / "realm_frontend" / "src" / "lib" / "i18n" / "locales" / "extensions"
-        dst_i18n = realm_src / "realm_frontend" / "src" / "lib" / "i18n" / "locales" / "extensions"
-        
-        if src_i18n.exists():
-            if dst_i18n.exists():
-                shutil.rmtree(dst_i18n)
-            shutil.copytree(src_i18n, dst_i18n)
-            console.print("[dim]   ✅ Synced i18n translations[/dim]")
-            logger.info(f"Synced i18n from {src_i18n} to {dst_i18n}")
-            
-    except Exception as e:
-        console.print(f"[yellow]   ⚠️ Warning: Failed to sync extension files: {e}[/yellow]")
-        logger.warning(f"Extension sync warning: {e}")
 
 
 def _deploy_realm_internal(
@@ -188,11 +133,6 @@ def _deploy_realm_internal(
                         )
                         logger.info(f"{script_name} completed successfully")
                         scripts_executed += 1
-                        
-                        # After install-extensions.sh, sync extension files from /app/src to realm's src
-                        # This is needed because extensions install to /app/src but realm builds from copied src
-                        if script_name == "1-install-extensions.sh":
-                            _sync_extension_files(folder_path, console, logger)
                     else:
                         console.print(f"[red]❌ {script_name} failed with exit code {result.returncode}[/red]")
                         console.print(f"[yellow]Check realms.log for details[/yellow]")

@@ -25,7 +25,6 @@
     "svelte": "^5.19.0",
     "svelte-highlight": "^7.8.2",
     "svelte-i18n": "^4.0.1",
-    "svelte-markdown": "^0.4.1",
     "tailwind-merge": "^2.5.2"
   },
   "peerDependencies": {
