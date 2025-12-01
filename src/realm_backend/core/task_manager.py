@@ -199,8 +199,13 @@ class TaskStep(Entity, TimestampedMixin):
 
 
 class Task(GGGTask):
-    # Note: status and step_to_execute are inherited from ggg.task.Task
+    # Redefine relationships here for ORM to properly resolve them
     steps = OneToMany("TaskStep", "task")
+    schedules = OneToMany("TaskSchedule", "task")
+    executions = OneToMany("TaskExecution", "task")
+    # Note: status and step_to_execute are also in base ggg.task.Task
+    status = String()
+    step_to_execute = Integer()
 
     def __init__(self, steps: List[TaskStep] = None, **kwargs):
         super().__init__(**kwargs)
