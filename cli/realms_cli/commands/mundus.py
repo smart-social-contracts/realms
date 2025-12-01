@@ -71,23 +71,25 @@ def mundus_create_command(
     
     # Create each realm
     for i, realm_entry in enumerate(realms, 1):
-        # Handle both string (realm name) and dict (full config) formats
+        # Handle both formats:
+        # - String: path to realm folder (relative to mundus manifest)
+        # - Dict: inline realm config
         if isinstance(realm_entry, str):
-            realm_config = {"name": realm_entry}
+            # String is a path to realm folder containing manifest.json
+            realm_manifest_path = manifest_path.parent / realm_entry / "manifest.json"
+            if not realm_manifest_path.exists():
+                console.print(f"[red]❌ Realm manifest not found: {realm_manifest_path}[/red]")
+                raise typer.Exit(1)
+            with open(realm_manifest_path, 'r') as f:
+                realm_config = json.load(f)
+            use_manifest = str(realm_manifest_path)
         else:
+            # Dict is inline config
             realm_config = realm_entry
+            use_manifest = None
         
         realm_name = realm_config.get("name", f"Realm{i}")
         console.print(f"  📦 Creating realm: {realm_name}...")
-        
-        # Check if there's an existing realm manifest with canister_ids.json
-        # If so, pass it to create_command so it uses existing canister names
-        realm_folder = realm_name.lower()  # e.g., "Realm1" -> "realm1"
-        realm_manifest_path = manifest_path.parent / realm_folder / "manifest.json"
-        realm_canister_ids = manifest_path.parent / realm_folder / "canister_ids.json"
-        
-        # Use the realm-specific manifest if it exists (has canister_ids.json alongside)
-        use_manifest = str(realm_manifest_path) if realm_manifest_path.exists() else None
         
         # Call create_command for each realm (it will create timestamped directory)
         # We pass the mundus directory as the base output_dir
