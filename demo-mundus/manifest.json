@@ -1,5 +1,4 @@
 {
-  "type": "mundus",
   "realms": [
     "realm1",
     "realm2",
@@ -8,5 +7,5 @@
   "registries": [
     "registry"
   ],
-  "name": "Demo Mundus"
+  "name": "Test Mundus"
 }

@@ -31,6 +31,96 @@
       "type": "assets",
       "workspace": "realm_frontend"
     },
+    "realm1_backend": {
+      "build": "python -m kybra realm1_backend src/realm_backend/main.py",
+      "candid": "src/realm_backend/realm_backend.did",
+      "declarations": {
+        "node_compatibility": true
+      },
+      "gzip": true,
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ],
+      "tech_stack": {
+        "cdk": {
+          "kybra": {}
+        },
+        "language": {
+          "python": {}
+        }
+      },
+      "type": "custom",
+      "wasm": ".kybra/realm1_backend/realm1_backend.wasm"
+    },
+    "realm1_frontend": {
+      "source": [
+        "src/realm_frontend/dist"
+      ],
+      "type": "assets",
+      "workspace": "realm_frontend"
+    },
+    "realm2_backend": {
+      "build": "python -m kybra realm2_backend src/realm_backend/main.py",
+      "candid": "src/realm_backend/realm_backend.did",
+      "declarations": {
+        "node_compatibility": true
+      },
+      "gzip": true,
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ],
+      "tech_stack": {
+        "cdk": {
+          "kybra": {}
+        },
+        "language": {
+          "python": {}
+        }
+      },
+      "type": "custom",
+      "wasm": ".kybra/realm2_backend/realm2_backend.wasm"
+    },
+    "realm2_frontend": {
+      "source": [
+        "src/realm_frontend/dist"
+      ],
+      "type": "assets",
+      "workspace": "realm_frontend"
+    },
+    "realm3_backend": {
+      "build": "python -m kybra realm3_backend src/realm_backend/main.py",
+      "candid": "src/realm_backend/realm_backend.did",
+      "declarations": {
+        "node_compatibility": true
+      },
+      "gzip": true,
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ],
+      "tech_stack": {
+        "cdk": {
+          "kybra": {}
+        },
+        "language": {
+          "python": {}
+        }
+      },
+      "type": "custom",
+      "wasm": ".kybra/realm3_backend/realm3_backend.wasm"
+    },
+    "realm3_frontend": {
+      "source": [
+        "src/realm_frontend/dist"
+      ],
+      "type": "assets",
+      "workspace": "realm_frontend"
+    },
     "realm_registry_backend": {
       "build": "python -m kybra realm_registry_backend src/realm_registry_backend/main.py",
       "candid": "src/realm_registry_backend/realm_registry_backend.did",

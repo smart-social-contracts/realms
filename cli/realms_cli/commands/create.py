@@ -385,6 +385,10 @@ def _generate_deployment_scripts(
     scripts_dir = output_path / "scripts"
     scripts_dir.mkdir(exist_ok=True)
 
+    # Create scripts subdirectory in output
+    scripts_dir = output_path / "scripts"
+    scripts_dir.mkdir(exist_ok=True)
+
     # Get scripts path (auto-detects repo vs image mode)
     scripts_path = get_scripts_path()
 
