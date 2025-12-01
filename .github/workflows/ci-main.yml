@@ -330,7 +330,7 @@ jobs:
           # Pull the image that was tested
           docker pull ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}
           
-          # Deploy using realms CLI with staging network
+          # Deploy mundus (3 realms + registry) from examples/demo
           docker run --rm \
             -v "$(pwd)/identity.pem:/app/identity.pem" \
             -v "$(pwd)/deploy-logs:/app/deploy-logs" \
@@ -338,12 +338,33 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
             bash -c "(dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
                      dfx identity use my-identity && \
-                     realms realm create --random --network staging --deploy); \
+                     realms mundus create --manifest examples/demo/manifest.json --deploy --network staging); \
                      EXIT_CODE=\$?; \
                      mkdir -p /app/deploy-logs && \
                      cp -f dfx.log /app/deploy-logs/ 2>/dev/null || true && \
                      cp -f dfx2.log /app/deploy-logs/ 2>/dev/null || true && \
                      cp -f realms.log /app/deploy-logs/ 2>/dev/null || true; \
+                     exit \$EXIT_CODE"
+          
+      - name: Redeploy Realm1 (single realm test)
+        run: |
+          # Store identity in a temporary file
+          echo "${{ secrets.IC_IDENTITY_PEM }}" > identity.pem
+          chmod 600 identity.pem
+          
+          # Redeploy just realm1 to test single realm deployment on existing mundus
+          docker run --rm \
+            -v "$(pwd)/identity.pem:/app/identity.pem" \
+            -v "$(pwd)/deploy-logs:/app/deploy-logs" \
+            -e DFX_WARNING="-mainnet_plaintext_identity" \
+            ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
+            bash -c "(dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
+                     dfx identity use my-identity && \
+                     realms realm create --manifest examples/demo/realm1/manifest.json --deploy --network staging); \
+                     EXIT_CODE=\$?; \
+                     mkdir -p /app/deploy-logs && \
+                     cp -f dfx.log /app/deploy-logs/realm1-dfx.log 2>/dev/null || true && \
+                     cp -f realms.log /app/deploy-logs/realm1-realms.log 2>/dev/null || true; \
                      exit \$EXIT_CODE"
           
           # Clean up
