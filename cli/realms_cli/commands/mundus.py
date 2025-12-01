@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import subprocess
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -262,99 +263,46 @@ def mundus_deploy_command(
     console.print(f"📡 Network: {network}")
     console.print(f"🔄 Mode: {mode}\n")
     
-    # Start dfx once for local network (shared by all deployments)
+    # For local network, manage shared dfx instance
     if network == "local":
-        import subprocess
-        from ..utils import get_project_root
-        
-        # Start dfx from repo root so all deployments can share it
         repo_root = get_project_root()
         
-        # Determine port based on branch
-        port = 8006  # Default port for mundus
+        # Check if dfx is already running
+        dfx_running = False
         try:
-            branch_name = subprocess.check_output(
-                ["git", "branch", "--show-current"],
-                cwd=repo_root,
-                text=True
-            ).strip()
-            if branch_name == "main":
-                port = 8000
-            else:
-                # Hash branch name to get consistent port
-                import hashlib
-                hash_val = int(hashlib.md5(branch_name.encode()).hexdigest(), 16)
-                port = 8001 + (hash_val % 99)
+            result = subprocess.run(
+                ["dfx", "ping", "--network", "local"],
+                capture_output=True, timeout=2
+            )
+            dfx_running = result.returncode == 0
         except:
             pass
         
-        # Check if dfx is already running and responsive
-        dfx_running = False
-        try:
-            # First check if port is occupied
-            subprocess.run(["lsof", "-ti:" + str(port)], check=True, capture_output=True)
-            # Then verify dfx is actually responsive
-            result = subprocess.run(
-                ["dfx", "ping", "--network", "local"],
-                capture_output=True,
-                timeout=2
+        if dfx_running:
+            console.print("🌐 dfx already running\n")
+        else:
+            console.print("🌐 Starting dfx...\n")
+            subprocess.run(["dfx", "stop"], cwd=repo_root, capture_output=True)
+            subprocess.Popen(
+                ["dfx", "start", "--clean", "--background"],
+                cwd=repo_root,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
             )
-            if result.returncode == 0:
-                dfx_running = True
-                console.print(f"🌐 dfx already running on port {port}\n")
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
-            pass
+            time.sleep(5)
         
-        if not dfx_running:
-            console.print(f"🌐 Starting shared dfx instance on port {port}...\n")
-            # Activate venv and start dfx from repo root
-            venv_activate = repo_root / "venv" / "bin" / "activate"
-            
-            # Stop any existing dfx
-            if venv_activate.exists():
-                subprocess.run(
-                    ["bash", "-c", f"source {venv_activate} && dfx stop"],
-                    cwd=repo_root,
-                    capture_output=True
-                )
-            else:
-                subprocess.run(["dfx", "stop"], cwd=repo_root, capture_output=True)
-            
-            # Start dfx with venv activated
-            if venv_activate.exists():
-                subprocess.Popen(
-                    ["bash", "-c", f"source {venv_activate} && dfx start --clean --background --host 127.0.0.1:{port}"],
-                    cwd=repo_root,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
-                )
-            else:
-                subprocess.Popen(
-                    ["dfx", "start", "--clean", "--background", "--host", f"127.0.0.1:{port}"],
-                    cwd=repo_root,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
-                )
-            
-            import time
-            time.sleep(5)  # Wait for dfx to initialize
-        
-        # Set environment variable to skip dfx start in individual deployments
-        # since we're managing a shared instance (only for local network)
+        # Skip dfx start in individual deployments
         os.environ['SKIP_DFX_START'] = 'true'
         
-        # Create symlinks to shared .dfx directory from repo root (only for local network)
+        # Symlink .dfx to deployment directories
         shared_dfx = repo_root / ".dfx"
-        
-        # Symlink .dfx to all deployment directories so they can find the running dfx
-        all_deploy_dirs = list(mundus_path.glob("registry_*")) + list(mundus_path.glob("realm_*"))
-        for deploy_dir in all_deploy_dirs:
+        for deploy_dir in list(mundus_path.glob("registry_*")) + list(mundus_path.glob("realm_*")):
             dfx_link = deploy_dir / ".dfx"
             if not dfx_link.exists():
                 try:
                     dfx_link.symlink_to(shared_dfx, target_is_directory=True)
                 except:
-                    pass  # Ignore if symlink fails
+                    pass
     
     # Import deploy commands
     from .deploy import deploy_command as realm_deploy_command
@@ -430,191 +378,3 @@ def mundus_deploy_command(
         console.print("")
 
 
-def _deploy_canister(realm_dir: Path, canister_name: str, network: str, identity: Optional[str], mode: str) -> None:
-    """Deploy a single canister from a realm directory."""
-    
-    # If deploying frontend, generate declarations and rebuild
-    if "frontend" in canister_name:
-        backend_name = canister_name.replace("_frontend", "_backend")
-        _generate_declarations(realm_dir, backend_name, network)
-        _build_frontend(realm_dir)
-    
-    cmd = ["dfx", "deploy", canister_name, "--network", network]
-    
-    if mode == "reinstall":
-        cmd.append("--mode=reinstall")
-    
-    if identity:
-        # Handle identity (PEM file or dfx identity name)
-        if Path(identity).exists():
-            # TODO: Import identity from PEM file
-            pass
-        else:
-            cmd.extend(["--identity", identity])
-    
-    try:
-        subprocess.run(
-            cmd,
-            cwd=realm_dir,
-            check=True,
-            capture_output=False,  # Show output in real-time
-            text=True
-        )
-    except subprocess.CalledProcessError as e:
-        console.print(f"[red]❌ Error deploying {canister_name}[/red]")
-        raise typer.Exit(1)
-
-
-def _generate_declarations(realm_dir: Path, backend_name: str, network: str) -> None:
-    """Generate TypeScript declarations for a backend canister."""
-    
-    cmd = ["dfx", "generate", backend_name, "--network", network]
-    
-    try:
-        subprocess.run(
-            cmd,
-            cwd=realm_dir,
-            check=True,
-            capture_output=True,
-            text=True
-        )
-        
-        # Create symlink from realm_backend to realm{N}_backend for frontend compatibility
-        declarations_dir = realm_dir / "src" / "declarations"
-        if declarations_dir.exists():
-            backend_decl = declarations_dir / backend_name
-            symlink_target = declarations_dir / "realm_backend"
-            
-            if backend_decl.exists() and not symlink_target.exists():
-                os.symlink(backend_name, symlink_target)
-                
-    except subprocess.CalledProcessError as e:
-        console.print(f"[yellow]⚠️  Warning: Could not generate declarations for {backend_name}[/yellow]")
-        console.print(f"[dim]{e.stderr}[/dim]")
-
-
-def _build_frontend(realm_dir: Path) -> None:
-    """Build the frontend for a realm."""
-    
-    frontend_dir = realm_dir / "src" / "realm_frontend"
-    
-    if not frontend_dir.exists():
-        frontend_dir = realm_dir / "src" / "realm_registry_frontend"
-    
-    if not frontend_dir.exists():
-        console.print(f"[yellow]⚠️  Warning: Frontend directory not found in {realm_dir}[/yellow]")
-        return
-    
-    console.print(f"[dim]     Building frontend...[/dim]")
-    try:
-        subprocess.run(
-            ["npm", "run", "build"],
-            cwd=frontend_dir,
-            check=True,
-            capture_output=True,  # Keep this quiet unless it fails
-            text=True
-        )
-    except subprocess.CalledProcessError as e:
-        console.print(f"[red]❌ Error building frontend:[/red]")
-        console.print(f"[red]{e.stderr}[/red]")
-        raise typer.Exit(1)
-
-
-def _build_all_frontends(mundus_path: Path) -> None:
-    """Build all frontend applications in the mundus."""
-    
-    # Build realm frontends
-    for realm_num in [1, 2, 3]:
-        realm_id = f"realm{realm_num}"
-        frontend_dir = mundus_path / realm_id / "src" / "realm_frontend"
-        
-        if frontend_dir.exists():
-            console.print(f"[dim]  Building {realm_id} frontend...[/dim]")
-            try:
-                subprocess.run(
-                    ["npm", "run", "build"],
-                    cwd=frontend_dir,
-                    check=True,
-                    capture_output=True,
-                    text=True
-                )
-            except subprocess.CalledProcessError as e:
-                console.print(f"[red]❌ Error building {realm_id} frontend:[/red]")
-                console.print(f"[red]{e.stderr}[/red]")
-                raise typer.Exit(1)
-    
-    # Build registry frontend
-    registry_frontend_dir = mundus_path / "registry" / "src" / "realm_registry_frontend"
-    if registry_frontend_dir.exists():
-        console.print(f"[dim]  Building registry frontend...[/dim]")
-        try:
-            subprocess.run(
-                ["npm", "run", "build"],
-                cwd=registry_frontend_dir,
-                check=True,
-                capture_output=True,
-                text=True
-            )
-        except subprocess.CalledProcessError as e:
-            console.print(f"[red]❌ Error building registry frontend:[/red]")
-            console.print(f"[red]{e.stderr}[/red]")
-            raise typer.Exit(1)
-
-
-def _deploy_all_canisters(mundus_path: Path, network: str, identity: Optional[str], mode: str) -> None:
-    """Deploy all canisters using the unified dfx.json."""
-    
-    cmd = ["dfx", "deploy", "--network", network]
-    
-    if mode == "reinstall":
-        cmd.append("--mode=reinstall")
-    
-    if identity:
-        if not Path(identity).exists():
-            cmd.extend(["--identity", identity])
-    
-    try:
-        subprocess.run(
-            cmd,
-            cwd=mundus_path,
-            check=True,
-            capture_output=False,  # Show output in real-time
-            text=True
-        )
-    except subprocess.CalledProcessError as e:
-        console.print(f"[red]❌ Deployment failed[/red]")
-        raise typer.Exit(1)
-
-
-def _ensure_dfx_running(cwd: Optional[Path] = None) -> None:
-    """Ensure dfx is running on local network, start if not."""
-    
-    # Check if dfx is running
-    try:
-        result = subprocess.run(
-            ["dfx", "ping", "local"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            cwd=cwd
-        )
-        if result.returncode == 0:
-            console.print("[dim]✅ dfx is already running[/dim]\n")
-            return
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        pass
-    
-    # Start dfx
-    console.print("[yellow]🚀 Starting dfx local replica...[/yellow]")
-    try:
-        subprocess.run(
-            ["dfx", "start", "--background"],
-            check=True,
-            capture_output=False,  # Show output in real-time
-            text=True,
-            cwd=cwd
-        )
-        console.print("[green]✅ dfx started successfully[/green]\n")
-    except subprocess.CalledProcessError as e:
-        console.print(f"[red]❌ Failed to start dfx[/red]")
-        raise typer.Exit(1)
