@@ -69,7 +69,13 @@ def mundus_create_command(
     created_realms = []
     
     # Create each realm
-    for i, realm_config in enumerate(realms, 1):
+    for i, realm_entry in enumerate(realms, 1):
+        # Handle both string (realm name) and dict (full config) formats
+        if isinstance(realm_entry, str):
+            realm_config = {"name": realm_entry}
+        else:
+            realm_config = realm_entry
+        
         realm_name = realm_config.get("name", f"Realm{i}")
         console.print(f"  📦 Creating realm: {realm_name}...")
         
