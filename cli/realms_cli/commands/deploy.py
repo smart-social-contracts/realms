@@ -2,12 +2,14 @@
 
 import os
 import subprocess
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import typer
 from rich.console import Console
 
+from ..constants import REALM_FOLDER
 from ..utils import get_logger, run_command, display_canister_urls_json
 
 console = Console()
@@ -147,8 +149,8 @@ def deploy_command(
     config_file: Optional[str] = typer.Option(
         None, "--file", "-f", help="Path to realm configuration file"
     ),
-    folder: str = typer.Option(
-        ..., "--folder", help="Path to generated realm folder with scripts (required)"
+    folder: Optional[str] = typer.Option(
+        None, "--folder", help="Path to generated realm folder with scripts"
     ),
     network: str = typer.Option(
         "local", "--network", "-n", help="Target network for deployment"
@@ -162,6 +164,40 @@ def deploy_command(
     ),
 ) -> None:
     """Deploy a realm to the specified network."""
+    
+    # If folder not provided, try to auto-detect
+    if not folder:
+        realm_base = Path(REALM_FOLDER) / "realms"
+        
+        if not realm_base.exists():
+            console.print(f"[red]❌ No realm folder specified and no realms found.[/red]")
+            console.print(f"[yellow]   Create a realm first with: realms create --realm-name <name>[/yellow]")
+            raise typer.Exit(1)
+        
+        # Find all realm_* directories
+        realm_dirs = [d for d in realm_base.iterdir() if d.is_dir() and d.name.startswith("realm_")]
+        
+        if len(realm_dirs) == 0:
+            console.print(f"[red]❌ No realm folders found in {realm_base}[/red]")
+            console.print(f"[yellow]   Create a realm first with: realms create --realm-name <name>[/yellow]")
+            raise typer.Exit(1)
+        
+        elif len(realm_dirs) == 1:
+            folder = str(realm_dirs[0])
+            console.print(f"[dim]📁 Auto-detected single realm folder: {folder}[/dim]")
+        
+        else:
+            # Multiple realms found - show error with list
+            console.print(f"[red]❌ Multiple realm folders found. Please specify which one to deploy:[/red]")
+            console.print("")
+            for realm_dir in sorted(realm_dirs, key=lambda x: x.stat().st_mtime, reverse=True):
+                mtime = realm_dir.stat().st_mtime
+                time_str = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
+                console.print(f"   • {realm_dir} [dim]({time_str})[/dim]")
+            console.print("")
+            console.print(f"[yellow]   Usage: realms deploy --folder <path>[/yellow]")
+            raise typer.Exit(1)
+    
     _deploy_realm_internal(config_file, folder, network, clean, identity, mode)
 
 
