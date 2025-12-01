@@ -8,23 +8,21 @@ from typing import Optional
 import typer
 from rich.console import Console
 
-from ..constants import REALM_FOLDER
-from ..utils import get_logger, get_scripts_path, is_repo_mode, run_command, run_in_docker, display_canister_urls_json
+from ..utils import get_logger, run_command, display_canister_urls_json
 
 console = Console()
 
 
 def _deploy_realm_internal(
     config_file: Optional[str],
-    folder: Optional[str],
+    folder: str,
     network: str,
     clean: bool,
     identity: Optional[str],
     mode: str = "upgrade",
 ) -> None:
     """Internal deployment logic (can be called directly from Python)."""
-    # Determine log directory - use folder if provided, otherwise current dir
-    log_dir = Path(folder).absolute() if folder else Path.cwd()
+    log_dir = Path(folder).absolute()
     
     # Create logger for capturing script output in the realm folder
     logger = get_logger("deploy", log_dir=log_dir)
@@ -36,215 +34,121 @@ def _deploy_realm_internal(
     logger.info("=" * 60)
     
     console.print(f"[bold blue]🚀 Deploying Realm to {network}[/bold blue]\n")
+    console.print(f"📁 Realm folder: {folder}")
+
+    folder_path = Path(folder).resolve()
+    if not folder_path.exists():
+        console.print(f"[red]❌ Folder not found: {folder}[/red]")
+        raise typer.Exit(1)
+
+    scripts_dir = folder_path / "scripts"
+    if not scripts_dir.exists():
+        console.print(f"[red]❌ Scripts directory not found: {scripts_dir}[/red]")
+        raise typer.Exit(1)
+
+    # Run the scripts in sequence
+    scripts = [
+        "1-install-extensions.sh",
+        "2-deploy-canisters.sh",
+        "3-upload-data.sh",
+        "4-post-deploy.py",
+    ]
+
+    scripts_executed = 0
+    scripts_found = 0
     
-    # Auto-detect folder if not provided - look for most recent realm folder in REALM_FOLDER
-    if not folder:
-        realm_base = Path(REALM_FOLDER)
-        if realm_base.exists():
-            # Find all realm_* directories and get the most recent one
-            realm_dirs = sorted(
-                [d for d in realm_base.iterdir() if d.is_dir() and d.name.startswith("realm_")],
-                key=lambda x: x.stat().st_mtime,
-                reverse=True
-            )
-            if realm_dirs:
-                folder = str(realm_dirs[0])
-                console.print(f"[dim]📁 Auto-detected realm folder: {folder}[/dim]")
-
-    if folder:
-        # Deploy using generated realm folder scripts
-        if not folder.startswith(REALM_FOLDER):
-            # User provided explicit folder path
-            console.print(f"📁 Using realm folder: {folder}")
-
-        folder_path = Path(folder).resolve()
-        if not folder_path.exists():
-            console.print(f"[red]❌ Folder not found: {folder}[/red]")
-            raise typer.Exit(1)
-
-        scripts_dir = folder_path / "scripts"
-        if not scripts_dir.exists():
-            console.print(f"[red]❌ Scripts directory not found: {scripts_dir}[/red]")
-            raise typer.Exit(1)
-
-        # Run the scripts in sequence
-        scripts = [
-            "1-install-extensions.sh",
-            "2-deploy-canisters.sh",
-            "3-upload-data.sh",
-            "4-run-adjustments.py",
-        ]
-
-        scripts_executed = 0
-        scripts_found = 0
-        
-        try:
-            for script_name in scripts:
-                script_path = scripts_dir / script_name
-                if not script_path.exists():
-                    console.print(
-                        f"[yellow]⚠️  Script not found: {script_path}[/yellow]"
-                    )
-                    continue
-                
-                scripts_found += 1
-                console.print(f"🔧 Running {script_name}...")
-                console.print(f"[dim]Script path: {script_path}[/dim]")
-                console.print(f"[dim]Network: {network}[/dim]")
-
-                # Determine working directory and command based on script
-                if script_name == "2-deploy-canisters.sh":
-                    # Run deployment script with network and mode parameters
-                    # Note: mode only applies to production networks (staging/ic)
-                    working_dir = Path.cwd()
-                    cmd = [str(script_path.resolve()), network, mode]
-                elif script_name == "3-upload-data.sh":
-                    # Run upload script from the realm folder where data files are located
-                    working_dir = folder_path
-                    cmd = [str(script_path.resolve()), network]
-                elif script_name == "4-run-adjustments.py":
-                    # Run Python script from the realm folder and pass network parameter
-                    working_dir = folder_path
-                    cmd = ["python", str(script_path.resolve()), network]
-                else:
-                    # Run other scripts from project root (like install-extensions.sh)
-                    working_dir = Path.cwd()
-                    cmd = [str(script_path.resolve())]
-
-                console.print(f"[dim]Working directory: {working_dir}[/dim]")
-                console.print(f"[dim]Command: {' '.join(cmd)}[/dim]")
-
-                # Make sure script is executable
-                script_path.chmod(0o755)
-
-                # Prepare environment with identity if specified
-                env = None
-                if identity:
-                    env = os.environ.copy()
-                    # Pass identity via environment variable so all dfx commands pick it up
-                    env["DFX_IDENTITY"] = identity
-                
-                try:
-                    result = run_command(cmd, cwd=str(working_dir), use_project_venv=True, logger=logger, env=env)
-
-                    if result.returncode == 0:
-                        console.print(
-                            f"[green]✅ {script_name} completed successfully[/green]"
-                        )
-                        logger.info(f"{script_name} completed successfully")
-                        scripts_executed += 1
-                    else:
-                        console.print(f"[red]❌ {script_name} failed with exit code {result.returncode}[/red]")
-                        console.print(f"[yellow]Check realms.log for details[/yellow]")
-                        logger.error(f"{script_name} failed")
-                        raise typer.Exit(1)
-                except subprocess.CalledProcessError as e:
-                    console.print(f"[red]❌ {script_name} failed with exit code {e.returncode}[/red]")
-                    console.print(f"[yellow]Check realms.log for details[/yellow]")
-                    logger.error(f"{script_name} failed: {e}")
-                    raise typer.Exit(1)
-
-                console.print("")  # Add spacing between scripts
-
-            # Show appropriate message based on what actually ran
-            if scripts_found == 0:
+    try:
+        for script_name in scripts:
+            script_path = scripts_dir / script_name
+            if not script_path.exists():
                 console.print(
-                    "[red]❌ No deployment scripts found![/red]"
+                    f"[yellow]⚠️  Script not found: {script_path}[/yellow]"
                 )
-                console.print(
-                    "[yellow]Run 'realms realm create' to generate a realm with deployment scripts[/yellow]"
-                )
-                raise typer.Exit(1)
-            elif scripts_executed == scripts_found:
-                console.print(
-                    f"[green]🎉 All {scripts_executed} deployment script(s) completed successfully![/green]"
-                )
-                console.print(
-                    f"[dim]Full deployment log saved to {log_dir}/realms.log[/dim]"
-                )
-                logger.info(f"All {scripts_executed} deployment scripts completed successfully")
-                
-                # Display canister URLs as JSON
-                display_canister_urls_json(folder_path, network, "Realm Deployment Summary")
+                continue
+            
+            scripts_found += 1
+            console.print(f"🔧 Running {script_name}...")
+            console.print(f"[dim]Script path: {script_path}[/dim]")
+            console.print(f"[dim]Network: {network}[/dim]")
+
+            # Determine working directory and command based on script
+            if script_name == "2-deploy-canisters.sh":
+                # Run deployment script with network and mode parameters
+                working_dir = folder_path
+                cmd = [str(script_path.resolve()), str(folder_path), network, mode]
+            elif script_name == "3-upload-data.sh":
+                # Run upload script from the realm folder where data files are located
+                working_dir = folder_path
+                cmd = [str(script_path.resolve()), network]
+            elif script_name == "4-post-deploy.py":
+                # Run Python script from the realm folder and pass network parameter
+                working_dir = folder_path
+                cmd = ["python", str(script_path.resolve()), network]
             else:
-                console.print(
-                    f"[yellow]⚠️  Only {scripts_executed}/{scripts_found} scripts executed[/yellow]"
-                )
+                # Run other scripts from the realm folder
+                working_dir = folder_path
+                cmd = [str(script_path.resolve())]
 
-        except Exception as e:
-            console.print(f"[red]❌ Error during script execution: {e}[/red]")
-            raise typer.Exit(1)
+            console.print(f"[dim]Working directory: {working_dir}[/dim]")
+            console.print(f"[dim]Command: {' '.join(cmd)}[/dim]")
 
-    elif config_file:
-        console.print(f"📄 Using config file: {config_file}")
+            # Make sure script is executable
+            script_path.chmod(0o755)
 
-        # Check if config file exists
-        config_path = Path(config_file)
-        if not config_path.exists():
-            console.print(f"[red]❌ Config file not found: {config_file}[/red]")
-            raise typer.Exit(1)
-
-        # Config file deployment not yet implemented
-        console.print("[yellow]⚠️  Config file deployment not yet implemented[/yellow]")
-
-    else:
-        # Default deployment using deploy_canisters.sh
-        try:
-            scripts_path = get_scripts_path()
-            deploy_script = scripts_path / "deploy_canisters.sh"
-            working_dir = str(Path.cwd())
-            
-            console.print(f"🔧 Running deployment script for network: {network}, mode: {mode}...")
-            
+            # Prepare environment with identity if specified
             env = None
             if identity:
                 env = os.environ.copy()
                 env["DFX_IDENTITY"] = identity
             
-            # deploy_canisters.sh args: WORKING_DIR NETWORK MODE [IDENTITY_FILE]
-            cmd_args = [str(deploy_script), working_dir, network, mode]
-            
-            # Run in Docker if in image mode, otherwise run locally
-            if is_repo_mode():
-                result = run_command(
-                    cmd_args,
-                    cwd=working_dir,
-                    use_project_venv=True,
-                    logger=logger,
-                    env=env,
-                )
-            else:
-                console.print("[dim]Running in Docker image mode...[/dim]")
-                result = run_in_docker(
-                    ["bash"] + cmd_args,
-                    working_dir=Path.cwd(),
-                    env=env,
-                )
+            try:
+                result = run_command(cmd, cwd=str(working_dir), use_project_venv=True, logger=logger, env=env)
 
-            if result.returncode == 0:
-                console.print("[green]✅ Deployment completed successfully[/green]")
-                console.print("[dim]Full deployment log saved to realms.log[/dim]")
-                logger.info("Deployment completed successfully")
-                
-                # Display canister URLs as JSON
-                display_canister_urls_json(Path.cwd(), network, "Realm Deployment Summary")
-            else:
-                console.print("[red]❌ Deployment failed[/red]")
-                console.print("[yellow]Check realms.log for details[/yellow]")
-                logger.error("Deployment failed")
+                if result.returncode == 0:
+                    console.print(
+                        f"[green]✅ {script_name} completed successfully[/green]"
+                    )
+                    logger.info(f"{script_name} completed successfully")
+                    scripts_executed += 1
+                else:
+                    console.print(f"[red]❌ {script_name} failed with exit code {result.returncode}[/red]")
+                    console.print(f"[yellow]Check realms.log for details[/yellow]")
+                    logger.error(f"{script_name} failed")
+                    raise typer.Exit(1)
+            except subprocess.CalledProcessError as e:
+                console.print(f"[red]❌ {script_name} failed with exit code {e.returncode}[/red]")
+                console.print(f"[yellow]Check realms.log for details[/yellow]")
+                logger.error(f"{script_name} failed: {e}")
                 raise typer.Exit(1)
 
-        except Exception as e:
-            console.print(f"[red]❌ Error during deployment: {e}[/red]")
+            console.print("")  # Add spacing between scripts
+
+        # Show appropriate message based on what actually ran
+        if scripts_found == 0:
+            console.print("[red]❌ No deployment scripts found![/red]")
+            console.print("[yellow]Run 'realms create' to generate a realm with deployment scripts[/yellow]")
             raise typer.Exit(1)
+        elif scripts_executed == scripts_found:
+            console.print(f"[green]🎉 All {scripts_executed} deployment script(s) completed successfully![/green]")
+            console.print(f"[dim]Full deployment log saved to {log_dir}/realms.log[/dim]")
+            logger.info(f"All {scripts_executed} deployment scripts completed successfully")
+            
+            # Display canister URLs as JSON
+            display_canister_urls_json(folder_path, network, "Realm Deployment Summary")
+        else:
+            console.print(f"[yellow]⚠️  Only {scripts_executed}/{scripts_found} scripts executed[/yellow]")
+
+    except Exception as e:
+        console.print(f"[red]❌ Error during script execution: {e}[/red]")
+        raise typer.Exit(1)
 
 
 def deploy_command(
     config_file: Optional[str] = typer.Option(
         None, "--file", "-f", help="Path to realm configuration file"
     ),
-    folder: Optional[str] = typer.Option(
-        None, "--folder", help="Path to generated realm folder with scripts"
+    folder: str = typer.Option(
+        ..., "--folder", help="Path to generated realm folder with scripts (required)"
     ),
     network: str = typer.Option(
         "local", "--network", "-n", help="Target network for deployment"
