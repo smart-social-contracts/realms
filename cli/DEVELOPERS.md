@@ -59,8 +59,9 @@ Each realm/registry directory contains:
 
 Default templates from `examples/demo/`:
 - `examples/demo/manifest.json` - Mundus manifest (3 realms + registry)
-- `examples/demo/realm1/manifest.json` - Default realm template
-- `examples/demo/realm1/*.py` - Codex files
+- `examples/demo/realmXXX/manifest.json` - Default realm template
+- `examples/demo/realmXXX/*.py` - Codex files
+- `examples/demo/registry/manifest.json` - Default registry template
 
 ---
 
@@ -113,12 +114,6 @@ Default templates from `examples/demo/`:
 
 ---
 
-## 5. Mundus Deployment (Multi-Realm)
-
-For mundus, the CLI:
-1. Creates all realms and registry directories
-2. Starts ONE shared dfx instance (local only)
-3. Sets `SKIP_DFX_START=true` for child deployments
-4. Deploys registry first, then each realm
-5. Each realm gets unique canister names to avoid conflicts
+create.py
+deploy.py
 
