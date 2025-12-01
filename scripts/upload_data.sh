@@ -5,8 +5,9 @@
 
 set -e
 
-# Get network from command line argument or default to local
+# Args: NETWORK [MODE] (MODE is ignored, for interface consistency)
 NETWORK="${1:-local}"
+# MODE="${2:-upgrade}"  # Not used by this script
 echo "📥 Uploading realm data for network: $NETWORK..."
 echo "⚠️  Note: This requires the admin_dashboard extension to be installed"
 

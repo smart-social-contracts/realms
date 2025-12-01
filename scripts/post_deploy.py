@@ -15,8 +15,9 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 realm_dir = os.path.dirname(script_dir)
 os.chdir(realm_dir)
 
-# Get network from command line argument or default to local
+# Args: NETWORK [MODE] (MODE is ignored, for interface consistency)
 network = sys.argv[1] if len(sys.argv) > 1 else 'local'
+# mode = sys.argv[2] if len(sys.argv) > 2 else 'upgrade'  # Not used by this script
 print(f"🚀 Running post-deployment tasks for network: {network}")
 
 
