@@ -121,14 +121,14 @@ def deploy_command(
     
     # If folder not provided, try to auto-detect
     if not folder:
-        realm_base = Path(REALM_FOLDER) / "realms"
+        realm_base = Path(REALM_FOLDER)
         
         if not realm_base.exists():
             console.print(f"[red]❌ No realm folder specified and no realms found.[/red]")
             console.print(f"[yellow]   Create a realm first with: realms create --realm-name <name>[/yellow]")
             raise typer.Exit(1)
         
-        # Find all realm_* directories
+        # Find all realm_* directories (realms are created directly in REALM_FOLDER)
         realm_dirs = [d for d in realm_base.iterdir() if d.is_dir() and d.name.startswith("realm_")]
         
         if len(realm_dirs) == 0:
