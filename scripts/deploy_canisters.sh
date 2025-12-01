@@ -45,17 +45,11 @@ else
     echo "⚠️  No venv found, using system Python"
 fi
 
-# Check dependencies
-echo "🔍 Checking dependencies..."
-python3 -m kybra --version || {
-    echo "❌ Kybra not found. Please install: pip install -r requirements.txt"
-    exit 1
-}
-
 # Install canister-specific dependencies if requirements.txt exists in src/
+echo "📦 Installing dependencies..."
 for backend_dir in src/*_backend; do
     if [ -f "$backend_dir/requirements.txt" ]; then
-        echo "📦 Installing dependencies for $(basename $backend_dir)..."
+        echo "   Installing for $(basename $backend_dir)..."
         pip3 install -q -r "$backend_dir/requirements.txt"
     fi
 done
