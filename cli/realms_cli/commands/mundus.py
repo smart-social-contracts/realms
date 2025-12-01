@@ -335,7 +335,6 @@ def mundus_deploy_command(
         
         # Set environment variable to skip dfx start in individual deployments
         # since we're managing a shared instance (only for local network)
-        import os
         os.environ['SKIP_DFX_START'] = 'true'
         
         # Create symlinks to shared .dfx directory from repo root (only for local network)
@@ -481,7 +480,6 @@ def _generate_declarations(realm_dir: Path, backend_name: str, network: str) -> 
             symlink_target = declarations_dir / "realm_backend"
             
             if backend_decl.exists() and not symlink_target.exists():
-                import os
                 os.symlink(backend_name, symlink_target)
                 
     except subprocess.CalledProcessError as e:
