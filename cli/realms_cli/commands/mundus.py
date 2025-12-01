@@ -310,8 +310,44 @@ def mundus_deploy_command(
     from .deploy import deploy_command as realm_deploy_command
     from .registry import registry_deploy_command
     
-    # Deploy registry first
+    # Get all directories
     registry_dirs = sorted(mundus_path.glob("registry_*"))
+    realm_dirs = sorted(mundus_path.glob("realm_*"))
+    
+    if not realm_dirs:
+        console.print("[yellow]⚠️  No realms found in mundus directory[/yellow]")
+        return
+    
+    # 1. Deploy shared canisters (local only - on IC, production canisters are used)
+    if network == "local":
+        first_realm = realm_dirs[0]
+        dfx_json_path = first_realm / "dfx.json"
+        if dfx_json_path.exists():
+            with open(dfx_json_path, 'r') as f:
+                dfx_config = json.load(f)
+            
+            shared_canisters = [
+                name for name in dfx_config.get("canisters", {}).keys()
+                if name in ["internet_identity", "ckbtc_ledger", "ckbtc_minter"]
+            ]
+            
+            if shared_canisters:
+                console.print("🔐 Deploying shared canisters (local)...")
+                for canister in shared_canisters:
+                    try:
+                        result = subprocess.run(
+                            ["dfx", "deploy", canister, "--network", network],
+                            cwd=first_realm, capture_output=True, text=True
+                        )
+                        if result.returncode == 0:
+                            console.print(f"   ✅ {canister} deployed")
+                        else:
+                            console.print(f"[yellow]   ⚠️  {canister} skipped[/yellow]")
+                    except Exception as e:
+                        console.print(f"[yellow]   ⚠️  {canister} skipped: {e}[/yellow]")
+                console.print("")
+    
+    # 2. Deploy registry
     if registry_dirs:
         console.print("📋 Deploying registry...")
         for registry_dir in registry_dirs:
@@ -327,12 +363,7 @@ def mundus_deploy_command(
                 console.print(f"[red]   ❌ Failed to deploy {registry_dir.name}: {e}[/red]")
                 raise typer.Exit(1)
     
-    # Deploy all realms
-    realm_dirs = sorted(mundus_path.glob("realm_*"))
-    if not realm_dirs:
-        console.print("[yellow]⚠️  No realms found in mundus directory[/yellow]")
-        return
-    
+    # 3. Deploy all realms (last)
     console.print(f"🏛️  Deploying {len(realm_dirs)} realm(s)...\n")
     
     for realm_dir in realm_dirs:
@@ -342,16 +373,13 @@ def mundus_deploy_command(
                 folder=str(realm_dir),
                 network=network,
                 mode=mode,
-                identity=identity
+                identity=identity,
+                skip_shared=True,  # Shared canisters already deployed by mundus
             )
             console.print(f"   ✅ {realm_dir.name} deployed\n")
         except Exception as e:
             console.print(f"[red]   ❌ Failed to deploy {realm_dir.name}: {e}[/red]")
             raise typer.Exit(1)
-    
-    # Clean up environment variable
-    if 'SKIP_DFX_START' in os.environ:
-        del os.environ['SKIP_DFX_START']
     
     console.print(Panel.fit(
         "[bold green]✅ Mundus Deployment Complete[/bold green]",

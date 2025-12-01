@@ -132,25 +132,40 @@ else
     echo "   Found: $BACKENDS"
 fi
 
-# Deploy Internet Identity FIRST (if present)
+# Define shared canisters that may be skipped (deployed once by mundus)
+SHARED_CANISTERS="internet_identity ckbtc_ledger ckbtc_minter"
+
+# Deploy Internet Identity FIRST (if present and not skipped)
 echo ""
 if echo "$BACKENDS" | grep -q "internet_identity"; then
-    echo "🔑 Deploying Internet Identity first..."
-    if [ "$NETWORK" = "local" ]; then
-        dfx deploy internet_identity --yes
+    if [ "$SKIP_SHARED_CANISTERS" = "true" ]; then
+        echo "🔑 Skipping Internet Identity (SKIP_SHARED_CANISTERS=true)"
     else
-        dfx deploy --network "$NETWORK" --yes internet_identity --mode="$MODE"
+        echo "🔑 Deploying Internet Identity first..."
+        if [ "$NETWORK" = "local" ]; then
+            dfx deploy internet_identity --yes
+        else
+            dfx deploy --network "$NETWORK" --yes internet_identity --mode="$MODE"
+        fi
+        dfx canister start --network "$NETWORK" internet_identity 2>/dev/null || true
     fi
-    dfx canister start --network "$NETWORK" internet_identity 2>/dev/null || true
     echo ""
 fi
 
 # Deploy other backends
 echo "🔨 Deploying backend canisters..."
 for canister in $BACKENDS; do
-    # Skip internet_identity since we already deployed it
+    # Skip internet_identity since we already handled it
     if [ "$canister" = "internet_identity" ]; then
         continue
+    fi
+    
+    # Skip shared canisters if SKIP_SHARED_CANISTERS is set
+    if [ "$SKIP_SHARED_CANISTERS" = "true" ]; then
+        if echo "$SHARED_CANISTERS" | grep -qw "$canister"; then
+            echo "   ⏭️  Skipping $canister (shared canister)"
+            continue
+        fi
     fi
     
     echo "   📦 Deploying $canister..."
