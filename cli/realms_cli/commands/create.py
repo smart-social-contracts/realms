@@ -1,6 +1,7 @@
 """Create command for generating new realms with demo data and deployment scripts."""
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -108,168 +109,281 @@ def _generate_single_realm(
 
 
 def create_command(
-    random: bool,
-    members: int,
-    organizations: int,
-    transactions: int,
-    disputes: int,
-    seed: Optional[int],
     output_dir: str,
     realm_name: str,
+    manifest: Optional[str],
+    random: bool,
+    members: Optional[int],
+    organizations: Optional[int],
+    transactions: Optional[int],
+    disputes: Optional[int],
+    seed: Optional[int],
     network: str,
     deploy: bool,
-    no_extensions: bool,
     identity: Optional[str] = None,
     mode: str = "upgrade",
 ) -> None:
-    """Create a new realm (or mundus with multiple realms) with deployment scripts."""
-    console.print(f"[bold blue]🏛️  Creating Mundus: {realm_name}[/bold blue]\n")
-    if no_extensions:
-        console.print("[yellow]⚠️  Creating base realms without extensions[/yellow]\n")
+    """Create a new single realm. Flags override manifest values."""
+    from ..utils import generate_output_dir_name
+    
+    console.print(f"[bold blue]🏛️  Creating Realm: {realm_name}[/bold blue]\n")
 
-    # Check if output directory already exists and contains files
-    output_path = Path(output_dir)
-    if output_path.exists():
-        # Check if directory is not empty
-        if any(output_path.iterdir()):
-            console.print(f"[red]❌ Error: Destination folder already exists and is not empty:[/red]")
-            console.print(f"[red]   {output_path.absolute()}[/red]")
-            console.print("\n[yellow]Please either:[/yellow]")
-            console.print("   • Choose a different output directory with --output-dir")
-            console.print("   • Remove or rename the existing folder")
-            console.print("   • Clear the folder contents")
-            raise typer.Exit(1)
-        else:
-            console.print(f"[dim]ℹ️  Using existing empty directory: {output_path.absolute()}[/dim]")
+    # Generate timestamped directory name
+    dir_name = generate_output_dir_name("realm", realm_name)
+    base_dir = Path(output_dir)
+    output_path = base_dir / dir_name
+    
+    # Create base directory if it doesn't exist
+    base_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Check if generated directory already exists (unlikely with timestamps, but check anyway)
+    if output_path.exists() and any(output_path.iterdir()):
+        console.print(f"[red]❌ Error: Generated directory already exists and is not empty:[/red]")
+        console.print(f"[red]   {output_path.absolute()}[/red]")
+        raise typer.Exit(1)
     
     # Create output directory
     output_path.mkdir(exist_ok=True)
+    console.print(f"📁 Realm directory: {output_path}\n")
 
-    # Read the demo manifest to get realms and registries configuration
     scripts_path = get_scripts_path()
-    repo_root = scripts_path.parent
-    demo_manifest_path = repo_root / "examples" / "demo" / "manifest.json"
     
-    mundus_config = None
-    is_simple_mode = False
-    
-    if demo_manifest_path.exists():
-        with open(demo_manifest_path, 'r') as f:
-            mundus_config = json.load(f)
-        
-        # Copy mundus manifest to output
-        mundus_manifest_path = output_path / "manifest.json"
-        mundus_config_copy = mundus_config.copy()
-        mundus_config_copy["name"] = realm_name  # Use provided name
-        with open(mundus_manifest_path, "w") as f:
-            json.dump(mundus_config_copy, f, indent=2)
-            f.write("\n")
-        console.print(f"📄 Copied mundus manifest: {mundus_manifest_path.absolute()}")
+    # Check if we're in repo mode or need to use Docker
+    in_repo_mode = is_repo_mode()
+    if not in_repo_mode:
+        # In Docker/pip install mode - will use Docker container with full repo
+        # repo_root should point to /app in the Docker image
+        repo_root = Path("/app")
+        console.print("[dim]Running in Docker mode (realm_generator will run in container)...[/dim]")
     else:
-        console.print(f"[yellow]⚠️  Warning: No demo manifest found at {demo_manifest_path}[/yellow]")
-        console.print("[dim]Creating simple single-realm (backward compatibility mode)[/dim]")
-        is_simple_mode = True
+        repo_root = scripts_path.parent
+        if not repo_root.exists() or not (repo_root / "scripts" / "realm_generator.py").exists():
+            # In repo mode but scripts missing - error
+            console.print("[red]❌ Error: Cannot locate realm_generator.py[/red]")
+            console.print("[yellow]Repository structure is incomplete.[/yellow]")
+            raise typer.Exit(1)
+    
+    # Determine if we should use manifest or flags
+    has_flags = any([members is not None, organizations is not None, transactions is not None, disputes is not None, seed is not None])
+    
+    # Load manifest for defaults (if exists)
+    realm_options = {}
+    if not has_flags or manifest is not None:
+        if manifest is None:
+            manifest_path = repo_root / "examples" / "demo" / "realm1" / "manifest.json"
+        else:
+            manifest_path = Path(manifest)
         
-        # In backward compatibility mode, generate directly to output_path
-        # This is for CLI Docker tests and simple single-realm generation
-        if random:
-            console.print("\n🎲 Generating random data...")
-            console.print(f"   👥 Members: {members}")
-            console.print(f"   🏢 Organizations: {organizations}")
-            console.print(f"   💰 Transactions: {transactions}")
-            console.print(f"   ⚖️  Disputes: {disputes}")
-            if seed:
-                console.print(f"   🌱 Seed: {seed}")
+        if manifest_path.exists():
+            with open(manifest_path, 'r') as f:
+                realm_manifest = json.load(f)
+            realm_options = realm_manifest.get("options", {}).get("random", {})
+    
+    # Call realm_generator.py
+    # In Docker mode, paths need to be relative to /workspace mount point
+    if in_repo_mode:
+        generator_path = str(repo_root / "scripts" / "realm_generator.py")
+        output_dir_arg = str(output_path)
+    else:
+        # In Docker, script is at /app/scripts/realm_generator.py
+        # and output_path is mounted at /workspace, so use /workspace as output
+        generator_path = "/app/scripts/realm_generator.py"
+        output_dir_arg = "/workspace"
+    
+    cmd = [
+        "python",
+        generator_path,
+        "--output-dir", output_dir_arg,
+        "--realm-name", realm_name,
+    ]
+    
+    # Use flags if provided, otherwise fall back to manifest
+    if members is not None:
+        cmd.extend(["--members", str(members)])
+    elif "members" in realm_options:
+        cmd.extend(["--members", str(realm_options["members"])])
+    
+    if organizations is not None:
+        cmd.extend(["--organizations", str(organizations)])
+    elif "organizations" in realm_options:
+        cmd.extend(["--organizations", str(realm_options["organizations"])])
+    
+    if transactions is not None:
+        cmd.extend(["--transactions", str(transactions)])
+    elif "transactions" in realm_options:
+        cmd.extend(["--transactions", str(realm_options["transactions"])])
+    
+    if disputes is not None:
+        cmd.extend(["--disputes", str(disputes)])
+    elif "disputes" in realm_options:
+        cmd.extend(["--disputes", str(realm_options["disputes"])])
+    
+    if seed is not None:
+        cmd.extend(["--seed", str(seed)])
+    elif "seed" in realm_options:
+        cmd.extend(["--seed", str(realm_options["seed"])])
+    
+    try:
+        # Suppress debug output from realm_generator (ggg.user.User objects)
+        if in_repo_mode:
+            # Run locally in repo
+            result = subprocess.run(cmd, check=True, cwd=repo_root, capture_output=True, text=True)
+        else:
+            # Run in Docker container (pip install mode)
+            console.print("[dim]Running realm_generator in Docker container...[/dim]")
+            result = run_in_docker(cmd, working_dir=output_path.absolute())
+            if result.returncode != 0:
+                console.print(f"[red]❌ realm_generator.py failed with exit code {result.returncode}[/red]")
+                if result.stdout:
+                    console.print("[yellow]stdout:[/yellow]")
+                    console.print(result.stdout)
+                if result.stderr:
+                    console.print("[yellow]stderr:[/yellow]")
+                    console.print(result.stderr)
+                raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
         
-        # Generate simple realm directly to output_path (no mundus structure)
-        _generate_single_realm(
-            realm_name=realm_name,
-            realm_folder=output_path.name,  # Use output dir name as folder
-            output_path=output_path.parent,  # Parent dir, so output_path/name = original output_path
-            repo_root=repo_root,
-            random=random,
-            members=members,
-            organizations=organizations,
-            transactions=transactions,
-            disputes=disputes,
-            seed=seed,
-        )
+        # Only show important output (skip debug lines)
+        for line in result.stdout.split('\n'):
+            if line and not 'ggg.user.User object at' in line and not 'from_user' in line and not 'users [' in line:
+                console.print(f"[dim]{line}[/dim]")
+    except subprocess.CalledProcessError as e:
+        console.print(f"[red]❌ Error creating realm: {e}[/red]")
+        if e.stderr:
+            console.print(f"[red]{e.stderr}[/red]")
+        raise typer.Exit(1)
+    
+    # Copy canister_ids.json from manifest's directory if a manifest was specified
+    if manifest is not None:
+        manifest_path = Path(manifest)
+        if manifest_path.exists():
+            canister_ids_source = manifest_path.parent / "canister_ids.json"
+            if canister_ids_source.exists():
+                canister_ids_dest = output_path / "canister_ids.json"
+                shutil.copy2(canister_ids_source, canister_ids_dest)
+                console.print(f"\n✅ Copied canister_ids.json from {canister_ids_source.parent}")
+    
+    # Generate deployment scripts after data generation
+    # Check if we can generate scripts (either in repo mode or in Docker image with full repo)
+    can_generate_scripts = in_repo_mode or (repo_root / "dfx.json").exists()
+    
+    if can_generate_scripts:
+        _generate_deployment_scripts(output_path, network, realm_name, random, repo_root, deploy, identity, mode, no_extensions=False, in_repo_mode=in_repo_mode)
+    else:
+        console.print(f"\n[yellow]⚠️  Deployment scripts not generated (Docker mode without full repo)[/yellow]")
+        console.print("[dim]To deploy this realm, you'll need to use the Realms Docker image or clone the full repository.[/dim]")
+    
+    console.print(f"\n[green]✅ Realm created successfully at: {output_path.absolute()}[/green]")
+
+
+def _generate_deployment_scripts(
+    output_path: Path,
+    network: str,
+    realm_name: str,
+    has_random_data: bool,
+    repo_root: Path,
+    deploy: bool,
+    identity: Optional[str],
+    mode: str,
+    no_extensions: bool = False,
+    in_repo_mode: bool = True
+):
+    """Generate deployment scripts and dfx.json for independent realm."""
+    console.print("\n🔧 Generating deployment configuration...")
+
+    # 1. Generate dfx.json for this independent realm
+    console.print("\n📝 Creating dfx.json...")
+    
+    # Load template dfx.json from repo root
+    template_dfx = repo_root / "dfx.json"
+    if not template_dfx.exists():
+        console.print(f"[red]❌ Template dfx.json not found at {template_dfx}[/red]")
+        if not in_repo_mode:
+            console.print("[yellow]Expected at /app/dfx.json in Docker image[/yellow]")
+        raise typer.Exit(1)
+    
+    with open(template_dfx, 'r') as f:
+        dfx_config = json.load(f)
+    
+    # Create realm-only dfx.json (realm_backend, realm_frontend, and optional local-only canisters)
+    # Check if canister_ids.json exists - if so, use standard names to match existing canisters
+    # Otherwise, use unique names to avoid conflicts in mundus deployments
+    canister_ids_file = output_path / "canister_ids.json"
+    
+    if canister_ids_file.exists():
+        # canister_ids.json exists (from manifest) - use standard names to match existing canisters
+        backend_name = "realm_backend"
+        frontend_name = "realm_frontend"
+        console.print(f"   ✅ Using standard canister names from canister_ids.json")
+    else:
+        # No canister_ids.json - generate unique names for local/mundus deployments
+        sanitized_realm_name = realm_name.lower().replace(" ", "_").replace("-", "_")
+        backend_name = f"{sanitized_realm_name}_backend"
+        frontend_name = f"{sanitized_realm_name}_frontend"
+        console.print(f"   ✅ Using unique canister names: {backend_name}, {frontend_name}")
+    
+    # Deep copy and update canister configs to avoid reference issues
+    import copy
+    backend_config = copy.deepcopy(dfx_config["canisters"]["realm_backend"])
+    frontend_config = copy.deepcopy(dfx_config["canisters"]["realm_frontend"])
+    
+    # IMPORTANT: Keep workspace as "realm_frontend" (not unique name)
+    # because src/ directories are shared via symlink across all realms
+    # The workspace field tells dfx where to find package.json, which is at src/realm_frontend/
+    
+    realm_canisters = {
+        backend_name: backend_config,
+        frontend_name: frontend_config,
+    }
+    
+    # For local networks, include additional canisters (Internet Identity, ckBTC, etc.)
+    is_local_network = network.startswith("local")
+    
+    if is_local_network:
+        # Include Internet Identity for local development (shared across realms)
+        if "internet_identity" in dfx_config["canisters"]:
+            realm_canisters["internet_identity"] = dfx_config["canisters"]["internet_identity"]
         
-        console.print("\n[green]✅ Simple realm generated successfully[/green]")
-
-    if not is_simple_mode:
-        # Multi-realm mundus mode: Create realms directory
-        realms_dir = output_path / "realms"
-        realms_dir.mkdir(exist_ok=True)
-        console.print(f"📁 Output directory: {output_path.absolute()}")
-        console.print(f"📁 Realms directory: {realms_dir.absolute()}")
-
-        # Generate each realm
-        if random:
-            console.print("\n🎲 Generating random data for realms...")
-            console.print(f"   👥 Members per realm: {members}")
-            console.print(f"   🏢 Organizations per realm: {organizations}")
-            console.print(f"   💰 Transactions per realm: {transactions}")
-            console.print(f"   ⚖️  Disputes per realm: {disputes}")
-            if seed:
-                console.print(f"   🌱 Seed: {seed}")
-
-        realms_list = mundus_config.get("realms", [])
-        console.print(f"\n[bold]📦 Generating {len(realms_list)} realm(s)...[/bold]")
-        
-        for realm_folder in realms_list:
-            # Use the folder name as the realm name by default
-            # Read the manifest to get the proper name
-            demo_realm_manifest = repo_root / "examples" / "demo" / realm_folder / "manifest.json"
-            if demo_realm_manifest.exists():
-                with open(demo_realm_manifest, 'r') as f:
-                    realm_manifest = json.load(f)
-                    current_realm_name = realm_manifest.get("name", realm_folder.capitalize())
-            else:
-                current_realm_name = realm_folder.capitalize()
-            
-            _generate_single_realm(
-                realm_name=current_realm_name,
-                realm_folder=realm_folder,
-                output_path=realms_dir,
-                repo_root=repo_root,
-                random=random,
-                members=members,
-                organizations=organizations,
-                transactions=transactions,
-                disputes=disputes,
-                seed=seed,
-            )
-
-        # Generate registries
-        registries_list = mundus_config.get("registries", [])
-        if registries_list:
-            console.print(f"\n[bold]🏛️  Generating {len(registries_list)} registr(y/ies)...[/bold]")
-            registries_dir = output_path / "registries"
-            registries_dir.mkdir(exist_ok=True)
-            
-            for registry_folder in registries_list:
-                console.print(f"\n[bold cyan]  📦 Generating {registry_folder}...[/bold cyan]")
-                registry_output = registries_dir / registry_folder
-                registry_output.mkdir(parents=True, exist_ok=True)
-                
-                # Copy registry manifest
-                demo_registry_dir = repo_root / "examples" / "demo" / registry_folder
-                demo_registry_manifest = demo_registry_dir / "manifest.json"
-                
-                if demo_registry_manifest.exists():
-                    shutil.copy2(demo_registry_manifest, registry_output / "manifest.json")
-                    console.print(f"     ✅ Copied registry manifest")
+        # Include any ICRC-1 ledger canisters if they exist
+        for canister_name, canister_config in dfx_config["canisters"].items():
+            if any(keyword in canister_name.lower() for keyword in ["icrc1", "ledger"]) and canister_name not in realm_canisters:
+                # Use standard name if canister_ids exists, otherwise unique name
+                if canister_ids_file.exists():
+                    ledger_name = canister_name
                 else:
-                    console.print(f"     ⚠️  Warning: No manifest found for {registry_folder}")
+                    sanitized_realm_name = realm_name.lower().replace(" ", "_").replace("-", "_")
+                    ledger_name = f"{sanitized_realm_name}_{canister_name}"
+                realm_canisters[ledger_name] = canister_config
+                console.print(f"   ✅ Including {ledger_name} for local development")
+    
+    realm_dfx = {
+        "canisters": realm_canisters,
+        "defaults": dfx_config.get("defaults", {}),
+        "networks": dfx_config.get("networks", {}),
+        "output_env_file": ".env",
+        "version": dfx_config.get("version", 1)
+    }
+    
+    # Write dfx.json
+    dfx_json_path = output_path / "dfx.json"
+    with open(dfx_json_path, 'w') as f:
+        json.dump(realm_dfx, f, indent=2)
+    console.print(f"   ✅ dfx.json created")
 
-        console.print("\n[green]✅ All realms and registries generated successfully[/green]")
-    else:
-        # Simple mode - skip registries
-        pass
-
-    # Copy deployment scripts from existing files
+    # Create symlinks to src directories so deploy_canisters.sh can find them
+    # This is crucial: deploy_canisters.sh cd's into the realm directory and expects src/ there
+    src_link = output_path / "src"
+    if not src_link.exists():
+        src_target = repo_root / "src"
+        if src_target.exists():
+            os.symlink(src_target, src_link)
+            console.print(f"   ✅ Created symlink: src -> {src_target}")
+        else:
+            console.print(f"   ⚠️  Warning: Could not find src directory at {src_target}")
+    
+    # 2. Create scripts subdirectory
     console.print("\n🔧 Generating deployment scripts...")
+    scripts_dir = output_path / "scripts"
+    scripts_dir.mkdir(exist_ok=True)
 
     # Create scripts subdirectory in output
     scripts_dir = output_path / "scripts"
@@ -303,39 +417,101 @@ echo "✅ Skipping extension installation"
             console.print(f"   ❌ Source file not found: {source_install}")
 
     # 2. Create network-aware deployment wrapper script
-    deploy_wrapper_content = """#!/bin/bash
-set -e
-set -x
+    deploy_wrapper_content = f"""#!/bin/bash
+# Realm deployment script
+# Generated by: realms realm create
 
-# Get network from command line argument or default to local
-NETWORK="${1:-local}"
-# Get mode from second argument or default to upgrade
-MODE="${2:-upgrade}"
-echo "🚀 Deploying canisters to network: $NETWORK..."
+set -e
+set -x  # Enable verbose mode for debugging
+
+# Redirect stderr to stdout so Python logger captures everything
+exec 2>&1
+
+NETWORK="${{1:-{network}}}"
+MODE="${{2:-upgrade}}"
+
+echo "════════════════════════════════════════════════════════════════"
+echo "🚀 Deploying realm to network: $NETWORK"
+echo "🔄 Mode: $MODE"
+echo "📅 Time: $(date)"
+echo "════════════════════════════════════════════════════════════════"
 
 # Clear Kybra build cache to ensure extensions are included in backend build
-# This is critical after installing extensions
 if [ -d ".kybra" ]; then
     echo "🧹 Clearing Kybra build cache to include newly installed extensions..."
     rm -rf .kybra/realm_backend
     echo "   ✅ Cache cleared"
 fi
 
-# Determine which deployment script to use
-if [ "$NETWORK" = "local" ] || [ "$NETWORK" = "local2" ]; then
-    # For local deployment, mode is not used (dfx start --clean requires install mode)
-    echo "Using local deployment script..."
-    bash scripts/deploy_local.sh
-elif [ "$NETWORK" = "staging" ] || [ "$NETWORK" = "ic" ]; then
-    echo "Using staging/IC deployment script with mode: $MODE..."
-    bash scripts/deploy_staging.sh "$NETWORK" "$MODE"
+# Find the repo root by searching upward for scripts/deploy_canisters.sh
+SCRIPT_DIR="$( cd "$( dirname "${{BASH_SOURCE[0]}}" )" && pwd )"
+REALM_DIR="$( dirname "$SCRIPT_DIR" )"
+
+echo "📁 Script directory: $SCRIPT_DIR"
+echo "📁 Realm directory: $REALM_DIR"
+
+# Search upward for scripts/deploy_canisters.sh
+SEARCH_DIR="$REALM_DIR"
+DEPLOY_SCRIPT=""
+echo "🔍 Searching for deploy_canisters.sh..."
+while [ "$SEARCH_DIR" != "/" ]; do
+    echo "   Checking: $SEARCH_DIR/scripts/deploy_canisters.sh"
+    if [ -f "$SEARCH_DIR/scripts/deploy_canisters.sh" ]; then
+        DEPLOY_SCRIPT="$SEARCH_DIR/scripts/deploy_canisters.sh"
+        echo "   ✅ Found: $DEPLOY_SCRIPT"
+        break
+    fi
+    SEARCH_DIR="$(dirname "$SEARCH_DIR")"
+done
+
+if [ -n "$DEPLOY_SCRIPT" ] && [ -f "$DEPLOY_SCRIPT" ]; then
+    echo "════════════════════════════════════════════════════════════════"
+    echo "🔧 Executing deploy_canisters.sh"
+    echo "   Script: $DEPLOY_SCRIPT"
+    echo "   Args: $REALM_DIR $NETWORK $MODE"
+    echo "════════════════════════════════════════════════════════════════"
+    
+    # Debug: Show what canisters are in dfx.json
+    echo "📋 Canisters in $REALM_DIR/dfx.json:"
+    if command -v jq &> /dev/null && [ -f "$REALM_DIR/dfx.json" ]; then
+        jq -r '.canisters | keys[]' "$REALM_DIR/dfx.json" 2>/dev/null || echo "   (jq failed to parse)"
+    else
+        echo "   (jq not available or dfx.json not found)"
+    fi
+    echo ""
+    echo "📄 Full dfx.json content (first 50 lines):"
+    head -50 "$REALM_DIR/dfx.json" || echo "   (could not read dfx.json)"
+    echo "════════════════════════════════════════════════════════════════"
+    
+    # Run with explicit error handling
+    # Use stdbuf to disable buffering for immediate output visibility
+    set +e  # Temporarily disable exit on error to capture exit code
+    if command -v stdbuf &> /dev/null; then
+        stdbuf -oL -eL bash "$DEPLOY_SCRIPT" "$REALM_DIR" "$NETWORK" "$MODE"
+    else
+        bash "$DEPLOY_SCRIPT" "$REALM_DIR" "$NETWORK" "$MODE"
+    fi
+    EXIT_CODE=$?
+    set -e  # Re-enable exit on error
+    
+    if [ $EXIT_CODE -eq 0 ]; then
+        echo "════════════════════════════════════════════════════════════════"
+        echo "✅ Deployment completed successfully"
+        echo "════════════════════════════════════════════════════════════════"
+        exit 0
+    else
+        echo "════════════════════════════════════════════════════════════════"
+        echo "❌ Deployment failed with exit code: $EXIT_CODE"
+        echo "════════════════════════════════════════════════════════════════"
+        exit $EXIT_CODE
+    fi
 else
-    echo "❌ Unknown network: $NETWORK"
-    echo "Supported networks: local, local2, staging, ic"
+    echo "════════════════════════════════════════════════════════════════"
+    echo "❌ Error: deploy_canisters.sh not found in parent directories"
+    echo "   Searched from: $REALM_DIR"
+    echo "════════════════════════════════════════════════════════════════"
     exit 1
 fi
-
-echo "✅ Deployment to $NETWORK completed!"
 """
     target_deploy = scripts_dir / "2-deploy-canisters.sh"
     target_deploy.write_text(deploy_wrapper_content)
@@ -382,13 +558,13 @@ try:
     print(f"   Network: {{network}}")
     
     # Check if realm is already registered
-    check_cmd = ['realms', 'realm', 'registry', 'get', '--id', realm_id, '--network', network]
+    check_cmd = ['realms', 'registry', 'get', '--id', realm_id, '--network', network]
     check_result = subprocess.run(check_cmd, cwd=os.path.dirname(os.path.dirname(s)), capture_output=True)
     
     if check_result.returncode != 0:
         # Realm not registered, register it
         print(f"   Registering realm with central registry...")
-        register_cmd = ['realms', 'realm', 'registry', 'add', 
+        register_cmd = ['realms', 'registry', 'add', 
                        '--realm-id', realm_id,
                        '--realm-name', realm_name,
                        '--network', network]
@@ -402,11 +578,20 @@ try:
 except Exception as e:
     print(f"   ⚠️  Could not register realm: {{e}} (continuing anyway)")
 
-# Run the adjustments script with network parameter
-realms_cmd = ['realms', 'shell', '--file', '{output_dir}/scripts/adjustments.py']
-if network != 'local':
-    realms_cmd.extend(['--network', network])
-run_dfx_command(realms_cmd)
+# Run the adjustments script with network parameter  
+adjustments_path = os.path.join(s, 'adjustments.py')
+if os.path.exists(adjustments_path):
+    print(f"\\n📝 Running adjustments script...")
+    realms_cmd = ['realms', 'shell', '--file', adjustments_path]
+    if network != 'local':
+        realms_cmd.extend(['--network', network])
+    try:
+        run_dfx_command(realms_cmd)
+        print(f"   ✅ Adjustments completed")
+    except Exception as e:
+        print(f"   ⚠️  Adjustments failed: {{e}} (continuing anyway)")
+else:
+    print(f"\\n⚠️  No adjustments.py found, skipping...")
 
 # Reload entity method overrides after adjustments
 print("\\n🔄 Reloading entity method overrides...")
@@ -420,29 +605,31 @@ except Exception as e:
     print(f"   ⚠️  Failed to reload overrides: {{e}}")
 """.strip()
 
-    upload_script_content = """#!/bin/bash
+    upload_script_content = f"""#!/bin/bash
 # NOTE: This script requires the admin_dashboard extension to be installed
 # The 'realms import' command uses the admin_dashboard extension backend
 # to import data into the realm canister
 
 # Get network from command line argument or default to local
-NETWORK="${1:-local}"
+NETWORK="${{1:-local}}"
 echo "📥 Uploading realm data for network: $NETWORK..."
 echo "⚠️  Note: This requires the admin_dashboard extension to be installed"
 
 # Track if any uploads succeeded
 UPLOAD_SUCCESS=false
 
-# Build realms command with network parameter
-REALMS_CMD="realms import"
+# Build realms command with network parameter and canister name
+REALMS_CMD="realms import --canister {backend_name}"
 if [ "$NETWORK" != "local" ]; then
-    REALMS_CMD="realms import --network $NETWORK"
+    REALMS_CMD="realms import --network $NETWORK --canister {backend_name}"
 fi
 
 # Check if realm_data.json exists and has content
 if [ -f "realm_data.json" ] && [ -s "realm_data.json" ]; then
     echo "📥 Uploading realm data..."
-    if $REALMS_CMD realm_data.json 2>&1 | tee /tmp/upload.log; then
+    # Run import command and capture exit code properly (don't use tee in conditional)
+    $REALMS_CMD realm_data.json
+    if [ $? -eq 0 ]; then
         echo "  ✅ Realm data uploaded successfully"
         UPLOAD_SUCCESS=true
     else
@@ -458,7 +645,8 @@ CODEX_COUNT=0
 for codex_file in *_codex.py; do
     if [ -f "$codex_file" ]; then
         echo "  Importing $(basename $codex_file)..."
-        if $REALMS_CMD "$codex_file" --type codex; then
+        $REALMS_CMD "$codex_file" --type codex
+        if [ $? -eq 0 ]; then
             echo "    ✅ Imported successfully"
             CODEX_COUNT=$((CODEX_COUNT + 1))
             UPLOAD_SUCCESS=true
@@ -481,14 +669,15 @@ EXTENSION_DATA_COUNT=0
 # Look for data files in extensions/*/data/*.json
 if [ -d "../extensions" ]; then
     for extension_dir in ../extensions/*/; do
-        if [ -d "${extension_dir}data" ]; then
+        if [ -d "${{extension_dir}}data" ]; then
             extension_name=$(basename "$extension_dir")
             echo "  Checking extension: $extension_name"
             
-            for data_file in "${extension_dir}data/"*.json; do
+            for data_file in "${{extension_dir}}data/"*.json; do
                 if [ -f "$data_file" ]; then
                     echo "    📥 Importing $(basename "$data_file")..."
-                    if $REALMS_CMD "$data_file"; then
+                    $REALMS_CMD "$data_file"
+                    if [ $? -eq 0 ]; then
                         echo "      ✅ Imported successfully"
                         EXTENSION_DATA_COUNT=$((EXTENSION_DATA_COUNT + 1))
                         UPLOAD_SUCCESS=true
@@ -565,58 +754,15 @@ ic.print("len(Codex.instances()) = %d" % len(Codex.instances()))
     if deploy:
         console.print("\n[yellow]🚀 Auto-deployment requested...[/yellow]")
         try:
-            # Deploy all realms and registries defined in the mundus manifest
-            if mundus_config:
-                import subprocess
-                
-                # Build list of canisters to deploy
-                canisters_to_deploy = []
-                
-                # Add realm canisters
-                for realm_folder in mundus_config.get("realms", []):
-                    canisters_to_deploy.append(f"{realm_folder}_backend")
-                    canisters_to_deploy.append(f"{realm_folder}_frontend")
-                
-                # Add registry canisters
-                for registry_folder in mundus_config.get("registries", []):
-                    # Registry uses realm_registry_backend/frontend naming
-                    if registry_folder == "registry":
-                        canisters_to_deploy.append("realm_registry_backend")
-                        canisters_to_deploy.append("realm_registry_frontend")
-                
-                if canisters_to_deploy:
-                    console.print(f"\n[bold]Deploying {len(canisters_to_deploy)} canisters:[/bold]")
-                    
-                    # Deploy each canister one by one
-                    deployed_count = 0
-                    for canister in canisters_to_deploy:
-                        console.print(f"\n  🚀 Deploying {canister}...")
-                        
-                        # Build dfx deploy command for single canister
-                        cmd = ["dfx", "deploy", canister]
-                        if network and network != "local":
-                            cmd.extend(["--network", network])
-                        if mode == "install":
-                            cmd.append("--mode=install")
-                        
-                        result = subprocess.run(cmd, cwd=Path.cwd(), capture_output=True, text=True)
-                        
-                        if result.returncode != 0:
-                            console.print(f"[red]     ❌ Failed to deploy {canister}[/red]")
-                            console.print(f"[red]{result.stderr}[/red]")
-                            raise typer.Exit(1)
-                        else:
-                            deployed_count += 1
-                            console.print(f"[green]     ✅ {canister} deployed ({deployed_count}/{len(canisters_to_deploy)})[/green]")
-                    
-                    console.print(f"\n[green]✅ All {deployed_count} canisters deployed successfully![/green]")
-                else:
-                    console.print("[yellow]⚠️  No canisters to deploy[/yellow]")
-            else:
-                # Fallback to old single-realm deployment
-                _deploy_realm_internal(
-                    config_file=None, folder=output_dir, network=network, clean=False, identity=identity, mode=mode
-                )
+            # Deploy the single realm using the internal deploy function
+            _deploy_realm_internal(
+                config_file=None, 
+                folder=str(output_path),  # Use the generated realm directory
+                network=network, 
+                clean=False, 
+                identity=identity, 
+                mode=mode
+            )
         except typer.Exit as e:
             console.print(
                 f"[red]❌ Auto-deployment failed with exit code: {e.exit_code}[/red]"
@@ -626,21 +772,6 @@ ic.print("len(Codex.instances()) = %d" % len(Codex.instances()))
             console.print(f"[red]❌ Auto-deployment failed: {e}[/red]")
             raise typer.Exit(1)
     else:
-        console.print("\n[bold]Next Steps:[/bold]")
-        # Show the appropriate deploy command
-        if mundus_config and len(mundus_config.get("realms", [])) > 1:
-            # Multi-realm mundus
-            console.print("Deploy all canisters with one of these options:\n")
-            console.print("[bold]Option 1:[/bold] Use the create command with --deploy flag")
-            console.print("  realms create --deploy --output-dir ./demo-mundus --realm-name \"My Mundus\"\n")
-            console.print("[bold]Option 2:[/bold] Deploy each canister manually:")
-            canisters = []
-            for realm_folder in mundus_config.get("realms", []):
-                canisters.extend([f"{realm_folder}_backend", f"{realm_folder}_frontend"])
-            for registry_folder in mundus_config.get("registries", []):
-                if registry_folder == "registry":
-                    canisters.extend(["realm_registry_backend", "realm_registry_frontend"])
-            for canister in canisters:
-                console.print(f"  dfx deploy {canister}")
-        else:
-            console.print("realms deploy")
+        console.print("\n[yellow]📝 Next steps:[/yellow]")
+        console.print(f"   1. Deploy: realms realm deploy --folder {output_path}")
+        console.print(f"   2. Or run: cd {output_path} && bash scripts/2-deploy-canisters.sh")

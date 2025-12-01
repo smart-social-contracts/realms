@@ -19,18 +19,19 @@ from ..utils import (
 
 def import_data_command(
     file_path: str,
-    entity_type: str = None,
+    entity_type: Optional[str] = None,
     format: str = "json",
     batch_size: int = MAX_BATCH_SIZE,
     dry_run: bool = False,
     network: str = "local",
     identity: Optional[str] = None,
+    canister: str = "realm_backend",
 ) -> None:
     """Import data into the realm. Supports JSON data and Python codex files."""
 
     # Handle codex files separately
     if entity_type == "codex":
-        return import_codex_command(file_path, dry_run=dry_run, network=network, identity=identity)
+        return import_codex_command(file_path, dry_run=dry_run, network=network, identity=identity, canister=canister)
 
     console.print(
         f"[bold blue]📥 Importing data from {file_path}[/bold blue]\n"
@@ -81,7 +82,7 @@ def import_data_command(
                 "dfx",
                 "canister",
                 "call",
-                "realm_backend",
+                canister,
                 "extension_sync_call",
                 f'(record {{ extension_name = "admin_dashboard"; function_name = "import_data"; args = "{escaped_args}"; }})',
                 "--network",
@@ -132,6 +133,7 @@ def import_codex_command(
     dry_run: bool = False,
     network: str = "local",
     identity: Optional[str] = None,
+    canister: str = "realm_backend",
 ) -> None:
     """Import Python codex file into the realm.
 
@@ -184,7 +186,7 @@ def import_codex_command(
             "dfx",
             "canister",
             "call",
-            "realm_backend",
+            canister,
             "extension_sync_call",
             f'(record {{ extension_name = "admin_dashboard"; function_name = "import_data"; args = "{escaped_args}"; }})',
             "--network",

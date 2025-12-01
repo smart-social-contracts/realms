@@ -10,7 +10,7 @@ CANISTER_ID=$(dfx canister id realm_frontend 2>/dev/null)
 
 if [ -z "$CANISTER_ID" ]; then
   echo "❌ Error: Could not get realm_frontend canister ID."
-  echo "   Make sure you have deployed the realm first with 'realms deploy'"
+  echo "   Make sure you have deployed the realm first with 'realms realm deploy'"
   exit 1
 fi
 

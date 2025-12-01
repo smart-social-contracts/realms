@@ -1,6 +1,6 @@
 # Demo Realm Configuration Files
 
-This folder contains sample configuration and codex files used by the `realms create` command to generate demo realm instances.
+This folder contains sample configuration and codex files used by the `realms realm create` command to generate demo realm instances.
 
 ## Configuration Files
 
@@ -46,7 +46,7 @@ Custom user registration hook:
 
 These files are automatically copied when running:
 ```bash
-realms create --random --members 100 --organizations 10
+realms realm create --random --members 100 --organizations 10
 ```
 
 The `realm_generator.py` script copies these files from `examples/demo/` to the generated realm directory, where they can be imported into the realm canister.
@@ -55,7 +55,7 @@ The `realm_generator.py` script copies these files from `examples/demo/` to the 
 
 You can modify these files to create your own demo scenarios:
 1. Edit the codex files in this folder
-2. Run `realms create` to generate a new realm with your custom codex files
+2. Run `realms realm create` to generate a new realm with your custom codex files
 3. The updated files will be automatically copied to your new realm
 
 ## Single Source of Truth

@@ -7,7 +7,7 @@ In CI, this is handled by the workflow starting a container with the realm deplo
 
 For local testing, ensure you have run:
   - dfx start --clean --background
-  - realms create && realms deploy
+  - realms realm create && realms realm deploy
 
 Then run:
   - bash tests/integration/run_tests.sh

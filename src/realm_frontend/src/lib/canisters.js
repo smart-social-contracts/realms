@@ -9,12 +9,33 @@ async function initializeImports() {
 	if (importsInitialized) return;
 
 	console.log('🏭 Loading IC backend implementations');
-	const declarationsModule = await import('declarations/realm_backend');
+	
+	// Import realm_backend declarations directly
+	// This will be bundled by Vite at build time
+	let declarationsModule = null;
+	try {
+		// Use static import path that Vite can analyze at build time
+		const { createActor: ca, canisterId: cid } = await import('$lib/declarations/realm_backend');
+		declarationsModule = { createActor: ca, canisterId: cid };
+		console.log(`✅ Loaded declarations for realm_backend`);
+	} catch (e) {
+		console.error('Failed to load backend declarations:', e);
+		throw new Error('Could not load backend declarations. Please run: dfx generate');
+	}
+	
+	if (declarationsModule) {
+		createActor = declarationsModule.createActor;
+		canisterId = declarationsModule.canisterId;
+	} else {
+		throw new Error('Could not load backend declarations. Please run: dfx generate');
+	}
+	
 	const agentModule = await import('@dfinity/agent');
-
-	createActor = declarationsModule.createActor;
-	canisterId = declarationsModule.canisterId;
 	HttpAgent = agentModule.HttpAgent;
+
+	if (!canisterId) {
+		throw new Error('Canister ID not found in declarations');
+	}
 
 	importsInitialized = true;
 }

@@ -72,8 +72,8 @@ Extensions can override entity methods, add UI routes, and call backend function
 ### 4. CLI Tools
 ```bash
 # Realm lifecycle
-realms create --citizens 100 --organizations 10
-realms deploy --network ic
+realms realm create --citizens 100 --organizations 10
+realms realm deploy --network ic
 realms import realm_data.json
 
 # Task management
@@ -167,7 +167,7 @@ const result = await backendActor.extension_sync_call(
 
 ```bash
 # 1. Generate realm
-realms create --random --citizens 100
+realms realm create --random --citizens 100
 
 # 2. Deploy canisters
 cd generated_realm

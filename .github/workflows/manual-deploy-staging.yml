@@ -3,10 +3,15 @@ name: Force Deploy (main)
 on:
   workflow_dispatch:
     inputs:
-      canister:
-        description: 'Canister to deploy (leave empty for all)'
-        required: false
-        default: ''
+      type:
+        description: 'Deployment type'
+        required: true
+        type: choice
+        options:
+          - realm
+          - registry
+          - mundus
+        default: realm
       commit:
         description: 'Commit SHA to deploy (leave empty for latest main)'
         required: false
@@ -45,7 +50,7 @@ jobs:
           # Pull the demo image (includes extensions)
           docker pull ghcr.io/${{ github.repository_owner }}/realms:demo-${{ steps.commit.outputs.deploy_commit }}
           
-          # Deploy using realms CLI with staging network and specified mode
+          # Deploy to existing fixed-name canisters on staging using realms CLI
           docker run --rm \
             -v "$(pwd)/identity.pem:/app/identity.pem" \
             -v "$(pwd)/deploy-logs:/app/deploy-logs" \
@@ -53,12 +58,12 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/realms:demo-${{ steps.commit.outputs.deploy_commit }} \
             bash -c "(dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
                      dfx identity use my-identity && \
-                     realms create --random --network staging --deploy --mode ${{ github.event.inputs.mode }}); \
+                     bash scripts/manual-deploy-staging.sh '${{ github.event.inputs.type }}' '${{ github.event.inputs.mode }}'); \
                      EXIT_CODE=\$?; \
                      mkdir -p /app/deploy-logs && \
                      cp -f dfx.log /app/deploy-logs/ 2>/dev/null || true && \
                      cp -f dfx2.log /app/deploy-logs/ 2>/dev/null || true && \
-                     cp -f realms_cli.log /app/deploy-logs/ 2>/dev/null || true; \
+                     cp -f realms.log /app/deploy-logs/ 2>/dev/null || true; \
                      exit \$EXIT_CODE"
           
           # Clean up

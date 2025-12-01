@@ -92,7 +92,7 @@ realms self-register register \
 echo "✅ Realm registered!"
 ```
 
-## Integration with `realms create`
+## Integration with `realms realm create`
 
 You can add auto-registration to the generated deployment scripts:
 
@@ -145,7 +145,7 @@ Users can browse all available realms through the registry frontend and discover
 Organizations can deploy multiple realm instances (e.g., different cities, departments) and register them all for easy management.
 
 ### 3. Demo Showcases
-Generate demo realms with `realms create` and automatically register them for presentations or testing.
+Generate demo realms with `realms realm create` and automatically register them for presentations or testing.
 
 ### 4. Network Monitoring
 The registry frontend shows real-time status of all realms, helping administrators monitor the health of their deployments.

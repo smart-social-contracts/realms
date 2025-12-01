@@ -96,8 +96,8 @@ Tasks & Automation        Services                Registry
 ### CLI Commands
 ```bash
 # Realm Management
-realms create          # Create new realm
-realms deploy          # Deploy canisters
+realms realm create          # Create new realm
+realms realm deploy          # Deploy canisters
 realms import          # Import data
 
 # Task Management  
@@ -122,7 +122,7 @@ realms registry list   # List realms
 ### Deploy a Realm
 ```bash
 # 1. Create with demo data
-realms create --random --citizens 100 --organizations 10
+realms realm create --random --citizens 100 --organizations 10
 
 # 2. Deploy locally
 cd generated_realm

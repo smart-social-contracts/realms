@@ -46,7 +46,7 @@ else
     log_info "Will copy test files after container start (CI mode)"
 fi
 
-# Start container (let realms deploy handle dfx startup)
+# Start container (let realms realm deploy handle dfx startup)
 log_info "Starting container..."
 docker run -d \
   --name "$CONTAINER_NAME" \
@@ -56,7 +56,7 @@ docker run -d \
 
 # Deploy realm (this will block until complete - handles dfx startup internally)
 log_info "Creating and deploying realm (this takes ~2-3 minutes)..."
-if ! docker exec "$CONTAINER_NAME" bash -c "realms create --random --members $MEMBERS_COUNT && realms deploy"; then
+if ! docker exec "$CONTAINER_NAME" bash -c "realms realm create --random --members $MEMBERS_COUNT && realms realm deploy"; then
     log_error "Realm deployment failed"
     log_info "Checking logs..."
     docker exec "$CONTAINER_NAME" tail -100 realms_cli.log 2>/dev/null || true

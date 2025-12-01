@@ -40,7 +40,7 @@ echo ""
 
 echo "🧪 Test 4: Test realm creation"
 cd /tmp
-realms create \
+realms realm create \
     --realm-name "Test Realm" \
     --network local \
     --members 5 \
@@ -102,7 +102,7 @@ fi
 echo ""
 
 echo "🧪 Test 7: Test deploy command accessibility"
-realms deploy --help > /dev/null
+realms realm deploy --help > /dev/null
 echo "✅ Deploy command is accessible"
 echo ""
 

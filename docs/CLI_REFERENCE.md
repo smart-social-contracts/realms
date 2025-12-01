@@ -19,18 +19,18 @@ realms --help
 
 ## Realm Management
 
-### `realms create`
+### `realms realm create`
 Create new realm with optional demo data.
 
 ```bash
 # Basic realm
-realms create
+realms realm create
 
 # With demo data
-realms create --random --members 100 --organizations 10
+realms realm create --random --members 100 --organizations 10
 
 # Custom configuration
-realms create \
+realms realm create \
   --realm-name "My Governance Realm" \
   --members 50 \
   --organizations 5 \
@@ -41,10 +41,10 @@ realms create \
   --network local
 
 # Create and deploy
-realms create --random --deploy
+realms realm create --random --deploy
 
 # Without extensions (base realm only)
-realms create --no-extensions
+realms realm create --no-extensions
 ```
 
 **Options:**
@@ -64,21 +64,21 @@ realms create --no-extensions
 
 ---
 
-### `realms deploy`
+### `realms realm deploy`
 Deploy realm canisters.
 
 ```bash
 # Deploy locally
-realms deploy
+realms realm deploy
 
 # Deploy to network
-realms deploy --network staging
+realms realm deploy --network staging
 
 # Reinstall (wipes data)
-realms deploy --mode reinstall
+realms realm deploy --mode reinstall
 
 # With specific identity
-realms deploy --identity ~/.config/dfx/identity/prod/identity.pem
+realms realm deploy --identity ~/.config/dfx/identity/prod/identity.pem
 ```
 
 **Options:**
@@ -457,10 +457,10 @@ realms import large_users.json --batch-size 100
 
 ```bash
 # Use named dfx identity
-realms deploy --identity alice --network ic
+realms realm deploy --identity alice --network ic
 
 # Use PEM file
-realms deploy --identity ~/.ssh/prod.pem --network ic
+realms realm deploy --identity ~/.ssh/prod.pem --network ic
 
 # Check current identity
 dfx identity whoami
@@ -488,7 +488,7 @@ realms status  # Uses REALMS_NETWORK
 ### Development Workflow
 ```bash
 # 1. Create local realm with demo data
-realms create --random --deploy
+realms realm create --random --deploy
 
 # 2. Test extensions
 cd generated_realm
@@ -505,11 +505,11 @@ realms ps logs <task_id>
 ### Production Deployment
 ```bash
 # 1. Create production realm
-realms create --realm-name "Production" --no-extensions
+realms realm create --realm-name "Production" --no-extensions
 
 # 2. Deploy to IC mainnet
 cd generated_realm
-realms deploy --network ic --identity prod --mode reinstall
+realms realm deploy --network ic --identity prod --mode reinstall
 
 # 3. Import production data
 realms import prod_data.json --network ic --identity prod
@@ -527,7 +527,7 @@ realms registry add \
 realms export --output-dir backup --network staging
 
 # 2. Deploy new realm
-realms deploy --network ic
+realms realm deploy --network ic
 
 # 3. Import to new realm
 realms import backup/realm_data.json --network ic
@@ -561,7 +561,7 @@ dfx canister call realm_backend status --network staging
 dfx stop
 rm -rf .dfx
 dfx start --clean --background
-realms deploy --mode reinstall
+realms realm deploy --mode reinstall
 ```
 
 ---

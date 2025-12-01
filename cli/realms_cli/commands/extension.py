@@ -320,9 +320,24 @@ def package_extension_command(extension_id: str, output_dir: Optional[str] = Non
 
     manifest = None
     manifest_path = None
-    if "backend" in locations:
-        manifest_path = os.path.join(locations["backend"], "manifest.json")
-        if os.path.exists(manifest_path):
+    
+    # First try to load root manifest.json from source_dir
+    if source_dir:
+        root_manifest_path = os.path.join(source_dir, "manifest.json")
+        if os.path.exists(root_manifest_path):
+            manifest_path = root_manifest_path
+            try:
+                with open(manifest_path, "r") as f:
+                    manifest = json.load(f)
+            except Exception as e:
+                console.print(f"[red]Failed to load manifest: {e}[/red]")
+                return False
+    
+    # Fall back to backend manifest.json if root manifest not found
+    if not manifest and "backend" in locations:
+        backend_manifest_path = os.path.join(locations["backend"], "manifest.json")
+        if os.path.exists(backend_manifest_path):
+            manifest_path = backend_manifest_path
             try:
                 with open(manifest_path, "r") as f:
                     manifest = json.load(f)

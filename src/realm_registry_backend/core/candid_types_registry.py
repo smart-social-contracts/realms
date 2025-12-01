@@ -7,6 +7,7 @@ class RealmRecord(Record):
     id: text
     name: text
     url: text
+    logo: text
     created_at: float64
 
 

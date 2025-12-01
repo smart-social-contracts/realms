@@ -14,6 +14,7 @@ class RealmRecord(Entity, TimestampedMixin):
     id = String()
     name = String()
     url = String(max_length=512)
+    logo = String(max_length=512)
     created_at = Float()
 
     def to_dict(self) -> dict:
@@ -22,5 +23,6 @@ class RealmRecord(Entity, TimestampedMixin):
             "id": self.id,
             "name": self.name,
             "url": self.url,
+            "logo": getattr(self, 'logo', ''),  # Default to empty string if not set
             "created_at": self.created_at,
         }

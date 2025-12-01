@@ -13,6 +13,7 @@ docker run --rm \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -v "$SCRIPT_DIR/docker_mode_tests.sh:/tests/docker_mode_tests.sh:ro" \
     -v "$SCRIPT_DIR/../:/cli" \
+    -e REALMS_DOCKER_IMAGE="${REALMS_DOCKER_IMAGE:-ghcr.io/smart-social-contracts/realms:v0.1.5}" \
     python:3.10-slim \
     bash /tests/docker_mode_tests.sh
 

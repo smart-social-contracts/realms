@@ -20,7 +20,6 @@ COPY .flake8 ./.flake8
 COPY mypy.ini ./mypy.ini
 COPY tsconfig.json ./tsconfig.json
 COPY dfx.json ./dfx.json
-COPY canister_ids.json ./canister_ids.json
 COPY pyproject.toml ./pyproject.toml
 COPY realm_config.json ./realm_config.json
 
@@ -28,6 +27,7 @@ COPY realm_config.json ./realm_config.json
 COPY scripts ./scripts
 COPY src ./src
 COPY tests ./tests
+COPY examples ./examples
 
 RUN touch src/realm_backend/extension_packages/extension_imports.py
 

@@ -4,10 +4,12 @@ import hashlib
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 import time
 import venv
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -21,13 +23,72 @@ from .constants import DOCKER_IMAGE
 console = Console()
 
 
-def get_logger(name: str) -> logging.Logger:
-    """Get a logger instance with the specified name."""
+def generate_timestamp() -> str:
+    """Generate timestamp string for directory naming.
+    
+    Returns:
+        Timestamp string in format YYYYMMDD_HHMMSS
+    """
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+
+def sanitize_name(name: str) -> str:
+    """Sanitize a name for use in directory/file names.
+    
+    Args:
+        name: Name to sanitize
+        
+    Returns:
+        Sanitized name with only alphanumeric and underscores
+    """
+    # Replace spaces and hyphens with underscores
+    name = name.replace(" ", "_").replace("-", "_")
+    # Remove any non-alphanumeric characters except underscores
+    name = re.sub(r'[^a-zA-Z0-9_]', '', name)
+    # Remove multiple consecutive underscores
+    name = re.sub(r'_+', '_', name)
+    # Remove leading/trailing underscores
+    name = name.strip('_')
+    return name
+
+
+def generate_output_dir_name(prefix: str, name: Optional[str] = None) -> str:
+    """Generate output directory name with timestamp.
+    
+    Args:
+        prefix: Prefix (e.g., 'realm', 'registry', 'mundus')
+        name: Optional name to include
+        
+    Returns:
+        Directory name in format: prefix_Name_YYYYMMDD_HHMMSS or prefix_YYYYMMDD_HHMMSS
+    """
+    timestamp = generate_timestamp()
+    if name:
+        sanitized_name = sanitize_name(name)
+        return f"{prefix}_{sanitized_name}_{timestamp}"
+    return f"{prefix}_{timestamp}"
+
+
+def get_logger(name: str, log_dir: Optional[Path] = None) -> logging.Logger:
+    """Get a logger instance with the specified name.
+    
+    Args:
+        name: Logger name
+        log_dir: Optional directory for log file. If None, uses current directory.
+    """
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
 
+    # Determine log file path
+    if log_dir:
+        log_dir = Path(log_dir)
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / "realms.log"
+    else:
+        log_file = Path("realms.log")
+
     # save to file
-    file_handler = logging.FileHandler("realms_cli.log")
+    file_handler = logging.FileHandler(log_file)
     file_handler.setLevel(logging.DEBUG)
     logger.addHandler(file_handler)
 
@@ -294,6 +355,8 @@ def run_command(
                 if line:
                     logger.info(line)
                     stdout_lines.append(line)
+                    # Also print to stdout so CI can capture it
+                    print(line, flush=True)
             
             # Wait for process to complete
             returncode = process.wait()
@@ -708,3 +771,124 @@ def get_effective_network_and_canister(
     effective_canister = explicit_canister or "realm_backend"
 
     return effective_network, effective_canister
+
+
+def get_canister_urls(
+    working_dir: Path,
+    network: str = "local"
+) -> Dict[str, Dict[str, str]]:
+    """Extract canister IDs and URLs from a deployment directory.
+    
+    Args:
+        working_dir: Directory containing dfx.json and .dfx directory
+        network: Network name (local, staging, ic, etc.)
+        
+    Returns:
+        Dictionary mapping canister names to their IDs and URLs
+    """
+    import subprocess
+    
+    canisters = {}
+    working_dir = Path(working_dir).absolute()
+    
+    # Read dfx.json to get list of canisters
+    dfx_json_path = working_dir / "dfx.json"
+    if not dfx_json_path.exists():
+        return canisters
+    
+    try:
+        with open(dfx_json_path, 'r') as f:
+            dfx_config = json.load(f)
+        
+        canister_names = dfx_config.get("canisters", {}).keys()
+        
+        # Determine port for local network
+        port = 8000
+        if network == "local":
+            # Try to detect actual port
+            try:
+                port_result = subprocess.run(
+                    ["dfx", "info", "webserver-port"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    cwd=working_dir
+                )
+                if port_result.returncode == 0 and port_result.stdout.strip():
+                    port = int(port_result.stdout.strip())
+            except:
+                # Fallback: try lsof
+                try:
+                    lsof_result = subprocess.run(
+                        ["lsof", "-iTCP", "-sTCP:LISTEN", "-n", "-P"],
+                        capture_output=True,
+                        text=True,
+                        timeout=5
+                    )
+                    for line in lsof_result.stdout.split('\n'):
+                        if 'replica' in line or 'pocket' in line:
+                            import re
+                            match = re.search(r':(\d+)', line)
+                            if match:
+                                port = int(match.group(1))
+                                break
+                except:
+                    pass
+        
+        # Get canister IDs and construct URLs
+        for canister_name in canister_names:
+            try:
+                id_result = subprocess.run(
+                    ["dfx", "canister", "id", canister_name],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    cwd=working_dir
+                )
+                
+                if id_result.returncode == 0:
+                    canister_id = id_result.stdout.strip()
+                    
+                    # Determine URL based on network - prefer CANISTER_ID.localhost format
+                    canister_info = {"id": canister_id}
+                    
+                    if network == "local":
+                        # Use CANISTER_ID.localhost:PORT format for all canisters
+                        canister_info["url"] = f"http://{canister_id}.localhost:{port}/"
+                    elif network in ["staging", "ic", "mainnet"]:
+                        if "frontend" in canister_name:
+                            canister_info["url"] = f"https://{canister_id}.icp0.io/"
+                        else:
+                            # For backends on IC, use Candid UI
+                            canister_info["url"] = f"https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id={canister_id}"
+                    
+                    canisters[canister_name] = canister_info
+                    
+            except Exception:
+                # Skip canisters we can't get IDs for
+                pass
+    
+    except Exception:
+        pass
+    
+    return canisters
+
+
+def display_canister_urls_json(
+    working_dir: Path,
+    network: str = "local",
+    title: str = "Deployed Canisters"
+) -> None:
+    """Display canister URLs as formatted JSON.
+    
+    Args:
+        working_dir: Directory containing the deployed canisters
+        network: Network name
+        title: Title to display above the JSON
+    """
+    canisters = get_canister_urls(working_dir, network)
+    
+    if canisters:
+        console.print(f"\n[bold cyan]📋 {title}[/bold cyan]")
+        console.print(json.dumps(canisters, indent=2))
+        console.print("")

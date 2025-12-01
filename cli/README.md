@@ -20,7 +20,7 @@ Before installing realms-cli, ensure you have the following dependencies:
 sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
 ```
 - **Required for**: Canister deployment, local replica management
-- **Used by**: `realms deploy` command for backend/frontend deployment
+- **Used by**: `realms realm deploy` command for backend/frontend deployment
 - **Verify installation**: `dfx --version`
 
 ### 2. Node.js (v16 or later)
@@ -79,7 +79,7 @@ This creates a complete project structure with:
 
 ```bash
 cd my_gov_realm
-realms deploy --file realm_config.json
+realms realm deploy --file realm_config.json
 ```
 
 Your realm will be available at `http://localhost:8000`
@@ -107,12 +107,12 @@ Options:
 realms init --name "City Services" --id city_services --admin "2vxsx-fae"
 ```
 
-### `realms deploy`
+### `realms realm deploy`
 
 Deploy a Realms project based on configuration.
 
 ```bash
-realms deploy [OPTIONS]
+realms realm deploy [OPTIONS]
 
 Options:
   -f, --file TEXT           Configuration file (default: realm_config.json)
@@ -127,16 +127,16 @@ Options:
 **Examples:**
 ```bash
 # Basic deployment
-realms deploy
+realms realm deploy
 
 # Deploy to IC mainnet
-realms deploy --network ic --identity ~/.config/dfx/identity/production/identity.pem
+realms realm deploy --network ic --identity ~/.config/dfx/identity/production/identity.pem
 
 # Deploy only specific extension phases
-realms deploy --phases q1,q2
+realms realm deploy --phases q1,q2
 
 # Dry run to see what would be deployed
-realms deploy --dry-run
+realms realm deploy --dry-run
 ```
 
 ### `realms status`
@@ -233,7 +233,7 @@ pipx install realms-cli
 
 # Use the CLI tool (no venv activation needed)
 realms --help
-realms create --citizens 50
+realms realm create --citizens 50
 ```
 
 ### Alternative: Using pip with venv
@@ -282,7 +282,7 @@ realms init \
   --admin "rdmx6-jaaaa-aaaaa-aaadq-cai"
 
 cd gov_services
-realms deploy
+realms realm deploy
 ```
 
 ### Multi-Phase Deployment
@@ -307,9 +307,9 @@ realms deploy
 
 Deploy phases incrementally:
 ```bash
-realms deploy --phases initial
-realms deploy --phases q1
-realms deploy --phases q2
+realms realm deploy --phases initial
+realms realm deploy --phases q1
+realms realm deploy --phases q2
 ```
 
 ## Troubleshooting
@@ -341,7 +341,7 @@ ls extensions/
 
 - Check project status: `realms status`
 - Validate configuration: `realms validate`
-- Use dry-run mode: `realms deploy --dry-run`
+- Use dry-run mode: `realms realm deploy --dry-run`
 
 ## Contributing
 

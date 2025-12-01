@@ -351,6 +351,8 @@ class RealmGenerator:
         import json
         
         # Get entity method overrides configuration
+        # Note: manifest_data field removed from Realm to avoid Candid parsing issues during import
+        # The manifest can be uploaded separately after deployment if needed
         manifest = self.get_codex_overrides_manifest()
         
         realm = Realm(
@@ -368,8 +370,7 @@ class RealmGenerator:
                 "quorum_percentage": 0.3,
                 "tax_rate": 0.15,
                 "ubi_amount": 1000
-            },
-            manifest_data=json.dumps(manifest)
+            }
         )
         
         return realm
@@ -570,6 +571,35 @@ def main():
         print(f"- {file}")
     
     print(f"\nSeed used: {generator.seed} (use this seed to reproduce the same data)")
+    
+    # Copy source code folders to output directory
+    print("\nCopying source code folders...")
+    
+    # Define folders to copy
+    folders_to_copy = [
+        ("src/realm_backend", "src/realm_backend"),
+        ("src/realm_frontend", "src/realm_frontend"),
+        ("extensions", "extensions"),
+        ("scripts", "scripts"),
+    ]
+    
+    for src_rel, dest_rel in folders_to_copy:
+        src_folder = repo_root / src_rel
+        dest_folder = output_dir / dest_rel
+        
+        if src_folder.exists():
+            # Create parent directories if needed
+            dest_folder.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Copy the folder
+            if dest_folder.exists():
+                shutil.rmtree(dest_folder)
+            shutil.copytree(src_folder, dest_folder)
+            print(f"  Copied {src_rel} -> {dest_rel}")
+        else:
+            print(f"  Warning: Source folder {src_rel} not found at {src_folder}")
+    
+    print("\nSource code copying complete!")
 
 if __name__ == "__main__":
     main()
