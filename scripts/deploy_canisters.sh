@@ -204,6 +204,10 @@ if [ -n "$BACKENDS" ]; then
         mkdir -p src/realm_frontend/src/lib/declarations
         cp -r src/declarations/* src/realm_frontend/src/lib/declarations/
         
+        # Remove original declarations to prevent vite from finding them
+        # (vite should only use the ones in src/realm_frontend/src/lib/declarations/)
+        rm -rf src/declarations
+        
         # Replace process.env.CANISTER_ID_* with actual canister IDs
         echo "   🔧 Injecting canister IDs into declarations..."
         for canister in $BACKENDS; do
@@ -298,8 +302,8 @@ if [ -n "$FRONTENDS" ]; then
         fi
         
         if [ -n "$frontend_dir" ] && [ -f "$frontend_dir/package.json" ]; then
-            # Install dependencies if needed
-            if [ ! -d "$frontend_dir/node_modules" ]; then
+            # Install dependencies if no root package.json (standalone realm)
+            if [ ! -f "package.json" ] && [ ! -d "$frontend_dir/node_modules" ]; then
                 echo "      📥 Installing npm dependencies..."
                 (cd "$frontend_dir" && npm install --legacy-peer-deps)
             fi
