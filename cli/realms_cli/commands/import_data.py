@@ -2,6 +2,7 @@
 
 import base64
 import json
+import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -76,7 +77,8 @@ def import_data_command(
             }
 
             args_json = json.dumps(args)
-            escaped_args = args_json.replace('"', '\\"')
+            # Use base64 encoding to avoid shell escaping issues
+            args_b64 = base64.b64encode(args_json.encode()).decode()
 
             cmd = [
                 "dfx",
@@ -84,7 +86,7 @@ def import_data_command(
                 "call",
                 canister,
                 "extension_sync_call",
-                f'(record {{ extension_name = "admin_dashboard"; function_name = "import_data"; args = "{escaped_args}"; }})',
+                f'(record {{ extension_name = "admin_dashboard"; function_name = "import_data"; args = "base64:{args_b64}"; }})',
                 "--network",
                 network,
                 "--output",
@@ -94,9 +96,11 @@ def import_data_command(
             if identity:
                 cmd.extend(["--identity", identity])
             
+            console.print(f"Running: {' '.join(cmd[:6])}...")
+            
             result = run_command(
                 cmd,
-                cwd=project_root,
+                cwd=str(project_root),
                 capture_output=True,
             )
 
