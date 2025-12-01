@@ -55,17 +55,18 @@ jobs:
           MODE="${{ github.event.inputs.mode }}"
           
           if [ "$TARGET" = "realm" ]; then
+            # Single realm deployment
             if [ "$MODE" = "reinstall" ]; then
               DEPLOY_CMD="realms realm create --manifest examples/demo/realm1/manifest.json --random --network staging --deploy --mode reinstall"
             else
               DEPLOY_CMD="realms realm create --manifest examples/demo/realm1/manifest.json --network staging --deploy --mode upgrade"
             fi
           elif [ "$TARGET" = "registry" ]; then
-            # Registry deployment - uses existing registry in .realms/mundus/registry
-            DEPLOY_CMD="realms registry deploy --folder .realms/mundus/registry --network staging --mode $MODE"
+            # Registry deployment - create and deploy
+            DEPLOY_CMD="realms registry create --name 'Demo Registry' --output-dir .realms && realms registry deploy --folder .realms/registry --network staging --mode $MODE"
           elif [ "$TARGET" = "mundus" ]; then
-            # Full mundus deployment - deploys registry + all realms
-            DEPLOY_CMD="realms mundus deploy --mundus-dir .realms/mundus --network staging --mode $MODE"
+            # Full mundus deployment - creates registry + all realms from manifest
+            DEPLOY_CMD="realms mundus create --manifest examples/demo/manifest.json --network staging --deploy --mode $MODE"
           else
             echo "Unknown target: $TARGET"
             exit 1
