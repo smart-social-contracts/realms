@@ -802,38 +802,18 @@ def get_canister_urls(
         
         canister_names = dfx_config.get("canisters", {}).keys()
         
-        # Determine port for local network
+        # Determine port for local network (default 8000)
         port = 8000
         if network == "local":
-            # Try to detect actual port
             try:
-                port_result = subprocess.run(
+                result = subprocess.run(
                     ["dfx", "info", "webserver-port"],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                    cwd=working_dir
+                    capture_output=True, text=True, timeout=5, cwd=working_dir
                 )
-                if port_result.returncode == 0 and port_result.stdout.strip():
-                    port = int(port_result.stdout.strip())
+                if result.returncode == 0 and result.stdout.strip():
+                    port = int(result.stdout.strip())
             except:
-                # Fallback: try lsof
-                try:
-                    lsof_result = subprocess.run(
-                        ["lsof", "-iTCP", "-sTCP:LISTEN", "-n", "-P"],
-                        capture_output=True,
-                        text=True,
-                        timeout=5
-                    )
-                    for line in lsof_result.stdout.split('\n'):
-                        if 'replica' in line or 'pocket' in line:
-                            import re
-                            match = re.search(r':(\d+)', line)
-                            if match:
-                                port = int(match.group(1))
-                                break
-                except:
-                    pass
+                pass  # Use default 8000
         
         # Get canister IDs and construct URLs
         for canister_name in canister_names:
