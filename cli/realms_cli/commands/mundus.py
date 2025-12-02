@@ -362,6 +362,7 @@ def mundus_deploy_command(
                     console.print("")
     
     # 2. Deploy registry
+    registry_canister_ids = {}
     if registry_dirs:
         console.print("📋 Deploying registry...")
         for registry_dir in registry_dirs:
@@ -373,9 +374,28 @@ def mundus_deploy_command(
                     identity=identity
                 )
                 console.print(f"   ✅ {registry_dir.name} deployed\n")
+                
+                # Capture registry canister IDs for injection into realms
+                for canister in ["realm_registry_backend", "realm_registry_frontend"]:
+                    try:
+                        id_result = subprocess.run(
+                            ["dfx", "canister", "id", canister, "--network", network],
+                            cwd=registry_dir, capture_output=True, text=True
+                        )
+                        if id_result.returncode == 0:
+                            registry_canister_ids[canister] = {network: id_result.stdout.strip()}
+                    except:
+                        pass
             except Exception as e:
                 console.print(f"[red]   ❌ Failed to deploy {registry_dir.name}: {e}[/red]")
                 raise typer.Exit(1)
+        
+        # Inject registry canister IDs into all realms so they can register themselves
+        if registry_canister_ids and realm_dirs:
+            console.print("📋 Injecting registry canister IDs into realms...")
+            for realm_dir in realm_dirs:
+                _inject_shared_canister_ids(registry_canister_ids, realm_dir, network)
+            console.print("")
     
     # 3. Deploy all realms (last)
     console.print(f"🏛️  Deploying {len(realm_dirs)} realm(s)...\n")
