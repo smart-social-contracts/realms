@@ -85,41 +85,41 @@ def get_log_dir() -> Path:
     return _session_log_dir or Path.cwd()
 
 
-def get_logger(
-    name: str, 
-    log_dir: Optional[Path] = None,
-    log_file: Optional[str] = None
-) -> logging.Logger:
-    """Get a logger instance with the specified name.
+def get_logger(name: str) -> logging.Logger:
+    """Get a basic logger instance (no file output).
     
-    Args:
-        name: Logger name (e.g., 'realms')
-        log_dir: Optional directory for log file. If None, uses session log dir or cwd.
-        log_file: Optional specific log filename. If None, uses 'realms.log'.
-    
-    Returns:
-        Configured logger that writes to file with timestamps.
+    Use this for module-level loggers that don't need file logging.
+    For deployment logging, use get_realms_logger() instead.
     """
     logger = logging.getLogger(name)
+    if not logger.handlers:
+        logger.setLevel(logging.DEBUG)
+        # No handlers = no output by default (can be configured externally)
+    return logger
+
+
+def get_realms_logger(log_dir: Path) -> logging.Logger:
+    """Get a file logger for realms.log in the specified directory.
+    
+    Args:
+        log_dir: Directory where realms.log will be created. REQUIRED.
+    
+    Returns:
+        Logger that writes timestamped entries to realms.log
+    """
+    log_dir = Path(log_dir)
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / "realms.log"
+    
+    # Use unique logger name per log path to support multiple deployments
+    logger_name = f"realms_{log_path}"
+    logger = logging.getLogger(logger_name)
     
     # Avoid adding duplicate handlers
     if logger.handlers:
         return logger
     
     logger.setLevel(logging.DEBUG)
-
-    # Determine log directory
-    if log_dir:
-        log_dir = Path(log_dir)
-    else:
-        log_dir = get_log_dir()
-    log_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Determine log file name
-    if log_file:
-        log_path = log_dir / log_file
-    else:
-        log_path = log_dir / "realms.log"
 
     # File handler with timestamps
     file_handler = logging.FileHandler(log_path, mode='a')
@@ -132,11 +132,6 @@ def get_logger(
     logger.addHandler(file_handler)
 
     return logger
-
-
-def get_realms_logger(log_dir: Optional[Path] = None) -> logging.Logger:
-    """Get the realms CLI logger."""
-    return get_logger('realms', log_dir=log_dir, log_file='realms.log')
 
 
 def truncate_command_for_logging(command: List[str], max_arg_length: int = 200) -> str:

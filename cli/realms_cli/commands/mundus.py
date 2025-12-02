@@ -285,12 +285,16 @@ def mundus_deploy_command(
         else:
             console.print("🌐 Starting dfx...\n")
             subprocess.run(["dfx", "stop"], cwd=repo_root, capture_output=True)
+            
+            # Start dfx with logging to dfx.log in the mundus directory
+            dfx_log_path = mundus_path / "dfx.log"
             subprocess.Popen(
-                ["dfx", "start", "--clean", "--background"],
+                ["dfx", "start", "--clean", "--background", "--log", "file", "--logfile", str(dfx_log_path)],
                 cwd=repo_root,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
             )
+            console.print(f"[dim]dfx replica log: {dfx_log_path}[/dim]")
             time.sleep(5)
         
         # Skip dfx start in individual deployments
