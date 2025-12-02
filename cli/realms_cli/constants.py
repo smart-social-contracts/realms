@@ -2,7 +2,7 @@
 
 import os
 
-MAX_BATCH_SIZE = 100
+MAX_BATCH_SIZE = 25  # Reduced from 100 to avoid ICP instruction limit (40B) on large records
 
 # Docker image configuration
 # Updated automatically during release to match the current version
