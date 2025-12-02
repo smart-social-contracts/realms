@@ -14,7 +14,7 @@ from rich.panel import Panel
 
 from .create import create_command
 from .registry import registry_create_command
-from ..utils import console, generate_output_dir_name, get_project_root, display_canister_urls_json, get_canister_urls
+from ..utils import console, generate_output_dir_name, get_project_root, display_canister_urls_json, get_canister_urls, ensure_dfx_running
 
 
 def mundus_create_command(
@@ -269,36 +269,8 @@ def mundus_deploy_command(
     if network == "local":
         repo_root = get_project_root()
         
-        # Check if dfx is already running
-        dfx_running = False
-        try:
-            result = subprocess.run(
-                ["dfx", "ping", "--network", "local"],
-                capture_output=True, timeout=2
-            )
-            dfx_running = result.returncode == 0
-        except:
-            pass
-        
-        if dfx_running:
-            console.print("🌐 dfx already running\n")
-        else:
-            console.print("🌐 Starting dfx...\n")
-            subprocess.run(["dfx", "stop"], cwd=repo_root, capture_output=True)
-            
-            # Start dfx with logging to dfx.log in the mundus directory
-            dfx_log_path = mundus_path / "dfx.log"
-            subprocess.Popen(
-                ["dfx", "start", "--clean", "--background", "--log", "file", "--logfile", str(dfx_log_path)],
-                cwd=repo_root,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-            console.print(f"[dim]dfx replica log: {dfx_log_path}[/dim]")
-            time.sleep(5)
-        
-        # Skip dfx start in individual deployments
-        os.environ['SKIP_DFX_START'] = 'true'
+        # Ensure dfx is running (creates dfx.log in mundus dir)
+        ensure_dfx_running(log_dir=mundus_path, network=network)
         
         # Symlink .dfx to deployment directories
         shared_dfx = repo_root / ".dfx"

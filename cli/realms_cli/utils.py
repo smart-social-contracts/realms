@@ -564,6 +564,85 @@ def get_current_branch() -> str:
         return "main"
 
 
+def is_dfx_running(network: str = "local") -> bool:
+    """Check if dfx replica is running."""
+    try:
+        result = subprocess.run(
+            ["dfx", "ping", "--network", network],
+            capture_output=True,
+            timeout=2
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def ensure_dfx_running(
+    log_dir: Path,
+    network: str = "local",
+    clean: bool = True,
+    port: Optional[int] = None
+) -> bool:
+    """Ensure dfx replica is running for local network.
+    
+    Args:
+        log_dir: Directory where dfx.log will be created
+        network: Network name (only 'local' triggers dfx start)
+        clean: Whether to start with --clean flag
+        port: Optional port number. If None, uses branch-based port.
+    
+    Returns:
+        True if dfx is running (either already was or just started)
+    
+    Side effects:
+        - Sets SKIP_DFX_START=true env var to prevent deploy scripts from starting dfx
+        - Creates dfx.log in log_dir
+    """
+    if network != "local":
+        return True
+    
+    # Always set this so deploy scripts don't try to start dfx
+    os.environ['SKIP_DFX_START'] = 'true'
+    
+    if is_dfx_running(network):
+        console.print("🌐 dfx already running\n")
+        return True
+    
+    console.print("🌐 Starting dfx...\n")
+    
+    # Stop any existing dfx
+    subprocess.run(["dfx", "stop"], capture_output=True)
+    
+    # Determine port
+    if port is None:
+        branch = get_current_branch()
+        port = generate_port_from_branch(branch)
+    
+    # Start dfx with logging
+    dfx_log_path = Path(log_dir) / "dfx.log"
+    cmd = [
+        "dfx", "start", "--background",
+        "--log", "file", "--logfile", str(dfx_log_path),
+        "--host", f"127.0.0.1:{port}"
+    ]
+    if clean:
+        cmd.insert(2, "--clean")
+    
+    subprocess.Popen(
+        cmd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
+    )
+    
+    console.print(f"[dim]dfx replica log: {dfx_log_path}[/dim]")
+    console.print(f"[dim]dfx port: {port}[/dim]\n")
+    
+    # Wait for dfx to be ready
+    time.sleep(5)
+    
+    return is_dfx_running(network)
+
+
 def wait_for_canister_ready(
     canister_name: str, network: str = "local", timeout: int = 60
 ) -> bool:
