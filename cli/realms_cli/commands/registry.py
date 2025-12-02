@@ -12,7 +12,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .create import create_command
-from ..utils import console, generate_output_dir_name, get_project_root, display_canister_urls_json
+from ..utils import console, generate_output_dir_name, get_project_root, display_canister_urls_json, get_realms_logger, set_log_dir, run_command
 
 
 def _run_dfx_command(
@@ -385,13 +385,27 @@ def registry_deploy_command(
         identity: Optional identity file for IC deployment
     """
     registry_dir = Path(folder)
+    log_dir = registry_dir.absolute()
+    
+    # Set up logging
+    set_log_dir(log_dir)
+    logger = get_realms_logger(log_dir=log_dir)
+    logger.info("=" * 60)
+    logger.info(f"Starting registry deployment to {network}")
+    logger.info(f"Registry folder: {registry_dir}")
+    logger.info(f"Deploy mode: {mode}")
+    if identity:
+        logger.info(f"Using identity: {identity}")
+    logger.info("=" * 60)
     
     if not registry_dir.exists():
         console.print(f"[red]❌ Registry directory not found: {registry_dir}[/red]")
+        logger.error(f"Registry directory not found: {registry_dir}")
         raise typer.Exit(1)
     
     if not (registry_dir / "dfx.json").exists():
         console.print(f"[red]❌ dfx.json not found in {registry_dir}[/red]")
+        logger.error(f"dfx.json not found in {registry_dir}")
         raise typer.Exit(1)
     
     console.print(Panel.fit(f"🚀 Deploying Registry to {network}", style="bold blue"))
@@ -405,6 +419,7 @@ def registry_deploy_command(
     
     if not deploy_script.exists():
         console.print(f"[red]❌ Deployment script not found: {deploy_script}[/red]")
+        logger.error(f"Deployment script not found: {deploy_script}")
         raise typer.Exit(1)
     
     # Build command
@@ -419,14 +434,24 @@ def registry_deploy_command(
     if identity:
         cmd.append(identity)
     
-    # Run deployment
+    # Run deployment with logging
     try:
-        subprocess.run(cmd, check=True)
+        result = run_command(cmd, cwd=str(registry_dir), logger=logger)
+        if result.returncode != 0:
+            console.print(f"\n[red]❌ Deployment failed with exit code {result.returncode}[/red]")
+            console.print(f"[yellow]   Check {log_dir}/realms.log for details[/yellow]")
+            logger.error(f"Deployment failed with exit code {result.returncode}")
+            raise typer.Exit(1)
+            
         console.print(f"\n[green]✅ Registry deployed successfully![/green]")
+        console.print(f"[dim]Full log saved to {log_dir}/realms.log[/dim]")
+        logger.info("Registry deployment completed successfully")
         
         # Display canister URLs as JSON
         display_canister_urls_json(registry_dir, network, "Registry Deployment Summary")
         
     except subprocess.CalledProcessError as e:
         console.print(f"\n[red]❌ Deployment failed with exit code {e.returncode}[/red]")
+        console.print(f"[yellow]   Check {log_dir}/realms.log for details[/yellow]")
+        logger.error(f"Deployment failed: {e}")
         raise typer.Exit(1)
