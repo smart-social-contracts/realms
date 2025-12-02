@@ -283,6 +283,42 @@ else
     echo "   Found: $FRONTENDS"
 fi
 
+# Copy realm logo to frontend static folder if it exists
+echo ""
+echo "🖼️  Checking for realm logo..."
+if [ -f "manifest.json" ] && command -v jq &> /dev/null; then
+    LOGO_FILE=$(jq -r '.logo // empty' manifest.json)
+    if [ -n "$LOGO_FILE" ]; then
+        # Check if logo file exists in realm directory (could be realm1_logo.svg or logo.svg)
+        if [ -f "$LOGO_FILE" ]; then
+            LOGO_SOURCE="$LOGO_FILE"
+        elif [ -f "logo.svg" ]; then
+            LOGO_SOURCE="logo.svg"
+        else
+            LOGO_SOURCE=""
+        fi
+        
+        if [ -n "$LOGO_SOURCE" ]; then
+            # Find frontend directory and copy logo to static/images
+            if [ -d "src/realm_frontend/static/images" ]; then
+                LOGO_DEST="src/realm_frontend/static/images/$LOGO_FILE"
+            else
+                # Create static/images directory if it doesn't exist
+                mkdir -p src/realm_frontend/static/images
+                LOGO_DEST="src/realm_frontend/static/images/$LOGO_FILE"
+            fi
+            cp "$LOGO_SOURCE" "$LOGO_DEST"
+            echo "   ✅ Copied realm logo: $LOGO_SOURCE → $LOGO_DEST"
+        else
+            echo "   ⚠️  Logo file not found: $LOGO_FILE"
+        fi
+    else
+        echo "   ℹ️  No logo defined in manifest.json"
+    fi
+else
+    echo "   ℹ️  No manifest.json found or jq not available"
+fi
+
 # Build and deploy frontends
 if [ -n "$FRONTENDS" ]; then
     echo ""

@@ -97,6 +97,7 @@ class RealmGenerator:
         random.seed(self.seed)
         self.generated_data = {}
         self.realm_id = "0"
+        self.logo = ""  # Logo path/URL for the realm
         
     def generate_id(self, prefix: str = "") -> str:
         """Generate a unique ID with optional prefix"""
@@ -355,10 +356,14 @@ class RealmGenerator:
         # The manifest can be uploaded separately after deployment if needed
         manifest = self.get_codex_overrides_manifest()
         
+        # Logo path - if set, points to /images/{logo_filename} served from frontend static folder
+        logo_path = f"/images/{self.logo}" if self.logo else ""
+        
         realm = Realm(
             id=self.realm_id,
             name=realm_name,
             description=f"Generated demo realm with {members} members and {organizations} organizations",
+            logo=logo_path,
             created_at=datetime.now().isoformat(),
             status="active",
             governance_type="democratic",
@@ -521,15 +526,24 @@ def main():
             json.dump(manifest_data, f, indent=2)
         print(f"Copied manifest from examples/demo, realm name set to: {args.realm_name}")
         
-        # Copy logo if it exists in the demo folder
+        # Copy logo if it exists in the demo folder and set it on the generator
         if "logo" in manifest_data:
             demo_logo = demo_base_dir / manifest_data["logo"]
             if demo_logo.exists():
                 dest_logo = output_dir / manifest_data["logo"]
                 shutil.copy2(demo_logo, dest_logo)
+                generator.logo = manifest_data["logo"]  # Set logo on generator for Realm entity
                 print(f"Copied realm logo: {manifest_data['logo']}")
             else:
-                print(f"Warning: Logo file {manifest_data['logo']} not found in {demo_base_dir}")
+                # Try the generic 'logo.svg' file as fallback
+                fallback_logo = demo_base_dir / "logo.svg"
+                if fallback_logo.exists():
+                    dest_logo = output_dir / manifest_data["logo"]
+                    shutil.copy2(fallback_logo, dest_logo)
+                    generator.logo = manifest_data["logo"]
+                    print(f"Copied realm logo (from logo.svg): {manifest_data['logo']}")
+                else:
+                    print(f"Warning: Logo file {manifest_data['logo']} not found in {demo_base_dir}")
     else:
         print(f"Warning: Demo manifest not found at {demo_manifest}")
         # Fallback to programmatic generation

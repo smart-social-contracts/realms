@@ -52,6 +52,7 @@ def registry_add_command(
     realm_id: str,
     name: str,
     url: str = "",
+    logo: str = "",
     network: str = "local",
     canister_id: Optional[str] = None,
 ) -> None:
@@ -62,13 +63,15 @@ def registry_add_command(
     console.print(f"Name: [cyan]{name}[/cyan]")
     if url:
         console.print(f"URL: [cyan]{url}[/cyan]")
+    if logo:
+        console.print(f"Logo: [cyan]{logo}[/cyan]")
     console.print(f"Network: [dim]{network}[/dim]\n")
 
     # Escape quotes in arguments
     realm_id_escaped = f'"{realm_id}"'
     name_escaped = f'"{name}"'
     url_escaped = f'"{url}"'
-    logo_escaped = '""'  # Empty logo for now
+    logo_escaped = f'"{logo}"'
 
     args = [f"({realm_id_escaped}, {name_escaped}, {url_escaped}, {logo_escaped})"]
     result = _run_dfx_command(
