@@ -243,6 +243,38 @@ echo ""
     console.print(f"   ✅ Created orchestration script: scripts/deploy-all.sh")
 
 
+def _inject_shared_canister_ids(shared_ids: dict, deploy_dir: Path, network: str) -> None:
+    """Inject shared canister IDs into a realm/registry's canister_ids.json.
+    
+    This allows each realm to have its own backend/frontend canisters while
+    sharing internet_identity, ckbtc_ledger, etc.
+    
+    Args:
+        shared_ids: Dict of {canister_name: {network: canister_id}}
+        deploy_dir: Path to the realm or registry directory
+        network: Network name (e.g., 'local')
+    """
+    ids_file = deploy_dir / ".dfx" / network / "canister_ids.json"
+    ids_file.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Load existing IDs if any
+    existing = {}
+    if ids_file.exists():
+        try:
+            existing = json.loads(ids_file.read_text())
+        except json.JSONDecodeError:
+            pass
+    
+    # Merge shared canister IDs (don't overwrite realm-specific canisters)
+    for canister_name, network_ids in shared_ids.items():
+        if canister_name not in existing:
+            existing[canister_name] = {}
+        existing[canister_name].update(network_ids)
+    
+    ids_file.write_text(json.dumps(existing, indent=2))
+    console.print(f"   ✅ Injected shared IDs into {deploy_dir.name}")
+
+
 def mundus_deploy_command(
     mundus_dir: str,
     network: str,
@@ -267,20 +299,8 @@ def mundus_deploy_command(
     
     # For local network, manage shared dfx instance
     if network == "local":
-        repo_root = get_project_root()
-        
         # Ensure dfx is running (creates dfx.log in mundus dir)
         ensure_dfx_running(log_dir=mundus_path, network=network)
-        
-        # Symlink .dfx to deployment directories
-        shared_dfx = repo_root / ".dfx"
-        for deploy_dir in list(mundus_path.glob("registry_*")) + list(mundus_path.glob("realm_*")):
-            dfx_link = deploy_dir / ".dfx"
-            if not dfx_link.exists():
-                try:
-                    dfx_link.symlink_to(shared_dfx, target_is_directory=True)
-                except:
-                    pass
     
     # Import deploy commands
     from .deploy import deploy_command as realm_deploy_command
@@ -294,6 +314,9 @@ def mundus_deploy_command(
         console.print("[yellow]⚠️  No realms found in mundus directory[/yellow]")
         return
     
+    # Track shared canister IDs to inject into each realm
+    shared_canister_ids = {}
+    
     # 1. Deploy shared canisters (local only - on IC, production canisters are used)
     if network == "local":
         first_realm = realm_dirs[0]
@@ -302,14 +325,14 @@ def mundus_deploy_command(
             with open(dfx_json_path, 'r') as f:
                 dfx_config = json.load(f)
             
-            shared_canisters = [
+            shared_canister_names = [
                 name for name in dfx_config.get("canisters", {}).keys()
                 if name in ["internet_identity", "ckbtc_ledger", "ckbtc_minter"]
             ]
             
-            if shared_canisters:
+            if shared_canister_names:
                 console.print("🔐 Deploying shared canisters (local)...")
-                for canister in shared_canisters:
+                for canister in shared_canister_names:
                     try:
                         result = subprocess.run(
                             ["dfx", "deploy", canister, "--network", network],
@@ -317,11 +340,25 @@ def mundus_deploy_command(
                         )
                         if result.returncode == 0:
                             console.print(f"   ✅ {canister} deployed")
+                            # Get the canister ID
+                            id_result = subprocess.run(
+                                ["dfx", "canister", "id", canister, "--network", network],
+                                cwd=first_realm, capture_output=True, text=True
+                            )
+                            if id_result.returncode == 0:
+                                shared_canister_ids[canister] = {network: id_result.stdout.strip()}
                         else:
                             console.print(f"[yellow]   ⚠️  {canister} skipped[/yellow]")
                     except Exception as e:
                         console.print(f"[yellow]   ⚠️  {canister} skipped: {e}[/yellow]")
                 console.print("")
+                
+                # Inject shared canister IDs into all realms and registry
+                if shared_canister_ids:
+                    console.print("📋 Injecting shared canister IDs into realms...")
+                    for deploy_dir in list(registry_dirs) + list(realm_dirs):
+                        _inject_shared_canister_ids(shared_canister_ids, deploy_dir, network)
+                    console.print("")
     
     # 2. Deploy registry
     if registry_dirs:
