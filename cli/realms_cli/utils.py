@@ -69,35 +69,99 @@ def generate_output_dir_name(prefix: str, name: Optional[str] = None) -> str:
     return f"{prefix}_{timestamp}"
 
 
-def get_logger(name: str, log_dir: Optional[Path] = None) -> logging.Logger:
+# Global log directory for the current session
+_session_log_dir: Optional[Path] = None
+
+
+def set_log_dir(log_dir: Path) -> None:
+    """Set the log directory for the current session."""
+    global _session_log_dir
+    _session_log_dir = Path(log_dir)
+    _session_log_dir.mkdir(parents=True, exist_ok=True)
+
+
+def get_log_dir() -> Path:
+    """Get the current log directory, defaulting to current working directory."""
+    return _session_log_dir or Path.cwd()
+
+
+def get_logger(
+    name: str, 
+    log_dir: Optional[Path] = None,
+    log_file: Optional[str] = None
+) -> logging.Logger:
     """Get a logger instance with the specified name.
     
     Args:
-        name: Logger name
-        log_dir: Optional directory for log file. If None, uses current directory.
+        name: Logger name (e.g., 'realms')
+        log_dir: Optional directory for log file. If None, uses session log dir or cwd.
+        log_file: Optional specific log filename. If None, uses 'realms.log'.
+    
+    Returns:
+        Configured logger that writes to file with timestamps.
     """
     logger = logging.getLogger(name)
+    
+    # Avoid adding duplicate handlers
+    if logger.handlers:
+        return logger
+    
     logger.setLevel(logging.DEBUG)
 
-    # Determine log file path
+    # Determine log directory
     if log_dir:
         log_dir = Path(log_dir)
-        log_dir.mkdir(parents=True, exist_ok=True)
-        log_file = log_dir / "realms.log"
     else:
-        log_file = Path("realms.log")
+        log_dir = get_log_dir()
+    log_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Determine log file name
+    if log_file:
+        log_path = log_dir / log_file
+    else:
+        log_path = log_dir / "realms.log"
 
-    # save to file
-    file_handler = logging.FileHandler(log_file)
+    # File handler with timestamps
+    file_handler = logging.FileHandler(log_path, mode='a')
     file_handler.setLevel(logging.DEBUG)
+    file_formatter = logging.Formatter(
+        '%(asctime)s [%(levelname)s] %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    file_handler.setFormatter(file_formatter)
     logger.addHandler(file_handler)
 
-    # # print warnings and errors to console
-    # console_handler = logging.StreamHandler()
-    # console_handler.setLevel(logging.WARNING)
-    # logger.addHandler(console_handler)
-
     return logger
+
+
+def get_realms_logger(log_dir: Optional[Path] = None) -> logging.Logger:
+    """Get the realms CLI logger."""
+    return get_logger('realms', log_dir=log_dir, log_file='realms.log')
+
+
+def truncate_command_for_logging(command: List[str], max_arg_length: int = 200) -> str:
+    """Format command for logging, truncating very long arguments like base64 data.
+    
+    Args:
+        command: Command as list of strings
+        max_arg_length: Maximum length for each argument before truncation
+    
+    Returns:
+        Formatted command string suitable for logging
+    """
+    formatted_parts = []
+    for arg in command:
+        if len(arg) > max_arg_length:
+            # Truncate long arguments (like base64 data)
+            truncated = arg[:max_arg_length] + f"...[truncated {len(arg) - max_arg_length} chars]"
+            formatted_parts.append(truncated)
+        elif " " in arg or '"' in arg or "'" in arg:
+            # Quote arguments with special characters
+            escaped_arg = arg.replace("'", "'\"'\"'")
+            formatted_parts.append(f"'{escaped_arg}'")
+        else:
+            formatted_parts.append(arg)
+    return ' '.join(formatted_parts)
 
 
 def get_scripts_path() -> Path:
@@ -308,20 +372,13 @@ def run_command(
         logger: If provided, output will be written to the logger instead of console.
     """
     try:
-        # Format command for copy-paste with proper quoting
-        formatted_command = []
-        for arg in command:
-            if " " in arg or '"' in arg or "'" in arg:
-                # Use single quotes and escape any single quotes inside
-                escaped_arg = arg.replace("'", "'\"'\"'")
-                formatted_command.append(f"'{escaped_arg}'")
-            else:
-                formatted_command.append(arg)
+        # Format command for logging (with truncation of long args like base64)
+        log_command = truncate_command_for_logging(command)
 
         if logger:
-            logger.info(f"Running: {' '.join(formatted_command)}")
+            logger.info(f"Running: {log_command}")
         else:
-            console.print(f"[dim]Running: {' '.join(formatted_command)}[/dim]")
+            console.print(f"[dim]Running: {log_command}[/dim]")
 
         # Use project venv environment if requested
         if use_project_venv and cwd:

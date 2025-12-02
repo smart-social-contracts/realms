@@ -9,7 +9,7 @@ import typer
 from rich.console import Console
 
 from ..constants import REALM_FOLDER
-from ..utils import get_logger, run_command, display_canister_urls_json
+from ..utils import get_realms_logger, set_log_dir, run_command, display_canister_urls_json
 
 console = Console()
 
@@ -34,10 +34,14 @@ def _deploy_realm_internal(
         os.environ['SKIP_SHARED_CANISTERS'] = 'true'
     log_dir = Path(folder).absolute()
     
+    # Set up logging directory for this deployment
+    set_log_dir(log_dir)
+    
     # Create logger for capturing script output in the realm folder
-    logger = get_logger("deploy", log_dir=log_dir)
+    logger = get_realms_logger(log_dir=log_dir)
     logger.info("=" * 60)
     logger.info(f"Starting deployment to {network}")
+    logger.info(f"Realm folder: {folder}")
     logger.info(f"Deploy mode: {mode}")
     if identity:
         logger.info(f"Using identity: {identity}")
