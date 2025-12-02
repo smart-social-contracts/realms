@@ -54,12 +54,13 @@ print(f"🎯 Target canister: {backend_name}")
 try:
     print(f"\n🌐 Checking realm registration...")
     
-    # Load manifest to get realm name
+    # Load manifest to get realm name and logo
     manifest_path = os.path.join(realm_dir, 'manifest.json')
     if os.path.exists(manifest_path):
         with open(manifest_path, 'r') as f:
             manifest = json.load(f)
         realm_name = manifest.get('name', 'Generated Realm')
+        realm_logo = manifest.get('logo', '')
         
         # Generate a unique realm ID based on name and timestamp
         realm_id = f"{realm_name.lower().replace(' ', '_')}_{int(time.time())}"
@@ -67,6 +68,39 @@ try:
         print(f"   Realm Name: {realm_name}")
         print(f"   Realm ID: {realm_id}")
         print(f"   Network: {network}")
+        if realm_logo:
+            print(f"   Logo: {realm_logo}")
+        
+        # Get frontend canister ID to construct logo URL
+        logo_url = ""
+        if realm_logo:
+            try:
+                # Find frontend canister name from dfx.json
+                dfx_json_path = os.path.join(realm_dir, 'dfx.json')
+                frontend_name = "realm_frontend"
+                if os.path.exists(dfx_json_path):
+                    with open(dfx_json_path, 'r') as f:
+                        dfx_config = json.load(f)
+                    for name in dfx_config.get("canisters", {}).keys():
+                        if name.endswith("_frontend") and name != "realm_registry_frontend":
+                            frontend_name = name
+                            break
+                
+                result = subprocess.run(
+                    ['dfx', 'canister', 'id', frontend_name, '--network', network],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0:
+                    frontend_id = result.stdout.strip()
+                    if network == 'ic':
+                        logo_url = f"https://{frontend_id}.ic0.app/images/{realm_logo}"
+                    elif network == 'staging':
+                        logo_url = f"https://{frontend_id}.icp0.io/images/{realm_logo}"
+                    else:  # local
+                        logo_url = f"http://{frontend_id}.localhost:8000/images/{realm_logo}"
+                    print(f"   Logo URL: {logo_url}")
+            except Exception as e:
+                print(f"   ⚠️  Could not construct logo URL: {e}")
         
         # Check if realm is already registered
         check_cmd = ['realms', 'registry', 'get', '--id', realm_id, '--network', network]
@@ -79,6 +113,8 @@ try:
                            '--realm-id', realm_id,
                            '--realm-name', realm_name,
                            '--network', network]
+            if logo_url:
+                register_cmd.extend(['--logo-url', logo_url])
             register_result = subprocess.run(register_cmd, cwd=realm_dir)
             if register_result.returncode == 0:
                 print(f"   ✅ Realm registered successfully!")
