@@ -11,6 +11,7 @@ from typing import Optional
 import typer
 from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
 
 from .create import create_command
 from .registry import registry_create_command
@@ -420,4 +421,120 @@ def mundus_deploy_command(
         console.print(json.dumps(all_canisters, indent=2))
         console.print("")
 
+
+def mundus_status_command(
+    mundus_dir: Optional[str],
+    network: str,
+) -> None:
+    """Show status of mundus deployments including realms and registries."""
+    
+    console.print(Panel.fit(
+        "[bold cyan]📊 Mundus Status[/bold cyan]",
+        border_style="cyan"
+    ))
+    
+    # Determine which mundus directories to check
+    if mundus_dir:
+        mundus_dirs = [Path(mundus_dir).absolute()]
+    else:
+        # Find all mundus directories in default location
+        default_mundus_base = Path(".realms/mundus")
+        if default_mundus_base.exists():
+            mundus_dirs = sorted(default_mundus_base.glob("mundus_*"))
+        else:
+            mundus_dirs = []
+    
+    if not mundus_dirs:
+        console.print("[yellow]No mundus directories found.[/yellow]")
+        console.print(f"[dim]Create one with: realms mundus create[/dim]")
+        return
+    
+    console.print(f"[dim]Network: {network}[/dim]\n")
+    
+    for mundus_path in mundus_dirs:
+        if not mundus_path.is_dir():
+            continue
+            
+        console.print(f"[bold cyan]📂 {mundus_path.name}[/bold cyan]")
+        console.print(f"   [dim]{mundus_path}[/dim]\n")
+        
+        # Load manifest if exists
+        manifest_path = mundus_path / "manifest.json"
+        if manifest_path.exists():
+            try:
+                with open(manifest_path, 'r') as f:
+                    manifest = json.load(f)
+                console.print(f"   [dim]Manifest: {manifest.get('name', 'unnamed')}[/dim]\n")
+            except:
+                pass
+        
+        # Find registries
+        registry_dirs = sorted(mundus_path.glob("registry_*"))
+        if registry_dirs:
+            console.print("   [bold]📋 Registries:[/bold]")
+            for registry_dir in registry_dirs:
+                _print_deployment_status(registry_dir, network)
+        
+        # Find realms
+        realm_dirs = sorted(mundus_path.glob("realm_*"))
+        if realm_dirs:
+            console.print("   [bold]🏛️  Realms:[/bold]")
+            for realm_dir in realm_dirs:
+                _print_deployment_status(realm_dir, network)
+        
+        if not registry_dirs and not realm_dirs:
+            console.print("   [yellow]No realms or registries found[/yellow]")
+        
+        console.print("")
+
+
+def _print_deployment_status(deploy_dir: Path, network: str) -> None:
+    """Print deployment status for a realm or registry directory."""
+    
+    dir_name = deploy_dir.name
+    console.print(f"      [cyan]{dir_name}[/cyan]")
+    
+    # Check for dfx.json
+    dfx_json = deploy_dir / "dfx.json"
+    if not dfx_json.exists():
+        console.print(f"         [yellow]⚠️  No dfx.json found[/yellow]")
+        return
+    
+    try:
+        with open(dfx_json, 'r') as f:
+            dfx_config = json.load(f)
+        canister_names = list(dfx_config.get("canisters", {}).keys())
+    except:
+        console.print(f"         [yellow]⚠️  Could not read dfx.json[/yellow]")
+        return
+    
+    # Try to get canister IDs
+    deployed_canisters = []
+    for canister_name in canister_names:
+        try:
+            result = subprocess.run(
+                ["dfx", "canister", "id", canister_name, "--network", network],
+                capture_output=True, text=True, timeout=5, cwd=deploy_dir
+            )
+            if result.returncode == 0:
+                canister_id = result.stdout.strip()
+                deployed_canisters.append((canister_name, canister_id))
+        except:
+            pass
+    
+    if deployed_canisters:
+        console.print(f"         [green]✅ Deployed ({len(deployed_canisters)} canisters)[/green]")
+        for name, cid in deployed_canisters:
+            # Construct URL
+            if network == "local":
+                url = f"http://{cid}.localhost:8000/"
+            elif network in ["staging", "ic"]:
+                url = f"https://{cid}.icp0.io/"
+            else:
+                url = ""
+            
+            if "frontend" in name or "backend" in name:
+                console.print(f"            • {name}: [dim]{url}[/dim]")
+    else:
+        console.print(f"         [yellow]⏸️  Not deployed on {network}[/yellow]")
 

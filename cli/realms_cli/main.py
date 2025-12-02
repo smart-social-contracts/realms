@@ -13,7 +13,7 @@ from .commands.deploy import deploy_command
 from .commands.export_data import export_data_command
 from .commands.extension import extension_command
 from .commands.import_data import import_codex_command, import_data_command
-from .commands.mundus import mundus_create_command, mundus_deploy_command
+from .commands.mundus import mundus_create_command, mundus_deploy_command, mundus_status_command
 from .commands.ps import ps_kill_command, ps_logs_command, ps_ls_command
 from .commands.registry import (
     registry_add_command,
@@ -258,6 +258,19 @@ def mundus_deploy(
 ) -> None:
     """Deploy all realms and registry in an existing mundus."""
     mundus_deploy_command(mundus_dir, network, identity, mode)
+
+
+@mundus_app.command("status")
+def mundus_status(
+    mundus_dir: Optional[str] = typer.Option(
+        None, "--mundus-dir", help="Path to specific mundus directory (default: scan .realms/mundus)"
+    ),
+    network: str = typer.Option(
+        "local", "--network", "-n", help="Network to check status for"
+    ),
+) -> None:
+    """Show status of mundus deployments including realms and registries."""
+    mundus_status_command(mundus_dir, network)
 
 
 # Create realm subcommand group
