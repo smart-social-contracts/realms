@@ -57,10 +57,40 @@
       realms = response || [];
       filteredRealms = realms;
       loading = false;
+      // Fetch user counts from each realm's status endpoint
+      fetchUserCounts();
     } catch (err) {
       error = err.message || 'Failed to load realms';
       loading = false;
     }
+  }
+
+  async function fetchUserCounts() {
+    // Fetch user counts from each realm's status endpoint in parallel
+    const promises = realms.map(async (realm) => {
+      if (!realm.url) return;
+      try {
+        const statusUrl = `${ensureProtocol(realm.url)}/status`;
+        const response = await fetch(statusUrl, { 
+          method: 'GET',
+          headers: { 'Accept': 'application/json' }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.users_count !== undefined) {
+            // Update the realm's user count
+            realm.users_count = Number(data.users_count);
+            // Trigger reactivity
+            realms = [...realms];
+            filteredRealms = [...filteredRealms];
+          }
+        }
+      } catch (err) {
+        // Silently ignore fetch errors - realm might be offline
+        console.debug(`Could not fetch status for ${realm.name}:`, err.message);
+      }
+    });
+    await Promise.allSettled(promises);
   }
 
   async function addRealm() {
@@ -252,6 +282,7 @@
               {/if}
               <div class="realm-title">
                 <h3 class="realm-name">{realm.name}</h3>
+                <span class="realm-users">👥 {realm.users_count || 0} users</span>
               </div>
               <span class="realm-id">{realm.id}</span>
             </div>
@@ -584,6 +615,13 @@
     margin: 0;
     color: #2c3e50;
     font-size: 1.25rem;
+  }
+
+  .realm-users {
+    font-size: 0.85rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+    display: block;
   }
 
   .health-indicator {

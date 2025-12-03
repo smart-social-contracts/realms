@@ -8,6 +8,7 @@ class RealmRecord(Record):
     name: text
     url: text
     logo: text
+    users_count: nat64
     created_at: float64
 
 
