@@ -56,6 +56,16 @@ def _generate_single_realm(
             json.dump(manifest_data, f, indent=2)
             f.write("\n")
         console.print(f"     ✅ Copied manifest from {demo_realm_dir}")
+        
+        # Copy logo file if specified in manifest
+        logo_filename = manifest_data.get("logo", "")
+        if logo_filename:
+            logo_source = demo_realm_dir / logo_filename
+            if logo_source.exists():
+                shutil.copy2(logo_source, realm_output / logo_filename)
+                console.print(f"     ✅ Copied logo: {logo_filename}")
+            else:
+                console.print(f"     ⚠️  Warning: Logo file not found: {logo_source}")
     else:
         console.print(f"     ⚠️  Warning: No manifest found in {demo_realm_dir}")
     
@@ -178,6 +188,23 @@ def create_command(
             with open(manifest_path, 'r') as f:
                 realm_manifest = json.load(f)
             realm_options = realm_manifest.get("options", {}).get("random", {})
+            
+            # Copy manifest to output directory
+            dest_manifest = output_path / "manifest.json"
+            with open(dest_manifest, 'w') as f:
+                realm_manifest["name"] = realm_name  # Update name
+                json.dump(realm_manifest, f, indent=2)
+            console.print(f"✅ Copied manifest from {manifest_path.parent}")
+            
+            # Copy logo file if specified in manifest
+            logo_filename = realm_manifest.get("logo", "")
+            if logo_filename:
+                logo_source = manifest_path.parent / logo_filename
+                if logo_source.exists():
+                    shutil.copy2(logo_source, output_path / logo_filename)
+                    console.print(f"✅ Copied logo: {logo_filename}")
+                else:
+                    console.print(f"[yellow]⚠️  Logo file not found: {logo_source}[/yellow]")
     
     # Call realm_generator.py
     # In Docker mode, paths need to be relative to /workspace mount point

@@ -500,59 +500,62 @@ def main():
     # Generate data
     generator = RealmGenerator(args.seed)
     
-    # Copy manifest.json from examples/demo/{demo_folder} and update realm name
+    # Define repo_root for later use
     script_dir = Path(__file__).parent
     repo_root = script_dir.parent
     
-    # Determine the demo folder path
-    if args.demo_folder:
-        demo_base_dir = repo_root / "examples" / "demo" / args.demo_folder
-    else:
-        demo_base_dir = repo_root / "examples" / "demo"
+    # Check if manifest already exists in output_dir (copied by create_command)
+    output_manifest = output_dir / "manifest.json"
     
-    demo_manifest = demo_base_dir / "manifest.json"
-    
-    if demo_manifest.exists():
-        # Load the demo manifest
-        with open(demo_manifest, 'r') as f:
+    if output_manifest.exists():
+        # Manifest was already copied by create_command - just read it
+        with open(output_manifest, 'r') as f:
             manifest_data = json.load(f)
+        print(f"Using existing manifest from output directory")
         
-        # Update the realm name
-        manifest_data["name"] = args.realm_name
-        
-        # Write to output directory
-        manifest_file = output_dir / "manifest.json"
-        with open(manifest_file, 'w') as f:
-            json.dump(manifest_data, f, indent=2)
-        print(f"Copied manifest from examples/demo, realm name set to: {args.realm_name}")
-        
-        # Copy logo if it exists in the demo folder and set it on the generator
-        if "logo" in manifest_data:
-            demo_logo = demo_base_dir / manifest_data["logo"]
-            if demo_logo.exists():
-                dest_logo = output_dir / manifest_data["logo"]
-                shutil.copy2(demo_logo, dest_logo)
-                generator.logo = manifest_data["logo"]  # Set logo on generator for Realm entity
-                print(f"Copied realm logo: {manifest_data['logo']}")
+        # Set logo on generator if specified in manifest
+        logo_filename = manifest_data.get("logo", "")
+        if logo_filename:
+            logo_file = output_dir / logo_filename
+            if logo_file.exists():
+                generator.logo = logo_filename
+                print(f"Using logo: {logo_filename}")
             else:
-                # Try the generic 'logo.svg' file as fallback
-                fallback_logo = demo_base_dir / "logo.svg"
-                if fallback_logo.exists():
-                    dest_logo = output_dir / manifest_data["logo"]
-                    shutil.copy2(fallback_logo, dest_logo)
-                    generator.logo = manifest_data["logo"]
-                    print(f"Copied realm logo (from logo.svg): {manifest_data['logo']}")
-                else:
-                    print(f"Warning: Logo file {manifest_data['logo']} not found in {demo_base_dir}")
+                print(f"Warning: Logo file {logo_filename} not found in output directory")
     else:
-        print(f"Warning: Demo manifest not found at {demo_manifest}")
-        # Fallback to programmatic generation
-        manifest_data = generator.get_codex_overrides_manifest()
-        manifest_data["name"] = args.realm_name
-        manifest_file = output_dir / "manifest.json"
-        with open(manifest_file, 'w') as f:
-            json.dump(manifest_data, f, indent=2)
-        print(f"Generated realm manifest saved to: {manifest_file}")
+        # Fallback: Copy manifest from examples/demo (for backwards compatibility)
+        if args.demo_folder:
+            demo_base_dir = repo_root / "examples" / "demo" / args.demo_folder
+        else:
+            demo_base_dir = repo_root / "examples" / "demo"
+        
+        demo_manifest = demo_base_dir / "manifest.json"
+        
+        if demo_manifest.exists():
+            with open(demo_manifest, 'r') as f:
+                manifest_data = json.load(f)
+            
+            manifest_data["name"] = args.realm_name
+            
+            with open(output_manifest, 'w') as f:
+                json.dump(manifest_data, f, indent=2)
+            print(f"Copied manifest from {demo_base_dir}")
+            
+            # Copy logo if it exists
+            logo_filename = manifest_data.get("logo", "")
+            if logo_filename:
+                logo_source = demo_base_dir / logo_filename
+                if logo_source.exists():
+                    shutil.copy2(logo_source, output_dir / logo_filename)
+                    generator.logo = logo_filename
+                    print(f"Copied logo: {logo_filename}")
+        else:
+            # Generate minimal manifest
+            manifest_data = generator.get_codex_overrides_manifest()
+            manifest_data["name"] = args.realm_name
+            with open(output_manifest, 'w') as f:
+                json.dump(manifest_data, f, indent=2)
+            print(f"Generated manifest saved to: {output_manifest}")
     
     realm_data = generator.generate_realm_data(
         members=args.members,
