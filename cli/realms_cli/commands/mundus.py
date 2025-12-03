@@ -396,6 +396,13 @@ def mundus_deploy_command(
             for realm_dir in realm_dirs:
                 _inject_shared_canister_ids(registry_canister_ids, realm_dir, network)
             console.print("")
+        
+        # Set env var for post_deploy.py to use when registering realms
+        if "realm_registry_backend" in registry_canister_ids:
+            backend_id = registry_canister_ids["realm_registry_backend"].get(network)
+            if backend_id:
+                os.environ["REGISTRY_CANISTER_ID"] = backend_id
+                console.print(f"   Set REGISTRY_CANISTER_ID={backend_id}")
     
     # 3. Deploy all realms (last)
     console.print(f"🏛️  Deploying {len(realm_dirs)} realm(s)...\n")

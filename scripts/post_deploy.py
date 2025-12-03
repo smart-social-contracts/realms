@@ -10,13 +10,13 @@ import sys
 import json
 import time
 
-# Determine working directory
+# Determine working directory (can be overridden via REALM_DIR env var)
 script_dir = os.path.dirname(os.path.abspath(__file__))
-realm_dir = os.path.dirname(script_dir)
+realm_dir = os.environ.get('REALM_DIR', os.path.dirname(script_dir))
 os.chdir(realm_dir)
 
-# Args: NETWORK [MODE] (MODE is ignored, for interface consistency)
-network = sys.argv[1] if len(sys.argv) > 1 else 'local'
+# Network from env var or command line arg
+network = os.environ.get('NETWORK') or (sys.argv[1] if len(sys.argv) > 1 else 'local')
 # mode = sys.argv[2] if len(sys.argv) > 2 else 'upgrade'  # Not used by this script
 print(f"🚀 Running post-deployment tasks for network: {network}")
 
@@ -130,7 +130,11 @@ try:
             print(f"   ⚠️  Could not get canister URLs: {e}")
         
         # Check if realm is already registered
+        # Use explicit registry canister ID if available (from mundus deploy)
+        registry_canister_id = os.environ.get('REGISTRY_CANISTER_ID')
         check_cmd = ['realms', 'registry', 'get', '--id', realm_id, '--network', network]
+        if registry_canister_id:
+            check_cmd.extend(['--registry-canister', registry_canister_id])
         check_result = subprocess.run(check_cmd, cwd=realm_dir, capture_output=True)
         
         if check_result.returncode != 0:
@@ -140,6 +144,8 @@ try:
                            '--realm-id', realm_id,
                            '--realm-name', realm_name,
                            '--network', network]
+            if registry_canister_id:
+                register_cmd.extend(['--registry-canister', registry_canister_id])
             if frontend_url:
                 register_cmd.extend(['--frontend-url', frontend_url])
             if backend_url:
