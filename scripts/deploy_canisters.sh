@@ -233,6 +233,17 @@ if [ -n "$BACKENDS" ]; then
                 fi
             fi
         done
+        
+        # Inject Internet Identity canister ID into auth.js (only for local network)
+        # Staging and mainnet use the standard identity.ic0.app
+        if [ "$NETWORK" = "local" ]; then
+            II_CANISTER_ID=$(dfx canister id internet_identity --network "$NETWORK" 2>/dev/null || echo "")
+            AUTH_JS_FILE="src/realm_frontend/src/lib/auth.js"
+            if [ -n "$II_CANISTER_ID" ] && [ -f "$AUTH_JS_FILE" ]; then
+                sed -i "s|__INTERNET_IDENTITY_CANISTER_ID__|${II_CANISTER_ID}|g" "$AUTH_JS_FILE"
+                echo "      ✅ Injected Internet Identity canister ID ($II_CANISTER_ID) into auth.js"
+            fi
+        fi
     fi
 fi
 

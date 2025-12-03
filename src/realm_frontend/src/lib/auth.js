@@ -2,28 +2,28 @@
 import { AuthClient } from '@dfinity/auth-client';
 import { Principal } from '@dfinity/principal';
 
-// More reliable local development detection
-// This checks both the hostname and NODE_ENV (where available)
+// Environment detection
+const hostname = window.location.hostname;
 const isLocalDev = (
-  window.location.hostname.includes('localhost') || 
-  window.location.hostname.includes('127.0.0.1') ||
+  hostname.includes('localhost') || 
+  hostname.includes('127.0.0.1') ||
   process.env.NODE_ENV === 'development'
 );
 
 console.log(`Environment: ${isLocalDev ? 'Local Development' : 'Production'}`);
 
+// Internet Identity canister ID - injected by deploy script for local development
+const INTERNET_IDENTITY_CANISTER_ID = '__INTERNET_IDENTITY_CANISTER_ID__';
+
 // Get the Internet Identity canister URL
 function getInternetIdentityUrl() {
-  // For local development, use the known Internet Identity canister ID
+  // For local development, use the injected II canister ID with localhost
   if (isLocalDev) {
-    const canisterId = 'uxrrr-q7777-77774-qaaaq-cai'; // Internet Identity canister ID from dfx deploy
-    // Dynamically detect the port from current URL
     const currentPort = window.location.port || '8000';
-    
-    return `http://${canisterId}.localhost:${currentPort}`;
-  } 
+    return `http://${INTERNET_IDENTITY_CANISTER_ID}.localhost:${currentPort}`;
+  }
   
-  // For production, use the standard II URL
+  // For staging and mainnet, use the standard II URL
   return 'https://identity.ic0.app';
 }
 
