@@ -75,7 +75,7 @@
         return;
       }
       try {
-        const statusUrl = `${ensureProtocol(backendUrl)}/api/v1/status`;
+        const statusUrl = `${ensureProtocol(backendUrl)}/status`;
         const response = await fetch(statusUrl, { 
           method: 'GET',
           headers: { 'Accept': 'application/json' }

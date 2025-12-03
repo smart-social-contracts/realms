@@ -1078,10 +1078,11 @@ def http_request(req: HttpRequest) -> HttpResponse:
         )
 
         if method == "GET":
-            url_path = url.split("/")
+            # Strip leading slash and query params
+            path = url.lstrip("/").split("?")[0]
 
-            # Handle /api/v1/status
-            if len(url_path) >= 3 and url_path[0] == "api" and url_path[1] == "v1" and url_path[2] == "status":
+            # Handle /status
+            if path == "status":
                 return http_request_core(get_status())
 
         return not_found
