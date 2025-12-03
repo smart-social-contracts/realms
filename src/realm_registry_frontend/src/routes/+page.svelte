@@ -1,7 +1,6 @@
 <script>
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
-  import QRCode from 'qrcode';
 
   let backend;
   let realms = [];
@@ -12,10 +11,7 @@
   let showAddForm = false;
   let newRealm = { id: '', name: '', url: '', logo: '' };
   let addingRealm = false;
-  let selectedRealm = null;
-  let showDrawer = false;
   let copiedLink = null;
-  let qrCodeDataUrl = '';
 
   // Get commit hash from meta tag
   let commitHash = '';
@@ -103,59 +99,6 @@
     });
   }
 
-  async function getRealmStatus(realm) {
-    try {
-      if (!realm.url) {
-        return {
-          status: 'unknown',
-          icon: '❓',
-          label: 'Status unavailable',
-          details: 'No URL configured for this realm'
-        };
-      }
-
-      const statusUrl = `https://${realm.url}/status`;
-      const response = await fetch(statusUrl);
-      
-      if (response.ok) {
-        const statusData = await response.json();
-        return {
-          status: 'healthy',
-          icon: '✅',
-          label: 'Healthy',
-          details: statusData
-        };
-      } else {
-        return {
-          status: 'error',
-          icon: '❌',
-          label: 'Error',
-          details: `HTTP ${response.status}: ${response.statusText}`
-        };
-      }
-    } catch (error) {
-      return {
-        status: 'error',
-        icon: '❌',
-        label: 'Error',
-        details: error.message
-      };
-    }
-  }
-
-  async function openRealmDetails(realm) {
-    selectedRealm = realm;
-    selectedRealm.statusInfo = await getRealmStatus(realm);
-    showDrawer = true;
-    // Generate QR code when drawer opens
-    qrCodeDataUrl = await generateQRCode(getPublicLink(realm));
-  }
-
-  function closeDrawer() {
-    showDrawer = false;
-    selectedRealm = null;
-  }
-
   function ensureProtocol(url) {
     if (!url) return '';
     // If URL already has a protocol, return as-is
@@ -178,23 +121,6 @@
       setTimeout(() => copiedLink = null, 2000);
     } catch (err) {
       console.error('Failed to copy link:', err);
-    }
-  }
-
-  async function generateQRCode(text) {
-    try {
-      const dataUrl = await QRCode.toDataURL(text, {
-        width: 200,
-        margin: 2,
-        color: {
-          dark: '#2c3e50',
-          light: '#ffffff'
-        }
-      });
-      return dataUrl;
-    } catch (err) {
-      console.error('Failed to generate QR code:', err);
-      return '';
     }
   }
 
@@ -316,7 +242,7 @@
     {:else}
       <div class="realms-grid">
         {#each filteredRealms as realm}
-          <button class="realm-card" on:click={() => openRealmDetails(realm)} type="button">
+          <div class="realm-card">
             <div class="realm-header">
               {#if realm.logo}
                 <div class="realm-logo-container">
@@ -325,10 +251,6 @@
               {/if}
               <div class="realm-title">
                 <h3 class="realm-name">{realm.name}</h3>
-                <div class="health-indicator" title="Click to view status">
-                  <span class="health-icon">🔄</span>
-                  <span class="health-label">Click for status</span>
-                </div>
               </div>
               <span class="realm-id">{realm.id}</span>
             </div>
@@ -346,7 +268,7 @@
               </p>
             </div>
             
-            <div class="realm-actions" on:click|stopPropagation on:keydown|stopPropagation role="group" aria-label="Realm actions">
+            <div class="realm-actions">
               <button 
                 class="btn btn-secondary btn-sm"
                 on:click={() => copyLink(realm)}
@@ -363,7 +285,7 @@
                 </button>
               {/if}
             </div>
-          </button>
+          </div>
         {/each}
       </div>
       
@@ -404,95 +326,6 @@
     {/if}
   </footer>
 </div>
-
-<!-- Realm Details Drawer -->
-{#if showDrawer && selectedRealm}
-  <div class="drawer-overlay" on:click={closeDrawer} on:keydown={(e) => e.key === 'Escape' && closeDrawer()} role="dialog" aria-modal="true">
-    <div class="drawer" on:click|stopPropagation on:keydown|stopPropagation role="document">
-      <div class="drawer-header">
-        <h2>{selectedRealm.name}</h2>
-        <button class="close-btn" on:click={closeDrawer}>✕</button>
-      </div>
-      
-      <div class="drawer-content">
-        <div class="status-section">
-          <h3>Status</h3>
-          <div class="status-card">
-            <div class="status-indicator">
-              <span class="status-icon">{selectedRealm.statusInfo?.icon || '🔄'}</span>
-              <span class="status-text">{selectedRealm.statusInfo?.label || 'Loading...'}</span>
-            </div>
-            <div class="status-details">
-              <p><strong>Realm ID:</strong> {selectedRealm.id}</p>
-              <p><strong>Created:</strong> {formatDate(selectedRealm.created_at)}</p>
-              {#if selectedRealm.url}
-                <p><strong>URL:</strong> <code>{selectedRealm.url}</code></p>
-              {/if}
-              <p><strong>Last Check:</strong> {new Date().toLocaleString()}</p>
-              {#if selectedRealm.statusInfo?.details && typeof selectedRealm.statusInfo.details === 'object'}
-                <p><strong>Version:</strong> {selectedRealm.statusInfo.details.version || 'Unknown'}</p>
-                <p><strong>Users:</strong> {selectedRealm.statusInfo.details.users_count || 0}</p>
-                <p><strong>Organizations:</strong> {selectedRealm.statusInfo.details.organizations_count || 0}</p>
-              {:else if selectedRealm.statusInfo?.details}
-                <p><strong>Details:</strong> {selectedRealm.statusInfo.details}</p>
-              {/if}
-            </div>
-          </div>
-        </div>
-        
-        <div class="sharing-section">
-          <h3>Share Realm</h3>
-          <div class="sharing-card">
-            <div class="public-link">
-              <label for="public-link-input">Public Link:</label>
-              <div class="link-input">
-                <input 
-                  id="public-link-input"
-                  type="text" 
-                  value={getPublicLink(selectedRealm)} 
-                  readonly 
-                  class="link-field"
-                />
-                <button 
-                  class="btn btn-primary btn-sm"
-                  on:click={() => copyLink(selectedRealm)}
-                >
-                  {copiedLink === selectedRealm.id ? '✓' : 'Copy'}
-                </button>
-              </div>
-            </div>
-            
-            <div class="qr-code">
-              <label for="qr-code-container">QR Code:</label>
-              <div id="qr-code-container" class="qr-container">
-                {#if qrCodeDataUrl}
-                  <img 
-                    src={qrCodeDataUrl} 
-                    alt="QR Code for {selectedRealm.name}"
-                    class="qr-image"
-                  />
-                {:else}
-                  <div class="qr-loading">Generating QR code...</div>
-                {/if}
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="actions-section">
-          {#if selectedRealm.url}
-            <button 
-              class="btn btn-primary"
-              on:click={() => window.open(`https://${selectedRealm.url}`, '_blank')}
-            >
-              🌐 Visit Realm
-            </button>
-          {/if}
-        </div>
-      </div>
-    </div>
-  </div>
-{/if}
 
 <style>
   :global(body) {
