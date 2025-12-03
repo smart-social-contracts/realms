@@ -451,6 +451,7 @@ def registry_add(
     realm_id: str = typer.Option(..., "--realm-id", help="Unique realm identifier"),
     realm_name: str = typer.Option(..., "--realm-name", help="Human-readable realm name"),
     frontend_url: str = typer.Option("", "--frontend-url", help="Frontend canister URL (optional, will auto-derive)"),
+    backend_url: str = typer.Option("", "--backend-url", help="Backend canister URL for status fetching"),
     logo_url: str = typer.Option("", "--logo-url", help="Realm logo URL (served from frontend static folder)"),
     network: str = typer.Option("local", "--network", "-n", help="Network to use"),
     registry_canister_id: str = typer.Option(
@@ -507,13 +508,15 @@ def registry_add(
     console.print(f"\n[cyan]Realm ID:[/cyan] {realm_id}")
     console.print(f"[cyan]Realm Name:[/cyan] {realm_name}")
     console.print(f"[cyan]Frontend URL:[/cyan] {frontend_url}")
+    if backend_url:
+        console.print(f"[cyan]Backend URL:[/cyan] {backend_url}")
     if logo_url:
         console.print(f"[cyan]Logo URL:[/cyan] {logo_url}")
     console.print(f"[dim]Network:[/dim] {network}\n")
     
     # Call registry directly
-    # Note: add_realm expects 4 parameters: realm_id, name, url, logo
-    args = [f'("{realm_id}", "{realm_name}", "{frontend_url}", "{logo_url}")']
+    # Note: add_realm expects 5 parameters: realm_id, name, url, logo, backend_url
+    args = [f'("{realm_id}", "{realm_name}", "{frontend_url}", "{logo_url}", "{backend_url}")']
     cmd = ["dfx", "canister", "call", "--network", network, registry_canister_id, "add_realm"]
     cmd.extend(args)
     

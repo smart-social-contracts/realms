@@ -28,7 +28,7 @@ def list_registered_realms() -> List[dict]:
         return []
 
 
-def add_registered_realm(realm_id: str, name: str, url: str = "", logo: str = "") -> dict:
+def add_registered_realm(realm_id: str, name: str, url: str = "", logo: str = "", backend_url: str = "") -> dict:
     """Add a new realm to the registry"""
     logger.info(f"Adding realm to registry: {realm_id}")
 
@@ -53,6 +53,7 @@ def add_registered_realm(realm_id: str, name: str, url: str = "", logo: str = ""
             id=realm_id.strip(),
             name=name.strip(),
             url=url.strip() if url else "",
+            backend_url=backend_url.strip() if backend_url else "",
             logo=logo.strip() if logo else "",
             created_at=float(
                 ic.time() / 1_000_000_000

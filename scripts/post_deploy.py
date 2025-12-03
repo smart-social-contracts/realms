@@ -71,36 +71,63 @@ try:
         if realm_logo:
             print(f"   Logo: {realm_logo}")
         
-        # Get frontend canister ID to construct logo URL
+        # Get frontend and backend canister IDs
         logo_url = ""
-        if realm_logo:
-            try:
-                # Find frontend canister name from dfx.json
-                dfx_json_path = os.path.join(realm_dir, 'dfx.json')
-                frontend_name = "realm_frontend"
-                if os.path.exists(dfx_json_path):
-                    with open(dfx_json_path, 'r') as f:
-                        dfx_config = json.load(f)
-                    for name in dfx_config.get("canisters", {}).keys():
-                        if name.endswith("_frontend") and name != "realm_registry_frontend":
-                            frontend_name = name
-                            break
-                
-                result = subprocess.run(
-                    ['dfx', 'canister', 'id', frontend_name, '--network', network],
-                    capture_output=True, text=True, timeout=5
-                )
-                if result.returncode == 0:
-                    frontend_id = result.stdout.strip()
-                    if network == 'ic':
+        frontend_url = ""
+        backend_url = ""
+        try:
+            # Find canister names from dfx.json
+            dfx_json_path = os.path.join(realm_dir, 'dfx.json')
+            frontend_name = "realm_frontend"
+            backend_name_local = "realm_backend"
+            if os.path.exists(dfx_json_path):
+                with open(dfx_json_path, 'r') as f:
+                    dfx_config = json.load(f)
+                for name in dfx_config.get("canisters", {}).keys():
+                    if name.endswith("_frontend") and name != "realm_registry_frontend":
+                        frontend_name = name
+                    if name.endswith("_backend") and name != "realm_registry_backend":
+                        backend_name_local = name
+            
+            # Get frontend canister ID
+            result = subprocess.run(
+                ['dfx', 'canister', 'id', frontend_name, '--network', network],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0:
+                frontend_id = result.stdout.strip()
+                if network == 'ic':
+                    frontend_url = f"{frontend_id}.ic0.app"
+                    if realm_logo:
                         logo_url = f"https://{frontend_id}.ic0.app/images/{realm_logo}"
-                    elif network == 'staging':
+                elif network == 'staging':
+                    frontend_url = f"{frontend_id}.icp0.io"
+                    if realm_logo:
                         logo_url = f"https://{frontend_id}.icp0.io/images/{realm_logo}"
-                    else:  # local
+                else:  # local
+                    frontend_url = f"{frontend_id}.localhost:8000"
+                    if realm_logo:
                         logo_url = f"http://{frontend_id}.localhost:8000/images/{realm_logo}"
+                print(f"   Frontend URL: {frontend_url}")
+                if logo_url:
                     print(f"   Logo URL: {logo_url}")
-            except Exception as e:
-                print(f"   ⚠️  Could not construct logo URL: {e}")
+            
+            # Get backend canister ID
+            result = subprocess.run(
+                ['dfx', 'canister', 'id', backend_name_local, '--network', network],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0:
+                backend_id = result.stdout.strip()
+                if network == 'ic':
+                    backend_url = f"{backend_id}.ic0.app"
+                elif network == 'staging':
+                    backend_url = f"{backend_id}.icp0.io"
+                else:  # local
+                    backend_url = f"{backend_id}.localhost:8000"
+                print(f"   Backend URL: {backend_url}")
+        except Exception as e:
+            print(f"   ⚠️  Could not get canister URLs: {e}")
         
         # Check if realm is already registered
         check_cmd = ['realms', 'registry', 'get', '--id', realm_id, '--network', network]
@@ -113,6 +140,10 @@ try:
                            '--realm-id', realm_id,
                            '--realm-name', realm_name,
                            '--network', network]
+            if frontend_url:
+                register_cmd.extend(['--frontend-url', frontend_url])
+            if backend_url:
+                register_cmd.extend(['--backend-url', backend_url])
             if logo_url:
                 register_cmd.extend(['--logo-url', logo_url])
             register_result = subprocess.run(register_cmd, cwd=realm_dir)

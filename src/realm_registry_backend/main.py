@@ -69,10 +69,10 @@ def list_realms() -> Vec[RealmRecord]:
 
 
 @update
-def add_realm(realm_id: text, name: text, url: text, logo: text) -> AddRealmResult:
+def add_realm(realm_id: text, name: text, url: text, logo: text, backend_url: text = "") -> AddRealmResult:
     """Add a new realm to the registry"""
     try:
-        result = add_registered_realm(realm_id, name, url, logo)
+        result = add_registered_realm(realm_id, name, url, logo, backend_url)
         if result["success"]:
             return {"Ok": result["message"]}
         else:

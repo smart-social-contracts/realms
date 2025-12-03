@@ -66,11 +66,16 @@
   }
 
   async function fetchUserCounts() {
-    // Fetch user counts from each realm's status endpoint in parallel
+    // Fetch user counts from each realm's backend status endpoint in parallel
     const promises = realms.map(async (realm) => {
-      if (!realm.url) return;
+      // Use backend_url if available, otherwise skip
+      const backendUrl = realm.backend_url;
+      if (!backendUrl) {
+        console.debug(`No backend_url for ${realm.name}, skipping status fetch`);
+        return;
+      }
       try {
-        const statusUrl = `${ensureProtocol(realm.url)}/status`;
+        const statusUrl = `${ensureProtocol(backendUrl)}/api/v1/status`;
         const response = await fetch(statusUrl, { 
           method: 'GET',
           headers: { 'Accept': 'application/json' }

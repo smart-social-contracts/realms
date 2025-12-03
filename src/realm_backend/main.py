@@ -1059,55 +1059,41 @@ def verify_checksum(content: str, expected_checksum: str) -> Tuple[bool, str]:
         return False, f"Error verifying checksum: {str(e)}"
 
 
-# @query
-# def http_request(req: HttpRequest) -> HttpResponse:
-#     """Handle HTTP requests to the canister. Only for unauthenticated read operations."""
-#
-#     try:
-#         method = req["method"]
-#         url = req["url"]
-#
-#         logger.info(f"HTTP {method} request to {url}")
-#
-#         not_found = HttpResponse(
-#             status_code=404,
-#             headers=[],
-#             body=bytes("Not found", "ascii"),
-#             streaming_strategy=None,
-#             upgrade=False,
-#         )
-#
-#         if method == "GET":
-#             url_path = url.split("/")
-#
-#             if url_path[0] != "api":
-#                 return not_found
-#
-#             if url_path[1] != "v1":
-#                 return not_found
-#
-#             if url_path[2] == "status":
-#                 return http_request_core(get_status())
-#
-#             # if url_path[2] == "extensions":
-#             #     if len(url_path) < 4:
-#             #         # List all extensions
-#             #         extensions_list = list_extensions()
-#             #         return http_request_core({"extensions": extensions_list})
-#
-#             # Note: We no longer need to handle extension-specific HTTP endpoints here
-#             # as we have proper canister methods now
-#
-#         return not_found
-#     except Exception as e:
-#         logger.error(f"Error handling HTTP request: {str(e)}\n{traceback.format_exc()}")
-#         return {
-#             "status_code": 500,
-#             "headers": [],
-#             "body": bytes(traceback.format_exc(), "ascii"),
-#             "streaming_strategy": None,
-#             "upgrade": False,
-#         }
+@query
+def http_request(req: HttpRequest) -> HttpResponse:
+    """Handle HTTP requests to the canister. Only for unauthenticated read operations."""
+
+    try:
+        method = req["method"]
+        url = req["url"]
+
+        logger.info(f"HTTP {method} request to {url}")
+
+        not_found = HttpResponse(
+            status_code=404,
+            headers=[],
+            body=bytes("Not found", "ascii"),
+            streaming_strategy=None,
+            upgrade=False,
+        )
+
+        if method == "GET":
+            url_path = url.split("/")
+
+            # Handle /api/v1/status
+            if len(url_path) >= 3 and url_path[0] == "api" and url_path[1] == "v1" and url_path[2] == "status":
+                return http_request_core(get_status())
+
+        return not_found
+    except Exception as e:
+        logger.error(f"Error handling HTTP request: {str(e)}\n{traceback.format_exc()}")
+        return {
+            "status_code": 500,
+            "headers": [],
+            "body": bytes(traceback.format_exc(), "ascii"),
+            "streaming_strategy": None,
+            "upgrade": False,
+        }
 
 
 @update
