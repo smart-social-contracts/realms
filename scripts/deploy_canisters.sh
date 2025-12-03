@@ -493,6 +493,17 @@ for canister in $FRONTENDS; do
     fi
 done
 
+# Run post-deploy script if it exists (registers realm with central registry)
+POST_DEPLOY_SCRIPT="$WORKING_DIR/scripts/4-post-deploy.py"
+if [ -f "$POST_DEPLOY_SCRIPT" ]; then
+    echo ""
+    echo "📝 Running post-deploy script..."
+    # Pass the network and working directory to the script
+    REALM_DIR="$WORKING_DIR" NETWORK="$NETWORK" python3 "$POST_DEPLOY_SCRIPT" || {
+        echo "⚠️  Post-deploy script failed (continuing anyway)"
+    }
+fi
+
 echo ""
 echo "✅ All done!"
 echo ""
