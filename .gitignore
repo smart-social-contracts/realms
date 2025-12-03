@@ -37,3 +37,6 @@ src/realm_frontend/static/extensions/
 
 # CLI build artifacts
 cli/build/
+
+# Canister IDs
+canister_ids.json
