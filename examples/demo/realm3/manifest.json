@@ -1,7 +1,7 @@
 {
   "type": "realm",
   "name": "Realm 3",
-  "logo": "realm3_logo.svg",
+  "logo": "logo.svg",
   "options": {
     "random": {
       "members": 20,
