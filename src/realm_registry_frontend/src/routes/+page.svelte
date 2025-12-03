@@ -105,8 +105,9 @@
     if (url.startsWith('http://') || url.startsWith('https://')) {
       return url;
     }
-    // Otherwise add https://
-    return `https://${url}`;
+    // Use http for localhost, https for production
+    const isLocal = url.includes('localhost') || url.includes('127.0.0.1');
+    return isLocal ? `http://${url}` : `https://${url}`;
   }
 
   function getPublicLink(realm) {
