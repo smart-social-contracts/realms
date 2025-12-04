@@ -98,9 +98,10 @@ def import_data_command(
             
             console.print(f"Running: {' '.join(cmd[:6])}...")
             
+            # Run from current directory so dfx can find .dfx/local/canister_ids.json
             result = run_command(
                 cmd,
-                cwd=str(project_root),
+                cwd=None,  # Use current working directory
                 capture_output=True,
             )
 
@@ -200,9 +201,10 @@ def import_codex_command(
         if identity:
             cmd.extend(["--identity", identity])
         
+        # Run from current directory so dfx can find .dfx/local/canister_ids.json
         result = run_command(
             cmd,
-            cwd=project_root,
+            cwd=None,  # Use current working directory
         )
 
         display_success_panel(
