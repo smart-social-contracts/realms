@@ -28,8 +28,49 @@ def list_registered_realms() -> List[dict]:
         return []
 
 
+def register_realm_by_caller(name: str, url: str = "", logo: str = "", backend_url: str = "") -> dict:
+    """Register a realm using the caller's principal as the unique ID (upsert logic)"""
+    caller_id = str(ic.caller())
+    logger.info(f"Registering realm by caller: {caller_id}")
+
+    try:
+        # Validate input
+        if not name or not name.strip():
+            return {"success": False, "error": "Realm name cannot be empty"}
+
+        # Check if realm already exists (upsert)
+        existing_realm = RealmRecord[caller_id]
+        if existing_realm is not None:
+            # Update existing realm
+            existing_realm.name = name.strip()
+            existing_realm.url = url.strip() if url else existing_realm.url
+            existing_realm.backend_url = backend_url.strip() if backend_url else existing_realm.backend_url
+            existing_realm.logo = logo.strip() if logo else existing_realm.logo
+            logger.info(f"Updated existing realm: {caller_id} - {name}")
+            return {"success": True, "message": f"Realm '{caller_id}' updated successfully", "action": "updated"}
+
+        # Create new realm record
+        realm = RealmRecord(
+            id=caller_id,
+            name=name.strip(),
+            url=url.strip() if url else "",
+            backend_url=backend_url.strip() if backend_url else "",
+            logo=logo.strip() if logo else "",
+            created_at=float(
+                ic.time() / 1_000_000_000
+            ),  # Convert nanoseconds to seconds
+        )
+
+        logger.info(f"Successfully registered realm: {caller_id} - {name}")
+        return {"success": True, "message": f"Realm '{caller_id}' registered successfully", "action": "created"}
+
+    except Exception as e:
+        logger.error(f"Error registering realm {caller_id}: {str(e)}")
+        return {"success": False, "error": f"Failed to register realm: {str(e)}"}
+
+
 def add_registered_realm(realm_id: str, name: str, url: str = "", logo: str = "", backend_url: str = "") -> dict:
-    """Add a new realm to the registry"""
+    """Add a new realm to the registry (legacy - use register_realm_by_caller instead)"""
     logger.info(f"Adding realm to registry: {realm_id}")
 
     try:

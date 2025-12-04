@@ -7,6 +7,7 @@ from api.registry import (
     count_registered_realms,
     get_registered_realm,
     list_registered_realms,
+    register_realm_by_caller,
     remove_registered_realm,
     search_registered_realms,
 )
@@ -69,8 +70,22 @@ def list_realms() -> Vec[RealmRecord]:
 
 
 @update
+def register_realm(name: text, url: text, logo: text, backend_url: text = "") -> AddRealmResult:
+    """Register calling realm (uses caller principal as ID, upsert logic)"""
+    try:
+        result = register_realm_by_caller(name, url, logo, backend_url)
+        if result["success"]:
+            return {"Ok": result["message"]}
+        else:
+            return {"Err": result["error"]}
+    except Exception as e:
+        logger.error(f"Error in register_realm: {str(e)}")
+        return {"Err": f"Internal error: {str(e)}"}
+
+
+@update
 def add_realm(realm_id: text, name: text, url: text, logo: text, backend_url: text = "") -> AddRealmResult:
-    """Add a new realm to the registry"""
+    """Add a new realm to the registry (legacy)"""
     try:
         result = add_registered_realm(realm_id, name, url, logo, backend_url)
         if result["success"]:

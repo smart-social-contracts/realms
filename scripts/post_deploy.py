@@ -75,6 +75,7 @@ try:
         logo_url = ""
         frontend_url = ""
         backend_url = ""
+        backend_id = ""
         try:
             # Find canister names from dfx.json
             dfx_json_path = os.path.join(realm_dir, 'dfx.json')
@@ -129,36 +130,47 @@ try:
         except Exception as e:
             print(f"   ⚠️  Could not get canister URLs: {e}")
         
-        # Check if realm is already registered
-        # Use explicit registry canister ID if available (from mundus deploy)
+        # Register realm via inter-canister call from realm_backend to registry
+        # The registry uses ic.caller() (realm_backend's canister ID) as the unique key
+        # This prevents duplicates - same canister calling again just updates the record
         registry_canister_id = os.environ.get('REGISTRY_CANISTER_ID')
-        check_cmd = ['realms', 'registry', 'get', '--id', realm_id, '--network', network]
-        if registry_canister_id:
-            check_cmd.extend(['--registry-canister', registry_canister_id])
-        check_result = subprocess.run(check_cmd, cwd=realm_dir, capture_output=True)
         
-        if check_result.returncode != 0:
-            # Realm not registered, register it
+        if registry_canister_id:
             print(f"   Registering realm with central registry...")
-            register_cmd = ['realms', 'registry', 'add', 
-                           '--realm-id', realm_id,
-                           '--realm-name', realm_name,
-                           '--network', network]
-            if registry_canister_id:
-                register_cmd.extend(['--registry-canister', registry_canister_id])
-            if frontend_url:
-                register_cmd.extend(['--frontend-url', frontend_url])
-            if backend_url:
-                register_cmd.extend(['--backend-url', backend_url])
-            if logo_url:
-                register_cmd.extend(['--logo-url', logo_url])
-            register_result = subprocess.run(register_cmd, cwd=realm_dir)
+            
+            # Call realm_backend's register_realm function which makes inter-canister call
+            # Signature: register_realm(registry_canister_id, realm_name, realm_url, realm_logo, backend_url)
+            register_args = f'("{registry_canister_id}", "{realm_name}", "{frontend_url}", "{logo_url}", "{backend_url}")'
+            register_cmd = [
+                'dfx', 'canister', 'call', backend_name_local, 'register_realm_with_registry',
+                register_args,
+                '--network', network
+            ]
+            
+            register_result = subprocess.run(register_cmd, cwd=realm_dir, capture_output=True, text=True)
             if register_result.returncode == 0:
                 print(f"   ✅ Realm registered successfully!")
             else:
-                print(f"   ⚠️  Failed to register realm (continuing anyway)")
+                # Fallback: Try direct CLI registration if inter-canister call fails
+                print(f"   ⚠️  Inter-canister registration failed, trying direct registration...")
+                register_cmd = ['realms', 'registry', 'add', 
+                               '--realm-id', backend_id if backend_id else realm_id,
+                               '--realm-name', realm_name,
+                               '--network', network,
+                               '--registry-canister', registry_canister_id]
+                if frontend_url:
+                    register_cmd.extend(['--frontend-url', frontend_url])
+                if backend_url:
+                    register_cmd.extend(['--backend-url', backend_url])
+                if logo_url:
+                    register_cmd.extend(['--logo-url', logo_url])
+                register_result = subprocess.run(register_cmd, cwd=realm_dir)
+                if register_result.returncode == 0:
+                    print(f"   ✅ Realm registered successfully (direct)!")
+                else:
+                    print(f"   ⚠️  Failed to register realm (continuing anyway)")
         else:
-            print(f"   ℹ️  Realm already registered")
+            print(f"   ℹ️  No registry canister ID provided, skipping registration")
     else:
         print(f"   ⚠️  No manifest.json found, skipping registration")
 except Exception as e:

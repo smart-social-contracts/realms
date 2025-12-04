@@ -1059,44 +1059,6 @@ def verify_checksum(content: str, expected_checksum: str) -> Tuple[bool, str]:
         return False, f"Error verifying checksum: {str(e)}"
 
 
-@query
-def http_request(req: HttpRequest) -> HttpResponse:
-    """Handle HTTP requests to the canister. Only for unauthenticated read operations."""
-
-    try:
-        method = req["method"]
-        url = req["url"]
-
-        logger.info(f"HTTP {method} request to {url}")
-
-        not_found = HttpResponse(
-            status_code=404,
-            headers=[],
-            body=bytes("Not found", "ascii"),
-            streaming_strategy=None,
-            upgrade=False,
-        )
-
-        if method == "GET":
-            # Strip leading slash and query params
-            path = url.lstrip("/").split("?")[0]
-
-            # Handle /status
-            if path == "status":
-                return http_request_core(get_status())
-
-        return not_found
-    except Exception as e:
-        logger.error(f"Error handling HTTP request: {str(e)}\n{traceback.format_exc()}")
-        return {
-            "status_code": 500,
-            "headers": [],
-            "body": bytes(traceback.format_exc(), "ascii"),
-            "streaming_strategy": None,
-            "upgrade": False,
-        }
-
-
 @update
 def execute_code(code: str) -> str:
     """
@@ -1690,28 +1652,31 @@ def create_multi_step_scheduled_task(
 @update
 def register_realm_with_registry(
     registry_canister_id: text,
-    realm_id: text,
     realm_name: text,
     frontend_url: text = "",
+    logo_url: text = "",
+    backend_url: text = "",
 ) -> Async[text]:
     """
     Register this realm with the central registry.
 
     Makes an inter-canister call to the realm_registry_backend to register
-    this realm in the global registry.
+    this realm. The registry uses ic.caller() (this backend's canister ID)
+    as the unique realm ID, preventing duplicates via upsert logic.
 
     Args:
         registry_canister_id: Canister ID of the realm registry backend
-        realm_id: Unique ID for this realm
         realm_name: Display name for this realm
-        frontend_url: Frontend canister URL (optional, will auto-derive if empty)
+        frontend_url: Frontend canister URL (optional)
+        logo_url: Logo URL (optional)
+        backend_url: Backend canister URL (optional)
 
     Returns:
         JSON string with success status and message
     """
     try:
         result = yield register_realm(
-            registry_canister_id, realm_id, realm_name, frontend_url
+            registry_canister_id, realm_name, frontend_url, logo_url, backend_url
         )
         return json.dumps(result, indent=2)
     except Exception as e:
