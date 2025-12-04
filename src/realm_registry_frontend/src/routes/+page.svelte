@@ -66,36 +66,10 @@
   }
 
   async function fetchUserCounts() {
-    // Fetch user counts from each realm's backend status endpoint in parallel
-    const promises = realms.map(async (realm) => {
-      // Use backend_url if available, otherwise skip
-      const backendUrl = realm.backend_url;
-      if (!backendUrl) {
-        console.debug(`No backend_url for ${realm.name}, skipping status fetch`);
-        return;
-      }
-      try {
-        const statusUrl = `${ensureProtocol(backendUrl)}/status`;
-        const response = await fetch(statusUrl, { 
-          method: 'GET',
-          headers: { 'Accept': 'application/json' }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          if (data.users_count !== undefined) {
-            // Update the realm's user count
-            realm.users_count = Number(data.users_count);
-            // Trigger reactivity
-            realms = [...realms];
-            filteredRealms = [...filteredRealms];
-          }
-        }
-      } catch (err) {
-        // Silently ignore fetch errors - realm might be offline
-        console.debug(`Could not fetch status for ${realm.name}:`, err.message);
-      }
-    });
-    await Promise.allSettled(promises);
+    // User counts are stored in the registry when realms are registered
+    // HTTP status fetch removed - realm backends don't expose HTTP endpoints
+    // The users_count field is already populated from the registry data
+    console.debug('User counts loaded from registry data');
   }
 
   async function addRealm() {
