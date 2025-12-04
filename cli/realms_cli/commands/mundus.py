@@ -195,7 +195,7 @@ REGISTRY_DIR=$(find "$MUNDUS_DIR" -maxdepth 1 -type d -name "registry_*" | head 
 if [ -n "$REGISTRY_DIR" ]; then
     echo "   Directory: $REGISTRY_DIR"
     if [ -f "$REGISTRY_DIR/scripts/2-deploy-canisters.sh" ]; then
-        bash "$REGISTRY_DIR/scripts/2-deploy-canisters.sh" "$NETWORK" "$MODE"
+        bash "$REGISTRY_DIR/scripts/2-deploy-canisters.sh" "$REGISTRY_DIR" "$NETWORK" "$MODE"
         echo "   ✅ Registry deployed"
     else
         echo "   ⚠️  Registry deployment script not found"
@@ -220,7 +220,7 @@ for REALM_DIR in "$MUNDUS_DIR"/realm_*/; do
         fi
         
         if [ -f "$REALM_DIR/scripts/2-deploy-canisters.sh" ]; then
-            bash "$REALM_DIR/scripts/2-deploy-canisters.sh" "$NETWORK" "$MODE"
+            bash "$REALM_DIR/scripts/2-deploy-canisters.sh" "$REALM_DIR" "$NETWORK" "$MODE"
             echo "      ✅ $REALM_NAME deployed"
             REALM_COUNT=$((REALM_COUNT + 1))
         else

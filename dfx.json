@@ -1,0 +1,125 @@
+{
+  "dfx": "0.29.0",
+  "canisters": {
+    "realm_backend": {
+      "build": "python -m kybra realm_backend src/realm_backend/main.py",
+      "candid": "src/realm_backend/realm_backend.did",
+      "declarations": {
+        "node_compatibility": true
+      },
+      "gzip": true,
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ],
+      "tech_stack": {
+        "cdk": {
+          "kybra": {}
+        },
+        "language": {
+          "python": {}
+        }
+      },
+      "type": "custom",
+      "wasm": ".kybra/realm_backend/realm_backend.wasm"
+    },
+    "realm_frontend": {
+      "source": [
+        "src/realm_frontend/dist"
+      ],
+      "type": "assets",
+      "workspace": "realm_frontend"
+    },
+    "realm_registry_backend": {
+      "build": "python -m kybra realm_registry_backend src/realm_registry_backend/main.py",
+      "candid": "src/realm_registry_backend/realm_registry_backend.did",
+      "declarations": {
+        "node_compatibility": true
+      },
+      "gzip": true,
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ],
+      "tech_stack": {
+        "cdk": {
+          "kybra": {}
+        },
+        "language": {
+          "python": {}
+        }
+      },
+      "type": "custom",
+      "wasm": ".kybra/realm_registry_backend/realm_registry_backend.wasm"
+    },
+    "realm_registry_frontend": {
+      "source": [
+        "src/realm_registry_frontend/dist"
+      ],
+      "type": "assets",
+      "workspace": "realm_registry_frontend"
+    },
+    "internet_identity": {
+      "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
+      "frontend": {},
+      "remote": {
+        "id": {
+          "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
+        }
+      },
+      "type": "custom",
+      "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz"
+    },
+    "ckbtc_ledger": {
+      "type": "custom",
+      "candid": "https://raw.githubusercontent.com/dfinity/ic/master/rs/ledger_suite/icrc1/ledger/ledger.did",
+      "wasm": "https://download.dfinity.systems/ic/d87954601e4b22972899e9957e800406a0a6b929/canisters/ic-icrc1-ledger.wasm.gz",
+      "remote": {
+        "id": {
+          "ic": "mxzaz-hqaaa-aaaar-qaada-cai"
+        }
+      },
+      "init_arg": "(variant { Init = record { token_name = \"ckBTC\"; token_symbol = \"ckBTC\"; minting_account = record { owner = principal \"aaaaa-aa\" }; initial_balances = vec {}; metadata = vec {}; transfer_fee = 10; archive_options = record { trigger_threshold = 2000; num_blocks_to_archive = 1000; controller_id = principal \"aaaaa-aa\" }; feature_flags = opt record { icrc2 = true }; } })"
+    },
+    "ckbtc_indexer": {
+      "type": "custom",
+      "candid": "https://raw.githubusercontent.com/dfinity/ic/master/rs/ledger_suite/icrc1/index-ng/index-ng.did",
+      "wasm": "https://download.dfinity.systems/ic/d87954601e4b22972899e9957e800406a0a6b929/canisters/ic-icrc1-index-ng.wasm.gz",
+      "remote": {
+        "id": {
+          "ic": "n5wcd-faaaa-aaaar-qaaea-cai"
+        }
+      },
+      "init_arg": "(opt variant { Init = record { ledger_id = principal \"aaaaa-aa\" } })"
+    }
+  },
+  "defaults": { 
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:8000",
+      "type": "ephemeral"
+    },
+    "staging": {
+      "providers": ["https://icp0.io"],
+      "type": "persistent"
+    },
+    "ic": {
+      "providers": ["https://icp0.io"],
+      "type": "persistent"
+    }
+  },
+  "metadata": [
+   {
+     "name": "candid:service"
+   }
+  ],
+  "output_env_file": ".env",
+  "version": 1
+}
