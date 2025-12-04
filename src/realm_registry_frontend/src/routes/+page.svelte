@@ -535,35 +535,15 @@
     padding: 1.5rem;
     border: 1px solid #E5E5E5;
     box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-    transition: all 0.15s ease-in-out;
-    cursor: pointer;
     position: relative;
-    overflow: hidden;
     width: 100%;
     text-align: left;
     font-family: inherit;
     font-size: inherit;
   }
 
-  .realm-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(23, 23, 23, 0.05), transparent);
-    transition: left 0.3s ease-in-out;
-  }
-
   .realm-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     border-color: #D4D4D4;
-  }
-
-  .realm-card:hover::before {
-    left: 100%;
   }
 
   .realm-header {
