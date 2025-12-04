@@ -20,11 +20,12 @@ echo "🔄 Mode: $MODE"
 echo "📅 Time: $(date '+%Y-%m-%d %H:%M:%S')"
 echo ""
 
-# Change to working directory
+# Change to working directory and get absolute path
 cd "$WORKING_DIR" || {
     echo "❌ Error: Cannot access directory: $WORKING_DIR"
     exit 1
 }
+WORKING_DIR="$(pwd)"  # Convert to absolute path
 
 # Verify dfx.json exists
 if [ ! -f "dfx.json" ]; then
@@ -32,12 +33,20 @@ if [ ! -f "dfx.json" ]; then
     exit 1
 fi
 
-# Activate virtual environment if it exists in repo root
+# Find repo root by looking for dfx.template.json (using absolute path)
 REPO_ROOT="$WORKING_DIR"
-while [ ! -d "$REPO_ROOT/venv" ] && [ "$REPO_ROOT" != "/" ]; do
+while [ ! -f "$REPO_ROOT/dfx.template.json" ] && [ "$REPO_ROOT" != "/" ]; do
     REPO_ROOT=$(dirname "$REPO_ROOT")
 done
 
+if [ ! -f "$REPO_ROOT/dfx.template.json" ]; then
+    echo "⚠️  Could not find repo root (dfx.template.json)"
+    REPO_ROOT="$WORKING_DIR"
+fi
+
+echo "📂 Repo root: $REPO_ROOT"
+
+# Activate virtual environment if it exists in repo root
 if [ -f "$REPO_ROOT/venv/bin/activate" ]; then
     echo "🐍 Activating virtual environment..."
     source "$REPO_ROOT/venv/bin/activate"
@@ -59,13 +68,6 @@ if [ -d ".kybra" ]; then
     echo "🧹 Clearing Kybra build cache..."
     rm -rf .kybra/realm_backend .kybra/*_backend 2>/dev/null || true
     echo "   ✅ Cache cleared"
-fi
-
-# Download WASMs if script exists
-if [ -f "../../../scripts/download_wasms.sh" ]; then
-    bash ../../../scripts/download_wasms.sh
-elif [ -f "scripts/download_wasms.sh" ]; then
-    bash scripts/download_wasms.sh
 fi
 
 # Handle identity for IC deployments
@@ -127,39 +129,49 @@ else
 fi
 
 # Define shared canisters that may be skipped (deployed once by mundus)
-SHARED_CANISTERS="internet_identity ckbtc_ledger ckbtc_minter"
+SHARED_CANISTERS="internet_identity ckbtc_ledger ckbtc_indexer"
 
-# Deploy Internet Identity FIRST (if present and not skipped)
+# Deploy shared canisters FIRST (if present and not already deployed)
 echo ""
-if echo "$BACKENDS" | grep -q "internet_identity"; then
-    if [ "$SKIP_SHARED_CANISTERS" = "true" ]; then
-        echo "🔑 Skipping Internet Identity (SKIP_SHARED_CANISTERS=true)"
+if [ "$NETWORK" = "local" ]; then
+    # Download WASMs for shared canisters (if not already present)
+    WASM_FOLDER="$REPO_ROOT/.wasm"
+    if [ -f "$WASM_FOLDER/ledger.wasm" ] && [ -f "$WASM_FOLDER/indexer.wasm" ]; then
+        echo "📦 WASMs already downloaded, skipping..."
     else
-        echo "🔑 Deploying Internet Identity first..."
-        if [ "$NETWORK" = "local" ]; then
-            dfx deploy internet_identity --yes
+        echo "📦 Downloading WASMs for shared canisters..."
+        if [ -f "$REPO_ROOT/scripts/download_wasms.sh" ]; then
+            (cd "$REPO_ROOT" && bash scripts/download_wasms.sh)
         else
-            dfx deploy --network "$NETWORK" --yes internet_identity --mode="$MODE"
+            echo "⚠️  download_wasms.sh not found, skipping WASM download"
         fi
-        dfx canister start --network "$NETWORK" internet_identity 2>/dev/null || true
     fi
-    echo ""
+
+    for shared_canister in $SHARED_CANISTERS; do
+        # Check if this shared canister is defined in dfx.json
+        if echo "$BACKENDS" | grep -q "$shared_canister"; then
+            # Check if already deployed
+            existing_id=$(dfx canister id "$shared_canister" --network "$NETWORK" 2>/dev/null || echo "")
+            if [ -n "$existing_id" ]; then
+                echo "🔗 $shared_canister already deployed: $existing_id. Skipping..."
+            else
+                echo "🔗 Deploying $shared_canister..."
+                dfx deploy "$shared_canister" --yes
+                dfx canister start --network "$NETWORK" "$shared_canister" 2>/dev/null || true
+            fi
+        fi
+    done
+    "$REPO_ROOT/scripts/set_canister_config.py" "$NETWORK"
+else
+    echo "🔗 Skipping deployment of shared canisters (not local network)"
 fi
 
 # Deploy other backends
 echo "🔨 Deploying backend canisters..."
 for canister in $BACKENDS; do
-    # Skip internet_identity since we already handled it
-    if [ "$canister" = "internet_identity" ]; then
+    # Skip shared canisters (already handled above)
+    if echo "$SHARED_CANISTERS" | grep -qw "$canister"; then
         continue
-    fi
-    
-    # Skip shared canisters if SKIP_SHARED_CANISTERS is set
-    if [ "$SKIP_SHARED_CANISTERS" = "true" ]; then
-        if echo "$SHARED_CANISTERS" | grep -qw "$canister"; then
-            echo "   ⏭️  Skipping $canister (shared canister)"
-            continue
-        fi
     fi
     
     echo "   📦 Deploying $canister..."
@@ -246,19 +258,13 @@ fi
 # Get all frontend canisters
 echo ""
 echo "🎨 Detecting frontend canisters..."
-echo "[DEBUG] dfx.json canisters section:"
-jq '.canisters | keys' dfx.json 2>/dev/null || echo "[DEBUG] jq not available or dfx.json invalid"
 
 # Parse dfx.json to find frontend canisters (those with type "assets")
 if command -v jq &> /dev/null; then
     FRONTENDS=$(jq -r '.canisters | to_entries[] | select(.value.type == "assets") | .key' dfx.json 2>/dev/null || echo "")
-    echo "[DEBUG] jq result for frontends: $FRONTENDS"
 else
     # Fallback: Simple approach - find canister names containing "frontend"
-    # Pattern matches lines starting with whitespace + quote + name + quote + colon
-    echo "[DEBUG] jq not available, using simple grep fallback"
     FRONTENDS=$(grep -o '^[[:space:]]*"[a-zA-Z0-9_-]*frontend[a-zA-Z0-9_-]*"[[:space:]]*:' dfx.json | grep -o '"[^"]*"' | tr -d '"' || echo "")
-    echo "[DEBUG] grep found potential frontends: $FRONTENDS"
     
     # Verify these are actually asset canisters by checking for "type": "assets" nearby
     if [ -n "$FRONTENDS" ]; then
@@ -267,13 +273,9 @@ else
             # Check if this canister has type "assets" in its definition
             if grep -A 10 "\"$canister\"" dfx.json | grep -q '"type"[[:space:]]*:[[:space:]]*"assets"'; then
                 VERIFIED_FRONTENDS="$VERIFIED_FRONTENDS $canister"
-                echo "[DEBUG]   ✅ $canister has type 'assets'"
-            else
-                echo "[DEBUG]   ❌ $canister does not have type 'assets'"
             fi
         done
         FRONTENDS=$(echo $VERIFIED_FRONTENDS | xargs)
-        echo "[DEBUG] final verified frontends: $FRONTENDS"
     fi
 fi
 

@@ -1,34 +1,10 @@
 // src/lib/auth.js
 import { AuthClient } from '@dfinity/auth-client';
 import { Principal } from '@dfinity/principal';
+import { CONFIG } from '$lib/config.js';
 
-// More reliable local development detection
-// This checks both the hostname and NODE_ENV (where available)
-const isLocalDev = (
-  window.location.hostname.includes('localhost') || 
-  window.location.hostname.includes('127.0.0.1') ||
-  process.env.NODE_ENV === 'development'
-);
-
-console.log(`Environment: ${isLocalDev ? 'Local Development' : 'Production'}`);
-
-// Get the Internet Identity canister URL
-function getInternetIdentityUrl() {
-  // For local development, use the known Internet Identity canister ID
-  if (isLocalDev) {
-    const canisterId = 'uxrrr-q7777-77774-qaaaq-cai'; // Internet Identity canister ID from dfx deploy
-    // Dynamically detect the port from current URL
-    const currentPort = window.location.port || '8000';
-    
-    return `http://${canisterId}.localhost:${currentPort}`;
-  } 
-  
-  // For production, use the standard II URL
-  return 'https://identity.ic0.app';
-}
-
-// This may throw an error if II canister ID cannot be found in local development
-const II_URL = getInternetIdentityUrl();
+// Use the Internet Identity URL from config (set during deployment)
+const II_URL = CONFIG.internet_identity_url;
 console.log(`Using Identity Provider: ${II_URL}`);
 
 let authClient;

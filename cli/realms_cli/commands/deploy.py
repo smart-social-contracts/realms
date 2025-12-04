@@ -21,17 +21,8 @@ def _deploy_realm_internal(
     clean: bool,
     identity: Optional[str],
     mode: str = "upgrade",
-    skip_shared: bool = False,
 ) -> None:
-    """Internal deployment logic (can be called directly from Python).
-    
-    Args:
-        skip_shared: If True, skip deploying shared canisters (internet_identity, ckbtc).
-                     Used by mundus deploy to avoid duplicate deployments.
-    """
-    # Set env var for deploy scripts to check
-    if skip_shared:
-        os.environ['SKIP_SHARED_CANISTERS'] = 'true'
+    """Internal deployment logic (can be called directly from Python)."""
     log_dir = Path(folder).absolute()
     
     # Set up logging directory for this deployment
@@ -129,9 +120,6 @@ def deploy_command(
     mode: str = typer.Option(
         "upgrade", "--mode", "-m", help="Deploy mode: 'upgrade' or 'reinstall' (wipes stable memory)"
     ),
-    skip_shared: bool = typer.Option(
-        False, "--skip-shared", help="Skip deploying shared canisters (internet_identity, ckbtc)"
-    ),
 ) -> None:
     """Deploy a realm to the specified network."""
     
@@ -168,7 +156,7 @@ def deploy_command(
             console.print(f"[yellow]   Usage: realms deploy --folder <path>[/yellow]")
             raise typer.Exit(1)
     
-    _deploy_realm_internal(config_file, folder, network, clean, identity, mode, skip_shared)
+    _deploy_realm_internal(config_file, folder, network, clean, identity, mode)
 
 
 if __name__ == "__main__":

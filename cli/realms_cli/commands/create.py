@@ -291,7 +291,7 @@ def create_command(
     
     # Generate deployment scripts after data generation
     # Check if we can generate scripts (either in repo mode or in Docker image with full repo)
-    can_generate_scripts = in_repo_mode or (repo_root / "dfx.json").exists()
+    can_generate_scripts = in_repo_mode or (repo_root / "dfx.template.json").exists()
     
     if can_generate_scripts:
         _generate_deployment_scripts(output_path, network, realm_name, random, repo_root, deploy, identity, mode, in_repo_mode=in_repo_mode)
@@ -320,11 +320,11 @@ def _generate_deployment_scripts(
     console.print("\n📝 Creating dfx.json...")
     
     # Load template dfx.json from repo root
-    template_dfx = repo_root / "dfx.json"
+    template_dfx = repo_root / "dfx.template.json"
     if not template_dfx.exists():
-        console.print(f"[red]❌ Template dfx.json not found at {template_dfx}[/red]")
+        console.print(f"[red]❌ Template dfx.template.json not found at {template_dfx}[/red]")
         if not in_repo_mode:
-            console.print("[yellow]Expected at /app/dfx.json in Docker image[/yellow]")
+            console.print("[yellow]Expected at /app/dfx.template.json in Docker image[/yellow]")
         raise typer.Exit(1)
     
     with open(template_dfx, 'r') as f:

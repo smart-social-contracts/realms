@@ -19,7 +19,6 @@ kybra_simple_db
 src/declarations
 *.log
 integration-test-logs/
-src/realm_frontend/src/lib/config.js
 playwright-report
 test-results
 

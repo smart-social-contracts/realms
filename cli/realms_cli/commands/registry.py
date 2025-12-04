@@ -294,9 +294,9 @@ def registry_create_command(
         console.print(f"   ✅ Copied frontend to src/realm_registry_frontend/")
     
     # Create dfx.json
-    dfx_template = repo_root / "dfx.json"
+    dfx_template = repo_root / "dfx.template.json"
     if not dfx_template.exists():
-        console.print(f"[red]❌ Template dfx.json not found at {dfx_template}[/red]")
+        console.print(f"[red]❌ Template dfx.template.json not found at {dfx_template}[/red]")
         raise typer.Exit(1)
     
     with open(dfx_template, 'r') as f:

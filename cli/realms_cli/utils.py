@@ -529,9 +529,11 @@ def get_project_root() -> Path:
     """Get the project root directory."""
     current_path = Path.cwd()
 
-    # Look for dfx.json to identify project root
+    # Look for dfx.template.json or pyproject.toml to identify project root
     while current_path != current_path.parent:
-        if (current_path / "dfx.json").exists():
+        if (current_path / "dfx.template.json").exists():
+            return current_path
+        if (current_path / "pyproject.toml").exists() and (current_path / "cli").exists():
             return current_path
         current_path = current_path.parent
 

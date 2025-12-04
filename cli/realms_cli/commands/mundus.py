@@ -328,7 +328,7 @@ def mundus_deploy_command(
             
             shared_canister_names = [
                 name for name in dfx_config.get("canisters", {}).keys()
-                if name in ["internet_identity", "ckbtc_ledger", "ckbtc_minter"]
+                if name in ["internet_identity", "ckbtc_ledger", "ckbtc_indexer"]
             ]
             
             if shared_canister_names:
@@ -415,7 +415,6 @@ def mundus_deploy_command(
                 network=network,
                 mode=mode,
                 identity=identity,
-                skip_shared=True,  # Shared canisters already deployed by mundus
             )
             console.print(f"   ✅ {realm_dir.name} deployed\n")
         except Exception as e:
