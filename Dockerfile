@@ -21,7 +21,7 @@ RUN ./scripts/setup_docker_dev_env.sh
 COPY .flake8 ./.flake8
 COPY mypy.ini ./mypy.ini
 COPY tsconfig.json ./tsconfig.json
-COPY dfx.json ./dfx.json
+COPY dfx.template.json ./dfx.template.json
 COPY pyproject.toml ./pyproject.toml
 COPY realm_config.json ./realm_config.json
 
