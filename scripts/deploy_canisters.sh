@@ -100,8 +100,9 @@ if [ "$NETWORK" = "local" ] && [ "$SKIP_DFX_START" != "true" ]; then
         # Stop any existing dfx processes
         dfx stop 2>/dev/null || true
         
-        # Start dfx (redirect output to avoid stdout inheritance issues)
-        dfx start --clean --background --log file --logfile dfx.log --host 127.0.0.1:$PORT >/dev/null 2>&1
+        # Start dfx WITHOUT --background to capture canister logs from stderr
+        # dfx.log = CLI logs, dfx2.log = canister/replica logs
+        dfx start --clean --log file --logfile dfx.log --host 127.0.0.1:$PORT 2>dfx2.log &
         
         # Wait for initialization
         echo "⏳ Waiting for dfx to initialize..."

@@ -621,22 +621,25 @@ def ensure_dfx_running(
         port = generate_port_from_branch(branch)
     
     # Start dfx with logging
+    # dfx.log = dfx CLI logs (via --logfile)
+    # dfx2.log = canister/replica logs (via stderr - requires NOT using --background)
     dfx_log_path = Path(log_dir) / "dfx.log"
-    cmd = [
-        "dfx", "start", "--background",
-        "--log", "file", "--logfile", str(dfx_log_path),
-        "--host", f"127.0.0.1:{port}"
-    ]
-    if clean:
-        cmd.insert(2, "--clean")
+    dfx2_log_path = Path(log_dir) / "dfx2.log"
+    
+    # Run dfx WITHOUT --background to capture canister logs from stderr
+    # Use shell to run in background with stderr redirect
+    cmd = f"dfx start {'--clean ' if clean else ''}--log file --logfile {dfx_log_path} --host 127.0.0.1:{port} 2>{dfx2_log_path} &"
     
     subprocess.Popen(
         cmd,
+        shell=True,
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL
+        cwd=log_dir,
+        start_new_session=True
     )
     
-    console.print(f"[dim]dfx replica log: {dfx_log_path}[/dim]")
+    console.print(f"[dim]dfx CLI log: {dfx_log_path}[/dim]")
+    console.print(f"[dim]dfx canister log: {dfx2_log_path}[/dim]")
     console.print(f"[dim]dfx port: {port}[/dim]\n")
     
     # Wait for dfx to be ready
