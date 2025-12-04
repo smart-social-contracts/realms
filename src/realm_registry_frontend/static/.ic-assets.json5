@@ -12,6 +12,14 @@
         }
     },
     {
+        // SVG files need explicit content-type for proper certification
+        "match": "**/*.svg",
+        "headers": {
+            "Content-Type": "image/svg+xml",
+            "Cache-Control": "public, max-age=31536000, immutable"
+        }
+    },
+    {
         "match": "**/*",
 
         // Provides a base set of security headers that will work for most dapps.
