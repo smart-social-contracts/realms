@@ -19,13 +19,32 @@ else
   echo "   ⚠️  No /app/.dfx/ directory found"
 fi
 
+# Try to get canister ID from dfx first (disable set -e temporarily)
+set +e
 CANISTER_ID=$(dfx canister id realm_frontend 2>&1)
-EXIT_CODE=$?
+DFX_EXIT_CODE=$?
+set -e
 
-if [ $EXIT_CODE -ne 0 ] || [ -z "$CANISTER_ID" ]; then
-  echo "❌ Error: Could not get realm_frontend canister ID."
-  echo "   dfx exit code: $EXIT_CODE"
+echo "   dfx exit code: $DFX_EXIT_CODE"
+if [ $DFX_EXIT_CODE -ne 0 ]; then
   echo "   dfx output: $CANISTER_ID"
+fi
+
+# If dfx fails, try to read directly from canister_ids.json
+if [ $DFX_EXIT_CODE -ne 0 ] || [ -z "$CANISTER_ID" ]; then
+  echo "   ⚠️  dfx canister id failed, trying to read from canister_ids.json..."
+  if [ -f "/app/.dfx/local/canister_ids.json" ]; then
+    # Use python to parse JSON (works cross-platform)
+    CANISTER_ID=$(python3 -c "import json; print(json.load(open('/app/.dfx/local/canister_ids.json'))['realm_frontend']['local'])" 2>/dev/null || true)
+    if [ -n "$CANISTER_ID" ]; then
+      echo "   ✅ Successfully read canister ID from JSON: $CANISTER_ID"
+    fi
+  fi
+fi
+
+if [ -z "$CANISTER_ID" ]; then
+  echo "❌ Error: Could not get realm_frontend canister ID."
+  echo "   Tried both 'dfx canister id' and reading /app/.dfx/local/canister_ids.json"
   echo "   Make sure you have deployed the realm first with 'realms realm deploy'"
   exit 1
 fi
