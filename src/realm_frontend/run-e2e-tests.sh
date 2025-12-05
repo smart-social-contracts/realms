@@ -6,10 +6,26 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Get the realm_frontend canister ID and set as base URL for Playwright
 echo "🔍 Getting realm_frontend canister ID..."
-CANISTER_ID=$(dfx canister id realm_frontend 2>/dev/null)
+echo "   Working directory: $(pwd)"
+echo "   Checking for .dfx directory..."
+if [ -d "/app/.dfx" ]; then
+  echo "   ✅ Found /app/.dfx/"
+  ls -la /app/.dfx/local/ 2>/dev/null || echo "   ⚠️  No /app/.dfx/local/ directory"
+  if [ -f "/app/.dfx/local/canister_ids.json" ]; then
+    echo "   📄 /app/.dfx/local/canister_ids.json contents:"
+    cat /app/.dfx/local/canister_ids.json || echo "   ⚠️  Could not read file"
+  fi
+else
+  echo "   ⚠️  No /app/.dfx/ directory found"
+fi
 
-if [ -z "$CANISTER_ID" ]; then
+CANISTER_ID=$(dfx canister id realm_frontend 2>&1)
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -ne 0 ] || [ -z "$CANISTER_ID" ]; then
   echo "❌ Error: Could not get realm_frontend canister ID."
+  echo "   dfx exit code: $EXIT_CODE"
+  echo "   dfx output: $CANISTER_ID"
   echo "   Make sure you have deployed the realm first with 'realms realm deploy'"
   exit 1
 fi

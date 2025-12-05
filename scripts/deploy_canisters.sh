@@ -463,10 +463,8 @@ for canister in $BACKENDS; do
         canister_id=$(dfx canister id "$canister" 2>/dev/null || echo "")
         if [ -n "$canister_id" ]; then
             echo "   Adding alias: realm_backend -> $canister ($canister_id)"
-            # Add to working directory's canister_ids.json
-            if [ -f "$CANISTER_IDS_FILE" ]; then
-                add_canister_alias "$CANISTER_IDS_FILE" "realm_backend" "$canister_id" "$NETWORK"
-            fi
+            # Add to working directory's canister_ids.json (create if doesn't exist)
+            add_canister_alias "$CANISTER_IDS_FILE" "realm_backend" "$canister_id" "$NETWORK"
             # Also add to repo root's canister_ids.json (where tests run from - Docker only)
             if [ -n "$REPO_CANISTER_IDS_FILE" ]; then
                 add_canister_alias "$REPO_CANISTER_IDS_FILE" "realm_backend" "$canister_id" "$NETWORK"
@@ -483,10 +481,8 @@ for canister in $FRONTENDS; do
         canister_id=$(dfx canister id "$canister" 2>/dev/null || echo "")
         if [ -n "$canister_id" ]; then
             echo "   Adding alias: realm_frontend -> $canister ($canister_id)"
-            # Add to working directory's canister_ids.json
-            if [ -f "$CANISTER_IDS_FILE" ]; then
-                add_canister_alias "$CANISTER_IDS_FILE" "realm_frontend" "$canister_id" "$NETWORK"
-            fi
+            # Add to working directory's canister_ids.json (create if doesn't exist)
+            add_canister_alias "$CANISTER_IDS_FILE" "realm_frontend" "$canister_id" "$NETWORK"
             # Also add to repo root's canister_ids.json (where tests run from - Docker only)
             if [ -n "$REPO_CANISTER_IDS_FILE" ]; then
                 add_canister_alias "$REPO_CANISTER_IDS_FILE" "realm_frontend" "$canister_id" "$NETWORK"
