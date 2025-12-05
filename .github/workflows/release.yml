@@ -102,18 +102,16 @@ jobs:
             -v "$(pwd)/release-logs:/logs" \
             ghcr.io/${{ github.repository_owner }}/realms:latest \
             bash -c "realms realm create && realms realm deploy && \
-                    cp .dfx/local/canisters/realm_backend/realm_backend.wasm.gz /artifacts/ && \
-                    cp .dfx/local/canisters/realm_backend/service.did /artifacts/realm_backend.did && \
-                    cp .dfx/local/canisters/realm_registry_backend/realm_registry_backend.wasm.gz /artifacts/ && \
-                    cp .dfx/local/canisters/realm_registry_backend/service.did /artifacts/realm_registry_backend.did && \
-                    cp -f dfx.log /logs/canister-extraction-dfx.log 2>/dev/null || true && \
-                    cp -f realms.log /logs/canister-extraction-cli.log 2>/dev/null || true"
+                    REALM_DIR=\$(ls -td .realms/realm_* | head -1) && \
+                    echo \"📂 Found realm directory: \$REALM_DIR\" && \
+                    cp \$REALM_DIR/.dfx/local/canisters/realm_backend/realm_backend.wasm.gz /artifacts/ && \
+                    cp \$REALM_DIR/.dfx/local/canisters/realm_backend/service.did /artifacts/realm_backend.did && \
+                    cp -f \$REALM_DIR/dfx.log /logs/canister-extraction-dfx.log 2>/dev/null || true && \
+                    cp -f \$REALM_DIR/realms.log /logs/canister-extraction-cli.log 2>/dev/null || true"
           
           # Move artifacts to root for release
           mv artifacts/realm_backend.wasm.gz ./
           mv artifacts/realm_backend.did ./
-          mv artifacts/realm_registry_backend.wasm.gz ./
-          mv artifacts/realm_registry_backend.did ./
           
           echo "✅ Canister artifacts extracted" | tee -a release-logs/canister-extraction.log
       
@@ -173,8 +171,6 @@ jobs:
           files: |
             realm_backend.wasm.gz
             realm_backend.did
-            realm_registry_backend.wasm.gz
-            realm_registry_backend.did
           body: |
             # Release v${{ steps.bump_version.outputs.NEW_VERSION }}
             
@@ -190,8 +186,7 @@ jobs:
             ```
             
             ### 🔧 Canister Artifacts (WASM + DID)
-            - `realm_backend.wasm.gz` + `realm_backend.did` - Main backend canister
-            - `realm_registry_backend.wasm.gz` + `realm_registry_backend.did` - Registry backend canister
+            - `realm_backend.wasm.gz` + `realm_backend.did` - Main realm backend canister
             
             ### 📦 CLI Tool (PyPI)
             ```bash
