@@ -319,6 +319,9 @@ def realm_create(
     mode: str = typer.Option(
         "upgrade", "--mode", "-m", help="Deploy mode: 'upgrade' or 'reinstall' (wipes stable memory)"
     ),
+    bare: bool = typer.Option(
+        False, "--bare", help="Create minimal realm (canisters only, no extensions or data)"
+    ),
 ) -> None:
     """Create a new realm. Use --manifest for template or flags for custom configuration."""
     create_command(
@@ -335,6 +338,7 @@ def realm_create(
         deploy,
         identity,
         mode,
+        bare,
     )
 
 

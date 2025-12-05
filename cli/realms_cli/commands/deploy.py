@@ -21,8 +21,13 @@ def _deploy_realm_internal(
     clean: bool,
     identity: Optional[str],
     mode: str = "upgrade",
+    bare: bool = False,
 ) -> None:
-    """Internal deployment logic (can be called directly from Python)."""
+    """Internal deployment logic (can be called directly from Python).
+    
+    Args:
+        bare: If True, only deploy canisters (skip extensions, data, post-deploy)
+    """
     log_dir = Path(folder).absolute()
     
     # Set up logging directory for this deployment
@@ -52,12 +57,20 @@ def _deploy_realm_internal(
         raise typer.Exit(1)
 
     # Run the scripts in sequence
-    scripts = [
-        "1-install-extensions.sh",
-        "2-deploy-canisters.sh",
-        "3-upload-data.sh",
-        "4-post-deploy.py",
-    ]
+    if bare:
+        # Bare deployment: only deploy canisters (no extensions, no data)
+        scripts = [
+            "2-deploy-canisters.sh",
+        ]
+        console.print("[yellow]ℹ️  Bare deployment mode: skipping extensions and data upload[/yellow]\n")
+    else:
+        # Full deployment: extensions + canisters + data + post-deploy
+        scripts = [
+            "1-install-extensions.sh",
+            "2-deploy-canisters.sh",
+            "3-upload-data.sh",
+            "4-post-deploy.py",
+        ]
 
     # Prepare environment with identity if specified
     env = None
@@ -156,7 +169,7 @@ def deploy_command(
             console.print(f"[yellow]   Usage: realms deploy --folder <path>[/yellow]")
             raise typer.Exit(1)
     
-    _deploy_realm_internal(config_file, folder, network, clean, identity, mode)
+    _deploy_realm_internal(config_file, folder, network, clean, identity, mode, bare=False)
 
 
 if __name__ == "__main__":

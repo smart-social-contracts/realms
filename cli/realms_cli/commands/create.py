@@ -132,8 +132,13 @@ def create_command(
     deploy: bool,
     identity: Optional[str] = None,
     mode: str = "upgrade",
+    bare: bool = False,
 ) -> None:
-    """Create a new single realm. Flags override manifest values."""
+    """Create a new single realm. Flags override manifest values.
+    
+    Args:
+        bare: If True, skip data generation and only deploy canisters (no extensions/data)
+    """
     from ..utils import generate_output_dir_name
     
     console.print(f"[bold blue]🏛️  Creating Realm: {realm_name}[/bold blue]\n")
@@ -294,7 +299,7 @@ def create_command(
     can_generate_scripts = in_repo_mode or (repo_root / "dfx.template.json").exists()
     
     if can_generate_scripts:
-        _generate_deployment_scripts(output_path, network, realm_name, random, repo_root, deploy, identity, mode, in_repo_mode=in_repo_mode)
+        _generate_deployment_scripts(output_path, network, realm_name, random, repo_root, deploy, identity, mode, bare, in_repo_mode=in_repo_mode)
     else:
         console.print(f"\n[yellow]⚠️  Deployment scripts not generated (Docker mode without full repo)[/yellow]")
         console.print("[dim]To deploy this realm, you'll need to use the Realms Docker image or clone the full repository.[/dim]")
@@ -311,9 +316,14 @@ def _generate_deployment_scripts(
     deploy: bool,
     identity: Optional[str],
     mode: str,
+    bare: bool,
     in_repo_mode: bool = True
 ):
-    """Generate deployment scripts and dfx.json for independent realm."""
+    """Generate deployment scripts and dfx.json for independent realm.
+    
+    Args:
+        bare: If True, skip extensions and data upload during deployment
+    """
     console.print("\n🔧 Generating deployment configuration...")
 
     # 1. Generate dfx.json for this independent realm
@@ -482,7 +492,8 @@ def _generate_deployment_scripts(
                 network=network, 
                 clean=False, 
                 identity=identity, 
-                mode=mode
+                mode=mode,
+                bare=bare,
             )
         except typer.Exit as e:
             console.print(
