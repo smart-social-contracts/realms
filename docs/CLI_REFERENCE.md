@@ -102,6 +102,63 @@ realms status --network staging
 
 ---
 
+## Mundus Management (Multi-Realm)
+
+### `realms mundus create`
+Create a multi-realm ecosystem with shared registry.
+
+```bash
+# Create mundus from default manifest
+realms mundus create
+
+# Create with custom manifest
+realms mundus create --manifest examples/demo/manifest.json
+
+# Create and deploy immediately
+realms mundus create --deploy
+
+# Specify network
+realms mundus create --network local --deploy
+```
+
+**Options:**
+- `--manifest PATH` - Mundus manifest file (default: examples/demo/manifest.json)
+- `--mundus-name TEXT` - Mundus name (overrides manifest)
+- `--network TEXT` - Target network (local/staging/ic)
+- `--deploy` - Deploy after creation
+- `--mode TEXT` - Deploy mode (upgrade/reinstall)
+
+**What Gets Created:**
+- Multiple realm directories in `.realms/mundus/`
+- Shared registry directory
+- Unified `dfx.json` with all canisters
+- Each realm has its own data and configuration
+- All realms share single dfx instance
+
+---
+
+### `realms mundus deploy`
+Deploy an existing mundus.
+
+```bash
+# Deploy mundus
+realms mundus deploy --mundus-dir .realms/mundus/mundus_Demo_Mundus_*
+
+# Deploy to specific network
+realms mundus deploy --mundus-dir .realms/mundus/... --network staging
+
+# Reinstall mode (wipes data)
+realms mundus deploy --mundus-dir .realms/mundus/... --mode reinstall
+```
+
+**Options:**
+- `--mundus-dir PATH` - Path to mundus directory (required)
+- `--network TEXT` - Target network
+- `--mode TEXT` - Deploy mode (upgrade/reinstall)
+- `--identity PATH` - Identity for deployment
+
+---
+
 ## Data Operations
 
 ### `realms import`
@@ -485,7 +542,7 @@ realms status  # Uses REALMS_NETWORK
 
 ## Common Workflows
 
-### Development Workflow
+### Single Realm Development
 ```bash
 # 1. Create local realm with demo data
 realms realm create --random --deploy
@@ -500,6 +557,22 @@ realms run --file test_proposal.py
 # 4. Monitor tasks
 realms ps ls
 realms ps logs <task_id>
+```
+
+### Multi-Realm Development (Mundus)
+```bash
+# 1. Create mundus with 3 realms + registry
+realms mundus create --deploy
+
+# 2. Verify deployment
+# Each realm frontend accessible at different port/canister
+
+# 3. Test cross-realm features via registry
+# Registry URL shown after deployment
+
+# 4. Update individual realms
+cd .realms/mundus/mundus_*/realm_*
+# Make changes and redeploy specific realm
 ```
 
 ### Production Deployment

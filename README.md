@@ -4,10 +4,33 @@ A framework for building and deploying governance systems on the Internet Comput
 
 ## Table of Contents
 
+- [Quick Start](#quick-start)
 - [Extension Development](#extension-development)
 - [Running Python Code in Realms](#running-python-code-in-realms)
 - [Creating a New Realm](#creating-a-new-realm)
+- [Multi-Realm Deployment (Mundus)](#multi-realm-deployment-mundus)
 - [Sandbox](#sandbox)
+
+---
+
+## Quick Start
+
+```bash
+# Install Realms CLI
+pip install realms-cli
+
+# or alternatively
+pip install -e cli/
+
+# Create a single realm with demo data
+realms realm create --random --citizens 50 --deploy
+
+# Or create a multi-realm ecosystem
+realms mundus create --deploy
+
+# Your realm is now running!
+# Frontend: http://<canister_id>.localhost:8000
+```
 
 ---
 
@@ -125,22 +148,21 @@ def another_function(args: str) -> Async[str]:
 #### For Extension Developers (Local Testing)
 
 ```bash
-# Clone realms at specific version
+# Clone realms repository
 git clone --recurse-submodules https://github.com/smart-social-contracts/realms.git
 cd realms
-git checkout v1.2.3  # Use specific release
 
 # Install realms CLI in development mode
 pip install -e cli/
 
-# Install your extension from local path
-realms extension install --source /path/to/my-extension/
+# Install extensions from source
+./scripts/install_extensions.sh
 
 # Deploy for testing
 dfx start --clean --background
-realms realm deploy --network local
+realms realm create --random --deploy
 
-# Test your extension
+# Test your extension via frontend or CLI
 dfx canister call realm_backend extension_call '("my_extension", "my_function", "{\"param\": \"value\"}")'
 ```
 
@@ -148,20 +170,18 @@ dfx canister call realm_backend extension_call '("my_extension", "my_function", 
 
 ```bash
 # Install realms CLI
-pip install realms-cli
+pip install -e cli/  # (pip install realms-cli when published)
 
 # Create a realm
-realms realm create my-realm --deploy
+realms realm create --realm-name "My Realm" --deploy
 
-# Install extension from GitHub release
-realms extension install my_extension \
-  --from https://github.com/username/my-extension/releases/download/v1.0.0/my_extension-1.0.0.zip
-
-# Or from extension registry (future)
-realms extension install my_extension@1.0.0
+# Extensions are installed automatically during realm creation
+# To update extensions, re-run:
+./scripts/install_extensions.sh
+dfx deploy realm_frontend
 
 # Deploy
-realms realm deploy
+realms realm deploy --network ic --identity prod
 ```
 
 ### Managing Extensions
@@ -170,11 +190,14 @@ realms realm deploy
 # List installed extensions
 realms extension list
 
+# Install extensions from source
+./scripts/install_extensions.sh
+
 # Uninstall an extension
 realms extension uninstall my_extension
 
-# Update an extension
-realms extension install my_extension --from <new-url>
+# Package an extension for distribution
+realms extension package --extension-id my_extension
 ```
 
 ### Testing Extensions
@@ -207,30 +230,39 @@ pytest tests/ -v
 
 ```bash
 # Package extension into distributable zip
-realms extension package /path/to/my-extension/
-# Creates: my_extension-1.0.0.zip
+realms extension package --extension-id my_extension
+# Creates: my_extension-1.0.0.zip in current directory
 ```
 
 ### Publishing Extensions
 
-```bash
-# Tag release
-git tag -a v1.0.0 -m "Release v1.0.0"
-git push origin v1.0.0
+Extensions are developed in the `extensions/` directory and installed via the install script. For external distribution:
 
-# Create GitHub release with package
-gh release create v1.0.0 my_extension-1.0.0.zip \
-  --title "My Extension v1.0.0" \
-  --notes "Release notes here"
+```bash
+# Package your extension
+realms extension package --extension-id my_extension
+
+# Distribute via GitHub releases or other channels
+# Users install by copying to their extensions/ directory
+# and running ./scripts/install_extensions.sh
 ```
 
 ### Extension Examples
 
-- **vault** - Treasury and token management
-  - Repository: https://github.com/smart-social-contracts/realms-extension-vault
-  - Features: ckBTC balance tracking, transfers, ICRC integration
+Available extensions in the repository:
 
-- More examples available in `extensions/` directory
+- **admin_dashboard** - Administrative dashboard for realm management
+- **citizen_dashboard** - Member-facing dashboard  
+- **vault** - Treasury and ICRC-1 token management
+- **public_dashboard** - Public-facing statistics and information
+- **land_registry** - Property and land management
+- **llm_chat** - AI-powered chat assistant
+- **notifications** - Notification system
+- **passport_verification** - Identity verification
+- **justice_litigation** - Legal system management
+- **market_place** - Extension marketplace
+
+See `extensions/README.md` for complete documentation
 
 ### Extension Best Practices
 
@@ -375,44 +407,104 @@ def async_task():
 
 ```bash
 # Install Realms CLI
-pip install realms-cli  # (future - for now: pip install -e cli/)
+pip install -e cli/
 
-# Create a new realm
-realms realm create my-realm --deploy
+# Create a new realm with demo data
+realms realm create --random --citizens 100 --organizations 10 --deploy
 
-# Or create with random data for testing
-realms realm create my-realm --random --deploy
+# Or create with custom configuration
+realms realm create \
+  --realm-name "My Government Realm" \
+  --citizens 50 \
+  --organizations 5 \
+  --transactions 200 \
+  --seed 12345 \
+  --deploy
 ```
 
-### Configure Your Realm
-
-Write a JSON configuration file or copy one from the [Realm Registry](https://registry.realmsgos.org).
+### Import Existing Data
 
 ```bash
-# Import realm data
-realms realm import cli/example_realm_data.json
-```
+# Create realm structure
+realms realm create --realm-name "My Realm"
 
-### Add Extensions
+# Import data
+cd generated_realm
+realms import ../my_realm_data.json
 
-After creating your realm, you can extend its functionality:
-
-```bash
-# Install treasury management
-realms extension install vault
-
-# Install governance extensions
-realms extension install voting
-
-# See all available extensions
-realms extension list
+# Deploy
+realms realm deploy
 ```
 
 ### Administration
 
-Upload members, codex, and other data:
-- Via CLI: `realms realm import <data.json>`
-- Via UI: Use the `Administration Dashboard` extension
+Manage realm data:
+- **Via CLI**: `realms import <data.json>` or `realms import <codex.py> --type codex`
+- **Via UI**: Use the Admin Dashboard extension (admin-only access)
+- **Via Extensions**: Extensions can provide custom data management interfaces
+
+---
+
+## Multi-Realm Deployment (Mundus)
+
+Mundus allows you to deploy multiple realm instances with a shared registry on a single dfx instance.
+
+### Quick Start
+
+```bash
+# Create mundus with 3 realms + registry
+realms mundus create --deploy
+
+# Access realms at different URLs
+# Realm 1: http://<realm1_frontend_id>.localhost:8000
+# Realm 2: http://<realm2_frontend_id>.localhost:8000
+# Realm 3: http://<realm3_frontend_id>.localhost:8000
+# Registry: http://<registry_frontend_id>.localhost:8000
+```
+
+### Features
+
+- **Single dfx Instance**: All realms share one dfx process
+- **Unique Canister Names**: Each realm has unique canister IDs
+- **Shared Registry**: Central registry tracks all realms
+- **Independent Data**: Each realm has its own entities and state
+- **Customizable**: Configure each realm independently via manifests
+
+### Use Cases
+
+- **Development**: Test multi-realm interactions locally
+- **Demos**: Showcase multiple realm configurations
+- **Testing**: Integration testing across realms
+- **Staging**: Multi-tenant staging environment
+
+### Customization
+
+Edit realm manifests in `examples/demo/realm{N}/manifest.json`:
+
+```json
+{
+  "type": "realm",
+  "name": "My Custom Realm",
+  "options": {
+    "random": {
+      "members": 100,
+      "organizations": 10,
+      "transactions": 200,
+      "disputes": 15,
+      "seed": 42
+    }
+  }
+}
+```
+
+Then create with your custom manifest:
+```bash
+realms mundus create --manifest examples/demo/manifest.json --deploy
+```
+
+See [Deployment Guide](./docs/DEPLOYMENT_GUIDE.md#multi-realm-deployment-mundus) for details.
+
+---
 
 ## Sandbox
 

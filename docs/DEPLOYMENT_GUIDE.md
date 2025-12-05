@@ -73,6 +73,131 @@ realms import realm_data.json
 
 ---
 
+## Multi-Realm Deployment (Mundus)
+
+### What is Mundus?
+
+Mundus is a multi-realm deployment system that allows you to run multiple realm instances with a shared registry on a single dfx instance.
+
+### Quick Start
+
+```bash
+# Create mundus with 3 realms + registry
+realms mundus create --deploy
+
+# Access realms
+# Realm 1: http://<realm1_frontend_id>.localhost:8000
+# Realm 2: http://<realm2_frontend_id>.localhost:8000
+# Realm 3: http://<realm3_frontend_id>.localhost:8000
+# Registry: http://<registry_frontend_id>.localhost:8000
+```
+
+### Mundus Architecture
+
+**Single dfx Instance:**
+- One dfx process manages all canisters
+- Port determined by git branch hash (8001-8099)
+- Shared Internet Identity canister
+- Separate ICRC-1 ledger per realm
+
+**Unique Canister Names:**
+- Each realm: `{realm_name}_backend`, `{realm_name}_frontend`
+- Each ledger: `{realm_name}_icrc1_ledger`
+- Registry: `registry_backend`, `registry_frontend`
+- Example: `realm1_backend`, `realm2_backend`, `realm3_backend`
+
+**Directory Structure:**
+```
+.realms/mundus/mundus_{name}_{timestamp}/
+├── realm_Realm1_{timestamp}/
+│   ├── src/              # Symlink to repo src/
+│   ├── scripts/          # Deployment scripts
+│   ├── manifest.json     # Realm configuration
+│   └── realm_data.json   # Generated data
+├── realm_Realm2_{timestamp}/
+├── realm_Realm3_{timestamp}/
+├── registry_{timestamp}/
+└── dfx.json             # Unified canister config
+```
+
+### Deployment Process
+
+```bash
+# 1. Create mundus
+realms mundus create
+
+# 2. Navigate to mundus directory
+cd .realms/mundus/mundus_Demo_Mundus_*
+
+# 3. Deploy all canisters
+realms mundus deploy --mundus-dir .
+
+# Or deploy during creation
+realms mundus create --deploy
+```
+
+### Customizing Realms
+
+Edit realm manifests before deployment:
+
+```json
+// examples/demo/realm1/manifest.json
+{
+  "type": "realm",
+  "name": "Realm 1",
+  "options": {
+    "random": {
+      "members": 100,
+      "organizations": 10,
+      "transactions": 200,
+      "disputes": 15,
+      "seed": 1
+    }
+  }
+}
+```
+
+### Network Deployment
+
+**Local (Development):**
+```bash
+realms mundus create --network local --deploy
+```
+
+**Staging:**
+```bash
+realms mundus create --network staging --deploy --identity staging
+```
+
+**Production:**
+```bash
+realms mundus create --network ic --deploy --identity prod --mode reinstall
+```
+
+### Troubleshooting
+
+**Port conflicts:**
+```bash
+# Clean existing dfx instances
+scripts/clean_dfx.sh
+rm -rf .realms
+realms mundus create --deploy
+```
+
+**Canister name conflicts:**
+- Mundus automatically generates unique names
+- Each realm has `{realm_name}_*` prefix
+- No manual intervention needed
+
+**Symlink issues:**
+```bash
+# Verify symlinks exist
+ls -la .realms/mundus/mundus_*/realm_*/src
+# Should show symlink to repo src/
+```
+
+---
+
 ## Network Configuration
 
 ### Local Network
