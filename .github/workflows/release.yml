@@ -101,7 +101,7 @@ jobs:
             -v "$(pwd)/artifacts:/artifacts" \
             -v "$(pwd)/release-logs:/logs" \
             ghcr.io/${{ github.repository_owner }}/realms:latest \
-            bash -c "realms realm create && realms realm deploy && \
+            bash -c "realms realm create --deploy && \
                     REALM_DIR=\$(ls -td .realms/realm_* | head -1) && \
                     echo \"📂 Found realm directory: \$REALM_DIR\" && \
                     cp \$REALM_DIR/.dfx/local/canisters/realm_backend/realm_backend.wasm.gz /artifacts/ && \
