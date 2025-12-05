@@ -102,7 +102,9 @@ if [ "$NETWORK" = "local" ] && [ "$SKIP_DFX_START" != "true" ]; then
         
         # Start dfx WITHOUT --background to capture canister logs from stderr
         # dfx.log = CLI logs, dfx2.log = canister/replica logs
-        dfx start --clean --log file --logfile dfx.log --host 127.0.0.1:$PORT 2>dfx2.log &
+        # Note: All file descriptors must be redirected for docker exec to return properly
+        dfx start --clean --log file --logfile dfx.log --host 127.0.0.1:$PORT </dev/null >/dev/null 2>dfx2.log &
+        disown
         
         # Wait for initialization
         echo "⏳ Waiting for dfx to initialize..."
