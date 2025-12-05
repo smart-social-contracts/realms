@@ -141,15 +141,13 @@ jobs:
           
           echo "✅ CLI published to PyPI: v${{ steps.bump_version.outputs.NEW_VERSION }}" | tee -a ../release-logs/pypi-publish.log
       
-      # Commit version changes
+      # Commit version changes (tag will be created by release action)
       - name: Commit and push version changes
         run: |
-          git add version.txt cli/pyproject.toml cli/realms_cli/__init__.py 2>&1 | tee release-logs/git-add.log
+          git add version.txt cli/pyproject.toml cli/realms_cli/__init__.py cli/realms_cli/constants.py 2>&1 | tee release-logs/git-add.log
           git commit -m "Bump version to ${{ steps.bump_version.outputs.NEW_VERSION }}" 2>&1 | tee release-logs/git-commit.log
-          git tag -a "v${{ steps.bump_version.outputs.NEW_VERSION }}" -m "Release v${{ steps.bump_version.outputs.NEW_VERSION }}" 2>&1 | tee -a release-logs/git-tag.log
           git remote set-url origin https://${{ secrets.PAT_GITHUB }}@github.com/${{ github.repository }}.git
           git push origin 2>&1 | tee release-logs/git-push.log
-          git push origin --tags 2>&1 | tee release-logs/git-push-tags.log
           
           echo "✅ Version changes committed and pushed" | tee -a release-logs/git-push.log
       
