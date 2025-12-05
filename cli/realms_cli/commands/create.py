@@ -402,10 +402,9 @@ def _generate_deployment_scripts(
         src_source = repo_root / "src"
         if src_source.exists():
             # Define patterns to ignore during copy (build artifacts, caches, etc.)
-            # Also exclude monitor route which depends on task_monitor extension
             ignore_patterns = shutil.ignore_patterns(
                 'node_modules', '__pycache__', '.kybra', '*.pyc', '.svelte-kit',
-                'build', 'dist', '.env', '.env.*', '*.log', 'monitor'
+                'build', 'dist', '.env', '.env.*', '*.log'
             )
             shutil.copytree(src_source, src_dest, ignore=ignore_patterns)
             console.print(f"   ✅ Copied src/ directory")
