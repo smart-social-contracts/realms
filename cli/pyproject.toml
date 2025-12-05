@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "realms-cli"
-version = "0.1.5"
+version = "0.2.0"
 description = "CLI tool for managing Realms project lifecycle"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -73,7 +73,7 @@ profile = "black"
 multi_line_output = 3
 
 [tool.mypy]
-python_version = "0.1.5"
+python_version = "0.2.0"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
