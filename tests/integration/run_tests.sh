@@ -1,7 +1,17 @@
 #!/bin/bash
 # Run all integration tests
 
-cd "$(dirname "$0")"
+# If REALM_DIR is set, run from there (so dfx can find .dfx/ state)
+# Otherwise run from the test directory (legacy behavior)
+if [ -n "$REALM_DIR" ]; then
+    cd "$REALM_DIR"
+    echo "Running tests from realm directory: $REALM_DIR"
+    # Set TEST_DIR to absolute path of test files
+    TEST_DIR="/app/tests/integration"
+else
+    cd "$(dirname "$0")"
+    TEST_DIR="."
+fi
 
 # Parse arguments for specific test files
 SPECIFIC_TESTS="$@"
@@ -55,7 +65,7 @@ if [ -n "$SPECIFIC_TESTS" ]; then
     TEST_FILE_LIST="$SPECIFIC_TESTS"
 else
     # Run all test files
-    TEST_FILE_LIST=$(ls test_*.py 2>/dev/null || echo "")
+    TEST_FILE_LIST=$(ls $TEST_DIR/test_*.py 2>/dev/null | xargs -n 1 basename || echo "")
 fi
 
 if [ -z "$TEST_FILE_LIST" ]; then
@@ -65,9 +75,12 @@ fi
 
 # Run each test file
 for test_file in $TEST_FILE_LIST; do
+    # Build full path to test file
+    test_file_path="$TEST_DIR/$test_file"
+    
     # Check if file exists (in case of specific tests)
-    if [ ! -f "$test_file" ]; then
-        echo "❌ Test file not found: $test_file"
+    if [ ! -f "$test_file_path" ]; then
+        echo "❌ Test file not found: $test_file_path"
         FAILED=$((FAILED + 1))
         continue
     fi
@@ -82,7 +95,7 @@ for test_file in $TEST_FILE_LIST; do
     # Use pipefail so the pipeline fails if python3 fails (not just tee)
     set +e          # Don't exit on error
     set -o pipefail # Fail if any command in pipeline fails
-    python3 "$test_file" 2>&1 | tee "$LOG_FILE"
+    python3 "$test_file_path" 2>&1 | tee "$LOG_FILE"
     test_exit_code=$?
     set +o pipefail # Reset pipefail
     set -e
@@ -148,7 +161,7 @@ Test Details:
 EOF
 
 # Add individual test results to summary
-for test_file in test_*.py; do
+for test_file in $TEST_FILE_LIST; do
     status="${test_results[$test_file]}"
     if [ "$status" = "PASSED" ]; then
         echo "  ✅ $test_file - PASSED" >> "$SUMMARY_FILE"

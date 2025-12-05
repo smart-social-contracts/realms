@@ -67,6 +67,16 @@ fi
 
 log_success "Realm deployed successfully!"
 
+# Find the deployed realm directory (needed for dfx context)
+log_info "Finding realm directory..."
+REALM_DIR=$(docker exec "$CONTAINER_NAME" bash -c "ls -td /app/.realms/realm_* 2>/dev/null | head -1" || echo "")
+if [ -z "$REALM_DIR" ]; then
+    log_error "Could not find realm directory"
+    docker rm -f "$CONTAINER_NAME"
+    exit 1
+fi
+log_info "Realm directory: $REALM_DIR"
+
 # Copy test files into container if not using volumes
 if [ "$USE_VOLUMES" != "true" ]; then
     log_info "Copying test files into container..."
@@ -85,17 +95,17 @@ if [ "$USE_VOLUMES" != "true" ]; then
     }
 fi
 
-# Run integration tests
+# Run integration tests (pass REALM_DIR so dfx can find .dfx/ state)
 if [ -n "$TEST_FILES" ]; then
     log_info "Running specific integration tests: $TEST_FILES"
     set +e  # Don't exit on test failure
-    docker exec "$CONTAINER_NAME" bash tests/integration/run_tests.sh "$TEST_FILES"
+    docker exec "$CONTAINER_NAME" bash -c "REALM_DIR=$REALM_DIR bash /app/tests/integration/run_tests.sh $TEST_FILES"
     TEST_EXIT_CODE=$?
     set -e
 else
     log_info "Running all integration tests..."
     set +e  # Don't exit on test failure
-    docker exec "$CONTAINER_NAME" bash tests/integration/run_tests.sh
+    docker exec "$CONTAINER_NAME" bash -c "REALM_DIR=$REALM_DIR bash /app/tests/integration/run_tests.sh"
     TEST_EXIT_CODE=$?
     set -e
 fi
@@ -111,11 +121,13 @@ fi
 log_info "Collecting test logs..."
 mkdir -p integration-test-logs
 docker exec "$CONTAINER_NAME" bash -c "
-  cp -f dfx.log /tmp/dfx.log 2>/dev/null || true && \
-  cp -f realms_cli.log /tmp/realms_cli.log 2>/dev/null || true"
+  cp -f $REALM_DIR/dfx.log /tmp/dfx.log 2>/dev/null || true && \
+  cp -f $REALM_DIR/dfx2.log /tmp/dfx2.log 2>/dev/null || true && \
+  cp -f $REALM_DIR/realms.log /tmp/realms.log 2>/dev/null || true"
 
 docker cp "$CONTAINER_NAME:/tmp/dfx.log" integration-test-logs/ 2>/dev/null || true
-docker cp "$CONTAINER_NAME:/tmp/realms_cli.log" integration-test-logs/ 2>/dev/null || true
+docker cp "$CONTAINER_NAME:/tmp/dfx2.log" integration-test-logs/ 2>/dev/null || true
+docker cp "$CONTAINER_NAME:/tmp/realms.log" integration-test-logs/ 2>/dev/null || true
 
 # Cleanup
 log_info "Cleaning up container..."
