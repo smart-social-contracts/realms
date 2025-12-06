@@ -298,8 +298,9 @@ class RealmGenerator:
         from datetime import datetime
         
         # Create Codex entity (code will be set during import)
+        # Note: Name must match the codex file name (without .py) for import to update it
         codex = Codex(
-            name="Satoshi Transfer",
+            name="satoshi_transfer_codex",
             description="Sends 1 satoshi every 60 seconds",
             code=""  # Will be populated when codex file is imported
         )
@@ -309,7 +310,7 @@ class RealmGenerator:
             name="Satoshi Transfer Task",
             metadata=json.dumps({
                 "description": "Automated satoshi transfer every 60 seconds",
-                "codex_name": "Satoshi Transfer",
+                "codex_name": "satoshi_transfer_codex",
                 "target_principal": "64fpo-jgpms-fpewi-hrskb-f3n6u-3z5fy-bv25f-zxjzg-q5m55-xmfpq-hqe",
                 "amount": 1
             })
@@ -464,7 +465,8 @@ class RealmGenerator:
             "tax_collection_codex.py",
             "social_benefits_codex.py",
             "governance_automation_codex.py",
-            "user_registration_hook_codex.py"
+            "user_registration_hook_codex.py",
+            "satoshi_transfer_codex.py"
         ]
         
         # Copy each codex file from examples/demo to output directory
