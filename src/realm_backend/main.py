@@ -1709,45 +1709,70 @@ def reload_entity_method_overrides() -> str:
     Admin function to reload entity method overrides from Realm manifest.
     This should be called after importing realm data that includes codexes and manifest_data.
     """
+    logger.info("🔄 reload_entity_method_overrides() called")
     try:
         from ggg import Codex, Realm
         import ggg
         import json
         
-        realm = list(Realm.instances())[0] if Realm.instances() else None
-        if not realm or not realm.manifest_data:
-            return json.dumps({"success": False, "error": "No realm or manifest_data found"})
+        logger.info("📜 Looking for Codex['manifest']...")
+        realm_manifest = Codex["manifest"]
+        if not realm_manifest:
+            logger.error("❌ No Codex['manifest'] found")
+            return json.dumps({"success": False, "error": "No realm manifest found"})
         
-        manifest = json.loads(str(realm.manifest_data))
+        logger.info(f"✅ Found manifest codex (code length: {len(str(realm_manifest.code))} chars)")
+        manifest = json.loads(str(realm_manifest.code))
         overrides = manifest.get("entity_method_overrides", [])
+        logger.info(f"📋 Found {len(overrides)} override(s) in manifest")
         
         loaded_overrides = []
-        for o in overrides:
+        for i, o in enumerate(overrides):
+            logger.info(f"  [{i+1}/{len(overrides)}] Processing: {o.get('entity', '?')}.{o.get('method', '?')}()")
             try:
                 if not all([o.get("entity"), o.get("method"), o.get("implementation")]):
+                    logger.warning(f"    ⚠️ Skipping - missing required fields (entity/method/implementation)")
                     continue
+                    
                 entity_class = getattr(ggg, o["entity"], None)
+                if not entity_class:
+                    logger.warning(f"    ⚠️ Skipping - entity class '{o['entity']}' not found in ggg")
+                    continue
+                    
                 parts = o["implementation"].split(".")
-                if not entity_class or len(parts) != 3 or parts[0] != "Codex":
+                if len(parts) != 3 or parts[0] != "Codex":
+                    logger.warning(f"    ⚠️ Skipping - invalid implementation format: {o['implementation']} (expected Codex.name.function)")
                     continue
-                target_codex = Codex[parts[1]]
+                
+                codex_name = parts[1]
+                func_name = parts[2]
+                logger.info(f"    🔍 Looking for Codex['{codex_name}']...")
+                target_codex = Codex[codex_name]
                 if not target_codex:
+                    logger.warning(f"    ⚠️ Skipping - Codex['{codex_name}'] not found")
                     continue
+                
+                logger.info(f"    ✅ Found codex '{codex_name}' (code length: {len(str(target_codex.code))} chars)")
                 ns = {}
                 exec(str(target_codex.code), ns)
-                func = ns.get(parts[2])
+                func = ns.get(func_name)
                 if not func:
+                    logger.warning(f"    ⚠️ Skipping - function '{func_name}' not found in codex")
+                    logger.info(f"    📦 Available names in codex: {list(ns.keys())}")
                     continue
+                
                 method_type = o.get("type", "method")
                 wrapper = classmethod(func) if method_type == "classmethod" else staticmethod(func) if method_type == "staticmethod" else func
                 setattr(entity_class, o["method"], wrapper)
                 loaded_overrides.append(f"{o['entity']}.{o['method']}() -> {o['implementation']}")
-                logger.info(f"  ✓ Reloaded {o['entity']}.{o['method']}() [{method_type}] -> {o['implementation']}")
+                logger.info(f"    ✅ Successfully loaded {o['entity']}.{o['method']}() [{method_type}] -> {o['implementation']}")
             except Exception as e:
-                logger.error(f"Failed to reload override {o}: {e}")
+                logger.error(f"    ❌ Failed to reload override: {e}")
         
+        logger.info(f"🏁 Completed: {len(loaded_overrides)}/{len(overrides)} overrides loaded successfully")
         return json.dumps({"success": True, "loaded_overrides": loaded_overrides}, indent=2)
     except Exception as e:
+        logger.error(f"❌ reload_entity_method_overrides failed: {e}")
         return json.dumps({"success": False, "error": str(e)}, indent=2)
 
 

@@ -193,6 +193,21 @@ else:
     print(f"\nℹ️  No canister_init.py found, skipping initialization...")
 
 
+# Import manifest.json as a codex (contains entity_method_overrides)
+manifest_path = os.path.join(realm_dir, 'manifest.json')
+if os.path.exists(manifest_path):
+    print(f"\n📜 Importing manifest.json as codex...")
+    import_cmd = ['realms', 'import', manifest_path, '--type', 'codex', '--canister', backend_name]
+    if network != 'local':
+        import_cmd.extend(['--network', network])
+    try:
+        run_command(import_cmd, capture=False)
+        print(f"   ✅ Manifest imported as codex")
+    except Exception as e:
+        print(f"   ⚠️  Failed to import manifest: {e}")
+else:
+    print(f"\nℹ️  No manifest.json found at {manifest_path}, skipping...")
+
 # Reload entity method overrides after adjustments
 print("\n🔄 Reloading entity method overrides...")
 reload_cmd = ['dfx', 'canister', 'call', backend_name, 'reload_entity_method_overrides']

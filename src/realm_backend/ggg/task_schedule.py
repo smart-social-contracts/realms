@@ -12,6 +12,11 @@ logger = get_logger("entity.task_schedule")
 
 
 class TaskSchedule(Entity, TimestampedMixin):
+    """Schedule for running a Task at specified intervals.
+    
+    Note: No custom __init__ - Entity base class handles field assignment
+    and ManyToOne relationship resolution during deserialization.
+    """
     __alias__ = "name"
     name = String(max_length=256)
     disabled = Boolean()
@@ -19,24 +24,6 @@ class TaskSchedule(Entity, TimestampedMixin):
     run_at = Integer()
     repeat_every = Integer()
     last_run_at = Integer()
-
-    def __init__(
-        self,
-        name: str,
-        task,
-        run_at: int = 0,
-        repeat_every: int = 0,
-        last_run_at: int = 0,
-        disabled: bool = False,
-        **kwargs,
-    ):
-        super().__init__(**kwargs)
-        self.name = name
-        self.task = task
-        self.run_at = run_at
-        self.repeat_every = repeat_every
-        self.last_run_at = last_run_at
-        self.disabled = disabled
 
     def serialize(self):
         """Convert TaskSchedule to dictionary for JSON serialization"""

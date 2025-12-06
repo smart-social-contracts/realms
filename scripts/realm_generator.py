@@ -453,10 +453,11 @@ class RealmGenerator:
         script_dir = Path(__file__).parent
         repo_root = script_dir.parent
         
+        # Default to realm1 if no demo_folder specified (codex files are in subdirectories)
         if demo_folder:
             examples_demo_dir = repo_root / "examples" / "demo" / demo_folder
         else:
-            examples_demo_dir = repo_root / "examples" / "demo"
+            examples_demo_dir = repo_root / "examples" / "demo" / "realm1"
         
         # List of codex files to copy
         demo_codex_files = [

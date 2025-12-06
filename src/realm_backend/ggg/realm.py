@@ -11,4 +11,3 @@ class Realm(Entity, TimestampedMixin):
     logo = String(max_length=512)  # Path or URL to realm logo
     treasury = OneToOne("Treasury", "realm")
     principal_id = String(max_length=64)
-    manifest_data = String()
