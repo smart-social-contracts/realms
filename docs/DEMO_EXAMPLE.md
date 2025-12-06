@@ -97,7 +97,7 @@ The [`3-upload-data.sh`](../.realms/realm_Generated_Demo_Realm_20251205_212402/s
 
 The Vault extension overrides core GGG entity methods to integrate with the ckBTC blockchain.
 
-**Configuration**: [`extensions/vault/manifest.json`](../extensions/vault/manifest.json)
+**Configuration**: [`extensions/vault/manifest.json`](https://github.com/smart-social-contracts/realms-extension-vault/blob/main/manifest.json)
 ```json
 {
   "entity_method_overrides": [
@@ -118,7 +118,7 @@ The Vault extension overrides core GGG entity methods to integrate with the ckBT
 }
 ```
 
-**Implementation**: [`extensions/vault/backend/methods.py`](../extensions/vault/backend/methods.py)
+**Implementation**: [`extensions/vault/backend/methods.py`](https://github.com/smart-social-contracts/realms-extension-vault/blob/main/backend/methods.py)
 ```python
 def execute_transfer(self) -> Async[dict]:
     """Execute transfer via blockchain integration."""
@@ -210,7 +210,7 @@ flowchart LR
 
 | Component | Location | Description |
 |-----------|----------|-------------|
-| **Vault Extension** | [`extensions/vault/`](../extensions/vault/) | Overrides treasury methods for blockchain transfers |
+| **Vault Extension** | [`extensions/vault/`](https://github.com/smart-social-contracts/realms-extension-vault) | Overrides treasury methods for blockchain transfers |
 | **Registration Hook Codex** | [`examples/demo/realm1/user_registration_hook_codex.py`](../examples/demo/realm1/user_registration_hook_codex.py) | Custom logic executed after user registration |
 | **Realm Manifest** | [`examples/demo/realm1/manifest.json`](../examples/demo/realm1/manifest.json) | Configures entity method overrides |
 | **User Entity** | [`src/realm_backend/ggg/user.py`](../src/realm_backend/ggg/user.py) | Core user entity with hook extension points |
@@ -223,8 +223,8 @@ flowchart LR
 ### Pattern 1: Extension-Based Overrides
 
 Code lives in the **extension package**:
-- Defined in extension's [`manifest.json`](../extensions/vault/manifest.json)
-- Implementation in [`extensions/vault/backend/methods.py`](../extensions/vault/backend/methods.py)
+- Defined in extension's [`manifest.json`](https://github.com/smart-social-contracts/realms-extension-vault/blob/main/manifest.json)
+- Implementation in [`backend/methods.py`](https://github.com/smart-social-contracts/realms-extension-vault/blob/main/backend/methods.py)
 - Installed with the extension via `1-install-extensions.sh`
 
 ### Pattern 2: Codex-Based Overrides
@@ -239,7 +239,7 @@ Code lives in **realm-specific codexes**:
 
 ## Summary
 
-1. **Vault extension** overrides `Transfer.execute()` and `Balance.refresh()` for blockchain integration. The code lives in the [vault extension repository](../extensions/vault/).
+1. **Vault extension** overrides `Transfer.execute()` and `Balance.refresh()` for blockchain integration. The code lives in the [vault extension repository](https://github.com/smart-social-contracts/realms-extension-vault).
 
 2. **User registration hook** is configured via the realm's manifest and implemented in a codex that creates an invoice for new users. This code is deployed with the realm.
 
