@@ -176,6 +176,17 @@ realms extension install-from-source
 
 ---
 
+## 📝 Examples
+
+| Example | Description | Documentation |
+|---------|-------------|---------------|
+| **Demo Mundus** | Multi-realm ecosystem with 3 realms and registry | [EXAMPLE_DEMO.md](./EXAMPLE_DEMO.md) |
+| **File Download** | HTTP outcalls to download files from the internet | [EXAMPLE_FILE_DOWNLOAD.md](./EXAMPLE_FILE_DOWNLOAD.md) |
+
+See the [examples/](../examples/) directory for code samples.
+
+---
+
 ## 🔗 External Resources
 
 - **Main Repository** - [GitHub](https://github.com/smart-social-contracts/realms)
