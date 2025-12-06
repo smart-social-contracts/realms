@@ -5,6 +5,7 @@ A framework for building and deploying governance systems on the Internet Comput
 ## Table of Contents
 
 - [Quick Start](#quick-start)
+- [Examples](#examples)
 - [Extension Development](#extension-development)
 - [Running Python Code in Realms](#running-python-code-in-realms)
 - [Creating a New Realm](#creating-a-new-realm)
@@ -31,6 +32,29 @@ realms mundus create --deploy
 # Your realm is now running!
 # Frontend: http://<canister_id>.localhost:8000
 ```
+
+---
+
+## Examples
+
+Realms includes several documented examples to help you get started:
+
+| Example | Description | Documentation |
+|---------|-------------|---------------|
+| **Demo Mundus** | Multi-realm ecosystem with 3 realms and registry | [EXAMPLE_DEMO.md](./docs/EXAMPLE_DEMO.md) |
+| **File Download** | HTTP outcalls to download files from the internet | [EXAMPLE_FILE_DOWNLOAD.md](./docs/EXAMPLE_FILE_DOWNLOAD.md) |
+
+### Quick Example Commands
+
+```bash
+# Deploy a complete demo mundus with 3 realms
+realms mundus create --deploy
+
+# Run a scheduled file download task
+realms run --file examples/file_download/word_counter_codex.py --every 300
+```
+
+See the [examples/](./examples/) directory for more code samples.
 
 ---
 
