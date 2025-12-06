@@ -14,7 +14,7 @@ from .commands.export_data import export_data_command
 from .commands.extension import extension_command
 from .commands.import_data import import_codex_command, import_data_command
 from .commands.mundus import mundus_create_command, mundus_deploy_command, mundus_status_command
-from .commands.ps import ps_kill_command, ps_logs_command, ps_ls_command
+from .commands.ps import ps_kill_command, ps_logs_command, ps_ls_command, ps_start_command
 from .commands.registry import (
     registry_add_command,
     registry_count_command,
@@ -1086,6 +1086,26 @@ def ps_ls(
         network, canister
     )
     ps_ls_command(effective_network, effective_canister, verbose, output)
+
+
+@ps_app.command("start")
+def ps_start(
+    task_id: str = typer.Argument(help="Task ID (full or partial) to start"),
+    network: Optional[str] = typer.Option(
+        None, "--network", "-n", help="Network to use (overrides context)"
+    ),
+    canister: Optional[str] = typer.Option(
+        None, "--canister", "-c", help="Canister name (overrides context)"
+    ),
+    output: str = typer.Option(
+        "table", "--output", "-o", help="Output format: 'table' or 'json'"
+    ),
+) -> None:
+    """Start a scheduled task."""
+    effective_network, effective_canister = get_effective_network_and_canister(
+        network, canister
+    )
+    ps_start_command(task_id, effective_network, effective_canister, output)
 
 
 @ps_app.command("kill")

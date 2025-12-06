@@ -1242,6 +1242,62 @@ def stop_task(task_id: str) -> str:
         return json.dumps({"success": False, "error": str(e)}, indent=2)
 
 
+@update
+def start_task(task_id: str) -> str:
+    """
+    Start a scheduled task by enabling its schedules and triggering execution.
+
+    Args:
+        task_id: Full or partial task ID to start
+
+    Returns JSON with:
+    - success: Boolean indicating success
+    - task_id: The started task ID
+    - name: The task name
+    - error: Error message if failed
+    """
+    import json
+
+    from core.task_manager import TaskManager
+    from ggg.task import Task
+
+    try:
+        # Try to find task by partial or full ID
+        found_task = None
+        for task in Task.instances():
+            if task._id.startswith(task_id) or task._id == task_id:
+                found_task = task
+                break
+
+        if found_task:
+            # Mark task as pending
+            if hasattr(found_task, "status"):
+                found_task.status = "pending"
+
+            # Enable all schedules and reset last_run_at for immediate execution
+            for schedule in found_task.schedules:
+                schedule.disabled = False
+                schedule.last_run_at = 0  # Reset to trigger immediate execution
+
+            logger.info(f"Starting task: {found_task.name} ({found_task._id})")
+
+            # Trigger task manager to process the schedule
+            TaskManager().run()
+
+            return json.dumps(
+                {"success": True, "task_id": found_task._id, "name": found_task.name},
+                indent=2,
+            )
+        else:
+            return json.dumps(
+                {"success": False, "error": f"Task not found: {task_id}"}, indent=2
+            )
+
+    except Exception as e:
+        logger.error(f"Error starting task: {e}")
+        return json.dumps({"success": False, "error": str(e)}, indent=2)
+
+
 @query
 def get_task_logs(task_id: str, limit: nat = 20) -> str:
     """

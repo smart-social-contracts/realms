@@ -336,6 +336,45 @@ def ps_ls_command(
     console.print(f"[dim]💡 Use '--verbose' flag for metadata details[/dim]")
 
 
+def ps_start_command(
+    task_id: str,
+    network: Optional[str] = None,
+    canister: str = "realm_backend",
+    output_format: str = "table",
+) -> None:
+    """Start a scheduled task."""
+    if output_format != "json":
+        console.print(f"[bold blue]▶️ Starting Task: {task_id}[/bold blue]\n")
+    
+    # Call backend API endpoint
+    response = call_canister_endpoint(
+        canister,
+        "start_task",
+        f'("{task_id}")',
+        network=network
+    )
+    
+    if "error" in response or not response.get("success"):
+        error_msg = response.get("error", "Unknown error")
+        if output_format == "json":
+            print(json.dumps({"success": False, "error": error_msg}, indent=2))
+        else:
+            console.print(f"[red]❌ Error: {error_msg}[/red]")
+        raise typer.Exit(1)
+    
+    if output_format == "json":
+        print(json.dumps({
+            "success": True,
+            "task_id": response['task_id'],
+            "name": response['name'],
+            "message": "Task started successfully"
+        }, indent=2))
+    else:
+        console.print(f"[green]✅ Started task: {response['name']} ({response['task_id'][:8]})[/green]")
+        console.print(f"\n[dim]💡 Use 'realms ps ls' to verify[/dim]")
+        console.print(f"[dim]💡 Use 'realms ps logs {response['task_id'][:8]}' to view execution[/dim]")
+
+
 def ps_kill_command(
     task_id: str,
     network: Optional[str] = None,
