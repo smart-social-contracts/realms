@@ -29,6 +29,188 @@ realms --help
 
 ---
 
+## Deployment Scripts Overview
+
+When you create a realm using `realms create`, four deployment scripts are generated in the `scripts/` directory. These scripts should be executed **in order** to complete a full deployment.
+
+### Script Execution Order
+
+```bash
+cd .realms/realm_YourRealm_*/
+
+# Step 1: Install extensions
+./scripts/1-install-extensions.sh
+
+# Step 2: Deploy canisters
+./scripts/2-deploy-canisters.sh local
+
+# Step 3: Upload data
+./scripts/3-upload-data.sh local
+
+# Step 4: Post-deployment tasks (called automatically by step 2)
+# python scripts/4-post-deploy.py local
+```
+
+---
+
+### 1-install-extensions.sh
+
+**Purpose:** Installs all Realms extensions from source into the project structure.
+
+**What it does:**
+- Calls `realms extension install-from-source --source-dir extensions`
+- Packages each extension from `extensions/` directory
+- Installs backend code to `src/realm_backend/extension_packages/`
+- Installs frontend components to `src/realm_frontend/src/lib/extensions/`
+- Installs routes to `src/realm_frontend/src/routes/(sidebar)/extensions/`
+- Installs i18n translations to `src/realm_frontend/src/lib/i18n/locales/extensions/`
+
+**When to run:** Before deploying canisters, as extensions must be bundled into the canister builds.
+
+---
+
+### 2-deploy-canisters.sh
+
+**Purpose:** Deploys all backend and frontend canisters to the Internet Computer.
+
+**Parameters:**
+```bash
+./scripts/2-deploy-canisters.sh [WORKING_DIR] [NETWORK] [MODE] [IDENTITY_FILE]
+# WORKING_DIR: Directory containing dfx.json (default: current dir)
+# NETWORK: local, staging, or ic (default: local)
+# MODE: upgrade, reinstall, or install (default: upgrade)
+# IDENTITY_FILE: Optional path to identity PEM file
+```
+
+**What it does:**
+1. **Environment Setup:**
+   - Activates Python virtual environment if present
+   - Installs backend dependencies from `requirements.txt`
+   - Clears Kybra build cache to include new extensions
+
+2. **Local Network (if applicable):**
+   - Starts dfx replica with port based on git branch hash
+   - Downloads WASMs for shared canisters (Internet Identity, ckBTC)
+
+3. **Backend Deployment:**
+   - Deploys shared canisters (Internet Identity, ledgers)
+   - Deploys all `*_backend` canisters
+   - Generates TypeScript declarations
+   - Injects canister IDs into declaration files
+
+4. **Frontend Deployment:**
+   - Installs npm dependencies
+   - Copies realm logo to static folder
+   - Builds frontend with Vite/SvelteKit
+   - Deploys `*_frontend` asset canisters
+
+5. **Post-Deployment:**
+   - Creates canister aliases for testing
+   - Displays canister URLs
+   - **Automatically calls `4-post-deploy.py`**
+
+---
+
+### 3-upload-data.sh
+
+**Purpose:** Uploads realm data and codex files to the deployed backend canister.
+
+**Parameters:**
+```bash
+./scripts/3-upload-data.sh [NETWORK]
+# NETWORK: local, staging, or ic (default: local)
+```
+
+**What it does:**
+1. **Realm Data Import:**
+   - Imports `realm_data.json` containing entities (Users, Organizations, Transfers, etc.)
+   - Uses `realms import` command with admin_dashboard extension
+
+2. **Codex Import:**
+   - Discovers all `*_codex.py` files in realm directory
+   - Imports each codex file with `--type codex` flag
+   - Codexes contain automation scripts for governance, taxes, benefits, etc.
+
+3. **Extension Data:**
+   - Scans `extensions/*/data/*.json` for extension-specific data
+   - Imports any discovered extension data files
+
+**Prerequisites:** 
+- The `admin_dashboard` extension must be installed
+- Backend canister must be deployed and running
+
+---
+
+### 4-post-deploy.py
+
+**Purpose:** Performs final configuration tasks after deployment and data upload.
+
+**Parameters:**
+```bash
+python scripts/4-post-deploy.py [NETWORK]
+# NETWORK: local, staging, or ic (default: local)
+# Can also be set via NETWORK environment variable
+```
+
+**What it does:**
+1. **Realm Registration:**
+   - Loads `manifest.json` to get realm name and logo
+   - Retrieves frontend and backend canister IDs
+   - Registers realm with central registry (if `REGISTRY_CANISTER_ID` is set)
+   - Uses inter-canister call or falls back to direct CLI registration
+
+2. **Canister Initialization:**
+   - Looks for optional `canister_init.py` in `scripts/` directory
+   - Executes initialization script via `realms shell` if present
+   - Used for custom realm-specific setup (e.g., setting `manifest_data`)
+
+3. **Entity Method Overrides:**
+   - Calls `reload_entity_method_overrides` on backend canister
+   - Loads custom method implementations from `Realm.manifest_data`
+   - Wires codex functions to entity methods (e.g., post-registration hooks)
+
+**Note:** This script is automatically called by `2-deploy-canisters.sh` at the end of deployment.
+
+---
+
+### Complete Deployment Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     1-install-extensions.sh                      │
+│  • Package extensions from extensions/ directory                 │
+│  • Install to src/realm_backend/ and src/realm_frontend/        │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     2-deploy-canisters.sh                        │
+│  • Start dfx (local only)                                        │
+│  • Deploy backend canisters (with extensions bundled)           │
+│  • Generate declarations                                         │
+│  • Build and deploy frontend                                     │
+│  • Call 4-post-deploy.py                                        │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      3-upload-data.sh                            │
+│  • Import realm_data.json (entities)                            │
+│  • Import *_codex.py files (automation scripts)                 │
+│  • Import extension data files                                   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      4-post-deploy.py                            │
+│  • Register realm with central registry                          │
+│  • Run canister_init.py (if present)                            │
+│  • Reload entity method overrides from manifest                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Local Development
 
 ### Quick Start
