@@ -813,10 +813,41 @@ def unset_current_network() -> None:
     save_context(context)
 
 
-def get_current_realm_folder() -> Optional[str]:
-    """Get the current active realm folder path."""
+def get_current_realm_folder(auto_select: bool = True) -> Optional[str]:
+    """Get the current active realm folder path.
+    
+    Args:
+        auto_select: If True, automatically select the first available realm
+                     when none is set in context.
+    
+    Returns:
+        Path to the current realm folder, or None if no realms available.
+    """
     context = load_context()
-    return context.get("current_realm_folder")
+    folder = context.get("current_realm_folder")
+    
+    # If folder is set and exists, use it
+    if folder and Path(folder).exists():
+        return folder
+    
+    # Fallback: pick the first available realm (prefer deployed)
+    if auto_select:
+        realms = list_realm_folders()
+        if realms:
+            # Prefer deployed realms over created-but-not-deployed
+            deployed = [r for r in realms if r["status"] == "deployed"]
+            first_realm = deployed[0] if deployed else realms[0]
+            
+            # Auto-save for convenience
+            set_current_realm_folder(first_realm["path"])
+            set_current_realm(first_realm["name"])
+            if first_realm["network"] != "unknown":
+                set_current_network(first_realm["network"])
+            
+            console.print(f"[dim]📁 Auto-selected realm: {first_realm['name']}[/dim]")
+            return first_realm["path"]
+    
+    return None
 
 
 def set_current_realm_folder(folder_path: str) -> None:
