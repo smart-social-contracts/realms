@@ -1025,14 +1025,17 @@ def db_callback(
     canister: Optional[str] = typer.Option(
         None, "--canister", "-c", help="Canister name to connect to (overrides context)"
     ),
+    folder: Optional[str] = typer.Option(
+        None, "--folder", "-f", help="Realm folder containing dfx.json (uses current realm context if not specified)"
+    ),
 ) -> None:
     """Explore the Realm database. Use subcommands for specific operations or run without subcommand for interactive mode."""
-    # Store network and canister in context for subcommands
-    ctx.obj = {"network": network, "canister": canister}
+    # Store network, canister, and folder in context for subcommands
+    ctx.obj = {"network": network, "canister": canister, "folder": folder}
     
     # If no subcommand is provided, run interactive explorer
     if ctx.invoked_subcommand is None:
-        db_command(network, canister)
+        db_command(network, canister, folder)
 
 
 @db_app.command("get")
@@ -1048,11 +1051,12 @@ def db_get(
         realms db get User user1        # Get specific user by ID
         realms db get Transfer          # Get all transfers
     """
-    # Get network and canister from context
+    # Get network, canister, and folder from context
     network = ctx.obj.get("network") if ctx.obj else None
     canister = ctx.obj.get("canister") if ctx.obj else None
+    folder = ctx.obj.get("folder") if ctx.obj else None
     
-    db_get_command(entity_type, entity_id, network, canister)
+    db_get_command(entity_type, entity_id, network, canister, folder)
 
 
 @app.command("shell")
@@ -1189,12 +1193,15 @@ def ps_ls(
     output: str = typer.Option(
         "table", "--output", "-o", help="Output format: 'table' or 'json'"
     ),
+    folder: Optional[str] = typer.Option(
+        None, "--folder", "-f", help="Realm folder containing dfx.json (uses current realm context if not specified)"
+    ),
 ) -> None:
     """List all scheduled tasks."""
     effective_network, effective_canister = get_effective_network_and_canister(
         network, canister
     )
-    ps_ls_command(effective_network, effective_canister, verbose, output)
+    ps_ls_command(effective_network, effective_canister, verbose, output, folder)
 
 
 @ps_app.command("start")
@@ -1209,12 +1216,15 @@ def ps_start(
     output: str = typer.Option(
         "table", "--output", "-o", help="Output format: 'table' or 'json'"
     ),
+    folder: Optional[str] = typer.Option(
+        None, "--folder", "-f", help="Realm folder containing dfx.json (uses current realm context if not specified)"
+    ),
 ) -> None:
     """Start a scheduled task."""
     effective_network, effective_canister = get_effective_network_and_canister(
         network, canister
     )
-    ps_start_command(task_id, effective_network, effective_canister, output)
+    ps_start_command(task_id, effective_network, effective_canister, output, folder)
 
 
 @ps_app.command("kill")
@@ -1229,12 +1239,15 @@ def ps_kill(
     output: str = typer.Option(
         "table", "--output", "-o", help="Output format: 'table' or 'json'"
     ),
+    folder: Optional[str] = typer.Option(
+        None, "--folder", "-f", help="Realm folder containing dfx.json (uses current realm context if not specified)"
+    ),
 ) -> None:
     """Stop a scheduled task."""
     effective_network, effective_canister = get_effective_network_and_canister(
         network, canister
     )
-    ps_kill_command(task_id, effective_network, effective_canister, output)
+    ps_kill_command(task_id, effective_network, effective_canister, output, folder)
 
 
 @ps_app.command("logs")
@@ -1253,7 +1266,7 @@ def ps_logs(
         "table", "--output", "-o", help="Output format: 'table' or 'json'"
     ),
     follow: bool = typer.Option(
-        False, "--follow", "-f", help="Follow logs in real-time (use with Ctrl+C to stop)"
+        False, "--follow", help="Follow logs in real-time (use with Ctrl+C to stop)"
     ),
     output_file: Optional[str] = typer.Option(
         None, "--output-file", help="Write logs to file"
@@ -1263,6 +1276,9 @@ def ps_logs(
     ),
     from_entry: int = typer.Option(
         0, "--from", help="Start index for pagination (default: 0)"
+    ),
+    folder: Optional[str] = typer.Option(
+        None, "--folder", help="Realm folder containing dfx.json (uses current realm context if not specified)"
     ),
 ) -> None:
     """View execution logs for a task.
@@ -1284,7 +1300,8 @@ def ps_logs(
         follow,
         output_file,
         limit,
-        from_entry
+        from_entry,
+        folder
     )
 
 

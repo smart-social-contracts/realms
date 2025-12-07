@@ -19,7 +19,7 @@ from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.layout.layout import Layout
 from rich.console import Console
 
-from ..utils import get_effective_network_and_canister, get_logger
+from ..utils import get_effective_network_and_canister, get_effective_cwd, get_logger
 
 logger = get_logger("db")
 
@@ -70,9 +70,10 @@ class NavigationState:
 class CursorDatabaseExplorer:
     """Interactive database explorer for Realm entities."""
 
-    def __init__(self, network: str, canister: str):
+    def __init__(self, network: str, canister: str, cwd: Optional[str] = None):
         self.network = network
         self.canister = canister
+        self.cwd = cwd  # Working directory for dfx commands
         self.state = NavigationState()
         self.app = None
 
@@ -109,7 +110,7 @@ class CursorDatabaseExplorer:
         logger.debug(f"cmd: {' '.join(cmd)}")
 
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5, cwd=self.cwd)
             logger.debug(f"result: {result}")
             if result.returncode == 0:
                 output = result.stdout.strip()
@@ -915,6 +916,7 @@ def db_get_command(
     entity_id: Optional[str] = None,
     network: Optional[str] = None,
     canister: Optional[str] = None,
+    folder: Optional[str] = None,
 ) -> None:
     """Get entities from the database and output as JSON.
     
@@ -923,12 +925,14 @@ def db_get_command(
         entity_id: Optional specific entity ID to retrieve
         network: Network to use
         canister: Canister to connect to
+        folder: Realm folder containing dfx.json
     """
     effective_network, effective_canister = get_effective_network_and_canister(
         network, canister
     )
+    effective_cwd = get_effective_cwd(folder)
 
-    explorer = CursorDatabaseExplorer(effective_network, effective_canister)
+    explorer = CursorDatabaseExplorer(effective_network, effective_canister, cwd=effective_cwd)
     
     # Test connection
     try:
@@ -1008,19 +1012,25 @@ def db_command(
     canister: Optional[str] = typer.Option(
         None, "--canister", "-c", help="Canister name to connect to (overrides context)"
     ),
+    folder: Optional[str] = typer.Option(
+        None, "--folder", "-f", help="Realm folder containing dfx.json (uses current realm context if not specified)"
+    ),
 ) -> None:
     """Explore the Realm database in an interactive text-based interface with cursor navigation."""
 
     logger.debug("db_command")
     logger.debug(f"network: {network}")
     logger.debug(f"canister: {canister}")
+    logger.debug(f"folder: {folder}")
 
     effective_network, effective_canister = get_effective_network_and_canister(
         network, canister
     )
+    effective_cwd = get_effective_cwd(folder)
 
     logger.debug(f"Effective network: {effective_network}")
     logger.debug(f"Effective canister: {effective_canister}")
+    logger.debug(f"Effective cwd: {effective_cwd}")
 
-    explorer = CursorDatabaseExplorer(effective_network, effective_canister)
+    explorer = CursorDatabaseExplorer(effective_network, effective_canister, cwd=effective_cwd)
     explorer.run()

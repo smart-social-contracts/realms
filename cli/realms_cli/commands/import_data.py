@@ -13,36 +13,10 @@ from ..utils import (
     console,
     display_error_panel,
     display_success_panel,
-    get_current_realm_folder,
+    get_effective_cwd,
     get_project_root,
     run_command,
 )
-
-
-def _get_effective_cwd(folder: Optional[str]) -> Optional[str]:
-    """Get the effective working directory for dfx commands.
-    
-    Priority:
-    1. Explicit folder parameter
-    2. Current realm folder from context
-    3. None (use current working directory)
-    """
-    if folder:
-        folder_path = Path(folder).resolve()
-        if folder_path.exists():
-            return str(folder_path)
-        console.print(f"[yellow]⚠️  Specified folder not found: {folder}[/yellow]")
-    
-    # Try current realm folder from context
-    current_folder = get_current_realm_folder()
-    if current_folder:
-        folder_path = Path(current_folder).resolve()
-        if folder_path.exists():
-            console.print(f"[dim]Using realm folder: {current_folder}[/dim]")
-            return str(folder_path)
-        console.print(f"[yellow]⚠️  Current realm folder not found: {current_folder}[/yellow]")
-    
-    return None
 
 
 def import_data_command(
@@ -127,7 +101,7 @@ def import_data_command(
             console.print(f"Running: {' '.join(cmd[:6])}...")
             
             # Run from realm folder so dfx can find .dfx/local/canister_ids.json
-            effective_cwd = _get_effective_cwd(folder)
+            effective_cwd = get_effective_cwd(folder)
             result = run_command(
                 cmd,
                 cwd=effective_cwd,
@@ -232,7 +206,7 @@ def import_codex_command(
             cmd.extend(["--identity", identity])
         
         # Run from realm folder so dfx can find .dfx/local/canister_ids.json
-        effective_cwd = _get_effective_cwd(folder)
+        effective_cwd = get_effective_cwd(folder)
         result = run_command(
             cmd,
             cwd=effective_cwd,

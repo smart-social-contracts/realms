@@ -4,11 +4,14 @@ import json
 import subprocess
 import time
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 import typer
 from rich.console import Console
 from rich.table import Table
+
+from ..utils import get_effective_cwd
 
 console = Console()
 
@@ -45,7 +48,7 @@ def format_interval(seconds: int) -> str:
         return f"{days}d{hours}h" if hours > 0 else f"{days}d"
 
 
-def call_canister_endpoint(canister: str, method: str, args: str = "()", network: Optional[str] = None) -> dict:
+def call_canister_endpoint(canister: str, method: str, args: str = "()", network: Optional[str] = None, cwd: Optional[str] = None) -> dict:
     """Helper to call a canister endpoint and parse JSON response."""
     cmd = ["dfx", "canister", "call"]
     
@@ -55,7 +58,7 @@ def call_canister_endpoint(canister: str, method: str, args: str = "()", network
     cmd.extend([canister, method, args])
     
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30, cwd=cwd)
         
         # Parse the output - extract JSON from tuple format
         output = result.stdout.strip()
@@ -92,10 +95,13 @@ def ps_ls_command(
     canister: str = "realm_backend",
     verbose: bool = False,
     output_format: str = "table",
+    folder: Optional[str] = None,
 ) -> None:
     """List all scheduled and running tasks."""
     if output_format != "json":
         console.print("[bold blue]📋 Scheduled Tasks & Schedules[/bold blue]\n")
+    
+    effective_cwd = get_effective_cwd(folder)
     
     try:
         # Query all Tasks using get_objects_paginated
@@ -105,7 +111,7 @@ def ps_ls_command(
                 "get_objects_paginated", '("Task", 0, 1000, "asc")',
                 "--output", "json"
             ] + (["--network", network] if network else []),
-            capture_output=True, text=True, check=False
+            capture_output=True, text=True, check=False, cwd=effective_cwd
         )
         
         # Query all TaskSchedules using get_objects_paginated
@@ -115,7 +121,7 @@ def ps_ls_command(
                 "get_objects_paginated", '("TaskSchedule", 0, 1000, "asc")',
                 "--output", "json"
             ] + (["--network", network] if network else []),
-            capture_output=True, text=True, check=False
+            capture_output=True, text=True, check=False, cwd=effective_cwd
         )
         
         if tasks_result.returncode != 0:
@@ -341,17 +347,21 @@ def ps_start_command(
     network: Optional[str] = None,
     canister: str = "realm_backend",
     output_format: str = "table",
+    folder: Optional[str] = None,
 ) -> None:
     """Start a scheduled task."""
     if output_format != "json":
         console.print(f"[bold blue]▶️ Starting Task: {task_id}[/bold blue]\n")
+    
+    effective_cwd = get_effective_cwd(folder)
     
     # Call backend API endpoint
     response = call_canister_endpoint(
         canister,
         "start_task",
         f'("{task_id}")',
-        network=network
+        network=network,
+        cwd=effective_cwd
     )
     
     if "error" in response or not response.get("success"):
@@ -380,17 +390,21 @@ def ps_kill_command(
     network: Optional[str] = None,
     canister: str = "realm_backend",
     output_format: str = "table",
+    folder: Optional[str] = None,
 ) -> None:
     """Stop a scheduled task."""
     if output_format != "json":
         console.print(f"[bold blue]❌ Stopping Task: {task_id}[/bold blue]\n")
+    
+    effective_cwd = get_effective_cwd(folder)
     
     # Call backend API endpoint
     response = call_canister_endpoint(
         canister,
         "stop_task",
         f'("{task_id}")',
-        network=network
+        network=network,
+        cwd=effective_cwd
     )
     
     if "error" in response or not response.get("success"):
@@ -444,6 +458,7 @@ def ps_logs_continuous(
     output_file: Optional[str],
     limit: int = 100,
     from_entry: int = 0,
+    cwd: Optional[str] = None,
 ) -> None:
     """View continuous task logs using get_task_logs_by_name endpoint."""
     import subprocess
@@ -460,7 +475,7 @@ def ps_logs_continuous(
     
     try:
         # Get logs
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30, cwd=cwd)
         
         # Parse the output - it's a JSON array in tuple format: ("[{...}, {...}]")
         output = result.stdout.strip()
@@ -522,7 +537,7 @@ def ps_logs_continuous(
                     follow_cmd.extend([canister, "get_task_logs_by_name", f'("{task_id}", {current_from}, {limit})'])
                     
                     # Get logs again
-                    result = subprocess.run(follow_cmd, capture_output=True, text=True, check=True, timeout=30)
+                    result = subprocess.run(follow_cmd, capture_output=True, text=True, check=True, timeout=30, cwd=cwd)
                     output = result.stdout.strip()
                     
                     # Parse again
@@ -569,13 +584,16 @@ def ps_logs_command(
     output_file: Optional[str] = None,
     limit: int = 100,
     from_entry: int = 0,
+    folder: Optional[str] = None,
 ) -> None:
     """View execution logs for a task."""
+    
+    effective_cwd = get_effective_cwd(folder)
     
     # Use new get_task_logs_by_name endpoint for continuous logs
     if follow or output_file:
         return ps_logs_continuous(
-            task_id, network, canister, follow, output_file, limit, from_entry
+            task_id, network, canister, follow, output_file, limit, from_entry, cwd=effective_cwd
         )
     
     # Original behavior for --tail (execution history)
@@ -587,7 +605,8 @@ def ps_logs_command(
         canister,
         "get_task_logs",
         f'("{task_id}", {tail})',
-        network=network
+        network=network,
+        cwd=effective_cwd
     )
     
     if "error" in response or not response.get("success"):
