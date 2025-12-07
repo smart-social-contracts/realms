@@ -13,9 +13,36 @@ from ..utils import (
     console,
     display_error_panel,
     display_success_panel,
+    get_current_realm_folder,
     get_project_root,
     run_command,
 )
+
+
+def _get_effective_cwd(folder: Optional[str]) -> Optional[str]:
+    """Get the effective working directory for dfx commands.
+    
+    Priority:
+    1. Explicit folder parameter
+    2. Current realm folder from context
+    3. None (use current working directory)
+    """
+    if folder:
+        folder_path = Path(folder).resolve()
+        if folder_path.exists():
+            return str(folder_path)
+        console.print(f"[yellow]⚠️  Specified folder not found: {folder}[/yellow]")
+    
+    # Try current realm folder from context
+    current_folder = get_current_realm_folder()
+    if current_folder:
+        folder_path = Path(current_folder).resolve()
+        if folder_path.exists():
+            console.print(f"[dim]Using realm folder: {current_folder}[/dim]")
+            return str(folder_path)
+        console.print(f"[yellow]⚠️  Current realm folder not found: {current_folder}[/yellow]")
+    
+    return None
 
 
 def import_data_command(
@@ -27,12 +54,13 @@ def import_data_command(
     network: str = "local",
     identity: Optional[str] = None,
     canister: str = "realm_backend",
+    folder: Optional[str] = None,
 ) -> None:
     """Import data into the realm. Supports JSON data and Python codex files."""
 
     # Handle codex files separately
     if entity_type == "codex":
-        return import_codex_command(file_path, dry_run=dry_run, network=network, identity=identity, canister=canister)
+        return import_codex_command(file_path, dry_run=dry_run, network=network, identity=identity, canister=canister, folder=folder)
 
     console.print(
         f"[bold blue]📥 Importing data from {file_path}[/bold blue]\n"
@@ -98,10 +126,11 @@ def import_data_command(
             
             console.print(f"Running: {' '.join(cmd[:6])}...")
             
-            # Run from current directory so dfx can find .dfx/local/canister_ids.json
+            # Run from realm folder so dfx can find .dfx/local/canister_ids.json
+            effective_cwd = _get_effective_cwd(folder)
             result = run_command(
                 cmd,
-                cwd=None,  # Use current working directory
+                cwd=effective_cwd,
                 capture_output=True,
             )
 
@@ -139,6 +168,7 @@ def import_codex_command(
     network: str = "local",
     identity: Optional[str] = None,
     canister: str = "realm_backend",
+    folder: Optional[str] = None,
 ) -> None:
     """Import Python codex file into the realm.
 
@@ -201,10 +231,11 @@ def import_codex_command(
         if identity:
             cmd.extend(["--identity", identity])
         
-        # Run from current directory so dfx can find .dfx/local/canister_ids.json
+        # Run from realm folder so dfx can find .dfx/local/canister_ids.json
+        effective_cwd = _get_effective_cwd(folder)
         result = run_command(
             cmd,
-            cwd=None,  # Use current working directory
+            cwd=effective_cwd,
         )
 
         display_success_panel(

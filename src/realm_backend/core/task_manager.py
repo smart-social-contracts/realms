@@ -3,8 +3,11 @@
 Timer-based task scheduling for the Internet Computer supporting one-time and
 recurring tasks with multi-step workflows.
 
-Core Entities:
+Core Entities (defined in ggg module):
   Codex → Call → TaskStep → Task → TaskSchedule
+
+Note: Call and TaskStep are implementation details for task execution,
+not part of the GGG (Generalized Global Governance) standard.
 
 Execution Flow:
   1. create_scheduled_task() → TaskManager._update_timers()
@@ -25,26 +28,15 @@ Other Uses:
 """
 
 import traceback
-from enum import Enum
 from typing import Callable, List
 
-from execution import run_code
-from ggg.codex import Codex
+from ggg.call import Call
 from ggg.status import TaskStatus
-from ggg.task import Task as GGGTask
+from ggg.task import Task
 from ggg.task_executions import TaskExecution
-from ggg.task_schedule import TaskSchedule  # as GGGTaskSchedule
-from kybra import Async, Duration, TimerId, ic, void
-from kybra_simple_db import (
-    Boolean,
-    Entity,
-    Integer,
-    ManyToOne,
-    OneToMany,
-    OneToOne,
-    String,
-    TimestampedMixin,
-)
+from ggg.task_schedule import TaskSchedule
+from ggg.task_step import TaskStep
+from kybra import Async, Duration, ic, void
 from kybra_simple_logging import get_logger
 
 logger = get_logger("core.task_manager")
@@ -52,172 +44,6 @@ logger = get_logger("core.task_manager")
 
 def get_now() -> int:
     return int(round(ic.time() / 1e9))
-
-
-class Call(Entity, TimestampedMixin):
-    _function_def = None
-    _function_params = None
-
-    is_async = Boolean()
-    codex = ManyToOne("Codex", "calls")
-    task_step = OneToOne("TaskStep", "call")
-
-    def _function(self):
-        if not self.codex or not self.codex.code:
-            raise ValueError("Call must have a codex code")
-
-        # Auto-detect async if codex is present
-        self.is_async = "yield" in self.codex.code or "async_task" in self.codex.code
-
-        if self.is_async:
-            return self._async_function
-        else:
-            return self._sync_function
-
-    def _sync_function(self) -> void:
-        logger.info("Executing sync call")
-        if self.codex:
-            logger.info("Executing codex")
-            # Get task name and ID from task_step -> task
-            task_name = None
-            task_id = None
-            task_logger = None
-            
-            if self.task_step and self.task_step.task:
-                task_name = self.task_step.task.name
-                task_id = str(self.task_step.task._id)
-                logger.info(f"Executing codex for task: {task_name} (ID: {task_id})")
-                
-                # Create task-specific logger using kybra-simple-logging
-                from kybra_simple_logging import get_logger as get_task_logger
-                task_logger = get_task_logger(f"task_{task_id}")
-                task_logger.info(f"Starting sync execution for task: {task_name}")
-
-            result = run_code(self.codex.code, task_name=task_name, task_logger=task_logger)
-            # Store result for execute_code() to retrieve
-            self._result = result
-            
-            # Log to task logger if available
-            if task_logger:
-                if result.get("success"):
-                    task_logger.info(f"Execution completed successfully")
-                    if result.get('result'):
-                        task_logger.info(f"Result: {result.get('result')}")
-                else:
-                    task_logger.error(f"Execution failed: {result.get('error')}")
-            
-            # Also log captured output
-            if result.get("logs"):
-                logger.info(f"Captured logs: {result['logs']}")
-            if result.get("success"):
-                logger.info(f"Execution successful, result: {result.get('result')}")
-            else:
-                logger.error(f"Execution failed: {result.get('error')}")
-        else:
-            result = self._function_def(*self._function_params)
-            self._result = result
-            return result
-
-    def _async_function(self) -> Async:
-        logger.info("Executing async call")
-        if self.codex:
-            logger.info("Executing async codex")
-            # Execute codex code in globals context
-            safe_globals = globals().copy()
-            import ggg
-            import kybra
-            from execution import create_task_entity_class
-
-            safe_globals.update({"ggg": ggg, "kybra": kybra})
-
-            # Get task name and ID, add TaskEntity and TaskLogger if available
-            task_name = None
-            task_id = None
-            task_logger = None
-            
-            if self.task_step and self.task_step.task:
-                task_name = self.task_step.task.name
-                task_id = str(self.task_step.task._id)
-                logger.info(f"Executing async codex for task: {task_name} (ID: {task_id})")
-                
-                # Add TaskEntity
-                safe_globals["TaskEntity"] = create_task_entity_class(task_name)
-                logger.info(f"TaskEntity class added with namespace: task_{task_name}")
-                
-                # Create and add task-specific logger using kybra-simple-logging
-                from kybra_simple_logging import get_logger as get_task_logger
-                task_logger = get_task_logger(f"task_{task_id}")
-                task_logger.info(f"Starting async execution for task: {task_name}")
-                safe_globals["logger"] = task_logger
-                safe_globals["log"] = task_logger  # Alias for convenience
-
-            # Execute the codex code (defines async_task function)
-            exec(self.codex.code, safe_globals)
-
-            # Call the async_task function
-            async_task = safe_globals.get("async_task")
-            if async_task and callable(async_task):
-                result = yield from async_task()
-                
-                # Log completion
-                if task_logger:
-                    task_logger.info(f"Async execution completed: {result}")
-                
-                # Store result for status checking
-                self._result = result
-                return result
-            else:
-                error_msg = "async_task function not found in codex"
-                logger.error(error_msg)
-                if task_logger:
-                    task_logger.error(error_msg)
-                return None
-        else:
-            result = yield self._function_def(*self._function_params)
-            self._result = result
-            return result
-
-
-class TaskStep(Entity, TimestampedMixin):
-    call = OneToOne("Call", "task_step")
-    status = String()
-    run_next_after = Integer()  # number of seconds to schedule the next step
-    timer_id = Integer()
-    task = ManyToOne("Task", "steps")
-
-    def __init__(self, call: Call, run_next_after: int = 0, **kwargs):
-        super().__init__(**kwargs)
-        self.call = call
-        self.run_next_after = run_next_after
-        self.status = TaskStatus.PENDING.value
-
-
-# TODO
-# class TaskHistory:
-#     executed_at: int
-#     result: dict
-
-
-class Task(GGGTask):
-    # Redefine relationships here for ORM to properly resolve them
-    steps = OneToMany("TaskStep", "task")
-    schedules = OneToMany("TaskSchedule", "task")
-    executions = OneToMany("TaskExecution", "task")
-    # Note: status and step_to_execute are also in base ggg.task.Task
-    status = String()
-    step_to_execute = Integer()
-
-    def __init__(self, steps: List[TaskStep] = None, **kwargs):
-        super().__init__(**kwargs)
-        self.status = TaskStatus.PENDING.value
-        self.step_to_execute = 0
-        # Set up relationships after entity is saved
-        if steps:
-            for step in steps:
-                step.task = self
-
-    def __repr__(self) -> str:
-        return f"Task(name={self.name}, steps={self.steps}, schedules={self.schedules}, status={self.status}, step_to_execute={self.step_to_execute})"
 
 
 class TaskManager:

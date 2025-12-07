@@ -33,13 +33,18 @@ from .utils import (
     display_info_panel,
     get_current_network,
     get_current_realm,
+    get_current_realm_folder,
     get_effective_network_and_canister,
     get_project_root,
+    list_realm_folders,
+    resolve_realm_by_id,
     resolve_realm_details,
     set_current_network,
     set_current_realm,
+    set_current_realm_folder,
     unset_current_network,
     unset_current_realm,
+    unset_current_realm_folder,
 )
 
 console = Console()
@@ -98,9 +103,12 @@ def import_data(
     canister: str = typer.Option(
         "realm_backend", "--canister", "-c", help="Canister name to import data to (e.g. realm1_backend for mundus)"
     ),
+    folder: Optional[str] = typer.Option(
+        None, "--folder", "-f", help="Realm folder containing dfx.json (uses current realm context if not specified)"
+    ),
 ) -> None:
     """Import data into the realm. Supports JSON data and Python codex files."""
-    import_data_command(file_path, entity_type, format, batch_size, dry_run, network, identity, canister)
+    import_data_command(file_path, entity_type, format, batch_size, dry_run, network, identity, canister, folder)
 
 
 @app.command("export")
@@ -646,30 +654,104 @@ def registry_deploy(
 
 
 # Realm context management commands
+@realm_app.command("ls")
+def realm_ls(
+    base_dir: Optional[str] = typer.Option(
+        None, "--dir", "-d", help="Base directory to search for realms"
+    ),
+) -> None:
+    """List all available realm folders."""
+    from rich.table import Table
+    
+    console.print("[bold blue]📁 Available Realms[/bold blue]\n")
+    
+    realms = list_realm_folders(base_dir)
+    
+    if not realms:
+        console.print(f"[yellow]No realm folders found in {base_dir or REALM_FOLDER}[/yellow]")
+        console.print(f"\n[dim]💡 Create a realm with: realms create --realm-name <name>[/dim]")
+        return
+    
+    # Get current realm folder to highlight it
+    current_folder = get_current_realm_folder()
+    
+    # Create table
+    table = Table(show_header=True, header_style="bold cyan")
+    table.add_column("#", style="dim", width=3)
+    table.add_column("Name", style="white")
+    table.add_column("Network", style="cyan", width=10)
+    table.add_column("Status", style="green", width=10)
+    table.add_column("Canisters", justify="right", width=10)
+    table.add_column("Modified", style="dim", width=20)
+    
+    for i, realm in enumerate(realms, 1):
+        is_current = current_folder and realm["path"] == current_folder
+        
+        # Format status with color
+        status = realm["status"]
+        if status == "deployed":
+            status_str = "[green]deployed[/green]"
+        else:
+            status_str = "[yellow]created[/yellow]"
+        
+        # Format name with indicator if current
+        name = realm["name"]
+        if is_current:
+            name = f"[bold green]► {name}[/bold green]"
+        
+        # Format date
+        date_str = ""
+        if realm["created"]:
+            date_str = realm["created"].strftime("%Y-%m-%d %H:%M")
+        
+        table.add_row(
+            str(i),
+            name,
+            realm["network"],
+            status_str,
+            str(realm["canister_count"]) if realm["canister_count"] else "-",
+            date_str,
+        )
+    
+    console.print(table)
+    
+    if current_folder:
+        console.print(f"\n[dim]Current realm: {current_folder}[/dim]")
+    
+    console.print(f"\n[dim]💡 Set active realm: realms realm set <# or name>[/dim]")
+
+
 @realm_app.command("set")
 def realm_set(
-    realm_name: str = typer.Argument(help="Realm name to set as current context"),
+    realm_id: str = typer.Argument(help="Realm index number or folder name"),
+    base_dir: Optional[str] = typer.Option(
+        None, "--dir", "-d", help="Base directory to search for realms"
+    ),
 ) -> None:
-    """Set the current realm context."""
+    """Set the current realm context by folder."""
     console.print("[bold blue]🏛️  Setting Realm Context[/bold blue]\n")
 
-    try:
-        # Verify realm exists in registry
-        network, canister = resolve_realm_details(realm_name)
-        set_current_realm(realm_name)
-
-        console.print(
-            f"[green]✅ Realm context set to: [bold]{realm_name}[/bold][/green]"
-        )
-        console.print(f"[dim]Network: {network}[/dim]")
-        console.print(f"[dim]Canister: {canister}[/dim]")
-
-    except ValueError as e:
-        console.print(f"[red]❌ {e}[/red]")
-        console.print(
-            f'[yellow]💡 Add the realm to registry first: realms registry add --id {realm_name} --name "Realm Name"[/yellow]'
-        )
+    realm = resolve_realm_by_id(realm_id, base_dir)
+    
+    if not realm:
+        console.print(f"[red]❌ Realm not found: {realm_id}[/red]")
+        console.print(f"\n[dim]💡 List available realms with: realms realm ls[/dim]")
         raise typer.Exit(1)
+    
+    # Set both the realm folder and network
+    set_current_realm_folder(realm["path"])
+    set_current_realm(realm["name"])
+    if realm["network"] != "unknown":
+        set_current_network(realm["network"])
+
+    console.print(
+        f"[green]✅ Realm context set to: [bold]{realm['name']}[/bold][/green]"
+    )
+    console.print(f"[dim]   Folder: {realm['path']}[/dim]")
+    console.print(f"[dim]   Network: {realm['network']}[/dim]")
+    console.print(f"[dim]   Status: {realm['status']}[/dim]")
+    if realm["canister_count"]:
+        console.print(f"[dim]   Canisters: {realm['canister_count']}[/dim]")
 
 
 @realm_app.command("current")
@@ -678,9 +760,28 @@ def realm_current() -> None:
     console.print("[bold blue]📍 Current Context[/bold blue]\n")
 
     current_realm = get_current_realm()
+    current_folder = get_current_realm_folder()
     current_network = get_current_network()
 
-    if current_realm:
+    if current_folder:
+        console.print(f"[green]📁 Folder: [bold]{current_folder}[/bold][/green]")
+        
+        # Check if folder still exists and get current status
+        from pathlib import Path
+        folder_path = Path(current_folder)
+        if folder_path.exists():
+            realms = list_realm_folders()
+            for r in realms:
+                if r["path"] == current_folder:
+                    console.print(f"[dim]   Name: {r['name']}[/dim]")
+                    console.print(f"[dim]   Status: {r['status']}[/dim]")
+                    if r["canister_count"]:
+                        console.print(f"[dim]   Canisters: {r['canister_count']}[/dim]")
+                    break
+        else:
+            console.print(f"[yellow]   ⚠️  Folder no longer exists[/yellow]")
+    elif current_realm:
+        # Legacy: realm set via registry
         try:
             realm_network, realm_canister = resolve_realm_details(current_realm)
             console.print(f"[green]🏛️  Realm: [bold]{current_realm}[/bold][/green]")
@@ -689,13 +790,13 @@ def realm_current() -> None:
         except ValueError as e:
             console.print(f"[red]🏛️  Realm: [bold]{current_realm}[/bold] (⚠️  {e})[/red]")
     else:
-        console.print("[dim]🏛️  Realm: Not set[/dim]")
+        console.print("[dim]📁 Realm: Not set[/dim]")
 
     console.print(f"[cyan]🌐 Network: [bold]{current_network}[/bold][/cyan]")
 
-    if not current_realm and current_network == "local":
+    if not current_folder and not current_realm and current_network == "local":
         console.print(
-            "\n[dim]💡 Using defaults: local network, realm_backend canister[/dim]"
+            "\n[dim]💡 Set a realm with: realms realm ls && realms realm set <#>[/dim]"
         )
 
 
@@ -704,12 +805,20 @@ def realm_unset() -> None:
     """Clear the current realm context."""
     console.print("[bold blue]🔄 Clearing Realm Context[/bold blue]\n")
 
+    current_folder = get_current_realm_folder()
     current_realm = get_current_realm()
-    if current_realm:
-        unset_current_realm()
-        console.print(
-            f"[green]✅ Cleared realm context: [bold]{current_realm}[/bold][/green]"
-        )
+    
+    if current_folder or current_realm:
+        if current_folder:
+            unset_current_realm_folder()
+            console.print(
+                f"[green]✅ Cleared realm folder: [bold]{current_folder}[/bold][/green]"
+            )
+        if current_realm:
+            unset_current_realm()
+            console.print(
+                f"[green]✅ Cleared realm context: [bold]{current_realm}[/bold][/green]"
+            )
         console.print("[dim]Will use network context or defaults[/dim]")
     else:
         console.print("[yellow]No realm context set[/yellow]")

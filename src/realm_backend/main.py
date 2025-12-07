@@ -23,8 +23,8 @@ from core.candid_types_realm import (
     StatusRecord,
     UserGetRecord,
 )
-from core.task_manager import Call, Task, TaskManager, TaskStep
-from ggg import Codex
+from core.task_manager import TaskManager
+from ggg import Call, Codex, Task, TaskStep
 from ggg.task_schedule import TaskSchedule
 from kybra import (
     Async,
@@ -1079,7 +1079,8 @@ def execute_code(code: str) -> str:
     import json
     import traceback
 
-    from core.task_manager import Call, Task, TaskManager, TaskStep
+    from core.task_manager import TaskManager
+    from ggg import Call, Task, TaskStep
     from ggg.task_schedule import TaskSchedule
 
     try:
@@ -1259,42 +1260,131 @@ def start_task(task_id: str) -> str:
     import json
 
     from core.task_manager import TaskManager
-    from ggg.task import Task
+    from ggg import Call, Task, TaskStep
 
     try:
         # Try to find task by partial or full ID
         found_task = None
         for task in Task.instances():
-            if task._id.startswith(task_id) or task._id == task_id:
+            if str(task._id).startswith(task_id) or str(task._id) == task_id:
                 found_task = task
                 break
 
-        if found_task:
-            # Mark task as pending
-            if hasattr(found_task, "status"):
-                found_task.status = "pending"
-
-            # Enable all schedules and reset last_run_at for immediate execution
-            for schedule in found_task.schedules:
-                schedule.disabled = False
-                schedule.last_run_at = 0  # Reset to trigger immediate execution
-
-            logger.info(f"Starting task: {found_task.name} ({found_task._id})")
-
-            # Trigger task manager to process the schedule
-            TaskManager().run()
-
-            return json.dumps(
-                {"success": True, "task_id": found_task._id, "name": found_task.name},
-                indent=2,
-            )
-        else:
+        if not found_task:
             return json.dumps(
                 {"success": False, "error": f"Task not found: {task_id}"}, indent=2
             )
 
+        # Check if task has steps - if not, create them from metadata
+        # Note: GGG Task entities may not have 'steps' attribute (only TaskManager.Task does)
+        has_steps = hasattr(found_task, 'steps') and found_task.steps and len(list(found_task.steps)) > 0
+        if not has_steps:
+            logger.info(f"Task {found_task.name} has no steps, creating from metadata")
+            
+            # Parse metadata to get codex_name
+            metadata = {}
+            if found_task.metadata:
+                try:
+                    metadata = json.loads(found_task.metadata)
+                except:
+                    pass
+            
+            codex_name = metadata.get("codex_name")
+            if not codex_name:
+                return json.dumps(
+                    {"success": False, "error": f"Task has no steps and no codex_name in metadata"}, 
+                    indent=2
+                )
+            
+            # Find the codex
+            codex = None
+            for c in Codex.instances():
+                if c.name == codex_name:
+                    codex = c
+                    break
+            
+            if not codex:
+                return json.dumps(
+                    {"success": False, "error": f"Codex '{codex_name}' not found"}, 
+                    indent=2
+                )
+            
+            if not codex.code:
+                return json.dumps(
+                    {"success": False, "error": f"Codex '{codex_name}' has no code"}, 
+                    indent=2
+                )
+            
+            # Check if codex is async (contains 'yield')
+            is_async = "yield" in codex.code
+            
+            # Create Call and TaskStep
+            call = Call(is_async=is_async, codex=codex)
+            step = TaskStep(call=call, run_next_after=0)
+            step.task = found_task
+            
+            logger.info(f"Created step for task {found_task.name} using codex {codex_name} (async={is_async})")
+
+        # Mark task as pending and reset step counter
+        found_task.status = "pending"
+        if hasattr(found_task, 'step_to_execute'):
+            found_task.step_to_execute = 0
+        
+        # Reset all step statuses (if task has steps)
+        if hasattr(found_task, 'steps') and found_task.steps:
+            for step in found_task.steps:
+                step.status = "pending"
+
+        # Enable all schedules and reset last_run_at for immediate execution
+        # Check both the task's schedules relation and find schedules by task reference
+        from ggg.task_schedule import TaskSchedule
+        schedules_found = False
+        
+        # Try to get schedules from task relationship
+        if hasattr(found_task, 'schedules') and found_task.schedules:
+            for schedule in found_task.schedules:
+                schedule.disabled = False
+                schedule.last_run_at = 0
+                schedules_found = True
+                logger.info(f"Enabled schedule: {schedule.name}")
+        
+        # Also search for schedules that reference this task by ID
+        if not schedules_found:
+            for schedule in TaskSchedule.instances():
+                # Check if schedule references this task
+                if hasattr(schedule, 'task') and schedule.task and str(schedule.task._id) == str(found_task._id):
+                    schedule.disabled = False
+                    schedule.last_run_at = 0
+                    schedules_found = True
+                    logger.info(f"Found and enabled orphan schedule: {schedule.name}")
+
+        logger.info(f"Starting task: {found_task.name} ({found_task._id})")
+
+        # If no schedules found, create a one-time schedule for immediate execution
+        if not schedules_found:
+            logger.info(f"No schedules found for task {found_task.name}, creating one-time schedule")
+            schedule = TaskSchedule(
+                name=f"{found_task.name}_schedule",
+                disabled=False,
+                run_at=0,  # Run immediately
+                repeat_every=0,  # One-time execution
+                last_run_at=0,
+            )
+            schedule.task = found_task
+            logger.info(f"Created one-time schedule for task {found_task.name}")
+
+        # Trigger task manager to process the schedule
+        TaskManager().run()
+
+        return json.dumps(
+            {"success": True, "task_id": str(found_task._id), "name": found_task.name},
+            indent=2,
+        )
+
     except Exception as e:
+        import traceback
         logger.error(f"Error starting task: {e}")
+        logger.error(traceback.format_exc())
         return json.dumps({"success": False, "error": str(e)}, indent=2)
 
 
@@ -1519,7 +1609,8 @@ def create_scheduled_task(
     """
     try:
 
-        from core.task_manager import Call, Task, TaskManager, TaskStep
+        from core.task_manager import TaskManager
+        from ggg import Call, Task, TaskStep
         from ggg.task_schedule import TaskSchedule
         
         # Decode the base64 encoded code

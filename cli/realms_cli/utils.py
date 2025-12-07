@@ -813,6 +813,139 @@ def unset_current_network() -> None:
     save_context(context)
 
 
+def get_current_realm_folder() -> Optional[str]:
+    """Get the current active realm folder path."""
+    context = load_context()
+    return context.get("current_realm_folder")
+
+
+def set_current_realm_folder(folder_path: str) -> None:
+    """Set the current active realm folder."""
+    context = load_context()
+    context["current_realm_folder"] = folder_path
+    save_context(context)
+
+
+def unset_current_realm_folder() -> None:
+    """Clear the current realm folder context."""
+    context = load_context()
+    context.pop("current_realm_folder", None)
+    save_context(context)
+
+
+def list_realm_folders(base_dir: Optional[str] = None) -> List[Dict[str, Any]]:
+    """List all realm folders with their status information.
+    
+    Args:
+        base_dir: Base directory to search for realms (defaults to REALM_FOLDER constant)
+        
+    Returns:
+        List of dicts with realm folder info: name, path, network, status, canister_count, created
+    """
+    from .constants import REALM_FOLDER
+    
+    base_path = Path(base_dir) if base_dir else Path(REALM_FOLDER)
+    realms = []
+    
+    if not base_path.exists():
+        return realms
+    
+    # Find all realm_* directories
+    for realm_dir in sorted(base_path.iterdir()):
+        if not realm_dir.is_dir() or not realm_dir.name.startswith("realm_"):
+            continue
+        
+        realm_info = {
+            "name": realm_dir.name,
+            "path": str(realm_dir),
+            "network": "unknown",
+            "status": "created",
+            "canister_count": 0,
+            "created": None,
+        }
+        
+        # Get creation time
+        try:
+            realm_info["created"] = datetime.fromtimestamp(realm_dir.stat().st_mtime)
+        except Exception:
+            pass
+        
+        # Check for dfx.json to determine network config
+        dfx_json_path = realm_dir / "dfx.json"
+        if dfx_json_path.exists():
+            try:
+                with open(dfx_json_path, "r") as f:
+                    dfx_config = json.load(f)
+                # Check networks config
+                networks = dfx_config.get("networks", {})
+                if "ic" in networks:
+                    realm_info["network"] = "ic"
+                elif "staging" in networks:
+                    realm_info["network"] = "staging"
+                else:
+                    realm_info["network"] = "local"
+            except Exception:
+                pass
+        
+        # Check for .dfx folder to determine deployment status
+        dfx_folder = realm_dir / ".dfx"
+        if dfx_folder.exists():
+            # Check for canister_ids.json in local or network folders
+            for network_dir in dfx_folder.iterdir():
+                if network_dir.is_dir():
+                    canister_ids_file = network_dir / "canister_ids.json"
+                    if canister_ids_file.exists():
+                        realm_info["status"] = "deployed"
+                        realm_info["network"] = network_dir.name
+                        try:
+                            with open(canister_ids_file, "r") as f:
+                                canister_ids = json.load(f)
+                                realm_info["canister_count"] = len(canister_ids)
+                        except Exception:
+                            pass
+                        break
+        
+        realms.append(realm_info)
+    
+    return realms
+
+
+def resolve_realm_by_id(realm_id: str, base_dir: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Resolve a realm by ID (name or index number).
+    
+    Args:
+        realm_id: Either a realm folder name or a 1-based index number
+        base_dir: Base directory to search for realms
+        
+    Returns:
+        Realm info dict if found, None otherwise
+    """
+    realms = list_realm_folders(base_dir)
+    
+    if not realms:
+        return None
+    
+    # Try as index first (1-based)
+    try:
+        index = int(realm_id) - 1
+        if 0 <= index < len(realms):
+            return realms[index]
+    except ValueError:
+        pass
+    
+    # Try as name
+    for realm in realms:
+        if realm["name"] == realm_id:
+            return realm
+    
+    # Try partial match
+    for realm in realms:
+        if realm_id in realm["name"]:
+            return realm
+    
+    return None
+
+
 def resolve_realm_details(
     realm_name: str,
     registry_network: Optional[str] = None,

@@ -1,8 +1,12 @@
 """
 Python implementation of the Generalized Global Governance (GGG) standard
+
+Note: Call and TaskStep are implementation details for task execution,
+not part of the core GGG standard.
 """
 
 from .balance import Balance
+from .call import Call
 from .member import Member
 from .codex import Codex
 
@@ -26,6 +30,7 @@ from .registry import Registry
 from .service import Service
 from .task import Task
 from .task_schedule import TaskSchedule
+from .task_step import TaskStep
 from .invoice import Invoice
 from .trade import Trade
 from .transfer import Transfer
@@ -35,35 +40,37 @@ from .user_profile import Operations, Profiles, UserProfile
 from .vote import Vote
 
 __all__ = [
+    "Balance",
+    "Call",  # Implementation detail, not GGG standard
     "Codex",
     "Contract",
     "Dispute",
+    "Human",
+    "Identity",
     "Instrument",
     "Invoice",
     "Land",
     "LandType",
-    "Balance",
     "License",
     "Mandate",
+    "Member",
     "Notification",
+    "Operations",
     "Organization",
     "PaymentAccount",
     "Permission",
+    "Profiles",
     "Proposal",
     "Realm",
     "Registry",
     "Service",
     "Task",
     "TaskSchedule",
+    "TaskStep",  # Implementation detail, not GGG standard
     "Trade",
+    "Transfer",
+    "Treasury",
     "User",
     "UserProfile",
-    "Profiles",
-    "Operations",
     "Vote",
-    "Transfer",
-    "Human",
-    "Member",
-    "Identity",
-    "Treasury",
 ]
