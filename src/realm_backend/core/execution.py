@@ -44,7 +44,9 @@ def run_code(source_code, locals={}, task_name=None, task_logger=None):
         task_name: Optional task name for TaskEntity namespacing
         task_logger: Optional task-specific logger for isolated logging
     """
-    logger.info("running code: ************************ %s" % source_code)
+
+    logger.info("run_code start")
+    # logger.info("running code: ************************ %s" % source_code)
     # Use current globals to ensure built-ins and proper scope
     safe_globals = globals().copy()
 
@@ -79,6 +81,7 @@ def run_code(source_code, locals={}, task_name=None, task_logger=None):
 
     try:
         with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+            logger.info("executing code")
             # Execute with globals as locals to ensure functions can call each other
             exec(source_code, safe_globals, safe_globals)
 
@@ -86,6 +89,9 @@ def run_code(source_code, locals={}, task_name=None, task_logger=None):
         logs = []
         stdout_content = stdout_capture.getvalue().strip()
         stderr_content = stderr_capture.getvalue().strip()
+
+        logger.info("stdout: %s" % stdout_content)
+        logger.info("stderr: %s" % stderr_content)
 
         if stdout_content:
             logs.extend(stdout_content.split("\n"))

@@ -1525,8 +1525,6 @@ def test_mixed_sync_async_task() -> void:
         url = "https://raw.githubusercontent.com/smart-social-contracts/realms/3d863b4d8a7d8c72490537d44a4e05363752ae3c/src/realm_backend/codex.py"
 
         # Step 1: Async HTTP download with codex
-        async_call = Call()
-        async_call.is_async = True
         download_codex = Codex()
         download_codex.code = f"""
 from main import download_file_from_url
@@ -1539,11 +1537,10 @@ def async_task():
     ic.print(f"Download result for {{url}}: {{result[0]}}")
     return result
 """.strip()
-        async_call.codex = download_codex
+        async_call = Call(codex=download_codex)
         step1 = TaskStep(call=async_call, run_next_after=10)
 
-        sync_call = Call()
-        sync_call.is_async = False
+        # Step 2: Sync verification step
         codex = Codex()
         codex.code = f"""
 from main import downloaded_content
@@ -1570,7 +1567,7 @@ if len(content) > 0:
 else:
     ic.print("❌ FAILURE: No content was downloaded!")
 ic.print("=== VERIFICATION COMPLETE ===")""".strip()
-        sync_call.codex = codex
+        sync_call = Call(codex=codex)
         step2 = TaskStep(call=sync_call)
 
         task = Task(name="test_mixed_steps", steps=[step1, step2])
@@ -1625,7 +1622,7 @@ def create_scheduled_task(
         logger.info(f"Auto-detected is_async={is_async} for task {name}")
 
         # Create call and step
-        call = Call(is_async=is_async, codex=codex)
+        call = Call(codex=codex)
         step = TaskStep(call=call, run_next_after=0)
 
         # Create task (using TaskManager Task, not GGG Task)
@@ -1732,9 +1729,8 @@ def create_multi_step_scheduled_task(
             codex_name = f"_{name}_step_{idx}_{int(ic.time())}"
             codex = Codex(name=codex_name, code=decoded_code)
 
-            # Create call - is_async will be auto-detected by Call._function()
-            # Set to False initially, auto-detection will override if needed
-            call = Call(is_async=False, codex=codex)
+            # Create call
+            call = Call(codex=codex)
 
             # Get run_next_after delay (default to 0)
             run_next_after = step_config.get("run_next_after", 0)

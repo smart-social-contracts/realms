@@ -8,9 +8,6 @@ operations which is required by ICP canisters.
 """
 
 from kybra_simple_db import Entity, Integer, ManyToOne, OneToOne, String, TimestampedMixin
-from kybra_simple_logging import get_logger
-
-logger = get_logger("entity.task_step")
 
 
 class TaskStep(Entity, TimestampedMixin):

@@ -27,39 +27,32 @@ class Call(Entity, TimestampedMixin):
         if not self.codex or not self.codex.code:
             raise ValueError("Call has no codex or codex has no code")
 
-        def wrapper():
-            return run_code(
-                self.codex.code,
-                task_name=self.task_step.task.name if self.task_step and self.task_step.task else None
-            )
+        task_name = self.task_step.task.name if self.task_step and self.task_step.task else None
 
-        return wrapper
+        if self.is_async:
+            # For async: exec code, then return the async_task generator
+            def async_wrapper():
+                import ggg
+                import kybra
+                from kybra import ic
 
-    def _sync_function(self):
-        """Execute synchronous code from codex"""
-        if not self.codex or not self.codex.code:
-            raise ValueError("Call has no codex or codex has no code")
+                namespace = {
+                    "ggg": ggg,
+                    "kybra": kybra,
+                    "ic": ic,
+                }
+                exec(self.codex.code, namespace, namespace)
 
-        task_name = None
-        if self.task_step and self.task_step.task:
-            task_name = self.task_step.task.name
+                # Get and call async_task function
+                async_task_fn = namespace.get("async_task")
+                if async_task_fn is None:
+                    raise ValueError("Async codex must define 'async_task()' function")
+                return async_task_fn()
 
-        return run_code(self.codex.code, task_name=task_name)
+            return async_wrapper
+        else:
+            # For sync: just run the code
+            def sync_wrapper():
+                return run_code(self.codex.code, task_name=task_name)
 
-    def _async_function(self):
-        """Return an async generator function for async code execution"""
-        if not self.codex or not self.codex.code:
-            raise ValueError("Call has no codex or codex has no code")
-
-        task_name = None
-        if self.task_step and self.task_step.task:
-            task_name = self.task_step.task.name
-
-        def async_wrapper():
-            result = run_code(self.codex.code, task_name=task_name)
-            if hasattr(result, "__next__"):
-                # It's a generator, yield from it
-                return (yield from result)
-            return result
-
-        return async_wrapper
+            return sync_wrapper

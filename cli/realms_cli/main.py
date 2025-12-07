@@ -1105,6 +1105,9 @@ def run(
     config: Optional[str] = typer.Option(
         None, "--config", help="Multi-step task configuration file (JSON)"
     ),
+    folder: Optional[str] = typer.Option(
+        None, "--folder", help="Realm folder to use (overrides context)"
+    ),
 ) -> None:
     """Start an interactive Python shell connected to the Realms backend canister or execute a Python file (with async task waiting support)."""
     # Get effective network and canister from context
@@ -1116,7 +1119,7 @@ def run(
     if wait or wait_timeout is not None:
         actual_wait = wait_timeout if wait_timeout is not None else 0
     
-    run_command(effective_network, effective_canister, file, actual_wait, every, after, config)
+    run_command(effective_network, effective_canister, file, actual_wait, every, after, config, folder)
 
 
 # Create network subcommand group

@@ -738,8 +738,8 @@ def display_info_panel(title: str, message: str) -> None:
 
 
 def get_realms_config_dir() -> Path:
-    """Get the Realms configuration directory."""
-    config_dir = Path.home() / ".realms"
+    """Get the Realms configuration directory (project-local)."""
+    config_dir = Path.cwd() / ".realms"
     config_dir.mkdir(exist_ok=True)
     return config_dir
 

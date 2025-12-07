@@ -14,7 +14,7 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.history import InMemoryHistory
 from rich.console import Console
 
-from ..utils import is_repo_mode
+from ..utils import is_repo_mode, get_effective_cwd
 
 console = Console()
 
@@ -26,10 +26,11 @@ class RealmsShell:
     """Interactive Python shell for Realms backend canister."""
 
     def __init__(
-        self, canister_name: str = "realm_backend", network: Optional[str] = None
+        self, canister_name: str = "realm_backend", network: Optional[str] = None, cwd: Optional[str] = None
     ):
         self.canister_name = canister_name
         self.network = network
+        self.cwd = cwd
         self.globals_dict = {}
 
     def execute(self, code: str) -> str:
@@ -51,7 +52,7 @@ class RealmsShell:
 
         try:
             # Execute the dfx command
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=self.cwd)
 
             # Parse the output
             output = result.stdout.strip()
@@ -154,7 +155,7 @@ class RealmsShell:
 
         try:
             # Execute the dfx command
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=self.cwd)
 
             # Parse the JSON response
             response = json.loads(result.stdout)
@@ -218,7 +219,7 @@ class RealmsShell:
                 cmd.extend(["--network", self.network])
             cmd.extend([self.canister_name, "status"])
 
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10, cwd=self.cwd)
             if result.returncode == 0:
                 console.print("[green]✅ Backend canister is responding[/green]")
                 if "success = true" in result.stdout:
@@ -294,7 +295,8 @@ class RealmsShell:
 def schedule_multi_step_task_from_config(
     config_path: str, 
     canister: str, 
-    network: Optional[str]
+    network: Optional[str],
+    cwd: Optional[str] = None
 ) -> None:
     """Schedule a multi-step task from a JSON config file."""
     import os
@@ -413,7 +415,7 @@ def schedule_multi_step_task_from_config(
     
     try:
         console.print(f"[dim]Calling backend to create multi-step task...[/dim]")
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30, cwd=cwd)
         
         # Parse response
         output = result.stdout.strip()
@@ -459,11 +461,15 @@ def run_command(
     every: Optional[int] = None,
     after: Optional[int] = None,
     config: Optional[str] = None,
+    folder: Optional[str] = None,
 ) -> None:
     """Start an interactive Python shell connected to the Realms backend canister or execute a Python file."""
+    # Get effective working directory from context
+    effective_cwd = get_effective_cwd(folder)
+    
     # If config is provided, create multi-step task from config file
     if config:
-        schedule_multi_step_task_from_config(config, canister, network)
+        schedule_multi_step_task_from_config(config, canister, network, effective_cwd)
         return
     
     # If file is provided, execute it instead of interactive shell
@@ -471,11 +477,11 @@ def run_command(
         # If scheduling options are provided, schedule the task
         if every is not None or after is not None:
             console.print(f"[bold blue]📅 Scheduling Python file: {file}[/bold blue]\n")
-            schedule_python_file(file, canister, network, every, after)
+            schedule_python_file(file, canister, network, every, after, effective_cwd)
             return
         
         console.print(f"[bold blue]📄 Executing Python file: {file}[/bold blue]\n")
-        execute_python_file(file, canister, network, wait)
+        execute_python_file(file, canister, network, wait, effective_cwd)
         return
 
     console.print("[bold blue]🚀 Starting Realms Interactive Console[/bold blue]\n")
@@ -504,11 +510,11 @@ def run_command(
             console.print("[yellow]⚠️  Could not check dfx replica status.[/yellow]")
 
     # Create and run the shell
-    shell = RealmsShell(canister_name=canister, network=network)
+    shell = RealmsShell(canister_name=canister, network=network, cwd=effective_cwd)
     shell.run_shell()
 
 
-def execute_python_file(file_path: str, canister: str, network: Optional[str], wait: Optional[int] = None) -> None:
+def execute_python_file(file_path: str, canister: str, network: Optional[str], wait: Optional[int] = None, cwd: Optional[str] = None) -> None:
     """Execute a Python file on the Realms backend canister."""
     import os
     from pathlib import Path
@@ -535,7 +541,7 @@ def execute_python_file(file_path: str, canister: str, network: Optional[str], w
     )
 
     # Create shell instance and execute the code
-    shell = RealmsShell(canister_name=canister, network=network)
+    shell = RealmsShell(canister_name=canister, network=network, cwd=cwd)
 
     try:
         result = shell.execute(code_content)
@@ -609,7 +615,7 @@ def execute_python_file(file_path: str, canister: str, network: Optional[str], w
         raise typer.Exit(1)
 
 
-def schedule_python_file(file_path: str, canister: str, network: Optional[str], every: Optional[int], after: Optional[int]) -> None:
+def schedule_python_file(file_path: str, canister: str, network: Optional[str], every: Optional[int], after: Optional[int], cwd: Optional[str] = None) -> None:
     """Schedule a Python file to run at intervals on the Realms backend canister."""
     import os
     import base64
@@ -663,7 +669,7 @@ def schedule_python_file(file_path: str, canister: str, network: Optional[str], 
     ])
     
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30, cwd=cwd)
         
         # Parse response
         output = result.stdout.strip()
