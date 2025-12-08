@@ -305,12 +305,13 @@ if [ -f "manifest.json" ] && command -v jq &> /dev/null; then
         
         if [ -n "$LOGO_SOURCE" ]; then
             # Find frontend directory and copy logo to static/images
+            # Use a unique filename (custom_logo.svg) to avoid caching issues
             if [ -d "src/realm_frontend/static/images" ]; then
-                LOGO_DEST="src/realm_frontend/static/images/$LOGO_FILE"
+                LOGO_DEST="src/realm_frontend/static/images/custom_logo.svg"
             else
                 # Create static/images directory if it doesn't exist
                 mkdir -p src/realm_frontend/static/images
-                LOGO_DEST="src/realm_frontend/static/images/$LOGO_FILE"
+                LOGO_DEST="src/realm_frontend/static/images/custom_logo.svg"
             fi
             cp "$LOGO_SOURCE" "$LOGO_DEST"
             echo "   ✅ Copied realm logo: $LOGO_SOURCE → $LOGO_DEST"

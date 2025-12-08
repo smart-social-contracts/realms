@@ -100,15 +100,18 @@ try:
                 if network == 'ic':
                     frontend_url = f"{frontend_id}.ic0.app"
                     if realm_logo:
-                        logo_url = f"https://{frontend_id}.ic0.app/images/{realm_logo}"
+                        # Use custom_logo.svg (the filename deploy_canisters.sh copies to)
+                        logo_url = f"https://{frontend_id}.ic0.app/images/custom_logo.svg"
                 elif network == 'staging':
                     frontend_url = f"{frontend_id}.icp0.io"
                     if realm_logo:
-                        logo_url = f"https://{frontend_id}.icp0.io/images/{realm_logo}"
+                        # Use custom_logo.svg (the filename deploy_canisters.sh copies to)
+                        logo_url = f"https://{frontend_id}.icp0.io/images/custom_logo.svg"
                 else:  # local
                     frontend_url = f"{frontend_id}.localhost:8000"
                     if realm_logo:
-                        logo_url = f"http://{frontend_id}.localhost:8000/images/{realm_logo}"
+                        # Use custom_logo.svg (the filename deploy_canisters.sh copies to)
+                        logo_url = f"http://{frontend_id}.localhost:8000/images/custom_logo.svg"
                 print(f"   Frontend URL: {frontend_url}")
                 if logo_url:
                     print(f"   Logo URL: {logo_url}")
