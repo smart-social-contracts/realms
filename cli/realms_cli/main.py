@@ -1200,7 +1200,7 @@ def ps_ls(
         False, "--verbose", "-v", help="Show detailed information"
     ),
     output: str = typer.Option(
-        "table", "--output", "-o", help="Output format: 'table' or 'json'"
+        "json", "--output", "-o", help="Output format: 'json' (default) or 'table'"
     ),
     folder: Optional[str] = typer.Option(
         None, "--folder", "-f", help="Realm folder containing dfx.json (uses current realm context if not specified)"
@@ -1223,7 +1223,7 @@ def ps_start(
         None, "--canister", "-c", help="Canister name (overrides context)"
     ),
     output: str = typer.Option(
-        "table", "--output", "-o", help="Output format: 'table' or 'json'"
+        "json", "--output", "-o", help="Output format: 'json' (default) or 'table'"
     ),
     folder: Optional[str] = typer.Option(
         None, "--folder", "-f", help="Realm folder containing dfx.json (uses current realm context if not specified)"
@@ -1246,7 +1246,7 @@ def ps_kill(
         None, "--canister", "-c", help="Canister name (overrides context)"
     ),
     output: str = typer.Option(
-        "table", "--output", "-o", help="Output format: 'table' or 'json'"
+        "json", "--output", "-o", help="Output format: 'json' (default) or 'table'"
     ),
     folder: Optional[str] = typer.Option(
         None, "--folder", "-f", help="Realm folder containing dfx.json (uses current realm context if not specified)"
@@ -1272,7 +1272,7 @@ def ps_logs(
         20, "--tail", "-t", help="Number of recent executions to show (default: 20)"
     ),
     output: str = typer.Option(
-        "table", "--output", "-o", help="Output format: 'table' or 'json'"
+        "json", "--output", "-o", help="Output format: 'json' (default) or 'table'"
     ),
     follow: bool = typer.Option(
         False, "--follow", help="Follow logs in real-time (use with Ctrl+C to stop)"
@@ -1292,7 +1292,7 @@ def ps_logs(
 ) -> None:
     """View execution logs for a task.
     
-    By default, shows execution history (--tail).
+    By default, outputs JSON. Use --output table for table format.
     Use --follow for continuous task-specific logs.
     Use --output-file to save logs to a file.
     Use --limit and --from for pagination of large log sets.
