@@ -46,6 +46,35 @@ def get_now() -> int:
     return int(round(ic.time() / 1e9))
 
 
+def _format_logs(logs_data) -> str:
+    """Format logs from run_code result into a string for storage.
+    
+    Args:
+        logs_data: Either a list of log dicts from get_logs(), or a string
+    
+    Returns:
+        Formatted string of logs, truncated to 4999 chars
+    """
+    if not logs_data:
+        return "No logs captured"
+    
+    if isinstance(logs_data, str):
+        return logs_data[:4999]
+    
+    if isinstance(logs_data, list):
+        formatted_lines = []
+        for log in logs_data:
+            if isinstance(log, dict):
+                level = log.get('level', 'INFO')
+                msg = log.get('message', '')
+                formatted_lines.append(f"[{level}] {msg}")
+            else:
+                formatted_lines.append(str(log))
+        return "\n".join(formatted_lines)[:4999]
+    
+    return str(logs_data)[:4999]
+
+
 class TaskManager:
     tasks: List[Task] = []
     last_execution: int = 0
@@ -89,10 +118,12 @@ class TaskManager:
                     if execution:
                         try:
                             execution.status = "completed"
-                            execution.result = (
-                                str(result)[:4999] if result else "completed"
-                            )
-                            execution.logs = "Execution completed successfully"
+                            if result and isinstance(result, dict):
+                                execution.result = str(result.get("result", "completed"))[:4999]
+                                execution.logs = _format_logs(result.get("logs", []))
+                            else:
+                                execution.result = str(result)[:4999] if result else "completed"
+                                execution.logs = "Execution completed successfully"
                         except Exception as exec_error:
                             logger.warning(
                                 f"Failed to update TaskExecution record: {exec_error}"
@@ -143,25 +174,18 @@ class TaskManager:
                             f"Failed to create TaskExecution record: {exec_error}"
                         )
 
-                    # Execute the task
-                    step.call._function()()
-
-                    # Get result if available (from Call._sync_function)
-                    result = getattr(step.call, "_result", None)
+                    # Execute the task and capture result
+                    result = step.call._function()()
 
                     # Update execution record with result (defensive)
                     if execution:
                         try:
+                            execution.status = "completed"
                             if result and isinstance(result, dict):
-                                execution.status = "completed"
-                                logs = result.get("logs", "") or "Execution completed"
-                                execution.logs = logs[:4999]  # Truncate to max length
-                                execution.result = str(
-                                    result.get("result", "completed")
-                                )[:4999]
+                                execution.logs = _format_logs(result.get("logs", []))
+                                execution.result = str(result.get("result", "completed"))[:4999]
                             else:
-                                execution.status = "completed"
-                                execution.result = "completed"
+                                execution.result = str(result)[:4999] if result else "completed"
                                 execution.logs = "Execution completed successfully"
                         except Exception as exec_error:
                             logger.warning(

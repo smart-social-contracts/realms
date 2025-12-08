@@ -3,7 +3,7 @@ import sys
 import traceback
 from contextlib import redirect_stderr, redirect_stdout
 
-from kybra_simple_logging import get_logger
+from kybra_simple_logging import get_logger, get_logs
 
 logger = get_logger("execution")
 
@@ -62,10 +62,12 @@ def run_code(source_code, locals={}, task_name=None, task_logger=None):
         }
     )
 
+    # Create task-specific logger if task_name is provided
+    if task_name and not task_logger:
+        task_logger = get_logger(f"task_{task_name}_{ic.time()}")
+    
     # Add task-specific logger if provided
-    if task_logger:
-        safe_globals["logger"] = task_logger
-        safe_globals["log"] = task_logger  # Alias for convenience
+    safe_globals["logger"] = task_logger
 
     # Add TaskEntity if task_name is provided
     if task_name:
@@ -98,7 +100,14 @@ def run_code(source_code, locals={}, task_name=None, task_logger=None):
         if stderr_content:
             logs.extend(stderr_content.split("\n"))
 
-        result = {"success": True, "result": safe_globals.get("result"), "logs": logs}
+        result = {
+            "success": True,
+            "result": safe_globals.get("result"),
+            "logs": get_logs(logger_name=task_logger.name),
+            "stdout_content": stdout_content,
+            "stderr_content": stderr_content
+        }
+    
     except Exception:
         stack_trace = traceback.format_exc()
 
@@ -112,6 +121,13 @@ def run_code(source_code, locals={}, task_name=None, task_logger=None):
         if stderr_content:
             logs.extend(stderr_content.split("\n"))
 
-        result = {"success": False, "error": stack_trace, "logs": logs}
+        result = {
+            "success": False,
+            "error": stack_trace,
+            "result": None,
+            "logs": get_logs(logger_name=task_logger.name),
+            "stdout_content": stdout_content,
+            "stderr_content": stderr_content
+        }
 
     return result
