@@ -324,6 +324,37 @@ else
     echo "   ℹ️  No manifest.json found or jq not available"
 fi
 
+# Copy logo to registry frontend static folder if this is a registry deployment
+if [ -d "src/realm_registry_frontend/static/images" ] && [ -f "manifest.json" ] && command -v jq &> /dev/null; then
+    MANIFEST_TYPE=$(jq -r '.type // empty' manifest.json)
+    if [ "$MANIFEST_TYPE" = "registry" ]; then
+        echo ""
+        echo "🖼️  Checking for registry logo..."
+        LOGO_FILE=$(jq -r '.logo // empty' manifest.json)
+        if [ -n "$LOGO_FILE" ]; then
+            # Check if logo file exists
+            if [ -f "$LOGO_FILE" ]; then
+                LOGO_SOURCE="$LOGO_FILE"
+            elif [ -f "logo.svg" ]; then
+                LOGO_SOURCE="logo.svg"
+            else
+                LOGO_SOURCE=""
+            fi
+            
+            if [ -n "$LOGO_SOURCE" ]; then
+                # Copy to registry frontend static folder (overwrite default logo_horizontal.svg)
+                LOGO_DEST="src/realm_registry_frontend/static/images/logo_horizontal.svg"
+                cp "$LOGO_SOURCE" "$LOGO_DEST"
+                echo "   ✅ Copied registry logo: $LOGO_SOURCE → $LOGO_DEST"
+            else
+                echo "   ⚠️  Registry logo file not found: $LOGO_FILE"
+            fi
+        else
+            echo "   ℹ️  No logo defined in registry manifest.json"
+        fi
+    fi
+fi
+
 # Build and deploy frontends
 if [ -n "$FRONTENDS" ]; then
     echo ""

@@ -141,6 +141,28 @@ def mundus_create_command(
             shutil.copy2(registry_canister_ids, registry_ids_dest)
             console.print(f"     ✅ Copied canister_ids.json for existing staging canisters")
         
+        # Copy registry manifest if it exists (includes logo reference)
+        registry_manifest_path = manifest_path.parent / "registry" / "manifest.json"
+        if registry_manifest_path.exists():
+            registry_manifest_dest = registry_dir / "manifest.json"
+            shutil.copy2(registry_manifest_path, registry_manifest_dest)
+            console.print(f"     ✅ Copied registry manifest.json")
+            
+            # Load manifest to check for logo
+            with open(registry_manifest_path, 'r') as f:
+                registry_manifest = json.load(f)
+            
+            # Copy logo file if specified in manifest
+            logo_filename = registry_manifest.get("logo", "")
+            if logo_filename:
+                logo_source = manifest_path.parent / "registry" / logo_filename
+                if logo_source.exists():
+                    logo_dest = registry_dir / logo_filename
+                    shutil.copy2(logo_source, logo_dest)
+                    console.print(f"     ✅ Copied registry logo: {logo_filename}")
+                else:
+                    console.print(f"     ⚠️  Registry logo file not found: {logo_source}")
+        
         console.print(f"     ✅ Registry created\n")
         
     finally:
