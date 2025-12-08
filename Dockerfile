@@ -1,6 +1,6 @@
 FROM ghcr.io/smart-social-contracts/icp-dev-env:db60540 AS base
 
-RUN apt-get update && apt-get install -y --no-install-recommends procps nano && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends procps nano jq && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
