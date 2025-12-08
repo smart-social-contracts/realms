@@ -31,9 +31,9 @@ import traceback
 from typing import Callable, List
 
 from ggg.call import Call
-from ggg.status import TaskStatus
+from ggg.status import TaskExecutionStatus, TaskStatus
 from ggg.task import Task
-from ggg.task_executions import TaskExecution
+from ggg.task_execution import TaskExecution
 from ggg.task_schedule import TaskSchedule
 from ggg.task_step import TaskStep
 from kybra import Async, Duration, ic, void
@@ -90,62 +90,32 @@ class TaskManager:
 
     def _create_timer_callback(self, step: TaskStep, task: Task) -> Callable:
         """Create a proper timer callback function that can handle both sync and async calls"""
+
         if step.call.is_async:
 
             def async_timer_callback() -> Async[void]:
                 logger.info(f"Executing async timer callback for {step.call}")
-                execution = None
+                task_execution = task.new_task_execution()
                 try:
                     # Create execution record (defensive - don't fail if this errors)
-                    try:
-                        execution = TaskExecution(
-                            name=f"{task.name}_execution",
-                            task=task,
-                            status="running",
-                            logs="",
-                            result="",
-                        )
-                    except Exception as exec_error:
-                        logger.warning(
-                            f"Failed to create TaskExecution record: {exec_error}"
-                        )
+                    task_execution.status = TaskExecutionStatus.RUNNING.value
 
                     # Use _function() which handles both codex and function-based calls
-                    result = yield step.call._function()()
+                    result = yield step.call._function(task_execution)()
                     logger.info(f"Async timer callback completed with result: {result}")
 
-                    # Update execution record with result (defensive)
-                    if execution:
-                        try:
-                            execution.status = "completed"
-                            if result and isinstance(result, dict):
-                                execution.result = str(result.get("result", "completed"))[:4999]
-                                execution.logs = _format_logs(result.get("logs", []))
-                            else:
-                                execution.result = str(result)[:4999] if result else "completed"
-                                execution.logs = "Execution completed successfully"
-                        except Exception as exec_error:
-                            logger.warning(
-                                f"Failed to update TaskExecution record: {exec_error}"
-                            )
 
+                    task_execution.status = TaskExecutionStatus.COMPLETED.value
                     step.status = TaskStatus.COMPLETED.value
                     self._check_and_schedule_next_step(task)
                 except Exception as e:
                     logger.error(f"Async timer callback failed: {e}")
                     logger.error(traceback.format_exc())
 
-                    # Update execution record with error (defensive)
-                    if execution:
-                        try:
-                            execution.status = "failed"
-                            execution.result = "failed"
-                            error_log = f"Error: {str(e)}\n{traceback.format_exc()}"
-                            execution.logs = error_log[:4999]  # Truncate to max length
-                        except Exception as exec_error:
-                            logger.warning(
-                                f"Failed to update TaskExecution error: {exec_error}"
-                            )
+                    task_execution.status = TaskExecutionStatus.FAILED.value
+                    task_execution.result = "failed"
+
+
 
                     step.status = TaskStatus.FAILED.value
                     task.status = TaskStatus.FAILED.value
@@ -158,57 +128,59 @@ class TaskManager:
                 logger.info(
                     f"step.call.task_step.task.name: {step.call.task_step.task.name}"
                 )
-                execution = None
+                task_execution = task.new_task_execution()
                 try:
-                    # Create execution record (defensive - don't fail if this errors)
-                    try:
-                        execution = TaskExecution(
-                            name=f"{task.name}_execution",
-                            task=task,
-                            status="running",
-                            logs="",
-                            result="",
-                        )
-                    except Exception as exec_error:
-                        logger.warning(
-                            f"Failed to create TaskExecution record: {exec_error}"
-                        )
+                    # # Create execution record (defensive - don't fail if this errors)
+                    # try:
+                    #     execution = TaskExecution(
+                    #         name=f"{task.name}_execution",
+                    #         task=task,
+                    #         status="running",
+                    #         logs="",
+                    #         result="",
+                    #     )
+                    # except Exception as exec_error:
+                    #     logger.warning(
+                    #         f"Failed to create TaskExecution record: {exec_error}"
+                    #     )
 
                     # Execute the task and capture result
-                    result = step.call._function()()
+                    task_execution.status = TaskExecutionStatus.RUNNING.value
+                    result = step.call._function(task_execution)()
 
-                    # Update execution record with result (defensive)
-                    if execution:
-                        try:
-                            execution.status = "completed"
-                            if result and isinstance(result, dict):
-                                execution.logs = _format_logs(result.get("logs", []))
-                                execution.result = str(result.get("result", "completed"))[:4999]
-                            else:
-                                execution.result = str(result)[:4999] if result else "completed"
-                                execution.logs = "Execution completed successfully"
-                        except Exception as exec_error:
-                            logger.warning(
-                                f"Failed to update TaskExecution record: {exec_error}"
-                            )
-
+                    # # Update execution record with result (defensive)
+                    # if execution:
+                    #     try:
+                    #         execution.status = "completed"
+                    #         if result and isinstance(result, dict):
+                    #             execution.logs = _format_logs(result.get("logs", []))
+                    #             execution.result = str(result.get("result", "completed"))[:4999]
+                    #         else:
+                    #             execution.result = str(result)[:4999] if result else "completed"
+                    #             execution.logs = "Execution completed successfully"
+                    #     except Exception as exec_error:
+                    #         logger.warning(
+                    #             f"Failed to update TaskExecution record: {exec_error}"
+                    #         )
+                    task_execution.status = TaskExecutionStatus.COMPLETED.value
                     step.status = TaskStatus.COMPLETED.value
                     self._check_and_schedule_next_step(task)
                 except Exception as e:
-                    logger.error(f"Sync timer callback failed: {e}")
+                    logger.error(f"Sync timer callback failed: {traceback.format_exc()}")
 
-                    # Update execution record with error (defensive)
-                    if execution:
-                        try:
-                            execution.status = "failed"
-                            execution.result = "failed"
-                            error_log = f"Error: {str(e)}\n{traceback.format_exc()}"
-                            execution.logs = error_log[:4999]  # Truncate to max length
-                        except Exception as exec_error:
-                            logger.warning(
-                                f"Failed to update TaskExecution error: {exec_error}"
-                            )
+                    # # Update execution record with error (defensive)
+                    # if execution:
+                    #     try:
+                    #         execution.status = "failed"
+                    #         execution.result = "failed"
+                    #         error_log = f"Error: {str(e)}\n{traceback.format_exc()}"
+                    #         execution.logs = error_log[:4999]  # Truncate to max length
+                    #     except Exception as exec_error:
+                    #         logger.warning(
+                    #             f"Failed to update TaskExecution error: {exec_error}"
+                    #         )
 
+                    task_execution.status = TaskExecutionStatus.FAILED.value
                     step.status = TaskStatus.FAILED.value
                     task.status = TaskStatus.FAILED.value
 

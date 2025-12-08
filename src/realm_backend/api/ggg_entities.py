@@ -14,6 +14,7 @@ from ggg.payment_account import PaymentAccount
 from ggg.proposal import Proposal
 from ggg.realm import Realm
 from ggg.task import Task
+from ggg.task_execution import TaskExecution
 from ggg.task_schedule import TaskSchedule
 from ggg.trade import Trade
 from ggg.transfer import Transfer

@@ -16,6 +16,9 @@ from kybra_simple_db import (
     TimestampedMixin,
 )
 
+from ggg.task_execution import TaskExecution
+from ggg.status import TaskExecutionStatus
+
 
 class Task(Entity, TimestampedMixin):
     """
@@ -32,3 +35,16 @@ class Task(Entity, TimestampedMixin):
     steps = OneToMany("TaskStep", "task")
     schedules = OneToMany("TaskSchedule", "task")
     executions = OneToMany("TaskExecution", "task")
+
+
+
+
+    def new_task_execution(self):
+        execution_name = 'taskexec_%s_%s' % (self._id, self._id)
+        execution = TaskExecution(
+            name=execution_name,
+            task=self,
+            status=TaskExecutionStatus.IDLE.value,
+            result="",
+        )
+        return execution

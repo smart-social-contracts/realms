@@ -1,6 +1,5 @@
 from typing import Any
 
-from ggg import Trade, Transfer
 from ggg.user_profile import UserProfile
 
 from kybra_simple_db import (

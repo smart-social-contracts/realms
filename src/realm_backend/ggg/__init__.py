@@ -29,6 +29,7 @@ from .realm import Realm
 from .registry import Registry
 from .service import Service
 from .task import Task
+from .task_execution import TaskExecution
 from .task_schedule import TaskSchedule
 from .task_step import TaskStep
 from .invoice import Invoice
@@ -65,8 +66,9 @@ __all__ = [
     "Registry",
     "Service",
     "Task",
+    "TaskExecution",
     "TaskSchedule",
-    "TaskStep",  # Implementation detail, not GGG standard
+    "TaskStep",
     "Trade",
     "Transfer",
     "Treasury",

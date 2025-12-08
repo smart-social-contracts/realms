@@ -74,3 +74,10 @@ class TaskStatus(Enum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+
+
+class TaskExecutionStatus(Enum):
+    IDLE = "idle"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"

@@ -2,8 +2,14 @@ import io
 import sys
 import traceback
 from contextlib import redirect_stderr, redirect_stdout
+from typing import TYPE_CHECKING, Optional
 
 from kybra_simple_logging import get_logger, get_logs
+
+if TYPE_CHECKING:
+    from ggg.task_execution import TaskExecution
+    from ggg.task import Task
+
 
 logger = get_logger("execution")
 
@@ -35,14 +41,9 @@ def create_task_entity_class(task_name):
     return TaskEntity
 
 
-def run_code(source_code, locals={}, task_name=None, task_logger=None):
+def run_code(source_code, locals={}, task: Optional["Task"] = None, task_execution: Optional["TaskExecution"] = None):
     """Execute Python code with optional task-scoped entity support.
 
-    Args:
-        source_code: Python code to execute
-        locals: Local variables to make available
-        task_name: Optional task name for TaskEntity namespacing
-        task_logger: Optional task-specific logger for isolated logging
     """
 
     logger.info("run_code start")
@@ -62,15 +63,15 @@ def run_code(source_code, locals={}, task_name=None, task_logger=None):
         }
     )
 
-    # Create task-specific logger if task_name is provided
-    if task_name and not task_logger:
-        task_logger = get_logger(f"task_{task_name}_{ic.time()}")
+    # Create specific logger if task_name is provided
+    execution_logger = task_execution.logger() if task_execution else get_logger(f"execution_{ic.time()}")
     
     # Add task-specific logger if provided
-    safe_globals["logger"] = task_logger
+    safe_globals["logger"] = execution_logger
 
     # Add TaskEntity if task_name is provided
-    if task_name:
+    if task_execution:
+        task_name = task_execution.task.name
         safe_globals["TaskEntity"] = create_task_entity_class(task_name)
         logger.info(f"TaskEntity class added with namespace: task_{task_name}")
 
@@ -103,11 +104,11 @@ def run_code(source_code, locals={}, task_name=None, task_logger=None):
         result = {
             "success": True,
             "result": safe_globals.get("result"),
-            "logs": get_logs(logger_name=task_logger.name),
+            "logs": get_logs(logger_name=execution_logger.name),
             "stdout_content": stdout_content,
             "stderr_content": stderr_content
         }
-    
+
     except Exception:
         stack_trace = traceback.format_exc()
 
@@ -125,7 +126,7 @@ def run_code(source_code, locals={}, task_name=None, task_logger=None):
             "success": False,
             "error": stack_trace,
             "result": None,
-            "logs": get_logs(logger_name=task_logger.name),
+            "logs": get_logs(logger_name=execution_logger.name),
             "stdout_content": stdout_content,
             "stderr_content": stderr_content
         }

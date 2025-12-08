@@ -1402,7 +1402,7 @@ def get_task_logs(task_id: str, limit: nat = 20) -> str:
     - task_id: The task ID
     - task_name: The task name
     - status: Current task status
-    - executions: Array of recent execution records
+    - executions: Array of recent execution records with logs
     - error: Error message if failed
     """
     import json
@@ -1423,15 +1423,19 @@ def get_task_logs(task_id: str, limit: nat = 20) -> str:
                 list(found_task.executions) if hasattr(found_task, "executions") else []
             )
 
-            # Format execution data
+            # Format execution data with logs from kybra_simple_logging
             execution_data = []
             for execution in executions[-limit:]:
+                # Compose logger name: task_{task_id}_{exec_id}
+                logger_name = f"task_{found_task._id}_{execution._id}"
+                exec_logs = get_logs(logger_name=logger_name)
+                
                 exec_info = {
-                    "started_at": getattr(execution, "_timestamp_created", 0),
+                    "execution_id": execution._id,
+                    "started_at": getattr(execution, "timestamp_created", 0),
                     "status": getattr(execution, "status", "unknown"),
+                    "logs": exec_logs if exec_logs else [],
                 }
-                if hasattr(execution, "logs") and execution.logs:
-                    exec_info["logs"] = str(execution.logs)
                 if hasattr(execution, "result") and execution.result:
                     exec_info["result"] = str(execution.result)
                 execution_data.append(exec_info)
@@ -1466,8 +1470,7 @@ def get_task_logs_by_name(
     """
     Get in-memory logs for a specific task by task name.
     
-    This retrieves the actual execution logs from the task-specific logger,
-    not the execution history. Logs are stored in memory only via kybra-simple-logging.
+    Fetches logs from all executions of the task using kybra-simple-logging.
     
     Args:
         task_name: Exact task name or partial task ID
@@ -1475,7 +1478,7 @@ def get_task_logs_by_name(
         max_entries: Maximum number of log entries to return (default: 100, max: 1000)
     
     Returns:
-        JSON string with array of log entries: [{"timestamp": ..., "level": ..., "message": ...}, ...]
+        JSON string with array of log entries from all executions
     """
     from ggg.task import Task
     import json
@@ -1491,22 +1494,26 @@ def get_task_logs_by_name(
         if not found_task:
             return json.dumps([])
         
-        task_id = str(found_task._id)
-        logger_name = f"task_{task_id}"
-        
         # Limit max_entries to prevent too large responses
         safe_max_entries = min(int(max_entries), 1000)
-        safe_from_entry = int(from_entry) if from_entry else None
         
-        # Get logs from kybra-simple-logging in-memory storage with pagination
-        logs = get_logs(
-            logger_name=logger_name,
-            from_entry=safe_from_entry,
-            max_entries=safe_max_entries
-        )
+        # Collect logs from all executions
+        all_logs = []
+        executions = list(found_task.executions) if hasattr(found_task, "executions") else []
         
-        # Return raw logs as JSON string for CLI to format
-        return json.dumps(logs) if logs else json.dumps([])
+        for execution in executions:
+            # Compose logger name: task_{task_id}_{exec_id}
+            logger_name = f"task_{found_task._id}_{execution._id}"
+            exec_logs = get_logs(logger_name=logger_name)
+            if exec_logs:
+                all_logs.extend(exec_logs)
+        
+        # Apply pagination
+        start_idx = int(from_entry) if from_entry else 0
+        end_idx = start_idx + safe_max_entries
+        paginated_logs = all_logs[start_idx:end_idx]
+        
+        return json.dumps(paginated_logs) if paginated_logs else json.dumps([])
     
     except Exception as e:
         logger.error(f"Error getting task logs by name: {e}")
