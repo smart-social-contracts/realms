@@ -869,14 +869,20 @@ def get_effective_cwd(folder: Optional[str] = None) -> Optional[str]:
     
     Priority:
     1. Explicit folder parameter
-    2. Current realm folder from context
-    3. None (use current working directory)
+    2. Current working directory if it's a realm folder
+    3. Current realm folder from context
+    4. None (use current working directory)
     """
     if folder:
         folder_path = Path(folder).resolve()
         if folder_path.exists():
             return str(folder_path)
         console.print(f"[yellow]⚠️  Specified folder not found: {folder}[/yellow]")
+    
+    # Check if current working directory is a realm folder
+    cwd = Path.cwd()
+    if _is_realm_folder(cwd):
+        return str(cwd)
     
     # Try current realm folder from context
     current_folder = get_current_realm_folder()
@@ -886,6 +892,14 @@ def get_effective_cwd(folder: Optional[str] = None) -> Optional[str]:
             return str(folder_path)
     
     return None
+
+
+def _is_realm_folder(path: Path) -> bool:
+    """Check if a path is a realm folder (in .realms/ and starts with realm_)."""
+    # Check if it's in .realms/ directory and starts with realm_
+    if ".realms" in str(path) and path.name.startswith("realm_"):
+        return True
+    return False
 
 
 def list_realm_folders(base_dir: Optional[str] = None) -> List[Dict[str, Any]]:

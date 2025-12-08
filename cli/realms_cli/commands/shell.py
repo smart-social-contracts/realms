@@ -12,7 +12,7 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.history import InMemoryHistory
 from rich.console import Console
 
-from ..utils import is_repo_mode
+from ..utils import is_repo_mode, get_effective_cwd
 
 console = Console()
 
@@ -21,10 +21,11 @@ class RealmsShell:
     """Interactive Python shell for Realms backend canister."""
 
     def __init__(
-        self, canister_name: str = "realm_backend", network: Optional[str] = None
+        self, canister_name: str = "realm_backend", network: Optional[str] = None, cwd: Optional[str] = None
     ):
         self.canister_name = canister_name
         self.network = network
+        self.cwd = cwd
         self.globals_dict = {}
 
     def execute(self, code: str) -> str:
@@ -45,8 +46,8 @@ class RealmsShell:
         cmd.extend([self.canister_name, "execute_code_shell", f'("{escaped_code}")'])
 
         try:
-            # Execute the dfx command
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            # Execute the dfx command from the realm folder if specified
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=self.cwd)
 
             # Parse the output
             output = result.stdout.strip()
@@ -166,7 +167,7 @@ class RealmsShell:
                 cmd.extend(["--network", self.network])
             cmd.extend([self.canister_name, "status"])
 
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10, cwd=self.cwd)
             if result.returncode == 0:
                 console.print("[green]✅ Backend canister is responding[/green]")
                 if "success = true" in result.stdout:
@@ -240,21 +241,16 @@ class RealmsShell:
 
 
 def shell_command(
-    network: Optional[str] = typer.Option(
-        None, "--network", "-n", help="Network to use (local, ic, etc.)"
-    ),
-    canister: str = typer.Option(
-        "realm_backend", "--canister", "-c", help="Canister name to connect to"
-    ),
-    file: Optional[str] = typer.Option(
-        None, "--file", "-f", help="Execute Python file instead of interactive shell"
-    ),
+    network: Optional[str],
+    canister: str,
+    file: Optional[str],
+    cwd: Optional[str] = None,
 ) -> None:
     """Start an interactive Python shell connected to the Realms backend canister or execute a Python file."""
     # If file is provided, execute it instead of interactive shell
     if file:
         console.print(f"[bold blue]📄 Executing Python file: {file}[/bold blue]\n")
-        execute_python_file(file, canister, network)
+        execute_python_file(file, canister, network, cwd)
         return
 
     console.print("[bold blue]🚀 Starting Realms Shell[/bold blue]\n")
@@ -283,11 +279,11 @@ def shell_command(
             console.print("[yellow]⚠️  Could not check dfx replica status.[/yellow]")
 
     # Create and run the shell
-    shell = RealmsShell(canister_name=canister, network=network)
+    shell = RealmsShell(canister_name=canister, network=network, cwd=cwd)
     shell.run_shell()
 
 
-def execute_python_file(file_path: str, canister: str, network: Optional[str]) -> None:
+def execute_python_file(file_path: str, canister: str, network: Optional[str], cwd: Optional[str] = None) -> None:
     """Execute a Python file on the Realms backend canister."""
     import os
     from pathlib import Path
@@ -314,7 +310,7 @@ def execute_python_file(file_path: str, canister: str, network: Optional[str]) -
     )
 
     # Create shell instance and execute the code
-    shell = RealmsShell(canister_name=canister, network=network)
+    shell = RealmsShell(canister_name=canister, network=network, cwd=cwd)
 
     try:
         result = shell.execute(code_content)

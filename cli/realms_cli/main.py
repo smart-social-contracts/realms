@@ -34,6 +34,7 @@ from .utils import (
     get_current_network,
     get_current_realm,
     get_current_realm_folder,
+    get_effective_cwd,
     get_effective_network_and_canister,
     get_project_root,
     list_realm_folders,
@@ -1070,13 +1071,18 @@ def shell(
     file: Optional[str] = typer.Option(
         None, "--file", "-f", help="Execute Python file instead of interactive shell"
     ),
+    folder: Optional[str] = typer.Option(
+        None, "--folder", help="Realm folder to use (overrides context)"
+    ),
 ) -> None:
     """Start an interactive Python shell connected to the Realms backend canister or execute a Python file."""
     # Get effective network and canister from context
     effective_network, effective_canister = get_effective_network_and_canister(
         network, canister
     )
-    shell_command(effective_network, effective_canister, file)
+    # Get effective working directory from context
+    effective_cwd = get_effective_cwd(folder)
+    shell_command(effective_network, effective_canister, file, effective_cwd)
 
 
 @app.command("run")
