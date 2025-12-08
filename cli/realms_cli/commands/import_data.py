@@ -110,7 +110,8 @@ def import_data_command(
 
             # Parse the dfx response to check for backend errors
             if result and result.stdout:
-                if "'success': True" in result.stdout:
+                # Check for success in response (handle both JSON double quotes and Python single quotes)
+                if '"success": true' in result.stdout.lower() or "'success': True" in result.stdout:
                     display_success_panel("Import Chunk Complete! 🎉", result.stdout)
                 else:
                     display_error_panel("Backend Import Chunk Failed", result.stdout)
