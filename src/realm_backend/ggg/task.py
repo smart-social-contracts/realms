@@ -16,8 +16,8 @@ from kybra_simple_db import (
     TimestampedMixin,
 )
 
-from ggg.task_execution import TaskExecution
-from ggg.status import TaskExecutionStatus
+from .task_execution import TaskExecution
+from .status import TaskExecutionStatus
 
 
 class Task(Entity, TimestampedMixin):
