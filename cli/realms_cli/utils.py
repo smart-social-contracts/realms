@@ -21,6 +21,7 @@ from rich.text import Text
 from .constants import DOCKER_IMAGE
 
 console = Console()
+stderr_console = Console(stderr=True)  # For warnings/errors that shouldn't pollute JSON output
 
 
 def generate_timestamp() -> str:
@@ -844,7 +845,7 @@ def get_current_realm_folder(auto_select: bool = True) -> Optional[str]:
             if first_realm["network"] != "unknown":
                 set_current_network(first_realm["network"])
             
-            console.print(f"[dim]📁 Auto-selected realm: {first_realm['name']}[/dim]")
+            stderr_console.print(f"[dim]📁 Auto-selected realm: {first_realm['name']}[/dim]")
             return first_realm["path"]
     
     return None
@@ -877,7 +878,7 @@ def get_effective_cwd(folder: Optional[str] = None) -> Optional[str]:
         folder_path = Path(folder).resolve()
         if folder_path.exists():
             return str(folder_path)
-        console.print(f"[yellow]⚠️  Specified folder not found: {folder}[/yellow]")
+        stderr_console.print(f"[yellow]⚠️  Specified folder not found: {folder}[/yellow]")
     
     # Check if current working directory is a realm folder
     cwd = Path.cwd()
@@ -1104,8 +1105,11 @@ def get_effective_network_and_canister(
                 explicit_canister or realm_canister,
             )
         except ValueError as e:
-            console.print(f"[yellow]Warning: {e}[/yellow]")
-            console.print("[yellow]Falling back to network/default values[/yellow]")
+            # Log to stderr so JSON output on stdout is not polluted
+            logger = get_logger("utils")
+            logger.warning(f"{e}")
+            stderr_console.print(f"[yellow]Warning: {e}[/yellow]")
+            stderr_console.print("[yellow]Falling back to network/default values[/yellow]")
 
     # Use network context or explicit network
     effective_network = explicit_network or get_current_network()

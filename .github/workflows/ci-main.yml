@@ -237,6 +237,8 @@ jobs:
             tests: "test_task_manager_api.py test_scheduled_tasks.py"
           - name: "System Operations"
             tests: "test_db_command.py test_shell_command.py"
+          - name: "CLI"
+            tests: "test_cli.py"
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
