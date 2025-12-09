@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: realms-cli
-Version: 0.1.5
+Version: 0.2.0
 Summary: CLI tool for managing Realms project lifecycle
 Author-email: Realms Team <team@realms.dev>
 License: MIT
