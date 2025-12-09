@@ -253,6 +253,28 @@ dfx canister call realm_backend initialize
 realms import realm_data.json
 ```
 
+### Local Token Testing (ckBTC)
+
+The default ledger uses management canister as minter. Redeploy with your principal to get test tokens:
+
+```bash
+# Stop and delete existing ledger
+dfx canister stop ckbtc_ledger
+dfx canister delete ckbtc_ledger --no-withdrawal
+
+# Deploy with your principal as minter (1000 ckBTC initial balance)
+MY_PRINCIPAL=$(dfx identity get-principal)
+dfx deploy ckbtc_ledger --argument="(variant { Init = record { token_name = \"ckBTC\"; token_symbol = \"ckBTC\"; minting_account = record { owner = principal \"$MY_PRINCIPAL\" }; initial_balances = vec { record { record { owner = principal \"$MY_PRINCIPAL\"; subaccount = null }; 100_000_000_000 } }; metadata = vec {}; transfer_fee = 10; archive_options = record { trigger_threshold = 2000; num_blocks_to_archive = 1000; controller_id = principal \"$MY_PRINCIPAL\" }; feature_flags = opt record { icrc2 = true }; } })"
+
+# Verify with icw
+icw -n local balance --ledger $(dfx canister id ckbtc_ledger)
+
+# Transfer to realm_backend
+icw -n local transfer $(dfx canister id realm_backend) 10.0 --ledger $(dfx canister id ckbtc_ledger) --fee 10
+```
+
+> **Note:** `100_000_000_000` raw = 1000 ckBTC (8 decimals). Canister ID changes after redeployment.
+
 ---
 
 ## Multi-Realm Deployment (Mundus)
