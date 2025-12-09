@@ -11,8 +11,8 @@ Complete documentation for building and deploying governance systems on the Inte
 ## 📖 Start Here
 
 **New to Realms?** Choose your path:
-- **[Non-Technical Introduction](./NON_TECHNICAL_INTRO.md)** - Understand what Realms is and why it exists
-- **[Technical Introduction](./TECHNICAL_INTRO.md)** - Architecture, APIs, and development guide
+- **[Non-Technical Introduction](./reference/NON_TECHNICAL_INTRO.md)** - Understand what Realms is and why it exists
+- **[Technical Introduction](./reference/TECHNICAL_INTRO.md)** - Architecture, APIs, and development guide
 
 ---
 
@@ -20,43 +20,44 @@ Complete documentation for building and deploying governance systems on the Inte
 
 ### 👤 End Users
 - [Citizen Dashboard](../extensions/citizen_dashboard/README.md) - Manage your account
-- [Governance Tutorial](./GOVERNANCE_TUTORIAL.md) - Vote on proposals
+- [Governance Tutorial](./reference/GOVERNANCE_TUTORIAL.md) - Vote on proposals
 
 ### 👨‍💼 Realm Operators  
-- [Deployment Guide](./DEPLOYMENT_GUIDE.md) - Deploy your realm
-- [Realm Registration](./REALM_REGISTRATION_GUIDE.md) - Register with central registry
-- [CLI Reference](./CLI_REFERENCE.md) - All commands
+- [Deployment Guide](./reference/DEPLOYMENT_GUIDE.md) - Deploy your realm
+- [Realm Registration](./reference/REALM_REGISTRATION_GUIDE.md) - Register with central registry
+- [CLI Reference](./reference/CLI_REFERENCE.md) - All commands
 
 ### 🔧 Extension Developers
 - [Extension Guide](../extensions/README.md) - Build extensions
-- [Method Overrides](./METHOD_OVERRIDE_SYSTEM.md) - Override entity methods
+- [Method Overrides](./reference/METHOD_OVERRIDE_SYSTEM.md) - Override entity methods
 - [Testing Guide](../extensions/_shared/testing/README.md) - Test your extensions
 
 ### 💻 Platform Developers
-- [Core Entities](./CORE_ENTITIES.md) - Data model reference
-- [API Reference](./API_REFERENCE.md) - Backend endpoints
-- [Frontend Architecture](./FRONTEND_ARCHITECTURE.md) - Svelte components
+- [Core Entities](./reference/CORE_ENTITIES.md) - Data model reference
+- [API Reference](./reference/API_REFERENCE.md) - Backend endpoints
+- [Frontend Architecture](./reference/FRONTEND_ARCHITECTURE.md) - Svelte components
 
 ---
 
 ## 📚 Core Documentation
 
 ### Platform Fundamentals
-- **[Core Entities](./CORE_ENTITIES.md)** - All 30+ entity types with examples
-- **[API Reference](./API_REFERENCE.md)** - Complete backend API
-- **[CLI Reference](./CLI_REFERENCE.md)** - All command-line tools
-- **[Frontend Architecture](./FRONTEND_ARCHITECTURE.md)** - UI structure and patterns
+- **[Core Entities](./reference/CORE_ENTITIES.md)** - All 30+ entity types with examples
+- **[API Reference](./reference/API_REFERENCE.md)** - Complete backend API
+- **[CLI Reference](./reference/CLI_REFERENCE.md)** - All command-line tools
+- **[Frontend Architecture](./reference/FRONTEND_ARCHITECTURE.md)** - UI structure and patterns
 
 ### Deployment & Operations
-- **[Deployment Guide](./DEPLOYMENT_GUIDE.md)** - Local → Staging → Production
-- **[Realm Registration](./REALM_REGISTRATION_GUIDE.md)** - Join the registry
-- **[Troubleshooting](./TROUBLESHOOTING.md)** - Common issues
+- **[Deployment Guide](./reference/DEPLOYMENT_GUIDE.md)** - Local → Staging → Production
+- **[Realm Registration](./reference/REALM_REGISTRATION_GUIDE.md)** - Join the registry
+- **[Troubleshooting](./reference/TROUBLESHOOTING.md)** - Common issues
 
 ### Advanced Features
-- **[Task System](./TASK_ENTITY.md)** - Batch processing with TaskEntity
-- **[Multi-Step Tasks](./MULTI_STEP_TASKS_IMPLEMENTATION.md)** - Complex workflows
-- **[Method Override System](./METHOD_OVERRIDE_SYSTEM.md)** - Extension method injection
-- **[Governance Tutorial](./GOVERNANCE_TUTORIAL.md)** - Proposals and voting
+- **[Scheduled Tasks](./reference/SCHEDULED_TASKS.md)** - Task scheduling and `realms ps` commands
+- **[Task System](./reference/TASK_ENTITY.md)** - Batch processing with TaskEntity
+- **[Multi-Step Tasks](./reference/MULTI_STEP_TASKS_IMPLEMENTATION.md)** - Complex workflows
+- **[Method Override System](./reference/METHOD_OVERRIDE_SYSTEM.md)** - Extension method injection
+- **[Governance Tutorial](./reference/GOVERNANCE_TUTORIAL.md)** - Proposals and voting
 
 ### Extension Development
 - **[Extension Guide](../extensions/README.md)** - Complete development guide
@@ -82,7 +83,7 @@ Tasks & Automation        Services                Registry
 ├─ Codex                  ├─ Dispute
 └─ TaskEntity             └─ Permission
 ```
-→ [Full Entity Reference](./CORE_ENTITIES.md)
+→ [Full Entity Reference](./reference/CORE_ENTITIES.md)
 
 ### Key APIs
 - **Entity Management** - CRUD operations for all entities
@@ -91,7 +92,7 @@ Tasks & Automation        Services                Registry
 - **User Management** - Authentication & profiles
 - **Registry** - Realm discovery
 
-→ [Complete API Docs](./API_REFERENCE.md)
+→ [Complete API Docs](./reference/API_REFERENCE.md)
 
 ### CLI Commands
 ```bash
@@ -113,7 +114,7 @@ realms extension install   # Install extension
 realms registry add    # Register realm
 realms registry list   # List realms
 ```
-→ [Full CLI Reference](./CLI_REFERENCE.md)
+→ [Full CLI Reference](./reference/CLI_REFERENCE.md)
 
 ---
 
@@ -131,7 +132,7 @@ cd generated_realm
 # 3. Upload data
 ./scripts/3-upload-data.sh
 ```
-→ [Deployment Guide](./DEPLOYMENT_GUIDE.md)
+→ [Deployment Guide](./reference/DEPLOYMENT_GUIDE.md)
 
 ### Create a Governance Proposal
 ```python
@@ -146,7 +147,7 @@ proposal = Proposal(
     required_threshold=0.51
 )
 ```
-→ [Governance Tutorial](./GOVERNANCE_TUTORIAL.md)
+→ [Governance Tutorial](./reference/GOVERNANCE_TUTORIAL.md)
 
 ### Build an Extension
 ```bash
@@ -169,10 +170,11 @@ realms extension install-from-source
 
 | Guide | Description | Status |
 |-------|-------------|--------|
-| [TASK_ENTITY.md](./TASK_ENTITY.md) | Batch processing for large datasets | ✅ Complete |
-| [METHOD_OVERRIDE_SYSTEM.md](./METHOD_OVERRIDE_SYSTEM.md) | Extension method injection | ✅ Complete |
-| [MULTI_STEP_TASKS_IMPLEMENTATION.md](./MULTI_STEP_TASKS_IMPLEMENTATION.md) | Complex task workflows | ✅ Complete |
-| [REALM_REGISTRATION_GUIDE.md](./REALM_REGISTRATION_GUIDE.md) | Registry integration | ✅ Complete |
+| [SCHEDULED_TASKS.md](./reference/SCHEDULED_TASKS.md) | Task scheduling architecture and CLI | ✅ Complete |
+| [TASK_ENTITY.md](./reference/TASK_ENTITY.md) | Batch processing for large datasets | ✅ Complete |
+| [METHOD_OVERRIDE_SYSTEM.md](./reference/METHOD_OVERRIDE_SYSTEM.md) | Extension method injection | ✅ Complete |
+| [MULTI_STEP_TASKS_IMPLEMENTATION.md](./reference/MULTI_STEP_TASKS_IMPLEMENTATION.md) | Complex task workflows | ✅ Complete |
+| [REALM_REGISTRATION_GUIDE.md](./reference/REALM_REGISTRATION_GUIDE.md) | Registry integration | ✅ Complete |
 
 ---
 
@@ -180,8 +182,8 @@ realms extension install-from-source
 
 | Example | Description | Documentation |
 |---------|-------------|---------------|
-| **Demo Mundus** | Multi-realm ecosystem with 3 realms and registry | [EXAMPLE_DEMO.md](./EXAMPLE_DEMO.md) |
-| **File Download** | HTTP outcalls to download files from the internet | [EXAMPLE_FILE_DOWNLOAD.md](./EXAMPLE_FILE_DOWNLOAD.md) |
+| **Demo Mundus** | Multi-realm ecosystem with 3 realms and registry | [EXAMPLE_DEMO.md](./reference/EXAMPLE_DEMO.md) |
+| **File Download** | HTTP outcalls to download files from the internet | [EXAMPLE_FILE_DOWNLOAD.md](./reference/EXAMPLE_FILE_DOWNLOAD.md) |
 
 See the [examples/](../examples/) directory for code samples.
 
@@ -198,6 +200,6 @@ See the [examples/](../examples/) directory for code samples.
 
 ## 🆘 Need Help?
 
-- **Troubleshooting** - [Common issues and solutions](./TROUBLESHOOTING.md)
+- **Troubleshooting** - [Common issues and solutions](./reference/TROUBLESHOOTING.md)
 - **Examples** - [Code examples](../examples/)
 - **Extensions** - [Extension examples](../extensions/)
