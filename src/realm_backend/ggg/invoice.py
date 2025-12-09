@@ -1,9 +1,15 @@
 import uuid
+from datetime import datetime
+from typing import Optional
 
+from kybra import Async, Principal, ic
 from kybra_simple_db import Entity, Float, ManyToOne, String, TimestampedMixin
 from kybra_simple_logging import get_logger
 
 logger = get_logger("entity.invoice")
+
+# ICRC-1 decimals for ckBTC
+CKBTC_DECIMALS = 8
 
 
 class Invoice(Entity, TimestampedMixin):
@@ -65,3 +71,25 @@ class Invoice(Entity, TimestampedMixin):
     def id_from_subaccount(subaccount: bytes) -> str:
         """Extract the invoice ID from a subaccount."""
         return subaccount.rstrip(b'\x00').decode()
+
+    def get_amount_raw(self) -> int:
+        """Get the invoice amount in raw satoshis."""
+        return int(self.amount * (10 ** CKBTC_DECIMALS))
+
+    def mark_paid(self) -> None:
+        """Mark this invoice as paid with current timestamp."""
+        self.status = "Paid"
+        self.paid_at = datetime.utcnow().isoformat()
+        logger.info(f"Invoice {self.id} marked as paid at {self.paid_at}")
+
+    def get_payment_address(self) -> dict:
+        """
+        Get the payment address for this invoice.
+        Returns dict with principal and subaccount for display to user.
+        """
+        return {
+            "principal": ic.id().to_str(),
+            "subaccount": self.get_subaccount_hex(),
+            "subaccount_int": int(self._id) if self._id else 0,
+        }
+
