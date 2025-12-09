@@ -167,15 +167,15 @@ realms ps logs <task_id> --output json
 
 ## Task Code Requirements
 
-Tasks are defined as Python functions named `async_task()`.
+Tasks must define a function called `async_task()`. The function name is always `async_task` regardless of whether your code is synchronous or asynchronous—the distinction is whether you use `yield` inside the function.
 
 ### Sync Tasks (No Yield)
 
-For simple operations that don't require inter-canister calls:
+For simple operations that don't require inter-canister calls, just write normal Python code without `yield`:
 
 ```python
 def async_task():
-    """Simple sync task - no inter-canister calls"""
+    """Sync task - no yield, no inter-canister calls"""
     ic.print('Processing...')
     
     # Access GGG entities
@@ -188,11 +188,11 @@ def async_task():
 
 ### Async Tasks (With Yield)
 
-For operations that require inter-canister calls (e.g., transfers, external API calls):
+For operations that require inter-canister calls (e.g., transfers, external API calls), use `yield` to pause execution until the call completes:
 
 ```python
 def async_task():
-    """Async task with inter-canister call"""
+    """Async task - uses yield for inter-canister calls"""
     from ggg import Treasury
     
     treasury = Treasury.instances()[0]
