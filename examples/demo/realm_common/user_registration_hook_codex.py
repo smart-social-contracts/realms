@@ -12,7 +12,7 @@ def user_register_posthook(user):
     """Custom user registration hook - creates welcome invoice."""
     try:
         # Calculate expiry time (5 minutes from now)
-        expiry_time = datetime.now() + timedelta(minutes=5)
+        expiry_time = datetime.now() + timedelta(days=1)
         due_date = expiry_time.isoformat()
         
         # Create 1 ckBTC invoice for the new user
