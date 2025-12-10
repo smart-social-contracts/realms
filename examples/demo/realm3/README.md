@@ -1,63 +1,17 @@
-# Demo Realm Configuration Files
+# Realm 3
 
-This folder contains sample configuration and codex files used by the `realms realm create` command to generate demo realm instances.
+Demo realm instance with 20 members, 2 organizations, 30 transactions, and 3 disputes.
 
-## Configuration Files
+## Realm-Specific Files
 
-### `manifest.json`
-Realm configuration with entity method overrides:
-- Defines the realm name (updated dynamically during generation)
-- Specifies entity method overrides (e.g., `user_register_posthook`)
-- Links to custom codex implementations for lifecycle hooks
+| File | Description |
+|------|-------------|
+| `manifest.json` | Realm configuration (name: "Realm 3", seed: 3) |
+| `logo.svg` | Realm-specific logo |
+| `canister_ids.json` | Deployment canister IDs |
 
-### `adjustments.py`
-Post-deployment adjustment script:
-- Loads `manifest.json` and applies entity method overrides to the Realm
-- Prints entity counts for verification (Realm, Treasury, Users, Codex, etc.)
-- Runs after data upload to configure the deployed realm canister
+## Shared Codex Files
 
-## Codex Files
+Common codex files are stored in `../realm_common/` and automatically copied to generated realms during `realms realm create`.
 
-### 1. `tax_collection_codex.py`
-Automated tax collection system with progressive tax rates:
-- Calculates taxes based on user income from transfers
-- Progressive rates: 10% (≤10K), 20% (≤50K), 30% (>50K)
-- Automatically creates tax payment transfers to the system account
-
-### 2. `social_benefits_codex.py`
-Social benefits distribution system:
-- Checks member eligibility based on residence, tax compliance, and identity verification
-- Calculates benefit amounts based on member status
-- Automatically distributes benefits to eligible members
-
-### 3. `governance_automation_codex.py`
-Democratic governance automation:
-- Creates and manages governance proposals
-- Processes votes and determines outcomes
-- Tallies results and closes proposals after voting deadline
-
-### 4. `user_registration_hook_codex.py`
-Custom user registration hook:
-- Overrides the default `user_register_posthook` method
-- Creates a 1 ckBTC welcome invoice for new users
-- Invoice expires in 5 minutes with unique subaccount
-
-## Usage
-
-These files are automatically copied when running:
-```bash
-realms realm create --random --members 100 --organizations 10
-```
-
-The `realm_generator.py` script copies these files from `examples/demo/` to the generated realm directory, where they can be imported into the realm canister.
-
-## Customization
-
-You can modify these files to create your own demo scenarios:
-1. Edit the codex files in this folder
-2. Run `realms realm create` to generate a new realm with your custom codex files
-3. The updated files will be automatically copied to your new realm
-
-## Single Source of Truth
-
-These files serve as the canonical examples for realm codex automation. Any changes made here will automatically propagate to all newly created demo realms, ensuring consistency and maintainability.
+See `../realm_common/README.md` for documentation on shared files.

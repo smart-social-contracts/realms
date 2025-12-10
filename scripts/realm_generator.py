@@ -447,21 +447,19 @@ class RealmGenerator:
         return ret
     
     def generate_codex_files(self, output_dir: Path, demo_folder: Optional[str] = None) -> List[str]:
-        """Copy Python codex files from examples/demo/{demo_folder} folder"""
+        """Copy Python codex files from examples/demo/realm_common folder"""
         codex_files = []
         
-        # Get the path to the examples/demo folder
+        # Get the path to the examples/demo/realm_common folder
         script_dir = Path(__file__).parent
         repo_root = script_dir.parent
         
-        # Default to realm1 if no demo_folder specified (codex files are in subdirectories)
-        if demo_folder:
-            examples_demo_dir = repo_root / "examples" / "demo" / demo_folder
-        else:
-            examples_demo_dir = repo_root / "examples" / "demo" / "realm1"
+        # Always use realm_common for shared codex files
+        examples_common_dir = repo_root / "examples" / "demo" / "realm_common"
         
-        # List of codex files to copy
+        # List of codex files to copy (shared across all realms)
         demo_codex_files = [
+            "adjustments.py",
             "tax_collection_codex.py",
             "social_benefits_codex.py",
             "governance_automation_codex.py",
@@ -469,17 +467,17 @@ class RealmGenerator:
             "satoshi_transfer_codex.py"
         ]
         
-        # Copy each codex file from examples/demo to output directory
+        # Copy each codex file from realm_common to output directory
         for codex_filename in demo_codex_files:
-            source_file = examples_demo_dir / codex_filename
+            source_file = examples_common_dir / codex_filename
             
             if source_file.exists():
                 dest_file = output_dir / codex_filename
                 shutil.copy2(source_file, dest_file)
                 codex_files.append(str(dest_file))
-                print(f"  Copied {codex_filename} from {examples_demo_dir}")
+                print(f"  Copied {codex_filename} from realm_common/")
             else:
-                print(f"  Warning: {codex_filename} not found in {examples_demo_dir}")
+                print(f"  Warning: {codex_filename} not found in {examples_common_dir}")
         
         return codex_files
 
