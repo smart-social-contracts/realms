@@ -374,6 +374,19 @@ def _generate_deployment_scripts(
     # For local networks, include additional canisters (Internet Identity, ckBTC, etc.)
     is_local_network = network.startswith("local")
     
+    # Get the deploying user's principal for local ledger initialization
+    deployer_principal = None
+    if is_local_network:
+        try:
+            result = subprocess.run(
+                ["dfx", "identity", "get-principal"],
+                capture_output=True, text=True, check=True
+            )
+            deployer_principal = result.stdout.strip()
+            console.print(f"   ✅ Deployer principal: {deployer_principal}")
+        except Exception as e:
+            console.print(f"   ⚠️  Could not get deployer principal: {e}")
+    
     if is_local_network:
         # Include Internet Identity for local development (shared across realms)
         if "internet_identity" in dfx_config["canisters"]:
@@ -388,7 +401,21 @@ def _generate_deployment_scripts(
                 else:
                     sanitized_realm_name = realm_name.lower().replace(" ", "_").replace("-", "_")
                     ledger_name = f"{sanitized_realm_name}_{canister_name}"
-                realm_canisters[ledger_name] = canister_config
+                
+                # Deep copy the config to avoid modifying the template
+                ledger_config = copy.deepcopy(canister_config)
+                
+                # Update init_arg for ckbtc_ledger to include initial balance for deployer
+                if "ckbtc" in canister_name.lower() and "ledger" in canister_name.lower() and deployer_principal:
+                    if "init_arg" in ledger_config:
+                        # Replace minting_account and initial_balances in existing init_arg
+                        init_arg = ledger_config["init_arg"]
+                        init_arg = init_arg.replace('principal "aaaaa-aa"', f'principal "{deployer_principal}"')
+                        init_arg = init_arg.replace('initial_balances = vec {}', f'initial_balances = vec {{ record {{ record {{ owner = principal "{deployer_principal}"; subaccount = null }}; 100_000_000_000 }} }}')
+                        ledger_config["init_arg"] = init_arg
+                        console.print(f"   ✅ Configured {ledger_name} with 1000 ckBTC initial balance for deployer")
+                
+                realm_canisters[ledger_name] = ledger_config
                 console.print(f"   ✅ Including {ledger_name} for local development")
     
     realm_dfx = {
