@@ -522,15 +522,17 @@ class CursorDatabaseExplorer:
         classes = []
 
         # Add the GGG module path to sys.path if not already there
+        # Path from cli/realms/cli/commands/db.py -> repo_root/src/realm_backend
         ggg_path = os.path.join(
-            os.path.dirname(__file__), "..", "..", "..", "src", "realm_backend"
+            os.path.dirname(__file__), "..", "..", "..", "..", "src", "realm_backend"
         )
         ggg_path = os.path.abspath(ggg_path)
         if ggg_path not in sys.path:
             sys.path.insert(0, ggg_path)
 
         # Also add the project root to handle kybra_simple_db imports
-        project_root = os.path.join(os.path.dirname(__file__), "..", "..", "..")
+        # Path from cli/realms/cli/commands/db.py -> repo_root
+        project_root = os.path.join(os.path.dirname(__file__), "..", "..", "..", "..")
         project_root = os.path.abspath(project_root)
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
