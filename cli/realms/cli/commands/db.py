@@ -1033,4 +1033,30 @@ def db_command(
     logger.debug(f"Effective cwd: {effective_cwd}")
 
     explorer = CursorDatabaseExplorer(effective_network, effective_canister, cwd=effective_cwd)
+    
+    # Check if running in non-interactive mode (stdin is not a TTY)
+    # In this case, print a simple list of entity types and counts instead of running the interactive app
+    if not sys.stdin.isatty():
+        logger.debug("Non-interactive mode detected, printing entity list")
+        try:
+            explorer.call_backend("status")
+        except Exception as e:
+            console.print(f"[red]Error: Could not connect to backend canister: {e}[/red]")
+            raise typer.Exit(1)
+        
+        explorer._fetch_entity_counts()
+        
+        print("Realm Database Explorer")
+        print("Available entity types:")
+        print()
+        
+        sorted_classes = sorted(explorer._ggg_classes, key=lambda cls: cls.__name__)
+        for cls in sorted_classes:
+            count = explorer._entity_counts.get(cls.__name__, 0)
+            print(f"  {cls.__name__} ({count})")
+        
+        print()
+        print("Use 'realms db get <EntityType>' to query entities")
+        return
+    
     explorer.run()
