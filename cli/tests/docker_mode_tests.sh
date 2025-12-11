@@ -29,7 +29,7 @@ echo "✅ realms --help works"
 echo ""
 
 echo "🧪 Test 2: Verify Docker mode (not repo mode)"
-python -c "from realms_cli.utils import is_repo_mode; assert not is_repo_mode()"
+python -c "from realms.cli.utils import is_repo_mode; assert not is_repo_mode()"
 echo "✅ Correctly in Docker mode"
 echo ""
 

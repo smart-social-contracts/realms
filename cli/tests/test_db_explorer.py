@@ -5,7 +5,7 @@ from io import StringIO
 import pytest
 import typer
 
-from realms_cli.commands.db import CursorDatabaseExplorer, NavigationState, db_get_command
+from realms.cli.commands.db import CursorDatabaseExplorer, NavigationState, db_get_command
 
 
 class TestCursorDatabaseExplorer:

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from realms_cli.utils import (
+from realms.cli.utils import (
     create_directory_structure,
     generate_port_from_branch,
     get_current_branch,

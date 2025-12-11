@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from realms_cli.models import (
+from realms.cli.models import (
     DeploymentConfig,
     Extension,
     PostDeploymentAction,

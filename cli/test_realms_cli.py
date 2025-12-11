@@ -11,11 +11,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 try:
-    from realms_cli.main import app
-    from realms_cli.models import RealmConfig
-    from realms_cli.utils import load_config, save_config
+    from realms.cli.main import app
+    from realms.cli.models import RealmConfig
+    from realms.cli.utils import load_config, save_config
 except ImportError as e:
-    print(f"❌ Failed to import realms_cli modules: {e}")
+    print(f"❌ Failed to import realms.cli modules: {e}")
     print("Make sure to install the package first: cd cli && pip install -e .")
     sys.exit(1)
 
@@ -26,7 +26,7 @@ def test_cli_help():
     try:
         # Test CLI installation and help command
         result = subprocess.run(
-            [sys.executable, "-m", "realms_cli.main", "--help"],
+            [sys.executable, "-m", "realms.cli.main", "--help"],
             capture_output=True,
             text=True,
             timeout=10,
@@ -111,7 +111,7 @@ def test_project_scaffolding():
     print("🧪 Testing project scaffolding...")
 
     try:
-        from realms_cli.commands.init import (
+        from realms.cli.commands.init import (
             _get_dfx_json_template,
             _get_readme_template,
         )

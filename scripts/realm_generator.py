@@ -28,7 +28,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src/realm_backend
 # Add the CLI directory to the Python path to access constants
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'cli'))
 
-from realms_cli.constants import REALM_FOLDER
+from realms.cli.constants import REALM_FOLDER
 from ggg import (
     UserProfile,
     Profiles,
