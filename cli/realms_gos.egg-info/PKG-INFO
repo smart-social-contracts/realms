@@ -1,7 +1,7 @@
 Metadata-Version: 2.4
-Name: realms-cli
+Name: realms-gos
 Version: 0.2.0
-Summary: CLI tool for managing Realms project lifecycle
+Summary: Realms Government Operating System - CLI and SDK for managing realms on the Internet Computer
 Author-email: Realms Team <team@realms.dev>
 License: MIT
 Project-URL: Homepage, https://github.com/smartsocialcontracts/realms

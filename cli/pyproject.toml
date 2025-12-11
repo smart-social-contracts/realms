@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "realms-cli"
+name = "realms-gos"
 version = "0.2.0"
-description = "CLI tool for managing Realms project lifecycle"
+description = "Realms Government Operating System - CLI and SDK for managing realms on the Internet Computer"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
@@ -57,11 +57,11 @@ Documentation = "https://docs.realms.dev"
 "Bug Tracker" = "https://github.com/smartsocialcontracts/realms/issues"
 
 [project.scripts]
-realms = "realms_cli.main:app"
+realms = "realms.cli.main:app"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["realms_cli*"]
+include = ["realms*"]
 
 [tool.black]
 line-length = 88

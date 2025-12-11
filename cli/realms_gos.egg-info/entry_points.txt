@@ -1,0 +1,2 @@
+[console_scripts]
+realms = realms.cli.main:app
