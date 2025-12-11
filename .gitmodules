@@ -1,3 +1,6 @@
 [submodule "extensions"]
 	path = extensions
 	url = git@github.com:smart-social-contracts/realms-extensions.git
+[submodule "icw"]
+	path = icw
+	url = git@github.com:smart-social-contracts/icw.git
