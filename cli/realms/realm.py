@@ -124,12 +124,13 @@ async def call_extension(
     Returns:
         Parsed response from the extension
     """
-    call_type = "extension-async" if async_call else "extension"
     cmd = [
-        "realms", "realm", "call", call_type,
+        "realms", "realm", "call", "extension",
         extension, function, json.dumps(args),
         "-f", folder, "-n", network
     ]
+    if async_call:
+        cmd.append("--async")
     return await _run_command(cmd)
 
 

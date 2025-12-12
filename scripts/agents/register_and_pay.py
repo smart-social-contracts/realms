@@ -111,10 +111,14 @@ async def main():
     # Step 4: Pay the invoice
     print("\n💸 Step 4: Paying invoice...")
     try:
+        # Convert invoice_id to 32-byte hex subaccount (same format as Invoice.get_subaccount_hex())
+        subaccount_hex = invoice_id.encode().ljust(32, b'\x00').hex()
+        print(f"   Subaccount: {subaccount_hex}")
+        
         transfer_result = await realm.icw.transfer(
             to=backend_id,
             amount=amount,
-            subaccount=invoice_id,
+            subaccount=subaccount_hex,
             ledger=ledger_id,
             fee=0,
             network=network
@@ -124,39 +128,33 @@ async def main():
         print(f"   ❌ Transfer failed: {e}")
         return False
     
-    # Step 5: Verify payment (trigger check and verify status)
+    # Step 5: Verify payment by checking subaccount balance
     print("\n✔️  Step 5: Verifying payment...")
     try:
-        # Call check_invoice_payment extension
-        check_result = await realm.call_extension(
-            extension="member_dashboard",
-            function="check_invoice_payment",
-            args={"invoice_id": invoice_id},
-            folder=folder,
-            network=network,
-            async_call=True
+        # Check balance at the invoice subaccount using icw
+        balance_result = await realm.icw.balance(
+            principal=backend_id,
+            subaccount=subaccount_hex,
+            ledger=ledger_id,
+            network=network
         )
-        print(f"   Check result: {check_result}")
         
-        # Get updated invoice status
-        invoice = await realm.db.get("Invoice", invoice_id, folder=folder, network=network)
-        status = invoice.get("status") if isinstance(invoice, dict) else invoice[0].get("status") if invoice else "Unknown"
+        balance = balance_result.get("balance", 0) if isinstance(balance_result, dict) else 0
+        print(f"   Subaccount balance: {balance} ckBTC")
         
-        if status == "Paid":
-            print(f"   ✅ Invoice {invoice_id} is now PAID!")
+        if balance >= amount:
+            print(f"   ✅ Payment verified! Invoice {invoice_id} has sufficient funds.")
+            print("\n🎉 Agent completed successfully!")
             return True
         else:
-            print(f"   ⚠️  Invoice status: {status}")
-            print("   Note: The payment was sent. Status may need manual verification.")
-            return True  # Payment was sent successfully
+            print(f"   ⚠️  Balance ({balance}) less than invoice amount ({amount})")
+            print("   Note: Payment may be pending or there was an issue.")
+            return False
             
     except Exception as e:
-        print(f"   ⚠️  Verification check failed: {e}")
-        print("   Note: Payment was sent, but verification failed. Check manually.")
+        print(f"   ⚠️  Balance check failed: {e}")
+        print("   Note: Payment was sent. Verify manually with: icw balance")
         return True  # Payment was sent, verification is secondary
-    
-    print("\n🎉 Agent completed successfully!")
-    return True
 
 
 if __name__ == "__main__":
