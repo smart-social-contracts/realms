@@ -91,16 +91,21 @@ async def main():
         # Get backend canister ID (vault)
         import subprocess
         result = subprocess.run(
-            ["dfx", "canister", "id", "realm_backend"],
+            ["dfx", "canister", "id", "realm_backend", "--network", network],
             capture_output=True, text=True, cwd=folder
         )
         backend_id = result.stdout.strip()
         
-        result = subprocess.run(
-            ["dfx", "canister", "id", "ckbtc_ledger"],
-            capture_output=True, text=True, cwd=folder
-        )
-        ledger_id = result.stdout.strip()
+        # For staging/ic networks, use the real IC ckBTC ledger
+        # For local network, use the local test ledger
+        if network in ["staging", "ic"]:
+            ledger_id = "mxzaz-hqaaa-aaaar-qaada-cai"  # IC mainnet ckBTC ledger
+        else:
+            result = subprocess.run(
+                ["dfx", "canister", "id", "ckbtc_ledger", "--network", network],
+                capture_output=True, text=True, cwd=folder
+            )
+            ledger_id = result.stdout.strip()
         
         print(f"   Backend (vault): {backend_id}")
         print(f"   Ledger: {ledger_id}")
@@ -115,14 +120,24 @@ async def main():
         subaccount_hex = invoice_id.encode().ljust(32, b'\x00').hex()
         print(f"   Subaccount: {subaccount_hex}")
         
+        # IC ckBTC ledger requires 10 satoshi fee, local test ledger uses 0
+        fee = 10 if network in ["staging", "ic"] else 0
+        
         transfer_result = await realm.icw.transfer(
             to=backend_id,
             amount=amount,
             subaccount=subaccount_hex,
             ledger=ledger_id,
-            fee=0,
+            fee=fee,
             network=network
         )
+        
+        # Check if transfer was successful
+        if isinstance(transfer_result, dict) and transfer_result.get("ok") == False:
+            error = transfer_result.get("error", "Unknown error")
+            print(f"   ❌ Transfer rejected: {error}")
+            return False
+        
         print(f"   ✅ Transfer successful: {transfer_result}")
     except Exception as e:
         print(f"   ❌ Transfer failed: {e}")
