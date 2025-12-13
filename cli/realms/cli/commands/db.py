@@ -943,23 +943,34 @@ def db_get_command(
         console.print(f"[red]Error: Could not connect to backend canister: {e}[/red]")
         raise typer.Exit(1)
     
-    # Find the matching class
-    matching_class = None
-    for cls in explorer._ggg_classes:
-        if cls.__name__.lower() == entity_type.lower():
-            matching_class = cls
-            break
+    # Check if this is a namespaced extension entity (e.g., "vault::KnownSubaccount")
+    is_extension_entity = "::" in entity_type
     
-    if not matching_class:
-        # Print available entity types
-        available = [cls.__name__ for cls in explorer._ggg_classes]
-        console.print(f"[red]Error: Entity type '{entity_type}' not found[/red]")
-        console.print(f"[yellow]Available entity types: {', '.join(sorted(available))}[/yellow]")
-        raise typer.Exit(1)
+    if is_extension_entity:
+        # For extension entities, we pass the namespaced type directly to the canister
+        matching_class = None  # We'll query by string, not by class
+    else:
+        # Find the matching class for core entities
+        matching_class = None
+        for cls in explorer._ggg_classes:
+            if cls.__name__.lower() == entity_type.lower():
+                matching_class = cls
+                break
+        
+        if not matching_class:
+            # Print available entity types
+            available = [cls.__name__ for cls in explorer._ggg_classes]
+            console.print(f"[red]Error: Entity type '{entity_type}' not found[/red]")
+            console.print(f"[yellow]Available entity types: {', '.join(sorted(available))}[/yellow]")
+            console.print(f"[yellow]Tip: For extension entities, use namespace::EntityType (e.g., vault::KnownSubaccount)[/yellow]")
+            raise typer.Exit(1)
+    
+    # Determine the query type name
+    query_type = entity_type if is_extension_entity else matching_class.__name__
     
     # If entity_id is provided, get specific entity
     if entity_id:
-        result = explorer.list_entities(matching_class.__name__, 0, 1000)
+        result = explorer.list_entities(query_type, 0, 1000)
         if "error" in result:
             console.print(f"[red]Error: {result['error']}[/red]")
             raise typer.Exit(1)
@@ -999,7 +1010,7 @@ def db_get_command(
         page_size = 100
         
         while True:
-            result = explorer.list_entities(matching_class.__name__, page_num, page_size)
+            result = explorer.list_entities(query_type, page_num, page_size)
             if "error" in result:
                 console.print(f"[red]Error: {result['error']}[/red]")
                 raise typer.Exit(1)
