@@ -370,11 +370,13 @@ jobs:
             -v "$(pwd)/identity.pem:/app/identity.pem" \
             -v "$(pwd)/test-logs:/app/test-logs" \
             -e DFX_WARNING="-mainnet_plaintext_identity" \
+            -e DFX_NETWORK=staging \
             ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
             bash -c "(dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
                      dfx identity use my-identity && \
-                     cd .realms/realm_realm1_* && \
-                     REALM_DIR=\$(pwd) python ../../examples/demo/realm_common/tests/test_invoice_payment.py); \
+                     cp dfx.template.json examples/demo/realm1/dfx.json && \
+                     cd examples/demo/realm1 && \
+                     REALM_DIR=\$(pwd) python ../realm_common/tests/test_invoice_payment.py); \
                      EXIT_CODE=\$?; \
                      mkdir -p /app/test-logs && \
                      cp -f *.log /app/test-logs/ 2>/dev/null || true; \
