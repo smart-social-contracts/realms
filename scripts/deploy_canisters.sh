@@ -159,7 +159,21 @@ if [ "$NETWORK" = "local" ]; then
                 echo "🔗 $shared_canister already deployed: $existing_id. Skipping..."
             else
                 echo "🔗 Deploying $shared_canister..."
-                dfx deploy "$shared_canister" --yes
+                
+                # Special handling for ckbtc_indexer: must be deployed with correct ledger_id
+                if [ "$shared_canister" = "ckbtc_indexer" ]; then
+                    # Get the ledger canister ID (must be deployed first)
+                    ledger_id=$(dfx canister id ckbtc_ledger --network "$NETWORK" 2>/dev/null || echo "")
+                    if [ -z "$ledger_id" ]; then
+                        echo "   ⚠️  ckbtc_ledger not deployed yet, skipping ckbtc_indexer"
+                        continue
+                    fi
+                    echo "   📎 Configuring indexer with ledger_id: $ledger_id"
+                    dfx deploy "$shared_canister" --yes --argument "(opt variant { Init = record { ledger_id = principal \"$ledger_id\" } })"
+                else
+                    dfx deploy "$shared_canister" --yes
+                fi
+                
                 dfx canister start --network "$NETWORK" "$shared_canister" 2>/dev/null || true
             fi
         fi
@@ -402,6 +416,26 @@ fi
 echo ""
 echo "✅ Deployment completed successfully!"
 echo ""
+
+# Configure vault extension with local canister IDs (if local network)
+if [ "$NETWORK" = "local" ]; then
+    echo "🔧 Configuring vault extension with local canister IDs..."
+    ledger_id=$(dfx canister id ckbtc_ledger --network "$NETWORK" 2>/dev/null || echo "")
+    indexer_id=$(dfx canister id ckbtc_indexer --network "$NETWORK" 2>/dev/null || echo "")
+    backend_id=$(dfx canister id realm_backend --network "$NETWORK" 2>/dev/null || echo "")
+    
+    if [ -n "$ledger_id" ] && [ -n "$indexer_id" ] && [ -n "$backend_id" ]; then
+        echo "   📎 Setting ckBTC ledger: $ledger_id"
+        dfx canister call "$backend_id" extension_sync_call "(record { extension_name = \"vault\"; function_name = \"set_canister\"; args = \"{\\\"canister_name\\\": \\\"ckBTC ledger\\\", \\\"principal_id\\\": \\\"$ledger_id\\\"}\" })" --network "$NETWORK" >/dev/null 2>&1 || true
+        
+        echo "   📎 Setting ckBTC indexer: $indexer_id"
+        dfx canister call "$backend_id" extension_sync_call "(record { extension_name = \"vault\"; function_name = \"set_canister\"; args = \"{\\\"canister_name\\\": \\\"ckBTC indexer\\\", \\\"principal_id\\\": \\\"$indexer_id\\\"}\" })" --network "$NETWORK" >/dev/null 2>&1 || true
+        
+        echo "   ✅ Vault configured with local canisters"
+    else
+        echo "   ⚠️  Could not configure vault (missing canister IDs)"
+    fi
+fi
 
 # Show canister URLs for local deployment
 if [ "$NETWORK" = "local" ]; then
