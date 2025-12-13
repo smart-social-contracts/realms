@@ -14,7 +14,7 @@
         "security_policy": "standard",
 
         "headers": {
-            "Content-Security-Policy": "default-src 'self';script-src 'self' 'unsafe-eval' 'unsafe-inline';connect-src 'self' http://localhost:* http://*.localhost:8000 https://icp0.io https://*.icp0.io https://icp-api.io https://*.ic0.app;img-src 'self' data: http://*.localhost:8000 https://*.icp0.io https://*.ic0.app https://api.dicebear.com https://api.qrserver.com;style-src * 'unsafe-inline';style-src-elem * 'unsafe-inline';font-src *;object-src 'none';base-uri 'self';frame-ancestors 'none';form-action 'self';upgrade-insecure-requests;",
+            "Content-Security-Policy": "default-src 'self';script-src 'self' 'unsafe-eval' 'unsafe-inline';connect-src 'self' http://localhost:* http://*.localhost:8000 https://icp0.io https://*.icp0.io https://icp-api.io https://*.ic0.app https://*.realmsgos.ch;img-src 'self' data: http://*.localhost:8000 https://*.icp0.io https://*.ic0.app https://api.dicebear.com https://api.qrserver.com;style-src * 'unsafe-inline';style-src-elem * 'unsafe-inline';font-src *;object-src 'none';base-uri 'self';frame-ancestors 'none';form-action 'self';upgrade-insecure-requests;",
         }
     }
 ]
