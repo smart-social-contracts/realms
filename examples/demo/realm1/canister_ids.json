@@ -4,5 +4,11 @@
   },
   "realm_frontend": {
     "staging": "gzya5-jyaaa-aaaac-qai5a-cai"
+  },
+  "ckbtc_ledger": {
+    "staging": "mxzaz-hqaaa-aaaar-qaada-cai"
+  },
+  "ckbtc_indexer": {
+    "staging": "n5wcd-faaaa-aaaar-qaaea-cai"
   }
 }
