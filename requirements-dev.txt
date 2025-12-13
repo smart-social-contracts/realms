@@ -9,4 +9,4 @@ flask
 flask_cors
 requests
 urllib3
-internet-computer-wallet>=0.2.0
+internet-computer-wallet>=0.2.1
