@@ -213,6 +213,31 @@ class CursorDatabaseExplorer:
             
         return self.call_backend(method, args)
 
+    def get_entity(self, entity_type: str, entity_id: str) -> Dict[str, Any]:
+        """Get a single entity by type and ID. Uses kybra-simple-db alias resolution."""
+        method = "get_objects"
+        # Format as Candid vec of records: vec { record { 0 = "Type"; 1 = "id" } }
+        candid_args = f'(vec {{ record {{ 0 = "{entity_type}"; 1 = "{entity_id}" }} }})'
+        
+        cmd = ["dfx", "canister", "call", "--output", "json"]
+        if self.network != "local":
+            cmd.extend(["--network", self.network])
+        cmd.extend([self.canister, method, candid_args])
+        
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5, cwd=self.cwd)
+            if result.returncode == 0:
+                json_response = json.loads(result.stdout.strip())
+                parsed = self._parse_json_response(json_response)
+                items = parsed.get("items", [])
+                if items:
+                    return items[0]
+                return {"error": f"Entity '{entity_id}' not found"}
+            else:
+                return {"error": result.stderr}
+        except Exception as e:
+            return {"error": str(e)}
+
     def create_key_bindings(self):
         """Create key bindings for cursor navigation."""
         kb = KeyBindings()
@@ -970,39 +995,13 @@ def db_get_command(
     
     # If entity_id is provided, get specific entity
     if entity_id:
-        result = explorer.list_entities(query_type, 0, 1000)
+        result = explorer.get_entity(query_type, entity_id)
         if "error" in result:
             console.print(f"[red]Error: {result['error']}[/red]")
             raise typer.Exit(1)
         
-        # Find the specific entity by _id first, then try alias fields
-        items = result.get("items", [])
-        found_item = None
-        
-        # First try exact match on _id
-        for item in items:
-            if item.get("_id") == entity_id:
-                found_item = item
-                break
-        
-        # If not found, try common alias fields (id, name, etc.)
-        if not found_item:
-            alias_fields = ["id", "name", "invoice_id", "user_id", "principal"]
-            for item in items:
-                for field in alias_fields:
-                    if item.get(field) == entity_id:
-                        found_item = item
-                        break
-                if found_item:
-                    break
-        
-        if not found_item:
-            console.print(f"[red]Error: Entity with ID '{entity_id}' not found[/red]")
-            console.print(f"[yellow]Searched _id and alias fields: id, name, invoice_id, user_id, principal[/yellow]")
-            raise typer.Exit(1)
-        
         # Output single entity as JSON
-        print(json.dumps(found_item, indent=2))
+        print(json.dumps(result, indent=2))
     else:
         # Get all entities (with pagination if needed)
         all_items = []
