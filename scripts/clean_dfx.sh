@@ -95,11 +95,27 @@ kill_processes "replica"
 echo "🔍 Looking for icx-proxy processes..."
 kill_processes "icx-proxy"
 
-# Step 6: Check for and clean up zombie processes
+# Step 6: Free up dfx ports (kill any process using them)
+echo "🔍 Checking dfx ports (8000, 8070, 4943)..."
+for port in 8000 8070 4943; do
+    port_pids=$(lsof -ti:$port 2>/dev/null || true)
+    if [ -n "$port_pids" ]; then
+        echo "  Found processes on port $port: $port_pids"
+        for pid in $port_pids; do
+            proc_name=$(ps -p "$pid" -o comm= 2>/dev/null || echo "unknown")
+            echo "    Killing $proc_name (PID $pid) on port $port"
+            $USE_SUDO kill -9 "$pid" 2>/dev/null || true
+        done
+    else
+        echo "  Port $port is free"
+    fi
+done
+
+# Step 7: Check for and clean up zombie processes
 echo "🔍 Checking for zombie processes..."
 kill_zombie_parents
 
-# Step 7: Final aggressive cleanup pass
+# Step 8: Final aggressive cleanup pass
 echo "🔍 Final cleanup pass..."
 remaining=$($USE_SUDO ps aux | grep -E 'dfx|pocket-ic|replica|icx-proxy' | grep -v grep | grep -v clean_dfx | awk '{print $2}' || true)
 if [ -n "$remaining" ]; then

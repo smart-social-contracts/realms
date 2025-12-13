@@ -943,37 +943,62 @@ def db_get_command(
         console.print(f"[red]Error: Could not connect to backend canister: {e}[/red]")
         raise typer.Exit(1)
     
-    # Find the matching class
-    matching_class = None
-    for cls in explorer._ggg_classes:
-        if cls.__name__.lower() == entity_type.lower():
-            matching_class = cls
-            break
+    # Check if this is a namespaced extension entity (e.g., "vault::KnownSubaccount")
+    is_extension_entity = "::" in entity_type
     
-    if not matching_class:
-        # Print available entity types
-        available = [cls.__name__ for cls in explorer._ggg_classes]
-        console.print(f"[red]Error: Entity type '{entity_type}' not found[/red]")
-        console.print(f"[yellow]Available entity types: {', '.join(sorted(available))}[/yellow]")
-        raise typer.Exit(1)
+    if is_extension_entity:
+        # For extension entities, we pass the namespaced type directly to the canister
+        matching_class = None  # We'll query by string, not by class
+    else:
+        # Find the matching class for core entities
+        matching_class = None
+        for cls in explorer._ggg_classes:
+            if cls.__name__.lower() == entity_type.lower():
+                matching_class = cls
+                break
+        
+        if not matching_class:
+            # Print available entity types
+            available = [cls.__name__ for cls in explorer._ggg_classes]
+            console.print(f"[red]Error: Entity type '{entity_type}' not found[/red]")
+            console.print(f"[yellow]Available entity types: {', '.join(sorted(available))}[/yellow]")
+            console.print(f"[yellow]Tip: For extension entities, use namespace::EntityType (e.g., vault::KnownSubaccount)[/yellow]")
+            raise typer.Exit(1)
+    
+    # Determine the query type name
+    query_type = entity_type if is_extension_entity else matching_class.__name__
     
     # If entity_id is provided, get specific entity
     if entity_id:
-        result = explorer.list_entities(matching_class.__name__, 0, 1000)
+        result = explorer.list_entities(query_type, 0, 1000)
         if "error" in result:
             console.print(f"[red]Error: {result['error']}[/red]")
             raise typer.Exit(1)
         
-        # Find the specific entity
+        # Find the specific entity by _id first, then try alias fields
         items = result.get("items", [])
         found_item = None
+        
+        # First try exact match on _id
         for item in items:
             if item.get("_id") == entity_id:
                 found_item = item
                 break
         
+        # If not found, try common alias fields (id, name, etc.)
+        if not found_item:
+            alias_fields = ["id", "name", "invoice_id", "user_id", "principal"]
+            for item in items:
+                for field in alias_fields:
+                    if item.get(field) == entity_id:
+                        found_item = item
+                        break
+                if found_item:
+                    break
+        
         if not found_item:
             console.print(f"[red]Error: Entity with ID '{entity_id}' not found[/red]")
+            console.print(f"[yellow]Searched _id and alias fields: id, name, invoice_id, user_id, principal[/yellow]")
             raise typer.Exit(1)
         
         # Output single entity as JSON
@@ -985,7 +1010,7 @@ def db_get_command(
         page_size = 100
         
         while True:
-            result = explorer.list_entities(matching_class.__name__, page_num, page_size)
+            result = explorer.list_entities(query_type, page_num, page_size)
             if "error" in result:
                 console.print(f"[red]Error: {result['error']}[/red]")
                 raise typer.Exit(1)

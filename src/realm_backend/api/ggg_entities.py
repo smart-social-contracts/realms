@@ -1,3 +1,4 @@
+import importlib
 import math
 import traceback
 from typing import Any, Dict, List, Optional
@@ -63,13 +64,29 @@ def list_objects_paginated(
     """List objects in the system with pagination.
 
     Args:
-        class_name: Name of the entity class to query
+        class_name: Name of the entity class to query. Supports namespaced format
+                    for extension entities (e.g., "vault::KnownSubaccount")
         page_num: Page number (0-indexed)
         page_size: Number of items per page
         order: Sort order, either 'asc' (ascending) or 'desc' (descending). Default is 'asc'.
     """
     try:
-        class_object = globals()[class_name]
+        # Handle namespaced extension entities (e.g., "vault::KnownSubaccount")
+        if "::" in class_name:
+            ext_name, entity_name = class_name.split("::", 1)
+            try:
+                # Try extension_packages.{ext}.{ext}_lib.entities first
+                entities_module = importlib.import_module(
+                    f"extension_packages.{ext_name}.{ext_name}_lib.entities"
+                )
+            except ImportError:
+                # Fallback to extension_packages.{ext}.vault_lib.entities (legacy)
+                entities_module = importlib.import_module(
+                    f"extension_packages.{ext_name}.vault_lib.entities"
+                )
+            class_object = getattr(entities_module, entity_name)
+        else:
+            class_object = globals()[class_name]
         count = class_object.count()
         logger.info(f"Total count: {count}")
 

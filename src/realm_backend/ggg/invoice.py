@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional
 
 from kybra import Async, Principal, ic
-from kybra_simple_db import Entity, Float, ManyToOne, String, TimestampedMixin
+from kybra_simple_db import Entity, Float, ManyToOne, OneToMany, String, TimestampedMixin
 from kybra_simple_logging import get_logger
 
 logger = get_logger("entity.invoice")
@@ -33,6 +33,7 @@ class Invoice(Entity, TimestampedMixin):
     due_date = String(max_length=64)  # ISO format timestamp
     status = String(max_length=32)  # Pending, Paid, Overdue, Expired
     user = ManyToOne("User", "invoices")
+    transfers = OneToMany("Transfer", "invoice")  # Transfers that paid this invoice
     paid_at = String(max_length=64)  # ISO timestamp when paid
     metadata = String(max_length=256)
 
