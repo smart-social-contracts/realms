@@ -964,16 +964,30 @@ def db_get_command(
             console.print(f"[red]Error: {result['error']}[/red]")
             raise typer.Exit(1)
         
-        # Find the specific entity
+        # Find the specific entity by _id first, then try alias fields
         items = result.get("items", [])
         found_item = None
+        
+        # First try exact match on _id
         for item in items:
             if item.get("_id") == entity_id:
                 found_item = item
                 break
         
+        # If not found, try common alias fields (id, name, etc.)
+        if not found_item:
+            alias_fields = ["id", "name", "invoice_id", "user_id", "principal"]
+            for item in items:
+                for field in alias_fields:
+                    if item.get(field) == entity_id:
+                        found_item = item
+                        break
+                if found_item:
+                    break
+        
         if not found_item:
             console.print(f"[red]Error: Entity with ID '{entity_id}' not found[/red]")
+            console.print(f"[yellow]Searched _id and alias fields: id, name, invoice_id, user_id, principal[/yellow]")
             raise typer.Exit(1)
         
         # Output single entity as JSON
