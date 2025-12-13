@@ -79,8 +79,8 @@ def icw_transfer(
     # Find icw in PATH or use the realms venv
     icw_path = shutil.which("icw")
     if not icw_path:
-        # Try realms venv
-        realms_root = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", ".."))
+        # Try realms venv (script is at examples/demo/realm_common/tests/, so go up 4 levels)
+        realms_root = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "..", ".."))
         icw_path = os.path.join(realms_root, "venv", "bin", "icw")
         if not os.path.exists(icw_path):
             print_error(f"icw not found in PATH or {icw_path}")
