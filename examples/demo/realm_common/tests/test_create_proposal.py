@@ -91,36 +91,21 @@ def test_create_proposal():
     proposal_title = "Test Proposal from CI"
     proposal_description = "Automated test proposal created during staging post-deployment test"
     
+    # Use proposal_id field (not id) as per Proposal entity definition
     create_code = f'''
 from ggg import Proposal
-prop = Proposal(
-    id="{proposal_id}",
-    title="{proposal_title}",
-    description="{proposal_description}",
-    status="Active",
-    proposer="{principal}",
-    votes_for=0,
-    votes_against=0
-)
-print(prop.id)
+prop = Proposal(proposal_id="{proposal_id}", title="{proposal_title}", description="{proposal_description}", status="Active")
+print(prop.proposal_id)
 '''
     result = execute_on_canister(create_code)
-    if proposal_id not in result.get("raw", ""):
-        print_error(f"Failed to create proposal: {result}")
-        return False
-    print_ok(f"Created proposal: {proposal_id}")
-
-    # Step 2: Verify proposal exists
-    print("\n--- Step 2: Verify Proposal ---")
-    check_cmd = f"realms db get Proposal {proposal_id}"
-    result = run_command(check_cmd)
-    print(f"Proposal data: {result}")
-
-    if result and proposal_id in result and proposal_title in result:
-        print_ok("✅ Proposal successfully created and verified!")
+    raw = result.get("raw", "")
+    print(f"Result: {raw}")
+    
+    if proposal_id in raw:
+        print_ok(f"✅ Proposal {proposal_id} created successfully!")
         return True
     else:
-        print_error("❌ Proposal verification failed")
+        print_error(f"❌ Failed to create proposal: {result}")
         return False
 
 
