@@ -985,9 +985,20 @@ def db_get_command(
                 found_item = item
                 break
         
-        # If not found, try common alias fields (id, name, etc.)
+        # If not found, try alias field from entity class or derive from data
         if not found_item:
-            alias_fields = ["id", "name", "invoice_id", "user_id", "principal"]
+            # Get alias field from entity class if available, otherwise use common patterns
+            alias_fields = []
+            if matching_class and hasattr(matching_class, "__alias__"):
+                alias_fields = [matching_class.__alias__]
+            elif items:
+                # Derive potential alias fields from the first item's keys
+                # Common patterns: 'id', '<type>_id', 'name'
+                first_item = items[0]
+                entity_type_lower = entity_type.split("::")[-1].lower()
+                potential_aliases = ["id", "name", f"{entity_type_lower}_id"]
+                alias_fields = [f for f in potential_aliases if f in first_item and f != "_id"]
+            
             for item in items:
                 for field in alias_fields:
                     if item.get(field) == entity_id:
@@ -997,8 +1008,9 @@ def db_get_command(
                     break
         
         if not found_item:
+            searched_fields = ["_id"] + (alias_fields if alias_fields else [])
             console.print(f"[red]Error: Entity with ID '{entity_id}' not found[/red]")
-            console.print(f"[yellow]Searched _id and alias fields: id, name, invoice_id, user_id, principal[/yellow]")
+            console.print(f"[yellow]Searched fields: {', '.join(searched_fields)}[/yellow]")
             raise typer.Exit(1)
         
         # Output single entity as JSON
