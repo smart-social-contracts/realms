@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import time
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -17,6 +18,33 @@ from ..utils import get_scripts_path, is_repo_mode, run_in_docker
 from .deploy import _deploy_realm_internal
 
 console = Console()
+
+
+def _replace_timestamp_placeholders(extensions_dir: Path) -> None:
+    """Replace timestamp placeholders in extension data JSON files.
+    
+    Placeholders:
+    - __REALM_CREATION_TIME__: Current timestamp in format "YYYY-MM-DD HH:MM:SS.000"
+    - __VOTING_DEADLINE_24H__: 24 hours from now in ISO format
+    """
+    now = datetime.utcnow()
+    creation_time = now.strftime("%Y-%m-%d %H:%M:%S.000")
+    voting_deadline = (now + timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    
+    # Find all JSON files in extensions/*/data/ directories
+    for data_dir in extensions_dir.glob("*/data"):
+        if data_dir.is_dir():
+            for json_file in data_dir.glob("*.json"):
+                try:
+                    content = json_file.read_text(encoding="utf-8")
+                    
+                    # Check if file contains any placeholders
+                    if "__REALM_CREATION_TIME__" in content or "__VOTING_DEADLINE_24H__" in content:
+                        content = content.replace("__REALM_CREATION_TIME__", creation_time)
+                        content = content.replace("__VOTING_DEADLINE_24H__", voting_deadline)
+                        json_file.write_text(content, encoding="utf-8")
+                except Exception as e:
+                    console.print(f"   ⚠️  Warning: Could not process {json_file}: {e}")
 
 
 def _generate_single_realm(
@@ -455,6 +483,24 @@ def _generate_deployment_scripts(
     if requirements_source.exists() and not requirements_dest.exists():
         shutil.copy2(requirements_source, requirements_dest)
         console.print(f"   ✅ Copied requirements.txt")
+    
+    # Copy extensions/ directory for extension data files (voting_data.json, etc.)
+    # Also replace timestamp placeholders with actual values
+    extensions_dest = output_path / "extensions"
+    extensions_source = repo_root / "extensions"
+    if extensions_source.exists():
+        if not extensions_dest.exists():
+            ignore_patterns = shutil.ignore_patterns(
+                '__pycache__', '*.pyc', 'venv', '.venv', 'node_modules'
+            )
+            shutil.copytree(extensions_source, extensions_dest, ignore=ignore_patterns)
+            console.print(f"   ✅ Copied extensions/ directory")
+        
+        # Always replace timestamp placeholders in extension data files
+        _replace_timestamp_placeholders(extensions_dest)
+        console.print(f"   ✅ Replaced timestamp placeholders in extension data")
+    else:
+        console.print(f"   ⚠️  Warning: Could not find extensions directory at {extensions_source}")
     
     # 2. Create scripts subdirectory
     console.print("\n🔧 Generating deployment scripts...")
