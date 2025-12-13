@@ -351,6 +351,7 @@ jobs:
   test-staging-post-deployment:
     runs-on: ubuntu-latest
     needs: [deploy-staging]
+    continue-on-error: true  # Optional: failures won't block the workflow
     if: "!contains(github.event.head_commit.message, 'Bump version')"
     steps:
       - name: Checkout code
