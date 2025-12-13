@@ -357,6 +357,9 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Run invoice payment test on staging
+        # TODO: Re-enable when ckBTC ledger is deployed on staging
+        # The test requires ckbtc_ledger canister which isn't available on staging yet
+        if: false
         run: |
           # Store identity in a temporary file
           echo "${{ secrets.IC_IDENTITY_PEM }}" > identity.pem
