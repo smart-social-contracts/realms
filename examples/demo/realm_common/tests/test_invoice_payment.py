@@ -104,7 +104,7 @@ def icw_transfer(
         "--ledger",
         ledger_id,
         "--fee",
-        "0",
+        "10",
     ]
     print(f"Running: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
