@@ -86,10 +86,16 @@ def icw_transfer(
             print_error(f"icw not found in PATH or {icw_path}")
             return False
     
+    # Use DFX_NETWORK env var or default to local
+    # Map "staging" to "ic" since icw only knows "local" and "ic"
+    network = os.environ.get("DFX_NETWORK", "local")
+    if network == "staging":
+        network = "ic"
+    
     cmd = [
         icw_path,
         "-n",
-        "local",
+        network,
         "transfer",
         recipient,
         str(amount),
