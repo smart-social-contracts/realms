@@ -1,0 +1,81 @@
+From 4ceb7728588d749c3f4f4704b708dc2c6289c2c9 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 14 Dec 2025 08:57:42 +0000
+Subject: [PATCH] fix(llm_chat): add friendly error messages when API is
+ unavailable
+
+- Add error_connection message for network/connection failures
+- Add error_server message for HTTP errors from the API
+- Use i18n keys for all error messages (English and Chinese)
+- Improve error detection to differentiate between connection issues
+  and server errors
+---
+ .../i18n/locales/extensions/llm_chat/en.json    |  2 ++
+ .../i18n/locales/extensions/llm_chat/zh-CN.json |  2 ++
+ .../lib/extensions/llm_chat/LLMChat.svelte      | 17 ++++++++++++++---
+ 3 files changed, 18 insertions(+), 3 deletions(-)
+
+diff --git a/llm_chat/frontend/i18n/locales/extensions/llm_chat/en.json b/llm_chat/frontend/i18n/locales/extensions/llm_chat/en.json
+index 0d5d407..b4111b1 100644
+--- a/llm_chat/frontend/i18n/locales/extensions/llm_chat/en.json
++++ b/llm_chat/frontend/i18n/locales/extensions/llm_chat/en.json
+@@ -9,6 +9,8 @@
+   "message_placeholder": "Type your message...",
+   "no_response": "No response from LLM",
+   "error_response": "Failed to get response from LLM. Please try again.",
++  "error_connection": "Unable to connect to the AI service. The service may be temporarily unavailable. Please try again in a few moments.",
++  "error_server": "The AI service encountered an issue. Please try again later.",
+   "loading": "Loading...",
+   "suggestions_title": "Try asking:",
+   "suggestion_1": "What is a realm?",
+diff --git a/llm_chat/frontend/i18n/locales/extensions/llm_chat/zh-CN.json b/llm_chat/frontend/i18n/locales/extensions/llm_chat/zh-CN.json
+index 2f5475b..0b502a6 100644
+--- a/llm_chat/frontend/i18n/locales/extensions/llm_chat/zh-CN.json
++++ b/llm_chat/frontend/i18n/locales/extensions/llm_chat/zh-CN.json
+@@ -9,6 +9,8 @@
+   "message_placeholder": "输入您的消息...",
+   "no_response": "LLM 无响应",
+   "error_response": "无法从 LLM 获取响应。请重试。",
++  "error_connection": "无法连接到 AI 服务。服务可能暂时不可用，请稍后再试。",
++  "error_server": "AI 服务遇到问题，请稍后再试。",
+   "loading": "加载中...",
+   "suggestions_title": "试试问：",
+   "suggestion_1": "什么是领域？",
+diff --git a/llm_chat/frontend/lib/extensions/llm_chat/LLMChat.svelte b/llm_chat/frontend/lib/extensions/llm_chat/LLMChat.svelte
+index 68a36ef..804f1d4 100644
+--- a/llm_chat/frontend/lib/extensions/llm_chat/LLMChat.svelte
++++ b/llm_chat/frontend/lib/extensions/llm_chat/LLMChat.svelte
+@@ -170,7 +170,7 @@
+ 			console.log("Realm data fetched:", realmData);
+ 		} catch (err) {
+ 			console.error("Error fetching realm data:", err);
+-			error = "Failed to get realm data. LLM responses may be less accurate.";
++			// Don't show error for realm data fetch - it's not critical
+ 		} finally {
+ 			isLoadingRealmData = false;
+ 		}
+@@ -277,8 +277,19 @@
+ 
+ 		} catch (err) {
+ 			console.error("Error calling LLM:", err);
+-			error = "Failed to get response from LLM. Please try again.";
+-			
++
++			// Determine the type of error and show appropriate message
++			if (err instanceof TypeError || (err instanceof Error && err.message.includes('fetch'))) {
++				// Network/connection error - API unreachable
++				error = $_('extensions.llm_chat.error_connection');
++			} else if (err instanceof Error && err.message.includes('HTTP error')) {
++				// Server returned an error status
++				error = $_('extensions.llm_chat.error_server');
++			} else {
++				// Generic error fallback
++				error = $_('extensions.llm_chat.error_response');
++			}
++
+ 			// Remove the AI message if there was an error and it exists
+ 			if (messages.length > 0 && !messages[messages.length - 1].isUser) {
+ 				messages = messages.slice(0, -1);
+-- 
+2.43.0
+
