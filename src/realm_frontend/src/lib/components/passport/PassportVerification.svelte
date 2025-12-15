@@ -29,7 +29,11 @@
         const result = JSON.parse(response.response);
         console.log('Verification link result:', result);
         
-        if (result.data && result.data.attributes) {
+        // Check if the inner result indicates an error
+        if (result.success === false) {
+          verificationStatus = 'error';
+          errorMessage = result.error || 'Verification service error';
+        } else if (result.data && result.data.attributes) {
           const verificationUrl = result.data.attributes.rarime_app_url || result.data.attributes.get_proof_params;
           verificationLink = verificationUrl;
           qrCodeData = generateQRCodeData(verificationUrl);
