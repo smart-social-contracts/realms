@@ -1,7 +1,5 @@
 from typing import Any
 
-from ggg.user_profile import UserProfile
-
 from kybra_simple_db import (
     Entity,
     ManyToMany,
@@ -11,6 +9,12 @@ from kybra_simple_db import (
     TimestampedMixin,
 )
 from kybra_simple_logging import get_logger
+
+# Support both absolute imports (backend deployment) and relative imports (pip package)
+try:
+    from ggg.user_profile import UserProfile
+except ImportError:
+    from .user_profile import UserProfile
 
 logger = get_logger("entity.user")
 

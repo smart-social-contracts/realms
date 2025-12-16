@@ -14,7 +14,8 @@ import typer
 from rich.console import Console
 
 from ..constants import REALM_FOLDER
-from ..utils import get_scripts_path, is_repo_mode, run_in_docker
+from ..generator import RealmGenerator
+from ..utils import get_scripts_path, is_repo_mode
 from .deploy import _deploy_realm_internal
 
 console = Console()
@@ -98,46 +99,26 @@ def _generate_single_realm(
         console.print(f"     ⚠️  Warning: No manifest found in {demo_realm_dir}")
     
     if random:
-        # Generate random data for this realm
+        # Generate random data for this realm using bundled generator
         try:
-            scripts_path = get_scripts_path()
-            generator_script = scripts_path / "realm_generator.py"
+            generator = RealmGenerator(seed) if seed else RealmGenerator()
             
-            cmd = [
-                "python3",
-                str(generator_script),
-                "--members",
-                str(members),
-                "--organizations",
-                str(organizations),
-                "--transactions",
-                str(transactions),
-                "--disputes",
-                str(disputes),
-                "--output-dir",
-                str(realm_output),
-                "--realm-name",
-                realm_name,
-            ]
+            realm_data = generator.generate_realm_data(
+                members=members,
+                organizations=organizations,
+                transactions=transactions,
+                disputes=disputes,
+                realm_name=realm_name
+            )
             
-            # Only pass --demo-folder if it exists (for multi-realm mundus with demo folders)
-            demo_realm_dir = repo_root / "examples" / "demo" / realm_folder
-            if demo_realm_dir.exists():
-                cmd.extend(["--demo-folder", realm_folder])
+            # Save realm data JSON
+            json_file = realm_output / "realm_data.json"
+            realm_data_serialized = [obj.serialize() for obj in realm_data]
+            with open(json_file, 'w') as f:
+                json.dump(realm_data_serialized, f, indent=2)
             
-            if seed:
-                cmd.extend(["--seed", str(seed)])
-            
-            # Run in Docker if in image mode, otherwise run locally
-            if is_repo_mode():
-                result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path.cwd())
-            else:
-                result = run_in_docker(cmd, working_dir=Path.cwd())
-            
-            if result.returncode != 0:
-                console.print(f"[red]     ❌ Error generating data for {realm_name}:[/red]")
-                console.print(f"[red]{result.stderr}[/red]")
-                raise typer.Exit(1)
+            # Generate codex files
+            generator.generate_codex_files(realm_output)
             
             console.print(f"[green]     ✅ Generated random data for {realm_name}[/green]")
         
@@ -191,13 +172,15 @@ def create_command(
 
     scripts_path = get_scripts_path()
     
-    # Check if we're in repo mode or need to use Docker
+    # Check if we're in repo mode or pip-installed mode
     in_repo_mode = is_repo_mode()
     if not in_repo_mode:
-        # In Docker/pip install mode - will use Docker container with full repo
-        # repo_root should point to /app in the Docker image
-        repo_root = Path("/app")
-        console.print("[dim]Running in Docker mode (realm_generator will run in container)...[/dim]")
+        # In pip-installed mode - use bundled files from package
+        # The package includes src, extensions, scripts via symlinks at realms/ level
+        # dfx.template.json and requirements.txt are in cli/ directory
+        package_root = Path(__file__).parent.parent.parent  # cli/commands -> cli -> realms
+        repo_root = package_root
+        console.print("[dim]Running in pip-installed mode (using bundled files)...[/dim]")
     else:
         repo_root = scripts_path.parent
         if not repo_root.exists() or not (repo_root / "scripts" / "realm_generator.py").exists():
@@ -239,77 +222,45 @@ def create_command(
                 else:
                     console.print(f"[yellow]⚠️  Logo file not found: {logo_source}[/yellow]")
     
-    # Call realm_generator.py
-    # In Docker mode, paths need to be relative to /workspace mount point
-    if in_repo_mode:
-        generator_path = str(repo_root / "scripts" / "realm_generator.py")
-        output_dir_arg = str(output_path)
-    else:
-        # In Docker, script is at /app/scripts/realm_generator.py
-        # and output_path is mounted at /workspace, so use /workspace as output
-        generator_path = "/app/scripts/realm_generator.py"
-        output_dir_arg = "/workspace"
-    
-    cmd = [
-        "python",
-        generator_path,
-        "--output-dir", output_dir_arg,
-        "--realm-name", realm_name,
-    ]
-    
-    # Use flags if provided, otherwise fall back to manifest
-    if members is not None:
-        cmd.extend(["--members", str(members)])
-    elif "members" in realm_options:
-        cmd.extend(["--members", str(realm_options["members"])])
-    
-    if organizations is not None:
-        cmd.extend(["--organizations", str(organizations)])
-    elif "organizations" in realm_options:
-        cmd.extend(["--organizations", str(realm_options["organizations"])])
-    
-    if transactions is not None:
-        cmd.extend(["--transactions", str(transactions)])
-    elif "transactions" in realm_options:
-        cmd.extend(["--transactions", str(realm_options["transactions"])])
-    
-    if disputes is not None:
-        cmd.extend(["--disputes", str(disputes)])
-    elif "disputes" in realm_options:
-        cmd.extend(["--disputes", str(realm_options["disputes"])])
-    
-    if seed is not None:
-        cmd.extend(["--seed", str(seed)])
-    elif "seed" in realm_options:
-        cmd.extend(["--seed", str(realm_options["seed"])])
-    
+    # Use bundled RealmGenerator directly
     try:
-        # Suppress debug output from realm_generator (ggg.user.User objects)
-        if in_repo_mode:
-            # Run locally in repo
-            result = subprocess.run(cmd, check=True, cwd=repo_root, capture_output=True, text=True)
-        else:
-            # Run in Docker container (pip install mode)
-            console.print("[dim]Running realm_generator in Docker container...[/dim]")
-            result = run_in_docker(cmd, working_dir=output_path.absolute())
-            if result.returncode != 0:
-                console.print(f"[red]❌ realm_generator.py failed with exit code {result.returncode}[/red]")
-                if result.stdout:
-                    console.print("[yellow]stdout:[/yellow]")
-                    console.print(result.stdout)
-                if result.stderr:
-                    console.print("[yellow]stderr:[/yellow]")
-                    console.print(result.stderr)
-                raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
+        # Determine parameters from flags or manifest
+        gen_members = members if members is not None else realm_options.get("members", 50)
+        gen_organizations = organizations if organizations is not None else realm_options.get("organizations", 5)
+        gen_transactions = transactions if transactions is not None else realm_options.get("transactions", 100)
+        gen_disputes = disputes if disputes is not None else realm_options.get("disputes", 10)
+        gen_seed = seed if seed is not None else realm_options.get("seed")
         
-        # Only show important output (skip debug lines)
-        for line in result.stdout.split('\n'):
-            if line and not 'ggg.user.User object at' in line and not 'from_user' in line and not 'users [' in line:
-                console.print(f"[dim]{line}[/dim]")
-    except subprocess.CalledProcessError as e:
+        # Create generator
+        generator = RealmGenerator(gen_seed) if gen_seed else RealmGenerator()
+        
+        # Generate realm data
+        console.print("[dim]Generating realm data...[/dim]")
+        realm_data = generator.generate_realm_data(
+            members=gen_members,
+            organizations=gen_organizations,
+            transactions=gen_transactions,
+            disputes=gen_disputes,
+            realm_name=realm_name
+        )
+        
+        # Save realm data JSON
+        json_file = output_path / "realm_data.json"
+        realm_data_serialized = [obj.serialize() for obj in realm_data]
+        with open(json_file, 'w') as f:
+            json.dump(realm_data_serialized, f, indent=2)
+        console.print(f"[dim]Generated realm data saved to: {json_file}[/dim]")
+        
+        # Generate codex files
+        codex_files = generator.generate_codex_files(output_path)
+        console.print(f"[dim]Generated {len(codex_files)} codex files[/dim]")
+        
+        console.print(f"[dim]Seed used: {generator.seed}[/dim]")
+        
+    except Exception as e:
         console.print(f"[red]❌ Error creating realm: {e}[/red]")
-        if e.stderr:
-            console.print(f"[red]{e.stderr}[/red]")
+        import traceback
+        console.print(f"[red]{traceback.format_exc()}[/red]")
         raise typer.Exit(1)
     
     # Copy canister_ids.json from manifest's directory if a manifest was specified
@@ -323,14 +274,15 @@ def create_command(
                 console.print(f"\n✅ Copied canister_ids.json from {canister_ids_source.parent}")
     
     # Generate deployment scripts after data generation
-    # Check if we can generate scripts (either in repo mode or in Docker image with full repo)
-    can_generate_scripts = in_repo_mode or (repo_root / "dfx.template.json").exists()
+    # Check if we can generate scripts - look in cli directory first (pip-installed), then repo root
+    cli_dir = Path(__file__).parent.parent  # cli/commands -> cli
+    can_generate_scripts = (cli_dir / "dfx.template.json").exists() or (repo_root / "dfx.template.json").exists()
     
     if can_generate_scripts:
         _generate_deployment_scripts(output_path, network, realm_name, random, repo_root, deploy, identity, mode, bare, in_repo_mode=in_repo_mode)
     else:
-        console.print(f"\n[yellow]⚠️  Deployment scripts not generated (Docker mode without full repo)[/yellow]")
-        console.print("[dim]To deploy this realm, you'll need to use the Realms Docker image or clone the full repository.[/dim]")
+        console.print(f"\n[yellow]⚠️  Deployment scripts not generated (bundled files not found)[/yellow]")
+        console.print(f"[dim]Searched: {cli_dir / 'dfx.template.json'}, {repo_root / 'dfx.template.json'}[/dim]")
     
     console.print(f"\n[green]✅ Realm created successfully at: {output_path.absolute()}[/green]")
 
@@ -357,12 +309,14 @@ def _generate_deployment_scripts(
     # 1. Generate dfx.json for this independent realm
     console.print("\n📝 Creating dfx.json...")
     
-    # Load template dfx.json from repo root
-    template_dfx = repo_root / "dfx.template.json"
+    # Load template dfx.json - check cli directory first (pip-installed), then repo root
+    cli_dir = Path(__file__).parent.parent  # cli/commands -> cli
+    template_dfx = cli_dir / "dfx.template.json"
     if not template_dfx.exists():
-        console.print(f"[red]❌ Template dfx.template.json not found at {template_dfx}[/red]")
-        if not in_repo_mode:
-            console.print("[yellow]Expected at /app/dfx.template.json in Docker image[/yellow]")
+        template_dfx = repo_root / "dfx.template.json"
+    if not template_dfx.exists():
+        console.print(f"[red]❌ Template dfx.template.json not found[/red]")
+        console.print(f"[dim]Searched: {cli_dir / 'dfx.template.json'}, {repo_root / 'dfx.template.json'}[/dim]")
         raise typer.Exit(1)
     
     with open(template_dfx, 'r') as f:
@@ -478,7 +432,10 @@ def _generate_deployment_scripts(
             console.print(f"   ⚠️  Warning: Could not find src directory at {src_source}")
     
     # Copy requirements.txt for venv creation during deployment
-    requirements_source = repo_root / "requirements.txt"
+    # Check cli directory first (pip-installed), then repo root
+    requirements_source = cli_dir / "requirements.txt"
+    if not requirements_source.exists():
+        requirements_source = repo_root / "requirements.txt"
     requirements_dest = output_path / "requirements.txt"
     if requirements_source.exists() and not requirements_dest.exists():
         shutil.copy2(requirements_source, requirements_dest)
@@ -550,8 +507,26 @@ def _generate_deployment_scripts(
     else:
         console.print(f"   ❌ Source file not found: {source_post_deploy}")
     
-    # Note: canister_init.py is optional and realm-specific
-    # It will be created by realm_generator.py if needed, or users can add it manually
+    # 5. Copy additional required scripts for deployment
+    additional_scripts = [
+        "download_wasms.sh",
+        "set_canister_config.py",
+        "clean_dfx.sh",
+    ]
+    for script_name in additional_scripts:
+        source_script = scripts_path / script_name
+        target_script = scripts_dir / script_name
+        if source_script.exists():
+            shutil.copy2(source_script, target_script)
+            target_script.chmod(0o755)
+            console.print(f"   ✅ {script_name}")
+    
+    # Copy utils directory if it exists (needed by some scripts)
+    utils_source = scripts_path / "utils"
+    utils_dest = scripts_dir / "utils"
+    if utils_source.exists() and not utils_dest.exists():
+        shutil.copytree(utils_source, utils_dest)
+        console.print(f"   ✅ utils/")
 
     console.print(f"\n[green]🎉 Realm '{realm_name}' created successfully![/green]")
     

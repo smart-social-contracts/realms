@@ -18,8 +18,6 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.text import Text
 
-from .constants import DOCKER_IMAGE
-
 console = Console()
 stderr_console = Console(stderr=True)  # For warnings/errors that shouldn't pollute JSON output
 
@@ -162,17 +160,27 @@ def truncate_command_for_logging(command: List[str], max_arg_length: int = 200) 
 
 def get_scripts_path() -> Path:
     """
-    Get scripts path - auto-detect repo mode vs image mode.
+    Get scripts path - auto-detect repo mode vs pip-installed mode.
     
-    If ./scripts exists with expected files, use it (repo mode).
-    Otherwise, assume Docker image mode (/app/scripts).
+    Priority:
+    1. ./scripts (repo mode - local development)
+    2. Package bundled scripts (pip-installed mode)
+    3. /app/scripts (legacy Docker image mode)
     
     Returns:
         Path to scripts directory
     """
+    # 1. Check for local repo scripts
     local_scripts = Path.cwd() / "scripts"
     if local_scripts.exists() and (local_scripts / "realm_generator.py").exists():
         return local_scripts
+    
+    # 2. Check for bundled scripts in pip package
+    package_scripts = Path(__file__).parent.parent / "scripts"  # cli -> realms -> scripts
+    if package_scripts.exists() and (package_scripts / "deploy_canisters.sh").exists():
+        return package_scripts
+    
+    # 3. Fallback to Docker image path
     return Path("/app/scripts")
 
 
@@ -180,58 +188,6 @@ def is_repo_mode() -> bool:
     """Check if running in repo mode (local scripts exist)."""
     local_scripts = Path.cwd() / "scripts"
     return local_scripts.exists() and (local_scripts / "realm_generator.py").exists()
-
-
-def run_in_docker(
-    cmd: List[str],
-    working_dir: Optional[Path] = None,
-    env: Optional[Dict[str, str]] = None,
-    docker_image: Optional[str] = None,
-) -> subprocess.CompletedProcess:
-    """
-    Run a command inside a Docker container.
-    
-    Args:
-        cmd: Command to run
-        working_dir: Working directory (defaults to current directory)
-        env: Environment variables to pass through
-        docker_image: Docker image to use (defaults to DOCKER_IMAGE from constants)
-    
-    Returns:
-        CompletedProcess result
-    """
-    if working_dir is None:
-        working_dir = Path.cwd()
-    
-    if docker_image is None:
-        docker_image = DOCKER_IMAGE
-    
-    # Build docker run command
-    docker_cmd = [
-        "docker", "run",
-        "--rm",  # Remove container after run
-        "-v", f"{working_dir}:/workspace",  # Mount working directory
-        "-w", "/workspace",  # Set working directory in container
-    ]
-    
-    # Mount home directory for dfx identity access
-    home_dir = Path.home()
-    docker_cmd.extend(["-v", f"{home_dir}/.config/dfx:/root/.config/dfx:ro"])
-    
-    # Pass through environment variables
-    if env:
-        for key, value in env.items():
-            docker_cmd.extend(["-e", f"{key}={value}"])
-    
-    # Add the image
-    docker_cmd.append(docker_image)
-    
-    # Add the command to run
-    docker_cmd.extend(cmd)
-    
-    console.print(f"[dim]Running in Docker: {' '.join(docker_cmd)}[/dim]")
-    
-    return subprocess.run(docker_cmd, capture_output=True, text=True)
 
 
 def find_python_310() -> Optional[str]:
@@ -474,12 +430,6 @@ def run_command(
 
 def check_dependencies() -> bool:
     """Check if required dependencies are available."""
-    # In Docker mode, all dependencies are in the container
-    if not is_repo_mode():
-        console.print("  ℹ️  Running in Docker mode - dependencies available in container")
-        return True
-    
-    # Only check dependencies in repo mode
     required_tools = ["dfx", "npm", "python3"]
     missing_tools = []
 

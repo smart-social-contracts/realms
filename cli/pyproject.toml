@@ -63,6 +63,9 @@ realms = "realms.cli.main:app"
 where = ["."]
 include = ["realms*"]
 
+[tool.setuptools.package-data]
+"*" = ["*"]
+
 [tool.black]
 line-length = 88
 target-version = ['py38']
