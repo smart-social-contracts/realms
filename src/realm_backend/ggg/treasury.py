@@ -2,11 +2,14 @@ import json
 import traceback
 from pprint import pformat
 
-from core.extensions import extension_async_call
-from ggg import Transfer
 from kybra import Async, ic
 from kybra_simple_db import Entity, Integer, OneToOne, String, TimestampedMixin
 from kybra_simple_logging import get_logger
+
+try:
+    from core.extensions import extension_async_call
+except ImportError:
+    from ..core.extensions import extension_async_call
 
 logger = get_logger("entity.treasury")
 
@@ -41,8 +44,7 @@ class Treasury(Entity, TimestampedMixin):
 
         logger.info(f"Treasury '{self.name}' sending {amount} tokens to {to_principal}")
 
-        from core.extensions import extension_async_call
-
+        # Use already imported extension_async_call
         # Use embedded vault extension API
         args = json.dumps(
             {

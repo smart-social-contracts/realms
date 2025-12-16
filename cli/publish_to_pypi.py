@@ -85,6 +85,52 @@ def run_tests() -> bool:
         return False
 
 
+def resolve_symlinks() -> None:
+    """Replace symlinks with actual files for packaging."""
+    import shutil
+    
+    realms_dir = Path("realms")
+    
+    # Find and resolve symlinks
+    for item in realms_dir.rglob("*"):
+        if item.is_symlink():
+            target = item.resolve()
+            print(f"  Resolving symlink: {item} -> {target}")
+            
+            # Remove symlink
+            item.unlink()
+            
+            # Copy actual content
+            if target.is_dir():
+                shutil.copytree(target, item)
+            else:
+                shutil.copy2(target, item)
+
+
+def restore_symlinks() -> None:
+    """Restore symlinks after packaging (for development)."""
+    import shutil
+    
+    # Known symlinks to restore
+    symlinks = [
+        ("realms/ggg", "../../src/realm_backend/ggg"),
+        ("realms/core", "../../src/realm_backend/core"),
+        ("realms/examples", "../../examples"),
+        ("realms/src", "../../src"),
+        ("realms/extensions", "../../extensions"),
+        ("realms/scripts", "../../scripts"),
+        ("realms/cli/dfx.template.json", "../../../dfx.template.json"),
+        ("realms/cli/requirements.txt", "../../../requirements.txt"),
+    ]
+    
+    for link_path, target in symlinks:
+        link = Path(link_path)
+        if link.exists() and not link.is_symlink():
+            print(f"  Restoring symlink: {link_path}")
+            shutil.rmtree(link)
+            link.symlink_to(target)
+
+
 def build_package() -> bool:
     """Build the package."""
     print("📦 Building package...")
@@ -97,10 +143,18 @@ def build_package() -> bool:
 
             shutil.rmtree(dist_dir)
 
+        # Resolve symlinks before building
+        print("  Resolving symlinks for packaging...")
+        resolve_symlinks()
+
         # Build package
         result = subprocess.run(
             [sys.executable, "-m", "build"], capture_output=True, text=True
         )
+
+        # Restore symlinks for development
+        print("  Restoring symlinks for development...")
+        restore_symlinks()
 
         if result.returncode == 0:
             print("✅ Package built successfully")
@@ -110,6 +164,11 @@ def build_package() -> bool:
             return False
 
     except Exception as e:
+        # Try to restore symlinks even on error
+        try:
+            restore_symlinks()
+        except:
+            pass
         print(f"❌ Build error: {e}")
         return False
 

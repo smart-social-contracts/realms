@@ -1,7 +1,5 @@
 from typing import Any
 
-from ggg.user_profile import UserProfile
-
 from kybra_simple_db import (
     Entity,
     ManyToMany,
@@ -11,6 +9,11 @@ from kybra_simple_db import (
     TimestampedMixin,
 )
 from kybra_simple_logging import get_logger
+
+try:
+    from ggg.user_profile import UserProfile
+except ImportError:
+    from .user_profile import UserProfile
 
 logger = get_logger("entity.user")
 
@@ -36,6 +39,9 @@ class User(Entity, TimestampedMixin):
     # trades_a = OneToMany("Trade", "user_a")
     # trades_b = OneToMany("Trade", "user_b")
     # owned_lands = OneToMany("Land", "owner_user")
+
+    def __repr__(self):
+        return f"User(id={self.id!r})"
 
     @staticmethod
     def user_register_posthook(user: "User"):

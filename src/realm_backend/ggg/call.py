@@ -6,10 +6,15 @@ It is an implementation detail for the task execution system, providing the link
 between Codex code and TaskStep execution.
 """
 
-from core.execution import run_code
 from kybra_simple_db import Boolean, Entity, ManyToOne, OneToOne, String, TimestampedMixin
-from ggg.task_execution import TaskExecution
 from kybra_simple_logging import get_logger
+
+try:
+    from core.execution import run_code
+    from ggg.task_execution import TaskExecution
+except ImportError:
+    from ..core.execution import run_code
+    from .task_execution import TaskExecution
 
 logger = get_logger("entity.call")
 
