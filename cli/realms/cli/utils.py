@@ -688,16 +688,9 @@ def display_info_panel(title: str, message: str) -> None:
 # Realm Context Management
 
 
-def get_realms_config_dir() -> Path:
-    """Get the Realms configuration directory (project-local)."""
-    config_dir = Path.cwd() / ".realms"
-    config_dir.mkdir(exist_ok=True)
-    return config_dir
-
-
 def get_context_file() -> Path:
     """Get the path to the context configuration file."""
-    return get_realms_config_dir() / "context.json"
+    return Path.cwd() / ".realms-context.json"
 
 
 def load_context() -> Dict[str, Any]:
