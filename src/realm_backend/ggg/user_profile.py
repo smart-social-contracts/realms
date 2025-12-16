@@ -42,6 +42,9 @@ class UserProfile(Entity, TimestampedMixin):
     allowed_to = String()
     users = ManyToMany(["User"], "profiles")
 
+    def __repr__(self):
+        return f"UserProfile(name={self.name!r})"
+
     def add(self, operation: str):
         self.allowed_to = str(self.allowed_to or "").split(OPERATIONS_SEPARATOR)
         if operation not in self.allowed_to:
