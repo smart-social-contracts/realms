@@ -10,7 +10,6 @@ from kybra_simple_db import (
 )
 from kybra_simple_logging import get_logger
 
-# Support both absolute imports (backend deployment) and relative imports (pip package)
 try:
     from ggg.user_profile import UserProfile
 except ImportError:
@@ -40,6 +39,9 @@ class User(Entity, TimestampedMixin):
     # trades_a = OneToMany("Trade", "user_a")
     # trades_b = OneToMany("Trade", "user_b")
     # owned_lands = OneToMany("Land", "owner_user")
+
+    def __repr__(self):
+        return f"User(id={self.id!r})"
 
     @staticmethod
     def user_register_posthook(user: "User"):

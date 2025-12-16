@@ -9,7 +9,6 @@ between Codex code and TaskStep execution.
 from kybra_simple_db import Boolean, Entity, ManyToOne, OneToOne, String, TimestampedMixin
 from kybra_simple_logging import get_logger
 
-# Support both absolute imports (backend deployment) and relative imports (pip package)
 try:
     from core.execution import run_code
     from ggg.task_execution import TaskExecution

@@ -6,7 +6,6 @@ from kybra import Async, ic
 from kybra_simple_db import Entity, Integer, OneToOne, String, TimestampedMixin
 from kybra_simple_logging import get_logger
 
-# Support both absolute imports (backend deployment) and relative imports (pip package)
 try:
     from core.extensions import extension_async_call
 except ImportError:
