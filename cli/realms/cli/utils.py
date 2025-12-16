@@ -690,7 +690,8 @@ def display_info_panel(title: str, message: str) -> None:
 
 def get_context_file() -> Path:
     """Get the path to the context configuration file."""
-    return Path.cwd() / ".realms-context.json"
+    config_dir = Path.home() / ".config" / "realms"
+    return config_dir / "context.json"
 
 
 def load_context() -> Dict[str, Any]:
@@ -710,6 +711,7 @@ def save_context(context: Dict[str, Any]) -> None:
     """Save the realm context."""
     context_file = get_context_file()
     try:
+        context_file.parent.mkdir(parents=True, exist_ok=True)
         with open(context_file, "w") as f:
             json.dump(context, f, indent=2)
     except IOError as e:
