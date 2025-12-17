@@ -46,7 +46,9 @@ from ggg import (
     Proposal,
     Codex,
     Task,
-    TaskSchedule
+    TaskSchedule,
+    TaskStep,
+    Call
 )
 
 
@@ -291,7 +293,7 @@ class RealmGenerator:
     def generate_scheduled_task(self) -> tuple:
         """Generate a scheduled task for the satoshi transfer codex
         
-        Returns tuple of (codex, task, task_schedule)
+        Returns tuple of (codex, call, step, task, task_schedule)
         Note: Codex code will be loaded from the generated file during upload
         """
         import json
@@ -305,7 +307,20 @@ class RealmGenerator:
             code=""  # Will be populated when codex file is imported
         )
         
-        # Create Task that references the codex
+        # Create Call that references the codex (async since it does inter-canister calls)
+        call = Call(
+            is_async=True,
+            codex=codex
+        )
+        
+        # Create TaskStep that wraps the call
+        step = TaskStep(
+            call=call,
+            status="pending",
+            run_next_after=0  # Execute immediately when scheduled
+        )
+        
+        # Create Task that references the step
         task = Task(
             name="Satoshi Transfer Task",
             metadata=json.dumps({
@@ -313,7 +328,8 @@ class RealmGenerator:
                 "codex_name": "satoshi_transfer_codex",
                 "target_principal": "64fpo-jgpms-fpewi-hrskb-f3n6u-3z5fy-bv25f-zxjzg-q5m55-xmfpq-hqe",
                 "amount": 1
-            })
+            }),
+            steps=[step]
         )
         
         # Create TaskSchedule to run every 60 seconds
@@ -326,7 +342,7 @@ class RealmGenerator:
             disabled=False  # Enabled by default
         )
         
-        return (codex, task, task_schedule)
+        return (codex, call, step, task, task_schedule)
     
     def generate_treasury_data(self, realm: Realm) -> Treasury:
         """Generate treasury data matching Treasury entity schema"""
@@ -424,7 +440,7 @@ class RealmGenerator:
         mandates = self.generate_mandates()
         
         # Generate scheduled task for satoshi transfer
-        codex, task, task_schedule = self.generate_scheduled_task()
+        codex, call, step, task, task_schedule = self.generate_scheduled_task()
         
         # Generate user registration hook codex
         user_reg_hook_codex = self.generate_user_registration_hook_codex()
@@ -441,6 +457,8 @@ class RealmGenerator:
         ret += disputes
         ret += mandates
         ret.append(codex)
+        ret.append(call)
+        ret.append(step)
         ret.append(task)
         ret.append(task_schedule)
         ret.append(user_reg_hook_codex)
