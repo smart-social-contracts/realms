@@ -379,7 +379,7 @@ def realm_deploy(
 @realm_app.command("call")
 def realm_call(
     method: str = typer.Argument(help="Method name or 'extension' for extension calls"),
-    args: str = typer.Argument(help="Candid arguments (e.g., '(\"admin\")') or extension name for extension calls"),
+    args: str = typer.Argument("()", help="Candid arguments (e.g., '(\"admin\")') or extension name for extension calls"),
     function_name: Optional[str] = typer.Argument(None, help="Function name (only for extension calls)"),
     function_args: Optional[str] = typer.Argument(None, help="JSON arguments (only for extension calls)"),
     folder: Optional[str] = typer.Option(
@@ -391,8 +391,14 @@ def realm_call(
     canister: Optional[str] = typer.Option(
         None, "--canister", "-c", help="Canister name (default: realm_backend)"
     ),
+    output: str = typer.Option(
+        "json", "--output", "-o", help="Output format: json or candid"
+    ),
     async_call: bool = typer.Option(
         False, "--async", "-a", help="Use async extension call (for extension calls only)"
+    ),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Show verbose output"
     ),
 ) -> None:
     """
@@ -400,17 +406,23 @@ def realm_call(
     
     Examples:
         # Call backend method directly
+        realms realm call status
         realms realm call join_realm '("admin")' -f .realms/realm_X
-        realms realm call get_status '()' -f .realms/realm_X
         
         # Call extension function
         realms realm call extension member_dashboard check_invoice_payment '{"invoice_id": "x"}' -f .realms/realm_X
         
-        # Async extension call
-        realms realm call extension member_dashboard check_invoice_payment '{"invoice_id": "x"}' --async -f .realms/realm_X
+        # Output format (default: json)
+        realms realm call status --output candid
     """
     import json
     import subprocess
+    import sys
+    
+    # Validate output format
+    if output not in ("json", "candid"):
+        console.print(f"[red]❌ Invalid output format: {output}. Use 'json' or 'candid'[/red]")
+        raise typer.Exit(1)
     
     # Get effective network and canister from context or folder
     if folder:
@@ -420,7 +432,7 @@ def realm_call(
         effective_canister = canister or "realm_backend"
     else:
         effective_network, effective_canister = get_effective_network_and_canister(
-            network, canister
+            network, canister, quiet=not verbose
         )
         effective_cwd = get_effective_cwd()
     
@@ -433,13 +445,14 @@ def realm_call(
         
         extension_name = args  # args is actually the extension name in this case
         
-        console.print("[bold blue]🔧 Calling Extension Function[/bold blue]\n")
-        console.print(f"Extension: [cyan]{extension_name}[/cyan]")
-        console.print(f"Function: [cyan]{function_name}[/cyan]")
-        console.print(f"Args: [dim]{function_args}[/dim]")
-        console.print(f"Network: [dim]{effective_network}[/dim]")
-        console.print(f"Canister: [dim]{effective_canister}[/dim]")
-        console.print(f"Async: [dim]{async_call}[/dim]\n")
+        if verbose:
+            console.print("[bold blue]🔧 Calling Extension Function[/bold blue]\n")
+            console.print(f"Extension: [cyan]{extension_name}[/cyan]")
+            console.print(f"Function: [cyan]{function_name}[/cyan]")
+            console.print(f"Args: [dim]{function_args}[/dim]")
+            console.print(f"Network: [dim]{effective_network}[/dim]")
+            console.print(f"Canister: [dim]{effective_canister}[/dim]")
+            console.print(f"Async: [dim]{async_call}[/dim]\n")
         
         try:
             # Validate JSON args
@@ -456,38 +469,45 @@ def realm_call(
         cmd = ["dfx", "canister", "call", effective_canister, call_method, call_record]
         if effective_network != "local":
             cmd.extend(["--network", effective_network])
+        if output == "json":
+            cmd.extend(["--output", "json"])
     else:
         # Regular backend method call
-        console.print("[bold blue]📞 Calling Backend Method[/bold blue]\n")
-        console.print(f"Method: [cyan]{method}[/cyan]")
-        console.print(f"Args: [dim]{args}[/dim]")
-        console.print(f"Network: [dim]{effective_network}[/dim]")
-        console.print(f"Canister: [dim]{effective_canister}[/dim]\n")
+        if verbose:
+            console.print("[bold blue]📞 Calling Backend Method[/bold blue]\n")
+            console.print(f"Method: [cyan]{method}[/cyan]")
+            console.print(f"Args: [dim]{args}[/dim]")
+            console.print(f"Network: [dim]{effective_network}[/dim]")
+            console.print(f"Canister: [dim]{effective_canister}[/dim]\n")
         
         cmd = ["dfx", "canister", "call", effective_canister, method, args]
         if effective_network != "local":
             cmd.extend(["--network", effective_network])
+        if output == "json":
+            cmd.extend(["--output", "json"])
     
     try:
-        console.print("[dim]Executing...[/dim]")
+        if verbose:
+            console.print("[dim]Executing...[/dim]")
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd=effective_cwd)
         
         if result.returncode == 0:
-            console.print("[green]✅ Call successful[/green]\n")
-            console.print("[bold]Response:[/bold]")
-            console.print(result.stdout)
+            if verbose:
+                console.print("[green]✅ Call successful[/green]\n")
+                console.print("[bold]Response:[/bold]")
+            
+            print(result.stdout.strip())
         else:
-            console.print("[red]❌ Call failed[/red]\n")
             if result.stderr:
-                console.print(f"[red]Error: {result.stderr}[/red]")
+                sys.stderr.write(f"Error: {result.stderr}\n")
             if result.stdout:
-                console.print(f"Output: {result.stdout}")
+                sys.stderr.write(f"Output: {result.stdout}\n")
             raise typer.Exit(1)
     except subprocess.TimeoutExpired:
-        console.print("[red]❌ Call timed out[/red]")
+        sys.stderr.write("Error: Call timed out\n")
         raise typer.Exit(1)
     except Exception as e:
-        console.print(f"[red]❌ Error executing call: {e}[/red]")
+        sys.stderr.write(f"Error: {e}\n")
         raise typer.Exit(1)
 
 

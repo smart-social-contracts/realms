@@ -1022,7 +1022,8 @@ def resolve_realm_details(
 
 
 def get_effective_network_and_canister(
-    explicit_network: Optional[str] = None, explicit_canister: Optional[str] = None
+    explicit_network: Optional[str] = None, explicit_canister: Optional[str] = None,
+    quiet: bool = False
 ) -> Tuple[str, str]:
     """Get the effective network and canister, considering realm and network context.
 
@@ -1031,6 +1032,11 @@ def get_effective_network_and_canister(
     2. Current realm context (if set) - overrides network context
     3. Current network context (if set)
     4. Default values (local, realm_backend)
+
+    Args:
+        explicit_network: Explicit network override
+        explicit_canister: Explicit canister override
+        quiet: If True, suppress warning messages
 
     Returns:
         Tuple[str, str]: (network, canister_id)
@@ -1050,11 +1056,12 @@ def get_effective_network_and_canister(
                 explicit_canister or realm_canister,
             )
         except ValueError as e:
-            # Log to stderr so JSON output on stdout is not polluted
-            logger = get_logger("utils")
-            logger.warning(f"{e}")
-            stderr_console.print(f"[yellow]Warning: {e}[/yellow]")
-            stderr_console.print("[yellow]Falling back to network/default values[/yellow]")
+            if not quiet:
+                # Log to stderr so JSON output on stdout is not polluted
+                logger = get_logger("utils")
+                logger.warning(f"{e}")
+                stderr_console.print(f"[yellow]Warning: {e}[/yellow]")
+                stderr_console.print("[yellow]Falling back to network/default values[/yellow]")
 
     # Use network context or explicit network
     effective_network = explicit_network or get_current_network()
