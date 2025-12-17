@@ -3,6 +3,8 @@ Satoshi Transfer Codex
 Sends 1 satoshi to a configured target principal every execution.
 
 This codex is designed to run as a scheduled task.
+Note: Use 'logger' (provided in execution namespace) for logs to be captured
+in TaskExecution records, not ic.print() which only goes to canister stdout.
 """
 
 from kybra import ic
@@ -19,18 +21,18 @@ def async_task():
     Main entry point for scheduled task.
     Sends 1 satoshi to the target principal.
     """
-    ic.print("💸 Satoshi Transfer Task starting...")
+    logger.info("💸 Satoshi Transfer Task starting...")
     
     target = DEFAULT_TARGET_PRINCIPAL
     amount = AMOUNT_SATOSHIS
     
-    ic.print(f"📍 Target principal: {target}")
-    ic.print(f"💰 Amount: {amount} satoshi(s)")
+    logger.info(f"📍 Target principal: {target}")
+    logger.info(f"💰 Amount: {amount} satoshi(s)")
     
     try:
         # Get the vault/canister principal as source
         source_principal = ic.id().to_str()
-        ic.print(f"📤 Source: {source_principal}")
+        logger.info(f"📤 Source: {source_principal}")
         
         # Create a transfer record
         transfer = Transfer(
@@ -44,18 +46,18 @@ def async_task():
             tags="scheduled,satoshi_transfer"
         )
         
-        ic.print(f"📝 Created transfer record: {transfer.id}")
+        logger.info(f"📝 Created transfer record: {transfer.id}")
         
         # Execute the transfer (uses vault extension if installed)
         try:
             transfer.execute()
             transfer.status = "completed"
-            ic.print("✅ Transfer completed successfully!")
+            logger.info("✅ Transfer completed successfully!")
         except NotImplementedError:
-            ic.print("⚠️ Transfer.execute() not implemented - vault extension may not be installed")
+            logger.warning("⚠️ Transfer.execute() not implemented - vault extension may not be installed")
             transfer.status = "recorded_only"
         except Exception as exec_error:
-            ic.print(f"❌ Transfer execution failed: {exec_error}")
+            logger.error(f"❌ Transfer execution failed: {exec_error}")
             transfer.status = "failed"
         
         return json.dumps({
@@ -65,5 +67,5 @@ def async_task():
         })
         
     except Exception as e:
-        ic.print(f"❌ Error in satoshi transfer: {e}")
+        logger.error(f"❌ Error in satoshi transfer: {e}")
         return json.dumps({"success": False, "error": str(e)})
