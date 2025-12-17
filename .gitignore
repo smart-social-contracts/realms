@@ -38,5 +38,6 @@ src/realm_frontend/static/extensions/
 # CLI build artifacts
 cli/build/
 
-# Canister IDs
+# dfx configuration
+dfx.json
 canister_ids.json
