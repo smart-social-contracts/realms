@@ -1,0 +1,3 @@
+CNAME Record		_acme-challenge.demo	_acme-challenge.demo.realmsgos.org.icp2.io.
+CNAME Record		demo			demo.realmsgos.org.icp1.io.
+TXT Record		_canister-id.demo	2zaor-5yaaa-aaaac-qbxaa-cai

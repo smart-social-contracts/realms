@@ -1,0 +1,391 @@
+import { useState } from 'react'
+import { 
+  Globe, 
+  Shield, 
+  Code, 
+  Layers, 
+  ArrowRight, 
+  CheckCircle, 
+  Terminal, 
+  Github, 
+  ExternalLink,
+  Menu,
+  X,
+  Zap,
+  Users,
+  Building2,
+  Vote,
+  Wallet,
+  Scale,
+  BookOpen,
+  ChevronRight,
+  Sparkles
+} from 'lucide-react'
+
+function App() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  const features = [
+    {
+      icon: <Globe className="w-6 h-6" />,
+      title: "Internet Computer Native",
+      description: "Deploy fully on-chain governance systems on the Internet Computer blockchain with seamless integration."
+    },
+    {
+      icon: <Layers className="w-6 h-6" />,
+      title: "Extension System",
+      description: "Powerful modular architecture allowing custom extensions for voting, treasury, identity, and more."
+    },
+    {
+      icon: <Shield className="w-6 h-6" />,
+      title: "Secure & Transparent",
+      description: "Built-in security with transparent governance rules enforced by smart contracts."
+    },
+    {
+      icon: <Code className="w-6 h-6" />,
+      title: "Developer Friendly",
+      description: "Python/Kybra backend with SvelteKit frontend. Simple CLI for rapid development and deployment."
+    },
+    {
+      icon: <Users className="w-6 h-6" />,
+      title: "Multi-Realm Support",
+      description: "Deploy multiple interconnected governance systems with shared registry via Mundus."
+    },
+    {
+      icon: <Zap className="w-6 h-6" />,
+      title: "Instant Setup",
+      description: "Get a full governance system running with a single command. Demo data included."
+    }
+  ]
+
+  const extensions = [
+    { name: "Admin Dashboard", icon: <Building2 className="w-5 h-5" />, desc: "Realm management & configuration" },
+    { name: "Citizen Dashboard", icon: <Users className="w-5 h-5" />, desc: "Member-facing interface" },
+    { name: "Vault", icon: <Wallet className="w-5 h-5" />, desc: "Treasury & ICRC-1 tokens" },
+    { name: "Justice System", icon: <Scale className="w-5 h-5" />, desc: "Legal & dispute resolution" },
+    { name: "Land Registry", icon: <BookOpen className="w-5 h-5" />, desc: "Property management" },
+    { name: "Voting", icon: <Vote className="w-5 h-5" />, desc: "Proposals & governance" },
+  ]
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-primary-50 text-slate-900">
+      {/* Navigation */}
+      <nav className="fixed top-0 left-0 right-0 z-50 glass-dark shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-3">
+              <img src="/logo_sphere_only.svg" alt="Realms" className="h-10 w-10" />
+              <span className="text-xl font-bold">Realms GOS</span>
+            </div>
+            
+            <div className="hidden md:flex items-center gap-8">
+              <a href="#features" className="text-slate-600 hover:text-slate-900 transition-colors">Features</a>
+              <a href="#extensions" className="text-slate-600 hover:text-slate-900 transition-colors">Extensions</a>
+              <a href="#quickstart" className="text-slate-600 hover:text-slate-900 transition-colors">Quick Start</a>
+              <a href="https://github.com/smart-social-contracts/realms" target="_blank" rel="noopener noreferrer" 
+                 className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors">
+                <Github className="w-5 h-5" />
+                GitHub
+              </a>
+            </div>
+
+            <button 
+              className="md:hidden p-2"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden glass-dark border-t border-slate-200">
+            <div className="px-4 py-4 space-y-4">
+              <a href="#features" className="block text-slate-600 hover:text-slate-900">Features</a>
+              <a href="#extensions" className="block text-slate-600 hover:text-slate-900">Extensions</a>
+              <a href="#quickstart" className="block text-slate-600 hover:text-slate-900">Quick Start</a>
+              <a href="https://github.com/smart-social-contracts/realms" target="_blank" rel="noopener noreferrer"
+                 className="flex items-center gap-2 text-slate-600 hover:text-slate-900">
+                <Github className="w-5 h-5" />
+                GitHub
+              </a>
+            </div>
+          </div>
+        )}
+      </nav>
+
+      {/* Hero Section */}
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
+        {/* Background effects */}
+        <div className="absolute inset-0 bg-grid opacity-30"></div>
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary-300/30 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent-300/30 rounded-full blur-3xl"></div>
+        
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-8 text-sm">
+            <Sparkles className="w-4 h-4 text-accent-400" />
+            <span className="text-slate-600">Governance for the decentralized web</span>
+          </div>
+          
+          <div className="mb-8">
+            <img src="/logo_horizontal.svg" alt="Realms" className="h-20 sm:h-24 lg:h-28 mx-auto" />
+          </div>
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6">
+            <span className="text-slate-800">Governance Operating System</span>
+          </h1>
+          
+          <p className="text-xl sm:text-2xl text-slate-600 max-w-3xl mx-auto mb-10">
+            A powerful framework for building and deploying governance systems on the Internet Computer. 
+            Create transparent, secure, and scalable digital governments.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="#quickstart" 
+               className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-primary-500 to-accent-500 rounded-xl font-semibold text-lg hover:opacity-90 transition-opacity">
+              Get Started
+              <ArrowRight className="w-5 h-5" />
+            </a>
+            <a href="https://github.com/smart-social-contracts/realms" target="_blank" rel="noopener noreferrer"
+               className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white border border-slate-200 rounded-xl font-semibold text-lg hover:bg-slate-50 transition-colors shadow-lg shadow-slate-200/50">
+              <Github className="w-5 h-5" />
+              View on GitHub
+            </a>
+          </div>
+
+          {/* Quick command preview */}
+          <div className="mt-16 max-w-2xl mx-auto">
+            <div className="bg-slate-900 rounded-2xl p-6 text-left shadow-2xl">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                <span className="ml-2 text-slate-500 text-sm">terminal</span>
+              </div>
+              <code className="text-sm sm:text-base">
+                <span className="text-slate-500">$ </span>
+                <span className="text-primary-400">pip install</span>
+                <span className="text-slate-300"> realms-cli</span>
+                <br />
+                <span className="text-slate-500">$ </span>
+                <span className="text-primary-400">realms realm create</span>
+                <span className="text-slate-300"> --random --deploy</span>
+                <br />
+                <span className="text-green-400">✓ Your realm is running at http://localhost:8000</span>
+              </code>
+            </div>
+          </div>
+        </div>
+
+        {/* Scroll indicator */}
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
+          <ChevronRight className="w-6 h-6 rotate-90 text-slate-500" />
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section id="features" className="py-24 relative">
+        <div className="absolute inset-0 bg-dots opacity-30"></div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl sm:text-5xl font-bold mb-4 text-slate-800">
+              Why <span className="text-gradient">Realms</span>?
+            </h2>
+            <p className="text-xl text-slate-600 max-w-2xl mx-auto">
+              Everything you need to build modern governance infrastructure
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {features.map((feature, index) => (
+              <div 
+                key={index}
+                className="glass-dark rounded-2xl p-8 hover:border-primary-400 transition-colors group"
+              >
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-100 to-accent-100 flex items-center justify-center text-primary-600 mb-6 group-hover:scale-110 transition-transform">
+                  {feature.icon}
+                </div>
+                <h3 className="text-xl font-semibold mb-3 text-slate-800">{feature.title}</h3>
+                <p className="text-slate-600">{feature.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Extensions Section */}
+      <section id="extensions" className="py-24 relative bg-gradient-to-br from-primary-50/50 to-accent-50/50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div>
+              <h2 className="text-4xl sm:text-5xl font-bold mb-6 text-slate-800">
+                Modular <span className="text-gradient">Extensions</span>
+              </h2>
+              <p className="text-xl text-slate-600 mb-8">
+                Realms comes with a powerful extension system. Add features like treasury management, 
+                voting systems, identity verification, and more. Build your own or use community extensions.
+              </p>
+              
+              <div className="space-y-4">
+                {extensions.map((ext, index) => (
+                  <div key={index} className="flex items-center gap-4 glass-dark rounded-xl p-4">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-100 to-accent-100 flex items-center justify-center text-primary-600">
+                      {ext.icon}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-slate-800">{ext.name}</div>
+                      <div className="text-sm text-slate-600">{ext.desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary-200/40 to-accent-200/40 rounded-3xl blur-3xl"></div>
+              <div className="relative bg-slate-900 rounded-3xl p-8 shadow-2xl">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
+                  <Code className="w-5 h-5 text-primary-400" />
+                  Extension Architecture
+                </h3>
+                <pre className="text-sm text-slate-300 overflow-x-auto">
+{`my-extension/
+├── backend/
+│   ├── __init__.py
+│   └── entry.py        # Entry points
+├── frontend/
+│   ├── lib/extensions/
+│   └── routes/
+├── manifest.json       # Metadata
+└── requirements.txt    # Dependencies`}
+                </pre>
+                <div className="mt-6 pt-6 border-t border-slate-700">
+                  <div className="flex items-center gap-2 text-sm text-slate-400">
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                    No inter-canister overhead
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-slate-400 mt-2">
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                    Atomic operations with shared memory
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-slate-400 mt-2">
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                    CLI-first development workflow
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Quick Start Section */}
+      <section id="quickstart" className="py-24 relative">
+        <div className="absolute inset-0 bg-grid opacity-30"></div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl sm:text-5xl font-bold mb-4 text-slate-800">
+              <span className="text-gradient">Quick Start</span>
+            </h2>
+            <p className="text-xl text-slate-600 max-w-2xl mx-auto">
+              Get your governance system running in minutes
+            </p>
+          </div>
+
+          <div className="max-w-3xl mx-auto space-y-6">
+            {[
+              { step: "1", title: "Install the CLI", code: "pip install realms-cli" },
+              { step: "2", title: "Create a Realm", code: "realms realm create --random --citizens 50 --deploy" },
+              { step: "3", title: "Access Your Realm", code: "# Frontend: http://<canister_id>.localhost:8000" },
+            ].map((item, index) => (
+              <div key={index} className="glass-dark rounded-2xl p-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center font-bold text-white">
+                    {item.step}
+                  </div>
+                  <h3 className="text-xl font-semibold text-slate-800">{item.title}</h3>
+                </div>
+                <div className="bg-slate-900 rounded-xl p-4 font-mono text-sm">
+                  <span className="text-slate-500">$ </span>
+                  <span className="text-primary-300">{item.code}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Multi-realm option */}
+          <div className="mt-12 max-w-3xl mx-auto">
+            <div className="glass-dark rounded-2xl p-8 text-center">
+              <h3 className="text-2xl font-bold mb-4 text-slate-800">Need Multiple Realms?</h3>
+              <p className="text-slate-600 mb-6">
+                Deploy a multi-realm ecosystem with shared registry using Mundus
+              </p>
+              <div className="bg-slate-900 rounded-xl p-4 font-mono text-sm text-left">
+                <span className="text-slate-500">$ </span>
+                <span className="text-primary-300">realms mundus create --deploy</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Sandbox CTA */}
+      <section className="py-24 relative bg-gradient-to-br from-primary-600 to-accent-600">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-4xl sm:text-5xl font-bold mb-6 text-white">
+            Try the <span className="text-white/90">Sandbox</span>
+          </h2>
+          <p className="text-xl text-white/80 max-w-2xl mx-auto mb-10">
+            Explore a production-like environment with 10k+ members, scheduled tasks, 
+            voting systems, and more.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="https://sandbox.realmsgos.org" target="_blank" rel="noopener noreferrer"
+               className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white text-primary-600 rounded-xl font-semibold text-lg hover:bg-white/90 transition-opacity shadow-lg">
+              Open Sandbox
+              <ExternalLink className="w-5 h-5" />
+            </a>
+            <a href="https://registry.realmsgos.org" target="_blank" rel="noopener noreferrer"
+               className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white/20 text-white border border-white/30 rounded-xl font-semibold text-lg hover:bg-white/30 transition-colors">
+              Realm Registry
+              <ExternalLink className="w-5 h-5" />
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-12 border-t border-slate-200 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-3">
+              <img src="/logo_sphere_only.svg" alt="Realms" className="h-10 w-10" />
+              <div>
+                <div className="font-bold">Realms GOS</div>
+                <div className="text-sm text-slate-500">Governance Operating System</div>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-6">
+              <a href="https://github.com/smart-social-contracts/realms" target="_blank" rel="noopener noreferrer"
+                 className="text-slate-500 hover:text-slate-900 transition-colors">
+                <Github className="w-6 h-6" />
+              </a>
+              <a href="https://docs.realms.dev" target="_blank" rel="noopener noreferrer"
+                 className="text-slate-500 hover:text-slate-900 transition-colors flex items-center gap-2">
+                <BookOpen className="w-5 h-5" />
+                Docs
+              </a>
+            </div>
+          </div>
+          
+          <div className="mt-8 pt-8 border-t border-slate-200 text-center text-slate-500 text-sm">
+            Built for the Internet Computer • Open Source • MIT License
+          </div>
+        </div>
+      </footer>
+    </div>
+  )
+}
+
+export default App
