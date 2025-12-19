@@ -18,8 +18,7 @@ import {
   Wallet,
   Scale,
   BookOpen,
-  ChevronRight,
-  Sparkles
+  ChevronRight
 } from 'lucide-react'
 
 function App() {
@@ -123,11 +122,6 @@ function App() {
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent-300/30 rounded-full blur-3xl"></div>
         
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-8 text-sm">
-            <Sparkles className="w-4 h-4 text-accent-400" />
-            <span className="text-slate-600">Governance for the decentralized web</span>
-          </div>
-          
           <div className="mb-8">
             <img src="/logo_horizontal.svg" alt="Realms" className="h-20 sm:h-24 lg:h-28 mx-auto" />
           </div>
@@ -141,15 +135,10 @@ function App() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="#quickstart" 
-               className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-primary-500 to-accent-500 rounded-xl font-semibold text-lg hover:opacity-90 transition-opacity">
-              Get Started
+            <a href="https://demo.realmsgos.org" target="_blank" rel="noopener noreferrer"
+               className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-primary-900 text-white rounded-xl font-semibold text-lg hover:bg-primary-800 transition-colors">
+              Try Demo
               <ArrowRight className="w-5 h-5" />
-            </a>
-            <a href="https://github.com/smart-social-contracts/realms" target="_blank" rel="noopener noreferrer"
-               className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white border border-slate-200 rounded-xl font-semibold text-lg hover:bg-slate-50 transition-colors shadow-lg shadow-slate-200/50">
-              <Github className="w-5 h-5" />
-              View on GitHub
             </a>
           </div>
 
@@ -164,11 +153,11 @@ function App() {
               </div>
               <code className="text-sm sm:text-base">
                 <span className="text-slate-500">$ </span>
-                <span className="text-primary-400">pip install</span>
+                <span className="text-primary-300">pip install</span>
                 <span className="text-slate-300"> realms-cli</span>
                 <br />
                 <span className="text-slate-500">$ </span>
-                <span className="text-primary-400">realms realm create</span>
+                <span className="text-primary-300">realms realm create</span>
                 <span className="text-slate-300"> --random --deploy</span>
                 <br />
                 <span className="text-green-400">✓ Your realm is running at http://localhost:8000</span>
@@ -202,7 +191,7 @@ function App() {
                 key={index}
                 className="glass-dark rounded-2xl p-8 hover:border-primary-400 transition-colors group"
               >
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-100 to-accent-100 flex items-center justify-center text-primary-600 mb-6 group-hover:scale-110 transition-transform">
+                <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center text-primary-700 mb-6 group-hover:scale-110 transition-transform">
                   {feature.icon}
                 </div>
                 <h3 className="text-xl font-semibold mb-3 text-slate-800">{feature.title}</h3>
@@ -214,7 +203,7 @@ function App() {
       </section>
 
       {/* Extensions Section */}
-      <section id="extensions" className="py-24 relative bg-gradient-to-br from-primary-50/50 to-accent-50/50">
+      <section id="extensions" className="py-24 relative bg-primary-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
@@ -229,7 +218,7 @@ function App() {
               <div className="space-y-4">
                 {extensions.map((ext, index) => (
                   <div key={index} className="flex items-center gap-4 glass-dark rounded-xl p-4">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-100 to-accent-100 flex items-center justify-center text-primary-600">
+                    <div className="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center text-primary-700">
                       {ext.icon}
                     </div>
                     <div>
@@ -242,10 +231,10 @@ function App() {
             </div>
 
             <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary-200/40 to-accent-200/40 rounded-3xl blur-3xl"></div>
+              <div className="absolute inset-0 bg-primary-200/40 rounded-3xl blur-3xl"></div>
               <div className="relative bg-slate-900 rounded-3xl p-8 shadow-2xl">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
-                  <Code className="w-5 h-5 text-primary-400" />
+                  <Code className="w-5 h-5 text-primary-300" />
                   Extension Architecture
                 </h3>
                 <pre className="text-sm text-slate-300 overflow-x-auto">
@@ -300,7 +289,7 @@ function App() {
             ].map((item, index) => (
               <div key={index} className="glass-dark rounded-2xl p-6">
                 <div className="flex items-center gap-4 mb-4">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center font-bold text-white">
+                  <div className="w-10 h-10 rounded-full bg-primary-900 flex items-center justify-center font-bold text-white">
                     {item.step}
                   </div>
                   <h3 className="text-xl font-semibold text-slate-800">{item.title}</h3>
@@ -325,31 +314,6 @@ function App() {
                 <span className="text-primary-300">realms mundus create --deploy</span>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Sandbox CTA */}
-      <section className="py-24 relative bg-gradient-to-br from-primary-600 to-accent-600">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl sm:text-5xl font-bold mb-6 text-white">
-            Try the <span className="text-white/90">Sandbox</span>
-          </h2>
-          <p className="text-xl text-white/80 max-w-2xl mx-auto mb-10">
-            Explore a production-like environment with 10k+ members, scheduled tasks, 
-            voting systems, and more.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="https://demo.realmsgos.org" target="_blank" rel="noopener noreferrer"
-               className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white text-primary-600 rounded-xl font-semibold text-lg hover:bg-white/90 transition-opacity shadow-lg">
-              Open Sandbox
-              <ExternalLink className="w-5 h-5" />
-            </a>
-            <a href="https://registry.realmsgos.org" target="_blank" rel="noopener noreferrer"
-               className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white/20 text-white border border-white/30 rounded-xl font-semibold text-lg hover:bg-white/30 transition-colors">
-              Realm Registry
-              <ExternalLink className="w-5 h-5" />
-            </a>
           </div>
         </div>
       </section>

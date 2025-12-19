@@ -20,19 +20,19 @@ body {
 
 @layer utilities {
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-500 via-accent-500 to-primary-500;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-700 via-primary-500 to-primary-700;
     background-size: 200% auto;
   }
 
   .bg-grid {
     background-image: 
-      linear-gradient(to right, rgba(14, 165, 233, 0.05) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(14, 165, 233, 0.05) 1px, transparent 1px);
+      linear-gradient(to right, rgba(115, 115, 115, 0.08) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(115, 115, 115, 0.08) 1px, transparent 1px);
     background-size: 60px 60px;
   }
 
   .bg-dots {
-    background-image: radial-gradient(rgba(14, 165, 233, 0.15) 1px, transparent 1px);
+    background-image: radial-gradient(rgba(115, 115, 115, 0.15) 1px, transparent 1px);
     background-size: 30px 30px;
   }
 
