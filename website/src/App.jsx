@@ -125,14 +125,15 @@ function App() {
           <div className="mb-8">
             <img src="/logo_horizontal.svg" alt="Realms" className="h-20 sm:h-24 lg:h-28 mx-auto" />
           </div>
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6">
-            <span className="text-slate-800">Governance Operating System</span>
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-8">
+            <span className="text-slate-800">The Governance Operating System</span>
           </h1>
           
-          <p className="text-xl sm:text-2xl text-slate-600 max-w-3xl mx-auto mb-10">
-            A powerful framework for building and deploying governance systems on the Internet Computer. 
-            Create transparent, secure, and scalable digital governments.
-          </p>
+          <div className="text-xl sm:text-2xl text-slate-600 max-w-3xl mx-auto mb-10 space-y-2">
+            <p>• Launch a full public administration in seconds</p>
+            <p>• Fully auditable. Fully transparent. AI-powered</p>
+            <p>• Engineered to eliminate corruption and inefficiencies</p>
+          </div>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a href="https://demo.realmsgos.org" target="_blank" rel="noopener noreferrer"
@@ -141,34 +142,77 @@ function App() {
               <ArrowRight className="w-5 h-5" />
             </a>
           </div>
-
-          {/* Quick command preview */}
-          <div className="mt-16 max-w-2xl mx-auto">
-            <div className="bg-slate-900 rounded-2xl p-6 text-left shadow-2xl">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                <span className="ml-2 text-slate-500 text-sm">terminal</span>
-              </div>
-              <code className="text-sm sm:text-base">
-                <span className="text-slate-500">$ </span>
-                <span className="text-primary-300">pip install</span>
-                <span className="text-slate-300"> realms-cli</span>
-                <br />
-                <span className="text-slate-500">$ </span>
-                <span className="text-primary-300">realms realm create</span>
-                <span className="text-slate-300"> --random --deploy</span>
-                <br />
-                <span className="text-green-400">✓ Your realm is running at http://localhost:8000</span>
-              </code>
-            </div>
-          </div>
         </div>
 
         {/* Scroll indicator */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
           <ChevronRight className="w-6 h-6 rotate-90 text-slate-500" />
+        </div>
+      </section>
+
+      {/* Mission Section */}
+      <section className="py-24 bg-primary-50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-4xl sm:text-5xl font-bold mb-8 text-slate-800">
+            Governance as It Should Be
+          </h2>
+          <p className="text-xl text-slate-600 leading-relaxed">
+            <strong>Realms</strong> is a decentralized software platform for public administration — a Governance Operating System (GOS) 
+            designed to deliver essential public services such as justice, social welfare, property registries, and more. 
+            From small towns to entire nations, it empowers communities to design, run, and evolve their own governance systems — 
+            free from the corruption and inefficiencies of traditional bureaucracy.
+          </p>
+        </div>
+      </section>
+
+      {/* Design Principles Section */}
+      <section className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-4xl sm:text-5xl font-bold mb-16 text-center text-slate-800">
+            Design Principles
+          </h2>
+          
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="bg-primary-50 rounded-2xl p-8">
+              <div className="text-primary-500 font-semibold mb-2">01</div>
+              <h3 className="text-xl font-bold mb-4 text-slate-800">Transparency</h3>
+              <p className="text-base text-slate-600">
+                Transparency builds trust between the government and the public, as users can see how processes are executed 
+                and where resources, such as tax money, are allocated. Transparency also helps prevent corruption and 
+                strengthens the legitimacy of institutions.
+              </p>
+            </div>
+            
+            <div className="bg-primary-50 rounded-2xl p-8">
+              <div className="text-primary-500 font-semibold mb-2">02</div>
+              <h3 className="text-xl font-bold mb-4 text-slate-800">Efficiency</h3>
+              <p className="text-base text-slate-600">
+                Efficiency involves delivering services effectively while minimizing costs and reducing waste. 
+                This fosters a strong sense of fairness, reinforcing public confidence in the governance system. 
+                As a result, users are more likely to support and comply with tax obligations.
+              </p>
+            </div>
+            
+            <div className="bg-primary-50 rounded-2xl p-8">
+              <div className="text-primary-500 font-semibold mb-2">03</div>
+              <h3 className="text-xl font-bold mb-4 text-slate-800">Diversity</h3>
+              <p className="text-base text-slate-600">
+                Diversity in governance ensures that a wide range of perspectives are represented. 
+                This leads to more inclusive and equitable policies that cater to different societal needs, 
+                fostering social cohesion and reducing marginalization.
+              </p>
+            </div>
+            
+            <div className="bg-primary-50 rounded-2xl p-8">
+              <div className="text-primary-500 font-semibold mb-2">04</div>
+              <h3 className="text-xl font-bold mb-4 text-slate-800">Resilience</h3>
+              <p className="text-base text-slate-600">
+                Resilience enables governance systems to respond to crises, adapt to changes, and recover from setbacks. 
+                A resilient governance system ensures stability and continuity, even in times of stress, 
+                protecting long-term societal wellbeing.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -195,7 +239,7 @@ function App() {
                   {feature.icon}
                 </div>
                 <h3 className="text-xl font-semibold mb-3 text-slate-800">{feature.title}</h3>
-                <p className="text-slate-600">{feature.description}</p>
+                <p className="text-base text-slate-600">{feature.description}</p>
               </div>
             ))}
           </div>
@@ -223,7 +267,7 @@ function App() {
                     </div>
                     <div>
                       <div className="font-semibold text-slate-800">{ext.name}</div>
-                      <div className="text-sm text-slate-600">{ext.desc}</div>
+                      <div className="text-base text-slate-600">{ext.desc}</div>
                     </div>
                   </div>
                 ))}
@@ -305,8 +349,8 @@ function App() {
           {/* Multi-realm option */}
           <div className="mt-12 max-w-3xl mx-auto">
             <div className="glass-dark rounded-2xl p-8 text-center">
-              <h3 className="text-2xl font-bold mb-4 text-slate-800">Need Multiple Realms?</h3>
-              <p className="text-slate-600 mb-6">
+              <h3 className="text-xl font-bold mb-4 text-slate-800">Need Multiple Realms?</h3>
+              <p className="text-base text-slate-600 mb-6">
                 Deploy a multi-realm ecosystem with shared registry using Mundus
               </p>
               <div className="bg-slate-900 rounded-xl p-4 font-mono text-sm text-left">
