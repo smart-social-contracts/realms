@@ -340,7 +340,7 @@ function App() {
             voting systems, and more.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="https://sandbox.realmsgos.org" target="_blank" rel="noopener noreferrer"
+            <a href="https://demo.realmsgos.org" target="_blank" rel="noopener noreferrer"
                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white text-primary-600 rounded-xl font-semibold text-lg hover:bg-white/90 transition-opacity shadow-lg">
               Open Sandbox
               <ExternalLink className="w-5 h-5" />

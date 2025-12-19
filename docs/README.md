@@ -193,7 +193,7 @@ See the [examples/](../examples/) directory for code samples.
 
 - **Main Repository** - [GitHub](https://github.com/smart-social-contracts/realms)
 - **Realm Registry** - [registry.realmsgos.org](https://registry.realmsgos.org)
-- **Sandbox Realm** - [sandbox.realmsgos.org](https://sandbox.realmsgos.org)
+- **Sandbox Realm** - [demo.realmsgos.org](https://demo.realmsgos.org)
 - **Internet Computer** - [internetcomputer.org](https://internetcomputer.org)
 
 ---

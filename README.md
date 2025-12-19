@@ -495,7 +495,7 @@ See [Deployment Guide](./docs/DEPLOYMENT_GUIDE.md#multi-realm-deployment-mundus)
 
 ## Sandbox
 
-[Sandbox Realm](https://sandbox.realmsgos.org).
+[Sandbox Realm](https://demo.realmsgos.org).
 Decent amount of members (10k) and other objects simulating a production-like environment.
 Runs scheduled tasks for payments, tax claculations etc.
 Voting of new codex and deployment of it.

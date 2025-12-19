@@ -53,7 +53,7 @@ Everything is recorded on the blockchain, visible to all, and executed fairly by
 ## Getting Started
 
 **Non-Technical Users:**
-- Visit a demo Realm: [sandbox.realmsgos.org](https://sandbox.realmsgos.org)
+- Visit a demo Realm: [demo.realmsgos.org](https://demo.realmsgos.org)
 - Learn about voting: [Governance Tutorial](./GOVERNANCE_TUTORIAL.md)
 
 **Technical Users:**

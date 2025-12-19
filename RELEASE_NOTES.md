@@ -300,7 +300,7 @@ This project is licensed under the MIT License. See LICENSE file for details.
 - **Extensions**: [extensions/](./extensions/)
 - **CLI Reference**: [docs/CLI_REFERENCE.md](./docs/CLI_REFERENCE.md)
 - **Deployment Guide**: [docs/DEPLOYMENT_GUIDE.md](./docs/DEPLOYMENT_GUIDE.md)
-- **Sandbox**: https://sandbox.realmsgos.org
+- **Sandbox**: https://demo.realmsgos.org
 - **Registry**: https://registry.realmsgos.org
 
 ---
