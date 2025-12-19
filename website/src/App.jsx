@@ -116,10 +116,15 @@ function App() {
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
-        {/* Background effects */}
-        <div className="absolute inset-0 bg-grid opacity-30"></div>
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary-300/30 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent-300/30 rounded-full blur-3xl"></div>
+        {/* Background image */}
+        <div className="absolute inset-0">
+          <img 
+            src="/hero-bg.jpg" 
+            alt="Background" 
+            className="w-full h-full object-cover opacity-40"
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-50/60 via-white/50 to-primary-50/60"></div>
+        </div>
         
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="mb-8">
@@ -388,7 +393,10 @@ function App() {
           </div>
           
           <div className="mt-8 pt-8 border-t border-slate-200 text-center text-slate-500 text-sm">
-            Built for the Internet Computer • Open Source • MIT License
+            <a href="https://internetcomputer.org" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-slate-700 transition-colors">
+              Built on the <img src="/images/internet-computer-icp-logo.svg" alt="Internet Computer" className="inline h-4 w-4 mx-1" /> with ❤️ from 🇨🇭
+            </a>
+            <div className="mt-2">Open Source • MIT License</div>
           </div>
         </div>
       </footer>
