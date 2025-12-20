@@ -2,7 +2,7 @@
 layout: home
 
 hero:
-  name: Realms GOS
+  name: Realms
   text: Governance Operating System
   tagline: Build and deploy transparent, efficient governance systems on the Internet Computer
   image:

@@ -21,18 +21,30 @@ function getVersion() {
 const version = getVersion()
 
 export default defineConfig({
-  title: 'Realms GOS',
+  title: 'Realms',
   description: 'Governance Operating System Documentation',
   base: '/docs/',
   ignoreDeadLinks: true,
+  appearance: true,
   
   head: [
     ['link', { rel: 'icon', href: '/docs/img/logo_sphere_only.svg' }]
   ],
 
+  locales: {
+    root: {
+      label: 'English',
+      lang: 'en'
+    }
+  },
+
   themeConfig: {
     logo: '/img/logo_horizontal.svg',
     siteTitle: false,
+    
+    darkModeSwitchLabel: 'Appearance',
+    lightModeSwitchTitle: 'Switch to light mode',
+    darkModeSwitchTitle: 'Switch to dark mode',
     
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
@@ -116,7 +128,7 @@ export default defineConfig({
 
     footer: {
       message: 'Open Source • MIT License',
-      copyright: `Documentation for Realms GOS v${version}`
+      copyright: `Documentation for Realms v${version}`
     },
 
     editLink: {
