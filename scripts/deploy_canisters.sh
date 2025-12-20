@@ -106,9 +106,24 @@ if [ "$NETWORK" = "local" ] && [ "$SKIP_DFX_START" != "true" ]; then
         dfx start --clean --log file --logfile dfx.log --host 127.0.0.1:$PORT </dev/null >/dev/null 2>dfx2.log &
         disown
         
-        # Wait for initialization
+        # Wait for initialization with health check
         echo "⏳ Waiting for dfx to initialize..."
-        sleep 3
+        MAX_WAIT=10
+        ELAPSED=0
+        while [ $ELAPSED -lt $MAX_WAIT ]; do
+            if dfx ping local >/dev/null 2>&1; then
+                echo "✅ dfx is ready (took ${ELAPSED}s)"
+                break
+            fi
+            sleep 1
+            ELAPSED=$((ELAPSED + 1))
+        done
+        
+        if [ $ELAPSED -ge $MAX_WAIT ]; then
+            echo "❌ Error: dfx failed to start after ${MAX_WAIT} seconds"
+            echo "Check dfx.log for details"
+            exit 1
+        fi
     fi
 elif [ "$SKIP_DFX_START" = "true" ]; then
     echo "🌐 Using existing dfx instance (SKIP_DFX_START=true)"
