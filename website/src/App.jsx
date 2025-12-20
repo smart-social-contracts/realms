@@ -80,14 +80,8 @@ function App() {
             </div>
             
             <div className="hidden md:flex items-center gap-8">
-              <a href="#features" className="text-slate-600 hover:text-slate-900 transition-colors">{t('nav.features')}</a>
-              <a href="#extensions" className="text-slate-600 hover:text-slate-900 transition-colors">{t('nav.extensions')}</a>
-              <a href="#quickstart" className="text-slate-600 hover:text-slate-900 transition-colors">{t('nav.quickStart')}</a>
-              <a href="https://github.com/smart-social-contracts/realms" target="_blank" rel="noopener noreferrer" 
-                 className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors">
-                <Github className="w-5 h-5" />
-                {t('nav.github')}
-              </a>
+              <a href="#features" className="text-slate-600 hover:text-slate-900 transition-colors">For people</a>
+              <a href="#extensions" className="text-slate-600 hover:text-slate-900 transition-colors">For developers</a>
               <LanguageSwitcher />
             </div>
 
@@ -104,14 +98,8 @@ function App() {
         {mobileMenuOpen && (
           <div className="md:hidden glass-dark border-t border-slate-200">
             <div className="px-4 py-4 space-y-4">
-              <a href="#features" className="block text-slate-600 hover:text-slate-900">{t('nav.features')}</a>
-              <a href="#extensions" className="block text-slate-600 hover:text-slate-900">{t('nav.extensions')}</a>
-              <a href="#quickstart" className="block text-slate-600 hover:text-slate-900">{t('nav.quickStart')}</a>
-              <a href="https://github.com/smart-social-contracts/realms" target="_blank" rel="noopener noreferrer"
-                 className="flex items-center gap-2 text-slate-600 hover:text-slate-900">
-                <Github className="w-5 h-5" />
-                {t('nav.github')}
-              </a>
+              <a href="#features" className="block text-slate-600 hover:text-slate-900">For people</a>
+              <a href="#extensions" className="block text-slate-600 hover:text-slate-900">For developers</a>
               <LanguageSwitcher />
             </div>
           </div>
@@ -131,25 +119,27 @@ function App() {
         </div>
         
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="mb-8">
-            <img src="/logo_horizontal.svg" alt="Realms" className="h-20 sm:h-24 lg:h-28 mx-auto" />
-          </div>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-8">
-            <span className="text-slate-800">{t('hero.title')}</span>
-          </h1>
-          
-          <div className="text-lg sm:text-xl lg:text-2xl text-slate-600 max-w-4xl mx-auto mb-10 space-y-3 px-4">
-            <p className="break-words">{t('hero.subtitle1')}</p>
-            <p className="break-words">{t('hero.subtitle2')}</p>
-            <p className="break-words">{t('hero.subtitle3')}</p>
-          </div>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="https://demo.realmsgos.org" target="_blank" rel="noopener noreferrer"
-               className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-primary-900 text-white rounded-xl font-semibold text-lg hover:bg-primary-800 transition-colors">
-              {t('hero.tryDemo')}
-              <ArrowRight className="w-5 h-5" />
-            </a>
+          <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl p-8 sm:p-12 max-w-5xl mx-auto text-left">
+            <div className="mb-8 flex justify-center">
+              <img src="/logo_horizontal.svg" alt="Realms" className="h-20 sm:h-24 lg:h-28" />
+            </div>
+            
+            <h1 className="text-lg sm:text-xl lg:text-2xl font-bold mb-6 text-center">
+              <span className="text-slate-800">{t('hero.title')}</span>
+            </h1>
+            
+            <div className="text-base sm:text-lg text-slate-600 mb-8 space-y-2">
+              <p className="break-words">{t('hero.subtitle1')}</p>
+              <p className="break-words">{t('hero.subtitle2')}</p>
+              <p className="break-words">{t('hero.subtitle3')}</p>
+            </div>
+            
+            <div className="flex justify-center">
+              <a href="https://demo.realmsgos.org" target="_blank" rel="noopener noreferrer"
+                 className="inline-flex items-center justify-center px-8 py-4 bg-primary-900 text-white rounded-xl font-semibold text-lg hover:bg-primary-800 transition-colors">
+                {t('hero.tryDemo')}
+              </a>
+            </div>
           </div>
         </div>
 
