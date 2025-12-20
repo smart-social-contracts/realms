@@ -205,7 +205,7 @@ def publish_to_test_pypi() -> bool:
 
         if result.returncode == 0:
             print("✅ Published to Test PyPI successfully")
-            print("🔗 Check: https://test.pypi.org/project/realms-cli/")
+            print("🔗 Check: https://test.pypi.org/project/realms-gos/")
             return True
         else:
             print("❌ Test PyPI upload failed")
@@ -225,7 +225,7 @@ def publish_to_pypi() -> bool:
 
         if result.returncode == 0:
             print("✅ Published to PyPI successfully")
-            print("🔗 Check: https://pypi.org/project/realms-cli/")
+            print("🔗 Check: https://pypi.org/project/realms-gos/")
             return True
         else:
             print("❌ PyPI upload failed")
@@ -320,7 +320,7 @@ def main():
     print("1. Push git tags: git push --tags")
     print("2. Create GitHub release")
     print("3. Update documentation")
-    print(f"4. Test installation: pip install realms-cli=={new_version}")
+    print(f"4. Test installation: pip install realms-gos=={new_version}")
 
     return 0
 

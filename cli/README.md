@@ -13,7 +13,7 @@ A powerful command-line tool for managing Realms project lifecycle on the Intern
 
 ## Prerequisites
 
-Before installing realms-cli, ensure you have the following dependencies:
+Before installing realms-gos, ensure you have the following dependencies:
 
 ### 1. DFX (DFINITY Canister SDK)
 ```bash
@@ -42,7 +42,7 @@ nvm use 18
 ## Installation
 
 ```bash
-pip install realms-cli
+pip install realms-gos
 ```
 
 ### From Source
@@ -228,8 +228,8 @@ The easiest way to install the Realms CLI is using `pipx`, which automatically m
 # Install pipx if you don't have it
 pip install pipx
 
-# Install realms-cli in an isolated environment
-pipx install realms-cli
+# Install realms-gos in an isolated environment
+pipx install realms-gos
 
 # Use the CLI tool (no venv activation needed)
 realms --help
@@ -243,7 +243,7 @@ If you prefer manual environment management:
 ```bash
 python -m venv realms-env
 source realms-env/bin/activate  # On Windows: realms-env\Scripts\activate
-pip install realms-cli
+pip install realms-gos
 ```
 
 ### Development Setup

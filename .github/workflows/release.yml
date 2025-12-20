@@ -186,7 +186,7 @@ jobs:
             
             ### 📦 CLI Tool (PyPI)
             ```bash
-            pip install --upgrade realms-cli==${{ steps.bump_version.outputs.NEW_VERSION }}
+            pip install --upgrade realms-gos==${{ steps.bump_version.outputs.NEW_VERSION }}
             ```
             
             ### 📁 Source Code
@@ -208,7 +208,7 @@ jobs:
             
             **Install CLI:**
             ```bash
-            pip install realms-cli==${{ steps.bump_version.outputs.NEW_VERSION }}
+            pip install realms-gos==${{ steps.bump_version.outputs.NEW_VERSION }}
             ```
             
             ## Commit

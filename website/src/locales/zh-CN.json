@@ -102,7 +102,7 @@
     "subtitle": "几分钟内运行您的治理系统",
     "step1": {
       "title": "安装CLI",
-      "code": "pip install realms-cli"
+      "code": "pip install realms-gos"
     },
     "step2": {
       "title": "创建Realm",

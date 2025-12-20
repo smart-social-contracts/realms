@@ -102,7 +102,7 @@
     "subtitle": "Pon tu sistema de gobernanza en funcionamiento en minutos",
     "step1": {
       "title": "Instalar el CLI",
-      "code": "pip install realms-cli"
+      "code": "pip install realms-gos"
     },
     "step2": {
       "title": "Crear un Realm",

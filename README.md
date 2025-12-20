@@ -17,7 +17,7 @@ A framework for building and deploying governance systems on the Internet Comput
 
 ```bash
 # Install Realms CLI
-pip install realms-cli
+pip install realms-gos
 
 # or alternatively
 pip install -e cli/
@@ -170,7 +170,7 @@ dfx canister call realm_backend extension_call '("my_extension", "my_function", 
 
 ```bash
 # Install realms CLI
-pip install -e cli/  # (pip install realms-cli when published)
+pip install -e cli/  # (pip install realms-gos when published)
 
 # Create a realm
 realms realm create --realm-name "My Realm" --deploy
