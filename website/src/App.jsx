@@ -354,9 +354,8 @@ function App() {
           {/* Multi-realm option */}
           <div className="mt-12 max-w-3xl mx-auto">
             <div className="glass-dark rounded-2xl p-8 text-center">
-              <h3 className="text-xl font-bold mb-4 text-slate-800">Need Multiple Realms?</h3>
               <p className="text-base text-slate-600 mb-6">
-                Deploy a multi-realm ecosystem with shared registry using Mundus
+                Add your deploy to the Realm GOS Mundus by adding your realm to the registry
               </p>
               <div className="bg-slate-900 rounded-xl p-4 font-mono text-sm text-left">
                 <span className="text-slate-500">$ </span>
