@@ -2,12 +2,11 @@
 layout: home
 
 hero:
-  name: Realms
-  text: Governance Operating System
-  tagline: Build and deploy transparent, efficient governance systems on the Internet Computer
+  name: realms
+  tagline: Welcome to the documentation of realms Governance Operating System. Build and deploy transparent, efficient governance systems on the Internet Computer.
   image:
-    src: /img/logo_horizontal.svg
-    alt: Realms GOS
+    src: /img/logo_sphere_only.svg
+    alt: Realms
   actions:
     - theme: brand
       text: Get Started
