@@ -13,11 +13,12 @@
     "tryDemo": "试用演示"
   },
   "mission": {
-    "title": "理想的治理",
+    "title": "什么是Realms?",
     "description": "<strong>Realms</strong>是一个用于公共管理的去中心化软件平台——一个治理操作系统(GOS),旨在提供司法、社会福利、财产登记等基本公共服务。从小城镇到整个国家,它赋能社区设计、运行和发展自己的治理系统——摆脱传统官僚机构的腐败和低效。"
   },
   "principles": {
-    "title": "设计原则",
+    "title": "核心原则",
+    "intro": "Realms基于以下4个核心原则来解决我们社会当前的问题。",
     "transparency": {
       "title": "透明度",
       "description": "透明度在政府和公众之间建立信任,因为用户可以看到流程如何执行以及资源(如税收)如何分配。透明度还有助于防止腐败并加强机构的合法性。"
@@ -36,7 +37,7 @@
     }
   },
   "features": {
-    "title": "为什么选择Realms?",
+    "title": "面向开发者",
     "subtitle": "构建现代治理基础设施所需的一切",
     "internetComputer": {
       "title": "Internet Computer原生",

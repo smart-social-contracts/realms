@@ -81,7 +81,7 @@ function App() {
             
             <div className="hidden md:flex items-center gap-8">
               <a href="#features" className="text-slate-600 hover:text-slate-900 transition-colors">For people</a>
-              <a href="#extensions" className="text-slate-600 hover:text-slate-900 transition-colors">For developers</a>
+              <a href="#features" className="text-slate-600 hover:text-slate-900 transition-colors">For developers</a>
               <LanguageSwitcher />
             </div>
 
@@ -99,7 +99,7 @@ function App() {
           <div className="md:hidden glass-dark border-t border-slate-200">
             <div className="px-4 py-4 space-y-4">
               <a href="#features" className="block text-slate-600 hover:text-slate-900">For people</a>
-              <a href="#extensions" className="block text-slate-600 hover:text-slate-900">For developers</a>
+              <a href="#features" className="block text-slate-600 hover:text-slate-900">For developers</a>
               <LanguageSwitcher />
             </div>
           </div>
@@ -152,24 +152,27 @@ function App() {
       {/* Mission Section */}
       <section className="py-24 bg-primary-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl sm:text-5xl font-bold mb-8 text-slate-800">
+          <h2 className="text-3xl sm:text-4xl font-bold mb-8 text-slate-800">
             {t('mission.title')}
           </h2>
-          <p className="text-xl text-slate-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: t('mission.description') }} />
+          <p className="text-base text-slate-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: t('mission.description') }} />
         </div>
       </section>
 
       {/* Design Principles Section */}
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl sm:text-5xl font-bold mb-16 text-center text-slate-800">
+          <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-center text-slate-800">
             {t('principles.title')}
           </h2>
+          <p className="text-base text-slate-600 text-center mb-16 max-w-3xl mx-auto">
+            {t('principles.intro')}
+          </p>
           
           <div className="grid md:grid-cols-2 gap-8">
             <div className="bg-primary-50 rounded-2xl p-8">
               <div className="text-primary-500 font-semibold mb-2">01</div>
-              <h3 className="text-xl font-bold mb-4 text-slate-800">{t('principles.transparency.title')}</h3>
+              <h3 className="text-lg sm:text-xl font-bold mb-4 text-slate-800">{t('principles.transparency.title')}</h3>
               <p className="text-base text-slate-600">
                 {t('principles.transparency.description')}
               </p>
@@ -177,7 +180,7 @@ function App() {
             
             <div className="bg-primary-50 rounded-2xl p-8">
               <div className="text-primary-500 font-semibold mb-2">02</div>
-              <h3 className="text-xl font-bold mb-4 text-slate-800">{t('principles.efficiency.title')}</h3>
+              <h3 className="text-lg sm:text-xl font-bold mb-4 text-slate-800">{t('principles.efficiency.title')}</h3>
               <p className="text-base text-slate-600">
                 {t('principles.efficiency.description')}
               </p>
@@ -185,7 +188,7 @@ function App() {
             
             <div className="bg-primary-50 rounded-2xl p-8">
               <div className="text-primary-500 font-semibold mb-2">03</div>
-              <h3 className="text-xl font-bold mb-4 text-slate-800">{t('principles.diversity.title')}</h3>
+              <h3 className="text-lg sm:text-xl font-bold mb-4 text-slate-800">{t('principles.diversity.title')}</h3>
               <p className="text-base text-slate-600">
                 {t('principles.diversity.description')}
               </p>
@@ -193,7 +196,7 @@ function App() {
             
             <div className="bg-primary-50 rounded-2xl p-8">
               <div className="text-primary-500 font-semibold mb-2">04</div>
-              <h3 className="text-xl font-bold mb-4 text-slate-800">{t('principles.resilience.title')}</h3>
+              <h3 className="text-lg sm:text-xl font-bold mb-4 text-slate-800">{t('principles.resilience.title')}</h3>
               <p className="text-base text-slate-600">
                 {t('principles.resilience.description')}
               </p>
@@ -207,10 +210,10 @@ function App() {
         <div className="absolute inset-0 bg-dots opacity-30"></div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl sm:text-5xl font-bold mb-4 text-slate-800">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-slate-800">
               {t('features.title')}
             </h2>
-            <p className="text-xl text-slate-600 max-w-2xl mx-auto">
+            <p className="text-base text-slate-600 max-w-2xl mx-auto">
               {t('features.subtitle')}
             </p>
           </div>
@@ -237,10 +240,10 @@ function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
-              <h2 className="text-4xl sm:text-5xl font-bold mb-6 text-slate-800">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-6 text-slate-800">
                 {t('extensions.title')}
               </h2>
-              <p className="text-xl text-slate-600 mb-8">
+              <p className="text-base text-slate-600 mb-8">
                 {t('extensions.subtitle')}
               </p>
               
@@ -302,10 +305,10 @@ function App() {
         <div className="absolute inset-0 bg-grid opacity-30"></div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl sm:text-5xl font-bold mb-4 text-slate-800">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-slate-800">
               <span className="text-gradient">{t('quickStart.title')}</span>
             </h2>
-            <p className="text-xl text-slate-600 max-w-2xl mx-auto">
+            <p className="text-base text-slate-600 max-w-2xl mx-auto">
               {t('quickStart.subtitle')}
             </p>
           </div>

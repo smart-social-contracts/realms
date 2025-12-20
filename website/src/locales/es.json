@@ -13,11 +13,12 @@
     "tryDemo": "Probar Demo"
   },
   "mission": {
-    "title": "Gobernanza como Debería Ser",
+    "title": "¿Qué es Realms?",
     "description": "<strong>Realms</strong> es una plataforma de software descentralizada para la administración pública — un Sistema Operativo de Gobernanza (GOS) diseñado para ofrecer servicios públicos esenciales como justicia, bienestar social, registros de propiedad y más. Desde pequeñas ciudades hasta naciones enteras, empodera a las comunidades para diseñar, ejecutar y evolucionar sus propios sistemas de gobernanza — libres de la corrupción e ineficiencias de la burocracia tradicional."
   },
   "principles": {
-    "title": "Principios de Diseño",
+    "title": "Principios Fundamentales",
+    "intro": "Realms se basa en los siguientes 4 principios fundamentales para resolver los problemas actuales de nuestras sociedades.",
     "transparency": {
       "title": "Transparencia",
       "description": "La transparencia genera confianza entre el gobierno y el público, ya que los usuarios pueden ver cómo se ejecutan los procesos y dónde se asignan los recursos, como el dinero de los impuestos. La transparencia también ayuda a prevenir la corrupción y fortalece la legitimidad de las instituciones."
@@ -36,7 +37,7 @@
     }
   },
   "features": {
-    "title": "¿Por qué Realms?",
+    "title": "Para Desarrolladores",
     "subtitle": "Todo lo que necesitas para construir infraestructura de gobernanza moderna",
     "internetComputer": {
       "title": "Nativo de Internet Computer",
