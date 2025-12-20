@@ -1,9 +1,5 @@
 # Realms Platform Documentation
 
-<p align="center">
-  <img src="img/logo_horizontal.svg" alt="Realms Logo" width="400"/>
-</p>
-
 Complete documentation for building and deploying governance systems on the Internet Computer.
 
 ---

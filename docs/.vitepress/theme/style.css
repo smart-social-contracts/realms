@@ -1,0 +1,15 @@
+/* Custom styles for Realms GOS documentation */
+
+/* Make the logo larger in the navbar */
+.VPNavBarTitle .logo {
+  height: 48px !important;
+  max-height: 48px !important;
+}
+
+/* Ensure logo scales properly on mobile */
+@media (max-width: 768px) {
+  .VPNavBarTitle .logo {
+    height: 40px !important;
+    max-height: 40px !important;
+  }
+}

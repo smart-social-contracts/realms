@@ -1,0 +1,128 @@
+{
+  "nav": {
+    "features": "Características",
+    "extensions": "Extensiones",
+    "quickStart": "Inicio Rápido",
+    "github": "GitHub"
+  },
+  "hero": {
+    "title": "El Sistema Operativo de Gobernanza",
+    "subtitle1": "• Lanza una administración pública completa en segundos",
+    "subtitle2": "• Totalmente auditable. Totalmente transparente. Impulsado por IA",
+    "subtitle3": "• Diseñado para eliminar la corrupción y las ineficiencias",
+    "tryDemo": "Probar Demo"
+  },
+  "mission": {
+    "title": "Gobernanza como Debería Ser",
+    "description": "<strong>Realms</strong> es una plataforma de software descentralizada para la administración pública — un Sistema Operativo de Gobernanza (GOS) diseñado para ofrecer servicios públicos esenciales como justicia, bienestar social, registros de propiedad y más. Desde pequeñas ciudades hasta naciones enteras, empodera a las comunidades para diseñar, ejecutar y evolucionar sus propios sistemas de gobernanza — libres de la corrupción e ineficiencias de la burocracia tradicional."
+  },
+  "principles": {
+    "title": "Principios de Diseño",
+    "transparency": {
+      "title": "Transparencia",
+      "description": "La transparencia genera confianza entre el gobierno y el público, ya que los usuarios pueden ver cómo se ejecutan los procesos y dónde se asignan los recursos, como el dinero de los impuestos. La transparencia también ayuda a prevenir la corrupción y fortalece la legitimidad de las instituciones."
+    },
+    "efficiency": {
+      "title": "Eficiencia",
+      "description": "La eficiencia implica prestar servicios de manera efectiva mientras se minimizan los costos y se reduce el desperdicio. Esto fomenta un fuerte sentido de equidad, reforzando la confianza pública en el sistema de gobernanza. Como resultado, los usuarios son más propensos a apoyar y cumplir con las obligaciones fiscales."
+    },
+    "diversity": {
+      "title": "Diversidad",
+      "description": "La diversidad en la gobernanza asegura que se represente una amplia gama de perspectivas. Esto conduce a políticas más inclusivas y equitativas que atienden diferentes necesidades sociales, fomentando la cohesión social y reduciendo la marginación."
+    },
+    "resilience": {
+      "title": "Resiliencia",
+      "description": "La resiliencia permite que los sistemas de gobernanza respondan a crisis, se adapten a cambios y se recuperen de contratiempos. Un sistema de gobernanza resiliente asegura estabilidad y continuidad, incluso en tiempos de estrés, protegiendo el bienestar social a largo plazo."
+    }
+  },
+  "features": {
+    "title": "¿Por qué Realms?",
+    "subtitle": "Todo lo que necesitas para construir infraestructura de gobernanza moderna",
+    "internetComputer": {
+      "title": "Nativo de Internet Computer",
+      "description": "Despliega sistemas de gobernanza completamente en cadena en la blockchain de Internet Computer con integración perfecta."
+    },
+    "extensionSystem": {
+      "title": "Sistema de Extensiones",
+      "description": "Arquitectura modular poderosa que permite extensiones personalizadas para votación, tesorería, identidad y más."
+    },
+    "secure": {
+      "title": "Seguro y Transparente",
+      "description": "Seguridad integrada con reglas de gobernanza transparentes aplicadas por contratos inteligentes."
+    },
+    "developerFriendly": {
+      "title": "Amigable para Desarrolladores",
+      "description": "Backend Python/Kybra con frontend SvelteKit. CLI simple para desarrollo y despliegue rápido."
+    },
+    "multiRealm": {
+      "title": "Soporte Multi-Realm",
+      "description": "Despliega múltiples sistemas de gobernanza interconectados con registro compartido a través de Mundus."
+    },
+    "instantSetup": {
+      "title": "Configuración Instantánea",
+      "description": "Obtén un sistema de gobernanza completo funcionando con un solo comando. Datos de demostración incluidos."
+    }
+  },
+  "extensions": {
+    "title": "Extensiones Modulares",
+    "subtitle": "Realms viene con un poderoso sistema de extensiones. Agrega características como gestión de tesorería, sistemas de votación, verificación de identidad y más. Construye las tuyas propias o usa extensiones de la comunidad.",
+    "adminDashboard": {
+      "name": "Panel de Administración",
+      "description": "Gestión y configuración del Realm"
+    },
+    "citizenDashboard": {
+      "name": "Panel de Ciudadanos",
+      "description": "Interfaz para miembros"
+    },
+    "vault": {
+      "name": "Bóveda",
+      "description": "Tesorería y tokens ICRC-1"
+    },
+    "justice": {
+      "name": "Sistema de Justicia",
+      "description": "Legal y resolución de disputas"
+    },
+    "landRegistry": {
+      "name": "Registro de Tierras",
+      "description": "Gestión de propiedades"
+    },
+    "voting": {
+      "name": "Votación",
+      "description": "Propuestas y gobernanza"
+    },
+    "architecture": {
+      "title": "Arquitectura de Extensiones",
+      "noOverhead": "Sin sobrecarga entre canisters",
+      "atomicOps": "Operaciones atómicas con memoria compartida",
+      "cliFirst": "Flujo de trabajo centrado en CLI"
+    }
+  },
+  "quickStart": {
+    "title": "Inicio Rápido",
+    "subtitle": "Pon tu sistema de gobernanza en funcionamiento en minutos",
+    "step1": {
+      "title": "Instalar el CLI",
+      "code": "pip install realms-cli"
+    },
+    "step2": {
+      "title": "Crear un Realm",
+      "code": "realms realm create --random --citizens 50 --deploy"
+    },
+    "step3": {
+      "title": "Acceder a tu Realm",
+      "code": "# Frontend: http://<canister_id>.localhost:8000"
+    },
+    "mundus": {
+      "description": "Agrega tu despliegue al Realm GOS Mundus añadiendo tu realm al registro",
+      "code": "realms mundus create --deploy"
+    }
+  },
+  "footer": {
+    "title": "Realms GOS",
+    "subtitle": "Sistema Operativo de Gobernanza",
+    "docs": "Documentación",
+    "builtOn": "Construido en",
+    "withLove": "con ❤️ desde 🇨🇭",
+    "openSource": "Código Abierto • Licencia MIT"
+  }
+}

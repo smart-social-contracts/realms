@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import LanguageSwitcher from './components/LanguageSwitcher'
 import { 
   Globe, 
   Shield, 
@@ -22,48 +24,49 @@ import {
 } from 'lucide-react'
 
 function App() {
+  const { t } = useTranslation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const features = [
     {
       icon: <Globe className="w-6 h-6" />,
-      title: "Internet Computer Native",
-      description: "Deploy fully on-chain governance systems on the Internet Computer blockchain with seamless integration."
+      titleKey: "features.internetComputer.title",
+      descKey: "features.internetComputer.description"
     },
     {
       icon: <Layers className="w-6 h-6" />,
-      title: "Extension System",
-      description: "Powerful modular architecture allowing custom extensions for voting, treasury, identity, and more."
+      titleKey: "features.extensionSystem.title",
+      descKey: "features.extensionSystem.description"
     },
     {
       icon: <Shield className="w-6 h-6" />,
-      title: "Secure & Transparent",
-      description: "Built-in security with transparent governance rules enforced by smart contracts."
+      titleKey: "features.secure.title",
+      descKey: "features.secure.description"
     },
     {
       icon: <Code className="w-6 h-6" />,
-      title: "Developer Friendly",
-      description: "Python/Kybra backend with SvelteKit frontend. Simple CLI for rapid development and deployment."
+      titleKey: "features.developerFriendly.title",
+      descKey: "features.developerFriendly.description"
     },
     {
       icon: <Users className="w-6 h-6" />,
-      title: "Multi-Realm Support",
-      description: "Deploy multiple interconnected governance systems with shared registry via Mundus."
+      titleKey: "features.multiRealm.title",
+      descKey: "features.multiRealm.description"
     },
     {
       icon: <Zap className="w-6 h-6" />,
-      title: "Instant Setup",
-      description: "Get a full governance system running with a single command. Demo data included."
+      titleKey: "features.instantSetup.title",
+      descKey: "features.instantSetup.description"
     }
   ]
 
   const extensions = [
-    { name: "Admin Dashboard", icon: <Building2 className="w-5 h-5" />, desc: "Realm management & configuration" },
-    { name: "Citizen Dashboard", icon: <Users className="w-5 h-5" />, desc: "Member-facing interface" },
-    { name: "Vault", icon: <Wallet className="w-5 h-5" />, desc: "Treasury & ICRC-1 tokens" },
-    { name: "Justice System", icon: <Scale className="w-5 h-5" />, desc: "Legal & dispute resolution" },
-    { name: "Land Registry", icon: <BookOpen className="w-5 h-5" />, desc: "Property management" },
-    { name: "Voting", icon: <Vote className="w-5 h-5" />, desc: "Proposals & governance" },
+    { nameKey: "extensions.adminDashboard.name", icon: <Building2 className="w-5 h-5" />, descKey: "extensions.adminDashboard.description" },
+    { nameKey: "extensions.citizenDashboard.name", icon: <Users className="w-5 h-5" />, descKey: "extensions.citizenDashboard.description" },
+    { nameKey: "extensions.vault.name", icon: <Wallet className="w-5 h-5" />, descKey: "extensions.vault.description" },
+    { nameKey: "extensions.justice.name", icon: <Scale className="w-5 h-5" />, descKey: "extensions.justice.description" },
+    { nameKey: "extensions.landRegistry.name", icon: <BookOpen className="w-5 h-5" />, descKey: "extensions.landRegistry.description" },
+    { nameKey: "extensions.voting.name", icon: <Vote className="w-5 h-5" />, descKey: "extensions.voting.description" },
   ]
 
   return (
@@ -73,19 +76,19 @@ function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <img src="/logo_sphere_only.svg" alt="Realms" className="h-10 w-10" />
-              <span className="text-xl font-bold">Realms GOS</span>
+              <img src="/logo_horizontal.svg" alt="Realms" className="h-10" />
             </div>
             
             <div className="hidden md:flex items-center gap-8">
-              <a href="#features" className="text-slate-600 hover:text-slate-900 transition-colors">Features</a>
-              <a href="#extensions" className="text-slate-600 hover:text-slate-900 transition-colors">Extensions</a>
-              <a href="#quickstart" className="text-slate-600 hover:text-slate-900 transition-colors">Quick Start</a>
+              <a href="#features" className="text-slate-600 hover:text-slate-900 transition-colors">{t('nav.features')}</a>
+              <a href="#extensions" className="text-slate-600 hover:text-slate-900 transition-colors">{t('nav.extensions')}</a>
+              <a href="#quickstart" className="text-slate-600 hover:text-slate-900 transition-colors">{t('nav.quickStart')}</a>
               <a href="https://github.com/smart-social-contracts/realms" target="_blank" rel="noopener noreferrer" 
                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors">
                 <Github className="w-5 h-5" />
-                GitHub
+                {t('nav.github')}
               </a>
+              <LanguageSwitcher />
             </div>
 
             <button 
@@ -101,14 +104,15 @@ function App() {
         {mobileMenuOpen && (
           <div className="md:hidden glass-dark border-t border-slate-200">
             <div className="px-4 py-4 space-y-4">
-              <a href="#features" className="block text-slate-600 hover:text-slate-900">Features</a>
-              <a href="#extensions" className="block text-slate-600 hover:text-slate-900">Extensions</a>
-              <a href="#quickstart" className="block text-slate-600 hover:text-slate-900">Quick Start</a>
+              <a href="#features" className="block text-slate-600 hover:text-slate-900">{t('nav.features')}</a>
+              <a href="#extensions" className="block text-slate-600 hover:text-slate-900">{t('nav.extensions')}</a>
+              <a href="#quickstart" className="block text-slate-600 hover:text-slate-900">{t('nav.quickStart')}</a>
               <a href="https://github.com/smart-social-contracts/realms" target="_blank" rel="noopener noreferrer"
                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900">
                 <Github className="w-5 h-5" />
-                GitHub
+                {t('nav.github')}
               </a>
+              <LanguageSwitcher />
             </div>
           </div>
         )}
@@ -131,19 +135,19 @@ function App() {
             <img src="/logo_horizontal.svg" alt="Realms" className="h-20 sm:h-24 lg:h-28 mx-auto" />
           </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-8">
-            <span className="text-slate-800">The Governance Operating System</span>
+            <span className="text-slate-800">{t('hero.title')}</span>
           </h1>
           
-          <div className="text-xl sm:text-2xl text-slate-600 max-w-3xl mx-auto mb-10 space-y-2">
-            <p>• Launch a full public administration in seconds</p>
-            <p>• Fully auditable. Fully transparent. AI-powered</p>
-            <p>• Engineered to eliminate corruption and inefficiencies</p>
+          <div className="text-lg sm:text-xl lg:text-2xl text-slate-600 max-w-4xl mx-auto mb-10 space-y-3 px-4">
+            <p className="break-words">{t('hero.subtitle1')}</p>
+            <p className="break-words">{t('hero.subtitle2')}</p>
+            <p className="break-words">{t('hero.subtitle3')}</p>
           </div>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a href="https://demo.realmsgos.org" target="_blank" rel="noopener noreferrer"
                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-primary-900 text-white rounded-xl font-semibold text-lg hover:bg-primary-800 transition-colors">
-              Try Demo
+              {t('hero.tryDemo')}
               <ArrowRight className="w-5 h-5" />
             </a>
           </div>
@@ -159,14 +163,9 @@ function App() {
       <section className="py-24 bg-primary-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-4xl sm:text-5xl font-bold mb-8 text-slate-800">
-            Governance as It Should Be
+            {t('mission.title')}
           </h2>
-          <p className="text-xl text-slate-600 leading-relaxed">
-            <strong>Realms</strong> is a decentralized software platform for public administration — a Governance Operating System (GOS) 
-            designed to deliver essential public services such as justice, social welfare, property registries, and more. 
-            From small towns to entire nations, it empowers communities to design, run, and evolve their own governance systems — 
-            free from the corruption and inefficiencies of traditional bureaucracy.
-          </p>
+          <p className="text-xl text-slate-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: t('mission.description') }} />
         </div>
       </section>
 
@@ -174,47 +173,39 @@ function App() {
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-4xl sm:text-5xl font-bold mb-16 text-center text-slate-800">
-            Design Principles
+            {t('principles.title')}
           </h2>
           
           <div className="grid md:grid-cols-2 gap-8">
             <div className="bg-primary-50 rounded-2xl p-8">
               <div className="text-primary-500 font-semibold mb-2">01</div>
-              <h3 className="text-xl font-bold mb-4 text-slate-800">Transparency</h3>
+              <h3 className="text-xl font-bold mb-4 text-slate-800">{t('principles.transparency.title')}</h3>
               <p className="text-base text-slate-600">
-                Transparency builds trust between the government and the public, as users can see how processes are executed 
-                and where resources, such as tax money, are allocated. Transparency also helps prevent corruption and 
-                strengthens the legitimacy of institutions.
+                {t('principles.transparency.description')}
               </p>
             </div>
             
             <div className="bg-primary-50 rounded-2xl p-8">
               <div className="text-primary-500 font-semibold mb-2">02</div>
-              <h3 className="text-xl font-bold mb-4 text-slate-800">Efficiency</h3>
+              <h3 className="text-xl font-bold mb-4 text-slate-800">{t('principles.efficiency.title')}</h3>
               <p className="text-base text-slate-600">
-                Efficiency involves delivering services effectively while minimizing costs and reducing waste. 
-                This fosters a strong sense of fairness, reinforcing public confidence in the governance system. 
-                As a result, users are more likely to support and comply with tax obligations.
+                {t('principles.efficiency.description')}
               </p>
             </div>
             
             <div className="bg-primary-50 rounded-2xl p-8">
               <div className="text-primary-500 font-semibold mb-2">03</div>
-              <h3 className="text-xl font-bold mb-4 text-slate-800">Diversity</h3>
+              <h3 className="text-xl font-bold mb-4 text-slate-800">{t('principles.diversity.title')}</h3>
               <p className="text-base text-slate-600">
-                Diversity in governance ensures that a wide range of perspectives are represented. 
-                This leads to more inclusive and equitable policies that cater to different societal needs, 
-                fostering social cohesion and reducing marginalization.
+                {t('principles.diversity.description')}
               </p>
             </div>
             
             <div className="bg-primary-50 rounded-2xl p-8">
               <div className="text-primary-500 font-semibold mb-2">04</div>
-              <h3 className="text-xl font-bold mb-4 text-slate-800">Resilience</h3>
+              <h3 className="text-xl font-bold mb-4 text-slate-800">{t('principles.resilience.title')}</h3>
               <p className="text-base text-slate-600">
-                Resilience enables governance systems to respond to crises, adapt to changes, and recover from setbacks. 
-                A resilient governance system ensures stability and continuity, even in times of stress, 
-                protecting long-term societal wellbeing.
+                {t('principles.resilience.description')}
               </p>
             </div>
           </div>
@@ -227,10 +218,10 @@ function App() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl sm:text-5xl font-bold mb-4 text-slate-800">
-              Why <span className="text-gradient">Realms</span>?
+              {t('features.title')}
             </h2>
             <p className="text-xl text-slate-600 max-w-2xl mx-auto">
-              Everything you need to build modern governance infrastructure
+              {t('features.subtitle')}
             </p>
           </div>
 
@@ -243,8 +234,8 @@ function App() {
                 <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center text-primary-700 mb-6 group-hover:scale-110 transition-transform">
                   {feature.icon}
                 </div>
-                <h3 className="text-xl font-semibold mb-3 text-slate-800">{feature.title}</h3>
-                <p className="text-base text-slate-600">{feature.description}</p>
+                <h3 className="text-xl font-semibold mb-3 text-slate-800">{t(feature.titleKey)}</h3>
+                <p className="text-base text-slate-600">{t(feature.descKey)}</p>
               </div>
             ))}
           </div>
@@ -257,11 +248,10 @@ function App() {
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
               <h2 className="text-4xl sm:text-5xl font-bold mb-6 text-slate-800">
-                Modular <span className="text-gradient">Extensions</span>
+                {t('extensions.title')}
               </h2>
               <p className="text-xl text-slate-600 mb-8">
-                Realms comes with a powerful extension system. Add features like treasury management, 
-                voting systems, identity verification, and more. Build your own or use community extensions.
+                {t('extensions.subtitle')}
               </p>
               
               <div className="space-y-4">
@@ -271,8 +261,8 @@ function App() {
                       {ext.icon}
                     </div>
                     <div>
-                      <div className="font-semibold text-slate-800">{ext.name}</div>
-                      <div className="text-base text-slate-600">{ext.desc}</div>
+                      <div className="font-semibold text-slate-800">{t(ext.nameKey)}</div>
+                      <div className="text-base text-slate-600">{t(ext.descKey)}</div>
                     </div>
                   </div>
                 ))}
@@ -284,7 +274,7 @@ function App() {
               <div className="relative bg-slate-900 rounded-3xl p-8 shadow-2xl">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
                   <Code className="w-5 h-5 text-primary-300" />
-                  Extension Architecture
+                  {t('extensions.architecture.title')}
                 </h3>
                 <pre className="text-sm text-slate-300 overflow-x-auto">
 {`my-extension/
@@ -300,15 +290,15 @@ function App() {
                 <div className="mt-6 pt-6 border-t border-slate-700">
                   <div className="flex items-center gap-2 text-sm text-slate-400">
                     <CheckCircle className="w-4 h-4 text-green-500" />
-                    No inter-canister overhead
+                    {t('extensions.architecture.noOverhead')}
                   </div>
                   <div className="flex items-center gap-2 text-sm text-slate-400 mt-2">
                     <CheckCircle className="w-4 h-4 text-green-500" />
-                    Atomic operations with shared memory
+                    {t('extensions.architecture.atomicOps')}
                   </div>
                   <div className="flex items-center gap-2 text-sm text-slate-400 mt-2">
                     <CheckCircle className="w-4 h-4 text-green-500" />
-                    CLI-first development workflow
+                    {t('extensions.architecture.cliFirst')}
                   </div>
                 </div>
               </div>
@@ -323,29 +313,29 @@ function App() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl sm:text-5xl font-bold mb-4 text-slate-800">
-              <span className="text-gradient">Quick Start</span>
+              <span className="text-gradient">{t('quickStart.title')}</span>
             </h2>
             <p className="text-xl text-slate-600 max-w-2xl mx-auto">
-              Get your governance system running in minutes
+              {t('quickStart.subtitle')}
             </p>
           </div>
 
           <div className="max-w-3xl mx-auto space-y-6">
             {[
-              { step: "1", title: "Install the CLI", code: "pip install realms-cli" },
-              { step: "2", title: "Create a Realm", code: "realms realm create --random --citizens 50 --deploy" },
-              { step: "3", title: "Access Your Realm", code: "# Frontend: http://<canister_id>.localhost:8000" },
+              { step: "1", titleKey: "quickStart.step1.title", codeKey: "quickStart.step1.code" },
+              { step: "2", titleKey: "quickStart.step2.title", codeKey: "quickStart.step2.code" },
+              { step: "3", titleKey: "quickStart.step3.title", codeKey: "quickStart.step3.code" },
             ].map((item, index) => (
               <div key={index} className="glass-dark rounded-2xl p-6">
                 <div className="flex items-center gap-4 mb-4">
                   <div className="w-10 h-10 rounded-full bg-primary-900 flex items-center justify-center font-bold text-white">
                     {item.step}
                   </div>
-                  <h3 className="text-xl font-semibold text-slate-800">{item.title}</h3>
+                  <h3 className="text-xl font-semibold text-slate-800">{t(item.titleKey)}</h3>
                 </div>
                 <div className="bg-slate-900 rounded-xl p-4 font-mono text-sm">
                   <span className="text-slate-500">$ </span>
-                  <span className="text-primary-300">{item.code}</span>
+                  <span className="text-primary-300">{t(item.codeKey)}</span>
                 </div>
               </div>
             ))}
@@ -355,11 +345,11 @@ function App() {
           <div className="mt-12 max-w-3xl mx-auto">
             <div className="glass-dark rounded-2xl p-8 text-center">
               <p className="text-base text-slate-600 mb-6">
-                Add your deploy to the Realm GOS Mundus by adding your realm to the registry
+                {t('quickStart.mundus.description')}
               </p>
               <div className="bg-slate-900 rounded-xl p-4 font-mono text-sm text-left">
                 <span className="text-slate-500">$ </span>
-                <span className="text-primary-300">realms mundus create --deploy</span>
+                <span className="text-primary-300">{t('quickStart.mundus.code')}</span>
               </div>
             </div>
           </div>
@@ -371,11 +361,7 @@ function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <img src="/logo_sphere_only.svg" alt="Realms" className="h-10 w-10" />
-              <div>
-                <div className="font-bold">Realms GOS</div>
-                <div className="text-sm text-slate-500">Governance Operating System</div>
-              </div>
+              <img src="/logo_horizontal.svg" alt="Realms GOS" className="h-12" />
             </div>
             
             <div className="flex items-center gap-6">
@@ -383,19 +369,19 @@ function App() {
                  className="text-slate-500 hover:text-slate-900 transition-colors">
                 <Github className="w-6 h-6" />
               </a>
-              <a href="https://docs.realms.dev" target="_blank" rel="noopener noreferrer"
+              <a href="/docs"
                  className="text-slate-500 hover:text-slate-900 transition-colors flex items-center gap-2">
                 <BookOpen className="w-5 h-5" />
-                Docs
+                {t('footer.docs')}
               </a>
             </div>
           </div>
           
           <div className="mt-8 pt-8 border-t border-slate-200 text-center text-slate-500 text-sm">
             <a href="https://internetcomputer.org" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-slate-700 transition-colors">
-              Built on the <img src="/images/internet-computer-icp-logo.svg" alt="Internet Computer" className="inline h-4 w-4 mx-1" /> with ❤️ from 🇨🇭
+              {t('footer.builtOn')} <img src="/images/internet-computer-icp-logo.svg" alt="Internet Computer" className="inline h-4 w-4 mx-1" /> {t('footer.withLove')}
             </a>
-            <div className="mt-2">Open Source • MIT License</div>
+            <div className="mt-2">{t('footer.openSource')}</div>
           </div>
         </div>
       </footer>

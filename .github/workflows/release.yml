@@ -170,8 +170,6 @@ jobs:
             realm_backend.wasm.gz
             realm_backend.did
           body: |
-            # Release v${{ steps.bump_version.outputs.NEW_VERSION }}
-            
             This release includes:
             
             ## 📦 Release Assets

@@ -1,0 +1,128 @@
+{
+  "nav": {
+    "features": "Features",
+    "extensions": "Extensions",
+    "quickStart": "Quick Start",
+    "github": "GitHub"
+  },
+  "hero": {
+    "title": "The Governance Operating System",
+    "subtitle1": "• Launch a full public administration in seconds",
+    "subtitle2": "• Fully auditable. Fully transparent. AI-powered",
+    "subtitle3": "• Engineered to eliminate corruption and inefficiencies",
+    "tryDemo": "Try Demo"
+  },
+  "mission": {
+    "title": "Governance as It Should Be",
+    "description": "<strong>Realms</strong> is a decentralized software platform for public administration — a Governance Operating System (GOS) designed to deliver essential public services such as justice, social welfare, property registries, and more. From small towns to entire nations, it empowers communities to design, run, and evolve their own governance systems — free from the corruption and inefficiencies of traditional bureaucracy."
+  },
+  "principles": {
+    "title": "Design Principles",
+    "transparency": {
+      "title": "Transparency",
+      "description": "Transparency builds trust between the government and the public, as users can see how processes are executed and where resources, such as tax money, are allocated. Transparency also helps prevent corruption and strengthens the legitimacy of institutions."
+    },
+    "efficiency": {
+      "title": "Efficiency",
+      "description": "Efficiency involves delivering services effectively while minimizing costs and reducing waste. This fosters a strong sense of fairness, reinforcing public confidence in the governance system. As a result, users are more likely to support and comply with tax obligations."
+    },
+    "diversity": {
+      "title": "Diversity",
+      "description": "Diversity in governance ensures that a wide range of perspectives are represented. This leads to more inclusive and equitable policies that cater to different societal needs, fostering social cohesion and reducing marginalization."
+    },
+    "resilience": {
+      "title": "Resilience",
+      "description": "Resilience enables governance systems to respond to crises, adapt to changes, and recover from setbacks. A resilient governance system ensures stability and continuity, even in times of stress, protecting long-term societal wellbeing."
+    }
+  },
+  "features": {
+    "title": "Why Realms?",
+    "subtitle": "Everything you need to build modern governance infrastructure",
+    "internetComputer": {
+      "title": "Internet Computer Native",
+      "description": "Deploy fully on-chain governance systems on the Internet Computer blockchain with seamless integration."
+    },
+    "extensionSystem": {
+      "title": "Extension System",
+      "description": "Powerful modular architecture allowing custom extensions for voting, treasury, identity, and more."
+    },
+    "secure": {
+      "title": "Secure & Transparent",
+      "description": "Built-in security with transparent governance rules enforced by smart contracts."
+    },
+    "developerFriendly": {
+      "title": "Developer Friendly",
+      "description": "Python/Kybra backend with SvelteKit frontend. Simple CLI for rapid development and deployment."
+    },
+    "multiRealm": {
+      "title": "Multi-Realm Support",
+      "description": "Deploy multiple interconnected governance systems with shared registry via Mundus."
+    },
+    "instantSetup": {
+      "title": "Instant Setup",
+      "description": "Get a full governance system running with a single command. Demo data included."
+    }
+  },
+  "extensions": {
+    "title": "Modular Extensions",
+    "subtitle": "Realms comes with a powerful extension system. Add features like treasury management, voting systems, identity verification, and more. Build your own or use community extensions.",
+    "adminDashboard": {
+      "name": "Admin Dashboard",
+      "description": "Realm management & configuration"
+    },
+    "citizenDashboard": {
+      "name": "Citizen Dashboard",
+      "description": "Member-facing interface"
+    },
+    "vault": {
+      "name": "Vault",
+      "description": "Treasury & ICRC-1 tokens"
+    },
+    "justice": {
+      "name": "Justice System",
+      "description": "Legal & dispute resolution"
+    },
+    "landRegistry": {
+      "name": "Land Registry",
+      "description": "Property management"
+    },
+    "voting": {
+      "name": "Voting",
+      "description": "Proposals & governance"
+    },
+    "architecture": {
+      "title": "Extension Architecture",
+      "noOverhead": "No inter-canister overhead",
+      "atomicOps": "Atomic operations with shared memory",
+      "cliFirst": "CLI-first development workflow"
+    }
+  },
+  "quickStart": {
+    "title": "Quick Start",
+    "subtitle": "Get your governance system running in minutes",
+    "step1": {
+      "title": "Install the CLI",
+      "code": "pip install realms-cli"
+    },
+    "step2": {
+      "title": "Create a Realm",
+      "code": "realms realm create --random --citizens 50 --deploy"
+    },
+    "step3": {
+      "title": "Access Your Realm",
+      "code": "# Frontend: http://<canister_id>.localhost:8000"
+    },
+    "mundus": {
+      "description": "Add your deploy to the Realm GOS Mundus by adding your realm to the registry",
+      "code": "realms mundus create --deploy"
+    }
+  },
+  "footer": {
+    "title": "Realms GOS",
+    "subtitle": "Governance Operating System",
+    "docs": "Docs",
+    "builtOn": "Built on the",
+    "withLove": "with ❤️ from 🇨🇭",
+    "openSource": "Open Source • MIT License"
+  }
+}

@@ -1,0 +1,128 @@
+{
+  "nav": {
+    "features": "Funktionen",
+    "extensions": "Erweiterungen",
+    "quickStart": "Schnellstart",
+    "github": "GitHub"
+  },
+  "hero": {
+    "title": "Das Governance-Betriebssystem",
+    "subtitle1": "• Starten Sie eine vollständige öffentliche Verwaltung in Sekunden",
+    "subtitle2": "• Vollständig prüfbar. Vollständig transparent. KI-gestützt",
+    "subtitle3": "• Entwickelt, um Korruption und Ineffizienzen zu beseitigen",
+    "tryDemo": "Demo Ausprobieren"
+  },
+  "mission": {
+    "title": "Governance wie sie sein sollte",
+    "description": "<strong>Realms</strong> ist eine dezentrale Softwareplattform für die öffentliche Verwaltung — ein Governance Operating System (GOS), das entwickelt wurde, um wesentliche öffentliche Dienstleistungen wie Justiz, Sozialfürsorge, Grundbuchämter und mehr zu erbringen. Von kleinen Städten bis zu ganzen Nationen befähigt es Gemeinschaften, ihre eigenen Governance-Systeme zu entwerfen, zu betreiben und weiterzuentwickeln — frei von der Korruption und den Ineffizienzen traditioneller Bürokratie."
+  },
+  "principles": {
+    "title": "Designprinzipien",
+    "transparency": {
+      "title": "Transparenz",
+      "description": "Transparenz schafft Vertrauen zwischen Regierung und Öffentlichkeit, da Nutzer sehen können, wie Prozesse ausgeführt werden und wo Ressourcen wie Steuergelder zugewiesen werden. Transparenz hilft auch, Korruption zu verhindern und stärkt die Legitimität von Institutionen."
+    },
+    "efficiency": {
+      "title": "Effizienz",
+      "description": "Effizienz bedeutet, Dienstleistungen effektiv zu erbringen und gleichzeitig Kosten zu minimieren und Verschwendung zu reduzieren. Dies fördert ein starkes Gefühl von Fairness und stärkt das öffentliche Vertrauen in das Governance-System. Infolgedessen sind Nutzer eher bereit, Steuerverpflichtungen zu unterstützen und einzuhalten."
+    },
+    "diversity": {
+      "title": "Vielfalt",
+      "description": "Vielfalt in der Governance stellt sicher, dass eine breite Palette von Perspektiven vertreten ist. Dies führt zu inklusiveren und gerechteren Richtlinien, die unterschiedlichen gesellschaftlichen Bedürfnissen gerecht werden und sozialen Zusammenhalt fördern sowie Marginalisierung reduzieren."
+    },
+    "resilience": {
+      "title": "Resilienz",
+      "description": "Resilienz ermöglicht es Governance-Systemen, auf Krisen zu reagieren, sich an Veränderungen anzupassen und sich von Rückschlägen zu erholen. Ein resilientes Governance-System gewährleistet Stabilität und Kontinuität, selbst in Stresszeiten, und schützt das langfristige gesellschaftliche Wohlergehen."
+    }
+  },
+  "features": {
+    "title": "Warum Realms?",
+    "subtitle": "Alles, was Sie zum Aufbau moderner Governance-Infrastruktur benötigen",
+    "internetComputer": {
+      "title": "Internet Computer Native",
+      "description": "Stellen Sie vollständig On-Chain-Governance-Systeme auf der Internet Computer Blockchain mit nahtloser Integration bereit."
+    },
+    "extensionSystem": {
+      "title": "Erweiterungssystem",
+      "description": "Leistungsstarke modulare Architektur, die benutzerdefinierte Erweiterungen für Abstimmungen, Finanzverwaltung, Identität und mehr ermöglicht."
+    },
+    "secure": {
+      "title": "Sicher & Transparent",
+      "description": "Integrierte Sicherheit mit transparenten Governance-Regeln, die durch Smart Contracts durchgesetzt werden."
+    },
+    "developerFriendly": {
+      "title": "Entwicklerfreundlich",
+      "description": "Python/Kybra-Backend mit SvelteKit-Frontend. Einfache CLI für schnelle Entwicklung und Bereitstellung."
+    },
+    "multiRealm": {
+      "title": "Multi-Realm-Unterstützung",
+      "description": "Stellen Sie mehrere miteinander verbundene Governance-Systeme mit gemeinsamer Registry über Mundus bereit."
+    },
+    "instantSetup": {
+      "title": "Sofortige Einrichtung",
+      "description": "Bringen Sie ein vollständiges Governance-System mit einem einzigen Befehl zum Laufen. Demo-Daten enthalten."
+    }
+  },
+  "extensions": {
+    "title": "Modulare Erweiterungen",
+    "subtitle": "Realms verfügt über ein leistungsstarkes Erweiterungssystem. Fügen Sie Funktionen wie Finanzverwaltung, Abstimmungssysteme, Identitätsüberprüfung und mehr hinzu. Erstellen Sie Ihre eigenen oder verwenden Sie Community-Erweiterungen.",
+    "adminDashboard": {
+      "name": "Admin-Dashboard",
+      "description": "Realm-Verwaltung & Konfiguration"
+    },
+    "citizenDashboard": {
+      "name": "Bürger-Dashboard",
+      "description": "Mitglieder-Schnittstelle"
+    },
+    "vault": {
+      "name": "Tresor",
+      "description": "Finanzverwaltung & ICRC-1-Token"
+    },
+    "justice": {
+      "name": "Justizsystem",
+      "description": "Rechtswesen & Streitbeilegung"
+    },
+    "landRegistry": {
+      "name": "Grundbuchamt",
+      "description": "Immobilienverwaltung"
+    },
+    "voting": {
+      "name": "Abstimmung",
+      "description": "Vorschläge & Governance"
+    },
+    "architecture": {
+      "title": "Erweiterungsarchitektur",
+      "noOverhead": "Kein Inter-Canister-Overhead",
+      "atomicOps": "Atomare Operationen mit gemeinsamem Speicher",
+      "cliFirst": "CLI-zentrierter Entwicklungsworkflow"
+    }
+  },
+  "quickStart": {
+    "title": "Schnellstart",
+    "subtitle": "Bringen Sie Ihr Governance-System in Minuten zum Laufen",
+    "step1": {
+      "title": "CLI installieren",
+      "code": "pip install realms-cli"
+    },
+    "step2": {
+      "title": "Realm erstellen",
+      "code": "realms realm create --random --citizens 50 --deploy"
+    },
+    "step3": {
+      "title": "Auf Ihr Realm zugreifen",
+      "code": "# Frontend: http://<canister_id>.localhost:8000"
+    },
+    "mundus": {
+      "description": "Fügen Sie Ihre Bereitstellung zum Realm GOS Mundus hinzu, indem Sie Ihr Realm zur Registry hinzufügen",
+      "code": "realms mundus create --deploy"
+    }
+  },
+  "footer": {
+    "title": "Realms GOS",
+    "subtitle": "Governance-Betriebssystem",
+    "docs": "Dokumentation",
+    "builtOn": "Gebaut auf",
+    "withLove": "mit ❤️ aus 🇨🇭",
+    "openSource": "Open Source • MIT-Lizenz"
+  }
+}
