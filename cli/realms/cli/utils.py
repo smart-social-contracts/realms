@@ -133,7 +133,7 @@ def get_realms_logger(log_dir: Path) -> logging.Logger:
     return logger
 
 
-def truncate_command_for_logging(command: List[str], max_arg_length: int = 200) -> str:
+def truncate_command_for_logging(command: List[str], max_arg_length: int = 100) -> str:
     """Format command for logging, truncating very long arguments like base64 data.
     
     Args:
@@ -147,7 +147,7 @@ def truncate_command_for_logging(command: List[str], max_arg_length: int = 200) 
     for arg in command:
         if len(arg) > max_arg_length:
             # Truncate long arguments (like base64 data)
-            truncated = arg[:max_arg_length] + f"...[truncated {len(arg) - max_arg_length} chars]"
+            truncated = arg[:max_arg_length] + "..."
             formatted_parts.append(truncated)
         elif " " in arg or '"' in arg or "'" in arg:
             # Quote arguments with special characters
