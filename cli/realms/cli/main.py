@@ -1448,13 +1448,74 @@ def ps_logs(
     )
 
 
+@app.command("clean")
+def clean(
+    yes: bool = typer.Option(
+        False, "--yes", "-y", help="Skip confirmation prompt"
+    ),
+) -> None:
+    """Clean up dfx state and .realms directory.
+    
+    Runs scripts/clean_dfx.sh and removes the .realms directory.
+    """
+    import shutil
+    import subprocess
+    from pathlib import Path
+    
+    if not yes:
+        confirm = typer.confirm(
+            "⚠️  This will stop dfx, clean dfx state, and remove .realms directory. Continue?"
+        )
+        if not confirm:
+            console.print("[yellow]Aborted.[/yellow]")
+            raise typer.Exit(0)
+    
+    console.print("[bold blue]🧹 Cleaning up...[/bold blue]\n")
+    
+    # Run scripts/clean_dfx.sh
+    scripts_dir = Path("scripts")
+    clean_script = scripts_dir / "clean_dfx.sh"
+    
+    if clean_script.exists():
+        console.print("Running scripts/clean_dfx.sh...")
+        result = subprocess.run(
+            ["bash", str(clean_script)],
+            capture_output=False
+        )
+        if result.returncode == 0:
+            console.print("[green]✅ clean_dfx.sh completed[/green]")
+        else:
+            console.print(f"[yellow]⚠️  clean_dfx.sh exited with code {result.returncode}[/yellow]")
+    else:
+        console.print(f"[yellow]⚠️  {clean_script} not found, skipping[/yellow]")
+    
+    # Remove .realms directory
+    realms_dir = Path(".realms")
+    if realms_dir.exists():
+        console.print("Removing .realms directory...")
+        shutil.rmtree(realms_dir)
+        console.print("[green]✅ .realms directory removed[/green]")
+    else:
+        console.print("[dim].realms directory does not exist[/dim]")
+    
+    console.print("\n[green]🎉 Cleanup complete![/green]")
+
+
 @app.command("version")
 def version() -> None:
     """Show version information."""
     import subprocess
     from pathlib import Path
     from . import __version__
-
+    
+    try:
+        from . import __commit__, __commit_date__
+        print(f"{__version__}+{__commit__}")
+        print(__commit_date__)
+        return
+    except ImportError:
+        pass
+    
     try:
         cli_dir = Path(__file__).parent.parent.parent
         commit_hash = subprocess.check_output(
