@@ -3,5 +3,6 @@ include LICENSE
 include pyproject.toml
 recursive-include realms_cli *.py
 recursive-include realms_cli/templates *.j2 *.txt *.json
+recursive-include ../scripts *.sh
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
