@@ -196,9 +196,7 @@ def status(
     try:
         import subprocess
 
-        cmd = ["dfx", "ping"]
-        if effective_network != "local":
-            cmd.extend(["--network", effective_network])
+        cmd = ["dfx", "ping", effective_network]
 
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
         if result.returncode == 0:

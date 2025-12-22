@@ -521,7 +521,7 @@ def is_dfx_running(network: str = "local") -> bool:
     """Check if dfx replica is running."""
     try:
         result = subprocess.run(
-            ["dfx", "ping", "--network", network],
+            ["dfx", "ping", network],
             capture_output=True,
             timeout=2
         )
