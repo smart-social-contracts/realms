@@ -1451,13 +1451,26 @@ def ps_logs(
 @app.command("version")
 def version() -> None:
     """Show version information."""
+    import subprocess
+    from pathlib import Path
     from . import __version__
 
-    console.print(
-        f"[bold blue]Realms CLI[/bold blue] version [bold green]{__version__}[/bold green]"
-    )
-    console.print("\nA tool for managing Realms project lifecycle")
-    console.print("🏛️  Build digital government platforms with ease")
+    try:
+        cli_dir = Path(__file__).parent.parent.parent
+        commit_hash = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=cli_dir,
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+        commit_date = subprocess.check_output(
+            ["git", "log", "-1", "--format=%cI"],
+            cwd=cli_dir,
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+        print(f"{__version__}+{commit_hash}")
+        print(commit_date)
+    except Exception:
+        print(__version__)
 
 
 @app.callback()
