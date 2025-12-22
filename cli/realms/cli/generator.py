@@ -205,10 +205,6 @@ class RealmGenerator:
         
         for i in range(count):
             from_user = random.choice(users)
-            print('from_user', from_user)
-
-            print('users', users)
-
             to_user = random.choice([u for u in users if u.id != from_user.id])
             instrument = random.choice(instruments)
             
