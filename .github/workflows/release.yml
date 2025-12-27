@@ -66,10 +66,10 @@ jobs:
           
           # Update CLI version
           sed -i "s/version = \".*\"/version = \"${NEW_VERSION}\"/" cli/pyproject.toml
-          sed -i "s/__version__ = \".*\"/__version__ = \"${NEW_VERSION}\"/" cli/realms_cli/__init__.py
+          sed -i "s/__version__ = \".*\"/__version__ = \"${NEW_VERSION}\"/" cli/realms/__init__.py
           
           # Update default Docker image to use the new version tag
-          sed -i "s|DEFAULT_DOCKER_IMAGE = \"ghcr.io/smart-social-contracts/realms:v.*\"|DEFAULT_DOCKER_IMAGE = \"ghcr.io/smart-social-contracts/realms:v${NEW_VERSION}\"|" cli/realms_cli/constants.py
+          sed -i "s|DEFAULT_DOCKER_IMAGE = \"ghcr.io/smart-social-contracts/realms:v.*\"|DEFAULT_DOCKER_IMAGE = \"ghcr.io/smart-social-contracts/realms:v${NEW_VERSION}\"|" cli/realms/cli/constants.py
           
           # Store new version for later use
           echo "NEW_VERSION=${NEW_VERSION}" >> $GITHUB_OUTPUT
@@ -124,7 +124,7 @@ jobs:
           
           # Verify version consistency
           PYPROJECT_VERSION=$(grep -Po '^version = "\K[^"]*' pyproject.toml)
-          INIT_VERSION=$(grep -Po '(?<=__version__ = ")[^"]*' realms_cli/__init__.py)
+          INIT_VERSION=$(grep -Po '(?<=__version__ = ")[^"]*' realms/__init__.py)
           
           echo "Version in pyproject.toml: $PYPROJECT_VERSION" | tee -a ../release-logs/pypi-publish.log
           echo "Version in __init__.py: $INIT_VERSION" | tee -a ../release-logs/pypi-publish.log
@@ -144,7 +144,7 @@ jobs:
       # Commit version changes (tag will be created by release action)
       - name: Commit and push version changes
         run: |
-          git add version.txt cli/pyproject.toml cli/realms_cli/__init__.py cli/realms_cli/constants.py 2>&1 | tee release-logs/git-add.log
+          git add version.txt cli/pyproject.toml cli/realms/__init__.py cli/realms/cli/constants.py 2>&1 | tee release-logs/git-add.log
           git commit -m "Bump version to ${{ steps.bump_version.outputs.NEW_VERSION }}" 2>&1 | tee release-logs/git-commit.log
           git remote set-url origin https://${{ secrets.PAT_GITHUB }}@github.com/${{ github.repository }}.git
           git push origin 2>&1 | tee release-logs/git-push.log
