@@ -40,3 +40,6 @@ cli/build/
 
 # Canister IDs
 canister_ids.json
+
+# Separate project with its own git
+website2/
