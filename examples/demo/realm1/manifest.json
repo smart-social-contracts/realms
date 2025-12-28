@@ -1,7 +1,10 @@
 {
   "type": "realm",
   "name": "Realm 1",
+  "description": "A beautiful alpine community in the Swiss mountains",
   "logo": "logo.svg",
+  "welcome_image": "/images/default_welcome.jpg",
+  "welcome_message": "Welcome to our alpine community! Join us to participate in transparent, efficient governance.",
   "options": {
     "random": {
       "members": 50,

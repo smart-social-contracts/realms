@@ -354,6 +354,48 @@ else
     echo "   ℹ️  No manifest.json found or jq not available"
 fi
 
+# Copy realm welcome image to frontend static folder if it exists
+echo ""
+echo "🖼️  Checking for realm welcome image..."
+if [ -f "manifest.json" ] && command -v jq &> /dev/null; then
+    WELCOME_IMAGE=$(jq -r '.welcome_image // empty' manifest.json)
+    if [ -n "$WELCOME_IMAGE" ]; then
+        # Check if welcome image file exists in realm directory
+        if [ -f "welcome.jpg" ]; then
+            WELCOME_SOURCE="welcome.jpg"
+        elif [ -f "welcome.png" ]; then
+            WELCOME_SOURCE="welcome.png"
+        else
+            WELCOME_SOURCE=""
+        fi
+        
+        if [ -n "$WELCOME_SOURCE" ]; then
+            # Copy to frontend static/images folder as default_welcome.jpg
+            mkdir -p src/realm_frontend/static/images
+            WELCOME_DEST="src/realm_frontend/static/images/default_welcome.jpg"
+            cp "$WELCOME_SOURCE" "$WELCOME_DEST"
+            echo "   ✅ Copied realm welcome image: $WELCOME_SOURCE → $WELCOME_DEST"
+        else
+            echo "   ⚠️  Welcome image file not found (welcome.jpg or welcome.png)"
+        fi
+    else
+        echo "   ℹ️  No welcome_image defined in manifest.json"
+    fi
+    
+    # Also copy realm logo to frontend static/images folder
+    LOGO_FILE=$(jq -r '.logo // empty' manifest.json)
+    if [ -n "$LOGO_FILE" ] && [ -f "$LOGO_FILE" ]; then
+        mkdir -p src/realm_frontend/static/images
+        # Get file extension
+        LOGO_EXT="${LOGO_FILE##*.}"
+        LOGO_DEST="src/realm_frontend/static/images/realm_logo.${LOGO_EXT}"
+        cp "$LOGO_FILE" "$LOGO_DEST"
+        echo "   ✅ Copied realm logo: $LOGO_FILE → $LOGO_DEST"
+    fi
+else
+    echo "   ℹ️  No manifest.json found or jq not available"
+fi
+
 # Copy logo to registry frontend static folder if this is a registry deployment
 if [ -d "src/realm_registry_frontend/static/images" ] && [ -f "manifest.json" ] && command -v jq &> /dev/null; then
     MANIFEST_TYPE=$(jq -r '.type // empty' manifest.json)

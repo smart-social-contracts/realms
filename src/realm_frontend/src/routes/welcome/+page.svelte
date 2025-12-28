@@ -3,148 +3,93 @@
   import { browser } from '$app/environment';
   import Footer from '$lib/../routes/(sidebar)/Footer.svelte';
   import { _ } from 'svelte-i18n';
+  import { realmInfo, realmName, realmLogo, realmWelcomeImage, realmWelcomeMessage, realmDescription } from '$lib/stores/realmInfo';
+  import { isAuthenticated } from '$lib/stores/auth';
   
-  let isMobile = false;
-  let currentPhotoIndex = 0;
+  // Default fallback image if realm has no welcome image configured
+  const defaultWelcomeImage = '/images/default_welcome.jpg';
   
-  // Available photos
-  const photos = [
-    '/extensions/welcome/photos/Sucre, Bolivia.jpg',
-    '/extensions/welcome/photos/Bönigen, Switzerland.jpg',
-    '/extensions/welcome/photos/Hoi An, Vietnam.jpg',
-    '/extensions/welcome/photos/Varanasi, India.jpg', 
-    '/extensions/welcome/photos/Requena, Spain.jpg'
-   ];
-  
-  // Check for mobile viewport and setup photo carousel
+  // Fetch realm info on mount
   onMount(() => {
-    if (browser) {
-      const checkMobile = () => {
-        isMobile = window.innerWidth < 768;
-      };
-      
-      // Initial check
-      checkMobile();
-      
-      // Add resize listener
-      window.addEventListener('resize', checkMobile);
-      
-      // Setup photo carousel - change every 5 seconds
-      const photoInterval = setInterval(() => {
-        currentPhotoIndex = (currentPhotoIndex + 1) % photos.length;
-      }, 5000);
-      
-      // Cleanup
-      return () => {
-        window.removeEventListener('resize', checkMobile);
-        clearInterval(photoInterval);
-      };
-    }
+    realmInfo.fetch();
   });
+  
+  // Reactive welcome image - use realm's image or fallback
+  $: welcomeImageUrl = $realmWelcomeImage || defaultWelcomeImage;
 </script>
 
 <svelte:head>
-  <title>{$_('extensions.welcome.page_title')}</title>
+  <title>{$realmName || $_('extensions.welcome.page_title')}</title>
 </svelte:head>
 
 <div class="welcome-container">
   {#if browser}
     <div class="background-photo-container">
-      {#each photos as photo, index}
-        <img
-          src={photo}
-          alt="{$_('extensions.welcome.alt_text.background', { values: { index: index + 1 } })}"
-          class="background-photo {index === currentPhotoIndex ? 'active' : ''}"
-        />
-      {/each}
-    </div>
-    <!-- Photo filename display -->
-    <div class="photo-info">
-      {photos[currentPhotoIndex].split('/').pop().replace('.jpg', '')}
+      <img
+        src={welcomeImageUrl}
+        alt="{$realmName || 'Realm'} - {$_('extensions.welcome.alt_text.background')}"
+        class="background-photo active"
+      />
     </div>
     
-    <!-- "Built with" text -->
+    <!-- "Built on" text -->
     <div class="built-with-love">
-      <a href="https://internetcomputer.org" target="_blank" rel="noopener noreferrer" class="built-with-link">
-        {$_('extensions.welcome.built_with.text')} 
-        <img src="/images/internet-computer-icp-logo.svg" alt="{$_('extensions.welcome.alt_text.internet_computer_logo')}" width="20" height="20" class="inline-logo" />
-        {$_('extensions.welcome.built_with.with_love')}
+      <a href="https://realmsgos.org" target="_blank" rel="noopener noreferrer" class="built-with-link">
+        Built on
+        <img src="/images/logo_horizontal_white.svg" alt="Realms GOS" width="80" height="20" class="inline-logo" />
       </a>
+    </div>
+    
+    <!-- Scroll down indicator -->
+    <div class="scroll-indicator">
+      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 5v14M5 12l7 7 7-7"/>
+      </svg>
     </div>
   {/if}
   
   <!-- Top bar with logo -->
   <div class="top-bar">
     <div class="realms-logo">
-      <img src="/images/logo_horizontal_white.svg" alt="{$_('extensions.welcome.alt_text.realms_logo')}" class="logo-img" width="200" />
+      {#if $realmLogo}
+        <img src={$realmLogo} alt="{$realmName}" class="logo-img" />
+      {:else}
+        <img src="/images/logo_horizontal_white.svg" alt="{$_('extensions.welcome.alt_text.realms_logo')}" class="logo-img" width="200" />
+      {/if}
     </div>
   </div>
 
   <div class="content">
     <div class="hero-text">
-      <h1>{$_('extensions.welcome.hero.title')}</h1>
-      <p class="hero-subtitle">{$_('extensions.welcome.hero.subtitle_1')}</p>
-      <p class="hero-subtitle">{$_('extensions.welcome.hero.subtitle_2')}</p>
-      <p class="hero-subtitle">{$_('extensions.welcome.hero.subtitle_3')}</p>
+      {#if $realmInfo.loading}
+        <h1>{$_('extensions.welcome.loading')}</h1>
+      {:else}
+        <h1>{$_('extensions.welcome.hero.welcome_to')} {$realmName || $_('extensions.welcome.hero.this_realm')}</h1>
+        {#if $realmWelcomeMessage}
+          <p class="hero-subtitle welcome-message">{$realmWelcomeMessage}</p>
+        {/if}
+        {#if $realmDescription}
+          <p class="hero-subtitle realm-description">{$realmDescription}</p>
+        {/if}
+      {/if}
     </div>
     
     <div class="button-container">
-      <a href="/extensions/llm_chat" class="btn btn-visitor">  <!-- TODO: generalize this! -->
-        {$_('extensions.welcome.hero.try_sandbox')}
-      </a>
-    </div>
-  </div>
-  
-  <!-- Scroll indicator -->
-  <div class="scroll-indicator">
-    <!-- <div class="scroll-text">Scroll to learn more</div> -->
-    <div class="scroll-arrow">
-      <div class="arrow-down"></div>
+      {#if $isAuthenticated}
+        <a href="/" class="btn btn-primary">
+          {$_('extensions.welcome.hero.enter_realm')}
+        </a>
+      {:else}
+        <a href="/join" class="btn btn-primary">
+          {$_('extensions.welcome.hero.join_realm')}
+        </a>
+        <a href="/join" class="btn btn-secondary">
+          {$_('extensions.welcome.hero.login')}
+        </a>
+      {/if}
     </div>
   </div>
 </div>
-
-<!-- Our Mission Section -->
-<section class="mission-section">
-  <div class="mission-content">
-    <h2>{$_('extensions.welcome.mission.title')}</h2>
-    <p>
-      {@html $_('extensions.welcome.mission.description')}
-    </p>
-</section>
-
-<!-- Design principles Section -->
-<section class="values-section">
-  <div class="values-container">
-    <h2>{$_('extensions.welcome.principles.title')}</h2>
-    
-    <div class="values-grid">
-      <div class="value-item">
-        <div class="value-number">01</div>
-        <h3>{$_('extensions.welcome.principles.transparency.title')}</h3>
-        <p>{$_('extensions.welcome.principles.transparency.description')}</p>
-      </div>
-      
-      <div class="value-item">
-        <div class="value-number">02</div>
-        <h3>{$_('extensions.welcome.principles.efficiency.title')}</h3>
-        <p>{$_('extensions.welcome.principles.efficiency.description')}</p>
-      </div>
-      
-      <div class="value-item">
-        <div class="value-number">03</div>
-        <h3>{$_('extensions.welcome.principles.diversity.title')}</h3>
-        <p>{$_('extensions.welcome.principles.diversity.description')}</p>
-      </div>
-      
-      <div class="value-item">
-        <div class="value-number">04</div>
-        <h3>{$_('extensions.welcome.principles.resilience.title')}</h3>
-        <p>{$_('extensions.welcome.principles.resilience.description')}</p>
-      </div>
-    </div>
-  </div>
-</section>
 
 <!-- Footer -->
 <Footer />
@@ -228,6 +173,30 @@
     display: inline-block;
     vertical-align: middle;
     margin: 0 0.2rem;
+  }
+
+  .scroll-indicator {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    opacity: 0.8;
+    animation: bounce 2s infinite;
+    z-index: 20;
+    cursor: pointer;
+  }
+
+  @keyframes bounce {
+    0%, 20%, 50%, 80%, 100% {
+      transform: translateX(-50%) translateY(0);
+    }
+    40% {
+      transform: translateX(-50%) translateY(-10px);
+    }
+    60% {
+      transform: translateX(-50%) translateY(-5px);
+    }
   }
 
   .top-bar {
@@ -358,197 +327,40 @@
     letter-spacing: 0.5px;
   }
   
-  .btn-member {
-    background-color: rgba(59, 130, 246, 0.8);
+  .btn-primary {
+    background-color: rgba(59, 130, 246, 0.9);
     color: white;
-    border: 2px solid rgba(59, 130, 246, 0.9);
+    border: 2px solid rgba(59, 130, 246, 1);
   }
   
-  .btn-member:hover {
+  .btn-primary:hover {
     background-color: rgba(59, 130, 246, 1);
     transform: translateY(-2px);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
   }
   
-  .btn-visitor {
+  .btn-secondary {
     background-color: transparent;
     color: white;
     border: 2px solid rgba(255, 255, 255, 0.6);
   }
   
-  .btn-visitor:hover {
+  .btn-secondary:hover {
     background-color: rgba(255, 255, 255, 0.1);
     border-color: rgba(255, 255, 255, 0.8);
     transform: translateY(-2px);
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
   }
   
-  /* Scroll indicator styles */
-  .scroll-indicator {
-    position: absolute;
-    bottom: 2rem;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-    z-index: 2;
-    animation: fadeInUp 2s ease-out 1s both;
-  }
-  
-  .scroll-text {
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 0.9rem;
-    font-weight: 400;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-    letter-spacing: 0.5px;
-  }
-  
-  .scroll-arrow {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    animation: bounce 2s infinite;
-  }
-  
-  .arrow-down {
-    width: 0;
-    height: 0;
-    border-left: 8px solid transparent;
-    border-right: 8px solid transparent;
-    border-top: 12px solid rgba(255, 255, 255, 0.8);
-    filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.5));
-  }
-  
-  @keyframes bounce {
-    0%, 20%, 50%, 80%, 100% {
-      transform: translateY(0);
-    }
-    40% {
-      transform: translateY(-8px);
-    }
-    60% {
-      transform: translateY(-4px);
-    }
-  }
-  
-  @keyframes fadeInUp {
-    from {
-      opacity: 0;
-      transform: translateX(-50%) translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-  }
-  
-  /* Mission Section Styles */
-  .mission-section {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 60vh;
-    padding: 4rem 2rem;
-    background-color: #f8f9fa;
-    gap: 4rem;
-  }
-  
-  .mission-content {
-    flex: 1;
-    max-width: 100%;
-    text-align: center;
-  }
-  
-  .mission-content h2 {
-    font-size: 2.5rem;
-    font-weight: 400;
-    color: #333;
-    margin-bottom: 2rem;
-    line-height: 1.2;
-  }
-  
-  .mission-content p {
-    font-size: 1.1rem;
-    line-height: 1.6;
-    color: #555;
-    margin-bottom: 2rem;
-  }
-  
-  .read-more-btn {
-    background-color: #333;
-    color: white;
-    border: none;
-    padding: 0.8rem 2rem;
-    font-size: 1rem;
+  .welcome-message {
+    font-size: 1.3rem;
     font-weight: 500;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-  }
-  
-  .read-more-btn:hover {
-    background-color: #555;
-  }
-  
-  .mission-image {
-    flex: 1;
-    min-height: 300px;
-    background-color: #e9ecef;
-    border-radius: 8px;
-  }
-  
-  /* Values Section Styles */
-  .values-section {
-    padding: 5rem 2rem;
-    background-color: white;
-  }
-  
-  .values-container {
-    max-width: 1200px;
-    margin: 0 auto;
-  }
-  
-  .values-container h2 {
-    font-size: 2.5rem;
-    font-weight: 400;
-    color: #333;
-    text-align: center;
-    margin-bottom: 4rem;
-    line-height: 1.2;
-  }
-  
-  .values-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 3rem;
-  }
-  
-  .value-item {
-    padding: 2rem;
-    background-color: #f8f9fa;
-    border-radius: 8px;
-  }
-  
-  .value-number {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: #666;
     margin-bottom: 1rem;
   }
   
-  .value-item h3 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: #333;
-    margin-bottom: 1rem;
-    line-height: 1.3;
-  }
-  
-  .value-item p {
+  .realm-description {
     font-size: 1rem;
-    line-height: 1.6;
-    color: #555;
+    opacity: 0.9;
   }
   
   /* For mobile screens */
@@ -559,8 +371,12 @@
     }
     
     .hero-subtitle {
-      font-size: 1.1rem;
+      font-size: 1rem;
       margin-bottom: 0.4rem;
+    }
+    
+    .welcome-message {
+      font-size: 1.1rem;
     }
     
     .hero-text {
@@ -575,75 +391,12 @@
       padding: 0.8rem 1.2rem;
     }
     
-    /* Adjust positioning for mobile to avoid overlap */
+    /* Adjust positioning for mobile */
     .built-with-love {
-      bottom: 4rem; /* Move higher to avoid arrow overlap */
+      bottom: 1rem;
       right: 0.5rem;
       font-size: 0.8rem;
       padding: 0.4rem 0.6rem;
-    }
-    
-    .photo-info {
-      bottom: 4rem; /* Move higher to match built-with text */
-      left: 0.5rem;
-      font-size: 0.8rem;
-      padding: 0.4rem 0.6rem;
-    }
-    
-    .scroll-indicator {
-      bottom: 1rem; /* Keep arrow at bottom */
-    }
-    
-    /* Mission section mobile */
-    .mission-section {
-      flex-direction: column;
-      padding: 3rem 1rem;
-      gap: 2rem;
-      min-height: auto;
-    }
-    
-    .mission-content h2 {
-      font-size: 2rem;
-      margin-bottom: 1.5rem;
-    }
-    
-    .mission-content p {
-      font-size: 1rem;
-    }
-    
-    .mission-image {
-      min-height: 200px;
-    }
-    
-    /* Values section mobile */
-    .values-section {
-      padding: 3rem 1rem;
-    }
-    
-    .values-container h2 {
-      font-size: 2rem;
-      margin-bottom: 3rem;
-    }
-    
-    .values-grid {
-      grid-template-columns: 1fr;
-      gap: 2rem;
-    }
-    
-    .value-item {
-      padding: 1.5rem;
-    }
-    
-    .value-item h3 {
-      font-size: 1.3rem;
-    }
-    
-    .scroll-indicator {
-      bottom: 1rem;
-    }
-    
-    .scroll-text {
-      font-size: 0.8rem;
     }
   }
 </style>

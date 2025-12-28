@@ -1,7 +1,10 @@
 {
   "type": "realm",
   "name": "Realm 2",
+  "description": "A historic Mediterranean town with rich cultural heritage",
   "logo": "logo.svg",
+  "welcome_image": "/images/default_welcome.jpg",
+  "welcome_message": "Bienvenido! Experience governance that honors our traditions while embracing the future.",
   "options": {
     "random": {
       "members": 30,

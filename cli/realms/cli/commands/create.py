@@ -95,6 +95,14 @@ def _generate_single_realm(
                 console.print(f"     ✅ Copied logo: {logo_filename}")
             else:
                 console.print(f"     ⚠️  Warning: Logo file not found: {logo_source}")
+        
+        # Copy welcome image file if it exists
+        for welcome_ext in ["jpg", "jpeg", "png", "webp"]:
+            welcome_source = demo_realm_dir / f"welcome.{welcome_ext}"
+            if welcome_source.exists():
+                shutil.copy2(welcome_source, realm_output / f"welcome.{welcome_ext}")
+                console.print(f"     ✅ Copied welcome image: welcome.{welcome_ext}")
+                break
     else:
         console.print(f"     ⚠️  Warning: No manifest found in {demo_realm_dir}")
     
@@ -221,6 +229,14 @@ def create_command(
                     console.print(f"✅ Copied logo: {logo_filename}")
                 else:
                     console.print(f"[yellow]⚠️  Logo file not found: {logo_source}[/yellow]")
+            
+            # Copy welcome image file if it exists in manifest directory
+            for welcome_ext in ["jpg", "jpeg", "png", "webp"]:
+                welcome_source = manifest_path.parent / f"welcome.{welcome_ext}"
+                if welcome_source.exists():
+                    shutil.copy2(welcome_source, output_path / f"welcome.{welcome_ext}")
+                    console.print(f"✅ Copied welcome image: welcome.{welcome_ext}")
+                    break
     
     # Use bundled RealmGenerator directly
     try:

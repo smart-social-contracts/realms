@@ -1,7 +1,10 @@
 {
   "type": "realm",
   "name": "Realm 3",
+  "description": "A vibrant Latin American city blending colonial charm with modern governance",
   "logo": "logo.svg",
+  "welcome_image": "/images/default_welcome.jpg",
+  "welcome_message": "¡Bienvenidos! Join our community where every voice matters.",
   "options": {
     "random": {
       "members": 20,

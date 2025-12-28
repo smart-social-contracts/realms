@@ -8,9 +8,7 @@
   let error = null;
   let searchQuery = '';
   let filteredRealms = [];
-  let showAddForm = false;
-  let newRealm = { id: '', name: '', url: '', logo: '' };
-  let addingRealm = false;
+  let showCreateModal = false;
 
   // Get commit hash from meta tag
   let commitHash = '';
@@ -167,29 +165,10 @@
     });
   }
 
-  async function addRealm() {
-    if (!newRealm.id.trim() || !newRealm.name.trim()) {
-      error = 'Realm ID and Name are required';
-      return;
-    }
-
-    try {
-      addingRealm = true;
-      error = null;
-      const result = await backend.add_realm(newRealm.id, newRealm.name, newRealm.url, newRealm.logo);
-      
-      if (result.Ok) {
-        newRealm = { id: '', name: '', url: '', logo: '' };
-        showAddForm = false;
-        await loadRealms();
-      } else {
-        error = result.Err;
-      }
-    } catch (err) {
-      error = err.message || 'Failed to add realm';
-    } finally {
-      addingRealm = false;
-    }
+  function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+      // Brief visual feedback could be added here
+    });
   }
 
 
@@ -267,49 +246,64 @@
     
     <button 
       class="btn btn-primary add-btn"
-      on:click={() => showAddForm = !showAddForm}
+      on:click={() => showCreateModal = true}
     >
-      {showAddForm ? '✕ Cancel' : '+ Add Realm'}
+      Create Realm
     </button>
   </div>
 
-  {#if showAddForm}
-    <div class="add-form">
-      <h3>Add New Realm</h3>
-      <div class="form-row">
-        <input
-          type="text"
-          placeholder="Realm ID (required)"
-          bind:value={newRealm.id}
-          class="form-input"
-        />
-        <input
-          type="text"
-          placeholder="Realm Name (required)"
-          bind:value={newRealm.name}
-          class="form-input"
-        />
-        <input
-          type="text"
-          placeholder="Canister URL (optional)"
-          bind:value={newRealm.url}
-          class="form-input"
-        />
-        <input
-          type="text"
-          placeholder="Logo URL (optional)"
-          bind:value={newRealm.logo}
-          class="form-input"
-        />
-      </div>
-      <div class="form-actions">
-        <button 
-          class="btn btn-primary"
-          on:click={addRealm}
-          disabled={addingRealm}
-        >
-          {addingRealm ? 'Adding...' : 'Add Realm'}
+  {#if showCreateModal}
+    <div class="modal-overlay" on:click={() => showCreateModal = false}>
+      <div class="modal-content" on:click|stopPropagation>
+        <button class="modal-close" on:click={() => showCreateModal = false}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12"></path>
+          </svg>
         </button>
+        
+        <h2 class="modal-title">Create a Realm</h2>
+        <p class="modal-subtitle">Deploy your own governance system in minutes</p>
+        
+        <div class="instruction-step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h3>Install the CLI</h3>
+            <div class="code-block">
+              <code>pip install realms-gos</code>
+              <button class="copy-btn" on:click={() => copyToClipboard('pip install realms-gos')}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="instruction-step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h3>Create and Deploy</h3>
+            <div class="code-block">
+              <code>realms realm create --deploy --network staging</code>
+              <button class="copy-btn" on:click={() => copyToClipboard('realms realm create --deploy --network staging')}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <a href="https://github.com/smart-social-contracts/realms" target="_blank" rel="noopener noreferrer" class="docs-link">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+            </svg>
+            View Documentation
+          </a>
+        </div>
       </div>
     </div>
   {/if}
@@ -347,9 +341,9 @@
           <p>No realms have been registered yet.</p>
           <button 
             class="btn btn-primary"
-            on:click={() => showAddForm = true}
+            on:click={() => showCreateModal = true}
           >
-            Add First Realm
+            Create Realm
           </button>
         {/if}
       </div>
@@ -357,6 +351,12 @@
       <div class="realms-grid">
         {#each filteredRealms as realm}
           <div class="realm-card">
+            {#if realm.url}
+              <div 
+                class="realm-card-bg" 
+                style="background-image: url('{ensureProtocol(realm.url)}/images/default_welcome.jpg')"
+              ></div>
+            {/if}
             <div class="card-accent"></div>
             <div class="realm-header">
               <div class="realm-logo-container">
@@ -390,7 +390,7 @@
               {#if realm.url}
                 <button 
                   class="btn btn-dark btn-sm btn-full"
-                  on:click={() => window.open(ensureProtocol(realm.url), '_blank')}
+                  on:click={() => window.open(ensureProtocol(realm.url) + '/welcome', '_blank')}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
@@ -752,6 +752,19 @@
     transition: all 0.2s ease;
   }
 
+  .realm-card-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-size: cover;
+    background-position: center;
+    opacity: 0.2;
+    z-index: 0;
+    pointer-events: none;
+  }
+
   .realm-card:hover {
     border-color: #D4D4D4;
     box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 10px -5px rgba(0, 0, 0, 0.04);
@@ -761,6 +774,8 @@
   .card-accent {
     height: 4px;
     background: linear-gradient(90deg, #404040 0%, #737373 100%);
+    position: relative;
+    z-index: 1;
   }
 
   .realm-header {
@@ -768,6 +783,8 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
+    position: relative;
+    z-index: 1;
   }
 
   .realm-logo-container {
@@ -822,6 +839,8 @@
   .realm-content {
     padding: 1rem 1.5rem;
     text-align: center;
+    position: relative;
+    z-index: 1;
   }
 
   .realm-name {
@@ -971,6 +990,8 @@
     gap: 0.75rem;
     padding: 1rem 1.5rem 1.5rem;
     border-top: 1px solid #F5F5F5;
+    position: relative;
+    z-index: 1;
   }
 
   .btn {
@@ -1384,6 +1405,191 @@
 
     .card-accent {
       height: 3px;
+    }
+  }
+
+  /* Modal Styles */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  .modal-content {
+    background: #FFFFFF;
+    border-radius: 1rem;
+    padding: 2rem;
+    max-width: 520px;
+    width: 100%;
+    position: relative;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    animation: slideUp 0.3s ease-out;
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .modal-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #A3A3A3;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-close:hover {
+    background: #F5F5F5;
+    color: #525252;
+  }
+
+  .modal-title {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #171717;
+  }
+
+  .modal-subtitle {
+    margin: 0 0 2rem 0;
+    color: #737373;
+    font-size: 0.95rem;
+  }
+
+  .instruction-step {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .step-number {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    background: #171717;
+    color: #FFFFFF;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
+
+  .step-content {
+    flex: 1;
+  }
+
+  .step-content h3 {
+    margin: 0 0 0.75rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #171717;
+  }
+
+  .code-block {
+    background: #1E1E1E;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .code-block code {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.875rem;
+    color: #E5E5E5;
+    white-space: nowrap;
+    overflow-x: auto;
+  }
+
+  .copy-btn {
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: #737373;
+    padding: 0.375rem;
+    border-radius: 0.375rem;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .copy-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #FFFFFF;
+  }
+
+  .modal-footer {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #E5E5E5;
+    display: flex;
+    justify-content: center;
+  }
+
+  .docs-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #525252;
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    transition: all 0.15s ease;
+  }
+
+  .docs-link:hover {
+    background: #F5F5F5;
+    color: #171717;
+  }
+
+  @media (max-width: 768px) {
+    .modal-content {
+      padding: 1.5rem;
+      max-width: 100%;
+    }
+
+    .modal-title {
+      font-size: 1.25rem;
+    }
+
+    .code-block {
+      padding: 0.75rem;
+    }
+
+    .code-block code {
+      font-size: 0.75rem;
     }
   }
 </style>
