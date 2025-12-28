@@ -6,6 +6,14 @@ from kybra import Async, Principal, ic
 from kybra_simple_db import Entity, Float, ManyToOne, OneToMany, String, TimestampedMixin
 from kybra_simple_logging import get_logger
 
+# Try ICP-compatible random, fall back to uuid for CLI/regular Python
+try:
+    from core.random import generate_unique_id
+except ImportError:
+    def generate_unique_id(prefix: str = "", length: int = 12) -> str:
+        """Fallback using uuid.uuid4() for non-ICP environments."""
+        return f"{prefix}{uuid.uuid4().hex[:length]}"
+
 logger = get_logger("entity.invoice")
 
 # ICRC-1 decimals for ckBTC
@@ -19,7 +27,7 @@ class Invoice(Entity, TimestampedMixin):
     Each invoice has a unique subaccount derived from its ID.
     Users pay by sending ckBTC to: vault_principal + invoice_subaccount
     
-    The ID is auto-generated as "inv_{uuid}" if not provided.
+    The ID is auto-generated using ic.time() + counter if not provided.
     Custom IDs can be specified for sequential numbering (e.g., "INV-2024-001").
     
     The subaccount is the invoice ID padded to 32 bytes, allowing direct
@@ -40,7 +48,7 @@ class Invoice(Entity, TimestampedMixin):
     def __init__(self, **kwargs):
         # Auto-generate invoice ID if not provided (max 32 chars for subaccount)
         if "id" not in kwargs and "_id" not in kwargs:
-            kwargs["id"] = f"inv_{uuid.uuid4().hex[:12]}"
+            kwargs["id"] = generate_unique_id("inv_")
         super().__init__(**kwargs)
 
     def get_subaccount(self) -> bytes:
