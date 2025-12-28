@@ -379,16 +379,11 @@
             <div class="realm-content">
               <h3 class="realm-name">{realm.name}</h3>
               
-              <div class="realm-meta">
-                <p class="realm-id">
-                  <span class="meta-label">ID:</span>
-                  <code title="{realm.id}">{truncateId(realm.id)}</code>
-                </p>
-                <p class="realm-date">
-                  <span class="meta-label">Created:</span>
-                  <span>{formatFullDate(realm.created_at)}</span>
-                </p>
-              </div>
+              <p class="realm-info" title="{formatFullDate(realm.created_at)}">
+                <code>{realm.id}</code>
+                <span class="info-separator">·</span>
+                <span>{formatTimeAgo(realm.created_at)}</span>
+              </p>
             </div>
             
             <div class="realm-actions">
@@ -834,6 +829,27 @@
     color: #171717;
     font-size: 1.35rem;
     font-weight: 600;
+  }
+
+  .realm-info {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #737373;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .realm-info code {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.75rem;
+    color: #525252;
+  }
+
+  .info-separator {
+    color: #A3A3A3;
   }
 
   .realm-id {
