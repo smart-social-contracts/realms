@@ -46,6 +46,7 @@ from kybra import (
     init,
     match,
     nat,
+    nat16,
     post_upgrade,
     query,
     text,
@@ -62,6 +63,15 @@ Database.init(db_storage=storage, audit_enabled=True)
 logger = get_logger("main")
 
 
+# Import management canister for outgoing HTTP requests
+from kybra.canisters.management import (
+    management_canister,
+)
+
+# Types for incoming HTTP requests (http_request query)
+Header = Tuple[str, str]
+
+
 class HttpRequest(Record):
     method: str
     url: str
@@ -69,14 +79,12 @@ class HttpRequest(Record):
     body: blob
 
 
-# Import management canister for HTTP requests
-from kybra.canisters.management import (
-    HttpResponse,
-    HttpTransformArgs,
-    management_canister,
-)
-
-Header = Tuple[str, str]
+class HttpResponseIncoming(Record):
+    status_code: nat16
+    headers: Vec["Header"]
+    body: blob
+    streaming_strategy: Opt["StreamingStrategy"]
+    upgrade: Opt[bool]
 
 
 class StreamingStrategy(Variant):
@@ -717,11 +725,61 @@ def http_request_core(data):
     d = json.dumps(data)
     return {
         "status_code": 200,
-        "headers": [],
+        "headers": [("Content-Type", "application/json"), ("Access-Control-Allow-Origin", "*")],
         "body": bytes(d + "\n", "ascii"),
         "streaming_strategy": None,
         "upgrade": False,
     }
+
+
+def http_request_404():
+    return {
+        "status_code": 404,
+        "headers": [("Content-Type", "application/json"), ("Access-Control-Allow-Origin", "*")],
+        "body": b'{"error": "Not found"}\n',
+        "streaming_strategy": None,
+        "upgrade": False,
+    }
+
+
+@query
+def http_request(req: HttpRequest) -> HttpResponseIncoming:
+    """Handle HTTP requests to the canister. Only for unauthenticated read operations."""
+    try:
+        method = req["method"]
+        url = req["url"]
+        
+        logger.info(f"HTTP {method} request to {url}")
+        
+        not_found = HttpResponseIncoming(
+            status_code=404,
+            headers=[],
+            body=bytes("Not found", "ascii"),
+            streaming_strategy=None,
+            upgrade=False,
+        )
+        
+        if method == "GET":
+            # Strip leading slash and query params
+            path = url.lstrip("/").split("?")[0]
+            
+            # Handle /status
+            if path == "status" or path == "":
+                return http_request_core(get_status())
+            # Handle /extensions
+            elif path == "extensions":
+                return http_request_core({"extensions": list_extensions()})
+        
+        return not_found
+    except Exception as e:
+        logger.error(f"Error handling HTTP request: {str(e)}\n{traceback.format_exc()}")
+        return {
+            "status_code": 500,
+            "headers": [],
+            "body": bytes(traceback.format_exc(), "ascii"),
+            "streaming_strategy": None,
+            "upgrade": False,
+        }
 
 
 # @query
@@ -736,12 +794,13 @@ def http_request_core(data):
 #     return http_response
 
 
-@query
-def http_transform(args: HttpTransformArgs) -> HttpResponse:
-    """Transform function for HTTP requests - removes headers for consensus"""
-    http_response = args["response"]
-    http_response["headers"] = []
-    return http_response
+# http_transform commented out - only needed for outgoing HTTP requests
+# @query
+# def http_transform(args: HttpTransformArgs) -> HttpResponse:
+#     """Transform function for HTTP requests - removes headers for consensus"""
+#     http_response = args["response"]
+#     http_response["headers"] = []
+#     return http_response
 
 
 # @update

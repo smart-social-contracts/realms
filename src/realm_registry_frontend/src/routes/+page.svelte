@@ -11,7 +11,6 @@
   let showAddForm = false;
   let newRealm = { id: '', name: '', url: '', logo: '' };
   let addingRealm = false;
-  let copiedLink = null;
 
   // Get commit hash from meta tag
   let commitHash = '';
@@ -65,11 +64,107 @@
     }
   }
 
+  function isLocalDevelopment() {
+    return window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1');
+  }
+
   async function fetchUserCounts() {
-    // User counts are stored in the registry when realms are registered
-    // HTTP status fetch removed - realm backends don't expose HTTP endpoints
-    // The users_count field is already populated from the registry data
-    console.debug('User counts loaded from registry data');
+    // Fetch user counts from each realm's backend via Candid
+    const { Actor, HttpAgent } = await import('@dfinity/agent');
+    const { Principal } = await import('@dfinity/principal');
+    
+    // Minimal IDL for the status method - only need users_count from the response
+    const { IDL } = await import('@dfinity/candid');
+    
+    const statusIdlFactory = ({ IDL }) => {
+      const StatusData = IDL.Record({
+        'status': IDL.Text,
+        'demo_mode': IDL.Bool,
+        'transfers_count': IDL.Nat,
+        'codexes_count': IDL.Nat,
+        'proposals_count': IDL.Nat,
+        'realms_count': IDL.Nat,
+        'version': IDL.Text,
+        'extensions': IDL.Vec(IDL.Text),
+        'disputes_count': IDL.Nat,
+        'commit': IDL.Text,
+        'instruments_count': IDL.Nat,
+        'organizations_count': IDL.Nat,
+        'mandates_count': IDL.Nat,
+        'tasks_count': IDL.Nat,
+        'votes_count': IDL.Nat,
+        'licenses_count': IDL.Nat,
+        'users_count': IDL.Nat,
+        'trades_count': IDL.Nat,
+      });
+      const ApiResponse = IDL.Record({
+        'data': IDL.Variant({ 'status': StatusData }),
+        'success': IDL.Bool,
+      });
+      return IDL.Service({
+        'status': IDL.Func([], [ApiResponse], ['query']),
+      });
+    };
+    
+    const host = isLocalDevelopment() 
+      ? 'http://localhost:8000' 
+      : 'https://icp0.io';
+    
+    const updates = await Promise.allSettled(
+      realms.map(async (realm) => {
+        try {
+          const agent = new HttpAgent({ host });
+          
+          // Fetch root key for local development
+          if (isLocalDevelopment()) {
+            await agent.fetchRootKey();
+          }
+          
+          const actor = Actor.createActor(statusIdlFactory, {
+            agent,
+            canisterId: Principal.fromText(realm.id),
+          });
+          
+          const response = await actor.status();
+          if (response.success && response.data.status) {
+            const usersCount = Number(response.data.status.users_count);
+            return { id: realm.id, users_count: usersCount };
+          }
+        } catch (e) {
+          console.debug(`Could not fetch status for ${realm.id}:`, e.message);
+        }
+        return null;
+      })
+    );
+    
+    // Update realms with fetched counts
+    updates.forEach(result => {
+      if (result.status === 'fulfilled' && result.value) {
+        const { id, users_count } = result.value;
+        realms = realms.map(r => r.id === id ? { ...r, users_count } : r);
+        filteredRealms = filteredRealms.map(r => r.id === id ? { ...r, users_count } : r);
+      }
+    });
+  }
+
+  function formatTimeAgo(timestamp) {
+    const now = Date.now();
+    const date = new Date(timestamp * 1000);
+    const seconds = Math.floor((now - date.getTime()) / 1000);
+    
+    if (seconds < 60) return 'just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+    if (seconds < 2592000) return `${Math.floor(seconds / 604800)}w ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function formatFullDate(timestamp) {
+    return new Date(timestamp * 1000).toLocaleString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
   }
 
   async function addRealm() {
@@ -98,14 +193,14 @@
   }
 
 
+  // formatDate kept for backwards compatibility
   function formatDate(timestamp) {
-    return new Date(timestamp * 1000).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatTimeAgo(timestamp);
+  }
+
+  function truncateId(id) {
+    if (!id || id.length <= 16) return id;
+    return `${id.slice(0, 8)}...${id.slice(-4)}`;
   }
 
   function ensureProtocol(url) {
@@ -119,20 +214,6 @@
     return isLocal ? `http://${url}` : `https://${url}`;
   }
 
-  function getPublicLink(realm) {
-    return realm.url ? ensureProtocol(realm.url) : `${window.location.origin}/realm/${realm.id}`;
-  }
-
-  async function copyLink(realm) {
-    const link = getPublicLink(realm);
-    try {
-      await navigator.clipboard.writeText(link);
-      copiedLink = realm.id;
-      setTimeout(() => copiedLink = null, 2000);
-    } catch (err) {
-      console.error('Failed to copy link:', err);
-    }
-  }
 
   function searchRealms() {
     if (!searchQuery.trim()) {
@@ -163,12 +244,25 @@
 
   <div class="controls">
     <div class="search-section">
-      <input
-        type="text"
-        placeholder="Search realms by name or ID..."
-        bind:value={searchQuery}
-        class="search-input"
-      />
+      <div class="search-wrapper">
+        <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <path d="m21 21-4.35-4.35"></path>
+        </svg>
+        <input
+          type="text"
+          placeholder="Search realms by name or ID..."
+          bind:value={searchQuery}
+          class="search-input"
+        />
+        {#if searchQuery}
+          <button class="search-clear" on:click={() => searchQuery = ''}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 6L6 18M6 6l12 12"></path>
+            </svg>
+          </button>
+        {/if}
+      </div>
     </div>
     
     <button 
@@ -229,9 +323,19 @@
 
   <main class="main-content">
     {#if loading}
-      <div class="loading">
-        <div class="spinner"></div>
-        <p>Loading realms...</p>
+      <div class="loading-grid">
+        {#each [1, 2, 3] as _}
+          <div class="skeleton-card">
+            <div class="skeleton-icon"></div>
+            <div class="skeleton-title"></div>
+            <div class="skeleton-text"></div>
+            <div class="skeleton-text short"></div>
+            <div class="skeleton-buttons">
+              <div class="skeleton-btn"></div>
+              <div class="skeleton-btn"></div>
+            </div>
+          </div>
+        {/each}
       </div>
     {:else if filteredRealms.length === 0}
       <div class="empty-state">
@@ -253,45 +357,51 @@
       <div class="realms-grid">
         {#each filteredRealms as realm}
           <div class="realm-card">
+            <div class="card-accent"></div>
             <div class="realm-header">
-              {#if realm.logo}
-                <div class="realm-logo-container">
+              <div class="realm-logo-container">
+                {#if realm.logo}
                   <img src={realm.logo} alt="{realm.name} logo" class="realm-logo" />
-                </div>
-              {/if}
-              <div class="realm-title">
-                <h3 class="realm-name">{realm.name}</h3>
-                <span class="realm-users">👥 {realm.users_count || 0} users</span>
+                {:else}
+                  <div class="realm-logo-fallback">
+                    <span>{realm.name.charAt(0).toUpperCase()}</span>
+                  </div>
+                {/if}
               </div>
-              <span class="realm-id">{realm.id}</span>
+              <div class="user-badge" class:has-users={realm.users_count > 0}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                </svg>
+                <span>{realm.users_count || 0}</span>
+              </div>
             </div>
             
-            <div class="realm-details">
-              {#if realm.url}
-                <p class="realm-url">
-                  <strong>URL:</strong> 
-                  <code>{realm.url}</code>
-                </p>
-              {/if}
+            <div class="realm-content">
+              <h3 class="realm-name">{realm.name}</h3>
               
-              <p class="realm-date">
-                <strong>Created:</strong> {formatDate(realm.created_at)}
-              </p>
+              <div class="realm-meta">
+                <p class="realm-id">
+                  <span class="meta-label">ID:</span>
+                  <code title="{realm.id}">{truncateId(realm.id)}</code>
+                </p>
+                <p class="realm-date">
+                  <span class="meta-label">Created:</span>
+                  <span>{formatFullDate(realm.created_at)}</span>
+                </p>
+              </div>
             </div>
             
             <div class="realm-actions">
-              <button 
-                class="btn btn-secondary btn-sm"
-                on:click={() => copyLink(realm)}
-                title="Copy public link"
-              >
-                {copiedLink === realm.id ? '✓ Copied!' : '🔗 Copy Link'}
-              </button>
               {#if realm.url}
                 <button 
-                  class="btn btn-primary btn-sm"
+                  class="btn btn-dark btn-sm btn-full"
                   on:click={() => window.open(ensureProtocol(realm.url), '_blank')}
                 >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                  </svg>
                   Visit
                 </button>
               {/if}
@@ -407,21 +517,60 @@
     min-width: 300px;
   }
 
+  .search-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 1rem;
+    color: #A3A3A3;
+    pointer-events: none;
+  }
+
   .search-input {
     width: 100%;
-    padding: 1rem;
+    padding: 1rem 2.5rem 1rem 3rem;
     font-size: 1rem;
     border: 1px solid #E5E5E5;
-    border-radius: 0.5rem;
+    border-radius: 0.75rem;
     background: #FFFFFF;
     color: #171717;
     font-family: inherit;
+    transition: all 0.2s ease;
   }
 
   .search-input:focus {
     outline: none;
     border-color: #525252;
     box-shadow: 0 0 0 3px rgba(82, 82, 82, 0.1);
+  }
+
+  .search-input:focus + .search-icon,
+  .search-wrapper:focus-within .search-icon {
+    color: #525252;
+  }
+
+  .search-clear {
+    position: absolute;
+    right: 0.75rem;
+    background: none;
+    border: none;
+    padding: 0.25rem;
+    cursor: pointer;
+    color: #A3A3A3;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+  }
+
+  .search-clear:hover {
+    color: #525252;
+    background: #F5F5F5;
   }
 
   .add-btn {
@@ -507,6 +656,74 @@
     padding: 3rem;
   }
 
+  .loading-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .skeleton-card {
+    background: #FFFFFF;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    border: 1px solid #E5E5E5;
+  }
+
+  .skeleton-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 1rem;
+    background: linear-gradient(90deg, #F5F5F5 25%, #E5E5E5 50%, #F5F5F5 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    margin: 0 auto 1rem;
+  }
+
+  .skeleton-title {
+    height: 24px;
+    width: 60%;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #F5F5F5 25%, #E5E5E5 50%, #F5F5F5 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    margin: 0 auto 0.75rem;
+  }
+
+  .skeleton-text {
+    height: 16px;
+    width: 80%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #F5F5F5 25%, #E5E5E5 50%, #F5F5F5 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    margin: 0 auto 0.5rem;
+  }
+
+  .skeleton-text.short {
+    width: 50%;
+  }
+
+  .skeleton-buttons {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    margin-top: 1.5rem;
+  }
+
+  .skeleton-btn {
+    height: 36px;
+    width: 100px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #F5F5F5 25%, #E5E5E5 50%, #F5F5F5 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
   .spinner {
     width: 40px;
     height: 40px;
@@ -524,63 +741,168 @@
 
   .realms-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 1.5rem;
     margin-bottom: 2rem;
   }
 
   .realm-card {
     background: #FFFFFF;
-    border-radius: 0.75rem;
-    padding: 1.5rem;
+    border-radius: 1rem;
+    padding: 0;
     border: 1px solid #E5E5E5;
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08);
     position: relative;
-    width: 100%;
-    text-align: left;
-    font-family: inherit;
-    font-size: inherit;
+    overflow: hidden;
+    transition: all 0.2s ease;
   }
 
   .realm-card:hover {
     border-color: #D4D4D4;
+    box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 10px -5px rgba(0, 0, 0, 0.04);
+    transform: translateY(-2px);
+  }
+
+  .card-accent {
+    height: 4px;
+    background: linear-gradient(90deg, #404040 0%, #737373 100%);
   }
 
   .realm-header {
-    margin-bottom: 1rem;
+    padding: 1.5rem 1.5rem 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
   }
 
   .realm-logo-container {
-    margin-bottom: 1rem;
     display: flex;
     justify-content: center;
+    align-items: center;
   }
 
   .realm-logo {
-    max-width: 80px;
-    max-height: 80px;
+    width: 72px;
+    height: 72px;
     object-fit: contain;
-    border-radius: 8px;
+    border-radius: 1rem;
+    background: #F5F5F5;
+    padding: 0.5rem;
   }
 
-  .realm-title {
+  .realm-logo-fallback {
+    width: 72px;
+    height: 72px;
+    border-radius: 1rem;
+    background: linear-gradient(135deg, #525252 0%, #737373 100%);
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.5rem;
+    justify-content: center;
+    color: #FFFFFF;
+    font-size: 1.75rem;
+    font-weight: 600;
+  }
+
+  .user-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 2rem;
+    background: #F5F5F5;
+    color: #737373;
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+
+  .user-badge.has-users {
+    background: #DCFCE7;
+    color: #166534;
+  }
+
+  .user-badge svg {
+    opacity: 0.8;
+  }
+
+  .realm-content {
+    padding: 1rem 1.5rem;
+    text-align: center;
   }
 
   .realm-name {
-    margin: 0;
-    color: #2c3e50;
-    font-size: 1.25rem;
+    margin: 0 0 0.5rem;
+    color: #171717;
+    font-size: 1.35rem;
+    font-weight: 600;
   }
 
-  .realm-users {
+  .realm-id {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #F5F5F5;
+    padding: 0.35rem 0.75rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .realm-id code {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.75rem;
+    color: #737373;
+  }
+
+  .copy-id-btn {
+    background: none;
+    border: none;
+    padding: 0.2rem;
+    cursor: pointer;
+    color: #A3A3A3;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    transition: all 0.15s ease;
+  }
+
+  .copy-id-btn:hover {
+    color: #525252;
+    background: #E5E5E5;
+  }
+
+  .realm-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    text-align: left;
+  }
+
+  .realm-meta p {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     font-size: 0.85rem;
-    color: #6b7280;
-    margin-top: 0.25rem;
-    display: block;
+    color: #525252;
+  }
+
+  .meta-label {
+    font-weight: 500;
+    color: #737373;
+    font-size: 0.8rem;
+  }
+
+  .realm-meta svg {
+    color: #A3A3A3;
+    flex-shrink: 0;
+  }
+
+  .realm-meta code {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.8rem;
+    color: #525252;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .health-indicator {
@@ -630,14 +952,15 @@
 
   .realm-actions {
     display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem 1.5rem;
+    border-top: 1px solid #F5F5F5;
   }
 
   .btn {
-    padding: 0.75rem 1.5rem;
+    padding: 0.65rem 1.25rem;
     border: 1px solid transparent;
-    border-radius: 0.375rem;
+    border-radius: 0.5rem;
     font-size: 0.875rem;
     cursor: pointer;
     transition: all 0.15s ease-in-out;
@@ -646,6 +969,13 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+    flex: 1;
   }
 
   .btn-primary {
@@ -659,6 +989,49 @@
     border-color: #262626;
     transform: translateY(-1px);
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.12), 0 2px 4px -1px rgba(0, 0, 0, 0.08);
+  }
+
+  .btn-accent {
+    background: #2563EB;
+    color: #FFFFFF;
+    border-color: #2563EB;
+  }
+
+  .btn-accent:hover {
+    background: #1D4ED8;
+    border-color: #1D4ED8;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.25), 0 2px 4px -1px rgba(37, 99, 235, 0.15);
+  }
+
+  .btn-dark {
+    background: #171717;
+    color: #FFFFFF;
+    border-color: #171717;
+  }
+
+  .btn-dark:hover {
+    background: #404040;
+    border-color: #404040;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+  }
+
+  .btn-full {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: #525252;
+    border-color: #E5E5E5;
+  }
+
+  .btn-ghost:hover {
+    background: #F5F5F5;
+    border-color: #D4D4D4;
+    color: #171717;
   }
 
   .btn-secondary {
@@ -937,16 +1310,12 @@
       padding: 1rem;
     }
 
+    .header {
+      margin-bottom: 1rem;
+    }
+
     .header h1 {
       font-size: 2rem;
-    }
-
-    .header-content {
-      flex-direction: column;
-    }
-
-    .header-logo {
-      height: 50px;
     }
 
     .header-content {
@@ -960,6 +1329,11 @@
     .controls {
       flex-direction: column;
       align-items: stretch;
+      margin-bottom: 1rem;
+    }
+
+    .main-content {
+      padding: 1rem;
     }
 
     .form-row {
@@ -968,6 +1342,32 @@
 
     .realms-grid {
       grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    .realm-header {
+      padding: 1rem 1rem 0;
+    }
+
+    .realm-logo, .realm-logo-fallback {
+      width: 56px;
+      height: 56px;
+    }
+
+    .realm-content {
+      padding: 0.75rem 1rem;
+    }
+
+    .realm-name {
+      font-size: 1.1rem;
+    }
+
+    .realm-actions {
+      padding: 0.75rem 1rem 1rem;
+    }
+
+    .card-accent {
+      height: 3px;
     }
   }
 </style>
