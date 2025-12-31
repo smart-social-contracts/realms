@@ -551,38 +551,96 @@ def _print_deployment_status(deploy_dir: Path, network: str) -> None:
     try:
         with open(dfx_json, 'r') as f:
             dfx_config = json.load(f)
-        canister_names = list(dfx_config.get("canisters", {}).keys())
+        all_canister_names = list(dfx_config.get("canisters", {}).keys())
     except:
         console.print(f"         [yellow]⚠️  Could not read dfx.json[/yellow]")
         return
     
-    # Try to get canister IDs
+    # Filter to only deployment-specific canisters (not shared infrastructure)
+    # Shared canisters like internet_identity, ckbtc_*, __Candid_UI are managed separately
+    shared_canisters = {
+        "internet_identity", "ckbtc_ledger", "ckbtc_indexer", 
+        "__Candid_UI", "icrc1_ledger"
+    }
+    
+    # Determine which canisters are specific to this deployment
+    is_registry = dir_name.startswith("registry_")
+    if is_registry:
+        # Registry should only count realm_registry_backend and realm_registry_frontend
+        canister_names = [n for n in all_canister_names 
+                         if n.startswith("realm_registry_")]
+    else:
+        # Realm should only count realm_backend and realm_frontend
+        canister_names = [n for n in all_canister_names 
+                         if n in ("realm_backend", "realm_frontend") or 
+                         (n.endswith("_backend") and not n.startswith("realm_registry_")) or
+                         (n.endswith("_frontend") and not n.startswith("realm_registry_"))]
+        # Exclude shared canisters
+        canister_names = [n for n in canister_names if n not in shared_canisters]
+    
+    if not canister_names:
+        console.print(f"         [yellow]⚠️  No deployment canisters found[/yellow]")
+        return
+    
+    # Verify actual deployment status using dfx canister status
     deployed_canisters = []
+    created_only_canisters = []
+    not_created_canisters = []
+    
     for canister_name in canister_names:
         try:
-            result = subprocess.run(
+            # First check if canister ID exists
+            id_result = subprocess.run(
                 ["dfx", "canister", "id", canister_name, "--network", network],
                 capture_output=True, text=True, timeout=5, cwd=deploy_dir
             )
-            if result.returncode == 0:
-                canister_id = result.stdout.strip()
-                deployed_canisters.append((canister_name, canister_id))
-        except:
-            pass
-    
-    if deployed_canisters:
-        console.print(f"         [green]✅ Deployed ({len(deployed_canisters)} canisters)[/green]")
-        for name, cid in deployed_canisters:
-            # Construct URL
-            if network == "local":
-                url = f"http://{cid}.localhost:8000/"
-            elif network in ["staging", "ic"]:
-                url = f"https://{cid}.icp0.io/"
-            else:
-                url = ""
+            if id_result.returncode != 0:
+                not_created_canisters.append(canister_name)
+                continue
+                
+            canister_id = id_result.stdout.strip()
             
-            if "frontend" in name or "backend" in name:
-                console.print(f"            • {name}: [dim]{url}[/dim]")
+            # Now verify it's actually deployed by checking status
+            status_result = subprocess.run(
+                ["dfx", "canister", "status", canister_name, "--network", network],
+                capture_output=True, text=True, timeout=10, cwd=deploy_dir
+            )
+            
+            if status_result.returncode == 0 and "Status: Running" in status_result.stdout:
+                deployed_canisters.append((canister_name, canister_id))
+            else:
+                # Canister ID exists but not running (created but not deployed)
+                created_only_canisters.append((canister_name, canister_id))
+        except:
+            not_created_canisters.append(canister_name)
+    
+    # Display status based on actual deployment state
+    total_expected = len(canister_names)
+    
+    if len(deployed_canisters) == total_expected:
+        console.print(f"         [green]✅ Deployed ({len(deployed_canisters)}/{total_expected} canisters)[/green]")
+    elif deployed_canisters:
+        console.print(f"         [yellow]⚠️  Partial ({len(deployed_canisters)}/{total_expected} canisters)[/yellow]")
     else:
-        console.print(f"         [yellow]⏸️  Not deployed on {network}[/yellow]")
+        console.print(f"         [red]❌ Not deployed (0/{total_expected} canisters)[/red]")
+    
+    # Show deployed canisters with URLs
+    for name, cid in deployed_canisters:
+        if network == "local":
+            url = f"http://{cid}.localhost:8000/"
+        elif network in ["staging", "ic"]:
+            url = f"https://{cid}.icp0.io/"
+        else:
+            url = ""
+        console.print(f"            • {name}: [dim]{url}[/dim]")
+    
+    # Show created but not running
+    if created_only_canisters:
+        console.print(f"         [yellow]   Created but not running:[/yellow]")
+        for name, cid in created_only_canisters:
+            console.print(f"            • {name}: {cid}")
+    
+    # Show not created
+    if not_created_canisters:
+        console.print(f"         [dim]   Not created: {', '.join(not_created_canisters)}[/dim]")
 
