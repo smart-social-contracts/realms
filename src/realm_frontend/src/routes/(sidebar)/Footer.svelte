@@ -36,10 +36,21 @@
 		const versionMeta = document.querySelector('meta[name="version"]');
 		if (versionMeta) {
 			version = versionMeta.getAttribute('content') || '';
-			// Show the full version
-			if (version && version !== 'VERSION_PLACEHOLDER') {
-				version = version;
-			}
+		}
+		
+		// Use build-time values as fallback for local development
+		// These are injected by Vite at build time via define config
+		if (!version || version === 'VERSION_PLACEHOLDER') {
+			// @ts-ignore - Vite injects this at build time
+			version = typeof __BUILD_VERSION__ !== 'undefined' ? __BUILD_VERSION__ : 'dev';
+		}
+		if (!commitHash || commitHash === 'COMMIT_HASH_PLACEHOLDER') {
+			// @ts-ignore - Vite injects this at build time
+			commitHash = typeof __BUILD_COMMIT__ !== 'undefined' ? __BUILD_COMMIT__ : 'local';
+		}
+		if (!commitDatetime || commitDatetime === 'COMMIT_DATETIME_PLACEHOLDER') {
+			// @ts-ignore - Vite injects this at build time
+			commitDatetime = typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : new Date().toISOString().replace('T', ' ').substring(0, 19);
 		}
 	}
 
@@ -94,13 +105,9 @@
 	</div>
 	
 	<!-- App name, version and commit hash display -->
-	{#if (version && version !== 'VERSION_PLACEHOLDER') || (commitHash && commitHash !== 'COMMIT_HASH_PLACEHOLDER') || (commitDatetime && commitDatetime !== 'COMMIT_DATETIME_PLACEHOLDER')}
-		<div class="mt-3 text-center">
-			<span class="text-xs text-gray-400 dark:text-gray-500">
-				Realms GOS {#if version && version !== 'VERSION_PLACEHOLDER'}{version}{/if} 
-				{#if commitHash && commitHash !== 'COMMIT_HASH_PLACEHOLDER'}({commitHash}){/if}
-				{#if commitDatetime && commitDatetime !== 'COMMIT_DATETIME_PLACEHOLDER'} - {commitDatetime}{/if}
-			</span>
-		</div>
-	{/if}
+	<div class="mt-3 text-center">
+		<span class="text-xs text-gray-400 dark:text-gray-500">
+			Realms GOS {version} ({commitHash}) - {commitDatetime}{typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname.endsWith('.localhost')) ? ' - Local deployment' : ''}
+		</span>
+	</div>
 </Frame>

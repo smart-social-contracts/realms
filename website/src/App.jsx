@@ -375,6 +375,9 @@ function App() {
               {t('footer.builtOn')} <img src="/images/internet-computer-icp-logo.svg" alt="Internet Computer" className="inline h-4 w-4 mx-1" /> {t('footer.withLove')}
             </a>
             <div className="mt-2">{t('footer.openSource')}</div>
+            <div className="mt-2 text-xs text-slate-400">
+              Realms GOS {typeof __BUILD_VERSION__ !== 'undefined' ? __BUILD_VERSION__ : 'dev'} ({typeof __BUILD_COMMIT__ !== 'undefined' ? __BUILD_COMMIT__ : 'local'}) - {typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : new Date().toISOString().replace('T', ' ').substring(0, 19)}{window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? ' - Local deployment' : ''}
+            </div>
           </div>
         </div>
       </footer>

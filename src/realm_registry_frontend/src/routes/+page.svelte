@@ -43,6 +43,20 @@
       if (versionMeta) {
         version = versionMeta.getAttribute('content') || '';
       }
+      
+      // Use build-time values as fallback for local development
+      // @ts-ignore - Vite injects this at build time
+      if (!version || version === 'VERSION_PLACEHOLDER') {
+        version = typeof __BUILD_VERSION__ !== 'undefined' ? __BUILD_VERSION__ : 'dev';
+      }
+      // @ts-ignore - Vite injects this at build time
+      if (!commitHash || commitHash === 'COMMIT_HASH_PLACEHOLDER') {
+        commitHash = typeof __BUILD_COMMIT__ !== 'undefined' ? __BUILD_COMMIT__ : 'local';
+      }
+      // @ts-ignore - Vite injects this at build time
+      if (!commitDatetime || commitDatetime === 'COMMIT_DATETIME_PLACEHOLDER') {
+        commitDatetime = typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : new Date().toISOString().replace('T', ' ').substring(0, 19);
+      }
     }
   });
 
@@ -431,15 +445,11 @@
     </div>
     
     <!-- Version info with dynamic data -->
-    {#if (version && version !== 'VERSION_PLACEHOLDER') || (commitHash && commitHash !== 'COMMIT_HASH_PLACEHOLDER') || (commitDatetime && commitDatetime !== 'COMMIT_DATETIME_PLACEHOLDER')}
-      <div class="footer-version">
-        <span>
-          Realm Registry {#if version && version !== 'VERSION_PLACEHOLDER'}{version}{/if}
-          {#if commitHash && commitHash !== 'COMMIT_HASH_PLACEHOLDER'}({commitHash}){/if}
-          {#if commitDatetime && commitDatetime !== 'COMMIT_DATETIME_PLACEHOLDER'} - {commitDatetime}{/if}
-        </span>
-      </div>
-    {/if}
+    <div class="footer-version">
+      <span>
+        Realm Registry {version} ({commitHash}) - {commitDatetime}{typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname.endsWith('.localhost')) ? ' - Local deployment' : ''}
+      </span>
+    </div>
   </footer>
 </div>
 

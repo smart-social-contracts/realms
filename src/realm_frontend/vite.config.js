@@ -3,8 +3,33 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import environment from 'vite-plugin-environment';
 import dotenv from 'dotenv';
+import { execSync } from 'child_process';
+import { readFileSync } from 'fs';
 
 dotenv.config({ path: '../../.env' });
+
+// Get build-time values for local development
+function getBuildTimeValues() {
+  let version = 'dev';
+  let commitHash = 'local';
+  const buildTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  
+  try {
+    version = readFileSync('../../version.txt', 'utf-8').trim();
+  } catch (e) {
+    // version.txt not found, use default
+  }
+  
+  try {
+    commitHash = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
+  } catch (e) {
+    // git not available, use default
+  }
+  
+  return { version, commitHash, buildTime };
+}
+
+const buildValues = getBuildTimeValues();
 
 export default defineConfig({
   build: {
@@ -24,6 +49,11 @@ export default defineConfig({
     reportCompressedSize: false,
   },
   logLevel: 'error', // Only show errors
+  define: {
+    '__BUILD_VERSION__': JSON.stringify(buildValues.version),
+    '__BUILD_COMMIT__': JSON.stringify(buildValues.commitHash),
+    '__BUILD_TIME__': JSON.stringify(buildValues.buildTime),
+  },
   optimizeDeps: {
     esbuildOptions: {
       define: {
