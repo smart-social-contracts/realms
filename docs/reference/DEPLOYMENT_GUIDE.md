@@ -400,6 +400,58 @@ ls -la .realms/mundus/mundus_*/realm_*/src
 # Should show symlink to repo src/
 ```
 
+### Iterative Local Development
+
+When developing locally with a mundus deployment, the full deployment cycle can be slow. The `redeploy_local_mundus.sh` script **significantly speeds up redeployment cycles** by copying only the changed source files and redeploying specific canisters, without recreating the entire mundus.
+
+**Script Location:** `scripts/redeploy_local_mundus.sh`
+
+**Usage:**
+```bash
+# Redeploy registry frontend only
+./scripts/redeploy_local_mundus.sh -m .realms/mundus/mundus_Demo_Mundus_* -r
+
+# Redeploy specific realm frontend (e.g., Realm 1)
+./scripts/redeploy_local_mundus.sh -m .realms/mundus/mundus_Demo_Mundus_* -R 1
+
+# Redeploy all frontends (registry + all realms)
+./scripts/redeploy_local_mundus.sh -m .realms/mundus/mundus_Demo_Mundus_* -a
+
+# Clean build (clears .svelte-kit and Vite cache) and redeploy all
+./scripts/redeploy_local_mundus.sh -m .realms/mundus/mundus_Demo_Mundus_* -a -c
+
+# Also include backend changes
+./scripts/redeploy_local_mundus.sh -m .realms/mundus/mundus_Demo_Mundus_* -a -b
+```
+
+**Options:**
+| Flag | Description |
+|------|-------------|
+| `-m, --mundus DIR` | Path to mundus directory (required, supports glob) |
+| `-r, --registry` | Redeploy registry frontend |
+| `-R, --realm NUM` | Redeploy specific realm (1, 2, 3, etc.) |
+| `-a, --all` | Redeploy all frontends |
+| `-c, --clean` | Clean build cache before rebuilding |
+| `-b, --backend` | Also copy and redeploy backends |
+| `-h, --help` | Show help message |
+
+**What it does:**
+1. Copies source files from `src/realm_frontend/` and `src/realm_registry_frontend/` to the mundus deployment folders
+2. Optionally clears build cache for fresh builds
+3. Runs `dfx deploy` for each target canister
+4. Optionally copies and deploys backend changes too
+
+**Typical development workflow:**
+```bash
+# 1. Make changes to source files in src/
+# 2. Redeploy to see changes (use -c for clean build if needed)
+./scripts/redeploy_local_mundus.sh -m .realms/mundus/mundus_* -a -c
+
+# 3. Hard refresh browser (Ctrl+Shift+R) to bypass cache
+```
+
+> **Tip:** For frontend-only changes, this script is much faster than recreating the mundus from scratch. Use `-c` (clean) flag if you're seeing stale cached content.
+
 ---
 
 ## Network Configuration
