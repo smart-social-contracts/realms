@@ -11,6 +11,7 @@ from api.ggg_entities import (
 )
 from api.registry import get_registry_info, register_realm
 from api.status import get_status
+from api.zones import get_zone_aggregation
 from api.user import user_get, user_register, user_update_profile_picture
 from core.candid_types_realm import (
     ExtensionCallArgs,
@@ -159,6 +160,26 @@ def get_my_principal() -> text:
 def get_canister_id() -> text:
     """Return this canister's principal ID"""
     return ic.id().to_str()
+
+
+@query
+def get_zones(resolution: nat = 6) -> text:
+    """
+    Get H3 zone aggregation data for users in this realm.
+    Returns zones with user counts at each H3 cell.
+    
+    Args:
+        resolution: H3 resolution level (0-15). Default 6.
+    
+    Returns:
+        JSON string with zone data
+    """
+    try:
+        result = get_zone_aggregation(resolution)
+        return json.dumps(result)
+    except Exception as e:
+        logger.error(f"Error getting zones: {e}")
+        return json.dumps({"success": False, "error": str(e)})
 
 
 @query

@@ -39,6 +39,7 @@ from .treasury import Treasury
 from .user import User
 from .user_profile import Operations, Profiles, UserProfile
 from .vote import Vote
+from .zone import Zone
 
 __all__ = [
     "Balance",
@@ -75,4 +76,5 @@ __all__ = [
     "User",
     "UserProfile",
     "Vote",
+    "Zone",
 ]

@@ -1,4 +1,4 @@
-from kybra_simple_db import Entity, Integer, ManyToOne, String, TimestampedMixin
+from kybra_simple_db import Entity, Integer, ManyToOne, OneToMany, String, TimestampedMixin
 from kybra_simple_logging import get_logger
 
 logger = get_logger("entity.land")
@@ -23,3 +23,4 @@ class Land(Entity, TimestampedMixin):
     size_width = Integer(default=1)
     size_height = Integer(default=1)
     metadata = String(max_length=512, default="{}")
+    zones = OneToMany("Zone", "land")

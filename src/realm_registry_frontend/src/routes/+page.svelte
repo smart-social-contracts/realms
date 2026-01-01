@@ -16,6 +16,7 @@
   let h3;
   let hexLayer = null;
   let markerLayer = null; // Layer for location markers (visible only when zoomed out)
+  let realmZoneData = {}; // Store zone data fetched from each realm's backend
   const H3_RESOLUTION = 6; // Resolution 6 = ~3.2km hex edge (good for city level)
   const MARKER_HIDE_ZOOM = 5; // Hide markers when zoom >= this level (hexes become visible)
 
@@ -168,6 +169,70 @@
     });
   }
 
+  async function fetchZoneData() {
+    // Fetch zone data from each realm's backend via Candid
+    const { Actor, HttpAgent } = await import('@dfinity/agent');
+    const { Principal } = await import('@dfinity/principal');
+    const { IDL } = await import('@dfinity/candid');
+    
+    // IDL for the get_zones method - returns JSON string
+    const zonesIdlFactory = ({ IDL }) => {
+      return IDL.Service({
+        'get_zones': IDL.Func([IDL.Nat], [IDL.Text], ['query']),
+      });
+    };
+    
+    const host = isLocalDevelopment() 
+      ? 'http://localhost:8000' 
+      : 'https://icp0.io';
+    
+    const zoneResults = await Promise.allSettled(
+      filteredRealms.map(async (realm, index) => {
+        try {
+          const agent = new HttpAgent({ host });
+          
+          if (isLocalDevelopment()) {
+            await agent.fetchRootKey();
+          }
+          
+          const actor = Actor.createActor(zonesIdlFactory, {
+            agent,
+            canisterId: Principal.fromText(realm.id),
+          });
+          
+          const response = await actor.get_zones(BigInt(H3_RESOLUTION));
+          const data = JSON.parse(response);
+          
+          if (data.success && data.zones && data.zones.length > 0) {
+            return { 
+              realmId: realm.id, 
+              realmName: realm.name,
+              realmIndex: index,
+              zones: data.zones,
+              totalUsers: data.total_users,
+            };
+          }
+        } catch (e) {
+          console.debug(`Could not fetch zones for ${realm.name}:`, e.message);
+        }
+        return null;
+      })
+    );
+    
+    // Store zone data by realm ID
+    realmZoneData = {};
+    zoneResults.forEach(result => {
+      if (result.status === 'fulfilled' && result.value) {
+        realmZoneData[result.value.realmId] = result.value;
+      }
+    });
+    
+    // Re-render hex zones with real data
+    if (viewMode === 'map' && map && h3) {
+      addRealmHexZones();
+    }
+  }
+
   function formatTimeAgo(timestamp) {
     const now = Date.now();
     const date = new Date(timestamp * 1000);
@@ -268,8 +333,11 @@
       }
     });
     
-    // Add hex zones and markers for realms with coordinates
+    // First render with demo data, then fetch real zone data from backends
     addRealmHexZones();
+    
+    // Fetch real zone data from realm backends (async, will re-render when complete)
+    fetchZoneData();
   }
 
   // Generate a color for a realm based on its index
@@ -388,61 +456,93 @@
       const color = getRealmColor(index);
       const baseUsers = realm.users_count || 50; // Default demo users
       
-      // Get all locations for this realm (multiple if using demo coordinates)
-      const hasCoords = realm.latitude != null && realm.longitude != null;
-      const locations = hasCoords 
-        ? [{ lat: realm.latitude, lng: realm.longitude }]
-        : demoCoordinates[index % demoCoordinates.length] || [];
+      // Check if we have real zone data from this realm's backend
+      const realZoneData = realmZoneData[realm.id];
       
-      // Distribute users across all locations
-      const usersPerLocation = Math.ceil(baseUsers / locations.length);
-      
-      locations.forEach((coords, locIndex) => {
-        const influenceRings = Math.min(Math.ceil(Math.log2(usersPerLocation + 1)) + 1, 4);
-        const isHQ = locIndex === 0; // First location is headquarters
-        
-        // Get center hex and all influence hexes for this location
-        const centerH3 = h3.latLngToCell(coords.lat, coords.lng, H3_RESOLUTION);
-        const allHexes = h3.gridDisk(centerH3, influenceRings);
-        
-        // Get location name
-        const locKey = `${coords.lat},${coords.lng}`;
-        const locationName = locationNames[locKey] || `Location ${locIndex + 1}`;
-        
-        // Distribute users across hexes (more in center, less at edges)
-        allHexes.forEach(hexIndex => {
-          const distance = h3.gridDistance(centerH3, hexIndex);
-          
-          // Calculate users in this hex (inverse of distance, with randomization)
-          const distanceFactor = 1 - (distance / (influenceRings + 1));
-          const usersInHex = Math.round(usersPerLocation * distanceFactor * distanceFactor * (0.5 + Math.random() * 0.5) / (influenceRings + 1));
+      if (realZoneData && realZoneData.zones && realZoneData.zones.length > 0) {
+        // Use REAL zone data from the realm's backend
+        realZoneData.zones.forEach(zone => {
+          const hexIndex = zone.h3_index;
+          const usersInHex = zone.user_count;
           
           if (!hexData[hexIndex]) {
             hexData[hexIndex] = { realms: [], totalUsers: 0 };
           }
           
-          // Check if this realm already has an entry for this hex (from another location)
+          // Check if this realm already has an entry for this hex
           const existingEntry = hexData[hexIndex].realms.find(r => r.realm.name === realm.name);
           if (existingEntry) {
             existingEntry.users += usersInHex;
-            if (distance === 0 && isHQ) existingEntry.isHQ = true;
-            if (!existingEntry.locations.includes(locationName)) {
-              existingEntry.locations.push(locationName);
-            }
           } else {
             hexData[hexIndex].realms.push({
               realm: realm,
               color: color,
               users: usersInHex,
-              distance: distance,
-              isCenter: distance === 0,
-              isHQ: distance === 0 && isHQ,
-              locations: [locationName],
+              distance: 0,
+              isCenter: true,
+              isHQ: true,
+              locations: ['Real Data'],
             });
           }
           hexData[hexIndex].totalUsers += usersInHex;
         });
-      });
+      } else {
+        // Fall back to DEMO coordinates (no real zone data available)
+        const hasCoords = realm.latitude != null && realm.longitude != null;
+        const locations = hasCoords 
+          ? [{ lat: realm.latitude, lng: realm.longitude }]
+          : demoCoordinates[index % demoCoordinates.length] || [];
+        
+        // Distribute users across all locations
+        const usersPerLocation = Math.ceil(baseUsers / locations.length);
+        
+        locations.forEach((coords, locIndex) => {
+          const influenceRings = Math.min(Math.ceil(Math.log2(usersPerLocation + 1)) + 1, 4);
+          const isHQ = locIndex === 0; // First location is headquarters
+          
+          // Get center hex and all influence hexes for this location
+          const centerH3 = h3.latLngToCell(coords.lat, coords.lng, H3_RESOLUTION);
+          const allHexes = h3.gridDisk(centerH3, influenceRings);
+          
+          // Get location name
+          const locKey = `${coords.lat},${coords.lng}`;
+          const locationName = locationNames[locKey] || `Location ${locIndex + 1}`;
+          
+          // Distribute users across hexes (more in center, less at edges)
+          allHexes.forEach(hexIndex => {
+            const distance = h3.gridDistance(centerH3, hexIndex);
+            
+            // Calculate users in this hex (inverse of distance, with randomization)
+            const distanceFactor = 1 - (distance / (influenceRings + 1));
+            const usersInHex = Math.round(usersPerLocation * distanceFactor * distanceFactor * (0.5 + Math.random() * 0.5) / (influenceRings + 1));
+            
+            if (!hexData[hexIndex]) {
+              hexData[hexIndex] = { realms: [], totalUsers: 0 };
+            }
+            
+            // Check if this realm already has an entry for this hex (from another location)
+            const existingEntry = hexData[hexIndex].realms.find(r => r.realm.name === realm.name);
+            if (existingEntry) {
+              existingEntry.users += usersInHex;
+              if (distance === 0 && isHQ) existingEntry.isHQ = true;
+              if (!existingEntry.locations.includes(locationName)) {
+                existingEntry.locations.push(locationName);
+              }
+            } else {
+              hexData[hexIndex].realms.push({
+                realm: realm,
+                color: color,
+                users: usersInHex,
+                distance: distance,
+                isCenter: distance === 0,
+                isHQ: distance === 0 && isHQ,
+                locations: [locationName],
+              });
+            }
+            hexData[hexIndex].totalUsers += usersInHex;
+          });
+        });
+      }
     });
     
     // Second pass: render all hex cells with combined realm info
@@ -515,10 +615,33 @@
     
     filteredRealms.forEach((realm, index) => {
       const color = getRealmColor(index);
-      const hasCoords = realm.latitude != null && realm.longitude != null;
-      const locations = hasCoords 
-        ? [{ lat: realm.latitude, lng: realm.longitude }]
-        : demoCoordinates[index % demoCoordinates.length] || [];
+      
+      // Check if we have real zone data - use zone centers for markers
+      const realZones = realmZoneData[realm.id];
+      let locations = [];
+      
+      if (realZones && realZones.zones && realZones.zones.length > 0) {
+        // Use real zone centers (pick unique centers, limit to prevent too many markers)
+        const uniqueLocations = new Map();
+        realZones.zones.forEach(zone => {
+          const key = `${zone.center_lat.toFixed(2)},${zone.center_lng.toFixed(2)}`;
+          if (!uniqueLocations.has(key)) {
+            uniqueLocations.set(key, { lat: zone.center_lat, lng: zone.center_lng, users: zone.user_count });
+          } else {
+            uniqueLocations.get(key).users += zone.user_count;
+          }
+        });
+        // Take top locations by user count
+        locations = Array.from(uniqueLocations.values())
+          .sort((a, b) => b.users - a.users)
+          .slice(0, 5);
+      } else {
+        // Fall back to demo coordinates
+        const hasCoords = realm.latitude != null && realm.longitude != null;
+        locations = hasCoords 
+          ? [{ lat: realm.latitude, lng: realm.longitude }]
+          : demoCoordinates[index % demoCoordinates.length] || [];
+      }
       
       locations.forEach((coords, locIndex) => {
         // Add an outer glow effect
@@ -542,7 +665,8 @@
         
         // Add realm name tooltip
         const isHQ = locIndex === 0;
-        circleMarker.bindTooltip(`${realm.name}${isHQ ? ' (HQ)' : ''}`, {
+        const suffix = realZones ? '' : (isHQ ? ' (HQ)' : '');
+        circleMarker.bindTooltip(`${realm.name}${suffix}`, {
           permanent: false,
           direction: 'top',
           className: 'realm-tooltip',
@@ -560,13 +684,22 @@
     if (filteredRealms.length > 0) {
       const allCoords = [];
       filteredRealms.forEach((realm, index) => {
-        const hasCoords = realm.latitude != null && realm.longitude != null;
-        if (hasCoords) {
-          allCoords.push([realm.latitude, realm.longitude]);
+        // Check for real zone data first
+        const realZones = realmZoneData[realm.id];
+        if (realZones && realZones.zones && realZones.zones.length > 0) {
+          // Use real zone centers
+          realZones.zones.forEach(zone => {
+            allCoords.push([zone.center_lat, zone.center_lng]);
+          });
         } else {
-          // Add all demo locations for this realm
-          const locations = demoCoordinates[index % demoCoordinates.length] || [];
-          locations.forEach(loc => allCoords.push([loc.lat, loc.lng]));
+          // Fall back to demo coordinates
+          const hasCoords = realm.latitude != null && realm.longitude != null;
+          if (hasCoords) {
+            allCoords.push([realm.latitude, realm.longitude]);
+          } else {
+            const locations = demoCoordinates[index % demoCoordinates.length] || [];
+            locations.forEach(loc => allCoords.push([loc.lat, loc.lng]));
+          }
         }
       });
       if (allCoords.length > 0) {

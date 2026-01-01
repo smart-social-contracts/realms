@@ -48,7 +48,8 @@ from ggg import (
     Task,
     TaskSchedule,
     TaskStep,
-    Call
+    Call,
+    Zone
 )
 
 
@@ -93,6 +94,25 @@ MANDATE_TYPES = [
     {"name": "Healthcare Services", "description": "Public healthcare administration"}
 ]
 
+# City coordinates for demo user locations (scattered globally)
+CITY_COORDINATES = [
+    {"name": "Paris", "lat": 48.8566, "lng": 2.3522},
+    {"name": "New York", "lat": 40.7128, "lng": -74.0060},
+    {"name": "Tokyo", "lat": 35.6762, "lng": 139.6503},
+    {"name": "Sydney", "lat": -33.8688, "lng": 151.2093},
+    {"name": "London", "lat": 51.5074, "lng": -0.1278},
+    {"name": "Berlin", "lat": 52.5200, "lng": 13.4050},
+    {"name": "Seoul", "lat": 37.5665, "lng": 126.9780},
+    {"name": "Singapore", "lat": 1.3521, "lng": 103.8198},
+    {"name": "Dubai", "lat": 25.2048, "lng": 55.2708},
+    {"name": "São Paulo", "lat": -23.5505, "lng": -46.6333},
+    {"name": "Mumbai", "lat": 19.0760, "lng": 72.8777},
+    {"name": "Toronto", "lat": 43.6532, "lng": -79.3832},
+    {"name": "Amsterdam", "lat": 52.3676, "lng": 4.9041},
+    {"name": "Stockholm", "lat": 59.3293, "lng": 18.0686},
+    {"name": "Cape Town", "lat": -33.9249, "lng": 18.4241},
+]
+
 class RealmGenerator:
     def __init__(self, seed: int = random.randint(1, 1000000)):
         self.seed = seed
@@ -134,14 +154,21 @@ class RealmGenerator:
         return users
     
     def generate_humans(self, users: List[User]) -> List[Human]:
-        """Generate human data linked to users"""
+        """Generate human data linked to users with location coordinates"""
         humans = []
         
         for user in users[1:]:  # Skip system user
+            # Assign a random city with some offset for variety
+            city = random.choice(CITY_COORDINATES)
+            lat = city["lat"] + random.uniform(-0.5, 0.5)  # Add ~50km variance
+            lng = city["lng"] + random.uniform(-0.5, 0.5)
+            
             human = Human(
                 name=f"{random.choice(FIRST_NAMES)} {random.choice(LAST_NAMES)}",
                 date_of_birth=(datetime.now() - timedelta(days=random.randint(18*365, 80*365))).strftime("%Y-%m-%d"),
-                user_id=user.id
+                user_id=user.id,
+                latitude=lat,
+                longitude=lng
             )
             
             humans.append(human)
@@ -254,6 +281,52 @@ class RealmGenerator:
             mandates.append(mandate)
             
         return mandates
+    
+    def generate_zones(self, users: List[User], humans: List[Human]) -> List[Zone]:
+        """Generate zone data for users based on their Human's coordinates"""
+        zones = []
+        
+        # Create a mapping of user_id to human for quick lookup
+        user_to_human = {h.user_id: h for h in humans if hasattr(h, 'user_id')}
+        
+        for user in users[1:]:  # Skip system user
+            human = user_to_human.get(user.id)
+            if not human or not hasattr(human, 'latitude') or human.latitude is None:
+                continue
+            
+            lat = human.latitude
+            lng = human.longitude
+            
+            # Generate H3 index for the user's location (resolution 6)
+            try:
+                import h3
+                h3_index = h3.latlng_to_cell(lat, lng, 6)
+            except ImportError:
+                # Fallback: create a pseudo H3 index based on coordinates
+                h3_index = f"86{abs(int(lat * 1000)):06x}{abs(int(lng * 1000)):06x}f"
+            
+            # Find city name for this location
+            city_name = "Unknown"
+            min_dist = float('inf')
+            for city in CITY_COORDINATES:
+                dist = ((city["lat"] - lat) ** 2 + (city["lng"] - lng) ** 2) ** 0.5
+                if dist < min_dist:
+                    min_dist = dist
+                    city_name = city["name"]
+            
+            zone = Zone(
+                h3_index=h3_index,
+                name=f"{city_name} Zone",
+                description=f"Zone of influence near {city_name}",
+                latitude=lat,
+                longitude=lng,
+                resolution=6.0,
+                user_id=user.id,
+                metadata="{}"
+            )
+            zones.append(zone)
+        
+        return zones
     
     def generate_user_registration_hook_codex(self) -> Codex:
         """Generate a codex for user registration hook
@@ -441,6 +514,9 @@ class RealmGenerator:
         # Generate user registration hook codex
         user_reg_hook_codex = self.generate_user_registration_hook_codex()
         
+        # Generate zones for users based on their location
+        zones = self.generate_zones(users, humans)
+        
         # Return Realm first, then additional data
         ret = [realm]
         ret += users
@@ -452,6 +528,7 @@ class RealmGenerator:
         ret += transfers
         ret += disputes
         ret += mandates
+        ret += zones
         ret.append(codex)
         ret.append(call)
         ret.append(step)
