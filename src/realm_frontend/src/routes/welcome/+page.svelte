@@ -32,19 +32,12 @@
       />
     </div>
     
-    <!-- "Built on" text -->
+    <!-- "Powered by" text -->
     <div class="built-with-love">
       <a href="https://realmsgos.org" target="_blank" rel="noopener noreferrer" class="built-with-link">
-        Built on
-        <img src="/images/logo_horizontal_white.svg" alt="Realms GOS" width="80" height="20" class="inline-logo" />
+        Powered by
+        <img src="/images/logo_horizontal_white.svg" alt="Realms GOS" width="100" height="25" class="inline-logo" />
       </a>
-    </div>
-    
-    <!-- Scroll down indicator -->
-    <div class="scroll-indicator">
-      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 5v14M5 12l7 7 7-7"/>
-      </svg>
     </div>
   {/if}
   
@@ -81,10 +74,7 @@
         </a>
       {:else}
         <a href="/join" class="btn btn-primary">
-          {$_('extensions.welcome.hero.join_realm')}
-        </a>
-        <a href="/join" class="btn btn-secondary">
-          {$_('extensions.welcome.hero.login')}
+          Log In
         </a>
       {/if}
     </div>
@@ -151,8 +141,8 @@
     background: rgba(0, 0, 0, 0.7);
     backdrop-filter: blur(10px);
     border-radius: 8px;
-    padding: 0.5rem 0.8rem;
-    font-size: 0.9rem;
+    padding: 0.6rem 1rem;
+    font-size: 1.1rem;
     z-index: 20;
   }
 
@@ -175,30 +165,7 @@
     margin: 0 0.2rem;
   }
 
-  .scroll-indicator {
-    position: absolute;
-    bottom: 2rem;
-    left: 50%;
-    transform: translateX(-50%);
-    color: white;
-    opacity: 0.8;
-    animation: bounce 2s infinite;
-    z-index: 20;
-    cursor: pointer;
-  }
-
-  @keyframes bounce {
-    0%, 20%, 50%, 80%, 100% {
-      transform: translateX(-50%) translateY(0);
-    }
-    40% {
-      transform: translateX(-50%) translateY(-10px);
-    }
-    60% {
-      transform: translateX(-50%) translateY(-5px);
-    }
-  }
-
+  
   .top-bar {
     position: absolute;
     top: 0;
