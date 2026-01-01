@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
 
   let backend;
@@ -9,6 +9,15 @@
   let searchQuery = '';
   let filteredRealms = [];
   let showCreateModal = false;
+  let viewMode = 'list'; // 'list' or 'map'
+  let mapContainer;
+  let map;
+  let L;
+  let h3;
+  let hexLayer = null;
+  let markerLayer = null; // Layer for location markers (visible only when zoomed out)
+  const H3_RESOLUTION = 6; // Resolution 6 = ~3.2km hex edge (good for city level)
+  const MARKER_HIDE_ZOOM = 5; // Hide markers when zoom >= this level (hexes become visible)
 
   // Get commit hash from meta tag
   let commitHash = '';
@@ -222,10 +231,373 @@
   }
 
   $: searchQuery, searchRealms();
+
+  // Initialize map when switching to map view
+  async function initMap() {
+    if (!browser || !mapContainer || map) return;
+    
+    // Dynamically import Leaflet and h3-js
+    L = await import('leaflet');
+    h3 = await import('h3-js');
+    
+    // Create map centered on world view
+    map = L.map(mapContainer).setView([20, 0], 2);
+    
+    // Add CartoDB Positron tiles (minimal grayscale, no labels)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 19,
+    }).addTo(map);
+    
+    // Add scale control (metric only)
+    L.control.scale({
+      metric: true,
+      imperial: false,
+      position: 'bottomright',
+    }).addTo(map);
+    
+    // Add zoom event listener to show/hide markers based on zoom level
+    map.on('zoomend', () => {
+      if (!markerLayer) return;
+      const zoom = map.getZoom();
+      if (zoom >= MARKER_HIDE_ZOOM && map.hasLayer(markerLayer)) {
+        map.removeLayer(markerLayer);
+      } else if (zoom < MARKER_HIDE_ZOOM && !map.hasLayer(markerLayer)) {
+        markerLayer.addTo(map);
+      }
+    });
+    
+    // Add hex zones and markers for realms with coordinates
+    addRealmHexZones();
+  }
+
+  // Generate a color for a realm based on its index
+  function getRealmColor(index) {
+    const colors = [
+      '#3B82F6', // blue
+      '#10B981', // green
+      '#F59E0B', // amber
+      '#EF4444', // red
+      '#8B5CF6', // violet
+      '#EC4899', // pink
+      '#06B6D4', // cyan
+      '#F97316', // orange
+    ];
+    return colors[index % colors.length];
+  }
+
+  // Demo coordinates for realms - each realm can have multiple locations worldwide
+  // Some locations overlap to show shared influence zones
+  const demoCoordinates = [
+    // Realm 1: Global presence - Europe, Americas, Asia (with overlaps in Paris & Tokyo)
+    [
+      { lat: 48.8566, lng: 2.3522 },    // Paris (HQ)
+      { lat: 40.7128, lng: -74.0060 },  // New York
+      { lat: 35.6762, lng: 139.6503 },  // Tokyo
+      { lat: -33.8688, lng: 151.2093 }, // Sydney
+    ],
+    // Realm 2: European focus with Paris overlap
+    [
+      { lat: 48.9, lng: 2.4 },          // Near Paris (overlap with Realm 1)
+      { lat: 51.5074, lng: -0.1278 },   // London
+      { lat: 52.5200, lng: 13.4050 },   // Berlin
+      { lat: 41.9028, lng: 12.4964 },   // Rome
+    ],
+    // Realm 3: Asian-Pacific with Tokyo overlap
+    [
+      { lat: 35.7, lng: 139.7 },        // Near Tokyo (overlap with Realm 1)
+      { lat: 37.5665, lng: 126.9780 },  // Seoul
+      { lat: 22.3193, lng: 114.1694 },  // Hong Kong
+      { lat: 1.3521, lng: 103.8198 },   // Singapore
+    ],
+    // Realm 4: Americas focus
+    [
+      { lat: 34.0522, lng: -118.2437 }, // Los Angeles
+      { lat: 41.8781, lng: -87.6298 },  // Chicago
+      { lat: -23.5505, lng: -46.6333 }, // São Paulo
+      { lat: 19.4326, lng: -99.1332 },  // Mexico City
+    ],
+    // Realm 5: Middle East & Africa with European overlap
+    [
+      { lat: 51.6, lng: -0.2 },         // Near London (overlap with Realm 2)
+      { lat: 25.2048, lng: 55.2708 },   // Dubai
+      { lat: -33.9249, lng: 18.4241 },  // Cape Town
+      { lat: 30.0444, lng: 31.2357 },   // Cairo
+    ],
+    // Realm 6: South Asia & Oceania
+    [
+      { lat: 28.6139, lng: 77.2090 },   // New Delhi
+      { lat: 13.0827, lng: 80.2707 },   // Chennai
+      { lat: -37.8136, lng: 144.9631 }, // Melbourne
+      { lat: -41.2865, lng: 174.7762 }, // Wellington
+    ],
+    // Realm 7: Northern Europe & Russia
+    [
+      { lat: 59.3293, lng: 18.0686 },   // Stockholm
+      { lat: 60.1699, lng: 24.9384 },   // Helsinki
+      { lat: 55.7558, lng: 37.6173 },   // Moscow
+      { lat: 52.4, lng: 13.5 },         // Near Berlin (overlap with Realm 2)
+    ],
+    // Realm 8: Southeast Asia with Singapore overlap
+    [
+      { lat: 1.4, lng: 103.9 },         // Near Singapore (overlap with Realm 3)
+      { lat: 13.7563, lng: 100.5018 },  // Bangkok
+      { lat: 14.5995, lng: 120.9842 },  // Manila
+      { lat: -6.2088, lng: 106.8456 },  // Jakarta
+    ],
+  ];
+
+  // Add H3 hex zones for realms with multi-realm tracking per hex
+  function addRealmHexZones() {
+    if (!map || !L || !h3) return;
+    
+    // Clear existing hex layer
+    if (hexLayer) {
+      map.removeLayer(hexLayer);
+      hexLayer = null;
+    }
+    
+    // Clear existing markers and polygons
+    map.eachLayer((layer) => {
+      if (layer instanceof L.Marker || layer instanceof L.Polygon) {
+        map.removeLayer(layer);
+      }
+    });
+    
+    // First pass: collect all hex cells and track which realms influence each
+    // hexData[h3Index] = { realms: [{realm, color, users, distance, locationName}], totalUsers }
+    const hexData = {};
+    
+    // Location names for popups
+    const locationNames = {
+      '48.8566,2.3522': 'Paris', '40.7128,-74.006': 'New York', '35.6762,139.6503': 'Tokyo',
+      '-33.8688,151.2093': 'Sydney', '48.9,2.4': 'Paris Area', '51.5074,-0.1278': 'London',
+      '52.52,13.405': 'Berlin', '41.9028,12.4964': 'Rome', '35.7,139.7': 'Tokyo Area',
+      '37.5665,126.978': 'Seoul', '22.3193,114.1694': 'Hong Kong', '1.3521,103.8198': 'Singapore',
+      '34.0522,-118.2437': 'Los Angeles', '41.8781,-87.6298': 'Chicago', '-23.5505,-46.6333': 'São Paulo',
+      '19.4326,-99.1332': 'Mexico City', '51.6,-0.2': 'London Area', '25.2048,55.2708': 'Dubai',
+      '-33.9249,18.4241': 'Cape Town', '30.0444,31.2357': 'Cairo', '28.6139,77.209': 'New Delhi',
+      '13.0827,80.2707': 'Chennai', '-37.8136,144.9631': 'Melbourne', '-41.2865,174.7762': 'Wellington',
+      '59.3293,18.0686': 'Stockholm', '60.1699,24.9384': 'Helsinki', '55.7558,37.6173': 'Moscow',
+      '52.4,13.5': 'Berlin Area', '1.4,103.9': 'Singapore Area', '13.7563,100.5018': 'Bangkok',
+      '14.5995,120.9842': 'Manila', '-6.2088,106.8456': 'Jakarta',
+    };
+    
+    filteredRealms.forEach((realm, index) => {
+      const color = getRealmColor(index);
+      const baseUsers = realm.users_count || 50; // Default demo users
+      
+      // Get all locations for this realm (multiple if using demo coordinates)
+      const hasCoords = realm.latitude != null && realm.longitude != null;
+      const locations = hasCoords 
+        ? [{ lat: realm.latitude, lng: realm.longitude }]
+        : demoCoordinates[index % demoCoordinates.length] || [];
+      
+      // Distribute users across all locations
+      const usersPerLocation = Math.ceil(baseUsers / locations.length);
+      
+      locations.forEach((coords, locIndex) => {
+        const influenceRings = Math.min(Math.ceil(Math.log2(usersPerLocation + 1)) + 1, 4);
+        const isHQ = locIndex === 0; // First location is headquarters
+        
+        // Get center hex and all influence hexes for this location
+        const centerH3 = h3.latLngToCell(coords.lat, coords.lng, H3_RESOLUTION);
+        const allHexes = h3.gridDisk(centerH3, influenceRings);
+        
+        // Get location name
+        const locKey = `${coords.lat},${coords.lng}`;
+        const locationName = locationNames[locKey] || `Location ${locIndex + 1}`;
+        
+        // Distribute users across hexes (more in center, less at edges)
+        allHexes.forEach(hexIndex => {
+          const distance = h3.gridDistance(centerH3, hexIndex);
+          
+          // Calculate users in this hex (inverse of distance, with randomization)
+          const distanceFactor = 1 - (distance / (influenceRings + 1));
+          const usersInHex = Math.round(usersPerLocation * distanceFactor * distanceFactor * (0.5 + Math.random() * 0.5) / (influenceRings + 1));
+          
+          if (!hexData[hexIndex]) {
+            hexData[hexIndex] = { realms: [], totalUsers: 0 };
+          }
+          
+          // Check if this realm already has an entry for this hex (from another location)
+          const existingEntry = hexData[hexIndex].realms.find(r => r.realm.name === realm.name);
+          if (existingEntry) {
+            existingEntry.users += usersInHex;
+            if (distance === 0 && isHQ) existingEntry.isHQ = true;
+            if (!existingEntry.locations.includes(locationName)) {
+              existingEntry.locations.push(locationName);
+            }
+          } else {
+            hexData[hexIndex].realms.push({
+              realm: realm,
+              color: color,
+              users: usersInHex,
+              distance: distance,
+              isCenter: distance === 0,
+              isHQ: distance === 0 && isHQ,
+              locations: [locationName],
+            });
+          }
+          hexData[hexIndex].totalUsers += usersInHex;
+        });
+      });
+    });
+    
+    // Second pass: render all hex cells with combined realm info
+    Object.entries(hexData).forEach(([hexIndex, data]) => {
+      const boundary = h3.cellToBoundary(hexIndex);
+      const latLngs = boundary.map(coord => [coord[0], coord[1]]);
+      
+      // Determine dominant color (realm with most users in this hex)
+      const sortedRealms = [...data.realms].sort((a, b) => b.users - a.users);
+      const dominantRealm = sortedRealms[0];
+      
+      // Mix colors if multiple realms (use gradient effect via opacity)
+      const hasMultipleRealms = data.realms.length > 1;
+      const minDistance = Math.min(...data.realms.map(r => r.distance));
+      const isAnyCenter = data.realms.some(r => r.isCenter);
+      
+      // Calculate opacity based on total users
+      const opacity = Math.min(0.15 + (data.totalUsers / 50) * 0.4, 0.7);
+      
+      // Create hex polygon
+      const hexPolygon = L.polygon(latLngs, {
+        color: hasMultipleRealms ? '#525252' : dominantRealm.color,
+        weight: isAnyCenter ? 2.5 : (minDistance <= 1 ? 1.5 : 1),
+        fillColor: dominantRealm.color,
+        fillOpacity: opacity,
+        dashArray: isAnyCenter ? null : (minDistance > 2 ? '4, 4' : '2, 2'),
+      }).addTo(map);
+      
+      // Create popup showing ALL realms in this hex with location info
+      const realmsList = sortedRealms.map(r => `
+        <div style="display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #E5E5E5;">
+          <div style="width: 12px; height: 12px; border-radius: 3px; background: ${r.color}; flex-shrink: 0;"></div>
+          <div style="flex: 1;">
+            <strong style="font-size: 13px; color: #171717;">${r.realm.name}</strong>
+            <span style="font-size: 11px; color: #737373; margin-left: 6px;">${r.users} users</span>
+            ${r.locations && r.locations.length > 0 ? `<div style="font-size: 10px; color: #A3A3A3; margin-top: 2px;">📍 ${r.locations.join(', ')}</div>` : ''}
+          </div>
+          ${r.isHQ ? '<span style="font-size: 10px; background: #171717; color: white; padding: 2px 6px; border-radius: 4px;">HQ</span>' : (r.isCenter ? '<span style="font-size: 10px; background: #E5E5E5; padding: 2px 6px; border-radius: 4px;">Base</span>' : '')}
+        </div>
+      `).join('');
+      
+      const popupContent = `
+        <div style="min-width: 220px; font-family: Inter, sans-serif;">
+          <div style="background: #F5F5F5; margin: -12px -14px 10px; padding: 10px 14px; border-radius: 12px 12px 0 0;">
+            <strong style="font-size: 14px; color: #171717;">
+              ${data.totalUsers} users in this zone
+            </strong>
+            <p style="margin: 4px 0 0; font-size: 11px; color: #737373;">
+              ${data.realms.length} realm${data.realms.length > 1 ? 's' : ''} with influence
+            </p>
+          </div>
+          <div style="margin-bottom: 8px;">
+            ${realmsList}
+          </div>
+          <p style="margin: 8px 0 0; font-size: 10px; color: #A3A3A3;">
+            H3: <code style="font-size: 9px;">${hexIndex}</code>
+          </p>
+        </div>
+      `;
+      
+      hexPolygon.bindPopup(popupContent);
+    });
+    
+    // Add circle markers at each realm location center (visible only when zoomed out)
+    // Clear existing marker layer
+    if (markerLayer) {
+      map.removeLayer(markerLayer);
+    }
+    markerLayer = L.layerGroup();
+    
+    filteredRealms.forEach((realm, index) => {
+      const color = getRealmColor(index);
+      const hasCoords = realm.latitude != null && realm.longitude != null;
+      const locations = hasCoords 
+        ? [{ lat: realm.latitude, lng: realm.longitude }]
+        : demoCoordinates[index % demoCoordinates.length] || [];
+      
+      locations.forEach((coords, locIndex) => {
+        // Add an outer glow effect
+        L.circleMarker([coords.lat, coords.lng], {
+          radius: 28,
+          fillColor: color,
+          color: color,
+          weight: 0,
+          fillOpacity: 0.3,
+        }).addTo(markerLayer);
+        
+        // Create a large, highly visible circle marker
+        const circleMarker = L.circleMarker([coords.lat, coords.lng], {
+          radius: 20,
+          fillColor: color,
+          color: '#FFFFFF',
+          weight: 4,
+          opacity: 1,
+          fillOpacity: 0.85,
+        }).addTo(markerLayer);
+        
+        // Add realm name tooltip
+        const isHQ = locIndex === 0;
+        circleMarker.bindTooltip(`${realm.name}${isHQ ? ' (HQ)' : ''}`, {
+          permanent: false,
+          direction: 'top',
+          className: 'realm-tooltip',
+        });
+      });
+    });
+    
+    // Show/hide markers based on current zoom level
+    const currentZoom = map.getZoom();
+    if (currentZoom < MARKER_HIDE_ZOOM) {
+      markerLayer.addTo(map);
+    }
+    
+    // Fit map to show all hex zones (world view since realms are scattered globally)
+    if (filteredRealms.length > 0) {
+      const allCoords = [];
+      filteredRealms.forEach((realm, index) => {
+        const hasCoords = realm.latitude != null && realm.longitude != null;
+        if (hasCoords) {
+          allCoords.push([realm.latitude, realm.longitude]);
+        } else {
+          // Add all demo locations for this realm
+          const locations = demoCoordinates[index % demoCoordinates.length] || [];
+          locations.forEach(loc => allCoords.push([loc.lat, loc.lng]));
+        }
+      });
+      if (allCoords.length > 0) {
+        const bounds = L.latLngBounds(allCoords);
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 3 });
+      }
+    }
+  }
+
+  // Update hex zones when filtered realms change
+  $: if (viewMode === 'map' && map && filteredRealms && h3) {
+    addRealmHexZones();
+  }
+
+  // Initialize map when view mode changes to map
+  $: if (viewMode === 'map' && mapContainer && !map) {
+    initMap();
+  }
+
+  // Cleanup on destroy
+  onDestroy(() => {
+    if (map) {
+      map.remove();
+      map = null;
+    }
+  });
 </script>
 
 <svelte:head>
   <title>Realm Registry</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 </svelte:head>
 
 <div class="container">
@@ -249,13 +621,41 @@
           class="search-input"
         />
         {#if searchQuery}
-          <button class="search-clear" on:click={() => searchQuery = ''}>
+          <button class="search-clear" on:click={() => searchQuery = ''} aria-label="Clear search">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M18 6L6 18M6 6l12 12"></path>
             </svg>
           </button>
         {/if}
       </div>
+    </div>
+    
+    <div class="view-toggle">
+      <button 
+        class="toggle-btn" 
+        class:active={viewMode === 'list'}
+        on:click={() => viewMode = 'list'}
+        aria-label="List view"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+      </button>
+      <button 
+        class="toggle-btn"
+        class:active={viewMode === 'map'}
+        on:click={() => viewMode = 'map'}
+        aria-label="Map view"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+          <line x1="8" y1="2" x2="8" y2="18"></line>
+          <line x1="16" y1="6" x2="16" y2="22"></line>
+        </svg>
+      </button>
     </div>
     
     <button 
@@ -362,62 +762,74 @@
         {/if}
       </div>
     {:else}
-      <div class="realms-grid">
-        {#each filteredRealms as realm}
-          <div class="realm-card">
-            {#if realm.url}
-              <div 
-                class="realm-card-bg" 
-                style="background-image: url('{ensureProtocol(realm.url)}/images/default_welcome.jpg')"
-              ></div>
-            {/if}
-            <div class="card-accent"></div>
-            <div class="realm-header">
-              <div class="realm-logo-container">
-                {#if realm.logo}
-                  <img src={realm.logo} alt="{realm.name} logo" class="realm-logo" />
-                {:else}
-                  <div class="realm-logo-fallback">
-                    <span>{realm.name.charAt(0).toUpperCase()}</span>
-                  </div>
+      {#if viewMode === 'list'}
+        <div class="realms-grid">
+          {#each filteredRealms as realm}
+            <div class="realm-card">
+              {#if realm.url}
+                <div 
+                  class="realm-card-bg" 
+                  style="background-image: url('{ensureProtocol(realm.url)}/images/default_welcome.jpg')"
+                ></div>
+              {/if}
+              <div class="card-accent"></div>
+              <div class="realm-header">
+                <div class="realm-logo-container">
+                  {#if realm.logo}
+                    <img src={realm.logo} alt="{realm.name} logo" class="realm-logo" />
+                  {:else}
+                    <div class="realm-logo-fallback">
+                      <span>{realm.name.charAt(0).toUpperCase()}</span>
+                    </div>
+                  {/if}
+                </div>
+                <div class="user-badge" class:has-users={realm.users_count > 0}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                  </svg>
+                  <span>{realm.users_count || 0}</span>
+                </div>
+              </div>
+              
+              <div class="realm-content">
+                <h3 class="realm-name">{realm.name}</h3>
+                
+                <p class="realm-info" title="{formatFullDate(realm.created_at)}">
+                  <code>{realm.id}</code>
+                  <span class="info-separator">·</span>
+                  <span>{formatTimeAgo(realm.created_at)}</span>
+                </p>
+              </div>
+              
+              <div class="realm-actions">
+                {#if realm.url}
+                  <button 
+                    class="btn btn-dark btn-sm btn-full"
+                    on:click={() => window.open(ensureProtocol(realm.url) + '/welcome', '_blank')}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                      <polyline points="15 3 21 3 21 9"></polyline>
+                      <line x1="10" y1="14" x2="21" y2="3"></line>
+                    </svg>
+                    Visit
+                  </button>
                 {/if}
               </div>
-              <div class="user-badge" class:has-users={realm.users_count > 0}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                </svg>
-                <span>{realm.users_count || 0}</span>
-              </div>
             </div>
-            
-            <div class="realm-content">
-              <h3 class="realm-name">{realm.name}</h3>
-              
-              <p class="realm-info" title="{formatFullDate(realm.created_at)}">
-                <code>{realm.id}</code>
-                <span class="info-separator">·</span>
-                <span>{formatTimeAgo(realm.created_at)}</span>
-              </p>
-            </div>
-            
-            <div class="realm-actions">
-              {#if realm.url}
-                <button 
-                  class="btn btn-dark btn-sm btn-full"
-                  on:click={() => window.open(ensureProtocol(realm.url) + '/welcome', '_blank')}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                    <polyline points="15 3 21 3 21 9"></polyline>
-                    <line x1="10" y1="14" x2="21" y2="3"></line>
-                  </svg>
-                  Visit
-                </button>
-              {/if}
-            </div>
+          {/each}
+        </div>
+      {:else}
+        <div class="map-view">
+          <div class="map-container" bind:this={mapContainer}></div>
+          <button class="map-back-btn" on:click={() => viewMode = 'list'} title="Back to list view">
+            ← Back to List
+          </button>
+          <div class="map-info">
+            <span>Showing {filteredRealms.length} realms</span>
           </div>
-        {/each}
-      </div>
+        </div>
+      {/if}
       
       <div class="stats">
         <p>Showing {filteredRealms.length} of {realms.length} realms</p>
@@ -580,6 +992,117 @@
 
   .add-btn {
     white-space: nowrap;
+  }
+
+  .view-toggle {
+    display: flex;
+    background: #F5F5F5;
+    border-radius: 0.5rem;
+    padding: 0.25rem;
+    gap: 0.25rem;
+  }
+
+  .toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 0.75rem;
+    border: none;
+    background: transparent;
+    color: #737373;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .toggle-btn:hover {
+    color: #525252;
+    background: rgba(255, 255, 255, 0.5);
+  }
+
+  .toggle-btn.active {
+    background: #FFFFFF;
+    color: #171717;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  }
+
+  .map-view {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 100;
+  }
+
+  .map-container {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    overflow: hidden;
+    z-index: 1;
+  }
+
+  .map-back-btn {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    padding: 12px 20px;
+    background: #FFFFFF;
+    color: #171717;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: all 0.2s;
+  }
+
+  .map-back-btn:hover {
+    background: #F5F5F5;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  .map-info {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    padding: 10px 20px;
+    background: rgba(255, 255, 255, 0.95);
+    color: #525252;
+    border-radius: 20px;
+    font-size: 13px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  :global(.leaflet-popup-content-wrapper) {
+    border-radius: 0.75rem !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+  }
+
+  :global(.leaflet-popup-content) {
+    margin: 12px 14px !important;
+  }
+
+  :global(.realm-tooltip) {
+    background: rgba(23, 23, 23, 0.9) !important;
+    border: none !important;
+    border-radius: 6px !important;
+    color: white !important;
+    font-family: Inter, sans-serif !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    padding: 6px 10px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  :global(.realm-tooltip::before) {
+    border-top-color: rgba(23, 23, 23, 0.9) !important;
   }
 
   .add-form {

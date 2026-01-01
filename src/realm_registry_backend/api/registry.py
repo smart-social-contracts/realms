@@ -28,7 +28,7 @@ def list_registered_realms() -> List[dict]:
         return []
 
 
-def register_realm_by_caller(name: str, url: str = "", logo: str = "", backend_url: str = "") -> dict:
+def register_realm_by_caller(name: str, url: str = "", logo: str = "", backend_url: str = "", latitude: Optional[float] = None, longitude: Optional[float] = None) -> dict:
     """Register a realm using the caller's principal as the unique ID (upsert logic)"""
     caller_id = str(ic.caller())
     logger.info(f"Registering realm by caller: {caller_id}")
@@ -46,6 +46,10 @@ def register_realm_by_caller(name: str, url: str = "", logo: str = "", backend_u
             existing_realm.url = url.strip() if url else existing_realm.url
             existing_realm.backend_url = backend_url.strip() if backend_url else existing_realm.backend_url
             existing_realm.logo = logo.strip() if logo else existing_realm.logo
+            if latitude is not None:
+                existing_realm.latitude = latitude
+            if longitude is not None:
+                existing_realm.longitude = longitude
             logger.info(f"Updated existing realm: {caller_id} - {name}")
             return {"success": True, "message": f"Realm '{caller_id}' updated successfully", "action": "updated"}
 
@@ -56,6 +60,8 @@ def register_realm_by_caller(name: str, url: str = "", logo: str = "", backend_u
             url=url.strip() if url else "",
             backend_url=backend_url.strip() if backend_url else "",
             logo=logo.strip() if logo else "",
+            latitude=latitude,
+            longitude=longitude,
             created_at=float(
                 ic.time() / 1_000_000_000
             ),  # Convert nanoseconds to seconds
@@ -69,7 +75,7 @@ def register_realm_by_caller(name: str, url: str = "", logo: str = "", backend_u
         return {"success": False, "error": f"Failed to register realm: {str(e)}"}
 
 
-def add_registered_realm(realm_id: str, name: str, url: str = "", logo: str = "", backend_url: str = "") -> dict:
+def add_registered_realm(realm_id: str, name: str, url: str = "", logo: str = "", backend_url: str = "", latitude: Optional[float] = None, longitude: Optional[float] = None) -> dict:
     """Add a new realm to the registry (legacy - use register_realm_by_caller instead)"""
     logger.info(f"Adding realm to registry: {realm_id}")
 
@@ -96,6 +102,8 @@ def add_registered_realm(realm_id: str, name: str, url: str = "", logo: str = ""
             url=url.strip() if url else "",
             backend_url=backend_url.strip() if backend_url else "",
             logo=logo.strip() if logo else "",
+            latitude=latitude,
+            longitude=longitude,
             created_at=float(
                 ic.time() / 1_000_000_000
             ),  # Convert nanoseconds to seconds

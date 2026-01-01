@@ -17,6 +17,8 @@ class RealmRecord(Entity, TimestampedMixin):
     backend_url = String(max_length=512)
     logo = String(max_length=512)
     users_count = Integer()
+    latitude = Float()
+    longitude = Float()
     created_at = Float()
 
     def to_dict(self) -> dict:
@@ -26,7 +28,9 @@ class RealmRecord(Entity, TimestampedMixin):
             "name": self.name,
             "url": self.url,
             "backend_url": getattr(self, 'backend_url', ''),
-            "logo": getattr(self, 'logo', ''),  # Default to empty string if not set
+            "logo": getattr(self, 'logo', ''),
             "users_count": getattr(self, 'users_count', 0) or 0,
+            "latitude": getattr(self, 'latitude', None),
+            "longitude": getattr(self, 'longitude', None),
             "created_at": self.created_at,
         }
