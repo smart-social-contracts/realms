@@ -14,8 +14,21 @@ import typer
 from rich.console import Console
 
 from ..constants import REALM_FOLDER
-from ..generator import RealmGenerator
 from ..utils import get_scripts_path, is_repo_mode
+
+# Dynamically import RealmGenerator based on mode
+def _get_realm_generator():
+    """Get RealmGenerator class - from scripts/ in repo mode, bundled in pip mode."""
+    if is_repo_mode():
+        # In repo mode - use scripts/realm_generator.py for latest code
+        scripts_path = get_scripts_path()
+        sys.path.insert(0, str(scripts_path))
+        from realm_generator import RealmGenerator
+        return RealmGenerator
+    else:
+        # In pip-installed mode - use bundled generator
+        from ..generator import RealmGenerator
+        return RealmGenerator
 from .deploy import _deploy_realm_internal
 
 console = Console()
@@ -109,6 +122,7 @@ def _generate_single_realm(
     if random:
         # Generate random data for this realm using bundled generator
         try:
+            RealmGenerator = _get_realm_generator()
             generator = RealmGenerator(seed) if seed else RealmGenerator()
             
             realm_data = generator.generate_realm_data(
@@ -238,8 +252,10 @@ def create_command(
                     console.print(f"✅ Copied welcome image: welcome.{welcome_ext}")
                     break
     
-    # Use bundled RealmGenerator directly
+    # Get RealmGenerator (from scripts/ in repo mode, bundled in pip mode)
     try:
+        RealmGenerator = _get_realm_generator()
+        
         # Determine parameters from flags or manifest
         gen_members = members if members is not None else realm_options.get("members", 50)
         gen_organizations = organizations if organizations is not None else realm_options.get("organizations", 5)

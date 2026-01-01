@@ -355,66 +355,6 @@
     return colors[index % colors.length];
   }
 
-  // Demo coordinates for realms - each realm can have multiple locations worldwide
-  // Some locations overlap to show shared influence zones
-  const demoCoordinates = [
-    // Realm 1: Global presence - Europe, Americas, Asia (with overlaps in Paris & Tokyo)
-    [
-      { lat: 48.8566, lng: 2.3522 },    // Paris (HQ)
-      { lat: 40.7128, lng: -74.0060 },  // New York
-      { lat: 35.6762, lng: 139.6503 },  // Tokyo
-      { lat: -33.8688, lng: 151.2093 }, // Sydney
-    ],
-    // Realm 2: European focus with Paris overlap
-    [
-      { lat: 48.9, lng: 2.4 },          // Near Paris (overlap with Realm 1)
-      { lat: 51.5074, lng: -0.1278 },   // London
-      { lat: 52.5200, lng: 13.4050 },   // Berlin
-      { lat: 41.9028, lng: 12.4964 },   // Rome
-    ],
-    // Realm 3: Asian-Pacific with Tokyo overlap
-    [
-      { lat: 35.7, lng: 139.7 },        // Near Tokyo (overlap with Realm 1)
-      { lat: 37.5665, lng: 126.9780 },  // Seoul
-      { lat: 22.3193, lng: 114.1694 },  // Hong Kong
-      { lat: 1.3521, lng: 103.8198 },   // Singapore
-    ],
-    // Realm 4: Americas focus
-    [
-      { lat: 34.0522, lng: -118.2437 }, // Los Angeles
-      { lat: 41.8781, lng: -87.6298 },  // Chicago
-      { lat: -23.5505, lng: -46.6333 }, // São Paulo
-      { lat: 19.4326, lng: -99.1332 },  // Mexico City
-    ],
-    // Realm 5: Middle East & Africa with European overlap
-    [
-      { lat: 51.6, lng: -0.2 },         // Near London (overlap with Realm 2)
-      { lat: 25.2048, lng: 55.2708 },   // Dubai
-      { lat: -33.9249, lng: 18.4241 },  // Cape Town
-      { lat: 30.0444, lng: 31.2357 },   // Cairo
-    ],
-    // Realm 6: South Asia & Oceania
-    [
-      { lat: 28.6139, lng: 77.2090 },   // New Delhi
-      { lat: 13.0827, lng: 80.2707 },   // Chennai
-      { lat: -37.8136, lng: 144.9631 }, // Melbourne
-      { lat: -41.2865, lng: 174.7762 }, // Wellington
-    ],
-    // Realm 7: Northern Europe & Russia
-    [
-      { lat: 59.3293, lng: 18.0686 },   // Stockholm
-      { lat: 60.1699, lng: 24.9384 },   // Helsinki
-      { lat: 55.7558, lng: 37.6173 },   // Moscow
-      { lat: 52.4, lng: 13.5 },         // Near Berlin (overlap with Realm 2)
-    ],
-    // Realm 8: Southeast Asia with Singapore overlap
-    [
-      { lat: 1.4, lng: 103.9 },         // Near Singapore (overlap with Realm 3)
-      { lat: 13.7563, lng: 100.5018 },  // Bangkok
-      { lat: 14.5995, lng: 120.9842 },  // Manila
-      { lat: -6.2088, lng: 106.8456 },  // Jakarta
-    ],
-  ];
 
   // Add H3 hex zones for realms with multi-realm tracking per hex
   function addRealmHexZones() {
@@ -437,20 +377,6 @@
     // hexData[h3Index] = { realms: [{realm, color, users, distance, locationName}], totalUsers }
     const hexData = {};
     
-    // Location names for popups
-    const locationNames = {
-      '48.8566,2.3522': 'Paris', '40.7128,-74.006': 'New York', '35.6762,139.6503': 'Tokyo',
-      '-33.8688,151.2093': 'Sydney', '48.9,2.4': 'Paris Area', '51.5074,-0.1278': 'London',
-      '52.52,13.405': 'Berlin', '41.9028,12.4964': 'Rome', '35.7,139.7': 'Tokyo Area',
-      '37.5665,126.978': 'Seoul', '22.3193,114.1694': 'Hong Kong', '1.3521,103.8198': 'Singapore',
-      '34.0522,-118.2437': 'Los Angeles', '41.8781,-87.6298': 'Chicago', '-23.5505,-46.6333': 'São Paulo',
-      '19.4326,-99.1332': 'Mexico City', '51.6,-0.2': 'London Area', '25.2048,55.2708': 'Dubai',
-      '-33.9249,18.4241': 'Cape Town', '30.0444,31.2357': 'Cairo', '28.6139,77.209': 'New Delhi',
-      '13.0827,80.2707': 'Chennai', '-37.8136,144.9631': 'Melbourne', '-41.2865,174.7762': 'Wellington',
-      '59.3293,18.0686': 'Stockholm', '60.1699,24.9384': 'Helsinki', '55.7558,37.6173': 'Moscow',
-      '52.4,13.5': 'Berlin Area', '1.4,103.9': 'Singapore Area', '13.7563,100.5018': 'Bangkok',
-      '14.5995,120.9842': 'Manila', '-6.2088,106.8456': 'Jakarta',
-    };
     
     filteredRealms.forEach((realm, index) => {
       const color = getRealmColor(index);
@@ -459,8 +385,8 @@
       // Check if we have real zone data from this realm's backend
       const realZoneData = realmZoneData[realm.id];
       
+      // Only use REAL zone data from the realm's backend - no fallback demo data
       if (realZoneData && realZoneData.zones && realZoneData.zones.length > 0) {
-        // Use REAL zone data from the realm's backend
         realZoneData.zones.forEach(zone => {
           const hexIndex = zone.h3_index;
           const usersInHex = zone.user_count;
@@ -481,68 +407,13 @@
               distance: 0,
               isCenter: true,
               isHQ: true,
-              locations: ['Real Data'],
+              locations: [zone.location_name || 'Zone'],
             });
           }
           hexData[hexIndex].totalUsers += usersInHex;
         });
-      } else {
-        // Fall back to DEMO coordinates (no real zone data available)
-        const hasCoords = realm.latitude != null && realm.longitude != null;
-        const locations = hasCoords 
-          ? [{ lat: realm.latitude, lng: realm.longitude }]
-          : demoCoordinates[index % demoCoordinates.length] || [];
-        
-        // Distribute users across all locations
-        const usersPerLocation = Math.ceil(baseUsers / locations.length);
-        
-        locations.forEach((coords, locIndex) => {
-          const influenceRings = Math.min(Math.ceil(Math.log2(usersPerLocation + 1)) + 1, 4);
-          const isHQ = locIndex === 0; // First location is headquarters
-          
-          // Get center hex and all influence hexes for this location
-          const centerH3 = h3.latLngToCell(coords.lat, coords.lng, H3_RESOLUTION);
-          const allHexes = h3.gridDisk(centerH3, influenceRings);
-          
-          // Get location name
-          const locKey = `${coords.lat},${coords.lng}`;
-          const locationName = locationNames[locKey] || `Location ${locIndex + 1}`;
-          
-          // Distribute users across hexes (more in center, less at edges)
-          allHexes.forEach(hexIndex => {
-            const distance = h3.gridDistance(centerH3, hexIndex);
-            
-            // Calculate users in this hex (inverse of distance, with randomization)
-            const distanceFactor = 1 - (distance / (influenceRings + 1));
-            const usersInHex = Math.round(usersPerLocation * distanceFactor * distanceFactor * (0.5 + Math.random() * 0.5) / (influenceRings + 1));
-            
-            if (!hexData[hexIndex]) {
-              hexData[hexIndex] = { realms: [], totalUsers: 0 };
-            }
-            
-            // Check if this realm already has an entry for this hex (from another location)
-            const existingEntry = hexData[hexIndex].realms.find(r => r.realm.name === realm.name);
-            if (existingEntry) {
-              existingEntry.users += usersInHex;
-              if (distance === 0 && isHQ) existingEntry.isHQ = true;
-              if (!existingEntry.locations.includes(locationName)) {
-                existingEntry.locations.push(locationName);
-              }
-            } else {
-              hexData[hexIndex].realms.push({
-                realm: realm,
-                color: color,
-                users: usersInHex,
-                distance: distance,
-                isCenter: distance === 0,
-                isHQ: distance === 0 && isHQ,
-                locations: [locationName],
-              });
-            }
-            hexData[hexIndex].totalUsers += usersInHex;
-          });
-        });
       }
+      // No fallback - realms without zone data won't show on the map
     });
     
     // Second pass: render all hex cells with combined realm info
@@ -620,6 +491,7 @@
       const realZones = realmZoneData[realm.id];
       let locations = [];
       
+      // Only use real zone data - no fallback demo coordinates
       if (realZones && realZones.zones && realZones.zones.length > 0) {
         // Use real zone centers (pick unique centers, limit to prevent too many markers)
         const uniqueLocations = new Map();
@@ -635,13 +507,8 @@
         locations = Array.from(uniqueLocations.values())
           .sort((a, b) => b.users - a.users)
           .slice(0, 5);
-      } else {
-        // Fall back to demo coordinates
-        const hasCoords = realm.latitude != null && realm.longitude != null;
-        locations = hasCoords 
-          ? [{ lat: realm.latitude, lng: realm.longitude }]
-          : demoCoordinates[index % demoCoordinates.length] || [];
       }
+      // No fallback - realms without zone data won't show markers
       
       locations.forEach((coords, locIndex) => {
         // Add an outer glow effect
@@ -686,21 +553,13 @@
       filteredRealms.forEach((realm, index) => {
         // Check for real zone data first
         const realZones = realmZoneData[realm.id];
+        // Only use real zone data - no fallback demo coordinates
         if (realZones && realZones.zones && realZones.zones.length > 0) {
-          // Use real zone centers
           realZones.zones.forEach(zone => {
             allCoords.push([zone.center_lat, zone.center_lng]);
           });
-        } else {
-          // Fall back to demo coordinates
-          const hasCoords = realm.latitude != null && realm.longitude != null;
-          if (hasCoords) {
-            allCoords.push([realm.latitude, realm.longitude]);
-          } else {
-            const locations = demoCoordinates[index % demoCoordinates.length] || [];
-            locations.forEach(loc => allCoords.push([loc.lat, loc.lng]));
-          }
         }
+        // No fallback - realms without zone data won't affect bounds
       });
       if (allCoords.length > 0) {
         const bounds = L.latLngBounds(allCoords);

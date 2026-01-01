@@ -34,6 +34,7 @@ from ggg.treasury import Treasury
 from ggg.user import User
 from ggg.user_profile import Operations, Profiles, UserProfile
 from ggg.vote import Vote
+from ggg.zone import Zone
 from kybra_simple_logging import get_logger
 
 logger = get_logger("api.ggg_entities")
@@ -121,6 +122,14 @@ def list_objects_paginated(
             "total_items_count": count,
             "total_pages": math.ceil(count / page_size),
         }
+    except KeyError as e:
+        logger.error(
+            f"Entity class '{class_name}' not found in globals(). "
+            f"Make sure it's imported in ggg_entities.py. "
+            f"Available classes: {[k for k in globals().keys() if k[0].isupper() and not k.startswith('_')]}"
+        )
+        logger.error(traceback.format_exc())
     except Exception as e:
+        logger.error(f"Error listing {class_name}: {e}")
         logger.error(traceback.format_exc())
     return {}
