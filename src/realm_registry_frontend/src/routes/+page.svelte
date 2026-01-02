@@ -356,6 +356,9 @@
   }
 
 
+  // Number of rings to expand around each center zone (area of influence)
+  const INFLUENCE_RINGS = 2; // 0 = just center, 1 = center + immediate neighbors, 2 = two rings out
+  
   // Add H3 hex zones for realms with multi-realm tracking per hex
   function addRealmHexZones() {
     if (!map || !L || !h3) return;
@@ -388,29 +391,59 @@
       // Only use REAL zone data from the realm's backend - no fallback demo data
       if (realZoneData && realZoneData.zones && realZoneData.zones.length > 0) {
         realZoneData.zones.forEach(zone => {
-          const hexIndex = zone.h3_index;
+          const centerHexIndex = zone.h3_index;
           const usersInHex = zone.user_count;
           
-          if (!hexData[hexIndex]) {
-            hexData[hexIndex] = { realms: [], totalUsers: 0 };
+          // Get the center hex and all neighboring hexes within INFLUENCE_RINGS
+          let influenceHexes;
+          try {
+            influenceHexes = h3.gridDisk(centerHexIndex, INFLUENCE_RINGS);
+          } catch (e) {
+            // Fallback for older h3-js versions
+            influenceHexes = h3.kRing ? h3.kRing(centerHexIndex, INFLUENCE_RINGS) : [centerHexIndex];
           }
           
-          // Check if this realm already has an entry for this hex
-          const existingEntry = hexData[hexIndex].realms.find(r => r.realm.name === realm.name);
-          if (existingEntry) {
-            existingEntry.users += usersInHex;
-          } else {
-            hexData[hexIndex].realms.push({
-              realm: realm,
-              color: color,
-              users: usersInHex,
-              distance: 0,
-              isCenter: true,
-              isHQ: true,
-              locations: [zone.location_name || 'Zone'],
-            });
-          }
-          hexData[hexIndex].totalUsers += usersInHex;
+          influenceHexes.forEach(hexIndex => {
+            // Calculate distance from center (0 = center, 1 = first ring, etc.)
+            let distance;
+            try {
+              distance = h3.gridDistance(centerHexIndex, hexIndex);
+            } catch (e) {
+              // Fallback: estimate based on position in array
+              distance = hexIndex === centerHexIndex ? 0 : 1;
+            }
+            
+            if (!hexData[hexIndex]) {
+              hexData[hexIndex] = { realms: [], totalUsers: 0 };
+            }
+            
+            // Check if this realm already has an entry for this hex
+            const existingEntry = hexData[hexIndex].realms.find(r => r.realm.name === realm.name);
+            if (existingEntry) {
+              // Update with closer distance if this is nearer to a center
+              if (distance < existingEntry.distance) {
+                existingEntry.distance = distance;
+                existingEntry.isCenter = distance === 0;
+              }
+              if (distance === 0) {
+                existingEntry.users += usersInHex;
+              }
+            } else {
+              hexData[hexIndex].realms.push({
+                realm: realm,
+                color: color,
+                users: distance === 0 ? usersInHex : 0, // Only count users at center
+                distance: distance,
+                isCenter: distance === 0,
+                isHQ: distance === 0,
+                locations: distance === 0 ? [zone.location_name || 'Zone'] : [],
+              });
+            }
+            
+            if (distance === 0) {
+              hexData[hexIndex].totalUsers += usersInHex;
+            }
+          });
         });
       }
       // No fallback - realms without zone data won't show on the map
@@ -430,16 +463,21 @@
       const minDistance = Math.min(...data.realms.map(r => r.distance));
       const isAnyCenter = data.realms.some(r => r.isCenter);
       
-      // Calculate opacity based on total users
-      const opacity = Math.min(0.15 + (data.totalUsers / 50) * 0.4, 0.7);
+      // Calculate opacity based on distance from center (fades with distance)
+      // Center = full opacity, outer rings = progressively more transparent
+      const distanceOpacityFactor = 1 - (minDistance / (INFLUENCE_RINGS + 1)) * 0.7;
+      const baseOpacity = isAnyCenter 
+        ? Math.min(0.4 + (data.totalUsers / 50) * 0.3, 0.7)  // Center hexes: higher opacity
+        : 0.15 + distanceOpacityFactor * 0.25;  // Influence rings: fading opacity
+      const opacity = Math.max(0.08, baseOpacity);
       
       // Create hex polygon
       const hexPolygon = L.polygon(latLngs, {
         color: hasMultipleRealms ? '#525252' : dominantRealm.color,
-        weight: isAnyCenter ? 2.5 : (minDistance <= 1 ? 1.5 : 1),
+        weight: isAnyCenter ? 2.5 : (minDistance <= 1 ? 1.2 : 0.8),
         fillColor: dominantRealm.color,
         fillOpacity: opacity,
-        dashArray: isAnyCenter ? null : (minDistance > 2 ? '4, 4' : '2, 2'),
+        dashArray: isAnyCenter ? null : (minDistance >= 2 ? '3, 3' : null),
       }).addTo(map);
       
       // Create popup showing ALL realms in this hex with location info
