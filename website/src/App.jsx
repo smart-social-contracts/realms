@@ -155,7 +155,7 @@ function App() {
           <h2 className="text-3xl sm:text-4xl font-bold mb-8 text-slate-800">
             {t('mission.title')}
           </h2>
-          <p className="text-base text-slate-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: t('mission.description') }} />
+          <p className="text-base text-slate-600 leading-relaxed text-justify" dangerouslySetInnerHTML={{ __html: t('mission.description') }} />
         </div>
       </section>
 
