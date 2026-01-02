@@ -4,6 +4,7 @@ from typing import Any, Dict
 from collections import defaultdict
 
 from ggg.human import Human
+from ggg.zone import Zone
 from kybra_simple_logging import get_logger
 
 logger = get_logger("api.zones")
@@ -16,14 +17,17 @@ def get_zone_aggregation(resolution: int = DEFAULT_H3_RESOLUTION) -> Dict[str, A
     """
     Get aggregated user counts per H3 hexagonal cell.
     
+    Uses Zone entities as the primary source. Each Zone represents a user's
+    zone of influence with an H3 index and coordinates.
+    
     Args:
         resolution: H3 resolution level (0-15). Default 7 (~1.2km hex edge)
                    Lower = larger hexes, Higher = smaller hexes
     
     Returns:
         Dictionary with zone data:
-        - zones: list of {h3_index, user_count, center_lat, center_lng}
-        - total_users: total users with location data
+        - zones: list of {h3_index, user_count, center_lat, center_lng, location_name}
+        - total_users: total users with zones
         - resolution: H3 resolution used
     """
     logger.info(f"Getting zone aggregation at resolution {resolution}")
@@ -32,53 +36,109 @@ def get_zone_aggregation(resolution: int = DEFAULT_H3_RESOLUTION) -> Dict[str, A
         # Try to import h3 - it may not be available in all environments
         try:
             import h3
+            h3_available = True
         except ImportError:
-            logger.warning("h3 library not available, returning empty zones")
-            return {
-                "success": True,
-                "zones": [],
-                "total_users": 0,
-                "resolution": resolution,
-                "error": "h3 library not installed"
-            }
+            logger.warning("h3 library not available")
+            h3_available = False
         
-        # Aggregate users by H3 index
-        zone_counts = defaultdict(int)
-        users_with_location = 0
+        # Aggregate zones by H3 index
+        # zone_data[h3_index] = {user_count, names[], lat, lng}
+        zone_data = defaultdict(lambda: {"user_count": 0, "names": [], "lat": None, "lng": None})
+        total_users = 0
+        unique_users = set()
         
-        for human in Human.instances():
-            lat = getattr(human, 'latitude', None)
-            lng = getattr(human, 'longitude', None)
+        # First, collect all Zone entities
+        for zone in Zone.instances():
+            h3_index = getattr(zone, 'h3_index', None)
+            lat = getattr(zone, 'latitude', None)
+            lng = getattr(zone, 'longitude', None)
+            name = getattr(zone, 'name', 'Zone')
+            user = getattr(zone, 'user', None)
+            user_id = getattr(zone, 'user_id', None) or (user.id if user else None)
             
-            if lat is not None and lng is not None:
+            # Skip zones without h3_index - try to compute from lat/lng
+            if not h3_index and lat is not None and lng is not None and h3_available:
                 try:
-                    # Get H3 index for this location at specified resolution
                     h3_index = h3.geo_to_h3(lat, lng, resolution)
-                    zone_counts[h3_index] += 1
-                    users_with_location += 1
                 except Exception as e:
-                    logger.warning(f"Failed to get H3 index for ({lat}, {lng}): {e}")
+                    logger.warning(f"Failed to compute H3 index for zone: {e}")
+                    continue
+            
+            if not h3_index:
+                continue
+            
+            # Re-index to requested resolution if different
+            zone_resolution = getattr(zone, 'resolution', None)
+            if h3_available and zone_resolution and int(zone_resolution) != resolution:
+                try:
+                    # Get center of original cell and re-index at new resolution
+                    center_lat, center_lng = h3.h3_to_geo(h3_index)
+                    h3_index = h3.geo_to_h3(center_lat, center_lng, resolution)
+                except Exception as e:
+                    logger.warning(f"Failed to re-index zone: {e}")
+            
+            zone_data[h3_index]["user_count"] += 1
+            zone_data[h3_index]["names"].append(name)
+            if lat is not None:
+                zone_data[h3_index]["lat"] = lat
+            if lng is not None:
+                zone_data[h3_index]["lng"] = lng
+            
+            if user_id:
+                unique_users.add(user_id)
+        
+        total_users = len(unique_users)
+        
+        # If no Zone entities, fall back to Human entities with location
+        if not zone_data:
+            logger.info("No Zone entities found, falling back to Human locations")
+            for human in Human.instances():
+                lat = getattr(human, 'latitude', None)
+                lng = getattr(human, 'longitude', None)
+                
+                if lat is not None and lng is not None and h3_available:
+                    try:
+                        h3_index = h3.geo_to_h3(lat, lng, resolution)
+                        zone_data[h3_index]["user_count"] += 1
+                        zone_data[h3_index]["lat"] = lat
+                        zone_data[h3_index]["lng"] = lng
+                        total_users += 1
+                    except Exception as e:
+                        logger.warning(f"Failed to get H3 index for ({lat}, {lng}): {e}")
         
         # Convert to list with center coordinates
         zones = []
-        for h3_index, count in zone_counts.items():
+        for h3_index, data in zone_data.items():
             try:
-                center_lat, center_lng = h3.h3_to_geo(h3_index)
+                # Use stored lat/lng or compute from h3 cell center
+                if data["lat"] is not None and data["lng"] is not None:
+                    center_lat, center_lng = data["lat"], data["lng"]
+                elif h3_available:
+                    center_lat, center_lng = h3.h3_to_geo(h3_index)
+                else:
+                    continue
+                
+                # Create location name from zone names
+                location_name = ", ".join(data["names"][:3])  # Limit to first 3 names
+                if len(data["names"]) > 3:
+                    location_name += f" +{len(data['names']) - 3} more"
+                
                 zones.append({
                     "h3_index": h3_index,
-                    "user_count": count,
+                    "user_count": data["user_count"],
                     "center_lat": center_lat,
                     "center_lng": center_lng,
+                    "location_name": location_name or "Zone",
                 })
             except Exception as e:
                 logger.warning(f"Failed to get center for {h3_index}: {e}")
         
-        logger.info(f"Found {len(zones)} zones with {users_with_location} users")
+        logger.info(f"Found {len(zones)} zones with {total_users} users")
         
         return {
             "success": True,
             "zones": zones,
-            "total_users": users_with_location,
+            "total_users": total_users,
             "resolution": resolution,
         }
         
