@@ -66,6 +66,8 @@ logger = get_logger("main")
 
 # Import management canister for outgoing HTTP requests
 from kybra.canisters.management import (
+    HttpResponse,
+    HttpTransformArgs,
     management_canister,
 )
 
@@ -815,13 +817,12 @@ def http_request(req: HttpRequest) -> HttpResponseIncoming:
 #     return http_response
 
 
-# http_transform commented out - only needed for outgoing HTTP requests
-# @query
-# def http_transform(args: HttpTransformArgs) -> HttpResponse:
-#     """Transform function for HTTP requests - removes headers for consensus"""
-#     http_response = args["response"]
-#     http_response["headers"] = []
-#     return http_response
+@query
+def http_transform(args: HttpTransformArgs) -> HttpResponse:
+    """Transform function for HTTP requests - removes headers for consensus"""
+    http_response = args["response"]
+    http_response["headers"] = []
+    return http_response
 
 
 # @update
