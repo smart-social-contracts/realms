@@ -1536,8 +1536,8 @@ def get_task_logs_by_name(
         return json.dumps(paginated_logs) if paginated_logs else json.dumps([])
     
     except Exception as e:
-        logger.error(f"Error getting task logs by name: {e}")
-        return f"Error retrieving logs: {str(e)}"
+        logger.error(f"Error getting task logs by name: {traceback.format_exc()}")
+        return f"Error retrieving logs: {str(traceback.format_exc())}"
 
 
 downloaded_content: dict = {}
