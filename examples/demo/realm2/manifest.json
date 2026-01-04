@@ -1,10 +1,10 @@
 {
   "type": "realm",
-  "name": "Realm 2",
-  "description": "A historic Mediterranean town with rich cultural heritage",
-  "logo": "logo.svg",
+  "name": "Agora",
+  "description": "A vision of what modern democracies could become if their original spirit were preserved and enhanced through smart social contracts and the Realms GOS — transparent, participatory, and accountable by design.",
+  "logo": "emblem.png",
   "welcome_image": "/images/default_welcome.jpg",
-  "welcome_message": "Bienvenido! Experience governance that honors our traditions while embracing the future.",
+  "welcome_message": "Welcome to Agora! Join our transparent, participatory community where every citizen has a voice and governance serves the people.",
   "options": {
     "random": {
       "members": 30,

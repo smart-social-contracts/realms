@@ -1,10 +1,10 @@
 {
   "type": "realm",
-  "name": "Realm 3",
-  "description": "A vibrant Latin American city blending colonial charm with modern governance",
-  "logo": "logo.svg",
+  "name": "Syntropia",
+  "description": "A possible evolutionary future enabled by smart social contracts and Realms GOS, where governance becomes protocol-based, adaptive, and freely chosen through a competitive ecosystem of AI-powered governors.",
+  "logo": "emblem.png",
   "welcome_image": "/images/default_welcome.jpg",
-  "welcome_message": "¡Bienvenidos! Join our community where every voice matters.",
+  "welcome_message": "Welcome to Syntropia. Experience adaptive, protocol-based governance where AI-powered systems compete to serve your evolving needs.",
   "options": {
     "random": {
       "members": 20,

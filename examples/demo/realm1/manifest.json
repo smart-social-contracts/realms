@@ -1,10 +1,10 @@
 {
   "type": "realm",
-  "name": "Realm 1",
-  "description": "A beautiful alpine community in the Swiss mountains",
-  "logo": "logo.svg",
+  "name": "Dominion",
+  "description": "A projection of where the world is likely heading: centralized, technocratic governance where algorithms, surveillance, and simulated consent replace genuine democratic agency.",
+  "logo": "emblem.png",
   "welcome_image": "/images/default_welcome.jpg",
-  "welcome_message": "Welcome to our alpine community! Join us to participate in transparent, efficient governance.",
+  "welcome_message": "Welcome to Dominion. Efficient governance through algorithmic oversight. Your compliance ensures collective prosperity.",
   "options": {
     "random": {
       "members": 50,
