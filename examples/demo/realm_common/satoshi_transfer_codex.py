@@ -50,7 +50,7 @@ def async_task():
         
         # Execute the transfer (uses vault extension if installed)
         try:
-            transfer.execute()
+            yield transfer.execute()
             transfer.status = "completed"
             logger.info("✅ Transfer completed successfully!")
         except NotImplementedError:
