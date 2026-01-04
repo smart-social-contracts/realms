@@ -39,7 +39,7 @@ class Task(Entity, TimestampedMixin):
 
 
 
-    def new_task_execution(self):
+    def new_task_execution(self) -> TaskExecution:
         execution_name = 'taskexec_%s_%s' % (self._id, self._id)
         execution = TaskExecution(
             name=execution_name,

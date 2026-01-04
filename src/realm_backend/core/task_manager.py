@@ -128,7 +128,7 @@ class TaskManager:
                 logger.info(
                     f"step.call.task_step.task.name: {step.call.task_step.task.name}"
                 )
-                task_execution = task.new_task_execution()
+                task_execution: TaskExecution = task.new_task_execution()
                 try:
                     # # Create execution record (defensive - don't fail if this errors)
                     # try:
