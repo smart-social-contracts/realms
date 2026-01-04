@@ -38,6 +38,7 @@ src/realm_frontend/static/extensions/
 
 # CLI build artifacts
 cli/build/
+*.egg-info/
 
 # Separate project with its own git
 website2/
