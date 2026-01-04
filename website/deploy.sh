@@ -5,7 +5,8 @@ echo "Building website..."
 npm run build
 
 echo "Deploying to IC mainnet..."
-TERM=xterm dfx canister --network ic install website --mode upgrade
+dfx build --network ic website
+TERM=xterm dfx canister --network ic install website --mode upgrade --yes
 
 echo ""
 echo "Done! Your website should be available at:"
