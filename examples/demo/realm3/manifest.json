@@ -3,7 +3,7 @@
   "name": "Syntropia",
   "description": "A possible evolutionary future enabled by smart social contracts and Realms GOS, where governance becomes protocol-based, adaptive, and freely chosen through a competitive ecosystem of AI-powered governors.",
   "logo": "emblem.png",
-  "welcome_image": "/images/default_welcome.jpg",
+  "welcome_image": "background.png",
   "welcome_message": "Welcome to Syntropia. Experience adaptive, protocol-based governance where AI-powered systems compete to serve your evolving needs.",
   "options": {
     "random": {

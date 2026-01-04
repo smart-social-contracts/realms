@@ -3,7 +3,7 @@
   "name": "Agora",
   "description": "A vision of what modern democracies could become if their original spirit were preserved and enhanced through smart social contracts and the Realms GOS — transparent, participatory, and accountable by design.",
   "logo": "emblem.png",
-  "welcome_image": "/images/default_welcome.jpg",
+  "welcome_image": "background.png",
   "welcome_message": "Welcome to Agora! Join our transparent, participatory community where every citizen has a voice and governance serves the people.",
   "options": {
     "random": {
