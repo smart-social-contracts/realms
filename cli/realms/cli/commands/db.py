@@ -406,20 +406,27 @@ class CursorDatabaseExplorer:
                 if related_class:
                     result = self.list_entities(related_class.__name__, 0, 100)
                     if "items" in result and result["items"]:
-                        # Find the specific item by ID
+                        # Find the specific item by ID or alias
                         related_items = [
                             item
                             for item in result["items"]
                             if item.get("_id") == str(related_id)
+                            or item.get("name") == str(related_id)  # Check alias/name match
                         ]
                         if related_items:
+                            # Navigate directly to record detail view for single item
                             self.state.current_items = related_items
                             self.state.cursor_position = 0
-                            self.state.view_mode = "record_list"
+                            if len(related_items) == 1:
+                                # Go directly to detail view for single match
+                                self.state.selected_item = related_items[0]
+                                self.state.view_mode = "record_detail"
+                            else:
+                                self.state.view_mode = "record_list"
                             self.state.entity_type = related_class
                             return
                         else:
-                            logger.debug(f"No item found with ID {related_id} in {related_entity_type}")
+                            logger.debug(f"No item found with ID or alias {related_id} in {related_entity_type}")
                     else:
                         logger.debug(f"No items returned for {related_entity_type}")
                 else:
@@ -616,7 +623,11 @@ class CursorDatabaseExplorer:
                             back_ref = None
 
                             # Try different ways to get relationship info
-                            if hasattr(attr, "_args") and len(attr._args) >= 1:
+                            if hasattr(attr, "entity_types"):
+                                related_model = attr.entity_types
+                                if hasattr(attr, "reverse_name"):
+                                    back_ref = attr.reverse_name
+                            elif hasattr(attr, "_args") and len(attr._args) >= 1:
                                 related_model = attr._args[0]
                                 if len(attr._args) >= 2:
                                     back_ref = attr._args[1]
@@ -640,6 +651,9 @@ class CursorDatabaseExplorer:
                                     relationship_fields[field_pattern] = (
                                         related_entity_type
                                     )
+                                    # Also map the bare field name for alias-based lookups
+                                    # e.g., "codex" -> "codex" (value might be alias like "satoshi_transfer_codex")
+                                    relationship_fields[attr_name] = related_entity_type
 
                                 elif attr_type == "OneToOne":
                                     # Similar to ManyToOne for foreign key fields
@@ -647,6 +661,8 @@ class CursorDatabaseExplorer:
                                     relationship_fields[field_pattern] = (
                                         related_entity_type
                                     )
+                                    # Also map the bare field name for alias-based lookups
+                                    relationship_fields[attr_name] = related_entity_type
 
                                 elif (
                                     attr_type in ["OneToMany", "ManyToMany"]
@@ -848,21 +864,22 @@ class CursorDatabaseExplorer:
         relations = self.get_all_relationships(item)
         for rel_name, rel_items in relations.items():
             # Skip if this relationship is already shown as a property field
-            rel_field_name = f"{rel_name}_id"
-            if not any(
-                nav_item["key"] == rel_field_name
+            # Check both "{rel_name}_id" and bare "{rel_name}" patterns
+            if any(
+                nav_item["key"] in [f"{rel_name}_id", rel_name]
                 for nav_item in navigable_items
                 if nav_item["type"] == "relationship_field"
             ):
-                count = len(rel_items) if isinstance(rel_items, list) else 1
-                navigable_items.append(
-                    {
-                        "type": "relationship",
-                        "key": rel_name,
-                        "value": rel_items,
-                        "display": f"{rel_name}: {count} items",
-                    }
-                )
+                continue
+            count = len(rel_items) if isinstance(rel_items, list) else 1
+            navigable_items.append(
+                {
+                    "type": "relationship",
+                    "key": rel_name,
+                    "value": rel_items,
+                    "display": f"{rel_name}: {count} items",
+                }
+            )
 
         # Render all items with navigation support
         lines.append("Properties & Relationships:")
