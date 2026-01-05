@@ -26,6 +26,9 @@
   let commitDatetime = '';
   // Get version from meta tag
   let version = '';
+  
+  // Description tooltip state
+  let activeDescriptionRealm = null;
 
   onMount(async () => {
     if (browser) {
@@ -781,6 +784,21 @@
     </div>
   {/if}
 
+  <!-- Description Modal -->
+  {#if activeDescriptionRealm}
+    <div class="description-modal-overlay" on:click={() => activeDescriptionRealm = null}>
+      <div class="description-modal" on:click|stopPropagation>
+        <button class="description-modal-close" on:click={() => activeDescriptionRealm = null}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12"></path>
+          </svg>
+        </button>
+        <h3 class="description-modal-title">{activeDescriptionRealm.name}</h3>
+        <p class="description-modal-text">{activeDescriptionRealm.description}</p>
+      </div>
+    </div>
+  {/if}
+
   <main class="main-content">
     {#if loading}
       <div class="loading-grid">
@@ -847,7 +865,15 @@
                 <h3 class="realm-name">{realm.realm_name || realm.name}</h3>
                 
                 {#if realm.description}
-                  <p class="realm-description">{realm.description}</p>
+                  <p 
+                    class="realm-description" 
+                    title={realm.description}
+                    on:click={() => activeDescriptionRealm = { id: realm.id, name: realm.realm_name || realm.name, description: realm.description }}
+                    role="button"
+                    tabindex="0"
+                  >
+                    {realm.description}
+                  </p>
                 {/if}
                 
                 <p class="realm-info" title="{formatFullDate(realm.created_at)}">
@@ -1440,7 +1466,7 @@
   }
 
   .realm-description {
-    margin: 0 0 0.75rem;
+    margin: 0 0 1rem;
     font-size: 0.85rem;
     color: #525252;
     line-height: 1.5;
@@ -1450,10 +1476,79 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
+    cursor: pointer;
+    transition: color 0.15s ease;
+  }
+  
+  .realm-description:hover {
+    color: #171717;
+  }
+  
+  .description-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+  }
+  
+  .description-modal {
+    background: white;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    max-width: 500px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  }
+  
+  .description-modal-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: #F5F5F5;
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    color: #737373;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+  }
+  
+  .description-modal-close:hover {
+    background: #E5E5E5;
+    color: #171717;
+  }
+  
+  .description-modal-title {
+    margin: 0 0 1rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #171717;
+    padding-right: 2rem;
+  }
+  
+  .description-modal-text {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #525252;
+    line-height: 1.7;
   }
 
   .realm-info {
-    margin: 0;
+    margin: 0 0 1rem;
     font-size: 0.8rem;
     color: #737373;
     display: flex;

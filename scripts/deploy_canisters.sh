@@ -334,14 +334,10 @@ if [ -f "manifest.json" ] && command -v jq &> /dev/null; then
         
         if [ -n "$LOGO_SOURCE" ]; then
             # Find frontend directory and copy logo to static/images
-            # Use a unique filename (custom_logo.svg) to avoid caching issues
-            if [ -d "src/realm_frontend/static/images" ]; then
-                LOGO_DEST="src/realm_frontend/static/images/custom_logo.svg"
-            else
-                # Create static/images directory if it doesn't exist
-                mkdir -p src/realm_frontend/static/images
-                LOGO_DEST="src/realm_frontend/static/images/custom_logo.svg"
-            fi
+            # Preserve original extension
+            LOGO_EXT="${LOGO_SOURCE##*.}"
+            mkdir -p src/realm_frontend/static/images
+            LOGO_DEST="src/realm_frontend/static/images/realm_logo.${LOGO_EXT}"
             cp "$LOGO_SOURCE" "$LOGO_DEST"
             echo "   ✅ Copied realm logo: $LOGO_SOURCE → $LOGO_DEST"
         else
@@ -360,11 +356,17 @@ echo "🖼️  Checking for realm welcome image..."
 if [ -f "manifest.json" ] && command -v jq &> /dev/null; then
     WELCOME_IMAGE=$(jq -r '.welcome_image // empty' manifest.json)
     if [ -n "$WELCOME_IMAGE" ]; then
-        # Check if welcome image file exists in realm directory
-        if [ -f "welcome.png" ]; then
-            WELCOME_SOURCE="welcome.png"
+        # Check if welcome image file exists - first try the manifest value, then fallback to welcome.*
+        if [ -f "$WELCOME_IMAGE" ]; then
+            WELCOME_SOURCE="$WELCOME_IMAGE"
         elif [ -f "welcome.png" ]; then
             WELCOME_SOURCE="welcome.png"
+        elif [ -f "welcome.jpg" ]; then
+            WELCOME_SOURCE="welcome.jpg"
+        elif [ -f "welcome.jpeg" ]; then
+            WELCOME_SOURCE="welcome.jpeg"
+        elif [ -f "welcome.webp" ]; then
+            WELCOME_SOURCE="welcome.webp"
         else
             WELCOME_SOURCE=""
         fi
@@ -376,7 +378,7 @@ if [ -f "manifest.json" ] && command -v jq &> /dev/null; then
             cp "$WELCOME_SOURCE" "$WELCOME_DEST"
             echo "   ✅ Copied realm welcome image: $WELCOME_SOURCE → $WELCOME_DEST"
         else
-            echo "   ⚠️  Welcome image file not found (welcome.png or welcome.png)"
+            echo "   ⚠️  Welcome image file not found: $WELCOME_IMAGE (or welcome.*)"
         fi
     else
         echo "   ℹ️  No welcome_image defined in manifest.json"
