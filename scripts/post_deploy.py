@@ -195,6 +195,36 @@ if os.path.exists(canister_init_path):
 else:
     print(f"\nℹ️  No canister_init.py found, skipping initialization...")
 
+# Update realm config from manifest.json
+manifest_path = os.path.join(realm_dir, 'manifest.json')
+if os.path.exists(manifest_path):
+    print(f"\n🔧 Updating realm config from manifest.json...")
+    try:
+        with open(manifest_path, 'r') as f:
+            manifest = json.load(f)
+        
+        # Extract realm config fields
+        config = {
+            "name": manifest.get("name", ""),
+            "description": manifest.get("description", ""),
+            "logo": manifest.get("logo", ""),
+            "welcome_image": manifest.get("welcome_image", ""),
+            "welcome_message": manifest.get("welcome_message", ""),
+        }
+        # Use ensure_ascii=False to keep UTF-8 characters instead of \uXXXX escapes
+        # which dfx Candid parser doesn't understand
+        config_json = json.dumps(config, ensure_ascii=False).replace('"', '\\"')
+        
+        update_cmd = ['dfx', 'canister', 'call', backend_name, 'update_realm_config', f'("{config_json}")']
+        if network != 'local':
+            update_cmd.extend(['--network', network])
+        result = run_command(update_cmd)
+        print(f"   ✅ Realm config updated: {result}")
+    except Exception as e:
+        print(f"   ⚠️  Failed to update realm config: {e} (continuing anyway)")
+else:
+    print(f"\nℹ️  No manifest.json found, skipping realm config update...")
+
 
 # Import manifest.json as a codex (contains entity_method_overrides)
 manifest_path = os.path.join(realm_dir, 'manifest.json')

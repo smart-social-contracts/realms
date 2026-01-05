@@ -79,7 +79,7 @@
       filteredRealms = realms;
       loading = false;
       // Fetch user counts from each realm's status endpoint
-      fetchUserCounts();
+      fetchRealmDetails();
     } catch (err) {
       error = err.message || 'Failed to load realms';
       loading = false;
@@ -90,12 +90,12 @@
     return window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1');
   }
 
-  async function fetchUserCounts() {
-    // Fetch user counts from each realm's backend via Candid
+  async function fetchRealmDetails() {
+    // Fetch details (user counts, description, logo) from each realm's backend via Candid
     const { Actor, HttpAgent } = await import('@dfinity/agent');
     const { Principal } = await import('@dfinity/principal');
     
-    // Minimal IDL for the status method - only need users_count from the response
+    // IDL for the status method - includes users_count and realm_description
     const { IDL } = await import('@dfinity/candid');
     
     const statusIdlFactory = ({ IDL }) => {
@@ -118,6 +118,12 @@
         'licenses_count': IDL.Nat,
         'users_count': IDL.Nat,
         'trades_count': IDL.Nat,
+        'realm_name': IDL.Text,
+        'realm_logo': IDL.Text,
+        'realm_description': IDL.Text,
+        'realm_welcome_image': IDL.Text,
+        'realm_welcome_message': IDL.Text,
+        'user_profiles_count': IDL.Nat,
       });
       const ApiResponse = IDL.Record({
         'data': IDL.Variant({ 'status': StatusData }),
@@ -148,23 +154,39 @@
           });
           
           const response = await actor.status();
+          console.log(`Status response for ${realm.id}:`, JSON.stringify(response, (key, value) =>
+            typeof value === 'bigint' ? value.toString() : value
+          ));
           if (response.success && response.data.status) {
-            const usersCount = Number(response.data.status.users_count);
-            return { id: realm.id, users_count: usersCount };
+            const statusData = response.data.status;
+            console.log(`Realm details for ${realm.id}:`, {
+              realm_name: statusData.realm_name,
+              realm_description: statusData.realm_description,
+              realm_logo: statusData.realm_logo,
+            });
+            return { 
+              id: realm.id, 
+              users_count: Number(statusData.users_count),
+              description: statusData.realm_description || '',
+              realm_logo: statusData.realm_logo || '',
+              realm_name: statusData.realm_name || '',
+            };
+          } else {
+            console.warn(`Status call failed or no status data for ${realm.id}:`, response);
           }
         } catch (e) {
-          console.debug(`Could not fetch status for ${realm.id}:`, e.message);
+          console.error(`Could not fetch status for ${realm.id}:`, e.message, e);
         }
         return null;
       })
     );
     
-    // Update realms with fetched counts
+    // Update realms with fetched details
     updates.forEach(result => {
       if (result.status === 'fulfilled' && result.value) {
-        const { id, users_count } = result.value;
-        realms = realms.map(r => r.id === id ? { ...r, users_count } : r);
-        filteredRealms = filteredRealms.map(r => r.id === id ? { ...r, users_count } : r);
+        const { id, users_count, description, realm_logo, realm_name } = result.value;
+        realms = realms.map(r => r.id === id ? { ...r, users_count, description, realm_logo, realm_name } : r);
+        filteredRealms = filteredRealms.map(r => r.id === id ? { ...r, users_count, description, realm_logo, realm_name } : r);
       }
     });
   }
@@ -799,7 +821,7 @@
               {#if realm.url}
                 <div 
                   class="realm-card-bg" 
-                  style="background-image: url('{ensureProtocol(realm.url)}/images/default_welcome.jpg')"
+                  style="background-image: url('{ensureProtocol(realm.url)}/images/default_welcome.png')"
                 ></div>
               {/if}
               <div class="card-accent"></div>
@@ -822,7 +844,11 @@
               </div>
               
               <div class="realm-content">
-                <h3 class="realm-name">{realm.name}</h3>
+                <h3 class="realm-name">{realm.realm_name || realm.name}</h3>
+                
+                {#if realm.description}
+                  <p class="realm-description">{realm.description}</p>
+                {/if}
                 
                 <p class="realm-info" title="{formatFullDate(realm.created_at)}">
                   <code>{realm.id}</code>
@@ -1411,6 +1437,19 @@
     color: #171717;
     font-size: 1.35rem;
     font-weight: 600;
+  }
+
+  .realm-description {
+    margin: 0 0 0.75rem;
+    font-size: 0.85rem;
+    color: #525252;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .realm-info {

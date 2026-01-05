@@ -57,7 +57,7 @@ def get_status() -> "dict[str, Any]":
     user_profiles_count = UserProfile.count()
 
     # Get realm info efficiently - only load first realm, not all realms
-    realm_name = "None"
+    realm_name = ""
     realm_logo = ""
     realm_welcome_image = ""
     realm_welcome_message = ""
@@ -66,15 +66,15 @@ def get_status() -> "dict[str, Any]":
         # Load only the first realm (ID 1) instead of all realms
         first_realm = Realm.load("1")
         if first_realm:
-            realm_name = first_realm.name
+            realm_name = first_realm.name or ""
             # Convert logo filename to full path - logo is copied to /images/realm_logo.{ext} during deployment
-            logo_filename = first_realm.logo if hasattr(first_realm, 'logo') else ""
+            logo_filename = getattr(first_realm, 'logo', None) or ""
             if logo_filename:
                 logo_ext = logo_filename.split('.')[-1] if '.' in logo_filename else 'svg'
                 realm_logo = f"/images/realm_logo.{logo_ext}"
-            realm_welcome_image = first_realm.welcome_image if hasattr(first_realm, 'welcome_image') else ""
-            realm_welcome_message = first_realm.welcome_message if hasattr(first_realm, 'welcome_message') else ""
-            realm_description = first_realm.description if hasattr(first_realm, 'description') else ""
+            realm_welcome_image = getattr(first_realm, 'welcome_image', None) or ""
+            realm_welcome_message = getattr(first_realm, 'welcome_message', None) or ""
+            realm_description = getattr(first_realm, 'description', None) or ""
     except Exception:
         # Realm might not exist yet
         pass

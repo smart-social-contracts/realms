@@ -394,14 +394,46 @@ def create_foundational_objects() -> void:
 
         logger.info("Created system identity")
 
-        # 4. Create realm
+        # 4. Create realm - try to load data from manifest.json if available
+        realm_name = "Default Realm"
+        realm_description = "A realm for digital governance and coordination"
+        realm_logo = ""
+        realm_welcome_image = ""
+        realm_welcome_message = ""
+        
+        try:
+            import os
+            import json
+            # Look for manifest.json in common locations
+            manifest_paths = [
+                "manifest.json",
+                "../manifest.json",
+                "/manifest.json",
+            ]
+            for manifest_path in manifest_paths:
+                if os.path.exists(manifest_path):
+                    with open(manifest_path, 'r') as f:
+                        manifest = json.load(f)
+                    realm_name = manifest.get("name", realm_name)
+                    realm_description = manifest.get("description", realm_description)
+                    realm_logo = manifest.get("logo", "")
+                    realm_welcome_image = manifest.get("welcome_image", "")
+                    realm_welcome_message = manifest.get("welcome_message", "")
+                    logger.info(f"Loaded realm config from {manifest_path}: name={realm_name}")
+                    break
+        except Exception as e:
+            logger.warning(f"Could not load manifest.json: {e}, using defaults")
+        
         realm = Realm(
-            name="Default Realm",
-            description="A realm for digital governance and coordination",
+            name=realm_name,
+            description=realm_description,
+            logo=realm_logo,
+            welcome_image=realm_welcome_image,
+            welcome_message=realm_welcome_message,
             principal_id="",
         )
 
-        logger.info("Created realm")
+        logger.info(f"Created realm: {realm_name}")
 
         # 5. Create treasury linked to realm
         treasury = Treasury(
@@ -1871,6 +1903,59 @@ def get_realm_registry_info() -> text:
         return json.dumps(
             {"success": False, "error": str(e), "registries": []}, indent=2
         )
+
+
+@update
+def update_realm_config(config_json: str) -> str:
+    """
+    Update the realm configuration (name, description, logo, welcome_image, welcome_message).
+    This should be called after deployment with the manifest.json data.
+    
+    Args:
+        config_json: JSON string containing realm configuration fields
+    """
+    logger.info("🔧 update_realm_config() called")
+    try:
+        from ggg import Realm
+        import json
+        
+        config = json.loads(config_json)
+        logger.info(f"📋 Config received: {list(config.keys())}")
+        
+        # Get the first realm
+        realms = list(Realm.instances())
+        if not realms:
+            logger.error("❌ No realm found")
+            return json.dumps({"success": False, "error": "No realm found"})
+        
+        realm = realms[0]
+        updated_fields = []
+        
+        if "name" in config and config["name"]:
+            realm.name = config["name"]
+            updated_fields.append(f"name={config['name']}")
+            
+        if "description" in config and config["description"]:
+            realm.description = config["description"]
+            updated_fields.append(f"description={config['description'][:50]}...")
+            
+        if "logo" in config:
+            realm.logo = config["logo"] or ""
+            updated_fields.append(f"logo={config['logo']}")
+            
+        if "welcome_image" in config:
+            realm.welcome_image = config["welcome_image"] or ""
+            updated_fields.append(f"welcome_image={config['welcome_image']}")
+            
+        if "welcome_message" in config:
+            realm.welcome_message = config["welcome_message"] or ""
+            updated_fields.append(f"welcome_message={config['welcome_message'][:50] if config['welcome_message'] else ''}...")
+        
+        logger.info(f"✅ Realm config updated: {', '.join(updated_fields)}")
+        return json.dumps({"success": True, "updated_fields": updated_fields})
+    except Exception as e:
+        logger.error(f"❌ update_realm_config failed: {e}")
+        return json.dumps({"success": False, "error": str(e)})
 
 
 @update

@@ -25,10 +25,25 @@ if realm:
             realm.name = manifest["name"]
             ic.print(f"✅ Realm name set to: {manifest['name']}")
         
+        # Update realm description if present in manifest
+        if "description" in manifest:
+            realm.description = manifest["description"]
+            ic.print(f"✅ Realm description set to: {manifest['description'][:50]}...")
+        
         # Update realm logo if present in manifest
         if "logo" in manifest:
             realm.logo = manifest["logo"]
             ic.print(f"✅ Realm logo set to: {manifest['logo']}")
+        
+        # Update realm welcome_image if present in manifest
+        if "welcome_image" in manifest:
+            realm.welcome_image = manifest["welcome_image"]
+            ic.print(f"✅ Realm welcome_image set to: {manifest['welcome_image']}")
+        
+        # Update realm welcome_message if present in manifest
+        if "welcome_message" in manifest:
+            realm.welcome_message = manifest["welcome_message"]
+            ic.print(f"✅ Realm welcome_message set to: {manifest['welcome_message'][:50]}...")
         
         ic.print(f"✅ Realm.manifest_data updated with entity method overrides from manifest.json")
     except FileNotFoundError:

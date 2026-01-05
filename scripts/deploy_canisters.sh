@@ -361,8 +361,8 @@ if [ -f "manifest.json" ] && command -v jq &> /dev/null; then
     WELCOME_IMAGE=$(jq -r '.welcome_image // empty' manifest.json)
     if [ -n "$WELCOME_IMAGE" ]; then
         # Check if welcome image file exists in realm directory
-        if [ -f "welcome.jpg" ]; then
-            WELCOME_SOURCE="welcome.jpg"
+        if [ -f "welcome.png" ]; then
+            WELCOME_SOURCE="welcome.png"
         elif [ -f "welcome.png" ]; then
             WELCOME_SOURCE="welcome.png"
         else
@@ -370,13 +370,13 @@ if [ -f "manifest.json" ] && command -v jq &> /dev/null; then
         fi
         
         if [ -n "$WELCOME_SOURCE" ]; then
-            # Copy to frontend static/images folder as default_welcome.jpg
+            # Copy to frontend static/images folder as default_welcome.png
             mkdir -p src/realm_frontend/static/images
-            WELCOME_DEST="src/realm_frontend/static/images/default_welcome.jpg"
+            WELCOME_DEST="src/realm_frontend/static/images/default_welcome.png"
             cp "$WELCOME_SOURCE" "$WELCOME_DEST"
             echo "   ✅ Copied realm welcome image: $WELCOME_SOURCE → $WELCOME_DEST"
         else
-            echo "   ⚠️  Welcome image file not found (welcome.jpg or welcome.png)"
+            echo "   ⚠️  Welcome image file not found (welcome.png or welcome.png)"
         fi
     else
         echo "   ℹ️  No welcome_image defined in manifest.json"

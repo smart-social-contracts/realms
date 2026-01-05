@@ -7,7 +7,7 @@
   import { isAuthenticated } from '$lib/stores/auth';
   
   // Default fallback image if realm has no welcome image configured
-  const defaultWelcomeImage = '/images/default_welcome.jpg';
+  const defaultWelcomeImage = '/images/default_welcome.png';
   
   // Fetch realm info on mount
   onMount(() => {
