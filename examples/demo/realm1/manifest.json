@@ -21,6 +21,13 @@
       "type": "staticmethod",
       "implementation": "Codex.user_registration_hook_codex.user_register_posthook",
       "description": "Custom post-registration hook for new users"
+    },
+    {
+      "entity": "Treasury",
+      "method": "send",
+      "type": "staticmethod",
+      "implementation": "Codex.treasury_send_hook_codex.send_hook",
+      "description": "Custom send hook for treasuries"
     }
   ]
 }

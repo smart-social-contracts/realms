@@ -39,21 +39,28 @@ class Treasury(Entity, TimestampedMixin):
                 f"Error refreshing treasury '{self.name}': {str(e)}\n{traceback.format_exc()}"
             )
 
+    @staticmethod
+    def send_hook(treasury: "Treasury", to_principal: str, amount: int) -> Async[str]:
+        """Hook for sending tokens from treasury. Can be overridden by codex."""
+        raise NotImplementedError("Treasury send hook has not been implemented")
+
     def send(self, to_principal: str, amount: int) -> Async[str]:
         """Send tokens from treasury to a principal using embedded vault extension"""
 
         logger.info(f"Treasury '{self.name}' sending {amount} tokens to {to_principal}")
 
-        # Use already imported extension_async_call
-        # Use embedded vault extension API
-        args = json.dumps(
-            {
-                "to_principal": to_principal,
-                "amount": amount,
-            }
-        )
+        # # Use already imported extension_async_call
+        # # Use embedded vault extension API
+        # args = json.dumps(
+        #     {
+        #         "to_principal": to_principal,
+        #         "amount": amount,
+        #     }
+        # )
 
-        result = yield extension_async_call("vault", "transfer", args)
+        # result = yield extension_async_call("vault", "transfer", args)
+        result = yield self.send_hook(self, to_principal, amount)
+        
         return result
 
     # def sync_balance(self) -> Async[None]:
