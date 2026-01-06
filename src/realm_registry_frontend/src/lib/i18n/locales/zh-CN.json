@@ -1,0 +1,55 @@
+{
+  "page_title": "领域注册中心",
+  "search": {
+    "placeholder": "按名称或ID搜索领域...",
+    "clear": "清除搜索",
+    "no_results": "无结果",
+    "no_results_message": "未找到匹配 \"{query}\" 的领域"
+  },
+  "controls": {
+    "list_view": "列表视图",
+    "map_view": "地图视图",
+    "create_realm": "创建领域"
+  },
+  "modal": {
+    "title": "创建领域",
+    "subtitle": "几分钟内部署您自己的治理系统",
+    "step1_title": "安装 CLI",
+    "step2_title": "创建并部署",
+    "view_docs": "查看文档"
+  },
+  "empty": {
+    "title": "暂无领域",
+    "message": "尚未注册任何领域。"
+  },
+  "card": {
+    "visit": "访问"
+  },
+  "map": {
+    "back_to_list": "返回列表",
+    "showing_realms": "显示 {count} 个领域",
+    "users_in_zone": "该区域有 {count} 位用户",
+    "realm_influence": "{count} 个领域具有影响力",
+    "realms_influence": "{count} 个领域具有影响力",
+    "hq": "总部",
+    "base": "基地"
+  },
+  "stats": {
+    "showing": "显示 {filtered} / {total} 个领域",
+    "users": "{count} 位用户"
+  },
+  "footer": {
+    "built_on_ic": "基于互联网计算机构建",
+    "local_deployment": "本地部署"
+  },
+  "time": {
+    "just_now": "刚刚",
+    "minutes_ago": "{count}分钟前",
+    "hours_ago": "{count}小时前",
+    "days_ago": "{count}天前",
+    "weeks_ago": "{count}周前"
+  },
+  "language": {
+    "select": "语言"
+  }
+}

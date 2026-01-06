@@ -1,6 +1,8 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
+  import { _, locale } from 'svelte-i18n';
+  import { supportedLocales, setLocale } from '$lib/i18n';
 
   let backend;
   let realms = [];
@@ -29,6 +31,7 @@
   
   // Description tooltip state
   let activeDescriptionRealm = null;
+  let showLanguageMenu = false;
 
   onMount(async () => {
     if (browser) {
@@ -263,12 +266,12 @@
     const date = new Date(timestamp * 1000);
     const seconds = Math.floor((now - date.getTime()) / 1000);
     
-    if (seconds < 60) return 'just now';
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-    if (seconds < 2592000) return `${Math.floor(seconds / 604800)}w ago`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    if (seconds < 60) return $_('time.just_now');
+    if (seconds < 3600) return $_('time.minutes_ago', { values: { count: Math.floor(seconds / 60) }});
+    if (seconds < 86400) return $_('time.hours_ago', { values: { count: Math.floor(seconds / 3600) }});
+    if (seconds < 604800) return $_('time.days_ago', { values: { count: Math.floor(seconds / 86400) }});
+    if (seconds < 2592000) return $_('time.weeks_ago', { values: { count: Math.floor(seconds / 604800) }});
+    return date.toLocaleDateString($locale || 'en', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
   function formatFullDate(timestamp) {
@@ -651,7 +654,7 @@
 </script>
 
 <svelte:head>
-  <title>Realm Registry</title>
+  <title>{$_('page_title')}</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 </svelte:head>
 
@@ -659,6 +662,39 @@
   <header class="header">
     <div class="header-content">
       <img src="/images/logo_horizontal.svg" alt="Realms Logo" class="header-logo" />
+    </div>
+    
+    <!-- Language Selector -->
+    <div class="language-selector">
+      <button 
+        class="language-btn"
+        on:click={() => showLanguageMenu = !showLanguageMenu}
+        aria-label={$_('language.select')}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="2" y1="12" x2="22" y2="12"></line>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+        </svg>
+        <span class="current-locale">{supportedLocales.find(l => l.id === $locale)?.name || 'English'}</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron" class:open={showLanguageMenu}>
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </button>
+      
+      {#if showLanguageMenu}
+        <div class="language-menu">
+          {#each supportedLocales as loc}
+            <button 
+              class="language-option"
+              class:active={$locale === loc.id}
+              on:click={() => { setLocale(loc.id); showLanguageMenu = false; }}
+            >
+              {loc.name}
+            </button>
+          {/each}
+        </div>
+      {/if}
     </div>
   </header>
 
@@ -671,12 +707,12 @@
         </svg>
         <input
           type="text"
-          placeholder="Search realms by name or ID..."
+          placeholder={$_('search.placeholder')}
           bind:value={searchQuery}
           class="search-input"
         />
         {#if searchQuery}
-          <button class="search-clear" on:click={() => searchQuery = ''} aria-label="Clear search">
+          <button class="search-clear" on:click={() => searchQuery = ''} aria-label={$_('search.clear')}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M18 6L6 18M6 6l12 12"></path>
             </svg>
@@ -690,7 +726,7 @@
         class="toggle-btn" 
         class:active={viewMode === 'list'}
         on:click={() => viewMode = 'list'}
-        aria-label="List view"
+        aria-label={$_('controls.list_view')}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="3" y="3" width="7" height="7"></rect>
@@ -703,7 +739,7 @@
         class="toggle-btn"
         class:active={viewMode === 'map'}
         on:click={() => viewMode = 'map'}
-        aria-label="Map view"
+        aria-label={$_('controls.map_view')}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
@@ -717,7 +753,7 @@
       class="btn btn-primary add-btn"
       on:click={() => showCreateModal = true}
     >
-      Create Realm
+      {$_('controls.create_realm')}
     </button>
   </div>
 
@@ -730,13 +766,13 @@
           </svg>
         </button>
         
-        <h2 class="modal-title">Create a Realm</h2>
-        <p class="modal-subtitle">Deploy your own governance system in minutes</p>
+        <h2 class="modal-title">{$_('modal.title')}</h2>
+        <p class="modal-subtitle">{$_('modal.subtitle')}</p>
         
         <div class="instruction-step">
           <div class="step-number">1</div>
           <div class="step-content">
-            <h3>Install the CLI</h3>
+            <h3>{$_('modal.step1_title')}</h3>
             <div class="code-block">
               <code>pip install realms-gos</code>
               <button class="copy-btn" on:click={() => copyToClipboard('pip install realms-gos')}>
@@ -752,7 +788,7 @@
         <div class="instruction-step">
           <div class="step-number">2</div>
           <div class="step-content">
-            <h3>Create and Deploy</h3>
+            <h3>{$_('modal.step2_title')}</h3>
             <div class="code-block">
               <code>realms realm create --deploy --network staging</code>
               <button class="copy-btn" on:click={() => copyToClipboard('realms realm create --deploy --network staging')}>
@@ -770,7 +806,7 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
             </svg>
-            View Documentation
+            {$_('modal.view_docs')}
           </a>
         </div>
       </div>
@@ -818,16 +854,16 @@
     {:else if filteredRealms.length === 0}
       <div class="empty-state">
         {#if searchQuery}
-          <h2>🔍 No Results</h2>
-          <p>No realms found matching "{searchQuery}"</p>
+          <h2>🔍 {$_('search.no_results')}</h2>
+          <p>{$_('search.no_results_message', { values: { query: searchQuery }})}</p>
         {:else}
-          <h2>📋 No Realms</h2>
-          <p>No realms have been registered yet.</p>
+          <h2>📋 {$_('empty.title')}</h2>
+          <p>{$_('empty.message')}</p>
           <button 
             class="btn btn-primary"
             on:click={() => showCreateModal = true}
           >
-            Create Realm
+            {$_('controls.create_realm')}
           </button>
         {/if}
       </div>
@@ -894,7 +930,7 @@
                       <polyline points="15 3 21 3 21 9"></polyline>
                       <line x1="10" y1="14" x2="21" y2="3"></line>
                     </svg>
-                    Visit
+                    {$_('card.visit')}
                   </button>
                 {/if}
               </div>
@@ -904,17 +940,17 @@
       {:else}
         <div class="map-view">
           <div class="map-container" bind:this={mapContainer}></div>
-          <button class="map-back-btn" on:click={() => viewMode = 'list'} title="Back to list view">
-            ← Back to List
+          <button class="map-back-btn" on:click={() => viewMode = 'list'} title={$_('map.back_to_list')}>
+            ← {$_('map.back_to_list')}
           </button>
           <div class="map-info">
-            <span>Showing {filteredRealms.length} realms</span>
+            <span>{$_('map.showing_realms', { values: { count: filteredRealms.length }})}</span>
           </div>
         </div>
       {/if}
       
       <div class="stats">
-        <p>Showing {filteredRealms.length} of {realms.length} realms</p>
+        <p>{$_('stats.showing', { values: { filtered: filteredRealms.length, total: realms.length }})}</p>
       </div>
     {/if}
   </main>
@@ -925,7 +961,7 @@
     <div class="footer-ic">
       <a href="https://internetcomputer.org" target="_blank" rel="noopener noreferrer" class="ic-link">
         <img src="/images/internet-computer-icp-logo.svg" alt="Internet Computer Logo" width="24" height="24" class="ic-logo" />
-        <span>Built on the Internet Computer</span>
+        <span>{$_('footer.built_on_ic')}</span>
       </a>
     </div>
     
@@ -941,7 +977,7 @@
     <!-- Version info with dynamic data -->
     <div class="footer-version">
       <span>
-        Realm Registry {version} ({commitHash}) - {commitDatetime}{typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname.endsWith('.localhost')) ? ' - Local deployment' : ''}
+{$_('page_title')} {version} ({commitHash}) - {commitDatetime}{typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname.endsWith('.localhost')) ? ` - ${$_('footer.local_deployment')}` : ''}
       </span>
     </div>
   </footer>
@@ -970,6 +1006,7 @@
     text-align: center;
     margin-bottom: 2rem;
     color: #171717;
+    position: relative;
   }
 
   .logo {
@@ -987,6 +1024,82 @@
   .header-logo {
     height: 120px;
     width: auto;
+  }
+
+  /* Language Selector */
+  .language-selector {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+
+  .language-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: #FFFFFF;
+    border: 1px solid #E5E5E5;
+    border-radius: 0.5rem;
+    color: #525252;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .language-btn:hover {
+    border-color: #525252;
+    color: #171717;
+  }
+
+  .language-btn .current-locale {
+    font-weight: 500;
+  }
+
+  .language-btn .chevron {
+    transition: transform 0.2s ease;
+  }
+
+  .language-btn .chevron.open {
+    transform: rotate(180deg);
+  }
+
+  .language-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 0.25rem;
+    background: #FFFFFF;
+    border: 1px solid #E5E5E5;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    min-width: 140px;
+    z-index: 100;
+    overflow: hidden;
+  }
+
+  .language-option {
+    display: block;
+    width: 100%;
+    padding: 0.625rem 1rem;
+    background: none;
+    border: none;
+    text-align: left;
+    color: #525252;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .language-option:hover {
+    background: #F5F5F5;
+    color: #171717;
+  }
+
+  .language-option.active {
+    background: #F5F5F5;
+    color: #171717;
+    font-weight: 500;
   }
 
   .header h1 {

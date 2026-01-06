@@ -1,0 +1,55 @@
+{
+  "page_title": "Registro de Reinos",
+  "search": {
+    "placeholder": "Buscar reinos por nombre o ID...",
+    "clear": "Limpiar búsqueda",
+    "no_results": "Sin Resultados",
+    "no_results_message": "No se encontraron reinos que coincidan con \"{query}\""
+  },
+  "controls": {
+    "list_view": "Vista de lista",
+    "map_view": "Vista de mapa",
+    "create_realm": "Crear Reino"
+  },
+  "modal": {
+    "title": "Crear un Reino",
+    "subtitle": "Despliega tu propio sistema de gobernanza en minutos",
+    "step1_title": "Instalar el CLI",
+    "step2_title": "Crear y Desplegar",
+    "view_docs": "Ver Documentación"
+  },
+  "empty": {
+    "title": "Sin Reinos",
+    "message": "Aún no se han registrado reinos."
+  },
+  "card": {
+    "visit": "Visitar"
+  },
+  "map": {
+    "back_to_list": "Volver a la Lista",
+    "showing_realms": "Mostrando {count} reinos",
+    "users_in_zone": "{count} usuarios en esta zona",
+    "realm_influence": "{count} reino con influencia",
+    "realms_influence": "{count} reinos con influencia",
+    "hq": "Sede",
+    "base": "Base"
+  },
+  "stats": {
+    "showing": "Mostrando {filtered} de {total} reinos",
+    "users": "{count} usuarios"
+  },
+  "footer": {
+    "built_on_ic": "Construido en Internet Computer",
+    "local_deployment": "Despliegue local"
+  },
+  "time": {
+    "just_now": "ahora mismo",
+    "minutes_ago": "hace {count}m",
+    "hours_ago": "hace {count}h",
+    "days_ago": "hace {count}d",
+    "weeks_ago": "hace {count}sem"
+  },
+  "language": {
+    "select": "Idioma"
+  }
+}

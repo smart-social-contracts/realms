@@ -1,0 +1,55 @@
+{
+  "page_title": "Registro dei Reami",
+  "search": {
+    "placeholder": "Cerca reami per nome o ID...",
+    "clear": "Cancella ricerca",
+    "no_results": "Nessun Risultato",
+    "no_results_message": "Nessun reame trovato corrispondente a \"{query}\""
+  },
+  "controls": {
+    "list_view": "Vista elenco",
+    "map_view": "Vista mappa",
+    "create_realm": "Crea Reame"
+  },
+  "modal": {
+    "title": "Crea un Reame",
+    "subtitle": "Distribuisci il tuo sistema di governance in pochi minuti",
+    "step1_title": "Installa il CLI",
+    "step2_title": "Crea e Distribuisci",
+    "view_docs": "Visualizza Documentazione"
+  },
+  "empty": {
+    "title": "Nessun Reame",
+    "message": "Non sono stati ancora registrati reami."
+  },
+  "card": {
+    "visit": "Visita"
+  },
+  "map": {
+    "back_to_list": "Torna all'Elenco",
+    "showing_realms": "Visualizzazione di {count} reami",
+    "users_in_zone": "{count} utenti in questa zona",
+    "realm_influence": "{count} reame con influenza",
+    "realms_influence": "{count} reami con influenza",
+    "hq": "QG",
+    "base": "Base"
+  },
+  "stats": {
+    "showing": "Visualizzazione di {filtered} su {total} reami",
+    "users": "{count} utenti"
+  },
+  "footer": {
+    "built_on_ic": "Costruito su Internet Computer",
+    "local_deployment": "Distribuzione locale"
+  },
+  "time": {
+    "just_now": "proprio ora",
+    "minutes_ago": "{count}min fa",
+    "hours_ago": "{count}h fa",
+    "days_ago": "{count}g fa",
+    "weeks_ago": "{count}sett fa"
+  },
+  "language": {
+    "select": "Lingua"
+  }
+}

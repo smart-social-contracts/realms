@@ -1,0 +1,55 @@
+{
+  "page_title": "Realm-Verzeichnis",
+  "search": {
+    "placeholder": "Realms nach Name oder ID suchen...",
+    "clear": "Suche löschen",
+    "no_results": "Keine Ergebnisse",
+    "no_results_message": "Keine Realms gefunden, die \"{query}\" entsprechen"
+  },
+  "controls": {
+    "list_view": "Listenansicht",
+    "map_view": "Kartenansicht",
+    "create_realm": "Realm erstellen"
+  },
+  "modal": {
+    "title": "Ein Realm erstellen",
+    "subtitle": "Stellen Sie Ihr eigenes Governance-System in Minuten bereit",
+    "step1_title": "CLI installieren",
+    "step2_title": "Erstellen und Bereitstellen",
+    "view_docs": "Dokumentation anzeigen"
+  },
+  "empty": {
+    "title": "Keine Realms",
+    "message": "Es wurden noch keine Realms registriert."
+  },
+  "card": {
+    "visit": "Besuchen"
+  },
+  "map": {
+    "back_to_list": "Zurück zur Liste",
+    "showing_realms": "{count} Realms angezeigt",
+    "users_in_zone": "{count} Benutzer in dieser Zone",
+    "realm_influence": "{count} Realm mit Einfluss",
+    "realms_influence": "{count} Realms mit Einfluss",
+    "hq": "HQ",
+    "base": "Basis"
+  },
+  "stats": {
+    "showing": "Zeige {filtered} von {total} Realms",
+    "users": "{count} Benutzer"
+  },
+  "footer": {
+    "built_on_ic": "Aufgebaut auf dem Internet Computer",
+    "local_deployment": "Lokale Bereitstellung"
+  },
+  "time": {
+    "just_now": "gerade eben",
+    "minutes_ago": "vor {count}Min",
+    "hours_ago": "vor {count}Std",
+    "days_ago": "vor {count}T",
+    "weeks_ago": "vor {count}W"
+  },
+  "language": {
+    "select": "Sprache"
+  }
+}

@@ -35,6 +35,15 @@ export default defineConfig({
   build: {
     emptyOutDir: true,
   },
+  ssr: {
+    noExternal: [
+      'svelte-i18n',
+      'intl-messageformat',
+      '@formatjs/icu-messageformat-parser',
+      '@formatjs/icu-skeleton-parser',
+      '@formatjs/fast-memoize',
+    ],
+  },
   define: {
     '__BUILD_VERSION__': JSON.stringify(buildValues.version),
     '__BUILD_COMMIT__': JSON.stringify(buildValues.commitHash),

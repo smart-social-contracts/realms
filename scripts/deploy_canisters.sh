@@ -448,11 +448,9 @@ if [ -n "$FRONTENDS" ]; then
         fi
         
         if [ -n "$frontend_dir" ] && [ -f "$frontend_dir/package.json" ]; then
-            # Install dependencies if no root package.json (standalone realm)
-            if [ ! -f "package.json" ] && [ ! -d "$frontend_dir/node_modules" ]; then
-                echo "      📥 Installing npm dependencies..."
-                (cd "$frontend_dir" && npm install --legacy-peer-deps)
-            fi
+            # Always install dependencies (npm is fast if already up to date)
+            echo "      📥 Installing npm dependencies..."
+            (cd "$frontend_dir" && npm install --legacy-peer-deps)
             
             # Run prebuild if script exists
             (cd "$frontend_dir" && npm run prebuild 2>/dev/null) || true
