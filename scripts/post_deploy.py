@@ -207,7 +207,7 @@ if os.path.exists(manifest_path):
             "name": manifest.get("name", ""),
             "description": manifest.get("description", ""),
             "logo": manifest.get("logo", ""),
-            "welcome_image": manifest.get("welcome_image", ""),
+            "welcome_image": "images/welcome.png",  # Standardized path after deployment copy
             "welcome_message": manifest.get("welcome_message", ""),
         }
         # Use ensure_ascii=False to keep UTF-8 characters instead of \uXXXX escapes

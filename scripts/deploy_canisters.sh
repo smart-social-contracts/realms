@@ -340,6 +340,9 @@ if [ -f "manifest.json" ] && command -v jq &> /dev/null; then
             LOGO_DEST="src/realm_frontend/static/images/realm_logo.${LOGO_EXT}"
             cp "$LOGO_SOURCE" "$LOGO_DEST"
             echo "   ✅ Copied realm logo: $LOGO_SOURCE → $LOGO_DEST"
+            # Also use logo as favicon
+            cp "$LOGO_SOURCE" "src/realm_frontend/static/favicon.png"
+            echo "   ✅ Set realm logo as favicon: $LOGO_SOURCE → src/realm_frontend/static/favicon.png"
         else
             echo "   ⚠️  Logo file not found: $LOGO_FILE"
         fi
@@ -372,9 +375,9 @@ if [ -f "manifest.json" ] && command -v jq &> /dev/null; then
         fi
         
         if [ -n "$WELCOME_SOURCE" ]; then
-            # Copy to frontend static/images folder as default_welcome.png
+            # Copy to frontend static/images folder as welcome.png
             mkdir -p src/realm_frontend/static/images
-            WELCOME_DEST="src/realm_frontend/static/images/default_welcome.png"
+            WELCOME_DEST="src/realm_frontend/static/images/welcome.png"
             cp "$WELCOME_SOURCE" "$WELCOME_DEST"
             echo "   ✅ Copied realm welcome image: $WELCOME_SOURCE → $WELCOME_DEST"
         else
@@ -393,6 +396,9 @@ if [ -f "manifest.json" ] && command -v jq &> /dev/null; then
         LOGO_DEST="src/realm_frontend/static/images/realm_logo.${LOGO_EXT}"
         cp "$LOGO_FILE" "$LOGO_DEST"
         echo "   ✅ Copied realm logo: $LOGO_FILE → $LOGO_DEST"
+        # Also use logo as favicon
+        cp "$LOGO_FILE" "src/realm_frontend/static/favicon.png"
+        echo "   ✅ Set realm logo as favicon: $LOGO_FILE → src/realm_frontend/static/favicon.png"
     fi
 else
     echo "   ℹ️  No manifest.json found or jq not available"

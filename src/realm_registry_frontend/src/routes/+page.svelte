@@ -176,6 +176,7 @@
               description: statusData.realm_description || '',
               realm_logo: statusData.realm_logo || '',
               realm_name: statusData.realm_name || '',
+              realm_welcome_image: statusData.realm_welcome_image || '',
             };
           } else {
             console.warn(`Status call failed or no status data for ${realm.id}:`, response);
@@ -190,9 +191,9 @@
     // Update realms with fetched details
     updates.forEach(result => {
       if (result.status === 'fulfilled' && result.value) {
-        const { id, users_count, description, realm_logo, realm_name } = result.value;
-        realms = realms.map(r => r.id === id ? { ...r, users_count, description, realm_logo, realm_name } : r);
-        filteredRealms = filteredRealms.map(r => r.id === id ? { ...r, users_count, description, realm_logo, realm_name } : r);
+        const { id, users_count, description, realm_logo, realm_name, realm_welcome_image } = result.value;
+        realms = realms.map(r => r.id === id ? { ...r, users_count, description, realm_logo, realm_name, realm_welcome_image } : r);
+        filteredRealms = filteredRealms.map(r => r.id === id ? { ...r, users_count, description, realm_logo, realm_name, realm_welcome_image } : r);
       }
     });
   }
@@ -875,7 +876,7 @@
               {#if realm.url}
                 <div 
                   class="realm-card-bg" 
-                  style="background-image: url('{ensureProtocol(realm.url)}/images/default_welcome.png')"
+                  style="background-image: url('{ensureProtocol(realm.url)}/{realm.realm_welcome_image || 'images/welcome.png'}')"
                 ></div>
               {/if}
               <div class="card-accent"></div>
