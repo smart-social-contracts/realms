@@ -93,6 +93,17 @@
         }
       },
       "init_arg": "(opt variant { Init = record { ledger_id = principal \"aaaaa-aa\" } })"
+    },
+    "token_backend": {
+      "type": "custom",
+      "candid": "https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/token_backend.did",
+      "wasm": "https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/token_backend.wasm",
+      "remote": {
+        "id": {
+          "staging": "xbkkh-syaaa-aaaah-qq3ya-cai"
+        }
+      },
+      "init_arg": "(record { name = \"Simple Token\"; symbol = \"SMPL\"; decimals = 8 : nat8; total_supply = 100_000_000_000_000_000 : nat; fee = 10_000 : nat })"
     }
   },
   "defaults": { 
