@@ -152,7 +152,7 @@ test.describe('User workflows', () => {
 		await page.goto('/join');
 		await page.waitForLoadState('networkidle');
 		
-		const logoLink = page.getByRole('link').filter({ has: page.getByAltText('Realms Logo') });
+		const logoLink = page.locator('a[href="/"]').filter({ has: page.locator('img.h-8') }).first();
 		await expect(logoLink).toBeVisible();
 		await logoLink.click();
 		
