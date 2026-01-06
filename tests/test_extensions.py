@@ -8,7 +8,7 @@ from test_utils import assert_file_exists, assert_in, print_ok, run_command
 
 def get_extension_names():
     """Discover all extensions from the extensions directory"""
-    extensions_dir = "extensions"
+    extensions_dir = "extensions/extensions"
     if not os.path.exists(extensions_dir):
         return []
 
@@ -33,7 +33,7 @@ def test_extensions():
     )
 
     # Get absolute path to extensions directory
-    extensions_dir = os.path.abspath("extensions")
+    extensions_dir = os.path.abspath("extensions/extensions")
 
     for name in EXTENSION_NAMES:
         run_command(f"realms extension uninstall --extension-id {name} || true")

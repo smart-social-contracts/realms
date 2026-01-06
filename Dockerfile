@@ -47,7 +47,7 @@ RUN echo '"""' > src/realm_backend/extension_packages/extension_manifests.py && 
 
 # Demo stage: extends base and adds extensions folder for testing/demos
 FROM base AS demo
-COPY extensions ./extensions
+COPY extensions/extensions ./extensions/extensions
 
 FROM demo AS test
 
