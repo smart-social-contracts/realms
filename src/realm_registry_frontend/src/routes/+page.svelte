@@ -2158,6 +2158,15 @@
       padding: 1rem;
     }
 
+    .language-btn .current-locale,
+    .language-btn .chevron {
+      display: none;
+    }
+
+    .language-btn {
+      padding: 0.5rem;
+    }
+
     .header {
       margin-bottom: 1rem;
     }
