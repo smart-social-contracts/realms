@@ -21,4 +21,8 @@ CANISTER_IDS = {
     # Internet Identity canister for authentication
     # IC mainnet: rdmx6-jaaaa-aaaaa-aaadq-cai
     "internet_identity": "rdmx6-jaaaa-aaaaa-aaadq-cai",
+    
+    # Simple Token backend canister
+    # Staging: xbkkh-syaaa-aaaah-qq3ya-cai
+    "token_backend": "xbkkh-syaaa-aaaah-qq3ya-cai",
 }

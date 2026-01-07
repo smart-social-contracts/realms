@@ -147,7 +147,7 @@ else
 fi
 
 # Define shared canisters that may be skipped (deployed once by mundus)
-SHARED_CANISTERS="internet_identity ckbtc_ledger ckbtc_indexer"
+SHARED_CANISTERS="internet_identity ckbtc_ledger ckbtc_indexer token_backend"
 
 # Deploy shared canisters FIRST (if present and not already deployed)
 echo ""
