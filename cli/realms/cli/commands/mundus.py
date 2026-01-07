@@ -5,8 +5,9 @@ import os
 import shutil
 import subprocess
 import time
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 import typer
 from rich.console import Console
@@ -266,6 +267,37 @@ echo ""
     console.print(f"   ✅ Created orchestration script: scripts/deploy-all.sh")
 
 
+def _deploy_single_realm(
+    folder: str,
+    network: str,
+    mode: str,
+    identity: Optional[str],
+) -> Tuple[bool, str]:
+    """Deploy a single realm - designed to run in a subprocess.
+    
+    Returns:
+        Tuple of (success: bool, error_message: str)
+    """
+    try:
+        # Import here to avoid circular imports and ensure fresh import in subprocess
+        from .deploy import deploy_command as realm_deploy_command
+        
+        realm_deploy_command(
+            folder=folder,
+            network=network,
+            mode=mode,
+            identity=identity,
+        )
+        return (True, "")
+    except SystemExit as e:
+        # typer.Exit raises SystemExit
+        if e.code != 0:
+            return (False, f"Deployment exited with code {e.code}")
+        return (True, "")
+    except Exception as e:
+        return (False, str(e))
+
+
 def _inject_shared_canister_ids(shared_ids: dict, deploy_dir: Path, network: str) -> None:
     """Inject shared canister IDs into a realm/registry's canister_ids.json.
     
@@ -426,22 +458,47 @@ def mundus_deploy_command(
                 os.environ["REGISTRY_CANISTER_ID"] = backend_id
                 console.print(f"   Set REGISTRY_CANISTER_ID={backend_id}")
     
-    # 3. Deploy all realms (last)
-    console.print(f"🏛️  Deploying {len(realm_dirs)} realm(s)...\n")
+    # 3. Deploy all realms (last) - in parallel for speed
+    console.print(f"🏛️  Deploying {len(realm_dirs)} realm(s) in parallel...\n")
     
-    for realm_dir in realm_dirs:
-        console.print(f"   📦 Deploying {realm_dir.name}...")
-        try:
-            realm_deploy_command(
-                folder=str(realm_dir),
-                network=network,
-                mode=mode,
-                identity=identity,
-            )
-            console.print(f"   ✅ {realm_dir.name} deployed\n")
-        except Exception as e:
-            console.print(f"[red]   ❌ Failed to deploy {realm_dir.name}: {e}[/red]")
-            raise typer.Exit(1)
+    failed_realms = []
+    successful_realms = []
+    
+    # Use ProcessPoolExecutor for parallel deployment
+    with ProcessPoolExecutor(max_workers=len(realm_dirs)) as executor:
+        # Submit all realm deployments
+        future_to_realm = {
+            executor.submit(
+                _deploy_single_realm,
+                str(realm_dir),
+                network,
+                mode,
+                identity,
+            ): realm_dir for realm_dir in realm_dirs
+        }
+        
+        # Collect results as they complete
+        for future in as_completed(future_to_realm):
+            realm_dir = future_to_realm[future]
+            try:
+                success, error_msg = future.result()
+                if success:
+                    console.print(f"   ✅ {realm_dir.name} deployed")
+                    successful_realms.append(realm_dir)
+                else:
+                    console.print(f"[red]   ❌ {realm_dir.name} failed: {error_msg}[/red]")
+                    failed_realms.append((realm_dir, error_msg))
+            except Exception as e:
+                console.print(f"[red]   ❌ {realm_dir.name} failed: {e}[/red]")
+                failed_realms.append((realm_dir, str(e)))
+    
+    console.print("")  # Blank line after parallel deployments
+    
+    if failed_realms:
+        console.print(f"[red]❌ {len(failed_realms)} realm(s) failed to deploy:[/red]")
+        for realm_dir, error in failed_realms:
+            console.print(f"[red]   • {realm_dir.name}: {error}[/red]")
+        raise typer.Exit(1)
     
     console.print(Panel.fit(
         "[bold green]✅ Mundus Deployment Complete[/bold green]",
