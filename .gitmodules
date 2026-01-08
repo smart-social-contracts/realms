@@ -1,3 +1,6 @@
 [submodule "extensions"]
 	path = extensions
 	url = git@github.com:smart-social-contracts/realms-extensions.git
+[submodule "codices"]
+	path = codices
+	url = git@github.com:smart-social-contracts/realms-codices.git
