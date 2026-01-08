@@ -587,8 +587,13 @@ with open('$ids_file', 'w') as f:
 }
 
 # Find backend and frontend canisters that match our patterns
+# Skip shared canisters (they shouldn't be aliased to realm_backend)
 for canister in $BACKENDS; do
     if [[ "$canister" == *_backend ]]; then
+        # Skip shared canisters - they shouldn't override the realm_backend alias
+        if echo "$SHARED_CANISTERS" | grep -qw "$canister"; then
+            continue
+        fi
         canister_id=$(dfx canister id "$canister" 2>/dev/null || echo "")
         if [ -n "$canister_id" ]; then
             echo "   Adding alias: realm_backend -> $canister ($canister_id)"
