@@ -22,7 +22,8 @@ class Token(Entity, TimestampedMixin):
     - "realm": Realm-specific token (e.g., Dominion Token)
     """
     
-    __alias__ = "symbol"
+    __alias__ = "id"
+    id = String(max_length=16)  # Symbol serves as ID: e.g., "ckBTC", "REALMS", "DOM"
     symbol = String(max_length=16)  # e.g., "ckBTC", "REALMS", "DOM"
     name = String(max_length=64)  # e.g., "ckBTC", "REALMS Token", "Dominion Token"
     ledger_canister_id = String(max_length=64)  # Principal ID of the ledger canister

@@ -332,9 +332,10 @@ try:
         python_code = f'''
 from ggg import Token
 # Check if token already exists
-existing = [t for t in Token.instances() if t.symbol == "{token['symbol']}"]
+existing = [t for t in Token.instances() if t.id == "{token['symbol']}"]
 if existing:
     t = existing[0]
+    t.symbol = "{token['symbol']}"
     t.name = "{token['name']}"
     t.ledger_canister_id = "{token['ledger_canister_id']}"
     t.indexer_canister_id = "{token['indexer_canister_id']}"
@@ -344,6 +345,7 @@ if existing:
     "updated"
 else:
     Token(
+        id="{token['symbol']}",
         symbol="{token['symbol']}",
         name="{token['name']}",
         ledger_canister_id="{token['ledger_canister_id']}",
