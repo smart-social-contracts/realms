@@ -89,14 +89,14 @@ def list_objects_paginated(
         else:
             class_object = globals()[class_name]
         count = class_object.count()
-        logger.info(f"Total count: {count}")
+        max_id = class_object.max_id()
+        logger.info(f"Total count: {count}, max_id: {max_id}")
 
         if order == "desc":
-            # For descending order with efficient loading:
-            # Assume IDs are mostly sequential. Load from calculated position.
-            # Page 0: from_id = count - page_size + 1 (e.g., 94 for 103 total, size 10)
-            # Page 1: from_id = count - 2*page_size + 1 (e.g., 84)
-            from_id = max(1, count - ((page_num + 1) * page_size) + 1)
+            # For descending order: use max_id to calculate from_id
+            # Page 0: load last page_size items (max_id - page_size + 1 to max_id)
+            # Page 1: load previous page_size items, etc.
+            from_id = max(1, max_id - ((page_num + 1) * page_size) + 1)
 
             logger.info(
                 f"Listing objects (desc): loading {page_size} items from ID {from_id}"
@@ -107,7 +107,9 @@ def list_objects_paginated(
             objects.reverse()
         else:
             # For ascending order, use standard pagination
-            from_id = page_num * page_size + 1
+            # Calculate min_id from max_id and count
+            min_id = max(1, max_id - count + 1)
+            from_id = min_id + (page_num * page_size)
             logger.info(
                 f"Listing objects (asc) from {from_id} with page size {page_size}"
             )

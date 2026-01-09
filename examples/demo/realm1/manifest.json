@@ -5,6 +5,7 @@
   "logo": "emblem.png",
   "welcome_image": "background.png",
   "welcome_message": "Welcome to Dominion. Efficient governance through algorithmic oversight. Your compliance ensures collective prosperity.",
+  "codex": "dominion",
   "options": {
     "random": {
       "members": 50,
@@ -13,21 +14,5 @@
       "disputes": 10,
       "seed": 1
     }
-  },
-  "entity_method_overrides": [
-    {
-      "entity": "User",
-      "method": "user_register_posthook",
-      "type": "staticmethod",
-      "implementation": "Codex.user_registration_hook_codex.user_register_posthook",
-      "description": "Custom post-registration hook for new users"
-    },
-    {
-      "entity": "Treasury",
-      "method": "send",
-      "type": "staticmethod",
-      "implementation": "Codex.treasury_send_hook_codex.send_hook",
-      "description": "Custom send hook for treasuries"
-    }
-  ]
+  }
 }

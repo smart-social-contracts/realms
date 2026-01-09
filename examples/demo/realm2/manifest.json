@@ -5,6 +5,7 @@
   "logo": "emblem.png",
   "welcome_image": "background.png",
   "welcome_message": "Welcome to Agora! Join our transparent, participatory community where every citizen has a voice and governance serves the people.",
+  "codex": "agora",
   "options": {
     "random": {
       "members": 30,
@@ -13,21 +14,5 @@
       "disputes": 5,
       "seed": 2
     }
-  },
-  "entity_method_overrides": [
-    {
-      "entity": "User",
-      "method": "user_register_posthook",
-      "type": "staticmethod",
-      "implementation": "Codex.user_registration_hook_codex.user_register_posthook",
-      "description": "Custom post-registration hook for new users"
-    },
-    {
-      "entity": "Treasury",
-      "method": "send",
-      "type": "staticmethod",
-      "implementation": "Codex.treasury_send_hook_codex.send_hook",
-      "description": "Custom send hook for treasuries"
-    }
-  ]
+  }
 }

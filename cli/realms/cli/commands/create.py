@@ -283,9 +283,24 @@ def create_command(
             json.dump(realm_data_serialized, f, indent=2)
         console.print(f"[dim]Generated realm data saved to: {json_file}[/dim]")
         
-        # Generate codex files
-        codex_files = generator.generate_codex_files(output_path)
+        # Generate codex files - get codex name from manifest if available
+        codex_name = realm_manifest.get("codex") if 'realm_manifest' in dir() else None
+        codex_result = generator.generate_codex_files(output_path, codex_name=codex_name)
+        codex_files = codex_result.get("codex_files", [])
+        codex_extensions = codex_result.get("extensions", [])
+        codex_overrides = codex_result.get("entity_method_overrides", [])
         console.print(f"[dim]Generated {len(codex_files)} codex files[/dim]")
+        
+        # If codex provided entity_method_overrides, merge them into the realm manifest
+        if codex_overrides and (output_path / "manifest.json").exists():
+            with open(output_path / "manifest.json", 'r') as f:
+                output_manifest = json.load(f)
+            output_manifest["entity_method_overrides"] = codex_overrides
+            if codex_extensions:
+                output_manifest["extensions"] = codex_extensions
+            with open(output_path / "manifest.json", 'w') as f:
+                json.dump(output_manifest, f, indent=2)
+            console.print(f"[dim]Updated manifest with {len(codex_overrides)} method overrides from codex[/dim]")
         
         console.print(f"[dim]Seed used: {generator.seed}[/dim]")
         
@@ -408,7 +423,7 @@ def _generate_deployment_scripts(
         
         # Include any ICRC-1 ledger canisters if they exist
         for canister_name, canister_config in dfx_config["canisters"].items():
-            if any(keyword in canister_name.lower() for keyword in ["icrc1", "ledger", "indexer"]) and canister_name not in realm_canisters:
+            if any(keyword in canister_name.lower() for keyword in ["icrc1", "ledger", "indexer", "token_backend"]) and canister_name not in realm_canisters:
                 # Use standard name if canister_ids exists, otherwise unique name
                 if canister_ids_file.exists():
                     ledger_name = canister_name
@@ -478,7 +493,13 @@ def _generate_deployment_scripts(
     extensions_dest = output_path / "extensions"
     extensions_source = repo_root / "extensions"
     if extensions_source.exists():
-        if not extensions_dest.exists():
+        # Check if extensions directory is empty (likely uninitialized submodule)
+        extensions_contents = list(extensions_source.iterdir())
+        if not extensions_contents or (len(extensions_contents) == 1 and extensions_contents[0].name == '.git'):
+            console.print(f"   [yellow]⚠️  Warning: extensions/ directory is empty![/yellow]")
+            console.print(f"   [yellow]   This is likely because the git submodule is not initialized.[/yellow]")
+            console.print(f"   [yellow]   Run: git submodule update --init --recursive[/yellow]")
+        elif not extensions_dest.exists():
             ignore_patterns = shutil.ignore_patterns(
                 '__pycache__', '*.pyc', 'venv', '.venv', 'node_modules'
             )
@@ -486,10 +507,12 @@ def _generate_deployment_scripts(
             console.print(f"   ✅ Copied extensions/ directory")
         
         # Always replace timestamp placeholders in extension data files
-        _replace_timestamp_placeholders(extensions_dest)
-        console.print(f"   ✅ Replaced timestamp placeholders in extension data")
+        if extensions_dest.exists():
+            _replace_timestamp_placeholders(extensions_dest)
+            console.print(f"   ✅ Replaced timestamp placeholders in extension data")
     else:
-        console.print(f"   ⚠️  Warning: Could not find extensions directory at {extensions_source}")
+        console.print(f"   [yellow]⚠️  Warning: Could not find extensions directory at {extensions_source}[/yellow]")
+        console.print(f"   [yellow]   Run: git submodule update --init --recursive[/yellow]")
     
     # 2. Create scripts subdirectory
     console.print("\n🔧 Generating deployment scripts...")

@@ -21,4 +21,9 @@ CANISTER_IDS = {
     # Internet Identity canister for authentication
     # IC mainnet: rdmx6-jaaaa-aaaaa-aaadq-cai
     "internet_identity": "rdmx6-jaaaa-aaaaa-aaadq-cai",
+    
+    # REALM token canister (ledger + indexer in one canister)
+    # Staging: xbkkh-syaaa-aaaah-qq3ya-cai
+    "realm_token_ledger": "xbkkh-syaaa-aaaah-qq3ya-cai",
+    "realm_token_indexer": "xbkkh-syaaa-aaaah-qq3ya-cai",  # Same canister provides both
 }
