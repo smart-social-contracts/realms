@@ -4,5 +4,8 @@
   },
   "realm_frontend": {
     "staging": "2madn-vqaaa-aaaac-qcymq-cai"
+  },
+  "token_backend": {
+    "staging": "tgp4d-piaaa-aaaah-qq46q-cai"
   }
 }

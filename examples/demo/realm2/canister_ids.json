@@ -4,5 +4,8 @@
   },
   "realm_frontend": {
     "staging": "3gpbx-xaaaa-aaaac-qcylq-cai"
+  },
+  "token_backend": {
+    "staging": "tbo2x-cqaaa-aaaah-qq46a-cai"
   }
 }

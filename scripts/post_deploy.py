@@ -262,6 +262,9 @@ try:
     MAINNET_CKBTC_LEDGER = "mxzaz-hqaaa-aaaar-qaada-cai"
     MAINNET_CKBTC_INDEXER = "n5wcd-faaaa-aaaar-qaaea-cai"
     
+    # Staging shared REALMS token (kybra-simple-token deployment)
+    STAGING_REALMS_TOKEN = "xbkkh-syaaa-aaaah-qq3ya-cai"
+    
     # 1. ckBTC (shared)
     ckbtc_ledger_id = None
     ckbtc_indexer_id = None
@@ -299,6 +302,12 @@ try:
     
     # 2. REALMS token (shared mundus token)
     realms_token_id = os.environ.get('REALMS_TOKEN_CANISTER_ID')
+    
+    # Fallback to staging REALMS token if env var not set
+    if not realms_token_id and network in ('staging', 'ic'):
+        realms_token_id = STAGING_REALMS_TOKEN
+        print(f"   ℹ️  Using staging REALMS token: {realms_token_id}")
+    
     if realms_token_id:
         tokens_to_seed.append({
             "symbol": "REALMS",

@@ -10,5 +10,8 @@
   },
   "ckbtc_indexer": {
     "staging": "n5wcd-faaaa-aaaar-qaaea-cai"
+  },
+  "token_backend": {
+    "staging": "tujl2-dyaaa-aaaah-qq45q-cai"
   }
 }
