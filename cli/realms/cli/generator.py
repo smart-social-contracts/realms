@@ -452,40 +452,86 @@ class RealmGenerator:
         ret.append(user_reg_hook_codex)
         return ret
     
-    def generate_codex_files(self, output_dir: Path, demo_folder: Optional[str] = None) -> List[str]:
-        """Copy Python codex files from examples/demo/realm_common folder"""
-        codex_files = []
+    def generate_codex_files(self, output_dir: Path, codex_name: Optional[str] = None) -> Dict[str, Any]:
+        """Copy Python codex files from codices submodule or fallback to realm_common.
         
-        # Get the path to the examples/demo/realm_common folder
+        Args:
+            output_dir: Directory to copy codex files to
+            codex_name: Name of codex package in codices/codices/ (e.g., 'dominion', 'agora')
+        
+        Returns:
+            Dict with keys:
+                - codex_files: List of copied file paths
+                - entity_method_overrides: List from codex manifest (or empty)
+                - extensions: List of extension names from codex manifest (or empty)
+        """
+        codex_files = []
+        entity_method_overrides = []
+        extensions = []
+        
         script_dir = Path(__file__).parent
         repo_root = script_dir.parent
         
-        # Always use realm_common for shared codex files
-        examples_common_dir = repo_root / "examples" / "demo" / "realm_common"
+        # Try to load from codices submodule first
+        codices_dir = repo_root / "codices" / "codices"
+        codex_dir = codices_dir / codex_name if codex_name else None
         
-        # List of codex files to copy (shared across all realms)
-        demo_codex_files = [
-            "adjustments.py",
-            "tax_collection_codex.py",
-            "social_benefits_codex.py",
-            "governance_automation_codex.py",
-            "user_registration_hook_codex.py",
-            "satoshi_transfer_codex.py"
-        ]
-        
-        # Copy each codex file from realm_common to output directory
-        for codex_filename in demo_codex_files:
-            source_file = examples_common_dir / codex_filename
-            
-            if source_file.exists():
-                dest_file = output_dir / codex_filename
-                shutil.copy2(source_file, dest_file)
-                codex_files.append(str(dest_file))
-                print(f"  Copied {codex_filename} from realm_common/")
+        if codex_name and codex_dir and codex_dir.exists():
+            # Load codex manifest
+            codex_manifest_path = codex_dir / "manifest.json"
+            if codex_manifest_path.exists():
+                with open(codex_manifest_path, 'r') as f:
+                    codex_manifest = json.load(f)
+                
+                entity_method_overrides = codex_manifest.get("entity_method_overrides", [])
+                extensions = codex_manifest.get("extensions", [])
+                codex_file_list = codex_manifest.get("codex_files", [])
+                
+                print(f"  Loading codex '{codex_name}' from codices submodule")
+                print(f"    Extensions: {extensions}")
+                print(f"    Method overrides: {len(entity_method_overrides)}")
+                
+                # Copy codex files listed in manifest
+                for codex_filename in codex_file_list:
+                    source_file = codex_dir / codex_filename
+                    if source_file.exists():
+                        dest_file = output_dir / codex_filename
+                        shutil.copy2(source_file, dest_file)
+                        codex_files.append(str(dest_file))
+                        print(f"    Copied {codex_filename}")
+                    else:
+                        print(f"    Warning: {codex_filename} not found in {codex_dir}")
             else:
-                print(f"  Warning: {codex_filename} not found in {examples_common_dir}")
+                print(f"  Warning: No manifest.json found in codex '{codex_name}'")
+        else:
+            # Fallback to realm_common for backwards compatibility
+            print(f"  Codex '{codex_name}' not found in codices submodule, falling back to realm_common")
+            examples_common_dir = repo_root / "examples" / "demo" / "realm_common"
+            
+            demo_codex_files = [
+                "adjustments.py",
+                "tax_collection_codex.py",
+                "social_benefits_codex.py",
+                "governance_automation_codex.py",
+                "user_registration_hook_codex.py",
+                "satoshi_transfer_codex.py"
+            ]
+            
+            for codex_filename in demo_codex_files:
+                source_file = examples_common_dir / codex_filename
+                if source_file.exists():
+                    dest_file = output_dir / codex_filename
+                    shutil.copy2(source_file, dest_file)
+                    codex_files.append(str(dest_file))
+                    print(f"  Copied {codex_filename} from realm_common/")
+                else:
+                    print(f"  Warning: {codex_filename} not found in {examples_common_dir}")
         
-        return codex_files
+        return {
+            "codex_files": codex_files,
+            "entity_method_overrides": entity_method_overrides,
+            "extensions": extensions
+        }
 
 def main():
     parser = argparse.ArgumentParser(description="Generate realistic realm demo data")
