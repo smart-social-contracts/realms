@@ -11,8 +11,9 @@ import json
 import time
 
 # Determine working directory (can be overridden via REALM_DIR env var)
+# Default to current working directory (where script is invoked from)
 script_dir = os.path.dirname(os.path.abspath(__file__))
-realm_dir = os.environ.get('REALM_DIR', os.path.dirname(script_dir))
+realm_dir = os.environ.get('REALM_DIR', os.getcwd())
 os.chdir(realm_dir)
 
 # Network from env var or command line arg
@@ -325,10 +326,37 @@ try:
     except Exception as e:
         print(f"   ⚠️  Could not get token_backend canister ID: {e}")
     
-    # Seed each token via dfx canister call
+    # Seed each token via execute_code (since upsert_object doesn't exist)
     for token in tokens_to_seed:
-        token_json = json.dumps(token, ensure_ascii=False).replace('"', '\\"')
-        seed_cmd = ['dfx', 'canister', 'call', backend_name, 'upsert_object', f'("Token", "{token_json}")']
+        # Build Python code to create the Token entity
+        python_code = f'''
+from ggg import Token
+# Check if token already exists
+existing = [t for t in Token.instances() if t.symbol == "{token['symbol']}"]
+if existing:
+    t = existing[0]
+    t.name = "{token['name']}"
+    t.ledger_canister_id = "{token['ledger_canister_id']}"
+    t.indexer_canister_id = "{token['indexer_canister_id']}"
+    t.decimals = {token['decimals']}
+    t.token_type = "{token['token_type']}"
+    t.enabled = "{token['enabled']}"
+    "updated"
+else:
+    Token(
+        symbol="{token['symbol']}",
+        name="{token['name']}",
+        ledger_canister_id="{token['ledger_canister_id']}",
+        indexer_canister_id="{token['indexer_canister_id']}",
+        decimals={token['decimals']},
+        token_type="{token['token_type']}",
+        enabled="{token['enabled']}"
+    )
+    "created"
+'''
+        # Escape the code for shell
+        escaped_code = python_code.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
+        seed_cmd = ['dfx', 'canister', 'call', backend_name, 'execute_code', f'("{escaped_code}")']
         if network != 'local':
             seed_cmd.extend(['--network', network])
         result = subprocess.run(seed_cmd, cwd=realm_dir, capture_output=True, text=True)
