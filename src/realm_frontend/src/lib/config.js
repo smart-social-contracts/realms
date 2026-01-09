@@ -11,6 +11,8 @@ export const CONFIG = {
   ckbtc_ledger_canister_id: 'mxzaz-hqaaa-aaaar-qaada-cai',
   ckbtc_indexer_canister_id: 'n5wcd-faaaa-aaaar-qaaea-cai',
   token_backend_canister_id: 'xbkkh-syaaa-aaaah-qq3ya-cai',
+  realm_token_name: 'REALMS Token',
+  realm_token_symbol: 'REALMS',
 };
 
 export const DEV_PORT = 8000;

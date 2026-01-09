@@ -689,6 +689,81 @@ def mundus_status_command(
             except:
                 pass
         
+        # Check for ckBTC canisters (may be in realm dfx.json, not mundus)
+        # First try mundus dfx.json, then fall back to first realm's dfx.json
+        ckbtc_dfx_path = mundus_dfx_path
+        ckbtc_cwd = mundus_path
+        realm_dirs = sorted(mundus_path.glob("realm_*"))
+        if realm_dirs:
+            first_realm_dfx = realm_dirs[0] / "dfx.json"
+            if first_realm_dfx.exists():
+                ckbtc_dfx_path = first_realm_dfx
+                ckbtc_cwd = realm_dirs[0]
+        
+        if ckbtc_dfx_path.exists():
+            try:
+                with open(ckbtc_dfx_path, 'r') as f:
+                    ckbtc_dfx = json.load(f)
+                ckbtc_canisters = [c for c in ckbtc_dfx.get("canisters", {}).keys() 
+                                   if c.startswith("ckbtc_")]
+                if ckbtc_canisters:
+                    console.print("   [bold]₿ ckBTC:[/bold]")
+                    for canister_name in sorted(ckbtc_canisters):
+                        try:
+                            id_result = subprocess.run(
+                                ["dfx", "canister", "id", canister_name, "--network", network],
+                                capture_output=True, text=True, timeout=5, cwd=ckbtc_cwd
+                            )
+                            if id_result.returncode == 0:
+                                cid = id_result.stdout.strip()
+                                if network == "local":
+                                    url = f"http://{cid}.localhost:8000/"
+                                elif network in ["staging", "ic"]:
+                                    url = f"https://{cid}.icp0.io/"
+                                else:
+                                    url = ""
+                                console.print(f"      [green]✅ {canister_name}[/green]")
+                                console.print(f"         [dim]{url}[/dim]")
+                            else:
+                                console.print(f"      [yellow]⚠️  {canister_name} not deployed[/yellow]")
+                        except:
+                            console.print(f"      [yellow]⚠️  Could not check {canister_name} status[/yellow]")
+            except:
+                pass
+        
+        # Check for Internet Identity canister (may be in realm dfx.json, not mundus)
+        # Use the same path as ckbtc (first realm's dfx.json)
+        ii_dfx_path = ckbtc_dfx_path
+        ii_cwd = ckbtc_cwd
+        
+        if ii_dfx_path.exists():
+            try:
+                with open(ii_dfx_path, 'r') as f:
+                    ii_dfx = json.load(f)
+                if "internet_identity" in ii_dfx.get("canisters", {}):
+                    console.print("   [bold]🔐 Identity:[/bold]")
+                    try:
+                        id_result = subprocess.run(
+                            ["dfx", "canister", "id", "internet_identity", "--network", network],
+                            capture_output=True, text=True, timeout=5, cwd=ii_cwd
+                        )
+                        if id_result.returncode == 0:
+                            cid = id_result.stdout.strip()
+                            if network == "local":
+                                url = f"http://{cid}.localhost:8000/"
+                            elif network in ["staging", "ic"]:
+                                url = f"https://{cid}.icp0.io/"
+                            else:
+                                url = ""
+                            console.print(f"      [green]✅ internet_identity[/green]")
+                            console.print(f"         [dim]{url}[/dim]")
+                        else:
+                            console.print(f"      [yellow]⚠️  internet_identity not deployed[/yellow]")
+                    except:
+                        console.print(f"      [yellow]⚠️  Could not check internet_identity status[/yellow]")
+            except:
+                pass
+        
         # Find realms
         realm_dirs = sorted(mundus_path.glob("realm_*"))
         if realm_dirs:

@@ -36,7 +36,7 @@ def get_local_port() -> str:
     return "8000"
 
 
-def update_frontend_config(ii_id: str, ckbtc_ledger_id: str, ckbtc_indexer_id: str, token_backend_id: str, network: str) -> None:
+def update_frontend_config(ii_id: str, ckbtc_ledger_id: str, ckbtc_indexer_id: str, token_backend_id: str, network: str, token_name: str = "", token_symbol: str = "") -> None:
     """Update frontend config.js with canister IDs."""
     import re
     
@@ -60,6 +60,10 @@ def update_frontend_config(ii_id: str, ckbtc_ledger_id: str, ckbtc_indexer_id: s
         content = re.sub(r"ckbtc_indexer_canister_id: '[^']*'", f"ckbtc_indexer_canister_id: '{ckbtc_indexer_id}'", content)
     if token_backend_id:
         content = re.sub(r"token_backend_canister_id: '[^']*'", f"token_backend_canister_id: '{token_backend_id}'", content)
+    if token_name:
+        content = re.sub(r"realm_token_name: '[^']*'", f"realm_token_name: '{token_name}'", content)
+    if token_symbol:
+        content = re.sub(r"realm_token_symbol: '[^']*'", f"realm_token_symbol: '{token_symbol}'", content)
     
     CONFIG_FILE_FRONTEND.write_text(content)
     print(f"✅ Updated {CONFIG_FILE_FRONTEND}")
@@ -83,12 +87,16 @@ def update_backend_config(ii_id: str, ckbtc_ledger_id: str, ckbtc_indexer_id: st
         content = re.sub(r'"ckbtc_indexer": "[^"]*"', f'"ckbtc_indexer": "{ckbtc_indexer_id}"', content)
     if token_backend_id:
         content = re.sub(r'"token_backend": "[^"]*"', f'"token_backend": "{token_backend_id}"', content)
+        # Also update realm_token_ledger and realm_token_indexer (same canister for simple token)
+        content = re.sub(r'"realm_token_ledger": "[^"]*"', f'"realm_token_ledger": "{token_backend_id}"', content)
+        content = re.sub(r'"realm_token_indexer": "[^"]*"', f'"realm_token_indexer": "{token_backend_id}"', content)
     
     CONFIG_FILE_BACKEND.write_text(content)
     print(f"✅ Updated {CONFIG_FILE_BACKEND}")
 
 
 def main(network: str):
+    import json
     print(f"🔧 Setting canister config for network: {network}")
     
     # Get canister IDs
@@ -105,8 +113,25 @@ def main(network: str):
     print(f"   ckbtc_indexer: {ckbtc_indexer_id or 'not found'}")
     print(f"   token_backend: {token_backend_id or 'not found'}")
 
+    # Read token name/symbol from manifest if available
+    token_name = ""
+    token_symbol = ""
+    manifest_path = Path("manifest.json")
+    if manifest_path.exists():
+        try:
+            with open(manifest_path, 'r') as f:
+                manifest = json.load(f)
+            token_config = manifest.get("token", {})
+            token_name = token_config.get("name", "")
+            token_symbol = token_config.get("symbol", "")
+            if token_name:
+                print(f"   token_name: {token_name}")
+                print(f"   token_symbol: {token_symbol}")
+        except Exception as e:
+            print(f"Warning: Could not read manifest.json: {e}")
+
     # Update config files
-    update_frontend_config(ii_id, ckbtc_ledger_id, ckbtc_indexer_id, token_backend_id, network)
+    update_frontend_config(ii_id, ckbtc_ledger_id, ckbtc_indexer_id, token_backend_id, network, token_name, token_symbol)
     update_backend_config(ii_id, ckbtc_ledger_id, ckbtc_indexer_id, token_backend_id)
 
 
