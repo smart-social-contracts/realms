@@ -258,7 +258,13 @@ try:
     # Get canister IDs for tokens
     tokens_to_seed = []
     
+    # Mainnet/staging ckBTC canister IDs (these are fixed on IC mainnet)
+    MAINNET_CKBTC_LEDGER = "mxzaz-hqaaa-aaaar-qaada-cai"
+    MAINNET_CKBTC_INDEXER = "n5wcd-faaaa-aaaar-qaaea-cai"
+    
     # 1. ckBTC (shared)
+    ckbtc_ledger_id = None
+    ckbtc_indexer_id = None
     try:
         result = subprocess.run(
             ['dfx', 'canister', 'id', 'ckbtc_ledger', '--network', network],
@@ -271,17 +277,25 @@ try:
                 capture_output=True, text=True, timeout=5
             )
             ckbtc_indexer_id = result.stdout.strip() if result.returncode == 0 else ckbtc_ledger_id
-            tokens_to_seed.append({
-                "symbol": "ckBTC",
-                "name": "ckBTC",
-                "ledger_canister_id": ckbtc_ledger_id,
-                "indexer_canister_id": ckbtc_indexer_id,
-                "decimals": 8,
-                "token_type": "shared",
-                "enabled": "true"
-            })
-    except Exception as e:
-        print(f"   ⚠️  Could not get ckBTC canister ID: {e}")
+    except Exception:
+        pass
+    
+    # Fallback to mainnet IDs for staging/ic networks
+    if not ckbtc_ledger_id and network in ('staging', 'ic'):
+        ckbtc_ledger_id = MAINNET_CKBTC_LEDGER
+        ckbtc_indexer_id = MAINNET_CKBTC_INDEXER
+        print(f"   ℹ️  Using mainnet ckBTC canister IDs")
+    
+    if ckbtc_ledger_id:
+        tokens_to_seed.append({
+            "symbol": "ckBTC",
+            "name": "ckBTC",
+            "ledger_canister_id": ckbtc_ledger_id,
+            "indexer_canister_id": ckbtc_indexer_id or ckbtc_ledger_id,
+            "decimals": 8,
+            "token_type": "shared",
+            "enabled": "true"
+        })
     
     # 2. REALMS token (shared mundus token)
     realms_token_id = os.environ.get('REALMS_TOKEN_CANISTER_ID')
@@ -295,8 +309,11 @@ try:
             "token_type": "shared",
             "enabled": "true"
         })
+    else:
+        print(f"   ℹ️  REALMS_TOKEN_CANISTER_ID not set, skipping REALMS token")
     
     # 3. Realm-specific token (from token_backend)
+    realm_token_id = None
     try:
         result = subprocess.run(
             ['dfx', 'canister', 'id', 'token_backend', '--network', network],
@@ -304,27 +321,33 @@ try:
         )
         if result.returncode == 0:
             realm_token_id = result.stdout.strip()
-            # Get token name/symbol from manifest
-            manifest_path = os.path.join(realm_dir, 'manifest.json')
-            token_name = "Realm Token"
-            token_symbol = "RLM"
-            if os.path.exists(manifest_path):
-                with open(manifest_path, 'r') as f:
-                    manifest = json.load(f)
-                token_config = manifest.get("token", {})
-                token_name = token_config.get("name", f"{manifest.get('name', 'Realm')} Token")
-                token_symbol = token_config.get("symbol", manifest.get('name', 'RLM')[:3].upper())
-            tokens_to_seed.append({
-                "symbol": token_symbol,
-                "name": token_name,
-                "ledger_canister_id": realm_token_id,
-                "indexer_canister_id": realm_token_id,
-                "decimals": 8,
-                "token_type": "realm",
-                "enabled": "true"
-            })
-    except Exception as e:
-        print(f"   ⚠️  Could not get token_backend canister ID: {e}")
+    except Exception:
+        pass
+    
+    if realm_token_id:
+        # Get token name/symbol from manifest
+        manifest_path = os.path.join(realm_dir, 'manifest.json')
+        token_name = "Realm Token"
+        token_symbol = "RLM"
+        if os.path.exists(manifest_path):
+            with open(manifest_path, 'r') as f:
+                manifest = json.load(f)
+            token_config = manifest.get("token", {})
+            token_name = token_config.get("name", f"{manifest.get('name', 'Realm')} Token")
+            token_symbol = token_config.get("symbol", manifest.get('name', 'RLM')[:3].upper())
+        tokens_to_seed.append({
+            "symbol": token_symbol,
+            "name": token_name,
+            "ledger_canister_id": realm_token_id,
+            "indexer_canister_id": realm_token_id,
+            "decimals": 8,
+            "token_type": "realm",
+            "enabled": "true"
+        })
+    else:
+        print(f"   ℹ️  No token_backend found for this realm, skipping realm token")
+    
+    print(f"   📊 Tokens to seed: {len(tokens_to_seed)}")
     
     # Seed each token via execute_code (since upsert_object doesn't exist)
     for token in tokens_to_seed:
