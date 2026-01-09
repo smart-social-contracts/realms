@@ -372,6 +372,13 @@ def mundus_deploy_command(
     # Track shared canister IDs to inject into each realm
     shared_canister_ids = {}
     
+    # Load mundus manifest for token config
+    mundus_manifest_path = mundus_path / "manifest.json"
+    mundus_config = {}
+    if mundus_manifest_path.exists():
+        with open(mundus_manifest_path, 'r') as f:
+            mundus_config = json.load(f)
+    
     # 1. Deploy shared canisters (local only - on IC, production canisters are used)
     if network == "local":
         first_realm = realm_dirs[0]
@@ -414,6 +421,73 @@ def mundus_deploy_command(
                     for deploy_dir in list(registry_dirs) + list(realm_dirs):
                         _inject_shared_canister_ids(shared_canister_ids, deploy_dir, network)
                     console.print("")
+        
+        # 1b. Deploy shared REALMS token at mundus level
+        mundus_token_config = mundus_config.get("token", {})
+        if mundus_token_config:
+            console.print("🪙 Deploying shared REALMS token...")
+            
+            # Create a temporary dfx.json for the REALMS token in mundus directory
+            token_name = mundus_token_config.get("name", "REALMS Token")
+            token_symbol = mundus_token_config.get("symbol", "REALMS")
+            token_decimals = mundus_token_config.get("decimals", 8)
+            token_supply = mundus_token_config.get("total_supply", 100000000000000000)
+            
+            # Get token_backend config from first realm's dfx.json
+            if dfx_json_path.exists():
+                token_backend_config = dfx_config.get("canisters", {}).get("token_backend", {})
+                if token_backend_config:
+                    import copy
+                    realms_token_config = copy.deepcopy(token_backend_config)
+                    
+                    # Update init_arg with REALMS token config
+                    init_arg = f'(record {{ name = "{token_name}"; symbol = "{token_symbol}"; decimals = {token_decimals} : nat8; total_supply = {token_supply} : nat; fee = 10_000 : nat }})'
+                    realms_token_config["init_arg"] = init_arg
+                    
+                    # Create mundus-level dfx.json for REALMS token
+                    mundus_dfx = {
+                        "canisters": {
+                            "realms_token": realms_token_config
+                        },
+                        "defaults": dfx_config.get("defaults", {}),
+                        "networks": dfx_config.get("networks", {}),
+                        "output_env_file": ".env",
+                        "version": dfx_config.get("version", 1)
+                    }
+                    
+                    mundus_dfx_path = mundus_path / "dfx.json"
+                    with open(mundus_dfx_path, 'w') as f:
+                        json.dump(mundus_dfx, f, indent=2)
+                    
+                    # Deploy REALMS token from mundus directory
+                    try:
+                        result = subprocess.run(
+                            ["dfx", "deploy", "realms_token", "--network", network, "--yes"],
+                            cwd=mundus_path, capture_output=True, text=True
+                        )
+                        if result.returncode == 0:
+                            console.print(f"   ✅ realms_token deployed as '{token_name}' ({token_symbol})")
+                            # Get the canister ID
+                            id_result = subprocess.run(
+                                ["dfx", "canister", "id", "realms_token", "--network", network],
+                                cwd=mundus_path, capture_output=True, text=True
+                            )
+                            if id_result.returncode == 0:
+                                shared_canister_ids["realms_token"] = {network: id_result.stdout.strip()}
+                                console.print(f"   📍 Canister ID: {id_result.stdout.strip()}")
+                        else:
+                            console.print(f"[yellow]   ⚠️  realms_token deployment failed: {result.stderr}[/yellow]")
+                    except Exception as e:
+                        console.print(f"[yellow]   ⚠️  realms_token deployment failed: {e}[/yellow]")
+                    
+                    console.print("")
+                    
+                    # Re-inject shared canister IDs (now including realms_token)
+                    if "realms_token" in shared_canister_ids:
+                        console.print("📋 Injecting REALMS token ID into realms...")
+                        for deploy_dir in list(registry_dirs) + list(realm_dirs):
+                            _inject_shared_canister_ids({"realms_token": shared_canister_ids["realms_token"]}, deploy_dir, network)
+                        console.print("")
     
     # 2. Deploy registry
     registry_canister_ids = {}
@@ -580,6 +654,41 @@ def mundus_status_command(
             for registry_dir in registry_dirs:
                 _print_deployment_status(registry_dir, network)
         
+        # Check for shared REALMS token at mundus level
+        mundus_dfx_path = mundus_path / "dfx.json"
+        if mundus_dfx_path.exists():
+            try:
+                with open(mundus_dfx_path, 'r') as f:
+                    mundus_dfx = json.load(f)
+                if "realms_token" in mundus_dfx.get("canisters", {}):
+                    console.print("   [bold]🪙 Shared Token:[/bold]")
+                    # Check deployment status
+                    try:
+                        id_result = subprocess.run(
+                            ["dfx", "canister", "id", "realms_token", "--network", network],
+                            capture_output=True, text=True, timeout=5, cwd=mundus_path
+                        )
+                        if id_result.returncode == 0:
+                            cid = id_result.stdout.strip()
+                            if network == "local":
+                                url = f"http://{cid}.localhost:8000/"
+                            elif network in ["staging", "ic"]:
+                                url = f"https://{cid}.icp0.io/"
+                            else:
+                                url = ""
+                            # Get token info from manifest
+                            token_info = manifest.get("token", {}) if manifest_path.exists() else {}
+                            token_name = token_info.get("name", "REALMS Token")
+                            token_symbol = token_info.get("symbol", "REALMS")
+                            console.print(f"      [green]✅ realms_token[/green]: {token_name} ({token_symbol})")
+                            console.print(f"         [dim]{url}[/dim]")
+                        else:
+                            console.print(f"      [yellow]⚠️  realms_token not deployed[/yellow]")
+                    except:
+                        console.print(f"      [yellow]⚠️  Could not check realms_token status[/yellow]")
+            except:
+                pass
+        
         # Find realms
         realm_dirs = sorted(mundus_path.glob("realm_*"))
         if realm_dirs:
@@ -627,11 +736,12 @@ def _print_deployment_status(deploy_dir: Path, network: str) -> None:
         canister_names = [n for n in all_canister_names 
                          if n.startswith("realm_registry_")]
     else:
-        # Realm should only count realm_backend and realm_frontend
+        # Realm should count realm_backend, realm_frontend, and token_backend
         canister_names = [n for n in all_canister_names 
-                         if n in ("realm_backend", "realm_frontend") or 
+                         if n in ("realm_backend", "realm_frontend", "token_backend") or 
                          (n.endswith("_backend") and not n.startswith("realm_registry_")) or
-                         (n.endswith("_frontend") and not n.startswith("realm_registry_"))]
+                         (n.endswith("_frontend") and not n.startswith("realm_registry_")) or
+                         n.endswith("_token_backend")]
         # Exclude shared canisters
         canister_names = [n for n in canister_names if n not in shared_canisters]
     

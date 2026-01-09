@@ -1,5 +1,12 @@
 {
   "type": "mundus",
+  "name": "Demo Mundus",
+  "token": {
+    "name": "REALMS Token",
+    "symbol": "REALMS",
+    "decimals": 8,
+    "total_supply": 100000000000000000
+  },
   "realms": [
     "realm1",
     "realm2",
@@ -7,6 +14,5 @@
   ],
   "registries": [
     "registry"
-  ],
-  "name": "Demo Mundus"
+  ]
 }

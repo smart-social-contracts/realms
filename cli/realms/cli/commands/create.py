@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -443,6 +444,21 @@ def _generate_deployment_scripts(
                         init_arg = init_arg.replace('initial_balances = vec {}', f'initial_balances = vec {{ record {{ record {{ owner = principal "{deployer_principal}"; subaccount = null }}; 100_000_000_000 }} }}')
                         ledger_config["init_arg"] = init_arg
                         console.print(f"   ✅ Configured {ledger_name} with 1000 ckBTC initial balance for deployer")
+                
+                # Update init_arg for token_backend with realm-specific name and symbol
+                if canister_name == "token_backend" and "init_arg" in ledger_config:
+                    # Get token config from realm manifest if available
+                    token_config = realm_manifest.get("token", {}) if 'realm_manifest' in dir() else {}
+                    token_name = token_config.get("name", f"{realm_name} Token")
+                    token_symbol = token_config.get("symbol", realm_name[:3].upper())
+                    
+                    # Update the init_arg with realm-specific token name and symbol
+                    init_arg = ledger_config["init_arg"]
+                    # Replace name = "Simple Token" with realm-specific name
+                    init_arg = re.sub(r'name = "[^"]*"', f'name = "{token_name}"', init_arg)
+                    init_arg = re.sub(r'symbol = "[^"]*"', f'symbol = "{token_symbol}"', init_arg)
+                    ledger_config["init_arg"] = init_arg
+                    console.print(f"   ✅ Configured {ledger_name} as '{token_name}' ({token_symbol})")
                 
                 realm_canisters[ledger_name] = ledger_config
                 console.print(f"   ✅ Including {ledger_name} for local development")

@@ -6,6 +6,10 @@
   "welcome_image": "background.png",
   "welcome_message": "Welcome to Dominion. Efficient governance through algorithmic oversight. Your compliance ensures collective prosperity.",
   "codex": "dominion",
+  "token": {
+    "name": "Dominion Token",
+    "symbol": "DOM"
+  },
   "options": {
     "random": {
       "members": 50,
