@@ -251,4 +251,93 @@ try:
 except Exception as e:
     print(f"   ⚠️  Failed to reload overrides: {e}")
 
+# Seed Token entities for Vault Manager
+print("\n🪙 Seeding Token entities...")
+try:
+    # Get canister IDs for tokens
+    tokens_to_seed = []
+    
+    # 1. ckBTC (shared)
+    try:
+        result = subprocess.run(
+            ['dfx', 'canister', 'id', 'ckbtc_ledger', '--network', network],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            ckbtc_ledger_id = result.stdout.strip()
+            result = subprocess.run(
+                ['dfx', 'canister', 'id', 'ckbtc_indexer', '--network', network],
+                capture_output=True, text=True, timeout=5
+            )
+            ckbtc_indexer_id = result.stdout.strip() if result.returncode == 0 else ckbtc_ledger_id
+            tokens_to_seed.append({
+                "symbol": "ckBTC",
+                "name": "ckBTC",
+                "ledger_canister_id": ckbtc_ledger_id,
+                "indexer_canister_id": ckbtc_indexer_id,
+                "decimals": 8,
+                "token_type": "shared",
+                "enabled": "true"
+            })
+    except Exception as e:
+        print(f"   ⚠️  Could not get ckBTC canister ID: {e}")
+    
+    # 2. REALMS token (shared mundus token)
+    realms_token_id = os.environ.get('REALMS_TOKEN_CANISTER_ID')
+    if realms_token_id:
+        tokens_to_seed.append({
+            "symbol": "REALMS",
+            "name": "REALMS Token",
+            "ledger_canister_id": realms_token_id,
+            "indexer_canister_id": realms_token_id,
+            "decimals": 8,
+            "token_type": "shared",
+            "enabled": "true"
+        })
+    
+    # 3. Realm-specific token (from token_backend)
+    try:
+        result = subprocess.run(
+            ['dfx', 'canister', 'id', 'token_backend', '--network', network],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            realm_token_id = result.stdout.strip()
+            # Get token name/symbol from manifest
+            manifest_path = os.path.join(realm_dir, 'manifest.json')
+            token_name = "Realm Token"
+            token_symbol = "RLM"
+            if os.path.exists(manifest_path):
+                with open(manifest_path, 'r') as f:
+                    manifest = json.load(f)
+                token_config = manifest.get("token", {})
+                token_name = token_config.get("name", f"{manifest.get('name', 'Realm')} Token")
+                token_symbol = token_config.get("symbol", manifest.get('name', 'RLM')[:3].upper())
+            tokens_to_seed.append({
+                "symbol": token_symbol,
+                "name": token_name,
+                "ledger_canister_id": realm_token_id,
+                "indexer_canister_id": realm_token_id,
+                "decimals": 8,
+                "token_type": "realm",
+                "enabled": "true"
+            })
+    except Exception as e:
+        print(f"   ⚠️  Could not get token_backend canister ID: {e}")
+    
+    # Seed each token via dfx canister call
+    for token in tokens_to_seed:
+        token_json = json.dumps(token, ensure_ascii=False).replace('"', '\\"')
+        seed_cmd = ['dfx', 'canister', 'call', backend_name, 'upsert_object', f'("Token", "{token_json}")']
+        if network != 'local':
+            seed_cmd.extend(['--network', network])
+        result = subprocess.run(seed_cmd, cwd=realm_dir, capture_output=True, text=True)
+        if result.returncode == 0:
+            print(f"   ✅ Seeded token: {token['symbol']} ({token['name']})")
+        else:
+            print(f"   ⚠️  Failed to seed {token['symbol']}: {result.stderr}")
+
+except Exception as e:
+    print(f"   ⚠️  Token seeding failed: {e} (continuing anyway)")
+
 print("\n✅ Post-deployment tasks completed")

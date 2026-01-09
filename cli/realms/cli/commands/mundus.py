@@ -532,6 +532,13 @@ def mundus_deploy_command(
                 os.environ["REGISTRY_CANISTER_ID"] = backend_id
                 console.print(f"   Set REGISTRY_CANISTER_ID={backend_id}")
     
+    # Set REALMS_TOKEN_CANISTER_ID env var for token seeding
+    if "realms_token" in shared_canister_ids:
+        realms_token_id = shared_canister_ids["realms_token"].get(network)
+        if realms_token_id:
+            os.environ["REALMS_TOKEN_CANISTER_ID"] = realms_token_id
+            console.print(f"   Set REALMS_TOKEN_CANISTER_ID={realms_token_id}")
+    
     # 3. Deploy all realms (last) - in parallel for speed
     console.print(f"🏛️  Deploying {len(realm_dirs)} realm(s) in parallel...\n")
     

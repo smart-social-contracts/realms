@@ -33,6 +33,7 @@ from .task_execution import TaskExecution
 from .task_schedule import TaskSchedule
 from .task_step import TaskStep
 from .invoice import Invoice
+from .token import Token
 from .trade import Trade
 from .transfer import Transfer
 from .treasury import Treasury
@@ -70,6 +71,7 @@ __all__ = [
     "TaskExecution",
     "TaskSchedule",
     "TaskStep",
+    "Token",
     "Trade",
     "Transfer",
     "Treasury",
