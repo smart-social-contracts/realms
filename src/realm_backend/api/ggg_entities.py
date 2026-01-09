@@ -28,6 +28,7 @@ from ggg.task import Task
 from ggg.task_execution import TaskExecution
 from ggg.task_schedule import TaskSchedule
 from ggg.task_step import TaskStep
+from ggg.token import Token
 from ggg.trade import Trade
 from ggg.transfer import Transfer
 from ggg.treasury import Treasury
