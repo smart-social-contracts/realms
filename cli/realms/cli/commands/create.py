@@ -285,7 +285,12 @@ def create_command(
         console.print(f"[dim]Generated realm data saved to: {json_file}[/dim]")
         
         # Generate codex files - get codex name from manifest if available
-        codex_name = realm_manifest.get("codex") if 'realm_manifest' in dir() else None
+        # Support both old format ("codex": "name") and new format ("codex": {"package": {"name": "...", "version": "..."}})
+        codex_config = realm_manifest.get("codex") if 'realm_manifest' in dir() else None
+        if isinstance(codex_config, dict):
+            codex_name = codex_config.get("package", {}).get("name")
+        else:
+            codex_name = codex_config  # Old format: string directly
         codex_result = generator.generate_codex_files(output_path, codex_name=codex_name)
         codex_files = codex_result.get("codex_files", [])
         codex_extensions = codex_result.get("extensions", [])

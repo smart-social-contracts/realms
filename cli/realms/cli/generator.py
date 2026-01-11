@@ -453,7 +453,7 @@ class RealmGenerator:
         return ret
     
     def generate_codex_files(self, output_dir: Path, codex_name: Optional[str] = None) -> Dict[str, Any]:
-        """Copy Python codex files from codices submodule or fallback to realm_common.
+        """Copy Python codex files from codices submodule (_common + package).
         
         Args:
             output_dir: Directory to copy codex files to
@@ -472,60 +472,58 @@ class RealmGenerator:
         script_dir = Path(__file__).parent
         repo_root = script_dir.parent
         
-        # Try to load from codices submodule first
         codices_dir = repo_root / "codices" / "codices"
+        common_dir = codices_dir / "_common"
         codex_dir = codices_dir / codex_name if codex_name else None
         
+        # Step 1: Load and copy from _common/ (shared codices)
+        if common_dir.exists():
+            print(f"  Loading shared codices from _common/")
+            
+            # Load _common/manifest.json for entity_method_overrides
+            common_manifest_path = common_dir / "manifest.json"
+            if common_manifest_path.exists():
+                with open(common_manifest_path, 'r') as f:
+                    common_manifest = json.load(f)
+                entity_method_overrides = common_manifest.get("entity_method_overrides", [])
+                extensions = common_manifest.get("extensions", [])
+                print(f"    Loaded {len(entity_method_overrides)} method overrides from _common/manifest.json")
+            
+            # Copy all .py files from _common/
+            for source_file in common_dir.glob("*.py"):
+                dest_file = output_dir / source_file.name
+                shutil.copy2(source_file, dest_file)
+                codex_files.append(str(dest_file))
+                print(f"    Copied {source_file.name} from _common/")
+        
+        # Step 2: Copy from package directory (package-specific codices)
         if codex_name and codex_dir and codex_dir.exists():
-            # Load codex manifest
-            codex_manifest_path = codex_dir / "manifest.json"
-            if codex_manifest_path.exists():
-                with open(codex_manifest_path, 'r') as f:
-                    codex_manifest = json.load(f)
-                
-                entity_method_overrides = codex_manifest.get("entity_method_overrides", [])
-                extensions = codex_manifest.get("extensions", [])
-                codex_file_list = codex_manifest.get("codex_files", [])
-                
-                print(f"  Loading codex '{codex_name}' from codices submodule")
-                print(f"    Extensions: {extensions}")
-                print(f"    Method overrides: {len(entity_method_overrides)}")
-                
-                # Copy codex files listed in manifest
-                for codex_filename in codex_file_list:
-                    source_file = codex_dir / codex_filename
-                    if source_file.exists():
-                        dest_file = output_dir / codex_filename
-                        shutil.copy2(source_file, dest_file)
-                        codex_files.append(str(dest_file))
-                        print(f"    Copied {codex_filename}")
-                    else:
-                        print(f"    Warning: {codex_filename} not found in {codex_dir}")
-            else:
-                print(f"  Warning: No manifest.json found in codex '{codex_name}'")
-        else:
-            # Fallback to realm_common for backwards compatibility
-            print(f"  Codex '{codex_name}' not found in codices submodule, falling back to realm_common")
-            examples_common_dir = repo_root / "examples" / "demo" / "realm_common"
+            print(f"  Loading package codices from {codex_name}/")
             
-            demo_codex_files = [
-                "adjustments.py",
-                "tax_collection_codex.py",
-                "social_benefits_codex.py",
-                "governance_automation_codex.py",
-                "user_registration_hook_codex.py",
-                "satoshi_transfer_codex.py"
-            ]
+            # Load package manifest.json if exists (for additional overrides/extensions)
+            pkg_manifest_path = codex_dir / "manifest.json"
+            if pkg_manifest_path.exists():
+                with open(pkg_manifest_path, 'r') as f:
+                    pkg_manifest = json.load(f)
+                # Merge package overrides with common overrides
+                pkg_overrides = pkg_manifest.get("entity_method_overrides", [])
+                pkg_extensions = pkg_manifest.get("extensions", [])
+                if pkg_overrides:
+                    entity_method_overrides.extend(pkg_overrides)
+                    print(f"    Added {len(pkg_overrides)} method overrides from {codex_name}/manifest.json")
+                if pkg_extensions:
+                    extensions.extend(pkg_extensions)
             
-            for codex_filename in demo_codex_files:
-                source_file = examples_common_dir / codex_filename
-                if source_file.exists():
-                    dest_file = output_dir / codex_filename
-                    shutil.copy2(source_file, dest_file)
-                    codex_files.append(str(dest_file))
-                    print(f"  Copied {codex_filename} from realm_common/")
-                else:
-                    print(f"  Warning: {codex_filename} not found in {examples_common_dir}")
+            # Copy all .py files from package directory
+            for source_file in codex_dir.glob("*.py"):
+                dest_file = output_dir / source_file.name
+                shutil.copy2(source_file, dest_file)
+                codex_files.append(str(dest_file))
+                print(f"    Copied {source_file.name} from {codex_name}/")
+        elif codex_name:
+            print(f"  Warning: Codex package '{codex_name}' not found in {codices_dir}")
+        
+        print(f"  Total: {len(codex_files)} codex files, {len(entity_method_overrides)} method overrides")
         
         return {
             "codex_files": codex_files,

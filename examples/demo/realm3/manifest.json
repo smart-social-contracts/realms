@@ -5,7 +5,12 @@
   "logo": "emblem.png",
   "welcome_image": "background.png",
   "welcome_message": "Welcome to Syntropia. Experience adaptive, protocol-based governance where AI-powered systems compete to serve your evolving needs.",
-  "codex": "syntropia",
+  "codex": {
+    "package": {
+      "name": "syntropia",
+      "version": "latest"
+    }
+  },
   "token": {
     "name": "Syntropia Token",
     "symbol": "SYN"

@@ -5,7 +5,12 @@
   "logo": "emblem.png",
   "welcome_image": "background.png",
   "welcome_message": "Welcome to Agora! Join our transparent, participatory community where every citizen has a voice and governance serves the people.",
-  "codex": "agora",
+  "codex": {
+    "package": {
+      "name": "agora",
+      "version": "latest"
+    }
+  },
   "token": {
     "name": "Agora Token",
     "symbol": "AGO"
