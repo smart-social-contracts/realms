@@ -393,9 +393,12 @@ def _generate_deployment_scripts(
         console.print(f"   ✅ Using unique canister names: {backend_name}, {frontend_name}")
     
     # Deep copy and update canister configs to avoid reference issues
+    # Strip remote block - it's only for CLI commands, not for realm deployments
     import copy
     backend_config = copy.deepcopy(dfx_config["canisters"]["realm_backend"])
+    backend_config.pop("remote", None)
     frontend_config = copy.deepcopy(dfx_config["canisters"]["realm_frontend"])
+    frontend_config.pop("remote", None)
     
     # IMPORTANT: Keep workspace as "realm_frontend" (not unique name)
     # because src/ directories are copied with standard names

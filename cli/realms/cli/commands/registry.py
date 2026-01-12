@@ -307,10 +307,16 @@ def registry_create_command(
     with open(dfx_template, 'r') as f:
         dfx_config = json.load(f)
     
-    # Create registry-only dfx.json
+    # Create registry-only dfx.json (strip remote block - it's only for CLI registry list)
+    backend_config = dfx_config["canisters"]["realm_registry_backend"].copy()
+    backend_config.pop("remote", None)  # Remove remote block if present
+    
+    frontend_config = dfx_config["canisters"]["realm_registry_frontend"].copy()
+    frontend_config.pop("remote", None)
+    
     registry_canisters = {
-        "realm_registry_backend": dfx_config["canisters"]["realm_registry_backend"],
-        "realm_registry_frontend": dfx_config["canisters"]["realm_registry_frontend"],
+        "realm_registry_backend": backend_config,
+        "realm_registry_frontend": frontend_config,
     }
     
     # For local networks, include additional canisters (Internet Identity)
