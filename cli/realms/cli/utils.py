@@ -1169,3 +1169,145 @@ def display_canister_urls_json(
         console.print(f"\n[bold cyan]📋 {title}[/bold cyan]")
         console.print(json.dumps(canisters, indent=2))
         console.print("")
+
+
+def get_registry_canister_id(network: str = "local") -> str:
+    """Get the registry canister ID for a given network.
+    
+    Reads from dfx.json remote.id section for non-local networks.
+    For local network, returns the canister name (dfx will resolve it).
+    
+    Args:
+        network: Network name (local, staging, ic)
+        
+    Returns:
+        Canister ID or name for the registry backend
+    """
+    if network == "local":
+        return "realm_registry_backend"
+    
+    # Try to read from dfx.json
+    project_root = get_project_root()
+    dfx_json_path = project_root / "dfx.json"
+    
+    if dfx_json_path.exists():
+        try:
+            with open(dfx_json_path, "r") as f:
+                dfx_config = json.load(f)
+            
+            registry_config = dfx_config.get("canisters", {}).get("realm_registry_backend", {})
+            remote_ids = registry_config.get("remote", {}).get("id", {})
+            
+            if network in remote_ids:
+                return remote_ids[network]
+        except (json.JSONDecodeError, IOError):
+            pass
+    
+    # Fallback to canister name (may fail if not deployed locally)
+    return "realm_registry_backend"
+
+
+def is_canister_id(value: str) -> bool:
+    """Check if a string looks like a canister ID (principal).
+    
+    Canister IDs are typically 27 characters with dashes, like:
+    2lbfz-yiaaa-aaaac-qcyma-cai
+    
+    Args:
+        value: String to check
+        
+    Returns:
+        True if it looks like a canister ID
+    """
+    # Principal IDs contain dashes and are typically 27 chars
+    # They end with -cai for canisters
+    if "-" in value and len(value) >= 20:
+        # Check for typical canister ID pattern
+        parts = value.split("-")
+        if len(parts) >= 4 and parts[-1] == "cai":
+            return True
+    return False
+
+
+def resolve_realm_ref_to_canister_id(
+    realm_ref: str,
+    network: str = "local",
+    registry_canister_id: Optional[str] = None,
+) -> Tuple[str, str]:
+    """Resolve a realm reference (name or canister ID) to backend canister ID.
+    
+    If realm_ref looks like a principal ID, returns it as-is.
+    Otherwise, queries the registry to find a realm by name.
+    
+    Args:
+        realm_ref: Realm canister ID or name (e.g., "Dominion" or "2lbfz-yiaaa-aaaac-qcyma-cai")
+        network: Network to query the registry on
+        registry_canister_id: Optional override for registry canister ID
+        
+    Returns:
+        Tuple of (backend_canister_id, realm_name)
+        
+    Raises:
+        ValueError: If realm not found or multiple realms match the name
+    """
+    # If it's already a canister ID, return it
+    if is_canister_id(realm_ref):
+        return realm_ref, realm_ref  # Use ID as name placeholder
+    
+    # Otherwise, query the registry by name
+    effective_registry = registry_canister_id or get_registry_canister_id(network)
+    
+    try:
+        # Get all realms from registry
+        cmd = [
+            "dfx", "canister", "call",
+            "--network", network,
+            effective_registry,
+            "list_realms"
+        ]
+        
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, check=True, timeout=30
+        )
+        
+        output = result.stdout.strip()
+        
+        # Parse the Candid output to find matching realms
+        # Look for: name = "RealmName"; ... id = "canister-id";
+        matches = []
+        
+        # Split by records
+        records = re.split(r'record\s*\{', output)
+        
+        for record in records:
+            if not record.strip():
+                continue
+                
+            # Extract name and id from record
+            name_match = re.search(r'name\s*=\s*"([^"]+)"', record)
+            id_match = re.search(r'id\s*=\s*"([^"]+)"', record)
+            
+            if name_match and id_match:
+                name = name_match.group(1)
+                realm_id = id_match.group(1)
+                
+                # Case-insensitive match
+                if name.lower() == realm_ref.lower():
+                    matches.append((realm_id, name))
+        
+        if len(matches) == 0:
+            raise ValueError(f"Realm '{realm_ref}' not found in registry on network '{network}'")
+        
+        if len(matches) > 1:
+            names = [m[1] for m in matches]
+            raise ValueError(
+                f"Multiple realms match '{realm_ref}': {', '.join(names)}. "
+                "Please use the canister ID instead."
+            )
+        
+        return matches[0]  # (canister_id, realm_name)
+        
+    except subprocess.CalledProcessError as e:
+        raise ValueError(f"Failed to query registry: {e.stderr.strip()}")
+    except subprocess.TimeoutExpired:
+        raise ValueError("Timeout querying registry")

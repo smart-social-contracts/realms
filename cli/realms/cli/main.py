@@ -37,9 +37,12 @@ from .utils import (
     get_effective_cwd,
     get_effective_network_and_canister,
     get_project_root,
+    get_registry_canister_id,
+    is_canister_id,
     list_realm_folders,
     resolve_realm_by_id,
     resolve_realm_details,
+    resolve_realm_ref_to_canister_id,
     set_current_network,
     set_current_realm,
     set_current_realm_folder,
@@ -376,18 +379,13 @@ def realm_deploy(
 
 @realm_app.command("call")
 def realm_call(
+    realm_ref: str = typer.Argument(help="Realm canister ID or name (e.g., 'Dominion' or '2lbfz-yiaaa-aaaac-qcyma-cai')"),
     method: str = typer.Argument(help="Method name or 'extension' for extension calls"),
     args: str = typer.Argument("()", help="Candid arguments (e.g., '(\"admin\")') or extension name for extension calls"),
     function_name: Optional[str] = typer.Argument(None, help="Function name (only for extension calls)"),
     function_args: Optional[str] = typer.Argument(None, help="JSON arguments (only for extension calls)"),
-    folder: Optional[str] = typer.Option(
-        None, "--folder", "-f", help="Path to realm folder"
-    ),
     network: Optional[str] = typer.Option(
         None, "--network", "-n", help="Network to use (overrides context)"
-    ),
-    canister: Optional[str] = typer.Option(
-        None, "--canister", "-c", help="Canister name (default: realm_backend)"
     ),
     output: str = typer.Option(
         "json", "--output", "-o", help="Output format: json or candid"
@@ -400,20 +398,23 @@ def realm_call(
     ),
 ) -> None:
     """
-    Call a backend method or extension function.
+    Call a backend method or extension function on a realm.
     
     Examples:
-        # Call backend method directly
-        realms realm call status
-        realms realm call join_realm '("admin")' -f .realms/realm_X
+        # Call backend method on a realm by name
+        realms realm call Dominion status --network staging
+        realms realm call Dominion join_realm '("admin")' --network staging
+        
+        # Call backend method on a realm by canister ID
+        realms realm call 2lbfz-yiaaa-aaaac-qcyma-cai status --network staging
         
         # Call extension function
-        realms realm call extension member_dashboard check_invoice_payment '{"invoice_id": "x"}' -f .realms/realm_X
+        realms realm call Dominion extension member_dashboard check_invoice_payment '{"invoice_id": "x"}' --network staging
         
         # Output format (default: json)
-        realms realm call status --output candid
+        realms realm call Dominion status --output candid --network staging
     """
-    import json
+    import json as json_module
     import subprocess
     import sys
     
@@ -422,23 +423,30 @@ def realm_call(
         console.print(f"[red]❌ Invalid output format: {output}. Use 'json' or 'candid'[/red]")
         raise typer.Exit(1)
     
-    # Get effective network and canister from context or folder
-    if folder:
-        # Use folder context
-        effective_cwd = folder
-        effective_network = network or "local"
-        effective_canister = canister or "realm_backend"
-    else:
-        effective_network, effective_canister = get_effective_network_and_canister(
-            network, canister, quiet=not verbose
+    # Get effective network
+    effective_network, _ = get_effective_network_and_canister(network, None, quiet=not verbose)
+    
+    # Resolve realm reference to canister ID
+    try:
+        backend_canister_id, realm_name = resolve_realm_ref_to_canister_id(
+            realm_ref, effective_network
         )
-        effective_cwd = get_effective_cwd()
+    except ValueError as e:
+        console.print(f"[red]❌ {e}[/red]")
+        raise typer.Exit(1)
+    
+    effective_canister = backend_canister_id
+    
+    if verbose:
+        console.print(f"[dim]Realm: {realm_name}[/dim]")
+        console.print(f"[dim]Backend Canister: {backend_canister_id}[/dim]")
+        console.print(f"[dim]Network: {effective_network}[/dim]\n")
     
     # Check if this is an extension call
     if method == "extension":
         if not function_name or not function_args:
             console.print("[red]❌ Extension calls require: extension <ext_name> <function> <json_args>[/red]")
-            console.print("Example: realms realm call extension member_dashboard check_invoice_payment '{\"invoice_id\": \"x\"}'")
+            console.print("Example: realms realm call Dominion extension member_dashboard check_invoice_payment '{\"invoice_id\": \"x\"}' --network staging")
             raise typer.Exit(1)
         
         extension_name = args  # args is actually the extension name in this case
@@ -448,14 +456,12 @@ def realm_call(
             console.print(f"Extension: [cyan]{extension_name}[/cyan]")
             console.print(f"Function: [cyan]{function_name}[/cyan]")
             console.print(f"Args: [dim]{function_args}[/dim]")
-            console.print(f"Network: [dim]{effective_network}[/dim]")
-            console.print(f"Canister: [dim]{effective_canister}[/dim]")
             console.print(f"Async: [dim]{async_call}[/dim]\n")
         
         try:
             # Validate JSON args
-            json.loads(function_args)
-        except json.JSONDecodeError as e:
+            json_module.loads(function_args)
+        except json_module.JSONDecodeError as e:
             console.print(f"[red]❌ Invalid JSON arguments: {e}[/red]")
             raise typer.Exit(1)
         
@@ -464,9 +470,7 @@ def realm_call(
         call_record = f"""(record {{ extension_name = "{extension_name}"; function_name = "{function_name}"; args = "{escaped_args}"; }})"""
         
         call_method = "extension_async_call" if async_call else "extension_sync_call"
-        cmd = ["dfx", "canister", "call", effective_canister, call_method, call_record]
-        if effective_network != "local":
-            cmd.extend(["--network", effective_network])
+        cmd = ["dfx", "canister", "call", "--network", effective_network, effective_canister, call_method, call_record]
         if output == "json":
             cmd.extend(["--output", "json"])
     else:
@@ -474,20 +478,16 @@ def realm_call(
         if verbose:
             console.print("[bold blue]📞 Calling Backend Method[/bold blue]\n")
             console.print(f"Method: [cyan]{method}[/cyan]")
-            console.print(f"Args: [dim]{args}[/dim]")
-            console.print(f"Network: [dim]{effective_network}[/dim]")
-            console.print(f"Canister: [dim]{effective_canister}[/dim]\n")
+            console.print(f"Args: [dim]{args}[/dim]\n")
         
-        cmd = ["dfx", "canister", "call", effective_canister, method, args]
-        if effective_network != "local":
-            cmd.extend(["--network", effective_network])
+        cmd = ["dfx", "canister", "call", "--network", effective_network, effective_canister, method, args]
         if output == "json":
             cmd.extend(["--output", "json"])
     
     try:
         if verbose:
             console.print("[dim]Executing...[/dim]")
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd=effective_cwd)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         
         if result.returncode == 0:
             if verbose:
@@ -511,6 +511,7 @@ def realm_call(
 
 @realm_app.command("extension")
 def realm_extension(
+    realm_ref: str = typer.Argument(help="Realm canister ID or name"),
     extension_name: str = typer.Argument(help="Extension name"),
     function_name: str = typer.Argument(help="Function name to call"),
     args: str = typer.Argument(help="JSON arguments for the function"),
@@ -518,20 +519,28 @@ def realm_extension(
         None, "--network", "-n", help="Network to use (overrides context)"
     ),
 ) -> None:
-    """Call an extension function on the realm backend. (DEPRECATED: use 'realms realm call extension' instead)"""
-    console.print("[yellow]⚠️  Deprecated: Use 'realms realm call extension' instead[/yellow]\n")
+    """Call an extension function on the realm backend. (DEPRECATED: use 'realms realm call <realm> extension' instead)"""
+    console.print("[yellow]⚠️  Deprecated: Use 'realms realm call <realm> extension ...' instead[/yellow]\n")
     console.print("[bold blue]🔧 Calling Extension Function[/bold blue]\n")
 
-    # Get effective network and canister from context
-    effective_network, effective_canister = get_effective_network_and_canister(
-        network, None
-    )
+    # Get effective network
+    effective_network, _ = get_effective_network_and_canister(network, None)
+    
+    # Resolve realm reference to canister ID
+    try:
+        backend_canister_id, realm_name = resolve_realm_ref_to_canister_id(
+            realm_ref, effective_network
+        )
+    except ValueError as e:
+        console.print(f"[red]❌ {e}[/red]")
+        raise typer.Exit(1)
 
+    console.print(f"Realm: [cyan]{realm_name}[/cyan]")
     console.print(f"Extension: [cyan]{extension_name}[/cyan]")
     console.print(f"Function: [cyan]{function_name}[/cyan]")
     console.print(f"Args: [dim]{args}[/dim]")
     console.print(f"Network: [dim]{effective_network}[/dim]")
-    console.print(f"Canister: [dim]{effective_canister}[/dim]\n")
+    console.print(f"Canister: [dim]{backend_canister_id}[/dim]\n")
 
     try:
         import json
@@ -558,12 +567,11 @@ def realm_extension(
             "dfx",
             "canister",
             "call",
-            effective_canister,
+            "--network", effective_network,
+            backend_canister_id,
             "extension_sync_call",
             call_record,
         ]
-        if effective_network != "local":
-            cmd.extend(["--network", effective_network])
 
         console.print("[dim]Executing...[/dim]")
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
@@ -961,15 +969,44 @@ def realm_unset() -> None:
 
 @realm_app.command("status")
 def realm_status(
+    realm_ref: Optional[str] = typer.Argument(
+        None, help="Realm canister ID or name (e.g., 'Dominion' or '2lbfz-yiaaa-aaaac-qcyma-cai')"
+    ),
     network: Optional[str] = typer.Option(
         None, "--network", "-n", help="Network to use (overrides context)"
     ),
 ) -> None:
-    """Show canister IDs and URLs for the realm."""
+    """Show canister IDs and URLs for a realm.
+    
+    Examples:
+        realms realm status Dominion --network staging
+        realms realm status 2lbfz-yiaaa-aaaac-qcyma-cai --network staging
+        realms realm status  # Uses local folder context
+    """
     console.print("[bold blue]🏛️  Realm Status[/bold blue]\n")
 
     # Get effective network
     effective_network, _ = get_effective_network_and_canister(network, None)
+    
+    # If a realm reference is provided, resolve it to canister ID
+    if realm_ref:
+        try:
+            backend_canister_id, realm_name = resolve_realm_ref_to_canister_id(
+                realm_ref, effective_network
+            )
+            console.print(f"[dim]Realm: {realm_name}[/dim]")
+            console.print(f"[dim]Backend Canister: {backend_canister_id}[/dim]")
+            console.print(f"[dim]Network: {effective_network}[/dim]\n")
+            
+            # For remote realms, show info from the registry
+            _show_remote_realm_status(backend_canister_id, realm_name, effective_network)
+            return
+            
+        except ValueError as e:
+            console.print(f"[red]❌ {e}[/red]")
+            raise typer.Exit(1)
+    
+    # No realm_ref provided - use local folder context (existing behavior)
     console.print(f"[dim]Network: {effective_network}[/dim]\n")
 
     # Load canister IDs
@@ -1144,6 +1181,48 @@ def realm_status(
     except Exception as e:
         console.print(f"[red]❌ Error reading canister IDs: {e}[/red]")
         raise typer.Exit(1)
+
+
+def _show_remote_realm_status(backend_canister_id: str, realm_name: str, network: str) -> None:
+    """Show status for a remote realm (queried from registry)."""
+    import subprocess
+    
+    # Construct URLs based on network
+    if network == "ic":
+        frontend_url = f"https://{backend_canister_id}.ic0.app"  # Actually need frontend ID
+        backend_url = f"https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.ic0.app/?id={backend_canister_id}"
+    elif network == "staging":
+        frontend_url = f"https://{backend_canister_id}.icp0.io"  # Actually need frontend ID
+        backend_url = f"https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id={backend_canister_id}"
+    else:
+        frontend_url = f"http://{backend_canister_id}.localhost:8000/"
+        backend_url = f"http://127.0.0.1:8000/?canisterId=<candid-ui>&id={backend_canister_id}"
+    
+    # Create table
+    table = Table(title=f"Realm '{realm_name}' on {network.upper()}")
+    table.add_column("Component", style="cyan", no_wrap=True)
+    table.add_column("Canister ID", style="green")
+    table.add_column("URL", style="blue")
+    
+    table.add_row("Backend", backend_canister_id, backend_url)
+    
+    # Try to get realm info from backend to find frontend canister
+    try:
+        cmd = [
+            "dfx", "canister", "call",
+            "--network", network,
+            backend_canister_id,
+            "status"
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            console.print(f"[dim]Backend is responding[/dim]\n")
+    except Exception:
+        pass
+    
+    console.print(table)
+    
+    console.print(f"\n[dim]💡 Use 'realms realm call {realm_name} <method> --network {network}' to call backend methods[/dim]")
 
 
 # Create db subcommand group

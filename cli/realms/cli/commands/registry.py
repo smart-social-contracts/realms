@@ -12,7 +12,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .create import create_command
-from ..utils import console, generate_output_dir_name, get_project_root, display_canister_urls_json, get_realms_logger, set_log_dir, run_command
+from ..utils import console, generate_output_dir_name, get_project_root, display_canister_urls_json, get_realms_logger, set_log_dir, run_command, get_registry_canister_id
 
 
 def _run_dfx_command(
@@ -101,8 +101,9 @@ def registry_list_command(
     """List all realms in the registry"""
     console.print("[bold blue]📋 Listing Registered Realms[/bold blue]\n")
 
+    effective_registry = canister_id or get_registry_canister_id(network)
     result = _run_dfx_command(
-        "list_realms", None, network, canister_id or "realm_registry_backend"
+        "list_realms", None, network, effective_registry
     )
 
     if not result["success"]:
@@ -121,7 +122,7 @@ def registry_list_command(
 
     # Also get the count
     count_result = _run_dfx_command(
-        "realm_count", None, network, canister_id or "realm_registry_backend"
+        "realm_count", None, network, effective_registry
     )
 
     if count_result["success"]:
@@ -141,9 +142,10 @@ def registry_get_command(
     """Get a specific realm by ID"""
     console.print("[bold blue]🔍 Getting Realm Details[/bold blue]\n")
 
+    effective_registry = canister_id or get_registry_canister_id(network)
     args = [f'("{realm_id}")']
     result = _run_dfx_command(
-        "get_realm", args, network, canister_id or "realm_registry_backend"
+        "get_realm", args, network, effective_registry
     )
 
     if not result["success"]:
@@ -173,9 +175,10 @@ def registry_remove_command(
         console.print("[yellow]Operation cancelled[/yellow]")
         return
 
+    effective_registry = canister_id or get_registry_canister_id(network)
     args = [f'("{realm_id}")']
     result = _run_dfx_command(
-        "remove_realm", args, network, canister_id or "realm_registry_backend"
+        "remove_realm", args, network, effective_registry
     )
 
     if not result["success"]:
@@ -200,9 +203,10 @@ def registry_search_command(
     console.print("[bold blue]🔍 Searching Realms[/bold blue]\n")
     console.print(f"Query: [cyan]{query}[/cyan]\n")
 
+    effective_registry = canister_id or get_registry_canister_id(network)
     args = [f'("{query}")']
     result = _run_dfx_command(
-        "search_realms", args, network, canister_id or "realm_registry_backend"
+        "search_realms", args, network, effective_registry
     )
 
     if not result["success"]:
@@ -219,8 +223,9 @@ def registry_count_command(
     """Get the total number of realms"""
     console.print("[bold blue]📊 Realm Count[/bold blue]\n")
 
+    effective_registry = canister_id or get_registry_canister_id(network)
     result = _run_dfx_command(
-        "realm_count", None, network, canister_id or "realm_registry_backend"
+        "realm_count", None, network, effective_registry
     )
 
     if not result["success"]:
