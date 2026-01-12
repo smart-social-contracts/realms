@@ -174,11 +174,12 @@ jobs:
       
       # Create GitHub release
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.bump_version.outputs.NEW_VERSION }}
           name: Release v${{ steps.bump_version.outputs.NEW_VERSION }}
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
             realm_backend.wasm.gz
             realm_backend.did
