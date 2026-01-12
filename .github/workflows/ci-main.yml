@@ -398,7 +398,8 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
             bash -c "dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
                      dfx identity use my-identity && \
-                     pip install geister && \
+                     pip install geister realms-gos && \
+                     cp dfx.template.json dfx.json && \
                      python examples/demo/realm_common/tests/test_agent_swarm.py"
           
           # Clean up

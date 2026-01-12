@@ -9,6 +9,7 @@ Usage:
     python test_agent_swarm.py
     AGENTS_COUNT=100 python test_agent_swarm.py
 """
+import json
 import os
 import sys
 import re
@@ -82,17 +83,24 @@ def run_agent_task(agent_id: str, realm_id: str, realm_name: str, task: str) -> 
         cmd = [
             "geister", "agent", "ask", agent_id, task,
             "--realm", realm_id,
+            "--json",  # Use structured JSON output for reliable success detection
         ]
         
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
-        output = result.stdout + result.stderr
         
-        # Check for errors in output even if return code is 0
-        error_patterns = ["Error:", "error:", "failed", "Failed", "Exception", "Traceback"]
-        has_error = any(pattern in output for pattern in error_patterns)
-        
-        success = result.returncode == 0 and not has_error
-        return (agent_id, realm_name, success, output[:500])
+        # Parse JSON response for reliable success detection
+        try:
+            data = json.loads(result.stdout)
+            success = data.get("success", False)
+            response = data.get("response", "")[:500]
+            error = data.get("error")
+            if error:
+                return (agent_id, realm_name, False, f"Error: {error}")
+            return (agent_id, realm_name, success, response)
+        except json.JSONDecodeError:
+            # Fallback if JSON parsing fails
+            output = result.stdout + result.stderr
+            return (agent_id, realm_name, result.returncode == 0, output[:500])
         
     except subprocess.TimeoutExpired:
         return (agent_id, realm_name, False, "Timeout")

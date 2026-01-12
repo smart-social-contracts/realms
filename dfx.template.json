@@ -43,6 +43,11 @@
           "name": "candid:service"
         }
       ],
+      "remote": {
+        "id": {
+          "staging": "rhw4p-gqaaa-aaaac-qbw7q-cai"
+        }
+      },
       "tech_stack": {
         "cdk": {
           "kybra": {}
