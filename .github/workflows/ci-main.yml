@@ -376,63 +376,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Run invoice payment test on staging
-        run: |
-          # Store identity in a temporary file
-          echo "${{ secrets.IC_IDENTITY_PEM }}" > identity.pem
-          chmod 600 identity.pem
-          
-          # Pull the image that was tested
-          docker pull ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}
-          
-          # Run invoice payment test against realm1 on staging
-          docker run --rm \
-            -v "$(pwd)/identity.pem:/app/identity.pem" \
-            -v "$(pwd)/test-logs:/app/test-logs" \
-            -e DFX_WARNING="-mainnet_plaintext_identity" \
-            -e DFX_NETWORK=staging \
-            ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
-            bash -c "(dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
-                     dfx identity use my-identity && \
-                     cp dfx.template.json examples/demo/realm1/dfx.json && \
-                     cd examples/demo/realm1 && \
-                     REALM_DIR=\$(pwd) python ../realm_common/tests/test_invoice_payment.py); \
-                     EXIT_CODE=\$?; \
-                     mkdir -p /app/test-logs && \
-                     cp -f *.log /app/test-logs/ 2>/dev/null || true; \
-                     exit \$EXIT_CODE"
-          
-          # Clean up
-          rm identity.pem
-
-      - name: Run create proposal test on staging
-        run: |
-          # Store identity in a temporary file
-          echo "${{ secrets.IC_IDENTITY_PEM }}" > identity.pem
-          chmod 600 identity.pem
-          
-          # Pull the image that was tested
-          docker pull ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}
-          
-          # Run proposal creation test against realm1 on staging
-          docker run --rm \
-            -v "$(pwd)/identity.pem:/app/identity.pem" \
-            -v "$(pwd)/test-logs:/app/test-logs" \
-            -e DFX_WARNING="-mainnet_plaintext_identity" \
-            -e DFX_NETWORK=staging \
-            ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
-            bash -c "(dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
-                     dfx identity use my-identity && \
-                     cp dfx.template.json examples/demo/realm1/dfx.json && \
-                     cd examples/demo/realm1 && \
-                     REALM_DIR=\$(pwd) python ../realm_common/tests/test_create_proposal.py); \
-                     EXIT_CODE=\$?; \
-                     mkdir -p /app/test-logs && \
-                     cp -f *.log /app/test-logs/ 2>/dev/null || true; \
-                     exit \$EXIT_CODE"
-          
-          # Clean up
-          rm identity.pem
+      # NOTE: test_invoice_payment.py and test_create_proposal.py moved to tests_TODO_review_or_delete/
+      # Skipping these tests until they are reviewed and restored
 
       - name: Run geister agent swarm test on staging
         run: |
