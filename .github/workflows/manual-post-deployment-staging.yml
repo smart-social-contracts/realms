@@ -1,0 +1,62 @@
+name: Post-Deployment Tests (staging)
+
+on:
+  workflow_dispatch:
+    inputs:
+      agents_count:
+        description: 'Number of agents to run'
+        required: false
+        default: '3'
+      commit:
+        description: 'Commit SHA for Docker image (leave empty for latest main)'
+        required: false
+        default: ''
+
+jobs:
+  test-staging-post-deployment:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.commit || github.sha }}
+
+      - name: Set deployment commit
+        id: commit
+        run: |
+          DEPLOY_COMMIT="${{ github.event.inputs.commit || github.sha }}"
+          echo "deploy_commit=$DEPLOY_COMMIT" >> $GITHUB_OUTPUT
+          echo "Using commit: $DEPLOY_COMMIT"
+
+      - name: Run geister agent swarm test on staging
+        run: |
+          # Store identity in a temporary file
+          echo "${{ secrets.IC_IDENTITY_PEM }}" > identity.pem
+          chmod 600 identity.pem
+          
+          # Pull the image
+          docker pull ghcr.io/${{ github.repository_owner }}/realms:demo-${{ steps.commit.outputs.deploy_commit }}
+          
+          # Run agent swarm test inside Docker container (needs dfx for registry list)
+          docker run --rm \
+            -v "$(pwd)/identity.pem:/app/identity.pem" \
+            -e DFX_WARNING="-mainnet_plaintext_identity" \
+            -e DFX_NETWORK=staging \
+            -e AGENTS_COUNT=${{ github.event.inputs.agents_count || '3' }} \
+            -e NETWORK=staging \
+            ghcr.io/${{ github.repository_owner }}/realms:demo-${{ steps.commit.outputs.deploy_commit }} \
+            bash -c "dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
+                     dfx identity use my-identity && \
+                     pip install geister && \
+                     python examples/demo/realm_common/tests/test_agent_swarm.py"
+          
+          # Clean up
+          rm identity.pem
+      
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-deployment-test-logs
+          path: test-logs/
+          retention-days: 7
