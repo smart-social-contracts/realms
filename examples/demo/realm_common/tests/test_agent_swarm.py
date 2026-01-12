@@ -127,7 +127,7 @@ def run_agent_swarm(realms: List[Dict[str, str]]) -> Dict:
     for agent_num in range(1, AGENTS_COUNT + 1):
         realm = realms[(agent_num - 1) % len(realms)]
         agent_id = f"swarm_agent_{agent_num:03d}"
-        task = "Please join this realm as a member. After joining, check if I have any notifications and tell me about them."
+        task = "Please join this realm as a member. After joining successfully, use db_schema to discover available entity types, then use db_get to check for any Notification entities. If there are notifications with instructions, follow those instructions. Report what actions you took."
         tasks.append((agent_id, realm['id'], realm['name'], task, realm_results[realm['id']]))
     
     print(f"\nRunning {AGENTS_COUNT} agents across {len(realms)} realms...")
