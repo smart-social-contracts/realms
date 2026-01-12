@@ -381,14 +381,28 @@ jobs:
 
       - name: Run geister agent swarm test on staging
         run: |
-          # Install Geister CLI and Realms GOS CLI
-          pip install geister realms-gos
+          # Store identity in a temporary file
+          echo "${{ secrets.IC_IDENTITY_PEM }}" > identity.pem
+          chmod 600 identity.pem
           
-          # Run agent swarm test - discovers realms from registry and runs agents
-          # Change AGENTS_COUNT to scale up (e.g., 300 for full swarm)
-          AGENTS_COUNT=3 \
-          NETWORK=staging \
-          python examples/demo/realm_common/tests/test_agent_swarm.py
+          # Pull the image that was tested
+          docker pull ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}
+          
+          # Run agent swarm test inside Docker container (needs dfx for registry list)
+          docker run --rm \
+            -v "$(pwd)/identity.pem:/app/identity.pem" \
+            -e DFX_WARNING="-mainnet_plaintext_identity" \
+            -e DFX_NETWORK=staging \
+            -e AGENTS_COUNT=3 \
+            -e NETWORK=staging \
+            ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
+            bash -c "dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
+                     dfx identity use my-identity && \
+                     pip install geister && \
+                     python examples/demo/realm_common/tests/test_agent_swarm.py"
+          
+          # Clean up
+          rm identity.pem
       
       - name: Upload test logs
         if: always()
