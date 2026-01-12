@@ -224,7 +224,7 @@ if [ -n "$BACKENDS" ]; then
     echo "🔧 Generating declarations..."
     for canister in $BACKENDS; do
         echo "   Generating for $canister..."
-        dfx generate "$canister"
+        dfx generate --network "$NETWORK" "$canister"
     done
     
     # Copy declarations to standard names for frontend compatibility
