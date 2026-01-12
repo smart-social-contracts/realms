@@ -74,6 +74,19 @@ jobs:
           # Store new version for later use
           echo "NEW_VERSION=${NEW_VERSION}" >> $GITHUB_OUTPUT
       
+      - name: Check if release already exists
+        run: |
+          TAG="v${{ steps.bump_version.outputs.NEW_VERSION }}"
+          if gh release view "$TAG" &>/dev/null; then
+            echo "❌ ERROR: Release $TAG already exists!"
+            echo "If you want to create a new release, the version has already been bumped."
+            echo "Either delete the existing release first, or trigger the workflow again to bump to the next version."
+            exit 1
+          fi
+          echo "✅ Release $TAG does not exist yet, proceeding..."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
       # Pull and tag the Docker images
       - name: Pull and tag Docker images
         run: |
