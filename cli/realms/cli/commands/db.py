@@ -1048,6 +1048,106 @@ def db_get_command(
         print(json.dumps(all_items, indent=2))
 
 
+def db_schema_command(
+    network: Optional[str] = None,
+    canister: Optional[str] = None,
+    folder: Optional[str] = None,
+) -> None:
+    """Get the database schema showing all entity types, their fields, and relationships.
+    
+    Outputs JSON with entity types, field definitions, and relationship mappings.
+    This is useful for discovering what data types are available in the realm.
+    
+    Args:
+        network: Network to use
+        canister: Canister to connect to
+        folder: Realm folder containing dfx.json
+    """
+    effective_network, effective_canister = get_effective_network_and_canister(
+        network, canister
+    )
+    effective_cwd = get_effective_cwd(folder)
+
+    explorer = CursorDatabaseExplorer(effective_network, effective_canister, cwd=effective_cwd)
+    
+    # Discover all entity classes
+    ggg_classes = explorer._discover_ggg_classes()
+    
+    if not ggg_classes:
+        console.print("[yellow]Warning: No entity classes discovered. Schema may be incomplete.[/yellow]")
+    
+    # Discover relationship fields
+    relationship_fields = explorer._discover_relationship_fields()
+    
+    schema = {"entities": {}}
+    
+    for cls in sorted(ggg_classes, key=lambda c: c.__name__):
+        entity_name = cls.__name__
+        entity_schema = {
+            "fields": {},
+            "relationships": {}
+        }
+        
+        # Get field types from annotations
+        annotations = getattr(cls, '__annotations__', {})
+        for field_name, field_type in annotations.items():
+            # Convert type to string representation
+            if hasattr(field_type, '__name__'):
+                type_str = field_type.__name__
+            elif hasattr(field_type, '__origin__'):
+                # Handle generic types like Optional[str], List[int]
+                origin = getattr(field_type, '__origin__', None)
+                args = getattr(field_type, '__args__', ())
+                if origin:
+                    origin_name = getattr(origin, '__name__', str(origin))
+                    if args:
+                        args_str = ', '.join(
+                            getattr(a, '__name__', str(a)) for a in args
+                        )
+                        type_str = f"{origin_name}[{args_str}]"
+                    else:
+                        type_str = origin_name
+                else:
+                    type_str = str(field_type)
+            else:
+                type_str = str(field_type)
+            
+            entity_schema["fields"][field_name] = type_str
+        
+        # Get relationships by inspecting class attributes
+        for attr_name in dir(cls):
+            if attr_name.startswith('_'):
+                continue
+            try:
+                attr = getattr(cls, attr_name, None)
+                if attr is None:
+                    continue
+                
+                attr_type = type(attr).__name__
+                if attr_type in ["ManyToOne", "OneToOne", "OneToMany", "ManyToMany"]:
+                    # Extract relationship info
+                    related_model = None
+                    if hasattr(attr, "entity_types"):
+                        related_model = attr.entity_types
+                    elif hasattr(attr, "_args") and len(attr._args) >= 1:
+                        related_model = attr._args[0]
+                    elif hasattr(attr, "args") and len(attr.args) >= 1:
+                        related_model = attr.args[0]
+                    
+                    if related_model:
+                        entity_schema["relationships"][attr_name] = {
+                            "type": attr_type,
+                            "target": related_model
+                        }
+            except Exception:
+                continue
+        
+        schema["entities"][entity_name] = entity_schema
+    
+    # Output schema as JSON
+    print(json.dumps(schema, indent=2))
+
+
 def db_command(
     network: Optional[str] = typer.Option(
         None, "--network", "-n", help="Network to use (overrides context)"

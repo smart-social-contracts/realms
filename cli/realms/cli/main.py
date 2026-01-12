@@ -8,7 +8,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .commands.create import create_command
-from .commands.db import db_command, db_get_command
+from .commands.db import db_command, db_get_command, db_schema_command
 from .commands.deploy import deploy_command
 from .commands.export_data import export_data_command
 from .commands.extension import extension_command
@@ -1271,6 +1271,27 @@ def db_get(
     folder = ctx.obj.get("folder") if ctx.obj else None
     
     db_get_command(entity_type, entity_id, network, canister, folder)
+
+
+@db_app.command("schema")
+def db_schema(
+    ctx: typer.Context,
+) -> None:
+    """Get the database schema showing all entity types, fields, and relationships.
+    
+    Outputs JSON with entity types, field definitions, and relationship mappings.
+    This is useful for discovering what data types are available in the realm.
+    
+    Examples:
+        realms db schema                    # Get full schema
+        realms db schema -n staging         # Get schema from staging network
+    """
+    # Get network, canister, and folder from context
+    network = ctx.obj.get("network") if ctx.obj else None
+    canister = ctx.obj.get("canister") if ctx.obj else None
+    folder = ctx.obj.get("folder") if ctx.obj else None
+    
+    db_schema_command(network, canister, folder)
 
 
 @app.command("shell")
