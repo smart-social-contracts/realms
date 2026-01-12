@@ -18,13 +18,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-        with:
-          ref: ${{ github.event.inputs.commit || github.sha }}
 
       - name: Set deployment commit
         id: commit
         run: |
-          DEPLOY_COMMIT="${{ github.event.inputs.commit || github.sha }}"
+          # Use input commit if provided, otherwise use current HEAD
+          if [ -n "${{ github.event.inputs.commit }}" ]; then
+            DEPLOY_COMMIT="${{ github.event.inputs.commit }}"
+          else
+            DEPLOY_COMMIT=$(git rev-parse HEAD)
+          fi
           echo "deploy_commit=$DEPLOY_COMMIT" >> $GITHUB_OUTPUT
           echo "Using commit: $DEPLOY_COMMIT"
 
