@@ -385,16 +385,21 @@ jobs:
           echo "${{ secrets.IC_IDENTITY_PEM }}" > identity.pem
           chmod 600 identity.pem
           
+          # Create logs directory for artifacts
+          mkdir -p agent_logs
+          
           # Pull the image that was tested
           docker pull ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}
           
           # Run agent swarm test inside Docker container (needs dfx for registry list)
           docker run --rm \
             -v "$(pwd)/identity.pem:/app/identity.pem" \
+            -v "$(pwd)/agent_logs:/app/agent_logs" \
             -e DFX_WARNING="-mainnet_plaintext_identity" \
             -e DFX_NETWORK=staging \
             -e AGENTS_COUNT=3 \
             -e NETWORK=staging \
+            -e LOGS_DIR=/app/agent_logs \
             ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
             bash -c "dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
                      dfx identity use my-identity && \
@@ -405,11 +410,11 @@ jobs:
           # Clean up
           rm identity.pem
       
-      - name: Upload test logs
+      - name: Upload agent logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: staging-post-deployment-test-logs
-          path: test-logs/
-          retention-days: 7
+          name: agent-swarm-logs
+          path: agent_logs/
+          retention-days: 14
 

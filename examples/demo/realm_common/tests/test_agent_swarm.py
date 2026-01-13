@@ -15,6 +15,8 @@ import sys
 import re
 import subprocess
 import concurrent.futures
+from datetime import datetime
+from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 
 # Configuration - easily changeable
@@ -23,6 +25,7 @@ NETWORK = os.getenv("NETWORK", "staging")
 GEISTER_API_URL = os.getenv("GEISTER_API_URL", "https://geister-api.realmsgos.dev")
 MAX_WORKERS = int(os.getenv("MAX_WORKERS", "5"))
 FAILURE_THRESHOLD = float(os.getenv("FAILURE_THRESHOLD", "0.2"))  # 20% max failures allowed
+LOGS_DIR = Path(os.getenv("LOGS_DIR", "agent_logs"))
 
 
 def discover_realms() -> List[Dict[str, str]]:
@@ -77,8 +80,22 @@ def discover_realms() -> List[Dict[str, str]]:
         return []
 
 
-def run_agent_task(agent_id: str, realm_id: str, realm_name: str, task: str) -> Tuple[str, str, bool, str]:
-    """Run a single agent task and return (agent_id, realm_name, success, result)."""
+def run_agent_task(agent_id: str, realm_id: str, realm_name: str, task: str) -> Tuple[str, str, bool, str, dict]:
+    """Run a single agent task and return (agent_id, realm_name, success, result, full_log)."""
+    full_log = {
+        "agent_id": agent_id,
+        "realm_id": realm_id,
+        "realm_name": realm_name,
+        "task": task,
+        "timestamp": datetime.now().isoformat(),
+        "stdout": "",
+        "stderr": "",
+        "returncode": None,
+        "parsed_response": None,
+        "success": False,
+        "error": None
+    }
+    
     try:
         cmd = [
             "geister", "agent", "ask", agent_id, task,
@@ -88,25 +105,34 @@ def run_agent_task(agent_id: str, realm_id: str, realm_name: str, task: str) -> 
         ]
         
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        full_log["stdout"] = result.stdout
+        full_log["stderr"] = result.stderr
+        full_log["returncode"] = result.returncode
         
         # Parse JSON response for reliable success detection
         try:
             data = json.loads(result.stdout)
+            full_log["parsed_response"] = data
             success = data.get("success", False)
+            full_log["success"] = success
             response = data.get("response", "")[:500]
             error = data.get("error")
             if error:
-                return (agent_id, realm_name, False, f"Error: {error}")
-            return (agent_id, realm_name, success, response)
-        except json.JSONDecodeError:
+                full_log["error"] = error
+                return (agent_id, realm_name, False, f"Error: {error}", full_log)
+            return (agent_id, realm_name, success, response, full_log)
+        except json.JSONDecodeError as e:
             # Fallback if JSON parsing fails
+            full_log["error"] = f"JSON decode error: {e}"
             output = result.stdout + result.stderr
-            return (agent_id, realm_name, result.returncode == 0, output[:500])
+            return (agent_id, realm_name, result.returncode == 0, output[:500], full_log)
         
     except subprocess.TimeoutExpired:
-        return (agent_id, realm_name, False, "Timeout")
+        full_log["error"] = "Timeout after 180s"
+        return (agent_id, realm_name, False, "Timeout", full_log)
     except Exception as e:
-        return (agent_id, realm_name, False, str(e))
+        full_log["error"] = str(e)
+        return (agent_id, realm_name, False, str(e), full_log)
 
 
 def run_agent_swarm(realms: List[Dict[str, str]]) -> Dict:
@@ -143,6 +169,10 @@ def run_agent_swarm(realms: List[Dict[str, str]]) -> Dict:
     print(f"(AGENTS_COUNT={AGENTS_COUNT}, MAX_WORKERS={MAX_WORKERS})")
     print("=" * 60)
     
+    # Create logs directory
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    all_logs = []
+    
     # Run tasks in parallel
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = {}
@@ -152,7 +182,13 @@ def run_agent_swarm(realms: List[Dict[str, str]]) -> Dict:
         
         for future in concurrent.futures.as_completed(futures):
             realm_result = futures[future]
-            agent_id, realm_name, success, output = future.result()
+            agent_id, realm_name, success, output, full_log = future.result()
+            all_logs.append(full_log)
+            
+            # Save individual agent log
+            log_file = LOGS_DIR / f"{agent_id}_{realm_name.replace(' ', '_')}.json"
+            with open(log_file, 'w') as f:
+                json.dump(full_log, f, indent=2)
             
             if success:
                 realm_result["success"] += 1
@@ -170,6 +206,12 @@ def run_agent_swarm(realms: List[Dict[str, str]]) -> Dict:
                 "success": success,
                 "output": output[:200]
             })
+    
+    # Save combined logs
+    combined_log_file = LOGS_DIR / "all_agents.json"
+    with open(combined_log_file, 'w') as f:
+        json.dump(all_logs, f, indent=2)
+    print(f"\n📋 Agent logs saved to {LOGS_DIR}/")
     
     return results
 
