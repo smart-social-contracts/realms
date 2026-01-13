@@ -466,12 +466,12 @@ if [ -n "$FRONTENDS" ]; then
             (cd "$frontend_dir" && npm run build)
         fi
         
-        # Deploy frontend
+        # Deploy frontend (use reinstall mode for non-local - asset canisters are stateless)
         echo "   📦 Deploying $canister..."
         if [ "$NETWORK" = "local" ]; then
             dfx deploy "$canister"
         else
-            dfx deploy --network "$NETWORK" --yes "$canister"
+            dfx deploy --network "$NETWORK" --yes "$canister" --mode reinstall
         fi
     done
 fi
