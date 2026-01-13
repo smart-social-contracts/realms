@@ -570,8 +570,15 @@ class CursorDatabaseExplorer:
             sys.path.insert(0, project_root)
 
         try:
-            # Import the GGG module
-            ggg_module = importlib.import_module("ggg")
+            # Import the GGG module - first try local realm project, then fall back to bundled
+            ggg_module = None
+            try:
+                ggg_module = importlib.import_module("ggg")
+                logger.debug("Loaded ggg module from local realm project")
+            except ImportError:
+                # Fall back to bundled realms.ggg module
+                ggg_module = importlib.import_module("realms.ggg")
+                logger.debug("Loaded ggg module from bundled realms.ggg")
 
             # Get all exported classes from the __all__ list
             for class_name in getattr(ggg_module, "__all__", []):
@@ -580,12 +587,12 @@ class CursorDatabaseExplorer:
                     if inspect.isclass(cls) and hasattr(cls, "__name__"):
                         classes.append(cls)
                 except AttributeError:
-                    logger.error(traceback.format_exc())
+                    logger.debug(f"Failed to get class {class_name}: {traceback.format_exc()}")
                     continue
 
         except ImportError as e:
-            # Silently fall back to common patterns if GGG models can't be imported
-            logger.error(traceback.format_exc())
+            # No GGG models available at all
+            logger.debug(f"No ggg module available: {e}")
             pass
 
         self._ggg_classes = classes
