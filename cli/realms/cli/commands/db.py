@@ -26,6 +26,42 @@ logger = get_logger("db")
 console = Console()
 
 
+class DfxNotFoundError(Exception):
+    """Raised when dfx is not installed or not in PATH."""
+    pass
+
+
+def check_dfx_available() -> bool:
+    """Check if dfx is available in the system PATH.
+    
+    Returns:
+        True if dfx is available, False otherwise.
+    """
+    try:
+        result = subprocess.run(
+            ["dfx", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        return result.returncode == 0
+    except FileNotFoundError:
+        return False
+    except Exception:
+        return False
+
+
+def require_dfx() -> None:
+    """Check that dfx is available, exit with user-friendly message if not.
+    
+    Raises:
+        typer.Exit: If dfx is not available.
+    """
+    if not check_dfx_available():
+        console.print("[red]Error: dfx is not installed or not in PATH[/red]")
+        raise typer.Exit(1)
+
+
 ENTITY_DESCRIPTIONS = {
     "users": "System users and their profiles",
     "humans": "Human entities and identity records",
@@ -978,6 +1014,8 @@ def db_get_command(
         canister: Canister to connect to
         folder: Realm folder containing dfx.json
     """
+    require_dfx()
+    
     effective_network, effective_canister = get_effective_network_and_canister(
         network, canister
     )
@@ -1069,6 +1107,9 @@ def db_schema_command(
         network: Network to use
         canister: Canister to connect to
         folder: Realm folder containing dfx.json
+    
+    Note:
+        This command does not require dfx as it only inspects the local GGG model definitions.
     """
     effective_network, effective_canister = get_effective_network_and_canister(
         network, canister
@@ -1167,6 +1208,7 @@ def db_command(
     ),
 ) -> None:
     """Explore the Realm database in an interactive text-based interface with cursor navigation."""
+    require_dfx()
 
     logger.debug("db_command")
     logger.debug(f"network: {network}")

@@ -5,7 +5,14 @@ from io import StringIO
 import pytest
 import typer
 
-from realms.cli.commands.db import CursorDatabaseExplorer, NavigationState, db_get_command
+from realms.cli.commands.db import (
+    CursorDatabaseExplorer,
+    NavigationState,
+    db_get_command,
+    db_schema_command,
+    check_dfx_available,
+    require_dfx,
+)
 
 
 class TestCursorDatabaseExplorer:
@@ -275,7 +282,8 @@ class TestDbGetCommand:
             }
         }
 
-        with patch("subprocess.run") as mock_run, \
+        with patch("realms.cli.commands.db.check_dfx_available", return_value=True), \
+             patch("subprocess.run") as mock_run, \
              patch("builtins.print") as mock_print:
             mock_run.return_value.returncode = 0
             mock_run.return_value.stdout = json.dumps(mock_response)
@@ -313,7 +321,8 @@ class TestDbGetCommand:
             }
         }
 
-        with patch("subprocess.run") as mock_run, \
+        with patch("realms.cli.commands.db.check_dfx_available", return_value=True), \
+             patch("subprocess.run") as mock_run, \
              patch("builtins.print") as mock_print:
             mock_run.return_value.returncode = 0
             mock_run.return_value.stdout = json.dumps(mock_response)
@@ -347,7 +356,8 @@ class TestDbGetCommand:
             }
         }
 
-        with patch("subprocess.run") as mock_run, \
+        with patch("realms.cli.commands.db.check_dfx_available", return_value=True), \
+             patch("subprocess.run") as mock_run, \
              patch("builtins.print") as mock_print:
             mock_run.return_value.returncode = 0
             mock_run.return_value.stdout = json.dumps(mock_response)
@@ -378,7 +388,8 @@ class TestDbGetCommand:
             }
         }
 
-        with patch("subprocess.run") as mock_run, \
+        with patch("realms.cli.commands.db.check_dfx_available", return_value=True), \
+             patch("subprocess.run") as mock_run, \
              pytest.raises(typer.Exit) as exc_info:
             mock_run.return_value.returncode = 0
             mock_run.return_value.stdout = json.dumps(mock_response)
@@ -407,7 +418,8 @@ class TestDbGetCommand:
             }
         }
 
-        with patch("subprocess.run") as mock_run, \
+        with patch("realms.cli.commands.db.check_dfx_available", return_value=True), \
+             patch("subprocess.run") as mock_run, \
              pytest.raises(typer.Exit) as exc_info:
             mock_run.return_value.returncode = 0
             mock_run.return_value.stdout = json.dumps(mock_response)
@@ -418,7 +430,8 @@ class TestDbGetCommand:
 
     def test_get_connection_error(self):
         """Test error handling when backend connection fails."""
-        with patch("subprocess.run") as mock_run, \
+        with patch("realms.cli.commands.db.check_dfx_available", return_value=True), \
+             patch("subprocess.run") as mock_run, \
              pytest.raises(typer.Exit) as exc_info:
             mock_run.side_effect = Exception("Connection failed")
 
@@ -464,7 +477,8 @@ class TestDbGetCommand:
             }
         }
 
-        with patch("subprocess.run") as mock_run, \
+        with patch("realms.cli.commands.db.check_dfx_available", return_value=True), \
+             patch("subprocess.run") as mock_run, \
              patch("builtins.print") as mock_print:
             # First call for status check, then alternating pages
             mock_run.return_value.returncode = 0
@@ -508,7 +522,8 @@ class TestDbGetCommand:
             }
         }
 
-        with patch("subprocess.run") as mock_run, \
+        with patch("realms.cli.commands.db.check_dfx_available", return_value=True), \
+             patch("subprocess.run") as mock_run, \
              pytest.raises(typer.Exit) as exc_info:
             # First call succeeds (status), second fails (entity query)
             def side_effect(*args, **kwargs):
@@ -525,3 +540,138 @@ class TestDbGetCommand:
             db_get_command("User", None, "local", "realm_backend")
 
         assert exc_info.value.exit_code == 1
+
+
+class TestDfxAvailability:
+    """Test suite for dfx availability checking."""
+
+    def test_check_dfx_available_when_installed(self):
+        """Test check_dfx_available returns True when dfx is installed."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.returncode = 0
+            mock_run.return_value.stdout = "dfx 0.29.0"
+
+            result = check_dfx_available()
+
+            assert result is True
+            mock_run.assert_called_once()
+            assert mock_run.call_args[0][0] == ["dfx", "--version"]
+
+    def test_check_dfx_available_when_not_installed(self):
+        """Test check_dfx_available returns False when dfx is not installed."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = FileNotFoundError("dfx not found")
+
+            result = check_dfx_available()
+
+            assert result is False
+
+    def test_check_dfx_available_when_command_fails(self):
+        """Test check_dfx_available returns False when dfx command fails."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.returncode = 1
+
+            result = check_dfx_available()
+
+            assert result is False
+
+    def test_require_dfx_exits_when_not_available(self):
+        """Test require_dfx exits with code 1 and shows user-friendly message when dfx is not available."""
+        with patch("realms.cli.commands.db.check_dfx_available") as mock_check, \
+             patch("realms.cli.commands.db.console.print") as mock_print, \
+             pytest.raises(typer.Exit) as exc_info:
+            mock_check.return_value = False
+
+            require_dfx()
+
+        assert exc_info.value.exit_code == 1
+        # Verify user-friendly message was printed
+        print_calls = [str(call) for call in mock_print.call_args_list]
+        assert any("dfx is not installed" in str(call) for call in print_calls)
+
+    def test_require_dfx_passes_when_available(self):
+        """Test require_dfx does nothing when dfx is available."""
+        with patch("realms.cli.commands.db.check_dfx_available") as mock_check:
+            mock_check.return_value = True
+
+            # Should not raise
+            require_dfx()
+
+    def test_db_get_command_checks_dfx_first(self):
+        """Test that db_get_command checks for dfx before doing anything else."""
+        with patch("realms.cli.commands.db.check_dfx_available") as mock_check, \
+             patch("realms.cli.commands.db.console.print"), \
+             pytest.raises(typer.Exit) as exc_info:
+            mock_check.return_value = False
+
+            db_get_command("User", None, "local", "realm_backend")
+
+        assert exc_info.value.exit_code == 1
+        mock_check.assert_called_once()
+
+
+class TestDbSchemaCommand:
+    """Test suite for db_schema_command function."""
+
+    def test_schema_returns_valid_json(self):
+        """Test that db_schema_command outputs valid JSON with entity schema."""
+        with patch("builtins.print") as mock_print:
+            db_schema_command("local", "realm_backend")
+
+            # Check that JSON was printed
+            mock_print.assert_called_once()
+            output = mock_print.call_args[0][0]
+            
+            # Should be valid JSON
+            schema = json.loads(output)
+            
+            # Should have entities key
+            assert "entities" in schema
+            assert isinstance(schema["entities"], dict)
+
+    def test_schema_includes_common_entity_types(self):
+        """Test that schema includes common GGG entity types."""
+        with patch("builtins.print") as mock_print:
+            db_schema_command("local", "realm_backend")
+
+            output = mock_print.call_args[0][0]
+            schema = json.loads(output)
+            
+            entities = schema["entities"]
+            
+            # Check for some common entity types
+            expected_entities = ["User", "Organization", "Transfer", "Notification", "Proposal"]
+            for entity_name in expected_entities:
+                assert entity_name in entities, f"Expected entity '{entity_name}' not found in schema"
+
+    def test_schema_entity_has_fields_and_relationships(self):
+        """Test that each entity in schema has fields and relationships keys."""
+        with patch("builtins.print") as mock_print:
+            db_schema_command("local", "realm_backend")
+
+            output = mock_print.call_args[0][0]
+            schema = json.loads(output)
+            
+            # Check structure of at least one entity
+            for entity_name, entity_schema in schema["entities"].items():
+                assert "fields" in entity_schema, f"Entity '{entity_name}' missing 'fields'"
+                assert "relationships" in entity_schema, f"Entity '{entity_name}' missing 'relationships'"
+                assert isinstance(entity_schema["fields"], dict)
+                assert isinstance(entity_schema["relationships"], dict)
+                break  # Just check one entity
+
+    def test_schema_does_not_require_dfx(self):
+        """Test that db_schema_command works without dfx (uses local GGG definitions)."""
+        # Mock subprocess.run to simulate dfx not being available
+        with patch("subprocess.run") as mock_run, \
+             patch("builtins.print") as mock_print:
+            mock_run.side_effect = FileNotFoundError("dfx not found")
+
+            # Should still work because schema only uses local GGG classes
+            db_schema_command("local", "realm_backend")
+
+            # Should have printed valid schema
+            mock_print.assert_called_once()
+            output = mock_print.call_args[0][0]
+            schema = json.loads(output)
+            assert "entities" in schema
