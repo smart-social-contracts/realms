@@ -84,6 +84,7 @@ def run_agent_task(agent_id: str, realm_id: str, realm_name: str, task: str) -> 
             "geister", "agent", "ask", agent_id, task,
             "--realm", realm_id,
             "--json",  # Use structured JSON output for reliable success detection
+            "--api-url", GEISTER_API_URL,  # Use configured API URL
         ]
         
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
