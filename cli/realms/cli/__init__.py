@@ -1,5 +1,5 @@
 """Realms CLI - A tool for managing Realms project lifecycle."""
 
-__version__ = "0.2.0"
-__commit__ = "a9b22f8"
-__commit_date__ = "2025-12-22T12:26:37+01:00"
+__version__ = "0.2.5"
+__commit__ = "f5b6b99"
+__commit_date__ = "2026-01-13T12:47:31+01:00"
