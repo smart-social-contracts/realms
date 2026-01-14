@@ -7,7 +7,7 @@ MAX_BATCH_SIZE = 25  # Reduced from 100 to avoid ICP instruction limit (40B) on 
 # Docker image configuration
 # Updated automatically during release to match the current version
 # Can be overridden with REALMS_DOCKER_IMAGE environment variable
-DEFAULT_DOCKER_IMAGE = "ghcr.io/smart-social-contracts/realms:v0.2.6"
+DEFAULT_DOCKER_IMAGE = "ghcr.io/smart-social-contracts/realms:v0.2.7"
 DOCKER_IMAGE = os.environ.get("REALMS_DOCKER_IMAGE", DEFAULT_DOCKER_IMAGE)
 
 # Default realm folder
