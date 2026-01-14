@@ -30,6 +30,7 @@ COPY scripts ./scripts
 COPY src ./src
 COPY tests ./tests
 COPY examples ./examples
+COPY codices ./codices
 
 RUN touch src/realm_backend/extension_packages/extension_imports.py
 
