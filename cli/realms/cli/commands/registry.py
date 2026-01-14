@@ -136,14 +136,45 @@ def registry_list_command(
             pass
 
 
+def _is_canister_id(value: str) -> bool:
+    """Check if a string looks like a canister ID (e.g., h5vpp-qyaaa-aaaac-qai3a-cai)."""
+    import re
+    # Canister IDs are typically 27 chars with dashes, ending in -cai
+    return bool(re.match(r'^[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{5}-[a-z0-9]{3}$', value))
+
+
 def registry_get_command(
     realm_id: str, network: str = "local", canister_id: Optional[str] = None
 ) -> None:
-    """Get a specific realm by ID"""
+    """Get a specific realm by ID or name"""
     console.print("[bold blue]🔍 Getting Realm Details[/bold blue]\n")
 
     effective_registry = canister_id or get_registry_canister_id(network)
-    args = [f'("{realm_id}")']
+    
+    # If it doesn't look like a canister ID, try searching by name first
+    lookup_id = realm_id
+    if not _is_canister_id(realm_id):
+        # Search for the realm by name
+        search_args = [f'("{realm_id}")']
+        search_result = _run_dfx_command(
+            "search_realms", search_args, network, effective_registry
+        )
+        
+        if search_result["success"] and "vec {" in search_result["data"]:
+            # Parse the search results to find a matching realm
+            import re
+            # Look for id = "..." in the results
+            id_matches = re.findall(r'id = "([^"]+)"', search_result["data"])
+            name_matches = re.findall(r'name = "([^"]+)"', search_result["data"])
+            
+            # Find exact name match (case-insensitive)
+            for i, name in enumerate(name_matches):
+                if name.lower() == realm_id.lower() and i < len(id_matches):
+                    lookup_id = id_matches[i]
+                    console.print(f"[dim]Resolved '{realm_id}' → {lookup_id}[/dim]\n")
+                    break
+    
+    args = [f'("{lookup_id}")']
     result = _run_dfx_command(
         "get_realm", args, network, effective_registry
     )
