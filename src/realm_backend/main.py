@@ -731,6 +731,29 @@ def post_upgrade_() -> void:
     logger.info("Realm canister initialized")
 
 
+@query
+def extension_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
+    """Query version of extension call for read-only operations like get_entity_types."""
+    try:
+        logger.debug(
+            f"Query calling extension '{args['extension_name']}' function '{args['function_name']}' with args {args['args']}"
+        )
+
+        extension_result = api.extensions.extension_sync_call(
+            args["extension_name"], args["function_name"], args["args"]
+        )
+
+        logger.debug(
+            f"Got extension result from {args['extension_name']} function {args['function_name']}: {extension_result}"
+        )
+
+        return ExtensionCallResponse(success=True, response=str(extension_result))
+
+    except Exception as e:
+        logger.error(f"Error in extension_call: {str(e)}\n{traceback.format_exc()}")
+        return ExtensionCallResponse(success=False, response=str(e))
+
+
 @update
 def extension_sync_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
     try:
