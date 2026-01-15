@@ -4,6 +4,7 @@ import { authClient, initializeAuthClient } from '$lib/auth';
 
 let createActor, canisterId, HttpAgent;
 let importsInitialized = false;
+let initWithIdentityPromise = null; // Singleton promise to prevent concurrent initialization
 
 async function initializeImports() {
 	if (importsInitialized) return;
@@ -99,24 +100,51 @@ export const backend = new Proxy(
 );
 
 // Initialize backend with authenticated identity
+// Uses a singleton promise to prevent race conditions from concurrent calls
 export async function initBackendWithIdentity() {
+	// If initialization is already in progress, wait for it
+	if (initWithIdentityPromise) {
+		return initWithIdentityPromise;
+	}
+
+	// Start initialization and store the promise
+	initWithIdentityPromise = _doInitBackendWithIdentity();
+	
+	try {
+		return await initWithIdentityPromise;
+	} finally {
+		// Clear the promise after completion so future calls can re-initialize if needed
+		initWithIdentityPromise = null;
+	}
+}
+
+async function _doInitBackendWithIdentity() {
 	try {
 		console.log('Initializing backend with authenticated identity...');
 
 		await initializeImports();
 
 		// Make sure we're using the shared auth client
-		const client = authClient || (await initializeAuthClient());
+		const client = await initializeAuthClient();
 
 		if (await client.isAuthenticated()) {
 			// Get the authenticated identity from the shared client
 			const identity = client.getIdentity();
-			console.log('Using authenticated identity:', identity.getPrincipal().toText());
+			const principalText = identity.getPrincipal().toText();
+			console.log('Using authenticated identity:', principalText);
 
 			const currentActor = get(backendStore);
-			if (currentActor && currentActor._agent && currentActor._agent._identity === identity) {
-				console.log('Backend already initialized with current identity');
-				return currentActor;
+			// Check if already initialized with same principal (more reliable than identity object comparison)
+			if (currentActor && currentActor._agent) {
+				try {
+					const currentPrincipal = currentActor._agent._identity?.getPrincipal()?.toText();
+					if (currentPrincipal === principalText) {
+						console.log('Backend already initialized with current identity');
+						return currentActor;
+					}
+				} catch (e) {
+					// Ignore comparison errors, proceed with re-initialization
+				}
 			}
 
 			// Create an agent with the identity

@@ -2,7 +2,7 @@
   import { Button, Card, Radio, Label, Spinner, Select, Checkbox } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { principal, isAuthenticated } from '$lib/stores/auth';
-  import { backend } from '$lib/canisters.js';
+  import { initBackendWithIdentity } from '$lib/canisters.js';
   import PassportVerification from '$lib/components/passport/PassportVerification.svelte';
   import { styles, cn } from '$lib/theme/utilities';
   import { _ } from 'svelte-i18n';
@@ -63,9 +63,11 @@
     
     try {
       loading = true;
+      // Initialize backend with authenticated identity before making the call
+      const authenticatedBackend = await initBackendWithIdentity();
       // Call the Kybra canister join_realm method with the selected profile
       console.log(`Joining realm with profile: ${selectedProfile}`);
-      const response = await backend.join_realm(selectedProfile);
+      const response = await authenticatedBackend.join_realm(selectedProfile);
       if (response.success) {
         success = true;
       } else if (response.data && response.data.Error) {
