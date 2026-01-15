@@ -80,3 +80,8 @@ __all__ = [
     "Vote",
     "Zone",
 ]
+
+
+def classes() -> list[str]:
+    """Return list of GGG entity class names (excludes helper types)."""
+    return [name for name in __all__ if name not in ('LandType', 'Operations', 'Profiles')]
