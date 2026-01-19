@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import LanguageSwitcher from './components/LanguageSwitcher'
 import { 
@@ -20,23 +20,26 @@ import {
   Wallet,
   Scale,
   BookOpen,
-  ChevronRight
+  ChevronRight,
+  Fingerprint,
+  Landmark,
+  UserPlus,
+  HeartHandshake,
+  Bot,
+  Mail
 } from 'lucide-react'
 
 function App() {
   const { t } = useTranslation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [lightboxImage, setLightboxImage] = useState(null)
 
   const features = [
     {
-      icon: <Globe className="w-6 h-6" />,
+      icon: <img src="/images/icp_logo_bw.png" alt="ICP" className="w-6 h-6" />,
       titleKey: "features.internetComputer.title",
-      descKey: "features.internetComputer.description"
-    },
-    {
-      icon: <Layers className="w-6 h-6" />,
-      titleKey: "features.extensionSystem.title",
-      descKey: "features.extensionSystem.description"
+      descKey: "features.internetComputer.description",
+      image: "/images/ic_dashboard.png"
     },
     {
       icon: <Shield className="w-6 h-6" />,
@@ -51,24 +54,28 @@ function App() {
     {
       icon: <Users className="w-6 h-6" />,
       titleKey: "features.multiRealm.title",
-      descKey: "features.multiRealm.description"
+      descKey: "features.multiRealm.description",
+      image: "/images/mundus_map.png"
+    },
+    {
+      icon: <Layers className="w-6 h-6" />,
+      titleKey: "features.extensionSystem.title",
+      descKey: "features.extensionSystem.description",
+      image: "/images/marketplace.png"
     },
     {
       icon: <Zap className="w-6 h-6" />,
       titleKey: "features.instantSetup.title",
       descKey: "features.instantSetup.description"
+    },
+    {
+      icon: <Bot className="w-6 h-6" />,
+      titleKey: "features.aiGovernors.title",
+      descKey: "features.aiGovernors.description"
     }
   ]
 
-  const extensions = [
-    { nameKey: "extensions.adminDashboard.name", icon: <Building2 className="w-5 h-5" />, descKey: "extensions.adminDashboard.description" },
-    { nameKey: "extensions.citizenDashboard.name", icon: <Users className="w-5 h-5" />, descKey: "extensions.citizenDashboard.description" },
-    { nameKey: "extensions.vault.name", icon: <Wallet className="w-5 h-5" />, descKey: "extensions.vault.description" },
-    { nameKey: "extensions.justice.name", icon: <Scale className="w-5 h-5" />, descKey: "extensions.justice.description" },
-    { nameKey: "extensions.landRegistry.name", icon: <BookOpen className="w-5 h-5" />, descKey: "extensions.landRegistry.description" },
-    { nameKey: "extensions.voting.name", icon: <Vote className="w-5 h-5" />, descKey: "extensions.voting.description" },
-  ]
-
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-primary-50 text-slate-900">
       {/* Navigation */}
@@ -80,8 +87,9 @@ function App() {
             </div>
             
             <div className="hidden md:flex items-center gap-8">
-              <a href="#features" className="text-slate-600 hover:text-slate-900 transition-colors">For people</a>
-              <a href="#features" className="text-slate-600 hover:text-slate-900 transition-colors">For developers</a>
+              <a href="#features" className="text-slate-600 hover:text-slate-900 transition-colors">{t('nav.howItWorks')}</a>
+              <a href="#forpeople" className="text-slate-600 hover:text-slate-900 transition-colors">{t('nav.forPeople')}</a>
+              <a href="#forinstitutions" className="text-slate-600 hover:text-slate-900 transition-colors">{t('nav.forInstitutions')}</a>
               <LanguageSwitcher />
             </div>
 
@@ -98,8 +106,9 @@ function App() {
         {mobileMenuOpen && (
           <div className="md:hidden glass-dark border-t border-slate-200">
             <div className="px-4 py-4 space-y-4">
-              <a href="#features" className="block text-slate-600 hover:text-slate-900">For people</a>
-              <a href="#features" className="block text-slate-600 hover:text-slate-900">For developers</a>
+              <a href="#features" className="block text-slate-600 hover:text-slate-900">{t('nav.howItWorks')}</a>
+              <a href="#forpeople" className="block text-slate-600 hover:text-slate-900">{t('nav.forPeople')}</a>
+              <a href="#forinstitutions" className="block text-slate-600 hover:text-slate-900">{t('nav.forInstitutions')}</a>
               <LanguageSwitcher />
             </div>
           </div>
@@ -113,13 +122,13 @@ function App() {
           <img 
             src="/hero-bg.jpg" 
             alt="Background" 
-            className="w-full h-full object-cover opacity-40"
+            className="w-full h-full object-cover opacity-60"
           />
           <div className="absolute inset-0 bg-gradient-to-br from-slate-50/60 via-white/50 to-primary-50/60"></div>
         </div>
         
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl p-8 sm:p-12 max-w-5xl mx-auto text-left">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center pt-12 sm:pt-0">
+            <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl p-6 sm:p-12 max-w-5xl mx-auto text-left">
             <div className="mb-8 flex justify-center">
               <img src="/logo_horizontal.svg" alt="Realms" className="h-20 sm:h-24 lg:h-28" />
             </div>
@@ -156,6 +165,15 @@ function App() {
             {t('mission.title')}
           </h2>
           <p className="text-base text-slate-600 leading-relaxed text-justify" dangerouslySetInnerHTML={{ __html: t('mission.description') }} />
+          <a 
+            href={t('mission.learnMoreUrl')}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 mt-6 px-5 py-2.5 bg-primary-50 border border-primary-200 text-primary-700 rounded-lg font-medium hover:bg-primary-100 hover:border-primary-300 transition-all"
+          >
+            {t('mission.learnMore')}
+            <ExternalLink className="w-4 h-4" />
+          </a>
         </div>
       </section>
 
@@ -205,7 +223,7 @@ function App() {
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* Features Section - How It Works */}
       <section id="features" className="py-24 relative">
         <div className="absolute inset-0 bg-dots opacity-30"></div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -218,92 +236,154 @@ function App() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="space-y-24">
             {features.map((feature, index) => (
               <div 
                 key={index}
-                className="glass-dark rounded-2xl p-8 hover:border-primary-400 transition-colors group"
+                className={`flex flex-col ${index % 2 === 0 ? 'lg:flex-row' : 'lg:flex-row-reverse'} gap-12 items-center`}
               >
-                <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center text-primary-700 mb-6 group-hover:scale-110 transition-transform">
-                  {feature.icon}
+                {/* Image Side - only show if feature has an image */}
+                {feature.image && (
+                  <div className="flex-1 w-full">
+                    <button 
+                      onClick={() => setLightboxImage(feature.image)}
+                      className="rounded-2xl shadow-lg overflow-hidden border border-slate-200 cursor-zoom-in hover:shadow-2xl hover:scale-[1.02] hover:border-primary-300 transition-all duration-300 w-full group"
+                    >
+                      <img src={feature.image} alt={t(feature.titleKey)} className="w-full h-auto group-hover:brightness-105 transition-all duration-300" />
+                    </button>
+                  </div>
+                )}
+                {/* Content Side */}
+                <div className="flex-1 w-full">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center text-primary-700">
+                      {feature.icon}
+                    </div>
+                    <h3 className="text-2xl font-bold text-slate-800">{t(feature.titleKey)}</h3>
+                  </div>
+                  <p className="text-lg text-slate-600 leading-relaxed">{t(feature.descKey)}</p>
                 </div>
-                <h3 className="text-xl font-semibold mb-3 text-slate-800">{t(feature.titleKey)}</h3>
-                <p className="text-base text-slate-600">{t(feature.descKey)}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Extensions Section */}
-      <section id="extensions" className="py-24 relative bg-primary-50">
+      {/* For People Section */}
+      <section id="forpeople" className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            <div>
-              <h2 className="text-3xl sm:text-4xl font-bold mb-6 text-slate-800">
-                {t('extensions.title')}
-              </h2>
-              <p className="text-base text-slate-600 mb-8">
-                {t('extensions.subtitle')}
-              </p>
-              
-              <div className="space-y-4">
-                {extensions.map((ext, index) => (
-                  <div key={index} className="flex items-center gap-4 glass-dark rounded-xl p-4">
-                    <div className="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center text-primary-700">
-                      {ext.icon}
-                    </div>
-                    <div>
-                      <div className="font-semibold text-slate-800">{t(ext.nameKey)}</div>
-                      <div className="text-base text-slate-600">{t(ext.descKey)}</div>
-                    </div>
-                  </div>
-                ))}
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-slate-800">
+              {t('forPeople.title')}
+            </h2>
+            <p className="text-base text-slate-600 max-w-3xl mx-auto">
+              {t('forPeople.subtitle')}
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-3 gap-8">
+            {/* Identity Verification Card */}
+            <div className="glass-dark rounded-2xl p-8">
+              <div className="w-14 h-14 rounded-xl bg-primary-100 flex items-center justify-center text-primary-700 mb-6">
+                <Fingerprint className="w-7 h-7" />
               </div>
+              <h3 className="text-xl font-semibold text-slate-800 mb-4">{t('forPeople.identity.title')}</h3>
+              <p className="text-base text-slate-600 mb-6">{t('forPeople.identity.description')}</p>
+              <ul className="space-y-2">
+                {(t('forPeople.identity.features', { returnObjects: true }) || []).map((feature, idx) => (
+                  <li key={idx} className="flex items-start gap-2 text-sm text-slate-600">
+                    <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
 
-            <div className="relative">
-              <div className="absolute inset-0 bg-primary-200/40 rounded-3xl blur-3xl"></div>
-              <div className="relative bg-slate-900 rounded-3xl p-8 shadow-2xl">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
-                  <Code className="w-5 h-5 text-primary-300" />
-                  {t('extensions.architecture.title')}
-                </h3>
-                <pre className="text-sm text-slate-300 overflow-x-auto">
-{`my-extension/
-├── backend/
-│   ├── __init__.py
-│   └── entry.py        # Entry points
-├── frontend/
-│   ├── lib/extensions/
-│   └── routes/
-├── manifest.json       # Metadata
-└── requirements.txt    # Dependencies`}
-                </pre>
-                <div className="mt-6 pt-6 border-t border-slate-700">
-                  <div className="flex items-center gap-2 text-sm text-slate-400">
-                    <CheckCircle className="w-4 h-4 text-green-500" />
-                    {t('extensions.architecture.noOverhead')}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-slate-400 mt-2">
-                    <CheckCircle className="w-4 h-4 text-green-500" />
-                    {t('extensions.architecture.atomicOps')}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-slate-400 mt-2">
-                    <CheckCircle className="w-4 h-4 text-green-500" />
-                    {t('extensions.architecture.cliFirst')}
-                  </div>
-                </div>
+            {/* Participate Card */}
+            <div className="glass-dark rounded-2xl p-8">
+              <div className="w-14 h-14 rounded-xl bg-primary-100 flex items-center justify-center text-primary-700 mb-6">
+                <Vote className="w-7 h-7" />
               </div>
+              <h3 className="text-xl font-semibold text-slate-800 mb-4">{t('forPeople.participate.title')}</h3>
+              <p className="text-base text-slate-600">{t('forPeople.participate.description')}</p>
+            </div>
+
+            {/* Create Your Own Realm Card */}
+            <div className="glass-dark rounded-2xl p-8">
+              <div className="w-14 h-14 rounded-xl bg-primary-100 flex items-center justify-center text-primary-700 mb-6">
+                <UserPlus className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-semibold text-slate-800 mb-4">{t('forPeople.create.title')}</h3>
+              <p className="text-base text-slate-600">{t('forPeople.create.description')}</p>
             </div>
           </div>
         </div>
       </section>
 
+      {/* For Institutions Section */}
+      <section id="forinstitutions" className="py-24 bg-primary-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-slate-800">
+              {t('forInstitutions.title')}
+            </h2>
+            <p className="text-base text-slate-600 max-w-3xl mx-auto">
+              {t('forInstitutions.subtitle')}
+            </p>
+          </div>
+
+          <div className="max-w-5xl mx-auto mb-12">
+            {/* For Governments Card */}
+            <div className="glass-dark rounded-2xl p-8 lg:p-12">
+              <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
+                {/* Left side - Title and description */}
+                <div className="flex-1">
+                  <div className="w-14 h-14 rounded-xl bg-primary-100 flex items-center justify-center text-primary-700 mb-6">
+                    <Landmark className="w-7 h-7" />
+                  </div>
+                  <h3 className="text-2xl font-semibold text-slate-800 mb-4">{t('forInstitutions.governments.title')}</h3>
+                  <p className="text-lg text-slate-600">{t('forInstitutions.governments.description')}</p>
+                </div>
+                {/* Right side - Benefits */}
+                <div className="flex-1 lg:border-l lg:border-slate-200 lg:pl-12">
+                  <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Key Benefits</h4>
+                  <ul className="space-y-3">
+                    {(t('forInstitutions.governments.benefits', { returnObjects: true }) || []).map((benefit, idx) => (
+                      <li key={idx} className="flex items-start gap-3 text-base text-slate-600">
+                        <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>{benefit}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-center">
+            <a 
+              href="mailto:contact@realmsgos.org"
+              className="inline-flex items-center justify-center px-8 py-4 bg-primary-900 text-white rounded-xl font-semibold text-lg hover:bg-primary-800 transition-colors"
+            >
+              {t('forInstitutions.cta')}
+              <Mail className="w-5 h-5 ml-2" />
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* Get Started Section */}
-      <section id="getstarted" className="py-24 relative">
-        <div className="absolute inset-0 bg-grid opacity-30"></div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section id="getstarted" className="py-24 relative overflow-hidden">
+        {/* Background image */}
+        <div className="absolute inset-0">
+          <img 
+            src="/hero2-bg.jpg" 
+            alt="Background" 
+            className="w-full h-full object-cover opacity-50"
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-50/70 via-white/60 to-primary-50/70"></div>
+        </div>
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-slate-800">
               <span className="text-gradient">{t('getStarted.title')}</span>
@@ -340,13 +420,11 @@ function App() {
               <h3 className="text-xl font-semibold text-slate-800 mb-3">{t('getStarted.contact.title')}</h3>
               <p className="text-base text-slate-600 mb-6 flex-grow">{t('getStarted.contact.description')}</p>
               <a 
-                href="https://x.com/realmsgos" 
-                target="_blank" 
-                rel="noopener noreferrer"
+                href="mailto:contact@realmsgos.org"
                 className="inline-flex items-center justify-center px-6 py-3 border-2 border-primary-900 text-primary-900 rounded-xl font-semibold hover:bg-primary-50 transition-colors"
               >
                 {t('getStarted.contact.button')}
-                <ExternalLink className="w-4 h-4 ml-2" />
+                <Mail className="w-4 h-4 ml-2" />
               </a>
             </div>
 
@@ -358,7 +436,9 @@ function App() {
               <h3 className="text-xl font-semibold text-slate-800 mb-3">{t('getStarted.developers.title')}</h3>
               <p className="text-base text-slate-600 mb-6 flex-grow">{t('getStarted.developers.description')}</p>
               <a 
-                href="/docs" 
+                href="https://github.com/smart-social-contracts/realms"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex items-center justify-center px-6 py-3 border-2 border-primary-900 text-primary-900 rounded-xl font-semibold hover:bg-primary-50 transition-colors"
               >
                 {t('getStarted.developers.button')}
@@ -388,10 +468,15 @@ function App() {
                   <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                 </svg>
               </a>
-              <a href="/docs"
-                 className="text-slate-500 hover:text-slate-900 transition-colors flex items-center gap-2">
-                <BookOpen className="w-5 h-5" />
-                {t('footer.docs')}
+              <a href="mailto:contact@realmsgos.org"
+                 className="text-slate-500 hover:text-slate-900 transition-colors">
+                <Mail className="w-6 h-6" />
+              </a>
+              <a href="https://github.com/smart-social-contracts/realms/tree/main/docs"
+                 target="_blank"
+                 rel="noopener noreferrer"
+                 className="text-slate-500 hover:text-slate-900 transition-colors">
+                <BookOpen className="w-6 h-6" />
               </a>
             </div>
           </div>
@@ -407,6 +492,27 @@ function App() {
           </div>
         </div>
       </footer>
+
+      {/* Lightbox Modal */}
+      {lightboxImage && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setLightboxImage(null)}
+        >
+          <button 
+            className="absolute top-4 right-4 text-white hover:text-slate-300 transition-colors"
+            onClick={() => setLightboxImage(null)}
+          >
+            <X className="w-8 h-8" />
+          </button>
+          <img 
+            src={lightboxImage} 
+            alt="Zoomed view" 
+            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   )
 }
