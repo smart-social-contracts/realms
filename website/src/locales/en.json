@@ -14,7 +14,9 @@
   },
   "mission": {
     "title": "What is Realms?",
-    "description": "<strong>Realms</strong> is a decentralized software platform for public administration — a Governance Operating System (GOS) designed to deliver essential public services such as justice, social welfare, property registries, and more. From small towns to entire nations, it empowers communities to design, run, and evolve their own governance systems — free from the corruption and inefficiencies of traditional bureaucracy."
+    "description": "<strong>Realms</strong> is a decentralized software platform for public administration — a Governance Operating System (GOS) designed to deliver essential public services such as justice, social welfare, property registries, and more. From small towns to entire nations, it empowers communities to design, run, and evolve their own governance systems — free from the corruption and inefficiencies of traditional bureaucracy.\n\nRealms opens a window towards a new civilizational paradigm called <strong>Smart Social Contracts</strong>.",
+    "learnMore": "Learn more about Smart Social Contracts at ",
+    "learnMoreUrl": "https://smartsocialcontracts.org"
   },
   "principles": {
     "title": "Core Principles",
@@ -62,6 +64,10 @@
     "instantSetup": {
       "title": "Clone & Deploy in Seconds",
       "description": "See a governance model you like? Clone it instantly and adapt it to your community. No need to build from scratch — proven systems can be replicated and customized in seconds."
+    },
+    "aiGovernors": {
+      "title": "AI Governors & Advisors",
+      "description": "Leverage AI-powered governors and advisors that can analyze proposals, provide recommendations, and even autonomously execute routine governance tasks — all while remaining transparent and accountable to citizens."
     }
   },
   "extensions": {
@@ -141,7 +147,7 @@
       "title": "Seamless Migration",
       "description": "Our team works with you to design a migration path that fits your needs. Start with a pilot program, onboard citizens gradually, and scale when you're ready."
     },
-    "cta": "Contact Us for a Consultation"
+    "cta": "Contact Us"
   },
   "getStarted": {
     "title": "Get Started",

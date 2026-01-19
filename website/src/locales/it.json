@@ -14,7 +14,9 @@
   },
   "mission": {
     "title": "Cos'è Realms?",
-    "description": "<strong>Realms</strong> è una piattaforma software decentralizzata per l'amministrazione pubblica — un Sistema Operativo di Governance (GOS) progettato per fornire servizi pubblici essenziali come giustizia, welfare sociale, registri immobiliari e altro. Dalle piccole città alle nazioni intere, consente alle comunità di progettare, gestire ed evolvere i propri sistemi di governance — liberi dalla corruzione e dalle inefficienze della burocrazia tradizionale."
+    "description": "<strong>Realms</strong> è una piattaforma software decentralizzata per la pubblica amministrazione — un Sistema Operativo di Governance (GOS) progettato per fornire servizi pubblici essenziali come giustizia, welfare sociale, registri di proprietà e altro. Dalle piccole città alle nazioni intere, permette alle comunità di progettare, gestire e far evolvere i propri sistemi di governance — liberi dalla corruzione e dalle inefficienze della burocrazia tradizionale. Realms apre una finestra verso un nuovo paradigma civilizzazionale: <strong>Smart Social Contracts</strong>.",
+    "learnMore": "Scopri di più sui Smart Social Contracts",
+    "learnMoreUrl": "https://smartsocialcontracts.org"
   },
   "principles": {
     "title": "Principi Fondamentali",
@@ -62,6 +64,10 @@
     "instantSetup": {
       "title": "Clona e Distribuisci in Secondi",
       "description": "Vedi un modello di governance che ti piace? Clonalo istantaneamente e adattalo alla tua comunità. Non c'è bisogno di costruire da zero — sistemi collaudati possono essere replicati e personalizzati in pochi secondi."
+    },
+    "aiGovernors": {
+      "title": "Governatori e Consulenti IA",
+      "description": "Sfrutta governatori e consulenti alimentati dall'IA che possono analizzare proposte, fornire raccomandazioni e persino eseguire compiti di governance di routine in modo autonomo — il tutto rimanendo trasparenti e responsabili verso i cittadini."
     }
   },
   "extensions": {
@@ -141,7 +147,7 @@
       "title": "Migrazione Senza Problemi",
       "description": "Il nostro team lavora con te per progettare un percorso di migrazione adatto alle tue esigenze. Inizia con un programma pilota, integra i cittadini gradualmente e scala quando sei pronto."
     },
-    "cta": "Contattaci per una Consulenza"
+    "cta": "Contattaci"
   },
   "getStarted": {
     "title": "Inizia Ora",

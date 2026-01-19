@@ -14,7 +14,9 @@
   },
   "mission": {
     "title": "Was ist Realms?",
-    "description": "<strong>Realms</strong> ist eine dezentrale Softwareplattform für die öffentliche Verwaltung — ein Governance Operating System (GOS), das entwickelt wurde, um wesentliche öffentliche Dienstleistungen wie Justiz, Sozialfürsorge, Grundbuchämter und mehr zu erbringen. Von kleinen Städten bis zu ganzen Nationen befähigt es Gemeinschaften, ihre eigenen Governance-Systeme zu entwerfen, zu betreiben und weiterzuentwickeln — frei von der Korruption und den Ineffizienzen traditioneller Bürokratie."
+    "description": "<strong>Realms</strong> ist eine dezentrale Softwareplattform für die öffentliche Verwaltung — ein Governance Operating System (GOS), das wesentliche öffentliche Dienste wie Justiz, Sozialwesen, Eigentumsregister und mehr bereitstellt. Von kleinen Städten bis hin zu ganzen Nationen befähigt es Gemeinschaften, ihre eigenen Governance-Systeme zu gestalten, zu betreiben und weiterzuentwickeln — frei von Korruption und Ineffizienzen traditioneller Bürokratie. Realms öffnet ein Fenster zu einem neuen zivilisatorischen Paradigma: <strong>Smart Social Contracts</strong>.",
+    "learnMore": "Mehr über Smart Social Contracts erfahren",
+    "learnMoreUrl": "https://smartsocialcontracts.org"
   },
   "principles": {
     "title": "Kernprinzipien",
@@ -62,6 +64,10 @@
     "instantSetup": {
       "title": "Klonen & Bereitstellen in Sekunden",
       "description": "Gefällt Ihnen ein Governance-Modell? Klonen Sie es sofort und passen Sie es an Ihre Gemeinschaft an. Kein Aufbau von Grund auf nötig — bewährte Systeme können in Sekunden repliziert und angepasst werden."
+    },
+    "aiGovernors": {
+      "title": "KI-Gouverneure & Berater",
+      "description": "Nutzen Sie KI-gestützte Gouverneure und Berater, die Vorschläge analysieren, Empfehlungen geben und sogar routinemäßige Governance-Aufgaben autonom ausführen können — dabei bleiben sie transparent und gegenüber den Bürgern rechenschaftspflichtig."
     }
   },
   "extensions": {
@@ -141,7 +147,7 @@
       "title": "Nahtlose Migration",
       "description": "Unser Team arbeitet mit Ihnen zusammen, um einen Migrationspfad zu entwerfen, der Ihren Bedürfnissen entspricht. Starten Sie mit einem Pilotprogramm, binden Sie Bürger schrittweise ein und skalieren Sie, wenn Sie bereit sind."
     },
-    "cta": "Kontaktieren Sie uns für eine Beratung"
+    "cta": "Kontaktieren Sie uns"
   },
   "getStarted": {
     "title": "Jetzt Starten",

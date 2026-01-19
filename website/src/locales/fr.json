@@ -13,8 +13,10 @@
     "tryDemo": "Essayer la Démo"
   },
   "mission": {
-    "title": "Qu'est-ce que Realms?",
-    "description": "<strong>Realms</strong> est une plateforme logicielle décentralisée pour l'administration publique — un Système d'Exploitation de Gouvernance (GOS) conçu pour fournir des services publics essentiels tels que la justice, la protection sociale, les registres fonciers et plus encore. Des petites villes aux nations entières, il permet aux communautés de concevoir, gérer et faire évoluer leurs propres systèmes de gouvernance — libres de la corruption et des inefficacités de la bureaucratie traditionnelle."
+    "title": "Qu'est-ce que Realms ?",
+    "description": "<strong>Realms</strong> est une plateforme logicielle décentralisée pour l'administration publique — un Système d'Exploitation de Gouvernance (GOS) conçu pour fournir des services publics essentiels tels que la justice, la protection sociale, les registres de propriété et plus encore. Des petites villes aux nations entières, il permet aux communautés de concevoir, gérer et faire évoluer leurs propres systèmes de gouvernance — libérés de la corruption et des inefficacités de la bureaucratie traditionnelle. Realms ouvre une fenêtre vers un nouveau paradigme civilisationnel : <strong>Smart Social Contracts</strong>.",
+    "learnMore": "En savoir plus sur les Smart Social Contracts",
+    "learnMoreUrl": "https://smartsocialcontracts.org"
   },
   "principles": {
     "title": "Principes Fondamentaux",
@@ -62,6 +64,10 @@
     "instantSetup": {
       "title": "Cloner et Déployer en Secondes",
       "description": "Vous aimez un modèle de gouvernance ? Clonez-le instantanément et adaptez-le à votre communauté. Pas besoin de construire à partir de zéro — les systèmes éprouvés peuvent être répliqués et personnalisés en quelques secondes."
+    },
+    "aiGovernors": {
+      "title": "Gouverneurs et Conseillers IA",
+      "description": "Tirez parti de gouverneurs et conseillers alimentés par l'IA qui peuvent analyser les propositions, fournir des recommandations et même exécuter des tâches de gouvernance de routine de manière autonome — tout en restant transparents et responsables envers les citoyens."
     }
   },
   "extensions": {
@@ -141,7 +147,7 @@
       "title": "Migration Transparente",
       "description": "Notre équipe travaille avec vous pour concevoir un chemin de migration adapté à vos besoins. Commencez par un programme pilote, intégrez les citoyens progressivement et passez à l'échelle quand vous êtes prêt."
     },
-    "cta": "Contactez-nous pour une Consultation"
+    "cta": "Contactez-nous"
   },
   "getStarted": {
     "title": "Commencer",
