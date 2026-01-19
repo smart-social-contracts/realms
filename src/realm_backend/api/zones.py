@@ -29,6 +29,9 @@ def get_zone_aggregation(resolution: int = DEFAULT_H3_RESOLUTION) -> Dict[str, A
     """
     # TODO: Implement proper H3 cell aggregation if needed for clustering users
     # Currently returns each Zone as a separate marker for simplicity and performance
+    # In order to avoid hitting the maxium cycle limit per function call, aggregation
+    # must probably be implemented at the frontend or pre-computed by a separate scheduled
+    # task.
     
     try:
         zones = []
