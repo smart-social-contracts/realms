@@ -6,7 +6,14 @@ npm run build
 
 echo "Deploying to IC mainnet..."
 dfx build --network ic website
-TERM=xterm dfx canister --network ic install website --mode upgrade --yes
+
+echo "Attempting upgrade..."
+if TERM=xterm dfx canister --network ic install website --mode upgrade --yes 2>&1; then
+    echo "Upgrade successful!"
+else
+    echo "Upgrade failed, trying reinstall..."
+    TERM=xterm dfx canister --network ic install website --mode reinstall --yes
+fi
 
 echo ""
 echo "Done! Your website should be available at:"
