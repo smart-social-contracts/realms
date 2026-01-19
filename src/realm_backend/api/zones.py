@@ -12,6 +12,9 @@ logger = get_logger("api.zones")
 # Default H3 resolution (7 = ~1.2km hex edge, good for city-level)
 DEFAULT_H3_RESOLUTION = 7
 
+# Safety limit to prevent instruction limit exceeded errors
+MAX_ENTITIES_TO_PROCESS = 1000
+
 
 def get_zone_aggregation(resolution: int = DEFAULT_H3_RESOLUTION) -> Dict[str, Any]:
     """
@@ -47,35 +50,40 @@ def get_zone_aggregation(resolution: int = DEFAULT_H3_RESOLUTION) -> Dict[str, A
         total_users = 0
         unique_users = set()
         
-        # First, collect all Zone entities
+        # First, collect all Zone entities - use direct attribute access to avoid relationship loading
+        zone_count = 0
         for zone in Zone.instances():
-            h3_index = getattr(zone, 'h3_index', None)
-            lat = getattr(zone, 'latitude', None)
-            lng = getattr(zone, 'longitude', None)
-            name = getattr(zone, 'name', 'Zone')
-            user = getattr(zone, 'user', None)
-            user_id = getattr(zone, 'user_id', None) or (user.id if user else None)
+            zone_count += 1
+            if zone_count > MAX_ENTITIES_TO_PROCESS:
+                logger.warning(f"Zone entity limit reached ({MAX_ENTITIES_TO_PROCESS}), stopping iteration")
+                break
+            # Use direct attribute access without triggering relationship loading
+            h3_index = zone.h3_index if hasattr(zone, 'h3_index') else None
+            lat = zone.latitude if hasattr(zone, 'latitude') else None
+            lng = zone.longitude if hasattr(zone, 'longitude') else None
+            name = zone.name if hasattr(zone, 'name') else 'Zone'
+            # Prefer user_id (foreign key) to avoid loading the full user relationship
+            user_id = zone.user_id if hasattr(zone, 'user_id') else None
             
             # Skip zones without h3_index - try to compute from lat/lng
             if not h3_index and lat is not None and lng is not None and h3_available:
                 try:
                     h3_index = h3.geo_to_h3(lat, lng, resolution)
-                except Exception as e:
-                    logger.warning(f"Failed to compute H3 index for zone: {e}")
+                except Exception:
                     continue
             
             if not h3_index:
                 continue
             
             # Re-index to requested resolution if different
-            zone_resolution = getattr(zone, 'resolution', None)
+            zone_resolution = zone.resolution if hasattr(zone, 'resolution') else None
             if h3_available and zone_resolution and int(zone_resolution) != resolution:
                 try:
                     # Get center of original cell and re-index at new resolution
                     center_lat, center_lng = h3.h3_to_geo(h3_index)
                     h3_index = h3.geo_to_h3(center_lat, center_lng, resolution)
-                except Exception as e:
-                    logger.warning(f"Failed to re-index zone: {e}")
+                except Exception:
+                    pass
             
             zone_data[h3_index]["user_count"] += 1
             zone_data[h3_index]["names"].append(name)
@@ -88,16 +96,22 @@ def get_zone_aggregation(resolution: int = DEFAULT_H3_RESOLUTION) -> Dict[str, A
                 unique_users.add(user_id)
         
         total_users = len(unique_users)
+        logger.info(f"Processed {zone_count} Zone entities")
         
         # Also include Human entities that have location data
         # (they may not have a Zone entity but still have coordinates)
         logger.info("Checking Human entities for location data")
+        human_count = 0
         for human in Human.instances():
-            lat = getattr(human, 'latitude', None)
-            lng = getattr(human, 'longitude', None)
-            # Get the linked User ID (not the Human ID) for deduplication
-            user = getattr(human, 'user', None)
-            user_id = getattr(human, 'user_id', None) or (user.id if user else None)
+            human_count += 1
+            if human_count > MAX_ENTITIES_TO_PROCESS:
+                logger.warning(f"Human entity limit reached ({MAX_ENTITIES_TO_PROCESS}), stopping iteration")
+                break
+            # Use direct attribute access to avoid loading relationships
+            lat = human.latitude if hasattr(human, 'latitude') else None
+            lng = human.longitude if hasattr(human, 'longitude') else None
+            # Prefer user_id (foreign key) to avoid loading the full user relationship
+            user_id = human.user_id if hasattr(human, 'user_id') else None
             
             # Skip if this human's user was already counted via a Zone entity
             if user_id and user_id in unique_users:
@@ -107,7 +121,7 @@ def get_zone_aggregation(resolution: int = DEFAULT_H3_RESOLUTION) -> Dict[str, A
                 try:
                     h3_index = h3.geo_to_h3(lat, lng, resolution)
                     zone_data[h3_index]["user_count"] += 1
-                    zone_data[h3_index]["names"].append(getattr(human, 'name', 'User'))
+                    zone_data[h3_index]["names"].append(human.name if hasattr(human, 'name') else 'User')
                     if zone_data[h3_index]["lat"] is None:
                         zone_data[h3_index]["lat"] = lat
                     if zone_data[h3_index]["lng"] is None:
@@ -115,8 +129,9 @@ def get_zone_aggregation(resolution: int = DEFAULT_H3_RESOLUTION) -> Dict[str, A
                     total_users += 1
                     if user_id:
                         unique_users.add(user_id)
-                except Exception as e:
-                    logger.warning(f"Failed to get H3 index for ({lat}, {lng}): {e}")
+                except Exception:
+                    pass
+        logger.info(f"Processed {human_count} Human entities")
         
         # Convert to list with center coordinates
         zones = []

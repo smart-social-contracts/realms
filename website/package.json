@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "npm run build:website && npm run build:docs && npm run merge:docs",
     "build:website": "vite build",
-    "build:docs": "cd ../docs && npm ci && npm run docs:build",
+    "build:docs": "cd ../docs && npm install --include=dev && npm run docs:build",
     "merge:docs": "mkdir -p dist/docs && cp -r ../docs/.vitepress/dist/* dist/docs/",
     "preview": "vite preview"
   },
