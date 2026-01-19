@@ -1,143 +1,68 @@
-"""Zone API for H3 hexagonal spatial aggregation of users."""
+"""Zone API for map display."""
 
 from typing import Any, Dict
-from collections import defaultdict
 
-from ggg.human import Human
 from ggg.zone import Zone
 from kybra_simple_logging import get_logger
 
 logger = get_logger("api.zones")
 
-# Default H3 resolution (7 = ~1.2km hex edge, good for city-level)
+# Default H3 resolution (kept for API compatibility)
 DEFAULT_H3_RESOLUTION = 7
-
-# Safety limit to prevent instruction limit exceeded errors
-MAX_ENTITIES_TO_PROCESS = 1000
 
 
 def get_zone_aggregation(resolution: int = DEFAULT_H3_RESOLUTION) -> Dict[str, Any]:
     """
-    Get aggregated user counts per H3 hexagonal cell.
+    Get zone locations for map display.
     
-    Uses Zone entities as the primary source. Each Zone has pre-computed
-    h3_index and coordinates stored at creation time.
+    Returns Zone entities directly without aggregation.
+    Each Zone has pre-computed h3_index and coordinates stored at creation time.
     
     Args:
-        resolution: H3 resolution level (0-15). Default 7 (~1.2km hex edge)
-                   Note: Currently uses stored h3_index regardless of resolution param.
+        resolution: H3 resolution level (currently unused, kept for API compatibility)
     
     Returns:
         Dictionary with zone data:
         - zones: list of {h3_index, user_count, center_lat, center_lng, location_name}
         - total_users: total users with zones
-        - resolution: H3 resolution used
+        - resolution: H3 resolution (passed through)
     """
-    logger.info(f"Getting zone aggregation at resolution {resolution}")
+    # TODO: Implement proper H3 cell aggregation if needed for clustering users
+    # Currently returns each Zone as a separate marker for simplicity and performance
     
     try:
-        # Aggregate zones by H3 index using pre-stored values (no h3 library needed)
-        # zone_data[h3_index] = {user_count, names[], lat, lng}
-        zone_data = defaultdict(lambda: {"user_count": 0, "names": [], "lat": None, "lng": None})
+        zones = []
         unique_users = set()
         
-        # Collect Zone entities - they have pre-computed h3_index
-        zone_count = 0
         for zone in Zone.instances():
-            zone_count += 1
-            if zone_count > MAX_ENTITIES_TO_PROCESS:
-                logger.warning(f"Zone entity limit reached ({MAX_ENTITIES_TO_PROCESS})")
-                break
-            
-            # Read pre-stored values directly (no h3 computation)
             h3_index = zone.h3_index if hasattr(zone, 'h3_index') else None
-            if not h3_index:
-                continue
-                
             lat = zone.latitude if hasattr(zone, 'latitude') else None
             lng = zone.longitude if hasattr(zone, 'longitude') else None
-            name = zone.name if hasattr(zone, 'name') else 'Zone'
-            user_id = zone.user_id if hasattr(zone, 'user_id') else None
             
-            zone_data[h3_index]["user_count"] += 1
-            zone_data[h3_index]["names"].append(name)
-            if lat is not None and zone_data[h3_index]["lat"] is None:
-                zone_data[h3_index]["lat"] = lat
-            if lng is not None and zone_data[h3_index]["lng"] is None:
-                zone_data[h3_index]["lng"] = lng
-            
-            if user_id:
-                unique_users.add(user_id)
-        
-        logger.info(f"Processed {zone_count} Zone entities")
-        
-        # Also check Human entities with pre-stored h3_index
-        human_count = 0
-        for human in Human.instances():
-            human_count += 1
-            if human_count > MAX_ENTITIES_TO_PROCESS:
-                logger.warning(f"Human entity limit reached ({MAX_ENTITIES_TO_PROCESS})")
-                break
-            
-            user_id = human.user_id if hasattr(human, 'user_id') else None
-            
-            # Skip if already counted via Zone
-            if user_id and user_id in unique_users:
+            if not h3_index or lat is None or lng is None:
                 continue
-            
-            # Use pre-stored h3_index if available
-            h3_index = human.h3_index if hasattr(human, 'h3_index') else None
-            if not h3_index:
-                continue
-                
-            lat = human.latitude if hasattr(human, 'latitude') else None
-            lng = human.longitude if hasattr(human, 'longitude') else None
-            name = human.name if hasattr(human, 'name') else 'User'
-            
-            zone_data[h3_index]["user_count"] += 1
-            zone_data[h3_index]["names"].append(name)
-            if lat is not None and zone_data[h3_index]["lat"] is None:
-                zone_data[h3_index]["lat"] = lat
-            if lng is not None and zone_data[h3_index]["lng"] is None:
-                zone_data[h3_index]["lng"] = lng
-            
-            if user_id:
-                unique_users.add(user_id)
-        
-        logger.info(f"Processed {human_count} Human entities")
-        
-        # Convert to list
-        zones = []
-        for h3_index, data in zone_data.items():
-            # Skip if no coordinates
-            if data["lat"] is None or data["lng"] is None:
-                continue
-            
-            # Create location name from zone names
-            location_name = ", ".join(data["names"][:3])
-            if len(data["names"]) > 3:
-                location_name += f" +{len(data['names']) - 3} more"
             
             zones.append({
                 "h3_index": h3_index,
-                "user_count": data["user_count"],
-                "center_lat": data["lat"],
-                "center_lng": data["lng"],
-                "location_name": location_name or "Zone",
+                "user_count": 1,
+                "center_lat": lat,
+                "center_lng": lng,
+                "location_name": zone.name if hasattr(zone, 'name') else "Zone",
             })
-        
-        total_users = len(unique_users)
-        logger.info(f"Found {len(zones)} zones with {total_users} users")
+            
+            user_id = zone.user_id if hasattr(zone, 'user_id') else None
+            if user_id:
+                unique_users.add(user_id)
         
         return {
             "success": True,
             "zones": zones,
-            "total_users": total_users,
+            "total_users": len(unique_users),
             "resolution": resolution,
         }
         
     except Exception as e:
-        logger.error(f"Error getting zone aggregation: {e}")
+        logger.error(f"Error getting zones: {e}")
         return {
             "success": False,
             "error": str(e),
