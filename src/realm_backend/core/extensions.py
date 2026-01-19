@@ -58,6 +58,10 @@ def call_extension_function(extension_name: str, function_name: str, args: str):
         result = func(args)
         logger.debug(f"Got result from function: {result}")
 
+    except AttributeError as e:
+        # Missing function is not an error - extensions may not implement all hooks
+        logger.warning(f"Extension function not found: {e}")
+        return None
     except Exception as e:
         logger.error(f"Error calling extension function: {e}\n{traceback.format_exc()}")
         raise e

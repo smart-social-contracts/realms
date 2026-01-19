@@ -1,8 +1,8 @@
 {
   "nav": {
-    "features": "Funzionalità",
-    "extensions": "Estensioni",
-    "quickStart": "Avvio Rapido",
+    "forPeople": "Per le Persone",
+    "forInstitutions": "Per le Istituzioni",
+    "howItWorks": "Come Funziona",
     "github": "GitHub"
   },
   "hero": {
@@ -37,31 +37,31 @@
     }
   },
   "features": {
-    "title": "Per Sviluppatori",
-    "subtitle": "Tutto ciò di cui hai bisogno per costruire un'infrastruttura di governance moderna",
+    "title": "Come Funziona",
+    "subtitle": "Una panoramica semplice della tecnologia dietro Realms",
     "internetComputer": {
-      "title": "Nativo Internet Computer",
-      "description": "Distribuisci sistemi di governance completamente on-chain sulla blockchain Internet Computer con integrazione perfetta."
+      "title": "Costruito sull'Internet Computer",
+      "description": "L'Internet Computer è un computer mondiale decentralizzato che funziona interamente on-chain — nessun server tradizionale, nessun punto di fallimento singolo. Questo significa che il tuo sistema di governance è sempre online, non appartiene a nessuna singola entità ed è immune alla censura o allo spegnimento."
     },
     "extensionSystem": {
-      "title": "Sistema di Estensioni",
-      "description": "Potente architettura modulare che consente estensioni personalizzate per votazioni, tesoreria, identità e altro."
+      "title": "Marketplace di Estensioni",
+      "description": "Personalizza il tuo realm con moduli pronti all'uso: sistemi di voto, gestione della tesoreria, registri fondiari, sistemi giudiziari, verifica dell'identità e altro. Le comunità possono condividere e adottare estensioni che funzionano per loro."
     },
     "secure": {
       "title": "Sicuro e Trasparente",
-      "description": "Sicurezza integrata con regole di governance trasparenti applicate da smart contract."
+      "description": "Ogni decisione, ogni transazione, ogni regola viene registrata on-chain ed è verificabile pubblicamente. I cittadini possono verificare come vengono spese le tasse, seguire le proposte dalla presentazione all'esecuzione e verificare che le regole siano applicate equamente a tutti."
     },
     "developerFriendly": {
-      "title": "Amichevole per gli Sviluppatori",
-      "description": "Backend Python/Kybra con frontend SvelteKit. CLI semplice per sviluppo e distribuzione rapidi."
+      "title": "Governance Componibile",
+      "description": "Chiunque può progettare le proprie regole di governance — chiamate codici — combinando componenti esistenti come blocchi da costruzione. Nessuna programmazione richiesta per iniziare; seleziona semplicemente i moduli che si adattano alle esigenze della tua comunità."
     },
     "multiRealm": {
-      "title": "Supporto Multi-Realm",
-      "description": "Distribuisci più sistemi di governance interconnessi con registro condiviso tramite Mundus."
+      "title": "Mundus: Realm Connessi",
+      "description": "I Realm non esistono in isolamento. Attraverso Mundus, più sistemi di governance possono interoperare — condividendo cittadini, risorse o accordi. Pensalo come una rete di nazioni digitali che possono collaborare senza attriti."
     },
     "instantSetup": {
-      "title": "Configurazione Istantanea",
-      "description": "Ottieni un sistema di governance completo in esecuzione con un singolo comando. Dati demo inclusi."
+      "title": "Clona e Distribuisci in Secondi",
+      "description": "Vedi un modello di governance che ti piace? Clonalo istantaneamente e adattalo alla tua comunità. Non c'è bisogno di costruire da zero — sistemi collaudati possono essere replicati e personalizzati in pochi secondi."
     }
   },
   "extensions": {
@@ -98,24 +98,68 @@
       "cliFirst": "Flusso di lavoro incentrato su CLI"
     }
   },
-  "quickStart": {
-    "title": "Avvio Rapido",
-    "subtitle": "Metti in funzione il tuo sistema di governance in pochi minuti",
-    "step1": {
-      "title": "Installa il CLI",
-      "code": "pip install realms-gos"
+  "forPeople": {
+    "title": "Per le Persone",
+    "subtitle": "Prendi il controllo della tua identità civica e partecipa a una governance trasparente",
+    "identity": {
+      "title": "Verifica la Tua Identità in Modo Privato",
+      "description": "Usando la tecnologia di prova a conoscenza zero, puoi dimostrare la tua cittadinanza e la tua età senza esporre i dati del passaporto. Le tue informazioni personali non lasciano mai il tuo dispositivo — viene condivisa solo la prova crittografica.",
+      "features": [
+        "Rispetto della privacy: i dati del passaporto rimangono sul tuo telefono",
+        "Dimostra età e cittadinanza senza rivelare dettagli personali",
+        "Una persona = un'identità (resistente ai Sybil)",
+        "Funziona con qualsiasi passaporto abilitato NFC"
+      ]
     },
-    "step2": {
-      "title": "Crea un Realm",
-      "code": "realms realm create --random --citizens 50 --deploy"
+    "participate": {
+      "title": "Partecipa alla Tua Comunità",
+      "description": "Una volta verificato, unisciti ai realm che ti interessano. Vota le proposte, traccia come vengono spesi i fondi pubblici e chiedi conto ai tuoi rappresentanti — il tutto con piena trasparenza."
     },
-    "step3": {
-      "title": "Accedi al tuo Realm",
-      "code": "# Frontend: http://<canister_id>.localhost:8000"
+    "create": {
+      "title": "Crea il Tuo Realm",
+      "description": "Che si tratti di un'associazione di quartiere, una cooperativa o un progetto comunitario — chiunque può creare un realm e invitare i membri a partecipare al processo decisionale collettivo."
+    }
+  },
+  "forInstitutions": {
+    "title": "Per le Istituzioni",
+    "subtitle": "Modernizza la tua infrastruttura di governance con trasparenza ed efficienza",
+    "governments": {
+      "title": "Per i Governi",
+      "description": "Migra la tua amministrazione pubblica su Realms GOS e offri ai cittadini un nuovo livello di trasparenza e partecipazione. Dai servizi comunali ai registri nazionali, Realms può gestire la governance su qualsiasi scala.",
+      "benefits": [
+        "Eliminare la corruzione attraverso la piena trasparenza",
+        "Ridurre i costi amministrativi con l'automazione",
+        "Aumentare la fiducia e il coinvolgimento dei cittadini",
+        "Interoperare con altri governi tramite Mundus"
+      ]
     },
-    "mundus": {
-      "description": "Aggiungi la tua distribuzione al Realm GOS Mundus aggiungendo il tuo realm al registro",
-      "code": "realms mundus create --deploy"
+    "organizations": {
+      "title": "Per le Organizzazioni",
+      "description": "ONG, cooperative e associazioni possono sfruttare Realms per una gestione trasparente della tesoreria, votazioni democratiche e leadership responsabile."
+    },
+    "migration": {
+      "title": "Migrazione Senza Problemi",
+      "description": "Il nostro team lavora con te per progettare un percorso di migrazione adatto alle tue esigenze. Inizia con un programma pilota, integra i cittadini gradualmente e scala quando sei pronto."
+    },
+    "cta": "Contattaci per una Consulenza"
+  },
+  "getStarted": {
+    "title": "Inizia Ora",
+    "subtitle": "Sperimenta Realms in prima persona o connettiti con il nostro team",
+    "demo": {
+      "title": "Prova la Demo",
+      "description": "Esplora un sistema di governance completamente funzionante. Crea proposte, vota, gestisci la tesoreria e scopri come funziona la governance trasparente nella pratica.",
+      "button": "Avvia Demo"
+    },
+    "contact": {
+      "title": "Parliamone",
+      "description": "Hai domande? Vuoi discutere come Realms potrebbe funzionare per la tua comunità? Ci piacerebbe sentirti.",
+      "button": "Contattaci"
+    },
+    "developers": {
+      "title": "Per Sviluppatori",
+      "description": "Pronto a costruire? Consulta la documentazione, gli strumenti CLI e inizia a creare le tue estensioni di governance.",
+      "button": "Leggi la Documentazione"
     }
   },
   "footer": {

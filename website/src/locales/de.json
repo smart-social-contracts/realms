@@ -1,8 +1,8 @@
 {
   "nav": {
-    "features": "Funktionen",
-    "extensions": "Erweiterungen",
-    "quickStart": "Schnellstart",
+    "forPeople": "Für Menschen",
+    "forInstitutions": "Für Institutionen",
+    "howItWorks": "So funktioniert es",
     "github": "GitHub"
   },
   "hero": {
@@ -37,31 +37,31 @@
     }
   },
   "features": {
-    "title": "Für Entwickler",
-    "subtitle": "Alles, was Sie zum Aufbau moderner Governance-Infrastruktur benötigen",
+    "title": "So funktioniert es",
+    "subtitle": "Ein einfacher Überblick über die Technologie hinter Realms",
     "internetComputer": {
-      "title": "Internet Computer Native",
-      "description": "Stellen Sie vollständig On-Chain-Governance-Systeme auf der Internet Computer Blockchain mit nahtloser Integration bereit."
+      "title": "Aufgebaut auf dem Internet Computer",
+      "description": "Der Internet Computer ist ein dezentraler Weltcomputer, der vollständig on-chain läuft — keine traditionellen Server, kein einzelner Ausfallpunkt. Das bedeutet, dass Ihr Governance-System immer online ist, keiner einzelnen Entität gehört und immun gegen Zensur oder Abschaltung ist."
     },
     "extensionSystem": {
-      "title": "Erweiterungssystem",
-      "description": "Leistungsstarke modulare Architektur, die benutzerdefinierte Erweiterungen für Abstimmungen, Finanzverwaltung, Identität und mehr ermöglicht."
+      "title": "Erweiterungs-Marktplatz",
+      "description": "Passen Sie Ihr Realm mit sofort einsatzbereiten Modulen an: Abstimmungssysteme, Finanzverwaltung, Grundbücher, Justizsysteme, Identitätsprüfung und mehr. Gemeinschaften können Erweiterungen teilen und übernehmen, die für sie funktionieren."
     },
     "secure": {
       "title": "Sicher & Transparent",
-      "description": "Integrierte Sicherheit mit transparenten Governance-Regeln, die durch Smart Contracts durchgesetzt werden."
+      "description": "Jede Entscheidung, jede Transaktion, jede Regel wird on-chain aufgezeichnet und ist öffentlich überprüfbar. Bürger können nachprüfen, wie Steuern ausgegeben werden, Vorschläge von der Einreichung bis zur Umsetzung verfolgen und sicherstellen, dass die Regeln für alle gleich angewandt werden."
     },
     "developerFriendly": {
-      "title": "Entwicklerfreundlich",
-      "description": "Python/Kybra-Backend mit SvelteKit-Frontend. Einfache CLI für schnelle Entwicklung und Bereitstellung."
+      "title": "Komponierbare Governance",
+      "description": "Jeder kann seine eigenen Governance-Regeln — sogenannte Codices — entwerfen, indem bestehende Komponenten wie Bausteine kombiniert werden. Kein Programmieren erforderlich, um loszulegen; wählen Sie einfach die Module aus, die den Bedürfnissen Ihrer Gemeinschaft entsprechen."
     },
     "multiRealm": {
-      "title": "Multi-Realm-Unterstützung",
-      "description": "Stellen Sie mehrere miteinander verbundene Governance-Systeme mit gemeinsamer Registry über Mundus bereit."
+      "title": "Mundus: Vernetzte Realms",
+      "description": "Realms existieren nicht isoliert. Über Mundus können mehrere Governance-Systeme interoperieren — Bürger, Ressourcen oder Vereinbarungen teilen. Denken Sie daran als ein Netzwerk digitaler Nationen, die nahtlos zusammenarbeiten können."
     },
     "instantSetup": {
-      "title": "Sofortige Einrichtung",
-      "description": "Bringen Sie ein vollständiges Governance-System mit einem einzigen Befehl zum Laufen. Demo-Daten enthalten."
+      "title": "Klonen & Bereitstellen in Sekunden",
+      "description": "Gefällt Ihnen ein Governance-Modell? Klonen Sie es sofort und passen Sie es an Ihre Gemeinschaft an. Kein Aufbau von Grund auf nötig — bewährte Systeme können in Sekunden repliziert und angepasst werden."
     }
   },
   "extensions": {
@@ -98,24 +98,68 @@
       "cliFirst": "CLI-zentrierter Entwicklungsworkflow"
     }
   },
-  "quickStart": {
-    "title": "Schnellstart",
-    "subtitle": "Bringen Sie Ihr Governance-System in Minuten zum Laufen",
-    "step1": {
-      "title": "CLI installieren",
-      "code": "pip install realms-gos"
+  "forPeople": {
+    "title": "Für Menschen",
+    "subtitle": "Übernehmen Sie die Kontrolle über Ihre bürgerliche Identität und nehmen Sie an transparenter Governance teil",
+    "identity": {
+      "title": "Verifizieren Sie Ihre Identität privat",
+      "description": "Mit Zero-Knowledge-Proof-Technologie können Sie Ihre Staatsbürgerschaft und Ihr Alter nachweisen, ohne Ihre Passdaten preiszugeben. Ihre persönlichen Daten verlassen nie Ihr Gerät — nur kryptographische Beweise werden geteilt.",
+      "features": [
+        "Datenschutzfreundlich: Passdaten bleiben auf Ihrem Handy",
+        "Alter und Staatsbürgerschaft nachweisen ohne persönliche Details preiszugeben",
+        "Eine Person = eine Identität (Sybil-resistent)",
+        "Funktioniert mit jedem NFC-fähigen Pass"
+      ]
     },
-    "step2": {
-      "title": "Realm erstellen",
-      "code": "realms realm create --random --citizens 50 --deploy"
+    "participate": {
+      "title": "Beteiligen Sie sich an Ihrer Gemeinschaft",
+      "description": "Nach der Verifizierung können Sie Realms beitreten, die Ihnen wichtig sind. Stimmen Sie über Vorschläge ab, verfolgen Sie, wie öffentliche Gelder ausgegeben werden, und halten Sie Ihre Vertreter zur Rechenschaft — alles mit voller Transparenz."
     },
-    "step3": {
-      "title": "Auf Ihr Realm zugreifen",
-      "code": "# Frontend: http://<canister_id>.localhost:8000"
+    "create": {
+      "title": "Erstellen Sie Ihr eigenes Realm",
+      "description": "Ob Nachbarschaftsverein, Genossenschaft oder Gemeinschaftsprojekt — jeder kann ein Realm erstellen und Mitglieder zur Teilnahme an kollektiven Entscheidungen einladen."
+    }
+  },
+  "forInstitutions": {
+    "title": "Für Institutionen",
+    "subtitle": "Modernisieren Sie Ihre Governance-Infrastruktur mit Transparenz und Effizienz",
+    "governments": {
+      "title": "Für Regierungen",
+      "description": "Migrieren Sie Ihre öffentliche Verwaltung zu Realms GOS und bieten Sie Bürgern ein neues Maß an Transparenz und Beteiligung. Von kommunalen Diensten bis hin zu nationalen Registern kann Realms Governance in jeder Größenordnung handhaben.",
+      "benefits": [
+        "Korruption durch volle Transparenz eliminieren",
+        "Verwaltungskosten durch Automatisierung reduzieren",
+        "Bürgervertrauen und -engagement erhöhen",
+        "Mit anderen Regierungen über Mundus interoperieren"
+      ]
     },
-    "mundus": {
-      "description": "Fügen Sie Ihre Bereitstellung zum Realm GOS Mundus hinzu, indem Sie Ihr Realm zur Registry hinzufügen",
-      "code": "realms mundus create --deploy"
+    "organizations": {
+      "title": "Für Organisationen",
+      "description": "NGOs, Genossenschaften und Vereine können Realms für transparente Finanzverwaltung, demokratische Abstimmungen und verantwortungsvolle Führung nutzen."
+    },
+    "migration": {
+      "title": "Nahtlose Migration",
+      "description": "Unser Team arbeitet mit Ihnen zusammen, um einen Migrationspfad zu entwerfen, der Ihren Bedürfnissen entspricht. Starten Sie mit einem Pilotprogramm, binden Sie Bürger schrittweise ein und skalieren Sie, wenn Sie bereit sind."
+    },
+    "cta": "Kontaktieren Sie uns für eine Beratung"
+  },
+  "getStarted": {
+    "title": "Jetzt Starten",
+    "subtitle": "Erleben Sie Realms aus erster Hand oder verbinden Sie sich mit unserem Team",
+    "demo": {
+      "title": "Demo Ausprobieren",
+      "description": "Erkunden Sie ein voll funktionsfähiges Governance-System. Erstellen Sie Vorschläge, stimmen Sie ab, verwalten Sie die Finanzen und sehen Sie, wie transparente Governance in der Praxis funktioniert.",
+      "button": "Demo Starten"
+    },
+    "contact": {
+      "title": "Sprechen Wir",
+      "description": "Haben Sie Fragen? Möchten Sie besprechen, wie Realms für Ihre Gemeinschaft funktionieren könnte? Wir freuen uns von Ihnen zu hören.",
+      "button": "Kontakt Aufnehmen"
+    },
+    "developers": {
+      "title": "Für Entwickler",
+      "description": "Bereit zum Bauen? Schauen Sie sich die Dokumentation, CLI-Tools an und beginnen Sie mit der Erstellung Ihrer eigenen Governance-Erweiterungen.",
+      "button": "Dokumentation Lesen"
     }
   },
   "footer": {

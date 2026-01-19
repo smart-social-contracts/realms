@@ -42,10 +42,15 @@ backend_name = "realm_backend"
 try:
     with open("dfx.json", "r") as f:
         dfx_config = json.load(f)
-    for name in dfx_config.get("canisters", {}).keys():
-        if name.endswith("_backend") and name != "realm_registry_backend":
-            backend_name = name
-            break
+    canister_names = list(dfx_config.get("canisters", {}).keys())
+    # Prioritize realm_backend specifically, then fall back to first *_backend (excluding token_backend)
+    if "realm_backend" in canister_names:
+        backend_name = "realm_backend"
+    else:
+        for name in canister_names:
+            if name.endswith("_backend") and name not in ("realm_registry_backend", "token_backend"):
+                backend_name = name
+                break
 except Exception:
     pass
 print(f"🎯 Target canister: {backend_name}")
@@ -85,11 +90,23 @@ try:
             if os.path.exists(dfx_json_path):
                 with open(dfx_json_path, 'r') as f:
                     dfx_config = json.load(f)
-                for name in dfx_config.get("canisters", {}).keys():
-                    if name.endswith("_frontend") and name != "realm_registry_frontend":
-                        frontend_name = name
-                    if name.endswith("_backend") and name != "realm_registry_backend":
-                        backend_name_local = name
+                canister_names = list(dfx_config.get("canisters", {}).keys())
+                # Prioritize realm_backend specifically, then fall back to first *_backend
+                if "realm_backend" in canister_names:
+                    backend_name_local = "realm_backend"
+                else:
+                    for name in canister_names:
+                        if name.endswith("_backend") and name not in ("realm_registry_backend", "token_backend"):
+                            backend_name_local = name
+                            break
+                # Same for frontend
+                if "realm_frontend" in canister_names:
+                    frontend_name = "realm_frontend"
+                else:
+                    for name in canister_names:
+                        if name.endswith("_frontend") and name != "realm_registry_frontend":
+                            frontend_name = name
+                            break
             
             # Get frontend canister ID
             result = subprocess.run(

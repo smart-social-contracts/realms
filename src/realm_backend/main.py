@@ -747,7 +747,8 @@ def extension_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
             f"Got extension result from {args['extension_name']} function {args['function_name']}: {extension_result}"
         )
 
-        return ExtensionCallResponse(success=True, response=json.dumps(extension_result))
+        response = extension_result if isinstance(extension_result, str) else json.dumps(extension_result)
+        return ExtensionCallResponse(success=True, response=response)
 
     except Exception as e:
         logger.error(f"Error in extension_call: {str(e)}\n{traceback.format_exc()}")
@@ -769,7 +770,8 @@ def extension_sync_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
             f"Got extension result from {args['extension_name']} function {args['function_name']}: {extension_result}, type: {type(extension_result)}"
         )
 
-        return ExtensionCallResponse(success=True, response=json.dumps(extension_result))
+        response = extension_result if isinstance(extension_result, str) else json.dumps(extension_result)
+        return ExtensionCallResponse(success=True, response=response)
 
     except Exception as e:
         logger.error(f"Error calling extension: {str(e)}\n{traceback.format_exc()}")
@@ -792,7 +794,8 @@ def extension_async_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse
             f"Got extension result from {args['extension_name']} function {args['function_name']}: {extension_result}, type: {type(extension_result)}"
         )
 
-        return ExtensionCallResponse(success=True, response=json.dumps(extension_result))
+        response = extension_result if isinstance(extension_result, str) else json.dumps(extension_result)
+        return ExtensionCallResponse(success=True, response=response)
 
     except Exception as e:
         logger.error(f"Error calling extension: {str(e)}\n{traceback.format_exc()}")

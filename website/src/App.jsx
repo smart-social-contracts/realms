@@ -300,50 +300,70 @@ function App() {
         </div>
       </section>
 
-      {/* Quick Start Section */}
-      <section id="quickstart" className="py-24 relative">
+      {/* Get Started Section */}
+      <section id="getstarted" className="py-24 relative">
         <div className="absolute inset-0 bg-grid opacity-30"></div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-slate-800">
-              <span className="text-gradient">{t('quickStart.title')}</span>
+              <span className="text-gradient">{t('getStarted.title')}</span>
             </h2>
             <p className="text-base text-slate-600 max-w-2xl mx-auto">
-              {t('quickStart.subtitle')}
+              {t('getStarted.subtitle')}
             </p>
           </div>
 
-          <div className="max-w-3xl mx-auto space-y-6">
-            {[
-              { step: "1", titleKey: "quickStart.step1.title", codeKey: "quickStart.step1.code" },
-              { step: "2", titleKey: "quickStart.step2.title", codeKey: "quickStart.step2.code" },
-              { step: "3", titleKey: "quickStart.step3.title", codeKey: "quickStart.step3.code" },
-            ].map((item, index) => (
-              <div key={index} className="glass-dark rounded-2xl p-6">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-10 h-10 rounded-full bg-primary-900 flex items-center justify-center font-bold text-white">
-                    {item.step}
-                  </div>
-                  <h3 className="text-xl font-semibold text-slate-800">{t(item.titleKey)}</h3>
-                </div>
-                <div className="bg-slate-900 rounded-xl p-4 font-mono text-sm">
-                  <span className="text-slate-500">$ </span>
-                  <span className="text-primary-300">{t(item.codeKey)}</span>
-                </div>
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            {/* Try Demo Card */}
+            <div className="glass-dark rounded-2xl p-8 flex flex-col text-center">
+              <div className="w-14 h-14 rounded-xl bg-primary-100 flex items-center justify-center text-primary-700 mb-6 mx-auto">
+                <Zap className="w-7 h-7" />
               </div>
-            ))}
-          </div>
+              <h3 className="text-xl font-semibold text-slate-800 mb-3">{t('getStarted.demo.title')}</h3>
+              <p className="text-base text-slate-600 mb-6 flex-grow">{t('getStarted.demo.description')}</p>
+              <a 
+                href="https://demo.realmsgos.org" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center px-6 py-3 bg-primary-900 text-white rounded-xl font-semibold hover:bg-primary-800 transition-colors"
+              >
+                {t('getStarted.demo.button')}
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </a>
+            </div>
 
-          {/* Multi-realm option */}
-          <div className="mt-12 max-w-3xl mx-auto">
-            <div className="glass-dark rounded-2xl p-8 text-center">
-              <p className="text-base text-slate-600 mb-6">
-                {t('quickStart.mundus.description')}
-              </p>
-              <div className="bg-slate-900 rounded-xl p-4 font-mono text-sm text-left">
-                <span className="text-slate-500">$ </span>
-                <span className="text-primary-300">{t('quickStart.mundus.code')}</span>
+            {/* Contact Card */}
+            <div className="glass-dark rounded-2xl p-8 flex flex-col text-center">
+              <div className="w-14 h-14 rounded-xl bg-primary-100 flex items-center justify-center text-primary-700 mb-6 mx-auto">
+                <Users className="w-7 h-7" />
               </div>
+              <h3 className="text-xl font-semibold text-slate-800 mb-3">{t('getStarted.contact.title')}</h3>
+              <p className="text-base text-slate-600 mb-6 flex-grow">{t('getStarted.contact.description')}</p>
+              <a 
+                href="https://x.com/realmsgos" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center px-6 py-3 border-2 border-primary-900 text-primary-900 rounded-xl font-semibold hover:bg-primary-50 transition-colors"
+              >
+                {t('getStarted.contact.button')}
+                <ExternalLink className="w-4 h-4 ml-2" />
+              </a>
+            </div>
+
+            {/* Developers Card */}
+            <div className="glass-dark rounded-2xl p-8 flex flex-col text-center">
+              <div className="w-14 h-14 rounded-xl bg-primary-100 flex items-center justify-center text-primary-700 mb-6 mx-auto">
+                <Code className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-semibold text-slate-800 mb-3">{t('getStarted.developers.title')}</h3>
+              <p className="text-base text-slate-600 mb-6 flex-grow">{t('getStarted.developers.description')}</p>
+              <a 
+                href="/docs" 
+                className="inline-flex items-center justify-center px-6 py-3 border-2 border-primary-900 text-primary-900 rounded-xl font-semibold hover:bg-primary-50 transition-colors"
+              >
+                {t('getStarted.developers.button')}
+                <BookOpen className="w-4 h-4 ml-2" />
+              </a>
             </div>
           </div>
         </div>

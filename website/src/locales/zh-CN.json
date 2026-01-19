@@ -37,31 +37,31 @@
     }
   },
   "features": {
-    "title": "面向开发者",
-    "subtitle": "构建现代治理基础设施所需的一切",
+    "title": "运作原理",
+    "subtitle": "Realms背后技术的简单概述",
     "internetComputer": {
-      "title": "Internet Computer原生",
-      "description": "在Internet Computer区块链上部署完全链上的治理系统,实现无缝集成。"
+      "title": "构建于互联网计算机之上",
+      "description": "互联网计算机是一台去中心化的世界计算机,完全在链上运行——没有传统服务器,没有单点故障。这意味着您的治理系统永远在线,不属于任何单一实体,并且免受审查或关闭的影响。"
     },
     "extensionSystem": {
-      "title": "扩展系统",
-      "description": "强大的模块化架构,允许投票、财务、身份等自定义扩展。"
+      "title": "扩展市场",
+      "description": "使用即用型模块自定义您的领域:投票系统、财务管理、土地登记、司法系统、身份验证等。社区可以分享和采用适合他们的扩展。"
     },
     "secure": {
       "title": "安全透明",
-      "description": "内置安全性,通过智能合约执行透明的治理规则。"
+      "description": "每个决定、每笔交易、每条规则都记录在链上并可公开验证。公民可以审计税款如何使用,追踪提案从提交到执行的全过程,并验证规则对每个人都平等适用。"
     },
     "developerFriendly": {
-      "title": "开发者友好",
-      "description": "Python/Kybra后端配合SvelteKit前端。简单的CLI用于快速开发和部署。"
+      "title": "可组合治理",
+      "description": "任何人都可以设计自己的治理规则——称为法典——通过像积木一样组合现有组件。无需编程即可开始;只需选择适合您社区需求的模块。"
     },
     "multiRealm": {
-      "title": "多Realm支持",
-      "description": "通过Mundus部署多个互连的治理系统,共享注册表。"
+      "title": "Mundus:互联领域",
+      "description": "领域不是孤立存在的。通过Mundus,多个治理系统可以互操作——共享公民、资源或协议。可以把它想象成一个可以无缝协作的数字国家网络。"
     },
     "instantSetup": {
-      "title": "即时设置",
-      "description": "使用单个命令运行完整的治理系统。包含演示数据。"
+      "title": "秒级克隆与部署",
+      "description": "看到喜欢的治理模式?立即克隆并根据您的社区进行调整。无需从头开始——经过验证的系统可以在几秒钟内复制和定制。"
     }
   },
   "extensions": {
@@ -98,24 +98,23 @@
       "cliFirst": "CLI优先的开发工作流"
     }
   },
-  "quickStart": {
-    "title": "快速开始",
-    "subtitle": "几分钟内运行您的治理系统",
-    "step1": {
-      "title": "安装CLI",
-      "code": "pip install realms-gos"
+  "getStarted": {
+    "title": "立即开始",
+    "subtitle": "亲身体验Realms或与我们的团队联系",
+    "demo": {
+      "title": "试用演示",
+      "description": "探索一个完全功能的治理系统。创建提案、投票、管理财务,并了解透明治理在实践中如何运作。",
+      "button": "启动演示"
     },
-    "step2": {
-      "title": "创建Realm",
-      "code": "realms realm create --random --citizens 50 --deploy"
+    "contact": {
+      "title": "联系我们",
+      "description": "有问题吗?想讨论Realms如何为您的社区服务?我们很乐意听取您的意见。",
+      "button": "取得联系"
     },
-    "step3": {
-      "title": "访问您的Realm",
-      "code": "# 前端: http://<canister_id>.localhost:8000"
-    },
-    "mundus": {
-      "description": "通过将您的realm添加到注册表,将您的部署添加到Realm GOS Mundus",
-      "code": "realms mundus create --deploy"
+    "developers": {
+      "title": "面向开发者",
+      "description": "准备好构建了吗?查看文档、CLI工具,并开始创建您自己的治理扩展。",
+      "button": "阅读文档"
     }
   },
   "footer": {

@@ -89,22 +89,34 @@ def get_zone_aggregation(resolution: int = DEFAULT_H3_RESOLUTION) -> Dict[str, A
         
         total_users = len(unique_users)
         
-        # If no Zone entities, fall back to Human entities with location
-        if not zone_data:
-            logger.info("No Zone entities found, falling back to Human locations")
-            for human in Human.instances():
-                lat = getattr(human, 'latitude', None)
-                lng = getattr(human, 'longitude', None)
-                
-                if lat is not None and lng is not None and h3_available:
-                    try:
-                        h3_index = h3.geo_to_h3(lat, lng, resolution)
-                        zone_data[h3_index]["user_count"] += 1
+        # Also include Human entities that have location data
+        # (they may not have a Zone entity but still have coordinates)
+        logger.info("Checking Human entities for location data")
+        for human in Human.instances():
+            lat = getattr(human, 'latitude', None)
+            lng = getattr(human, 'longitude', None)
+            # Get the linked User ID (not the Human ID) for deduplication
+            user = getattr(human, 'user', None)
+            user_id = getattr(human, 'user_id', None) or (user.id if user else None)
+            
+            # Skip if this human's user was already counted via a Zone entity
+            if user_id and user_id in unique_users:
+                continue
+            
+            if lat is not None and lng is not None and h3_available:
+                try:
+                    h3_index = h3.geo_to_h3(lat, lng, resolution)
+                    zone_data[h3_index]["user_count"] += 1
+                    zone_data[h3_index]["names"].append(getattr(human, 'name', 'User'))
+                    if zone_data[h3_index]["lat"] is None:
                         zone_data[h3_index]["lat"] = lat
+                    if zone_data[h3_index]["lng"] is None:
                         zone_data[h3_index]["lng"] = lng
-                        total_users += 1
-                    except Exception as e:
-                        logger.warning(f"Failed to get H3 index for ({lat}, {lng}): {e}")
+                    total_users += 1
+                    if user_id:
+                        unique_users.add(user_id)
+                except Exception as e:
+                    logger.warning(f"Failed to get H3 index for ({lat}, {lng}): {e}")
         
         # Convert to list with center coordinates
         zones = []
