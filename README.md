@@ -1,6 +1,6 @@
 # Realms
 
-A framework for building and deploying governance systems on the Internet Computer.
+Realms GOS (Governance Operating System) is a platform for building and deploying governance systems on the [Internet Computer](https://internetcomputer.org).
 
 ## Table of Contents
 
