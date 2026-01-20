@@ -6,20 +6,24 @@ not part of the core GGG standard.
 """
 
 from .balance import Balance
+from .budget import Budget, BudgetStatus
 from .call import Call
-from .member import Member
 from .codex import Codex
 
 # Import constants separately if needed
 # from .constants import *
 from .contract import Contract
+from .fiscal_period import FiscalPeriod, FiscalPeriodStatus
+from .fund import Fund, FundType
 from .dispute import Dispute
 from .human import Human
 from .identity import Identity
 from .instrument import Instrument
 from .land import Land, LandType
+from .ledger_entry import Category, EntryType, LedgerEntry
 from .license import License
 from .mandate import Mandate
+from .member import Member
 from .notification import Notification
 from .organization import Organization
 from .payment_account import PaymentAccount
@@ -44,16 +48,25 @@ from .zone import Zone
 
 __all__ = [
     "Balance",
+    "Budget",
+    "BudgetStatus",
     "Call",  # Implementation detail, not GGG standard
+    "Category",
     "Codex",
     "Contract",
     "Dispute",
+    "EntryType",
+    "FiscalPeriod",
+    "FiscalPeriodStatus",
+    "Fund",
+    "FundType",
     "Human",
     "Identity",
     "Instrument",
     "Invoice",
     "Land",
     "LandType",
+    "LedgerEntry",
     "License",
     "Mandate",
     "Member",
@@ -84,4 +97,7 @@ __all__ = [
 
 def classes() -> list[str]:
     """Return list of GGG entity class names (excludes helper types)."""
-    return [name for name in __all__ if name not in ('LandType', 'Operations', 'Profiles')]
+    return [name for name in __all__ if name not in (
+        'LandType', 'Operations', 'Profiles', 'BudgetStatus', 
+        'FiscalPeriodStatus', 'FundType', 'EntryType', 'Category'
+    )]

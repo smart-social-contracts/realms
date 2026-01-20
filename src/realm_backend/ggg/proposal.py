@@ -1,4 +1,4 @@
-from kybra_simple_db import Entity, Float, ManyToOne, String, TimestampedMixin
+from kybra_simple_db import Entity, Float, ManyToOne, OneToMany, String, TimestampedMixin
 from kybra_simple_logging import get_logger
 
 logger = get_logger("entity.proposal")
@@ -22,3 +22,4 @@ class Proposal(Entity, TimestampedMixin):
     total_voters = Float()
     required_threshold = Float()
     metadata = String(max_length=256)
+    budgets = OneToMany("Budget", "proposal")

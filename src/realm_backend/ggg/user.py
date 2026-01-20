@@ -35,6 +35,7 @@ class User(Entity, TimestampedMixin):
     payment_accounts = OneToMany("PaymentAccount", "user")
     invoices = OneToMany("Invoice", "user")
     zones = OneToMany("Zone", "user")
+    ledger_entries = OneToMany("LedgerEntry", "user")
     # transfers_from = OneToMany("Transfer", "from_user")
     # transfers_to = OneToMany("Transfer", "to_user")
     # trades_a = OneToMany("Trade", "user_a")

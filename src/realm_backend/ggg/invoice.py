@@ -32,6 +32,11 @@ class Invoice(Entity, TimestampedMixin):
     
     The subaccount is the invoice ID padded to 32 bytes, allowing direct
     lookup from subaccount → invoice without iteration.
+    
+    Accounting Integration:
+    - Call record_accounting() when invoice is created to record receivable
+    - Call record_payment() when invoice is paid to record revenue
+    - Override accounting_hook() via Codex for custom accounting logic
     """
     
     __alias__ = "id"
@@ -42,6 +47,7 @@ class Invoice(Entity, TimestampedMixin):
     status = String(max_length=32)  # Pending, Paid, Overdue, Expired
     user = ManyToOne("User", "invoices")
     transfers = OneToMany("Transfer", "invoice")  # Transfers that paid this invoice
+    ledger_entries = OneToMany("LedgerEntry", "invoice")
     paid_at = String(max_length=64)  # ISO timestamp when paid
     metadata = String(max_length=256)
 
@@ -101,4 +107,208 @@ class Invoice(Entity, TimestampedMixin):
             "subaccount": self.get_subaccount_hex(),
             "subaccount_int": int(self._id) if self._id else 0,
         }
+
+    def record_accounting(
+        self,
+        fund: Optional["Fund"] = None,
+        fiscal_period: Optional["FiscalPeriod"] = None,
+        revenue_category: Optional[str] = None,
+        description: Optional[str] = None
+    ) -> list:
+        """
+        Record accounting entries when invoice is created (out-of-the-box).
+        
+        Creates balanced double-entry LedgerEntry records:
+        - Debit: Accounts Receivable (Asset)
+        - Credit: Deferred Revenue (Liability) - until paid
+        
+        Args:
+            fund: Optional Fund to categorize the entries
+            fiscal_period: Optional FiscalPeriod for the entries
+            revenue_category: Category for the revenue (default: 'fee')
+            description: Optional description override
+            
+        Returns:
+            List of created LedgerEntry instances
+        """
+        from ggg.ledger_entry import Category, EntryType, LedgerEntry
+        
+        # Use hook for custom logic (can be overridden via Codex)
+        custom_entries = self.accounting_hook(
+            invoice=self,
+            event="created",
+            fund=fund,
+            fiscal_period=fiscal_period,
+            revenue_category=revenue_category,
+            description=description
+        )
+        if custom_entries is not None:
+            return custom_entries
+        
+        # Default out-of-the-box: Record receivable and deferred revenue
+        transaction_id = f"TXN-INV-{self.id}"
+        entry_date = datetime.utcnow().isoformat()
+        desc = description or f"Invoice {self.id}"
+        amount_raw = self.get_amount_raw()
+        
+        entries = [
+            {
+                "entry_type": EntryType.ASSET,
+                "category": Category.RECEIVABLE,
+                "debit": amount_raw,
+                "credit": 0,
+                "entry_date": entry_date,
+                "description": f"{desc} - Receivable",
+            },
+            {
+                "entry_type": EntryType.LIABILITY,
+                "category": Category.DEFERRED_REVENUE,
+                "debit": 0,
+                "credit": amount_raw,
+                "entry_date": entry_date,
+                "description": f"{desc} - Deferred revenue",
+            }
+        ]
+        
+        # Add fund, fiscal_period, and invoice link
+        for entry in entries:
+            if fund:
+                entry["fund"] = fund
+            if fiscal_period:
+                entry["fiscal_period"] = fiscal_period
+            entry["invoice"] = self
+            if self.user:
+                entry["user"] = self.user
+        
+        created = LedgerEntry.create_transaction(transaction_id, entries)
+        logger.info(f"Created {len(created)} accounting entries for Invoice {self.id}")
+        return created
+
+    def record_payment(
+        self,
+        transfer: Optional["Transfer"] = None,
+        fund: Optional["Fund"] = None,
+        fiscal_period: Optional["FiscalPeriod"] = None,
+        revenue_category: Optional[str] = None,
+        description: Optional[str] = None
+    ) -> list:
+        """
+        Record accounting entries when invoice is paid (out-of-the-box).
+        
+        Creates balanced double-entry LedgerEntry records:
+        - Debit: Cash (Asset) - payment received
+        - Credit: Accounts Receivable (Asset) - receivable cleared
+        - Debit: Deferred Revenue (Liability) - deferred cleared
+        - Credit: Revenue - revenue recognized
+        
+        Args:
+            transfer: Optional Transfer entity that paid the invoice
+            fund: Optional Fund to categorize the entries
+            fiscal_period: Optional FiscalPeriod for the entries
+            revenue_category: Category for the revenue (default: 'fee')
+            description: Optional description override
+            
+        Returns:
+            List of created LedgerEntry instances
+        """
+        from ggg.ledger_entry import Category, EntryType, LedgerEntry
+        
+        # Use hook for custom logic (can be overridden via Codex)
+        custom_entries = self.accounting_hook(
+            invoice=self,
+            event="paid",
+            transfer=transfer,
+            fund=fund,
+            fiscal_period=fiscal_period,
+            revenue_category=revenue_category,
+            description=description
+        )
+        if custom_entries is not None:
+            return custom_entries
+        
+        # Default out-of-the-box: Record cash receipt and revenue recognition
+        transaction_id = f"TXN-INV-PAY-{self.id}"
+        entry_date = self.paid_at or datetime.utcnow().isoformat()
+        desc = description or f"Invoice {self.id} payment"
+        rev_cat = revenue_category or Category.FEE
+        amount_raw = self.get_amount_raw()
+        
+        entries = [
+            # Cash received
+            {
+                "entry_type": EntryType.ASSET,
+                "category": Category.CASH,
+                "debit": amount_raw,
+                "credit": 0,
+                "entry_date": entry_date,
+                "description": f"{desc} - Cash received",
+            },
+            # Clear receivable
+            {
+                "entry_type": EntryType.ASSET,
+                "category": Category.RECEIVABLE,
+                "debit": 0,
+                "credit": amount_raw,
+                "entry_date": entry_date,
+                "description": f"{desc} - Receivable cleared",
+            },
+            # Clear deferred revenue
+            {
+                "entry_type": EntryType.LIABILITY,
+                "category": Category.DEFERRED_REVENUE,
+                "debit": amount_raw,
+                "credit": 0,
+                "entry_date": entry_date,
+                "description": f"{desc} - Deferred revenue cleared",
+            },
+            # Recognize revenue
+            {
+                "entry_type": EntryType.REVENUE,
+                "category": rev_cat,
+                "debit": 0,
+                "credit": amount_raw,
+                "entry_date": entry_date,
+                "description": f"{desc} - Revenue recognized",
+            }
+        ]
+        
+        # Add fund, fiscal_period, invoice, and transfer links
+        for entry in entries:
+            if fund:
+                entry["fund"] = fund
+            if fiscal_period:
+                entry["fiscal_period"] = fiscal_period
+            entry["invoice"] = self
+            if transfer:
+                entry["transfer"] = transfer
+            if self.user:
+                entry["user"] = self.user
+        
+        created = LedgerEntry.create_transaction(transaction_id, entries)
+        logger.info(f"Created {len(created)} payment entries for Invoice {self.id}")
+        return created
+
+    @staticmethod
+    def accounting_hook(
+        invoice: "Invoice" = None,
+        event: str = None,
+        transfer=None,
+        fund=None,
+        fiscal_period=None,
+        revenue_category=None,
+        description=None
+    ):
+        """
+        Hook for custom accounting logic. Override via Codex.
+        
+        Args:
+            invoice: The Invoice instance
+            event: 'created' or 'paid'
+            transfer: Transfer entity (for 'paid' event)
+            fund, fiscal_period, revenue_category, description: Optional params
+            
+        Return None to use default logic, or return a list of LedgerEntry
+        to use custom entries instead.
+        """
+        return None
 
