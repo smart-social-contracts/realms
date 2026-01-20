@@ -419,4 +419,300 @@ else:
 except Exception as e:
     print(f"   ⚠️  Token seeding failed: {e} (continuing anyway)")
 
+# Seed demo accounting data (Fund, FiscalPeriod, Budget, LedgerEntry)
+print("\n📊 Seeding demo accounting data...")
+try:
+    # Python code to create demo accounting data
+    accounting_seed_code = '''
+from ggg import Fund, FiscalPeriod, Budget, LedgerEntry
+from ggg import FundType, FiscalPeriodStatus, BudgetStatus, EntryType, Category
+from datetime import datetime
+import uuid
+
+# Check if we already have accounting data
+existing_funds = list(Fund.instances())
+if existing_funds:
+    "already_seeded"
+else:
+    # Create Funds
+    general_fund = Fund(
+        code="GF001",
+        name="General Fund",
+        fund_type=FundType.GENERAL,
+        description="Primary operating fund for general government activities"
+    )
+    
+    special_fund = Fund(
+        code="SF001",
+        name="Infrastructure Fund",
+        fund_type=FundType.SPECIAL_REVENUE,
+        description="Dedicated fund for infrastructure projects"
+    )
+    
+    capital_fund = Fund(
+        code="CF001",
+        name="Capital Projects Fund",
+        fund_type=FundType.CAPITAL_PROJECTS,
+        description="Fund for major capital acquisitions and construction"
+    )
+    
+    # Create Fiscal Period
+    current_year = datetime.now().year
+    fiscal_period = FiscalPeriod(
+        id=f"FY{current_year}",
+        name=f"Fiscal Year {current_year}",
+        start_date=f"{current_year}-01-01",
+        end_date=f"{current_year}-12-31",
+        status=FiscalPeriodStatus.OPEN
+    )
+    
+    # Create Budgets
+    Budget(
+        id=f"BUD-TAX-{current_year}",
+        name="Tax Revenue Budget",
+        fund=general_fund,
+        fiscal_period=fiscal_period,
+        category="tax",
+        budget_type="revenue",
+        planned_amount=500000,
+        actual_amount=425000,
+        status=BudgetStatus.ADOPTED,
+        description="Projected tax revenue from members"
+    )
+    
+    Budget(
+        id=f"BUD-FEE-{current_year}",
+        name="Service Fees Budget",
+        fund=general_fund,
+        fiscal_period=fiscal_period,
+        category="fee",
+        budget_type="revenue",
+        planned_amount=150000,
+        actual_amount=162000,
+        status=BudgetStatus.ADOPTED,
+        description="Revenue from service fees and licenses"
+    )
+    
+    Budget(
+        id=f"BUD-PERS-{current_year}",
+        name="Personnel Expenses Budget",
+        fund=general_fund,
+        fiscal_period=fiscal_period,
+        category="personnel",
+        budget_type="expense",
+        planned_amount=300000,
+        actual_amount=285000,
+        status=BudgetStatus.ADOPTED,
+        description="Salaries and benefits"
+    )
+    
+    Budget(
+        id=f"BUD-INFRA-{current_year}",
+        name="Infrastructure Budget",
+        fund=special_fund,
+        fiscal_period=fiscal_period,
+        category="capital",
+        budget_type="expense",
+        planned_amount=200000,
+        actual_amount=175000,
+        status=BudgetStatus.ADOPTED,
+        description="Infrastructure maintenance and improvements"
+    )
+    
+    # Create sample Ledger Entries (double-entry transactions)
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    # Transaction 1: Tax Revenue received
+    tx1_id = str(uuid.uuid4())[:8]
+    LedgerEntry(
+        id=f"LE-{tx1_id}-1",
+        transaction_id=tx1_id,
+        entry_type=EntryType.ASSET,
+        category=Category.CASH,
+        debit=425000,
+        credit=0,
+        entry_date=today,
+        fund=general_fund,
+        fiscal_period=fiscal_period,
+        description="Tax revenue received",
+        tags="operating"
+    )
+    LedgerEntry(
+        id=f"LE-{tx1_id}-2",
+        transaction_id=tx1_id,
+        entry_type=EntryType.REVENUE,
+        category=Category.TAX,
+        debit=0,
+        credit=425000,
+        entry_date=today,
+        fund=general_fund,
+        fiscal_period=fiscal_period,
+        description="Tax revenue received",
+        tags="operating"
+    )
+    
+    # Transaction 2: Service fees received
+    tx2_id = str(uuid.uuid4())[:8]
+    LedgerEntry(
+        id=f"LE-{tx2_id}-1",
+        transaction_id=tx2_id,
+        entry_type=EntryType.ASSET,
+        category=Category.CASH,
+        debit=162000,
+        credit=0,
+        entry_date=today,
+        fund=general_fund,
+        fiscal_period=fiscal_period,
+        description="Service fees collected",
+        tags="operating"
+    )
+    LedgerEntry(
+        id=f"LE-{tx2_id}-2",
+        transaction_id=tx2_id,
+        entry_type=EntryType.REVENUE,
+        category=Category.FEE,
+        debit=0,
+        credit=162000,
+        entry_date=today,
+        fund=general_fund,
+        fiscal_period=fiscal_period,
+        description="Service fees collected",
+        tags="operating"
+    )
+    
+    # Transaction 3: Personnel expenses paid
+    tx3_id = str(uuid.uuid4())[:8]
+    LedgerEntry(
+        id=f"LE-{tx3_id}-1",
+        transaction_id=tx3_id,
+        entry_type=EntryType.EXPENSE,
+        category=Category.PERSONNEL,
+        debit=285000,
+        credit=0,
+        entry_date=today,
+        fund=general_fund,
+        fiscal_period=fiscal_period,
+        description="Personnel salaries and benefits",
+        tags="operating"
+    )
+    LedgerEntry(
+        id=f"LE-{tx3_id}-2",
+        transaction_id=tx3_id,
+        entry_type=EntryType.ASSET,
+        category=Category.CASH,
+        debit=0,
+        credit=285000,
+        entry_date=today,
+        fund=general_fund,
+        fiscal_period=fiscal_period,
+        description="Personnel salaries and benefits",
+        tags="operating"
+    )
+    
+    # Transaction 4: Infrastructure investment
+    tx4_id = str(uuid.uuid4())[:8]
+    LedgerEntry(
+        id=f"LE-{tx4_id}-1",
+        transaction_id=tx4_id,
+        entry_type=EntryType.ASSET,
+        category=Category.EQUIPMENT,
+        debit=175000,
+        credit=0,
+        entry_date=today,
+        fund=special_fund,
+        fiscal_period=fiscal_period,
+        description="Infrastructure equipment purchase",
+        tags="investing,capital"
+    )
+    LedgerEntry(
+        id=f"LE-{tx4_id}-2",
+        transaction_id=tx4_id,
+        entry_type=EntryType.ASSET,
+        category=Category.CASH,
+        debit=0,
+        credit=175000,
+        entry_date=today,
+        fund=special_fund,
+        fiscal_period=fiscal_period,
+        description="Infrastructure equipment purchase",
+        tags="investing,capital"
+    )
+    
+    # Transaction 5: Grant revenue
+    tx5_id = str(uuid.uuid4())[:8]
+    LedgerEntry(
+        id=f"LE-{tx5_id}-1",
+        transaction_id=tx5_id,
+        entry_type=EntryType.ASSET,
+        category=Category.CASH,
+        debit=50000,
+        credit=0,
+        entry_date=today,
+        fund=capital_fund,
+        fiscal_period=fiscal_period,
+        description="Capital grant received",
+        tags="operating"
+    )
+    LedgerEntry(
+        id=f"LE-{tx5_id}-2",
+        transaction_id=tx5_id,
+        entry_type=EntryType.REVENUE,
+        category=Category.GRANT,
+        debit=0,
+        credit=50000,
+        entry_date=today,
+        fund=capital_fund,
+        fiscal_period=fiscal_period,
+        description="Capital grant received",
+        tags="operating"
+    )
+    
+    # Transaction 6: Bond proceeds (financing)
+    tx6_id = str(uuid.uuid4())[:8]
+    LedgerEntry(
+        id=f"LE-{tx6_id}-1",
+        transaction_id=tx6_id,
+        entry_type=EntryType.ASSET,
+        category=Category.CASH,
+        debit=100000,
+        credit=0,
+        entry_date=today,
+        fund=capital_fund,
+        fiscal_period=fiscal_period,
+        description="Bond proceeds received",
+        tags="financing,bond"
+    )
+    LedgerEntry(
+        id=f"LE-{tx6_id}-2",
+        transaction_id=tx6_id,
+        entry_type=EntryType.LIABILITY,
+        category=Category.BOND,
+        debit=0,
+        credit=100000,
+        entry_date=today,
+        fund=capital_fund,
+        fiscal_period=fiscal_period,
+        description="Bond liability recorded",
+        tags="financing,bond"
+    )
+    
+    "seeded"
+'''
+    # Escape the code for shell
+    escaped_code = accounting_seed_code.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
+    seed_cmd = ['dfx', 'canister', 'call', backend_name, 'execute_code', f'("{escaped_code}")']
+    if network != 'local':
+        seed_cmd.extend(['--network', network])
+    result = subprocess.run(seed_cmd, cwd=realm_dir, capture_output=True, text=True)
+    if result.returncode == 0:
+        if "already_seeded" in result.stdout:
+            print(f"   ℹ️  Accounting data already exists, skipping")
+        else:
+            print(f"   ✅ Demo accounting data seeded successfully")
+    else:
+        print(f"   ⚠️  Failed to seed accounting data: {result.stderr}")
+
+except Exception as e:
+    print(f"   ⚠️  Accounting data seeding failed: {e} (continuing anyway)")
+
 print("\n✅ Post-deployment tasks completed")

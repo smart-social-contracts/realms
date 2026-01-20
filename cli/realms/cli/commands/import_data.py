@@ -98,8 +98,6 @@ def import_data_command(
             if identity:
                 cmd.extend(["--identity", identity])
             
-            console.print(f"Running: {' '.join(cmd[:6])}...")
-            
             # Run from realm folder so dfx can find .dfx/local/canister_ids.json
             effective_cwd = get_effective_cwd(folder)
             result = run_command(
