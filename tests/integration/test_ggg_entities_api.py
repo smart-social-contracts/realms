@@ -68,6 +68,41 @@ def test_pagination_parameters():
     print("✓")
 
 
+def test_find_objects_by_id():
+    """Test finding objects by field criteria."""
+    print("  - test_find_objects_by_id...", end=" ")
+    output, code = dfx_call(
+        "realm_backend", "find_objects", '("User", vec { record { 0 = "id"; 1 = "system" }; })'
+    )
+
+    assert code == 0, f"find_objects (User by id) failed with code {code}"
+    assert "success" in output and "true" in output.lower(), "find_objects should return success"
+    print("✓")
+
+
+def test_find_objects_no_match():
+    """Test finding objects with criteria that match nothing."""
+    print("  - test_find_objects_no_match...", end=" ")
+    output, code = dfx_call(
+        "realm_backend", "find_objects", '("User", vec { record { 0 = "id"; 1 = "nonexistent_user_xyz" }; })'
+    )
+
+    assert code == 0, f"find_objects (no match) failed with code {code}"
+    assert "success" in output and "true" in output.lower(), "find_objects should return success even with no matches"
+    print("✓")
+
+
+def test_find_objects_invalid_entity():
+    """Test finding objects with invalid entity type."""
+    print("  - test_find_objects_invalid_entity...", end=" ")
+    output, code = dfx_call(
+        "realm_backend", "find_objects", '("NonexistentType", vec { record { 0 = "id"; 1 = "1" }; })'
+    )
+
+    # Should handle gracefully without crashing
+    print("✓")
+
+
 if __name__ == "__main__":
     print("Testing GGG Entities API:")
 
@@ -77,6 +112,9 @@ if __name__ == "__main__":
         test_list_mandates,
         test_list_invalid_entity_type,
         test_pagination_parameters,
+        test_find_objects_by_id,
+        test_find_objects_no_match,
+        test_find_objects_invalid_entity,
     ]
 
     failed = 0

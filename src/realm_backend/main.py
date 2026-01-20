@@ -8,6 +8,7 @@ from api.extensions import list_extensions
 from api.ggg_entities import (
     list_objects,
     list_objects_paginated,
+    search_objects,
 )
 from api.registry import get_registry_info, register_realm
 from api.status import get_status
@@ -344,6 +345,44 @@ def get_objects(params: Vec[Tuple[str, str]]) -> RealmResponse:
         )
     except Exception as e:
         logger.error(f"Error listing objects: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@query
+def find_objects(class_name: str, params: Vec[Tuple[str, str]]) -> RealmResponse:
+    """
+    Search for objects matching the given field criteria.
+
+    Args:
+        class_name: Name of the entity class (e.g., "User", "Transfer", "Mandate")
+        params: List of (field_name, field_value) tuples to match
+
+    Example:
+    $ dfx canister call --output json canister_id find_objects '("User", vec { record { 0 = "id"; 1 = "system" }; })'
+
+    Response:
+    {
+      "data": {
+        "objectsList": {
+          "objects": [
+            "{\"timestamp_created\": \"2025-09-10 11:28:41.147\", ...}"
+          ]
+        }
+      },
+      "success": true
+    }
+    """
+    try:
+        logger.info(f"Searching {class_name} objects with params: {params}")
+        results = search_objects(class_name, list(params))
+        objects_json = [json.dumps(obj.serialize()) for obj in results]
+        logger.info(f"Found {len(objects_json)} matching objects")
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(objectsList=ObjectsListRecord(objects=objects_json)),
+        )
+    except Exception as e:
+        logger.error(f"Error searching objects: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 

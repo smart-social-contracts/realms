@@ -60,6 +60,51 @@ def list_objects(params: tuple[str, str]) -> List[Any]:
     return []
 
 
+def search_objects(class_name: str, params: List[tuple[str, str]]) -> List[Any]:
+    """Search for objects matching the given field criteria using Entity.find().
+
+    Args:
+        class_name: Name of the entity class to query. Supports namespaced format
+                    for extension entities (e.g., "vault::KnownSubaccount")
+        params: List of (field_name, field_value) tuples to match
+
+    Returns:
+        List of entities matching all criteria
+    """
+    try:
+        # Handle namespaced extension entities (e.g., "vault::KnownSubaccount")
+        if "::" in class_name:
+            ext_name, entity_name = class_name.split("::", 1)
+            try:
+                entities_module = importlib.import_module(
+                    f"extension_packages.{ext_name}.{ext_name}_lib.entities"
+                )
+            except ImportError:
+                entities_module = importlib.import_module(
+                    f"extension_packages.{ext_name}.vault_lib.entities"
+                )
+            class_object = getattr(entities_module, entity_name)
+        else:
+            class_object = globals()[class_name]
+
+        search_dict = {k: v for k, v in params}
+        logger.info(f"Searching {class_name} with criteria: {search_dict}")
+        results = class_object.find(search_dict)
+        logger.info(f"Found {len(results)} matching objects")
+        return results
+    except KeyError as e:
+        logger.error(
+            f"Entity class '{class_name}' not found in globals(). "
+            f"Make sure it's imported in ggg_entities.py. "
+            f"Available classes: {[k for k in globals().keys() if k[0].isupper() and not k.startswith('_')]}"
+        )
+        logger.error(traceback.format_exc())
+    except Exception as e:
+        logger.error(f"Error searching {class_name}: {e}")
+        logger.error(traceback.format_exc())
+    return []
+
+
 def list_objects_paginated(
     class_name: str, page_num: int, page_size: int, order: str = "asc"
 ) -> Dict[str, Any]:
