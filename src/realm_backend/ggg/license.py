@@ -49,10 +49,15 @@ class License(Entity, TimestampedMixin):
         if self.expiry_date:
             from datetime import datetime
             try:
-                expiry = datetime.fromisoformat(self.expiry_date.replace('Z', '+00:00'))
+                # Handle various ISO formats
+                expiry_str = self.expiry_date.replace('Z', '+00:00')
+                # Remove timezone info for comparison with utcnow()
+                if '+' in expiry_str:
+                    expiry_str = expiry_str.split('+')[0]
+                expiry = datetime.fromisoformat(expiry_str)
                 if expiry < datetime.utcnow():
                     return False
-            except ValueError:
+            except (ValueError, AttributeError):
                 pass
         return True
 
@@ -96,17 +101,22 @@ def license_issue(
     now = datetime.utcnow()
     expiry = now + timedelta(days=validity_days)
     
-    license = License(
-        name=name,
-        license_type=license_type,
-        description=description,
-        status="active",
-        issued_date=now.isoformat(),
-        expiry_date=expiry.isoformat(),
-        issuing_authority=issuing_authority,
-        organization=organization,
-        metadata=metadata
-    )
+    kwargs = {
+        "name": name,
+        "license_type": license_type,
+        "description": description,
+        "status": "active",
+        "issued_date": now.isoformat(),
+        "expiry_date": expiry.isoformat(),
+        "issuing_authority": issuing_authority,
+        "metadata": metadata
+    }
+    
+    # Only add organization if not None
+    if organization is not None:
+        kwargs["organization"] = organization
+    
+    license = License(**kwargs)
     
     License.license_issued_posthook(license)
     return license

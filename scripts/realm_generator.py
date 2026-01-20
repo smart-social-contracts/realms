@@ -49,7 +49,22 @@ from ggg import (
     TaskSchedule,
     TaskStep,
     Call,
-    Zone
+    Zone,
+    # Justice System entities
+    JusticeSystem,
+    JusticeSystemType,
+    Court,
+    CourtLevel,
+    Judge,
+    Case,
+    CaseStatus,
+    Verdict,
+    Penalty,
+    PenaltyType,
+    Appeal,
+    AppealStatus,
+    License,
+    LicenseType,
 )
 
 
@@ -328,6 +343,277 @@ class RealmGenerator:
         
         return zones
     
+    def generate_justice_system(self, users: List[User], members: List[Member], codex: Codex = None) -> Dict[str, List]:
+        """Generate justice system demo data.
+        
+        Creates a complete justice system with courts, judges, cases, verdicts, and appeals.
+        
+        Args:
+            users: List of User entities for plaintiffs/defendants
+            members: List of Member entities for judges
+            codex: Optional Codex for courts to operate under
+            
+        Returns:
+            Dict with keys: justice_systems, courts, judges, cases, verdicts, penalties, appeals, licenses
+        """
+        result = {
+            "justice_systems": [],
+            "courts": [],
+            "judges": [],
+            "cases": [],
+            "verdicts": [],
+            "penalties": [],
+            "appeals": [],
+            "licenses": []
+        }
+        
+        if len(users) < 3:
+            print("  Skipping justice system generation: need at least 3 users")
+            return result
+        
+        # Create a legal codex if not provided
+        if not codex:
+            codex = Codex(
+                name="Civil Code",
+                code="",
+                url="",
+                checksum=""
+            )
+        
+        # 1. Create Justice Systems
+        public_js = JusticeSystem(
+            name="Public Justice System",
+            description="Official state justice system for civil and criminal matters",
+            system_type=JusticeSystemType.PUBLIC,
+            status="active",
+            metadata=""
+        )
+        result["justice_systems"].append(public_js)
+        
+        private_js = JusticeSystem(
+            name="Commercial Arbitration",
+            description="Private arbitration service for commercial disputes",
+            system_type=JusticeSystemType.PRIVATE,
+            status="active",
+            metadata=""
+        )
+        result["justice_systems"].append(private_js)
+        
+        # 2. Create Licenses for Courts
+        court_license_1 = License(
+            name="District Court License",
+            license_type=LicenseType.COURT,
+            description="Authorization to operate District Court",
+            status="active",
+            issued_date=datetime.now().isoformat(),
+            expiry_date=(datetime.now() + timedelta(days=365)).isoformat(),
+            issuing_authority="Ministry of Justice",
+            metadata=""
+        )
+        result["licenses"].append(court_license_1)
+        
+        court_license_2 = License(
+            name="Appeals Court License",
+            license_type=LicenseType.COURT,
+            description="Authorization to operate Court of Appeals",
+            status="active",
+            issued_date=datetime.now().isoformat(),
+            expiry_date=(datetime.now() + timedelta(days=365)).isoformat(),
+            issuing_authority="Ministry of Justice",
+            metadata=""
+        )
+        result["licenses"].append(court_license_2)
+        
+        arbitration_license = License(
+            name="Arbitration Provider License",
+            license_type=LicenseType.JUSTICE_PROVIDER,
+            description="Authorization to provide arbitration services",
+            status="active",
+            issued_date=datetime.now().isoformat(),
+            expiry_date=(datetime.now() + timedelta(days=365)).isoformat(),
+            issuing_authority="Commercial Authority",
+            metadata=""
+        )
+        result["licenses"].append(arbitration_license)
+        
+        # 3. Create Courts
+        district_court = Court(
+            name="First District Court",
+            description="Court of first instance for civil matters",
+            jurisdiction="District 1 - Civil",
+            level=CourtLevel.FIRST_INSTANCE,
+            status="active",
+            justice_system=public_js,
+            codex=codex,
+            license=court_license_1,
+            metadata=""
+        )
+        result["courts"].append(district_court)
+        
+        appeals_court = Court(
+            name="Court of Appeals",
+            description="Appellate court for reviewing lower court decisions",
+            jurisdiction="National - Appeals",
+            level=CourtLevel.APPELLATE,
+            status="active",
+            justice_system=public_js,
+            codex=codex,
+            license=court_license_2,
+            metadata=""
+        )
+        result["courts"].append(appeals_court)
+        
+        arbitration_court = Court(
+            name="Commercial Arbitration Tribunal",
+            description="Private tribunal for commercial dispute resolution",
+            jurisdiction="Commercial - National",
+            level=CourtLevel.SPECIALIZED,
+            status="active",
+            justice_system=private_js,
+            codex=codex,
+            license=arbitration_license,
+            metadata=""
+        )
+        result["courts"].append(arbitration_court)
+        
+        # 4. Create Judges
+        judge_1 = Judge(
+            id="JUDGE-001",
+            appointment_date=(datetime.now() - timedelta(days=365)).isoformat(),
+            status="active",
+            specialization="Civil Law",
+            court=district_court,
+            member=members[0] if members else None,
+            metadata=""
+        )
+        result["judges"].append(judge_1)
+        
+        judge_2 = Judge(
+            id="JUDGE-002",
+            appointment_date=(datetime.now() - timedelta(days=730)).isoformat(),
+            status="active",
+            specialization="Commercial Law",
+            court=district_court,
+            member=members[1] if len(members) > 1 else None,
+            metadata=""
+        )
+        result["judges"].append(judge_2)
+        
+        judge_3 = Judge(
+            id="JUDGE-003",
+            appointment_date=(datetime.now() - timedelta(days=1095)).isoformat(),
+            status="active",
+            specialization="Appeals",
+            court=appeals_court,
+            member=members[2] if len(members) > 2 else None,
+            metadata=""
+        )
+        result["judges"].append(judge_3)
+        
+        # 5. Create Cases
+        case_1 = Case(
+            case_number="CASE-2025-001",
+            title="Smith v. Jones - Contract Dispute",
+            description="Dispute over service agreement terms and payment obligations",
+            status=CaseStatus.VERDICT_ISSUED,
+            filed_date=(datetime.now() - timedelta(days=60)).isoformat(),
+            closed_date=(datetime.now() - timedelta(days=10)).isoformat(),
+            court=district_court,
+            plaintiff=users[0],
+            defendant=users[1] if len(users) > 1 else None,
+            metadata=""
+        )
+        case_1.judges.add(judge_1)
+        result["cases"].append(case_1)
+        
+        case_2 = Case(
+            case_number="CASE-2025-002",
+            title="ABC Corp v. XYZ Ltd - Commercial Arbitration",
+            description="Commercial dispute regarding supply chain agreement",
+            status=CaseStatus.IN_PROGRESS,
+            filed_date=(datetime.now() - timedelta(days=30)).isoformat(),
+            court=arbitration_court,
+            plaintiff=users[1] if len(users) > 1 else None,
+            defendant=users[2] if len(users) > 2 else None,
+            metadata=""
+        )
+        case_2.judges.add(judge_2)
+        result["cases"].append(case_2)
+        
+        case_3 = Case(
+            case_number="CASE-2025-003",
+            title="Public v. Defendant - Civil Infraction",
+            description="Civil case regarding regulatory compliance",
+            status=CaseStatus.ASSIGNED,
+            filed_date=(datetime.now() - timedelta(days=15)).isoformat(),
+            court=district_court,
+            plaintiff=users[0],
+            defendant=users[2] if len(users) > 2 else None,
+            metadata=""
+        )
+        case_3.judges.add(judge_1)
+        case_3.judges.add(judge_2)
+        result["cases"].append(case_3)
+        
+        # 6. Create Verdict for closed case
+        verdict_1 = Verdict(
+            id="VRD-2025-001",
+            decision="liable",
+            reasoning="The court finds the defendant liable for breach of contract. Evidence shows failure to deliver services as agreed.",
+            issued_date=(datetime.now() - timedelta(days=10)).isoformat(),
+            case=case_1,
+            issued_by=judge_1,
+            metadata=""
+        )
+        result["verdicts"].append(verdict_1)
+        
+        # 7. Create Penalties
+        penalty_1 = Penalty(
+            id="PEN-2025-001",
+            penalty_type=PenaltyType.RESTITUTION,
+            amount=5000.0,
+            currency="ckBTC",
+            description="Restitution payment to plaintiff for damages",
+            status="pending",
+            due_date=(datetime.now() + timedelta(days=30)).isoformat(),
+            verdict=verdict_1,
+            target_user=users[1] if len(users) > 1 else None,
+            metadata=""
+        )
+        result["penalties"].append(penalty_1)
+        
+        penalty_2 = Penalty(
+            id="PEN-2025-002",
+            penalty_type=PenaltyType.FINE,
+            amount=500.0,
+            currency="ckBTC",
+            description="Court fine for procedural violations",
+            status="executed",
+            executed_date=(datetime.now() - timedelta(days=5)).isoformat(),
+            verdict=verdict_1,
+            target_user=users[1] if len(users) > 1 else None,
+            metadata=""
+        )
+        result["penalties"].append(penalty_2)
+        
+        # 8. Create Appeal
+        appeal_1 = Appeal(
+            id="APL-2025-001",
+            grounds="Procedural error in evidence admission. New evidence discovered.",
+            status=AppealStatus.UNDER_REVIEW,
+            filed_date=(datetime.now() - timedelta(days=5)).isoformat(),
+            original_case=case_1,
+            original_verdict=verdict_1,
+            appellate_court=appeals_court,
+            appellant=users[1] if len(users) > 1 else None,
+            metadata=""
+        )
+        result["appeals"].append(appeal_1)
+        
+        print(f"  Generated justice system: {len(result['courts'])} courts, {len(result['judges'])} judges, {len(result['cases'])} cases")
+        
+        return result
+    
     def generate_user_registration_hook_codex(self) -> Codex:
         """Generate a codex for user registration hook
         
@@ -517,6 +803,9 @@ class RealmGenerator:
         # Generate zones for users based on their location
         zones = self.generate_zones(users, humans)
         
+        # Generate justice system data
+        justice_data = self.generate_justice_system(users, members, codex)
+        
         # Return Realm first, then additional data
         ret = [realm]
         ret += users
@@ -535,6 +824,17 @@ class RealmGenerator:
         ret.append(task)
         ret.append(task_schedule)
         ret.append(user_reg_hook_codex)
+        
+        # Add justice system entities
+        ret += justice_data["licenses"]
+        ret += justice_data["justice_systems"]
+        ret += justice_data["courts"]
+        ret += justice_data["judges"]
+        ret += justice_data["cases"]
+        ret += justice_data["verdicts"]
+        ret += justice_data["penalties"]
+        ret += justice_data["appeals"]
+        
         return ret
     
     def generate_codex_files(self, output_dir: Path, codex_name: Optional[str] = None) -> Dict[str, Any]:

@@ -53,7 +53,8 @@ def verdict_prehook(case: "Case", decision: str, penalties: list) -> bool:
     Returns:
         True to proceed, False to block.
     """
-    logger.info(f"Verdict prehook for case {case.case_number}: {decision}")
+    case_num = case.case_number if case else "unknown"
+    logger.info(f"Verdict prehook for case {case_num}: {decision}")
     return True
 
 
