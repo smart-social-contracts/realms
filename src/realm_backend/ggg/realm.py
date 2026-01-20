@@ -13,4 +13,5 @@ class Realm(Entity, TimestampedMixin):
     welcome_message = String(max_length=1024)  # Welcome message displayed on landing page
     treasury = OneToOne("Treasury", "realm")
     funds = OneToMany("Fund", "realm")
+    justice_systems = OneToMany("JusticeSystem", "realm")
     principal_id = String(max_length=64)

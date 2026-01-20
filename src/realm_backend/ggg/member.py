@@ -8,6 +8,7 @@ class Member(Entity, TimestampedMixin):
     __alias__ = "id"
     id = String()
     user = OneToOne("User", "member")
+    judge = OneToOne("Judge", "member")
 
     residence_permit: str
     tax_compliance: str

@@ -17,8 +17,18 @@ from ggg.instrument import Instrument
 from ggg.invoice import Invoice
 from ggg.land import Land, LandType
 from ggg.ledger_entry import Category, EntryType, LedgerEntry
-from ggg.license import License
+from ggg.license import License, LicenseType, license_issue, license_revoke
 from ggg.mandate import Mandate
+
+# Justice System entities
+from ggg.justice_system import JusticeSystem, JusticeSystemType
+from ggg.court import Court, CourtLevel
+from ggg.judge import Judge
+from ggg.case import Case, CaseStatus, case_file, case_assign_judges, case_issue_verdict, case_close
+from ggg.verdict import Verdict, verdict_prehook, verdict_posthook
+from ggg.penalty import Penalty, PenaltyType, penalty_execute, penalty_waive
+from ggg.appeal import Appeal, AppealStatus, appeal_file, appeal_decide
+
 from ggg.member import Member
 from ggg.notification import Notification
 from ggg.organization import Organization

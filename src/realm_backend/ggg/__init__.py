@@ -21,8 +21,17 @@ from .identity import Identity
 from .instrument import Instrument
 from .land import Land, LandType
 from .ledger_entry import Category, EntryType, LedgerEntry
-from .license import License
+from .license import License, LicenseType, license_issue, license_revoke
 from .mandate import Mandate
+
+# Justice System entities
+from .justice_system import JusticeSystem, JusticeSystemType
+from .court import Court, CourtLevel
+from .judge import Judge
+from .case import Case, CaseStatus, case_file, case_assign_judges, case_issue_verdict, case_close
+from .verdict import Verdict, verdict_prehook, verdict_posthook
+from .penalty import Penalty, PenaltyType, penalty_execute, penalty_waive
+from .appeal import Appeal, AppealStatus, appeal_file, appeal_decide
 from .member import Member
 from .notification import Notification
 from .organization import Organization
@@ -68,7 +77,33 @@ __all__ = [
     "LandType",
     "LedgerEntry",
     "License",
+    "LicenseType",
+    "license_issue",
+    "license_revoke",
     "Mandate",
+    # Justice System
+    "JusticeSystem",
+    "JusticeSystemType",
+    "Court",
+    "CourtLevel",
+    "Judge",
+    "Case",
+    "CaseStatus",
+    "case_file",
+    "case_assign_judges",
+    "case_issue_verdict",
+    "case_close",
+    "Verdict",
+    "verdict_prehook",
+    "verdict_posthook",
+    "Penalty",
+    "PenaltyType",
+    "penalty_execute",
+    "penalty_waive",
+    "Appeal",
+    "AppealStatus",
+    "appeal_file",
+    "appeal_decide",
     "Member",
     "Notification",
     "Operations",
@@ -99,5 +134,10 @@ def classes() -> list[str]:
     """Return list of GGG entity class names (excludes helper types)."""
     return [name for name in __all__ if name not in (
         'LandType', 'Operations', 'Profiles', 'BudgetStatus', 
-        'FiscalPeriodStatus', 'FundType', 'EntryType', 'Category'
+        'FiscalPeriodStatus', 'FundType', 'EntryType', 'Category',
+        'LicenseType', 'JusticeSystemType', 'CourtLevel', 'CaseStatus',
+        'PenaltyType', 'AppealStatus', 'case_file', 'case_assign_judges',
+        'case_issue_verdict', 'case_close', 'verdict_prehook', 'verdict_posthook',
+        'penalty_execute', 'penalty_waive', 'appeal_file', 'appeal_decide',
+        'license_issue', 'license_revoke'
     )]

@@ -10,4 +10,5 @@ class Codex(Entity, TimestampedMixin):
     url = String()  # Optional URL for downloadable code
     checksum = String()  # Optional SHA-256 checksum for verification
     calls = OneToMany("Call", "codex")
+    courts = OneToMany("Court", "codex")
     __alias__ = "name"

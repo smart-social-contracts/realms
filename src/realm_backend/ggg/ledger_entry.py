@@ -105,6 +105,11 @@ class LedgerEntry(Entity, TimestampedMixin):
     organization = ManyToOne("Organization", "ledger_entries")
     contract = ManyToOne("Contract", "ledger_entries")
     
+    # Justice System links
+    case = ManyToOne("Case", "ledger_entries")
+    penalty = ManyToOne("Penalty", "ledger_entries")
+    appeal = ManyToOne("Appeal", "ledger_entries")
+    
     # Metadata
     description = String(max_length=512)
     reference = String(max_length=128)  # External reference number
