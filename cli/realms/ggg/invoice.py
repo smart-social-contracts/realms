@@ -38,11 +38,13 @@ class Invoice(Entity, TimestampedMixin):
     id = String(max_length=32)  # Max 32 chars to fit in subaccount
     amount = Float()  # Amount in ckBTC (e.g., 0.001 = 100,000 satoshis)
     currency = String(max_length=16, default="ckBTC")
-    due_date = String(max_length=64)  # ISO format timestamp
+    due_on = String(max_length=64)  # ISO format timestamp
     status = String(max_length=32)  # Pending, Paid, Overdue, Expired
-    user = ManyToOne("User", "invoices")
+    recipient = ManyToOne("User", "invoices")
+    payer = ManyToOne("User", "invoices")
     transfers = OneToMany("Transfer", "invoice")  # Transfers that paid this invoice
-    paid_at = String(max_length=64)  # ISO timestamp when paid
+    paid_on = String(max_length=64)  # ISO timestamp when paid
+    type = String(max_length=32)  # Tax, fine, etc.
     metadata = String(max_length=256)
 
     def __init__(self, **kwargs):

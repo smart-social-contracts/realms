@@ -249,6 +249,36 @@ class CursorDatabaseExplorer:
             
         return self.call_backend(method, args)
 
+    def find_entities(self, entity_type: str, params: List[tuple]) -> Dict[str, Any]:
+        """Find entities matching given field criteria using Entity.find().
+        
+        Args:
+            entity_type: The entity class name (e.g., "User", "Transfer")
+            params: List of (field_name, field_value) tuples to match
+            
+        Returns:
+            Dict with 'items' list of matching entities
+        """
+        method = "find_objects"
+        # Format as Candid: ("EntityType", vec { record { 0 = "field"; 1 = "value" }; ... })
+        params_candid = "; ".join([f'record {{ 0 = "{k}"; 1 = "{v}" }}' for k, v in params])
+        candid_args = f'("{entity_type}", vec {{ {params_candid} }})'
+        
+        cmd = ["dfx", "canister", "call", "--output", "json"]
+        if self.network != "local":
+            cmd.extend(["--network", self.network])
+        cmd.extend([self.canister, method, candid_args])
+        
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, cwd=self.cwd)
+            if result.returncode == 0:
+                json_response = json.loads(result.stdout.strip())
+                return self._parse_json_response(json_response)
+            else:
+                return {"error": result.stderr, "items": []}
+        except Exception as e:
+            return {"error": str(e), "items": []}
+
     def get_entity(self, entity_type: str, entity_id: str) -> Dict[str, Any]:
         """Get a single entity by type and ID. Uses kybra-simple-db alias resolution."""
         method = "get_objects"
@@ -1091,6 +1121,83 @@ def db_get_command(
         
         # Output all entities as JSON array
         print(json.dumps(all_items, indent=2))
+
+
+def db_find_command(
+    entity_type: str,
+    filters: List[str],
+    network: Optional[str] = None,
+    canister: Optional[str] = None,
+    folder: Optional[str] = None,
+) -> None:
+    """Find entities matching given field criteria.
+    
+    Args:
+        entity_type: The entity type (e.g., User, Transfer, Mandate)
+        filters: List of field=value filters (e.g., "id=system" "status=active")
+        network: Network to use
+        canister: Canister to connect to
+        folder: Realm folder containing dfx.json
+    """
+    require_dfx()
+    
+    effective_network, effective_canister = get_effective_network_and_canister(
+        network, canister
+    )
+    effective_cwd = get_effective_cwd(folder)
+
+    explorer = CursorDatabaseExplorer(effective_network, effective_canister, cwd=effective_cwd)
+    
+    # Test connection
+    try:
+        explorer.call_backend("status")
+    except Exception as e:
+        console.print(f"[red]Error: Could not connect to backend canister: {e}[/red]")
+        raise typer.Exit(1)
+    
+    # Check if this is a namespaced extension entity (e.g., "vault::KnownSubaccount")
+    is_extension_entity = "::" in entity_type
+    
+    if is_extension_entity:
+        query_type = entity_type
+    else:
+        # Find the matching class for core entities
+        matching_class = None
+        for cls in explorer._ggg_classes:
+            if cls.__name__.lower() == entity_type.lower():
+                matching_class = cls
+                break
+        
+        if not matching_class:
+            available = [cls.__name__ for cls in explorer._ggg_classes]
+            console.print(f"[red]Error: Entity type '{entity_type}' not found[/red]")
+            console.print(f"[yellow]Available entity types: {', '.join(sorted(available))}[/yellow]")
+            raise typer.Exit(1)
+        
+        query_type = matching_class.__name__
+    
+    # Parse filters into (field, value) tuples
+    params = []
+    for f in filters:
+        if "=" not in f:
+            console.print(f"[red]Error: Invalid filter format '{f}'. Use field=value[/red]")
+            raise typer.Exit(1)
+        field, value = f.split("=", 1)
+        params.append((field.strip(), value.strip()))
+    
+    if not params:
+        console.print("[red]Error: At least one filter is required[/red]")
+        console.print("[yellow]Usage: realms db find <EntityType> <field=value> ...[/yellow]")
+        raise typer.Exit(1)
+    
+    result = explorer.find_entities(query_type, params)
+    
+    if "error" in result and result["error"]:
+        console.print(f"[red]Error: {result['error']}[/red]")
+        raise typer.Exit(1)
+    
+    items = result.get("items", [])
+    print(json.dumps(items, indent=2))
 
 
 def db_schema_command(

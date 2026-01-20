@@ -8,7 +8,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .commands.create import create_command
-from .commands.db import db_command, db_get_command, db_schema_command
+from .commands.db import db_command, db_find_command, db_get_command, db_schema_command
 from .commands.deploy import deploy_command
 from .commands.export_data import export_data_command
 from .commands.extension import extension_command
@@ -1271,6 +1271,28 @@ def db_get(
     folder = ctx.obj.get("folder") if ctx.obj else None
     
     db_get_command(entity_type, entity_id, network, canister, folder)
+
+
+@db_app.command("find")
+def db_find(
+    ctx: typer.Context,
+    entity_type: str = typer.Argument(help="Entity type (e.g., User, Transfer, Mandate)"),
+    filters: List[str] = typer.Argument(help="Field=value filters (e.g., id=system status=active)"),
+) -> None:
+    """Find entities matching given field criteria.
+    
+    Searches for entities where all specified field values match.
+    
+    Examples:
+        realms db find User id=system
+        realms db find Transfer status=completed
+        realms db find Invoice recipient=user123 status=Pending
+    """
+    network = ctx.obj.get("network") if ctx.obj else None
+    canister = ctx.obj.get("canister") if ctx.obj else None
+    folder = ctx.obj.get("folder") if ctx.obj else None
+    
+    db_find_command(entity_type, filters, network, canister, folder)
 
 
 @db_app.command("schema")
