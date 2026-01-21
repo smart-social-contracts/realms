@@ -36,7 +36,7 @@ def get_local_port() -> str:
     return "8000"
 
 
-def update_frontend_config(ii_id: str, ckbtc_ledger_id: str, ckbtc_indexer_id: str, token_backend_id: str, network: str) -> None:
+def update_frontend_config(ii_id: str, ckbtc_ledger_id: str, ckbtc_indexer_id: str, token_backend_id: str, nft_backend_id: str, network: str) -> None:
     """Update frontend config.js with canister IDs."""
     import re
     
@@ -60,12 +60,14 @@ def update_frontend_config(ii_id: str, ckbtc_ledger_id: str, ckbtc_indexer_id: s
         content = re.sub(r"ckbtc_indexer_canister_id: '[^']*'", f"ckbtc_indexer_canister_id: '{ckbtc_indexer_id}'", content)
     if token_backend_id:
         content = re.sub(r"token_backend_canister_id: '[^']*'", f"token_backend_canister_id: '{token_backend_id}'", content)
+    if nft_backend_id:
+        content = re.sub(r"nft_backend_canister_id: '[^']*'", f"nft_backend_canister_id: '{nft_backend_id}'", content)
     
     CONFIG_FILE_FRONTEND.write_text(content)
     print(f"✅ Updated {CONFIG_FILE_FRONTEND}")
 
 
-def update_backend_config(ii_id: str, ckbtc_ledger_id: str, ckbtc_indexer_id: str, token_backend_id: str) -> None:
+def update_backend_config(ii_id: str, ckbtc_ledger_id: str, ckbtc_indexer_id: str, token_backend_id: str, nft_backend_id: str) -> None:
     """Update backend config.py with canister IDs."""
     import re
     
@@ -86,6 +88,8 @@ def update_backend_config(ii_id: str, ckbtc_ledger_id: str, ckbtc_indexer_id: st
         # Also update realm_token_ledger and realm_token_indexer (same canister for simple token)
         content = re.sub(r'"realm_token_ledger": "[^"]*"', f'"realm_token_ledger": "{token_backend_id}"', content)
         content = re.sub(r'"realm_token_indexer": "[^"]*"', f'"realm_token_indexer": "{token_backend_id}"', content)
+    if nft_backend_id:
+        content = re.sub(r'"nft_backend": "[^"]*"', f'"nft_backend": "{nft_backend_id}"', content)
     
     CONFIG_FILE_BACKEND.write_text(content)
     print(f"✅ Updated {CONFIG_FILE_BACKEND}")
@@ -99,6 +103,7 @@ def main(network: str):
     ckbtc_ledger_id = get_canister_id("ckbtc_ledger", network)
     ckbtc_indexer_id = get_canister_id("ckbtc_indexer", network)
     token_backend_id = get_canister_id("token_backend", network)
+    nft_backend_id = get_canister_id("nft_backend", network)
 
     if not ii_id:
         print("Warning: Unable to retrieve Internet Identity canister ID")
@@ -107,10 +112,11 @@ def main(network: str):
     print(f"   ckbtc_ledger: {ckbtc_ledger_id or 'not found'}")
     print(f"   ckbtc_indexer: {ckbtc_indexer_id or 'not found'}")
     print(f"   token_backend: {token_backend_id or 'not found'}")
+    print(f"   nft_backend: {nft_backend_id or 'not found'}")
 
     # Update config files
-    update_frontend_config(ii_id, ckbtc_ledger_id, ckbtc_indexer_id, token_backend_id, network)
-    update_backend_config(ii_id, ckbtc_ledger_id, ckbtc_indexer_id, token_backend_id)
+    update_frontend_config(ii_id, ckbtc_ledger_id, ckbtc_indexer_id, token_backend_id, nft_backend_id, network)
+    update_backend_config(ii_id, ckbtc_ledger_id, ckbtc_indexer_id, token_backend_id, nft_backend_id)
 
 
 if __name__ == "__main__":

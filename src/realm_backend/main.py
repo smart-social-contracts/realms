@@ -11,6 +11,7 @@ from api.ggg_entities import (
     search_objects,
 )
 from api.registry import get_registry_info, register_realm
+from api.nft import mint_land_nft, get_nft_canister_id
 from api.status import get_status
 from api.zones import get_zone_aggregation
 from api.user import user_get, user_register, user_update_profile_picture
@@ -1968,6 +1969,84 @@ def get_realm_registry_info() -> text:
         return json.dumps(
             {"success": False, "error": str(e), "registries": []}, indent=2
         )
+
+
+@update
+def mint_land_nft_for_parcel(
+    land_id: text,
+    owner_principal: text,
+    token_id: nat,
+    nft_canister_id: text = "",
+) -> Async[text]:
+    """
+    Mint a LAND NFT for a registered land parcel.
+
+    Makes an inter-canister call to the realm's NFT canister to mint
+    an NFT representing ownership of the land parcel.
+
+    Args:
+        land_id: ID of the land parcel
+        owner_principal: Principal ID of the land owner
+        token_id: Unique token ID for the NFT
+        nft_canister_id: Optional NFT canister ID (uses config if not provided)
+
+    Returns:
+        JSON string with success status and token_id
+    """
+    try:
+        from ggg import Land
+        
+        # Get the land parcel
+        land = Land[land_id]
+        if not land:
+            return json.dumps({"success": False, "error": f"Land {land_id} not found"})
+        
+        # Get NFT canister ID from config if not provided
+        canister_id = nft_canister_id or get_nft_canister_id()
+        if not canister_id:
+            return json.dumps({"success": False, "error": "NFT canister ID not configured"})
+        
+        # Mint the NFT
+        result = yield mint_land_nft(
+            nft_canister_id=canister_id,
+            token_id=int(token_id),
+            owner_principal=owner_principal,
+            land_id=land_id,
+            x_coordinate=land.x_coordinate,
+            y_coordinate=land.y_coordinate,
+            land_type=land.land_type,
+        )
+        
+        # Update land with NFT token ID if successful
+        if result.get("success"):
+            land.nft_token_id = result.get("token_id", "")
+            logger.info(f"Updated land {land_id} with nft_token_id={land.nft_token_id}")
+        
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error in mint_land_nft_for_parcel: {e}")
+        logger.error(traceback.format_exc())
+        return json.dumps({"success": False, "error": str(e)}, indent=2)
+
+
+@query
+def get_nft_config() -> text:
+    """
+    Get the NFT canister configuration for this realm.
+
+    Returns:
+        JSON string with NFT canister ID
+    """
+    try:
+        canister_id = get_nft_canister_id()
+        return json.dumps({
+            "success": True,
+            "nft_canister_id": canister_id or "",
+            "configured": bool(canister_id),
+        }, indent=2)
+    except Exception as e:
+        logger.error(f"Error in get_nft_config: {e}")
+        return json.dumps({"success": False, "error": str(e)}, indent=2)
 
 
 @update

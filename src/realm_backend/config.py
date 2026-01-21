@@ -26,4 +26,8 @@ CANISTER_IDS = {
     # Staging: xbkkh-syaaa-aaaah-qq3ya-cai
     "realm_token_ledger": "xbkkh-syaaa-aaaah-qq3ya-cai",
     "realm_token_indexer": "xbkkh-syaaa-aaaah-qq3ya-cai",  # Same canister provides both
+    
+    # NFT backend canister for LAND NFTs
+    # Updated during deployment with realm-specific NFT canister
+    "nft_backend": "",
 }
