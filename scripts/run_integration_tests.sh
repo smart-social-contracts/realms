@@ -56,7 +56,7 @@ docker run -d \
 
 # Deploy realm (this will block until complete - handles dfx startup internally)
 log_info "Creating and deploying realm (this takes ~2-3 minutes)..."
-if ! docker exec "$CONTAINER_NAME" bash -c "realms realm create --random --members $MEMBERS_COUNT && realms realm deploy"; then
+if ! docker exec "$CONTAINER_NAME" bash -c "realms realm create --random --members $MEMBERS_COUNT && realms realm deploy --plain-logs"; then
     log_error "Realm deployment failed"
     log_info "Checking logs..."
     docker exec "$CONTAINER_NAME" tail -100 realms_cli.log 2>/dev/null || true
