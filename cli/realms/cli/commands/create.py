@@ -124,7 +124,7 @@ def _generate_single_realm(
         # Generate random data for this realm using bundled generator
         try:
             RealmGenerator = _get_realm_generator()
-            generator = RealmGenerator(seed) if seed else RealmGenerator()
+            generator = RealmGenerator(seed, quiet=True) if seed else RealmGenerator(quiet=True)
             
             realm_data = generator.generate_realm_data(
                 members=members,
@@ -165,13 +165,18 @@ def create_command(
     identity: Optional[str] = None,
     mode: str = "upgrade",
     bare: bool = False,
+    plain_logs: bool = False,
 ) -> None:
     """Create a new single realm. Flags override manifest values.
     
     Args:
         bare: If True, skip data generation and only deploy canisters (no extensions/data)
+        plain_logs: If True, show full verbose output instead of progress UI during deployment
     """
     from ..utils import generate_output_dir_name
+    
+    # Suppress verbose output when deploying with progress display
+    quiet = deploy and not plain_logs
     
     console.print(f"[bold blue]🏛️  Creating Realm: {realm_name}[/bold blue]\n")
 
@@ -191,7 +196,8 @@ def create_command(
     
     # Create output directory
     output_path.mkdir(exist_ok=True)
-    console.print(f"📁 Realm directory: {output_path}\n")
+    if not quiet:
+        console.print(f"📁 Realm directory: {output_path}\n")
 
     scripts_path = get_scripts_path()
     
@@ -203,7 +209,8 @@ def create_command(
         # dfx.template.json and requirements.txt are in cli/ directory
         package_root = Path(__file__).parent.parent.parent  # cli/commands -> cli -> realms
         repo_root = package_root
-        console.print("[dim]Running in pip-installed mode (using bundled files)...[/dim]")
+        if not quiet:
+            console.print("[dim]Running in pip-installed mode (using bundled files)...[/dim]")
     else:
         repo_root = scripts_path.parent
         if not repo_root.exists() or not (repo_root / "scripts" / "realm_generator.py").exists():
@@ -233,7 +240,8 @@ def create_command(
             with open(dest_manifest, 'w') as f:
                 realm_manifest["name"] = realm_name  # Update name
                 json.dump(realm_manifest, f, indent=2)
-            console.print(f"✅ Copied manifest from {manifest_path.parent}")
+            if not quiet:
+                console.print(f"✅ Copied manifest from {manifest_path.parent}")
             
             # Copy logo file if specified in manifest
             logo_filename = realm_manifest.get("logo", "")
@@ -241,16 +249,19 @@ def create_command(
                 logo_source = manifest_path.parent / logo_filename
                 if logo_source.exists():
                     shutil.copy2(logo_source, output_path / logo_filename)
-                    console.print(f"✅ Copied logo: {logo_filename}")
+                    if not quiet:
+                        console.print(f"✅ Copied logo: {logo_filename}")
                 else:
-                    console.print(f"[yellow]⚠️  Logo file not found: {logo_source}[/yellow]")
+                    if not quiet:
+                        console.print(f"[yellow]⚠️  Logo file not found: {logo_source}[/yellow]")
             
             # Copy welcome image file if it exists in manifest directory
             for welcome_ext in ["jpg", "jpeg", "png", "webp"]:
                 welcome_source = manifest_path.parent / f"welcome.{welcome_ext}"
                 if welcome_source.exists():
                     shutil.copy2(welcome_source, output_path / f"welcome.{welcome_ext}")
-                    console.print(f"✅ Copied welcome image: welcome.{welcome_ext}")
+                    if not quiet:
+                        console.print(f"✅ Copied welcome image: welcome.{welcome_ext}")
                     break
     
     # Get RealmGenerator (from scripts/ in repo mode, bundled in pip mode)
@@ -264,11 +275,12 @@ def create_command(
         gen_disputes = disputes if disputes is not None else realm_options.get("disputes", 10)
         gen_seed = seed if seed is not None else realm_options.get("seed")
         
-        # Create generator
-        generator = RealmGenerator(gen_seed) if gen_seed else RealmGenerator()
+        # Create generator (quiet mode when deploying with progress display)
+        generator = RealmGenerator(gen_seed, quiet=quiet) if gen_seed else RealmGenerator(quiet=quiet)
         
         # Generate realm data
-        console.print("[dim]Generating realm data...[/dim]")
+        if not quiet:
+            console.print("[dim]Generating realm data...[/dim]")
         realm_data = generator.generate_realm_data(
             members=gen_members,
             organizations=gen_organizations,
@@ -282,7 +294,8 @@ def create_command(
         realm_data_serialized = [obj.serialize() for obj in realm_data]
         with open(json_file, 'w') as f:
             json.dump(realm_data_serialized, f, indent=2)
-        console.print(f"[dim]Generated realm data saved to: {json_file}[/dim]")
+        if not quiet:
+            console.print(f"[dim]Generated realm data saved to: {json_file}[/dim]")
         
         # Generate codex files - get codex name from manifest if available
         # Support both old format ("codex": "name") and new format ("codex": {"package": {"name": "...", "version": "..."}})
@@ -295,7 +308,8 @@ def create_command(
         codex_files = codex_result.get("codex_files", [])
         codex_extensions = codex_result.get("extensions", [])
         codex_overrides = codex_result.get("entity_method_overrides", [])
-        console.print(f"[dim]Generated {len(codex_files)} codex files[/dim]")
+        if not quiet:
+            console.print(f"[dim]Generated {len(codex_files)} codex files[/dim]")
         
         # If codex provided entity_method_overrides, merge them into the realm manifest
         if codex_overrides and (output_path / "manifest.json").exists():
@@ -306,9 +320,11 @@ def create_command(
                 output_manifest["extensions"] = codex_extensions
             with open(output_path / "manifest.json", 'w') as f:
                 json.dump(output_manifest, f, indent=2)
-            console.print(f"[dim]Updated manifest with {len(codex_overrides)} method overrides from codex[/dim]")
+            if not quiet:
+                console.print(f"[dim]Updated manifest with {len(codex_overrides)} method overrides from codex[/dim]")
         
-        console.print(f"[dim]Seed used: {generator.seed}[/dim]")
+        if not quiet:
+            console.print(f"[dim]Seed used: {generator.seed}[/dim]")
         
     except Exception as e:
         console.print(f"[red]❌ Error creating realm: {e}[/red]")
@@ -324,7 +340,8 @@ def create_command(
             if canister_ids_source.exists():
                 canister_ids_dest = output_path / "canister_ids.json"
                 shutil.copy2(canister_ids_source, canister_ids_dest)
-                console.print(f"\n✅ Copied canister_ids.json from {canister_ids_source.parent}")
+                if not quiet:
+                    console.print(f"\n✅ Copied canister_ids.json from {canister_ids_source.parent}")
     
     # Generate deployment scripts after data generation
     # Check if we can generate scripts - look in cli directory first (pip-installed), then repo root
@@ -332,12 +349,13 @@ def create_command(
     can_generate_scripts = (cli_dir / "dfx.template.json").exists() or (repo_root / "dfx.template.json").exists()
     
     if can_generate_scripts:
-        _generate_deployment_scripts(output_path, network, realm_name, random, repo_root, deploy, identity, mode, bare, in_repo_mode=in_repo_mode)
+        _generate_deployment_scripts(output_path, network, realm_name, random, repo_root, deploy, identity, mode, bare, plain_logs, in_repo_mode=in_repo_mode)
     else:
         console.print(f"\n[yellow]⚠️  Deployment scripts not generated (bundled files not found)[/yellow]")
         console.print(f"[dim]Searched: {cli_dir / 'dfx.template.json'}, {repo_root / 'dfx.template.json'}[/dim]")
     
-    console.print(f"\n[green]✅ Realm created successfully at: {output_path.absolute()}[/green]")
+    if not quiet:
+        console.print(f"\n[green]✅ Realm created successfully at: {output_path.absolute()}[/green]")
 
 
 def _generate_deployment_scripts(
@@ -350,17 +368,24 @@ def _generate_deployment_scripts(
     identity: Optional[str],
     mode: str,
     bare: bool,
+    plain_logs: bool = False,
     in_repo_mode: bool = True
 ):
     """Generate deployment scripts and dfx.json for independent realm.
     
     Args:
         bare: If True, skip extensions and data upload during deployment
+        plain_logs: If True, show full verbose output instead of progress UI
     """
-    console.print("\n🔧 Generating deployment configuration...")
+    # Suppress verbose output when deploying with progress display
+    quiet = deploy and not plain_logs
+    
+    if not quiet:
+        console.print("\n🔧 Generating deployment configuration...")
 
     # 1. Generate dfx.json for this independent realm
-    console.print("\n📝 Creating dfx.json...")
+    if not quiet:
+        console.print("\n📝 Creating dfx.json...")
     
     # Load template dfx.json - check cli directory first (pip-installed), then repo root
     cli_dir = Path(__file__).parent.parent  # cli/commands -> cli
@@ -384,13 +409,15 @@ def _generate_deployment_scripts(
         # canister_ids.json exists (from manifest) - use standard names to match existing canisters
         backend_name = "realm_backend"
         frontend_name = "realm_frontend"
-        console.print(f"   ✅ Using standard canister names from canister_ids.json")
+        if not quiet:
+            console.print(f"   ✅ Using standard canister names from canister_ids.json")
     else:
         # No canister_ids.json - generate unique names for local/mundus deployments
         sanitized_realm_name = realm_name.lower().replace(" ", "_").replace("-", "_")
         backend_name = f"{sanitized_realm_name}_backend"
         frontend_name = f"{sanitized_realm_name}_frontend"
-        console.print(f"   ✅ Using unique canister names: {backend_name}, {frontend_name}")
+        if not quiet:
+            console.print(f"   ✅ Using unique canister names: {backend_name}, {frontend_name}")
     
     # Deep copy and update canister configs to avoid reference issues
     # Strip remote block - it's only for CLI commands, not for realm deployments
@@ -421,9 +448,11 @@ def _generate_deployment_scripts(
                 capture_output=True, text=True, check=True
             )
             deployer_principal = result.stdout.strip()
-            console.print(f"   ✅ Deployer principal: {deployer_principal}")
+            if not quiet:
+                console.print(f"   ✅ Deployer principal: {deployer_principal}")
         except Exception as e:
-            console.print(f"   ⚠️  Could not get deployer principal: {e}")
+            if not quiet:
+                console.print(f"   ⚠️  Could not get deployer principal: {e}")
     
     if is_local_network:
         # Include Internet Identity for local development (shared across realms)
@@ -451,7 +480,8 @@ def _generate_deployment_scripts(
                         init_arg = init_arg.replace('principal "aaaaa-aa"', f'principal "{deployer_principal}"')
                         init_arg = init_arg.replace('initial_balances = vec {}', f'initial_balances = vec {{ record {{ record {{ owner = principal "{deployer_principal}"; subaccount = null }}; 100_000_000_000 }} }}')
                         ledger_config["init_arg"] = init_arg
-                        console.print(f"   ✅ Configured {ledger_name} with 1000 ckBTC initial balance for deployer")
+                        if not quiet:
+                            console.print(f"   ✅ Configured {ledger_name} with 1000 ckBTC initial balance for deployer")
                 
                 # Update init_arg for token_backend with realm-specific name and symbol
                 if canister_name == "token_backend" and "init_arg" in ledger_config:
@@ -466,10 +496,12 @@ def _generate_deployment_scripts(
                     init_arg = re.sub(r'name = "[^"]*"', f'name = "{token_name}"', init_arg)
                     init_arg = re.sub(r'symbol = "[^"]*"', f'symbol = "{token_symbol}"', init_arg)
                     ledger_config["init_arg"] = init_arg
-                    console.print(f"   ✅ Configured {ledger_name} as '{token_name}' ({token_symbol})")
+                    if not quiet:
+                        console.print(f"   ✅ Configured {ledger_name} as '{token_name}' ({token_symbol})")
                 
                 realm_canisters[ledger_name] = ledger_config
-                console.print(f"   ✅ Including {ledger_name} for local development")
+                if not quiet:
+                    console.print(f"   ✅ Including {ledger_name} for local development")
     
     realm_dfx = {
         "canisters": realm_canisters,
@@ -483,7 +515,8 @@ def _generate_deployment_scripts(
     dfx_json_path = output_path / "dfx.json"
     with open(dfx_json_path, 'w') as f:
         json.dump(realm_dfx, f, indent=2)
-    console.print(f"   ✅ dfx.json created")
+    if not quiet:
+        console.print(f"   ✅ dfx.json created")
 
     # Copy src directories so the realm is fully self-contained and portable
     # This is crucial: deploy_canisters.sh cd's into the realm directory and expects src/ there
@@ -498,9 +531,11 @@ def _generate_deployment_scripts(
                 'build', 'dist', '.env', '.env.*', '*.log', 'monitor'
             )
             shutil.copytree(src_source, src_dest, ignore=ignore_patterns)
-            console.print(f"   ✅ Copied src/ directory")
+            if not quiet:
+                console.print(f"   ✅ Copied src/ directory")
         else:
-            console.print(f"   ⚠️  Warning: Could not find src directory at {src_source}")
+            if not quiet:
+                console.print(f"   ⚠️  Warning: Could not find src directory at {src_source}")
     
     # Copy requirements.txt for venv creation during deployment
     # Check cli directory first (pip-installed), then repo root
@@ -510,7 +545,8 @@ def _generate_deployment_scripts(
     requirements_dest = output_path / "requirements.txt"
     if requirements_source.exists() and not requirements_dest.exists():
         shutil.copy2(requirements_source, requirements_dest)
-        console.print(f"   ✅ Copied requirements.txt")
+        if not quiet:
+            console.print(f"   ✅ Copied requirements.txt")
     
     # Copy extensions/ directory for extension data files (voting_data.json, etc.)
     # Also replace timestamp placeholders with actual values
@@ -520,26 +556,31 @@ def _generate_deployment_scripts(
         # Check if extensions directory is empty (likely uninitialized submodule)
         extensions_contents = list(extensions_source.iterdir())
         if not extensions_contents or (len(extensions_contents) == 1 and extensions_contents[0].name == '.git'):
-            console.print(f"   [yellow]⚠️  Warning: extensions/ directory is empty![/yellow]")
-            console.print(f"   [yellow]   This is likely because the git submodule is not initialized.[/yellow]")
-            console.print(f"   [yellow]   Run: git submodule update --init --recursive[/yellow]")
+            if not quiet:
+                console.print(f"   [yellow]⚠️  Warning: extensions/ directory is empty![/yellow]")
+                console.print(f"   [yellow]   This is likely because the git submodule is not initialized.[/yellow]")
+                console.print(f"   [yellow]   Run: git submodule update --init --recursive[/yellow]")
         elif not extensions_dest.exists():
             ignore_patterns = shutil.ignore_patterns(
                 '__pycache__', '*.pyc', 'venv', '.venv', 'node_modules'
             )
             shutil.copytree(extensions_source, extensions_dest, ignore=ignore_patterns)
-            console.print(f"   ✅ Copied extensions/ directory")
+            if not quiet:
+                console.print(f"   ✅ Copied extensions/ directory")
         
         # Always replace timestamp placeholders in extension data files
         if extensions_dest.exists():
             _replace_timestamp_placeholders(extensions_dest)
-            console.print(f"   ✅ Replaced timestamp placeholders in extension data")
+            if not quiet:
+                console.print(f"   ✅ Replaced timestamp placeholders in extension data")
     else:
-        console.print(f"   [yellow]⚠️  Warning: Could not find extensions directory at {extensions_source}[/yellow]")
-        console.print(f"   [yellow]   Run: git submodule update --init --recursive[/yellow]")
+        if not quiet:
+            console.print(f"   [yellow]⚠️  Warning: Could not find extensions directory at {extensions_source}[/yellow]")
+            console.print(f"   [yellow]   Run: git submodule update --init --recursive[/yellow]")
     
     # 2. Create scripts subdirectory
-    console.print("\n🔧 Generating deployment scripts...")
+    if not quiet:
+        console.print("\n🔧 Generating deployment scripts...")
     scripts_dir = output_path / "scripts"
     scripts_dir.mkdir(exist_ok=True)
 
@@ -552,7 +593,8 @@ def _generate_deployment_scripts(
     if source_install.exists():
         shutil.copy2(source_install, target_install)
         target_install.chmod(0o755)
-        console.print(f"   ✅ {target_install.name}")
+        if not quiet:
+            console.print(f"   ✅ {target_install.name}")
     else:
         console.print(f"   ❌ Source file not found: {source_install}")
 
@@ -562,7 +604,8 @@ def _generate_deployment_scripts(
     if source_deploy.exists():
         shutil.copy2(source_deploy, target_deploy)
         target_deploy.chmod(0o755)
-        console.print(f"   ✅ {target_deploy.name}")
+        if not quiet:
+            console.print(f"   ✅ {target_deploy.name}")
     else:
         console.print(f"   ❌ Source file not found: {source_deploy}")
 
@@ -572,7 +615,8 @@ def _generate_deployment_scripts(
     if source_upload.exists():
         shutil.copy2(source_upload, target_upload)
         target_upload.chmod(0o755)
-        console.print(f"   ✅ {target_upload.name}")
+        if not quiet:
+            console.print(f"   ✅ {target_upload.name}")
     else:
         console.print(f"   ❌ Source file not found: {source_upload}")
 
@@ -582,7 +626,8 @@ def _generate_deployment_scripts(
     if source_post_deploy.exists():
         shutil.copy2(source_post_deploy, target_post_deploy)
         target_post_deploy.chmod(0o755)
-        console.print(f"   ✅ {target_post_deploy.name}")
+        if not quiet:
+            console.print(f"   ✅ {target_post_deploy.name}")
     else:
         console.print(f"   ❌ Source file not found: {source_post_deploy}")
     
@@ -598,19 +643,23 @@ def _generate_deployment_scripts(
         if source_script.exists():
             shutil.copy2(source_script, target_script)
             target_script.chmod(0o755)
-            console.print(f"   ✅ {script_name}")
+            if not quiet:
+                console.print(f"   ✅ {script_name}")
     
     # Copy utils directory if it exists (needed by some scripts)
     utils_source = scripts_path / "utils"
     utils_dest = scripts_dir / "utils"
     if utils_source.exists() and not utils_dest.exists():
         shutil.copytree(utils_source, utils_dest)
-        console.print(f"   ✅ utils/")
+        if not quiet:
+            console.print(f"   ✅ utils/")
 
-    console.print(f"\n[green]🎉 Realm '{realm_name}' created successfully![/green]")
+    if not quiet:
+        console.print(f"\n[green]🎉 Realm '{realm_name}' created successfully![/green]")
     
     if deploy:
-        console.print("\n[yellow]🚀 Auto-deployment requested...[/yellow]")
+        if not quiet:
+            console.print("\n[yellow]🚀 Auto-deployment requested...[/yellow]")
         try:
             # Deploy the single realm using the internal deploy function
             _deploy_realm_internal(
@@ -621,6 +670,7 @@ def _generate_deployment_scripts(
                 identity=identity, 
                 mode=mode,
                 bare=bare,
+                plain_logs=plain_logs,
             )
         except typer.Exit as e:
             console.print(

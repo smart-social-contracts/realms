@@ -4,7 +4,8 @@
 # It installs all extensions from the extensions/extensions/ directory
 
 set -e
-set -x
+# Enable verbose trace mode only if REALMS_VERBOSE is set (for --plain-logs)
+[ "$REALMS_VERBOSE" = "1" ] && set -x
 
 echo "Installing extensions..."
 

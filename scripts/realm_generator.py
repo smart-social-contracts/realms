@@ -129,8 +129,9 @@ CITY_COORDINATES = [
 ]
 
 class RealmGenerator:
-    def __init__(self, seed: int = random.randint(1, 1000000)):
+    def __init__(self, seed: int = random.randint(1, 1000000), quiet: bool = False):
         self.seed = seed
+        self.quiet = quiet
         random.seed(self.seed)
         self.generated_data = {}
         self.realm_id = "0"
@@ -368,7 +369,8 @@ class RealmGenerator:
         }
         
         if len(users) < 3:
-            print("  Skipping justice system generation: need at least 3 users")
+            if not self.quiet:
+                print("  Skipping justice system generation: need at least 3 users")
             return result
         
         # Create a legal codex if not provided
@@ -610,7 +612,8 @@ class RealmGenerator:
         )
         result["appeals"].append(appeal_1)
         
-        print(f"  Generated justice system: {len(result['courts'])} courts, {len(result['judges'])} judges, {len(result['cases'])} cases")
+        if not self.quiet:
+            print(f"  Generated justice system: {len(result['courts'])} courts, {len(result['judges'])} judges, {len(result['cases'])} cases")
         
         return result
     
@@ -773,8 +776,9 @@ class RealmGenerator:
         Other foundational objects (Treasury, UserProfiles, System User, Identity)
         are auto-created by the backend during canister initialization.
         """
-        print(f"Generating additional realm data with seed: {self.seed}")
-        print("Note: Some foundational objects (Treasury, UserProfiles, System User) are auto-created by backend.")
+        if not self.quiet:
+            print(f"Generating additional realm data with seed: {self.seed}")
+            print("Note: Some foundational objects (Treasury, UserProfiles, System User) are auto-created by backend.")
         
         # Generate realm with manifest_data
         realm = self.generate_realm_metadata(
@@ -863,7 +867,8 @@ class RealmGenerator:
         
         # Step 1: Load and copy from _common/ (shared codices)
         if common_dir.exists():
-            print(f"  Loading shared codices from _common/")
+            if not self.quiet:
+                print(f"  Loading shared codices from _common/")
             
             # Load _common/manifest.json for entity_method_overrides
             common_manifest_path = common_dir / "manifest.json"
@@ -872,18 +877,21 @@ class RealmGenerator:
                     common_manifest = json.load(f)
                 entity_method_overrides = common_manifest.get("entity_method_overrides", [])
                 extensions = common_manifest.get("extensions", [])
-                print(f"    Loaded {len(entity_method_overrides)} method overrides from _common/manifest.json")
+                if not self.quiet:
+                    print(f"    Loaded {len(entity_method_overrides)} method overrides from _common/manifest.json")
             
             # Copy all .py files from _common/
             for source_file in common_dir.glob("*.py"):
                 dest_file = output_dir / source_file.name
                 shutil.copy2(source_file, dest_file)
                 codex_files.append(str(dest_file))
-                print(f"    Copied {source_file.name} from _common/")
+                if not self.quiet:
+                    print(f"    Copied {source_file.name} from _common/")
         
         # Step 2: Copy from package directory (package-specific codices)
         if codex_name and codex_dir and codex_dir.exists():
-            print(f"  Loading package codices from {codex_name}/")
+            if not self.quiet:
+                print(f"  Loading package codices from {codex_name}/")
             
             # Load package manifest.json if exists (for additional overrides/extensions)
             pkg_manifest_path = codex_dir / "manifest.json"
@@ -895,7 +903,8 @@ class RealmGenerator:
                 pkg_extensions = pkg_manifest.get("extensions", [])
                 if pkg_overrides:
                     entity_method_overrides.extend(pkg_overrides)
-                    print(f"    Added {len(pkg_overrides)} method overrides from {codex_name}/manifest.json")
+                    if not self.quiet:
+                        print(f"    Added {len(pkg_overrides)} method overrides from {codex_name}/manifest.json")
                 if pkg_extensions:
                     extensions.extend(pkg_extensions)
             
@@ -904,11 +913,14 @@ class RealmGenerator:
                 dest_file = output_dir / source_file.name
                 shutil.copy2(source_file, dest_file)
                 codex_files.append(str(dest_file))
-                print(f"    Copied {source_file.name} from {codex_name}/")
+                if not self.quiet:
+                    print(f"    Copied {source_file.name} from {codex_name}/")
         elif codex_name:
-            print(f"  Warning: Codex package '{codex_name}' not found in {codices_dir}")
+            if not self.quiet:
+                print(f"  Warning: Codex package '{codex_name}' not found in {codices_dir}")
         
-        print(f"  Total: {len(codex_files)} codex files, {len(entity_method_overrides)} method overrides")
+        if not self.quiet:
+            print(f"  Total: {len(codex_files)} codex files, {len(entity_method_overrides)} method overrides")
         
         return {
             "codex_files": codex_files,

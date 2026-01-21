@@ -13,9 +13,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from rich.console import Console
+from collections import deque
+
+from rich.console import Console, Group
+from rich.live import Live
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
+from rich.table import Table
 from rich.text import Text
 
 console = Console()
@@ -133,6 +137,126 @@ def get_realms_logger(log_dir: Path) -> logging.Logger:
     return logger
 
 
+class DeploymentProgress:
+    """Live display with progress bar and rolling log output for clean deployment UI."""
+    
+    def __init__(self, total_steps: int, title: str = "Deploying"):
+        self.total_steps = total_steps
+        self.current_step = 0
+        self.current_task = ""
+        self.title = title
+        self.log_lines: deque = deque(maxlen=3)  # Keep last 3 lines
+        self.completed_steps: List[str] = []
+        self.failed = False
+        self.error_message = ""
+        
+        # Create progress bar
+        self.progress = Progress(
+            SpinnerColumn(),
+            TextColumn("[bold cyan]{task.description}"),
+            BarColumn(bar_width=40),
+            TaskProgressColumn(),
+            TimeElapsedColumn(),
+            console=console,
+            transient=False,
+        )
+        self.task_id = self.progress.add_task(f"[bold blue]{title}", total=total_steps)
+        self._live: Optional[Live] = None
+        
+    def make_display(self) -> Group:
+        """Create the display layout with progress and log panel."""
+        # Build completed steps display
+        steps_text = Text()
+        for step in self.completed_steps:
+            steps_text.append(f"  ✅ {step}\n", style="green")
+        
+        if self.current_task and not self.failed:
+            steps_text.append(f"  🔧 {self.current_task}...\n", style="cyan")
+        
+        if self.failed:
+            steps_text.append(f"  ❌ {self.current_task}\n", style="red")
+            if self.error_message:
+                steps_text.append(f"     {self.error_message}\n", style="red dim")
+        
+        # Build log lines display (last 3 lines in dim)
+        log_text = Text()
+        for line in self.log_lines:
+            # Truncate very long lines
+            display_line = line[:100] + "..." if len(line) > 100 else line
+            log_text.append(f"{display_line}\n", style="dim")
+        
+        # Create panel for logs
+        log_panel = Panel(
+            log_text if log_text.plain.strip() else Text("Waiting for output...", style="dim italic"),
+            title="[dim]Log[/dim]",
+            border_style="dim",
+            height=5,
+            padding=(0, 1),
+        )
+        
+        return Group(
+            self.progress,
+            Text(""),  # Spacer
+            steps_text,
+            log_panel,
+        )
+    
+    def start(self) -> "DeploymentProgress":
+        """Start the live display."""
+        self._live = Live(
+            self.make_display(),
+            console=console,
+            refresh_per_second=4,
+            transient=False,
+        )
+        self._live.start()
+        return self
+    
+    def stop(self):
+        """Stop the live display."""
+        if self._live:
+            self._live.stop()
+            self._live = None
+    
+    def __enter__(self) -> "DeploymentProgress":
+        return self.start()
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.stop()
+        return False
+    
+    def update(self):
+        """Refresh the display."""
+        if self._live:
+            self._live.update(self.make_display())
+    
+    def add_log_line(self, line: str):
+        """Add a line to the rolling log."""
+        if line.strip():
+            self.log_lines.append(line.strip())
+            self.update()
+    
+    def start_step(self, task_name: str):
+        """Start a new step."""
+        self.current_task = task_name
+        self.progress.update(self.task_id, description=f"[bold cyan]{task_name}")
+        self.update()
+    
+    def complete_step(self, task_name: str):
+        """Mark current step as complete and advance."""
+        self.completed_steps.append(task_name)
+        self.current_step += 1
+        self.current_task = ""
+        self.progress.update(self.task_id, advance=1)
+        self.update()
+    
+    def fail_step(self, error_message: str = ""):
+        """Mark current step as failed."""
+        self.failed = True
+        self.error_message = error_message
+        self.update()
+
+
 def truncate_command_for_logging(command: List[str], max_arg_length: int = 100) -> str:
     """Format command for logging, truncating very long arguments like base64 data.
     
@@ -235,14 +359,27 @@ def find_python_310() -> Optional[str]:
     return None
 
 
-def ensure_project_venv(project_dir: Path) -> Path:
-    """Ensure a project-specific virtual environment exists with required dependencies."""
+def ensure_project_venv(
+    project_dir: Path, 
+    quiet: bool = False,
+    progress: Optional["DeploymentProgress"] = None,
+) -> Path:
+    """Ensure a project-specific virtual environment exists with required dependencies.
+    
+    Args:
+        project_dir: Path to the project directory
+        quiet: If True, suppress console output (for progress display mode)
+        progress: Optional DeploymentProgress to stream output to
+    """
     venv_dir = project_dir / "venv"
 
     if not venv_dir.exists():
-        console.print(
-            f"[yellow]🔧 Creating project virtual environment at {venv_dir}[/yellow]"
-        )
+        if not quiet:
+            console.print(
+                f"[yellow]🔧 Creating project virtual environment at {venv_dir}[/yellow]"
+            )
+        if progress:
+            progress.add_log_line(f"Creating venv at {venv_dir.name}")
 
         # Check if Python 3.10 is available
         python_executable = find_python_310()
@@ -255,41 +392,67 @@ def ensure_project_venv(project_dir: Path) -> Path:
                 "Python 3.10 is required for project virtual environment"
             )
 
-        console.print(f"[dim]Using Python: {python_executable}[/dim]")
+        if not quiet:
+            console.print(f"[dim]Using Python: {python_executable}[/dim]")
 
         # Create virtual environment with specific Python version
-        subprocess.run([python_executable, "-m", "venv", str(venv_dir)], check=True)
+        subprocess.run(
+            [python_executable, "-m", "venv", str(venv_dir)], 
+            check=True,
+            capture_output=quiet,
+        )
 
         # Install requirements if they exist
         requirements_file = project_dir / "requirements.txt"
         if requirements_file.exists():
-            console.print("[yellow]📦 Installing project dependencies...[/yellow]")
+            if not quiet:
+                console.print("[yellow]📦 Installing project dependencies...[/yellow]")
+            if progress:
+                progress.add_log_line("Installing dependencies...")
+            
             pip_path = venv_dir / "bin" / "pip"
             if sys.platform == "win32":
                 pip_path = venv_dir / "Scripts" / "pip.exe"
 
             subprocess.run(
-                [str(pip_path), "install", "-r", str(requirements_file)], check=True
+                [str(pip_path), "install", "-q", "-r", str(requirements_file)] if quiet 
+                else [str(pip_path), "install", "-r", str(requirements_file)], 
+                check=True,
+                capture_output=quiet,
             )
 
         # Install development requirements if they exist
         dev_requirements_file = project_dir / "requirements-dev.txt"
         if dev_requirements_file.exists():
-            console.print("[yellow]📦 Installing development dependencies...[/yellow]")
+            if not quiet:
+                console.print("[yellow]📦 Installing development dependencies...[/yellow]")
             pip_path = venv_dir / "bin" / "pip"
             if sys.platform == "win32":
                 pip_path = venv_dir / "Scripts" / "pip.exe"
 
             subprocess.run(
-                [str(pip_path), "install", "-r", str(dev_requirements_file)], check=True
+                [str(pip_path), "install", "-q", "-r", str(dev_requirements_file)] if quiet
+                else [str(pip_path), "install", "-r", str(dev_requirements_file)], 
+                check=True,
+                capture_output=quiet,
             )
 
     return venv_dir
 
 
-def get_project_python_env(project_dir: Path) -> Dict[str, str]:
-    """Get environment variables for subprocess execution with project venv."""
-    venv_dir = ensure_project_venv(project_dir)
+def get_project_python_env(
+    project_dir: Path,
+    quiet: bool = False,
+    progress: Optional["DeploymentProgress"] = None,
+) -> Dict[str, str]:
+    """Get environment variables for subprocess execution with project venv.
+    
+    Args:
+        project_dir: Path to the project directory
+        quiet: If True, suppress console output during venv setup
+        progress: Optional DeploymentProgress to stream output to
+    """
+    venv_dir = ensure_project_venv(project_dir, quiet=quiet, progress=progress)
 
     # Get current environment
     env = os.environ.copy()
@@ -426,6 +589,67 @@ def run_command(
             console.print(f"[red]{error_msg}[/red]")
             console.print(f"[yellow]{info_msg}[/yellow]")
         raise
+
+
+def run_command_with_progress(
+    command: List[str],
+    cwd: Optional[str] = None,
+    env: Optional[Dict[str, str]] = None,
+    progress: Optional[DeploymentProgress] = None,
+    logger: Optional[logging.Logger] = None,
+    use_project_venv: bool = False,
+) -> subprocess.CompletedProcess:
+    """Run command and stream output to progress display.
+    
+    Args:
+        command: Command to run as list of strings
+        cwd: Working directory
+        env: Environment variables
+        progress: DeploymentProgress instance for live updates
+        logger: Logger for file logging
+        use_project_venv: Whether to use project virtual environment
+    
+    Returns:
+        CompletedProcess with return code and captured output
+    """
+    # Use project venv environment if requested (quiet mode when using progress display)
+    if use_project_venv and cwd:
+        project_dir = Path(cwd)
+        quiet_mode = progress is not None
+        if not env:
+            env = get_project_python_env(project_dir, quiet=quiet_mode, progress=progress)
+        else:
+            project_env = get_project_python_env(project_dir, quiet=quiet_mode, progress=progress)
+            project_env.update(env)
+            env = project_env
+    
+    process = subprocess.Popen(
+        command,
+        cwd=cwd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        universal_newlines=True,
+    )
+    
+    stdout_lines = []
+    for line in process.stdout:
+        line = line.rstrip()
+        if line:
+            stdout_lines.append(line)
+            if logger:
+                logger.info(line)
+            if progress:
+                progress.add_log_line(line)
+    
+    returncode = process.wait()
+    return subprocess.CompletedProcess(
+        command, returncode, 
+        stdout='\n'.join(stdout_lines), 
+        stderr=''
+    )
 
 
 def check_dependencies() -> bool:

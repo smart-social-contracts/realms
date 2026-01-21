@@ -86,8 +86,9 @@ MANDATE_TYPES = [
 ]
 
 class RealmGenerator:
-    def __init__(self, seed: int = random.randint(1, 1000000)):
+    def __init__(self, seed: int = random.randint(1, 1000000), quiet: bool = False):
         self.seed = seed
+        self.quiet = quiet
         random.seed(self.seed)
         self.generated_data = {}
         self.realm_id = "0"
@@ -406,8 +407,9 @@ class RealmGenerator:
         Other foundational objects (Treasury, UserProfiles, System User, Identity)
         are auto-created by the backend during canister initialization.
         """
-        print(f"Generating additional realm data with seed: {self.seed}")
-        print("Note: Some foundational objects (Treasury, UserProfiles, System User) are auto-created by backend.")
+        if not self.quiet:
+            print(f"Generating additional realm data with seed: {self.seed}")
+            print("Note: Some foundational objects (Treasury, UserProfiles, System User) are auto-created by backend.")
         
         # Generate realm with manifest_data
         realm = self.generate_realm_metadata(

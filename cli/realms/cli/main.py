@@ -332,6 +332,9 @@ def realm_create(
     bare: bool = typer.Option(
         False, "--bare", help="Create minimal realm (canisters only, no extensions or data)"
     ),
+    plain_logs: bool = typer.Option(
+        False, "--plain-logs", help="Show full verbose output instead of progress UI during deployment"
+    ),
 ) -> None:
     """Create a new realm. Use --manifest for template or flags for custom configuration."""
     create_command(
@@ -349,6 +352,7 @@ def realm_create(
         identity,
         mode,
         bare,
+        plain_logs,
     )
 
 
@@ -372,9 +376,12 @@ def realm_deploy(
     mode: str = typer.Option(
         "upgrade", "--mode", "-m", help="Deployment mode (upgrade, reinstall)"
     ),
+    plain_logs: bool = typer.Option(
+        False, "--plain-logs", help="Show full verbose output instead of progress UI"
+    ),
 ) -> None:
     """Deploy a realm to the specified network."""
-    deploy_command(config_file, folder, network, clean, identity, mode)
+    deploy_command(config_file, folder, network, clean, identity, mode, plain_logs)
 
 
 @realm_app.command("call")

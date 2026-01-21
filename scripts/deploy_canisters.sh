@@ -3,7 +3,8 @@
 # This script can deploy any realm/registry from its directory
 
 set -e
-set -x
+# Enable verbose trace mode only if REALMS_VERBOSE is set (for --plain-logs)
+[ "$REALMS_VERBOSE" = "1" ] && set -x
 
 # Parameters
 WORKING_DIR="${1:-.}"           # Directory containing dfx.json (default: current dir)
