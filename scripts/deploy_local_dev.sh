@@ -181,6 +181,10 @@ deploy_single_realm() {
                     mkdir -p "$SINGLE_REALM_PATH/src/realm_frontend/src/lib/extensions/$ext_name"
                     cp -r "$ext_dir/lib/extensions/$ext_name/"* "$SINGLE_REALM_PATH/src/realm_frontend/src/lib/extensions/$ext_name/"
                 fi
+                # Copy routes if exists
+                if [ -d "$ext_dir/routes" ]; then
+                    cp -r "$ext_dir/routes/"* "$SINGLE_REALM_PATH/src/realm_frontend/src/routes/"
+                fi
                 # Copy i18n if exists
                 if [ -d "$ext_dir/i18n" ]; then
                     mkdir -p "$SINGLE_REALM_PATH/src/realm_frontend/src/i18n"
@@ -283,6 +287,10 @@ deploy_mundus_realm() {
                 if [ -d "$ext_dir/lib/extensions/$ext_name" ]; then
                     mkdir -p "$realm_dir/src/realm_frontend/src/lib/extensions/$ext_name"
                     cp -r "$ext_dir/lib/extensions/$ext_name/"* "$realm_dir/src/realm_frontend/src/lib/extensions/$ext_name/"
+                fi
+                # Copy routes if exists
+                if [ -d "$ext_dir/routes" ]; then
+                    cp -r "$ext_dir/routes/"* "$realm_dir/src/realm_frontend/src/routes/"
                 fi
                 # Copy i18n if exists
                 if [ -d "$ext_dir/i18n" ]; then
