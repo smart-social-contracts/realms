@@ -7,5 +7,8 @@
   },
   "token_backend": {
     "staging": "tbo2x-cqaaa-aaaah-qq46a-cai"
+  },
+  "nft_backend": {
+    "staging": "4uolp-aqaaa-aaaaf-qdojq-cai"
   }
 }

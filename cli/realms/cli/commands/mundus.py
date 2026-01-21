@@ -818,12 +818,12 @@ def _print_deployment_status(deploy_dir: Path, network: str) -> None:
         canister_names = [n for n in all_canister_names 
                          if n.startswith("realm_registry_")]
     else:
-        # Realm should count realm_backend, realm_frontend, and token_backend
+        # Realm should count realm_backend, realm_frontend, token_backend, and nft_backend
         canister_names = [n for n in all_canister_names 
-                         if n in ("realm_backend", "realm_frontend", "token_backend") or 
+                         if n in ("realm_backend", "realm_frontend", "token_backend", "nft_backend") or 
                          (n.endswith("_backend") and not n.startswith("realm_registry_")) or
                          (n.endswith("_frontend") and not n.startswith("realm_registry_")) or
-                         n.endswith("_token_backend")]
+                         n.endswith("_token_backend") or n.endswith("_nft_backend")]
         # Exclude shared canisters
         canister_names = [n for n in canister_names if n not in shared_canisters]
     

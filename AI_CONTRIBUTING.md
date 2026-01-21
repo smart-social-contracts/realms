@@ -17,3 +17,5 @@ pip install -e cli
 To deploy locally `realms realm create --deploy` or `realms mundus create --deploy`.
 
 4. Use `scripts/deploy_local_dev.sh` to quickly re-deploy and test your local changes.
+
+5. 2. Use `gh` command line tool whenever necessary

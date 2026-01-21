@@ -15,6 +15,12 @@
     "name": "Agora Token",
     "symbol": "AGO"
   },
+  "land_token": {
+    "name": "Agora Land",
+    "symbol": "ALAND",
+    "description": "Land ownership NFT for Agora realm",
+    "supply_cap": 10000
+  },
   "options": {
     "random": {
       "members": 30,

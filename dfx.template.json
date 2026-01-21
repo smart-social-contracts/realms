@@ -109,6 +109,17 @@
         }
       },
       "init_arg": "(record { name = \"Simple Token\"; symbol = \"SMPL\"; decimals = 8 : nat8; total_supply = 100_000_000_000_000_000 : nat; fee = 10_000 : nat })"
+    },
+    "nft_backend": {
+      "type": "custom",
+      "candid": "https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/nft_backend.did",
+      "wasm": "https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/nft_backend.wasm",
+      "remote": {
+        "id": {
+          "staging": "6hrip-iiaaa-aaaaf-qdoha-cai"
+        }
+      },
+      "init_arg": "(record { name = \"Land NFT\"; symbol = \"LAND\"; description = opt \"Land ownership NFT for realm\"; supply_cap = opt 10000 : opt nat; test = opt true })"
     }
   },
   "defaults": { 

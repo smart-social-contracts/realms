@@ -461,7 +461,7 @@ def _generate_deployment_scripts(
         
         # Include any ICRC-1 ledger canisters if they exist
         for canister_name, canister_config in dfx_config["canisters"].items():
-            if any(keyword in canister_name.lower() for keyword in ["icrc1", "ledger", "indexer", "token_backend"]) and canister_name not in realm_canisters:
+            if any(keyword in canister_name.lower() for keyword in ["icrc1", "ledger", "indexer", "token_backend", "nft_backend"]) and canister_name not in realm_canisters:
                 # Use standard name if canister_ids exists, otherwise unique name
                 if canister_ids_file.exists():
                     ledger_name = canister_name
@@ -498,6 +498,27 @@ def _generate_deployment_scripts(
                     ledger_config["init_arg"] = init_arg
                     if not quiet:
                         console.print(f"   ✅ Configured {ledger_name} as '{token_name}' ({token_symbol})")
+                
+                # Update init_arg for nft_backend with realm-specific land_token config
+                if canister_name == "nft_backend" and "init_arg" in ledger_config:
+                    # Get land_token config from realm manifest if available
+                    land_token_config = realm_manifest.get("land_token", {}) if 'realm_manifest' in dir() else {}
+                    if land_token_config:
+                        nft_name = land_token_config.get("name", f"{realm_name} Land")
+                        nft_symbol = land_token_config.get("symbol", f"{realm_name[:1]}LAND")
+                        nft_description = land_token_config.get("description", f"Land ownership NFT for {realm_name}")
+                        nft_supply_cap = land_token_config.get("supply_cap", 10000)
+                        
+                        # Update the init_arg with realm-specific NFT config
+                        init_arg = ledger_config["init_arg"]
+                        init_arg = re.sub(r'name = "[^"]*"', f'name = "{nft_name}"', init_arg)
+                        init_arg = re.sub(r'symbol = "[^"]*"', f'symbol = "{nft_symbol}"', init_arg)
+                        init_arg = re.sub(r'description = opt "[^"]*"', f'description = opt "{nft_description}"', init_arg)
+                        init_arg = re.sub(r'supply_cap = opt \d+', f'supply_cap = opt {nft_supply_cap}', init_arg)
+                        ledger_config["init_arg"] = init_arg
+                        console.print(f"   ✅ Configured {ledger_name} as '{nft_name}' ({nft_symbol}) - Land NFT")
+                    else:
+                        console.print(f"   ⚠️  No land_token config in manifest, using defaults for {ledger_name}")
                 
                 realm_canisters[ledger_name] = ledger_config
                 if not quiet:

@@ -120,6 +120,28 @@
           "staging": "xglmt-7aaaa-aaaah-qq3yq-cai"
         }
       }
+    },
+    "nft_backend": {
+      "type": "custom",
+      "candid": "https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/nft_backend.did",
+      "wasm": "https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/nft_backend.wasm",
+      "remote": {
+        "id": {
+          "staging": "6hrip-iiaaa-aaaaf-qdoha-cai"
+        }
+      },
+      "init_arg": "(record { name = \"Land NFT\"; symbol = \"LAND\"; description = opt \"Land ownership NFT for realm\"; supply_cap = opt 10000 : opt nat; test = opt true })"
+    },
+    "nft_frontend": {
+      "type": "custom",
+      "candid": "https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/nft_frontend.did",
+      "wasm": "https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/nft_frontend.wasm",
+      "frontend": {},
+      "remote": {
+        "id": {
+          "staging": "6aqo3-fqaaa-aaaaf-qdohq-cai"
+        }
+      }
     }
   },
   "defaults": { 

@@ -13,5 +13,8 @@
   },
   "token_backend": {
     "staging": "tujl2-dyaaa-aaaah-qq45q-cai"
+  },
+  "nft_backend": {
+    "staging": "4tpn3-niaaa-aaaaf-qdoja-cai"
   }
 }

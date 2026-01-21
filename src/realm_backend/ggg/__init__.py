@@ -19,7 +19,7 @@ from .dispute import Dispute
 from .human import Human
 from .identity import Identity
 from .instrument import Instrument
-from .land import Land, LandType
+from .land import Land, LandType, LandStatus
 from .ledger_entry import Category, EntryType, LedgerEntry
 from .license import License, LicenseType, license_issue, license_revoke
 from .mandate import Mandate
@@ -47,6 +47,7 @@ from .task_schedule import TaskSchedule
 from .task_step import TaskStep
 from .invoice import Invoice
 from .token import Token
+from .nft_token import NFTToken
 from .trade import Trade
 from .transfer import Transfer
 from .treasury import Treasury
@@ -75,6 +76,7 @@ __all__ = [
     "Invoice",
     "Land",
     "LandType",
+    "LandStatus",
     "LedgerEntry",
     "License",
     "LicenseType",
@@ -120,6 +122,7 @@ __all__ = [
     "TaskSchedule",
     "TaskStep",
     "Token",
+    "NFTToken",
     "Trade",
     "Transfer",
     "Treasury",
@@ -133,7 +136,7 @@ __all__ = [
 def classes() -> list[str]:
     """Return list of GGG entity class names (excludes helper types)."""
     return [name for name in __all__ if name not in (
-        'LandType', 'Operations', 'Profiles', 'BudgetStatus', 
+        'LandType', 'LandStatus', 'Operations', 'Profiles', 'BudgetStatus', 
         'FiscalPeriodStatus', 'FundType', 'EntryType', 'Category',
         'LicenseType', 'JusticeSystemType', 'CourtLevel', 'CaseStatus',
         'PenaltyType', 'AppealStatus', 'case_file', 'case_assign_judges',

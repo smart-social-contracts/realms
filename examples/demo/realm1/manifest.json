@@ -15,6 +15,12 @@
     "name": "Dominion Token",
     "symbol": "DOM"
   },
+  "land_token": {
+    "name": "Dominion Land",
+    "symbol": "DLAND",
+    "description": "Land ownership NFT for Dominion realm",
+    "supply_cap": 10000
+  },
   "options": {
     "random": {
       "members": 50,

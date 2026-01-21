@@ -15,6 +15,12 @@
     "name": "Syntropia Token",
     "symbol": "SYN"
   },
+  "land_token": {
+    "name": "Syntropia Land",
+    "symbol": "SLAND",
+    "description": "Land ownership NFT for Syntropia realm",
+    "supply_cap": 10000
+  },
   "options": {
     "random": {
       "members": 20,
