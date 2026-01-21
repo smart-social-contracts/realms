@@ -7,8 +7,7 @@ from typing import TYPE_CHECKING, Optional
 from kybra_simple_logging import get_logger, get_logs
 
 if TYPE_CHECKING:
-    from ggg.task_execution import TaskExecution
-    from ggg.task import Task
+    from ggg import TaskExecution, Task
 
 
 logger = get_logger("execution")

@@ -5,56 +5,101 @@ Note: Call and TaskStep are implementation details for task execution,
 not part of the core GGG standard.
 """
 
-from .balance import Balance
-from .budget import Budget, BudgetStatus
-from .call import Call
-from .codex import Codex
+# System module - user management, permissions, tasks, and core services
+from .system import (
+    Call,
+    Notification,
+    Operations,
+    Permission,
+    Profiles,
+    Service,
+    Task,
+    TaskExecution,
+    TaskSchedule,
+    TaskStep,
+    User,
+    UserProfile,
+)
 
-# Import constants separately if needed
-# from .constants import *
-from .contract import Contract
-from .fiscal_period import FiscalPeriod, FiscalPeriodStatus
-from .fund import Fund, FundType
-from .dispute import Dispute
-from .human import Human
-from .identity import Identity
-from .instrument import Instrument
-from .land import Land, LandType, LandStatus
-from .ledger_entry import Category, EntryType, LedgerEntry
-from .license import License, LicenseType, license_issue, license_revoke
-from .mandate import Mandate
+# Justice module - legal system, courts, cases, and verdicts
+from .justice import (
+    Appeal,
+    AppealStatus,
+    appeal_file,
+    appeal_decide,
+    Case,
+    CaseStatus,
+    case_file,
+    case_assign_judges,
+    case_issue_verdict,
+    case_close,
+    Court,
+    CourtLevel,
+    Dispute,
+    Judge,
+    JusticeSystem,
+    JusticeSystemType,
+    Penalty,
+    PenaltyType,
+    penalty_execute,
+    penalty_waive,
+    Verdict,
+    verdict_prehook,
+    verdict_posthook,
+)
 
-# Justice System entities
-from .justice_system import JusticeSystem, JusticeSystemType
-from .court import Court, CourtLevel
-from .judge import Judge
-from .case import Case, CaseStatus, case_file, case_assign_judges, case_issue_verdict, case_close
-from .verdict import Verdict, verdict_prehook, verdict_posthook
-from .penalty import Penalty, PenaltyType, penalty_execute, penalty_waive
-from .appeal import Appeal, AppealStatus, appeal_file, appeal_decide
-from .member import Member
-from .notification import Notification
-from .organization import Organization
-from .payment_account import PaymentAccount
-from .permission import Permission
-from .proposal import Proposal
-from .realm import Realm
-from .registry import Registry
-from .service import Service
-from .task import Task
-from .task_execution import TaskExecution
-from .task_schedule import TaskSchedule
-from .task_step import TaskStep
-from .invoice import Invoice
-from .token import Token
-from .nft_token import NFTToken
-from .trade import Trade
-from .transfer import Transfer
-from .treasury import Treasury
-from .user import User
-from .user_profile import Operations, Profiles, UserProfile
-from .vote import Vote
-from .zone import Zone
+# Finance module - instruments, balances, budgets, tokens, and treasury
+from .finance import (
+    Balance,
+    Budget,
+    BudgetStatus,
+    Category,
+    EntryType,
+    FiscalPeriod,
+    FiscalPeriodStatus,
+    Fund,
+    FundType,
+    Instrument,
+    Invoice,
+    LedgerEntry,
+    NFTToken,
+    PaymentAccount,
+    Token,
+    Trade,
+    Transfer,
+    Treasury,
+)
+
+# Identity module - humans, identities, members, and organizations
+from .identity import (
+    Human,
+    Identity,
+    Member,
+    Organization,
+)
+
+# Governance module - realms, registries, codex, contracts, and voting
+from .governance import (
+    Codex,
+    Contract,
+    License,
+    LicenseType,
+    license_issue,
+    license_revoke,
+    Mandate,
+    Proposal,
+    Realm,
+    Registry,
+    Vote,
+)
+
+# Land module - land parcels and zones
+from .land import (
+    Land,
+    LandType,
+    LandStatus,
+    Zone,
+)
 
 __all__ = [
     "Balance",

@@ -8,7 +8,7 @@ from core.candid_types_realm import (
     RealmResponse,
     RealmResponseData,
 )
-from ggg.user import User
+from ggg import User
 from kybra import Async, query, update
 from kybra_simple_logging import get_logger
 

@@ -1,6 +1,7 @@
 from typing import Any
 
-from ggg.user import User, user_register as ggg_user_register
+from ggg import User
+from ggg.system.user import user_register as ggg_user_register
 from kybra_simple_logging import get_logger
 
 logger = get_logger("api.user")

@@ -10,10 +10,7 @@ from kybra_simple_db import (
 )
 from kybra_simple_logging import get_logger
 
-try:
-    from ggg.user_profile import UserProfile
-except ImportError:
-    from .user_profile import UserProfile
+from .user_profile import UserProfile
 
 logger = get_logger("entity.user")
 

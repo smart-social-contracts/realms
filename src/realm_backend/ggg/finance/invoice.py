@@ -131,7 +131,7 @@ class Invoice(Entity, TimestampedMixin):
         Returns:
             List of created LedgerEntry instances
         """
-        from ggg.ledger_entry import Category, EntryType, LedgerEntry
+        from .ledger_entry import Category, EntryType, LedgerEntry
         
         # Use hook for custom logic (can be overridden via Codex)
         custom_entries = self.accounting_hook(
@@ -211,7 +211,7 @@ class Invoice(Entity, TimestampedMixin):
         Returns:
             List of created LedgerEntry instances
         """
-        from ggg.ledger_entry import Category, EntryType, LedgerEntry
+        from .ledger_entry import Category, EntryType, LedgerEntry
         
         # Use hook for custom logic (can be overridden via Codex)
         custom_entries = self.accounting_hook(

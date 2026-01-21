@@ -30,12 +30,8 @@ Other Uses:
 import traceback
 from typing import Callable, List
 
-from ggg.call import Call
-from ggg.status import TaskExecutionStatus, TaskStatus
-from ggg.task import Task
-from ggg.task_execution import TaskExecution
-from ggg.task_schedule import TaskSchedule
-from ggg.task_step import TaskStep
+from ggg import Call, Task, TaskExecution, TaskSchedule, TaskStep
+from ggg.system.status import TaskExecutionStatus, TaskStatus
 from kybra import Async, Duration, ic, void
 from kybra_simple_logging import get_logger
 

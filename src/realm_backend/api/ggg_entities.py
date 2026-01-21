@@ -3,53 +3,27 @@ import math
 import traceback
 from typing import Any, Dict, List, Optional
 
-from ggg.balance import Balance
-from ggg.budget import Budget, BudgetStatus
-from ggg.call import Call
-from ggg.codex import Codex
-from ggg.contract import Contract
-from ggg.dispute import Dispute
-from ggg.fiscal_period import FiscalPeriod, FiscalPeriodStatus
-from ggg.fund import Fund, FundType
-from ggg.human import Human
-from ggg.identity import Identity
-from ggg.instrument import Instrument
-from ggg.invoice import Invoice
-from ggg.land import Land, LandType
-from ggg.ledger_entry import Category, EntryType, LedgerEntry
-from ggg.license import License, LicenseType, license_issue, license_revoke
-from ggg.mandate import Mandate
-
-# Justice System entities
-from ggg.justice_system import JusticeSystem, JusticeSystemType
-from ggg.court import Court, CourtLevel
-from ggg.judge import Judge
-from ggg.case import Case, CaseStatus, case_file, case_assign_judges, case_issue_verdict, case_close
-from ggg.verdict import Verdict, verdict_prehook, verdict_posthook
-from ggg.penalty import Penalty, PenaltyType, penalty_execute, penalty_waive
-from ggg.appeal import Appeal, AppealStatus, appeal_file, appeal_decide
-
-from ggg.member import Member
-from ggg.notification import Notification
-from ggg.organization import Organization
-from ggg.payment_account import PaymentAccount
-from ggg.permission import Permission
-from ggg.proposal import Proposal
-from ggg.realm import Realm
-from ggg.registry import Registry
-from ggg.service import Service
-from ggg.task import Task
-from ggg.task_execution import TaskExecution
-from ggg.task_schedule import TaskSchedule
-from ggg.task_step import TaskStep
-from ggg.token import Token
-from ggg.trade import Trade
-from ggg.transfer import Transfer
-from ggg.treasury import Treasury
-from ggg.user import User
-from ggg.user_profile import Operations, Profiles, UserProfile
-from ggg.vote import Vote
-from ggg.zone import Zone
+from ggg import (
+    # Finance
+    Balance, Budget, BudgetStatus, Category, EntryType, FiscalPeriod, FiscalPeriodStatus,
+    Fund, FundType, Instrument, Invoice, LedgerEntry, NFTToken, PaymentAccount, Token,
+    Trade, Transfer, Treasury,
+    # Identity
+    Human, Identity, Member, Organization,
+    # Governance
+    Codex, Contract, License, LicenseType, license_issue, license_revoke, Mandate,
+    Proposal, Realm, Registry, Vote,
+    # Justice
+    JusticeSystem, JusticeSystemType, Court, CourtLevel, Judge, Case, CaseStatus,
+    case_file, case_assign_judges, case_issue_verdict, case_close, Verdict,
+    verdict_prehook, verdict_posthook, Penalty, PenaltyType, penalty_execute,
+    penalty_waive, Appeal, AppealStatus, appeal_file, appeal_decide, Dispute,
+    # Land
+    Land, LandType, LandStatus, Zone,
+    # System
+    Call, Notification, Permission, Service, Task, TaskExecution, TaskSchedule,
+    TaskStep, User, UserProfile, Operations, Profiles,
+)
 from kybra_simple_logging import get_logger
 
 logger = get_logger("api.ggg_entities")

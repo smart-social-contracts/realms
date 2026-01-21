@@ -27,8 +27,7 @@ from core.candid_types_realm import (
     UserGetRecord,
 )
 from core.task_manager import TaskManager
-from ggg import Call, Codex, Task, TaskStep
-from ggg.task_schedule import TaskSchedule
+from ggg import Call, Codex, Task, TaskStep, TaskSchedule
 from kybra import (
     Async,
     CallResult,
@@ -1198,8 +1197,7 @@ def execute_code(code: str) -> str:
     import traceback
 
     from core.task_manager import TaskManager
-    from ggg import Call, Task, TaskStep
-    from ggg.task_schedule import TaskSchedule
+    from ggg import Call, Task, TaskStep, TaskSchedule
 
     try:
         # Detect if code is async (contains 'yield' or defines 'async_task')
@@ -1327,7 +1325,7 @@ def stop_task(task_id: str) -> str:
     """
     import json
 
-    from ggg.task import Task
+    from ggg import Task
 
     try:
         # Try to find task by partial or full ID
@@ -1455,7 +1453,7 @@ def start_task(task_id: str) -> str:
 
         # Enable all schedules and reset last_run_at for immediate execution
         # Check both the task's schedules relation and find schedules by task reference
-        from ggg.task_schedule import TaskSchedule
+        from ggg import TaskSchedule
         schedules_found = False
         
         # Try to get schedules from task relationship
@@ -1525,7 +1523,7 @@ def get_task_logs(task_id: str, limit: nat = 20) -> str:
     """
     import json
 
-    from ggg.task import Task
+    from ggg import Task
 
     try:
         # Try to find task by partial or full ID
@@ -1598,7 +1596,7 @@ def get_task_logs_by_name(
     Returns:
         JSON string with array of log entries from all executions
     """
-    from ggg.task import Task
+    from ggg import Task
     import json
     
     try:
@@ -1732,8 +1730,7 @@ def create_scheduled_task(
     try:
 
         from core.task_manager import TaskManager
-        from ggg import Call, Task, TaskStep
-        from ggg.task_schedule import TaskSchedule
+        from ggg import Call, Task, TaskStep, TaskSchedule
         
         # Decode the base64 encoded code
         decoded_code = base64.b64decode(code).decode("utf-8")

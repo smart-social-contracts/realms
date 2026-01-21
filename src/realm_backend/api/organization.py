@@ -1,6 +1,6 @@
 from typing import Any
 
-from ggg.organization import Organization
+from ggg import Organization
 
 
 def organization_register(principal: str) -> dict[str, Any]:

@@ -1,7 +1,7 @@
 from kybra_simple_db import Entity, ManyToOne, OneToMany, OneToOne, String, TimestampedMixin
 from kybra_simple_logging import get_logger
 
-from .constants import STATUS_MAX_LENGTH
+from ..system.constants import STATUS_MAX_LENGTH
 
 logger = get_logger("entity.justice_system")
 

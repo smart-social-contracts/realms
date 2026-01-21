@@ -1,6 +1,6 @@
 from typing import Any
 
-from ggg.realm import Realm
+from ggg import Realm
 
 
 def realm_register(principal: str) -> dict[str, Any]:
