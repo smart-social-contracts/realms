@@ -26,7 +26,7 @@ logger = get_logger("api.nft")
 
 
 # Candid types for NFT canister interface
-class Account(Record):
+class NftAccount(Record):
     owner: Principal
     subaccount: Opt[blob]
 
@@ -40,7 +40,7 @@ class MetadataValue(Variant, total=False):
 
 class MintArg(Record):
     token_id: nat
-    owner: Account
+    owner: NftAccount
     metadata: Opt[Vec[Tuple[text, MetadataValue]]]
 
 
