@@ -16,14 +16,8 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 REALM_DIR="$( dirname "$SCRIPT_DIR" )"
 cd "$REALM_DIR"
 
-# Detect backend canister name from dfx.json
-BACKEND_NAME=""
-if command -v jq &> /dev/null && [ -f "dfx.json" ]; then
-    BACKEND_NAME=$(jq -r '.canisters | keys[] | select(endswith("_backend") and . != "realm_registry_backend")' dfx.json 2>/dev/null | head -1)
-fi
-if [ -z "$BACKEND_NAME" ]; then
-    BACKEND_NAME="realm_backend"
-fi
+# Target canister is always realm_backend
+BACKEND_NAME="realm_backend"
 echo "🎯 Target canister: $BACKEND_NAME"
 
 # Track if any uploads succeeded
