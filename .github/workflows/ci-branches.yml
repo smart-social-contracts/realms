@@ -166,7 +166,7 @@ jobs:
           docker run --rm \
             -v ${{ github.workspace }}/cli/dist:/dist \
             ghcr.io/smart-social-contracts/icp-dev-env:db60540 \
-            bash -c "pip install /dist/realms_gos-*.whl && realms realm create --deploy" \
+            bash -c "pip install /dist/realms_gos-*.whl && realms realm create --deploy --plain-logs" \
             2>&1 | tee cli/tests/cli-pip-test.log
       
       - name: Upload CLI test logs
@@ -320,7 +320,7 @@ jobs:
             -v "$(pwd)/test-logs:/app/test-logs" \
             ghcr.io/${{ github.repository_owner }}/realms:ui-test-${{ github.sha }} bash -c "
           (realms realm create --random && \
-          realms realm deploy && \
+          realms realm deploy --plain-logs && \
           src/realm_frontend/run-e2e-tests.sh specs/workflows.spec.ts specs/multilingual.spec.ts --reporter=line); \
           EXIT_CODE=\$?; \
           mkdir -p /app/test-logs && \
