@@ -10,6 +10,7 @@ from kybra import (
     Principal,
     Record,
     Service,
+    Tuple,
     Variant,
     Vec,
     blob,
@@ -40,7 +41,7 @@ class MetadataValue(Variant, total=False):
 class MintArg(Record):
     token_id: nat
     owner: Account
-    metadata: Opt[Vec[tuple[text, MetadataValue]]]
+    metadata: Opt[Vec[Tuple[text, MetadataValue]]]
 
 
 class GenericError(Record):
