@@ -1,7 +1,7 @@
 """NFT API for minting and managing LAND NFTs."""
 
 import json
-from typing import Dict, Optional
+from typing import Optional
 
 from kybra import (
     Async,
@@ -15,6 +15,7 @@ from kybra import (
     blob,
     ic,
     nat,
+    null,
     service_update,
     text,
 )
@@ -49,9 +50,9 @@ class GenericError(Record):
 
 class MintError(Variant, total=False):
     GenericError: GenericError
-    SupplyCapReached: None
-    Unauthorized: None
-    TokenIdAlreadyExists: None
+    SupplyCapReached: null
+    Unauthorized: null
+    TokenIdAlreadyExists: null
 
 
 class MintResult(Variant, total=False):
@@ -74,7 +75,7 @@ def mint_land_nft(
     x_coordinate: int,
     y_coordinate: int,
     land_type: str = "",
-) -> Async[Dict]:
+):
     """
     Mint a LAND NFT for a registered land parcel.
 
