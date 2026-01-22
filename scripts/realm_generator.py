@@ -50,6 +50,9 @@ from ggg import (
     TaskStep,
     Call,
     Zone,
+    Land,
+    LandType,
+    LandStatus,
     # Justice System entities
     JusticeSystem,
     JusticeSystemType,
@@ -343,6 +346,77 @@ class RealmGenerator:
             zones.append(zone)
         
         return zones
+    
+    def generate_lands(self, zones: List[Zone], parcels_per_zone: int = 9) -> tuple:
+        """Generate land parcels within existing zones.
+        
+        Creates smaller zones (higher H3 resolution) within each parent zone,
+        and associates them with Land entities that can be sold for REALM tokens.
+        
+        Args:
+            zones: Parent zones (resolution 6)
+            parcels_per_zone: Number of land parcels to create per zone (default 9)
+            
+        Returns:
+            Tuple of (lands, child_zones) - Land entities and their associated smaller zones
+        """
+        lands = []
+        child_zones = []
+        
+        land_types = [LandType.RESIDENTIAL, LandType.AGRICULTURAL, 
+                      LandType.INDUSTRIAL, LandType.COMMERCIAL]
+        
+        for parent_zone in zones:
+            try:
+                import h3
+                # Get child cells at higher resolution (9 = ~174m hexagons, good for parcels)
+                children = list(h3.cell_to_children(parent_zone.h3_index, 9))[:parcels_per_zone]
+            except ImportError:
+                # Fallback: generate pseudo child indices
+                children = [f"{parent_zone.h3_index[:8]}{i:04x}fff" for i in range(parcels_per_zone)]
+            
+            for i, child_h3 in enumerate(children):
+                # Create Land entity (initially unowned - for sale)
+                land = Land(
+                    id=f"land_{parent_zone.h3_index[:8]}_{i:03d}",
+                    x_coordinate=i % 3,  # Grid position within zone
+                    y_coordinate=i // 3,
+                    land_type=random.choice(land_types),
+                    # owner_user and owner_organization left unset = available for purchase with REALM tokens
+                    size_width=1,
+                    size_height=1,
+                    status=LandStatus.ACTIVE,
+                    metadata=json.dumps({
+                        "parent_zone": parent_zone.h3_index,
+                        "price_realm_tokens": random.randint(100, 1000),
+                        "for_sale": True
+                    })
+                )
+                lands.append(land)
+                
+                # Create child zone associated with land
+                try:
+                    lat, lng = h3.cell_to_latlng(child_h3)
+                except:
+                    lat = parent_zone.latitude + (i % 3 - 1) * 0.001
+                    lng = parent_zone.longitude + (i // 3 - 1) * 0.001
+                
+                child_zone = Zone(
+                    h3_index=child_h3,
+                    name=f"{parent_zone.name} - Parcel {i+1}",
+                    description=f"Land parcel within {parent_zone.name}",
+                    latitude=lat,
+                    longitude=lng,
+                    resolution=9.0,
+                    land=land,  # Associate with land
+                    metadata=json.dumps({"parent_zone": parent_zone.h3_index})
+                )
+                child_zones.append(child_zone)
+        
+        if not self.quiet:
+            print(f"  Generated {len(lands)} land parcels across {len(zones)} zones")
+        
+        return lands, child_zones
     
     def generate_justice_system(self, users: List[User], members: List[Member], codex: Codex = None) -> Dict[str, List]:
         """Generate justice system demo data.
@@ -807,6 +881,9 @@ class RealmGenerator:
         # Generate zones for users based on their location
         zones = self.generate_zones(users, humans)
         
+        # Generate land parcels within zones (for sale with REALM tokens)
+        lands, land_zones = self.generate_lands(zones, params.get('land_parcels_per_zone', 9))
+        
         # Generate justice system data
         justice_data = self.generate_justice_system(users, members, codex)
         
@@ -822,6 +899,8 @@ class RealmGenerator:
         ret += disputes
         ret += mandates
         ret += zones
+        ret += lands
+        ret += land_zones
         ret.append(codex)
         ret.append(call)
         ret.append(step)
@@ -934,6 +1013,7 @@ def main():
     parser.add_argument("--organizations", type=int, default=5, help="Number of organizations to generate")
     parser.add_argument("--transactions", type=int, default=100, help="Number of transactions to generate")
     parser.add_argument("--disputes", type=int, default=10, help="Number of disputes to generate")
+    parser.add_argument("--land-parcels", type=int, default=9, help="Number of land parcels per zone (for sale with REALM tokens)")
     parser.add_argument("--seed", type=int, help="Random seed for reproducible generation")
     parser.add_argument("--output-dir", type=str, default=REALM_FOLDER, help="Output directory")
     parser.add_argument("--realm-name", type=str, default="Generated Demo Realm", help="Name of the realm")
@@ -1010,6 +1090,7 @@ def main():
         organizations=args.organizations,
         transactions=args.transactions,
         disputes=args.disputes,
+        land_parcels_per_zone=args.land_parcels,
         realm_name=args.realm_name
     )
     
