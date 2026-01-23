@@ -142,6 +142,16 @@
           "staging": "6aqo3-fqaaa-aaaaf-qdohq-cai"
         }
       }
+    },
+    "marketplace_backend": {
+      "type": "custom",
+      "candid": "https://github.com/smart-social-contracts/kybra-simple-marketplace/releases/latest/download/marketplace_backend.did",
+      "wasm": "https://github.com/smart-social-contracts/kybra-simple-marketplace/releases/latest/download/marketplace_backend.wasm",
+      "remote": {
+        "id": {
+          "staging": "ehyfg-wyaaa-aaaae-qg3qq-cai"
+        }
+      }
     }
   },
   "defaults": { 
