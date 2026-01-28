@@ -4,6 +4,3 @@
 [submodule "codices"]
 	path = codices
 	url = git@github.com:smart-social-contracts/realms-codices.git
-[submodule "website/realms-strategy"]
-	path = website/realms-strategy
-	url = git@github.com:smart-social-contracts/realms-strategy.git
