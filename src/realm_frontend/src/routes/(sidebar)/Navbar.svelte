@@ -37,7 +37,7 @@
 <Navbar {fluid} class="text-black relative z-50" color="default" let:NavContainer style="pointer-events: auto;">
 	<NavHamburger
 		onClick={() => (drawerHidden = !drawerHidden)}
-		class="m-0 me-3 md:block lg:hidden"
+		class="m-0 me-3 md:block"
 	/>
 	<NavBrand href="/" class="{list ? 'w-40' : 'lg:w-60'} relative z-40 cursor-pointer">
 		<img

@@ -374,7 +374,7 @@
 	class={drawerHidden ? 'hidden' : ''}
 	activeUrl={mainSidebarUrl}
 	activeClass="bg-gray-100 dark:bg-gray-700"
-	asideClass="fixed inset-0 z-30 flex-none h-full w-64 lg:h-auto lg:top-16 border-e border-gray-200 dark:border-gray-600 lg:overflow-y-visible lg:pt-0 lg:block"
+	asideClass="fixed inset-0 z-30 flex-none h-full w-64 lg:h-auto lg:top-16 border-e border-gray-200 dark:border-gray-600 lg:overflow-y-visible lg:pt-0 {drawerHidden ? 'lg:hidden' : 'lg:block'}"
 >
 	<h4 class="sr-only">{$_('common.main_menu')}</h4>
 	<SidebarWrapper
