@@ -2,7 +2,7 @@
 
 import os
 
-MAX_BATCH_SIZE = 25  # Reduced from 100 to avoid ICP instruction limit (40B) on large records
+MAX_BATCH_SIZE = 10  # Reduced from 25 to handle complex records with relationships (Zone+Land)
 
 # Docker image configuration
 # Updated automatically during release to match the current version
