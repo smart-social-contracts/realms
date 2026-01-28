@@ -380,10 +380,9 @@ try:
         # Build Python code to create the Token entity
         python_code = f'''
 from ggg import Token
-# Check if token already exists
-existing = [t for t in Token.instances() if t.id == "{token['symbol']}"]
-if existing:
-    t = existing[0]
+# Check if token already exists using direct load (O(1) vs O(n) for instances())
+t = Token.load("{token['symbol']}")
+if t:
     t.symbol = "{token['symbol']}"
     t.name = "{token['name']}"
     t.ledger_canister_id = "{token['ledger_canister_id']}"
