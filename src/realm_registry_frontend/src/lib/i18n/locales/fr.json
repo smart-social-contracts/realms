@@ -51,5 +51,33 @@
   },
   "language": {
     "select": "Langue"
+  },
+  "auth": {
+    "login": "Connexion",
+    "logout": "Déconnexion"
+  },
+  "dashboard": {
+    "title": "Mon Tableau de Bord",
+    "back_to_realms": "Retour aux Royaumes",
+    "credits_tab": "Crédits",
+    "realms_tab": "Mes Royaumes",
+    "loading": "Chargement...",
+    "current_balance": "Solde Actuel",
+    "credits_unit": "crédits",
+    "purchase_history": "Historique des Achats",
+    "no_purchases": "Pas encore d'achats",
+    "created_realms": "Royaumes Créés",
+    "joined_realms": "Royaumes Rejoints",
+    "no_created_realms": "Vous n'avez pas encore créé de royaume",
+    "no_joined_realms": "Vous n'avez pas encore rejoint de royaume",
+    "role_owner": "Propriétaire",
+    "role_member": "Membre",
+    "topup_title": "Recharger des Crédits",
+    "topup_description": "1 crédit = 1 $ USD. Les crédits servent à déployer des royaumes.",
+    "topup_amount": "Montant",
+    "topup_credits": "Crédits",
+    "topup_total": "Total",
+    "topup_button": "Payer par Carte",
+    "processing": "Traitement..."
   }
 }

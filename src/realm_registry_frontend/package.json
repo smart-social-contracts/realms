@@ -12,7 +12,9 @@
   },
   "dependencies": {
     "@dfinity/agent": "^3.2.4",
+    "@dfinity/auth-client": "^3.2.4",
     "@dfinity/candid": "^3.2.4",
+    "@dfinity/identity": "^3.2.4",
     "@dfinity/principal": "^3.2.4",
     "svelte-i18n": "^3.7.4",
     "@types/qrcode": "^1.5.5",

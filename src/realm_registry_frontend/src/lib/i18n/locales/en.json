@@ -51,5 +51,33 @@
   },
   "language": {
     "select": "Language"
+  },
+  "auth": {
+    "login": "Log In",
+    "logout": "Log Out"
+  },
+  "dashboard": {
+    "title": "My Dashboard",
+    "back_to_realms": "Back to Realms",
+    "credits_tab": "Credits",
+    "realms_tab": "My Realms",
+    "loading": "Loading...",
+    "current_balance": "Current Balance",
+    "credits_unit": "credits",
+    "purchase_history": "Purchase History",
+    "no_purchases": "No purchases yet",
+    "created_realms": "Created Realms",
+    "joined_realms": "Joined Realms",
+    "no_created_realms": "You haven't created any realms yet",
+    "no_joined_realms": "You haven't joined any realms yet",
+    "role_owner": "Owner",
+    "role_member": "Member",
+    "topup_title": "Top Up Credits",
+    "topup_description": "1 credit = $1 USD. Credits can be used to deploy realms.",
+    "topup_amount": "Amount",
+    "topup_credits": "Credits",
+    "topup_total": "Total",
+    "topup_button": "Pay with Card",
+    "processing": "Processing..."
   }
 }

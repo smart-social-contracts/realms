@@ -51,5 +51,33 @@
   },
   "language": {
     "select": "语言"
+  },
+  "auth": {
+    "login": "登录",
+    "logout": "退出"
+  },
+  "dashboard": {
+    "title": "我的仪表板",
+    "back_to_realms": "返回领域列表",
+    "credits_tab": "积分",
+    "realms_tab": "我的领域",
+    "loading": "加载中...",
+    "current_balance": "当前余额",
+    "credits_unit": "积分",
+    "purchase_history": "购买记录",
+    "no_purchases": "暂无购买记录",
+    "created_realms": "创建的领域",
+    "joined_realms": "加入的领域",
+    "no_created_realms": "您还没有创建任何领域",
+    "no_joined_realms": "您还没有加入任何领域",
+    "role_owner": "所有者",
+    "role_member": "成员",
+    "topup_title": "充值积分",
+    "topup_description": "1积分 = 1美元。积分可用于部署领域。",
+    "topup_amount": "数量",
+    "topup_credits": "积分",
+    "topup_total": "总计",
+    "topup_button": "银行卡支付",
+    "processing": "处理中..."
   }
 }

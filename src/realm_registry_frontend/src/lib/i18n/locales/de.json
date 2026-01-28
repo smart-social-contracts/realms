@@ -51,5 +51,33 @@
   },
   "language": {
     "select": "Sprache"
+  },
+  "auth": {
+    "login": "Anmelden",
+    "logout": "Abmelden"
+  },
+  "dashboard": {
+    "title": "Mein Dashboard",
+    "back_to_realms": "Zurück zu Realms",
+    "credits_tab": "Guthaben",
+    "realms_tab": "Meine Realms",
+    "loading": "Laden...",
+    "current_balance": "Aktuelles Guthaben",
+    "credits_unit": "Credits",
+    "purchase_history": "Kaufverlauf",
+    "no_purchases": "Noch keine Käufe",
+    "created_realms": "Erstellte Realms",
+    "joined_realms": "Beigetretene Realms",
+    "no_created_realms": "Sie haben noch keine Realms erstellt",
+    "no_joined_realms": "Sie sind noch keinen Realms beigetreten",
+    "role_owner": "Besitzer",
+    "role_member": "Mitglied",
+    "topup_title": "Credits aufladen",
+    "topup_description": "1 Credit = 1 USD. Credits können zum Bereitstellen von Realms verwendet werden.",
+    "topup_amount": "Betrag",
+    "topup_credits": "Credits",
+    "topup_total": "Gesamt",
+    "topup_button": "Mit Karte bezahlen",
+    "processing": "Wird verarbeitet..."
   }
 }

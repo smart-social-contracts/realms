@@ -51,5 +51,33 @@
   },
   "language": {
     "select": "Lingua"
+  },
+  "auth": {
+    "login": "Accedi",
+    "logout": "Esci"
+  },
+  "dashboard": {
+    "title": "La Mia Dashboard",
+    "back_to_realms": "Torna ai Reami",
+    "credits_tab": "Crediti",
+    "realms_tab": "I Miei Reami",
+    "loading": "Caricamento...",
+    "current_balance": "Saldo Attuale",
+    "credits_unit": "crediti",
+    "purchase_history": "Cronologia Acquisti",
+    "no_purchases": "Nessun acquisto ancora",
+    "created_realms": "Reami Creati",
+    "joined_realms": "Reami Uniti",
+    "no_created_realms": "Non hai ancora creato nessun reame",
+    "no_joined_realms": "Non hai ancora aderito a nessun reame",
+    "role_owner": "Proprietario",
+    "role_member": "Membro",
+    "topup_title": "Ricarica Crediti",
+    "topup_description": "1 credito = $1 USD. I crediti servono per distribuire reami.",
+    "topup_amount": "Importo",
+    "topup_credits": "Crediti",
+    "topup_total": "Totale",
+    "topup_button": "Paga con Carta",
+    "processing": "Elaborazione..."
   }
 }

@@ -51,5 +51,33 @@
   },
   "language": {
     "select": "Idioma"
+  },
+  "auth": {
+    "login": "Iniciar Sesión",
+    "logout": "Cerrar Sesión"
+  },
+  "dashboard": {
+    "title": "Mi Panel",
+    "back_to_realms": "Volver a Reinos",
+    "credits_tab": "Créditos",
+    "realms_tab": "Mis Reinos",
+    "loading": "Cargando...",
+    "current_balance": "Saldo Actual",
+    "credits_unit": "créditos",
+    "purchase_history": "Historial de Compras",
+    "no_purchases": "Sin compras aún",
+    "created_realms": "Reinos Creados",
+    "joined_realms": "Reinos Unidos",
+    "no_created_realms": "Aún no has creado ningún reino",
+    "no_joined_realms": "Aún no te has unido a ningún reino",
+    "role_owner": "Propietario",
+    "role_member": "Miembro",
+    "topup_title": "Recargar Créditos",
+    "topup_description": "1 crédito = $1 USD. Los créditos se usan para desplegar reinos.",
+    "topup_amount": "Cantidad",
+    "topup_credits": "Créditos",
+    "topup_total": "Total",
+    "topup_button": "Pagar con Tarjeta",
+    "processing": "Procesando..."
   }
 }

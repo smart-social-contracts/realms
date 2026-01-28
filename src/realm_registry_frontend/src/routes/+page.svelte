@@ -3,7 +3,7 @@
   import { browser } from '$app/environment';
   import { _, locale } from 'svelte-i18n';
   import { supportedLocales, setLocale } from '$lib/i18n';
-
+  
   let backend;
   let realms = [];
   let loading = true;
@@ -32,6 +32,11 @@
   // Description tooltip state
   let activeDescriptionRealm = null;
   let showLanguageMenu = false;
+  
+  // Auth state
+  let isLoggedIn = false;
+  let userPrincipal = null;
+  let authLoading = true;
 
   onMount(async () => {
     if (browser) {
@@ -73,6 +78,14 @@
       if (!commitDatetime || commitDatetime === 'COMMIT_DATETIME_PLACEHOLDER') {
         commitDatetime = typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : new Date().toISOString().replace('T', ' ').substring(0, 19);
       }
+      
+      // Check auth state
+      const { isAuthenticated, getPrincipal } = await import("$lib/auth");
+      isLoggedIn = await isAuthenticated();
+      if (isLoggedIn) {
+        userPrincipal = await getPrincipal();
+      }
+      authLoading = false;
     }
   });
 
@@ -325,6 +338,22 @@
   }
 
   $: searchQuery, searchRealms();
+
+  async function handleLogin() {
+    const { login, getPrincipal } = await import("$lib/auth");
+    const result = await login();
+    if (result.principal) {
+      isLoggedIn = true;
+      userPrincipal = result.principal;
+    }
+  }
+
+  async function handleLogout() {
+    const { logout } = await import("$lib/auth");
+    await logout();
+    isLoggedIn = false;
+    userPrincipal = null;
+  }
 
   // Initialize map when switching to map view
   async function initMap() {
@@ -665,6 +694,35 @@
       <img src="/images/logo_horizontal.svg" alt="Realms Logo" class="header-logo" />
     </div>
     
+    <!-- Auth Button -->
+    <div class="auth-section">
+      {#if authLoading}
+        <div class="auth-loading"></div>
+      {:else if isLoggedIn}
+        <div class="user-menu">
+          <a href="/my-dashboard" class="user-principal-btn" title={userPrincipal?.toText()}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            {userPrincipal?.toText().slice(0, 5)}...{userPrincipal?.toText().slice(-3)}
+          </a>
+          <button class="btn btn-secondary btn-sm" on:click={handleLogout}>
+            {$_('auth.logout')}
+          </button>
+        </div>
+      {:else}
+        <button class="btn btn-primary btn-sm login-btn" on:click={handleLogin}>
+          <svg class="login-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+            <polyline points="10 17 15 12 10 7"></polyline>
+            <line x1="15" y1="12" x2="3" y2="12"></line>
+          </svg>
+          <span class="login-text">{$_('auth.login')}</span>
+        </button>
+      {/if}
+    </div>
+    
     <!-- Language Selector -->
     <div class="language-selector">
       <button 
@@ -984,6 +1042,7 @@
   </footer>
 </div>
 
+
 <style>
   :global(body) {
     margin: 0;
@@ -1025,6 +1084,71 @@
   .header-logo {
     height: 120px;
     width: auto;
+  }
+
+  /* Auth Section */
+  .auth-section {
+    position: absolute;
+    top: 0;
+    right: 160px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .user-menu {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .user-principal {
+    font-family: monospace;
+    font-size: 0.75rem;
+    color: #525252;
+    background: #F5F5F5;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+  }
+
+  .user-principal-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: monospace;
+    font-size: 0.75rem;
+    color: #525252;
+    background: #F5F5F5;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    border: 1px solid #E5E5E5;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .user-principal-btn:hover {
+    background: #FFFFFF;
+    border-color: #525252;
+    color: #171717;
+  }
+
+  .auth-loading {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #E5E5E5;
+    border-top: 2px solid #525252;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  .login-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .login-icon {
+    display: none;
   }
 
   /* Language Selector */
@@ -2158,6 +2282,28 @@
       padding: 1rem;
     }
 
+    .auth-section {
+      position: absolute;
+      top: 0.5rem;
+      right: 3rem;
+    }
+
+    .user-menu {
+      flex-wrap: nowrap;
+    }
+
+    .login-btn {
+      padding: 0.5rem;
+    }
+
+    .login-btn .login-text {
+      display: none;
+    }
+
+    .login-btn .login-icon {
+      display: block;
+    }
+
     .language-btn .current-locale,
     .language-btn .chevron {
       display: none;
@@ -2167,8 +2313,15 @@
       padding: 0.5rem;
     }
 
+    .language-selector {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+    }
+
     .header {
       margin-bottom: 1rem;
+      padding-top: 2.5rem;
     }
 
     .header h1 {

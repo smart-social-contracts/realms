@@ -1,0 +1,799 @@
+<script>
+  import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
+  import { goto } from '$app/navigation';
+  import { _, locale } from 'svelte-i18n';
+  import { CONFIG } from '$lib/config.js';
+
+  let userPrincipal = null;
+  let loading = true;
+  let activeTab = 'credits';
+  
+  // Credits data
+  let balance = 0;
+  let purchases = [];
+  let loadingCredits = true;
+  
+  // Realms data
+  let createdRealms = [];
+  let joinedRealms = [];
+  let loadingRealms = true;
+
+  // Top-up state
+  let topUpAmount = 10;
+  let topUpLoading = false;
+  let topUpError = null;
+
+  // Billing service URL - should be configured per environment
+  const BILLING_SERVICE_URL = CONFIG.billing_service_url || 'http://localhost:8001';
+
+  onMount(async () => {
+    if (browser) {
+      // Check if user is authenticated
+      const { isAuthenticated, getPrincipal } = await import('$lib/auth.js');
+      const authenticated = await isAuthenticated();
+      
+      if (!authenticated) {
+        // Redirect to home if not logged in
+        goto('/');
+        return;
+      }
+      
+      userPrincipal = await getPrincipal();
+      loading = false;
+      
+      // Load user data
+      await Promise.all([loadCredits(), loadRealms()]);
+    }
+  });
+
+  async function loadCredits() {
+    loadingCredits = true;
+    try {
+      // TODO: Fetch from backend
+      // For now, use placeholder data
+      balance = 0;
+      purchases = [];
+    } catch (err) {
+      console.error('Failed to load credits:', err);
+    } finally {
+      loadingCredits = false;
+    }
+  }
+
+  async function loadRealms() {
+    loadingRealms = true;
+    try {
+      // TODO: Fetch from backend
+      // For now, use placeholder data
+      createdRealms = [];
+      joinedRealms = [];
+    } catch (err) {
+      console.error('Failed to load realms:', err);
+    } finally {
+      loadingRealms = false;
+    }
+  }
+
+  async function handleTopUp() {
+    if (!userPrincipal || topUpAmount < 1 || topUpAmount > 50) return;
+    
+    topUpLoading = true;
+    topUpError = null;
+    
+    try {
+      const response = await fetch(`${BILLING_SERVICE_URL}/checkout/create-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          principal_id: userPrincipal.toText(),
+          amount: topUpAmount,
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to create checkout session');
+      }
+      
+      const data = await response.json();
+      
+      // Redirect to Stripe checkout
+      window.location.href = data.checkout_url;
+    } catch (err) {
+      console.error('Top-up failed:', err);
+      topUpError = err.message;
+    } finally {
+      topUpLoading = false;
+    }
+  }
+
+  function formatDate(dateString) {
+    return new Date(dateString).toLocaleDateString();
+  }
+</script>
+
+<svelte:head>
+  <title>{$_('dashboard.title')} | Realms</title>
+</svelte:head>
+
+<div class="dashboard-page">
+  <div class="dashboard-container">
+    <!-- Header -->
+    <header class="dashboard-header">
+      <a href="/" class="back-link">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        {$_('dashboard.back_to_realms')}
+      </a>
+      <h1>{$_('dashboard.title')}</h1>
+      {#if userPrincipal}
+        <div class="principal-display">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+          <span class="principal-text">{userPrincipal.toText()}</span>
+        </div>
+      {/if}
+    </header>
+
+    {#if loading}
+      <div class="loading-container">
+        <div class="spinner"></div>
+        <p>{$_('dashboard.loading')}</p>
+      </div>
+    {:else}
+      <!-- Tabs -->
+      <div class="tabs">
+        <button 
+          class="tab" 
+          class:active={activeTab === 'credits'}
+          on:click={() => activeTab = 'credits'}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="16"></line>
+            <line x1="8" y1="12" x2="16" y2="12"></line>
+          </svg>
+          {$_('dashboard.credits_tab')}
+        </button>
+        <button 
+          class="tab" 
+          class:active={activeTab === 'realms'}
+          on:click={() => activeTab = 'realms'}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+          </svg>
+          {$_('dashboard.realms_tab')}
+        </button>
+      </div>
+
+      <!-- Tab Content -->
+      <div class="tab-content">
+        {#if activeTab === 'credits'}
+          <div class="credits-section">
+            <!-- Balance Card -->
+            <div class="balance-card">
+              <div class="balance-label">{$_('dashboard.current_balance')}</div>
+              {#if loadingCredits}
+                <div class="balance-loading"></div>
+              {:else}
+                <div class="balance-value">{balance}</div>
+              {/if}
+              <div class="balance-unit">{$_('dashboard.credits_unit')}</div>
+            </div>
+
+            <!-- Top-up Section -->
+            <div class="topup-section">
+              <h3>{$_('dashboard.topup_title')}</h3>
+              <p class="topup-description">{$_('dashboard.topup_description')}</p>
+              
+              <div class="topup-form">
+                <div class="amount-input-group">
+                  <label for="topup-amount">{$_('dashboard.topup_amount')}</label>
+                  <div class="amount-controls">
+                    <button 
+                      class="amount-btn"
+                      on:click={() => topUpAmount = Math.max(1, topUpAmount - 1)}
+                      disabled={topUpAmount <= 1}
+                    >−</button>
+                    <input 
+                      type="number" 
+                      id="topup-amount"
+                      bind:value={topUpAmount}
+                      min="1"
+                      max="50"
+                      class="amount-input"
+                    />
+                    <button 
+                      class="amount-btn"
+                      on:click={() => topUpAmount = Math.min(50, topUpAmount + 1)}
+                      disabled={topUpAmount >= 50}
+                    >+</button>
+                  </div>
+                  <div class="amount-range">1 - 50 {$_('dashboard.credits_unit')}</div>
+                </div>
+
+                <div class="topup-summary">
+                  <div class="summary-row">
+                    <span>{$_('dashboard.topup_credits')}</span>
+                    <span>{topUpAmount} {$_('dashboard.credits_unit')}</span>
+                  </div>
+                  <div class="summary-row total">
+                    <span>{$_('dashboard.topup_total')}</span>
+                    <span>${topUpAmount}.00 USD</span>
+                  </div>
+                </div>
+
+                {#if topUpError}
+                  <div class="error-message">{topUpError}</div>
+                {/if}
+
+                <button 
+                  class="topup-btn"
+                  on:click={handleTopUp}
+                  disabled={topUpLoading || topUpAmount < 1 || topUpAmount > 50}
+                >
+                  {#if topUpLoading}
+                    <div class="btn-spinner"></div>
+                    {$_('dashboard.processing')}
+                  {:else}
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                      <line x1="1" y1="10" x2="23" y2="10"></line>
+                    </svg>
+                    {$_('dashboard.topup_button')}
+                  {/if}
+                </button>
+              </div>
+            </div>
+
+            <!-- Purchase History -->
+            <div class="history-section">
+              <h3>{$_('dashboard.purchase_history')}</h3>
+              {#if loadingCredits}
+                <div class="loading-placeholder"></div>
+              {:else if purchases.length === 0}
+                <div class="empty-state">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                  </svg>
+                  <p>{$_('dashboard.no_purchases')}</p>
+                </div>
+              {:else}
+                <ul class="purchase-list">
+                  {#each purchases as purchase}
+                    <li class="purchase-item">
+                      <div class="purchase-info">
+                        <span class="purchase-amount">+{purchase.amount} {$_('dashboard.credits_unit')}</span>
+                        <span class="purchase-date">{formatDate(purchase.date)}</span>
+                      </div>
+                      <span class="purchase-price">${purchase.price}</span>
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+            </div>
+          </div>
+
+        {:else if activeTab === 'realms'}
+          <div class="realms-section">
+            <!-- Created Realms -->
+            <div class="realms-group">
+              <h3>{$_('dashboard.created_realms')}</h3>
+              {#if loadingRealms}
+                <div class="loading-placeholder"></div>
+              {:else if createdRealms.length === 0}
+                <div class="empty-state">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                  </svg>
+                  <p>{$_('dashboard.no_created_realms')}</p>
+                </div>
+              {:else}
+                <ul class="realm-list">
+                  {#each createdRealms as realm}
+                    <li class="realm-item">
+                      <div class="realm-info">
+                        <span class="realm-name">{realm.name}</span>
+                        <span class="realm-id">{realm.id}</span>
+                      </div>
+                      <span class="role-badge owner">{$_('dashboard.role_owner')}</span>
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+            </div>
+
+            <!-- Joined Realms -->
+            <div class="realms-group">
+              <h3>{$_('dashboard.joined_realms')}</h3>
+              {#if loadingRealms}
+                <div class="loading-placeholder"></div>
+              {:else if joinedRealms.length === 0}
+                <div class="empty-state">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                  </svg>
+                  <p>{$_('dashboard.no_joined_realms')}</p>
+                </div>
+              {:else}
+                <ul class="realm-list">
+                  {#each joinedRealms as realm}
+                    <li class="realm-item">
+                      <div class="realm-info">
+                        <span class="realm-name">{realm.name}</span>
+                        <span class="realm-id">{realm.id}</span>
+                      </div>
+                      <span class="role-badge member">{$_('dashboard.role_member')}</span>
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+            </div>
+          </div>
+        {/if}
+      </div>
+    {/if}
+  </div>
+</div>
+
+<style>
+  .dashboard-page {
+    min-height: 100vh;
+    background: #FAFAFA;
+    padding: 2rem;
+  }
+
+  .dashboard-container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .dashboard-header {
+    margin-bottom: 2rem;
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #525252;
+    text-decoration: none;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+    transition: color 0.15s ease;
+  }
+
+  .back-link:hover {
+    color: #171717;
+  }
+
+  .dashboard-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #171717;
+    margin: 0 0 1rem 0;
+  }
+
+  .principal-display {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #F5F5F5;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-family: monospace;
+    font-size: 0.75rem;
+    color: #525252;
+    overflow: hidden;
+  }
+
+  .principal-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem;
+    color: #525252;
+  }
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #E5E5E5;
+    border-top-color: #171717;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .tabs {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 1px solid #E5E5E5;
+    margin-bottom: 1.5rem;
+  }
+
+  .tab {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    background: none;
+    color: #525252;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.15s ease;
+  }
+
+  .tab:hover {
+    color: #171717;
+  }
+
+  .tab.active {
+    color: #171717;
+    border-bottom-color: #171717;
+  }
+
+  .tab-content {
+    background: #FFFFFF;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Credits Section */
+  .balance-card {
+    background: linear-gradient(135deg, #171717 0%, #404040 100%);
+    color: #FFFFFF;
+    padding: 2rem;
+    border-radius: 1rem;
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .balance-label {
+    font-size: 0.875rem;
+    opacity: 0.8;
+    margin-bottom: 0.5rem;
+  }
+
+  .balance-value {
+    font-size: 3rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.25rem;
+  }
+
+  .balance-unit {
+    font-size: 0.875rem;
+    opacity: 0.8;
+  }
+
+  .balance-loading {
+    width: 60px;
+    height: 48px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 0.5rem;
+    margin: 0 auto;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* Top-up Section */
+  .topup-section {
+    background: #F5F5F5;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .topup-section h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #171717;
+    margin: 0 0 0.5rem 0;
+  }
+
+  .topup-description {
+    color: #525252;
+    font-size: 0.875rem;
+    margin: 0 0 1.5rem 0;
+  }
+
+  .topup-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .amount-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .amount-input-group label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #171717;
+  }
+
+  .amount-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .amount-btn {
+    width: 40px;
+    height: 40px;
+    border: 1px solid #E5E5E5;
+    background: #FFFFFF;
+    border-radius: 0.5rem;
+    font-size: 1.25rem;
+    color: #171717;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .amount-btn:hover:not(:disabled) {
+    background: #F5F5F5;
+  }
+
+  .amount-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .amount-input {
+    width: 100px;
+    height: 40px;
+    border: 1px solid #E5E5E5;
+    border-radius: 0.5rem;
+    text-align: center;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #171717;
+  }
+
+  .amount-input:focus {
+    outline: none;
+    border-color: #171717;
+  }
+
+  .amount-range {
+    font-size: 0.75rem;
+    color: #737373;
+  }
+
+  .topup-summary {
+    background: #FFFFFF;
+    border-radius: 0.5rem;
+    padding: 1rem;
+  }
+
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    font-size: 0.875rem;
+    color: #525252;
+  }
+
+  .summary-row.total {
+    border-top: 1px solid #E5E5E5;
+    margin-top: 0.5rem;
+    padding-top: 1rem;
+    font-weight: 600;
+    color: #171717;
+    font-size: 1rem;
+  }
+
+  .error-message {
+    background: #FEE2E2;
+    color: #DC2626;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+  }
+
+  .topup-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 1rem;
+    background: #171717;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .topup-btn:hover:not(:disabled) {
+    background: #404040;
+  }
+
+  .topup-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #FFFFFF;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  /* History Section */
+  .history-section h3,
+  .realms-group h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #171717;
+    margin: 0 0 1rem 0;
+  }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem;
+    color: #737373;
+    text-align: center;
+  }
+
+  .empty-state svg {
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+
+  .empty-state p {
+    margin: 0;
+    font-size: 0.875rem;
+  }
+
+  .loading-placeholder {
+    height: 100px;
+    background: #F5F5F5;
+    border-radius: 0.5rem;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  .purchase-list,
+  .realm-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .purchase-item,
+  .realm-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid #F5F5F5;
+  }
+
+  .purchase-item:last-child,
+  .realm-item:last-child {
+    border-bottom: none;
+  }
+
+  .purchase-info,
+  .realm-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .purchase-amount {
+    font-weight: 600;
+    color: #059669;
+  }
+
+  .purchase-date,
+  .realm-id {
+    font-size: 0.75rem;
+    color: #737373;
+    font-family: monospace;
+  }
+
+  .purchase-price {
+    font-weight: 500;
+    color: #171717;
+  }
+
+  .realm-name {
+    font-weight: 500;
+    color: #171717;
+  }
+
+  .role-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .role-badge.owner {
+    background: #DBEAFE;
+    color: #1D4ED8;
+  }
+
+  .role-badge.member {
+    background: #D1FAE5;
+    color: #059669;
+  }
+
+  /* Realms Section */
+  .realms-group {
+    margin-bottom: 2rem;
+  }
+
+  .realms-group:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .dashboard-page {
+      padding: 1rem;
+    }
+
+    .dashboard-header h1 {
+      font-size: 1.5rem;
+    }
+
+    .balance-value {
+      font-size: 2.5rem;
+    }
+
+    .tab-content {
+      padding: 1rem;
+    }
+
+    .topup-section {
+      padding: 1rem;
+    }
+  }
+</style>
