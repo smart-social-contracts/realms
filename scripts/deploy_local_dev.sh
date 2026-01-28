@@ -247,6 +247,9 @@ deploy_registry() {
         echo -e "${YELLOW}🧹 Cleaning build cache...${NC}"
         rm -rf "$registry_dir/src/realm_registry_frontend/.svelte-kit"
         rm -rf "$registry_dir/src/realm_registry_frontend/node_modules/.vite"
+        rm -rf "$registry_dir/src/realm_registry_frontend/dist"
+        echo -e "${GREEN}🔨 Building registry frontend...${NC}"
+        (cd "$registry_dir/src/realm_registry_frontend" && npm run build)
     fi
     
     if [ "$DEPLOY_FRONTEND" = true ]; then
