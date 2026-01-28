@@ -16,6 +16,9 @@ from ..utils import (
     run_command_with_progress,
     display_canister_urls_json,
     DeploymentProgress,
+    set_current_realm,
+    set_current_realm_folder,
+    set_current_network,
 )
 
 console = Console()
@@ -114,6 +117,15 @@ def _deploy_realm_internal(
         _run_deployment_with_progress(scripts, scripts_dir, folder_path, network, mode, env, logger, log_dir)
     
     display_canister_urls_json(folder_path, network, "Realm Deployment Summary")
+    
+    # Update context to point to the deployed realm
+    realm_name = folder_path.name
+    relative_folder = str(folder_path.relative_to(Path.cwd())) if folder_path.is_relative_to(Path.cwd()) else str(folder_path)
+    set_current_realm_folder(relative_folder)
+    set_current_realm(realm_name)
+    set_current_network(network)
+    console.print(f"[dim]📍 Context set to: {realm_name} ({network})[/dim]")
+    logger.info(f"Set context to realm: {realm_name} on {network}")
 
 
 def _run_deployment_plain(

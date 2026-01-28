@@ -1022,7 +1022,13 @@ def realm_status(
         import subprocess
         from pathlib import Path
 
-        project_root = get_project_root()
+        # Use effective cwd which respects realm folder context
+        effective_cwd = get_effective_cwd()
+        if effective_cwd:
+            project_root = Path(effective_cwd)
+            console.print(f"[dim]Realm folder: {project_root}[/dim]\n")
+        else:
+            project_root = get_project_root()
         
         # Initialize variables for local network
         local_port = "8000"  # Default port
@@ -1062,7 +1068,8 @@ def realm_status(
                         capture_output=True,
                         text=True,
                         check=True,
-                        timeout=5
+                        timeout=5,
+                        cwd=str(project_root)
                     )
                     canister_id = result.stdout.strip()
                     canister_ids[canister_name] = {"local": canister_id}
@@ -1078,7 +1085,8 @@ def realm_status(
                     capture_output=True,
                     text=True,
                     check=True,
-                    timeout=5
+                    timeout=5,
+                    cwd=str(project_root)
                 )
                 candid_ui_id = result.stdout.strip()
             except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
