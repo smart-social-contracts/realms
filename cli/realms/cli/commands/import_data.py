@@ -2,6 +2,7 @@
 
 import base64
 import json
+import math
 import tempfile
 from pathlib import Path
 from typing import Optional
@@ -66,11 +67,14 @@ def import_data_command(
 
         project_root = get_project_root()
 
+        # Calculate the total number of chunks using ceiling division
+        total_chunks = math.ceil(len(data) / batch_size)
+
         for i in range(0, len(data), batch_size):
             chunk = data[i : i + batch_size]
 
             console.print(
-                f"📊 Sending chunk {i // batch_size + 1}/{len(data) // batch_size}"
+                f"📊 Sending chunk {i // batch_size + 1}/{total_chunks}"
             )
 
             args = {
