@@ -2,6 +2,7 @@
 
 import base64
 import json
+import math
 import tempfile
 from pathlib import Path
 from typing import Optional
@@ -34,11 +35,16 @@ def import_data_command(
 
     # Handle codex files separately
     if entity_type == "codex":
-        return import_codex_command(file_path, dry_run=dry_run, network=network, identity=identity, canister=canister, folder=folder)
+        return import_codex_command(
+            file_path,
+            dry_run=dry_run,
+            network=network,
+            identity=identity,
+            canister=canister,
+            folder=folder,
+        )
 
-    console.print(
-        f"[bold blue]📥 Importing data from {file_path}[/bold blue]\n"
-    )
+    console.print(f"[bold blue]📥 Importing data from {file_path}[/bold blue]\n")
 
     try:
         data_file = Path(file_path)
@@ -66,12 +72,13 @@ def import_data_command(
 
         project_root = get_project_root()
 
+        # Calculate the total number of chunks using ceiling division
+        total_chunks = math.ceil(len(data) / batch_size)
+
         for i in range(0, len(data), batch_size):
             chunk = data[i : i + batch_size]
 
-            console.print(
-                f"📊 Sending chunk {i // batch_size + 1}/{len(data) // batch_size}"
-            )
+            console.print(f"📊 Sending chunk {i // batch_size + 1}/{total_chunks}")
 
             args = {
                 "format": format,
@@ -94,10 +101,10 @@ def import_data_command(
                 "--output",
                 "json",
             ]
-            
+
             if identity:
                 cmd.extend(["--identity", identity])
-            
+
             # Run from realm folder so dfx can find .dfx/local/canister_ids.json
             effective_cwd = get_effective_cwd(folder)
             result = run_command(
@@ -109,21 +116,26 @@ def import_data_command(
             # Parse the dfx response to check for backend errors
             if result and result.stdout:
                 # Check for success in response (handle both JSON double quotes and Python single quotes)
-                if '"success": true' in result.stdout.lower() or "'success': True" in result.stdout:
+                if (
+                    '"success": true' in result.stdout.lower()
+                    or "'success': True" in result.stdout
+                ):
                     display_success_panel("Import Chunk Complete! 🎉", result.stdout)
                 else:
                     display_error_panel("Backend Import Chunk Failed", result.stdout)
                     raise typer.Exit(1)
-     
+
             elif result and result.stderr:
                 # dfx command had stderr output
                 display_error_panel("Backend Import Chunk Failed", result.stderr)
                 raise typer.Exit(1)
             else:
                 # dfx command failed completely
-                display_error_panel("Backend Import Data Failed", "dfx command failed with no output")
+                display_error_panel(
+                    "Backend Import Data Failed", "dfx command failed with no output"
+                )
                 raise typer.Exit(1)
-                
+
         display_success_panel(
             "Import Data Complete! 🎉",
             f"Successfully imported {len(data)} records from {file_path}",
@@ -174,17 +186,11 @@ def import_codex_command(
             return
 
         project_root = get_project_root()
-        base64_content = 'base64:' + base64.b64encode(codex_content.encode()).decode()
+        base64_content = "base64:" + base64.b64encode(codex_content.encode()).decode()
 
         args = {
             "format": "json",
-            "data": [
-                {
-                    "_type": "Codex",
-                    "name": codex_name,
-                    "code": base64_content
-                }
-            ]
+            "data": [{"_type": "Codex", "name": codex_name, "code": base64_content}],
         }
 
         args_json = json.dumps(args)
@@ -200,10 +206,10 @@ def import_codex_command(
             "--network",
             network,
         ]
-        
+
         if identity:
             cmd.extend(["--identity", identity])
-        
+
         # Run from realm folder so dfx can find .dfx/local/canister_ids.json
         effective_cwd = get_effective_cwd(folder)
         result = run_command(
