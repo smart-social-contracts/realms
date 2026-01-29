@@ -205,6 +205,12 @@ deploy_single_realm() {
         fi
     fi
     
+    if [ "$DEPLOY_FRONTEND" = true ]; then
+        # Set canister config BEFORE build so it gets baked into the bundle
+        echo -e "${GREEN}🔧 Setting canister config...${NC}"
+        (cd "$SINGLE_REALM_PATH" && python3 "$REPO_ROOT/scripts/set_canister_config.py" local)
+    fi
+    
     if [ "$CLEAN_BUILD" = true ] && [ "$DEPLOY_FRONTEND" = true ]; then
         echo -e "${YELLOW}🧹 Cleaning build cache...${NC}"
         rm -rf "$SINGLE_REALM_PATH/src/realm_frontend/.svelte-kit"
@@ -215,7 +221,7 @@ deploy_single_realm() {
     fi
     
     if [ "$DEPLOY_FRONTEND" = true ]; then
-        echo -e "${GREEN}🚀 Deploying frontend...${NC}"
+        echo -e "${GREEN}� Deploying frontend...${NC}"
         (cd "$SINGLE_REALM_PATH" && dfx deploy realm_frontend)
     fi
     

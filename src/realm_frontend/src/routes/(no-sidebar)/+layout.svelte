@@ -10,7 +10,7 @@
 >
 	<Navbar />
 </header>
-	<div class="w-full pt-[70px]">
+<div class="w-full">
 	<slot />
 	<Footer />
 </div>

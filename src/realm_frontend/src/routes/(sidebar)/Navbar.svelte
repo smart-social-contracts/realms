@@ -2,11 +2,9 @@
 	import Notifications from '../utils/dashboard/NotificationList.svelte';
 	import AppsMenu from '../utils/widgets/AppsMenu.svelte';
 	import UserMenu from '../utils/widgets/UserMenu.svelte';
-	import T from '$lib/components/T.svelte';
-	import { _ } from 'svelte-i18n';
+		import { _ } from 'svelte-i18n';
 	import { isAuthenticated } from '$lib/stores/auth';
-	import { hasJoined, profilesLoading } from '$lib/stores/profiles';
-	import { realmInfo, realmLogo, realmName } from '$lib/stores/realmInfo';
+		import { realmInfo, realmLogo, realmName } from '$lib/stores/realmInfo';
 	import { onMount } from 'svelte';
 	import {
 		DarkMode,
@@ -18,7 +16,6 @@
 		NavUl,
 		Navbar,
 		Search,
-		Button
 	} from 'flowbite-svelte';
 	import { ChevronDownOutline } from 'flowbite-svelte-icons';
 	import '../../app.pcss';
@@ -77,17 +74,6 @@
 	<div class="ms-auto flex items-center text-gray-500 dark:text-gray-400 sm:order-2">
 		<!-- <AppsMenu /> -->
 		<!-- <DarkMode /> -->
-		{#if $isAuthenticated && $profilesLoading}
-			<!-- Show a loading spinner while profile data is loading -->
-			<div class="flex items-center me-2" role="status">
-				<div class="animate-spin h-4 w-4 border-2 border-gray-300 rounded-full border-t-blue-600 mr-2"></div>
-				<span class="sr-only">Loading...</span>
-			</div>
-		{:else if $isAuthenticated && !hasJoined()}
-			<Button class="me-2" color="alternative" href="/join" pill={true}>
-				<T key="buttons.join" default_text="Join" />
-			</Button>
-		{/if}
 		<UserMenu {...Users[4]} />
 	</div>
 </Navbar>
