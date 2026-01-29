@@ -24,6 +24,13 @@
   let topUpLoading = false;
   let topUpError = null;
 
+  // Voucher state
+  let voucherCode = '';
+  let voucherLoading = false;
+  let voucherError = null;
+  let voucherSuccess = null;
+  let redeemedVouchers = [];
+
   // Billing service URL - should be configured per environment
   const BILLING_SERVICE_URL = CONFIG.billing_service_url || 'http://localhost:8001';
 
@@ -43,7 +50,7 @@
       loading = false;
       
       // Load user data
-      await Promise.all([loadCredits(), loadRealms()]);
+      await Promise.all([loadCredits(), loadRealms(), loadVouchers()]);
     }
   });
 
@@ -72,6 +79,58 @@
       console.error('Failed to load realms:', err);
     } finally {
       loadingRealms = false;
+    }
+  }
+
+  async function loadVouchers() {
+    if (!userPrincipal) return;
+    try {
+      const response = await fetch(`${BILLING_SERVICE_URL}/voucher/redemptions/${userPrincipal.toText()}`);
+      if (response.ok) {
+        redeemedVouchers = await response.json();
+      }
+    } catch (err) {
+      console.error('Failed to load vouchers:', err);
+    }
+  }
+
+  async function handleRedeemVoucher() {
+    if (!userPrincipal || !voucherCode.trim()) return;
+    
+    voucherLoading = true;
+    voucherError = null;
+    voucherSuccess = null;
+    
+    try {
+      const response = await fetch(`${BILLING_SERVICE_URL}/voucher/redeem`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          principal_id: userPrincipal.toText(),
+          code: voucherCode.trim(),
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok || !data.success) {
+        voucherError = data.message || data.detail || 'Failed to redeem voucher';
+        return;
+      }
+      
+      voucherSuccess = data.message;
+      voucherCode = '';
+      
+      // Reload credits and vouchers
+      await Promise.all([loadCredits(), loadVouchers()]);
+      
+    } catch (err) {
+      console.error('Voucher redemption failed:', err);
+      voucherError = 'Failed to redeem voucher. Please try again.';
+    } finally {
+      voucherLoading = false;
     }
   }
 
@@ -189,10 +248,57 @@
               <div class="balance-unit">{$_('dashboard.credits_unit')}</div>
             </div>
 
+            <!-- Voucher Redemption Section -->
+            <div class="voucher-section">
+              <h3>Redeem Voucher</h3>
+              <p class="voucher-description">Have a voucher code? Enter it below to redeem credits.</p>
+              
+              <div class="voucher-form">
+                <div class="voucher-input-group">
+                  <input 
+                    type="text" 
+                    bind:value={voucherCode}
+                    placeholder="Enter voucher code"
+                    class="voucher-input"
+                    class:error={voucherError}
+                    disabled={voucherLoading}
+                  />
+                  <button 
+                    class="voucher-btn"
+                    on:click={handleRedeemVoucher}
+                    disabled={voucherLoading || !voucherCode.trim()}
+                  >
+                    {#if voucherLoading}
+                      <div class="btn-spinner"></div>
+                    {:else}
+                      Redeem
+                    {/if}
+                  </button>
+                </div>
+                
+                {#if voucherError}
+                  <div class="error-message">{voucherError}</div>
+                {/if}
+                
+                {#if voucherSuccess}
+                  <div class="success-message">{voucherSuccess}</div>
+                {/if}
+              </div>
+            </div>
+
             <!-- Top-up Section -->
             <div class="topup-section">
               <h3>{$_('dashboard.topup_title')}</h3>
-              <p class="topup-description">{$_('dashboard.topup_description')}</p>
+              <p class="topup-description">
+                {$_('dashboard.topup_description')}
+                <a href="/faq" class="help-link" title="Learn more about credits" aria-label="Learn more about credits">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                  </svg>
+                </a>
+              </p>
               
               <div class="topup-form">
                 <div class="amount-input-group">
@@ -254,12 +360,32 @@
               </div>
             </div>
 
+            <!-- Redeemed Vouchers -->
+            {#if redeemedVouchers.length > 0}
+              <div class="history-section">
+                <h3>Redeemed Vouchers</h3>
+                <ul class="purchase-list">
+                  {#each redeemedVouchers as voucher}
+                    <li class="purchase-item">
+                      <div class="purchase-info">
+                        <span class="purchase-amount">+{voucher.credits} {$_('dashboard.credits_unit')}</span>
+                        <span class="purchase-date">Code: {voucher.code}</span>
+                      </div>
+                      <span class="voucher-badge" class:active={voucher.status === 'active'}>
+                        {voucher.status === 'active' ? 'Active' : 'Used'}
+                      </span>
+                    </li>
+                  {/each}
+                </ul>
+              </div>
+            {/if}
+
             <!-- Purchase History -->
             <div class="history-section">
               <h3>{$_('dashboard.purchase_history')}</h3>
               {#if loadingCredits}
                 <div class="loading-placeholder"></div>
-              {:else if purchases.length === 0}
+              {:else if purchases.length === 0 && redeemedVouchers.length === 0}
                 <div class="empty-state">
                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
                     <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
@@ -268,7 +394,7 @@
                   </svg>
                   <p>{$_('dashboard.no_purchases')}</p>
                 </div>
-              {:else}
+              {:else if purchases.length > 0}
                 <ul class="purchase-list">
                   {#each purchases as purchase}
                     <li class="purchase-item">
@@ -280,6 +406,8 @@
                     </li>
                   {/each}
                 </ul>
+              {:else}
+                <p class="no-purchases-note">No card purchases yet</p>
               {/if}
             </div>
           </div>
@@ -529,6 +657,20 @@
     color: #525252;
     font-size: 0.875rem;
     margin: 0 0 1.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .help-link {
+    display: inline-flex;
+    align-items: center;
+    color: #737373;
+    transition: color 0.15s ease;
+  }
+
+  .help-link:hover {
+    color: #171717;
   }
 
   .topup-form {
@@ -626,6 +768,119 @@
     padding: 0.75rem 1rem;
     border-radius: 0.5rem;
     font-size: 0.875rem;
+  }
+
+  .success-message {
+    background: #D1FAE5;
+    color: #059669;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+  }
+
+  /* Voucher Section */
+  .voucher-section {
+    background: #F0FDF4;
+    border: 1px solid #BBF7D0;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .voucher-section h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #171717;
+    margin: 0 0 0.5rem 0;
+  }
+
+  .voucher-description {
+    color: #525252;
+    font-size: 0.875rem;
+    margin: 0 0 1rem 0;
+  }
+
+  .voucher-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .voucher-input-group {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .voucher-input {
+    flex: 1;
+    height: 44px;
+    border: 1px solid #E5E5E5;
+    border-radius: 0.5rem;
+    padding: 0 1rem;
+    font-size: 1rem;
+    text-transform: uppercase;
+    background: #FFFFFF;
+  }
+
+  .voucher-input:focus {
+    outline: none;
+    border-color: #22C55E;
+  }
+
+  .voucher-input.error {
+    border-color: #DC2626;
+  }
+
+  .voucher-input:disabled {
+    background: #F5F5F5;
+  }
+
+  .voucher-btn {
+    height: 44px;
+    padding: 0 1.5rem;
+    background: #22C55E;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 100px;
+  }
+
+  .voucher-btn:hover:not(:disabled) {
+    background: #16A34A;
+  }
+
+  .voucher-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .voucher-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background: #F5F5F5;
+    color: #737373;
+  }
+
+  .voucher-badge.active {
+    background: #D1FAE5;
+    color: #059669;
+  }
+
+  .no-purchases-note {
+    color: #737373;
+    font-size: 0.875rem;
+    text-align: center;
+    padding: 1rem;
+    margin: 0;
   }
 
   .topup-btn {

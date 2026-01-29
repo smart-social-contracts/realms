@@ -73,7 +73,7 @@
     "role_owner": "Owner",
     "role_member": "Member",
     "topup_title": "Top Up Credits",
-    "topup_description": "1 credit = $1 USD. Credits can be used to deploy realms.",
+    "topup_description": "1 credit = $1 USD. Credits are used to access platform services.",
     "topup_amount": "Amount",
     "topup_credits": "Credits",
     "topup_total": "Total",

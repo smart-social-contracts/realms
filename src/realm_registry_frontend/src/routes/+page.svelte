@@ -694,37 +694,41 @@
       <img src="/images/logo_horizontal.svg" alt="Realms Logo" class="header-logo" />
     </div>
     
-    <!-- Auth Button -->
-    <div class="auth-section">
-      {#if authLoading}
-        <div class="auth-loading"></div>
-      {:else if isLoggedIn}
-        <div class="user-menu">
-          <a href="/my-dashboard" class="user-principal-btn" title={userPrincipal?.toText()}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <!-- Auth & Language Section (grouped for alignment) -->
+    <div class="header-controls">
+      <!-- Auth Button -->
+      <div class="auth-section">
+        {#if authLoading}
+          <div class="auth-loading"></div>
+        {:else if isLoggedIn}
+          <div class="user-menu">
+            <a href="/my-dashboard" class="user-principal-btn" title={userPrincipal?.toText()}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+              {userPrincipal?.toText().slice(0, 5)}...{userPrincipal?.toText().slice(-3)}
+            </a>
+            <button class="icon-btn logout-btn" on:click={handleLogout} title={$_('auth.logout')} aria-label={$_('auth.logout')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+            </button>
+          </div>
+        {:else}
+          <button class="icon-btn login-btn" on:click={handleLogin} title={$_('auth.login')} aria-label={$_('auth.login')}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
               <circle cx="12" cy="7" r="4"></circle>
             </svg>
-            {userPrincipal?.toText().slice(0, 5)}...{userPrincipal?.toText().slice(-3)}
-          </a>
-          <button class="btn btn-secondary btn-sm" on:click={handleLogout}>
-            {$_('auth.logout')}
           </button>
-        </div>
-      {:else}
-        <button class="btn btn-primary btn-sm login-btn" on:click={handleLogin}>
-          <svg class="login-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
-            <polyline points="10 17 15 12 10 7"></polyline>
-            <line x1="15" y1="12" x2="3" y2="12"></line>
-          </svg>
-          <span class="login-text">{$_('auth.login')}</span>
-        </button>
-      {/if}
-    </div>
-    
-    <!-- Language Selector -->
-    <div class="language-selector">
+        {/if}
+      </div>
+      
+      <!-- Language Selector -->
+      <div class="language-selector">
       <button 
         class="language-btn"
         on:click={() => showLanguageMenu = !showLanguageMenu}
@@ -754,6 +758,7 @@
           {/each}
         </div>
       {/if}
+      </div>
     </div>
   </header>
 
@@ -808,12 +813,9 @@
       </button>
     </div>
     
-    <button 
-      class="btn btn-primary add-btn"
-      on:click={() => showCreateModal = true}
-    >
+    <a href="/create-realm" class="btn btn-primary add-btn">
       {$_('controls.create_realm')}
-    </button>
+    </a>
   </div>
 
   {#if showCreateModal}
@@ -1086,11 +1088,18 @@
     width: auto;
   }
 
-  /* Auth Section */
-  .auth-section {
+  /* Header Controls (Auth + Language grouped) */
+  .header-controls {
     position: absolute;
     top: 0;
-    right: 160px;
+    right: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  /* Auth Section */
+  .auth-section {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -1141,21 +1150,48 @@
     animation: spin 1s linear infinite;
   }
 
-  .login-btn {
+  /* Icon buttons for login/logout */
+  .icon-btn {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    background: #FFFFFF;
+    border: 1px solid #E5E5E5;
+    border-radius: 0.5rem;
+    color: #525252;
+    cursor: pointer;
+    transition: all 0.15s ease;
   }
 
-  .login-icon {
-    display: none;
+  .icon-btn:hover {
+    border-color: #525252;
+    color: #171717;
+    background: #FAFAFA;
+  }
+
+  .icon-btn.login-btn {
+    background: #171717;
+    border-color: #171717;
+    color: #FFFFFF;
+  }
+
+  .icon-btn.login-btn:hover {
+    background: #404040;
+    border-color: #404040;
+    color: #FFFFFF;
+  }
+
+  .icon-btn.logout-btn:hover {
+    border-color: #DC2626;
+    color: #DC2626;
   }
 
   /* Language Selector */
   .language-selector {
-    position: absolute;
-    top: 0;
-    right: 0;
+    position: relative;
   }
 
   .language-btn {
@@ -2282,26 +2318,23 @@
       padding: 1rem;
     }
 
-    .auth-section {
-      position: absolute;
+    .header-controls {
       top: 0.5rem;
-      right: 3rem;
+      right: 0.5rem;
     }
 
     .user-menu {
       flex-wrap: nowrap;
     }
 
-    .login-btn {
-      padding: 0.5rem;
+    .icon-btn {
+      width: 32px;
+      height: 32px;
     }
 
-    .login-btn .login-text {
-      display: none;
-    }
-
-    .login-btn .login-icon {
-      display: block;
+    .icon-btn svg {
+      width: 16px;
+      height: 16px;
     }
 
     .language-btn .current-locale,
@@ -2311,12 +2344,9 @@
 
     .language-btn {
       padding: 0.5rem;
-    }
-
-    .language-selector {
-      position: absolute;
-      top: 0.5rem;
-      right: 0.5rem;
+      width: 32px;
+      height: 32px;
+      justify-content: center;
     }
 
     .header {
