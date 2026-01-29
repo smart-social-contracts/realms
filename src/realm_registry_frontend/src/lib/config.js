@@ -4,7 +4,7 @@
 // Mainnet Internet Identity canister URL: https://identity.ic0.app/
 // Local Internet Identity URL format: http://<canister-id>.localhost:8000
 export const CONFIG = { 
-  internet_identity_url: 'http://lqy7q-dh777-77777-aaaaq-cai.localhost:8000',
+  internet_identity_url: 'https://identity.ic0.app/',
   billing_service_url: 'https://billing.realmsgos.dev',
 };
 
