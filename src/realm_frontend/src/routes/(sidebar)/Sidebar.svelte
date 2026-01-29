@@ -63,12 +63,43 @@
 	import { styles, cn } from '$lib/theme/utilities';
 
 	export let drawerHidden: boolean = false;
-
+	
+	let showScrollIndicator = true;
+	let sidebarContainer: HTMLElement;
+	
 	$: {
 		if ($locale) {
 			console.log('Sidebar: Current locale:', $locale);
 		}
 	}
+	
+	function checkScrollPosition() {
+		if (sidebarContainer) {
+			const { scrollTop, scrollHeight, clientHeight } = sidebarContainer;
+			showScrollIndicator = scrollTop + clientHeight < scrollHeight - 20;
+		}
+	}
+	
+	onMount(() => {
+		// Find the scrollable sidebar div after component mounts
+		setTimeout(() => {
+			const sidebar = document.querySelector('aside.fixed');
+			if (sidebar) {
+				const scrollDiv = sidebar.querySelector('.overflow-y-auto');
+				if (scrollDiv) {
+					sidebarContainer = scrollDiv as HTMLElement;
+					sidebarContainer.addEventListener('scroll', checkScrollPosition);
+					checkScrollPosition(); // Initial check
+				}
+			}
+		}, 100);
+		
+		return () => {
+			if (sidebarContainer) {
+				sidebarContainer.removeEventListener('scroll', checkScrollPosition);
+			}
+		};
+	});
 	
 	const closeDrawer = () => {
 		drawerHidden = true;
@@ -119,8 +150,7 @@
 	afterNavigate((navigation) => {
 		// this fixes https://github.com/themesberg/flowbite-svelte/issues/364
 		document.getElementById('svelte')?.scrollTo({ top: 0 });
-		closeDrawer();
-
+		// Note: Do not close drawer here - sidebar state is persisted
 		activeMainSidebar = navigation.to?.url.pathname ?? '';
 	});
 
@@ -366,20 +396,20 @@
 	afterNavigate((navigation) => {
 		// this fixes https://github.com/themesberg/flowbite-svelte/issues/364
 		document.getElementById('svelte')?.scrollTo({ top: 0 });
-		closeDrawer();
+		// Note: Do not close drawer here - state is persisted via localStorage
 	});
 </script>
 
 <Sidebar
-	class={drawerHidden ? 'hidden' : ''}
+	class=""
 	activeUrl={mainSidebarUrl}
-	activeClass="bg-gray-100 dark:bg-gray-700"
-	asideClass="fixed inset-0 z-30 flex-none h-full w-64 lg:h-auto lg:top-16 border-e border-gray-200 dark:border-gray-600 lg:overflow-y-visible lg:pt-0 {drawerHidden ? 'lg:hidden' : 'lg:block'}"
+	activeClass="bg-gray-50 dark:bg-gray-700"
+	asideClass="fixed top-0 left-0 z-40 flex-none h-screen w-64 pt-16 border-r border-gray-200 dark:border-gray-600 transition-transform duration-500 ease-in-out {drawerHidden ? '-translate-x-full' : 'translate-x-0'}"
 >
 	<h4 class="sr-only">{$_('common.main_menu')}</h4>
 	<SidebarWrapper
-		divClass={cn(styles.sidebar.container(), "overflow-y-auto h-full px-3 pb-4")}
-		asideClass="fixed top-0 left-0 z-40 w-64 h-screen pt-14 transition-transform border-r lg:translate-x-0 {styles.sidebar.container()} {drawerHidden ? '-translate-x-full' : ''}"
+		divClass={cn(styles.sidebar.container(), "overflow-y-auto h-full px-3 pb-12 scrollbar-hide overscroll-contain")}
+		asideClass=""
 	>
 			<nav class="divide-y divide-gray-200 dark:divide-gray-700">
 				<!-- Core Navigation Items -->
@@ -391,8 +421,7 @@
 								<a 
 									href={href} 
 									data-sveltekit-reload 
-									class={itemClass} 
-									on:click={closeDrawer}
+									class={itemClass}
 								>
 									<svelte:component this={icon} class={iconClass} />
 									<span class="ml-3">{translationKey ? $_(translationKey) : name}</span>
@@ -435,8 +464,7 @@
 										<a 
 											href={href} 
 											data-sveltekit-reload 
-											class={itemClass} 
-											on:click={closeDrawer}
+											class={itemClass}
 										>
 											<svelte:component this={icon} class={iconClass} />
 											<span class="ml-3">{translationKey ? $_(translationKey) : name}</span>
@@ -463,6 +491,12 @@
 				</SidebarGroup>
 			</nav>
 		</SidebarWrapper>
+	<!-- Fixed scroll indicator at bottom of sidebar -->
+	{#if showScrollIndicator}
+		<div class="absolute bottom-0 left-0 right-0 h-12 pointer-events-none bg-gradient-to-t from-white to-transparent flex items-end justify-center pb-2">
+			<span class="text-gray-400 text-lg animate-bounce">⌄</span>
+		</div>
+	{/if}
 </Sidebar>
 
 <div

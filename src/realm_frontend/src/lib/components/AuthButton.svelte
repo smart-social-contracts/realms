@@ -2,9 +2,12 @@
 <script>
 	import { login, logout, isAuthenticated as checkAuth, initializeAuthClient } from '$lib/auth';
 	import { isAuthenticated, userIdentity, principal } from '$lib/stores/auth';
-	import { loadUserProfiles, resetProfileState } from '$lib/stores/profiles';
+	import { loadUserProfiles, resetProfileState, userProfiles } from '$lib/stores/profiles';
+	import { goto } from '$app/navigation';
 	import { Avatar, Button } from 'flowbite-svelte';
 	import { onMount } from 'svelte';
+	import { slide, fade } from 'svelte/transition';
+	import { quintOut } from 'svelte/easing';
 	import { _ } from 'svelte-i18n';
 	import T from '$lib/components/T.svelte';
 	import { initBackendWithIdentity, backend } from '$lib/canisters';
@@ -90,7 +93,21 @@
 		if (profilePictureUrl && profilePictureUrl.trim()) {
 			return profilePictureUrl;
 		}
-		return `https://api.dicebear.com/9.x/identicon/svg?seed=${seed}`;
+		// Use glass style for elegant colorful gradients
+		return `https://api.dicebear.com/9.x/glass/svg?seed=${seed}`;
+	}
+	
+	// Determine user type label based on profiles
+	$: userTypeLabel = (() => {
+		if (!$userProfiles || $userProfiles.length === 0) return 'Guest';
+		if ($userProfiles.includes('admin')) return 'Admin';
+		if ($userProfiles.includes('member')) return 'Member';
+		return 'Guest';
+	})();
+	
+	function goToSettings() {
+		showDropdown = false;
+		goto('/settings');
 	}
 
 	let userProfilePictureUrl = '';
@@ -162,15 +179,27 @@
 		<!-- Dropdown Menu -->
 		{#if showDropdown}
 			<div 
-				class="absolute right-0 mt-2 w-48 z-50 bg-white rounded-lg shadow-xl border border-gray-200 dark:bg-gray-800 dark:border-gray-700" 
+				class="absolute right-0 mt-2 w-48 z-50 bg-white rounded-lg shadow-xl border border-gray-200 dark:bg-gray-800 dark:border-gray-700 origin-top-right" 
 				role="menu"
+				transition:slide={{ duration: 200, easing: quintOut }}
 			>
 				<div class="px-4 py-3">
-					<p class="text-sm text-gray-900 dark:text-white truncate">
+					<p class="text-sm text-gray-900 dark:text-white truncate font-medium">
 						{shortPrincipal}
 					</p>
+					<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+						{userTypeLabel}
+					</p>
 				</div>
-				<hr class="h-px my-2 bg-gray-200 border-0 dark:bg-gray-700">
+				<hr class="h-px bg-gray-200 border-0 dark:bg-gray-700">
+				<button 
+					class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+					role="menuitem"
+					on:click={goToSettings}
+				>
+					<T key="common.settings" default_text="Settings" />
+				</button>
+				<hr class="h-px bg-gray-200 border-0 dark:bg-gray-700">
 				<button 
 					class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
 					role="menuitem"

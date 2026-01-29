@@ -88,15 +88,8 @@
 		{/each}
 	</ul> -->
 	
-	<!-- Built on Internet Computer section -->
-	<div class="flex justify-center mb-3">
-		<a href="https://internetcomputer.org" target="_blank" rel="noopener noreferrer" class="flex items-center text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
-			<img src="/images/internet-computer-icp-logo.svg" alt="Internet Computer Logo" width="24" height="24" class="mr-2" />
-			<span class="text-sm">Built on the Internet Computer</span>
-		</a>
-	</div>
-	
-	<div class="mt-4 flex justify-center space-x-6 md:mt-0">
+	<!-- Social links -->
+	<div class="flex justify-center space-x-6">
 		{#each brands as [component, href]}
 			<a {href} class="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
 				<svelte:component this={component} size="md" />
@@ -109,5 +102,13 @@
 		<span class="text-xs text-gray-400 dark:text-gray-500">
 			Realms GOS {version} ({commitHash}) - {commitDatetime}{typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname.endsWith('.localhost')) ? ' - Local deployment' : ''}
 		</span>
+	</div>
+	
+	<!-- Built on Internet Computer section -->
+	<div class="flex justify-center mt-3">
+		<a href="https://internetcomputer.org" target="_blank" rel="noopener noreferrer" class="flex items-center text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
+			<img src="/images/internet-computer-icp-logo.svg" alt="Internet Computer Logo" width="24" height="24" class="mr-2" />
+			<span class="text-sm">Built on the Internet Computer</span>
+		</a>
 	</div>
 </Frame>

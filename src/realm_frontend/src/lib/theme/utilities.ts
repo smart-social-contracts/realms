@@ -244,12 +244,15 @@ export const sidebarStyles = {
     p-[var(--spacing-sm)] 
     text-[var(--font-size-base)] 
     text-[var(--color-text-primary)] 
-    transition-[var(--transition-fast)] 
+    transition-colors
+    duration-200
+    ease-out
     rounded-[var(--border-radius-lg)] 
-    hover:bg-[var(--color-bg-secondary)] 
+    hover:bg-gray-200
+    hover:text-gray-900
     group 
     dark:text-[var(--color-gray-200)] 
-    dark:hover:bg-[var(--color-gray-700)]
+    dark:hover:bg-[var(--color-gray-600)]
   `,
   
   itemActive: () => `

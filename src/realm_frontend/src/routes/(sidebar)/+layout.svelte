@@ -8,8 +8,23 @@
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 	
-	// Set drawerHidden to true by default for desktop screens
+	const SIDEBAR_STATE_KEY = 'realm_sidebar_state';
+	
+	// Set drawerHidden to true by default
 	let drawerHidden = true;
+	let initialized = false;
+	
+	// Save sidebar state to localStorage
+	function saveSidebarState(hidden) {
+		if (browser && initialized) {
+			localStorage.setItem(SIDEBAR_STATE_KEY, JSON.stringify(hidden));
+		}
+	}
+	
+	// Watch for changes to drawerHidden and save (only after initialization)
+	$: if (browser && initialized) {
+		saveSidebarState(drawerHidden);
+	}
 
 	onMount(() => {
 		if (browser) {
@@ -18,19 +33,30 @@
 			// Force light mode
 			document.documentElement.classList.add('light');
 			
-			// Set initial drawer state based on screen size
-			const updateDrawerState = () => {
-				drawerHidden = window.innerWidth < 1024; // true if mobile, false if desktop
+			// Load saved state or use screen size default
+			const saved = localStorage.getItem(SIDEBAR_STATE_KEY);
+			if (saved !== null) {
+				drawerHidden = JSON.parse(saved);
+			} else {
+				// Default: visible on desktop, hidden on mobile
+				drawerHidden = window.innerWidth < 1024;
+			}
+			
+			// Mark as initialized so we start saving changes
+			initialized = true;
+			
+			// Only update on resize for mobile breakpoint changes
+			const handleResize = () => {
+				// On mobile, always hide sidebar
+				if (window.innerWidth < 1024) {
+					drawerHidden = true;
+				}
 			};
 			
-			// Initialize drawer state
-			updateDrawerState();
-			
-			// Update drawer state on resize
-			window.addEventListener('resize', updateDrawerState);
+			window.addEventListener('resize', handleResize);
 			
 			return () => {
-				window.removeEventListener('resize', updateDrawerState);
+				window.removeEventListener('resize', handleResize);
 			};
 		}
 	});
@@ -39,16 +65,16 @@
 </script>
 
 <header
-	class="sticky top-0 z-30 mx-auto w-full flex-none border-b border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800"
+	class="sticky top-0 z-50 mx-auto w-full flex-none border-b border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800"
 >
 	<Navbar bind:drawerHidden />
 </header>
-<div class="overflow-hidden lg:flex">
+<div class="min-h-screen lg:flex">
 	<!-- Sidebar -->
 	<Sidebar bind:drawerHidden />
 
 	<!-- Main Content -->
-	<div class="relative h-full w-full overflow-y-auto bg-white {drawerHidden ? '' : 'lg:ml-64'} lg:pl-6">
+	<div class="relative h-full w-full overflow-x-hidden bg-white transition-[margin] duration-500 ease-in-out {drawerHidden ? '' : 'lg:ml-64'} lg:pl-6">
 		<!-- Demo Banner -->
 		<div class="px-4 lg:px-0">
 			<DemoBanner />

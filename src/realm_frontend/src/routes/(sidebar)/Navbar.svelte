@@ -32,48 +32,30 @@
 </script>
 
 <Navbar {fluid} class="text-black relative z-50" color="default" let:NavContainer style="pointer-events: auto;">
+	<!-- Left: Hamburger -->
 	<NavHamburger
 		onClick={() => (drawerHidden = !drawerHidden)}
-		class="m-0 me-3 md:block"
+		class="m-0 md:block p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200"
 	/>
-	<NavBrand href="/" class="{list ? 'w-40' : 'lg:w-60'} relative z-40 cursor-pointer">
-		<img
-			src={$realmLogo || "/images/logo_horizontal.svg"}
-			class="h-8 sm:h-10 pointer-events-none"
-			alt={$realmName || "Realms Logo"}
-		/>
-		<span
-			class="ml-2 self-center whitespace-nowrap text-xl font-semibold dark:text-white sm:text-2xl pointer-events-none"
-		>
-			{$realmName || ''}
-		</span>
-	</NavBrand>
-	<div class="hidden lg:block lg:ps-3">
-		{#if list}
-			<NavUl class="ml-2" activeUrl="/" activeClass="text-primary-600 dark:text-primary-500">
-				<NavLi href="/">Home</NavLi>
-				<NavLi href="#top">Messages</NavLi>
-				<NavLi href="#top">Profile</NavLi>
-				<NavLi href="#top">Settings</NavLi>
-				<NavLi class="cursor-pointer">
-					Dropdown
-					<ChevronDownOutline  class="ms-0 inline" />
-				</NavLi>
-				<Dropdown class="z-20 w-44">
-					<DropdownItem href="#top">Item 1</DropdownItem>
-					<DropdownItem href="#top">Item 2</DropdownItem>
-					<DropdownItem href="#top">Item 3</DropdownItem>
-				</Dropdown>
-			</NavUl>
-		{:else}
-			<!-- <form>
-				<Search size="md" class="mt-1 w-96 border focus:outline-none" />
-			</form> -->
-		{/if}
+	
+	<!-- Center: Logo and Name (absolutely positioned) -->
+	<div class="absolute left-1/2 transform -translate-x-1/2">
+		<a href="/" class="flex items-center cursor-pointer">
+			<img
+				src={$realmLogo || "/images/logo_horizontal.svg"}
+				class="h-8 sm:h-10 pointer-events-none"
+				alt={$realmName || "Realms Logo"}
+			/>
+			<span
+				class="ml-3 self-center whitespace-nowrap text-xl font-medium text-gray-700 dark:text-white sm:text-2xl pointer-events-none"
+			>
+				{$realmName || ''}
+			</span>
+		</a>
 	</div>
-	<div class="ms-auto flex items-center text-gray-500 dark:text-gray-400 sm:order-2">
-		<!-- <AppsMenu /> -->
-		<!-- <DarkMode /> -->
+	
+	<!-- Right: User Menu -->
+	<div class="ms-auto flex items-center text-gray-500 dark:text-gray-400">
 		<UserMenu {...Users[4]} />
 	</div>
 </Navbar>
