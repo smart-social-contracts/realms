@@ -16,6 +16,10 @@ from .commands.import_data import import_codex_command, import_data_command
 from .commands.mundus import mundus_create_command, mundus_deploy_command, mundus_status_command
 from .commands.ps import ps_kill_command, ps_logs_command, ps_ls_command, ps_start_command
 from .commands.registry import (
+    billing_add_credits_command,
+    billing_balance_command,
+    billing_deduct_credits_command,
+    billing_status_command,
     registry_add_command,
     registry_count_command,
     registry_create_command,
@@ -608,8 +612,16 @@ def realm_extension(
 registry_app = typer.Typer(name="registry", help="Realm registry operations")
 app.add_typer(registry_app, name="registry")
 
+# Create registry realm subgroup
+registry_realm_app = typer.Typer(name="realm", help="Manage realms in registry")
+registry_app.add_typer(registry_realm_app, name="realm")
 
-@registry_app.command("add")
+# Create registry billing subgroup
+registry_billing_app = typer.Typer(name="billing", help="Manage credits and billing")
+registry_app.add_typer(registry_billing_app, name="billing")
+
+
+@registry_realm_app.command("add")
 def registry_add(
     realm_id: str = typer.Option(..., "--realm-id", help="Unique realm identifier"),
     realm_name: str = typer.Option(..., "--realm-name", help="Human-readable realm name"),
@@ -725,7 +737,7 @@ def registry_add(
         raise typer.Exit(1)
 
 
-@registry_app.command("list")
+@registry_realm_app.command("list")
 def registry_list(
     network: str = typer.Option("local", "--network", "-n", help="Network to use"),
     canister_id: Optional[str] = typer.Option(
@@ -736,7 +748,7 @@ def registry_list(
     registry_list_command(network, canister_id)
 
 
-@registry_app.command("get")
+@registry_realm_app.command("get")
 def registry_get(
     realm_id: str = typer.Option(..., "--id", help="Realm ID to retrieve"),
     network: str = typer.Option("local", "--network", "-n", help="Network to use"),
@@ -748,7 +760,7 @@ def registry_get(
     registry_get_command(realm_id, network, canister_id)
 
 
-@registry_app.command("remove")
+@registry_realm_app.command("remove")
 def registry_remove(
     realm_id: str = typer.Option(..., "--id", help="Realm ID to remove"),
     network: str = typer.Option("local", "--network", "-n", help="Network to use"),
@@ -760,7 +772,7 @@ def registry_remove(
     registry_remove_command(realm_id, network, canister_id)
 
 
-@registry_app.command("search")
+@registry_realm_app.command("search")
 def registry_search(
     query: str = typer.Option(..., "--query", help="Search query"),
     network: str = typer.Option("local", "--network", "-n", help="Network to use"),
@@ -772,7 +784,7 @@ def registry_search(
     registry_search_command(query, network, canister_id)
 
 
-@registry_app.command("count")
+@registry_realm_app.command("count")
 def registry_count(
     network: str = typer.Option("local", "--network", "-n", help="Network to use"),
     canister_id: Optional[str] = typer.Option(
@@ -813,6 +825,60 @@ def registry_status(
 ) -> None:
     """Get the status of the registry backend canister."""
     registry_status_command(network, canister_id)
+
+
+# ============== Billing Commands ==============
+
+@registry_billing_app.command("balance")
+def billing_balance(
+    principal_id: str = typer.Option(..., "--principal", "-p", help="User principal ID"),
+    network: str = typer.Option("local", "--network", "-n", help="Network to use"),
+    canister_id: Optional[str] = typer.Option(
+        None, "--canister-id", help="Registry canister ID"
+    ),
+) -> None:
+    """Get a user's credit balance."""
+    billing_balance_command(principal_id, network, canister_id)
+
+
+@registry_billing_app.command("add_credits")
+def billing_add_credits(
+    principal_id: str = typer.Option(..., "--principal", "-p", help="User principal ID"),
+    amount: int = typer.Option(..., "--amount", "-a", help="Amount of credits to add"),
+    stripe_session_id: str = typer.Option("", "--stripe-session", help="Stripe session ID"),
+    description: str = typer.Option("Manual top-up", "--description", "-d", help="Transaction description"),
+    network: str = typer.Option("local", "--network", "-n", help="Network to use"),
+    canister_id: Optional[str] = typer.Option(
+        None, "--canister-id", help="Registry canister ID"
+    ),
+) -> None:
+    """Add credits to a user's balance."""
+    billing_add_credits_command(principal_id, amount, stripe_session_id, description, network, canister_id)
+
+
+@registry_billing_app.command("deduct_credits")
+def billing_deduct_credits(
+    principal_id: str = typer.Option(..., "--principal", "-p", help="User principal ID"),
+    amount: int = typer.Option(..., "--amount", "-a", help="Amount of credits to deduct"),
+    description: str = typer.Option("Manual deduction", "--description", "-d", help="Transaction description"),
+    network: str = typer.Option("local", "--network", "-n", help="Network to use"),
+    canister_id: Optional[str] = typer.Option(
+        None, "--canister-id", help="Registry canister ID"
+    ),
+) -> None:
+    """Deduct credits from a user's balance."""
+    billing_deduct_credits_command(principal_id, amount, description, network, canister_id)
+
+
+@registry_billing_app.command("status")
+def billing_status(
+    network: str = typer.Option("local", "--network", "-n", help="Network to use"),
+    canister_id: Optional[str] = typer.Option(
+        None, "--canister-id", help="Registry canister ID"
+    ),
+) -> None:
+    """Get overall billing status across all users."""
+    billing_status_command(network, canister_id)
 
 
 # Realm context management commands

@@ -5,6 +5,7 @@ from typing import Optional
 from api.credits import (
     add_user_credits,
     deduct_user_credits,
+    get_billing_status,
     get_user_credits,
     get_user_transactions,
 )
@@ -21,8 +22,10 @@ from api.status import get_status
 from core.candid_types_registry import (
     AddCreditsResult,
     AddRealmResult,
+    BillingStatusRecord,
     CreditTransactionRecord,
     DeductCreditsResult,
+    GetBillingStatusResult,
     GetCreditsResult,
     GetRealmResult,
     GetStatusResult,
@@ -302,4 +305,26 @@ def get_transactions(principal_id: text, limit: nat64 = nat64(50)) -> Transactio
             return {"Err": result["error"]}
     except Exception as e:
         logger.error(f"Error in get_transactions: {str(e)}")
+        return {"Err": f"Internal error: {str(e)}"}
+
+
+@query
+def billing_status() -> GetBillingStatusResult:
+    """Get overall billing status across all users"""
+    try:
+        result = get_billing_status()
+        if result["success"]:
+            billing = result["billing"]
+            return {
+                "Ok": BillingStatusRecord(
+                    users_count=nat64(billing["users_count"]),
+                    total_balance=nat64(billing["total_balance"]),
+                    total_purchased=nat64(billing["total_purchased"]),
+                    total_spent=nat64(billing["total_spent"]),
+                )
+            }
+        else:
+            return {"Err": result["error"]}
+    except Exception as e:
+        logger.error(f"Error in billing_status: {str(e)}")
         return {"Err": f"Internal error: {str(e)}"}

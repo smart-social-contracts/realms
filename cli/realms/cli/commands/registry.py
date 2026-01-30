@@ -557,3 +557,169 @@ def registry_deploy_command(
         console.print(f"[yellow]   Check {log_dir}/realms.log for details[/yellow]")
         logger.error(f"Deployment failed: {e}")
         raise typer.Exit(1)
+
+
+# ============== Billing Commands ==============
+
+def billing_balance_command(
+    principal_id: str,
+    network: str = "local",
+    canister_id: Optional[str] = None,
+) -> None:
+    """Get a user's credit balance"""
+    console.print("[bold blue]💰 User Balance[/bold blue]\n")
+
+    effective_registry = canister_id or get_registry_canister_id(network)
+    result = _run_dfx_command(
+        "get_credits", [f'("{principal_id}")'], network, effective_registry
+    )
+
+    if not result["success"]:
+        console.print(f"[red]❌ Error: {result['error']}[/red]")
+        raise typer.Exit(1)
+
+    data = result["data"]
+
+    if "Ok" in data:
+        import re
+        balance_match = re.search(r'balance\s*=\s*(\d+)', data)
+        total_purchased_match = re.search(r'total_purchased\s*=\s*(\d+)', data)
+        total_spent_match = re.search(r'total_spent\s*=\s*(\d+)', data)
+
+        balance = balance_match.group(1) if balance_match else "0"
+        total_purchased = total_purchased_match.group(1) if total_purchased_match else "0"
+        total_spent = total_spent_match.group(1) if total_spent_match else "0"
+
+        table = Table(title=f"Credits for {principal_id}", show_header=False, box=None)
+        table.add_column("Field", style="cyan")
+        table.add_column("Value", style="white")
+
+        table.add_row("Balance", f"[green]{balance}[/green]")
+        table.add_row("Total Purchased", total_purchased)
+        table.add_row("Total Spent", total_spent)
+
+        console.print(table)
+    elif "Err" in data:
+        error_msg = data.split('"')[1] if '"' in data else data
+        console.print(f"[red]❌ Error: {error_msg}[/red]")
+        raise typer.Exit(1)
+
+
+def billing_add_credits_command(
+    principal_id: str,
+    amount: int,
+    stripe_session_id: str = "",
+    description: str = "Manual top-up",
+    network: str = "local",
+    canister_id: Optional[str] = None,
+) -> None:
+    """Add credits to a user's balance"""
+    console.print("[bold blue]➕ Adding Credits[/bold blue]\n")
+
+    effective_registry = canister_id or get_registry_canister_id(network)
+    args = f'("{principal_id}", {amount} : nat64, "{stripe_session_id}", "{description}")'
+    result = _run_dfx_command(
+        "add_credits", [args], network, effective_registry
+    )
+
+    if not result["success"]:
+        console.print(f"[red]❌ Error: {result['error']}[/red]")
+        raise typer.Exit(1)
+
+    data = result["data"]
+
+    if "Ok" in data:
+        import re
+        balance_match = re.search(r'balance\s*=\s*(\d+)', data)
+        balance = balance_match.group(1) if balance_match else "unknown"
+        console.print(f"[green]✅ Added {amount} credits to {principal_id}[/green]")
+        console.print(f"[dim]New balance: {balance}[/dim]")
+    elif "Err" in data:
+        error_msg = data.split('"')[1] if '"' in data else data
+        console.print(f"[red]❌ Error: {error_msg}[/red]")
+        raise typer.Exit(1)
+
+
+def billing_deduct_credits_command(
+    principal_id: str,
+    amount: int,
+    description: str = "Manual deduction",
+    network: str = "local",
+    canister_id: Optional[str] = None,
+) -> None:
+    """Deduct credits from a user's balance"""
+    console.print("[bold blue]➖ Deducting Credits[/bold blue]\n")
+
+    effective_registry = canister_id or get_registry_canister_id(network)
+    args = f'("{principal_id}", {amount} : nat64, "{description}")'
+    result = _run_dfx_command(
+        "deduct_credits", [args], network, effective_registry
+    )
+
+    if not result["success"]:
+        console.print(f"[red]❌ Error: {result['error']}[/red]")
+        raise typer.Exit(1)
+
+    data = result["data"]
+
+    if "Ok" in data:
+        import re
+        balance_match = re.search(r'balance\s*=\s*(\d+)', data)
+        balance = balance_match.group(1) if balance_match else "unknown"
+        console.print(f"[green]✅ Deducted {amount} credits from {principal_id}[/green]")
+        console.print(f"[dim]New balance: {balance}[/dim]")
+    elif "Err" in data:
+        error_msg = data.split('"')[1] if '"' in data else data
+        console.print(f"[red]❌ Error: {error_msg}[/red]")
+        raise typer.Exit(1)
+
+
+def billing_status_command(
+    network: str = "local",
+    canister_id: Optional[str] = None,
+) -> None:
+    """Get overall billing status across all users"""
+    console.print("[bold blue]📊 Billing Status[/bold blue]\n")
+
+    effective_registry = canister_id or get_registry_canister_id(network)
+    console.print(f"[dim]Registry: {effective_registry}[/dim]")
+    console.print(f"[dim]Network: {network}[/dim]\n")
+
+    result = _run_dfx_command(
+        "billing_status", None, network, effective_registry
+    )
+
+    if not result["success"]:
+        console.print(f"[red]❌ Error: {result['error']}[/red]")
+        raise typer.Exit(1)
+
+    data = result["data"]
+
+    if "Ok" in data:
+        import re
+        users_count_match = re.search(r'users_count\s*=\s*(\d+)', data)
+        total_balance_match = re.search(r'total_balance\s*=\s*(\d+)', data)
+        total_purchased_match = re.search(r'total_purchased\s*=\s*(\d+)', data)
+        total_spent_match = re.search(r'total_spent\s*=\s*(\d+)', data)
+
+        users_count = users_count_match.group(1) if users_count_match else "0"
+        total_balance = total_balance_match.group(1) if total_balance_match else "0"
+        total_purchased = total_purchased_match.group(1) if total_purchased_match else "0"
+        total_spent = total_spent_match.group(1) if total_spent_match else "0"
+
+        table = Table(title="Overall Billing Status", show_header=False, box=None)
+        table.add_column("Field", style="cyan")
+        table.add_column("Value", style="white")
+
+        table.add_row("Users with Credits", users_count)
+        table.add_row("Total Balance", f"[green]{total_balance}[/green]")
+        table.add_row("Total Purchased", total_purchased)
+        table.add_row("Total Spent", total_spent)
+
+        console.print(table)
+    elif "Err" in data:
+        error_msg = data.split('"')[1] if '"' in data else data
+        console.print(f"[red]❌ Error: {error_msg}[/red]")
+        raise typer.Exit(1)
+    else:
+        console.print(f"[yellow]❓ Unexpected response: {data}[/yellow]")

@@ -55,6 +55,12 @@
     if ($realmNameStore) {
       realmName = $realmNameStore;
     }
+    
+    // If user is already authenticated, load their profiles to check join status
+    if ($isAuthenticated) {
+      await initBackendWithIdentity();
+      await loadUserProfiles();
+    }
   });
 
   async function handleLogin() {

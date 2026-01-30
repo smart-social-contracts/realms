@@ -84,3 +84,15 @@ class StatusRecord(Record):
 class GetStatusResult(Variant, total=False):
     Ok: StatusRecord
     Err: text
+
+
+class BillingStatusRecord(Record):
+    users_count: nat64
+    total_balance: nat64
+    total_purchased: nat64
+    total_spent: nat64
+
+
+class GetBillingStatusResult(Variant, total=False):
+    Ok: BillingStatusRecord
+    Err: text

@@ -13,7 +13,7 @@ logger = get_logger("credits")
 def get_user_credits(principal_id: str) -> Dict:
     """Get a user's credit balance."""
     try:
-        user_credits = UserCredits.get(principal_id)
+        user_credits = UserCredits[principal_id]
         if user_credits:
             return {
                 "success": True,
@@ -55,13 +55,12 @@ def add_user_credits(
 
     try:
         # Get or create user credits record
-        user_credits = UserCredits.get(principal_id)
+        user_credits = UserCredits[principal_id]
         
         if user_credits:
             # Update existing record
             user_credits.balance = (user_credits.balance or 0) + amount
             user_credits.total_purchased = (user_credits.total_purchased or 0) + amount
-            user_credits.save()
         else:
             # Create new record
             user_credits = UserCredits(
@@ -70,7 +69,6 @@ def add_user_credits(
                 total_purchased=amount,
                 total_spent=0,
             )
-            user_credits.save()
 
         # Record the transaction
         transaction_id = f"tx_{uuid.uuid4().hex[:16]}"
@@ -83,8 +81,6 @@ def add_user_credits(
             stripe_session_id=stripe_session_id,
             timestamp=time.time(),
         )
-        transaction.save()
-
         logger.info(f"Added {amount} credits to {principal_id}. New balance: {user_credits.balance}")
 
         return {
@@ -112,7 +108,7 @@ def deduct_user_credits(
         return {"success": False, "error": "Amount must be positive"}
 
     try:
-        user_credits = UserCredits.get(principal_id)
+        user_credits = UserCredits[principal_id]
         
         if not user_credits:
             return {"success": False, "error": "User has no credits"}
@@ -127,7 +123,6 @@ def deduct_user_credits(
         # Deduct credits
         user_credits.balance = current_balance - amount
         user_credits.total_spent = (user_credits.total_spent or 0) + amount
-        user_credits.save()
 
         # Record the transaction
         transaction_id = f"tx_{uuid.uuid4().hex[:16]}"
@@ -140,7 +135,6 @@ def deduct_user_credits(
             stripe_session_id="",
             timestamp=time.time(),
         )
-        transaction.save()
 
         logger.info(f"Deducted {amount} credits from {principal_id}. New balance: {user_credits.balance}")
 
@@ -156,6 +150,30 @@ def deduct_user_credits(
         }
     except Exception as e:
         logger.error(f"Error deducting credits for {principal_id}: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+
+def get_billing_status() -> Dict:
+    """Get overall billing status across all users."""
+    try:
+        all_users = list(UserCredits.instances())
+        
+        total_balance = sum(u.balance or 0 for u in all_users)
+        total_purchased = sum(u.total_purchased or 0 for u in all_users)
+        total_spent = sum(u.total_spent or 0 for u in all_users)
+        users_count = len(all_users)
+        
+        return {
+            "success": True,
+            "billing": {
+                "users_count": users_count,
+                "total_balance": total_balance,
+                "total_purchased": total_purchased,
+                "total_spent": total_spent,
+            },
+        }
+    except Exception as e:
+        logger.error(f"Error getting billing status: {str(e)}")
         return {"success": False, "error": str(e)}
 
 

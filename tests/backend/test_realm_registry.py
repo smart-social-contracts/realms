@@ -56,6 +56,12 @@ class MockStorage:
 mock_storage = MockStorage()
 Database.init(db_storage=mock_storage, audit_enabled=False)
 
+from realm_registry_backend.api.credits import (
+    add_user_credits,
+    deduct_user_credits,
+    get_billing_status,
+    get_user_credits,
+)
 from realm_registry_backend.api.registry import (
     add_registered_realm,
     count_registered_realms,
@@ -65,7 +71,7 @@ from realm_registry_backend.api.registry import (
     search_registered_realms,
 )
 from realm_registry_backend.api.status import get_status
-from realm_registry_backend.core.models import RealmRecord
+from realm_registry_backend.core.models import RealmRecord, UserCredits
 
 # Color formatting for terminal output
 GREEN = "\033[92m"
@@ -93,6 +99,16 @@ def clear_database():
             realm.delete()
     except Exception:
         # If no realms exist, that's fine
+        pass
+
+
+def clear_user_credits():
+    """Clear all user credits from the database"""
+    try:
+        all_credits = list(UserCredits.instances())
+        for credit in all_credits:
+            credit.delete()
+    except Exception:
         pass
 
 
@@ -315,6 +331,64 @@ def test_status():
         return False
 
 
+def test_billing_status():
+    """Test billing status and credits functionality"""
+    try:
+        clear_user_credits()
+
+        # Test billing status with no users
+        result = get_billing_status()
+        assert result["success"], f"Failed to get billing status: {result.get('error')}"
+        assert result["billing"]["users_count"] == 0, f"Expected 0 users, got {result['billing']['users_count']}"
+        assert result["billing"]["total_balance"] == 0, f"Expected 0 balance, got {result['billing']['total_balance']}"
+        assert result["billing"]["total_purchased"] == 0, f"Expected 0 purchased, got {result['billing']['total_purchased']}"
+        assert result["billing"]["total_spent"] == 0, f"Expected 0 spent, got {result['billing']['total_spent']}"
+
+        # Add credits to a user
+        add_result = add_user_credits("user-1", 100, description="Test top-up")
+        assert add_result["success"], f"Failed to add credits: {add_result.get('error')}"
+        assert add_result["credits"]["balance"] == 100
+
+        # Check billing status with one user
+        result = get_billing_status()
+        assert result["billing"]["users_count"] == 1, f"Expected 1 user, got {result['billing']['users_count']}"
+        assert result["billing"]["total_balance"] == 100, f"Expected 100 balance, got {result['billing']['total_balance']}"
+        assert result["billing"]["total_purchased"] == 100, f"Expected 100 purchased, got {result['billing']['total_purchased']}"
+
+        # Add credits to another user
+        add_result = add_user_credits("user-2", 200, description="Test top-up")
+        assert add_result["success"], f"Failed to add credits: {add_result.get('error')}"
+
+        # Check billing status with two users
+        result = get_billing_status()
+        assert result["billing"]["users_count"] == 2, f"Expected 2 users, got {result['billing']['users_count']}"
+        assert result["billing"]["total_balance"] == 300, f"Expected 300 balance, got {result['billing']['total_balance']}"
+        assert result["billing"]["total_purchased"] == 300, f"Expected 300 purchased, got {result['billing']['total_purchased']}"
+
+        # Deduct credits from user-1
+        deduct_result = deduct_user_credits("user-1", 30, description="Test spend")
+        assert deduct_result["success"], f"Failed to deduct credits: {deduct_result.get('error')}"
+        assert deduct_result["credits"]["balance"] == 70
+
+        # Check billing status after deduction
+        result = get_billing_status()
+        assert result["billing"]["total_balance"] == 270, f"Expected 270 balance, got {result['billing']['total_balance']}"
+        assert result["billing"]["total_spent"] == 30, f"Expected 30 spent, got {result['billing']['total_spent']}"
+
+        # Test get_user_credits
+        user_result = get_user_credits("user-1")
+        assert user_result["success"], f"Failed to get user credits: {user_result.get('error')}"
+        assert user_result["credits"]["balance"] == 70
+        assert user_result["credits"]["total_purchased"] == 100
+        assert user_result["credits"]["total_spent"] == 30
+
+        print_success("billing_status tests passed")
+        return True
+    except Exception as e:
+        print_failure("billing_status tests failed", str(e))
+        return False
+
+
 def run_tests():
     """Run all tests and report results"""
     print(f"{BOLD}Running Realm Registry Tests...{RESET}\n")
@@ -332,6 +406,7 @@ def run_tests():
         test_search_realms,
         test_count_realms,
         test_status,
+        test_billing_status,
     ]
 
     for test in tests:

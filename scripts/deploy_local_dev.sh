@@ -23,6 +23,7 @@ MUNDUS_DIR=""
 SINGLE_REALM_DIR=""
 DEPLOY_FRONTEND=false
 DEPLOY_BACKEND=false
+DEPLOY_REGISTRY_BACKEND=false
 
 usage() {
     echo "Usage: $0 [OPTIONS]"
@@ -35,6 +36,7 @@ usage() {
     echo "Options:"
     echo "  -f, --frontend       Deploy frontend"
     echo "  -b, --backend        Deploy backend"
+    echo "  -r, --registry       Deploy registry backend (repo root or mundus mode)"
     echo "  -c, --clean          Clean build (remove .svelte-kit and vite cache)"
     echo "  -h, --help           Show this help message"
     echo ""
@@ -50,6 +52,7 @@ usage() {
     echo "Examples (repo root - no copying):"
     echo "  $0 -f                # Deploy frontend from repo root"
     echo "  $0 -b                # Deploy backend from repo root"
+    echo "  $0 -r                # Deploy registry backend from repo root"
     echo ""
     echo "Examples (single-realm in .realms/) - MOST COMMON:"
     echo "  $0 -s .realms/realm_* -f             # Deploy frontend only (typical iterative dev)"
@@ -78,6 +81,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         -r|--registry)
             DEPLOY_REGISTRY=true
+            DEPLOY_REGISTRY_BACKEND=true
             shift
             ;;
         -R|--realm)
@@ -143,9 +147,9 @@ else
     MODE="repo-root"
 fi
 
-# Check if frontend or backend specified
-if [ "$DEPLOY_FRONTEND" = false ] && [ "$DEPLOY_BACKEND" = false ]; then
-    echo -e "${YELLOW}Warning: No component specified. Use -f (frontend) and/or -b (backend)${NC}"
+# Check if frontend or backend or registry specified
+if [ "$DEPLOY_FRONTEND" = false ] && [ "$DEPLOY_BACKEND" = false ] && [ "$DEPLOY_REGISTRY_BACKEND" = false ]; then
+    echo -e "${YELLOW}Warning: No component specified. Use -f (frontend), -b (backend), and/or -r (registry)${NC}"
     usage
 fi
 
@@ -165,6 +169,11 @@ deploy_repo_root() {
     if [ "$DEPLOY_BACKEND" = true ]; then
         echo -e "${GREEN}🚀 Deploying backend...${NC}"
         (cd "$REPO_ROOT" && dfx deploy realm_backend)
+    fi
+    
+    if [ "$DEPLOY_REGISTRY_BACKEND" = true ]; then
+        echo -e "${GREEN}🚀 Deploying registry backend...${NC}"
+        (cd "$REPO_ROOT" && dfx deploy realm_registry_backend)
     fi
 }
 
