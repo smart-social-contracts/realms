@@ -71,3 +71,16 @@ class SearchRealmsResult(Record):
     realms: Vec[RealmRecord]
     query: text
     count: nat64
+
+
+class StatusRecord(Record):
+    version: text
+    commit: text
+    commit_datetime: text
+    status: text
+    realms_count: nat64
+
+
+class GetStatusResult(Variant, total=False):
+    Ok: StatusRecord
+    Err: text

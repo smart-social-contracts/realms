@@ -274,6 +274,63 @@ def registry_count_command(
         raise typer.Exit(1)
 
 
+def registry_status_command(
+    network: str = "local", canister_id: Optional[str] = None
+) -> None:
+    """Get the status of the registry backend canister"""
+    console.print("[bold blue]📊 Registry Status[/bold blue]\n")
+
+    effective_registry = canister_id or get_registry_canister_id(network)
+    console.print(f"[dim]Registry: {effective_registry}[/dim]")
+    console.print(f"[dim]Network: {network}[/dim]\n")
+
+    result = _run_dfx_command(
+        "status", None, network, effective_registry
+    )
+
+    if not result["success"]:
+        console.print(f"[red]❌ Error: {result['error']}[/red]")
+        raise typer.Exit(1)
+
+    data = result["data"]
+
+    if "Ok" in data:
+        # Parse the status record
+        import re
+        
+        # Extract fields from Candid record format
+        version_match = re.search(r'version\s*=\s*"([^"]*)"', data)
+        commit_match = re.search(r'commit\s*=\s*"([^"]*)"', data)
+        commit_datetime_match = re.search(r'commit_datetime\s*=\s*"([^"]*)"', data)
+        status_match = re.search(r'status\s*=\s*"([^"]*)"', data)
+        realms_count_match = re.search(r'realms_count\s*=\s*(\d+)', data)
+
+        version = version_match.group(1) if version_match else "unknown"
+        commit = commit_match.group(1) if commit_match else "unknown"
+        commit_datetime = commit_datetime_match.group(1) if commit_datetime_match else "unknown"
+        status = status_match.group(1) if status_match else "unknown"
+        realms_count = realms_count_match.group(1) if realms_count_match else "0"
+
+        # Display status table
+        table = Table(title="Registry Backend Status", show_header=False, box=None)
+        table.add_column("Field", style="cyan")
+        table.add_column("Value", style="white")
+
+        table.add_row("Status", f"[green]{status}[/green]" if status == "ok" else f"[red]{status}[/red]")
+        table.add_row("Version", version)
+        table.add_row("Commit", commit[:12] if len(commit) > 12 else commit)
+        table.add_row("Commit DateTime", commit_datetime)
+        table.add_row("Realms Count", realms_count)
+
+        console.print(table)
+    elif "Err" in data:
+        error_msg = data.split('"')[1] if '"' in data else data
+        console.print(f"[red]❌ Error: {error_msg}[/red]")
+        raise typer.Exit(1)
+    else:
+        console.print(f"[yellow]❓ Unexpected response: {data}[/yellow]")
+
+
 def registry_create_command(
     registry_name: Optional[str] = None,
     output_dir: str = ".realms",

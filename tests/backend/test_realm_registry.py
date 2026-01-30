@@ -64,6 +64,7 @@ from realm_registry_backend.api.registry import (
     remove_registered_realm,
     search_registered_realms,
 )
+from realm_registry_backend.api.status import get_status
 from realm_registry_backend.core.models import RealmRecord
 
 # Color formatting for terminal output
@@ -281,6 +282,39 @@ def test_count_realms():
         return False
 
 
+def test_status():
+    """Test getting registry status"""
+    try:
+        clear_database()
+
+        # Test status with empty registry
+        status = get_status()
+        assert status["status"] == "ok", f"Expected status 'ok', got {status['status']}"
+        assert "version" in status, "Status should contain 'version'"
+        assert "commit" in status, "Status should contain 'commit'"
+        assert "commit_datetime" in status, "Status should contain 'commit_datetime'"
+        assert "realms_count" in status, "Status should contain 'realms_count'"
+        assert status["realms_count"] == 0, f"Expected 0 realms, got {status['realms_count']}"
+
+        # Add some realms and check count is updated
+        add_registered_realm("test-realm-1", "Test Realm 1", "https://test1.com")
+        add_registered_realm("test-realm-2", "Test Realm 2", "https://test2.com")
+
+        status = get_status()
+        assert status["realms_count"] == 2, f"Expected 2 realms, got {status['realms_count']}"
+
+        # Verify placeholder values are present (they get replaced during build)
+        assert status["version"] == "VERSION_PLACEHOLDER", f"Expected VERSION_PLACEHOLDER, got {status['version']}"
+        assert status["commit"] == "COMMIT_HASH_PLACEHOLDER", f"Expected COMMIT_HASH_PLACEHOLDER, got {status['commit']}"
+        assert status["commit_datetime"] == "COMMIT_DATETIME_PLACEHOLDER", f"Expected COMMIT_DATETIME_PLACEHOLDER, got {status['commit_datetime']}"
+
+        print_success("status tests passed")
+        return True
+    except Exception as e:
+        print_failure("status tests failed", str(e))
+        return False
+
+
 def run_tests():
     """Run all tests and report results"""
     print(f"{BOLD}Running Realm Registry Tests...{RESET}\n")
@@ -297,6 +331,7 @@ def run_tests():
         test_remove_realm,
         test_search_realms,
         test_count_realms,
+        test_status,
     ]
 
     for test in tests:

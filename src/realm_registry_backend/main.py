@@ -17,6 +17,7 @@ from api.registry import (
     remove_registered_realm,
     search_registered_realms,
 )
+from api.status import get_status
 from core.candid_types_registry import (
     AddCreditsResult,
     AddRealmResult,
@@ -24,9 +25,11 @@ from core.candid_types_registry import (
     DeductCreditsResult,
     GetCreditsResult,
     GetRealmResult,
+    GetStatusResult,
     RealmRecord,
     RealmsListRecord,
     SearchRealmsResult,
+    StatusRecord,
     TransactionHistoryResult,
     UserCreditsRecord,
 )
@@ -68,6 +71,25 @@ logger = get_logger("main")
 def init_canister() -> void:
     """Initialize the realm registry canister"""
     logger.info("Realm Registry canister initialized")
+
+
+@query
+def status() -> GetStatusResult:
+    """Get the status of the registry backend canister"""
+    try:
+        status_data = get_status()
+        return {
+            "Ok": StatusRecord(
+                version=status_data["version"],
+                commit=status_data["commit"],
+                commit_datetime=status_data["commit_datetime"],
+                status=status_data["status"],
+                realms_count=status_data["realms_count"],
+            )
+        }
+    except Exception as e:
+        logger.error(f"Error getting status: {str(e)}")
+        return {"Err": f"Internal error: {str(e)}"}
 
 
 @query

@@ -24,6 +24,7 @@ from .commands.registry import (
     registry_list_command,
     registry_remove_command,
     registry_search_command,
+    registry_status_command,
 )
 from .commands.run import run_command
 from .commands.shell import shell_command
@@ -801,6 +802,17 @@ def registry_deploy(
 ) -> None:
     """Deploy a registry instance."""
     registry_deploy_command(folder, network, mode, identity)
+
+
+@registry_app.command("status")
+def registry_status(
+    network: str = typer.Option("local", "--network", "-n", help="Network to use"),
+    canister_id: Optional[str] = typer.Option(
+        None, "--canister-id", help="Registry canister ID"
+    ),
+) -> None:
+    """Get the status of the registry backend canister."""
+    registry_status_command(network, canister_id)
 
 
 # Realm context management commands
