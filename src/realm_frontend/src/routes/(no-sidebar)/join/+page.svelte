@@ -43,13 +43,21 @@
   
   // Determine initial step based on auth status and join status
   $: {
-    if ($isAuthenticated && currentStep === 'auth' && !$profilesLoading) {
+    console.log('[JOIN PAGE v3] Reactive check:', { isAuthenticated: $isAuthenticated, currentStep, profilesLoading: $profilesLoading });
+    if ($isAuthenticated && !$profilesLoading) {
       userHasJoined = hasJoined();
-      currentStep = userHasJoined ? 'already_joined' : 'terms';
+      console.log('[JOIN PAGE v3] hasJoined result:', userHasJoined);
+      // Redirect to already_joined if user has joined and is on auth or terms step
+      if (userHasJoined && (currentStep === 'auth' || currentStep === 'terms')) {
+        currentStep = 'already_joined';
+      } else if (!userHasJoined && currentStep === 'auth') {
+        currentStep = 'terms';
+      }
     }
   }
   
   onMount(async () => {
+    console.log('[JOIN PAGE v2] onMount - isAuthenticated:', $isAuthenticated);
     // Fetch realm info
     await realmInfo.fetch();
     if ($realmNameStore) {
@@ -58,8 +66,10 @@
     
     // If user is already authenticated, load their profiles to check join status
     if ($isAuthenticated) {
+      console.log('[JOIN PAGE v2] Loading profiles for authenticated user...');
       await initBackendWithIdentity();
       await loadUserProfiles();
+      console.log('[JOIN PAGE v2] Profiles loaded, hasJoined:', hasJoined());
     }
   });
 
