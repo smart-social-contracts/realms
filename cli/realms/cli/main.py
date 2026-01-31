@@ -20,7 +20,6 @@ from .commands.registry import (
     billing_balance_command,
     billing_deduct_credits_command,
     billing_status_command,
-    registry_add_command,
     registry_count_command,
     registry_create_command,
     registry_deploy_command,
