@@ -1966,6 +1966,9 @@ def register_realm_with_registry(
     frontend_url: text = "",
     logo_url: text = "",
     backend_url: text = "",
+    frontend_canister_id: text = "",
+    token_canister_id: text = "",
+    nft_canister_id: text = "",
 ) -> Async[text]:
     """
     Register this realm with the central registry.
@@ -1980,13 +1983,17 @@ def register_realm_with_registry(
         frontend_url: Frontend canister URL (optional)
         logo_url: Logo URL (optional)
         backend_url: Backend canister URL (optional)
+        frontend_canister_id: Frontend canister ID (optional)
+        token_canister_id: Token backend canister ID (optional)
+        nft_canister_id: NFT backend canister ID (optional)
 
     Returns:
         JSON string with success status and message
     """
     try:
         result = yield register_realm(
-            registry_canister_id, realm_name, frontend_url, logo_url, backend_url
+            registry_canister_id, realm_name, frontend_url, logo_url, backend_url,
+            frontend_canister_id, token_canister_id, nft_canister_id
         )
         return json.dumps(result, indent=2)
     except Exception as e:

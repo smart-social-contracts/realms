@@ -623,7 +623,6 @@ registry_app.add_typer(registry_billing_app, name="billing")
 
 @registry_realm_app.command("add")
 def registry_add(
-    realm_id: str = typer.Option(..., "--realm-id", help="Unique realm identifier"),
     realm_name: str = typer.Option(..., "--realm-name", help="Human-readable realm name"),
     frontend_url: str = typer.Option("", "--frontend-url", help="Frontend canister URL (optional, will auto-derive)"),
     backend_url: str = typer.Option("", "--backend-url", help="Backend canister URL for status fetching"),
@@ -634,16 +633,21 @@ def registry_add(
         "--registry-canister",
         help="Registry canister ID or name"
     ),
+    realm_backend_canister: str = typer.Option(
+        "realm_backend",
+        "--realm-canister",
+        help="This realm's backend canister ID or name"
+    ),
 ) -> None:
     """
-    Add this realm to the central registry.
+    Register this realm with the central registry.
     
-    Calls the registry backend's add_realm function to register this realm.
-    If frontend_url is not provided, it will be auto-derived from the realm_frontend canister ID.
+    Calls the realm backend's register_realm_with_registry function which makes
+    a secure inter-canister call to the registry. The registry uses the calling
+    canister's principal as the realm ID.
     
     Example:
-        realms registry add \\
-            --realm-id "my_demo_realm" \\
+        realms registry realm add \\
             --realm-name "My Demo Governance Realm" \\
             --network local
     """
@@ -655,76 +659,111 @@ def registry_add(
         border_style="cyan"
     ))
     
-    # Auto-derive frontend URL if not provided
-    if not frontend_url:
-        try:
-            result = subprocess.run(
-                ["dfx", "canister", "id", "realm_frontend", "--network", network],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=5
-            )
-            canister_id = result.stdout.strip()
-            
+    # Get canister IDs for registration
+    frontend_canister_id = ""
+    token_canister_id = ""
+    nft_canister_id = ""
+    
+    # Auto-derive frontend canister ID and URL
+    try:
+        result = subprocess.run(
+            ["dfx", "canister", "id", "realm_frontend", "--network", network],
+            capture_output=True, text=True, check=True, timeout=5
+        )
+        frontend_canister_id = result.stdout.strip()
+        
+        if not frontend_url:
             # Format URL based on network
             if network == "ic":
-                frontend_url = f"{canister_id}.ic0.app"
+                frontend_url = f"{frontend_canister_id}.ic0.app"
             elif network == "staging":
-                frontend_url = f"{canister_id}.icp0.io"
+                frontend_url = f"{frontend_canister_id}.icp0.io"
             else:  # local
-                frontend_url = f"{canister_id}.localhost:8000"
-                
+                frontend_url = f"{frontend_canister_id}.localhost:8000"
             console.print(f"[dim]Auto-derived frontend URL: {frontend_url}[/dim]")
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
-            console.print("[yellow]⚠️  Could not auto-derive frontend URL, using empty string[/yellow]")
-            frontend_url = ""
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        console.print("[yellow]⚠️  Could not get frontend canister ID[/yellow]")
     
-    console.print(f"\n[cyan]Realm ID:[/cyan] {realm_id}")
-    console.print(f"[cyan]Realm Name:[/cyan] {realm_name}")
+    # Try to get optional token_backend canister ID
+    try:
+        result = subprocess.run(
+            ["dfx", "canister", "id", "token_backend", "--network", network],
+            capture_output=True, text=True, check=True, timeout=5
+        )
+        token_canister_id = result.stdout.strip()
+        console.print(f"[dim]Found token_backend: {token_canister_id}[/dim]")
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        pass  # Optional canister
+    
+    # Try to get optional nft_backend canister ID
+    try:
+        result = subprocess.run(
+            ["dfx", "canister", "id", "nft_backend", "--network", network],
+            capture_output=True, text=True, check=True, timeout=5
+        )
+        nft_canister_id = result.stdout.strip()
+        console.print(f"[dim]Found nft_backend: {nft_canister_id}[/dim]")
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        pass  # Optional canister
+    
+    console.print(f"\n[cyan]Realm Name:[/cyan] {realm_name}")
     console.print(f"[cyan]Frontend URL:[/cyan] {frontend_url}")
+    if frontend_canister_id:
+        console.print(f"[cyan]Frontend Canister:[/cyan] {frontend_canister_id}")
     if backend_url:
         console.print(f"[cyan]Backend URL:[/cyan] {backend_url}")
     if logo_url:
         console.print(f"[cyan]Logo URL:[/cyan] {logo_url}")
     console.print(f"[dim]Network:[/dim] {network}\n")
     
-    # Call registry directly
-    # Note: add_realm expects 5 parameters: realm_id, name, url, logo, backend_url
-    args = [f'("{realm_id}", "{realm_name}", "{frontend_url}", "{logo_url}", "{backend_url}")']
-    cmd = ["dfx", "canister", "call", "--network", network, registry_canister_id, "add_realm"]
-    cmd.extend(args)
+    # Call realm backend's register_realm_with_registry (secure inter-canister call)
+    args = f'("{registry_canister_id}", "{realm_name}", "{frontend_url}", "{logo_url}", "{backend_url}", "{frontend_canister_id}", "{token_canister_id}", "{nft_canister_id}")'
+    cmd = ["dfx", "canister", "call", "--network", network, realm_backend_canister, "register_realm_with_registry", args]
     
     try:
         result = subprocess.run(
-            cmd, capture_output=True, text=True, check=True, timeout=30
+            cmd, capture_output=True, text=True, check=True, timeout=60
         )
         
-        # Parse the Candid output
+        # Parse the JSON response
         output = result.stdout.strip()
         if output.startswith("(") and output.endswith(")"):
+            output = output[1:-1].strip()
+        if output.startswith('"') and output.endswith('"'):
             output = output[1:-1]
         
-        if "Ok" in output:
-            console.print(Panel(
-                f"[green]✅ Successfully registered realm with registry![/green]\n\n"
-                f"[cyan]Realm ID:[/cyan] {realm_id}\n"
-                f"[cyan]Realm Name:[/cyan] {realm_name}\n"
-                f"[cyan]Frontend URL:[/cyan] {frontend_url}",
-                border_style="green",
-                title="Registration Complete"
-            ))
-        elif "Err" in output:
-            error_msg = output.split('"')[1] if '"' in output else output
-            console.print(Panel(
-                f"[red]❌ Registration failed[/red]\n\n"
-                f"[yellow]Error:[/yellow] {error_msg}",
-                border_style="red",
-                title="Registration Failed"
-            ))
-            raise typer.Exit(1)
-        else:
-            console.print(f"[yellow]⚠️  Unexpected response:[/yellow] {output}")
+        # Unescape the JSON string
+        output = output.replace('\\"', '"').replace('\\n', '\n')
+        
+        try:
+            response = json.loads(output)
+            if response.get("success"):
+                console.print(Panel(
+                    f"[green]✅ Successfully registered realm with registry![/green]\n\n"
+                    f"[cyan]Realm ID:[/cyan] {response.get('realm_id', 'N/A')}\n"
+                    f"[cyan]Realm Name:[/cyan] {realm_name}\n"
+                    f"[cyan]Frontend URL:[/cyan] {frontend_url}",
+                    border_style="green",
+                    title="Registration Complete"
+                ))
+            else:
+                console.print(Panel(
+                    f"[red]❌ Registration failed[/red]\n\n"
+                    f"[yellow]Error:[/yellow] {response.get('error', 'Unknown error')}",
+                    border_style="red",
+                    title="Registration Failed"
+                ))
+                raise typer.Exit(1)
+        except json.JSONDecodeError:
+            # Check for Ok/Err in raw output
+            if "success" in output.lower() or "Ok" in output:
+                console.print(Panel(
+                    f"[green]✅ Successfully registered realm with registry![/green]",
+                    border_style="green",
+                    title="Registration Complete"
+                ))
+            else:
+                console.print(f"[yellow]⚠️  Unexpected response:[/yellow] {output}")
             
     except subprocess.CalledProcessError as e:
         console.print(f"[red]❌ Error: {e.stderr.strip()}[/red]")

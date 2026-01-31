@@ -10,7 +10,6 @@ from api.credits import (
     get_user_transactions,
 )
 from api.registry import (
-    add_registered_realm,
     count_registered_realms,
     get_registered_realm,
     list_registered_realms,
@@ -130,20 +129,6 @@ def register_realm(
             return {"Err": result["error"]}
     except Exception as e:
         logger.error(f"Error in register_realm: {str(e)}")
-        return {"Err": f"Internal error: {str(e)}"}
-
-
-@update
-def add_realm(realm_id: text, name: text, url: text, logo: text, backend_url: text = "") -> AddRealmResult:
-    """Add a new realm to the registry (legacy)"""
-    try:
-        result = add_registered_realm(realm_id, name, url, logo, backend_url)
-        if result["success"]:
-            return {"Ok": result["message"]}
-        else:
-            return {"Err": result["error"]}
-    except Exception as e:
-        logger.error(f"Error in add_realm: {str(e)}")
         return {"Err": f"Internal error: {str(e)}"}
 
 

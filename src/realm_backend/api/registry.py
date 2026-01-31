@@ -20,7 +20,14 @@ class AddRealmResult(Variant, total=False):
 class RealmRegistryService(Service):
     @service_update
     def register_realm(
-        self, name: text, url: text, logo: text, backend_url: text
+        self,
+        name: text,
+        url: text,
+        logo: text,
+        backend_url: text,
+        frontend_canister_id: text,
+        token_canister_id: text,
+        nft_canister_id: text,
     ) -> AddRealmResult:
         ...
 
@@ -31,6 +38,9 @@ def register_realm(
     realm_url: str = "",
     realm_logo: str = "",
     backend_url: str = "",
+    frontend_canister_id: str = "",
+    token_canister_id: str = "",
+    nft_canister_id: str = "",
 ) -> Async[Dict]:
     """
     Register this realm with the central realm registry.
@@ -45,6 +55,9 @@ def register_realm(
         realm_url: Frontend canister URL (optional)
         realm_logo: URL or path to realm logo (optional)
         backend_url: Backend canister URL (optional)
+        frontend_canister_id: Frontend canister ID (optional)
+        token_canister_id: Token backend canister ID (optional)
+        nft_canister_id: NFT backend canister ID (optional)
 
     Returns:
         Dictionary with success status and message/error
@@ -62,12 +75,13 @@ def register_realm(
 
         # Create registry canister reference and make inter-canister call
         logger.info(
-            f"Calling registry register_realm with args: ({realm_name}, {realm_url}, {realm_logo}, {backend_url})"
+            f"Calling registry register_realm with args: ({realm_name}, {realm_url}, {realm_logo}, {backend_url}, {frontend_canister_id}, {token_canister_id}, {nft_canister_id})"
         )
 
         registry = RealmRegistryService(Principal.from_str(registry_canister_id))
         result: CallResult[AddRealmResult] = yield registry.register_realm(
-            realm_name, realm_url, realm_logo, backend_url
+            realm_name, realm_url, realm_logo, backend_url,
+            frontend_canister_id, token_canister_id, nft_canister_id
         )
 
         logger.info(f"Registry call result: {result}")

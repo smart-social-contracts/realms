@@ -48,51 +48,6 @@ def _run_dfx_command(
         return {"success": False, "error": f"Unexpected error: {str(e)}"}
 
 
-def registry_add_command(
-    realm_id: str,
-    name: str,
-    url: str = "",
-    logo: str = "",
-    network: str = "local",
-    canister_id: Optional[str] = None,
-) -> None:
-    """Add a new realm to the registry"""
-    console.print("[bold blue]🌍 Adding Realm to Registry[/bold blue]\n")
-
-    console.print(f"Realm ID: [cyan]{realm_id}[/cyan]")
-    console.print(f"Name: [cyan]{name}[/cyan]")
-    if url:
-        console.print(f"URL: [cyan]{url}[/cyan]")
-    if logo:
-        console.print(f"Logo: [cyan]{logo}[/cyan]")
-    console.print(f"Network: [dim]{network}[/dim]\n")
-
-    # Escape quotes in arguments
-    realm_id_escaped = f'"{realm_id}"'
-    name_escaped = f'"{name}"'
-    url_escaped = f'"{url}"'
-    logo_escaped = f'"{logo}"'
-
-    args = [f"({realm_id_escaped}, {name_escaped}, {url_escaped}, {logo_escaped})"]
-    result = _run_dfx_command(
-        "add_realm", args, network, canister_id or "realm_registry_backend"
-    )
-
-    if not result["success"]:
-        console.print(f"[red]❌ Error: {result['error']}[/red]")
-        raise typer.Exit(1)
-
-    # Parse the result
-    data = result["data"]
-    if "Ok" in data:
-        console.print(f"[green]✅ Realm '{realm_id}' added successfully[/green]")
-    elif "Err" in data:
-        # Extract error message
-        error_msg = data.split('"')[1] if '"' in data else data
-        console.print(f"[red]❌ Error: {error_msg}[/red]")
-        raise typer.Exit(1)
-    else:
-        console.print(f"[yellow]❓ Unexpected response: {data}[/yellow]")
 
 
 def registry_list_command(
