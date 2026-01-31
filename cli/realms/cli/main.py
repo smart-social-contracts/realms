@@ -716,7 +716,15 @@ def registry_add(
     console.print(f"[dim]Network:[/dim] {network}\n")
     
     # Call realm backend's register_realm_with_registry (secure inter-canister call)
-    args = f'("{registry_canister_id}", "{realm_name}", "{frontend_url}", "{logo_url}", "{backend_url}", "{frontend_canister_id}", "{token_canister_id}", "{nft_canister_id}")'
+    # Pack canister IDs into JSON (Kybra limits params to 5)
+    canister_ids_json = json.dumps({
+        "backend_url": backend_url,
+        "frontend_canister_id": frontend_canister_id,
+        "token_canister_id": token_canister_id,
+        "nft_canister_id": nft_canister_id,
+    }).replace('"', '\\"')  # Escape quotes for dfx call
+    
+    args = f'("{registry_canister_id}", "{realm_name}", "{frontend_url}", "{logo_url}", "{canister_ids_json}")'
     cmd = ["dfx", "canister", "call", "--network", network, realm_backend_canister, "register_realm_with_registry", args]
     
     try:

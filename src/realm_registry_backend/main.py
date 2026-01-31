@@ -111,17 +111,21 @@ def register_realm(
     url: text,
     logo: text,
     backend_url: text = "",
-    frontend_canister_id: text = "",
-    token_canister_id: text = "",
-    nft_canister_id: text = "",
+    canister_ids_json: text = "{}",
 ) -> AddRealmResult:
-    """Register calling realm (uses caller principal as ID, upsert logic)"""
+    """Register calling realm (uses caller principal as ID, upsert logic)
+    
+    Note: Kybra limits canister methods to 5 params, so canister IDs are passed as JSON.
+    """
     try:
+        # Parse canister IDs from JSON string
+        canister_ids = json.loads(canister_ids_json) if canister_ids_json else {}
+        
         result = register_realm_by_caller(
             name, url, logo, backend_url,
-            frontend_canister_id=frontend_canister_id,
-            token_canister_id=token_canister_id,
-            nft_canister_id=nft_canister_id,
+            frontend_canister_id=canister_ids.get("frontend_canister_id", ""),
+            token_canister_id=canister_ids.get("token_canister_id", ""),
+            nft_canister_id=canister_ids.get("nft_canister_id", ""),
         )
         if result["success"]:
             return {"Ok": result["message"]}
