@@ -3,6 +3,7 @@
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
   import { _, locale } from 'svelte-i18n';
+  import { CONFIG } from '$lib/config.js';
 
   // Auth state
   let isLoggedIn = false;
@@ -13,6 +14,12 @@
 
   // Deploy mode
   let deployMode = 'manual'; // 'automatic' or 'manual'
+  
+  // Automatic deployment state
+  let isDeploying = false;
+  let deployError = null;
+  let deploySuccess = null;
+  let deployedRealmUrl = null;
 
   onMount(async () => {
     if (browser) {
@@ -21,8 +28,7 @@
         isLoggedIn = await isAuthenticated();
         if (isLoggedIn) {
           userPrincipal = await getPrincipal();
-          // TODO: Fetch actual credit balance from backend
-          userCredits = 0; // Placeholder - would fetch from billing service
+          await loadUserCredits();
         }
       } catch (e) {
         console.error('Auth check failed:', e);
@@ -31,14 +37,93 @@
     }
   });
 
+  async function loadUserCredits() {
+    if (!userPrincipal) return;
+    try {
+      const { backend } = await import('$lib/canisters.js');
+      const result = await backend.get_credits(userPrincipal.toText());
+      if ('Ok' in result) {
+        userCredits = Number(result.Ok.balance);
+      }
+    } catch (e) {
+      console.error('Failed to load credits:', e);
+    }
+  }
+
   async function handleLogin() {
     const { login, getPrincipal } = await import("$lib/auth");
     const result = await login();
     if (result.principal) {
       isLoggedIn = true;
       userPrincipal = result.principal;
-      // TODO: Fetch credit balance after login
-      userCredits = 0;
+      await loadUserCredits();
+    }
+  }
+
+  async function handleAutomaticDeploy() {
+    if (!userPrincipal || userCredits < REQUIRED_CREDITS) return;
+    
+    isDeploying = true;
+    deployError = null;
+    deploySuccess = null;
+    deployedRealmUrl = null;
+    
+    try {
+      // Prepare realm configuration from formData
+      const realmConfig = {
+        name: formData.name,
+        descriptions: formData.descriptions,
+        languages: formData.languages,
+        logo: formData.logoPreview,
+        welcome_image: formData.welcomeImagePreview,
+        welcome_messages: formData.welcome_messages,
+        token_enabled: formData.token_enabled,
+        token_name: formData.token_name,
+        token_symbol: formData.token_symbol,
+        ckbtc_enabled: formData.ckbtc_enabled,
+        land_token_enabled: formData.land_token_enabled,
+        land_token_name: formData.land_token_name,
+        land_token_symbol: formData.land_token_symbol,
+        codex_source: formData.codex_source,
+        codex_package_name: formData.codex_package_name,
+        codex_url: formData.codex_url,
+        extensions: formData.extensions,
+        assistant: formData.assistant,
+      };
+      
+      const CANISTER_MGMT_URL = CONFIG.canister_management_url || 'https://canister-management.realmsgos.dev';
+      
+      // Call canister-management service to deploy
+      const response = await fetch(`${CANISTER_MGMT_URL}/deploy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          principal_id: userPrincipal.toText(),
+          realm_config: realmConfig,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok || !data.success) {
+        deployError = data.message || data.detail || 'Deployment failed. Please try again.';
+        return;
+      }
+      
+      // Deployment successful - credits are deducted by the service
+      deploySuccess = true;
+      deployedRealmUrl = data.realm_url;
+      
+      // Refresh credits after successful deployment
+      await loadUserCredits();
+      
+    } catch (err) {
+      console.error('Automatic deployment failed:', err);
+      deployError = 'Deployment failed. Please check your connection and try again.';
+    } finally {
+      isDeploying = false;
     }
   }
 
@@ -1229,10 +1314,49 @@
                   <path d="M12 6v6l4 2"></path>
                 </svg>
                 <span>You need at least {REQUIRED_CREDITS} credits (you have {userCredits})</span>
-                <a href="/credits" class="btn btn-small btn-dark" on:click|stopPropagation>
+                <a href="/my-dashboard" class="btn btn-small btn-dark" on:click|stopPropagation>
                   Buy Credits
                 </a>
               </div>
+            {:else if deployMode === 'automatic'}
+              <!-- Deploy button when automatic mode is selected and user has credits -->
+              {#if deploySuccess}
+                <div class="deploy-success">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                  </svg>
+                  <div>
+                    <strong>Realm deployed successfully!</strong>
+                    {#if deployedRealmUrl}
+                      <a href={deployedRealmUrl} target="_blank" rel="noopener noreferrer">Visit your realm →</a>
+                    {/if}
+                  </div>
+                </div>
+              {:else}
+                <div class="deploy-action">
+                  <p class="deploy-cost">Cost: <strong>{REQUIRED_CREDITS} credits</strong> (you have {userCredits})</p>
+                  <button 
+                    type="button" 
+                    class="btn btn-primary btn-deploy" 
+                    on:click|stopPropagation={handleAutomaticDeploy}
+                    disabled={isDeploying}
+                  >
+                    {#if isDeploying}
+                      <span class="spinner-small"></span>
+                      Deploying...
+                    {:else}
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
+                      </svg>
+                      Deploy Now
+                    {/if}
+                  </button>
+                  {#if deployError}
+                    <p class="deploy-error">{deployError}</p>
+                  {/if}
+                </div>
+              {/if}
             {/if}
           </div>
 
@@ -2869,6 +2993,72 @@
     margin: 0 0 1rem;
     color: #737373;
     font-size: 0.875rem;
+  }
+
+  /* Automatic Deployment Styles */
+  .deploy-action {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #F0FDF4;
+    border: 1px solid #86EFAC;
+    border-radius: 0.5rem;
+    text-align: center;
+  }
+
+  .deploy-cost {
+    margin: 0 0 1rem;
+    color: #166534;
+    font-size: 0.875rem;
+  }
+
+  .btn-deploy {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+  }
+
+  .deploy-error {
+    margin: 1rem 0 0;
+    color: #DC2626;
+    font-size: 0.875rem;
+  }
+
+  .deploy-success {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #F0FDF4;
+    border: 1px solid #86EFAC;
+    border-radius: 0.5rem;
+    color: #166534;
+  }
+
+  .deploy-success svg {
+    color: #22C55E;
+    flex-shrink: 0;
+  }
+
+  .deploy-success a {
+    color: #166534;
+    font-weight: 500;
+    text-decoration: underline;
+  }
+
+  .spinner-small {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #FFFFFF;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
 
   @media (max-width: 600px) {

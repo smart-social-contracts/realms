@@ -57,12 +57,21 @@
   async function loadCredits() {
     loadingCredits = true;
     try {
-      // TODO: Fetch from backend
-      // For now, use placeholder data
-      balance = 0;
-      purchases = [];
+      const { backend } = await import('$lib/canisters.js');
+      const result = await backend.get_credits(userPrincipal.toText());
+      
+      if ('Ok' in result) {
+        balance = Number(result.Ok.balance);
+        purchases = [];
+      } else {
+        console.error('Failed to get credits:', result.Err);
+        balance = 0;
+        purchases = [];
+      }
     } catch (err) {
       console.error('Failed to load credits:', err);
+      balance = 0;
+      purchases = [];
     } finally {
       loadingCredits = false;
     }

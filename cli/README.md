@@ -139,6 +139,36 @@ realms realm deploy --phases q1,q2
 realms realm deploy --dry-run
 ```
 
+### `realms registry create`
+
+Create and optionally deploy a registry instance.
+
+```bash
+realms registry create [OPTIONS]
+
+Options:
+  --name TEXT              Registry name (optional)
+  -o, --output-dir TEXT    Base output directory (default: .realms)
+  -n, --network TEXT       Network to deploy to [local|staging|ic] (default: local)
+  --deploy                 Deploy the registry after creation
+  --identity TEXT          Identity PEM file or dfx identity name
+  -m, --mode TEXT          Deploy mode: 'upgrade' or 'reinstall' (default: upgrade)
+```
+
+**Examples:**
+```bash
+# Create and deploy to local
+realms registry create --deploy
+
+# Create and deploy to staging (uses existing canister IDs from canister_ids.json)
+realms registry create --deploy --network staging
+
+# Create and deploy with reinstall (wipes stable memory)
+realms registry create --deploy --network staging --mode reinstall
+```
+
+**Note:** For non-local networks (staging, ic), the CLI automatically copies registry canister IDs from the root `canister_ids.json` file, allowing deployment to existing canisters.
+
 ### `realms status`
 
 Show the current status of your Realms project.

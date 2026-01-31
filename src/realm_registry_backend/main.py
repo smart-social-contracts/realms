@@ -64,7 +64,7 @@ from kybra_simple_logging import get_logger
 
 # Storage for the ORM (used internally by Database class)
 # Direct storage access is not needed - use Entity classes instead
-storage = StableBTreeMap[str, str](memory_id=1, max_key_size=100, max_value_size=2000)
+storage = StableBTreeMap[str, str](memory_id=1, max_key_size=200, max_value_size=2000)
 Database.init(db_storage=storage, audit_enabled=True)
 
 logger = get_logger("main")

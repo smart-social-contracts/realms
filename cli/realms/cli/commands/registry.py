@@ -335,6 +335,9 @@ def registry_create_command(
     registry_name: Optional[str] = None,
     output_dir: str = ".realms",
     network: str = "local",
+    deploy: bool = False,
+    identity: Optional[str] = None,
+    mode: str = "upgrade",
 ) -> Path:
     """Create a new registry instance.
     
@@ -342,6 +345,9 @@ def registry_create_command(
         registry_name: Optional name for the registry
         output_dir: Base output directory (default: .realms)
         network: Network to deploy to (default: local)
+        deploy: Whether to deploy after creation
+        identity: Optional identity file for IC deployment
+        mode: Deployment mode (upgrade, reinstall)
         
     Returns:
         Path to created registry directory
@@ -430,6 +436,25 @@ def registry_create_command(
         json.dump(registry_dfx, f, indent=2)
     console.print(f"   ✅ Created dfx.json")
     
+    # For non-local networks, copy registry canister IDs from root canister_ids.json
+    if not is_local_network:
+        root_canister_ids = repo_root / "canister_ids.json"
+        if root_canister_ids.exists():
+            with open(root_canister_ids, 'r') as f:
+                all_canister_ids = json.load(f)
+            
+            # Extract only registry-related canister IDs
+            registry_canister_ids = {}
+            for name in ["realm_registry_backend", "realm_registry_frontend"]:
+                if name in all_canister_ids:
+                    registry_canister_ids[name] = all_canister_ids[name]
+            
+            if registry_canister_ids:
+                registry_ids_path = registry_dir / "canister_ids.json"
+                with open(registry_ids_path, 'w') as f:
+                    json.dump(registry_canister_ids, f, indent=2)
+                console.print(f"   ✅ Copied canister_ids.json for existing {network} canisters")
+    
     # Create scripts directory
     scripts_dir = registry_dir / "scripts"
     scripts_dir.mkdir(exist_ok=True)
@@ -465,9 +490,19 @@ fi
     console.print(f"   ✅ Created scripts/2-deploy-canisters.sh")
     
     console.print(f"\n[green]✅ Registry created successfully at: {registry_dir}[/green]")
-    console.print(f"\n[yellow]📝 Next steps:[/yellow]")
-    console.print(f"   1. Deploy: realms registry deploy --folder {registry_dir}")
-    console.print(f"   2. Or run: cd {registry_dir} && bash scripts/2-deploy-canisters.sh")
+    
+    if deploy:
+        console.print("\n[bold yellow]🚀 Starting deployment...[/bold yellow]\n")
+        registry_deploy_command(
+            folder=str(registry_dir),
+            network=network,
+            mode=mode,
+            identity=identity,
+        )
+    else:
+        console.print(f"\n[yellow]📝 Next steps:[/yellow]")
+        console.print(f"   1. Deploy: realms registry deploy --folder {registry_dir}")
+        console.print(f"   2. Or run: cd {registry_dir} && bash scripts/2-deploy-canisters.sh")
     
     return registry_dir
 

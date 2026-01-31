@@ -800,9 +800,18 @@ def registry_create(
     registry_name: Optional[str] = typer.Option(None, "--name", help="Registry name"),
     output_dir: str = typer.Option(".realms", "--output-dir", "-o", help="Base output directory"),
     network: str = typer.Option("local", "--network", "-n", help="Network to deploy to"),
+    deploy: bool = typer.Option(
+        False, "--deploy", help="Deploy the registry after creation"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="Path to identity PEM file or identity name for dfx"
+    ),
+    mode: str = typer.Option(
+        "upgrade", "--mode", "-m", help="Deploy mode: 'upgrade' or 'reinstall' (wipes stable memory)"
+    ),
 ) -> None:
     """Create a new registry instance."""
-    registry_create_command(registry_name, output_dir, network)
+    registry_create_command(registry_name, output_dir, network, deploy, identity, mode)
 
 
 @registry_app.command("deploy")
