@@ -16,6 +16,7 @@ from api.status import get_status
 from api.zones import get_zone_aggregation
 from api.user import user_get, user_register, user_update_profile_picture
 from core.candid_types_realm import (
+    CanisterInfo,
     ExtensionCallArgs,
     ExtensionCallResponse,
     ObjectsListRecord,

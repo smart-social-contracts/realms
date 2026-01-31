@@ -4,6 +4,7 @@ Status API for Realm DAO system
 Provides health check and system status information
 """
 
+import os
 import sys
 from typing import Any
 
@@ -23,6 +24,7 @@ from ggg import (
     UserProfile,
     Vote,
 )
+from kybra import ic
 from kybra_simple_logging import get_logger
 
 # Initialize logger
@@ -105,6 +107,31 @@ def get_status() -> "dict[str, Any]":
     # TaskManager status can be queried via separate endpoint if needed
     task_manager_status = {"status": "available"}  # Simplified to reduce instructions
 
+    # Get canister IDs - backend is always self, others from env vars
+    canisters = []
+    
+    # Backend canister (self)
+    try:
+        backend_id = ic.id().to_str()
+        canisters.append({"canister_id": backend_id, "canister_type": "realm_backend"})
+    except Exception as e:
+        logger.warning(f"Could not get backend canister ID: {e}")
+    
+    # Frontend canister (from env var set during deployment)
+    frontend_id = os.environ.get("REALM_FRONTEND_CANISTER_ID", "")
+    if frontend_id:
+        canisters.append({"canister_id": frontend_id, "canister_type": "realm_frontend"})
+    
+    # Token backend canister (optional)
+    token_id = os.environ.get("TOKEN_BACKEND_CANISTER_ID", "")
+    if token_id:
+        canisters.append({"canister_id": token_id, "canister_type": "token_backend"})
+    
+    # NFT backend canister (optional)
+    nft_id = os.environ.get("NFT_BACKEND_CANISTER_ID", "")
+    if nft_id:
+        canisters.append({"canister_id": nft_id, "canister_type": "nft_backend"})
+
     # Return data in the format expected by the Status Candid type
     return {
         "version": version,
@@ -132,4 +159,5 @@ def get_status() -> "dict[str, Any]":
         "extensions": extension_names,
         "demo_mode": demo_mode,
         "task_manager": task_manager_status,
+        "canisters": canisters,
     }
