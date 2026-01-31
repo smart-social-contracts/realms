@@ -8,6 +8,11 @@ class PaginationInfo(Record):
     total_pages: int
 
 
+class CanisterInfo(Record):
+    canister_id: text
+    canister_type: text
+
+
 class StatusRecord(Record):
     version: text
     status: text
@@ -33,6 +38,7 @@ class StatusRecord(Record):
     realm_welcome_image: text
     realm_welcome_message: text
     user_profiles_count: nat
+    canisters: Vec[CanisterInfo]
 
 
 class UserGetRecord(Record):

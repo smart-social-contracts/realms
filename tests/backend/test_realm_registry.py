@@ -63,10 +63,10 @@ from realm_registry_backend.api.credits import (
     get_user_credits,
 )
 from realm_registry_backend.api.registry import (
-    add_registered_realm,
     count_registered_realms,
     get_registered_realm,
     list_registered_realms,
+    register_realm_by_caller,
     remove_registered_realm,
     search_registered_realms,
 )
@@ -102,6 +102,12 @@ def clear_database():
         pass
 
 
+def add_test_realm(realm_id: str, name: str, url: str = ""):
+    """Helper to add a realm using register_realm_by_caller with mocked caller"""
+    mock_ic.caller.return_value = realm_id
+    return register_realm_by_caller(name, url)
+
+
 def clear_user_credits():
     """Clear all user credits from the database"""
     try:
@@ -112,39 +118,30 @@ def clear_user_credits():
         pass
 
 
-def test_add_realm():
-    """Test adding a realm to the registry"""
+def test_register_realm():
+    """Test registering a realm with the registry"""
     try:
         clear_database()
 
-        # Test adding a valid realm
-        result = add_registered_realm(
-            "test-realm-1", "Test Realm 1", "https://test1.com"
-        )
-        assert result["success"], f"Failed to add realm: {result.get('error')}"
+        # Test registering a valid realm
+        result = add_test_realm("test-realm-1", "Test Realm 1", "https://test1.com")
+        assert result["success"], f"Failed to register realm: {result.get('error')}"
         assert "test-realm-1" in result["message"]
 
-        # Test adding duplicate realm
-        result = add_registered_realm(
-            "test-realm-1", "Test Realm 1 Duplicate", "https://test1.com"
-        )
-        assert not result["success"], "Should not allow duplicate realm IDs"
-        assert "already exists" in result["error"]
+        # Test updating existing realm (upsert behavior)
+        result = add_test_realm("test-realm-1", "Test Realm 1 Updated", "https://test1-updated.com")
+        assert result["success"], "Should allow updating existing realm"
+        assert result.get("action") == "updated"
 
-        # Test adding realm with empty ID
-        result = add_registered_realm("", "Empty ID Realm", "https://test.com")
-        assert not result["success"], "Should not allow empty realm ID"
-        assert "cannot be empty" in result["error"]
-
-        # Test adding realm with empty name
-        result = add_registered_realm("test-realm-2", "", "https://test.com")
+        # Test registering realm with empty name
+        result = add_test_realm("test-realm-2", "", "https://test.com")
         assert not result["success"], "Should not allow empty realm name"
         assert "cannot be empty" in result["error"]
 
-        print_success("add_realm tests passed")
+        print_success("register_realm tests passed")
         return True
     except Exception as e:
-        print_failure("add_realm tests failed", str(e))
+        print_failure("register_realm tests failed", str(e))
         return False
 
 
@@ -154,7 +151,7 @@ def test_get_realm():
         clear_database()
 
         # Add a test realm
-        add_registered_realm("test-realm-1", "Test Realm 1", "https://test1.com")
+        add_test_realm("test-realm-1", "Test Realm 1", "https://test1.com")
 
         # Test getting existing realm
         result = get_registered_realm("test-realm-1")
@@ -185,9 +182,9 @@ def test_list_realms():
         assert len(realms) == 0, "Should return empty list for empty registry"
 
         # Add multiple realms
-        add_registered_realm("test-realm-1", "Test Realm 1", "https://test1.com")
-        add_registered_realm("test-realm-2", "Test Realm 2", "https://test2.com")
-        add_registered_realm("test-realm-3", "Test Realm 3", "https://test3.com")
+        add_test_realm("test-realm-1", "Test Realm 1", "https://test1.com")
+        add_test_realm("test-realm-2", "Test Realm 2", "https://test2.com")
+        add_test_realm("test-realm-3", "Test Realm 3", "https://test3.com")
 
         # Test listing all realms
         realms = list_registered_realms()
@@ -206,7 +203,7 @@ def test_remove_realm():
         clear_database()
 
         # Add a test realm
-        add_registered_realm("test-realm-1", "Test Realm 1", "https://test1.com")
+        add_test_realm("test-realm-1", "Test Realm 1", "https://test1.com")
 
         # Test removing existing realm
         result = remove_registered_realm("test-realm-1")
@@ -234,9 +231,9 @@ def test_search_realms():
         clear_database()
 
         # Add test realms
-        add_registered_realm("demo-realm-1", "Demo Realm One", "https://demo1.com")
-        add_registered_realm("test-realm-1", "Test Realm One", "https://test1.com")
-        add_registered_realm("demo-realm-2", "Demo Realm Two", "https://demo2.com")
+        add_test_realm("demo-realm-1", "Demo Realm One", "https://demo1.com")
+        add_test_realm("test-realm-1", "Test Realm One", "https://test1.com")
+        add_test_realm("demo-realm-2", "Demo Realm Two", "https://demo2.com")
 
         # Test search by name
         results = search_registered_realms("demo")
@@ -277,8 +274,8 @@ def test_count_realms():
         assert count == 0, f"Expected 0 realms, got {count}"
 
         # Add realms
-        add_registered_realm("test-realm-1", "Test Realm 1", "https://test1.com")
-        add_registered_realm("test-realm-2", "Test Realm 2", "https://test2.com")
+        add_test_realm("test-realm-1", "Test Realm 1", "https://test1.com")
+        add_test_realm("test-realm-2", "Test Realm 2", "https://test2.com")
 
         # Test count
         count = count_registered_realms()
@@ -313,8 +310,8 @@ def test_status():
         assert status["realms_count"] == 0, f"Expected 0 realms, got {status['realms_count']}"
 
         # Add some realms and check count is updated
-        add_registered_realm("test-realm-1", "Test Realm 1", "https://test1.com")
-        add_registered_realm("test-realm-2", "Test Realm 2", "https://test2.com")
+        add_test_realm("test-realm-1", "Test Realm 1", "https://test1.com")
+        add_test_realm("test-realm-2", "Test Realm 2", "https://test2.com")
 
         status = get_status()
         assert status["realms_count"] == 2, f"Expected 2 realms, got {status['realms_count']}"
@@ -399,7 +396,7 @@ def run_tests():
 
     # Run tests
     tests = [
-        test_add_realm,
+        test_register_realm,
         test_get_realm,
         test_list_realms,
         test_remove_realm,

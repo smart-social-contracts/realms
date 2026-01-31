@@ -19,17 +19,11 @@ from ..utils import get_scripts_path, is_repo_mode
 
 # Dynamically import RealmGenerator based on mode
 def _get_realm_generator():
-    """Get RealmGenerator class - from scripts/ in repo mode, bundled in pip mode."""
-    if is_repo_mode():
-        # In repo mode - use scripts/realm_generator.py for latest code
-        scripts_path = get_scripts_path()
-        sys.path.insert(0, str(scripts_path))
-        from realm_generator import RealmGenerator
-        return RealmGenerator
-    else:
-        # In pip-installed mode - use bundled generator
-        from ..generator import RealmGenerator
-        return RealmGenerator
+    """Get RealmGenerator class - always use bundled generator with ggg.entities."""
+    # Always use bundled generator which uses ggg.entities (no kybra dependency)
+    # The scripts/realm_generator.py has import issues with backend's ggg module
+    from ..generator import RealmGenerator
+    return RealmGenerator
 from .deploy import _deploy_realm_internal
 
 console = Console()

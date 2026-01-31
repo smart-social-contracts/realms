@@ -57,7 +57,7 @@ class RealmRecord(Entity, TimestampedMixin):
 
     __alias__ = "id"
 
-    id = String()
+    id = String()  # realm_backend canister ID (primary identifier)
     name = String()
     url = String(max_length=512)
     backend_url = String(max_length=512)
@@ -66,6 +66,10 @@ class RealmRecord(Entity, TimestampedMixin):
     latitude = Float()
     longitude = Float()
     created_at = Float()
+    # Associated canister IDs
+    frontend_canister_id = String(max_length=64)
+    token_canister_id = String(max_length=64)
+    nft_canister_id = String(max_length=64)
 
     def to_dict(self) -> dict:
         """Convert realm record to dictionary format."""
@@ -79,4 +83,7 @@ class RealmRecord(Entity, TimestampedMixin):
             "latitude": getattr(self, 'latitude', None),
             "longitude": getattr(self, 'longitude', None),
             "created_at": self.created_at,
+            "frontend_canister_id": getattr(self, 'frontend_canister_id', '') or '',
+            "token_canister_id": getattr(self, 'token_canister_id', '') or '',
+            "nft_canister_id": getattr(self, 'nft_canister_id', '') or '',
         }

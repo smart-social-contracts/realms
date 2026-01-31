@@ -288,23 +288,35 @@ def get_scripts_path() -> Path:
     
     Priority:
     1. ./scripts (repo mode - local development)
-    2. Package bundled scripts (pip-installed mode)
-    3. /app/scripts (legacy Docker image mode)
+    2. ../scripts (repo mode - running from cli subfolder)
+    3. Package bundled scripts (pip-installed mode)
+    4. /srv/realms/scripts (server deployment)
+    5. /app/scripts (legacy Docker image mode)
     
     Returns:
         Path to scripts directory
     """
     # 1. Check for local repo scripts
     local_scripts = Path.cwd() / "scripts"
-    if local_scripts.exists() and (local_scripts / "realm_generator.py").exists():
+    if local_scripts.exists() and (local_scripts / "deploy_canisters.sh").exists():
         return local_scripts
     
-    # 2. Check for bundled scripts in pip package
+    # 2. Check parent directory (running from cli subfolder)
+    parent_scripts = Path.cwd().parent / "scripts"
+    if parent_scripts.exists() and (parent_scripts / "deploy_canisters.sh").exists():
+        return parent_scripts
+    
+    # 3. Check for bundled scripts in pip package
     package_scripts = Path(__file__).parent.parent / "scripts"  # cli -> realms -> scripts
     if package_scripts.exists() and (package_scripts / "deploy_canisters.sh").exists():
         return package_scripts
     
-    # 3. Fallback to Docker image path
+    # 4. Server deployment path
+    server_scripts = Path("/srv/realms/scripts")
+    if server_scripts.exists() and (server_scripts / "deploy_canisters.sh").exists():
+        return server_scripts
+    
+    # 5. Fallback to Docker image path
     return Path("/app/scripts")
 
 

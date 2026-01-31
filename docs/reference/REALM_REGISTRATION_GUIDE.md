@@ -9,8 +9,8 @@ The Realms platform has a **complete realm registry system** that allows realms 
 ### ✅ What Already Exists
 
 1. **Realm Registry Backend** (`realm_registry_backend` canister)
-   - `add_realm(realm_id, name, url)` - Register a realm
-   - `list_realms()` - List all registered realms
+   - `register_realm(name, url, logo, backend_url, frontend_canister_id, token_canister_id, nft_canister_id)` - Register a realm (uses caller's principal as ID)
+   - `list_realms()` - List all registered realms (includes all canister IDs)
    - `get_realm(realm_id)` - Get specific realm details
    - `remove_realm(realm_id)` - Remove a realm
    - `search_realms(query)` - Search realms by name/ID

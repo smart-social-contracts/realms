@@ -6,6 +6,9 @@ set -e
 # Enable verbose trace mode only if REALMS_VERBOSE is set (for --plain-logs)
 [ "$REALMS_VERBOSE" = "1" ] && set -x
 
+# Suppress dfx plaintext identity warning for mainnet
+export DFX_WARNING="-mainnet_plaintext_identity"
+
 # Parameters
 WORKING_DIR="${1:-.}"           # Directory containing dfx.json (default: current dir)
 NETWORK="${2:-local}"           # Network: local, staging, ic

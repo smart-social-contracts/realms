@@ -19,6 +19,14 @@
   let joinedRealms = [];
   let loadingRealms = true;
 
+  // Deployments data
+  let deployments = [];
+  let loadingDeployments = true;
+  let deploymentPollInterval = null;
+  
+  // Canister management service URL
+  const CANISTER_MGMT_URL = CONFIG.canister_management_url || 'https://canister-management.realmsgos.dev';
+
   // Top-up state
   let topUpAmount = 10;
   let topUpLoading = false;
@@ -50,7 +58,19 @@
       loading = false;
       
       // Load user data
-      await Promise.all([loadCredits(), loadRealms(), loadVouchers()]);
+      await Promise.all([loadCredits(), loadRealms(), loadVouchers(), loadDeployments()]);
+      
+      // Start polling for deployment status updates
+      startDeploymentPolling();
+    }
+  });
+  
+  import { onDestroy } from 'svelte';
+  
+  onDestroy(() => {
+    // Clean up polling interval
+    if (deploymentPollInterval) {
+      clearInterval(deploymentPollInterval);
     }
   });
 
@@ -89,6 +109,67 @@
     } finally {
       loadingRealms = false;
     }
+  }
+
+  async function loadDeployments() {
+    if (!userPrincipal) return;
+    loadingDeployments = true;
+    try {
+      const response = await fetch(`${CANISTER_MGMT_URL}/deploy?principal_id=${userPrincipal.toText()}`);
+      if (response.ok) {
+        deployments = await response.json();
+        // Sort by created_at descending
+        deployments.sort((a, b) => b.created_at - a.created_at);
+      }
+    } catch (err) {
+      console.error('Failed to load deployments:', err);
+      deployments = [];
+    } finally {
+      loadingDeployments = false;
+    }
+  }
+
+  function startDeploymentPolling() {
+    // Poll every 10 seconds for deployment status updates
+    deploymentPollInterval = setInterval(async () => {
+      // Only poll if there are active deployments
+      const hasActiveDeployments = deployments.some(d => 
+        d.status === 'pending' || d.status === 'in_progress'
+      );
+      
+      if (hasActiveDeployments) {
+        await loadDeployments();
+        // Refresh credits if a deployment completed
+        const justCompleted = deployments.some(d => d.status === 'completed');
+        if (justCompleted) {
+          await loadCredits();
+        }
+      }
+    }, 10000);
+  }
+
+  function getDeploymentStatusColor(status) {
+    switch (status) {
+      case 'completed': return '#22c55e';
+      case 'failed': return '#ef4444';
+      case 'in_progress': return '#3b82f6';
+      case 'pending': return '#f59e0b';
+      default: return '#6b7280';
+    }
+  }
+
+  function getDeploymentStatusLabel(status) {
+    switch (status) {
+      case 'completed': return 'Completed';
+      case 'failed': return 'Failed';
+      case 'in_progress': return 'Deploying...';
+      case 'pending': return 'Pending';
+      default: return status;
+    }
+  }
+
+  function formatDate(timestamp) {
+    return new Date(timestamp * 1000).toLocaleString();
   }
 
   async function loadVouchers() {
@@ -423,6 +504,45 @@
 
         {:else if activeTab === 'realms'}
           <div class="realms-section">
+            <!-- Active Deployments -->
+            {#if deployments.length > 0}
+              <div class="realms-group deployments-group">
+                <h3>Deployments</h3>
+                <ul class="deployment-list">
+                  {#each deployments as deployment}
+                    <li class="deployment-item">
+                      <div class="deployment-info">
+                        <span class="deployment-name">{deployment.realm_name}</span>
+                        <span class="deployment-date">{formatDate(deployment.created_at)}</span>
+                      </div>
+                      <div class="deployment-status-row">
+                        <span 
+                          class="deployment-status"
+                          style="background-color: {getDeploymentStatusColor(deployment.status)}20; color: {getDeploymentStatusColor(deployment.status)}; border-color: {getDeploymentStatusColor(deployment.status)}"
+                        >
+                          {#if deployment.status === 'in_progress'}
+                            <span class="spinner-tiny"></span>
+                          {/if}
+                          {getDeploymentStatusLabel(deployment.status)}
+                        </span>
+                        {#if deployment.status === 'completed' && deployment.realm_url}
+                          <a href={deployment.realm_url} target="_blank" rel="noopener noreferrer" class="visit-btn">
+                            Visit Realm →
+                          </a>
+                        {/if}
+                        {#if deployment.status === 'failed' && deployment.error}
+                          <span class="deployment-error" title={deployment.error}>Error</span>
+                        {/if}
+                      </div>
+                      {#if deployment.credits_charged > 0}
+                        <span class="credits-charged">-{deployment.credits_charged} credits</span>
+                      {/if}
+                    </li>
+                  {/each}
+                </ul>
+              </div>
+            {/if}
+
             <!-- Created Realms -->
             <div class="realms-group">
               <h3>{$_('dashboard.created_realms')}</h3>
@@ -1036,6 +1156,99 @@
 
   .realms-group:last-child {
     margin-bottom: 0;
+  }
+
+  /* Deployments Section */
+  .deployments-group {
+    background: #F0FDF4;
+    border: 1px solid #BBF7D0;
+    border-radius: 0.75rem;
+    padding: 1rem;
+  }
+
+  .deployment-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .deployment-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: #FFFFFF;
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid #E5E5E5;
+  }
+
+  .deployment-item:last-child {
+    margin-bottom: 0;
+  }
+
+  .deployment-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .deployment-name {
+    font-weight: 600;
+    color: #171717;
+  }
+
+  .deployment-date {
+    font-size: 0.75rem;
+    color: #737373;
+  }
+
+  .deployment-status-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .deployment-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border: 1px solid;
+  }
+
+  .spinner-tiny {
+    width: 12px;
+    height: 12px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  .visit-btn {
+    font-size: 0.75rem;
+    color: #2563EB;
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .visit-btn:hover {
+    text-decoration: underline;
+  }
+
+  .deployment-error {
+    font-size: 0.75rem;
+    color: #EF4444;
+    cursor: help;
+  }
+
+  .credits-charged {
+    font-size: 0.75rem;
+    color: #737373;
   }
 
   /* Responsive */

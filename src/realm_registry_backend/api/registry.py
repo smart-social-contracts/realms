@@ -28,7 +28,17 @@ def list_registered_realms() -> List[dict]:
         return []
 
 
-def register_realm_by_caller(name: str, url: str = "", logo: str = "", backend_url: str = "", latitude: Optional[float] = None, longitude: Optional[float] = None) -> dict:
+def register_realm_by_caller(
+    name: str,
+    url: str = "",
+    logo: str = "",
+    backend_url: str = "",
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
+    frontend_canister_id: str = "",
+    token_canister_id: str = "",
+    nft_canister_id: str = "",
+) -> dict:
     """Register a realm using the caller's principal as the unique ID (upsert logic)"""
     caller_id = str(ic.caller())
     logger.info(f"Registering realm by caller: {caller_id}")
@@ -50,6 +60,13 @@ def register_realm_by_caller(name: str, url: str = "", logo: str = "", backend_u
                 existing_realm.latitude = latitude
             if longitude is not None:
                 existing_realm.longitude = longitude
+            # Update canister IDs if provided
+            if frontend_canister_id:
+                existing_realm.frontend_canister_id = frontend_canister_id.strip()
+            if token_canister_id:
+                existing_realm.token_canister_id = token_canister_id.strip()
+            if nft_canister_id:
+                existing_realm.nft_canister_id = nft_canister_id.strip()
             logger.info(f"Updated existing realm: {caller_id} - {name}")
             return {"success": True, "message": f"Realm '{caller_id}' updated successfully", "action": "updated"}
 
@@ -65,6 +82,9 @@ def register_realm_by_caller(name: str, url: str = "", logo: str = "", backend_u
             created_at=float(
                 ic.time() / 1_000_000_000
             ),  # Convert nanoseconds to seconds
+            frontend_canister_id=frontend_canister_id.strip() if frontend_canister_id else "",
+            token_canister_id=token_canister_id.strip() if token_canister_id else "",
+            nft_canister_id=nft_canister_id.strip() if nft_canister_id else "",
         )
 
         logger.info(f"Successfully registered realm: {caller_id} - {name}")
@@ -73,48 +93,6 @@ def register_realm_by_caller(name: str, url: str = "", logo: str = "", backend_u
     except Exception as e:
         logger.error(f"Error registering realm {caller_id}: {str(e)}")
         return {"success": False, "error": f"Failed to register realm: {str(e)}"}
-
-
-def add_registered_realm(realm_id: str, name: str, url: str = "", logo: str = "", backend_url: str = "", latitude: Optional[float] = None, longitude: Optional[float] = None) -> dict:
-    """Add a new realm to the registry (legacy - use register_realm_by_caller instead)"""
-    logger.info(f"Adding realm to registry: {realm_id}")
-
-    try:
-        # Validate input
-        if not realm_id or not realm_id.strip():
-            return {"success": False, "error": "Realm ID cannot be empty"}
-
-        if not name or not name.strip():
-            return {"success": False, "error": "Realm name cannot be empty"}
-
-        # Check if realm already exists
-        existing_realm = RealmRecord[realm_id.strip()]
-        if existing_realm is not None:
-            return {
-                "success": False,
-                "error": f"Realm with ID '{realm_id}' already exists",
-            }
-
-        # Create realm record using ORM (auto-saves on creation)
-        realm = RealmRecord(
-            id=realm_id.strip(),
-            name=name.strip(),
-            url=url.strip() if url else "",
-            backend_url=backend_url.strip() if backend_url else "",
-            logo=logo.strip() if logo else "",
-            latitude=latitude,
-            longitude=longitude,
-            created_at=float(
-                ic.time() / 1_000_000_000
-            ),  # Convert nanoseconds to seconds
-        )
-
-        logger.info(f"Successfully added realm: {realm_id} - {name}")
-        return {"success": True, "message": f"Realm '{realm_id}' added successfully"}
-
-    except Exception as e:
-        logger.error(f"Error adding realm {realm_id}: {str(e)}")
-        return {"success": False, "error": f"Failed to add realm: {str(e)}"}
 
 
 def get_registered_realm(realm_id: str) -> dict:
