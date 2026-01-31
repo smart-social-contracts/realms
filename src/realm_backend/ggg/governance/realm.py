@@ -15,3 +15,7 @@ class Realm(Entity, TimestampedMixin):
     funds = OneToMany("Fund", "realm")
     justice_systems = OneToMany("JusticeSystem", "realm")
     principal_id = String(max_length=64)
+    # Canister IDs for this realm (set post-deployment via set_canister_config)
+    frontend_canister_id = String(max_length=64)
+    token_canister_id = String(max_length=64)
+    nft_canister_id = String(max_length=64)

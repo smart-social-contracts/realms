@@ -166,6 +166,50 @@ def get_canister_id() -> text:
     return ic.id().to_str()
 
 
+@update
+def set_canister_config(
+    frontend_canister_id: Opt[text],
+    token_canister_id: Opt[text],
+    nft_canister_id: Opt[text]
+) -> RealmResponse:
+    """
+    Set canister IDs for this realm (admin only).
+    Called post-deployment to enable canister discovery via status().
+    
+    Args:
+        frontend_canister_id: The realm_frontend canister ID
+        token_canister_id: Optional token_backend canister ID
+        nft_canister_id: Optional nft_backend canister ID
+    """
+    try:
+        from ggg import Realm
+        
+        realm = Realm.load("1")
+        if not realm:
+            return RealmResponse(
+                success=False,
+                data=RealmResponseData(error="Realm not found")
+            )
+        
+        if frontend_canister_id:
+            realm.frontend_canister_id = frontend_canister_id
+        if token_canister_id:
+            realm.token_canister_id = token_canister_id
+        if nft_canister_id:
+            realm.nft_canister_id = nft_canister_id
+        
+        realm.save()
+        logger.info(f"Updated canister config: frontend={frontend_canister_id}, token={token_canister_id}, nft={nft_canister_id}")
+        
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(message="Canister config updated")
+        )
+    except Exception as e:
+        logger.error(f"Error setting canister config: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
 @query
 def get_zones(resolution: nat = 6) -> text:
     """
