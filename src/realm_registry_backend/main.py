@@ -107,10 +107,23 @@ def list_realms() -> Vec[RealmRecord]:
 
 
 @update
-def register_realm(name: text, url: text, logo: text, backend_url: text = "") -> AddRealmResult:
+def register_realm(
+    name: text,
+    url: text,
+    logo: text,
+    backend_url: text = "",
+    frontend_canister_id: text = "",
+    token_canister_id: text = "",
+    nft_canister_id: text = "",
+) -> AddRealmResult:
     """Register calling realm (uses caller principal as ID, upsert logic)"""
     try:
-        result = register_realm_by_caller(name, url, logo, backend_url)
+        result = register_realm_by_caller(
+            name, url, logo, backend_url,
+            frontend_canister_id=frontend_canister_id,
+            token_canister_id=token_canister_id,
+            nft_canister_id=nft_canister_id,
+        )
         if result["success"]:
             return {"Ok": result["message"]}
         else:
