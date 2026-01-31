@@ -107,7 +107,7 @@ def get_status() -> "dict[str, Any]":
     # TaskManager status can be queried via separate endpoint if needed
     task_manager_status = {"status": "available"}  # Simplified to reduce instructions
 
-    # Get canister IDs - backend is always self, others from env vars
+    # Get canister IDs - backend is always self, others from canister_ids.json
     canisters = []
     
     # Backend canister (self)
@@ -117,20 +117,44 @@ def get_status() -> "dict[str, Any]":
     except Exception as e:
         logger.warning(f"Could not get backend canister ID: {e}")
     
-    # Frontend canister (from env var set during deployment)
-    frontend_id = os.environ.get("REALM_FRONTEND_CANISTER_ID", "")
-    if frontend_id:
-        canisters.append({"canister_id": frontend_id, "canister_type": "realm_frontend"})
+    # Load other canister IDs from canister_ids.json (copied during deployment)
+    canister_ids_data = {}
+    canister_ids_paths = [
+        "canister_ids.json",
+        "../canister_ids.json",
+        "/canister_ids.json",
+    ]
+    for path in canister_ids_paths:
+        try:
+            if os.path.exists(path):
+                import json as json_module
+                with open(path, 'r') as f:
+                    canister_ids_data = json_module.load(f)
+                logger.info(f"Loaded canister IDs from {path}")
+                break
+        except Exception as e:
+            logger.warning(f"Could not load canister_ids.json from {path}: {e}")
     
-    # Token backend canister (optional)
-    token_id = os.environ.get("TOKEN_BACKEND_CANISTER_ID", "")
-    if token_id:
-        canisters.append({"canister_id": token_id, "canister_type": "token_backend"})
+    # Map canister names to types
+    canister_type_map = {
+        "realm_frontend": "realm_frontend",
+        "token_backend": "token_backend",
+        "nft_backend": "nft_backend",
+    }
     
-    # NFT backend canister (optional)
-    nft_id = os.environ.get("NFT_BACKEND_CANISTER_ID", "")
-    if nft_id:
-        canisters.append({"canister_id": nft_id, "canister_type": "nft_backend"})
+    # Extract canister IDs for each network (try common network names)
+    networks_to_try = ["ic", "staging", "local"]
+    for canister_name, canister_type in canister_type_map.items():
+        if canister_name in canister_ids_data:
+            canister_entry = canister_ids_data[canister_name]
+            # canister_ids.json format: {"canister_name": {"network": "canister-id"}}
+            for network in networks_to_try:
+                if network in canister_entry:
+                    canisters.append({
+                        "canister_id": canister_entry[network],
+                        "canister_type": canister_type
+                    })
+                    break
 
     # Return data in the format expected by the Status Candid type
     return {
