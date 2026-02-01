@@ -168,8 +168,12 @@
     }
   }
 
-  function formatDate(timestamp) {
-    return new Date(timestamp * 1000).toLocaleString();
+  function formatDate(dateValue) {
+    // Handle both unix timestamps and ISO date strings
+    if (typeof dateValue === 'number') {
+      return new Date(dateValue * 1000).toLocaleString();
+    }
+    return new Date(dateValue).toLocaleDateString();
   }
 
   async function loadVouchers() {
@@ -257,10 +261,6 @@
     } finally {
       topUpLoading = false;
     }
-  }
-
-  function formatDate(dateString) {
-    return new Date(dateString).toLocaleDateString();
   }
 </script>
 
