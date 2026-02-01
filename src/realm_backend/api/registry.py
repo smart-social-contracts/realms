@@ -17,10 +17,17 @@ class AddRealmResult(Variant, total=False):
 
 
 # Define the registry canister service interface
+# Note: Kybra limits service methods to 6 params (including self)
+# So we pass canister_ids as a JSON string
 class RealmRegistryService(Service):
     @service_update
     def register_realm(
-        self, name: text, url: text, logo: text, backend_url: text
+        self,
+        name: text,
+        url: text,
+        logo: text,
+        backend_url: text,
+        canister_ids_json: text,  # JSON: {frontend, token, nft}
     ) -> AddRealmResult:
         ...
 
@@ -31,6 +38,7 @@ def register_realm(
     realm_url: str = "",
     realm_logo: str = "",
     backend_url: str = "",
+    canister_ids: dict = None,  # {frontend_canister_id, token_canister_id, nft_canister_id}
 ) -> Async[Dict]:
     """
     Register this realm with the central realm registry.
@@ -45,6 +53,7 @@ def register_realm(
         realm_url: Frontend canister URL (optional)
         realm_logo: URL or path to realm logo (optional)
         backend_url: Backend canister URL (optional)
+        canister_ids: Dict with frontend_canister_id, token_canister_id, nft_canister_id (optional)
 
     Returns:
         Dictionary with success status and message/error
@@ -61,13 +70,20 @@ def register_realm(
             logger.info(f"Constructed full logo URL: {realm_logo}")
 
         # Create registry canister reference and make inter-canister call
+        # Pack canister IDs into JSON string (Kybra limits params to 6 including self)
+        canister_ids = canister_ids or {}
+        canister_ids_json = json.dumps({
+            "frontend_canister_id": canister_ids.get("frontend_canister_id", ""),
+            "token_canister_id": canister_ids.get("token_canister_id", ""),
+            "nft_canister_id": canister_ids.get("nft_canister_id", ""),
+        })
         logger.info(
-            f"Calling registry register_realm with args: ({realm_name}, {realm_url}, {realm_logo}, {backend_url})"
+            f"Calling registry register_realm with args: ({realm_name}, {realm_url}, {realm_logo}, {backend_url}, {canister_ids_json})"
         )
 
         registry = RealmRegistryService(Principal.from_str(registry_canister_id))
         result: CallResult[AddRealmResult] = yield registry.register_realm(
-            realm_name, realm_url, realm_logo, backend_url
+            realm_name, realm_url, realm_logo, backend_url, canister_ids_json
         )
 
         logger.info(f"Registry call result: {result}")

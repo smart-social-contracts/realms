@@ -22,14 +22,11 @@ import sys
 import os
 import shutil
 
-# Add the src directory to the Python path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src/realm_backend'))
-
-# Add the CLI directory to the Python path to access constants
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'cli'))
+# Add the CLI directory to the Python path to access constants and ggg.entities
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'cli'))
 
 from realms.cli.constants import REALM_FOLDER
-from ggg import (
+from realms.ggg.entities import (
     UserProfile,
     Profiles,
     User,

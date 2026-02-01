@@ -10,7 +10,6 @@ from api.credits import (
     get_user_transactions,
 )
 from api.registry import (
-    add_registered_realm,
     count_registered_realms,
     get_registered_realm,
     list_registered_realms,
@@ -107,30 +106,33 @@ def list_realms() -> Vec[RealmRecord]:
 
 
 @update
-def register_realm(name: text, url: text, logo: text, backend_url: text = "") -> AddRealmResult:
-    """Register calling realm (uses caller principal as ID, upsert logic)"""
+def register_realm(
+    name: text,
+    url: text,
+    logo: text,
+    backend_url: text = "",
+    canister_ids_json: text = "{}",
+) -> AddRealmResult:
+    """Register calling realm (uses caller principal as ID, upsert logic)
+    
+    Note: Kybra limits canister methods to 5 params, so canister IDs are passed as JSON.
+    """
     try:
-        result = register_realm_by_caller(name, url, logo, backend_url)
+        # Parse canister IDs from JSON string
+        canister_ids = json.loads(canister_ids_json) if canister_ids_json else {}
+        
+        result = register_realm_by_caller(
+            name, url, logo, backend_url,
+            frontend_canister_id=canister_ids.get("frontend_canister_id", ""),
+            token_canister_id=canister_ids.get("token_canister_id", ""),
+            nft_canister_id=canister_ids.get("nft_canister_id", ""),
+        )
         if result["success"]:
             return {"Ok": result["message"]}
         else:
             return {"Err": result["error"]}
     except Exception as e:
         logger.error(f"Error in register_realm: {str(e)}")
-        return {"Err": f"Internal error: {str(e)}"}
-
-
-@update
-def add_realm(realm_id: text, name: text, url: text, logo: text, backend_url: text = "") -> AddRealmResult:
-    """Add a new realm to the registry (legacy)"""
-    try:
-        result = add_registered_realm(realm_id, name, url, logo, backend_url)
-        if result["success"]:
-            return {"Ok": result["message"]}
-        else:
-            return {"Err": result["error"]}
-    except Exception as e:
-        logger.error(f"Error in add_realm: {str(e)}")
         return {"Err": f"Internal error: {str(e)}"}
 
 

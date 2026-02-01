@@ -23,6 +23,7 @@ from ggg import (
     UserProfile,
     Vote,
 )
+from kybra import ic
 from kybra_simple_logging import get_logger
 
 # Initialize logger
@@ -105,6 +106,38 @@ def get_status() -> "dict[str, Any]":
     # TaskManager status can be queried via separate endpoint if needed
     task_manager_status = {"status": "available"}  # Simplified to reduce instructions
 
+    # Get canister IDs - backend is self, others from Realm entity
+    canisters = []
+    
+    # Backend canister (self)
+    try:
+        backend_id = ic.id().to_str()
+        canisters.append({"canister_id": backend_id, "canister_type": "realm_backend"})
+    except Exception as e:
+        logger.warning(f"Could not get backend canister ID: {e}")
+    
+    # Load other canister IDs from Realm entity (set via set_canister_config)
+    try:
+        first_realm = Realm.load("1")
+        if first_realm:
+            if getattr(first_realm, 'frontend_canister_id', None):
+                canisters.append({
+                    "canister_id": first_realm.frontend_canister_id,
+                    "canister_type": "realm_frontend"
+                })
+            if getattr(first_realm, 'token_canister_id', None):
+                canisters.append({
+                    "canister_id": first_realm.token_canister_id,
+                    "canister_type": "token_backend"
+                })
+            if getattr(first_realm, 'nft_canister_id', None):
+                canisters.append({
+                    "canister_id": first_realm.nft_canister_id,
+                    "canister_type": "nft_backend"
+                })
+    except Exception as e:
+        logger.warning(f"Could not load canister IDs from Realm entity: {e}")
+
     # Return data in the format expected by the Status Candid type
     return {
         "version": version,
@@ -132,4 +165,5 @@ def get_status() -> "dict[str, Any]":
         "extensions": extension_names,
         "demo_mode": demo_mode,
         "task_manager": task_manager_status,
+        "canisters": canisters,
     }
