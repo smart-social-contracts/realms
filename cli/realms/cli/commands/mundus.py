@@ -272,13 +272,28 @@ def _deploy_single_realm(
     network: str,
     mode: str,
     identity: Optional[str],
+    env_vars: Optional[dict] = None,
 ) -> Tuple[bool, str]:
     """Deploy a single realm - designed to run in a subprocess.
+    
+    Args:
+        folder: Path to realm directory
+        network: Network to deploy to
+        mode: Deployment mode (upgrade, reinstall, install)
+        identity: Identity file path
+        env_vars: Environment variables to set in the subprocess (for ProcessPoolExecutor)
     
     Returns:
         Tuple of (success: bool, error_message: str)
     """
     try:
+        # Set environment variables passed from parent process
+        # This is needed because ProcessPoolExecutor doesn't inherit env vars
+        if env_vars:
+            for key, value in env_vars.items():
+                if value:  # Only set if value is not None/empty
+                    os.environ[key] = value
+        
         # Import here to avoid circular imports and ensure fresh import in subprocess
         from .deploy import deploy_command as realm_deploy_command
         
@@ -545,6 +560,13 @@ def mundus_deploy_command(
     failed_realms = []
     successful_realms = []
     
+    # Collect environment variables to pass to child processes
+    # ProcessPoolExecutor spawns separate processes that don't inherit os.environ
+    deploy_env_vars = {
+        'REGISTRY_CANISTER_ID': os.environ.get('REGISTRY_CANISTER_ID'),
+        'REALMS_TOKEN_CANISTER_ID': os.environ.get('REALMS_TOKEN_CANISTER_ID'),
+    }
+    
     # Use ProcessPoolExecutor for parallel deployment
     with ProcessPoolExecutor(max_workers=len(realm_dirs)) as executor:
         # Submit all realm deployments
@@ -555,6 +577,7 @@ def mundus_deploy_command(
                 network,
                 mode,
                 identity,
+                deploy_env_vars,  # Pass env vars to child processes
             ): realm_dir for realm_dir in realm_dirs
         }
         
