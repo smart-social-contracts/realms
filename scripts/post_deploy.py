@@ -159,8 +159,10 @@ try:
             print(f"   Registering realm with central registry...")
             
             # Call realm_backend's register_realm function which makes inter-canister call
-            # Signature: register_realm(registry_canister_id, realm_name, realm_url, realm_logo, backend_url)
-            register_args = f'("{registry_canister_id}", "{realm_name}", "{frontend_url}", "{logo_url}", "{backend_url}")'
+            # Signature: register_realm_with_registry(registry_canister_id, realm_name, frontend_url, logo_url, canister_ids_json)
+            # canister_ids_json should contain backend_url and other canister IDs
+            canister_ids_json = json.dumps({"backend_url": backend_url}).replace('"', '\\"')
+            register_args = f'("{registry_canister_id}", "{realm_name}", "{frontend_url}", "{logo_url}", "{canister_ids_json}")'
             register_cmd = [
                 'dfx', 'canister', 'call', backend_name_local, 'register_realm_with_registry',
                 register_args,
@@ -169,7 +171,14 @@ try:
             
             register_result = subprocess.run(register_cmd, cwd=realm_dir, capture_output=True, text=True)
             if register_result.returncode == 0:
-                print(f"   ✅ Realm registered successfully!")
+                # Check actual response content, not just returncode
+                response = register_result.stdout.strip()
+                if '"success": true' in response.lower() or '"success":true' in response.lower():
+                    print(f"   ✅ Realm registered successfully!")
+                    print(f"   Response: {response[:200]}..." if len(response) > 200 else f"   Response: {response}")
+                else:
+                    print(f"   ⚠️  Registration may have failed. Response: {response[:300]}")
+                    # Continue to fallback
             else:
                 # Fallback: Try direct CLI registration if inter-canister call fails
                 print(f"   ⚠️  Inter-canister registration failed, trying direct registration...")
