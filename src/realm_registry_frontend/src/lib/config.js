@@ -6,7 +6,7 @@
 export const CONFIG = { 
   internet_identity_url: 'https://identity.ic0.app/',
   billing_service_url: 'https://billing.realmsgos.dev',
-  canister_management_url: 'https://canister-management.realmsgos.dev',
+  canister_management_url: 'https://management.realmsgos.dev',
 };
 
 export const DEV_PORT = 8000;
