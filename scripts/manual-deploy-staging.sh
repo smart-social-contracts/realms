@@ -32,10 +32,10 @@ case "$TYPE" in
         echo "📋 Deploying registry..."
         if [ "$MODE" = "reinstall" ]; then
             echo "   Reinstall mode: deploying with fresh state"
-            realms registry create --manifest examples/demo/registry/manifest.json --network $NETWORK --deploy --mode reinstall
+            realms registry create --network $NETWORK --deploy --mode reinstall
         else
             echo "   Upgrade mode: preserving existing data"
-            realms registry create --manifest examples/demo/registry/manifest.json --network $NETWORK --deploy --mode upgrade
+            realms registry create --network $NETWORK --deploy --mode upgrade
         fi
         ;;
     mundus)
