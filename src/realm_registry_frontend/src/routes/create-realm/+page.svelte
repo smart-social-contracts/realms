@@ -19,7 +19,7 @@
   let isDeploying = false;
   let deployError = null;
   let deploySuccess = null;
-  let deployedRealmUrl = null;
+  let deploymentId = null;
 
   onMount(async () => {
     if (browser) {
@@ -112,9 +112,9 @@
         return;
       }
       
-      // Deployment successful - credits are deducted by the service
+      // Deployment started - it runs in the background
       deploySuccess = true;
-      deployedRealmUrl = data.realm_url;
+      deploymentId = data.deployment_id;
       
       // Refresh credits after successful deployment
       await loadUserCredits();
@@ -1321,16 +1321,14 @@
             {:else if deployMode === 'automatic'}
               <!-- Deploy button when automatic mode is selected and user has credits -->
               {#if deploySuccess}
-                <div class="deploy-success">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                <div class="deploy-success deploy-in-progress">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spinning">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
                   </svg>
                   <div>
-                    <strong>Realm deployed successfully!</strong>
-                    {#if deployedRealmUrl}
-                      <a href={deployedRealmUrl} target="_blank" rel="noopener noreferrer">Visit your realm →</a>
-                    {/if}
+                    <strong>Your realm is being deployed!</strong>
+                    <p class="deploy-info">Deployment typically takes 5-10 minutes. You can monitor the progress in your dashboard.</p>
+                    <a href="/my-dashboard" class="btn btn-small btn-primary">View Deployment Status →</a>
                   </div>
                 </div>
               {:else}
@@ -3046,6 +3044,32 @@
     color: #166534;
     font-weight: 500;
     text-decoration: underline;
+  }
+
+  .deploy-success.deploy-in-progress {
+    background: #FEF3C7;
+    border-color: #FCD34D;
+    color: #92400E;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .deploy-success.deploy-in-progress svg {
+    color: #F59E0B;
+  }
+
+  .deploy-success.deploy-in-progress svg.spinning {
+    animation: spin 1s linear infinite;
+  }
+
+  .deploy-success .deploy-info {
+    margin: 0.5rem 0;
+    font-size: 0.875rem;
+    opacity: 0.9;
+  }
+
+  .deploy-success .btn {
+    margin-top: 0.5rem;
   }
 
   .spinner-small {

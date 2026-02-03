@@ -543,6 +543,38 @@
               </div>
             {/if}
 
+            <!-- Deployments in Progress -->
+            {#if deployments.length > 0}
+              <div class="realms-group deployments-section">
+                <h3>🚀 Deployments in Progress</h3>
+                <ul class="deployment-list">
+                  {#each deployments as deployment}
+                    <li class="deployment-item">
+                      <div class="deployment-header">
+                        <span class="deployment-name">{deployment.realm_name || 'Unnamed Realm'}</span>
+                        <span class="deployment-status status-{deployment.status}">
+                          {#if deployment.status === 'running'}
+                            <span class="status-spinner"></span>
+                          {/if}
+                          {deployment.status}
+                        </span>
+                      </div>
+                      <div class="deployment-id">ID: {deployment.deployment_id}</div>
+                      <div class="deployment-time">Started: {formatDate(deployment.started_at)}</div>
+                      {#if deployment.status === 'completed' && deployment.frontend_url}
+                        <a href={deployment.frontend_url} target="_blank" rel="noopener noreferrer" class="deployment-link">
+                          Visit Realm →
+                        </a>
+                      {/if}
+                      {#if deployment.status === 'failed' && deployment.error}
+                        <div class="deployment-error">{deployment.error}</div>
+                      {/if}
+                    </li>
+                  {/each}
+                </ul>
+              </div>
+            {/if}
+
             <!-- Created Realms -->
             <div class="realms-group">
               <h3>{$_('dashboard.created_realms')}</h3>
@@ -1249,6 +1281,69 @@
   .credits-charged {
     font-size: 0.75rem;
     color: #737373;
+  }
+
+  /* Deployments in My Realms section */
+  .deployments-section {
+    background: #FEF3C7;
+    border: 1px solid #FCD34D;
+    border-radius: 0.75rem;
+    padding: 1rem;
+  }
+
+  .deployments-section h3 {
+    color: #92400E;
+  }
+
+  .deployment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .deployment-id,
+  .deployment-time {
+    font-size: 0.75rem;
+    color: #737373;
+  }
+
+  .deployment-link {
+    font-size: 0.875rem;
+    color: #2563EB;
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .deployment-link:hover {
+    text-decoration: underline;
+  }
+
+  .status-spinner {
+    width: 12px;
+    height: 12px;
+    border: 2px solid #F59E0B;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+  }
+
+  .status-running {
+    background: #FEF3C7;
+    border-color: #FCD34D;
+    color: #92400E;
+  }
+
+  .status-completed {
+    background: #D1FAE5;
+    border-color: #6EE7B7;
+    color: #065F46;
+  }
+
+  .status-failed {
+    background: #FEE2E2;
+    border-color: #FCA5A5;
+    color: #991B1B;
   }
 
   /* Responsive */
