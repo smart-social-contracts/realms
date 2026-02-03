@@ -9,6 +9,28 @@ set -e
 # Suppress dfx plaintext identity warning for mainnet
 export DFX_WARNING="-mainnet_plaintext_identity"
 
+# Retry wrapper for dfx commands (handles transient 503 errors)
+retry_dfx() {
+    local max_attempts=3
+    local attempt=1
+    local delay=5
+    
+    while [ $attempt -le $max_attempts ]; do
+        if "$@"; then
+            return 0
+        fi
+        
+        local exit_code=$?
+        echo "   ⚠️  Command failed (attempt $attempt/$max_attempts), retrying in ${delay}s..."
+        sleep $delay
+        attempt=$((attempt + 1))
+        delay=$((delay * 2))
+    done
+    
+    echo "   ❌ Command failed after $max_attempts attempts"
+    return 1
+}
+
 # Parameters
 WORKING_DIR="${1:-.}"           # Directory containing dfx.json (default: current dir)
 NETWORK="${2:-local}"           # Network: local, staging, ic
@@ -216,9 +238,9 @@ if [ "$NETWORK" = "local" ]; then
                     continue
                 fi
                 echo "   📎 Configuring indexer with ledger_id: $ledger_id"
-                dfx deploy "$shared_canister" --yes --argument "(opt variant { Init = record { ledger_id = principal \"$ledger_id\" } })"
+                retry_dfx dfx deploy "$shared_canister" --yes --argument "(opt variant { Init = record { ledger_id = principal \"$ledger_id\" } })"
             else
-                dfx deploy "$shared_canister" --yes
+                retry_dfx dfx deploy "$shared_canister" --yes
             fi
             
             dfx canister start --network "$NETWORK" "$shared_canister" 2>/dev/null || true
@@ -240,9 +262,9 @@ for canister in $BACKENDS; do
     echo "   📦 Deploying $canister..."
     if [ "$NETWORK" = "local" ]; then
         # For local, let dfx decide mode (clean = install, otherwise upgrade)
-        dfx deploy "$canister" --yes
+        retry_dfx dfx deploy "$canister" --yes
     else
-        dfx deploy --network "$NETWORK" --yes "$canister" --mode="$MODE"
+        retry_dfx dfx deploy --network "$NETWORK" --yes "$canister" --mode="$MODE"
     fi
     
     # Start canister
@@ -500,9 +522,9 @@ if [ -n "$FRONTENDS" ]; then
         # Deploy frontend (use reinstall mode for non-local - asset canisters are stateless)
         echo "   📦 Deploying $canister..."
         if [ "$NETWORK" = "local" ]; then
-            dfx deploy "$canister"
+            retry_dfx dfx deploy "$canister"
         else
-            dfx deploy --network "$NETWORK" --yes "$canister" --mode reinstall
+            retry_dfx dfx deploy --network "$NETWORK" --yes "$canister" --mode reinstall
         fi
     done
 fi
