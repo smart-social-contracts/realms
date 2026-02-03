@@ -1,8 +1,10 @@
 include README.md
 include LICENSE
 include pyproject.toml
-recursive-include realms_cli *.py
-recursive-include realms_cli/templates *.j2 *.txt *.json
-recursive-include ../scripts *.sh
+recursive-include realms *.py
+recursive-include realms/cli/templates *.j2 *.txt *.json
+recursive-include realms/scripts *.sh *.py
+recursive-include realms/src *.py *.js *.ts *.svelte *.css *.html *.json *.did
+recursive-include realms/extensions *.py *.js *.ts *.svelte *.css *.html *.json *.md
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]

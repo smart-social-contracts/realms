@@ -150,8 +150,33 @@ else
     echo "   Found: $BACKENDS"
 fi
 
-# Define shared canisters that may be skipped (deployed once by mundus)
-SHARED_CANISTERS="internet_identity ckbtc_ledger ckbtc_indexer token_backend nft_backend"
+# Define shared canister PATTERNS (may be prefixed with realm name)
+# These match both exact names and prefixed versions (e.g., token_backend OR docker_test_token_backend)
+SHARED_PATTERNS="internet_identity ckbtc_ledger ckbtc_indexer token_backend nft_backend"
+
+# Function to find actual canister name in dfx.json matching a pattern
+# Matches exact name or names ending with _<pattern>
+find_canister_name() {
+    local pattern=$1
+    for canister in $BACKENDS; do
+        if [ "$canister" = "$pattern" ] || [[ "$canister" == *_${pattern} ]]; then
+            echo "$canister"
+            return 0
+        fi
+    done
+    echo ""
+    return 1
+}
+
+# Build list of actual shared canister names found in dfx.json
+SHARED_CANISTERS=""
+for pattern in $SHARED_PATTERNS; do
+    actual_name=$(find_canister_name "$pattern" || true)
+    if [ -n "$actual_name" ]; then
+        SHARED_CANISTERS="$SHARED_CANISTERS $actual_name"
+    fi
+done
+SHARED_CANISTERS=$(echo $SHARED_CANISTERS | xargs)  # trim whitespace
 
 # Deploy shared canisters FIRST (if present and not already deployed)
 echo ""
@@ -170,31 +195,33 @@ if [ "$NETWORK" = "local" ]; then
     fi
 
     for shared_canister in $SHARED_CANISTERS; do
-        # Check if this shared canister is defined in dfx.json
-        if echo "$BACKENDS" | grep -q "$shared_canister"; then
-            # Check if already deployed
-            existing_id=$(dfx canister id "$shared_canister" --network "$NETWORK" 2>/dev/null || echo "")
-            if [ -n "$existing_id" ]; then
-                echo "🔗 $shared_canister already deployed: $existing_id. Skipping..."
-            else
-                echo "🔗 Deploying $shared_canister..."
-                
-                # Special handling for ckbtc_indexer: must be deployed with correct ledger_id
-                if [ "$shared_canister" = "ckbtc_indexer" ]; then
-                    # Get the ledger canister ID (must be deployed first)
-                    ledger_id=$(dfx canister id ckbtc_ledger --network "$NETWORK" 2>/dev/null || echo "")
-                    if [ -z "$ledger_id" ]; then
-                        echo "   ⚠️  ckbtc_ledger not deployed yet, skipping ckbtc_indexer"
-                        continue
-                    fi
-                    echo "   📎 Configuring indexer with ledger_id: $ledger_id"
-                    dfx deploy "$shared_canister" --yes --argument "(opt variant { Init = record { ledger_id = principal \"$ledger_id\" } })"
-                else
-                    dfx deploy "$shared_canister" --yes
+        # Check if already deployed
+        existing_id=$(dfx canister id "$shared_canister" --network "$NETWORK" 2>/dev/null || echo "")
+        if [ -n "$existing_id" ]; then
+            echo "🔗 $shared_canister already deployed: $existing_id. Skipping..."
+        else
+            echo "🔗 Deploying $shared_canister..."
+            
+            # Special handling for ckbtc_indexer: must be deployed with correct ledger_id
+            if [[ "$shared_canister" == *ckbtc_indexer ]] || [ "$shared_canister" = "ckbtc_indexer" ]; then
+                # Get the ledger canister ID (must be deployed first) - find actual name
+                ledger_name=$(find_canister_name "ckbtc_ledger")
+                if [ -z "$ledger_name" ]; then
+                    echo "   ⚠️  ckbtc_ledger not found in dfx.json, skipping indexer"
+                    continue
                 fi
-                
-                dfx canister start --network "$NETWORK" "$shared_canister" 2>/dev/null || true
+                ledger_id=$(dfx canister id "$ledger_name" --network "$NETWORK" 2>/dev/null || echo "")
+                if [ -z "$ledger_id" ]; then
+                    echo "   ⚠️  $ledger_name not deployed yet, skipping indexer"
+                    continue
+                fi
+                echo "   📎 Configuring indexer with ledger_id: $ledger_id"
+                dfx deploy "$shared_canister" --yes --argument "(opt variant { Init = record { ledger_id = principal \"$ledger_id\" } })"
+            else
+                dfx deploy "$shared_canister" --yes
             fi
+            
+            dfx canister start --network "$NETWORK" "$shared_canister" 2>/dev/null || true
         fi
     done
     "$REPO_ROOT/scripts/set_canister_config.py" "$NETWORK"
