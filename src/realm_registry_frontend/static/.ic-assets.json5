@@ -30,7 +30,7 @@
         "security_policy": "standard",
 
         "headers": {
-            "Content-Security-Policy": "default-src 'self';script-src 'self' 'unsafe-eval' 'unsafe-inline';connect-src 'self' http://localhost:* http://*.localhost:8000 https://icp0.io https://*.icp0.io https://icp-api.io https://*.ic0.app https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://billing.realmsgos.dev;img-src 'self' data: http://*.localhost:8000 https://*.icp0.io https://*.ic0.app https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com;style-src * 'unsafe-inline';style-src-elem * 'unsafe-inline';font-src *;object-src 'none';base-uri 'self';frame-ancestors 'none';form-action 'self';upgrade-insecure-requests;",
+            "Content-Security-Policy": "default-src 'self';script-src 'self' 'unsafe-eval' 'unsafe-inline';connect-src 'self' http://localhost:* http://*.localhost:8000 https://icp0.io https://*.icp0.io https://icp-api.io https://*.ic0.app https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://billing.realmsgos.dev https://management.realmsgos.dev https://canister-management.realmsgos.dev;img-src 'self' data: http://*.localhost:8000 https://*.icp0.io https://*.ic0.app https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com;style-src * 'unsafe-inline';style-src-elem * 'unsafe-inline';font-src *;object-src 'none';base-uri 'self';frame-ancestors 'none';form-action 'self';upgrade-insecure-requests;",
         },
 
         // Uncomment to disable the warning about using the
