@@ -40,7 +40,10 @@ from ..ggg import (
     Task,
     TaskSchedule,
     TaskStep,
-    Call
+    Call,
+    Zone,
+    Land,
+    LandType,
 )
 
 
@@ -248,6 +251,140 @@ class RealmGenerator:
             
         return mandates
     
+    def generate_zones(self, users: List[User], humans: List[Human]) -> List[Zone]:
+        """Generate zone data for users based on their Human's coordinates"""
+        zones = []
+        
+        # Create a mapping of user_id to human for quick lookup
+        user_to_human = {h.user_id: h for h in humans if hasattr(h, 'user_id')}
+        
+        # Major world cities for naming zones
+        cities = [
+            {"name": "New York", "lat": 40.7128, "lng": -74.0060},
+            {"name": "London", "lat": 51.5074, "lng": -0.1278},
+            {"name": "Tokyo", "lat": 35.6762, "lng": 139.6503},
+            {"name": "Paris", "lat": 48.8566, "lng": 2.3522},
+            {"name": "Sydney", "lat": -33.8688, "lng": 151.2093},
+            {"name": "Singapore", "lat": 1.3521, "lng": 103.8198},
+            {"name": "Dubai", "lat": 25.2048, "lng": 55.2708},
+            {"name": "São Paulo", "lat": -23.5505, "lng": -46.6333},
+            {"name": "Mumbai", "lat": 19.0760, "lng": 72.8777},
+            {"name": "Berlin", "lat": 52.5200, "lng": 13.4050},
+        ]
+        
+        for user in users:
+            human = user_to_human.get(user.id)
+            if not human:
+                continue
+            
+            # Get lat/lng from human or generate random coordinates
+            lat = getattr(human, 'latitude', None)
+            lng = getattr(human, 'longitude', None)
+            if lat is None or lng is None:
+                lat = random.uniform(-60, 70)
+                lng = random.uniform(-180, 180)
+            
+            # Generate H3 index (simplified - real implementation would use h3 library)
+            try:
+                import h3
+                h3_index = h3.latlng_to_cell(lat, lng, 6)
+            except ImportError:
+                # Fallback: generate pseudo H3 index
+                h3_index = f"86{abs(hash(f'{lat}{lng}')) % 0xFFFFFFFF:08x}fffffff"[:16]
+            
+            # Find nearest city for naming
+            city_name = "Unknown"
+            min_dist = float('inf')
+            for city in cities:
+                dist = abs(lat - city["lat"]) + abs(lng - city["lng"])
+                if dist < min_dist:
+                    min_dist = dist
+                    city_name = city["name"]
+            
+            zone = Zone(
+                h3_index=h3_index,
+                name=f"{city_name} Zone",
+                description=f"Zone of influence near {city_name}",
+                latitude=lat,
+                longitude=lng,
+                resolution=6.0,
+                user_id=user.id,
+                metadata="{}"
+            )
+            zones.append(zone)
+        
+        return zones
+    
+    def generate_lands(self, zones: List[Zone], parcels_per_zone: int = 9) -> tuple:
+        """Generate land parcels within existing zones.
+        
+        Creates smaller zones (higher H3 resolution) within each parent zone,
+        and associates them with Land entities.
+        
+        Args:
+            zones: Parent zones (resolution 6)
+            parcels_per_zone: Number of land parcels to create per zone (default 9)
+            
+        Returns:
+            Tuple of (lands, child_zones) - Land entities and their associated smaller zones
+        """
+        lands = []
+        child_zones = []
+        
+        land_types = [LandType.RESIDENTIAL, LandType.AGRICULTURAL, 
+                      LandType.INDUSTRIAL, LandType.COMMERCIAL]
+        
+        for parent_zone in zones:
+            try:
+                import h3
+                # Get child cells at higher resolution (9 = ~174m hexagons, good for parcels)
+                children = list(h3.cell_to_children(parent_zone.h3_index, 9))[:parcels_per_zone]
+            except ImportError:
+                # Fallback: generate pseudo child indices
+                children = [f"{parent_zone.h3_index[:8]}{i:04x}fff" for i in range(parcels_per_zone)]
+            
+            for i, child_h3 in enumerate(children):
+                # Create Land entity
+                land = Land(
+                    id=f"land_{parent_zone.h3_index[:8]}_{i:03d}",
+                    x_coordinate=i % 3,  # Grid position within zone
+                    y_coordinate=i // 3,
+                    land_type=random.choice(land_types),
+                    size_width=1,
+                    size_height=1,
+                    metadata=json.dumps({
+                        "parent_zone": parent_zone.h3_index,
+                        "price_realm_tokens": random.randint(100, 1000),
+                        "for_sale": True
+                    })
+                )
+                lands.append(land)
+                
+                # Create child zone associated with land
+                try:
+                    import h3
+                    lat, lng = h3.cell_to_latlng(child_h3)
+                except:
+                    lat = parent_zone.latitude + (i % 3 - 1) * 0.001
+                    lng = parent_zone.longitude + (i // 3 - 1) * 0.001
+                
+                child_zone = Zone(
+                    h3_index=child_h3,
+                    name=f"{parent_zone.name} - Parcel {i+1}",
+                    description=f"Land parcel within {parent_zone.name}",
+                    latitude=lat,
+                    longitude=lng,
+                    resolution=9.0,
+                    land=land,  # Associate with land
+                    metadata=json.dumps({"parent_zone": parent_zone.h3_index})
+                )
+                child_zones.append(child_zone)
+        
+        if not self.quiet:
+            print(f"  Generated {len(lands)} land parcels across {len(zones)} zones")
+        
+        return lands, child_zones
+    
     def generate_user_registration_hook_codex(self) -> Codex:
         """Generate a codex for user registration hook
         
@@ -429,6 +566,12 @@ class RealmGenerator:
         disputes = self.generate_disputes(params.get('disputes', 10))
         mandates = self.generate_mandates()
         
+        # Generate zones for users based on their location
+        zones = self.generate_zones(users, humans)
+        
+        # Generate land parcels within zones
+        lands, land_zones = self.generate_lands(zones, params.get('land_parcels_per_zone', 9))
+        
         # Generate scheduled task for satoshi transfer
         codex, call, step, task, task_schedule = self.generate_scheduled_task()
         
@@ -446,6 +589,9 @@ class RealmGenerator:
         ret += transfers
         ret += disputes
         ret += mandates
+        ret += zones
+        ret += lands
+        ret += land_zones
         ret.append(codex)
         ret.append(call)
         ret.append(step)

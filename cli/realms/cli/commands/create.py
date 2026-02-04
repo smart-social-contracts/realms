@@ -9,7 +9,7 @@ import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import typer
 from rich.console import Console
@@ -218,6 +218,7 @@ def create_command(
     
     # Load manifest for defaults (if exists)
     realm_options = {}
+    realm_manifest = None  # Initialize to ensure it's always defined
     if not has_flags or manifest is not None:
         if manifest is None:
             manifest_path = repo_root / "examples" / "demo" / "realm1" / "manifest.json"
@@ -293,7 +294,7 @@ def create_command(
         
         # Generate codex files - get codex name from manifest if available
         # Support both old format ("codex": "name") and new format ("codex": {"package": {"name": "...", "version": "..."}})
-        codex_config = realm_manifest.get("codex") if 'realm_manifest' in dir() else None
+        codex_config = realm_manifest.get("codex") if realm_manifest else None
         if isinstance(codex_config, dict):
             codex_name = codex_config.get("package", {}).get("name")
         else:
@@ -343,7 +344,7 @@ def create_command(
     can_generate_scripts = (cli_dir / "dfx.template.json").exists() or (repo_root / "dfx.template.json").exists()
     
     if can_generate_scripts:
-        _generate_deployment_scripts(output_path, network, realm_name, random, repo_root, deploy, identity, mode, bare, plain_logs, in_repo_mode=in_repo_mode)
+        _generate_deployment_scripts(output_path, network, realm_name, random, repo_root, deploy, identity, mode, bare, plain_logs, in_repo_mode=in_repo_mode, realm_manifest=realm_manifest)
     else:
         console.print(f"\n[yellow]⚠️  Deployment scripts not generated (bundled files not found)[/yellow]")
         console.print(f"[dim]Searched: {cli_dir / 'dfx.template.json'}, {repo_root / 'dfx.template.json'}[/dim]")
@@ -363,7 +364,8 @@ def _generate_deployment_scripts(
     mode: str,
     bare: bool,
     plain_logs: bool = False,
-    in_repo_mode: bool = True
+    in_repo_mode: bool = True,
+    realm_manifest: Optional[Dict[str, Any]] = None
 ):
     """Generate deployment scripts and dfx.json for independent realm.
     
@@ -480,7 +482,7 @@ def _generate_deployment_scripts(
                 # Update init_arg for token_backend with realm-specific name and symbol
                 if canister_name == "token_backend" and "init_arg" in ledger_config:
                     # Get token config from realm manifest if available
-                    token_config = realm_manifest.get("token", {}) if 'realm_manifest' in dir() else {}
+                    token_config = realm_manifest.get("token", {}) if realm_manifest else {}
                     token_name = token_config.get("name", f"{realm_name} Token")
                     token_symbol = token_config.get("symbol", realm_name[:3].upper())
                     
@@ -496,7 +498,7 @@ def _generate_deployment_scripts(
                 # Update init_arg for nft_backend with realm-specific land_token config
                 if canister_name == "nft_backend" and "init_arg" in ledger_config:
                     # Get land_token config from realm manifest if available
-                    land_token_config = realm_manifest.get("land_token", {}) if 'realm_manifest' in dir() else {}
+                    land_token_config = realm_manifest.get("land_token", {}) if realm_manifest else {}
                     if land_token_config:
                         nft_name = land_token_config.get("name", f"{realm_name} Land")
                         nft_symbol = land_token_config.get("symbol", f"{realm_name[:1]}LAND")
