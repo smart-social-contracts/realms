@@ -66,7 +66,7 @@
     isDeploying = true;
     deployError = null;
     deploySuccess = null;
-    deployedRealmUrl = null;
+    deploymentId = null;
     
     try {
       // Prepare realm configuration from formData
