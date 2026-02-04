@@ -15,7 +15,7 @@
   const REQUIRED_CREDITS = 5;
 
   // Deploy mode
-  let deployMode = 'manual'; // 'automatic' or 'manual'
+  let deployMode = 'automatic'; // 'automatic' or 'manual'
   
   // Automatic deployment state
   let isDeploying = false;
@@ -96,7 +96,7 @@
       const CANISTER_MGMT_URL = CONFIG.canister_management_url || 'https://canister-management.realmsgos.dev';
       
       // Call canister-management service to deploy
-      const response = await fetch(`${CANISTER_MGMT_URL}/deploy`, {
+      const response = await fetch(`${CANISTER_MGMT_URL}/api/deploy`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -131,12 +131,12 @@
 
   // Wizard steps
   const STEPS = [
-    { id: 'basics', label: 'Basics' },
-    { id: 'branding', label: 'Branding' },
-    { id: 'land', label: 'Land & Tokens' },
     { id: 'codex', label: 'Codex' },
+    { id: 'land', label: 'Land & Tokens' },
     { id: 'extensions', label: 'Extensions' },
     { id: 'data', label: 'Data' },
+    { id: 'basics', label: 'Basics' },
+    { id: 'branding', label: 'Branding' },
     { id: 'deploy', label: 'Deploy' }
   ];
 
@@ -228,37 +228,21 @@
   function validateStep(step) {
     errors = {};
     
+    // Step 0: Codex
     if (step === 0) {
-      if (!formData.name.trim()) {
-        errors.name = 'Realm name is required';
-      } else if (formData.name.length < 3) {
-        errors.name = 'Name must be at least 3 characters';
+      if (formData.codex_source === 'package' && !formData.codex_package_name.trim()) {
+        errors.codex_package_name = 'Package name is required';
       }
-      if (formData.languages.length === 0) {
-        errors.languages = 'At least one language is required';
+      if (formData.codex_source === 'url' && !formData.codex_url.trim()) {
+        errors.codex_url = 'URL is required';
       }
-      // Validate descriptions for each language
-      for (const langCode of formData.languages) {
-        const desc = formData.descriptions[langCode] || '';
-        if (!desc.trim()) {
-          errors[`description_${langCode}`] = 'Description is required';
-        } else if (desc.length < 20) {
-          errors[`description_${langCode}`] = 'Description must be at least 20 characters';
-        }
+      if (formData.codex_source === 'file' && !formData.codex_file) {
+        errors.codex_file = 'Please upload a codex zip file';
       }
     }
     
+    // Step 1: Land & Tokens
     if (step === 1) {
-      // Validate welcome messages for each language
-      for (const langCode of formData.languages) {
-        const msg = formData.welcome_messages[langCode] || '';
-        if (!msg.trim()) {
-          errors[`welcome_message_${langCode}`] = 'Welcome message is required';
-        }
-      }
-    }
-    
-    if (step === 2) {
       if (formData.token_enabled) {
         if (!formData.token_name.trim()) {
           errors.token_name = 'Token name is required';
@@ -280,15 +264,38 @@
       }
     }
     
-    if (step === 3) {
-      if (formData.codex_source === 'package' && !formData.codex_package_name.trim()) {
-        errors.codex_package_name = 'Package name is required';
+    // Step 2: Extensions - no validation needed
+    // Step 3: Data - no validation needed
+    
+    // Step 4: Basics
+    if (step === 4) {
+      if (!formData.name.trim()) {
+        errors.name = 'Realm name is required';
+      } else if (formData.name.length < 3) {
+        errors.name = 'Name must be at least 3 characters';
       }
-      if (formData.codex_source === 'url' && !formData.codex_url.trim()) {
-        errors.codex_url = 'URL is required';
+      if (formData.languages.length === 0) {
+        errors.languages = 'At least one language is required';
       }
-      if (formData.codex_source === 'file' && !formData.codex_file) {
-        errors.codex_file = 'Please upload a codex zip file';
+      // Validate descriptions for each language
+      for (const langCode of formData.languages) {
+        const desc = formData.descriptions[langCode] || '';
+        if (!desc.trim()) {
+          errors[`description_${langCode}`] = 'Description is required';
+        } else if (desc.length < 20) {
+          errors[`description_${langCode}`] = 'Description must be at least 20 characters';
+        }
+      }
+    }
+    
+    // Step 5: Branding
+    if (step === 5) {
+      // Validate welcome messages for each language
+      for (const langCode of formData.languages) {
+        const msg = formData.welcome_messages[langCode] || '';
+        if (!msg.trim()) {
+          errors[`welcome_message_${langCode}`] = 'Welcome message is required';
+        }
       }
     }
     
@@ -604,8 +611,8 @@
 
   <!-- Form Content -->
   <div class="form-container">
-    {#if currentStep === 0}
-      <!-- Step 1: Basics -->
+    {#if currentStep === 4}
+      <!-- Step 5: Basics -->
       <div class="form-step">
         <h2>Basic Information</h2>
         <p class="step-description">Give your realm a unique identity</p>
@@ -691,8 +698,8 @@
         </div>
       </div>
 
-    {:else if currentStep === 1}
-      <!-- Step 2: Branding -->
+    {:else if currentStep === 5}
+      <!-- Step 6: Branding -->
       <div class="form-step">
         <h2>Branding & Welcome</h2>
         <p class="step-description">Customize how your realm looks and feels</p>
@@ -780,8 +787,8 @@
         </div>
       </div>
 
-    {:else if currentStep === 2}
-      <!-- Step 3: Tokens -->
+    {:else if currentStep === 1}
+      <!-- Step 2: Land & Tokens -->
       <div class="form-step">
         <h2>Token Configuration</h2>
         <p class="step-description">Configure the tokens for your realm</p>
@@ -939,8 +946,8 @@
         {/if}
       </div>
 
-    {:else if currentStep === 3}
-      <!-- Step 4: Codex -->
+    {:else if currentStep === 0}
+      <!-- Step 1: Codex -->
       <div class="form-step">
         <h2>Codex Configuration</h2>
         <p class="step-description">Configure the governance rules (Python codex files)</p>
@@ -1080,8 +1087,8 @@
         {/if}
       </div>
 
-    {:else if currentStep === 4}
-      <!-- Step 5: Extensions -->
+    {:else if currentStep === 2}
+      <!-- Step 3: Extensions -->
       <div class="form-step">
         <h2>Extensions</h2>
         <p class="step-description">Select which extensions to enable for your realm</p>
@@ -1237,8 +1244,8 @@
 
       </div>
 
-    {:else if currentStep === 5}
-      <!-- Step 6: Realm Data -->
+    {:else if currentStep === 3}
+      <!-- Step 4: Data -->
       <div class="form-step">
         <h2>Realm Data</h2>
         <p class="step-description">Optionally upload initial user data for your realm</p>

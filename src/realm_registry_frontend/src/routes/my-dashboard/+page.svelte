@@ -66,8 +66,13 @@
       userPrincipal = await getPrincipal();
       loading = false;
       
-      // Load user data
-      await Promise.all([loadCredits(), loadRealms(), loadVouchers(), loadDeployments()]);
+      // Load deployments first (fast API call) - don't wait for slow canister calls
+      loadDeployments();
+      
+      // Load other data in parallel (canister calls can be slow)
+      loadCredits();
+      loadRealms();
+      loadVouchers();
       
       // Start polling for deployment status updates
       startDeploymentPolling();
@@ -107,14 +112,27 @@
   }
 
   async function loadRealms() {
+    if (!userPrincipal) return;
     loadingRealms = true;
     try {
-      // TODO: Fetch from backend
-      // For now, use placeholder data
-      createdRealms = [];
+      const { backend } = await import('$lib/canisters.js');
+      // Try to get the user's realm (realm ID = user's principal)
+      const result = await backend.get_realm(userPrincipal.toText());
+      if ('Ok' in result) {
+        createdRealms = [{
+          id: result.Ok.id,
+          name: result.Ok.name,
+          url: result.Ok.url
+        }];
+      } else {
+        createdRealms = [];
+      }
+      // TODO: Implement joined realms when membership feature is added
       joinedRealms = [];
     } catch (err) {
       console.error('Failed to load realms:', err);
+      createdRealms = [];
+      joinedRealms = [];
     } finally {
       loadingRealms = false;
     }
@@ -124,7 +142,7 @@
     if (!userPrincipal) return;
     loadingDeployments = true;
     try {
-      const response = await fetch(`${CANISTER_MGMT_URL}/deploy?principal_id=${userPrincipal.toText()}`);
+      const response = await fetch(`${CANISTER_MGMT_URL}/api/deploy?principal_id=${userPrincipal.toText()}`);
       if (response.ok) {
         deployments = await response.json();
         // Sort by created_at descending
@@ -587,9 +605,9 @@
             <!-- Created Realms -->
             <div class="realms-group">
               <h3>{$_('dashboard.created_realms')}</h3>
-              {#if loadingRealms}
+              {#if loadingDeployments}
                 <div class="loading-placeholder"></div>
-              {:else if createdRealms.length === 0}
+              {:else if deployments.length === 0}
                 <div class="empty-state">
                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
                     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
@@ -605,13 +623,20 @@
                 </div>
               {:else}
                 <ul class="realm-list">
-                  {#each createdRealms as realm}
+                  {#each deployments as deployment}
                     <li class="realm-item">
                       <div class="realm-info">
-                        <span class="realm-name">{realm.name}</span>
-                        <span class="realm-id">{realm.id}</span>
+                        <span class="realm-name">{deployment.realm_name || deployment.realm_id}</span>
+                        <span class="realm-id">{deployment.realm_id}</span>
                       </div>
-                      <span class="role-badge owner">{$_('dashboard.role_owner')}</span>
+                      <div class="realm-status-row">
+                        <span class="deployment-status {deployment.status}">{deployment.status}</span>
+                        {#if deployment.status === 'completed' && deployment.frontend_url}
+                          <a href={deployment.frontend_url} target="_blank" rel="noopener noreferrer" class="realm-visit-link">
+                            Visit →
+                          </a>
+                        {/if}
+                      </div>
                     </li>
                   {/each}
                 </ul>
@@ -1186,6 +1211,22 @@
     font-size: 0.75rem;
     color: #737373;
     font-family: monospace;
+  }
+
+  .realm-status-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .realm-visit-link {
+    font-size: 0.75rem;
+    color: #2563EB;
+    text-decoration: none;
+  }
+
+  .realm-visit-link:hover {
+    text-decoration: underline;
   }
 
   .purchase-price {
