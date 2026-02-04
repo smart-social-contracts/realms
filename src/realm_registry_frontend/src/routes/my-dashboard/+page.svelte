@@ -2,12 +2,21 @@
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { _, locale } from 'svelte-i18n';
   import { CONFIG } from '$lib/config.js';
 
   let userPrincipal = null;
   let loading = true;
   let activeTab = 'credits';
+  
+  // Read tab from URL parameter (?tab=realms or ?tab=credits)
+  $: if (browser && $page.url.searchParams.get('tab')) {
+    const tabParam = $page.url.searchParams.get('tab');
+    if (tabParam === 'realms' || tabParam === 'credits') {
+      activeTab = tabParam;
+    }
+  }
   
   // Credits data
   let balance = 0;
