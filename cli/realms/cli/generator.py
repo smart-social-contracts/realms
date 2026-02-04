@@ -252,39 +252,75 @@ class RealmGenerator:
         return mandates
     
     def generate_zones(self, users: List[User], humans: List[Human]) -> List[Zone]:
-        """Generate zone data for users based on their Human's coordinates"""
+        """Generate zone data for users, placing them at major world cities.
+        
+        Zones are placed at actual city coordinates with small jitter for variation.
+        Multiple realms can share the same cities to create overlapping zones.
+        """
         zones = []
         
         # Create a mapping of user_id to human for quick lookup
         user_to_human = {h.user_id: h for h in humans if hasattr(h, 'user_id')}
         
-        # Major world cities for naming zones
+        # Major world cities on land - expanded list for better distribution
         cities = [
+            # North America
             {"name": "New York", "lat": 40.7128, "lng": -74.0060},
+            {"name": "Los Angeles", "lat": 34.0522, "lng": -118.2437},
+            {"name": "Chicago", "lat": 41.8781, "lng": -87.6298},
+            {"name": "Toronto", "lat": 43.6532, "lng": -79.3832},
+            {"name": "Mexico City", "lat": 19.4326, "lng": -99.1332},
+            {"name": "San Francisco", "lat": 37.7749, "lng": -122.4194},
+            # Europe
             {"name": "London", "lat": 51.5074, "lng": -0.1278},
-            {"name": "Tokyo", "lat": 35.6762, "lng": 139.6503},
             {"name": "Paris", "lat": 48.8566, "lng": 2.3522},
-            {"name": "Sydney", "lat": -33.8688, "lng": 151.2093},
+            {"name": "Berlin", "lat": 52.5200, "lng": 13.4050},
+            {"name": "Madrid", "lat": 40.4168, "lng": -3.7038},
+            {"name": "Rome", "lat": 41.9028, "lng": 12.4964},
+            {"name": "Amsterdam", "lat": 52.3676, "lng": 4.9041},
+            # Asia
+            {"name": "Tokyo", "lat": 35.6762, "lng": 139.6503},
             {"name": "Singapore", "lat": 1.3521, "lng": 103.8198},
             {"name": "Dubai", "lat": 25.2048, "lng": 55.2708},
-            {"name": "São Paulo", "lat": -23.5505, "lng": -46.6333},
             {"name": "Mumbai", "lat": 19.0760, "lng": 72.8777},
-            {"name": "Berlin", "lat": 52.5200, "lng": 13.4050},
+            {"name": "Shanghai", "lat": 31.2304, "lng": 121.4737},
+            {"name": "Seoul", "lat": 37.5665, "lng": 126.9780},
+            {"name": "Bangkok", "lat": 13.7563, "lng": 100.5018},
+            {"name": "Hong Kong", "lat": 22.3193, "lng": 114.1694},
+            # South America
+            {"name": "São Paulo", "lat": -23.5505, "lng": -46.6333},
+            {"name": "Buenos Aires", "lat": -34.6037, "lng": -58.3816},
+            {"name": "Rio de Janeiro", "lat": -22.9068, "lng": -43.1729},
+            {"name": "Lima", "lat": -12.0464, "lng": -77.0428},
+            # Africa
+            {"name": "Cairo", "lat": 30.0444, "lng": 31.2357},
+            {"name": "Lagos", "lat": 6.5244, "lng": 3.3792},
+            {"name": "Cape Town", "lat": -33.9249, "lng": 18.4241},
+            {"name": "Nairobi", "lat": -1.2921, "lng": 36.8219},
+            # Oceania
+            {"name": "Sydney", "lat": -33.8688, "lng": 151.2093},
+            {"name": "Melbourne", "lat": -37.8136, "lng": 144.9631},
         ]
         
-        for user in users:
-            human = user_to_human.get(user.id)
-            if not human:
-                continue
+        # Get users with humans (skip system user)
+        users_with_humans = [(u, user_to_human.get(u.id)) for u in users if user_to_human.get(u.id)]
+        
+        if not users_with_humans:
+            return zones
+        
+        # Distribute users across cities - each user gets assigned to a city
+        # Use modulo to cycle through cities, ensuring all cities get used
+        for i, (user, human) in enumerate(users_with_humans):
+            # Pick a city (cycle through the list)
+            city = cities[i % len(cities)]
             
-            # Get lat/lng from human or generate random coordinates
-            lat = getattr(human, 'latitude', None)
-            lng = getattr(human, 'longitude', None)
-            if lat is None or lng is None:
-                lat = random.uniform(-60, 70)
-                lng = random.uniform(-180, 180)
+            # Add small jitter (±0.05 degrees ≈ ±5km) to create variation
+            jitter_lat = random.uniform(-0.05, 0.05)
+            jitter_lng = random.uniform(-0.05, 0.05)
+            lat = city["lat"] + jitter_lat
+            lng = city["lng"] + jitter_lng
             
-            # Generate H3 index (simplified - real implementation would use h3 library)
+            # Generate H3 index
             try:
                 import h3
                 h3_index = h3.latlng_to_cell(lat, lng, 6)
@@ -292,19 +328,10 @@ class RealmGenerator:
                 # Fallback: generate pseudo H3 index
                 h3_index = f"86{abs(hash(f'{lat}{lng}')) % 0xFFFFFFFF:08x}fffffff"[:16]
             
-            # Find nearest city for naming
-            city_name = "Unknown"
-            min_dist = float('inf')
-            for city in cities:
-                dist = abs(lat - city["lat"]) + abs(lng - city["lng"])
-                if dist < min_dist:
-                    min_dist = dist
-                    city_name = city["name"]
-            
             zone = Zone(
                 h3_index=h3_index,
-                name=f"{city_name} Zone",
-                description=f"Zone of influence near {city_name}",
+                name=f"{city['name']} Zone",
+                description=f"Zone of influence near {city['name']}",
                 latitude=lat,
                 longitude=lng,
                 resolution=6.0,
