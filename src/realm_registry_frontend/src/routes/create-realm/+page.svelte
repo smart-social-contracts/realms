@@ -4,6 +4,8 @@
   import { goto } from '$app/navigation';
   import { _, locale } from 'svelte-i18n';
   import { CONFIG } from '$lib/config.js';
+  import extensionsConfig from '$lib/extensions-config.json';
+  import codicesConfig from '$lib/codices-config.json';
 
   // Auth state
   let isLoggedIn = false;
@@ -165,17 +167,17 @@
     }
   ];
 
-  // Available extensions (common ones)
-  const AVAILABLE_EXTENSIONS = [
-    { id: 'auth', name: 'Authentication', description: 'User authentication and identity management', default: true },
-    { id: 'governance', name: 'Governance', description: 'Voting and proposal systems', default: true },
-    { id: 'treasury', name: 'Treasury', description: 'Financial management and budgeting', default: true },
-    { id: 'disputes', name: 'Disputes', description: 'Conflict resolution mechanisms', default: true },
-    { id: 'marketplace', name: 'Marketplace', description: 'Trading and commerce features', default: true },
-    { id: 'messaging', name: 'Messaging', description: 'Internal communication system', default: false },
-    { id: 'reputation', name: 'Reputation', description: 'Member reputation tracking', default: false },
-    { id: 'analytics', name: 'Analytics', description: 'Usage and performance metrics', default: false }
-  ];
+  // Available extensions and categories (loaded from $lib/extensions-config.json)
+  const AVAILABLE_EXTENSIONS = extensionsConfig.extensions;
+  const EXTENSION_CATEGORIES = extensionsConfig.categories;
+
+  // Available codices (loaded from $lib/codices-config.json)
+  const AVAILABLE_CODICES = codicesConfig.codices;
+
+  // Helper to get extensions by category
+  function getExtensionsByCategory(categoryId) {
+    return AVAILABLE_EXTENSIONS.filter(ext => ext.category === categoryId);
+  }
 
   let currentStep = 0;
   let isSubmitting = false;
@@ -355,6 +357,10 @@
   }
 
   function toggleExtension(extId) {
+    // Prevent toggling mandatory extensions
+    const ext = AVAILABLE_EXTENSIONS.find(e => e.id === extId);
+    if (ext?.mandatory) return;
+    
     if (formData.extensions.includes(extId)) {
       formData.extensions = formData.extensions.filter(id => id !== extId);
     } else {
@@ -965,31 +971,43 @@
         </div>
 
         {#if formData.codex_source === 'package'}
-          <div class="form-row">
-            <div class="form-group">
-              <label for="codex_package">Package Name <span class="required">*</span></label>
-              <input 
-                type="text" 
-                id="codex_package" 
-                bind:value={formData.codex_package_name}
-                placeholder="e.g., dominion, agora, syntropia"
-                class:error={errors.codex_package_name}
-              />
-              {#if errors.codex_package_name}
-                <span class="error-message">{errors.codex_package_name}</span>
-              {/if}
+          <div class="form-group">
+            <label for="codex_package">Select Codex <span class="required">*</span></label>
+            <div class="codex-options">
+              {#each AVAILABLE_CODICES as codex}
+                <button
+                  type="button"
+                  class="codex-card"
+                  class:selected={formData.codex_package_name === codex.id}
+                  on:click={() => formData.codex_package_name = codex.id}
+                >
+                  <div class="codex-radio">
+                    {#if formData.codex_package_name === codex.id}
+                      <div class="codex-radio-dot"></div>
+                    {/if}
+                  </div>
+                  <div class="codex-info">
+                    <span class="codex-name">{codex.name}</span>
+                    <span class="codex-desc">{codex.description}</span>
+                    {#if codex.doc_url}
+                      <a href={codex.doc_url} target="_blank" rel="noopener" class="doc-link" on:click|stopPropagation>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                          <polyline points="15 3 21 3 21 9"></polyline>
+                          <line x1="10" y1="14" x2="21" y2="3"></line>
+                        </svg>
+                        View documentation
+                      </a>
+                    {/if}
+                  </div>
+                </button>
+              {/each}
             </div>
-            <div class="form-group">
-              <label for="codex_version">Version</label>
-              <input 
-                type="text" 
-                id="codex_version" 
-                bind:value={formData.codex_package_version}
-                placeholder="latest"
-              />
-            </div>
+            {#if errors.codex_package_name}
+              <span class="error-message">{errors.codex_package_name}</span>
+            {/if}
           </div>
-          <p class="hint">Use a pre-built codex package from the registry</p>
+          <p class="hint">Select a pre-built codex package for your realm's governance rules</p>
 
         {:else if formData.codex_source === 'url'}
           <div class="form-group">
@@ -1049,28 +1067,49 @@
         <h2>Extensions</h2>
         <p class="step-description">Select which extensions to enable for your realm</p>
 
-        <div class="extensions-grid">
-          {#each AVAILABLE_EXTENSIONS as ext}
-            <button 
-              type="button"
-              class="extension-card" 
-              class:selected={formData.extensions.includes(ext.id)}
-              on:click={() => toggleExtension(ext.id)}
-            >
-              <div class="extension-check">
-                {#if formData.extensions.includes(ext.id)}
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                  </svg>
-                {/if}
+        {#each EXTENSION_CATEGORIES as category}
+          {@const categoryExtensions = getExtensionsByCategory(category.id)}
+          {#if categoryExtensions.length > 0}
+            <div class="extension-category">
+              <h3 class="category-title">{category.name}</h3>
+              <p class="category-desc">{category.description}</p>
+              <div class="extensions-grid">
+                {#each categoryExtensions as ext}
+                  <button 
+                    type="button"
+                    class="extension-card" 
+                    class:selected={formData.extensions.includes(ext.id)}
+                    class:mandatory={ext.mandatory}
+                    on:click={() => toggleExtension(ext.id)}
+                    disabled={ext.mandatory}
+                  >
+                    <div class="extension-check">
+                      {#if formData.extensions.includes(ext.id)}
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                      {/if}
+                    </div>
+                    <div class="extension-info">
+                      <span class="extension-name">{ext.name}{#if ext.mandatory} <span class="mandatory-badge">Required</span>{/if}</span>
+                      <span class="extension-desc">{ext.description}</span>
+                      {#if ext.doc_url}
+                        <a href={ext.doc_url} target="_blank" rel="noopener" class="doc-link" on:click|stopPropagation>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                          </svg>
+                          Docs
+                        </a>
+                      {/if}
+                    </div>
+                  </button>
+                {/each}
               </div>
-              <div class="extension-info">
-                <span class="extension-name">{ext.name}</span>
-                <span class="extension-desc">{ext.description}</span>
-              </div>
-            </button>
-          {/each}
-        </div>
+            </div>
+          {/if}
+        {/each}
 
         <div class="divider"></div>
 
@@ -1152,55 +1191,6 @@
           {/if}
         </div>
 
-        <!-- AI Assistant Section -->
-        <div class="form-group" style="margin-top: 2rem;">
-          <h3 class="section-title">Governance Assistant (Optional)</h3>
-          <p class="section-desc">Add an AI assistant to help with governance decisions</p>
-          
-          <div class="assistant-inline-options">
-            <button 
-              type="button"
-              class="assistant-inline-card" 
-              class:selected={formData.assistant === null}
-              on:click={() => formData.assistant = null}
-            >
-              <span class="assistant-inline-check">
-                {#if formData.assistant === null}✓{/if}
-              </span>
-              <span class="assistant-inline-icon">🚫</span>
-              <span class="assistant-inline-name">None</span>
-            </button>
-
-            {#each AVAILABLE_ASSISTANTS as assistant}
-              <button 
-                type="button"
-                class="assistant-inline-card" 
-                class:selected={formData.assistant === assistant.id}
-                on:click={() => formData.assistant = assistant.id}
-              >
-                <span class="assistant-inline-check">
-                  {#if formData.assistant === assistant.id}✓{/if}
-                </span>
-                <span class="assistant-inline-icon">{assistant.avatar}</span>
-                <span class="assistant-inline-name">{assistant.name}</span>
-              </button>
-            {/each}
-          </div>
-          
-          {#if formData.assistant}
-            {@const selected = AVAILABLE_ASSISTANTS.find(a => a.id === formData.assistant)}
-            {#if selected}
-              <div class="assistant-selected-info">
-                <p>{selected.description}</p>
-                <div class="assistant-features-inline">
-                  {#each selected.features as feature}
-                    <span class="feature-tag-inline">{feature}</span>
-                  {/each}
-                </div>
-              </div>
-            {/if}
-          {/if}
-        </div>
       </div>
 
     {:else if currentStep === 5}
@@ -2185,6 +2175,107 @@
     color: #FFFFFF;
   }
 
+  /* Codex selection */
+  .codex-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .codex-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+    border: 2px solid #E5E5E5;
+    border-radius: 0.5rem;
+    background: #FFFFFF;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: left;
+  }
+
+  .codex-card:hover {
+    border-color: #A3A3A3;
+  }
+
+  .codex-card.selected {
+    background: #F0FDF4;
+    border-color: #22C55E;
+  }
+
+  .codex-radio {
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    border: 2px solid #D4D4D4;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 0.125rem;
+  }
+
+  .codex-card.selected .codex-radio {
+    border-color: #22C55E;
+  }
+
+  .codex-radio-dot {
+    width: 10px;
+    height: 10px;
+    background: #22C55E;
+    border-radius: 50%;
+  }
+
+  .codex-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .codex-name {
+    font-weight: 600;
+    color: #171717;
+    font-size: 0.9375rem;
+  }
+
+  .codex-desc {
+    font-size: 0.8125rem;
+    color: #737373;
+  }
+
+  .doc-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    color: #2563EB;
+    text-decoration: none;
+    margin-top: 0.25rem;
+  }
+
+  .doc-link:hover {
+    text-decoration: underline;
+  }
+
+  /* Extension categories */
+  .extension-category {
+    margin-bottom: 1.5rem;
+  }
+
+  .category-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #171717;
+    margin: 0 0 0.25rem 0;
+  }
+
+  .category-desc {
+    font-size: 0.8125rem;
+    color: #737373;
+    margin: 0 0 0.75rem 0;
+  }
+
   /* Extensions grid */
   .extensions-grid {
     display: grid;
@@ -2218,6 +2309,28 @@
   .extension-card.selected {
     background: #F0FDF4;
     border-color: #22C55E;
+  }
+
+  .extension-card.mandatory {
+    cursor: default;
+    opacity: 0.9;
+  }
+
+  .extension-card.mandatory:hover {
+    border-color: #22C55E;
+  }
+
+  .mandatory-badge {
+    display: inline-block;
+    font-size: 0.625rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    background: #22C55E;
+    color: white;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    margin-left: 0.5rem;
+    vertical-align: middle;
   }
 
   .extension-check {

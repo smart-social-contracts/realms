@@ -1,0 +1,29 @@
+{
+  "categories": [
+    { "id": "system", "name": "System", "description": "Core system functionality" },
+    { "id": "public_services", "name": "Public Services", "description": "Citizen-facing services" },
+    { "id": "finances", "name": "Finances", "description": "Financial management" },
+    { "id": "oversight", "name": "Oversight & AI", "description": "Monitoring, analytics, and AI assistants" },
+    { "id": "other", "name": "Other", "description": "Additional tools and utilities" }
+  ],
+  "extensions": [
+    { "id": "admin_dashboard", "name": "Admin Dashboard", "description": "Administrative control panel", "category": "other", "default": true, "mandatory": true, "doc_url": "https://github.com/smart-social-contracts/realms-extensions/tree/main/extensions/admin_dashboard" },
+    { "id": "market_place", "name": "Marketplace", "description": "Trading and commerce features", "category": "system", "default": false, "mandatory": false, "doc_url": "https://github.com/smart-social-contracts/realms-extensions/tree/main/extensions/market_place" },
+    { "id": "member_dashboard", "name": "Member Dashboard", "description": "Member personal dashboard", "category": "public_services", "default": true, "mandatory": false, "doc_url": "https://github.com/smart-social-contracts/realms-extensions/tree/main/extensions/member_dashboard" },
+    { "id": "voting", "name": "Voting", "description": "Voting and proposal systems", "category": "public_services", "default": true, "mandatory": false, "doc_url": "https://github.com/smart-social-contracts/realms-extensions/tree/main/extensions/voting" },
+    { "id": "justice_litigation", "name": "Justice & Litigation", "description": "Conflict resolution mechanisms", "category": "public_services", "default": false, "mandatory": false, "doc_url": "https://github.com/smart-social-contracts/realms-extensions/tree/main/extensions/justice_litigation" },
+    { "id": "land_registry", "name": "Land Registry", "description": "Land ownership and registration", "category": "public_services", "default": false, "mandatory": false, "doc_url": "https://github.com/smart-social-contracts/realms-extensions/tree/main/extensions/land_registry" },
+    { "id": "passport_verification", "name": "Passport Verification", "description": "Identity verification system", "category": "public_services", "default": false, "mandatory": false, "doc_url": "https://github.com/smart-social-contracts/realms-extensions/tree/main/extensions/passport_verification" },
+    { "id": "zone_selector", "name": "Zone Selector", "description": "Geographic zone selection", "category": "public_services", "default": false, "mandatory": false, "doc_url": "https://github.com/smart-social-contracts/realms-extensions/tree/main/extensions/zone_selector" },
+    { "id": "vault", "name": "Vault", "description": "Financial management and treasury", "category": "finances", "default": true, "mandatory": false, "doc_url": "https://github.com/smart-social-contracts/realms-extension-vault" },
+    { "id": "public_dashboard", "name": "Public Dashboard", "description": "Public-facing analytics dashboard", "category": "oversight", "default": true, "mandatory": false, "doc_url": "https://github.com/smart-social-contracts/realms-extensions/tree/main/extensions/public_dashboard" },
+    { "id": "metrics", "name": "Metrics", "description": "Usage and performance metrics", "category": "oversight", "default": false, "mandatory": false, "doc_url": "https://github.com/smart-social-contracts/realms-extensions/tree/main/extensions/metrics" },
+    { "id": "llm_chat", "name": "AI Governance Assistant", "description": "AI-powered assistant for governance and legal questions", "category": "oversight", "default": false, "mandatory": false, "doc_url": "https://github.com/smart-social-contracts/realms-extensions/tree/main/extensions/llm_chat" },
+    { "id": "codex_viewer", "name": "Codex Viewer", "description": "View and browse the realm codex", "category": "other", "default": false, "mandatory": false, "doc_url": "https://github.com/smart-social-contracts/realms-extensions/tree/main/extensions/codex_viewer" },
+    { "id": "erd_explorer", "name": "ERD Explorer", "description": "Entity relationship explorer", "category": "other", "default": false, "mandatory": false, "doc_url": "https://github.com/smart-social-contracts/realms-extensions/tree/main/extensions/erd_explorer" },
+    { "id": "notifications", "name": "Notifications", "description": "Internal notification system", "category": "other", "default": false, "mandatory": false, "doc_url": "https://github.com/smart-social-contracts/realms-extensions/tree/main/extensions/notifications" },
+    { "id": "task_monitor", "name": "Task Monitor", "description": "Task and job monitoring", "category": "other", "default": false, "mandatory": false, "doc_url": "https://github.com/smart-social-contracts/realms-extensions/tree/main/extensions/task_monitor" },
+    { "id": "welcome", "name": "Welcome", "description": "New member onboarding flow", "category": "other", "default": false, "mandatory": false, "doc_url": "https://github.com/smart-social-contracts/realms-extensions/tree/main/extensions/welcome" },
+    { "id": "test_bench", "name": "Test Bench", "description": "Development testing tools", "category": "other", "default": false, "mandatory": false, "doc_url": "https://github.com/smart-social-contracts/realms-extensions/tree/main/extensions/test_bench" }
+  ]
+}

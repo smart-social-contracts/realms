@@ -1,0 +1,7 @@
+{
+  "codices": [
+    { "id": "dominion", "name": "Dominion", "description": "Standard governance framework for digital realms", "doc_url": "https://github.com/smart-social-contracts/realms-codices/tree/main/codices/dominion" },
+    { "id": "agora", "name": "Agora", "description": "Democratic assembly-based governance model", "doc_url": "https://github.com/smart-social-contracts/realms-codices/tree/main/codices/agora" },
+    { "id": "syntropia", "name": "Syntropia", "description": "Collaborative ecosystem governance framework", "doc_url": "https://github.com/smart-social-contracts/realms-codices/tree/main/codices/syntropia" }
+  ]
+}
