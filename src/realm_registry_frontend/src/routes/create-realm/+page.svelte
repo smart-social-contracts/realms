@@ -140,20 +140,20 @@
     { id: 'deploy', label: 'Deploy' }
   ];
 
-  // Available languages
+  // Available languages with translated placeholders
   const AVAILABLE_LANGUAGES = [
-    { code: 'en', name: 'English', flag: '🇬🇧' },
-    { code: 'es', name: 'Spanish', flag: '🇪🇸' },
-    { code: 'fr', name: 'French', flag: '🇫🇷' },
-    { code: 'de', name: 'German', flag: '🇩🇪' },
-    { code: 'it', name: 'Italian', flag: '🇮🇹' },
-    { code: 'pt', name: 'Portuguese', flag: '🇵🇹' },
-    { code: 'zh', name: 'Chinese', flag: '🇨🇳' },
-    { code: 'ja', name: 'Japanese', flag: '🇯🇵' },
-    { code: 'ko', name: 'Korean', flag: '🇰🇷' },
-    { code: 'ar', name: 'Arabic', flag: '🇸🇦' },
-    { code: 'hi', name: 'Hindi', flag: '🇮🇳' },
-    { code: 'ru', name: 'Russian', flag: '🇷🇺' }
+    { code: 'en', name: 'English', native: 'English', descPlaceholder: "Describe your realm's vision, values, and purpose...", welcomePlaceholder: "Write a welcoming message for new citizens..." },
+    { code: 'es', name: 'Spanish', native: 'Español', descPlaceholder: "Describe la visión, los valores y el propósito de tu reino...", welcomePlaceholder: "Escribe un mensaje de bienvenida para los nuevos ciudadanos..." },
+    { code: 'fr', name: 'French', native: 'Français', descPlaceholder: "Décrivez la vision, les valeurs et la mission de votre royaume...", welcomePlaceholder: "Rédigez un message de bienvenue pour les nouveaux citoyens..." },
+    { code: 'de', name: 'German', native: 'Deutsch', descPlaceholder: "Beschreiben Sie die Vision, Werte und den Zweck Ihres Reiches...", welcomePlaceholder: "Schreiben Sie eine Willkommensnachricht für neue Bürger..." },
+    { code: 'it', name: 'Italian', native: 'Italiano', descPlaceholder: "Descrivi la visione, i valori e lo scopo del tuo regno...", welcomePlaceholder: "Scrivi un messaggio di benvenuto per i nuovi cittadini..." },
+    { code: 'pt', name: 'Portuguese', native: 'Português', descPlaceholder: "Descreva a visão, os valores e o propósito do seu reino...", welcomePlaceholder: "Escreva uma mensagem de boas-vindas para os novos cidadãos..." },
+    { code: 'zh', name: 'Chinese', native: '中文', descPlaceholder: "描述您领域的愿景、价值观和目标...", welcomePlaceholder: "为新公民写一条欢迎信息..." },
+    { code: 'ja', name: 'Japanese', native: '日本語', descPlaceholder: "あなたの領域のビジョン、価値観、目的を説明してください...", welcomePlaceholder: "新しい市民へのウェルカムメッセージを書いてください..." },
+    { code: 'ko', name: 'Korean', native: '한국어', descPlaceholder: "왕국의 비전, 가치관, 목적을 설명하세요...", welcomePlaceholder: "새로운 시민들을 위한 환영 메시지를 작성하세요..." },
+    { code: 'ar', name: 'Arabic', native: 'العربية', descPlaceholder: "صف رؤية مملكتك وقيمها وهدفها...", welcomePlaceholder: "اكتب رسالة ترحيب للمواطنين الجدد..." },
+    { code: 'hi', name: 'Hindi', native: 'हिन्दी', descPlaceholder: "अपने राज्य की दृष्टि, मूल्यों और उद्देश्य का वर्णन करें...", welcomePlaceholder: "नए नागरिकों के लिए स्वागत संदेश लिखें..." },
+    { code: 'ru', name: 'Russian', native: 'Русский', descPlaceholder: "Опишите видение, ценности и цели вашего королевства...", welcomePlaceholder: "Напишите приветственное сообщение для новых граждан..." }
   ];
 
   // Available governance assistants (AI bots)
@@ -213,7 +213,7 @@
     codex_file_name: '',
     codex_url: '',
     // New: Extensions
-    extensions: AVAILABLE_EXTENSIONS.filter(e => e.default).map(e => e.id),
+    extensions: AVAILABLE_EXTENSIONS.map(e => e.id),
     custom_extensions: [], // Array of { name, source: 'file'|'url', file, url }
     // New: Governance Assistant
     assistant: null, // null means no assistant, or assistant id
@@ -544,12 +544,6 @@
 
 <div class="wizard-container">
   <header class="wizard-header">
-    <a href="/" class="back-link">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M19 12H5M12 19l-7-7 7-7"/>
-      </svg>
-      Back to Realms
-    </a>
     <h1>Create Your Realm</h1>
     <p class="subtitle">Configure your realm settings step by step</p>
   </header>
@@ -581,6 +575,31 @@
         {/if}
       {/each}
     </div>
+  </div>
+
+  <!-- Navigation Buttons (at top) -->
+  <div class="wizard-nav wizard-nav-top">
+    {#if currentStep > 0}
+      <button class="btn btn-secondary" on:click={prevStep}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Back
+      </button>
+    {:else}
+      <div></div>
+    {/if}
+
+    {#if currentStep < STEPS.length - 1}
+      <button class="btn btn-primary" on:click={nextStep}>
+        Continue
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </button>
+    {:else}
+      <div></div>
+    {/if}
   </div>
 
   <!-- Form Content -->
@@ -628,8 +647,8 @@
                   }
                 }}
               >
-                <span class="lang-flag">{lang.flag}</span>
-                <span class="lang-name">{lang.name}</span>
+                <span class="lang-code">{lang.code.toUpperCase()}</span>
+                <span class="lang-name">{lang.name} ({lang.native})</span>
                 {#if formData.languages.includes(lang.code)}
                   <span class="lang-check">✓</span>
                 {/if}
@@ -652,14 +671,14 @@
               <div class="multilang-input">
                 {#if formData.languages.length > 1}
                   <div class="multilang-label">
-                    <span class="lang-flag">{lang?.flag}</span>
+                    <span class="lang-code-small">{lang?.code.toUpperCase()}</span>
                     <span>{lang?.name}</span>
                   </div>
                 {/if}
                 <textarea 
                   id="description_{langCode}" 
                   bind:value={formData.descriptions[langCode]}
-                  placeholder="Describe your realm's vision, values, and purpose..."
+                  placeholder={lang?.descPlaceholder || "Describe your realm's vision, values, and purpose..."}
                   rows="3"
                   class:error={errors[`description_${langCode}`]}
                 ></textarea>
@@ -741,14 +760,14 @@
               <div class="multilang-input">
                 {#if formData.languages.length > 1}
                   <div class="multilang-label">
-                    <span class="lang-flag">{lang?.flag}</span>
+                    <span class="lang-code-small">{lang?.code.toUpperCase()}</span>
                     <span>{lang?.name}</span>
                   </div>
                 {/if}
                 <textarea 
                   id="welcome_message_{langCode}" 
                   bind:value={formData.welcome_messages[langCode]}
-                  placeholder="Write a welcoming message for new citizens..."
+                  placeholder={lang?.welcomePlaceholder || "Write a welcoming message for new citizens..."}
                   rows="3"
                   class:error={errors[`welcome_message_${langCode}`]}
                 ></textarea>
@@ -1067,6 +1086,31 @@
         <h2>Extensions</h2>
         <p class="step-description">Select which extensions to enable for your realm</p>
 
+        <div class="select-all-row">
+          <span class="selected-count">{formData.extensions.length} of {AVAILABLE_EXTENSIONS.length} selected</span>
+          <button 
+            type="button" 
+            class="btn btn-small btn-outline"
+            on:click={() => {
+              const nonMandatory = AVAILABLE_EXTENSIONS.filter(e => !e.mandatory);
+              const allSelected = nonMandatory.every(e => formData.extensions.includes(e.id));
+              if (allSelected) {
+                // Unselect all non-mandatory
+                formData.extensions = AVAILABLE_EXTENSIONS.filter(e => e.mandatory).map(e => e.id);
+              } else {
+                // Select all
+                formData.extensions = AVAILABLE_EXTENSIONS.map(e => e.id);
+              }
+            }}
+          >
+            {#if AVAILABLE_EXTENSIONS.filter(e => !e.mandatory).every(e => formData.extensions.includes(e.id))}
+              Unselect All
+            {:else}
+              Select All
+            {/if}
+          </button>
+        </div>
+
         {#each EXTENSION_CATEGORIES as category}
           {@const categoryExtensions = getExtensionsByCategory(category.id)}
           {#if categoryExtensions.length > 0}
@@ -1304,6 +1348,13 @@
                   <path d="M12 6v6l4 2"></path>
                 </svg>
                 <span>You need at least {REQUIRED_CREDITS} credits (you have {userCredits})</span>
+                <button type="button" class="btn btn-small btn-outline" on:click|stopPropagation={loadUserCredits}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
+                    <path d="M21 3v5h-5"></path>
+                  </svg>
+                  Refresh
+                </button>
                 <a href="/my-dashboard" class="btn btn-small btn-dark" on:click|stopPropagation>
                   Buy Credits
                 </a>
@@ -1318,7 +1369,7 @@
                   <div>
                     <strong>Your realm is being deployed!</strong>
                     <p class="deploy-info">Deployment typically takes 5-10 minutes. You can monitor the progress in your dashboard.</p>
-                    <a href="/my-dashboard" class="btn btn-small btn-primary">View Deployment Status →</a>
+                    <a href="/my-dashboard?tab=realms" class="btn btn-small btn-primary">View Deployment Status →</a>
                   </div>
                 </div>
               {:else}
@@ -1449,30 +1500,6 @@
     {/if}
   </div>
 
-  <!-- Navigation -->
-  <div class="wizard-nav">
-    {#if currentStep > 0}
-      <button class="btn btn-secondary" on:click={prevStep}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M19 12H5M12 19l-7-7 7-7"/>
-        </svg>
-        Back
-      </button>
-    {:else}
-      <div></div>
-    {/if}
-
-    {#if currentStep < STEPS.length - 1}
-      <button class="btn btn-primary" on:click={nextStep}>
-        Continue
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M5 12h14M12 5l7 7-7 7"/>
-        </svg>
-      </button>
-    {:else}
-      <div></div>
-    {/if}
-  </div>
 </div>
 
 <style>
@@ -1853,8 +1880,27 @@
     border-color: #22C55E;
   }
 
-  .lang-flag {
-    font-size: 1.125rem;
+  .lang-code {
+    font-size: 0.75rem;
+    font-weight: 700;
+    background: #E5E5E5;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    color: #525252;
+  }
+
+  .language-chip.selected .lang-code {
+    background: #D1FAE5;
+    color: #059669;
+  }
+
+  .lang-code-small {
+    font-size: 0.625rem;
+    font-weight: 700;
+    background: #E5E5E5;
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.125rem;
+    color: #525252;
   }
 
   .lang-name {
@@ -1889,8 +1935,8 @@
     color: #525252;
   }
 
-  .multilang-label .lang-flag {
-    font-size: 1rem;
+  .multilang-label .lang-code-small {
+    font-size: 0.625rem;
   }
 
   .token-section {
@@ -2045,6 +2091,12 @@
     align-items: center;
   }
 
+  .wizard-nav-top {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #E5E5E5;
+  }
+
   .btn {
     display: inline-flex;
     align-items: center;
@@ -2081,6 +2133,17 @@
   .btn-secondary:hover {
     border-color: #525252;
     color: #171717;
+  }
+
+  .btn-outline {
+    background: #FFFFFF;
+    color: #171717;
+    border: 1px solid #E5E5E5;
+  }
+
+  .btn-outline:hover {
+    background: #F5F5F5;
+    border-color: #D4D4D4;
   }
 
   .btn-create {
@@ -2256,6 +2319,22 @@
 
   .doc-link:hover {
     text-decoration: underline;
+  }
+
+  /* Select all row */
+  .select-all-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding: 0.75rem 1rem;
+    background: #F5F5F5;
+    border-radius: 0.5rem;
+  }
+
+  .selected-count {
+    font-size: 0.875rem;
+    color: #525252;
   }
 
   /* Extension categories */

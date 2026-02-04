@@ -596,6 +596,12 @@
                     <polyline points="9 22 9 12 15 12 15 22"></polyline>
                   </svg>
                   <p>{$_('dashboard.no_created_realms')}</p>
+                  <a href="/create-realm" class="create-realm-btn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                    Create Realm
+                  </a>
                 </div>
               {:else}
                 <ul class="realm-list">
@@ -1114,6 +1120,25 @@
   .empty-state p {
     margin: 0;
     font-size: 0.875rem;
+  }
+
+  .create-realm-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding: 0.75rem 1.5rem;
+    background: #171717;
+    color: #FFFFFF;
+    border-radius: 0.5rem;
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: background 0.15s ease;
+  }
+
+  .create-realm-btn:hover {
+    background: #404040;
   }
 
   .loading-placeholder {
