@@ -27,6 +27,7 @@
   },
   "map": {
     "back_to_list": "Back to List",
+    "loading": "Loading map data...",
     "showing_realms": "Showing {count} realms",
     "users_in_zone": "{count} users in this zone",
     "realm_influence": "{count} realm with influence",

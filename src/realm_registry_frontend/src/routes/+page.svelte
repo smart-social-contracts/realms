@@ -19,6 +19,7 @@
   let hexLayer = null;
   let markerLayer = null; // Layer for location markers (visible only when zoomed out)
   let realmZoneData = {}; // Store zone data fetched from each realm's backend
+  let mapLoading = false; // Loading state for map initialization and data fetch
   const H3_RESOLUTION = 6; // Resolution 6 = ~3.2km hex edge (good for city level)
   const MARKER_HIDE_ZOOM = 5; // Hide markers when zoom >= this level (hexes become visible)
 
@@ -273,6 +274,8 @@
     if (viewMode === 'map' && map && h3) {
       addRealmHexZones();
     }
+    
+    mapLoading = false;
   }
 
   function formatTimeAgo(timestamp) {
@@ -358,6 +361,8 @@
   // Initialize map when switching to map view
   async function initMap() {
     if (!browser || !mapContainer || map) return;
+    
+    mapLoading = true;
     
     // Dynamically import Leaflet and h3-js
     L = await import('leaflet');
@@ -1001,6 +1006,12 @@
       {:else}
         <div class="map-view">
           <div class="map-container" bind:this={mapContainer}></div>
+          {#if mapLoading}
+            <div class="map-loading-overlay">
+              <div class="map-loading-spinner"></div>
+              <span>{$_('map.loading') || 'Loading map...'}</span>
+            </div>
+          {/if}
           <button class="map-back-btn" on:click={() => viewMode = 'list'} title={$_('map.back_to_list')}>
             ← {$_('map.back_to_list')}
           </button>
@@ -1434,6 +1445,40 @@
     border-radius: 20px;
     font-size: 13px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .map-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(250, 250, 250, 0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    z-index: 500;
+  }
+
+  .map-loading-overlay span {
+    color: #525252;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .map-loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #E5E5E5;
+    border-top-color: #3B82F6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
 
   :global(.leaflet-popup-content-wrapper) {
