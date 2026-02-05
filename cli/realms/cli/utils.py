@@ -321,9 +321,19 @@ def get_scripts_path() -> Path:
 
 
 def is_repo_mode() -> bool:
-    """Check if running in repo mode (local scripts exist)."""
-    local_scripts = Path.cwd() / "scripts"
-    return local_scripts.exists() and (local_scripts / "realm_generator.py").exists()
+    """Check if running in repo mode (full realms repository checkout).
+    
+    Repo mode is detected by checking for multiple repo-specific files,
+    not just a scripts directory (which could exist in deployments too).
+    This ensures standalone pip-installed CLI doesn't incorrectly enter repo mode.
+    """
+    cwd = Path.cwd()
+    # Must have ALL of these to be considered repo mode
+    repo_markers = [
+        cwd / "scripts" / "realm_generator.py",
+        cwd / "dfx.template.json",  # Only exists in repo root, not in deployments
+    ]
+    return all(marker.exists() for marker in repo_markers)
 
 
 def find_python_310() -> Optional[str]:
