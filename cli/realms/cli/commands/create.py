@@ -566,7 +566,9 @@ def _generate_deployment_scripts(
             console.print(f"   ✅ Copied requirements.txt")
     
     # Copy extensions/ directory for extension data files (voting_data.json, etc.)
-    # Also replace timestamp placeholders with actual values
+    # Flatten the nested submodule structure for standalone deployments:
+    # - Repo structure: extensions/extensions/{ext_id}/ (git submodule)
+    # - Deployment structure: extensions/{ext_id}/ (flat, for standalone use)
     extensions_dest = output_path / "extensions"
     extensions_source = repo_root / "extensions"
     if extensions_source.exists():
@@ -578,12 +580,34 @@ def _generate_deployment_scripts(
                 console.print(f"   [yellow]   This is likely because the git submodule is not initialized.[/yellow]")
                 console.print(f"   [yellow]   Run: git submodule update --init --recursive[/yellow]")
         elif not extensions_dest.exists():
+            extensions_dest.mkdir(parents=True, exist_ok=True)
             ignore_patterns = shutil.ignore_patterns(
-                '__pycache__', '*.pyc', 'venv', '.venv', 'node_modules'
+                '__pycache__', '*.pyc', 'venv', '.venv', 'node_modules', '.git', '.github'
             )
-            shutil.copytree(extensions_source, extensions_dest, ignore=ignore_patterns)
-            if not quiet:
-                console.print(f"   ✅ Copied extensions/ directory")
+            
+            # Check for nested structure (extensions/extensions/) and flatten it
+            nested_extensions = extensions_source / "extensions"
+            if nested_extensions.exists() and nested_extensions.is_dir():
+                # Copy contents of nested extensions directory directly to deployment
+                for item in nested_extensions.iterdir():
+                    if item.is_dir() and not item.name.startswith('.'):
+                        dest_item = extensions_dest / item.name
+                        shutil.copytree(item, dest_item, ignore=ignore_patterns)
+                if not quiet:
+                    console.print(f"   ✅ Copied extensions/ directory (flattened from submodule)")
+                
+                # Also copy marketplace if it exists at the extensions/ level
+                marketplace_source = extensions_source / "marketplace"
+                if marketplace_source.exists() and marketplace_source.is_dir():
+                    marketplace_dest = extensions_dest / "marketplace"
+                    shutil.copytree(marketplace_source, marketplace_dest, ignore=ignore_patterns)
+                    if not quiet:
+                        console.print(f"   ✅ Copied marketplace extension")
+            else:
+                # Already flat structure or different layout, copy as-is
+                shutil.copytree(extensions_source, extensions_dest, ignore=ignore_patterns, dirs_exist_ok=True)
+                if not quiet:
+                    console.print(f"   ✅ Copied extensions/ directory")
         
         # Always replace timestamp placeholders in extension data files
         if extensions_dest.exists():
