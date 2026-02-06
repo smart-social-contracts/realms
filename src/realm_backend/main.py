@@ -536,7 +536,6 @@ def create_foundational_objects() -> void:
         raise
 
 
-@update
 def initialize() -> void:
     # Register all entity types from ggg
     import ggg

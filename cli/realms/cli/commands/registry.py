@@ -292,7 +292,7 @@ def registry_create_command(
     network: str = "local",
     deploy: bool = False,
     identity: Optional[str] = None,
-    mode: str = "upgrade",
+    mode: str = "auto",
 ) -> Path:
     """Create a new registry instance.
     
@@ -465,7 +465,7 @@ fi
 def registry_deploy_command(
     folder: str = ".realms",
     network: str = "local",
-    mode: str = "upgrade",
+    mode: str = "auto",
     identity: Optional[str] = None,
 ) -> None:
     """Deploy a registry instance.

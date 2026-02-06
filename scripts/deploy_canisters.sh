@@ -15,6 +15,7 @@ retry_dfx() {
     local attempt=1
     local delay=5
     
+    echo "   🔧 Running: $@"
     while [ $attempt -le $max_attempts ]; do
         if "$@"; then
             return 0
@@ -34,7 +35,7 @@ retry_dfx() {
 # Parameters
 WORKING_DIR="${1:-.}"           # Directory containing dfx.json (default: current dir)
 NETWORK="${2:-local}"           # Network: local, staging, ic
-MODE="${3:-upgrade}"            # Mode: upgrade, reinstall, install
+MODE="${3:-auto}"               # Mode: auto, upgrade, reinstall, install (auto picks install/upgrade automatically)
 IDENTITY_FILE="${4:-}"          # Optional: Identity file for IC deployment
 
 echo "╭────────────────────────────────────────╮"
@@ -284,9 +285,12 @@ if [ -n "$BACKENDS" ]; then
     echo "   📋 Copying declarations to standard names for frontend..."
     if [ -d "src/declarations" ]; then
         for canister in $BACKENDS; do
-            # If canister name matches pattern *_backend, copy to realm_backend
-            if [[ "$canister" == *"_backend" ]] && [[ "$canister" != "realm_backend" ]] && [[ "$canister" != "realm_registry_backend" ]]; then
+            # If canister name matches pattern *_backend (but NOT *_token_backend or *_nft_backend), copy to realm_backend
+            # This ensures only the main backend gets copied, not token/nft backends
+            if [[ "$canister" == *"_backend" ]] && [[ "$canister" != *"_token_backend" ]] && [[ "$canister" != *"_nft_backend" ]] && [[ "$canister" != "realm_backend" ]] && [[ "$canister" != "realm_registry_backend" ]]; then
                 if [ -d "src/declarations/$canister" ]; then
+                    # Remove existing realm_backend to avoid cp -r creating a subdirectory
+                    rm -rf "src/declarations/realm_backend"
                     cp -r "src/declarations/$canister" "src/declarations/realm_backend"
                     echo "      📋 Copied $canister → realm_backend"
                 fi
