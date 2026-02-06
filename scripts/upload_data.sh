@@ -24,7 +24,7 @@ else
 fi
 # Fallback to realm_backend if detection fails
 BACKEND_NAME="${BACKEND_NAME:-realm_backend}"
-echo "🎯 Target canister: $BACKEND_NAME"
+echo "🎯 Target canister: $BACKEND_NAME (auto-detected from dfx.json)"
 
 # Track if any uploads succeeded
 UPLOAD_SUCCESS=false

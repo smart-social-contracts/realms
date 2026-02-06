@@ -33,6 +33,7 @@ def _deploy_realm_internal(
     mode: str = "auto",
     bare: bool = False,
     plain_logs: bool = False,
+    registry: Optional[str] = None,
 ) -> None:
     """Internal deployment logic (can be called directly from Python).
     
@@ -88,12 +89,17 @@ def _deploy_realm_internal(
             "4-post-deploy.py",
         ]
 
-    # Prepare environment with identity if specified
-    env = os.environ.copy() if identity or not plain_logs else None
+    # Prepare environment with identity and registry if specified
+    env = os.environ.copy() if identity or registry or not plain_logs else None
     if identity:
         if not env:
             env = os.environ.copy()
         env["DFX_IDENTITY"] = identity
+    if registry:
+        if not env:
+            env = os.environ.copy()
+        env["REGISTRY_CANISTER_ID"] = registry
+        logger.info(f"Registry canister: {registry}")
     
     # Set REALMS_VERBOSE for bash scripts when using plain logs
     if plain_logs:
@@ -252,6 +258,7 @@ def deploy_command(
     plain_logs: bool = typer.Option(
         False, "--plain-logs", help="Show full verbose output instead of progress UI"
     ),
+    registry: Optional[str] = None,
 ) -> None:
     """Deploy a realm to the specified network."""
     
@@ -288,7 +295,7 @@ def deploy_command(
             console.print(f"[yellow]   Usage: realms deploy --folder <path>[/yellow]")
             raise typer.Exit(1)
     
-    _deploy_realm_internal(config_file, folder, network, clean, identity, mode, bare=False, plain_logs=plain_logs)
+    _deploy_realm_internal(config_file, folder, network, clean, identity, mode, bare=False, plain_logs=plain_logs, registry=registry)
 
 
 if __name__ == "__main__":

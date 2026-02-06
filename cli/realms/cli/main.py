@@ -339,6 +339,9 @@ def realm_create(
     plain_logs: bool = typer.Option(
         False, "--plain-logs", help="Show full verbose output instead of progress UI during deployment"
     ),
+    registry: Optional[str] = typer.Option(
+        None, "--registry", help="Registry canister ID for realm registration during deployment"
+    ),
 ) -> None:
     """Create a new realm. Use --manifest for template or flags for custom configuration."""
     create_command(
@@ -357,6 +360,7 @@ def realm_create(
         mode,
         bare,
         plain_logs,
+        registry=registry,
     )
 
 
@@ -383,9 +387,12 @@ def realm_deploy(
     plain_logs: bool = typer.Option(
         False, "--plain-logs", help="Show full verbose output instead of progress UI"
     ),
+    registry: Optional[str] = typer.Option(
+        None, "--registry", help="Registry canister ID for realm registration"
+    ),
 ) -> None:
     """Deploy a realm to the specified network."""
-    deploy_command(config_file, folder, network, clean, identity, mode, plain_logs)
+    deploy_command(config_file, folder, network, clean, identity, mode, plain_logs, registry=registry)
 
 
 @realm_app.command("call")

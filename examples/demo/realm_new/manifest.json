@@ -1,0 +1,33 @@
+{
+  "type": "realm",
+  "name": "NewRealm",
+  "description": "A new realm",
+  "logo": "emblem.png",
+  "welcome_image": "background.png",
+  "welcome_message": "Welcome to NewRealm",
+  "codex": {
+    "package": {
+      "name": "syntropia",
+      "version": "latest"
+    }
+  },
+  "token": {
+    "name": "NewRealm Token",
+    "symbol": "NEW"
+  },
+  "land_token": {
+    "name": "NewRealm Land",
+    "symbol": "NLAND",
+    "description": "Land ownership NFT for NewRealm realm",
+    "supply_cap": 10000
+  },
+  "options": {
+    "random": {
+      "members": 20,
+      "organizations": 2,
+      "transactions": 30,
+      "disputes": 3,
+      "seed": 3
+    }
+  }
+}
