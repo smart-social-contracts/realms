@@ -230,11 +230,18 @@ if os.path.exists(manifest_path):
             manifest = json.load(f)
         
         # Extract realm config fields
+        # Logo is copied by deploy_canisters.sh as realm_logo.{ext} in static/images/
+        logo_filename = manifest.get("logo", "")
+        if logo_filename:
+            logo_ext = os.path.splitext(logo_filename)[1] or ".png"
+            logo_path = f"/images/realm_logo{logo_ext}"
+        else:
+            logo_path = ""
         config = {
             "name": manifest.get("name", ""),
             "description": manifest.get("description", ""),
-            "logo": manifest.get("logo", ""),
-            "welcome_image": "images/welcome.png",  # Standardized path after deployment copy
+            "logo": logo_path,
+            "welcome_image": "/images/welcome.png",  # Absolute path - copied by deploy_canisters.sh
             "welcome_message": manifest.get("welcome_message", ""),
         }
         # Use ensure_ascii=False to keep UTF-8 characters instead of \uXXXX escapes

@@ -511,6 +511,30 @@ if [ -n "$FRONTENDS" ]; then
         fi
         
         if [ -n "$frontend_dir" ] && [ -f "$frontend_dir/package.json" ]; then
+            # Copy realm images (logo, welcome) into frontend static folder before build
+            STATIC_IMAGES="$frontend_dir/static/images"
+            mkdir -p "$STATIC_IMAGES"
+            
+            # Copy logo file (referenced as "logo" in manifest.json)
+            if [ -f "manifest.json" ]; then
+                LOGO_FILE=$(python3 -c "import json; print(json.load(open('manifest.json')).get('logo',''))" 2>/dev/null)
+                if [ -n "$LOGO_FILE" ] && [ -f "$LOGO_FILE" ]; then
+                    LOGO_EXT="${LOGO_FILE##*.}"
+                    cp "$LOGO_FILE" "$STATIC_IMAGES/realm_logo.${LOGO_EXT}"
+                    echo "      🖼️  Copied logo: $LOGO_FILE → $STATIC_IMAGES/realm_logo.${LOGO_EXT}"
+                fi
+            fi
+            
+            # Copy welcome/background image
+            for img in welcome.png welcome.jpg welcome.webp background.png background.jpg; do
+                if [ -f "$img" ]; then
+                    IMG_EXT="${img##*.}"
+                    cp "$img" "$STATIC_IMAGES/welcome.${IMG_EXT}"
+                    echo "      🖼️  Copied welcome image: $img → $STATIC_IMAGES/welcome.${IMG_EXT}"
+                    break
+                fi
+            done
+            
             # Always install dependencies (npm is fast if already up to date)
             echo "      📥 Installing npm dependencies..."
             (cd "$frontend_dir" && npm install --legacy-peer-deps)

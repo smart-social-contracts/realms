@@ -160,6 +160,7 @@ def create_command(
     mode: str = "auto",
     bare: bool = False,
     plain_logs: bool = False,
+    registry: Optional[str] = None,
 ) -> None:
     """Create a new single realm. Flags override manifest values.
     
@@ -344,7 +345,7 @@ def create_command(
     can_generate_scripts = (cli_dir / "dfx.template.json").exists() or (repo_root / "dfx.template.json").exists()
     
     if can_generate_scripts:
-        _generate_deployment_scripts(output_path, network, realm_name, random, repo_root, deploy, identity, mode, bare, plain_logs, in_repo_mode=in_repo_mode, realm_manifest=realm_manifest)
+        _generate_deployment_scripts(output_path, network, realm_name, random, repo_root, deploy, identity, mode, bare, plain_logs, in_repo_mode=in_repo_mode, realm_manifest=realm_manifest, registry=registry)
     else:
         console.print(f"\n[yellow]⚠️  Deployment scripts not generated (bundled files not found)[/yellow]")
         console.print(f"[dim]Searched: {cli_dir / 'dfx.template.json'}, {repo_root / 'dfx.template.json'}[/dim]")
@@ -365,7 +366,8 @@ def _generate_deployment_scripts(
     bare: bool,
     plain_logs: bool = False,
     in_repo_mode: bool = True,
-    realm_manifest: Optional[Dict[str, Any]] = None
+    realm_manifest: Optional[Dict[str, Any]] = None,
+    registry: Optional[str] = None,
 ):
     """Generate deployment scripts and dfx.json for independent realm.
     
@@ -712,6 +714,7 @@ def _generate_deployment_scripts(
                 mode=mode,
                 bare=bare,
                 plain_logs=plain_logs,
+                registry=registry,
             )
         except typer.Exit as e:
             console.print(
@@ -719,7 +722,9 @@ def _generate_deployment_scripts(
             )
             raise
         except Exception as e:
+            import traceback
             console.print(f"[red]❌ Auto-deployment failed: {e}[/red]")
+            console.print(f"[red]{traceback.format_exc()}[/red]")
             raise typer.Exit(1)
     else:
         console.print("\n[yellow]📝 Next steps:[/yellow]")
