@@ -157,7 +157,7 @@ def create_command(
     network: str,
     deploy: bool,
     identity: Optional[str] = None,
-    mode: str = "upgrade",
+    mode: str = "auto",
     bare: bool = False,
     plain_logs: bool = False,
 ) -> None:

@@ -30,7 +30,7 @@ def _deploy_realm_internal(
     network: str,
     clean: bool,
     identity: Optional[str],
-    mode: str = "upgrade",
+    mode: str = "auto",
     bare: bool = False,
     plain_logs: bool = False,
 ) -> None:
@@ -51,6 +51,7 @@ def _deploy_realm_internal(
     logger.info(f"Starting deployment to {network}")
     logger.info(f"Realm folder: {folder}")
     logger.info(f"Deploy mode: {mode}")
+    logger.info(f"CLI version: realms-gos 0.2.8 (auto-mode fix)")
     if identity:
         logger.info(f"Using identity: {identity}")
     logger.info("=" * 60)
@@ -246,7 +247,7 @@ def deploy_command(
         None, "--identity", help="Path to identity PEM file or identity name for dfx"
     ),
     mode: str = typer.Option(
-        "upgrade", "--mode", "-m", help="Deploy mode: 'upgrade' or 'reinstall' (wipes stable memory)"
+        "auto", "--mode", "-m", help="Deploy mode: 'auto', 'upgrade' or 'reinstall' (auto picks install/upgrade)"
     ),
     plain_logs: bool = typer.Option(
         False, "--plain-logs", help="Show full verbose output instead of progress UI"

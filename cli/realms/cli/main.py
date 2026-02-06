@@ -240,7 +240,7 @@ def mundus_create(
         None, "--identity", help="Path to identity PEM file or identity name for dfx"
     ),
     mode: str = typer.Option(
-        "upgrade", "--mode", "-m", help="Deploy mode: 'upgrade' or 'reinstall' (wipes stable memory)"
+        "auto", "--mode", "-m", help="Deploy mode: 'auto', 'upgrade' or 'reinstall' (auto picks install/upgrade)"
     ),
 ) -> None:
     """Create a new multi-realm mundus from a manifest."""
@@ -267,7 +267,7 @@ def mundus_deploy(
         None, "--identity", help="Path to identity PEM file or identity name for dfx"
     ),
     mode: str = typer.Option(
-        "upgrade", "--mode", "-m", help="Deploy mode: 'upgrade' or 'reinstall'"
+        "auto", "--mode", "-m", help="Deploy mode: 'auto', 'upgrade' or 'reinstall'"
     ),
 ) -> None:
     """Deploy all realms and registry in an existing mundus."""
@@ -331,7 +331,7 @@ def realm_create(
         None, "--identity", help="Path to identity PEM file or identity name for dfx"
     ),
     mode: str = typer.Option(
-        "upgrade", "--mode", "-m", help="Deploy mode: 'upgrade' or 'reinstall' (wipes stable memory)"
+        "auto", "--mode", "-m", help="Deploy mode: 'auto', 'upgrade' or 'reinstall' (auto picks install/upgrade)"
     ),
     bare: bool = typer.Option(
         False, "--bare", help="Create minimal realm (canisters only, no extensions or data)"
@@ -378,7 +378,7 @@ def realm_deploy(
         None, "--identity", help="Identity file or name for IC deployment"
     ),
     mode: str = typer.Option(
-        "upgrade", "--mode", "-m", help="Deployment mode (upgrade, reinstall)"
+        "auto", "--mode", "-m", help="Deployment mode (auto, upgrade, reinstall)"
     ),
     plain_logs: bool = typer.Option(
         False, "--plain-logs", help="Show full verbose output instead of progress UI"
@@ -853,7 +853,7 @@ def registry_create(
         None, "--identity", help="Path to identity PEM file or identity name for dfx"
     ),
     mode: str = typer.Option(
-        "upgrade", "--mode", "-m", help="Deploy mode: 'upgrade' or 'reinstall' (wipes stable memory)"
+        "auto", "--mode", "-m", help="Deploy mode: 'auto', 'upgrade' or 'reinstall' (auto picks install/upgrade)"
     ),
 ) -> None:
     """Create a new registry instance."""
@@ -864,7 +864,7 @@ def registry_create(
 def registry_deploy(
     folder: str = typer.Option(..., "--folder", "-f", help="Path to registry directory"),
     network: str = typer.Option("local", "--network", "-n", help="Network to deploy to"),
-    mode: str = typer.Option("upgrade", "--mode", "-m", help="Deployment mode (upgrade, reinstall)"),
+    mode: str = typer.Option("auto", "--mode", "-m", help="Deployment mode (auto, upgrade, reinstall)"),
     identity: Optional[str] = typer.Option(None, "--identity", help="Identity file for IC deployment"),
 ) -> None:
     """Deploy a registry instance."""
