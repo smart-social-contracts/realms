@@ -287,7 +287,7 @@ if [ -n "$BACKENDS" ]; then
         for canister in $BACKENDS; do
             # If canister name matches pattern *_backend (but NOT *_token_backend or *_nft_backend), copy to realm_backend
             # This ensures only the main backend gets copied, not token/nft backends
-            if [[ "$canister" == *"_backend" ]] && [[ "$canister" != *"_token_backend" ]] && [[ "$canister" != *"_nft_backend" ]] && [[ "$canister" != "realm_backend" ]] && [[ "$canister" != "realm_registry_backend" ]]; then
+            if [[ "$canister" == *"_backend" ]] && [[ "$canister" != *"token_backend" ]] && [[ "$canister" != *"nft_backend" ]] && [[ "$canister" != "realm_backend" ]] && [[ "$canister" != "realm_registry_backend" ]]; then
                 if [ -d "src/declarations/$canister" ]; then
                     # Remove existing realm_backend to avoid cp -r creating a subdirectory
                     rm -rf "src/declarations/realm_backend"
