@@ -73,7 +73,11 @@ def get_status() -> "dict[str, Any]":
             if logo_filename:
                 logo_ext = logo_filename.split('.')[-1] if '.' in logo_filename else 'svg'
                 realm_logo = f"/images/realm_logo.{logo_ext}"
-            realm_welcome_image = getattr(first_realm, 'welcome_image', None) or ""
+            # Convert welcome image filename to full path - welcome image is copied to /images/welcome.{ext} during deployment
+            welcome_image_filename = getattr(first_realm, 'welcome_image', None) or ""
+            if welcome_image_filename:
+                welcome_ext = welcome_image_filename.split('.')[-1] if '.' in welcome_image_filename else 'png'
+                realm_welcome_image = f"/images/welcome.{welcome_ext}"
             realm_welcome_message = getattr(first_realm, 'welcome_message', None) or ""
             realm_description = getattr(first_realm, 'description', None) or ""
     except Exception:

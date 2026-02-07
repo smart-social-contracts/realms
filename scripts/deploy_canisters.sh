@@ -432,9 +432,10 @@ if [ -f "manifest.json" ] && command -v jq &> /dev/null; then
         fi
         
         if [ -n "$WELCOME_SOURCE" ]; then
-            # Copy to frontend static/images folder as welcome.png
+            # Copy to frontend static/images folder, preserving original extension
+            WELCOME_EXT="${WELCOME_SOURCE##*.}"
             mkdir -p src/realm_frontend/static/images
-            WELCOME_DEST="src/realm_frontend/static/images/welcome.png"
+            WELCOME_DEST="src/realm_frontend/static/images/welcome.${WELCOME_EXT}"
             cp "$WELCOME_SOURCE" "$WELCOME_DEST"
             echo "   ✅ Copied realm welcome image: $WELCOME_SOURCE → $WELCOME_DEST"
         else

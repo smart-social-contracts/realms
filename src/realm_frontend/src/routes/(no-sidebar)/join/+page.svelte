@@ -36,7 +36,7 @@
   ];
 
   // Default fallback image if realm has no welcome image configured
-  const defaultWelcomeImage = '/images/default_welcome.png';
+  const defaultWelcomeImage = '/images/default_welcome.jpg';
   
   // Reactive welcome image - use realm's image or fallback
   $: welcomeImageUrl = $realmWelcomeImage || defaultWelcomeImage;
