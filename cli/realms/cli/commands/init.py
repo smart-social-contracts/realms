@@ -25,7 +25,7 @@ def _get_dfx_json_template(realm_id: str) -> str:
   },
   "networks": {
     "local": {
-      "bind": "127.0.0.1:8000",
+      "bind": "127.0.0.1:4943",
       "type": "ephemeral"
     }
   }

@@ -22,6 +22,9 @@
   let deployError = null;
   let deploySuccess = null;
   let deploymentId = null;
+  let deploymentStatus = null; // 'pending' | 'in_progress' | 'completed' | 'failed'
+  let deploymentRealmUrl = null;
+  let pollTimer = null;
 
   onMount(async () => {
     if (browser) {
@@ -117,16 +120,43 @@
       // Deployment started - it runs in the background
       deploySuccess = true;
       deploymentId = data.deployment_id;
+      deploymentStatus = 'pending';
       
-      // Refresh credits after successful deployment
-      await loadUserCredits();
+      // Start polling for deployment status
+      startDeploymentPolling(CANISTER_MGMT_URL, data.deployment_id);
       
     } catch (err) {
       console.error('Automatic deployment failed:', err);
       deployError = 'Deployment failed. Please check your connection and try again.';
-    } finally {
       isDeploying = false;
     }
+  }
+
+  function startDeploymentPolling(baseUrl, depId) {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(async () => {
+      try {
+        const res = await fetch(`${baseUrl}/api/deploy/${depId}`);
+        if (!res.ok) return;
+        const info = await res.json();
+        deploymentStatus = info.status;
+        if (info.status === 'completed') {
+          clearInterval(pollTimer);
+          pollTimer = null;
+          deploymentRealmUrl = info.realm_url;
+          isDeploying = false;
+          await loadUserCredits();
+        } else if (info.status === 'failed') {
+          clearInterval(pollTimer);
+          pollTimer = null;
+          deployError = info.error || 'Deployment failed on the server.';
+          deploySuccess = false;
+          isDeploying = false;
+        }
+      } catch (e) {
+        console.error('Poll error:', e);
+      }
+    }, 10000); // Poll every 10 seconds
   }
 
   // Wizard steps
@@ -1368,15 +1398,45 @@
               </div>
             {:else if deployMode === 'automatic'}
               <!-- Deploy button when automatic mode is selected and user has credits -->
-              {#if deploySuccess}
+              {#if deploymentStatus === 'completed'}
+                <div class="deploy-success deploy-completed">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                  </svg>
+                  <div>
+                    <strong>Your realm has been deployed!</strong>
+                    {#if deploymentRealmUrl}
+                      <p class="deploy-info">Your realm is live at:</p>
+                      <a href={deploymentRealmUrl} target="_blank" rel="noopener" class="realm-url">{deploymentRealmUrl}</a>
+                    {:else}
+                      <p class="deploy-info">Your realm is live. Check your dashboard for details.</p>
+                    {/if}
+                    <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem;">
+                      {#if deploymentRealmUrl}
+                        <a href={deploymentRealmUrl} target="_blank" rel="noopener" class="btn btn-small btn-primary">Visit Realm</a>
+                      {/if}
+                      <a href="/my-dashboard?tab=realms" class="btn btn-small btn-outline">View Dashboard</a>
+                    </div>
+                  </div>
+                </div>
+              {:else if deploySuccess}
                 <div class="deploy-success deploy-in-progress">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spinning">
                     <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
                   </svg>
                   <div>
                     <strong>Your realm is being deployed!</strong>
-                    <p class="deploy-info">Deployment typically takes 5-10 minutes. You can monitor the progress in your dashboard.</p>
-                    <a href="/my-dashboard?tab=realms" class="btn btn-small btn-primary">View Deployment Status →</a>
+                    <p class="deploy-info">
+                      {#if deploymentStatus === 'pending'}
+                        Preparing deployment...
+                      {:else if deploymentStatus === 'in_progress'}
+                        Deploying canisters to the Internet Computer. This typically takes 5-10 minutes...
+                      {:else}
+                        Starting deployment...
+                      {/if}
+                    </p>
+                    <p class="deploy-status-note">This page will update automatically when deployment completes.</p>
                   </div>
                 </div>
               {:else}
@@ -3245,6 +3305,18 @@
     text-decoration: underline;
   }
 
+  .deploy-success.deploy-completed {
+    background: #F0FDF4;
+    border-color: #86EFAC;
+    color: #166534;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .deploy-success.deploy-completed svg {
+    color: #22C55E;
+  }
+
   .deploy-success.deploy-in-progress {
     background: #FEF3C7;
     border-color: #FCD34D;
@@ -3265,6 +3337,28 @@
     margin: 0.5rem 0;
     font-size: 0.875rem;
     opacity: 0.9;
+  }
+
+  .deploy-success .deploy-status-note {
+    margin: 0.25rem 0 0;
+    font-size: 0.8rem;
+    opacity: 0.7;
+  }
+
+  .deploy-success .realm-url {
+    display: inline-block;
+    font-family: monospace;
+    font-size: 0.9rem;
+    padding: 0.25rem 0.5rem;
+    background: rgba(0,0,0,0.05);
+    border-radius: 0.25rem;
+    color: inherit;
+    text-decoration: none;
+    word-break: break-all;
+  }
+
+  .deploy-success .realm-url:hover {
+    text-decoration: underline;
   }
 
   .deploy-success .btn {

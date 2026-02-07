@@ -72,7 +72,7 @@ class TestPortGeneration:
     def test_generate_port_main_branch(self):
         """Test port generation for main branch."""
         port = generate_port_from_branch("main")
-        assert port == 8000
+        assert port == 4943
 
     def test_generate_port_other_branches(self):
         """Test port generation for other branches."""

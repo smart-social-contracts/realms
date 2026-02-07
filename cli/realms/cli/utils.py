@@ -741,7 +741,7 @@ def get_project_root() -> Path:
 def generate_port_from_branch(branch_name: str) -> int:
     """Generate a unique port number based on branch name."""
     if branch_name == "main":
-        return 8000
+        return 4943
 
     # Generate hash-based port
     hash_obj = hashlib.md5(branch_name.encode())
@@ -1345,8 +1345,8 @@ def get_canister_urls(
         
         canister_names = dfx_config.get("canisters", {}).keys()
         
-        # Determine port for local network (default 8000)
-        port = 8000
+        # Determine port for local network (default 4943)
+        port = 4943
         if network == "local":
             try:
                 result = subprocess.run(
@@ -1356,7 +1356,7 @@ def get_canister_urls(
                 if result.returncode == 0 and result.stdout.strip():
                     port = int(result.stdout.strip())
             except:
-                pass  # Use default 8000
+                pass  # Use default 4943
         
         # Get canister IDs and construct URLs
         for canister_name in canister_names:

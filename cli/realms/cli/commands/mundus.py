@@ -701,7 +701,7 @@ def mundus_status_command(
                         if id_result.returncode == 0:
                             cid = id_result.stdout.strip()
                             if network == "local":
-                                url = f"http://{cid}.localhost:8000/"
+                                url = f"http://{cid}.localhost:4943/"
                             elif network in ["staging", "ic"]:
                                 url = f"https://{cid}.icp0.io/"
                             else:
@@ -747,7 +747,7 @@ def mundus_status_command(
                             if id_result.returncode == 0:
                                 cid = id_result.stdout.strip()
                                 if network == "local":
-                                    url = f"http://{cid}.localhost:8000/"
+                                    url = f"http://{cid}.localhost:4943/"
                                 elif network in ["staging", "ic"]:
                                     url = f"https://{cid}.icp0.io/"
                                 else:
@@ -780,7 +780,7 @@ def mundus_status_command(
                         if id_result.returncode == 0:
                             cid = id_result.stdout.strip()
                             if network == "local":
-                                url = f"http://{cid}.localhost:8000/"
+                                url = f"http://{cid}.localhost:4943/"
                             elif network in ["staging", "ic"]:
                                 url = f"https://{cid}.icp0.io/"
                             else:
@@ -899,7 +899,7 @@ def _print_deployment_status(deploy_dir: Path, network: str) -> None:
     # Show deployed canisters with URLs
     for name, cid in deployed_canisters:
         if network == "local":
-            url = f"http://{cid}.localhost:8000/"
+            url = f"http://{cid}.localhost:4943/"
         elif network in ["staging", "ic"]:
             url = f"https://{cid}.icp0.io/"
         else:

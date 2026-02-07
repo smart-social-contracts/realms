@@ -36,7 +36,7 @@ class DeploymentConfig(BaseModel):
         ..., description="Target network for deployment"
     )
     port: Optional[int] = Field(
-        None, ge=8000, le=8100, description="Port for local deployment"
+        None, ge=4943, le=8100, description="Port for local deployment"
     )
     identity_file: Optional[str] = Field(
         None, description="Path to identity file for deployment authentication"
