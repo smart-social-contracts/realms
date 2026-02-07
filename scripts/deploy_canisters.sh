@@ -175,7 +175,7 @@ fi
 
 # Define shared canister PATTERNS (may be prefixed with realm name)
 # These match both exact names and prefixed versions (e.g., token_backend OR docker_test_token_backend)
-SHARED_PATTERNS="internet_identity ckbtc_ledger ckbtc_indexer token_backend nft_backend"
+SHARED_PATTERNS="internet_identity ckbtc_ledger ckbtc_indexer token_backend nft_backend token_frontend nft_frontend"
 
 # Function to find actual canister name in dfx.json matching a pattern
 # Matches exact name or names ending with _<pattern>

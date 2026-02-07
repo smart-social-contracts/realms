@@ -459,7 +459,7 @@ def _generate_deployment_scripts(
         
         # Include any ICRC-1 ledger canisters if they exist
         for canister_name, canister_config in dfx_config["canisters"].items():
-            if any(keyword in canister_name.lower() for keyword in ["icrc1", "ledger", "indexer", "token_backend", "nft_backend"]) and canister_name not in realm_canisters:
+            if any(keyword in canister_name.lower() for keyword in ["icrc1", "ledger", "indexer", "token_backend", "nft_backend", "token_frontend", "nft_frontend"]) and canister_name not in realm_canisters:
                 # Use standard name if canister_ids exists, otherwise unique name
                 if canister_ids_file.exists():
                     ledger_name = canister_name
