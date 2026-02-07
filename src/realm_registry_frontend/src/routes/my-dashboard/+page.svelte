@@ -531,6 +531,16 @@
 
         {:else if activeTab === 'realms'}
           <div class="realms-section">
+            <!-- Create Realm Button -->
+            <div class="create-realm-header">
+              <a href="/create-realm" class="create-realm-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 5v14M5 12h14"/>
+                </svg>
+                Create Realm
+              </a>
+            </div>
+
             <!-- Active Deployments -->
             {#if deployments.length > 0}
               <div class="realms-group deployments-group">
@@ -587,9 +597,9 @@
                         </span>
                       </div>
                       <div class="deployment-id">ID: {deployment.deployment_id}</div>
-                      <div class="deployment-time">Started: {formatDate(deployment.started_at)}</div>
-                      {#if deployment.status === 'completed' && deployment.frontend_url}
-                        <a href={deployment.frontend_url} target="_blank" rel="noopener noreferrer" class="deployment-link">
+                      <div class="deployment-time">Started: {formatDate(deployment.created_at)}</div>
+                      {#if deployment.status === 'completed' && deployment.realm_url}
+                        <a href={deployment.realm_url} target="_blank" rel="noopener noreferrer" class="deployment-link">
                           Visit Realm →
                         </a>
                       {/if}
@@ -631,8 +641,8 @@
                       </div>
                       <div class="realm-status-row">
                         <span class="deployment-status {deployment.status}">{deployment.status}</span>
-                        {#if deployment.status === 'completed' && deployment.frontend_url}
-                          <a href={deployment.frontend_url} target="_blank" rel="noopener noreferrer" class="realm-visit-link">
+                        {#if deployment.status === 'completed' && deployment.realm_url}
+                          <a href={deployment.realm_url} target="_blank" rel="noopener noreferrer" class="realm-visit-link">
                             Visit →
                           </a>
                         {/if}
@@ -1257,6 +1267,12 @@
   }
 
   /* Realms Section */
+  .create-realm-header {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 1.5rem;
+  }
+
   .realms-group {
     margin-bottom: 2rem;
   }
