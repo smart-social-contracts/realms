@@ -140,11 +140,12 @@ def get_realms_logger(log_dir: Path) -> logging.Logger:
 class DeploymentProgress:
     """Live display with progress bar and rolling log output for clean deployment UI."""
     
-    def __init__(self, total_steps: int, title: str = "Deploying"):
+    def __init__(self, total_steps: int, title: str = "Deploying", log_path: str = ""):
         self.total_steps = total_steps
         self.current_step = 0
         self.current_task = ""
         self.title = title
+        self.log_path = log_path
         self.log_lines: deque = deque(maxlen=3)  # Keep last 3 lines
         self.completed_steps: List[str] = []
         self.failed = False
@@ -194,12 +195,16 @@ class DeploymentProgress:
             padding=(0, 1),
         )
         
-        return Group(
-            self.progress,
-            Text(""),  # Spacer
-            steps_text,
-            log_panel,
-        )
+        # Build header with log path
+        elements = []
+        if self.log_path:
+            elements.append(Text(f"📝 Log: {self.log_path}", style="dim"))
+        elements.append(self.progress)
+        elements.append(Text(""))  # Spacer
+        elements.append(steps_text)
+        elements.append(log_panel)
+        
+        return Group(*elements)
     
     def start(self) -> "DeploymentProgress":
         """Start the live display."""
@@ -1402,19 +1407,83 @@ def display_canister_urls_json(
     network: str = "local",
     title: str = "Deployed Canisters"
 ) -> None:
-    """Display canister URLs as formatted JSON.
+    """Display canister deployment summary with appropriate URLs.
+    
+    Shows the path to canister_ids.json and for each canister:
+    - Backend canisters: ID + Candid viewer URL
+    - Frontend canisters: ID + direct canister URL
     
     Args:
         working_dir: Directory containing the deployed canisters
         network: Network name
-        title: Title to display above the JSON
+        title: Title to display above the summary
     """
     canisters = get_canister_urls(working_dir, network)
     
-    if canisters:
-        console.print(f"\n[bold cyan]📋 {title}[/bold cyan]")
-        console.print(json.dumps(canisters, indent=2))
-        console.print("")
+    if not canisters:
+        return
+    
+    console.print(f"\n[bold cyan]📋 {title}[/bold cyan]")
+    
+    # Show path to canister_ids.json
+    canister_ids_path = Path(working_dir).absolute() / "canister_ids.json"
+    if canister_ids_path.exists():
+        console.print(f"[dim]   Canister IDs: {canister_ids_path}[/dim]")
+    
+    # Determine Candid UI canister ID for local networks
+    candid_ui_id = None
+    if network == "local":
+        try:
+            result = subprocess.run(
+                ["dfx", "canister", "id", "__Candid_UI"],
+                capture_output=True, text=True, timeout=5, cwd=working_dir
+            )
+            if result.returncode == 0:
+                candid_ui_id = result.stdout.strip()
+        except Exception:
+            pass
+    
+    # Determine port for local network
+    port = 8000
+    if network == "local":
+        try:
+            result = subprocess.run(
+                ["dfx", "info", "webserver-port"],
+                capture_output=True, text=True, timeout=5, cwd=working_dir
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                port = int(result.stdout.strip())
+        except Exception:
+            pass
+    
+    console.print("")
+    for name, info in canisters.items():
+        canister_id = info.get("id", "")
+        is_frontend = "frontend" in name
+        
+        # Build the appropriate URL
+        if is_frontend:
+            if network == "local":
+                url = f"http://{canister_id}.localhost:{port}/"
+            elif network in ["staging", "ic", "mainnet"]:
+                url = f"https://{canister_id}.icp0.io/"
+            else:
+                url = info.get("url", "")
+        else:
+            # Backend canister: use Candid viewer URL
+            if network == "local" and candid_ui_id:
+                url = f"http://127.0.0.1:{port}/?canisterId={candid_ui_id}&id={canister_id}"
+            elif network in ["staging", "ic", "mainnet"]:
+                url = f"https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id={canister_id}"
+            else:
+                url = info.get("url", "")
+        
+        console.print(f"   [bold]{name}[/bold]")
+        console.print(f"      [dim]ID:[/dim]  {canister_id}")
+        if url:
+            console.print(f"      [dim]URL:[/dim] {url}")
+    
+    console.print("")
 
 
 def get_registry_canister_id(network: str = "local") -> str:

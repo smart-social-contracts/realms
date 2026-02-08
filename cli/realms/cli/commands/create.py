@@ -173,12 +173,14 @@ def create_command(
     # Suppress verbose output when deploying with progress display
     quiet = deploy and not plain_logs
     
-    console.print(f"[bold blue]🏛️  Creating Realm: {realm_name}[/bold blue]\n")
+    console.print(f"[bold blue]🏛️  Creating Realm: {realm_name}[/bold blue]")
 
     # Generate timestamped directory name
     dir_name = generate_output_dir_name("realm", realm_name)
     base_dir = Path(output_dir)
     output_path = base_dir / dir_name
+    
+    console.print()
     
     # Create base directory if it doesn't exist
     base_dir.mkdir(parents=True, exist_ok=True)

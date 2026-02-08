@@ -61,6 +61,7 @@ def _deploy_realm_internal(
     if plain_logs:
         console.print(f"[bold blue]🚀 Deploying Realm to {network}[/bold blue]\n")
         console.print(f"📁 Realm folder: {folder}")
+        console.print(f"📝 Log: {log_dir / 'realms.log'}")
 
     folder_path = Path(folder).resolve()
     if not folder_path.exists():
@@ -164,7 +165,6 @@ def _run_deployment_plain(
         logger.info(f"{script_name} completed successfully")
 
     console.print(f"[green]🎉 Deployment completed successfully![/green]")
-    console.print(f"[dim]Full log saved to {log_dir}/realms.log[/dim]")
     logger.info("Deployment completed successfully")
 
 
@@ -187,9 +187,11 @@ def _run_deployment_with_progress(
         "4-post-deploy.py": "Running post-deploy",
     }
     
+    log_path = str(log_dir / "realms.log")
     progress = DeploymentProgress(
         total_steps=len(scripts),
-        title=f"Deploying to {network}"
+        title=f"Deploying to {network}",
+        log_path=log_path,
     )
     
     with progress:
@@ -224,7 +226,6 @@ def _run_deployment_with_progress(
             logger.info(f"{script_name} completed successfully")
     
     console.print(f"\n[green]🎉 Deployment completed successfully![/green]")
-    console.print(f"[dim]Full log saved to {log_dir}/realms.log[/dim]")
     logger.info("Deployment completed successfully")
 
 
