@@ -155,7 +155,7 @@
     };
     
     const host = isLocalDevelopment() 
-      ? 'http://localhost:8000' 
+      ? `http://localhost:${window.location.port || '4943'}` 
       : 'https://icp0.io';
     
     const updates = await Promise.allSettled(
@@ -226,7 +226,7 @@
     };
     
     const host = isLocalDevelopment() 
-      ? 'http://localhost:8000' 
+      ? `http://localhost:${window.location.port || '4943'}` 
       : 'https://icp0.io';
     
     const zoneResults = await Promise.allSettled(
@@ -319,11 +319,28 @@
     if (!url) return '';
     // If URL already has a protocol, return as-is
     if (url.startsWith('http://') || url.startsWith('https://')) {
+      // For localhost URLs, normalize port to match current browser port
+      // (registry may store stale ports like 8000 when dfx runs on 4943)
+      if (url.includes('localhost') || url.includes('127.0.0.1')) {
+        const currentPort = window.location.port;
+        if (currentPort) {
+          return url.replace(/localhost:\d+/, `localhost:${currentPort}`);
+        }
+      }
       return url;
     }
     // Use http for localhost, https for production
     const isLocal = url.includes('localhost') || url.includes('127.0.0.1');
-    return isLocal ? `http://${url}` : `https://${url}`;
+    if (isLocal) {
+      // Normalize port to match current browser port
+      const currentPort = window.location.port;
+      if (currentPort) {
+        const normalized = url.replace(/localhost:\d+/, `localhost:${currentPort}`);
+        return `http://${normalized}`;
+      }
+      return `http://${url}`;
+    }
+    return `https://${url}`;
   }
 
 
@@ -941,14 +958,14 @@
               {#if realm.url}
                 <div 
                   class="realm-card-bg" 
-                  style="background-image: url('{ensureProtocol(realm.url)}/{realm.realm_welcome_image || 'images/welcome.png'}')"
+                  style="background-image: url('{ensureProtocol(realm.url)}/{(realm.realm_welcome_image || 'images/welcome.png').replace(/^\//, '')}')"
                 ></div>
               {/if}
               <div class="card-accent"></div>
               <div class="realm-header">
                 <div class="realm-logo-container">
                   {#if realm.logo}
-                    <img src={realm.logo} alt="{realm.name} logo" class="realm-logo" />
+                    <img src={ensureProtocol(realm.logo)} alt="{realm.name} logo" class="realm-logo" />
                   {:else}
                     <div class="realm-logo-fallback">
                       <span>{realm.name.charAt(0).toUpperCase()}</span>

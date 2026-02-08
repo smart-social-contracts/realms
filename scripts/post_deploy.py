@@ -82,6 +82,20 @@ try:
         frontend_url = ""
         backend_url = ""
         backend_id = ""
+        
+        # Detect dfx webserver port for local network
+        local_port = 8000
+        if network == 'local':
+            try:
+                port_result = subprocess.run(
+                    ['dfx', 'info', 'webserver-port'],
+                    capture_output=True, text=True, timeout=5, cwd=realm_dir
+                )
+                if port_result.returncode == 0 and port_result.stdout.strip():
+                    local_port = int(port_result.stdout.strip())
+            except Exception:
+                pass
+        
         try:
             # Find canister names from dfx.json
             dfx_json_path = os.path.join(realm_dir, 'dfx.json')
@@ -126,9 +140,9 @@ try:
                     if realm_logo:
                         logo_url = f"https://{frontend_id}.icp0.io/images/realm_logo{logo_ext}"
                 else:  # local
-                    frontend_url = f"{frontend_id}.localhost:8000"
+                    frontend_url = f"{frontend_id}.localhost:{local_port}"
                     if realm_logo:
-                        logo_url = f"http://{frontend_id}.localhost:8000/images/realm_logo{logo_ext}"
+                        logo_url = f"http://{frontend_id}.localhost:{local_port}/images/realm_logo{logo_ext}"
                 print(f"   Frontend URL: {frontend_url}")
                 if logo_url:
                     print(f"   Logo URL: {logo_url}")
@@ -145,7 +159,7 @@ try:
                 elif network == 'staging':
                     backend_url = f"{backend_id}.icp0.io"
                 else:  # local
-                    backend_url = f"{backend_id}.localhost:8000"
+                    backend_url = f"{backend_id}.localhost:{local_port}"
                 print(f"   Backend URL: {backend_url}")
         except Exception as e:
             print(f"   ⚠️  Could not get canister URLs: {e}")
