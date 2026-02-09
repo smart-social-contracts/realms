@@ -90,6 +90,7 @@ function App() {
               <a href="#features" className="text-slate-600 hover:text-slate-900 transition-colors">{t('nav.howItWorks')}</a>
               <a href="#forpeople" className="text-slate-600 hover:text-slate-900 transition-colors">{t('nav.forPeople')}</a>
               <a href="#forinstitutions" className="text-slate-600 hover:text-slate-900 transition-colors">{t('nav.forInstitutions')}</a>
+              <a href="https://github.com/smart-social-contracts/realms/blob/main/ROADMAP.md" target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:text-slate-900 transition-colors">{t('nav.roadmap')}</a>
               <LanguageSwitcher />
             </div>
 
@@ -109,6 +110,7 @@ function App() {
               <a href="#features" className="block text-slate-600 hover:text-slate-900">{t('nav.howItWorks')}</a>
               <a href="#forpeople" className="block text-slate-600 hover:text-slate-900">{t('nav.forPeople')}</a>
               <a href="#forinstitutions" className="block text-slate-600 hover:text-slate-900">{t('nav.forInstitutions')}</a>
+              <a href="https://github.com/smart-social-contracts/realms/blob/main/ROADMAP.md" target="_blank" rel="noopener noreferrer" className="block text-slate-600 hover:text-slate-900">{t('nav.roadmap')}</a>
               <LanguageSwitcher />
             </div>
           </div>
