@@ -37,25 +37,36 @@ def get_zone_aggregation(resolution: int = DEFAULT_H3_RESOLUTION) -> Dict[str, A
         zones = []
         unique_users = set()
         
-        for zone in Zone.instances():
-            h3_index = zone.h3_index if hasattr(zone, 'h3_index') else None
-            lat = zone.latitude if hasattr(zone, 'latitude') else None
-            lng = zone.longitude if hasattr(zone, 'longitude') else None
+        BATCH_SIZE = 50
+        from_id = 1
+        max_id = Zone.max_id()
+        
+        while from_id <= max_id:
+            batch = Zone.load_some(from_id=from_id, count=BATCH_SIZE)
+            if not batch:
+                break
             
-            if not h3_index or lat is None or lng is None:
-                continue
+            for zone in batch:
+                h3_index = zone.h3_index if hasattr(zone, 'h3_index') else None
+                lat = zone.latitude if hasattr(zone, 'latitude') else None
+                lng = zone.longitude if hasattr(zone, 'longitude') else None
+                
+                if not h3_index or lat is None or lng is None:
+                    continue
+                
+                zones.append({
+                    "h3_index": h3_index,
+                    "user_count": 1,
+                    "center_lat": lat,
+                    "center_lng": lng,
+                    "location_name": zone.name if hasattr(zone, 'name') else "Zone",
+                })
+                
+                user_id = zone.user_id if hasattr(zone, 'user_id') else None
+                if user_id:
+                    unique_users.add(user_id)
             
-            zones.append({
-                "h3_index": h3_index,
-                "user_count": 1,
-                "center_lat": lat,
-                "center_lng": lng,
-                "location_name": zone.name if hasattr(zone, 'name') else "Zone",
-            })
-            
-            user_id = zone.user_id if hasattr(zone, 'user_id') else None
-            if user_id:
-                unique_users.add(user_id)
+            from_id = int(batch[-1]._id) + 1
         
         return {
             "success": True,

@@ -214,7 +214,7 @@ class TaskManager:
                         logger.info(
                             f"Task {task.name} is recurring, scheduling next execution in {schedule.repeat_every}s"
                         )
-                        task.status = TaskStatus.PENDING.value
+                        task.status = TaskStatus.RUNNING.value
                         task.step_to_execute = 0
                         # Reset all step statuses
                         for step in task.steps:
@@ -222,13 +222,7 @@ class TaskManager:
                         step = list(task.steps)[task.step_to_execute]
                         callback_function = self._create_timer_callback(step, task)
 
-                        if schedule.last_run_at:
-                            in_seconds = max(
-                                schedule.last_run_at + 2 * schedule.repeat_every - now,
-                                0,
-                            )
-                        else:
-                            in_seconds = schedule.repeat_every
+                        in_seconds = schedule.repeat_every
 
                         logger.info(f"schedule.last_run_at : {schedule.last_run_at}")
                         logger.info(f"schedule.repeat_every: {schedule.repeat_every}")
@@ -336,6 +330,7 @@ class TaskManager:
                             )
 
                             callback_function = self._create_timer_callback(step, task)
+                            schedule.last_run_at = now
                             step.timer_id = ic.set_timer(
                                 Duration(step.run_next_after), callback_function
                             )

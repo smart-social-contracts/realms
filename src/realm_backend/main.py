@@ -65,6 +65,9 @@ Database.init(db_storage=storage, audit_enabled=True)
 
 logger = get_logger("main")
 
+# Set to False to keep shell task entities after execution (old behavior)
+CLEANUP_SHELL_TASKS = True
+
 
 # Import management canister for outgoing HTTP requests
 from kybra.canisters.management import (
@@ -1297,6 +1300,18 @@ def execute_code(code: str) -> str:
                     response["result"] = str(result)
             else:
                 response["message"] = "Code executed successfully (no return value)"
+
+            if CLEANUP_SHELL_TASKS:
+                try:
+                    for exc in list(task.executions):
+                        exc.delete()
+                    schedule.delete()
+                    step.delete()
+                    call.delete()
+                    task.delete()
+                    codex.delete()
+                except Exception as cleanup_err:
+                    ic.print(f"Shell task cleanup warning: {cleanup_err}")
 
             return json.dumps(response, indent=2)
 
