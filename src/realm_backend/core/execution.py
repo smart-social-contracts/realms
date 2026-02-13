@@ -83,17 +83,29 @@ def run_code(source_code, locals={}, task: Optional["Task"] = None, task_executi
 
     try:
         with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
-            logger.info("executing code")
-            # Execute with globals as locals to ensure functions can call each other
-            exec(source_code, safe_globals, safe_globals)
+            execution_logger.info("Execution started")
+            # Redirect any get_logger() calls in exec'd code to the execution logger
+            # so codex log output is captured under the task execution's logger name
+            import kybra_simple_logging as _ksl
+            _original_get_logger = _ksl.get_logger
+            _ksl.get_logger = lambda name=None: execution_logger
+            safe_globals["get_logger"] = lambda name=None: execution_logger
+            try:
+                # Execute with globals as locals to ensure functions can call each other
+                exec(source_code, safe_globals, safe_globals)
+            finally:
+                _ksl.get_logger = _original_get_logger
 
         # Collect captured output
         logs = []
         stdout_content = stdout_capture.getvalue().strip()
         stderr_content = stderr_capture.getvalue().strip()
 
-        logger.info("stdout: %s" % stdout_content)
-        logger.info("stderr: %s" % stderr_content)
+        if stdout_content:
+            execution_logger.info("stdout: %s" % stdout_content)
+        if stderr_content:
+            execution_logger.warning("stderr: %s" % stderr_content)
+        execution_logger.info("Execution completed successfully")
 
         if stdout_content:
             logs.extend(stdout_content.split("\n"))
@@ -120,6 +132,12 @@ def run_code(source_code, locals={}, task: Optional["Task"] = None, task_executi
             logs.extend(stdout_content.split("\n"))
         if stderr_content:
             logs.extend(stderr_content.split("\n"))
+
+        execution_logger.error("Execution failed: %s" % stack_trace)
+        if stdout_content:
+            execution_logger.info("stdout: %s" % stdout_content)
+        if stderr_content:
+            execution_logger.warning("stderr: %s" % stderr_content)
 
         result = {
             "success": False,
