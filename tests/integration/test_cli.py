@@ -59,9 +59,9 @@ def test_ps_ls_table_output():
 
 def test_run_creates_task_sync():
     """Test that realms run creates a task (sync)."""
-    print("🧪 Testing: realms run --file examples/test_simple_sync.py")
+    print("🧪 Testing: realms run --file /app/examples/test_simple_sync.py")
     stdout, stderr, code = run_command(
-        "realms run --file examples/test_simple_sync.py", timeout=90
+        "realms run --file /app/examples/test_simple_sync.py", timeout=90
     )
     print(f"   run output: {stdout[:200]}..." if len(stdout) > 200 else f"   run output: {stdout}")
     time.sleep(2)
@@ -73,9 +73,9 @@ def test_run_creates_task_sync():
 
 def test_run_creates_task_async():
     """Test that realms run creates a task (async)."""
-    print("🧪 Testing: realms run --file examples/test_simple_async.py")
+    print("🧪 Testing: realms run --file /app/examples/test_simple_async.py")
     stdout, stderr, code = run_command(
-        "realms run --file examples/test_simple_async.py", timeout=90
+        "realms run --file /app/examples/test_simple_async.py", timeout=90
     )
     print(f"   run output: {stdout[:200]}..." if len(stdout) > 200 else f"   run output: {stdout}")
     time.sleep(2)
