@@ -149,10 +149,12 @@ test.describe('User workflows', () => {
 		await page.goto('/');
 		await page.waitForLoadState('networkidle');
 		
-		await page.goto('/join');
+		// Navigate to a page that uses the sidebar layout (which includes the Navbar with logo)
+		// Note: /join uses (no-sidebar) layout and has no Navbar
+		await page.goto('/dashboard');
 		await page.waitForLoadState('networkidle');
 		
-		const logoLink = page.locator('a[href="/"]').filter({ has: page.locator('img.h-8') }).first();
+		const logoLink = page.locator('a[href="/"]').filter({ has: page.locator('img') }).first();
 		await expect(logoLink).toBeVisible();
 		await logoLink.click();
 		
