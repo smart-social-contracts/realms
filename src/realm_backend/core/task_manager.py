@@ -249,9 +249,20 @@ class TaskManager:
 
     def _update_timers(self) -> void:
         logger.info("Updating timers")
-        # Load tasks from database (not just in-memory list)
-        # This ensures recurring callbacks can find tasks
-        all_tasks = list(Task.instances()) if Task.count() > 0 else self.tasks
+        # Load tasks individually from database (not Task.instances() which fails
+        # atomically if any related entity is missing, e.g. a deleted Call)
+        all_tasks = []
+        if Task.count() > 0:
+            max_id = Task.max_id()
+            for tid in range(1, max_id + 1):
+                try:
+                    t = Task.load(str(tid))
+                    if t:
+                        all_tasks.append(t)
+                except Exception:
+                    logger.warning(f"Skipping Task {tid} due to load error")
+        if not all_tasks:
+            all_tasks = self.tasks
         logger.info(f"Found {len(all_tasks)} tasks in database")
 
         now = get_now()
