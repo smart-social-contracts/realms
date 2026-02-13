@@ -2,7 +2,7 @@
 
 import os
 
-MAX_BATCH_SIZE = 3  # Reduced from 10 to stay within IC instruction limits on large imports
+MAX_BATCH_SIZE = 10
 
 # Docker image configuration
 # Updated automatically during release to match the current version
