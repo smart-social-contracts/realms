@@ -257,13 +257,15 @@ class TestLicenseEntity:
         """Test creating a License entity."""
         from ggg.license import License, LicenseType
 
+        import time
+        now = int(time.time())
         license = License(
             name="Court License - District 1",
             license_type=LicenseType.COURT,
             description="Authorization to operate as a court",
             status="active",
-            issued_date="2025-01-01",
-            expiry_date="2030-01-01",  # Far future date
+            issued_at=now,
+            expires_at=now + 5 * 365 * 86400,  # 5 years from now
             issuing_authority="Ministry of Justice"
         )
 
@@ -289,7 +291,7 @@ class TestLicenseEntity:
             name="Expired License",
             license_type=LicenseType.COURT,
             status="active",
-            expiry_date="2020-01-01"  # Past date
+            expires_at=1577836800  # 2020-01-01 - past date
         )
 
         assert license.is_valid() is False
@@ -360,7 +362,7 @@ class TestLicenseFunctions:
             name="New Court License",
             license_type=LicenseType.COURT,
             description="New court authorization",
-            validity_days=365,
+            validity_seconds=365 * 86400,
             issuing_authority="Ministry of Justice"
         )
 

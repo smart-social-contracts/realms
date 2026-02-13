@@ -1,5 +1,6 @@
-"""Governance module - realms, registries, codex, contracts, and voting."""
+"""Governance module - realms, registries, codex, contracts, calendar, and voting."""
 
+from .calendar import Calendar
 from .codex import Codex
 from .contract import Contract
 from .license import License, LicenseType, license_issue, license_revoke
@@ -10,6 +11,7 @@ from .registry import Registry
 from .vote import Vote
 
 __all__ = [
+    "Calendar",
     "Codex",
     "Contract",
     "License",

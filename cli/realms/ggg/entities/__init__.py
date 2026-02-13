@@ -6,6 +6,7 @@ Safe to import in CLI and any non-canister context.
 """
 
 from .balance import Balance
+from .calendar import Calendar
 from .call import Call
 from .codex import Codex
 from .contract import Contract
@@ -41,6 +42,7 @@ from .zone import Zone
 
 __all__ = [
     "Balance",
+    "Calendar",
     "Call",
     "Codex",
     "Contract",

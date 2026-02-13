@@ -21,6 +21,14 @@
     "description": "Land ownership NFT for Agora realm",
     "supply_cap": 10000
   },
+  "calendar": {
+    "fiscal_period": 600,
+    "voting_window": 120,
+    "codex_release_cycle": 900,
+    "benefit_cycle": 300,
+    "service_payment_cycle": 600,
+    "license_review_cycle": 600
+  },
   "options": {
     "random": {
       "members": 30,

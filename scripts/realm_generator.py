@@ -473,13 +473,14 @@ class RealmGenerator:
         result["justice_systems"].append(private_js)
         
         # 2. Create Licenses for Courts
+        now_ts = int(datetime.now().timestamp())
         court_license_1 = License(
             name="District Court License",
             license_type=LicenseType.COURT,
             description="Authorization to operate District Court",
             status="active",
-            issued_date=datetime.now().isoformat(),
-            expiry_date=(datetime.now() + timedelta(days=365)).isoformat(),
+            issued_at=now_ts,
+            expires_at=now_ts + 365 * 86400,
             issuing_authority="Ministry of Justice",
             metadata=""
         )
@@ -490,8 +491,8 @@ class RealmGenerator:
             license_type=LicenseType.COURT,
             description="Authorization to operate Court of Appeals",
             status="active",
-            issued_date=datetime.now().isoformat(),
-            expiry_date=(datetime.now() + timedelta(days=365)).isoformat(),
+            issued_at=now_ts,
+            expires_at=now_ts + 365 * 86400,
             issuing_authority="Ministry of Justice",
             metadata=""
         )
@@ -502,8 +503,8 @@ class RealmGenerator:
             license_type=LicenseType.JUSTICE_PROVIDER,
             description="Authorization to provide arbitration services",
             status="active",
-            issued_date=datetime.now().isoformat(),
-            expiry_date=(datetime.now() + timedelta(days=365)).isoformat(),
+            issued_at=now_ts,
+            expires_at=now_ts + 365 * 86400,
             issuing_authority="Commercial Authority",
             metadata=""
         )

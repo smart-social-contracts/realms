@@ -12,6 +12,7 @@ not part of the core GGG standard.
 # Re-export all entities from the entities submodule
 from .entities import (
     Balance,
+    Calendar,
     Call,
     Codex,
     Contract,
@@ -51,6 +52,7 @@ from .entities import (
 
 __all__ = [
     "Balance",
+    "Calendar",
     "Call",
     "Codex",
     "Contract",

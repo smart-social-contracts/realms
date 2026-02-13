@@ -1,7 +1,6 @@
-from datetime import datetime
 from typing import Optional
 
-from kybra_simple_db import Entity, ManyToOne, OneToOne, String, TimestampedMixin
+from kybra_simple_db import Entity, Integer, ManyToOne, OneToOne, String, TimestampedMixin
 from kybra_simple_logging import get_logger
 
 from ..system.constants import STATUS_MAX_LENGTH
@@ -31,8 +30,8 @@ class License(Entity, TimestampedMixin):
     license_type = String(max_length=32)  # court, church, justice_provider, etc.
     description = String(max_length=1024)
     status = String(max_length=STATUS_MAX_LENGTH)  # active, suspended, revoked, expired
-    issued_date = String(max_length=64)  # ISO format
-    expiry_date = String(max_length=64)  # ISO format
+    issued_at = Integer()   # Unix timestamp (seconds)
+    expires_at = Integer()   # Unix timestamp (seconds)
     issuing_authority = String(max_length=256)
     organization = OneToOne("Organization", "license")
     court = OneToOne("Court", "license")
@@ -43,22 +42,14 @@ class License(Entity, TimestampedMixin):
         return f"License(name={self.name!r}, type={self.license_type!r}, status={self.status!r})"
 
     def is_valid(self) -> bool:
-        """Check if this License is currently valid."""
+        """Check if this License is currently valid using system clock."""
         if self.status != "active":
             return False
-        if self.expiry_date:
-            from datetime import datetime
-            try:
-                # Handle various ISO formats
-                expiry_str = self.expiry_date.replace('Z', '+00:00')
-                # Remove timezone info for comparison with utcnow()
-                if '+' in expiry_str:
-                    expiry_str = expiry_str.split('+')[0]
-                expiry = datetime.fromisoformat(expiry_str)
-                if expiry < datetime.utcnow():
-                    return False
-            except (ValueError, AttributeError):
-                pass
+        if self.expires_at:
+            from kybra import ic
+            now = int(ic.time() / 1_000_000_000)
+            if now > self.expires_at:
+                return False
         return True
 
     @staticmethod
@@ -77,7 +68,7 @@ def license_issue(
     license_type: str,
     organization: Optional["Organization"] = None,
     description: str = "",
-    validity_days: int = 365,
+    validity_seconds: int = 0,
     issuing_authority: str = "",
     metadata: str = ""
 ) -> "License":
@@ -89,25 +80,36 @@ def license_issue(
         license_type: Type of license (court, church, etc.)
         organization: Optional Organization to license
         description: License description
-        validity_days: Number of days until expiry
+        validity_seconds: Duration in seconds. If 0, uses Calendar.license_review_cycle.
         issuing_authority: Authority issuing the license
         metadata: Optional JSON metadata
         
     Returns:
         The created License
     """
-    from datetime import timedelta
+    from kybra import ic
     
-    now = datetime.utcnow()
-    expiry = now + timedelta(days=validity_days)
+    now = int(ic.time() / 1_000_000_000)
+    
+    # Use Calendar's license_review_cycle as default validity
+    if not validity_seconds:
+        try:
+            from .realm import Realm
+            realm = Realm.load("1")
+            if realm and realm.calendar:
+                validity_seconds = realm.calendar.license_review_cycle
+        except Exception:
+            pass
+    if not validity_seconds:
+        validity_seconds = 365 * 86400  # fallback: 1 year
     
     kwargs = {
         "name": name,
         "license_type": license_type,
         "description": description,
         "status": "active",
-        "issued_date": now.isoformat(),
-        "expiry_date": expiry.isoformat(),
+        "issued_at": now,
+        "expires_at": now + validity_seconds,
         "issuing_authority": issuing_authority,
         "metadata": metadata
     }

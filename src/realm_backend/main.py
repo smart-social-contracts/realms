@@ -436,7 +436,8 @@ def find_objects(class_name: str, params: Vec[Tuple[str, str]]) -> RealmResponse
 
 def create_foundational_objects() -> void:
     """Create the foundational objects required for every realm to operate."""
-    from ggg import Identity, Profiles, Realm, Treasury, User, UserProfile
+    from ggg import Calendar, Identity, Profiles, Realm, Treasury, User, UserProfile
+    from ggg.governance.calendar import DEFAULTS as CALENDAR_DEFAULTS
 
     logger.info("Creating foundational objects...")
 
@@ -488,9 +489,9 @@ def create_foundational_objects() -> void:
         realm_welcome_image = ""
         realm_welcome_message = ""
         
+        import os
+        import json
         try:
-            import os
-            import json
             # Look for manifest.json in common locations
             manifest_paths = [
                 "manifest.json",
@@ -506,10 +507,13 @@ def create_foundational_objects() -> void:
                     realm_logo = manifest.get("logo", "")
                     realm_welcome_image = manifest.get("welcome_image", "")
                     realm_welcome_message = manifest.get("welcome_message", "")
+                    calendar_config = manifest.get("calendar", {})
                     logger.info(f"Loaded realm config from {manifest_path}: name={realm_name}")
                     break
+            calendar_config = locals().get("calendar_config", {})
         except Exception as e:
             logger.warning(f"Could not load manifest.json: {e}, using defaults")
+            calendar_config = {}
         
         realm = Realm(
             name=realm_name,
@@ -522,7 +526,24 @@ def create_foundational_objects() -> void:
 
         logger.info(f"Created realm: {realm_name}")
 
-        # 5. Create treasury linked to realm
+        # 5. Create calendar linked to realm
+        calendar_epoch = int(ic.time() / 1_000_000_000)
+        calendar = Calendar(
+            name=f"{realm.name} Calendar",
+            realm=realm,
+            epoch=calendar_config.get("epoch", calendar_epoch),
+            fiscal_period=calendar_config.get("fiscal_period", CALENDAR_DEFAULTS["fiscal_period"]),
+            voting_window=calendar_config.get("voting_window", CALENDAR_DEFAULTS["voting_window"]),
+            codex_release_cycle=calendar_config.get("codex_release_cycle", CALENDAR_DEFAULTS["codex_release_cycle"]),
+            benefit_cycle=calendar_config.get("benefit_cycle", CALENDAR_DEFAULTS["benefit_cycle"]),
+            service_payment_cycle=calendar_config.get("service_payment_cycle", CALENDAR_DEFAULTS["service_payment_cycle"]),
+            license_review_cycle=calendar_config.get("license_review_cycle", CALENDAR_DEFAULTS["license_review_cycle"]),
+            custom_cycles=json.dumps(calendar_config.get("custom_cycles", {})),
+        )
+
+        logger.info(f"Created calendar: epoch={calendar_epoch}, fiscal_period={calendar.fiscal_period}s, benefit_cycle={calendar.benefit_cycle}s")
+
+        # 6. Create treasury linked to realm
         treasury = Treasury(
             name=f"{realm.name} Treasury",
             vault_principal_id=None,  # Will be set during vault deployment

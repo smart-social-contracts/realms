@@ -78,8 +78,9 @@ from .identity import (
     Organization,
 )
 
-# Governance module - realms, registries, codex, contracts, and voting
+# Governance module - realms, registries, codex, contracts, calendar, and voting
 from .governance import (
+    Calendar,
     Codex,
     Contract,
     License,
@@ -103,6 +104,7 @@ from .land import (
 
 __all__ = [
     "Balance",
+    "Calendar",
     "Budget",
     "BudgetStatus",
     "Call",  # Implementation detail, not GGG standard
@@ -181,7 +183,7 @@ __all__ = [
 def classes() -> list[str]:
     """Return list of GGG entity class names (excludes helper types)."""
     return [name for name in __all__ if name not in (
-        'LandType', 'LandStatus', 'Operations', 'Profiles', 'BudgetStatus', 
+        'LandType', 'LandStatus', 'Operations', 'Profiles', 'BudgetStatus',
         'FiscalPeriodStatus', 'FundType', 'EntryType', 'Category',
         'LicenseType', 'JusticeSystemType', 'CourtLevel', 'CaseStatus',
         'PenaltyType', 'AppealStatus', 'case_file', 'case_assign_judges',
