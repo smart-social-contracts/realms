@@ -2,7 +2,7 @@
 
 import os
 
-MAX_BATCH_SIZE = 10  # Reduced from 25 to handle complex records with relationships (Zone+Land)
+MAX_BATCH_SIZE = 3  # Reduced from 10 to stay within IC instruction limits on large imports
 
 # Docker image configuration
 # Updated automatically during release to match the current version
