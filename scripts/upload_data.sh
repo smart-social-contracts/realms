@@ -3,8 +3,6 @@
 # NOTE: This script requires the admin_dashboard extension to be installed
 # The 'realms import' command uses the admin_dashboard extension backend
 
-set -e
-
 # Args: NETWORK [MODE] (MODE is ignored, for interface consistency)
 NETWORK="${1:-local}"
 # MODE="${2:-upgrade}"  # Not used by this script

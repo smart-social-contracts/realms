@@ -74,11 +74,14 @@ def import_data_command(
 
         # Calculate the total number of chunks using ceiling division
         total_chunks = math.ceil(len(data) / batch_size)
+        failed_chunks = 0
+        successful_chunks = 0
 
         for i in range(0, len(data), batch_size):
             chunk = data[i : i + batch_size]
+            chunk_num = i // batch_size + 1
 
-            console.print(f"📊 Sending chunk {i // batch_size + 1}/{total_chunks}")
+            console.print(f"📊 Sending chunk {chunk_num}/{total_chunks}")
 
             args = {
                 "format": format,
@@ -107,40 +110,56 @@ def import_data_command(
 
             # Run from realm folder so dfx can find .dfx/local/canister_ids.json
             effective_cwd = get_effective_cwd(folder)
-            result = run_command(
-                cmd,
-                cwd=effective_cwd,
-                capture_output=True,
+            try:
+                result = run_command(
+                    cmd,
+                    cwd=effective_cwd,
+                    capture_output=True,
+                )
+
+                # Parse the dfx response to check for backend errors
+                if result and result.stdout:
+                    # Check for success in response (handle both JSON double quotes and Python single quotes)
+                    if (
+                        '"success": true' in result.stdout.lower()
+                        or "'success': True" in result.stdout
+                    ):
+                        display_success_panel("Import Chunk Complete! 🎉", result.stdout)
+                        successful_chunks += 1
+                    else:
+                        display_error_panel(f"Backend Import Chunk {chunk_num}/{total_chunks} Failed", result.stdout)
+                        failed_chunks += 1
+                else:
+                    display_error_panel(
+                        f"Backend Import Chunk {chunk_num}/{total_chunks} Failed", "dfx command returned no output"
+                    )
+                    failed_chunks += 1
+            except Exception as chunk_err:
+                display_error_panel(
+                    f"Backend Import Chunk {chunk_num}/{total_chunks} Failed", str(chunk_err)
+                )
+                failed_chunks += 1
+
+        if failed_chunks > 0:
+            console.print(
+                f"[yellow]⚠️  {failed_chunks}/{total_chunks} chunks failed, "
+                f"{successful_chunks}/{total_chunks} succeeded[/yellow]"
             )
 
-            # Parse the dfx response to check for backend errors
-            if result and result.stdout:
-                # Check for success in response (handle both JSON double quotes and Python single quotes)
-                if (
-                    '"success": true' in result.stdout.lower()
-                    or "'success': True" in result.stdout
-                ):
-                    display_success_panel("Import Chunk Complete! 🎉", result.stdout)
-                else:
-                    display_error_panel("Backend Import Chunk Failed", result.stdout)
-                    raise typer.Exit(1)
+        if successful_chunks > 0:
+            display_success_panel(
+                "Import Data Complete! 🎉",
+                f"Imported {successful_chunks}/{total_chunks} chunks from {file_path}",
+            )
+        else:
+            display_error_panel(
+                "Import Data Failed",
+                f"All {total_chunks} chunks failed for {file_path}",
+            )
+            raise typer.Exit(1)
 
-            elif result and result.stderr:
-                # dfx command had stderr output
-                display_error_panel("Backend Import Chunk Failed", result.stderr)
-                raise typer.Exit(1)
-            else:
-                # dfx command failed completely
-                display_error_panel(
-                    "Backend Import Data Failed", "dfx command failed with no output"
-                )
-                raise typer.Exit(1)
-
-        display_success_panel(
-            "Import Data Complete! 🎉",
-            f"Successfully imported {len(data)} records from {file_path}",
-        )
-
+    except typer.Exit:
+        raise
     except Exception as e:
         display_error_panel("Backend Import Data Failed", str(e))
         raise typer.Exit(1)
