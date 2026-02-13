@@ -141,7 +141,7 @@
   }
 </script>
 
-<div class="h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex" style="transform: none !important;">
+<div class="h-screen lg:bg-gradient-to-br lg:from-gray-50 lg:to-gray-100 flex" style="transform: none !important;">
   <!-- Left Brand Panel with Background Image -->
   <div class="hidden lg:flex lg:w-[50%] text-white flex-col justify-between relative overflow-hidden">
     <!-- Background Image - no overlay, full opacity -->
@@ -186,10 +186,9 @@
         alt="{realmName} background"
         class="w-full h-full object-cover"
       />
-      <div class="absolute inset-0 bg-white/80 backdrop-blur-sm"></div>
     </div>
     
-    <div class="w-full max-w-md relative z-10">
+    <div class="w-full max-w-md relative z-10 lg:bg-transparent lg:backdrop-blur-none lg:rounded-none lg:p-0 bg-white/80 backdrop-blur-sm rounded-2xl p-4">
 
       <!-- Step Indicator -->
       {#if currentStep !== 'success'}

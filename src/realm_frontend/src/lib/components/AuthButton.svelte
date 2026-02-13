@@ -211,7 +211,7 @@
 		{/if}
 	</div>
 {:else}
-	<Button color="alternative" pill={true} on:click={handleLogin}>
+	<Button color="alternative" pill={true} on:click={() => goto('/join')}>
 		<T key="common.login" default_text="Log In" />
 	</Button>
 {/if}
