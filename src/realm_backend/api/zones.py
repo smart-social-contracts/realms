@@ -37,19 +37,19 @@ def get_zone_aggregation(resolution: int = DEFAULT_H3_RESOLUTION) -> Dict[str, A
         zones = []
         unique_users = set()
         
-        from_id = 1
+        # Use raw DB reads to avoid expensive Entity.load() overhead
+        # (entity construction, property descriptors, relationship resolution, hooks)
+        db = Zone.db()
+        type_name = Zone.get_full_type_name()
         max_id = Zone.max_id()
         
-        while from_id <= max_id:
-            # Use level=1 to load scalar fields without deep relationship resolution
-            zone = Zone.load(str(from_id), level=1)
-            from_id += 1
-            
-            if not zone:
+        for from_id in range(1, max_id + 1):
+            data = db.load(type_name, str(from_id))
+            if not data:
                 continue
             
             # Filter by resolution — skip land parcel zones (higher resolution)
-            zone_res = zone.resolution if hasattr(zone, 'resolution') else None
+            zone_res = data.get("resolution")
             if zone_res is not None:
                 try:
                     if int(float(zone_res)) != resolution:
@@ -57,9 +57,9 @@ def get_zone_aggregation(resolution: int = DEFAULT_H3_RESOLUTION) -> Dict[str, A
                 except (ValueError, TypeError):
                     pass
             
-            h3_index = zone.h3_index if hasattr(zone, 'h3_index') else None
-            lat = zone.latitude if hasattr(zone, 'latitude') else None
-            lng = zone.longitude if hasattr(zone, 'longitude') else None
+            h3_index = data.get("h3_index")
+            lat = data.get("latitude")
+            lng = data.get("longitude")
             
             if not h3_index or lat is None or lng is None:
                 continue
@@ -67,12 +67,12 @@ def get_zone_aggregation(resolution: int = DEFAULT_H3_RESOLUTION) -> Dict[str, A
             zones.append({
                 "h3_index": h3_index,
                 "user_count": 1,
-                "center_lat": lat,
-                "center_lng": lng,
-                "location_name": zone.name if hasattr(zone, 'name') else "Zone",
+                "center_lat": float(lat),
+                "center_lng": float(lng),
+                "location_name": data.get("name", "Zone"),
             })
             
-            user_id = zone.user_id if hasattr(zone, 'user_id') else None
+            user_id = data.get("user_id")
             if user_id:
                 unique_users.add(user_id)
         
