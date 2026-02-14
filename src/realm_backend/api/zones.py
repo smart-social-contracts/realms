@@ -50,8 +50,12 @@ def get_zone_aggregation(resolution: int = DEFAULT_H3_RESOLUTION) -> Dict[str, A
             
             # Filter by resolution — skip land parcel zones (higher resolution)
             zone_res = zone.resolution if hasattr(zone, 'resolution') else None
-            if zone_res is not None and int(zone_res) != resolution:
-                continue
+            if zone_res is not None:
+                try:
+                    if int(float(zone_res)) != resolution:
+                        continue
+                except (ValueError, TypeError):
+                    pass
             
             h3_index = zone.h3_index if hasattr(zone, 'h3_index') else None
             lat = zone.latitude if hasattr(zone, 'latitude') else None
