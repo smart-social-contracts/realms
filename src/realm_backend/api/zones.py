@@ -41,8 +41,8 @@ def get_zone_aggregation(resolution: int = DEFAULT_H3_RESOLUTION) -> Dict[str, A
         max_id = Zone.max_id()
         
         while from_id <= max_id:
-            # Use level=0 to avoid expensive relationship loading
-            zone = Zone.load(str(from_id), level=0)
+            # Use level=1 to load scalar fields without deep relationship resolution
+            zone = Zone.load(str(from_id), level=1)
             from_id += 1
             
             if not zone:
