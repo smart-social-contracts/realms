@@ -37,36 +37,40 @@ def get_zone_aggregation(resolution: int = DEFAULT_H3_RESOLUTION) -> Dict[str, A
         zones = []
         unique_users = set()
         
-        BATCH_SIZE = 50
         from_id = 1
         max_id = Zone.max_id()
         
         while from_id <= max_id:
-            batch = Zone.load_some(from_id=from_id, count=BATCH_SIZE)
-            if not batch:
-                break
+            # Use level=0 to avoid expensive relationship loading
+            zone = Zone.load(str(from_id), level=0)
+            from_id += 1
             
-            for zone in batch:
-                h3_index = zone.h3_index if hasattr(zone, 'h3_index') else None
-                lat = zone.latitude if hasattr(zone, 'latitude') else None
-                lng = zone.longitude if hasattr(zone, 'longitude') else None
-                
-                if not h3_index or lat is None or lng is None:
-                    continue
-                
-                zones.append({
-                    "h3_index": h3_index,
-                    "user_count": 1,
-                    "center_lat": lat,
-                    "center_lng": lng,
-                    "location_name": zone.name if hasattr(zone, 'name') else "Zone",
-                })
-                
-                user_id = zone.user_id if hasattr(zone, 'user_id') else None
-                if user_id:
-                    unique_users.add(user_id)
+            if not zone:
+                continue
             
-            from_id = int(batch[-1]._id) + 1
+            # Filter by resolution — skip land parcel zones (higher resolution)
+            zone_res = zone.resolution if hasattr(zone, 'resolution') else None
+            if zone_res is not None and int(zone_res) != resolution:
+                continue
+            
+            h3_index = zone.h3_index if hasattr(zone, 'h3_index') else None
+            lat = zone.latitude if hasattr(zone, 'latitude') else None
+            lng = zone.longitude if hasattr(zone, 'longitude') else None
+            
+            if not h3_index or lat is None or lng is None:
+                continue
+            
+            zones.append({
+                "h3_index": h3_index,
+                "user_count": 1,
+                "center_lat": lat,
+                "center_lng": lng,
+                "location_name": zone.name if hasattr(zone, 'name') else "Zone",
+            })
+            
+            user_id = zone.user_id if hasattr(zone, 'user_id') else None
+            if user_id:
+                unique_users.add(user_id)
         
         return {
             "success": True,
