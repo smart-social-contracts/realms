@@ -21,7 +21,7 @@
   let realmZoneData = {}; // Store zone data fetched from each realm's backend
   let mapLoading = false; // Loading state for map initialization and data fetch
   const H3_RESOLUTION = 6; // Resolution 6 = ~3.2km hex edge (good for city level)
-  const MARKER_HIDE_ZOOM = 5; // Hide markers when zoom >= this level (hexes become visible)
+  const MARKER_HIDE_ZOOM = 8; // Hide markers when zoom >= this level (hexes become visible)
 
   // Get commit hash from meta tag
   let commitHash = '';
@@ -247,6 +247,7 @@
           const data = JSON.parse(response);
           
           if (data.success && data.zones && data.zones.length > 0) {
+            console.log(`Zones for ${realm.name}: ${data.zones.length} zones, ${data.total_users} users`);
             return { 
               realmId: realm.id, 
               realmName: realm.name,
@@ -254,9 +255,11 @@
               zones: data.zones,
               totalUsers: data.total_users,
             };
+          } else {
+            console.warn(`No zones for ${realm.name}:`, data);
           }
         } catch (e) {
-          console.debug(`Could not fetch zones for ${realm.name}:`, e.message);
+          console.warn(`Could not fetch zones for ${realm.name}:`, e.message);
         }
         return null;
       })
@@ -388,12 +391,25 @@
     // Create map centered on world view
     map = L.map(mapContainer).setView([20, 0], 2);
     
-    // Add CartoDB Positron tiles (minimal grayscale, no labels)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+    // Add CartoDB Positron tiles (minimal grayscale, no labels) with OSM fallback
+    const cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a>',
       subdomains: 'abcd',
       maxZoom: 19,
-    }).addTo(map);
+      errorTileUrl: '',
+    });
+    cartoLayer.on('tileerror', function() {
+      // On persistent tile errors, swap to OSM fallback
+      if (!map._fallbackTiles) {
+        map._fallbackTiles = true;
+        map.removeLayer(cartoLayer);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+          maxZoom: 19,
+        }).addTo(map);
+      }
+    });
+    cartoLayer.addTo(map);
     
     // Add scale control (metric only)
     L.control.scale({
@@ -437,7 +453,7 @@
 
 
   // Number of rings to expand around each center zone (area of influence)
-  const INFLUENCE_RINGS = 2; // 0 = just center, 1 = center + immediate neighbors, 2 = two rings out
+  const INFLUENCE_RINGS = 3; // 0 = just center, 1 = center + immediate neighbors, 3 = three rings out
   
   // Add H3 hex zones for realms with multi-realm tracking per hex
   function addRealmHexZones() {
@@ -604,6 +620,7 @@
     
     filteredRealms.forEach((realm, index) => {
       const color = getRealmColor(index);
+      const realmCount = filteredRealms.length;
       
       // Check if we have real zone data - use zone centers for markers
       const realZones = realmZoneData[realm.id];
@@ -614,7 +631,7 @@
         // Use real zone centers (pick unique centers, limit to prevent too many markers)
         const uniqueLocations = new Map();
         realZones.zones.forEach(zone => {
-          const key = `${zone.center_lat.toFixed(2)},${zone.center_lng.toFixed(2)}`;
+          const key = `${zone.center_lat.toFixed(1)},${zone.center_lng.toFixed(1)}`;
           if (!uniqueLocations.has(key)) {
             uniqueLocations.set(key, { lat: zone.center_lat, lng: zone.center_lng, users: zone.user_count });
           } else {
@@ -624,34 +641,38 @@
         // Take top locations by user count
         locations = Array.from(uniqueLocations.values())
           .sort((a, b) => b.users - a.users)
-          .slice(0, 5);
+          .slice(0, 8);
       }
       // No fallback - realms without zone data won't show markers
       
       locations.forEach((coords, locIndex) => {
+        // Offset markers slightly per realm so overlapping cities show all colors
+        const offsetAngle = (2 * Math.PI * index) / realmCount;
+        const offsetDist = 0.6; // degrees offset
+        const lat = coords.lat + Math.sin(offsetAngle) * offsetDist;
+        const lng = coords.lng + Math.cos(offsetAngle) * offsetDist;
+        
         // Add an outer glow effect
-        L.circleMarker([coords.lat, coords.lng], {
-          radius: 28,
+        L.circleMarker([lat, lng], {
+          radius: 18,
           fillColor: color,
           color: color,
           weight: 0,
-          fillOpacity: 0.3,
+          fillOpacity: 0.25,
         }).addTo(markerLayer);
         
-        // Create a large, highly visible circle marker
-        const circleMarker = L.circleMarker([coords.lat, coords.lng], {
-          radius: 20,
+        // Create a visible circle marker
+        const circleMarker = L.circleMarker([lat, lng], {
+          radius: 12,
           fillColor: color,
           color: '#FFFFFF',
-          weight: 4,
+          weight: 3,
           opacity: 1,
-          fillOpacity: 0.85,
+          fillOpacity: 0.9,
         }).addTo(markerLayer);
         
         // Add realm name tooltip
-        const isHQ = locIndex === 0;
-        const suffix = realZones ? '' : (isHQ ? ' (HQ)' : '');
-        circleMarker.bindTooltip(`${realm.name}${suffix}`, {
+        circleMarker.bindTooltip(`${realm.name}`, {
           permanent: false,
           direction: 'top',
           className: 'realm-tooltip',
