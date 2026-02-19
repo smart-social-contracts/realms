@@ -214,6 +214,19 @@ deploy_single_realm() {
         if [ -d "$REPO_ROOT/extensions/extensions" ]; then
             cp -r "$REPO_ROOT/extensions/extensions" "$SINGLE_REALM_PATH/extensions/"
         fi
+        
+        # Also copy into extension_packages (what kybra build actually uses)
+        if [ -d "$SINGLE_REALM_PATH/src/realm_backend/extension_packages" ]; then
+            echo -e "${GREEN}📦 Updating extension_packages...${NC}"
+            for ext_dir in "$REPO_ROOT/extensions/extensions/"*/backend; do
+                if [ -d "$ext_dir" ]; then
+                    ext_name=$(basename "$(dirname "$ext_dir")")
+                    if [ -d "$SINGLE_REALM_PATH/src/realm_backend/extension_packages/$ext_name" ]; then
+                        cp -r "$ext_dir/"* "$SINGLE_REALM_PATH/src/realm_backend/extension_packages/$ext_name/"
+                    fi
+                fi
+            done
+        fi
     fi
     
     if [ "$DEPLOY_FRONTEND" = true ]; then
@@ -237,8 +250,16 @@ deploy_single_realm() {
     fi
     
     if [ "$DEPLOY_BACKEND" = true ]; then
+        # Activate venv if present (needed for kybra build)
+        if [ -f "$SINGLE_REALM_PATH/venv/bin/activate" ]; then
+            echo -e "${GREEN}🐍 Activating venv...${NC}"
+            source "$SINGLE_REALM_PATH/venv/bin/activate"
+        fi
+        
         echo -e "${GREEN}🚀 Deploying backend...${NC}"
         (cd "$SINGLE_REALM_PATH" && dfx deploy realm_backend)
+        
+        deactivate 2>/dev/null || true
     fi
 }
 
@@ -283,11 +304,23 @@ deploy_registry() {
 # Function to copy and deploy realm (mundus mode)
 deploy_mundus_realm() {
     local realm_num=$1
-    local realm_dir=$(ls -d "$MUNDUS_PATH"/realm_*_"$realm_num"_* 2>/dev/null | head -1)
+    local realm_dir=""
+    
+    # Match realm by name based on number
+    for d in "$MUNDUS_PATH"/realm_*; do
+        if [ -d "$d" ]; then
+            local dname=$(basename "$d")
+            case "$realm_num" in
+                1) [[ "$dname" == *"Dominion"* ]] && realm_dir="$d" ;;
+                2) [[ "$dname" == *"Agora"* ]] && realm_dir="$d" ;;
+                3) [[ "$dname" == *"Syntropia"* ]] && realm_dir="$d" ;;
+            esac
+        fi
+    done
     
     if [ -z "$realm_dir" ]; then
-        # Try finding by pattern matching
-        realm_dir=$(ls -d "$MUNDUS_PATH"/realm_*Realm_"$realm_num"_* 2>/dev/null | head -1)
+        # Fallback: try numeric suffix patterns
+        realm_dir=$(ls -d "$MUNDUS_PATH"/realm_*_"$realm_num"_* 2>/dev/null | head -1)
     fi
     
     if [ -z "$realm_dir" ]; then
@@ -330,6 +363,19 @@ deploy_mundus_realm() {
         if [ -d "$REPO_ROOT/extensions/extensions" ]; then
             cp -r "$REPO_ROOT/extensions/extensions" "$realm_dir/extensions/"
         fi
+        
+        # Also copy into extension_packages (what kybra build actually uses)
+        if [ -d "$realm_dir/src/realm_backend/extension_packages" ]; then
+            echo -e "${GREEN}📦 Updating extension_packages...${NC}"
+            for ext_dir in "$REPO_ROOT/extensions/extensions/"*/backend; do
+                if [ -d "$ext_dir" ]; then
+                    ext_name=$(basename "$(dirname "$ext_dir")")
+                    if [ -d "$realm_dir/src/realm_backend/extension_packages/$ext_name" ]; then
+                        cp -r "$ext_dir/"* "$realm_dir/src/realm_backend/extension_packages/$ext_name/"
+                    fi
+                fi
+            done
+        fi
     fi
     
     if [ "$CLEAN_BUILD" = true ] && [ "$DEPLOY_FRONTEND" = true ]; then
@@ -347,8 +393,16 @@ deploy_mundus_realm() {
     fi
     
     if [ "$DEPLOY_BACKEND" = true ]; then
+        # Activate venv if present (needed for kybra build)
+        if [ -f "$realm_dir/venv/bin/activate" ]; then
+            echo -e "${GREEN}🐍 Activating venv...${NC}"
+            source "$realm_dir/venv/bin/activate"
+        fi
+        
         echo -e "${GREEN}🚀 Deploying realm $realm_num backend...${NC}"
         (cd "$realm_dir" && dfx deploy realm_backend)
+        
+        deactivate 2>/dev/null || true
     fi
 }
 
