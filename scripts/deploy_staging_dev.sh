@@ -154,11 +154,17 @@ deploy_registry() {
             rm -rf "$registry_dir/src/realm_registry_frontend/dist"
         fi
         
-        echo -e "${GREEN}🔨 Building registry frontend...${NC}"
+        # Source .env so canister IDs are available to the vite build
+        echo -e "${GREEN}� Loading canister environment...${NC}"
+        set -a
+        source "$registry_dir/.env"
+        set +a
+        
+        echo -e "${GREEN}� Building registry frontend...${NC}"
         (cd "$registry_dir/src/realm_registry_frontend" && npm run build)
         
         echo -e "${GREEN}🚀 Deploying registry frontend to $NETWORK...${NC}"
-        (cd "$registry_dir" && dfx deploy realm_registry_frontend --network "$NETWORK" --mode upgrade)
+        (cd "$registry_dir" && dfx deploy realm_registry_frontend --network "$NETWORK")
     fi
     
     if [ "$DEPLOY_BACKEND" = true ]; then
@@ -231,11 +237,17 @@ deploy_realm() {
             rm -rf "$realm_dir/src/realm_frontend/dist"
         fi
         
+        # Source .env so canister IDs are available to the vite build
+        echo -e "${GREEN}🔧 Loading canister environment...${NC}"
+        set -a
+        source "$realm_dir/.env"
+        set +a
+        
         echo -e "${GREEN}🔨 Building realm frontend...${NC}"
         (cd "$realm_dir/src/realm_frontend" && npm run build)
         
         echo -e "${GREEN}🚀 Deploying realm frontend to $NETWORK...${NC}"
-        (cd "$realm_dir" && dfx deploy realm_frontend --network "$NETWORK" --mode upgrade)
+        (cd "$realm_dir" && dfx deploy realm_frontend --network "$NETWORK")
     fi
     
     if [ "$DEPLOY_BACKEND" = true ]; then
