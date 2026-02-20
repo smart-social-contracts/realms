@@ -1,6 +1,10 @@
 """Deploy command for deploying realms to different networks."""
 
+import json
 import os
+import subprocess
+import re
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -22,6 +26,47 @@ from ..utils import (
 )
 
 console = Console()
+
+
+def _query_cycles_balance(network: str, cwd: str = ".") -> Optional[float]:
+    """Query the deployer's cycles balance in TC. Returns None if query fails."""
+    if network in ("local",):
+        return None
+    try:
+        env = os.environ.copy()
+        env["DFX_WARNING"] = "-mainnet_plaintext_identity"
+        result = subprocess.run(
+            ["dfx", "cycles", "balance", "--network", network],
+            capture_output=True, text=True, timeout=30, cwd=cwd, env=env,
+        )
+        if result.returncode == 0:
+            # Parse e.g. "14.796 TC (trillion cycles)."
+            m = re.search(r'([\d.]+)\s*TC', result.stdout)
+            if m:
+                return float(m.group(1))
+    except Exception:
+        pass
+    return None
+
+
+def _query_canister_cycles(canister_id: str, network: str, cwd: str = ".") -> Optional[int]:
+    """Query cycles balance for a specific canister. Returns raw cycles count or None."""
+    if network in ("local",):
+        return None
+    try:
+        env = os.environ.copy()
+        env["DFX_WARNING"] = "-mainnet_plaintext_identity"
+        result = subprocess.run(
+            ["dfx", "canister", "status", canister_id, "--network", network],
+            capture_output=True, text=True, timeout=30, cwd=cwd, env=env,
+        )
+        if result.returncode == 0:
+            m = re.search(r'Balance:\s+([\d_]+)\s+Cycles', result.stdout)
+            if m:
+                return int(m.group(1).replace("_", ""))
+    except Exception:
+        pass
+    return None
 
 
 def _deploy_realm_internal(
@@ -117,6 +162,12 @@ def _deploy_realm_internal(
             console.print(f"[yellow]   Try recreating with: realms create --realm-name <name>[/yellow]")
             raise typer.Exit(1)
 
+    # Query cycles balance before deployment
+    cycles_before = _query_cycles_balance(network, cwd=str(folder_path))
+    deploy_start_time = time.time()
+    if cycles_before is not None:
+        logger.info(f"Cycles balance before deployment: {cycles_before} TC")
+
     if plain_logs:
         # Plain logs mode: show full verbose output
         _run_deployment_plain(scripts, scripts_dir, folder_path, network, mode, env, logger, log_dir)
@@ -124,8 +175,25 @@ def _deploy_realm_internal(
         # Default: Rich Live progress display
         _run_deployment_with_progress(scripts, scripts_dir, folder_path, network, mode, env, logger, log_dir)
     
+    deploy_end_time = time.time()
+    deploy_duration_s = round(deploy_end_time - deploy_start_time, 1)
+
     display_canister_urls_json(folder_path, network, "Realm Deployment Summary")
     
+    # Query cycles balance after deployment and print summary
+    cycles_after = _query_cycles_balance(network, cwd=str(folder_path))
+    cycles_summary = _build_cycles_summary(
+        folder_path, network, cycles_before, cycles_after, deploy_duration_s, logger
+    )
+    if cycles_summary:
+        console.print(f"\n[bold cyan]💰 Cycles Summary[/bold cyan]")
+        console.print(json.dumps(cycles_summary, indent=2))
+        logger.info(f"Cycles summary: {json.dumps(cycles_summary)}")
+        # Also save to deployment directory for the management service to pick up
+        summary_path = folder_path / "_cycles_summary.json"
+        with open(summary_path, "w") as f:
+            json.dump(cycles_summary, f, indent=2)
+
     # Update context to point to the deployed realm
     realm_name = folder_path.name
     relative_folder = str(folder_path.relative_to(Path.cwd())) if folder_path.is_relative_to(Path.cwd()) else str(folder_path)
@@ -227,6 +295,49 @@ def _run_deployment_with_progress(
     
     console.print(f"\n[green]🎉 Deployment completed successfully![/green]")
     logger.info("Deployment completed successfully")
+
+
+def _build_cycles_summary(
+    folder_path: Path,
+    network: str,
+    cycles_before: Optional[float],
+    cycles_after: Optional[float],
+    deploy_duration_s: float,
+    logger,
+) -> Optional[dict]:
+    """Build a cycles consumption summary after deployment."""
+    if network in ("local",):
+        return None
+
+    from ..utils import get_canister_urls
+    canisters = get_canister_urls(folder_path, network)
+
+    summary = {
+        "network": network,
+        "deploy_duration_seconds": deploy_duration_s,
+    }
+
+    if cycles_before is not None and cycles_after is not None:
+        consumed = round(cycles_before - cycles_after, 6)
+        summary["deployer_cycles_before_tc"] = cycles_before
+        summary["deployer_cycles_after_tc"] = cycles_after
+        summary["total_cycles_consumed_tc"] = consumed
+
+    # Query per-canister cycles
+    canister_balances = {}
+    for name, info in canisters.items():
+        cid = info.get("id", "")
+        if cid:
+            balance = _query_canister_cycles(cid, network, cwd=str(folder_path))
+            if balance is not None:
+                canister_balances[name] = {
+                    "canister_id": cid,
+                    "cycles_balance": balance,
+                }
+    if canister_balances:
+        summary["canister_balances"] = canister_balances
+
+    return summary if len(summary) > 2 else None
 
 
 def _build_script_command(script_path: Path, script_name: str, network: str, mode: str) -> list:
