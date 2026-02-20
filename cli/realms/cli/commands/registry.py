@@ -3,6 +3,7 @@
 import json
 import shutil
 import subprocess
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -713,3 +714,188 @@ def billing_status_command(
         raise typer.Exit(1)
     else:
         console.print(f"[yellow]❓ Unexpected response: {data}[/yellow]")
+
+
+# ============== HTTP API Helper ==============
+
+def _call_http_api(
+    url: str,
+    method: str = "GET",
+    data: dict = None,
+    timeout: int = 30,
+) -> dict:
+    """Make an HTTP API call and return the JSON response."""
+    import urllib.request
+    import urllib.error
+
+    try:
+        if data is not None:
+            body = json.dumps(data).encode("utf-8")
+            req = urllib.request.Request(
+                url,
+                data=body,
+                headers={"Content-Type": "application/json"},
+                method=method,
+            )
+        else:
+            req = urllib.request.Request(url, method=method)
+
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return {"success": True, "data": json.loads(resp.read().decode())}
+
+    except urllib.error.HTTPError as e:
+        try:
+            error_body = json.loads(e.read().decode())
+        except Exception:
+            error_body = {"detail": str(e)}
+        return {"success": False, "error": error_body.get("detail", str(e)), "status": e.code}
+    except urllib.error.URLError as e:
+        return {"success": False, "error": f"Connection failed: {e.reason}"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ============== Voucher Redemption Commands ==============
+
+def billing_redeem_voucher_command(
+    principal_id: str,
+    code: str,
+    billing_url: str = "https://billing.realmsgos.dev",
+) -> None:
+    """Redeem a voucher code and add credits to a user's balance."""
+    console.print("[bold blue]🎟️  Redeeming Voucher[/bold blue]\n")
+    console.print(f"[dim]Principal: {principal_id}[/dim]")
+    console.print(f"[dim]Code: {code}[/dim]")
+    console.print(f"[dim]Billing service: {billing_url}[/dim]\n")
+
+    result = _call_http_api(
+        f"{billing_url}/voucher/redeem",
+        method="POST",
+        data={"principal_id": principal_id, "code": code},
+    )
+
+    if not result["success"]:
+        console.print(f"[red]❌ Error: {result['error']}[/red]")
+        raise typer.Exit(1)
+
+    resp = result["data"]
+    if resp.get("success"):
+        credits = resp.get("data", {}).get("credits", 0)
+        console.print(f"[green]✅ {resp.get('message', 'Voucher redeemed')}[/green]")
+        if credits:
+            console.print(f"[dim]Credits added: {credits}[/dim]")
+    else:
+        console.print(f"[red]❌ {resp.get('message', 'Redemption failed')}[/red]")
+        raise typer.Exit(1)
+
+
+# ============== Realm Deployment via Management Service ==============
+
+def realm_deploy_realm_command(
+    principal_id: str,
+    realm_name: str,
+    management_url: str = "https://management.realmsgos.dev",
+) -> None:
+    """Deploy a new realm via the management service (appears in dashboard)."""
+    console.print("[bold blue]🚀 Deploying Realm via Management Service[/bold blue]\n")
+    console.print(f"[dim]Principal: {principal_id}[/dim]")
+    console.print(f"[dim]Realm name: {realm_name}[/dim]")
+    console.print(f"[dim]Management service: {management_url}[/dim]\n")
+
+    realm_config = {
+        "name": realm_name,
+        "descriptions": {"en": f"Realm created by agent: {realm_name}"},
+        "languages": ["en"],
+        "welcome_messages": {"en": f"Welcome to {realm_name}!"},
+        "token_enabled": True,
+        "token_name": realm_name,
+        "token_symbol": realm_name[:4].upper(),
+        "extensions": [],
+    }
+
+    result = _call_http_api(
+        f"{management_url}/api/deploy",
+        method="POST",
+        data={"principal_id": principal_id, "realm_config": realm_config},
+        timeout=60,
+    )
+
+    if not result["success"]:
+        console.print(f"[red]❌ Error: {result['error']}[/red]")
+        raise typer.Exit(1)
+
+    resp = result["data"]
+    if resp.get("success"):
+        deployment_id = resp.get("deployment_id", "unknown")
+        console.print(f"[green]✅ Deployment started![/green]")
+        console.print(f"[cyan]Deployment ID:[/cyan] {deployment_id}")
+        console.print(f"[dim]{resp.get('message', '')}[/dim]")
+        console.print(f"\n[yellow]📝 Check status with:[/yellow]")
+        console.print(f"   realms registry realm deploy-status --deployment-id {deployment_id}")
+    else:
+        console.print(f"[red]❌ {resp.get('message', 'Deployment failed')}[/red]")
+        if resp.get("error"):
+            console.print(f"[dim]Error code: {resp['error']}[/dim]")
+        raise typer.Exit(1)
+
+
+def realm_deploy_status_command(
+    deployment_id: str,
+    management_url: str = "https://management.realmsgos.dev",
+    wait: bool = False,
+    poll_interval: int = 10,
+    max_wait: int = 900,
+) -> None:
+    """Check deployment status, optionally waiting for completion."""
+    console.print("[bold blue]📋 Deployment Status[/bold blue]\n")
+
+    start_time = time.time()
+
+    while True:
+        result = _call_http_api(
+            f"{management_url}/api/deploy/{deployment_id}",
+            method="GET",
+        )
+
+        if not result["success"]:
+            console.print(f"[red]❌ Error: {result['error']}[/red]")
+            raise typer.Exit(1)
+
+        info = result["data"]
+        status = info.get("status", "unknown")
+
+        if not wait or status in ("completed", "failed"):
+            # Display final status
+            table = Table(title=f"Deployment {deployment_id[:12]}...", show_header=False, box=None)
+            table.add_column("Field", style="cyan")
+            table.add_column("Value", style="white")
+
+            status_style = {
+                "completed": "[green]completed[/green]",
+                "failed": "[red]failed[/red]",
+                "in_progress": "[yellow]in_progress[/yellow]",
+                "pending": "[dim]pending[/dim]",
+            }.get(status, status)
+
+            table.add_row("Status", status_style)
+            table.add_row("Realm Name", info.get("realm_name", "N/A"))
+            if info.get("realm_url"):
+                table.add_row("Realm URL", f"[green]{info['realm_url']}[/green]")
+            if info.get("realm_id"):
+                table.add_row("Realm ID", info["realm_id"])
+            if info.get("error"):
+                table.add_row("Error", f"[red]{info['error']}[/red]")
+            if info.get("credits_charged"):
+                table.add_row("Credits Charged", str(info["credits_charged"]))
+
+            console.print(table)
+            break
+
+        # Waiting mode - show progress
+        elapsed = int(time.time() - start_time)
+        if elapsed >= max_wait:
+            console.print(f"[red]❌ Timed out after {max_wait}s waiting for deployment[/red]")
+            raise typer.Exit(1)
+
+        console.print(f"[dim]  Status: {status} (elapsed: {elapsed}s, polling every {poll_interval}s)...[/dim]")
+        time.sleep(poll_interval)

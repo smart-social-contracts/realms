@@ -19,7 +19,10 @@ from .commands.registry import (
     billing_add_credits_command,
     billing_balance_command,
     billing_deduct_credits_command,
+    billing_redeem_voucher_command,
     billing_status_command,
+    realm_deploy_realm_command,
+    realm_deploy_status_command,
     registry_count_command,
     registry_create_command,
     registry_deploy_command,
@@ -941,6 +944,44 @@ def billing_status(
 ) -> None:
     """Get overall billing status across all users."""
     billing_status_command(network, canister_id)
+
+
+@registry_billing_app.command("redeem_voucher")
+def billing_redeem_voucher(
+    principal_id: str = typer.Option(..., "--principal", "-p", help="User principal ID"),
+    code: str = typer.Option(..., "--code", "-c", help="Voucher code to redeem"),
+    billing_url: str = typer.Option(
+        "https://billing.realmsgos.dev", "--billing-url", help="Billing service URL"
+    ),
+) -> None:
+    """Redeem a voucher code to add credits to a user's balance."""
+    billing_redeem_voucher_command(principal_id, code, billing_url)
+
+
+@registry_realm_app.command("deploy-realm")
+def registry_deploy_realm(
+    principal_id: str = typer.Option(..., "--principal", "-p", help="User principal ID"),
+    realm_name: str = typer.Option(..., "--name", "-n", help="Name for the new realm"),
+    management_url: str = typer.Option(
+        "https://management.realmsgos.dev", "--management-url", help="Management service URL"
+    ),
+) -> None:
+    """Deploy a new realm via the management service (appears in dashboard)."""
+    realm_deploy_realm_command(principal_id, realm_name, management_url)
+
+
+@registry_realm_app.command("deploy-status")
+def registry_deploy_status(
+    deployment_id: str = typer.Option(..., "--deployment-id", "-d", help="Deployment ID to check"),
+    management_url: str = typer.Option(
+        "https://management.realmsgos.dev", "--management-url", help="Management service URL"
+    ),
+    wait: bool = typer.Option(False, "--wait", "-w", help="Wait for deployment to complete (polls periodically)"),
+    poll_interval: int = typer.Option(10, "--poll-interval", help="Seconds between status polls (with --wait)"),
+    max_wait: int = typer.Option(900, "--max-wait", help="Maximum seconds to wait (with --wait)"),
+) -> None:
+    """Check deployment status, optionally waiting for completion."""
+    realm_deploy_status_command(deployment_id, management_url, wait, poll_interval, max_wait)
 
 
 # Realm context management commands
