@@ -253,14 +253,25 @@ def create_command(
                     if not quiet:
                         console.print(f"[yellow]⚠️  Logo file not found: {logo_source}[/yellow]")
             
-            # Copy welcome image file if it exists in manifest directory
-            for welcome_ext in ["jpg", "jpeg", "png", "webp"]:
-                welcome_source = manifest_path.parent / f"welcome.{welcome_ext}"
+            # Copy welcome/background image file if specified in manifest or found by convention
+            welcome_filename = realm_manifest.get("welcome_image", "")
+            welcome_copied = False
+            if welcome_filename:
+                welcome_source = manifest_path.parent / welcome_filename
                 if welcome_source.exists():
-                    shutil.copy2(welcome_source, output_path / f"welcome.{welcome_ext}")
+                    shutil.copy2(welcome_source, output_path / welcome_filename)
+                    welcome_copied = True
                     if not quiet:
-                        console.print(f"✅ Copied welcome image: welcome.{welcome_ext}")
-                    break
+                        console.print(f"✅ Copied welcome image: {welcome_filename}")
+            if not welcome_copied:
+                # Fallback: search for welcome.* or background.* in manifest directory
+                for img_name in ["welcome.png", "welcome.jpg", "welcome.webp", "background.png", "background.jpg"]:
+                    img_source = manifest_path.parent / img_name
+                    if img_source.exists():
+                        shutil.copy2(img_source, output_path / img_name)
+                        if not quiet:
+                            console.print(f"✅ Copied welcome image: {img_name}")
+                        break
     
     # Get RealmGenerator (from scripts/ in repo mode, bundled in pip mode)
     try:
