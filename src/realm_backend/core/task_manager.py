@@ -89,17 +89,15 @@ class TaskManager:
 
         if step.call.is_async:
 
-            def async_timer_callback() -> Async[void]:
+            def async_timer_callback() -> void:
                 logger.info(f"Executing async timer callback for {step.call}")
                 task_execution = task.new_task_execution()
                 try:
-                    # Create execution record (defensive - don't fail if this errors)
                     task_execution.status = TaskExecutionStatus.RUNNING.value
 
-                    # Use _function() which handles both codex and function-based calls
-                    result = yield step.call._function(task_execution)()
+                    # _function() now iterates generators internally, so no yield needed
+                    result = step.call._function(task_execution)()
                     logger.info(f"Async timer callback completed with result: {result}")
-
 
                     task_execution.status = TaskExecutionStatus.COMPLETED.value
                     step.status = TaskStatus.COMPLETED.value
@@ -109,9 +107,7 @@ class TaskManager:
                     logger.error(traceback.format_exc())
 
                     task_execution.status = TaskExecutionStatus.FAILED.value
-                    task_execution.result = "failed"
-
-
+                    task_execution.result = str(e)[:4999]
 
                     step.status = TaskStatus.FAILED.value
                     task.status = TaskStatus.FAILED.value

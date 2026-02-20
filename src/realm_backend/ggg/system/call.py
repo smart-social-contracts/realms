@@ -34,7 +34,12 @@ class Call(Entity, TimestampedMixin):
             raise ValueError("Call has no codex or codex has no code")
 
         if self.is_async:
-            # For async: run code with logging, then return the async_task generator
+            # For async codex: run_code first for logging setup, then find and
+            # execute the async_task() entry point.  async_task() may be a
+            # generator (uses ``yield`` for IC inter-canister calls).  We
+            # iterate the generator with next() so the code body executes
+            # synchronously; actual IC async calls won't fire but all sync
+            # logic (logging, entity creation) will run correctly.
             def async_wrapper():
                 # Use run_code to get proper logging
                 result = run_code(self.codex.code, task_execution=task_execution)
@@ -48,18 +53,29 @@ class Call(Entity, TimestampedMixin):
                 import kybra
                 from kybra import ic
                 
+                exec_logger = task_execution.logger()
                 namespace = {
                     "ggg": ggg,
                     "kybra": kybra,
                     "ic": ic,
-                    "logger": task_execution.logger(),
+                    "logger": exec_logger,
                 }
                 exec(self.codex.code, namespace, namespace)
                 
                 async_task_fn = namespace.get("async_task")
                 if async_task_fn is None:
                     raise ValueError("Async codex must define 'async_task()' function")
-                return async_task_fn()
+
+                call_result = async_task_fn()
+
+                # If async_task is a generator, iterate it so its body executes
+                if hasattr(call_result, '__next__'):
+                    try:
+                        while True:
+                            next(call_result)
+                    except StopIteration as e:
+                        return e.value
+                return call_result
 
             return async_wrapper
         else:
