@@ -769,7 +769,7 @@ def billing_redeem_voucher_command(
     console.print(f"[dim]Billing service: {billing_url}[/dim]\n")
 
     result = _call_http_api(
-        f"{billing_url}/api/vouchers/redeem",
+        f"{billing_url}/voucher/redeem",
         method="POST",
         data={"principal_id": principal_id, "code": code},
     )
