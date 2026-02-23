@@ -21,8 +21,7 @@ import re
 import subprocess
 import time
 import concurrent.futures
-import urllib.request
-import urllib.error
+import requests as http_requests
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional, NamedTuple
@@ -145,18 +144,14 @@ PERSONA_ROSTER: List[PersonaSlot] = [
 def _api_post(path: str, payload: Dict) -> Optional[Dict]:
     """POST JSON to the Geister API. Returns parsed response or None."""
     url = f"{GEISTER_API_URL}{path}"
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        url, data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")[:200]
-        print(f"  ⚠️  API POST {path} → HTTP {e.code}: {body}")
+        resp = http_requests.post(url, json=payload, timeout=30)
+        resp.raise_for_status()
+        return resp.json()
+    except http_requests.exceptions.HTTPError as e:
+        body = e.response.text[:200] if e.response is not None else ""
+        code = e.response.status_code if e.response is not None else "?"
+        print(f"  ⚠️  API POST {path} → HTTP {code}: {body}")
     except Exception as e:
         print(f"  ⚠️  API POST {path} failed: {e}")
     return None
@@ -165,18 +160,14 @@ def _api_post(path: str, payload: Dict) -> Optional[Dict]:
 def _api_put(path: str, payload: Dict) -> Optional[Dict]:
     """PUT JSON to the Geister API. Returns parsed response or None."""
     url = f"{GEISTER_API_URL}{path}"
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        url, data=data,
-        headers={"Content-Type": "application/json"},
-        method="PUT",
-    )
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")[:200]
-        print(f"  ⚠️  API PUT {path} → HTTP {e.code}: {body}")
+        resp = http_requests.put(url, json=payload, timeout=30)
+        resp.raise_for_status()
+        return resp.json()
+    except http_requests.exceptions.HTTPError as e:
+        body = e.response.text[:200] if e.response is not None else ""
+        code = e.response.status_code if e.response is not None else "?"
+        print(f"  ⚠️  API PUT {path} → HTTP {code}: {body}")
     except Exception as e:
         print(f"  ⚠️  API PUT {path} failed: {e}")
     return None
