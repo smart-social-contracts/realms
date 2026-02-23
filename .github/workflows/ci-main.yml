@@ -379,6 +379,45 @@ jobs:
       # NOTE: test_invoice_payment.py and test_create_proposal.py moved to tests_TODO_review_or_delete/
       # Skipping these tests until they are reviewed and restored
 
+      - name: Ensure Ollama pod is running
+        if: env.RUNPOD_API_KEY != ''
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+        run: |
+          pip install runpod requests >/dev/null 2>&1
+          python3 - <<'WAKE_SCRIPT'
+          import runpod, os, time, requests as r
+          runpod.api_key = os.environ["RUNPOD_API_KEY"]
+          OLLAMA_URL = "https://geister-ollama.realmsgos.dev"
+          pods = runpod.get_pods()
+          pod = next((p for p in pods if p["name"].startswith("geister-main-")), None)
+          if not pod:
+            print("::warning::No geister-main pod found, skipping wake"); exit(0)
+          status = pod.get("desiredStatus", "UNKNOWN")
+          print(f"Pod {pod['id']}: {status}")
+          if status != "RUNNING":
+            print("Starting pod...")
+            runpod.resume_pod(pod_id=pod["id"], gpu_count=1)
+            for i in range(60):
+              time.sleep(5)
+              pods = runpod.get_pods()
+              p = next((x for x in pods if x["id"] == pod["id"]), None)
+              if p and p.get("desiredStatus") == "RUNNING":
+                print("Pod is RUNNING"); break
+            else:
+              print("::warning::Pod did not reach RUNNING within 5min"); exit(0)
+          print("Waiting for Ollama to be healthy...")
+          for i in range(36):
+            try:
+              resp = r.get(OLLAMA_URL, timeout=10)
+              if resp.status_code == 200:
+                print("Ollama is healthy!"); exit(0)
+            except Exception:
+              pass
+            time.sleep(10)
+          print("::warning::Ollama not healthy after 6min, proceeding anyway")
+          WAKE_SCRIPT
+
       - name: Run geister agent swarm test on staging
         run: |
           # Store identity in a temporary file
