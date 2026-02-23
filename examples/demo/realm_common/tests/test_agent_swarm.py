@@ -2,76 +2,172 @@
 """
 Geister Agent Swarm Test - Run LLM-powered agents against staging realms.
 
-Discovers realms dynamically from the registry and runs agents that join
-and perform operations via the geister API.
+Discovers realms dynamically from the registry and runs a diverse swarm of
+agents (assistants, founders, and citizens) that join and perform governance
+operations via the Geister API.
+
+Any issues self-reported by agents (prefixed ISSUE:) are automatically filed
+as GitHub Issues using `gh issue create`.
 
 Usage:
     python test_agent_swarm.py
-    AGENTS_COUNT=100 python test_agent_swarm.py
+    AGENTS_COUNT=22 python test_agent_swarm.py
+    GITHUB_REPOSITORY=org/repo GH_TOKEN=xxx python test_agent_swarm.py
 """
 import json
 import os
 import sys
 import re
 import subprocess
+import time
 import concurrent.futures
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, NamedTuple
 
-# Configuration - easily changeable
-AGENTS_COUNT = int(os.getenv("AGENTS_COUNT", "3"))  # Total agents distributed across all realms
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+AGENTS_COUNT = int(os.getenv("AGENTS_COUNT", "22"))   # agents per realm
 NETWORK = os.getenv("NETWORK", "staging")
 GEISTER_API_URL = os.getenv("GEISTER_API_URL", "https://geister-api.realmsgos.dev")
-MAX_WORKERS = int(os.getenv("MAX_WORKERS", "5"))
-FAILURE_THRESHOLD = float(os.getenv("FAILURE_THRESHOLD", "0.2"))  # 20% max failures allowed
+MAX_WORKERS = int(os.getenv("MAX_WORKERS", "8"))
+AGENT_TIMEOUT_SECONDS = int(os.getenv("AGENT_TIMEOUT_SECONDS", "300"))  # 5 min per agent
+RUN_DURATION_MINUTES = int(os.getenv("RUN_DURATION_MINUTES", "0"))       # 0 = no overall limit
+FAILURE_THRESHOLD = float(os.getenv("FAILURE_THRESHOLD", "0.3"))        # 30% max failures
 LOGS_DIR = Path(os.getenv("LOGS_DIR", "agent_logs"))
+GITHUB_REPOSITORY = os.getenv("GITHUB_REPOSITORY", "")   # e.g. "smart-social-contracts/realms"
+GH_TOKEN = os.getenv("GH_TOKEN") or os.getenv("GITHUB_TOKEN", "")
+ISSUE_LABEL = os.getenv("ISSUE_LABEL", "agent-swarm")
 
+
+# ---------------------------------------------------------------------------
+# Persona roster definition
+# AGENTS_COUNT agents are spread across realms using the ratio below.
+# The list repeats as needed via modulo indexing.
+# ---------------------------------------------------------------------------
+class PersonaSlot(NamedTuple):
+    persona: str           # name passed to geister --persona
+    role_label: str        # human-readable label for logs
+    emoji: str
+    task: str              # LLM instruction for this agent
+
+
+PERSONA_ROSTER: List[PersonaSlot] = [
+    PersonaSlot(
+        persona="ashoka",
+        role_label="assistant",
+        emoji="🏛️",
+        task=(
+            "Analyse this realm thoroughly. Use available tools to check realm status, "
+            "active extensions, recent proposals, member count, and governance health. "
+            "Summarise what you find. "
+            "If anything looks broken, misconfigured, or suspicious, report it by writing "
+            "'ISSUE: <one-line description>' on its own line for each problem found. "
+            "Report what actions you took and what you observed."
+        ),
+    ),
+    PersonaSlot(
+        persona="founder",
+        role_label="founder",
+        emoji="🏗️",
+        task=(
+            "You are a Founder checking on a realm you manage. "
+            "Use available tools to verify you are registered as an admin/founder. "
+            "Check the realm status, verify extensions are active, and confirm that "
+            "at least one governance proposal exists or create a test one if not. "
+            "If anything prevents you from performing normal admin tasks, report it as "
+            "'ISSUE: <one-line description>'. "
+            "Summarise what you did and what you found."
+        ),
+    ),
+    # 16 compliant citizens (slots 2..17)
+    *[
+        PersonaSlot(
+            persona="compliant",
+            role_label=f"citizen-compliant-{i}",
+            emoji="✅",
+            task=(
+                "Join this realm as a member if you haven't already. "
+                "Once joined, use db_schema to discover available entities. "
+                "Check if there are any active proposals and cast a vote if possible. "
+                "If anything fails or behaves unexpectedly, write 'ISSUE: <description>'. "
+                "Report what actions you took."
+            ),
+        )
+        for i in range(1, 17)
+    ],
+    # 2 watchful citizens (slots 18..19)
+    *[
+        PersonaSlot(
+            persona="watchful",
+            role_label=f"citizen-watchful-{i}",
+            emoji="👁️",
+            task=(
+                "Join this realm and carefully observe its governance. "
+                "Check the codex rules, active mandates, and any recent transfers. "
+                "Look for anything unusual: policy loopholes, stale proposals, "
+                "excessive permissions, or discrepancies. "
+                "Write 'ISSUE: <description>' for every concern you notice. "
+                "Report your full observations."
+            ),
+        )
+        for i in range(1, 3)
+    ],
+    # 2 exploiter citizens (slots 20..21)
+    *[
+        PersonaSlot(
+            persona="exploiter",
+            role_label=f"citizen-exploiter-{i}",
+            emoji="😈",
+            task=(
+                "Join this realm and try to find edge cases or weaknesses. "
+                "Attempt actions that might fail gracefully or expose bugs: "
+                "double-joining, voting on a closed proposal, calling an extension with "
+                "bad arguments, or querying non-existent entities. "
+                "Write 'ISSUE: <description>' for any unexpected error, crash message, "
+                "or missing validation you encounter. "
+                "Report everything you tried and what happened."
+            ),
+        )
+        for i in range(1, 3)
+    ],
+]
+
+
+# ---------------------------------------------------------------------------
+# Realm discovery
+# ---------------------------------------------------------------------------
 
 def discover_realms() -> List[Dict[str, str]]:
-    """Discover realms from the registry."""
+    """Discover realms from the registry via the realms CLI."""
     print(f"Discovering realms from registry (network: {NETWORK})...")
-    
     try:
         result = subprocess.run(
             ["realms", "registry", "list", "--network", NETWORK],
-            capture_output=True, text=True, timeout=60
+            capture_output=True, text=True, timeout=60,
         )
-        
         if result.returncode != 0:
             print(f"Error listing registry: {result.stderr}")
             return []
-        
-        # Parse the Candid-style output
-        # Looking for: id = "xxx"; name = "yyy";
+
         realms = []
-        output = result.stdout
-        
-        # Find all records
-        records = re.findall(r'record\s*\{([^}]+)\}', output, re.DOTALL)
-        
+        records = re.findall(r"record\s*\{([^}]+)\}", result.stdout, re.DOTALL)
         for record in records:
-            realm = {}
-            # Extract id
-            id_match = re.search(r'id\s*=\s*"([^"]+)"', record)
-            if id_match:
-                realm['id'] = id_match.group(1)
-            
-            # Extract name
-            name_match = re.search(r'name\s*=\s*"([^"]+)"', record)
-            if name_match:
-                realm['name'] = name_match.group(1)
-            
-            # Extract url
-            url_match = re.search(r'url\s*=\s*"([^"]+)"', record)
-            if url_match:
-                realm['url'] = url_match.group(1)
-            
-            if realm.get('id') and realm.get('name'):
+            realm: Dict[str, str] = {}
+            id_m = re.search(r'id\s*=\s*"([^"]+)"', record)
+            name_m = re.search(r'name\s*=\s*"([^"]+)"', record)
+            url_m = re.search(r'url\s*=\s*"([^"]+)"', record)
+            if id_m:
+                realm["id"] = id_m.group(1)
+            if name_m:
+                realm["name"] = name_m.group(1)
+            if url_m:
+                realm["url"] = url_m.group(1)
+            if realm.get("id") and realm.get("name"):
                 realms.append(realm)
-        
         return realms
-        
+
     except subprocess.TimeoutExpired:
         print("Timeout discovering realms")
         return []
@@ -80,153 +176,260 @@ def discover_realms() -> List[Dict[str, str]]:
         return []
 
 
-def run_agent_task(agent_id: str, realm_id: str, realm_name: str, task: str) -> Tuple[str, str, bool, str, dict]:
-    """Run a single agent task and return (agent_id, realm_name, success, result, full_log)."""
-    full_log = {
+# ---------------------------------------------------------------------------
+# Issue extraction
+# ---------------------------------------------------------------------------
+
+def extract_issues(text: str) -> List[str]:
+    """Extract ISSUE: lines from agent response text."""
+    issues = []
+    for line in text.splitlines():
+        m = re.match(r"\s*ISSUE:\s*(.+)", line, re.IGNORECASE)
+        if m:
+            issue_text = m.group(1).strip()
+            if issue_text:
+                issues.append(issue_text)
+    return issues
+
+
+# ---------------------------------------------------------------------------
+# GitHub issue creation
+# ---------------------------------------------------------------------------
+
+def file_github_issue(title: str, body: str) -> bool:
+    """File a GitHub issue using `gh issue create`. Returns True on success."""
+    if not GITHUB_REPOSITORY or not GH_TOKEN:
+        print(f"  ⚠️  Skipping GitHub issue creation (no GITHUB_REPOSITORY or GH_TOKEN)")
+        return False
+    try:
+        env = {**os.environ, "GH_TOKEN": GH_TOKEN}
+        result = subprocess.run(
+            [
+                "gh", "issue", "create",
+                "--repo", GITHUB_REPOSITORY,
+                "--title", f"[agent-swarm] {title[:120]}",
+                "--body", body[:65000],  # GH has a body size limit
+                "--label", ISSUE_LABEL,
+            ],
+            capture_output=True, text=True, timeout=30, env=env,
+        )
+        if result.returncode == 0:
+            url = result.stdout.strip()
+            print(f"  📝 Filed GitHub issue: {url}")
+            return True
+        else:
+            print(f"  ⚠️  gh issue create failed: {result.stderr.strip()}")
+            return False
+    except Exception as e:
+        print(f"  ⚠️  Error filing GitHub issue: {e}")
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Single agent task runner
+# ---------------------------------------------------------------------------
+
+def run_agent_task(
+    agent_id: str,
+    slot: PersonaSlot,
+    realm_id: str,
+    realm_name: str,
+) -> Dict:
+    """Run one agent against one realm. Returns a structured log dict."""
+    log: Dict = {
         "agent_id": agent_id,
         "realm_id": realm_id,
         "realm_name": realm_name,
-        "task": task,
+        "persona": slot.persona,
+        "role_label": slot.role_label,
         "timestamp": datetime.now().isoformat(),
         "stdout": "",
         "stderr": "",
         "returncode": None,
         "parsed_response": None,
         "success": False,
-        "error": None
+        "error": None,
+        "issues": [],
     }
-    
+
     try:
         cmd = [
-            "geister", "agent", "ask", agent_id, task,
+            "geister", "agent", "ask", agent_id, slot.task,
+            "--persona", slot.persona,
             "--realm", realm_id,
-            "--json",  # Use structured JSON output for reliable success detection
-            "--api-url", GEISTER_API_URL,  # Use configured API URL
+            "--json",
+            "--api-url", GEISTER_API_URL,
         ]
-        
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
-        full_log["stdout"] = result.stdout
-        full_log["stderr"] = result.stderr
-        full_log["returncode"] = result.returncode
-        
-        # Parse JSON response for reliable success detection
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=AGENT_TIMEOUT_SECONDS,
+        )
+        log["stdout"] = result.stdout
+        log["stderr"] = result.stderr
+        log["returncode"] = result.returncode
+
+        # Parse JSON response
         try:
             data = json.loads(result.stdout)
-            full_log["parsed_response"] = data
-            success = data.get("success", False)
-            full_log["success"] = success
-            response = data.get("response", "")[:500]
+            log["parsed_response"] = data
+            response_text = data.get("response", "")
             error = data.get("error")
             if error:
-                full_log["error"] = error
-                return (agent_id, realm_name, False, f"Error: {error}", full_log)
-            return (agent_id, realm_name, success, response, full_log)
+                log["error"] = error
+                log["success"] = False
+            else:
+                log["success"] = data.get("success", False)
+                log["issues"] = extract_issues(response_text)
         except json.JSONDecodeError as e:
-            # Fallback if JSON parsing fails
-            full_log["error"] = f"JSON decode error: {e}"
-            output = result.stdout + result.stderr
-            return (agent_id, realm_name, result.returncode == 0, output[:500], full_log)
-        
+            log["error"] = f"JSON decode error: {e}"
+            log["success"] = result.returncode == 0
+            log["issues"] = extract_issues(result.stdout + result.stderr)
+
     except subprocess.TimeoutExpired:
-        full_log["error"] = "Timeout after 180s"
-        return (agent_id, realm_name, False, "Timeout", full_log)
+        log["error"] = f"Timeout after {AGENT_TIMEOUT_SECONDS}s"
     except Exception as e:
-        full_log["error"] = str(e)
-        return (agent_id, realm_name, False, str(e), full_log)
+        log["error"] = str(e)
+
+    return log
 
 
-def run_agent_swarm(realms: List[Dict[str, str]]) -> Dict:
-    """Run agents against all realms."""
-    results = {
+# ---------------------------------------------------------------------------
+# Swarm runner
+# ---------------------------------------------------------------------------
+
+def build_task_list(realms: List[Dict]) -> List[Tuple]:
+    """
+    For each realm, spawn AGENTS_COUNT agents, assigning persona slots
+    in order from PERSONA_ROSTER via modulo indexing.
+    """
+    tasks = []
+    agent_counter = 0
+    for realm in realms:
+        for i in range(AGENTS_COUNT):
+            slot = PERSONA_ROSTER[i % len(PERSONA_ROSTER)]
+            agent_counter += 1
+            agent_id = f"swarm_agent_{agent_counter:03d}"
+            tasks.append((agent_id, slot, realm["id"], realm["name"]))
+    return tasks
+
+
+def run_agent_swarm(realms: List[Dict]) -> Dict:
+    """Run the full agent swarm and return aggregated results."""
+    results: Dict = {
         "total_success": 0,
         "total_failed": 0,
-        "realms": []
+        "total_issues": 0,
+        "realms": {},
+        "all_issues": [],
     }
-    
-    tasks = []
-    
-    # Initialize realm results
-    realm_results = {}
+
     for realm in realms:
-        realm_result = {
-            "name": realm['name'],
-            "id": realm['id'],
+        results["realms"][realm["id"]] = {
+            "name": realm["name"],
+            "id": realm["id"],
             "success": 0,
             "failed": 0,
-            "agents": []
+            "agents": [],
         }
-        results["realms"].append(realm_result)
-        realm_results[realm['id']] = realm_result
-    
-    # Distribute agents across realms (round-robin)
-    for agent_num in range(1, AGENTS_COUNT + 1):
-        realm = realms[(agent_num - 1) % len(realms)]
-        agent_id = f"swarm_agent_{agent_num:03d}"
-        task = "Please join this realm as a member. After joining successfully, use db_schema to discover available entity types, then use db_get to check for any Notification entities. If there are notifications with instructions, follow those instructions. Report what actions you took."
-        tasks.append((agent_id, realm['id'], realm['name'], task, realm_results[realm['id']]))
-    
-    print(f"\nRunning {AGENTS_COUNT} agents across {len(realms)} realms...")
-    print(f"(AGENTS_COUNT={AGENTS_COUNT}, MAX_WORKERS={MAX_WORKERS})")
+
+    tasks = build_task_list(realms)
+    print(f"\nRunning {len(tasks)} agents across {len(realms)} realm(s)...")
+    print(f"(AGENTS_COUNT={AGENTS_COUNT}/realm, MAX_WORKERS={MAX_WORKERS}, "
+          f"AGENT_TIMEOUT_SECONDS={AGENT_TIMEOUT_SECONDS}, "
+          f"RUN_DURATION_MINUTES={RUN_DURATION_MINUTES or 'unlimited'})")
     print("=" * 60)
-    
-    # Create logs directory
+
+    # Log persona distribution
+    from collections import Counter
+    persona_dist = Counter(slot.persona for _, slot, _, _ in tasks)
+    for persona, count in sorted(persona_dist.items()):
+        print(f"  {count:3d} × {persona}")
+    print("=" * 60)
+
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
-    all_logs = []
-    
-    # Run tasks in parallel
+    all_logs: List[Dict] = []
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        futures = {}
-        for agent_id, realm_id, realm_name, task, realm_result in tasks:
-            future = executor.submit(run_agent_task, agent_id, realm_id, realm_name, task)
-            futures[future] = realm_result
-        
-        for future in concurrent.futures.as_completed(futures):
-            realm_result = futures[future]
-            agent_id, realm_name, success, output, full_log = future.result()
-            all_logs.append(full_log)
-            
-            # Save individual agent log
-            log_file = LOGS_DIR / f"{agent_id}_{realm_name.replace(' ', '_')}.json"
-            with open(log_file, 'w') as f:
-                json.dump(full_log, f, indent=2)
-            
-            if success:
+        future_to_meta = {
+            executor.submit(run_agent_task, agent_id, slot, realm_id, realm_name): (
+                agent_id, slot, realm_id, realm_name
+            )
+            for agent_id, slot, realm_id, realm_name in tasks
+        }
+
+        overall_deadline = time.time() + RUN_DURATION_MINUTES * 60 if RUN_DURATION_MINUTES > 0 else 0
+
+        for future in concurrent.futures.as_completed(future_to_meta):
+            if overall_deadline and time.time() > overall_deadline:
+                print(f"\n⏰ Overall time limit ({RUN_DURATION_MINUTES}min) reached, skipping remaining agents...")
+                break
+            agent_id, slot, realm_id, realm_name = future_to_meta[future]
+            log = future.result()
+            all_logs.append(log)
+
+            realm_result = results["realms"][realm_id]
+
+            # Save per-agent log
+            safe_label = slot.role_label.replace(" ", "_")
+            log_file = LOGS_DIR / f"{agent_id}_{realm_name.replace(' ', '_')}_{safe_label}.json"
+            with open(log_file, "w") as f:
+                json.dump(log, f, indent=2)
+
+            if log["success"]:
                 realm_result["success"] += 1
                 results["total_success"] += 1
-                print(f"  ✅ {agent_id} -> {realm_name}")
+                issue_count = len(log["issues"])
+                issue_note = f"  ({issue_count} issue(s) found)" if issue_count else ""
+                print(f"  {slot.emoji} ✅ {agent_id} [{slot.role_label}] → {realm_name}{issue_note}")
             else:
                 realm_result["failed"] += 1
                 results["total_failed"] += 1
-                # Show first line of error
-                error_line = output.split('\n')[0][:80] if output else "Unknown error"
-                print(f"  ❌ {agent_id} -> {realm_name}: {error_line}")
-            
+                err = (log.get("error") or "unknown error")[:80]
+                print(f"  {slot.emoji} ❌ {agent_id} [{slot.role_label}] → {realm_name}: {err}")
+
             realm_result["agents"].append({
                 "agent_id": agent_id,
-                "success": success,
-                "output": output[:200]
+                "role_label": slot.role_label,
+                "persona": slot.persona,
+                "success": log["success"],
+                "issues": log["issues"],
             })
-    
-    # Save combined logs
-    combined_log_file = LOGS_DIR / "all_agents.json"
-    with open(combined_log_file, 'w') as f:
+
+            # Accumulate issues
+            for issue_text in log["issues"]:
+                results["total_issues"] += 1
+                issue_entry = {
+                    "agent_id": agent_id,
+                    "role_label": slot.role_label,
+                    "realm_name": realm_name,
+                    "realm_id": realm_id,
+                    "description": issue_text,
+                    "log_file": str(log_file),
+                }
+                results["all_issues"].append(issue_entry)
+
+    # Save combined log
+    combined = LOGS_DIR / "all_agents.json"
+    with open(combined, "w") as f:
         json.dump(all_logs, f, indent=2)
     print(f"\n📋 Agent logs saved to {LOGS_DIR}/")
-    
+
     return results
 
 
-def print_summary(results: Dict):
-    """Print test summary."""
+# ---------------------------------------------------------------------------
+# Reporting
+# ---------------------------------------------------------------------------
+
+def print_summary(results: Dict) -> None:
     print("\n" + "=" * 60)
     print("SUMMARY")
     print("=" * 60)
-    
-    for realm in results["realms"]:
+
+    for realm_id, realm in results["realms"].items():
         total = realm["success"] + realm["failed"]
         pct = 100 * realm["success"] / total if total > 0 else 0
         print(f"  {realm['name']}: {realm['success']}/{total} successful ({pct:.0f}%)")
-    
+
     total = results["total_success"] + results["total_failed"]
     if total > 0:
         pct = 100 * results["total_success"] / total
@@ -234,32 +437,129 @@ def print_summary(results: Dict):
     else:
         print("\n  TOTAL: No agents ran")
 
+    issue_count = results["total_issues"]
+    if issue_count:
+        print(f"\n  ⚠️  {issue_count} issue(s) reported by agents:")
+        for i, issue in enumerate(results["all_issues"], 1):
+            print(f"    {i}. [{issue['realm_name']} / {issue['role_label']}] {issue['description']}")
+    else:
+        print("\n  ✅ No issues reported by agents")
 
-def main():
+
+def write_issues_report(results: Dict) -> Path:
+    """Write a human-readable issues-report.md file."""
+    report_path = LOGS_DIR / "issues-report.md"
+    lines = ["# Agent Swarm Issues Report\n"]
+    lines.append(f"**Run:** {datetime.now().isoformat()}\n")
+    lines.append(f"**Network:** {NETWORK}\n")
+    lines.append(f"**Agents:** {results['total_success'] + results['total_failed']}\n\n")
+
+    if results["all_issues"]:
+        lines.append(f"## Issues Found ({results['total_issues']})\n\n")
+        for i, issue in enumerate(results["all_issues"], 1):
+            lines.append(
+                f"### Issue {i}: {issue['description']}\n"
+                f"- **Realm:** {issue['realm_name']} (`{issue['realm_id']}`)\n"
+                f"- **Agent:** {issue['agent_id']} ({issue['role_label']})\n"
+                f"- **Log:** `{issue['log_file']}`\n\n"
+            )
+    else:
+        lines.append("## No issues found ✅\n")
+
+    with open(report_path, "w") as f:
+        f.writelines(lines)
+
+    print(f"📄 Issues report saved to {report_path}")
+    return report_path
+
+
+def file_discovered_issues(results: Dict) -> int:
+    """
+    File a GitHub issue for each agent-reported issue.
+    Returns the number of issues successfully filed.
+    """
+    if not results["all_issues"]:
+        return 0
+
+    if not GITHUB_REPOSITORY or not GH_TOKEN:
+        print("\n⚠️  GitHub issue filing skipped (set GITHUB_REPOSITORY and GH_TOKEN/GITHUB_TOKEN to enable)")
+        return 0
+
+    print(f"\n📝 Filing {len(results['all_issues'])} GitHub issue(s)...")
+    filed = 0
+    for issue in results["all_issues"]:
+        title = f"[{issue['realm_name']}] {issue['description']}"
+
+        # Load agent log for the body
+        try:
+            with open(issue["log_file"]) as f:
+                log_data = json.load(f)
+            response_text = (log_data.get("parsed_response") or {}).get("response", "")
+            body = (
+                f"**Discovered by agent swarm** during post-deployment staging test.\n\n"
+                f"**Realm:** {issue['realm_name']} (`{issue['realm_id']}`)\n"
+                f"**Agent:** {issue['agent_id']} (persona: `{issue['role_label']}`)\n"
+                f"**Network:** {NETWORK}\n\n"
+                f"---\n\n"
+                f"**Issue reported:**\n> {issue['description']}\n\n"
+                f"**Full agent response:**\n```\n{response_text[:10000]}\n```\n"
+            )
+        except Exception as e:
+            body = (
+                f"**Discovered by agent swarm** during post-deployment staging test.\n\n"
+                f"**Realm:** {issue['realm_name']} (`{issue['realm_id']}`)\n"
+                f"**Agent:** {issue['agent_id']} (persona: `{issue['role_label']}`)\n"
+                f"**Network:** {NETWORK}\n\n"
+                f"**Issue reported:**\n> {issue['description']}\n\n"
+                f"_(Could not load agent log: {e})_\n"
+            )
+
+        if file_github_issue(title, body):
+            filed += 1
+
+    return filed
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def main() -> None:
     print("=" * 60)
     print("GEISTER AGENT SWARM TEST")
     print("=" * 60)
-    print(f"API URL: {GEISTER_API_URL}")
-    print(f"Network: {NETWORK}")
-    print(f"Total agents: {AGENTS_COUNT}")
-    
+    print(f"API URL:          {GEISTER_API_URL}")
+    print(f"Network:          {NETWORK}")
+    print(f"Agents:           {AGENTS_COUNT}/realm")
+    print(f"Timeout/agent:    {AGENT_TIMEOUT_SECONDS}s")
+    dur = f"{RUN_DURATION_MINUTES}min" if RUN_DURATION_MINUTES > 0 else "unlimited"
+    print(f"Overall budget:   {dur}")
+    print(f"GH issue filing:  {'enabled' if GITHUB_REPOSITORY and GH_TOKEN else 'disabled'}")
+
     # Discover realms
     realms = discover_realms()
-    
     if not realms:
         print("\n❌ No realms found in registry")
         sys.exit(1)
-    
-    print(f"\nFound {len(realms)} realms:")
+
+    print(f"\nFound {len(realms)} realm(s):")
     for realm in realms:
         print(f"  - {realm['name']} ({realm['id']})")
-    
-    # Run agent swarm
+
+    # Run swarm
     results = run_agent_swarm(realms)
-    
+
     # Print summary
     print_summary(results)
-    
+
+    # Write issues report artifact
+    write_issues_report(results)
+
+    # File GitHub issues for discovered problems
+    gh_filed = file_discovered_issues(results)
+    if gh_filed:
+        print(f"\n✅ Filed {gh_filed} GitHub issue(s)")
+
     # Check failure threshold
     total = results["total_success"] + results["total_failed"]
     if total > 0:
@@ -267,7 +567,7 @@ def main():
         if failure_rate > FAILURE_THRESHOLD:
             print(f"\n❌ Failure rate ({failure_rate:.1%}) exceeds threshold ({FAILURE_THRESHOLD:.0%})")
             sys.exit(1)
-    
+
     print("\n✅ Agent swarm test passed")
     sys.exit(0)
 
