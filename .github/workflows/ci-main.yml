@@ -395,6 +395,7 @@ jobs:
           docker run --rm \
             -v "$(pwd)/identity.pem:/app/identity.pem" \
             -v "$(pwd)/agent_logs:/app/agent_logs" \
+            -v "$(pwd)/examples/demo/realm_common/tests/test_agent_swarm.py:/app/examples/demo/realm_common/tests/test_agent_swarm.py" \
             -e DFX_WARNING="-mainnet_plaintext_identity" \
             -e DFX_NETWORK=staging \
             -e AGENTS_COUNT=3 \
