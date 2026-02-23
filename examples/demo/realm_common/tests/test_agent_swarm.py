@@ -21,6 +21,8 @@ import re
 import subprocess
 import time
 import concurrent.futures
+import urllib.request
+import urllib.error
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional, NamedTuple
@@ -39,6 +41,7 @@ LOGS_DIR = Path(os.getenv("LOGS_DIR", "agent_logs"))
 GITHUB_REPOSITORY = os.getenv("GITHUB_REPOSITORY", "")   # e.g. "smart-social-contracts/realms"
 GH_TOKEN = os.getenv("GH_TOKEN") or os.getenv("GITHUB_TOKEN", "")
 ISSUE_LABEL = os.getenv("ISSUE_LABEL", "agent-swarm")
+RUN_ID = os.getenv("RUN_ID") or os.getenv("GITHUB_RUN_ID") or datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
 # ---------------------------------------------------------------------------
@@ -133,6 +136,120 @@ PERSONA_ROSTER: List[PersonaSlot] = [
         for i in range(1, 3)
     ],
 ]
+
+
+# ---------------------------------------------------------------------------
+# Agent registration (persistent profiles on the Geister API)
+# ---------------------------------------------------------------------------
+
+def _api_post(path: str, payload: Dict) -> Optional[Dict]:
+    """POST JSON to the Geister API. Returns parsed response or None."""
+    url = f"{GEISTER_API_URL}{path}"
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")[:200]
+        print(f"  ⚠️  API POST {path} → HTTP {e.code}: {body}")
+    except Exception as e:
+        print(f"  ⚠️  API POST {path} failed: {e}")
+    return None
+
+
+def _api_put(path: str, payload: Dict) -> Optional[Dict]:
+    """PUT JSON to the Geister API. Returns parsed response or None."""
+    url = f"{GEISTER_API_URL}{path}"
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=data,
+        headers={"Content-Type": "application/json"},
+        method="PUT",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")[:200]
+        print(f"  ⚠️  API PUT {path} → HTTP {e.code}: {body}")
+    except Exception as e:
+        print(f"  ⚠️  API PUT {path} failed: {e}")
+    return None
+
+
+def register_agent(
+    agent_id: str,
+    display_name: str,
+    persona: str,
+    realm_name: str,
+    realm_id: str,
+    role_label: str,
+) -> bool:
+    """Register a persistent agent profile on the Geister API.
+
+    The profile (and its telos) will survive the CI run so it is visible
+    on the dashboard afterwards.
+    """
+    metadata = {
+        "source": "agent-swarm-ci",
+        "run_id": RUN_ID,
+        "role_label": role_label,
+        "realm_name": realm_name,
+        "realm_id": realm_id,
+        "network": NETWORK,
+        "registered_at": datetime.now().isoformat(),
+    }
+    if GITHUB_REPOSITORY:
+        metadata["github_repository"] = GITHUB_REPOSITORY
+
+    result = _api_post("/api/agents", {
+        "agent_id": agent_id,
+        "display_name": display_name,
+        "persona": persona,
+        "metadata": metadata,
+    })
+    return result is not None and result.get("success", False)
+
+
+def update_agent_after_run(agent_id: str, success: bool, issues: List[str], error: Optional[str] = None) -> None:
+    """Update the agent's metadata with run results so they are visible on the dashboard."""
+    metadata_patch: Dict = {
+        "last_run_id": RUN_ID,
+        "last_run_success": success,
+        "last_run_at": datetime.now().isoformat(),
+    }
+    if issues:
+        metadata_patch["last_run_issues"] = issues[:10]  # cap to avoid huge payloads
+    if error:
+        metadata_patch["last_run_error"] = str(error)[:500]
+    _api_put(f"/api/agents/{agent_id}", {"metadata": metadata_patch})
+
+
+def register_all_agents(tasks: List[Tuple]) -> int:
+    """Register all agents with the Geister API. Returns count of successes."""
+    print(f"\nRegistering {len(tasks)} agent(s) on {GEISTER_API_URL} (run_id={RUN_ID})...")
+    registered = 0
+    for agent_id, slot, realm_id, realm_name in tasks:
+        ok = register_agent(
+            agent_id=agent_id,
+            display_name=agent_id,  # the API will generate a human name if it's a swarm_agent_NNN id
+            persona=slot.persona,
+            realm_name=realm_name,
+            realm_id=realm_id,
+            role_label=slot.role_label,
+        )
+        if ok:
+            registered += 1
+            print(f"  ✅ {agent_id} [{slot.role_label}] → {realm_name}")
+        else:
+            print(f"  ⚠️  {agent_id} [{slot.role_label}] → registration failed (will still attempt run)")
+    print(f"Registered {registered}/{len(tasks)} agents\n")
+    return registered
 
 
 # ---------------------------------------------------------------------------
@@ -332,6 +449,10 @@ def run_agent_swarm(realms: List[Dict]) -> Dict:
         }
 
     tasks = build_task_list(realms)
+
+    # Register persistent agent profiles on the Geister API
+    register_all_agents(tasks)
+
     print(f"\nRunning {len(tasks)} agents across {len(realms)} realm(s)...")
     print(f"(AGENTS_COUNT={AGENTS_COUNT}/realm, MAX_WORKERS={MAX_WORKERS}, "
           f"AGENT_TIMEOUT_SECONDS={AGENT_TIMEOUT_SECONDS}, "
@@ -385,6 +506,9 @@ def run_agent_swarm(realms: List[Dict]) -> Dict:
                 results["total_failed"] += 1
                 err = (log.get("error") or "unknown error")[:80]
                 print(f"  {slot.emoji} ❌ {agent_id} [{slot.role_label}] → {realm_name}: {err}")
+
+            # Update the persistent agent profile with run results
+            update_agent_after_run(agent_id, log["success"], log["issues"], log.get("error"))
 
             realm_result["agents"].append({
                 "agent_id": agent_id,
@@ -451,6 +575,7 @@ def write_issues_report(results: Dict) -> Path:
     report_path = LOGS_DIR / "issues-report.md"
     lines = ["# Agent Swarm Issues Report\n"]
     lines.append(f"**Run:** {datetime.now().isoformat()}\n")
+    lines.append(f"**Run ID:** {RUN_ID}\n")
     lines.append(f"**Network:** {NETWORK}\n")
     lines.append(f"**Agents:** {results['total_success'] + results['total_failed']}\n\n")
 
@@ -530,6 +655,7 @@ def main() -> None:
     print("=" * 60)
     print(f"API URL:          {GEISTER_API_URL}")
     print(f"Network:          {NETWORK}")
+    print(f"Run ID:           {RUN_ID}")
     print(f"Agents:           {AGENTS_COUNT}/realm")
     print(f"Timeout/agent:    {AGENT_TIMEOUT_SECONDS}s")
     dur = f"{RUN_DURATION_MINUTES}min" if RUN_DURATION_MINUTES > 0 else "unlimited"
