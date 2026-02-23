@@ -144,7 +144,7 @@ def discover_realms() -> List[Dict[str, str]]:
     print(f"Discovering realms from registry (network: {NETWORK})...")
     try:
         result = subprocess.run(
-            ["realms", "registry", "list", "--network", NETWORK],
+            ["realms", "registry", "realm", "list", "--network", NETWORK],
             capture_output=True, text=True, timeout=60,
         )
         if result.returncode != 0:
