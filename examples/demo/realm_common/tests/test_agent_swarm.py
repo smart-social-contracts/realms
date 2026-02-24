@@ -415,12 +415,37 @@ def build_task_list(realms: List[Dict]) -> List[Tuple]:
     """
     For each realm, spawn AGENTS_COUNT agents, assigning persona slots
     in order from PERSONA_ROSTER via modulo indexing.
+
+    Only the **first** realm gets a founder agent (slot with persona="founder").
+    Subsequent realms replace the founder slot with a compliant citizen to avoid
+    burning cycles on multiple realm deployments (~3 TC each).
     """
+    # Fallback slot used in place of founder for non-first realms
+    _citizen_fallback = PersonaSlot(
+        persona="compliant",
+        role_label="citizen-compliant-extra",
+        emoji="✅",
+        task=(
+            "Join this realm as a member if you haven't already. "
+            "Once joined, use db_schema to discover available entities. "
+            "Check if there are any active proposals and cast a vote if possible. "
+            "If anything fails or behaves unexpectedly, write 'ISSUE: <description>'. "
+            "Report what actions you took."
+        ),
+    )
+
     tasks = []
     agent_counter = 0
+    founder_assigned = False
     for realm in realms:
         for i in range(AGENTS_COUNT):
             slot = PERSONA_ROSTER[i % len(PERSONA_ROSTER)]
+            # Only one founder across the entire swarm
+            if slot.persona == "founder":
+                if founder_assigned:
+                    slot = _citizen_fallback
+                else:
+                    founder_assigned = True
             agent_counter += 1
             agent_id = f"swarm_agent_{agent_counter:03d}"
             tasks.append((agent_id, slot, realm["id"], realm["name"]))
