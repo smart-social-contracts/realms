@@ -76,13 +76,18 @@ PERSONA_ROSTER: List[PersonaSlot] = [
         role_label="founder",
         emoji="🏗️",
         task=(
-            "You are a Founder checking on a realm you manage. "
-            "Use available tools to verify you are registered as an admin/founder. "
-            "Check the realm status, verify extensions are active, and confirm that "
-            "at least one governance proposal exists or create a test one if not. "
-            "If anything prevents you from performing normal admin tasks, report it as "
-            "'ISSUE: <one-line description>'. "
-            "Summarise what you did and what you found."
+            "You are a visionary Founder. Your mission is to create a brand-new realm "
+            "that citizens will want to join. Follow these steps in order:\n"
+            "1. Call get_my_principal to learn your identity.\n"
+            "2. Call registry_redeem_voucher with code 'BETA50' to get deployment credits.\n"
+            "3. Call registry_deploy_realm with your principal and a creative, unique realm "
+            "name (include a short random suffix so it never collides, e.g. 'Aurora_7kx').\n"
+            "4. Call registry_deploy_status with the deployment_id and wait=false to check "
+            "the initial status (do NOT set wait=true, it takes too long).\n"
+            "5. Describe the vision for your realm: what governance model it uses, what "
+            "makes it attractive for citizens, and what founding proposals you would submit.\n"
+            "If any step fails, report it as 'ISSUE: <one-line description>'.\n"
+            "Summarise what you created and your vision for the realm."
         ),
     ),
     # 16 compliant citizens (slots 2..17)
