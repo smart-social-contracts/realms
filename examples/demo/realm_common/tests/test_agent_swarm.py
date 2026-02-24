@@ -32,7 +32,7 @@ from typing import List, Dict, Tuple, Optional, NamedTuple
 AGENTS_COUNT = int(os.getenv("AGENTS_COUNT", "22"))   # agents per realm
 NETWORK = os.getenv("NETWORK", "staging")
 GEISTER_API_URL = os.getenv("GEISTER_API_URL", "https://geister-api.realmsgos.dev")
-MAX_WORKERS = int(os.getenv("MAX_WORKERS", "8"))
+MAX_WORKERS = int(os.getenv("MAX_WORKERS", "3"))
 AGENT_TIMEOUT_SECONDS = int(os.getenv("AGENT_TIMEOUT_SECONDS", "300"))  # 5 min per agent
 RUN_DURATION_MINUTES = int(os.getenv("RUN_DURATION_MINUTES", "0"))       # 0 = no overall limit
 FAILURE_THRESHOLD = float(os.getenv("FAILURE_THRESHOLD", "0.3"))        # 30% max failures
