@@ -265,8 +265,20 @@ for canister in $BACKENDS; do
         # For local, let dfx decide mode (clean = install, otherwise upgrade)
         retry_dfx dfx deploy "$canister" --yes
     else
-        # Use --with-cycles to allocate from cycles ledger (needed when no wallet configured)
-        retry_dfx dfx deploy --network "$NETWORK" --yes "$canister" --mode="$MODE" --with-cycles 500000000000
+        # Ensure canister exists and has cycles before deploying wasm
+        existing_id=$(dfx canister id "$canister" --network "$NETWORK" 2>/dev/null || echo "")
+        if [ -z "$existing_id" ]; then
+            echo "   🆕 Creating canister $canister with initial cycles..."
+            retry_dfx dfx canister create "$canister" --network "$NETWORK" --with-cycles 1000000000000
+        fi
+        # Top up canister to ensure it has enough cycles for wasm installation
+        canister_id=$(dfx canister id "$canister" --network "$NETWORK" 2>/dev/null || echo "")
+        if [ -n "$canister_id" ]; then
+            echo "   💰 Topping up $canister ($canister_id) with 1 TC..."
+            dfx cycles top-up "$canister_id" 1000000000000 --network "$NETWORK" 2>/dev/null || true
+        fi
+        # Now deploy (canister already created and funded)
+        retry_dfx dfx deploy --network "$NETWORK" --yes "$canister" --mode="$MODE"
     fi
     
     # Start canister
@@ -554,8 +566,18 @@ if [ -n "$FRONTENDS" ]; then
         if [ "$NETWORK" = "local" ]; then
             retry_dfx dfx deploy "$canister"
         else
-            # Use --with-cycles to allocate from cycles ledger (needed when no wallet configured)
-            retry_dfx dfx deploy --network "$NETWORK" --yes "$canister" --mode "$MODE" --with-cycles 500000000000
+            # Ensure canister exists and has cycles before deploying assets
+            existing_id=$(dfx canister id "$canister" --network "$NETWORK" 2>/dev/null || echo "")
+            if [ -z "$existing_id" ]; then
+                echo "   🆕 Creating canister $canister with initial cycles..."
+                retry_dfx dfx canister create "$canister" --network "$NETWORK" --with-cycles 500000000000
+            fi
+            canister_id=$(dfx canister id "$canister" --network "$NETWORK" 2>/dev/null || echo "")
+            if [ -n "$canister_id" ]; then
+                echo "   💰 Topping up $canister ($canister_id)..."
+                dfx cycles top-up "$canister_id" 500000000000 --network "$NETWORK" 2>/dev/null || true
+            fi
+            retry_dfx dfx deploy --network "$NETWORK" --yes "$canister" --mode "$MODE"
         fi
     done
 fi
