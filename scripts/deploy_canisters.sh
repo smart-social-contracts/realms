@@ -265,7 +265,8 @@ for canister in $BACKENDS; do
         # For local, let dfx decide mode (clean = install, otherwise upgrade)
         retry_dfx dfx deploy "$canister" --yes
     else
-        retry_dfx dfx deploy --network "$NETWORK" --yes "$canister" --mode="$MODE"
+        # Use --with-cycles to allocate from cycles ledger (needed when no wallet configured)
+        retry_dfx dfx deploy --network "$NETWORK" --yes "$canister" --mode="$MODE" --with-cycles 500000000000
     fi
     
     # Start canister
@@ -553,7 +554,8 @@ if [ -n "$FRONTENDS" ]; then
         if [ "$NETWORK" = "local" ]; then
             retry_dfx dfx deploy "$canister"
         else
-            retry_dfx dfx deploy --network "$NETWORK" --yes "$canister" --mode "$MODE"
+            # Use --with-cycles to allocate from cycles ledger (needed when no wallet configured)
+            retry_dfx dfx deploy --network "$NETWORK" --yes "$canister" --mode "$MODE" --with-cycles 500000000000
         fi
     done
 fi
