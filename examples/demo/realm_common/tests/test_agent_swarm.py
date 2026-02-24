@@ -36,6 +36,8 @@ MAX_WORKERS = int(os.getenv("MAX_WORKERS", "8"))
 AGENT_TIMEOUT_SECONDS = int(os.getenv("AGENT_TIMEOUT_SECONDS", "300"))  # 5 min per agent
 RUN_DURATION_MINUTES = int(os.getenv("RUN_DURATION_MINUTES", "0"))       # 0 = no overall limit
 FAILURE_THRESHOLD = float(os.getenv("FAILURE_THRESHOLD", "0.3"))        # 30% max failures
+MAX_RETRIES = int(os.getenv("MAX_RETRIES", "2"))                        # retry failed agents up to N times
+RETRY_DELAY_SECONDS = int(os.getenv("RETRY_DELAY_SECONDS", "10"))       # pause between retries
 LOGS_DIR = Path(os.getenv("LOGS_DIR", "agent_logs"))
 GITHUB_REPOSITORY = os.getenv("GITHUB_REPOSITORY", "")   # e.g. "smart-social-contracts/realms"
 GH_TOKEN = os.getenv("GH_TOKEN") or os.getenv("GITHUB_TOKEN", "")
@@ -521,6 +523,74 @@ def run_agent_swarm(realms: List[Dict]) -> Dict:
                     "log_file": str(log_file),
                 }
                 results["all_issues"].append(issue_entry)
+
+    # --- Retry failed agents sequentially ---
+    _RETRYABLE = ("524", "timeout", "timed out", "connection", "502", "503", "504")
+
+    for retry_round in range(1, MAX_RETRIES + 1):
+        failed_entries = [
+            (log_entry, meta)
+            for log_entry, meta in zip(all_logs, [(l["agent_id"], next(s for a, s, r, rn in tasks if a == l["agent_id"]), l["realm_id"], l["realm_name"]) for l in all_logs])
+            if not log_entry["success"]
+            and log_entry.get("error")
+            and any(tok in log_entry["error"].lower() for tok in _RETRYABLE)
+        ]
+        if not failed_entries:
+            break
+
+        print(f"\n🔄 Retry round {retry_round}/{MAX_RETRIES}: {len(failed_entries)} agent(s) with transient errors")
+
+        if overall_deadline and time.time() > overall_deadline:
+            print(f"  ⏰ Time limit reached, skipping retries")
+            break
+
+        for log_entry, (agent_id, slot, realm_id, realm_name) in failed_entries:
+            if overall_deadline and time.time() > overall_deadline:
+                break
+
+            time.sleep(RETRY_DELAY_SECONDS)
+            print(f"  🔄 Retrying {agent_id} [{slot.role_label}] → {realm_name}...")
+            new_log = run_agent_task(agent_id, slot, realm_id, realm_name)
+
+            # Save retry log
+            safe_label = slot.role_label.replace(" ", "_")
+            log_file = LOGS_DIR / f"{agent_id}_{realm_name.replace(' ', '_')}_{safe_label}_retry{retry_round}.json"
+            with open(log_file, "w") as f:
+                json.dump(new_log, f, indent=2)
+
+            realm_result = results["realms"][realm_id]
+
+            if new_log["success"]:
+                # Flip from failed to success
+                log_entry["success"] = True
+                log_entry["error"] = None
+                log_entry["issues"] = new_log["issues"]
+                log_entry["parsed_response"] = new_log["parsed_response"]
+                realm_result["success"] += 1
+                realm_result["failed"] -= 1
+                results["total_success"] += 1
+                results["total_failed"] -= 1
+                issue_count = len(new_log["issues"])
+                issue_note = f"  ({issue_count} issue(s) found)" if issue_count else ""
+                print(f"  {slot.emoji} ✅ {agent_id} [{slot.role_label}] → {realm_name}{issue_note} (retry {retry_round})")
+
+                update_agent_after_run(agent_id, True, new_log["issues"], None)
+
+                for issue_text in new_log["issues"]:
+                    results["total_issues"] += 1
+                    results["all_issues"].append({
+                        "agent_id": agent_id,
+                        "role_label": slot.role_label,
+                        "realm_name": realm_name,
+                        "realm_id": realm_id,
+                        "description": issue_text,
+                        "log_file": str(log_file),
+                    })
+            else:
+                err = (new_log.get("error") or "unknown error")[:80]
+                print(f"  {slot.emoji} ❌ {agent_id} [{slot.role_label}] → {realm_name}: {err} (retry {retry_round})")
+                # Update error in original log so next retry round sees fresh error
+                log_entry["error"] = new_log.get("error")
 
     # Save combined log
     combined = LOGS_DIR / "all_agents.json"

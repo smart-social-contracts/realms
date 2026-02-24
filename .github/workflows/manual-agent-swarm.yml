@@ -10,7 +10,7 @@ on:
       run_duration_minutes:
         description: 'Overall time budget in minutes'
         required: false
-        default: '3'
+        default: '10'
       agent_timeout_seconds:
         description: 'Timeout per agent call in seconds'
         required: false

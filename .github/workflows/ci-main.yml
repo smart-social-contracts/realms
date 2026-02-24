@@ -440,7 +440,7 @@ jobs:
             -e AGENTS_COUNT=3 \
             -e NETWORK=staging \
             -e AGENT_TIMEOUT_SECONDS=180 \
-            -e RUN_DURATION_MINUTES=3 \
+            -e RUN_DURATION_MINUTES=10 \
             -e LOGS_DIR=/app/agent_logs \
             ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
             bash -c "dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
