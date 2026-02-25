@@ -57,90 +57,81 @@ class PersonaSlot(NamedTuple):
     task: str              # LLM instruction for this agent
 
 
-PERSONA_ROSTER: List[PersonaSlot] = [
+SLOT_ASHOKA = PersonaSlot(
+    persona="ashoka",
+    role_label="assistant",
+    emoji="🏛️",
+    task=(
+        "Analyse this realm thoroughly. Use available tools to check realm status, "
+        "active extensions, recent proposals, member count, and governance health. "
+        "Summarise what you find. "
+        "If anything looks broken, misconfigured, or suspicious, report it by writing "
+        "'ISSUE: <one-line description>' on its own line for each problem found. "
+        "Report what actions you took and what you observed."
+    ),
+)
+
+SLOT_FOUNDER = PersonaSlot(
+    persona="founder",
+    role_label="founder",
+    emoji="🏗️",
+    task=(
+        "You are a visionary Founder. Create a new realm by doing ONLY these two calls "
+        "(keep it fast, do NOT call anything else):\n"
+        "1. Call get_my_principal.\n"
+        "2. Call registry_deploy_realm with your principal and these fields:\n"
+        "   realm_name – a creative unique name (add a random 3-char suffix like 'Aurora_7kx')\n"
+        "   description – one sentence explaining the realm's vision\n"
+        "   welcome_message – a short greeting for new citizens\n"
+        "   logo_url – https://raw.githubusercontent.com/smart-social-contracts/realms/main/examples/demo/realm_new/emblem.png\n"
+        "   welcome_image_url – https://raw.githubusercontent.com/smart-social-contracts/realms/main/examples/demo/realm_new/background.png\n"
+        "If deploy fails with 'insufficient credits', call registry_redeem_voucher "
+        "with your principal and code 'BETA50', then retry the deploy.\n"
+        "Report any failure as 'ISSUE: <description>'. Summarise what you created."
+    ),
+)
+
+# Citizen persona templates – agents are distributed equally across these
+CITIZEN_PERSONAS: List[PersonaSlot] = [
     PersonaSlot(
-        persona="ashoka",
-        role_label="assistant",
-        emoji="🏛️",
+        persona="compliant",
+        role_label="citizen-compliant",
+        emoji="✅",
         task=(
-            "Analyse this realm thoroughly. Use available tools to check realm status, "
-            "active extensions, recent proposals, member count, and governance health. "
-            "Summarise what you find. "
-            "If anything looks broken, misconfigured, or suspicious, report it by writing "
-            "'ISSUE: <one-line description>' on its own line for each problem found. "
-            "Report what actions you took and what you observed."
+            "Join this realm as a member if you haven't already. "
+            "Once joined, use db_schema to discover available entities. "
+            "Check if there are any active proposals and cast a vote if possible. "
+            "If anything fails or behaves unexpectedly, write 'ISSUE: <description>'. "
+            "Report what actions you took."
         ),
     ),
     PersonaSlot(
-        persona="founder",
-        role_label="founder",
-        emoji="🏗️",
+        persona="watchful",
+        role_label="citizen-watchful",
+        emoji="👁️",
         task=(
-            "You are a visionary Founder. Create a new realm by doing ONLY these two calls "
-            "(keep it fast, do NOT call anything else):\n"
-            "1. Call get_my_principal.\n"
-            "2. Call registry_deploy_realm with your principal and these fields:\n"
-            "   realm_name – a creative unique name (add a random 3-char suffix like 'Aurora_7kx')\n"
-            "   description – one sentence explaining the realm's vision\n"
-            "   welcome_message – a short greeting for new citizens\n"
-            "   logo_url – https://raw.githubusercontent.com/smart-social-contracts/realms/main/examples/demo/realm_new/emblem.png\n"
-            "   welcome_image_url – https://raw.githubusercontent.com/smart-social-contracts/realms/main/examples/demo/realm_new/background.png\n"
-            "If deploy fails with 'insufficient credits', call registry_redeem_voucher "
-            "with your principal and code 'BETA50', then retry the deploy.\n"
-            "Report any failure as 'ISSUE: <description>'. Summarise what you created."
+            "Join this realm and carefully observe its governance. "
+            "Check the codex rules, active mandates, and any recent transfers. "
+            "Look for anything unusual: policy loopholes, stale proposals, "
+            "excessive permissions, or discrepancies. "
+            "Write 'ISSUE: <description>' for every concern you notice. "
+            "Report your full observations."
         ),
     ),
-    # 16 compliant citizens (slots 2..17)
-    *[
-        PersonaSlot(
-            persona="compliant",
-            role_label=f"citizen-compliant-{i}",
-            emoji="✅",
-            task=(
-                "Join this realm as a member if you haven't already. "
-                "Once joined, use db_schema to discover available entities. "
-                "Check if there are any active proposals and cast a vote if possible. "
-                "If anything fails or behaves unexpectedly, write 'ISSUE: <description>'. "
-                "Report what actions you took."
-            ),
-        )
-        for i in range(1, 17)
-    ],
-    # 2 watchful citizens (slots 18..19)
-    *[
-        PersonaSlot(
-            persona="watchful",
-            role_label=f"citizen-watchful-{i}",
-            emoji="👁️",
-            task=(
-                "Join this realm and carefully observe its governance. "
-                "Check the codex rules, active mandates, and any recent transfers. "
-                "Look for anything unusual: policy loopholes, stale proposals, "
-                "excessive permissions, or discrepancies. "
-                "Write 'ISSUE: <description>' for every concern you notice. "
-                "Report your full observations."
-            ),
-        )
-        for i in range(1, 3)
-    ],
-    # 2 exploiter citizens (slots 20..21)
-    *[
-        PersonaSlot(
-            persona="exploiter",
-            role_label=f"citizen-exploiter-{i}",
-            emoji="😈",
-            task=(
-                "Join this realm and try to find edge cases or weaknesses. "
-                "Attempt actions that might fail gracefully or expose bugs: "
-                "double-joining, voting on a closed proposal, calling an extension with "
-                "bad arguments, or querying non-existent entities. "
-                "Write 'ISSUE: <description>' for any unexpected error, crash message, "
-                "or missing validation you encounter. "
-                "Report everything you tried and what happened."
-            ),
-        )
-        for i in range(1, 3)
-    ],
+    PersonaSlot(
+        persona="exploiter",
+        role_label="citizen-exploiter",
+        emoji="😈",
+        task=(
+            "Join this realm and try to find edge cases or weaknesses. "
+            "Attempt actions that might fail gracefully or expose bugs: "
+            "double-joining, voting on a closed proposal, calling an extension with "
+            "bad arguments, or querying non-existent entities. "
+            "Write 'ISSUE: <description>' for any unexpected error, crash message, "
+            "or missing validation you encounter. "
+            "Report everything you tried and what happened."
+        ),
+    ),
 ]
 
 
@@ -413,39 +404,33 @@ def run_agent_task(
 
 def build_task_list(realms: List[Dict]) -> List[Tuple]:
     """
-    For each realm, spawn AGENTS_COUNT agents, assigning persona slots
-    in order from PERSONA_ROSTER via modulo indexing.
+    For each realm, spawn AGENTS_COUNT agents with the distribution:
+      - Slot 0: ashoka (assistant / analyst)
+      - Slot 1: founder (first realm only; citizen otherwise)
+      - Slots 2..N-1: cycle equally through CITIZEN_PERSONAS
 
-    Only the **first** realm gets a founder agent (slot with persona="founder").
-    Subsequent realms replace the founder slot with a compliant citizen to avoid
-    burning cycles on multiple realm deployments (~3 TC each).
+    Only the **first** realm gets a founder agent to avoid burning cycles
+    on multiple realm deployments (~3 TC each).
     """
-    # Fallback slot used in place of founder for non-first realms
-    _citizen_fallback = PersonaSlot(
-        persona="compliant",
-        role_label="citizen-compliant-extra",
-        emoji="✅",
-        task=(
-            "Join this realm as a member if you haven't already. "
-            "Once joined, use db_schema to discover available entities. "
-            "Check if there are any active proposals and cast a vote if possible. "
-            "If anything fails or behaves unexpectedly, write 'ISSUE: <description>'. "
-            "Report what actions you took."
-        ),
-    )
-
     tasks = []
     agent_counter = 0
     founder_assigned = False
+    citizen_idx = 0  # cycles through CITIZEN_PERSONAS across the whole swarm
+
     for realm in realms:
         for i in range(AGENTS_COUNT):
-            slot = PERSONA_ROSTER[i % len(PERSONA_ROSTER)]
-            # Only one founder across the entire swarm
-            if slot.persona == "founder":
-                if founder_assigned:
-                    slot = _citizen_fallback
-                else:
+            if i == 0:
+                slot = SLOT_ASHOKA
+            elif i == 1:
+                if not founder_assigned:
+                    slot = SLOT_FOUNDER
                     founder_assigned = True
+                else:
+                    slot = CITIZEN_PERSONAS[citizen_idx % len(CITIZEN_PERSONAS)]
+                    citizen_idx += 1
+            else:
+                slot = CITIZEN_PERSONAS[citizen_idx % len(CITIZEN_PERSONAS)]
+                citizen_idx += 1
             agent_counter += 1
             agent_id = f"swarm_agent_{agent_counter:03d}"
             tasks.append((agent_id, slot, realm["id"], realm["name"]))
