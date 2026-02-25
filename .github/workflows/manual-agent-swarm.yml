@@ -15,6 +15,11 @@ on:
         description: 'Timeout per agent call in seconds'
         required: false
         default: '180'
+      delete_all_agents:
+        description: 'Delete all geisters (start fresh)'
+        required: false
+        type: boolean
+        default: true
       docker_tag:
         description: 'Docker image tag to use (default: demo-latest)'
         required: false
@@ -66,6 +71,15 @@ jobs:
             time.sleep(10)
           print("::warning::Ollama not healthy after 6min, proceeding anyway")
           WAKE_SCRIPT
+
+      - name: Delete all geisters
+        if: ${{ github.event.inputs.delete_all_agents == 'true' }}
+        run: |
+          echo "Deleting all agents from Geister API..."
+          response=$(curl -s -X DELETE https://geister-api.realmsgos.dev/api/agents)
+          echo "Response: $response"
+          deleted=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('deleted_count', 0))" 2>/dev/null || echo 'unknown')
+          echo "Deleted $deleted agents"
 
       - name: Run geister agent swarm test on staging
         run: |
