@@ -49,7 +49,8 @@ class PersonaSlot(NamedTuple):
     persona: str           # name passed to geister --persona
     role_label: str        # human-readable label for logs
     emoji: str
-    task: str              # LLM instruction for this agent
+    task: str              # LLM instruction for this agent (used as custom_telos fallback)
+    template_name: str = ""  # if set, use this DB template instead of task
 
 
 SLOT_ASHOKA = PersonaSlot(
@@ -84,6 +85,7 @@ SLOT_FOUNDER = PersonaSlot(
         "with your principal and code 'BETA50', then retry the deploy.\n"
         "Report any failure as 'ISSUE: <description>'. Summarise what you created."
     ),
+    template_name="Realm Founder",
 )
 
 # Citizen persona templates – agents are distributed equally across these
@@ -99,6 +101,7 @@ CITIZEN_PERSONAS: List[PersonaSlot] = [
             "If anything fails or behaves unexpectedly, write 'ISSUE: <description>'. "
             "Report what actions you took."
         ),
+        template_name="Citizen Onboarding",
     ),
     PersonaSlot(
         persona="watchful",
@@ -112,6 +115,7 @@ CITIZEN_PERSONAS: List[PersonaSlot] = [
             "Write 'ISSUE: <description>' for every concern you notice. "
             "Report your full observations."
         ),
+        template_name="Citizen Onboarding",
     ),
     PersonaSlot(
         persona="exploiter",
@@ -126,6 +130,7 @@ CITIZEN_PERSONAS: List[PersonaSlot] = [
             "or missing validation you encounter. "
             "Report everything you tried and what happened."
         ),
+        template_name="Citizen Onboarding",
     ),
 ]
 
@@ -253,14 +258,28 @@ def register_all_agents(tasks: List[Tuple]) -> int:
 
 
 def assign_telos_to_all(tasks: List[Tuple]) -> int:
-    """Assign a custom telos (task) to each agent. Returns count of successes."""
+    """Assign telos to each agent, using DB templates when available. Returns count of successes."""
     print(f"Assigning telos to {len(tasks)} agent(s)...")
+
+    # Fetch available templates once so we can resolve template_name → template_id
+    templates_by_name: Dict[str, int] = {}
+    templates_resp = _api_get("/api/telos/templates")
+    if templates_resp and templates_resp.get("templates"):
+        for t in templates_resp["templates"]:
+            templates_by_name[t["name"]] = t["id"]
+        print(f"  Templates available: {list(templates_by_name.keys())}")
+
     assigned = 0
     for agent_id, slot, realm_id, realm_name in tasks:
-        result = _api_put(f"/api/agents/{agent_id}/telos", {
-            "custom_telos": slot.task,
-        })
+        payload: Dict = {}
+        if slot.template_name and slot.template_name in templates_by_name:
+            payload["template_id"] = templates_by_name[slot.template_name]
+        else:
+            payload["custom_telos"] = slot.task
+        result = _api_put(f"/api/agents/{agent_id}/telos", payload)
         if result and result.get("success"):
+            telos_src = slot.template_name or "custom"
+            print(f"  ✅ {agent_id} [{slot.role_label}] → telos: {telos_src}")
             assigned += 1
         else:
             print(f"  ⚠️  {agent_id}: telos assignment failed")
