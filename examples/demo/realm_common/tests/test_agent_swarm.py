@@ -372,15 +372,21 @@ def collect_agent_results(
         if telos_data and telos_data.get("success"):
             telos = telos_data.get("telos") or {}
             step_results = telos.get("step_results") or {}
-            # Extract response from step 0 (our single-step telos)
-            step_0 = step_results.get("0") or {}
-            response_text = step_0.get("result") or step_0.get("error") or ""
+            # Extract response from the latest step result
+            if step_results:
+                latest_key = max(step_results.keys(), key=lambda k: int(k) if k.isdigit() else -1)
+                latest_step = step_results.get(latest_key) or {}
+                response_text = latest_step.get("result") or latest_step.get("error") or ""
 
         success = telos_state == "completed"
         error = None
         if telos_state == "failed":
-            step_0 = step_results.get("0") or {}
-            error = step_0.get("result") or step_0.get("error") or "Step failed"
+            if step_results:
+                fail_key = max(step_results.keys(), key=lambda k: int(k) if k.isdigit() else -1)
+                fail_step = step_results.get(fail_key) or {}
+                error = fail_step.get("result") or fail_step.get("error") or "Step failed"
+            else:
+                error = "Step failed"
         elif telos_state not in ("completed", "failed"):
             error = f"Agent did not finish (state={telos_state})"
 
