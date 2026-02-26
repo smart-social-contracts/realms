@@ -20,7 +20,6 @@ import sys
 import re
 import subprocess
 import time
-import concurrent.futures
 import requests as http_requests
 from datetime import datetime
 from pathlib import Path
@@ -32,12 +31,8 @@ from typing import List, Dict, Tuple, Optional, NamedTuple
 AGENTS_COUNT = int(os.getenv("AGENTS_COUNT", "22"))   # agents per realm
 NETWORK = os.getenv("NETWORK", "staging")
 GEISTER_API_URL = os.getenv("GEISTER_API_URL", "https://geister-api.realmsgos.dev")
-MAX_WORKERS = int(os.getenv("MAX_WORKERS", "3"))
-AGENT_TIMEOUT_SECONDS = int(os.getenv("AGENT_TIMEOUT_SECONDS", "300"))  # 5 min per agent
 RUN_DURATION_MINUTES = int(os.getenv("RUN_DURATION_MINUTES", "0"))       # 0 = no overall limit
 FAILURE_THRESHOLD = float(os.getenv("FAILURE_THRESHOLD", "0.3"))        # 30% max failures
-MAX_RETRIES = int(os.getenv("MAX_RETRIES", "2"))                        # retry failed agents up to N times
-RETRY_DELAY_SECONDS = int(os.getenv("RETRY_DELAY_SECONDS", "10"))       # pause between retries
 LOGS_DIR = Path(os.getenv("LOGS_DIR", "agent_logs"))
 GITHUB_REPOSITORY = os.getenv("GITHUB_REPOSITORY", "")   # e.g. "smart-social-contracts/realms"
 GH_TOKEN = os.getenv("GH_TOKEN") or os.getenv("GITHUB_TOKEN", "")
@@ -171,6 +166,22 @@ def _api_put(path: str, payload: Dict) -> Optional[Dict]:
     return None
 
 
+def _api_get(path: str) -> Optional[Dict]:
+    """GET from the Geister API. Returns parsed response or None."""
+    url = f"{GEISTER_API_URL}{path}"
+    try:
+        resp = http_requests.get(url, timeout=30)
+        resp.raise_for_status()
+        return resp.json()
+    except http_requests.exceptions.HTTPError as e:
+        body = e.response.text[:200] if e.response is not None else ""
+        code = e.response.status_code if e.response is not None else "?"
+        print(f"  ⚠️  API GET {path} → HTTP {code}: {body}")
+    except Exception as e:
+        print(f"  ⚠️  API GET {path} failed: {e}")
+    return None
+
+
 def register_agent(
     agent_id: str,
     display_name: str,
@@ -239,6 +250,165 @@ def register_all_agents(tasks: List[Tuple]) -> int:
             print(f"  ⚠️  {agent_id} [{slot.role_label}] → registration failed (will still attempt run)")
     print(f"Registered {registered}/{len(tasks)} agents\n")
     return registered
+
+
+def assign_telos_to_all(tasks: List[Tuple]) -> int:
+    """Assign a custom telos (task) to each agent. Returns count of successes."""
+    print(f"Assigning telos to {len(tasks)} agent(s)...")
+    assigned = 0
+    for agent_id, slot, realm_id, realm_name in tasks:
+        result = _api_put(f"/api/agents/{agent_id}/telos", {
+            "custom_telos": slot.task,
+        })
+        if result and result.get("success"):
+            assigned += 1
+        else:
+            print(f"  ⚠️  {agent_id}: telos assignment failed")
+    print(f"Assigned telos to {assigned}/{len(tasks)} agents\n")
+    return assigned
+
+
+def activate_all_agents() -> int:
+    """Set all agents to telos_state='active'. Returns updated count."""
+    result = _api_put("/api/agents/telos/state", {"state": "active"})
+    count = result.get("updated_count", 0) if result else 0
+    print(f"Activated {count} agent(s)")
+    return count
+
+
+def ensure_executor_running() -> bool:
+    """Start the telos executor if not already running."""
+    status = _api_get("/api/telos/executor/status")
+    if status and status.get("running"):
+        print("Telos executor already running")
+        return True
+    result = _api_post("/api/telos/executor/start", {})
+    if result and result.get("success"):
+        print("Telos executor started")
+        return True
+    print("  ⚠️  Could not start telos executor")
+    return False
+
+
+def poll_until_complete(
+    agent_ids: List[str],
+    deadline: float,
+    poll_interval: int = 5,
+) -> Dict[str, Dict]:
+    """
+    Poll the Geister API until all agents reach a terminal telos state
+    (completed / failed) or the deadline is exceeded.
+
+    Returns a dict mapping agent_id → agent data (including telos info).
+    """
+    terminal = {"completed", "failed"}
+    final: Dict[str, Dict] = {}
+
+    while time.time() < deadline:
+        data = _api_get("/api/agents")
+        if not data or not data.get("success"):
+            time.sleep(poll_interval)
+            continue
+
+        agents_by_id = {a["agent_id"]: a for a in data.get("agents", [])}
+
+        pending = []
+        for aid in agent_ids:
+            agent = agents_by_id.get(aid)
+            if not agent:
+                continue
+            state = agent.get("telos_state") or "idle"
+            if state in terminal:
+                if aid not in final:
+                    final[aid] = agent
+                    emoji = "✅" if state == "completed" else "❌"
+                    print(f"  {emoji} {aid} → {state}")
+            else:
+                pending.append(aid)
+
+        if not pending:
+            print(f"\nAll {len(agent_ids)} agents reached terminal state")
+            break
+
+        # Show progress
+        done = len(final)
+        total = len(agent_ids)
+        remaining = int(deadline - time.time())
+        sys.stdout.write(f"\r  ⏳ {done}/{total} done, {len(pending)} pending, {remaining}s remaining  ")
+        sys.stdout.flush()
+
+        time.sleep(poll_interval)
+    else:
+        print(f"\n⏰ Deadline reached with {len(agent_ids) - len(final)} agent(s) still pending")
+        # Collect whatever state the remaining agents are in
+        data = _api_get("/api/agents")
+        if data and data.get("success"):
+            for a in data.get("agents", []):
+                if a["agent_id"] in agent_ids and a["agent_id"] not in final:
+                    final[a["agent_id"]] = a
+
+    print()  # newline after progress line
+    return final
+
+
+def collect_agent_results(
+    agent_ids: List[str],
+    final_states: Dict[str, Dict],
+    tasks: List[Tuple],
+) -> List[Dict]:
+    """Fetch telos results for each agent and build log entries."""
+    logs = []
+    task_map = {agent_id: (slot, realm_id, realm_name) for agent_id, slot, realm_id, realm_name in tasks}
+
+    for agent_id in agent_ids:
+        slot, realm_id, realm_name = task_map[agent_id]
+        agent = final_states.get(agent_id, {})
+        telos_state = agent.get("telos_state", "unknown")
+
+        # Fetch telos progress (contains step results with LLM responses)
+        telos_data = _api_get(f"/api/agents/{agent_id}/telos")
+        step_results = {}
+        response_text = ""
+        if telos_data and telos_data.get("success"):
+            telos = telos_data.get("telos") or {}
+            step_results = telos.get("step_results") or {}
+            # Extract response from step 0 (our single-step telos)
+            step_0 = step_results.get("0") or {}
+            response_text = step_0.get("result") or step_0.get("error") or ""
+
+        success = telos_state == "completed"
+        error = None
+        if telos_state == "failed":
+            step_0 = step_results.get("0") or {}
+            error = step_0.get("result") or step_0.get("error") or "Step failed"
+        elif telos_state not in ("completed", "failed"):
+            error = f"Agent did not finish (state={telos_state})"
+
+        issues = extract_issues(response_text)
+
+        log_entry = {
+            "agent_id": agent_id,
+            "realm_id": realm_id,
+            "realm_name": realm_name,
+            "persona": slot.persona,
+            "role_label": slot.role_label,
+            "timestamp": datetime.now().isoformat(),
+            "telos_state": telos_state,
+            "parsed_response": {
+                "success": success,
+                "agent_id": agent_id,
+                "realm": realm_id,
+                "question": slot.task,
+                "response": response_text,
+                "error": error,
+            },
+            "success": success,
+            "error": error,
+            "issues": issues,
+        }
+        logs.append(log_entry)
+
+    return logs
 
 
 # ---------------------------------------------------------------------------
@@ -332,102 +502,30 @@ def file_github_issue(title: str, body: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Single agent task runner
-# ---------------------------------------------------------------------------
-
-def run_agent_task(
-    agent_id: str,
-    slot: PersonaSlot,
-    realm_id: str,
-    realm_name: str,
-) -> Dict:
-    """Run one agent against one realm. Returns a structured log dict."""
-    log: Dict = {
-        "agent_id": agent_id,
-        "realm_id": realm_id,
-        "realm_name": realm_name,
-        "persona": slot.persona,
-        "role_label": slot.role_label,
-        "timestamp": datetime.now().isoformat(),
-        "stdout": "",
-        "stderr": "",
-        "returncode": None,
-        "parsed_response": None,
-        "success": False,
-        "error": None,
-        "issues": [],
-    }
-
-    try:
-        cmd = [
-            "geister", "agent", "ask", agent_id, slot.task,
-            "--persona", slot.persona,
-            "--realm", realm_id,
-            "--json",
-            "--api-url", GEISTER_API_URL,
-        ]
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=AGENT_TIMEOUT_SECONDS,
-        )
-        log["stdout"] = result.stdout
-        log["stderr"] = result.stderr
-        log["returncode"] = result.returncode
-
-        # Parse JSON response
-        try:
-            data = json.loads(result.stdout)
-            log["parsed_response"] = data
-            response_text = data.get("response", "")
-            error = data.get("error")
-            if error:
-                log["error"] = error
-                log["success"] = False
-            else:
-                log["success"] = data.get("success", False)
-                log["issues"] = extract_issues(response_text)
-        except json.JSONDecodeError as e:
-            log["error"] = f"JSON decode error: {e}"
-            log["success"] = result.returncode == 0
-            log["issues"] = extract_issues(result.stdout + result.stderr)
-
-    except subprocess.TimeoutExpired:
-        log["error"] = f"Timeout after {AGENT_TIMEOUT_SECONDS}s"
-    except Exception as e:
-        log["error"] = str(e)
-
-    return log
-
-
-# ---------------------------------------------------------------------------
 # Swarm runner
 # ---------------------------------------------------------------------------
 
 def build_task_list(realms: List[Dict]) -> List[Tuple]:
     """
-    For each realm, spawn AGENTS_COUNT agents with the distribution:
-      - Slot 0: ashoka (assistant / analyst)
-      - Slot 1: founder (first realm only; citizen otherwise)
-      - Slots 2..N-1: cycle equally through CITIZEN_PERSONAS
-
-    Only the **first** realm gets a founder agent to avoid burning cycles
-    on multiple realm deployments (~3 TC each).
+    Build a flat task list across all realms with the distribution:
+      - 1 ashoka (assistant) — assigned to the first realm
+      - 1 founder — assigned to the first realm
+      - All remaining slots: cycle equally through CITIZEN_PERSONAS
     """
     tasks = []
     agent_counter = 0
+    ashoka_assigned = False
     founder_assigned = False
-    citizen_idx = 0  # cycles through CITIZEN_PERSONAS across the whole swarm
+    citizen_idx = 0
 
     for realm in realms:
-        for i in range(AGENTS_COUNT):
-            if i == 0:
+        for _i in range(AGENTS_COUNT):
+            if not ashoka_assigned:
                 slot = SLOT_ASHOKA
-            elif i == 1:
-                if not founder_assigned:
-                    slot = SLOT_FOUNDER
-                    founder_assigned = True
-                else:
-                    slot = CITIZEN_PERSONAS[citizen_idx % len(CITIZEN_PERSONAS)]
-                    citizen_idx += 1
+                ashoka_assigned = True
+            elif not founder_assigned:
+                slot = SLOT_FOUNDER
+                founder_assigned = True
             else:
                 slot = CITIZEN_PERSONAS[citizen_idx % len(CITIZEN_PERSONAS)]
                 citizen_idx += 1
@@ -438,7 +536,16 @@ def build_task_list(realms: List[Dict]) -> List[Tuple]:
 
 
 def run_agent_swarm(realms: List[Dict]) -> Dict:
-    """Run the full agent swarm and return aggregated results."""
+    """Run the full agent swarm via the telos executor and return aggregated results.
+
+    Flow:
+      1. Build task list (1 ashoka + 1 founder + cycling citizens)
+      2. Register agent profiles on the Geister API
+      3. Assign a custom telos (the task text) to each agent
+      4. Activate all agents + ensure the telos executor is running
+      5. Poll until all agents complete/fail or the time budget runs out
+      6. Collect results from the API and save logs
+    """
     results: Dict = {
         "total_success": 0,
         "total_failed": 0,
@@ -462,8 +569,7 @@ def run_agent_swarm(realms: List[Dict]) -> Dict:
     register_all_agents(tasks)
 
     print(f"\nRunning {len(tasks)} agents across {len(realms)} realm(s)...")
-    print(f"(AGENTS_COUNT={AGENTS_COUNT}/realm, MAX_WORKERS={MAX_WORKERS}, "
-          f"AGENT_TIMEOUT_SECONDS={AGENT_TIMEOUT_SECONDS}, "
+    print(f"(AGENTS_COUNT={AGENTS_COUNT}/realm, "
           f"RUN_DURATION_MINUTES={RUN_DURATION_MINUTES or 'unlimited'})")
     print("=" * 60)
 
@@ -475,137 +581,74 @@ def run_agent_swarm(realms: List[Dict]) -> Dict:
     print("=" * 60)
 
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
-    all_logs: List[Dict] = []
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        future_to_meta = {
-            executor.submit(run_agent_task, agent_id, slot, realm_id, realm_name): (
-                agent_id, slot, realm_id, realm_name
-            )
-            for agent_id, slot, realm_id, realm_name in tasks
-        }
+    # --- Assign telos & activate ---
+    assign_telos_to_all(tasks)
+    activate_all_agents()
+    ensure_executor_running()
 
-        overall_deadline = time.time() + RUN_DURATION_MINUTES * 60 if RUN_DURATION_MINUTES > 0 else 0
+    # --- Poll until all agents reach a terminal state ---
+    overall_deadline = (
+        time.time() + RUN_DURATION_MINUTES * 60
+        if RUN_DURATION_MINUTES > 0
+        else time.time() + 3600  # fallback: 1 hour
+    )
+    agent_ids = [aid for aid, *_ in tasks]
+    final_states = poll_until_complete(agent_ids, overall_deadline)
 
-        for future in concurrent.futures.as_completed(future_to_meta):
-            if overall_deadline and time.time() > overall_deadline:
-                print(f"\n⏰ Overall time limit ({RUN_DURATION_MINUTES}min) reached, skipping remaining agents...")
-                break
-            agent_id, slot, realm_id, realm_name = future_to_meta[future]
-            log = future.result()
-            all_logs.append(log)
+    # --- Collect results ---
+    all_logs = collect_agent_results(agent_ids, final_states, tasks)
 
-            realm_result = results["realms"][realm_id]
+    for log_entry in all_logs:
+        agent_id = log_entry["agent_id"]
+        realm_id = log_entry["realm_id"]
+        realm_name = log_entry["realm_name"]
+        slot_info = next((s for a, s, r, rn in tasks if a == agent_id), None)
 
-            # Save per-agent log
-            safe_label = slot.role_label.replace(" ", "_")
-            log_file = LOGS_DIR / f"{agent_id}_{realm_name.replace(' ', '_')}_{safe_label}.json"
-            with open(log_file, "w") as f:
-                json.dump(log, f, indent=2)
+        realm_result = results["realms"][realm_id]
 
-            if log["success"]:
-                realm_result["success"] += 1
-                results["total_success"] += 1
-                issue_count = len(log["issues"])
-                issue_note = f"  ({issue_count} issue(s) found)" if issue_count else ""
-                print(f"  {slot.emoji} ✅ {agent_id} [{slot.role_label}] → {realm_name}{issue_note}")
-            else:
-                realm_result["failed"] += 1
-                results["total_failed"] += 1
-                err = (log.get("error") or "unknown error")[:80]
-                print(f"  {slot.emoji} ❌ {agent_id} [{slot.role_label}] → {realm_name}: {err}")
+        # Save per-agent log
+        safe_label = log_entry["role_label"].replace(" ", "_")
+        log_file = LOGS_DIR / f"{agent_id}_{realm_name.replace(' ', '_')}_{safe_label}.json"
+        with open(log_file, "w") as f:
+            json.dump(log_entry, f, indent=2)
 
-            # Update the persistent agent profile with run results
-            update_agent_after_run(agent_id, log["success"], log["issues"], log.get("error"))
+        if log_entry["success"]:
+            realm_result["success"] += 1
+            results["total_success"] += 1
+            issue_count = len(log_entry["issues"])
+            issue_note = f"  ({issue_count} issue(s) found)" if issue_count else ""
+            emoji = slot_info.emoji if slot_info else "❓"
+            print(f"  {emoji} ✅ {agent_id} [{log_entry['role_label']}] → {realm_name}{issue_note}")
+        else:
+            realm_result["failed"] += 1
+            results["total_failed"] += 1
+            err = (log_entry.get("error") or "unknown error")[:80]
+            emoji = slot_info.emoji if slot_info else "❓"
+            print(f"  {emoji} ❌ {agent_id} [{log_entry['role_label']}] → {realm_name}: {err}")
 
-            realm_result["agents"].append({
+        # Update the persistent agent profile with run results
+        update_agent_after_run(agent_id, log_entry["success"], log_entry["issues"], log_entry.get("error"))
+
+        realm_result["agents"].append({
+            "agent_id": agent_id,
+            "role_label": log_entry["role_label"],
+            "persona": log_entry["persona"],
+            "success": log_entry["success"],
+            "issues": log_entry["issues"],
+        })
+
+        # Accumulate issues
+        for issue_text in log_entry["issues"]:
+            results["total_issues"] += 1
+            results["all_issues"].append({
                 "agent_id": agent_id,
-                "role_label": slot.role_label,
-                "persona": slot.persona,
-                "success": log["success"],
-                "issues": log["issues"],
+                "role_label": log_entry["role_label"],
+                "realm_name": realm_name,
+                "realm_id": realm_id,
+                "description": issue_text,
+                "log_file": str(log_file),
             })
-
-            # Accumulate issues
-            for issue_text in log["issues"]:
-                results["total_issues"] += 1
-                issue_entry = {
-                    "agent_id": agent_id,
-                    "role_label": slot.role_label,
-                    "realm_name": realm_name,
-                    "realm_id": realm_id,
-                    "description": issue_text,
-                    "log_file": str(log_file),
-                }
-                results["all_issues"].append(issue_entry)
-
-    # --- Retry failed agents sequentially ---
-    _RETRYABLE = ("524", "timeout", "timed out", "connection", "502", "503", "504")
-
-    for retry_round in range(1, MAX_RETRIES + 1):
-        failed_entries = [
-            (log_entry, meta)
-            for log_entry, meta in zip(all_logs, [(l["agent_id"], next(s for a, s, r, rn in tasks if a == l["agent_id"]), l["realm_id"], l["realm_name"]) for l in all_logs])
-            if not log_entry["success"]
-            and log_entry.get("error")
-            and any(tok in log_entry["error"].lower() for tok in _RETRYABLE)
-        ]
-        if not failed_entries:
-            break
-
-        print(f"\n🔄 Retry round {retry_round}/{MAX_RETRIES}: {len(failed_entries)} agent(s) with transient errors")
-
-        if overall_deadline and time.time() > overall_deadline:
-            print(f"  ⏰ Time limit reached, skipping retries")
-            break
-
-        for log_entry, (agent_id, slot, realm_id, realm_name) in failed_entries:
-            if overall_deadline and time.time() > overall_deadline:
-                break
-
-            time.sleep(RETRY_DELAY_SECONDS)
-            print(f"  🔄 Retrying {agent_id} [{slot.role_label}] → {realm_name}...")
-            new_log = run_agent_task(agent_id, slot, realm_id, realm_name)
-
-            # Save retry log
-            safe_label = slot.role_label.replace(" ", "_")
-            log_file = LOGS_DIR / f"{agent_id}_{realm_name.replace(' ', '_')}_{safe_label}_retry{retry_round}.json"
-            with open(log_file, "w") as f:
-                json.dump(new_log, f, indent=2)
-
-            realm_result = results["realms"][realm_id]
-
-            if new_log["success"]:
-                # Flip from failed to success
-                log_entry["success"] = True
-                log_entry["error"] = None
-                log_entry["issues"] = new_log["issues"]
-                log_entry["parsed_response"] = new_log["parsed_response"]
-                realm_result["success"] += 1
-                realm_result["failed"] -= 1
-                results["total_success"] += 1
-                results["total_failed"] -= 1
-                issue_count = len(new_log["issues"])
-                issue_note = f"  ({issue_count} issue(s) found)" if issue_count else ""
-                print(f"  {slot.emoji} ✅ {agent_id} [{slot.role_label}] → {realm_name}{issue_note} (retry {retry_round})")
-
-                update_agent_after_run(agent_id, True, new_log["issues"], None)
-
-                for issue_text in new_log["issues"]:
-                    results["total_issues"] += 1
-                    results["all_issues"].append({
-                        "agent_id": agent_id,
-                        "role_label": slot.role_label,
-                        "realm_name": realm_name,
-                        "realm_id": realm_id,
-                        "description": issue_text,
-                        "log_file": str(log_file),
-                    })
-            else:
-                err = (new_log.get("error") or "unknown error")[:80]
-                print(f"  {slot.emoji} ❌ {agent_id} [{slot.role_label}] → {realm_name}: {err} (retry {retry_round})")
-                # Update error in original log so next retry round sees fresh error
-                log_entry["error"] = new_log.get("error")
 
     # Save combined log
     combined = LOGS_DIR / "all_agents.json"
@@ -733,7 +776,6 @@ def main() -> None:
     print(f"Network:          {NETWORK}")
     print(f"Run ID:           {RUN_ID}")
     print(f"Agents:           {AGENTS_COUNT}/realm")
-    print(f"Timeout/agent:    {AGENT_TIMEOUT_SECONDS}s")
     dur = f"{RUN_DURATION_MINUTES}min" if RUN_DURATION_MINUTES > 0 else "unlimited"
     print(f"Overall budget:   {dur}")
     print(f"GH issue filing:  {'enabled' if GITHUB_REPOSITORY and GH_TOKEN else 'disabled'}")
