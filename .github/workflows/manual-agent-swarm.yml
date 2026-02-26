@@ -10,7 +10,7 @@ on:
       run_duration_minutes:
         description: 'Overall time budget in minutes'
         required: false
-        default: '10'
+        default: '20'
       delete_all_agents:
         description: 'Delete all geisters (start fresh)'
         required: false
@@ -97,7 +97,7 @@ jobs:
             -e DFX_NETWORK=staging \
             -e AGENTS_COUNT=${{ github.event.inputs.agents_count || '3' }} \
             -e NETWORK=staging \
-            -e RUN_DURATION_MINUTES=${{ github.event.inputs.run_duration_minutes || '10' }} \
+            -e RUN_DURATION_MINUTES=${{ github.event.inputs.run_duration_minutes || '20' }} \
             -e LOGS_DIR=/app/agent_logs \
             ghcr.io/${{ github.repository_owner }}/realms:${{ github.event.inputs.docker_tag || 'demo-latest' }} \
             bash -c "dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
