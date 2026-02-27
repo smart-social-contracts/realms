@@ -90,6 +90,7 @@ from .governance import (
     Mandate,
     Proposal,
     Realm,
+    RealmStatus,
     Registry,
     Vote,
 )
@@ -162,6 +163,7 @@ __all__ = [
     "Profiles",
     "Proposal",
     "Realm",
+    "RealmStatus",
     "Registry",
     "Service",
     "Task",
