@@ -33,90 +33,19 @@ jobs:
         env:
           RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
         run: |
-          pip install runpod requests >/dev/null 2>&1
-          python3 - <<'ENSURE_POD'
-          import runpod, os, sys, time, requests as r
-
-          runpod.api_key = os.environ["RUNPOD_API_KEY"]
-          OLLAMA_URL = "https://geister-ollama.realmsgos.dev"
-          POD_PREFIX = "geister-main-"
-          # Config from geister/env
-          NETWORK_VOLUME_ID = "99taves6so"
-          TEMPLATE_ID = "mli5ubi3cf"
-          IMAGE_NAME = "docker.io/smartsocialcontracts/geister:main"
-          MAX_GPU_PRICE = 0.30
-          MIN_GPU_PRICE = 0.05
-
-          # --- Find existing pod ---
-          pods = runpod.get_pods()
-          pod = next((p for p in pods if p["name"].startswith(POD_PREFIX)), None)
-
-          if pod:
-              status = pod.get("desiredStatus", "UNKNOWN")
-              print(f"Found pod {pod['id']}: {status}")
-              if status != "RUNNING":
-                  print("Resuming pod...")
-                  runpod.resume_pod(pod_id=pod["id"], gpu_count=1)
-                  for _ in range(60):
-                      time.sleep(5)
-                      ps = runpod.get_pods()
-                      p = next((x for x in ps if x["id"] == pod["id"]), None)
-                      if p and p.get("desiredStatus") == "RUNNING":
-                          print("Pod is RUNNING"); break
-                  else:
-                      print("::warning::Pod did not reach RUNNING within 5min, attempting new deploy")
-                      pod = None  # fall through to deploy
+          pip install geister
+          geister pod start main --deploy-new --verbose
           
-          if not pod:
-              print("No running pod found — deploying a new one...")
-              gpu_types = runpod.get_gpus()
-              affordable = []
-              for g in gpu_types:
-                  try:
-                      detail = runpod.get_gpu(g["id"])
-                      price = detail.get("communitySpotPrice") or detail.get("secureSpotPrice")
-                      if price and MIN_GPU_PRICE <= price <= MAX_GPU_PRICE:
-                          affordable.append({"id": g["id"], "name": detail.get("displayName", g["id"]), "price": price})
-                  except Exception:
-                      pass
-              affordable.sort(key=lambda x: x["price"])
-              if not affordable:
-                  print(f"::error::No GPUs found between ${MIN_GPU_PRICE} and ${MAX_GPU_PRICE}/hr")
-                  sys.exit(1)
-              pod_name = f"geister-main-{int(time.time())}"
-              created = False
-              for gpu in affordable:
-                  try:
-                      print(f"Trying {gpu['name']} at ${gpu['price']:.3f}/hr...")
-                      result = runpod.create_pod(
-                          name=pod_name, template_id=TEMPLATE_ID, image_name=IMAGE_NAME,
-                          gpu_type_id=gpu["id"], gpu_count=1,
-                          network_volume_id=NETWORK_VOLUME_ID, volume_mount_path="/workspace",
-                          container_disk_in_gb=20, support_public_ip=True, start_ssh=True,
-                          env={"RUNPOD_API_KEY": os.environ["RUNPOD_API_KEY"],
-                               "POD_TYPE": "main", "INACTIVITY_TIMEOUT_SECONDS": "3600"})
-                      if result and result.get("id"):
-                          print(f"✅ Pod created: {result['id']} with {gpu['name']}")
-                          created = True; break
-                  except Exception as e:
-                      print(f"⚠️ {gpu['name']} failed: {e}")
-              if not created:
-                  print("::error::All GPU options exhausted, could not create pod")
-                  sys.exit(1)
-
-          # --- Wait for Ollama to be healthy ---
-          print("Waiting for Ollama to be healthy...")
-          for i in range(36):
-              try:
-                  resp = r.get(OLLAMA_URL, timeout=10)
-                  if resp.status_code == 200:
-                      print("✅ Ollama is healthy!"); sys.exit(0)
-              except Exception:
-                  pass
-              print(f"  Attempt {i+1}/36 - not ready yet, retrying in 10s...")
-              time.sleep(10)
-          print("::warning::Ollama not healthy after 6min, proceeding anyway")
-          ENSURE_POD
+          echo "Waiting for Ollama to be healthy..."
+          for i in $(seq 1 36); do
+            if curl -sf --max-time 10 https://geister-ollama.realmsgos.dev > /dev/null 2>&1; then
+              echo "✅ Ollama is healthy!"
+              exit 0
+            fi
+            echo "  Attempt $i/36 - not ready yet, retrying in 10s..."
+            sleep 10
+          done
+          echo "::warning::Ollama not healthy after 6min, proceeding anyway"
 
       - name: Delete all geisters
         if: ${{ github.event.inputs.delete_all_agents == 'true' }}
