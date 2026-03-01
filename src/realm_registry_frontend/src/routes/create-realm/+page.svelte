@@ -216,9 +216,10 @@
   const EXTENSION_CATEGORIES = extensionsConfig.categories;
 
   // Available codices (loaded from $lib/codices-config.json)
-  const AVAILABLE_CODICES = codicesConfig.codices;
+  let AVAILABLE_CODICES = codicesConfig.codices;
 
-  // Codex sorting
+  // Codex sorting & expand state
+  let expandedCodices = {};
   let codexSortBy = 'popularity'; // 'popularity' | 'newest' | 'oldest'
   $: sortedCodices = [...AVAILABLE_CODICES].sort((a, b) => {
     if (codexSortBy === 'popularity') return (b.popularity || 0) - (a.popularity || 0);
@@ -1097,7 +1098,12 @@
                   </div>
                   <div class="codex-info">
                     <span class="codex-name">{codex.name}</span>
-                    <span class="codex-desc">{codex.description}</span>
+                    <span class="codex-desc" class:expanded={expandedCodices[codex.id]}>{codex.description}</span>
+                    {#if codex.description && codex.description.length > 120}
+                      <button type="button" class="codex-expand-btn" on:click|stopPropagation={() => { expandedCodices[codex.id] = !expandedCodices[codex.id]; expandedCodices = expandedCodices; }}>
+                        {expandedCodices[codex.id] ? 'Show less' : 'Read more'}
+                      </button>
+                    {/if}
                     {#if codex.doc_url}
                       <a href={codex.doc_url} target="_blank" rel="noopener" class="doc-link" on:click|stopPropagation>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2493,7 +2499,7 @@
   .codex-info {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.35rem;
   }
 
   .codex-name {
@@ -2504,7 +2510,33 @@
 
   .codex-desc {
     font-size: 0.8125rem;
-    color: #737373;
+    line-height: 1.5;
+    color: #525252;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .codex-desc.expanded {
+    display: block;
+    -webkit-line-clamp: unset;
+    overflow: visible;
+  }
+
+  .codex-expand-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.75rem;
+    color: #2563EB;
+    cursor: pointer;
+    text-align: left;
+    font-weight: 500;
+  }
+
+  .codex-expand-btn:hover {
+    text-decoration: underline;
   }
 
   .doc-link {
