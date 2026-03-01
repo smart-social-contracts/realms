@@ -32,6 +32,7 @@ jobs:
         if: env.RUNPOD_API_KEY != ''
         env:
           RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+          NETWORK_VOLUME_ID: "99taves6so"
         run: |
           pip install geister runpod
           geister pod start main --deploy-new --verbose
