@@ -33,7 +33,7 @@ jobs:
         env:
           RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
         run: |
-          pip install geister
+          pip install geister runpod
           geister pod start main --deploy-new --verbose
           
           echo "Waiting for Ollama to be healthy..."
