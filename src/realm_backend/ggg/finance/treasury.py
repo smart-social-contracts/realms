@@ -1,6 +1,9 @@
 import json
 import traceback
-from pprint import pformat
+try:
+    from pprint import pformat
+except ImportError:
+    pformat = repr
 
 from _cdk import Async, ic
 from ic_python_db import Entity, Integer, OneToOne, String, TimestampedMixin

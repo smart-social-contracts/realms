@@ -1,8 +1,28 @@
-import io
 import sys
-import traceback
-from contextlib import redirect_stderr, redirect_stdout
 from typing import TYPE_CHECKING, Optional
+
+try:
+    import io
+except ImportError:
+    io = None
+
+try:
+    import traceback
+except ImportError:
+    traceback = None
+
+try:
+    from contextlib import redirect_stderr, redirect_stdout
+except ImportError:
+    class _NullRedirect:
+        """No-op context manager for WASI where contextlib is unavailable."""
+        def __init__(self, target):
+            pass
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+    redirect_stdout = redirect_stderr = _NullRedirect
 
 from ic_python_logging import get_logger, get_logs
 
@@ -78,8 +98,16 @@ def run_code(source_code, locals={}, task: Optional["Task"] = None, task_executi
     safe_locals.update(locals)
 
     # Capture stdout and stderr during execution
-    stdout_capture = io.StringIO()
-    stderr_capture = io.StringIO()
+    if io is not None:
+        stdout_capture = io.StringIO()
+        stderr_capture = io.StringIO()
+    else:
+        # WASI fallback: no io module, use no-op captures
+        class _DummyIO:
+            def getvalue(self):
+                return ""
+        stdout_capture = _DummyIO()
+        stderr_capture = _DummyIO()
 
     try:
         with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
@@ -121,7 +149,7 @@ def run_code(source_code, locals={}, task: Optional["Task"] = None, task_executi
         }
 
     except Exception:
-        stack_trace = traceback.format_exc()
+        stack_trace = traceback.format_exc() if traceback else str(sys.exc_info()[1])
 
         # Still capture any output that occurred before the exception
         logs = []
