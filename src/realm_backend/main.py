@@ -6,6 +6,33 @@
 # ============================================================================
 import sys as _wsys
 
+# -- 0a. builtins.open: not available in WASI (no filesystem) --
+import builtins as _bi
+if not hasattr(_bi, 'open'):
+    def _stub_open(*a, **kw):
+        raise OSError("open() not available in WASI (no filesystem)")
+    _bi.open = _stub_open
+del _bi
+
+# -- 0b. os / os.path: stub may lack path.exists/join etc. --
+import os as _os
+if not hasattr(_os, 'path') or not hasattr(getattr(_os, 'path', None) or _os, 'exists'):
+    class _FakePath:
+        sep = '/'
+        def exists(self, p): return False
+        def join(self, *a): return '/'.join(a)
+        def dirname(self, p): return p.rsplit('/', 1)[0] if '/' in p else ''
+        def basename(self, p): return p.rsplit('/', 1)[-1]
+        def isfile(self, p): return False
+        def isdir(self, p): return False
+        def abspath(self, p): return p
+    _os.path = _FakePath()
+    if not hasattr(_os, 'getcwd'):
+        _os.getcwd = lambda: '/'
+    if not hasattr(_os, 'environ'):
+        _os.environ = {}
+del _os
+
 # -- 1. dataclasses: stub is a no-op, must generate __init__/__repr__ --
 _dc = _wsys.modules.get('dataclasses')
 if _dc and getattr(_dc, '__file__', '') == '<frozen dataclasses>':
