@@ -37,7 +37,7 @@ RUN touch src/realm_backend/extension_packages/extension_imports.py
 
 # Generate extension manifests (create empty file with proper structure for Docker build)
 RUN echo '"""' > src/realm_backend/extension_packages/extension_manifests.py && \
-    echo 'Static extension manifest registry for Kybra canister environment.' >> src/realm_backend/extension_packages/extension_manifests.py && \
+    echo 'Static extension manifest registry for Basilisk canister environment.' >> src/realm_backend/extension_packages/extension_manifests.py && \
     echo 'This file will be regenerated during deployment.' >> src/realm_backend/extension_packages/extension_manifests.py && \
     echo '"""' >> src/realm_backend/extension_packages/extension_manifests.py && \
     echo '' >> src/realm_backend/extension_packages/extension_manifests.py && \

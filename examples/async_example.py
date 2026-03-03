@@ -2,7 +2,7 @@
 # Usage: realms shell --file examples/async_example.py
 # Usage with wait: realms shell --file examples/async_example.py --wait
 
-from kybra import ic
+from _cdk import ic
 from ggg import Treasury
 from pprint import pformat
 import json

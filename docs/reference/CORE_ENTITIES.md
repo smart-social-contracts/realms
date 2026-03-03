@@ -291,7 +291,7 @@ schedule = TaskSchedule(
 Task-scoped storage for batch processing.
 
 ```python
-from kybra_simple_db import String, Integer
+from ic_python_db import String, Integer
 
 # Inside task codex - automatically available
 class BatchState(TaskEntity):

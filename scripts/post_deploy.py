@@ -167,7 +167,10 @@ try:
         # Register realm via inter-canister call from realm_backend to registry
         # The registry uses ic.caller() (realm_backend's canister ID) as the unique key
         # This prevents duplicates - same canister calling again just updates the record
-        registry_canister_id = os.environ.get('REGISTRY_CANISTER_ID')
+        # Read registry canister ID from manifest services section, fall back to env var
+        registry_canister_id = manifest.get('services', {}).get('registry', {}).get('canister_id')
+        if not registry_canister_id:
+            registry_canister_id = os.environ.get('REGISTRY_CANISTER_ID')
         
         if registry_canister_id:
             print(f"   Registering realm with central registry...")

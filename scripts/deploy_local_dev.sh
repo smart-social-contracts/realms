@@ -215,7 +215,7 @@ deploy_single_realm() {
             cp -r "$REPO_ROOT/extensions/extensions" "$SINGLE_REALM_PATH/extensions/"
         fi
         
-        # Also copy into extension_packages (what kybra build actually uses)
+        # Also copy into extension_packages (what basilisk build actually uses)
         if [ -d "$SINGLE_REALM_PATH/src/realm_backend/extension_packages" ]; then
             echo -e "${GREEN}📦 Updating extension_packages...${NC}"
             for ext_dir in "$REPO_ROOT/extensions/extensions/"*/backend; do
@@ -250,7 +250,7 @@ deploy_single_realm() {
     fi
     
     if [ "$DEPLOY_BACKEND" = true ]; then
-        # Activate venv if present (needed for kybra build)
+        # Activate venv if present (needed for basilisk build)
         if [ -f "$SINGLE_REALM_PATH/venv/bin/activate" ]; then
             echo -e "${GREEN}🐍 Activating venv...${NC}"
             source "$SINGLE_REALM_PATH/venv/bin/activate"
@@ -364,7 +364,7 @@ deploy_mundus_realm() {
             cp -r "$REPO_ROOT/extensions/extensions" "$realm_dir/extensions/"
         fi
         
-        # Also copy into extension_packages (what kybra build actually uses)
+        # Also copy into extension_packages (what basilisk build actually uses)
         if [ -d "$realm_dir/src/realm_backend/extension_packages" ]; then
             echo -e "${GREEN}📦 Updating extension_packages...${NC}"
             for ext_dir in "$REPO_ROOT/extensions/extensions/"*/backend; do
@@ -393,7 +393,7 @@ deploy_mundus_realm() {
     fi
     
     if [ "$DEPLOY_BACKEND" = true ]; then
-        # Activate venv if present (needed for kybra build)
+        # Activate venv if present (needed for basilisk build)
         if [ -f "$realm_dir/venv/bin/activate" ]; then
             echo -e "${GREEN}🐍 Activating venv...${NC}"
             source "$realm_dir/venv/bin/activate"

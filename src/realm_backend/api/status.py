@@ -16,6 +16,7 @@ from ggg import (
     Organization,
     Proposal,
     Realm,
+    Registry,
     Task,
     Trade,
     Transfer,
@@ -23,8 +24,8 @@ from ggg import (
     UserProfile,
     Vote,
 )
-from kybra import ic
-from kybra_simple_logging import get_logger
+from _cdk import ic
+from ic_python_logging import get_logger
 
 # Initialize logger
 logger = get_logger("api.status")
@@ -41,7 +42,7 @@ def get_status() -> "dict[str, Any]":
     """
     logger.info("Status check requested")
 
-    # Get entity counts from the database (count() is optimized by kybra_simple_db)
+    # Get entity counts from the database (count() is optimized by ic_python_db)
     users_count = User.count()
     organizations_count = Organization.count()
     realms_count = Realm.count()
@@ -142,6 +143,18 @@ def get_status() -> "dict[str, Any]":
     except Exception as e:
         logger.warning(f"Could not load canister IDs from Realm entity: {e}")
 
+    # Get registries this realm is registered with
+    registries = []
+    try:
+        for reg in Registry.instances():
+            if getattr(reg, 'principal_id', None):
+                registries.append({
+                    "canister_id": reg.principal_id,
+                    "canister_type": "registry"
+                })
+    except Exception as e:
+        logger.warning(f"Could not load registries: {e}")
+
     # Return data in the format expected by the Status Candid type
     return {
         "version": version,
@@ -170,4 +183,5 @@ def get_status() -> "dict[str, Any]":
         "demo_mode": demo_mode,
         "task_manager": task_manager_status,
         "canisters": canisters,
+        "registries": registries,
     }

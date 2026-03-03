@@ -1,6 +1,6 @@
 """Candid type definitions for the realm registry backend."""
 
-from kybra import Record, Variant, Vec, float64, nat64, text
+from _cdk import Record, Variant, Vec, float64, nat64, text
 
 
 # Credits types

@@ -3,7 +3,7 @@
 import json
 from typing import Optional
 
-from kybra import (
+from _cdk import (
     Async,
     CallResult,
     Opt,
@@ -20,7 +20,7 @@ from kybra import (
     service_update,
     text,
 )
-from kybra_simple_logging import get_logger
+from ic_python_logging import get_logger
 
 logger = get_logger("api.nft")
 

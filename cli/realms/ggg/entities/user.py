@@ -1,6 +1,6 @@
 from typing import Any
 
-from kybra_simple_db import (
+from ic_python_db import (
     Entity,
     ManyToMany,
     OneToMany,
@@ -8,7 +8,7 @@ from kybra_simple_db import (
     String,
     TimestampedMixin,
 )
-from kybra_simple_logging import get_logger
+from ic_python_logging import get_logger
 
 try:
     from ggg.user_profile import UserProfile

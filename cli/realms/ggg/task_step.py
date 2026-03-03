@@ -7,7 +7,7 @@ step in a multi-step task workflow. This allows separation of sync and async
 operations which is required by ICP canisters.
 """
 
-from kybra_simple_db import Entity, Integer, ManyToOne, OneToOne, String, TimestampedMixin
+from ic_python_db import Entity, Integer, ManyToOne, OneToOne, String, TimestampedMixin
 
 
 class TaskStep(Entity, TimestampedMixin):

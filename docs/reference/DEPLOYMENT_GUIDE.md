@@ -86,7 +86,7 @@ cd .realms/realm_YourRealm_*/
 1. **Environment Setup:**
    - Activates Python virtual environment if present
    - Installs backend dependencies from `requirements.txt`
-   - Clears Kybra build cache to include new extensions
+   - Clears Basilisk build cache to include new extensions
 
 2. **Local Network (if applicable):**
    - Starts dfx replica with port based on git branch hash
@@ -520,8 +520,8 @@ dfx cycles convert 10 --network ic
     "realm_backend": {
       "type": "custom",
       "candid": "src/realm_backend/realm_backend.did",
-      "wasm": ".kybra/realm_backend/realm_backend.wasm",
-      "build": "python -m kybra realm_backend src/realm_backend",
+      "wasm": ".basilisk/realm_backend/realm_backend.wasm",
+      "build": "python -m basilisk realm_backend src/realm_backend",
       "declarations": {
         "output": "src/declarations/realm_backend"
       }
@@ -739,7 +739,7 @@ dfx deploy vault_backend --network ic  # if exists
 
 ```python
 # Backend to backend
-from kybra import ic
+from basilisk import ic
 
 registry_principal = Principal.from_str("rrkah-fqaaa-...")
 result = yield ic.call(registry_principal, "list_realms", {})

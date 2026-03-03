@@ -5,8 +5,8 @@ This module is safe to import from extensions as it has no lifecycle decorators.
 
 from typing import Tuple
 
-from kybra import Async, CallResult, ic, match, update
-from kybra.canisters.management import HttpResponse, management_canister
+from _cdk import Async, CallResult, ic, match, update
+from _cdk import HttpResponse, management_canister
 
 # Cache for downloaded content
 downloaded_content: dict = {}

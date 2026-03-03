@@ -8,7 +8,7 @@ Related entities (steps, schedules, executions) provide execution infrastructure
 but are not part of the core GGG standard.
 """
 
-from kybra_simple_db import (
+from ic_python_db import (
     Entity,
     Integer,
     OneToMany,

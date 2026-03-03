@@ -8,4 +8,4 @@ pip install -r requirements-dev.txt
 
 pip install -e cli/
 
-python -m kybra install-dfx-extension
+python -m basilisk install-dfx-extension

@@ -16,15 +16,15 @@
     "python.analysis.stubPath": "./typings",
     "python.analysis.packageIndexDepths": [
         {
-            "name": "kybra",
+            "name": "basilisk",
             "depth": 2
         },
         {
-            "name": "kybra_simple_db",
+            "name": "ic_python_db",
             "depth": 2
         },
         {
-            "name": "kybra_simple_logging",
+            "name": "ic_python_logging",
             "depth": 2
         }
     ],

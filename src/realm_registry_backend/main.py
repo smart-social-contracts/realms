@@ -35,7 +35,7 @@ from core.candid_types_registry import (
     TransactionHistoryResult,
     UserCreditsRecord,
 )
-from kybra import (
+from _cdk import (
     Async,
     CallResult,
     Func,
@@ -58,8 +58,8 @@ from kybra import (
     update,
     void,
 )
-from kybra_simple_db import Database
-from kybra_simple_logging import get_logger
+from ic_python_db import Database
+from ic_python_logging import get_logger
 
 # Storage for the ORM (used internally by Database class)
 # Direct storage access is not needed - use Entity classes instead
@@ -115,7 +115,7 @@ def register_realm(
 ) -> AddRealmResult:
     """Register calling realm (uses caller principal as ID, upsert logic)
     
-    Note: Kybra limits canister methods to 5 params, so canister IDs are passed as JSON.
+    Note: Basilisk limits canister methods to 5 params, so canister IDs are passed as JSON.
     """
     try:
         # Parse canister IDs from JSON string

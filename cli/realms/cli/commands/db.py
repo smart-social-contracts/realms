@@ -280,7 +280,7 @@ class CursorDatabaseExplorer:
             return {"error": str(e), "items": []}
 
     def get_entity(self, entity_type: str, entity_id: str) -> Dict[str, Any]:
-        """Get a single entity by type and ID. Uses kybra-simple-db alias resolution."""
+        """Get a single entity by type and ID. Uses ic-python-db alias resolution."""
         method = "get_objects"
         # Format as Candid vec of records: vec { record { 0 = "Type"; 1 = "id" } }
         candid_args = f'(vec {{ record {{ 0 = "{entity_type}"; 1 = "{entity_id}" }} }})'
@@ -628,7 +628,7 @@ class CursorDatabaseExplorer:
         if ggg_path not in sys.path:
             sys.path.insert(0, ggg_path)
 
-        # Also add the project root to handle kybra_simple_db imports
+        # Also add the project root to handle ic_python_db imports
         # Path from cli/realms/cli/commands/db.py -> repo_root
         project_root = os.path.join(os.path.dirname(__file__), "..", "..", "..", "..")
         project_root = os.path.abspath(project_root)
@@ -682,7 +682,7 @@ class CursorDatabaseExplorer:
                     if attr is None or attr_name.startswith("_"):
                         continue
 
-                    # Check if it's a relationship field from kybra_simple_db
+                    # Check if it's a relationship field from ic_python_db
                     attr_type = type(attr).__name__
                     if attr_type in [
                         "ManyToOne",

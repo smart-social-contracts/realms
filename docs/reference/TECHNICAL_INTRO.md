@@ -7,9 +7,9 @@ Realms is a **full-stack governance platform** built on the Internet Computer Pr
 ## Architecture
 
 ### Tech Stack
-- **Backend**: Python (Kybra) running on ICP canisters
+- **Backend**: Python (Basilisk) running on ICP canisters
 - **Frontend**: SvelteKit + TypeScript with Tailwind CSS
-- **Database**: On-chain key-value storage (Kybra Simple DB)
+- **Database**: On-chain key-value storage (Basilisk Simple DB)
 - **Authentication**: Internet Identity
 - **Blockchain**: Internet Computer Protocol
 

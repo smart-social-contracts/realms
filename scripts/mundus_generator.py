@@ -196,7 +196,7 @@ def create_mundus_dfx_json(mundus_dir: Path, repo_root: Path, realms: list, regi
         
         # Backend
         new_config["canisters"][f"{realm_id}_backend"] = {
-            "build": f"python -m kybra {realm_id}_backend src/{realm_id}_backend/main.py",
+            "build": f"python -m basilisk {realm_id}_backend src/{realm_id}_backend/main.py",
             "candid": f"src/{realm_id}_backend/realm_backend.did",
             "declarations": {
                 "output": f"src/{realm_id}_frontend/src/declarations",
@@ -205,11 +205,11 @@ def create_mundus_dfx_json(mundus_dir: Path, repo_root: Path, realms: list, regi
             "gzip": True,
             "metadata": [{"name": "candid:service"}],
             "tech_stack": {
-                "cdk": {"kybra": {}},
+                "cdk": {"basilisk": {}},
                 "language": {"python": {}}
             },
             "type": "custom",
-            "wasm": f".kybra/{realm_id}_backend/{realm_id}_backend.wasm"
+            "wasm": f".basilisk/{realm_id}_backend/{realm_id}_backend.wasm"
         }
         
         # Frontend
@@ -221,7 +221,7 @@ def create_mundus_dfx_json(mundus_dir: Path, repo_root: Path, realms: list, regi
     
     # Add registry backend and frontend
     new_config["canisters"]["realm_registry_backend"] = {
-        "build": "python -m kybra realm_registry_backend src/realm_registry_backend/main.py",
+        "build": "python -m basilisk realm_registry_backend src/realm_registry_backend/main.py",
         "candid": "src/realm_registry_backend/realm_registry_backend.did",
         "declarations": {
             "output": "src/realm_registry_frontend/src/declarations",
@@ -230,11 +230,11 @@ def create_mundus_dfx_json(mundus_dir: Path, repo_root: Path, realms: list, regi
         "gzip": True,
         "metadata": [{"name": "candid:service"}],
         "tech_stack": {
-            "cdk": {"kybra": {}},
+            "cdk": {"basilisk": {}},
             "language": {"python": {}}
         },
         "type": "custom",
-        "wasm": ".kybra/realm_registry_backend/realm_registry_backend.wasm"
+        "wasm": ".basilisk/realm_registry_backend/realm_registry_backend.wasm"
     }
     
     new_config["canisters"]["realm_registry_frontend"] = {

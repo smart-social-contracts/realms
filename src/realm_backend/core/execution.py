@@ -4,7 +4,7 @@ import traceback
 from contextlib import redirect_stderr, redirect_stdout
 from typing import TYPE_CHECKING, Optional
 
-from kybra_simple_logging import get_logger, get_logs
+from ic_python_logging import get_logger, get_logs
 
 if TYPE_CHECKING:
     from ggg import TaskExecution, Task
@@ -22,7 +22,7 @@ def create_task_entity_class(task_name):
     Returns:
         A class that can be used as base for entities with automatic namespacing
     """
-    from kybra_simple_db import Entity, TimestampedMixin
+    from ic_python_db import Entity, TimestampedMixin
 
     class TaskEntity(Entity, TimestampedMixin):
         """Base class for task-scoped entities with automatic namespacing.
@@ -51,13 +51,13 @@ def run_code(source_code, locals={}, task: Optional["Task"] = None, task_executi
     safe_globals = globals().copy()
 
     import ggg
-    import kybra
-    from kybra import ic
+    import _cdk as basilisk
+    from _cdk import ic
 
     safe_globals.update(
         {
             "ggg": ggg,
-            "kybra": kybra,
+            "basilisk": basilisk,
             "ic": ic,
         }
     )
@@ -86,15 +86,15 @@ def run_code(source_code, locals={}, task: Optional["Task"] = None, task_executi
             execution_logger.info("Execution started")
             # Redirect any get_logger() calls in exec'd code to the execution logger
             # so codex log output is captured under the task execution's logger name
-            import kybra_simple_logging as _ksl
-            _original_get_logger = _ksl.get_logger
-            _ksl.get_logger = lambda name=None: execution_logger
+            import ic_python_logging as _ipl
+            _original_get_logger = _ipl.get_logger
+            _ipl.get_logger = lambda name=None: execution_logger
             safe_globals["get_logger"] = lambda name=None: execution_logger
             try:
                 # Execute with globals as locals to ensure functions can call each other
                 exec(source_code, safe_globals, safe_globals)
             finally:
-                _ksl.get_logger = _original_get_logger
+                _ipl.get_logger = _original_get_logger
 
         # Collect captured output
         logs = []

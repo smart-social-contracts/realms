@@ -9,8 +9,8 @@ from core.candid_types_realm import (
     RealmResponseData,
 )
 from ggg import User
-from kybra import Async, query, update
-from kybra_simple_logging import get_logger
+from _cdk import Async, query, update
+from ic_python_logging import get_logger
 
 logger = get_logger("api.extensions")
 
@@ -35,7 +35,7 @@ def list_extensions(principal: str) -> RealmResponse:
         user = User[principal]
 
         # Use static manifest registry instead of filesystem access
-        # (Kybra canisters don't have filesystem access)
+        # (Basilisk canisters don't have filesystem access)
         extension_manifests = get_all_extension_manifests()
         extensions_data = list(extension_manifests.values())
 

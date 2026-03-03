@@ -3,7 +3,7 @@
 from typing import Any, Dict
 
 from ggg import Zone
-from kybra_simple_logging import get_logger
+from ic_python_logging import get_logger
 
 logger = get_logger("api.zones")
 

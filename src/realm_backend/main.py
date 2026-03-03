@@ -29,7 +29,7 @@ from core.candid_types_realm import (
 )
 from core.task_manager import TaskManager
 from ggg import Call, Codex, Task, TaskStep, TaskSchedule
-from kybra import (
+from _cdk import (
     Async,
     CallResult,
     Duration,
@@ -56,8 +56,8 @@ from kybra import (
     update,
     void,
 )
-from kybra_simple_db import Database
-from kybra_simple_logging import get_logger, get_logs
+from ic_python_db import Database
+from ic_python_logging import get_logger, get_logs
 from core.http_utils import download_file_from_url, downloaded_content
 
 storage = StableBTreeMap[str, str](memory_id=1, max_key_size=100, max_value_size=10000)
@@ -70,7 +70,7 @@ CLEANUP_SHELL_TASKS = True
 
 
 # Import management canister for outgoing HTTP requests
-from kybra.canisters.management import (
+from _cdk import (
     HttpResponse,
     HttpTransformArgs,
     management_canister,
@@ -1351,7 +1351,7 @@ def execute_code(code: str) -> str:
 def execute_code_shell(code: str) -> str:
     """Executes Python code and returns the output.
 
-    This is the core function needed for the Kybra Simple Shell to work.
+    This is the core function needed for the Basilisk Simple Shell to work.
     It captures stdout, stderr, and return values from the executed code.
     """
     import io
@@ -1619,7 +1619,7 @@ def get_task_logs(task_id: str, limit: nat = 20) -> str:
                 list(found_task.executions) if hasattr(found_task, "executions") else []
             )
 
-            # Format execution data with logs from kybra_simple_logging
+            # Format execution data with logs from ic_python_logging
             execution_data = []
             for execution in executions[-limit:]:
                 # Compose logger name: task_{task_id}_{exec_id}
@@ -1666,7 +1666,7 @@ def get_task_logs_by_name(
     """
     Get in-memory logs for a specific task by task name.
     
-    Fetches logs from all executions of the task using kybra-simple-logging.
+    Fetches logs from all executions of the task using ic-python-logging.
     
     Args:
         task_name: Exact task name or partial task ID

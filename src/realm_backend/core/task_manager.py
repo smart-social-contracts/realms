@@ -32,8 +32,8 @@ from typing import Callable, List
 
 from ggg import Call, Task, TaskExecution, TaskSchedule, TaskStep
 from ggg.system.status import TaskExecutionStatus, TaskStatus
-from kybra import Async, Duration, ic, void
-from kybra_simple_logging import get_logger
+from _cdk import Async, Duration, ic, void
+from ic_python_logging import get_logger
 
 logger = get_logger("core.task_manager")
 

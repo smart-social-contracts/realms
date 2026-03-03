@@ -1,5 +1,5 @@
 .dfx
-.kybra
+.basilisk
 venv
 .realms-venv
 dist
@@ -11,7 +11,7 @@ declarations
 debug_files
 deleteme*
 HACK*
-kybra_simple_db
+ic_python_db
 *.wasm
 *.did
 *temp

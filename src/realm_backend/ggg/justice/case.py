@@ -1,8 +1,8 @@
 from datetime import datetime
 from typing import Optional
 
-from kybra_simple_db import Entity, ManyToMany, ManyToOne, OneToMany, OneToOne, String, TimestampedMixin
-from kybra_simple_logging import get_logger
+from ic_python_db import Entity, ManyToMany, ManyToOne, OneToMany, OneToOne, String, TimestampedMixin
+from ic_python_logging import get_logger
 
 from ..system.constants import STATUS_MAX_LENGTH
 

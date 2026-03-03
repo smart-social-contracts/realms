@@ -16,15 +16,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-# Mock kybra before importing anything that uses it
-sys.modules["kybra"] = MagicMock()
-sys.modules["kybra.canisters.management"] = MagicMock()
+# Mock basilisk before importing anything that uses it
+sys.modules["basilisk"] = MagicMock()
+sys.modules["basilisk.canisters.management"] = MagicMock()
 
 
 def test_create_task_entity_class():
     """Test that create_task_entity_class creates properly namespaced entities"""
     from core.execution import create_task_entity_class
-    from kybra_simple_db import String
+    from ic_python_db import String
 
     # Create TaskEntity for a specific task
     TaskEntity = create_task_entity_class("tax_collection")
@@ -45,7 +45,7 @@ def test_create_task_entity_class():
 def test_task_entity_isolation():
     """Test that different tasks get different namespaces"""
     from core.execution import create_task_entity_class
-    from kybra_simple_db import String
+    from ic_python_db import String
 
     # Create entities for two different tasks
     TaxTaskEntity = create_task_entity_class("tax_collection")
@@ -71,7 +71,7 @@ def test_run_code_with_task_entity():
     from core.execution import run_code
 
     code = """
-from kybra_simple_db import String
+from ic_python_db import String
 
 # This should work because TaskEntity is injected
 class MyState(TaskEntity):
@@ -94,7 +94,7 @@ result = MyState.__namespace__
 def test_batch_processing_pattern():
     """Test typical batch processing pattern with TaskEntity"""
     from core.execution import create_task_entity_class
-    from kybra_simple_db import Integer, String
+    from ic_python_db import Integer, String
 
     TaskEntity = create_task_entity_class("batch_test")
 
@@ -125,7 +125,7 @@ def test_batch_processing_pattern():
 def test_multiple_state_entities():
     """Test using multiple TaskEntity subclasses for different purposes"""
     from core.execution import create_task_entity_class
-    from kybra_simple_db import Integer, String
+    from ic_python_db import Integer, String
 
     TaskEntity = create_task_entity_class("multi_state_test")
 
@@ -160,7 +160,7 @@ def test_task_entity_in_codex_execution():
     from core.execution import run_code
 
     codex_code = """
-from kybra_simple_db import String, Integer
+from ic_python_db import String, Integer
 import json
 
 # Define state entity
@@ -201,7 +201,7 @@ def test_task_entity_with_json_storage():
     from core.execution import run_code
 
     codex_code = """
-from kybra_simple_db import String
+from ic_python_db import String
 import json
 
 class Metadata(TaskEntity):

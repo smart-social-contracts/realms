@@ -5,7 +5,7 @@ set -e
 PYTHON_VERSION="3.10"
 NODE_VERSION="22"
 DFX_VERSION="0.29.0"
-KYBRA_VERSION="0.7.1"
+BASILISK_VERSION="0.8.0"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
@@ -119,25 +119,25 @@ install_dfx() {
     fi
 }
 
-install_kybra() {
+install_basilisk() {
     # Ensure Python 3.10 is active
     pyenv shell "$PYTHON_VERSION"
     
-    if python -c "import kybra; print(kybra.__version__)" 2>/dev/null | grep -q "$KYBRA_VERSION"; then
-        log "Kybra $KYBRA_VERSION already installed"
+    if python -c "import basilisk; print(basilisk.__version__)" 2>/dev/null | grep -q "$BASILISK_VERSION"; then
+        log "Basilisk $BASILISK_VERSION already installed"
     else
-        log "Installing Kybra $KYBRA_VERSION..."
-        pip install --no-cache-dir "kybra==$KYBRA_VERSION"
+        log "Installing Basilisk $BASILISK_VERSION..."
+        pip install --no-cache-dir "ic-basilisk==$BASILISK_VERSION"
     fi
     
-    log "Installing Kybra DFX extension..."
-    python -m kybra install-dfx-extension
+    log "Installing Basilisk DFX extension..."
+    python -m basilisk install-dfx-extension
     
-    log "Kybra installed successfully"
+    log "Basilisk installed successfully"
 }
 
-install_kybra_prerequisites() {
-    log "Installing Kybra prerequisites by deploying test canister..."
+install_basilisk_prerequisites() {
+    log "Installing Basilisk prerequisites by deploying test canister..."
     
     export PATH="$HOME/.local/share/dfx/bin:$PATH"
     # Ensure Python 3.10 is active
@@ -146,13 +146,13 @@ install_kybra_prerequisites() {
     temp_dir=$(mktemp -d)
     cd "$temp_dir"
     
-    echo 'from kybra import query, text
+    echo 'from basilisk import query, text
 
 @query
 def greet() -> text:
     return "Hello"' > main.py
     
-    echo '{"canisters":{"test":{"type":"kybra","main":"main.py"}}}' > dfx.json
+    echo '{"canisters":{"test":{"type":"basilisk","main":"main.py"}}}' > dfx.json
     
     dfx start --background --clean
     dfx deploy --no-wallet
@@ -161,7 +161,7 @@ def greet() -> text:
     cd "$PROJECT_ROOT"
     rm -rf "$temp_dir"
     
-    log "Kybra prerequisites installed successfully"
+    log "Basilisk prerequisites installed successfully"
 }
 
 setup_project_dependencies() {
@@ -182,7 +182,7 @@ setup_project_dependencies() {
         pip install -r requirements-dev.txt
     fi
     
-    python -m kybra install-dfx-extension
+    python -m basilisk install-dfx-extension
     
     if [[ -f "package.json" ]]; then
         log "Installing Node.js dependencies..."
@@ -206,10 +206,10 @@ verify_installation() {
     log "Node version: $(node --version)"
     log "DFX version: $(dfx --version)"
     
-    if python -c "import kybra; print(f'Kybra version: {kybra.__version__}')" 2>/dev/null; then
-        log "Kybra installation verified"
+    if python -c "import basilisk; print(f'Basilisk version: {basilisk.__version__}')" 2>/dev/null; then
+        log "Basilisk installation verified"
     else
-        error "Kybra verification failed"
+        error "Basilisk verification failed"
     fi
     
     log "All installations verified successfully!"
@@ -226,7 +226,7 @@ main() {
     trap cleanup_on_error ERR
     
     log "Starting ICP development environment setup..."
-    log "Target versions: Python $PYTHON_VERSION, Node $NODE_VERSION, DFX $DFX_VERSION, Kybra $KYBRA_VERSION"
+    log "Target versions: Python $PYTHON_VERSION, Node $NODE_VERSION, DFX $DFX_VERSION, Basilisk $BASILISK_VERSION"
     log "Note: This script installs core dependencies only. No canisters will be built or deployed."
     
     check_ubuntu
@@ -235,8 +235,8 @@ main() {
     install_python
     install_node
     install_dfx
-    install_kybra
-    install_kybra_prerequisites
+    install_basilisk
+    install_basilisk_prerequisites
     setup_project_dependencies
     verify_installation
     

@@ -56,4 +56,4 @@ End-to-end encryption powered by the Internet Computer's vetKeys (Verifiably Enc
 Introduction of Quarters — subdivisions within a Realm — allowing horizontal scaling by partitioning data and computation across multiple canisters while maintaining a unified Realm identity.
 
 ### Enhanced Python Interpreter
-Transition from the Kybra Python-to-Wasm toolchain to Basilisk, delivering improved performance, broader Python compatibility, and a more streamlined developer experience for canister development.
+Transition from the Basilisk Python-to-Wasm toolchain to Basilisk, delivering improved performance, broader Python compatibility, and a more streamlined developer experience for canister development.

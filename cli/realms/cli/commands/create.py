@@ -20,7 +20,7 @@ from ..utils import get_scripts_path, is_repo_mode
 # Dynamically import RealmGenerator based on mode
 def _get_realm_generator():
     """Get RealmGenerator class - always use bundled generator with ggg.entities."""
-    # Always use bundled generator which uses ggg.entities (no kybra dependency)
+    # Always use bundled generator which uses ggg.entities (no basilisk dependency)
     # The scripts/realm_generator.py has import issues with backend's ggg module
     from ..generator import RealmGenerator
     return RealmGenerator
@@ -237,6 +237,10 @@ def create_command(
             dest_manifest = output_path / "manifest.json"
             with open(dest_manifest, 'w') as f:
                 realm_manifest["name"] = realm_name  # Update name
+                # Inject registry canister ID into services section if provided
+                if registry:
+                    services = realm_manifest.setdefault("services", {})
+                    services["registry"] = {"canister_id": registry}
                 json.dump(realm_manifest, f, indent=2)
             if not quiet:
                 console.print(f"✅ Copied manifest from {manifest_path.parent}")
@@ -559,7 +563,7 @@ def _generate_deployment_scripts(
             # Define patterns to ignore during copy (build artifacts, caches, etc.)
             # Also exclude monitor route which depends on task_monitor extension
             ignore_patterns = shutil.ignore_patterns(
-                'node_modules', '__pycache__', '.kybra', '*.pyc', '.svelte-kit',
+                'node_modules', '__pycache__', '.basilisk', '*.pyc', '.svelte-kit',
                 'build', 'dist', '.env', '.env.*', '*.log', 'monitor'
             )
             shutil.copytree(src_source, src_dest, ignore=ignore_patterns)

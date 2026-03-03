@@ -88,7 +88,7 @@ my-extension/
   "icon": "settings",
   "show_in_sidebar": true,
   "python_dependencies": [
-    "kybra>=0.10.0"
+    "basilisk>=0.10.0"
   ]
 }
 ```
@@ -98,8 +98,8 @@ my-extension/
 ```python
 """My Extension Entry Point"""
 import json
-from kybra import Async
-from kybra_simple_logging import get_logger
+from basilisk import Async
+from ic_python_logging import get_logger
 
 logger = get_logger("extensions.my_extension")
 
@@ -289,9 +289,9 @@ result = yield extension_async_call("my_extension", "my_function", json.dumps({"
 
 Extensions can access:
 - **ggg entities** - User, Member, Treasury, etc.
-- **kybra** - IC SDK functions
-- **kybra_simple_db** - Database entities
-- **kybra_simple_logging** - Logging utilities
+- **basilisk** - IC SDK functions
+- **ic_python_db** - Database entities
+- **ic_python_logging** - Logging utilities
 - **realm_backend core** - Core realm functionality
 
 ---
@@ -343,7 +343,7 @@ result = len(members)  # Optional: set result variable
 
 **Async code** - Define an `async_task` function with `yield`:
 ```python
-from kybra import ic
+from basilisk import ic
 
 def async_task():
     result = yield some_async_call()

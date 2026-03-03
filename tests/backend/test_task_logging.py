@@ -1,7 +1,7 @@
-"""Integration tests for kybra-simple-logging integration in Realms tasks.
+"""Integration tests for ic-python-logging integration in Realms tasks.
 
-This tests the INTEGRATION of kybra-simple-logging into Realms, not the library itself.
-We assume kybra-simple-logging works correctly and test:
+This tests the INTEGRATION of ic-python-logging into Realms, not the library itself.
+We assume ic-python-logging works correctly and test:
 - Logger injection into codex execution scope
 - get_task_logs_by_name endpoint functionality
 - CLI integration with --follow flag
@@ -279,7 +279,7 @@ def main():
     """Run all tests."""
     print("="*60)
     print("Task Logging Integration Tests")
-    print("Testing kybra-simple-logging integration")
+    print("Testing ic-python-logging integration")
     print("="*60)
     
     tests = [

@@ -1,8 +1,8 @@
 # Fresh lottery codex with fixed async flow
 # VERSION: 2025-11-21-v5-FRESH
 
-from kybra import ic, CallResult, match
-from kybra.canisters.management import management_canister
+from _cdk import ic, CallResult, match
+from _cdk import management_canister
 import ggg
 
 User = ggg.User

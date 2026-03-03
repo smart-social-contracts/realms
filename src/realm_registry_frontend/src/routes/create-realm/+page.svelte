@@ -202,7 +202,17 @@
   const EXTENSION_CATEGORIES = extensionsConfig.categories;
 
   // Available codices (loaded from $lib/codices-config.json)
-  const AVAILABLE_CODICES = codicesConfig.codices;
+  let AVAILABLE_CODICES = codicesConfig.codices;
+
+  // Codex sorting & expand state
+  let expandedCodices = {};
+  let codexSortBy = 'popularity'; // 'popularity' | 'newest' | 'oldest'
+  $: sortedCodices = [...AVAILABLE_CODICES].sort((a, b) => {
+    if (codexSortBy === 'popularity') return (b.popularity || 0) - (a.popularity || 0);
+    if (codexSortBy === 'newest') return (b.created_at || '').localeCompare(a.created_at || '');
+    if (codexSortBy === 'oldest') return (a.created_at || '').localeCompare(b.created_at || '');
+    return 0;
+  });
 
   // Helper to get extensions by category
   function getExtensionsByCategory(categoryId) {
@@ -227,6 +237,7 @@
     token_name: '',
     token_symbol: '',
     ckbtc_enabled: false,
+    human_id_required: false,
     land_token_enabled: false,
     land_token_name: '',
     land_token_symbol: '',
@@ -886,6 +897,20 @@
 
         <div class="divider"></div>
 
+        <!-- Human ID Verification Section -->
+        <div class="token-section">
+          <div class="form-group">
+            <label class="toggle-label">
+              <input type="checkbox" bind:checked={formData.human_id_required} />
+              <span class="toggle-switch"></span>
+              <span>Require Human ID Verification</span>
+            </label>
+            <p class="hint">Require citizens to verify their humanity using a zero-knowledge proof system (currently supported: Rarimo ZKM)</p>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
         <div class="form-group">
           <label class="toggle-label">
             <input type="checkbox" bind:checked={formData.land_token_enabled} />
@@ -979,8 +1004,8 @@
     {:else if currentStep === 0}
       <!-- Step 1: Codex -->
       <div class="form-step">
-        <h2>Codex Configuration</h2>
-        <p class="step-description">Configure the governance rules (Python codex files)</p>
+        <h2>Codex Configuration <span class="info-tooltip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg><span class="info-tooltip-text">A codex is a set of governance rules implemented in Python code. It defines how your realm operates — including taxation, budgets, voting, and more.</span></span></h2>
+        <p class="step-description">Configure the governance rules for your realm</p>
 
         <div class="form-group">
           <label>Codex Source</label>
@@ -1029,8 +1054,23 @@
         {#if formData.codex_source === 'package'}
           <div class="form-group">
             <label for="codex_package">Select Codex <span class="required">*</span></label>
+            <div class="codex-sort-row">
+              <span class="codex-sort-label">Sort by:</span>
+              <button type="button" class="codex-sort-btn" class:active={codexSortBy === 'popularity'} on:click={() => codexSortBy = 'popularity'}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+                Popular
+              </button>
+              <button type="button" class="codex-sort-btn" class:active={codexSortBy === 'newest'} on:click={() => codexSortBy = 'newest'}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                Newest
+              </button>
+              <button type="button" class="codex-sort-btn" class:active={codexSortBy === 'oldest'} on:click={() => codexSortBy = 'oldest'}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                Oldest
+              </button>
+            </div>
             <div class="codex-options">
-              {#each AVAILABLE_CODICES as codex}
+              {#each sortedCodices as codex}
                 <button
                   type="button"
                   class="codex-card"
@@ -1044,7 +1084,12 @@
                   </div>
                   <div class="codex-info">
                     <span class="codex-name">{codex.name}</span>
-                    <span class="codex-desc">{codex.description}</span>
+                    <span class="codex-desc" class:expanded={expandedCodices[codex.id]}>{codex.description}</span>
+                    {#if codex.description && codex.description.length > 120}
+                      <button type="button" class="codex-expand-btn" on:click|stopPropagation={() => { expandedCodices[codex.id] = !expandedCodices[codex.id]; expandedCodices = expandedCodices; }}>
+                        {expandedCodices[codex.id] ? 'Show less' : 'Read more'}
+                      </button>
+                    {/if}
                     {#if codex.doc_url}
                       <a href={codex.doc_url} target="_blank" rel="noopener" class="doc-link" on:click|stopPropagation>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1702,7 +1747,48 @@
 
   .step-description {
     color: #737373;
+    font-size: 0.95rem;
     margin: 0 0 1.5rem;
+  }
+
+  .info-tooltip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    margin-left: 0.35rem;
+    cursor: help;
+    color: #a3a3a3;
+  }
+
+  .info-tooltip:hover {
+    color: #525252;
+  }
+
+  .info-tooltip .info-tooltip-text {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 8px);
+    transform: translateX(-50%);
+    background: #171717;
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 400;
+    line-height: 1.4;
+    padding: 0.6rem 0.75rem;
+    border-radius: 6px;
+    width: 260px;
+    z-index: 10;
+    pointer-events: none;
+    transition: opacity 0.15s;
+    white-space: normal;
+  }
+
+  .info-tooltip:hover .info-tooltip-text {
+    visibility: visible;
+    opacity: 1;
   }
 
   .form-group {
@@ -2305,6 +2391,45 @@
     color: #FFFFFF;
   }
 
+  /* Codex sorting */
+  .codex-sort-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .codex-sort-label {
+    font-size: 0.8125rem;
+    color: #737373;
+    margin-right: 0.125rem;
+  }
+
+  .codex-sort-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+    border: 1px solid #e5e5e5;
+    border-radius: 6px;
+    background: #fff;
+    color: #525252;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .codex-sort-btn:hover {
+    border-color: #a3a3a3;
+    background: #fafafa;
+  }
+
+  .codex-sort-btn.active {
+    background: #171717;
+    color: #fff;
+    border-color: #171717;
+  }
+
   /* Codex selection */
   .codex-options {
     display: flex;
@@ -2360,7 +2485,7 @@
   .codex-info {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.35rem;
   }
 
   .codex-name {
@@ -2371,7 +2496,33 @@
 
   .codex-desc {
     font-size: 0.8125rem;
-    color: #737373;
+    line-height: 1.5;
+    color: #525252;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .codex-desc.expanded {
+    display: block;
+    -webkit-line-clamp: unset;
+    overflow: visible;
+  }
+
+  .codex-expand-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.75rem;
+    color: #2563EB;
+    cursor: pointer;
+    text-align: left;
+    font-weight: 500;
+  }
+
+  .codex-expand-btn:hover {
+    text-decoration: underline;
   }
 
   .doc-link {

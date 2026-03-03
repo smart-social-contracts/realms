@@ -14,5 +14,8 @@
   ],
   "registries": [
     "registry"
-  ]
+  ],
+  "marketplace": {
+    "name": "ExtensionMarketplace"
+  }
 }

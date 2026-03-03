@@ -4,8 +4,8 @@ import json
 from typing import Dict
 
 from ggg import Registry
-from kybra import Async, CallResult, Principal, Service, Variant, ic, service_update, text
-from kybra_simple_logging import get_logger
+from _cdk import Async, CallResult, Principal, Service, Variant, ic, service_update, text
+from ic_python_logging import get_logger
 
 logger = get_logger("api.registry")
 
@@ -17,7 +17,7 @@ class AddRealmResult(Variant, total=False):
 
 
 # Define the registry canister service interface
-# Note: Kybra limits service methods to 6 params (including self)
+# Note: Basilisk limits service methods to 6 params (including self)
 # So we pass canister_ids as a JSON string
 class RealmRegistryService(Service):
     @service_update
@@ -70,7 +70,7 @@ def register_realm(
             logger.info(f"Constructed full logo URL: {realm_logo}")
 
         # Create registry canister reference and make inter-canister call
-        # Pack canister IDs into JSON string (Kybra limits params to 6 including self)
+        # Pack canister IDs into JSON string (Basilisk limits params to 6 including self)
         canister_ids = canister_ids or {}
         canister_ids_json = json.dumps({
             "frontend_canister_id": canister_ids.get("frontend_canister_id", ""),
@@ -89,7 +89,7 @@ def register_realm(
         logger.info(f"Registry call result: {result}")
         logger.info(f"Result type: {type(result)}, dir: {dir(result)}")
 
-        # Parse the CallResult - Kybra returns CallResult with Ok/Err attributes
+        # Parse the CallResult - Basilisk returns CallResult with Ok/Err attributes
         if hasattr(result, "Ok"):
             inner_result = result.Ok
             logger.info(f"Inner result: {inner_result}")

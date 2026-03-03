@@ -33,9 +33,9 @@ dependencies = [
     "requests>=2.28.0",
     "click>=8.0.0",
     "prompt-toolkit>=3.0.0",
-    "kybra==0.7.*",
-    "kybra-simple-logging==0.2.*",
-    "kybra-simple-db>=0.6.2",
+    "ic-basilisk==0.8.0",
+    "ic-python-logging==0.2.*",
+    "ic-python-db>=0.6.2",
 ]
 
 [project.optional-dependencies]

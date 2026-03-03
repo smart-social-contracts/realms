@@ -6,8 +6,8 @@ It is an implementation detail for the task execution system, providing the link
 between Codex code and TaskStep execution.
 """
 
-from kybra_simple_db import Boolean, Entity, ManyToOne, OneToOne, String, TimestampedMixin
-from kybra_simple_logging import get_logger
+from ic_python_db import Boolean, Entity, ManyToOne, OneToOne, String, TimestampedMixin
+from ic_python_logging import get_logger
 
 try:
     from core.execution import run_code
@@ -45,12 +45,12 @@ class Call(Entity, TimestampedMixin):
                 # Get the async_task function from the executed globals
                 # We need to re-exec to get the function reference
                 import ggg
-                import kybra
-                from kybra import ic
+                import _cdk as basilisk
+                from _cdk import ic
                 
                 namespace = {
                     "ggg": ggg,
-                    "kybra": kybra,
+                    "basilisk": basilisk,
                     "ic": ic,
                     "logger": task_execution.logger(),
                 }

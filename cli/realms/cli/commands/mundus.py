@@ -15,6 +15,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .create import create_command
+from .marketplace import marketplace_create_command
 from .registry import registry_create_command
 from ..utils import console, generate_output_dir_name, get_project_root, display_canister_urls_json, get_canister_urls, ensure_dfx_running
 
@@ -168,6 +169,33 @@ def mundus_create_command(
         
     finally:
         os.chdir(orig_dir)
+    
+    # Create marketplace (if specified in manifest)
+    marketplace_dir = None
+    marketplace_config = mundus_config.get("marketplace", {})
+    if marketplace_config:
+        console.print(f"  🛒 Creating marketplace...")
+        try:
+            orig_dir = os.getcwd()
+            os.chdir(project_root)
+            
+            marketplace_dir = marketplace_create_command(
+                marketplace_name=marketplace_config.get("name", "ExtensionMarketplace"),
+                output_dir=str(mundus_dir),
+                network=network,
+            )
+            
+            # Copy canister_ids.json for marketplace if it exists in manifest directory
+            marketplace_canister_ids_src = manifest_path.parent / "marketplace" / "canister_ids.json"
+            if marketplace_canister_ids_src.exists():
+                marketplace_ids_dest = marketplace_dir / "canister_ids.json"
+                shutil.copy2(marketplace_canister_ids_src, marketplace_ids_dest)
+                console.print(f"     ✅ Copied canister_ids.json for existing marketplace canisters")
+            
+            console.print(f"     ✅ Marketplace created\n")
+            
+        finally:
+            os.chdir(orig_dir)
     
     # Create mundus deployment orchestration script
     _create_mundus_deploy_script(mundus_dir, created_realms, registry_dir, network)
@@ -540,10 +568,26 @@ def mundus_deploy_command(
                 _inject_shared_canister_ids(registry_canister_ids, realm_dir, network)
             console.print("")
         
-        # Set env var for post_deploy.py to use when registering realms
+        # Inject registry canister ID into each realm's manifest.json services section
+        # This allows post_deploy.py to read it from the manifest instead of env var
         if "realm_registry_backend" in registry_canister_ids:
             backend_id = registry_canister_ids["realm_registry_backend"].get(network)
-            if backend_id:
+            if backend_id and realm_dirs:
+                console.print("📋 Injecting registry canister ID into realm manifests...")
+                for realm_dir in realm_dirs:
+                    realm_manifest_path = realm_dir / "manifest.json"
+                    if realm_manifest_path.exists():
+                        with open(realm_manifest_path, 'r') as f:
+                            realm_manifest = json.load(f)
+                        services = realm_manifest.setdefault("services", {})
+                        services["registry"] = {"canister_id": backend_id}
+                        with open(realm_manifest_path, 'w') as f:
+                            json.dump(realm_manifest, f, indent=2)
+                            f.write("\n")
+                        console.print(f"   ✅ {realm_dir.name}/manifest.json updated")
+                console.print("")
+                
+                # Also set env var as fallback for post_deploy.py
                 os.environ["REGISTRY_CANISTER_ID"] = backend_id
                 console.print(f"   Set REGISTRY_CANISTER_ID={backend_id}")
     
@@ -553,6 +597,42 @@ def mundus_deploy_command(
         if realms_token_id:
             os.environ["REALMS_TOKEN_CANISTER_ID"] = realms_token_id
             console.print(f"   Set REALMS_TOKEN_CANISTER_ID={realms_token_id}")
+    
+    # 2.5. Deploy marketplace (if present)
+    marketplace_dirs = sorted(mundus_path.glob("marketplace_*"))
+    if marketplace_dirs:
+        from .marketplace import marketplace_deploy_command
+        
+        console.print("🛒 Deploying marketplace...")
+        for marketplace_dir in marketplace_dirs:
+            try:
+                marketplace_deploy_command(
+                    folder=str(marketplace_dir),
+                    network=network,
+                    mode=mode,
+                    identity=identity,
+                )
+                console.print(f"   ✅ {marketplace_dir.name} deployed\n")
+                
+                # Capture marketplace backend canister ID
+                try:
+                    id_result = subprocess.run(
+                        ["dfx", "canister", "id", "marketplace_backend", "--network", network],
+                        cwd=marketplace_dir, capture_output=True, text=True
+                    )
+                    if id_result.returncode == 0:
+                        marketplace_backend_id = id_result.stdout.strip()
+                        # Set as env var for realm frontend builds
+                        # The vite config picks up CANISTER_* prefixed env vars
+                        os.environ["CANISTER_MARKETPLACE_BACKEND_ID"] = marketplace_backend_id
+                        console.print(f"   Set CANISTER_MARKETPLACE_BACKEND_ID={marketplace_backend_id}")
+                except Exception:
+                    pass
+                    
+            except Exception as e:
+                console.print(f"[yellow]   ⚠️  Failed to deploy {marketplace_dir.name}: {e}[/yellow]")
+                console.print(f"[yellow]   Continuing with realm deployment...[/yellow]")
+        console.print("")
     
     # 3. Deploy all realms (last) - in parallel for speed
     console.print(f"🏛️  Deploying {len(realm_dirs)} realm(s) in parallel...\n")
@@ -565,6 +645,7 @@ def mundus_deploy_command(
     deploy_env_vars = {
         'REGISTRY_CANISTER_ID': os.environ.get('REGISTRY_CANISTER_ID'),
         'REALMS_TOKEN_CANISTER_ID': os.environ.get('REALMS_TOKEN_CANISTER_ID'),
+        'CANISTER_MARKETPLACE_BACKEND_ID': os.environ.get('CANISTER_MARKETPLACE_BACKEND_ID'),
     }
     
     # Use ProcessPoolExecutor for parallel deployment
@@ -794,6 +875,13 @@ def mundus_status_command(
             except:
                 pass
         
+        # Find marketplaces
+        marketplace_dirs = sorted(mundus_path.glob("marketplace_*"))
+        if marketplace_dirs:
+            console.print("   [bold]🛒 Marketplaces:[/bold]")
+            for marketplace_dir in marketplace_dirs:
+                _print_deployment_status(marketplace_dir, network)
+        
         # Find realms
         realm_dirs = sorted(mundus_path.glob("realm_*"))
         if realm_dirs:
@@ -801,7 +889,7 @@ def mundus_status_command(
             for realm_dir in realm_dirs:
                 _print_deployment_status(realm_dir, network)
         
-        if not registry_dirs and not realm_dirs:
+        if not registry_dirs and not realm_dirs and not marketplace_dirs:
             console.print("   [yellow]No realms or registries found[/yellow]")
         
         console.print("")

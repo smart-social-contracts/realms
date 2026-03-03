@@ -18,9 +18,9 @@ import pytest
 src_path = Path(__file__).parent.parent.parent / "src" / "realm_backend"
 sys.path.insert(0, str(src_path))
 
-# Mock kybra before importing anything that uses it
-sys.modules["kybra"] = MagicMock()
-sys.modules["kybra.canisters.management"] = MagicMock()
+# Mock basilisk before importing anything that uses it
+sys.modules["basilisk"] = MagicMock()
+sys.modules["basilisk.canisters.management"] = MagicMock()
 
 
 class TestFundEntity:

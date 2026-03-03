@@ -13,6 +13,7 @@ from .commands.deploy import deploy_command
 from .commands.export_data import export_data_command
 from .commands.extension import extension_command
 from .commands.import_data import import_codex_command, import_data_command
+from .commands.marketplace import marketplace_create_command, marketplace_deploy_command
 from .commands.mundus import mundus_create_command, mundus_deploy_command, mundus_status_command
 from .commands.ps import ps_kill_command, ps_logs_command, ps_ls_command, ps_start_command
 from .commands.registry import (
@@ -726,7 +727,7 @@ def registry_add(
     console.print(f"[dim]Network:[/dim] {network}\n")
     
     # Call realm backend's register_realm_with_registry (secure inter-canister call)
-    # Pack canister IDs into JSON (Kybra limits params to 5)
+    # Pack canister IDs into JSON (Basilisk limits params to 5)
     canister_ids_json = json.dumps({
         "backend_url": backend_url,
         "frontend_canister_id": frontend_canister_id,
@@ -890,6 +891,42 @@ def registry_status(
 ) -> None:
     """Get the status of the registry backend canister."""
     registry_status_command(network, canister_id)
+
+
+# ============== Marketplace Commands ==============
+
+marketplace_app = typer.Typer(name="marketplace", help="Extension marketplace operations")
+app.add_typer(marketplace_app, name="marketplace")
+
+
+@marketplace_app.command("create")
+def marketplace_create(
+    marketplace_name: Optional[str] = typer.Option(None, "--name", help="Marketplace name"),
+    output_dir: str = typer.Option(".realms", "--output-dir", "-o", help="Base output directory"),
+    network: str = typer.Option("local", "--network", "-n", help="Network to deploy to"),
+    deploy: bool = typer.Option(
+        False, "--deploy", help="Deploy the marketplace after creation"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="Path to identity PEM file or identity name for dfx"
+    ),
+    mode: str = typer.Option(
+        "auto", "--mode", "-m", help="Deploy mode: 'auto', 'upgrade' or 'reinstall'"
+    ),
+) -> None:
+    """Create a new marketplace instance."""
+    marketplace_create_command(marketplace_name, output_dir, network, deploy, identity, mode)
+
+
+@marketplace_app.command("deploy")
+def marketplace_deploy(
+    folder: str = typer.Option(..., "--folder", "-f", help="Path to marketplace directory"),
+    network: str = typer.Option("local", "--network", "-n", help="Network to deploy to"),
+    mode: str = typer.Option("auto", "--mode", "-m", help="Deployment mode (auto, upgrade, reinstall)"),
+    identity: Optional[str] = typer.Option(None, "--identity", help="Identity file for IC deployment"),
+) -> None:
+    """Deploy a marketplace instance."""
+    marketplace_deploy_command(folder, network, mode, identity)
 
 
 # ============== Billing Commands ==============
