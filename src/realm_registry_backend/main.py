@@ -67,7 +67,20 @@ if not hasattr(_tb, 'format_exc'):
     _tb.print_exc = lambda **kw: print(_format_exc())
 del _tb
 
-# -- 3. hashlib: stub has no sha256 -- pure Python SHA-256 --
+# -- 3. random: frozen module may lack getrandbits (C ext _random missing) --
+import random as _rnd
+if not hasattr(_rnd, 'getrandbits'):
+    _rnd_counter = [0]
+    def _getrandbits(k, _c=_rnd_counter):
+        _c[0] += 1
+        v = hash((_c[0], id(_c))) & ((1 << k) - 1)
+        return v
+    _rnd.getrandbits = _getrandbits
+    if not hasattr(_rnd, 'randint'):
+        _rnd.randint = lambda a, b: a + (_getrandbits(32) % (b - a + 1))
+del _rnd
+
+# -- 4. hashlib: stub has no sha256 -- pure Python SHA-256 --
 import hashlib as _hl
 if not hasattr(_hl, 'sha256'):
     _K256 = [

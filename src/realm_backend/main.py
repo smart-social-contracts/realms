@@ -67,17 +67,30 @@ if not hasattr(_tb, 'format_exc'):
     _tb.print_exc = lambda **kw: print(_format_exc())
 del _tb
 
-# -- 3. uuid: stub has no uuid4/UUID --
+# -- 3. random: frozen module may lack getrandbits (C ext _random missing) --
+import random as _rnd
+if not hasattr(_rnd, 'getrandbits'):
+    _rnd_counter = [0]
+    def _getrandbits(k, _c=_rnd_counter):
+        _c[0] += 1
+        v = hash((_c[0], id(_c))) & ((1 << k) - 1)
+        return v
+    _rnd.getrandbits = _getrandbits
+    if not hasattr(_rnd, 'randint'):
+        _rnd.randint = lambda a, b: a + (_getrandbits(32) % (b - a + 1))
+del _rnd
+
+# -- 4. uuid: stub has no uuid4/UUID --
+import random as _rnd2
 import uuid as _uu
 if not hasattr(_uu, 'uuid4'):
-    import random as _rnd
     class _UUID:
         __slots__ = ('int',)
         def __init__(self, hex=None, int=None):
             if int is not None:
                 object.__setattr__(self, 'int', int)
             elif hex is not None:
-                object.__setattr__(self, 'int', builtins.int(hex.replace('-', ''), 16) if isinstance(hex, str) else 0)
+                object.__setattr__(self, 'int', __builtins__['int'](hex.replace('-', ''), 16) if isinstance(hex, str) else 0)
             else:
                 object.__setattr__(self, 'int', 0)
         @property
@@ -88,14 +101,14 @@ if not hasattr(_uu, 'uuid4'):
             return f'{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:]}'
         def __repr__(self):
             return f"UUID('{self}')"
-    def _uuid4(_r=_rnd):
+    def _uuid4(_r=_rnd2):
         bits = _r.getrandbits(128)
         bits = (bits & ~(0xf << 76)) | (4 << 76)
         bits = (bits & ~(0x3 << 62)) | (0x2 << 62)
         return _UUID(int=bits)
     _uu.UUID = _UUID
     _uu.uuid4 = _uuid4
-del _uu
+del _uu, _rnd2
 
 # -- 4. hashlib: stub has no sha256 -- pure Python SHA-256 --
 import hashlib as _hl
