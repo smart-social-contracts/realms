@@ -1,16 +1,23 @@
-# -- WASI dataclass fix: frozen stdlib stub is a no-op, must generate __init__ --
-import sys as _dc_sys
-_dc_mod = _dc_sys.modules.get('dataclasses')
-if _dc_mod and getattr(_dc_mod, '__file__', '') == '<frozen dataclasses>':
+# ============================================================================
+# WASI stdlib compatibility patches
+# Must run BEFORE any imports that trigger lazy module loads.
+# These fix stub modules created by basilisk's _wasi_safe_import hook.
+# TODO: move these into basilisk frozen_stdlib_preamble.py in a future release.
+# ============================================================================
+import sys as _wsys
+
+# -- 1. dataclasses: stub is a no-op, must generate __init__/__repr__ --
+_dc = _wsys.modules.get('dataclasses')
+if _dc and getattr(_dc, '__file__', '') == '<frozen dataclasses>':
     def _real_dataclass(cls=None, **kw):
         def _wrap(c):
             ann = {}
             for _b in reversed(c.__mro__):
                 ann.update(getattr(_b, '__annotations__', {}))
             if ann and '__init__' not in c.__dict__:
-                _fields = list(ann.keys())
-                _defaults = {n: getattr(c, n) for n in _fields if n in c.__dict__}
-                def _make_init(fs, ds):
+                _fs = list(ann.keys())
+                _ds = {n: getattr(c, n) for n in _fs if n in c.__dict__}
+                def _mkinit(fs, ds):
                     def __init__(self, *args, **kwargs):
                         for i, f in enumerate(fs):
                             if i < len(args):
@@ -21,55 +28,212 @@ if _dc_mod and getattr(_dc_mod, '__file__', '') == '<frozen dataclasses>':
                                 v = ds[f]
                                 object.__setattr__(self, f, v() if callable(v) else v)
                             else:
-                                raise TypeError(
-                                    f"{c.__name__}() missing required argument: '{f}'"
-                                )
+                                raise TypeError(f"{c.__name__}() missing required argument: '{f}'")
                     return __init__
-                c.__init__ = _make_init(_fields, _defaults)
+                c.__init__ = _mkinit(_fs, _ds)
             if '__repr__' not in c.__dict__ and ann:
-                _fields = list(ann.keys())
-                def _make_repr(fs):
+                _fs = list(ann.keys())
+                def _mkrepr(fs):
                     def __repr__(self):
-                        parts = ', '.join(f'{f}={getattr(self, f, None)!r}' for f in fs)
-                        return f'{type(self).__name__}({parts})'
+                        return f'{type(self).__name__}({", ".join(f"{f}={getattr(self, f, None)!r}" for f in fs)})'
                     return __repr__
-                c.__repr__ = _make_repr(_fields)
+                c.__repr__ = _mkrepr(_fs)
             return c
-        if cls is None:
-            return _wrap
-        return _wrap(cls)
-    _dc_mod.dataclass = _real_dataclass
-    del _real_dataclass
-del _dc_mod, _dc_sys
-# -- end WASI dataclass fix --
+        return _wrap if cls is None else _wrap(cls)
+    _dc.dataclass = _real_dataclass
+del _dc
 
-# -- WASI traceback fix: stub module has no format_exc/format_exception --
-import sys as _tb_sys
-import traceback as _tb_mod
-if not hasattr(_tb_mod, 'format_exc'):
-    def _format_exc(limit=None, chain=True, _sys=_tb_sys):
-        ei = _sys.exc_info()
+# -- 2. traceback: stub has no format_exc/format_exception/print_exc --
+import traceback as _tb
+if not hasattr(_tb, 'format_exc'):
+    def _format_exc(limit=None, chain=True, _s=_wsys):
+        ei = _s.exc_info()
         if ei[1] is None:
             return ''
-        lines = [f'{type(ei[1]).__name__}: {ei[1]}']
+        parts = [f'{type(ei[1]).__name__}: {ei[1]}']
         tb = ei[2]
         frames = []
         while tb:
             f = tb.tb_frame
-            frames.append(
-                f'  File "{f.f_code.co_filename}", line {tb.tb_lineno}, in {f.f_code.co_name}'
-            )
+            frames.append(f'  File "{f.f_code.co_filename}", line {tb.tb_lineno}, in {f.f_code.co_name}')
             tb = tb.tb_next
         if frames:
-            lines.insert(0, 'Traceback (most recent call last):')
-            for frame in frames:
-                lines.insert(-1, frame)
-        return '\n'.join(lines)
-    _tb_mod.format_exc = _format_exc
-    _tb_mod.format_exception = lambda tp, val, tb, **kw: [_format_exc()]
-    _tb_mod.print_exc = lambda **kw: print(_format_exc())
-del _format_exc, _tb_mod, _tb_sys
-# -- end WASI traceback fix --
+            parts.insert(0, 'Traceback (most recent call last):')
+            for fr in frames:
+                parts.insert(-1, fr)
+        return '\n'.join(parts)
+    _tb.format_exc = _format_exc
+    _tb.format_exception = lambda tp, val, tb, **kw: [_format_exc()]
+    _tb.print_exc = lambda **kw: print(_format_exc())
+del _tb
+
+# -- 3. uuid: stub has no uuid4/UUID --
+import uuid as _uu
+if not hasattr(_uu, 'uuid4'):
+    import random as _rnd
+    class _UUID:
+        __slots__ = ('int',)
+        def __init__(self, hex=None, int=None):
+            if int is not None:
+                object.__setattr__(self, 'int', int)
+            elif hex is not None:
+                object.__setattr__(self, 'int', builtins.int(hex.replace('-', ''), 16) if isinstance(hex, str) else 0)
+            else:
+                object.__setattr__(self, 'int', 0)
+        @property
+        def hex(self):
+            return format(self.int, '032x')
+        def __str__(self):
+            h = self.hex
+            return f'{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:]}'
+        def __repr__(self):
+            return f"UUID('{self}')"
+    def _uuid4(_r=_rnd):
+        bits = _r.getrandbits(128)
+        bits = (bits & ~(0xf << 76)) | (4 << 76)
+        bits = (bits & ~(0x3 << 62)) | (0x2 << 62)
+        return _UUID(int=bits)
+    _uu.UUID = _UUID
+    _uu.uuid4 = _uuid4
+del _uu
+
+# -- 4. hashlib: stub has no sha256 -- pure Python SHA-256 --
+import hashlib as _hl
+if not hasattr(_hl, 'sha256'):
+    _K256 = [
+        0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+        0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+        0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+        0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+        0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+        0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+        0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+        0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2,
+    ]
+    class _Sha256:
+        def __init__(self, data=b''):
+            self._h = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]
+            self._buf = b''
+            self._count = 0
+            if data:
+                self.update(data)
+        def _rr(self, x, n):
+            return ((x >> n) | (x << (32 - n))) & 0xffffffff
+        def _compress(self, block):
+            w = [int.from_bytes(block[i:i+4], 'big') for i in range(0, 64, 4)]
+            for i in range(16, 64):
+                s0 = self._rr(w[i-15], 7) ^ self._rr(w[i-15], 18) ^ (w[i-15] >> 3)
+                s1 = self._rr(w[i-2], 17) ^ self._rr(w[i-2], 19) ^ (w[i-2] >> 10)
+                w.append((w[i-16] + s0 + w[i-7] + s1) & 0xffffffff)
+            a,b,c,d,e,f,g,h = self._h
+            for i in range(64):
+                S1 = self._rr(e,6) ^ self._rr(e,11) ^ self._rr(e,25)
+                ch = (e & f) ^ ((~e) & g)
+                t1 = (h + S1 + ch + _K256[i] + w[i]) & 0xffffffff
+                S0 = self._rr(a,2) ^ self._rr(a,13) ^ self._rr(a,22)
+                mj = (a & b) ^ (a & c) ^ (b & c)
+                t2 = (S0 + mj) & 0xffffffff
+                h,g,f,e,d,c,b,a = g,f,e,(d+t1)&0xffffffff,c,b,a,(t1+t2)&0xffffffff
+            for i,v in enumerate([a,b,c,d,e,f,g,h]):
+                self._h[i] = (self._h[i] + v) & 0xffffffff
+        def update(self, data):
+            if isinstance(data, str):
+                data = data.encode('utf-8')
+            self._buf += data
+            self._count += len(data)
+            while len(self._buf) >= 64:
+                self._compress(self._buf[:64])
+                self._buf = self._buf[64:]
+        def digest(self):
+            buf = self._buf + b'\x80'
+            buf += b'\x00' * ((55 - len(self._buf)) % 64)
+            buf += (self._count * 8).to_bytes(8, 'big')
+            h = list(self._h)
+            _tmp = _Sha256.__new__(_Sha256)
+            _tmp._h = h; _tmp._buf = b''; _tmp._count = 0
+            for i in range(0, len(buf), 64):
+                _tmp._compress(buf[i:i+64])
+            return b''.join(v.to_bytes(4, 'big') for v in _tmp._h)
+        def hexdigest(self):
+            return self.digest().hex()
+        def copy(self):
+            c = _Sha256.__new__(_Sha256)
+            c._h = list(self._h); c._buf = self._buf; c._count = self._count
+            return c
+    def _sha256(data=b''):
+        return _Sha256(data)
+    _hl.sha256 = _sha256
+    _hl.new = lambda name, data=b'': _sha256(data) if name == 'sha256' else None
+del _hl
+
+# -- 5. base64: stub has no b64encode/b64decode --
+import base64 as _b64
+if not hasattr(_b64, 'b64encode'):
+    _B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+    _B64D = {c: i for i, c in enumerate(_B64)}
+    _B64D['='] = 0
+    def _b64encode(s):
+        if isinstance(s, str): s = s.encode('utf-8')
+        r = bytearray()
+        for i in range(0, len(s), 3):
+            chunk = s[i:i+3]
+            n = (chunk[0] << 16) | (chunk[1] << 8 if len(chunk) > 1 else 0) | (chunk[2] if len(chunk) > 2 else 0)
+            r.append(ord(_B64[(n >> 18) & 63]))
+            r.append(ord(_B64[(n >> 12) & 63]))
+            r.append(ord(_B64[(n >> 6) & 63]) if len(chunk) > 1 else ord('='))
+            r.append(ord(_B64[n & 63]) if len(chunk) > 2 else ord('='))
+        return bytes(r)
+    def _b64decode(s):
+        if isinstance(s, (bytes, bytearray)): s = s.decode('ascii')
+        s = s.rstrip('=')
+        r = bytearray()
+        for i in range(0, len(s), 4):
+            chunk = s[i:i+4]
+            n = 0
+            for c in chunk:
+                n = (n << 6) | _B64D.get(c, 0)
+            n <<= (4 - len(chunk)) * 6
+            r.append((n >> 16) & 0xff)
+            if len(chunk) > 2: r.append((n >> 8) & 0xff)
+            if len(chunk) > 3: r.append(n & 0xff)
+        return bytes(r)
+    _b64.b64encode = _b64encode
+    _b64.b64decode = _b64decode
+    _b64.encodebytes = lambda s: _b64encode(s) + b'\n'
+    _b64.decodebytes = _b64decode
+del _b64
+
+# -- 6. math: stub has no ceil/floor/log/sqrt --
+import math as _ma
+if not hasattr(_ma, 'ceil'):
+    _ma.ceil = lambda x: int(x) if x == int(x) else int(x) + (1 if x > 0 else 0)
+    _ma.floor = lambda x: int(x) if x >= 0 or x == int(x) else int(x) - 1
+    _ma.fabs = lambda x: x if x >= 0 else -x
+    _ma.sqrt = lambda x: x ** 0.5
+    _ma.pow = lambda x, y: x ** y
+    _ma.log = lambda x, base=2.718281828459045: _ma._ln(x) / _ma._ln(base) if base != 2.718281828459045 else _ma._ln(x)
+    _ma.pi = 3.141592653589793
+    _ma.e = 2.718281828459045
+    _ma.inf = float('inf')
+    _ma.nan = float('nan')
+    def _ln(x):
+        if x <= 0: raise ValueError("math domain error")
+        if x == 1: return 0.0
+        r = 0.0
+        while x > 2: x /= 2.718281828459045; r += 1.0
+        while x < 0.5: x *= 2.718281828459045; r -= 1.0
+        x -= 1; t = x; s = x
+        for n in range(2, 50):
+            t *= -x * (n - 1) / n
+            s += t / n if n % 2 else -t / n
+        return r + s
+    _ma._ln = _ln
+del _ma
+
+del _wsys
+# ============================================================================
+# End WASI stdlib compatibility patches
+# ============================================================================
 
 import base64
 import importlib
