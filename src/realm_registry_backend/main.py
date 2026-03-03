@@ -47,8 +47,8 @@ del _dc_mod, _dc_sys
 import sys as _tb_sys
 import traceback as _tb_mod
 if not hasattr(_tb_mod, 'format_exc'):
-    def _format_exc(limit=None, chain=True):
-        ei = _tb_sys.exc_info()
+    def _format_exc(limit=None, chain=True, _sys=_tb_sys):
+        ei = _sys.exc_info()
         if ei[1] is None:
             return ''
         lines = [f'{type(ei[1]).__name__}: {ei[1]}']
@@ -68,8 +68,7 @@ if not hasattr(_tb_mod, 'format_exc'):
     _tb_mod.format_exc = _format_exc
     _tb_mod.format_exception = lambda tp, val, tb, **kw: [_format_exc()]
     _tb_mod.print_exc = lambda **kw: print(_format_exc())
-    del _format_exc
-del _tb_mod, _tb_sys
+del _format_exc, _tb_mod, _tb_sys
 # -- end WASI traceback fix --
 
 import json
