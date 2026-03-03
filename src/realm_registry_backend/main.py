@@ -14,9 +14,15 @@ if not hasattr(_bi, 'open'):
     _bi.open = _stub_open
 del _bi
 
-# -- 0b. os / os.path: stub may lack path.exists/join etc. --
-import os as _os
-if not hasattr(_os, 'path') or not hasattr(getattr(_os, 'path', None) or _os, 'exists'):
+# -- 0b. os / os.path: create stub BEFORE real os.py loads (it crashes in WASI) --
+_os = _wsys.modules.get('os')
+if _os is None or not hasattr(_os, 'path') or not hasattr(getattr(_os, 'path', None) or _os, 'exists'):
+    if _os is None:
+        _os = type(_wsys)('os')
+        _os.__file__ = '<wasi-stub>'
+        _os.__path__ = []
+        _os.__package__ = 'os'
+        _wsys.modules['os'] = _os
     class _FakePath:
         sep = '/'
         def exists(self, p): return False
@@ -26,11 +32,29 @@ if not hasattr(_os, 'path') or not hasattr(getattr(_os, 'path', None) or _os, 'e
         def isfile(self, p): return False
         def isdir(self, p): return False
         def abspath(self, p): return p
+        def expanduser(self, p): return p
+        def normpath(self, p): return p
+        def realpath(self, p): return p
+        def splitext(self, p):
+            i = p.rfind('.')
+            return (p[:i], p[i:]) if i > 0 else (p, '')
     _os.path = _FakePath()
+    if not hasattr(_os, 'sep'):
+        _os.sep = '/'
     if not hasattr(_os, 'getcwd'):
         _os.getcwd = lambda: '/'
     if not hasattr(_os, 'environ'):
         _os.environ = {}
+    if not hasattr(_os, 'listdir'):
+        _os.listdir = lambda p='/': []
+    if not hasattr(_os, 'makedirs'):
+        _os.makedirs = lambda p, exist_ok=False: None
+    if not hasattr(_os, 'remove'):
+        _os.remove = lambda p: None
+    if not hasattr(_os, 'urandom'):
+        import random as _osrnd
+        _os.urandom = lambda n: bytes(_osrnd.getrandbits(8) for _ in range(n))
+        del _osrnd
 del _os
 
 # -- 1. dataclasses: stub is a no-op, must generate __init__/__repr__ --
