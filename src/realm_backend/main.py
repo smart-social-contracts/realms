@@ -45,8 +45,8 @@ del _dc_mod, _dc_sys
 
 # -- WASI traceback fix: stub module has no format_exc/format_exception --
 import sys as _tb_sys
-_tb_mod = _tb_sys.modules.get('traceback')
-if _tb_mod and not hasattr(_tb_mod, 'format_exc'):
+import traceback as _tb_mod
+if not hasattr(_tb_mod, 'format_exc'):
     def _format_exc(limit=None, chain=True):
         ei = _tb_sys.exc_info()
         if ei[1] is None:
