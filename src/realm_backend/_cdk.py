@@ -22,3 +22,18 @@ except (ImportError, ModuleNotFoundError):
     HttpResponse = dict
     HttpTransformArgs = dict
     management_canister = Service(principal=Principal.management_canister())
+
+# In CPython template mode, Variant and Record are plain dict which doesn't
+# accept keyword arguments (e.g. total=False) in __init_subclass__.
+# Override with subclasses that accept arbitrary kwargs.
+try:
+    class _TestVariant(Variant, total=False):  # noqa: F405
+        pass
+except TypeError:
+    class Variant(dict):
+        def __init_subclass__(cls, **kwargs):
+            super().__init_subclass__()
+
+    class Record(dict):
+        def __init_subclass__(cls, **kwargs):
+            super().__init_subclass__()
