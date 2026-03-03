@@ -43,6 +43,35 @@ if _dc_mod and getattr(_dc_mod, '__file__', '') == '<frozen dataclasses>':
 del _dc_mod, _dc_sys
 # -- end WASI dataclass fix --
 
+# -- WASI traceback fix: stub module has no format_exc/format_exception --
+import sys as _tb_sys
+_tb_mod = _tb_sys.modules.get('traceback')
+if _tb_mod and not hasattr(_tb_mod, 'format_exc'):
+    def _format_exc(limit=None, chain=True):
+        ei = _tb_sys.exc_info()
+        if ei[1] is None:
+            return ''
+        lines = [f'{type(ei[1]).__name__}: {ei[1]}']
+        tb = ei[2]
+        frames = []
+        while tb:
+            f = tb.tb_frame
+            frames.append(
+                f'  File "{f.f_code.co_filename}", line {tb.tb_lineno}, in {f.f_code.co_name}'
+            )
+            tb = tb.tb_next
+        if frames:
+            lines.insert(0, 'Traceback (most recent call last):')
+            for frame in frames:
+                lines.insert(-1, frame)
+        return '\n'.join(lines)
+    _tb_mod.format_exc = _format_exc
+    _tb_mod.format_exception = lambda tp, val, tb, **kw: [_format_exc()]
+    _tb_mod.print_exc = lambda **kw: print(_format_exc())
+    del _format_exc
+del _tb_mod, _tb_sys
+# -- end WASI traceback fix --
+
 import json
 import traceback
 from typing import Optional
