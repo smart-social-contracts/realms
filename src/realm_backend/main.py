@@ -1,3 +1,48 @@
+# -- WASI dataclass fix: frozen stdlib stub is a no-op, must generate __init__ --
+import sys as _dc_sys
+_dc_mod = _dc_sys.modules.get('dataclasses')
+if _dc_mod and getattr(_dc_mod, '__file__', '') == '<frozen dataclasses>':
+    def _real_dataclass(cls=None, **kw):
+        def _wrap(c):
+            ann = {}
+            for _b in reversed(c.__mro__):
+                ann.update(getattr(_b, '__annotations__', {}))
+            if ann and '__init__' not in c.__dict__:
+                _fields = list(ann.keys())
+                _defaults = {n: getattr(c, n) for n in _fields if n in c.__dict__}
+                def _make_init(fs, ds):
+                    def __init__(self, *args, **kwargs):
+                        for i, f in enumerate(fs):
+                            if i < len(args):
+                                object.__setattr__(self, f, args[i])
+                            elif f in kwargs:
+                                object.__setattr__(self, f, kwargs[f])
+                            elif f in ds:
+                                v = ds[f]
+                                object.__setattr__(self, f, v() if callable(v) else v)
+                            else:
+                                raise TypeError(
+                                    f"{c.__name__}() missing required argument: '{f}'"
+                                )
+                    return __init__
+                c.__init__ = _make_init(_fields, _defaults)
+            if '__repr__' not in c.__dict__ and ann:
+                _fields = list(ann.keys())
+                def _make_repr(fs):
+                    def __repr__(self):
+                        parts = ', '.join(f'{f}={getattr(self, f, None)!r}' for f in fs)
+                        return f'{type(self).__name__}({parts})'
+                    return __repr__
+                c.__repr__ = _make_repr(_fields)
+            return c
+        if cls is None:
+            return _wrap
+        return _wrap(cls)
+    _dc_mod.dataclass = _real_dataclass
+    del _real_dataclass
+del _dc_mod, _dc_sys
+# -- end WASI dataclass fix --
+
 import base64
 import importlib
 import json
