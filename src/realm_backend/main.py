@@ -316,18 +316,6 @@ from api.nft import mint_land_nft, get_nft_canister_id
 from api.status import get_status
 from api.zones import get_zone_aggregation
 from api.user import user_get, user_register, user_update_profile_picture
-from core.candid_types_realm import (
-    CanisterInfo,
-    ExtensionCallArgs,
-    ExtensionCallResponse,
-    ObjectsListRecord,
-    ObjectsListRecordPaginated,
-    PaginationInfo,
-    RealmResponse,
-    RealmResponseData,
-    StatusRecord,
-    UserGetRecord,
-)
 from core.task_manager import TaskManager
 from ggg import Call, Codex, Task, TaskStep, TaskSchedule
 from _cdk import (
@@ -360,6 +348,95 @@ from _cdk import (
 from ic_python_db import Database
 from ic_python_logging import get_logger, get_logs
 from core.http_utils import download_file_from_url, downloaded_content
+
+# NOTE: Record/Variant types MUST be defined in this file (not imported from
+# another module) because basilisk's Candid .did generator only parses main.py's
+# AST for type definitions.  Duplicated from core/candid_types_realm.py.
+
+class PaginationInfo(Record):
+    page_num: int
+    page_size: int
+    total_items_count: int
+    total_pages: int
+
+
+class CanisterInfo(Record):
+    canister_id: text
+    canister_type: text
+
+
+class StatusRecord(Record):
+    version: text
+    status: text
+    users_count: nat
+    organizations_count: nat
+    realms_count: nat
+    mandates_count: nat
+    tasks_count: nat
+    transfers_count: nat
+    instruments_count: nat
+    codexes_count: nat
+    disputes_count: nat
+    licenses_count: nat
+    trades_count: nat
+    proposals_count: nat
+    votes_count: nat
+    commit: text
+    extensions: Vec[text]
+    demo_mode: bool
+    realm_name: text
+    realm_logo: text
+    realm_description: text
+    realm_welcome_image: text
+    realm_welcome_message: text
+    user_profiles_count: nat
+    canisters: Vec[CanisterInfo]
+    registries: Vec[CanisterInfo]
+
+
+class UserGetRecord(Record):
+    principal: Principal
+    profiles: Vec[text]
+    profile_picture_url: text
+
+
+class ObjectsListRecordPaginated(Record):
+    objects: Vec[text]
+    pagination: PaginationInfo
+
+
+class ObjectsListRecord(Record):
+    objects: Vec[text]
+
+
+class ExtensionsListRecord(Record):
+    extensions: Vec[text]
+
+
+class RealmResponseData(Variant):
+    status: StatusRecord
+    userGet: UserGetRecord
+    error: text
+    message: text
+    objectsList: ObjectsListRecord
+    objectsListPaginated: ObjectsListRecordPaginated
+    extensionsList: ExtensionsListRecord
+
+
+class RealmResponse(Record):
+    success: bool
+    data: RealmResponseData
+
+
+class ExtensionCallArgs(Record):
+    extension_name: text
+    function_name: text
+    args: text
+
+
+class ExtensionCallResponse(Record):
+    success: bool
+    response: text
 
 storage = StableBTreeMap[str, str](memory_id=1, max_key_size=100, max_value_size=10000)
 Database.init(db_storage=storage, audit_enabled=True)
