@@ -1,4 +1,4 @@
-FROM ghcr.io/smart-social-contracts/icp-dev-env:latest AS base
+FROM ghcr.io/smart-social-contracts/icp-dev-env:077ba9d AS base
 
 RUN apt-get update && apt-get install -y --no-install-recommends procps nano jq && rm -rf /var/lib/apt/lists/*
 
