@@ -35,8 +35,8 @@ realms ps logs <task_id>
 The minimal code to download a file:
 
 ```python
-from kybra import ic, Async, CallResult, match
-from kybra.canisters.management import management_canister, HttpResponse
+from basilisk import ic, Async, CallResult, match
+from basilisk.canisters.management import management_canister, HttpResponse
 
 def async_task() -> Async[str]:
     """Download a file and return its content."""

@@ -32,8 +32,8 @@ from typing import Callable, List
 
 from ggg import Call, Task, TaskExecution, TaskSchedule, TaskStep
 from ggg.system.status import TaskExecutionStatus, TaskStatus
-from kybra import Async, Duration, ic, void
-from kybra_simple_logging import get_logger
+from _cdk import Async, Duration, ic, void
+from ic_python_logging import get_logger
 
 logger = get_logger("core.task_manager")
 
@@ -93,24 +93,24 @@ class TaskManager:
                 logger.info(f"Executing async timer callback for {step.call}")
                 task_execution = task.new_task_execution()
                 try:
-                    task_execution.status = TaskExecutionStatus.RUNNING.value
+                    task_execution.status = TaskExecutionStatus.RUNNING
 
                     # _function() now iterates generators internally, so no yield needed
                     result = step.call._function(task_execution)()
                     logger.info(f"Async timer callback completed with result: {result}")
 
-                    task_execution.status = TaskExecutionStatus.COMPLETED.value
-                    step.status = TaskStatus.COMPLETED.value
+                    task_execution.status = TaskExecutionStatus.COMPLETED
+                    step.status = TaskStatus.COMPLETED
                     self._check_and_schedule_next_step(task)
                 except Exception as e:
                     logger.error(f"Async timer callback failed: {e}")
                     logger.error(traceback.format_exc())
 
-                    task_execution.status = TaskExecutionStatus.FAILED.value
+                    task_execution.status = TaskExecutionStatus.FAILED
                     task_execution.result = str(e)[:4999]
 
-                    step.status = TaskStatus.FAILED.value
-                    task.status = TaskStatus.FAILED.value
+                    step.status = TaskStatus.FAILED
+                    task.status = TaskStatus.FAILED
 
             return async_timer_callback
         elif not step.call.is_async:
@@ -137,7 +137,7 @@ class TaskManager:
                     #     )
 
                     # Execute the task and capture result
-                    task_execution.status = TaskExecutionStatus.RUNNING.value
+                    task_execution.status = TaskExecutionStatus.RUNNING
                     result = step.call._function(task_execution)()
 
                     # # Update execution record with result (defensive)
@@ -154,8 +154,8 @@ class TaskManager:
                     #         logger.warning(
                     #             f"Failed to update TaskExecution record: {exec_error}"
                     #         )
-                    task_execution.status = TaskExecutionStatus.COMPLETED.value
-                    step.status = TaskStatus.COMPLETED.value
+                    task_execution.status = TaskExecutionStatus.COMPLETED
+                    step.status = TaskStatus.COMPLETED
                     self._check_and_schedule_next_step(task)
                 except Exception as e:
                     logger.error(f"Sync timer callback failed: {traceback.format_exc()}")
@@ -172,9 +172,9 @@ class TaskManager:
                     #             f"Failed to update TaskExecution error: {exec_error}"
                     #         )
 
-                    task_execution.status = TaskExecutionStatus.FAILED.value
-                    step.status = TaskStatus.FAILED.value
-                    task.status = TaskStatus.FAILED.value
+                    task_execution.status = TaskExecutionStatus.FAILED
+                    step.status = TaskStatus.FAILED
+                    task.status = TaskStatus.FAILED
 
             return sync_timer_callback
 
@@ -196,11 +196,11 @@ class TaskManager:
                 step.timer_id = ic.set_timer(
                     Duration(step.run_next_after), callback_function
                 )
-                step.status = TaskStatus.RUNNING.value
+                step.status = TaskStatus.RUNNING
                 task.step_to_execute += 1
             else:
                 logger.info(f"Task {task.name} completed all steps")
-                task.status = TaskStatus.COMPLETED.value
+                task.status = TaskStatus.COMPLETED
 
                 now = get_now()
 
@@ -210,11 +210,11 @@ class TaskManager:
                         logger.info(
                             f"Task {task.name} is recurring, scheduling next execution in {schedule.repeat_every}s"
                         )
-                        task.status = TaskStatus.RUNNING.value
+                        task.status = TaskStatus.RUNNING
                         task.step_to_execute = 0
                         # Reset all step statuses
                         for step in task.steps:
-                            step.status = TaskStatus.PENDING.value
+                            step.status = TaskStatus.PENDING
                         step = list(task.steps)[task.step_to_execute]
                         callback_function = self._create_timer_callback(step, task)
 
@@ -266,7 +266,7 @@ class TaskManager:
 
         for task in all_tasks:
             logger.info(f"Checking task {task.name}: {task.status}")
-            if task.status == TaskStatus.PENDING.value:
+            if task.status == TaskStatus.PENDING:
                 for schedule in task.schedules:
                     try:
 
@@ -341,8 +341,8 @@ class TaskManager:
                             step.timer_id = ic.set_timer(
                                 Duration(step.run_next_after), callback_function
                             )
-                            step.status = TaskStatus.RUNNING.value
-                            task.status = TaskStatus.RUNNING.value
+                            step.status = TaskStatus.RUNNING
+                            task.status = TaskStatus.RUNNING
                             task.step_to_execute += 1
                     except Exception as e:
                         logger.error(

@@ -69,7 +69,7 @@ realms init --name "My Government Realm" --id my_gov_realm
 ```
 
 This creates a complete project structure with:
-- Backend canister (Python/Kybra)
+- Backend canister (Python/Basilisk)
 - Frontend canister (SvelteKit)
 - Extension system
 - Configuration files

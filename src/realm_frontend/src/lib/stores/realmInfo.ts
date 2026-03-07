@@ -1,12 +1,18 @@
 import { writable, derived, get } from 'svelte/store';
 import { backendStore } from '$lib/canisters';
 
+interface CanisterInfo {
+	canister_id: string;
+	canister_type: string;
+}
+
 interface RealmInfo {
 	name: string;
 	logo: string;
 	welcomeImage: string;
 	welcomeMessage: string;
 	description: string;
+	registries: CanisterInfo[];
 	loading: boolean;
 	error: string | null;
 }
@@ -18,6 +24,7 @@ const createRealmInfoStore = () => {
 		welcomeImage: '',
 		welcomeMessage: '',
 		description: '',
+		registries: [],
 		loading: true,
 		error: null
 	});
@@ -44,6 +51,7 @@ const createRealmInfoStore = () => {
 						welcomeImage: status.realm_welcome_image || '',
 						welcomeMessage: status.realm_welcome_message || '',
 						description: status.realm_description || '',
+						registries: status.registries || [],
 						loading: false
 					}));
 				} else {

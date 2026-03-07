@@ -33,7 +33,7 @@ features:
   
   - icon: 💻
     title: Developer Friendly
-    details: Python/Kybra backend with SvelteKit frontend. Simple CLI for rapid development and deployment.
+    details: Python/Basilisk backend with SvelteKit frontend. Simple CLI for rapid development and deployment.
   
   - icon: 🏛️
     title: Multi-Realm Support

@@ -9,6 +9,7 @@
 	import { _ } from 'svelte-i18n';
 	import { onMount } from 'svelte';
 	import { backend } from '$lib/canisters.js';
+	import { realmInfo } from '$lib/stores/realmInfo';
 
 	const path: string = '/settings';
 	const description: string = 'Settings example - Smart Social Contracts';
@@ -86,6 +87,29 @@
 			<div class="space-y-6">
 				<MessagingHandles />
 			</div>
+		</div>
+
+		<!-- Registries -->
+		<div class="col-span-full mt-6">
+			<Heading tag="h2" class="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+				{$_('settings.registries_title', { default: 'Registries' })}
+			</Heading>
+			{#if $realmInfo.loading}
+				<div class="text-gray-500">Loading...</div>
+			{:else if $realmInfo.registries.length > 0}
+				<div class="space-y-2">
+					{#each $realmInfo.registries as reg}
+						<div class="p-3 bg-gray-50 rounded border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+							<span class="font-semibold">{reg.canister_type}:</span>
+							<span class="font-mono text-sm break-all ml-1">{reg.canister_id}</span>
+						</div>
+					{/each}
+				</div>
+			{:else}
+				<div class="text-gray-500 dark:text-gray-400">
+					{$_('settings.no_registries', { default: 'This realm is not registered with any registry.' })}
+				</div>
+			{/if}
 		</div>
 	</div>
 </main>

@@ -1,7 +1,7 @@
 from typing import Optional
 
-from kybra_simple_db import Entity, Integer, ManyToOne, OneToOne, String, TimestampedMixin
-from kybra_simple_logging import get_logger
+from ic_python_db import Entity, Integer, ManyToOne, OneToOne, String, TimestampedMixin
+from ic_python_logging import get_logger
 
 from ..system.constants import STATUS_MAX_LENGTH
 
@@ -14,6 +14,10 @@ class LicenseType:
     JUSTICE_PROVIDER = "justice_provider"
     BUSINESS = "business"
     PROFESSIONAL = "professional"
+    HEALTH = "health"
+    POLICE = "police"
+    INFRASTRUCTURE = "infrastructure"
+    EDUCATION = "education"
     OTHER = "other"
 
 
@@ -46,7 +50,7 @@ class License(Entity, TimestampedMixin):
         if self.status != "active":
             return False
         if self.expires_at:
-            from kybra import ic
+            from _cdk import ic
             now = int(ic.time() / 1_000_000_000)
             if now > self.expires_at:
                 return False
@@ -87,7 +91,7 @@ def license_issue(
     Returns:
         The created License
     """
-    from kybra import ic
+    from _cdk import ic
     
     now = int(ic.time() / 1_000_000_000)
     

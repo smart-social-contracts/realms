@@ -5,7 +5,7 @@ Provides the _function method for Call entity that executes codex code.
 Only works in canister context with core.execution available.
 """
 
-from kybra_simple_logging import get_logger
+from ic_python_logging import get_logger
 
 logger = get_logger("runtime.call")
 
@@ -34,12 +34,12 @@ def _call_function(self, task_execution):
             # Get the async_task function from the executed globals
             # We need to re-exec to get the function reference
             import ggg
-            import kybra
-            from kybra import ic
+            import _cdk as basilisk
+            from _cdk import ic
             
             namespace = {
                 "ggg": ggg,
-                "kybra": kybra,
+                "basilisk": basilisk,
                 "ic": ic,
                 "logger": task_execution.logger(),
             }

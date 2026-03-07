@@ -7,6 +7,7 @@ from .fund import Fund, FundType
 from .instrument import Instrument
 from .invoice import Invoice
 from .ledger_entry import Category, EntryType, LedgerEntry
+from .marketplace import MarketPlace
 from .nft_token import NFTToken
 from .payment_account import PaymentAccount
 from .token import Token
@@ -27,6 +28,7 @@ __all__ = [
     "Instrument",
     "Invoice",
     "LedgerEntry",
+    "MarketPlace",
     "NFTToken",
     "PaymentAccount",
     "Token",

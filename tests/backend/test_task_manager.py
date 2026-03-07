@@ -18,11 +18,11 @@ from unittest.mock import MagicMock, patch
 src_path = Path(__file__).parent.parent.parent / "src" / "realm_backend"
 sys.path.insert(0, str(src_path))
 
-# Mock kybra before importing anything that uses it
-mock_kybra = MagicMock()
-mock_kybra.Duration = lambda x: x  # Duration just passes through seconds
-sys.modules["kybra"] = mock_kybra
-sys.modules["kybra.canisters.management"] = MagicMock()
+# Mock basilisk before importing anything that uses it
+mock_basilisk = MagicMock()
+mock_basilisk.Duration = lambda x: x  # Duration just passes through seconds
+sys.modules["basilisk"] = mock_basilisk
+sys.modules["basilisk.canisters.management"] = MagicMock()
 
 NOW = 1770467070  # ~Feb 8, 2026 in seconds
 

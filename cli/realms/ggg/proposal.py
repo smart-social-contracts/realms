@@ -1,5 +1,5 @@
-from kybra_simple_db import Entity, Float, ManyToOne, String, TimestampedMixin
-from kybra_simple_logging import get_logger
+from ic_python_db import Entity, Float, ManyToOne, String, TimestampedMixin
+from ic_python_logging import get_logger
 
 logger = get_logger("entity.proposal")
 

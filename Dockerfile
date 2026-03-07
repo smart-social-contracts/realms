@@ -1,4 +1,4 @@
-FROM ghcr.io/smart-social-contracts/icp-dev-env:db60540 AS base
+FROM ghcr.io/smart-social-contracts/icp-dev-env:077ba9d AS base
 
 RUN apt-get update && apt-get install -y --no-install-recommends procps nano jq && rm -rf /var/lib/apt/lists/*
 
@@ -37,7 +37,7 @@ RUN touch src/realm_backend/extension_packages/extension_imports.py
 
 # Generate extension manifests (create empty file with proper structure for Docker build)
 RUN echo '"""' > src/realm_backend/extension_packages/extension_manifests.py && \
-    echo 'Static extension manifest registry for Kybra canister environment.' >> src/realm_backend/extension_packages/extension_manifests.py && \
+    echo 'Static extension manifest registry for Basilisk canister environment.' >> src/realm_backend/extension_packages/extension_manifests.py && \
     echo 'This file will be regenerated during deployment.' >> src/realm_backend/extension_packages/extension_manifests.py && \
     echo '"""' >> src/realm_backend/extension_packages/extension_manifests.py && \
     echo '' >> src/realm_backend/extension_packages/extension_manifests.py && \
@@ -50,6 +50,7 @@ RUN echo '"""' > src/realm_backend/extension_packages/extension_manifests.py && 
 # Demo stage: extends base and adds extensions folder for testing/demos
 FROM base AS demo
 COPY extensions/extensions ./extensions/extensions
+COPY extensions/marketplace ./extensions/marketplace
 
 FROM demo AS test
 

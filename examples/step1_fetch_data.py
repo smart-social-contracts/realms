@@ -4,7 +4,7 @@ Step 1: Fetch data (async example with HTTP outcall)
 This step demonstrates an async operation that fetches data from an external source.
 """
 
-from kybra import ic
+from _cdk import ic
 
 def async_task():
     """Async task to fetch data from external API."""

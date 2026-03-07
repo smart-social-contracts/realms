@@ -10,9 +10,9 @@ Usage:
     realms run --file examples/file_download/word_counter_codex.py --every 300
 """
 
-from kybra import ic, Async, CallResult, match
-from kybra.canisters.management import management_canister, HttpResponse
-from kybra_simple_db import String, Integer
+from _cdk import ic, Async, CallResult, match
+from _cdk import management_canister, HttpResponse
+from ic_python_db import String, Integer
 import json
 
 # Configuration - change this URL to your target

@@ -1,10 +1,13 @@
 import json
 import traceback
-from pprint import pformat
+try:
+    from pprint import pformat
+except ImportError:
+    pformat = repr
 
-from kybra import Async, ic
-from kybra_simple_db import Entity, Integer, OneToOne, String, TimestampedMixin
-from kybra_simple_logging import get_logger
+from _cdk import Async, ic
+from ic_python_db import Entity, Integer, OneToOne, String, TimestampedMixin
+from ic_python_logging import get_logger
 
 try:
     from core.extensions import extension_async_call

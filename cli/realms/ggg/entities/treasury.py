@@ -4,8 +4,8 @@ Treasury Entity (Pure Declaration)
 Runtime behavior (refresh, send methods) is in ggg.runtime.treasury_ops
 """
 
-from kybra_simple_db import Entity, Integer, OneToOne, String, TimestampedMixin
-from kybra_simple_logging import get_logger
+from ic_python_db import Entity, Integer, OneToOne, String, TimestampedMixin
+from ic_python_logging import get_logger
 
 logger = get_logger("entity.treasury")
 

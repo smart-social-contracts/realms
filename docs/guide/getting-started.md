@@ -115,7 +115,7 @@ realms ps logs <task_id>
 
 Realms consists of several key components:
 
-- **Backend** - Python/Kybra canisters on the Internet Computer
+- **Backend** - Python/Basilisk canisters on the Internet Computer
 - **Frontend** - SvelteKit web application
 - **CLI** - Command-line tools for development and deployment
 - **Extensions** - Modular plugins for additional functionality

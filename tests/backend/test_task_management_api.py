@@ -37,7 +37,7 @@ def test_create_sync_task():
     print("\n=== Test: Create Sync Task ===")
     
     # Create temp file with code
-    code = '''from kybra import ic
+    code = '''from _cdk import ic
 
 def async_task():
     ic.print('Test sync task')
@@ -60,7 +60,7 @@ def test_create_async_task_with_yield():
     """Test creating async task with yield."""
     print("\n=== Test: Create Async Task ===")
     
-    code = '''from kybra import ic
+    code = '''from _cdk import ic
 from ggg import Treasury
 
 def async_task():
@@ -88,7 +88,7 @@ def test_create_recurring_task():
     """Test creating recurring task with interval."""
     print("\n=== Test: Create Recurring Task ===")
     
-    code = '''from kybra import ic
+    code = '''from _cdk import ic
 def async_task():
     ic.print('Recurring tick')
     return 'ok'
@@ -145,7 +145,7 @@ def test_task_with_ggg_entities():
     """Test task using GGG entities."""
     print("\n=== Test: Task with GGG Entities ===")
     
-    code = '''from kybra import ic
+    code = '''from _cdk import ic
 from ggg import Treasury
 
 def async_task():
@@ -194,7 +194,7 @@ def test_get_task_logs():
 
 
 def test_task_specific_logging():
-    """Test task-specific logger functionality with kybra-simple-logging."""
+    """Test task-specific logger functionality with ic-python-logging."""
     print("\n=== Test: Task-Specific Logging ===")
     
     code = '''def async_task():

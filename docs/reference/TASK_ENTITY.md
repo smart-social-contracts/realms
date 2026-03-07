@@ -30,7 +30,7 @@ Creates a TaskEntity base class with automatic namespacing:
 ```python
 def create_task_entity_class(task_name: str):
     """Create a TaskEntity base class with task-specific namespace"""
-    from kybra_simple_db import Entity, TimestampedMixin
+    from ic_python_db import Entity, TimestampedMixin
     
     class TaskEntity(Entity, TimestampedMixin):
         __namespace__ = f"task_{task_name}"
@@ -88,7 +88,7 @@ def _async_function(self) -> Async:
 ### Basic State Storage
 
 ```python
-from kybra_simple_db import String
+from ic_python_db import String
 
 # TaskEntity is automatically available in task codexes
 class State(TaskEntity):
@@ -109,7 +109,7 @@ if state:
 
 ```python
 from ggg import User
-from kybra_simple_db import String, Integer
+from ic_python_db import String, Integer
 
 BATCH_SIZE = 100
 
@@ -187,8 +187,8 @@ class State(TaskEntity):
 """Tax Collection - Process users in batches"""
 
 from ggg import User, Transfer, Treasury, Instrument
-from kybra_simple_db import String, Integer
-from kybra import ic
+from ic_python_db import String, Integer
+from basilisk import ic
 import json
 
 BATCH_SIZE = 100
@@ -305,4 +305,4 @@ Potential improvements:
 
 - [Task Scheduling Framework](../src/realm_backend/core/task_manager.py)
 - [Entity System](../src/realm_backend/ggg/)
-- [kybra-simple-db Documentation](https://pypi.org/project/kybra-simple-db/)
+- [ic-python-db Documentation](https://pypi.org/project/ic-python-db/)

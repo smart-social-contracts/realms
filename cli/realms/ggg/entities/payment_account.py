@@ -1,11 +1,11 @@
-from kybra_simple_db import (
+from ic_python_db import (
     Boolean,
     Entity,
     ManyToOne,
     String,
     TimestampedMixin,
 )
-from kybra_simple_logging import get_logger
+from ic_python_logging import get_logger
 
 logger = get_logger("entity.payment_account")
 

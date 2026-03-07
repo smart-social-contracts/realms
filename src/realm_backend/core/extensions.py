@@ -2,8 +2,8 @@ import traceback
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
-from kybra import Async
-from kybra_simple_logging import get_logger
+from _cdk import Async
+from ic_python_logging import get_logger
 
 logger = get_logger("core.extensions")
 
@@ -33,7 +33,7 @@ def create_extension_entity_class(extension_name):
         if not config:
             config = AppConfig(key="setting_name", value="...")
     """
-    from kybra_simple_db import Entity, TimestampedMixin
+    from ic_python_db import Entity, TimestampedMixin
 
     class ExtensionEntity(Entity, TimestampedMixin):
         """Base class for extension-scoped entities with automatic namespacing.

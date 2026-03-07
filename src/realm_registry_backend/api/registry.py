@@ -3,8 +3,8 @@
 from typing import List, Optional
 
 from core.models import RealmRecord
-from kybra import ic
-from kybra_simple_logging import get_logger
+from _cdk import ic
+from ic_python_logging import get_logger
 
 logger = get_logger("registry")
 

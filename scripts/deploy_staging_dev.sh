@@ -38,7 +38,7 @@ usage() {
     echo "  -r, --registry       Target registry (combine with -f and/or -b)"
     echo "  -R, --realm NUM      Target specific realm number (1=Dominion, 2=Agora, 3=Syntropia)"
     echo "  -a, --all            Target all (registry + all realms)"
-    echo "  -c, --clean          Clean build (remove .svelte-kit, vite cache, .kybra cache)"
+    echo "  -c, --clean          Clean build (remove .svelte-kit, vite cache, .basilisk cache)"
     echo "  -m, --mundus DIR     Path to mundus directory (default: latest in .realms/mundus/)"
     echo "  -h, --help           Show this help message"
     echo ""
@@ -173,7 +173,7 @@ deploy_registry() {
         
         if [ "$CLEAN_BUILD" = true ]; then
             echo -e "${YELLOW}🧹 Cleaning backend build cache...${NC}"
-            rm -rf "$registry_dir/.kybra"
+            rm -rf "$registry_dir/.basilisk"
         fi
         
         echo -e "${GREEN}🚀 Deploying registry backend to $NETWORK...${NC}"
@@ -260,7 +260,7 @@ deploy_realm() {
             cp -r "$REPO_ROOT/extensions/extensions" "$realm_dir/extensions/"
         fi
         
-        # Also copy into extension_packages (what kybra build actually uses)
+        # Also copy into extension_packages (what basilisk build actually uses)
         if [ -d "$realm_dir/src/realm_backend/extension_packages" ]; then
             echo -e "${GREEN}📦 Updating extension_packages...${NC}"
             for ext_dir in "$REPO_ROOT/extensions/extensions/"*/backend; do
@@ -275,10 +275,10 @@ deploy_realm() {
         
         if [ "$CLEAN_BUILD" = true ]; then
             echo -e "${YELLOW}🧹 Cleaning backend build cache...${NC}"
-            rm -rf "$realm_dir/.kybra"
+            rm -rf "$realm_dir/.basilisk"
         fi
         
-        # Activate venv if present (needed for kybra build)
+        # Activate venv if present (needed for basilisk build)
         if [ -f "$realm_dir/venv/bin/activate" ]; then
             echo -e "${GREEN}🐍 Activating venv...${NC}"
             source "$realm_dir/venv/bin/activate"

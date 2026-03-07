@@ -5,7 +5,7 @@ import uuid
 from typing import Dict, List, Optional
 
 from core.models import CreditTransaction, UserCredits
-from kybra_simple_logging import get_logger
+from ic_python_logging import get_logger
 
 logger = get_logger("credits")
 

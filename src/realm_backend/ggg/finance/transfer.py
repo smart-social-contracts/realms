@@ -1,6 +1,6 @@
 from typing import Optional
 
-from kybra_simple_db import (
+from ic_python_db import (
     Entity,
     Integer,
     ManyToOne,
@@ -8,7 +8,7 @@ from kybra_simple_db import (
     String,
     TimestampedMixin,
 )
-from kybra_simple_logging import get_logger
+from ic_python_logging import get_logger
 
 logger = get_logger("entity.transfer")
 

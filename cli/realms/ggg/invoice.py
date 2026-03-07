@@ -2,9 +2,9 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from kybra import Async, Principal, ic
-from kybra_simple_db import Entity, Float, ManyToOne, OneToMany, String, TimestampedMixin
-from kybra_simple_logging import get_logger
+from _cdk import Async, Principal, ic
+from ic_python_db import Entity, Float, ManyToOne, OneToMany, String, TimestampedMixin
+from ic_python_logging import get_logger
 
 # Try ICP-compatible random, fall back to uuid for CLI/regular Python
 try:

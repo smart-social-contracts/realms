@@ -5,7 +5,7 @@ This step demonstrates saving processed results to the database.
 Auto-detected as sync because it doesn't contain 'yield' or 'async_task'.
 """
 
-from kybra import ic
+from _cdk import ic
 from ggg import Codex
 
 ic.print("💾 Step 3: Saving results...")

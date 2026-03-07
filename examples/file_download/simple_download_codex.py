@@ -8,8 +8,8 @@ Usage:
     realms run --file examples/file_download/simple_download_codex.py
 """
 
-from kybra import ic, Async, CallResult, match
-from kybra.canisters.management import management_canister, HttpResponse
+from _cdk import ic, Async, CallResult, match
+from _cdk import management_canister, HttpResponse
 import json
 
 

@@ -6,8 +6,8 @@ for complex task workflows.
 """
 
 from ggg import User, Proposal, Vote
-from kybra_simple_db import String, Integer, Boolean
-from kybra import ic
+from ic_python_db import String, Integer, Boolean
+from _cdk import ic
 import json
 
 # Define different state entities for different purposes

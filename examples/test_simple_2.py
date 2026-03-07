@@ -1,4 +1,4 @@
-from kybra import ic
+from _cdk import ic
 from ggg import Treasury
 
 def async_task():

@@ -1,4 +1,4 @@
-from kybra import Opt, Principal, Record, Variant, Vec, float64, nat, text
+from _cdk import Opt, Principal, Record, Variant, Vec, float64, nat, text
 
 
 class PaginationInfo(Record):
@@ -39,6 +39,8 @@ class StatusRecord(Record):
     realm_welcome_message: text
     user_profiles_count: nat
     canisters: Vec[CanisterInfo]
+    registries: Vec[CanisterInfo]
+    dependencies: Vec[text]
 
 
 class UserGetRecord(Record):

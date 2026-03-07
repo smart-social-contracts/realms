@@ -1,4 +1,4 @@
-from kybra import ic
+from _cdk import ic
 
 def async_task():
     logger.info('===== HELLO FROM NEW CODE ASYNC =====')

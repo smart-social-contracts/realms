@@ -108,12 +108,12 @@ dfx canister create realm_backend --with-cycles 5000000000000
 
 ### Build Fails
 
-**Problem:** Kybra build errors.
+**Problem:** Basilisk build errors.
 
 **Solution:**
 ```bash
 # Clear build cache
-rm -rf .kybra/
+rm -rf .basilisk/
 dfx cache clean
 
 # Install dependencies
@@ -329,7 +329,7 @@ cache[key] = data;
 **Solution:**
 ```python
 # Use TaskEntity for batch processing
-from kybra_simple_db import String, Integer
+from ic_python_db import String, Integer
 
 class BatchState(TaskEntity):
     __alias__ = "key"
@@ -483,7 +483,7 @@ cat extensions/my_ext/frontend/i18n/en.json
 **Solution:**
 ```python
 # Backend validation
-from kybra import ic
+from basilisk import ic
 
 def admin_only_function(args: str):
     # Check caller
@@ -564,7 +564,7 @@ dfx deploy --mode reinstall
 
 ```python
 # In codex/backend code
-from kybra import ic
+from basilisk import ic
 
 ic.print("Debug message")
 ic.print(f"Variable value: {my_var}")

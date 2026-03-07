@@ -2,14 +2,14 @@
 Treasury Runtime Behavior
 
 Provides refresh and send methods for Treasury entity that require
-canister-specific dependencies (core.extensions, kybra.Async, etc.)
+canister-specific dependencies (core.extensions, basilisk.Async, etc.)
 """
 
 import json
 import traceback
 
-from kybra import Async
-from kybra_simple_logging import get_logger
+from _cdk import Async
+from ic_python_logging import get_logger
 
 from core.extensions import extension_async_call
 

@@ -13,10 +13,10 @@ def _get_dfx_json_template(realm_id: str) -> str:
   "canisters": {
     "realm_backend": {
       "type": "custom",
-      "build": "python -m kybra realm_backend src/realm_backend/main.py",
+      "build": "python -m basilisk realm_backend src/realm_backend/main.py",
       "root": "src/realm_backend",
       "ts": "src/realm_backend/realm_backend.did",
-      "wasm": ".kybra/realm_backend/realm_backend.wasm.gz"
+      "wasm": ".basilisk/realm_backend/realm_backend.wasm.gz"
     },
     "realm_frontend": {
       "type": "assets",

@@ -24,7 +24,7 @@ from ggg import (
     Call, Notification, Permission, Service, Task, TaskExecution, TaskSchedule,
     TaskStep, User, UserProfile, Operations, Profiles,
 )
-from kybra_simple_logging import get_logger
+from ic_python_logging import get_logger
 
 logger = get_logger("api.ggg_entities")
 

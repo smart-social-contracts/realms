@@ -8,8 +8,8 @@ between Codex code and TaskStep execution.
 Runtime behavior (_function method) is in ggg.runtime.call_executor
 """
 
-from kybra_simple_db import Boolean, Entity, ManyToOne, OneToOne, String, TimestampedMixin
-from kybra_simple_logging import get_logger
+from ic_python_db import Boolean, Entity, ManyToOne, OneToOne, String, TimestampedMixin
+from ic_python_logging import get_logger
 
 logger = get_logger("entity.call")
 

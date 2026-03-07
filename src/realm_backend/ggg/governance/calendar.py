@@ -1,5 +1,5 @@
-from kybra_simple_db import Entity, Integer, OneToOne, String, TimestampedMixin
-from kybra_simple_logging import get_logger
+from ic_python_db import Entity, Integer, OneToOne, String, TimestampedMixin
+from ic_python_logging import get_logger
 
 logger = get_logger("entity.calendar")
 
@@ -61,7 +61,7 @@ class Calendar(Entity, TimestampedMixin):
         E.g., current_period("fiscal_period") -> 7 means we're in the 7th fiscal period.
         Returns 0 if the cycle duration is not set or is zero.
         """
-        from kybra import ic
+        from _cdk import ic
         now = int(ic.time() / 1_000_000_000)
         epoch = self.epoch if self.epoch else 0
         duration = getattr(self, cycle_name, 0)
@@ -80,7 +80,7 @@ class Calendar(Entity, TimestampedMixin):
 
         Useful for scheduling tasks aligned to cycle boundaries.
         """
-        from kybra import ic
+        from _cdk import ic
         now = int(ic.time() / 1_000_000_000)
         epoch = self.epoch if self.epoch else 0
         duration = getattr(self, cycle_name, 0)

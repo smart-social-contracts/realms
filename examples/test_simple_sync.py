@@ -1,4 +1,4 @@
-from kybra import ic
+from _cdk import ic
 
 
 def sync_task():

@@ -3,8 +3,8 @@
 # Access GGG entities via ggg module
 # VERSION: 2025-11-21-v5-WORKING
 
-from kybra import ic, CallResult, match
-from kybra.canisters.management import management_canister
+from _cdk import ic, CallResult, match
+from _cdk import management_canister
 import ggg
 # from main import logger
 

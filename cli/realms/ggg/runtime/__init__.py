@@ -2,7 +2,7 @@
 GGG Runtime Behavior
 
 This module contains runtime behavior that requires canister-specific dependencies
-(core.execution, core.extensions, kybra.ic, etc.)
+(core.execution, core.extensions, basilisk.ic, etc.)
 
 Only import this in canister context, not in CLI.
 """

@@ -2,7 +2,7 @@
   "dfx": "0.29.0",
   "canisters": {
     "realm_backend": {
-      "build": "python -m kybra realm_backend src/realm_backend/main.py",
+      "build": "python -m basilisk realm_backend src/realm_backend/main.py",
       "candid": "src/realm_backend/realm_backend.did",
       "declarations": {
         "node_compatibility": true
@@ -15,14 +15,14 @@
       ],
       "tech_stack": {
         "cdk": {
-          "kybra": {}
+          "basilisk": {}
         },
         "language": {
           "python": {}
         }
       },
       "type": "custom",
-      "wasm": ".kybra/realm_backend/realm_backend.wasm"
+      "wasm": ".basilisk/realm_backend/realm_backend.wasm"
     },
     "realm_frontend": {
       "source": [
@@ -32,7 +32,7 @@
       "workspace": "realm_frontend"
     },
     "realm_registry_backend": {
-      "build": "python -m kybra realm_registry_backend src/realm_registry_backend/main.py",
+      "build": "python -m basilisk realm_registry_backend src/realm_registry_backend/main.py",
       "candid": "src/realm_registry_backend/realm_registry_backend.did",
       "declarations": {
         "node_compatibility": true
@@ -50,14 +50,14 @@
       },
       "tech_stack": {
         "cdk": {
-          "kybra": {}
+          "basilisk": {}
         },
         "language": {
           "python": {}
         }
       },
       "type": "custom",
-      "wasm": ".kybra/realm_registry_backend/realm_registry_backend.wasm"
+      "wasm": ".basilisk/realm_registry_backend/realm_registry_backend.wasm"
     },
     "realm_registry_frontend": {
       "source": [

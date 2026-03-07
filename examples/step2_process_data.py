@@ -5,7 +5,7 @@ This step demonstrates a sync operation that processes data locally.
 Auto-detected as sync because it doesn't contain 'yield' or 'async_task'.
 """
 
-from kybra import ic
+from _cdk import ic
 from ggg import Member
 
 ic.print("🔧 Step 2: Processing data...")

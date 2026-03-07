@@ -15,7 +15,7 @@ from ggg import Codex
 from ggg.task import Task
 from ggg.task_schedule import TaskSchedule
 from core.task_manager import Call, TaskStep, TaskManager
-from kybra import ic
+from _cdk import ic
 
 print("=" * 70)
 print("📦 EXAMPLE: Scheduled Codex Download and Installation")
@@ -42,7 +42,7 @@ download_codex = Codex(
     code=f'''def async_task():
     """Async task to download codex code from GitHub."""
     from main import download_file_from_url
-    from kybra import ic
+    from _cdk import ic
     
     url = "{CODEX_URL}"
     ic.print(f"📥 Starting download from {{url}}...")
@@ -77,7 +77,7 @@ print("🔧 Step 2/2: Creating sync install step...")
 install_codex = Codex(
     name=f"_install_{CODEX_NAME}",
     code=f'''from ggg import Codex
-from kybra import ic
+from _cdk import ic
 
 ic.print("📦 Installing codex from downloaded content...")
 

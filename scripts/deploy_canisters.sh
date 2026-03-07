@@ -90,10 +90,10 @@ for backend_dir in src/*_backend; do
     fi
 done
 
-# Clear Kybra build cache to ensure extensions are included in backend build
-if [ -d ".kybra" ]; then
-    echo "🧹 Clearing Kybra build cache..."
-    rm -rf .kybra/realm_backend .kybra/*_backend 2>/dev/null || true
+# Clear Basilisk build cache to ensure extensions are included in backend build
+if [ -d ".basilisk" ]; then
+    echo "🧹 Clearing Basilisk build cache..."
+    rm -rf .basilisk/realm_backend .basilisk/*_backend 2>/dev/null || true
     echo "   ✅ Cache cleared"
 fi
 

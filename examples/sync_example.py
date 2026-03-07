@@ -1,7 +1,7 @@
 # Example sync code for realms shell
 # Usage: realms shell --file examples/sync_example.py
 
-from kybra import ic
+from _cdk import ic
 from ggg import Member, Treasury
 
 # Get all members

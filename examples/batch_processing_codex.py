@@ -9,8 +9,8 @@ so each task has isolated state storage.
 """
 
 from ggg import User, Transfer, Treasury, Instrument
-from kybra_simple_db import String, Integer
-from kybra import ic
+from ic_python_db import String, Integer
+from _cdk import ic
 import json
 
 # Define a state entity using TaskEntity

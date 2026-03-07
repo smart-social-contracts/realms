@@ -29,6 +29,20 @@ jobs:
   deploy-staging:
     runs-on: ubuntu-latest
     steps:
+      - name: Print workflow parameters
+        run: |
+          echo "=== Workflow Parameters ==="
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit SHA (github.sha): ${{ github.sha }}"
+          echo "Commit SHA (input): ${{ github.event.inputs.commit || '(not set - using github.sha)' }}"
+          echo "Effective commit: ${{ github.event.inputs.commit || github.sha }}"
+          echo "Deployment type: ${{ github.event.inputs.type }}"
+          echo "Deploy mode: ${{ github.event.inputs.mode }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "Event: ${{ github.event_name }}"
+          echo "==========================="
+
       - name: Checkout code
         uses: actions/checkout@v3
         with:
