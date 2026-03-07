@@ -2,7 +2,8 @@
     "python.analysis.extraPaths": [
         "./src/realm_backend",
         "./cli",
-        "./venv/lib/python3.11/site-packages"
+        "./venv/lib/python3.11/site-packages",
+        "./codices"
     ],
     "python.defaultInterpreterPath": "./venv/bin/python",
     "python.analysis.autoImportCompletions": true,
@@ -31,6 +32,7 @@
     "python.analysis.include": [
         "./src/**",
         "./cli/**",
+        "./codices/**",
         "./venv/lib/python3.11/site-packages/**"
     ]
 }

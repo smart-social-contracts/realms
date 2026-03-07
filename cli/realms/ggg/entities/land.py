@@ -12,6 +12,13 @@ class LandType:
     UNASSIGNED = "unassigned"
 
 
+class LandStatus:
+    ACTIVE = "active"
+    DISPUTED = "disputed"
+    TRANSFERRED = "transferred"
+    REVOKED = "revoked"
+
+
 class Land(Entity, TimestampedMixin):
     __alias__ = "id"
     id = String()
@@ -24,3 +31,8 @@ class Land(Entity, TimestampedMixin):
     size_height = Integer(default=1)
     metadata = String(max_length=512, default="{}")
     zones = OneToMany("Zone", "land")
+
+    # NFT integration fields (per realms#94)
+    status = String(max_length=16, default=LandStatus.ACTIVE)
+    registered_by = String(max_length=256, default="")  # Authority/notary who registered
+    nft_token_id = String(max_length=64, default="")    # Link to LAND NFT token ID

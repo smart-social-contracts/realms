@@ -81,3 +81,29 @@ class TaskExecutionStatus(Enum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+
+
+class RealmStatus:
+    """Realm lifecycle stages.
+
+    registration  — Realm announced. Users register interest with ZK proof
+                    of unique personhood (Rarimo passport extension) and a
+                    refundable deposit. Goal: reach critical mass.
+    accreditation — Critical mass reached. Deposits locked. Infrastructure
+                    built: electricity, roads, buildings, hospitals. Service
+                    provider licenses auctioned, land allocated.
+    operational   — Infrastructure ready. Citizens move in. Taxes, welfare,
+                    budgets, and governance run normally.
+    stable        — Realm fully self-sustaining. All services running,
+                    treasury healthy.
+    deprecation   — Winding down. No new members accepted. Migration or
+                    shutdown organised. Providers fulfil remaining contracts.
+    terminated    — Realm closed. Treasury distributed back to citizens.
+                    All licenses revoked. Read-only archive.
+    """
+    REGISTRATION = "registration"
+    ACCREDITATION = "accreditation"
+    OPERATIONAL = "operational"
+    STABLE = "stable"
+    DEPRECATION = "deprecation"
+    TERMINATED = "terminated"

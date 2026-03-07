@@ -53,7 +53,9 @@ Enable anyone to create their own digital Realm — a self-contained governance 
 End-to-end encryption powered by the Internet Computer's vetKeys (Verifiably Encrypted Threshold Keys), enabling secure private data handling within Realms without relying on external key management.
 
 ### Horizontal Scalability through Quarters
-Introduction of Quarters — subdivisions within a Realm — allowing horizontal scaling by partitioning data and computation across multiple canisters while maintaining a unified Realm identity.
+Introduction of Quarters — federated autonomous realm backends within a Realm — allowing horizontal scaling, realm split, and realm merge. Each Quarter is a full realm backend that can operate independently if detached, enabling near-zero-cost split and merge operations. Multi-quarter policies (taxes, voting, justice) are encoded in a Federation Codex shared across quarters.
+
+📋 [Full details — GitHub Epic #143](https://github.com/smart-social-contracts/realms/issues/143)
 
 ### Enhanced Python Interpreter
 Transition from the Kybra Python-to-Wasm toolchain to Basilisk, delivering improved performance, broader Python compatibility, and a more streamlined developer experience for canister development.
