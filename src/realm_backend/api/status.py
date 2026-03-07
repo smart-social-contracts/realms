@@ -155,6 +155,21 @@ def get_status() -> "dict[str, Any]":
     except Exception as e:
         logger.warning(f"Could not load registries: {e}")
 
+    # Collect dependency versions
+    dependencies = []
+    for pkg_name, import_name in [
+        ("ic-basilisk", "basilisk"),
+        ("kybra", "kybra"),
+        ("ic-python-db", "ic_python_db"),
+        ("ic-python-logging", "ic_python_logging"),
+    ]:
+        try:
+            mod = __import__(import_name)
+            ver = getattr(mod, "__version__", "unknown")
+            dependencies.append(f"{pkg_name}=={ver}")
+        except Exception:
+            pass
+
     # Return data in the format expected by the Status Candid type
     return {
         "version": version,
@@ -184,4 +199,5 @@ def get_status() -> "dict[str, Any]":
         "task_manager": task_manager_status,
         "canisters": canisters,
         "registries": registries,
+        "dependencies": dependencies,
     }

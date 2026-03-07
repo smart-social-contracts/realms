@@ -40,6 +40,7 @@ class StatusRecord(Record):
     user_profiles_count: nat
     canisters: Vec[CanisterInfo]
     registries: Vec[CanisterInfo]
+    dependencies: Vec[text]
 
 
 class UserGetRecord(Record):
