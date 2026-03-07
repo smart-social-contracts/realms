@@ -19,6 +19,18 @@ jobs:
       contents: read
       packages: write
     steps:
+      - name: Print workflow parameters
+        run: |
+          echo "=== Workflow Parameters ==="
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit SHA: ${{ github.sha }}"
+          echo "Event: ${{ github.event_name }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "Workflow dispatch canister input: ${{ github.event.inputs.canister || '(not set)' }}"
+          echo "Commit message: ${{ github.event.head_commit.message }}"
+          echo "==========================="
+
       - name: Checkout code
         uses: actions/checkout@v3
         with:
