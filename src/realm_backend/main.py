@@ -1,7 +1,15 @@
 import base64
 import importlib
 import json
+import sys
 import traceback
+
+# Patch traceback.format_exc if missing (basilisk WASM stub may not have it)
+if not hasattr(traceback, 'format_exc'):
+    def _format_exc():
+        exc_info = sys.exc_info()
+        return str(exc_info[1]) if exc_info[1] else ''
+    traceback.format_exc = _format_exc
 
 import api
 from api.extensions import list_extensions
@@ -91,6 +99,8 @@ class StatusRecord(Record):
     user_profiles_count: nat
     canisters: Vec[CanisterInfo]
     registries: Vec[CanisterInfo]
+    dependencies: Vec[text]
+    python_version: text
 
 
 class UserGetRecord(Record):
