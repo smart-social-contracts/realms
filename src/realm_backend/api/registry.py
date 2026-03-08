@@ -89,16 +89,28 @@ def register_realm(
         )
 
         logger.info(f"Registry call result: {result}")
-        logger.info(f"Result type: {type(result)}, dir: {dir(result)}")
+        logger.info(f"Result type: {type(result)}")
 
-        # Parse the CallResult - Basilisk returns CallResult with Ok/Err attributes
-        if hasattr(result, "Ok"):
-            inner_result = result.Ok
+        # Helper to get Ok/Err from result (basilisk may return dict or object)
+        def _get(obj, key):
+            if isinstance(obj, dict) and key in obj:
+                return obj[key]
+            return getattr(obj, key, None)
+
+        # Parse the CallResult — may be nested CallResult[AddRealmResult] or flat
+        ok_val = _get(result, "Ok")
+        err_val = _get(result, "Err")
+
+        if ok_val is not None:
+            inner_result = ok_val
             logger.info(f"Inner result: {inner_result}")
-            
-            # The inner result is the AddRealmResult variant (also has Ok/Err)
-            if hasattr(inner_result, "Ok"):
-                message = inner_result.Ok
+
+            # Inner result may be the AddRealmResult variant (also Ok/Err) or a string
+            inner_ok = _get(inner_result, "Ok") if not isinstance(inner_result, str) else inner_result
+            inner_err = _get(inner_result, "Err") if not isinstance(inner_result, str) else None
+
+            if inner_ok is not None:
+                message = inner_ok
                 logger.info(f"Successfully registered realm {realm_name}: {message}")
 
                 # Store registry information locally
@@ -121,17 +133,15 @@ def register_realm(
                     "backend_url": backend_url,
                     "registry_canister": registry_canister_id,
                 }
-            elif hasattr(inner_result, "Err"):
-                error = inner_result.Err
-                logger.error(f"Registry returned error: {error}")
-                return {"success": False, "error": str(error)}
+            elif inner_err is not None:
+                logger.error(f"Registry returned error: {inner_err}")
+                return {"success": False, "error": str(inner_err)}
             else:
                 logger.error(f"Unexpected inner response: {inner_result}")
                 return {"success": False, "error": f"Unexpected response: {inner_result}"}
-        elif hasattr(result, "Err"):
-            error = result.Err
-            logger.error(f"Inter-canister call failed: {error}")
-            return {"success": False, "error": f"Call failed: {error}"}
+        elif err_val is not None:
+            logger.error(f"Inter-canister call failed: {err_val}")
+            return {"success": False, "error": f"Call failed: {err_val}"}
         else:
             logger.error(f"Unexpected response from registry: {result}")
             return {"success": False, "error": f"Unexpected response: {result}"}
