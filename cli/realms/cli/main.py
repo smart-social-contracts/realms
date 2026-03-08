@@ -13,6 +13,7 @@ from .commands.deploy import deploy_command
 from .commands.fs import fs_cat_command, fs_ls_command, fs_rm_command, fs_write_command
 from .commands.import_data import import_codex_command, import_data_command
 from .commands.export_data import export_data_command
+from .commands.extension import extension_command
 from .commands.marketplace import marketplace_create_command, marketplace_deploy_command
 from .commands.mundus import mundus_create_command, mundus_deploy_command, mundus_status_command
 from .commands.ps import ps_kill_command, ps_logs_command, ps_ls_command, ps_start_command
@@ -98,6 +99,18 @@ def import_data(
 ) -> None:
     """Import data into the realm. Supports JSON data and Python codex files."""
     import_data_command(file_path, entity_type, format, batch_size, dry_run, network, identity, canister, folder)
+
+
+@app.command("extension", hidden=True)
+def extension(
+    action: str = typer.Argument(..., help="Action to perform"),
+    extension_id: Optional[str] = typer.Option(None, "--extension-id", help="Extension ID"),
+    package_path: Optional[str] = typer.Option(None, "--package-path", help="Package path"),
+    source_dir: str = typer.Option("extensions", "--source-dir", help="Source directory"),
+    all_extensions: bool = typer.Option(False, "--all", help="All extensions"),
+) -> None:
+    """Manage Realm extensions."""
+    extension_command(action, extension_id, package_path, source_dir, all_extensions)
 
 
 @app.command("export", hidden=True)
