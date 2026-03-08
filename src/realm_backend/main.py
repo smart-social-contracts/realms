@@ -3,13 +3,83 @@ import importlib
 import json
 import sys
 import traceback
+import uuid
 
-# Patch traceback.format_exc if missing (basilisk WASM stub may not have it)
+# --- Patch stdlib modules that may be empty stubs in basilisk WASM ---
+# Basilisk's frozen_stdlib_preamble auto-stubs missing stdlib modules as empty
+# modules (no attributes). Patch the critical ones used by the backend.
+
 if not hasattr(traceback, 'format_exc'):
     def _format_exc():
         exc_info = sys.exc_info()
         return str(exc_info[1]) if exc_info[1] else ''
     traceback.format_exc = _format_exc
+
+if not hasattr(uuid, 'uuid4'):
+    import random as _rnd
+
+    class _UUID:
+        def __init__(self, hex_str):
+            self.hex = hex_str
+            self.int = int(hex_str, 16)
+        def __str__(self):
+            h = self.hex
+            return f'{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:]}'
+        def __repr__(self):
+            return f"UUID('{self}')"
+        def __eq__(self, other):
+            return isinstance(other, _UUID) and self.int == other.int
+        def __hash__(self):
+            return hash(self.int)
+
+    def _uuid4():
+        b = [_rnd.getrandbits(8) for _ in range(16)]
+        b[6] = (b[6] & 0x0f) | 0x40  # version 4
+        b[8] = (b[8] & 0x3f) | 0x80  # variant RFC 4122
+        return _UUID(''.join(f'{x:02x}' for x in b))
+
+    uuid.uuid4 = _uuid4
+    uuid.UUID = _UUID
+
+if not hasattr(base64, 'b64decode'):
+    import binascii as _binascii
+    _B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+
+    def _b64encode(data):
+        if isinstance(data, str):
+            data = data.encode()
+        out = []
+        for i in range(0, len(data), 3):
+            chunk = data[i:i+3]
+            n = (chunk[0] << 16) | (chunk[1] << 8 if len(chunk) > 1 else 0) | (chunk[2] if len(chunk) > 2 else 0)
+            out.append(_B64[(n >> 18) & 63])
+            out.append(_B64[(n >> 12) & 63])
+            out.append(_B64[(n >> 6) & 63] if len(chunk) > 1 else '=')
+            out.append(_B64[n & 63] if len(chunk) > 2 else '=')
+        return ''.join(out).encode()
+
+    _B64_INV = {c: i for i, c in enumerate(_B64)}
+    _B64_INV['='] = 0
+
+    def _b64decode(data):
+        if isinstance(data, (bytes, bytearray)):
+            data = data.decode('ascii')
+        data = data.rstrip('=')
+        pad = (4 - len(data) % 4) % 4
+        data += '=' * pad
+        out = []
+        for i in range(0, len(data), 4):
+            n = (_B64_INV.get(data[i], 0) << 18) | (_B64_INV.get(data[i+1], 0) << 12) | \
+                (_B64_INV.get(data[i+2], 0) << 6) | _B64_INV.get(data[i+3], 0)
+            out.append((n >> 16) & 0xff)
+            if data[i+2] != '=':
+                out.append((n >> 8) & 0xff)
+            if data[i+3] != '=':
+                out.append(n & 0xff)
+        return bytes(out)
+
+    base64.b64encode = _b64encode
+    base64.b64decode = _b64decode
 
 import api
 from api.extensions import list_extensions
