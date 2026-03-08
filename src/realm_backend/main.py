@@ -65,6 +65,13 @@ class CanisterInfo(Record):
     canister_type: text
 
 
+class QuarterInfoRecord(Record):
+    name: text
+    canister_id: text
+    population: nat
+    status: text
+
+
 class StatusRecord(Record):
     version: text
     status: text
@@ -95,6 +102,9 @@ class StatusRecord(Record):
     registries: Vec[CanisterInfo]
     dependencies: Vec[text]
     python_version: text
+    quarters: Vec[QuarterInfoRecord]
+    is_quarter: bool
+    parent_realm_canister_id: text
 
 
 class UserGetRecord(Record):
@@ -291,6 +301,114 @@ def set_canister_config(
         )
     except Exception as e:
         logger.error(f"Error setting canister config: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@update
+def register_quarter(quarter_name: text, quarter_canister_id: text) -> RealmResponse:
+    """
+    Register a new quarter under this realm.
+    Creates a Quarter entity linked to the realm.
+
+    Args:
+        quarter_name: Human-readable name for the quarter
+        quarter_canister_id: The canister principal ID of the quarter backend
+    """
+    try:
+        from ggg import Quarter, Realm
+
+        realm = Realm.load("1")
+        if not realm:
+            return RealmResponse(
+                success=False,
+                data=RealmResponseData(error="Realm not found")
+            )
+
+        # Check for duplicate canister ID
+        for q in Quarter.instances():
+            if q.canister_id == quarter_canister_id:
+                return RealmResponse(
+                    success=False,
+                    data=RealmResponseData(error=f"Quarter with canister ID {quarter_canister_id} already registered")
+                )
+
+        quarter = Quarter(
+            name=quarter_name,
+            canister_id=quarter_canister_id,
+        )
+        quarter.federation = realm
+
+        logger.info(f"Registered quarter '{quarter_name}' (canister: {quarter_canister_id})")
+
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(message=f"Quarter '{quarter_name}' registered with ID {quarter._id}")
+        )
+    except Exception as e:
+        logger.error(f"Error registering quarter: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@update
+def deregister_quarter(quarter_canister_id: text) -> RealmResponse:
+    """
+    Remove a quarter from this realm by its canister ID.
+
+    Args:
+        quarter_canister_id: The canister principal ID of the quarter to remove
+    """
+    try:
+        from ggg import Quarter
+
+        for q in Quarter.instances():
+            if q.canister_id == quarter_canister_id:
+                q.delete()
+                logger.info(f"Deregistered quarter with canister ID {quarter_canister_id}")
+                return RealmResponse(
+                    success=True,
+                    data=RealmResponseData(message=f"Quarter '{q.name}' deregistered")
+                )
+
+        return RealmResponse(
+            success=False,
+            data=RealmResponseData(error=f"Quarter with canister ID {quarter_canister_id} not found")
+        )
+    except Exception as e:
+        logger.error(f"Error deregistering quarter: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@update
+def set_quarter_config(parent_realm_canister_id: text) -> RealmResponse:
+    """
+    Configure this realm as a quarter of a parent realm.
+    Sets is_quarter=True and stores the parent realm's canister ID.
+
+    Args:
+        parent_realm_canister_id: The canister principal ID of the parent realm
+    """
+    try:
+        from ggg import Realm
+
+        realm = Realm.load("1")
+        if not realm:
+            return RealmResponse(
+                success=False,
+                data=RealmResponseData(error="Realm not found")
+            )
+
+        realm.is_quarter = True
+        realm.federation_realm_id = parent_realm_canister_id
+        realm.save()
+
+        logger.info(f"Configured realm as quarter of parent {parent_realm_canister_id}")
+
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(message=f"Realm configured as quarter of {parent_realm_canister_id}")
+        )
+    except Exception as e:
+        logger.error(f"Error setting quarter config: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 

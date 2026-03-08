@@ -16,6 +16,13 @@ from .commands.export_data import export_data_command
 from .commands.extension import extension_command
 from .commands.marketplace import marketplace_create_command, marketplace_deploy_command
 from .commands.mundus import mundus_create_command, mundus_deploy_command, mundus_status_command
+from .commands.quarter import (
+    quarter_create_command,
+    quarter_list_command,
+    quarter_register_command,
+    quarter_remove_command,
+    quarter_status_command,
+)
 from .commands.ps import ps_kill_command, ps_logs_command, ps_ls_command, ps_start_command
 from .commands.registry import (
     billing_add_credits_command,
@@ -606,6 +613,85 @@ def realm_extension(
     except Exception as e:
         console.print(f"[red]❌ Error executing extension call: {e}[/red]")
         raise typer.Exit(1)
+
+
+# Create quarter subcommand group under realm
+quarter_app = typer.Typer(name="quarter", help="Manage quarters within a realm")
+realm_app.add_typer(quarter_app, name="quarter")
+
+
+@quarter_app.command("create")
+def realm_quarter_create(
+    realm_ref: str = typer.Argument(help="Parent realm canister ID or name"),
+    quarter_name: str = typer.Option(..., "--quarter-name", help="Name for the new quarter"),
+    output_dir: str = typer.Option(
+        REALM_FOLDER, "--output-dir", help="Output directory for quarter files"
+    ),
+    network: str = typer.Option("local", "--network", "-n", help="Network to deploy to"),
+    deploy: bool = typer.Option(
+        False, "--deploy", help="Deploy the quarter after creation"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="Identity for IC deployment"
+    ),
+    mode: str = typer.Option(
+        "auto", "--mode", "-m", help="Deploy mode: auto, upgrade, or reinstall"
+    ),
+    manifest: Optional[str] = typer.Option(
+        None, "--manifest", help="Path to realm manifest.json for the quarter"
+    ),
+    bare: bool = typer.Option(
+        False, "--bare", help="Create minimal quarter (canisters only, no extensions or data)"
+    ),
+    plain_logs: bool = typer.Option(
+        False, "--plain-logs", help="Show full verbose output instead of progress UI"
+    ),
+) -> None:
+    """Create a new quarter backend and register it with a parent realm."""
+    quarter_create_command(
+        realm_ref, quarter_name, network, identity, mode,
+        output_dir, deploy, manifest, bare, plain_logs,
+    )
+
+
+@quarter_app.command("register")
+def realm_quarter_register(
+    realm_ref: str = typer.Argument(help="Parent realm canister ID or name"),
+    quarter_name: str = typer.Option(..., "--quarter-name", help="Name for the quarter"),
+    canister_id: str = typer.Option(..., "--canister-id", help="Canister ID of the quarter backend"),
+    network: str = typer.Option("local", "--network", "-n", help="Network to use"),
+) -> None:
+    """Register an existing deployed canister as a quarter of a realm."""
+    quarter_register_command(realm_ref, quarter_name, canister_id, network)
+
+
+@quarter_app.command("list")
+def realm_quarter_list(
+    realm_ref: str = typer.Argument(help="Realm canister ID or name"),
+    network: str = typer.Option("local", "--network", "-n", help="Network to use"),
+) -> None:
+    """List all quarters under a realm."""
+    quarter_list_command(realm_ref, network)
+
+
+@quarter_app.command("status")
+def realm_quarter_status(
+    realm_ref: str = typer.Argument(help="Realm canister ID or name"),
+    quarter_ref: str = typer.Argument(help="Quarter name or canister ID"),
+    network: str = typer.Option("local", "--network", "-n", help="Network to use"),
+) -> None:
+    """Show detailed status of a specific quarter."""
+    quarter_status_command(realm_ref, quarter_ref, network)
+
+
+@quarter_app.command("remove")
+def realm_quarter_remove(
+    realm_ref: str = typer.Argument(help="Realm canister ID or name"),
+    quarter_ref: str = typer.Argument(help="Quarter name or canister ID to remove"),
+    network: str = typer.Option("local", "--network", "-n", help="Network to use"),
+) -> None:
+    """Remove a quarter from a realm."""
+    quarter_remove_command(realm_ref, quarter_ref, network)
 
 
 # Create registry subcommand group

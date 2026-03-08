@@ -33,6 +33,12 @@ type RealmResponseData = variant {
   error : text;
   message : text;
 };
+type QuarterInfoRecord = record {
+  name : text;
+  canister_id : text;
+  population : nat;
+  status : text;
+};
 type StatusRecord = record {
   status : text;
   demo_mode : bool;
@@ -52,6 +58,9 @@ type StatusRecord = record {
   licenses_count : nat;
   users_count : nat;
   trades_count : nat;
+  quarters : vec QuarterInfoRecord;
+  is_quarter : bool;
+  parent_realm_canister_id : text;
 };
 type UserGetRecord = record {
   "principal" : principal;
@@ -85,6 +94,9 @@ service : () -> {
   list_extensions : (text) -> (RealmResponse) query;
   register_realm_with_registry : (text, text, text, text) -> (text);
   reload_entity_method_overrides : () -> (text);
+  register_quarter : (text, text) -> (RealmResponse);
+  deregister_quarter : (text) -> (RealmResponse);
+  set_quarter_config : (text) -> (RealmResponse);
   set_application_id : (text) -> (text);
   status : () -> (RealmResponse) query;
   stop_task : (text) -> (text);

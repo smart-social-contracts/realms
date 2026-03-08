@@ -6,6 +6,13 @@ interface CanisterInfo {
 	canister_type: string;
 }
 
+interface QuarterInfo {
+	name: string;
+	canister_id: string;
+	population: number;
+	status: string;
+}
+
 interface RealmInfo {
 	name: string;
 	logo: string;
@@ -13,6 +20,9 @@ interface RealmInfo {
 	welcomeMessage: string;
 	description: string;
 	registries: CanisterInfo[];
+	quarters: QuarterInfo[];
+	isQuarter: boolean;
+	parentRealmCanisterId: string;
 	loading: boolean;
 	error: string | null;
 }
@@ -25,6 +35,9 @@ const createRealmInfoStore = () => {
 		welcomeMessage: '',
 		description: '',
 		registries: [],
+		quarters: [],
+		isQuarter: false,
+		parentRealmCanisterId: '',
 		loading: true,
 		error: null
 	});
@@ -52,6 +65,9 @@ const createRealmInfoStore = () => {
 						welcomeMessage: status.realm_welcome_message || '',
 						description: status.realm_description || '',
 						registries: status.registries || [],
+						quarters: status.quarters || [],
+						isQuarter: status.is_quarter || false,
+						parentRealmCanisterId: status.parent_realm_canister_id || '',
 						loading: false
 					}));
 				} else {

@@ -151,6 +151,29 @@ export async function initBackendWithIdentity() {
 	}
 }
 
+// Quarter-aware actor: creates an actor for a specific canister ID
+export async function createQuarterActor(quarterCanisterId) {
+	if (buildingOrTesting) return dummyActor();
+
+	await initializeImports();
+
+	const client = authClient || (await initializeAuthClient());
+	let agent;
+
+	if (await client.isAuthenticated()) {
+		const identity = client.getIdentity();
+		agent = new HttpAgent({ identity });
+	} else {
+		agent = new HttpAgent();
+	}
+
+	if (isLocalDevelopment()) {
+		await agent.fetchRootKey().catch(() => {});
+	}
+
+	return createActor(quarterCanisterId, { agent });
+}
+
 // Debug helper: expose backend globally in browser console
 if (typeof window !== 'undefined') {
 	window.__debug_backend = backend;

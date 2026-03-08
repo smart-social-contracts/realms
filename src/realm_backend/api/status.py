@@ -15,6 +15,7 @@ from ggg import (
     Mandate,
     Organization,
     Proposal,
+    Quarter,
     Realm,
     Registry,
     Task,
@@ -156,6 +157,25 @@ def get_status() -> "dict[str, Any]":
     except Exception as e:
         logger.warning(f"Could not load registries: {e}")
 
+    # Quarter discovery
+    quarters = []
+    is_quarter = False
+    parent_realm_canister_id = ""
+    try:
+        first_realm = Realm.load("1")
+        if first_realm:
+            is_quarter = getattr(first_realm, 'is_quarter', False) or False
+            parent_realm_canister_id = getattr(first_realm, 'federation_realm_id', '') or ''
+            for q in Quarter.instances():
+                quarters.append({
+                    "name": q.name or "",
+                    "canister_id": q.canister_id or "",
+                    "population": q.population or 0,
+                    "status": q.status or "active",
+                })
+    except Exception as e:
+        logger.warning(f"Could not load quarter info: {e}")
+
     # Dependency versions injected at build time (runtime detection doesn't work in WASM)
     dependencies = [
         "ic-basilisk==BASILISK_VERSION_PLACEHOLDER",
@@ -195,4 +215,7 @@ def get_status() -> "dict[str, Any]":
         "registries": registries,
         "dependencies": dependencies,
         "python_version": sys.version,
+        "quarters": quarters,
+        "is_quarter": is_quarter,
+        "parent_realm_canister_id": parent_realm_canister_id,
     }
