@@ -5,14 +5,22 @@ try:
 except ImportError:
     pformat = repr
 
-from _cdk import Async, ic
+try:
+    from _cdk import Async, ic
+except ImportError:
+    from typing import List
+    Async = List  # subscriptable placeholder for type annotations
+    ic = None
 from ic_python_db import Entity, Integer, OneToOne, String, TimestampedMixin
 from ic_python_logging import get_logger
 
 try:
     from core.extensions import extension_async_call
 except ImportError:
-    from ..core.extensions import extension_async_call
+    try:
+        from ..core.extensions import extension_async_call
+    except ImportError:
+        extension_async_call = None
 
 logger = get_logger("entity.treasury")
 

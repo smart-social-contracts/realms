@@ -2,7 +2,13 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from _cdk import Async, Principal, ic
+try:
+    from _cdk import Async, Principal, ic
+except ImportError:
+    from typing import Any, List
+    Async = List  # subscriptable placeholder for type annotations
+    Principal = Any
+    ic = None
 from ic_python_db import Entity, Float, ManyToOne, OneToMany, String, TimestampedMixin
 from ic_python_logging import get_logger
 

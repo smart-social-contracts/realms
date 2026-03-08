@@ -9,8 +9,15 @@ between Codex code and TaskStep execution.
 from ic_python_db import Boolean, Entity, ManyToOne, OneToOne, String, TimestampedMixin
 from ic_python_logging import get_logger
 
-from core.execution import run_code
-from ggg.system.task_execution import TaskExecution
+try:
+    from core.execution import run_code
+except ImportError:
+    run_code = None
+
+try:
+    from ggg.system.task_execution import TaskExecution
+except ImportError:
+    from .task_execution import TaskExecution
 
 logger = get_logger("entity.call")
 

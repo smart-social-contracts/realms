@@ -10,9 +10,9 @@ from rich.table import Table
 from .commands.create import create_command
 from .commands.db import db_command, db_find_command, db_get_command, db_schema_command
 from .commands.deploy import deploy_command
-from .commands.export_data import export_data_command
-from .commands.extension import extension_command
+from .commands.fs import fs_cat_command, fs_ls_command, fs_rm_command, fs_write_command
 from .commands.import_data import import_codex_command, import_data_command
+from .commands.export_data import export_data_command
 from .commands.marketplace import marketplace_create_command, marketplace_deploy_command
 from .commands.mundus import mundus_create_command, mundus_deploy_command, mundus_status_command
 from .commands.ps import ps_kill_command, ps_logs_command, ps_ls_command, ps_start_command
@@ -72,30 +72,7 @@ app = typer.Typer(
 
 
 
-@app.command("extension")
-def extension(
-    action: str = typer.Argument(
-        ...,
-        help="Action to perform: list, install-from-source, package, install, uninstall",
-    ),
-    extension_id: Optional[str] = typer.Option(
-        None, "--extension-id", help="Extension ID for package/uninstall operations"
-    ),
-    package_path: Optional[str] = typer.Option(
-        None, "--package-path", help="Path to extension package for install operation"
-    ),
-    source_dir: str = typer.Option(
-        "extensions", "--source-dir", help="Source directory for extensions"
-    ),
-    all_extensions: bool = typer.Option(
-        False, "--all", help="Uninstall all extensions (only for uninstall action)"
-    ),
-) -> None:
-    """Manage Realm extensions."""
-    extension_command(action, extension_id, package_path, source_dir, all_extensions)
-
-
-@app.command("import")
+@app.command("import", hidden=True)
 def import_data(
     file_path: str = typer.Argument(..., help="Path to JSON data file"),
     entity_type: Optional[str] = typer.Option(
@@ -123,7 +100,7 @@ def import_data(
     import_data_command(file_path, entity_type, format, batch_size, dry_run, network, identity, canister, folder)
 
 
-@app.command("export")
+@app.command("export", hidden=True)
 def export_data(
     output_dir: str = typer.Option(
         "exported_realm", "--output-dir", help="Output directory for exported data"
@@ -144,10 +121,10 @@ def export_data(
 
 
 # Register deploy command directly from commands module
-app.command("deploy")(deploy_command)
+app.command("deploy", rich_help_panel="Lifecycle")(deploy_command)
 
 
-@app.command("status")
+@app.command("status", rich_help_panel="Utility")
 def status(
     network: Optional[str] = typer.Option(
         None, "--network", "-n", help="Network to use (overrides context)"
@@ -220,7 +197,7 @@ def status(
 
 # Create mundus subcommand group
 mundus_app = typer.Typer(name="mundus", help="Multi-realm mundus operations")
-app.add_typer(mundus_app, name="mundus")
+app.add_typer(mundus_app, name="mundus", rich_help_panel="Lifecycle")
 
 
 @mundus_app.command("create")
@@ -293,7 +270,7 @@ def mundus_status(
 
 # Create realm subcommand group
 realm_app = typer.Typer(name="realm", help="Realm-specific operations")
-app.add_typer(realm_app, name="realm")
+app.add_typer(realm_app, name="realm", rich_help_panel="Lifecycle")
 
 
 @realm_app.command("create")
@@ -620,7 +597,7 @@ def realm_extension(
 
 # Create registry subcommand group
 registry_app = typer.Typer(name="registry", help="Realm registry operations")
-app.add_typer(registry_app, name="registry")
+app.add_typer(registry_app, name="registry", rich_help_panel="Lifecycle")
 
 # Create registry realm subgroup
 registry_realm_app = typer.Typer(name="realm", help="Manage realms in registry")
@@ -889,10 +866,64 @@ def registry_status(
     registry_status_command(network, canister_id)
 
 
+@registry_app.command("call")
+def registry_call(
+    method: str = typer.Argument(help="Backend method to call (e.g. status, list_realms)"),
+    args: str = typer.Argument("()", help="Candid arguments for the method"),
+    network: str = typer.Option("local", "--network", "-n", help="Network to use"),
+    canister_id: Optional[str] = typer.Option(
+        None, "--canister-id", help="Registry canister ID (auto-detected if not provided)"
+    ),
+    output: str = typer.Option("json", "--output", "-o", help="Output format: json or candid"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show verbose output"),
+) -> None:
+    """Call a method on the registry backend canister directly."""
+    import subprocess
+    import sys
+
+    if output not in ("json", "candid"):
+        console.print(f"[red]❌ Invalid output format: {output}. Use 'json' or 'candid'[/red]")
+        raise typer.Exit(1)
+
+    # Resolve registry canister ID
+    effective_canister = canister_id or get_registry_canister_id(network)
+    if not effective_canister:
+        console.print("[red]❌ Could not determine registry canister ID. Use --canister-id.[/red]")
+        raise typer.Exit(1)
+
+    if verbose:
+        console.print(f"[dim]Registry Canister: {effective_canister}[/dim]")
+        console.print(f"[dim]Network: {network}[/dim]")
+        console.print(f"[dim]Method: {method}[/dim]")
+        console.print(f"[dim]Args: {args}[/dim]\n")
+
+    cmd = ["dfx", "canister", "call", "--network", network, effective_canister, method, args]
+    if output == "json":
+        cmd.extend(["--output", "json"])
+
+    try:
+        import os
+        env = os.environ.copy()
+        env["DFX_WARNING"] = "-mainnet_plaintext_identity"
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, env=env)
+        if result.returncode == 0:
+            print(result.stdout.strip())
+        else:
+            if result.stderr:
+                sys.stderr.write(f"Error: {result.stderr}\n")
+            raise typer.Exit(1)
+    except subprocess.TimeoutExpired:
+        sys.stderr.write("Error: Call timed out\n")
+        raise typer.Exit(1)
+    except Exception as e:
+        sys.stderr.write(f"Error: {e}\n")
+        raise typer.Exit(1)
+
+
 # ============== Marketplace Commands ==============
 
 marketplace_app = typer.Typer(name="marketplace", help="Extension marketplace operations")
-app.add_typer(marketplace_app, name="marketplace")
+app.add_typer(marketplace_app, name="marketplace", rich_help_panel="Lifecycle")
 
 
 @marketplace_app.command("create")
@@ -923,6 +954,52 @@ def marketplace_deploy(
 ) -> None:
     """Deploy a marketplace instance."""
     marketplace_deploy_command(folder, network, mode, identity)
+
+
+@marketplace_app.command("call")
+def marketplace_call(
+    method: str = typer.Argument(help="Backend method to call (e.g. status, list_extensions)"),
+    args: str = typer.Argument("()", help="Candid arguments for the method"),
+    network: str = typer.Option("local", "--network", "-n", help="Network to use"),
+    canister_id: str = typer.Option(..., "--canister-id", help="Marketplace canister ID"),
+    output: str = typer.Option("json", "--output", "-o", help="Output format: json or candid"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show verbose output"),
+) -> None:
+    """Call a method on the marketplace backend canister directly."""
+    import subprocess
+    import sys
+
+    if output not in ("json", "candid"):
+        console.print(f"[red]❌ Invalid output format: {output}. Use 'json' or 'candid'[/red]")
+        raise typer.Exit(1)
+
+    if verbose:
+        console.print(f"[dim]Marketplace Canister: {canister_id}[/dim]")
+        console.print(f"[dim]Network: {network}[/dim]")
+        console.print(f"[dim]Method: {method}[/dim]")
+        console.print(f"[dim]Args: {args}[/dim]\n")
+
+    cmd = ["dfx", "canister", "call", "--network", network, canister_id, method, args]
+    if output == "json":
+        cmd.extend(["--output", "json"])
+
+    try:
+        import os
+        env = os.environ.copy()
+        env["DFX_WARNING"] = "-mainnet_plaintext_identity"
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, env=env)
+        if result.returncode == 0:
+            print(result.stdout.strip())
+        else:
+            if result.stderr:
+                sys.stderr.write(f"Error: {result.stderr}\n")
+            raise typer.Exit(1)
+    except subprocess.TimeoutExpired:
+        sys.stderr.write("Error: Call timed out\n")
+        raise typer.Exit(1)
+    except Exception as e:
+        sys.stderr.write(f"Error: {e}\n")
+        raise typer.Exit(1)
 
 
 # ============== Billing Commands ==============
@@ -1456,7 +1533,7 @@ def _show_remote_realm_status(backend_canister_id: str, realm_name: str, network
 
 # Create db subcommand group
 db_app = typer.Typer(name="db", help="Database exploration and querying", invoke_without_command=True)
-app.add_typer(db_app, name="db")
+app.add_typer(db_app, name="db", rich_help_panel="Development")
 
 
 @db_app.callback()
@@ -1545,7 +1622,56 @@ def db_schema(
     db_schema_command(network, canister, folder)
 
 
-@app.command("shell")
+@db_app.command("import")
+def db_import(
+    ctx: typer.Context,
+    file_path: str = typer.Argument(..., help="Path to JSON data file or Python codex file"),
+    entity_type: Optional[str] = typer.Option(
+        None, "--type", help="Entity type (codex for Python files, or json entity type)"
+    ),
+    format: str = typer.Option("json", "--format", help="Data format (json)"),
+    batch_size: int = typer.Option(
+        MAX_BATCH_SIZE, "--batch-size", help="Batch size for import"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Preview import without making changes"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", "-i", help="Identity to use for import"
+    ),
+) -> None:
+    """Import data into the realm. Supports JSON data and Python codex files."""
+    network = ctx.obj.get("network") if ctx.obj else None
+    canister = ctx.obj.get("canister") if ctx.obj else None
+    folder = ctx.obj.get("folder") if ctx.obj else None
+    effective_network = network or "local"
+    effective_canister = canister or "realm_backend"
+    import_data_command(file_path, entity_type, format, batch_size, dry_run, effective_network, identity, effective_canister, folder)
+
+
+@db_app.command("export")
+def db_export(
+    ctx: typer.Context,
+    output_dir: str = typer.Option(
+        "exported_realm", "--output-dir", help="Output directory for exported data"
+    ),
+    entity_types: Optional[str] = typer.Option(
+        None, "--entity-types", help="Comma-separated list of entity types to export (default: all)"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="Path to identity PEM file or identity name for dfx"
+    ),
+    include_codexes: bool = typer.Option(
+        True, "--include-codexes/--no-codexes", help="Include codexes in export (default: True)"
+    ),
+) -> None:
+    """Export data from the realm. Saves JSON data and Python codex files."""
+    network = ctx.obj.get("network") if ctx.obj else None
+    effective_network = network or "local"
+    export_data_command(output_dir, entity_types, effective_network, identity, include_codexes)
+
+
+@app.command("shell", rich_help_panel="Development")
 def shell(
     network: Optional[str] = typer.Option(
         None, "--network", "-n", help="Network to use (overrides context)"
@@ -1573,7 +1699,7 @@ def shell(
     shell_command(effective_network, effective_canister, file, effective_cwd, exec_code=exec_code)
 
 
-@app.command("run")
+@app.command("run", rich_help_panel="Development")
 def run(
     network: Optional[str] = typer.Option(
         None, "--network", "-n", help="Network to use (overrides context)"
@@ -1618,7 +1744,7 @@ def run(
 
 # Create network subcommand group
 network_app = typer.Typer(name="network", help="Network context management")
-app.add_typer(network_app, name="network")
+app.add_typer(network_app, name="network", rich_help_panel="Utility")
 
 
 @network_app.command("set")
@@ -1673,7 +1799,7 @@ def network_unset() -> None:
 
 # Create ps subcommand group
 ps_app = typer.Typer(name="ps", help="Manage scheduled tasks")
-app.add_typer(ps_app, name="ps")
+app.add_typer(ps_app, name="ps", rich_help_panel="Development")
 
 
 @ps_app.command("ls")
@@ -1802,7 +1928,115 @@ def ps_logs(
     )
 
 
-@app.command("clean")
+# Create fs subcommand group
+fs_app = typer.Typer(name="fs", help="Browse canister filesystem")
+app.add_typer(fs_app, name="fs", rich_help_panel="Development")
+
+
+@fs_app.command("ls")
+def fs_ls(
+    path: str = typer.Argument("/", help="Directory path to list"),
+    network: Optional[str] = typer.Option(
+        None, "--network", "-n", help="Network to use (overrides context)"
+    ),
+    canister: Optional[str] = typer.Option(
+        None, "--canister", "-c", help="Canister name (overrides context)"
+    ),
+    folder: Optional[str] = typer.Option(
+        None, "--folder", "-f", help="Realm folder (overrides context)"
+    ),
+) -> None:
+    """List files and directories on the canister filesystem."""
+    effective_network, effective_canister = get_effective_network_and_canister(
+        network, canister
+    )
+    effective_cwd = get_effective_cwd(folder)
+    fs_ls_command(path, effective_network, effective_canister, effective_cwd)
+
+
+@fs_app.command("cat")
+def fs_cat(
+    path: str = typer.Argument(help="File path to read"),
+    network: Optional[str] = typer.Option(
+        None, "--network", "-n", help="Network to use (overrides context)"
+    ),
+    canister: Optional[str] = typer.Option(
+        None, "--canister", "-c", help="Canister name (overrides context)"
+    ),
+    folder: Optional[str] = typer.Option(
+        None, "--folder", "-f", help="Realm folder (overrides context)"
+    ),
+) -> None:
+    """Read a file from the canister filesystem."""
+    effective_network, effective_canister = get_effective_network_and_canister(
+        network, canister
+    )
+    effective_cwd = get_effective_cwd(folder)
+    fs_cat_command(path, effective_network, effective_canister, effective_cwd)
+
+
+@fs_app.command("write")
+def fs_write(
+    path: str = typer.Argument(help="File path to write to"),
+    content: Optional[str] = typer.Option(
+        None, "--content", help="Content to write (alternative to stdin/file)"
+    ),
+    input_file: Optional[str] = typer.Option(
+        None, "--input", "-i", help="Local file to upload"
+    ),
+    network: Optional[str] = typer.Option(
+        None, "--network", "-n", help="Network to use (overrides context)"
+    ),
+    canister: Optional[str] = typer.Option(
+        None, "--canister", "-c", help="Canister name (overrides context)"
+    ),
+    folder: Optional[str] = typer.Option(
+        None, "--folder", "-f", help="Realm folder (overrides context)"
+    ),
+) -> None:
+    """Write content to a file on the canister filesystem."""
+    if input_file:
+        try:
+            with open(input_file, "r") as f:
+                file_content = f.read()
+        except Exception as e:
+            console.print(f"[red]❌ Error reading file: {e}[/red]")
+            raise typer.Exit(1)
+    elif content:
+        file_content = content
+    else:
+        console.print("[red]❌ Provide --content or --input[/red]")
+        raise typer.Exit(1)
+
+    effective_network, effective_canister = get_effective_network_and_canister(
+        network, canister
+    )
+    effective_cwd = get_effective_cwd(folder)
+    fs_write_command(path, file_content, effective_network, effective_canister, effective_cwd)
+
+
+@fs_app.command("rm")
+def fs_rm(
+    path: str = typer.Argument(help="File path to remove"),
+    network: Optional[str] = typer.Option(
+        None, "--network", "-n", help="Network to use (overrides context)"
+    ),
+    canister: Optional[str] = typer.Option(
+        None, "--canister", "-c", help="Canister name (overrides context)"
+    ),
+    folder: Optional[str] = typer.Option(
+        None, "--folder", "-f", help="Realm folder (overrides context)"
+    ),
+) -> None:
+    """Remove a file from the canister filesystem."""
+    effective_network, effective_canister = get_effective_network_and_canister(
+        network, canister
+    )
+    effective_cwd = get_effective_cwd(folder)
+    fs_rm_command(path, effective_network, effective_canister, effective_cwd)
+
+
+@app.command("clean", rich_help_panel="Utility")
 def clean(
     yes: bool = typer.Option(
         False, "--yes", "-y", help="Skip confirmation prompt"
@@ -1855,7 +2089,7 @@ def clean(
     console.print("\n[green]🎉 Cleanup complete![/green]")
 
 
-@app.command("version")
+@app.command("version", hidden=True)
 def version() -> None:
     """Show version information."""
     import subprocess
