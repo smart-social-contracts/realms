@@ -177,7 +177,7 @@ jobs:
           mkdir -p cli/tests
           docker run --rm \
             -v ${{ github.workspace }}/cli/dist:/dist \
-            ghcr.io/smart-social-contracts/icp-dev-env:ebc54a2 \
+            ghcr.io/smart-social-contracts/icp-dev-env:b26e7e9 \
             bash -c "pip install /dist/realms_gos-*.whl && realms realm create --deploy --plain-logs" \
             2>&1 | tee cli/tests/cli-pip-test.log
       
