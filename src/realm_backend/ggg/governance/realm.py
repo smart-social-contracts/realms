@@ -1,4 +1,4 @@
-from ic_python_db import Entity, Integer, OneToMany, OneToOne, String, TimestampedMixin
+from ic_python_db import Boolean, Entity, Integer, OneToMany, OneToOne, String, TimestampedMixin
 from ic_python_logging import get_logger
 from ..system.constants import STATUS_MAX_LENGTH
 
@@ -31,3 +31,8 @@ class Realm(Entity, TimestampedMixin):
     frontend_canister_id = String(max_length=64)
     token_canister_id = String(max_length=64)
     nft_canister_id = String(max_length=64)
+    # Quarter/Federation fields (dormant for single-quarter realms)
+    is_quarter = Boolean(default=False)
+    federation_realm_id = String(max_length=64)  # parent realm ID if this is a quarter
+    quarter_ids = OneToMany("Quarter", "federation")
+    federation_codex = OneToOne("Codex", "federation")

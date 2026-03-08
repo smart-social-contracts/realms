@@ -10,6 +10,7 @@ class Codex(Entity, TimestampedMixin):
     checksum = String()  # Optional SHA-256 checksum for verification
     calls = OneToMany("Call", "codex")
     courts = OneToMany("Court", "codex")
+    federation = OneToOne("Realm", "federation_codex")
     __alias__ = "name"
 
     @property
