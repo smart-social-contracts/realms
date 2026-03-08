@@ -174,8 +174,64 @@ export async function createQuarterActor(quarterCanisterId) {
 	return createActor(quarterCanisterId, { agent });
 }
 
+// --- Quarter-aware backend store ---
+// Holds the currently-active actor: main realm backend OR a quarter actor.
+// Import activeQuarterId from quarters store and subscribe to swap actors.
+export const quarterBackendStore = writable(buildingOrTesting ? dummyActor() : null);
+
+let _currentQuarterId = null;
+
+/**
+ * Switch the quarterBackend to a specific quarter canister, or back to the
+ * main realm backend when quarterId is null.
+ */
+export async function setActiveQuarter(quarterId) {
+	if (quarterId === _currentQuarterId) return;
+	_currentQuarterId = quarterId;
+
+	if (!quarterId) {
+		// Revert to main realm backend
+		const main = get(backendStore);
+		quarterBackendStore.set(main || backend);
+		console.log('🏛️ quarterBackend → main realm');
+		return;
+	}
+
+	try {
+		const actor = await createQuarterActor(quarterId);
+		quarterBackendStore.set(actor);
+		console.log(`🏘️ quarterBackend → quarter ${quarterId}`);
+	} catch (e) {
+		console.error('Failed to create quarter actor, falling back to main:', e);
+		quarterBackendStore.set(get(backendStore) || backend);
+	}
+}
+
+// Proxy that always resolves to the current quarter (or main) backend
+export const quarterBackend = new Proxy(
+	{},
+	{
+		get: function (target, prop) {
+			const current = get(quarterBackendStore);
+			if (!current) {
+				// Not initialised yet — delegate to main backend
+				return (...args) => backend[prop](...args);
+			}
+			return current[prop];
+		}
+	}
+);
+
+// Initialise quarterBackendStore to the main backend once it is ready
+backendStore.subscribe((actor) => {
+	if (actor && !_currentQuarterId) {
+		quarterBackendStore.set(actor);
+	}
+});
+
 // Debug helper: expose backend globally in browser console
 if (typeof window !== 'undefined') {
 	window.__debug_backend = backend;
+	window.__debug_quarterBackend = quarterBackend;
 	console.log('🔍 Debug: backend available as window.__debug_backend');
 }
