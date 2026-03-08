@@ -70,20 +70,22 @@ def register_realm(
             logger.info(f"Constructed full logo URL: {realm_logo}")
 
         # Create registry canister reference and make inter-canister call
-        # Pack canister IDs into JSON string (Basilisk limits params to 6 including self)
+        # Pack canister IDs into pipe-delimited string (Basilisk limits params to 6 including self)
+        # Format: frontend_id|token_id|nft_id
+        # NOTE: Cannot use JSON here — basilisk's Candid encoder parses {} as record syntax
         canister_ids = canister_ids or {}
-        canister_ids_json = json.dumps({
-            "frontend_canister_id": canister_ids.get("frontend_canister_id", ""),
-            "token_canister_id": canister_ids.get("token_canister_id", ""),
-            "nft_canister_id": canister_ids.get("nft_canister_id", ""),
-        })
+        canister_ids_packed = "|".join([
+            canister_ids.get("frontend_canister_id", ""),
+            canister_ids.get("token_canister_id", ""),
+            canister_ids.get("nft_canister_id", ""),
+        ])
         logger.info(
-            f"Calling registry register_realm with args: ({realm_name}, {realm_url}, {realm_logo}, {backend_url}, {canister_ids_json})"
+            f"Calling registry register_realm with args: ({realm_name}, {realm_url}, {realm_logo}, {backend_url}, {canister_ids_packed})"
         )
 
         registry = RealmRegistryService(Principal.from_str(registry_canister_id))
         result: CallResult[AddRealmResult] = yield registry.register_realm(
-            realm_name, realm_url, realm_logo, backend_url, canister_ids_json
+            realm_name, realm_url, realm_logo, backend_url, canister_ids_packed
         )
 
         logger.info(f"Registry call result: {result}")

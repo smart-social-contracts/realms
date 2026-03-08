@@ -727,15 +727,11 @@ def registry_add(
     console.print(f"[dim]Network:[/dim] {network}\n")
     
     # Call realm backend's register_realm_with_registry (secure inter-canister call)
-    # Pack canister IDs into JSON (Basilisk limits params to 5)
-    canister_ids_json = json.dumps({
-        "backend_url": backend_url,
-        "frontend_canister_id": frontend_canister_id,
-        "token_canister_id": token_canister_id,
-        "nft_canister_id": nft_canister_id,
-    }).replace('"', '\\"')  # Escape quotes for dfx call
+    # Pack canister IDs as pipe-delimited string: frontend_id|token_id|nft_id
+    # NOTE: Cannot use JSON — basilisk's Candid encoder parses {} as record syntax
+    canister_ids_packed = f"{frontend_canister_id}|{token_canister_id}|{nft_canister_id}"
     
-    args = f'("{registry_canister_id}", "{realm_name}", "{frontend_url}", "{logo_url}", "{canister_ids_json}")'
+    args = f'("{registry_canister_id}", "{realm_name}", "{frontend_url}", "{logo_url}", "{canister_ids_packed}")'
     cmd = ["dfx", "canister", "call", "--network", network, realm_backend_canister, "register_realm_with_registry", args]
     
     try:

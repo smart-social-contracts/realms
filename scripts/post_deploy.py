@@ -176,10 +176,10 @@ try:
             print(f"   Registering realm with central registry...")
             
             # Call realm_backend's register_realm function which makes inter-canister call
-            # Signature: register_realm_with_registry(registry_canister_id, realm_name, frontend_url, logo_url, canister_ids_json)
-            # canister_ids_json should contain backend_url and other canister IDs
-            canister_ids_json = json.dumps({"backend_url": backend_url}).replace('"', '\\"')
-            register_args = f'("{registry_canister_id}", "{realm_name}", "{frontend_url}", "{logo_url}", "{canister_ids_json}")'
+            # Signature: register_realm_with_registry(registry_canister_id, realm_name, frontend_url, logo_url, canister_ids_packed)
+            # canister_ids_packed is pipe-delimited: frontend_id|token_id|nft_id (JSON triggers basilisk Candid bug)
+            canister_ids_packed = "||"  # frontend|token|nft - empty for now
+            register_args = f'("{registry_canister_id}", "{realm_name}", "{frontend_url}", "{logo_url}", "{canister_ids_packed}")'
             register_cmd = [
                 'dfx', 'canister', 'call', backend_name_local, 'register_realm_with_registry',
                 register_args,

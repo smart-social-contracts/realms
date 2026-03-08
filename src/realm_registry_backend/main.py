@@ -423,14 +423,28 @@ def register_realm(
     Note: Basilisk limits canister methods to 5 params, so canister IDs are passed as JSON.
     """
     try:
-        # Parse canister IDs from JSON string
-        canister_ids = json.loads(canister_ids_json) if canister_ids_json else {}
+        # Parse canister IDs — pipe-delimited format: frontend_id|token_id|nft_id
+        # (JSON format triggers basilisk Candid encoder bug, so we use pipe-delimited)
+        frontend_canister_id = ""
+        token_canister_id = ""
+        nft_canister_id = ""
+        if canister_ids_json and "|" in canister_ids_json:
+            parts = canister_ids_json.split("|")
+            frontend_canister_id = parts[0] if len(parts) > 0 else ""
+            token_canister_id = parts[1] if len(parts) > 1 else ""
+            nft_canister_id = parts[2] if len(parts) > 2 else ""
+        elif canister_ids_json and canister_ids_json.startswith("{"):
+            # Fallback: JSON format (for direct dfx calls)
+            canister_ids = json.loads(canister_ids_json)
+            frontend_canister_id = canister_ids.get("frontend_canister_id", "")
+            token_canister_id = canister_ids.get("token_canister_id", "")
+            nft_canister_id = canister_ids.get("nft_canister_id", "")
         
         result = register_realm_by_caller(
             name, url, logo, backend_url,
-            frontend_canister_id=canister_ids.get("frontend_canister_id", ""),
-            token_canister_id=canister_ids.get("token_canister_id", ""),
-            nft_canister_id=canister_ids.get("nft_canister_id", ""),
+            frontend_canister_id=frontend_canister_id,
+            token_canister_id=token_canister_id,
+            nft_canister_id=nft_canister_id,
         )
         if result["success"]:
             return {"Ok": result["message"]}

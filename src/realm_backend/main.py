@@ -2101,12 +2101,19 @@ def register_realm_with_registry(
         JSON string with success status and message
     """
     try:
-        # Parse canister IDs from JSON
-        canister_ids = json.loads(canister_ids_json) if canister_ids_json else {}
-        backend_url = canister_ids.get("backend_url", "")
+        # canister_ids_json is pipe-delimited: frontend_id|token_id|nft_id
+        # (JSON triggers basilisk Candid encoder bug)
+        canister_ids = {}
+        if canister_ids_json and "|" in canister_ids_json:
+            parts = canister_ids_json.split("|")
+            canister_ids = {
+                "frontend_canister_id": parts[0] if len(parts) > 0 else "",
+                "token_canister_id": parts[1] if len(parts) > 1 else "",
+                "nft_canister_id": parts[2] if len(parts) > 2 else "",
+            }
         
         result = yield register_realm(
-            registry_canister_id, realm_name, frontend_url, logo_url, backend_url,
+            registry_canister_id, realm_name, frontend_url, logo_url, "",
             canister_ids
         )
         return json.dumps(result, indent=2)
