@@ -344,6 +344,8 @@ class StatusRecord(Record):
     commit_datetime: text
     status: text
     realms_count: nat64
+    dependencies: Vec[text]
+    python_version: text
 
 
 class GetStatusResult(Variant, total=False):
@@ -388,6 +390,8 @@ def status() -> GetStatusResult:
                 commit_datetime=status_data["commit_datetime"],
                 status=status_data["status"],
                 realms_count=status_data["realms_count"],
+                dependencies=status_data["dependencies"],
+                python_version=status_data["python_version"],
             )
         }
     except Exception as e:

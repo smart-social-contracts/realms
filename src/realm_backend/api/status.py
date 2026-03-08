@@ -200,4 +200,5 @@ def get_status() -> "dict[str, Any]":
         "canisters": canisters,
         "registries": registries,
         "dependencies": dependencies,
+        "python_version": sys.version,
     }

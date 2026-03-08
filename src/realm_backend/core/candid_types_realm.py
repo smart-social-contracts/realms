@@ -41,6 +41,7 @@ class StatusRecord(Record):
     canisters: Vec[CanisterInfo]
     registries: Vec[CanisterInfo]
     dependencies: Vec[text]
+    python_version: text
 
 
 class UserGetRecord(Record):

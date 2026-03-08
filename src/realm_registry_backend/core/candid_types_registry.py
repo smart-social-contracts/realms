@@ -79,6 +79,8 @@ class StatusRecord(Record):
     commit_datetime: text
     status: text
     realms_count: nat64
+    dependencies: Vec[text]
+    python_version: text
 
 
 class GetStatusResult(Variant, total=False):
