@@ -316,10 +316,11 @@ def test_status():
         status = get_status()
         assert status["realms_count"] == 2, f"Expected 2 realms, got {status['realms_count']}"
 
-        # Verify placeholder values are present (they get replaced during build)
-        assert status["version"] == "VERSION_PLACEHOLDER", f"Expected VERSION_PLACEHOLDER, got {status['version']}"
-        assert status["commit"] == "COMMIT_HASH_PLACEHOLDER", f"Expected COMMIT_HASH_PLACEHOLDER, got {status['commit']}"
-        assert status["commit_datetime"] == "COMMIT_DATETIME_PLACEHOLDER", f"Expected COMMIT_DATETIME_PLACEHOLDER, got {status['commit_datetime']}"
+        # Verify version/commit fields are present and non-empty
+        # (placeholders are replaced by CI sed commands before tests run)
+        assert status["version"], "version should be non-empty"
+        assert status["commit"], "commit should be non-empty"
+        assert status["commit_datetime"], "commit_datetime should be non-empty"
 
         print_success("status tests passed")
         return True
