@@ -1556,6 +1556,9 @@ def shell(
     file: Optional[str] = typer.Option(
         None, "--file", "-f", help="Execute Python file instead of interactive shell"
     ),
+    exec_code: Optional[str] = typer.Option(
+        None, "--exec", "-e", help="Execute Python code string directly (like python -c)"
+    ),
     folder: Optional[str] = typer.Option(
         None, "--folder", help="Realm folder to use (overrides context)"
     ),
@@ -1567,7 +1570,7 @@ def shell(
     )
     # Get effective working directory from context
     effective_cwd = get_effective_cwd(folder)
-    shell_command(effective_network, effective_canister, file, effective_cwd)
+    shell_command(effective_network, effective_canister, file, effective_cwd, exec_code=exec_code)
 
 
 @app.command("run")

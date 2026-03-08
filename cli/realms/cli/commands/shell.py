@@ -245,8 +245,17 @@ def shell_command(
     canister: str,
     file: Optional[str],
     cwd: Optional[str] = None,
+    exec_code: Optional[str] = None,
 ) -> None:
     """Start an interactive Python shell connected to the Realms backend canister or execute a Python file."""
+    # If exec_code is provided, execute it directly and return
+    if exec_code:
+        shell = RealmsShell(canister_name=canister, network=network, cwd=cwd)
+        result = shell.execute(exec_code)
+        if result:
+            console.print(result)
+        return
+
     # If file is provided, execute it instead of interactive shell
     if file:
         console.print(f"[bold blue]📄 Executing Python file: {file}[/bold blue]\n")
