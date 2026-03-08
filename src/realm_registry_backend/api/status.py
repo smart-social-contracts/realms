@@ -35,19 +35,12 @@ def get_status() -> "dict[str, Any]":
     commit_hash = "COMMIT_HASH_PLACEHOLDER"
     commit_datetime = "COMMIT_DATETIME_PLACEHOLDER"
 
-    # Collect dependency versions
-    dependencies = []
-    for pkg_name, import_name in [
-        ("ic-basilisk", "basilisk"),
-        ("ic-python-db", "ic_python_db"),
-        ("ic-python-logging", "ic_python_logging"),
-    ]:
-        try:
-            mod = __import__(import_name)
-            ver = getattr(mod, "__version__", "unknown")
-            dependencies.append(f"{pkg_name}=={ver}")
-        except Exception:
-            pass
+    # Dependency versions injected at build time (runtime detection doesn't work in WASM)
+    dependencies = [
+        "ic-basilisk==BASILISK_VERSION_PLACEHOLDER",
+        "ic-python-db==IC_PYTHON_DB_VERSION_PLACEHOLDER",
+        "ic-python-logging==IC_PYTHON_LOGGING_VERSION_PLACEHOLDER",
+    ]
 
     return {
         "version": version,

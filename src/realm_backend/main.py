@@ -82,6 +82,7 @@ class StatusRecord(Record):
     proposals_count: nat
     votes_count: nat
     commit: text
+    commit_datetime: text
     extensions: Vec[text]
     demo_mode: bool
     realm_name: text

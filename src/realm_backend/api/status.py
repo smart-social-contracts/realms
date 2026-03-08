@@ -102,8 +102,9 @@ def get_status() -> "dict[str, Any]":
     except Exception as e:
         logger.warning(f"Could not list extensions: {e}")
 
-    # Static values
+    # Static values — placeholders replaced at build time by CI
     commit_hash = "COMMIT_HASH_PLACEHOLDER"
+    commit_datetime = "COMMIT_DATETIME_PLACEHOLDER"
     version = "VERSION_PLACEHOLDER"
     demo_mode = False
 
@@ -155,20 +156,12 @@ def get_status() -> "dict[str, Any]":
     except Exception as e:
         logger.warning(f"Could not load registries: {e}")
 
-    # Collect dependency versions
-    dependencies = []
-    for pkg_name, import_name in [
-        ("ic-basilisk", "basilisk"),
-        ("kybra", "kybra"),
-        ("ic-python-db", "ic_python_db"),
-        ("ic-python-logging", "ic_python_logging"),
-    ]:
-        try:
-            mod = __import__(import_name)
-            ver = getattr(mod, "__version__", "unknown")
-            dependencies.append(f"{pkg_name}=={ver}")
-        except Exception:
-            pass
+    # Dependency versions injected at build time (runtime detection doesn't work in WASM)
+    dependencies = [
+        "ic-basilisk==BASILISK_VERSION_PLACEHOLDER",
+        "ic-python-db==IC_PYTHON_DB_VERSION_PLACEHOLDER",
+        "ic-python-logging==IC_PYTHON_LOGGING_VERSION_PLACEHOLDER",
+    ]
 
     # Return data in the format expected by the Status Candid type
     return {
@@ -194,6 +187,7 @@ def get_status() -> "dict[str, Any]":
         "proposals_count": proposals_count,
         "votes_count": votes_count,
         "commit": commit_hash,
+        "commit_datetime": commit_datetime,
         "extensions": extension_names,
         "demo_mode": demo_mode,
         "task_manager": task_manager_status,
