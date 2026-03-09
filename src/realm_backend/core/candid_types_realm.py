@@ -1,4 +1,4 @@
-from _cdk import Opt, Principal, Record, Variant, Vec, float64, nat, text
+from _cdk import Opt, Principal, Record, Variant, Vec, float64, nat, text, bool
 
 
 class PaginationInfo(Record):
@@ -11,6 +11,13 @@ class PaginationInfo(Record):
 class CanisterInfo(Record):
     canister_id: text
     canister_type: text
+
+
+class QuarterInfoRecord(Record):
+    name: text
+    canister_id: text
+    population: nat
+    status: text
 
 
 class StatusRecord(Record):
@@ -43,6 +50,9 @@ class StatusRecord(Record):
     registries: Vec[CanisterInfo]
     dependencies: Vec[text]
     python_version: text
+    quarters: Vec[QuarterInfoRecord]
+    is_quarter: bool
+    parent_realm_canister_id: text
 
 
 class UserGetRecord(Record):
