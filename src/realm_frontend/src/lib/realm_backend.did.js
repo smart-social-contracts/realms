@@ -66,6 +66,7 @@ type UserGetRecord = record {
   "principal" : principal;
   profile_picture_url : text;
   profiles : vec text;
+  assigned_quarter : text;
 };
 service : () -> {
   check_verification_status : (text) -> (text);
@@ -91,7 +92,7 @@ service : () -> {
   get_verification_link : (text) -> (text);
   http_transform : (HttpTransformArgs) -> (HttpResponse) query;
   initialize : () -> ();
-  join_realm : (text) -> (RealmResponse);
+  join_realm : (text, text) -> (RealmResponse);
   list_extensions : (text) -> (RealmResponse) query;
   register_realm_with_registry : (text, text, text, text) -> (text);
   reload_entity_method_overrides : () -> (text);

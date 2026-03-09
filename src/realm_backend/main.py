@@ -531,6 +531,7 @@ def get_my_user_status() -> RealmResponse:
                     principal=Principal.from_str(user["principal"]),
                     profiles=profiles,
                     profile_picture_url=user["profile_picture_url"],
+                    assigned_quarter="",
                 )
             ),
         )
@@ -555,6 +556,7 @@ def update_my_profile_picture(profile_picture_url: str) -> RealmResponse:
                     principal=ic.caller(),
                     profiles=Vec[text](),
                     profile_picture_url=result["profile_picture_url"],
+                    assigned_quarter="",
                 )
             ),
         )

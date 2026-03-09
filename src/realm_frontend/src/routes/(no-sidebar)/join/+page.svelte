@@ -124,7 +124,7 @@
     try {
       loading = true;
       console.log(`Joining realm with profile: ${selectedProfile}`);
-      const response = await backend.join_realm(selectedProfile);
+      const response = await backend.join_realm(selectedProfile, '');
       if (response.success) {
         currentStep = 'success';
       } else if (response.data && response.data.Error) {
