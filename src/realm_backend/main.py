@@ -2102,7 +2102,7 @@ def create_scheduled_task(
         logger.info(f"Auto-detected is_async={is_async} for task {name}")
 
         # Create call and step
-        call = Call(codex=codex)
+        call = Call(codex=codex, is_async=is_async)
         step = TaskStep(call=call, run_next_after=0)
 
         # Create task (using TaskManager Task, not GGG Task)
