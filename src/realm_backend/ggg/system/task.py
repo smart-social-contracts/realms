@@ -44,7 +44,7 @@ class Task(Entity, TimestampedMixin):
         execution = TaskExecution(
             name=execution_name,
             task=self,
-            status=TaskExecutionStatus.IDLE.value,
+            status=TaskExecutionStatus.IDLE,
             result="",
         )
         return execution
