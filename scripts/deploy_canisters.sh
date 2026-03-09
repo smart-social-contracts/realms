@@ -280,8 +280,17 @@ for canister in $BACKENDS; do
             echo "   💰 Topping up $canister ($canister_id) with 1 TC..."
             dfx cycles top-up "$canister_id" 1000000000000 --network "$NETWORK" 2>/dev/null || true
         fi
+        # Detect if canister has WASM installed; if not, force install mode
+        CANISTER_MODE="$MODE"
+        if [ "$CANISTER_MODE" = "upgrade" ] && [ -n "$canister_id" ]; then
+            module_hash=$(dfx canister info "$canister_id" --network "$NETWORK" 2>/dev/null | grep -i "module hash" | grep -i "none" || true)
+            if [ -n "$module_hash" ]; then
+                echo "   ⚠️  $canister has no WASM module, switching to install mode"
+                CANISTER_MODE="install"
+            fi
+        fi
         # Now deploy (canister already created and funded)
-        retry_dfx dfx deploy --network "$NETWORK" --yes "$canister" --mode="$MODE"
+        retry_dfx dfx deploy --network "$NETWORK" --yes "$canister" --mode="$CANISTER_MODE"
     fi
     
     # Start canister
