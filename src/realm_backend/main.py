@@ -111,6 +111,7 @@ class UserGetRecord(Record):
     principal: Principal
     profiles: Vec[text]
     profile_picture_url: text
+    assigned_quarter: text
 
 
 class ObjectsListRecordPaginated(Record):
@@ -259,8 +260,39 @@ def get_extensions() -> RealmResponse:
     return list_extensions(ic.caller().to_str())
 
 
+def _assign_quarter(principal: str, realm, quarters, preferred_quarter: str) -> str:
+    """Assign a quarter via federation_codex, or fall back to random.
+
+    The federation codex may define an ``assign_quarter(principal, quarters,
+    preferred_quarter)`` function.  It receives the list of active Quarter
+    entities and should return a canister_id string.  If the codex raises,
+    the error propagates to the caller so the user gets a clear rejection
+    reason (e.g. "quarter is full").
+
+    When no codex is present the default behaviour is deterministic random
+    assignment (hash of principal) which guarantees uniform load.
+    """
+    active_quarters = [q for q in quarters if q.status == "active"]
+    if not active_quarters:
+        return ""
+
+    codex = realm.federation_codex
+    if codex and codex.code:
+        ns = {}
+        exec(str(codex.code), ns)
+        assign_fn = ns.get("assign_quarter")
+        if assign_fn:
+            result = assign_fn(principal, active_quarters, preferred_quarter)
+            if result:
+                return str(result)
+
+    # Default: deterministic random (hash-based)
+    idx = hash(principal) % len(active_quarters)
+    return active_quarters[idx].canister_id
+
+
 @update
-def join_realm(profile: str) -> RealmResponse:
+def join_realm(profile: str, preferred_quarter: text) -> RealmResponse:
     try:
         user = user_register(ic.caller().to_str(), profile)
         profiles = Vec[text]()
@@ -268,13 +300,24 @@ def join_realm(profile: str) -> RealmResponse:
             for p in user["profiles"]:
                 profiles.append(p)
 
+        # Quarter assignment (no-op for single-quarter realms)
+        assigned_quarter_canister_id = ""
+        from ggg import Quarter, Realm
+        realm = Realm.load("1")
+        quarters = list(Quarter.instances()) if realm else []
+        if realm and quarters:
+            assigned_quarter_canister_id = _assign_quarter(
+                ic.caller().to_str(), realm, quarters, preferred_quarter
+            )
+
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                userGet=UserGetRecord(  # TODO: fix this
+                userGet=UserGetRecord(
                     principal=Principal.from_str(user["principal"]),
                     profiles=profiles,
                     profile_picture_url=user.get("profile_picture_url", ""),
+                    assigned_quarter=assigned_quarter_canister_id,
                 )
             ),
         )

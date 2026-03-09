@@ -59,6 +59,7 @@ class UserGetRecord(Record):
     principal: Principal
     profiles: Vec[text]
     profile_picture_url: text
+    assigned_quarter: text
 
 
 # New GGG response records
