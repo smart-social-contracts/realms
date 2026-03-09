@@ -21,6 +21,36 @@
 	let avatar: string | undefined = undefined;
 	let loadingUserStatus = true;
 	let userStatusError = '';
+	let assignedQuarter: string = '';
+	let selectedQuarter: string = '';
+	let changingQuarter = false;
+	let quarterChangeError = '';
+	let quarterChangeSuccess = '';
+
+	function getQuarterName(canisterId: string): string {
+		const q = $realmInfo.quarters.find(q => q.canister_id === canisterId);
+		return q ? `${q.name} (${canisterId})` : canisterId || 'Not assigned';
+	}
+
+	async function handleChangeQuarter() {
+		if (!selectedQuarter || selectedQuarter === assignedQuarter) return;
+		changingQuarter = true;
+		quarterChangeError = '';
+		quarterChangeSuccess = '';
+		try {
+			const response = await backend.change_quarter(selectedQuarter);
+			if (response.success) {
+				assignedQuarter = selectedQuarter;
+				quarterChangeSuccess = `Switched to ${getQuarterName(selectedQuarter)}`;
+			} else {
+				quarterChangeError = response.data?.error || 'Failed to change quarter';
+			}
+		} catch (e: any) {
+			quarterChangeError = e.message || 'Failed to change quarter';
+		} finally {
+			changingQuarter = false;
+		}
+	}
 
 	onMount(async () => {
 		console.log("Settings page mounted");
@@ -40,6 +70,8 @@
 				principal = response.data.userGet.principal;
 				profiles = response.data.userGet.profiles || [];
 				avatar = response.data.userGet.avatar;
+				assignedQuarter = response.data.userGet.assigned_quarter || '';
+				selectedQuarter = assignedQuarter;
 			} else {
 				console.error("Invalid backend response format:", response);
 				throw new Error('Could not fetch user status: Invalid response format.');
@@ -88,6 +120,52 @@
 				<MessagingHandles />
 			</div>
 		</div>
+
+		<!-- Quarter Assignment -->
+		{#if $realmInfo.quarters.length > 0}
+		<div class="col-span-full mt-6">
+			<Heading tag="h2" class="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+				{$_('settings.quarter_title', { default: 'Quarter' })}
+			</Heading>
+			<div class="p-4 bg-gray-50 rounded border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+				<div class="mb-3">
+					<span class="font-semibold">Current Quarter:</span>
+					<span class="ml-1">{getQuarterName(assignedQuarter)}</span>
+				</div>
+				<div class="flex items-end gap-3">
+					<div class="flex-1">
+						<label for="quarter-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+							Switch Quarter
+						</label>
+						<select
+							id="quarter-select"
+							bind:value={selectedQuarter}
+							class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+						>
+							{#each $realmInfo.quarters.filter(q => q.status === 'active') as quarter}
+								<option value={quarter.canister_id}>
+									{quarter.name} — {quarter.population} residents ({quarter.canister_id})
+								</option>
+							{/each}
+						</select>
+					</div>
+					<button
+						on:click={handleChangeQuarter}
+						disabled={changingQuarter || selectedQuarter === assignedQuarter || !selectedQuarter}
+						class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+					>
+						{changingQuarter ? 'Switching...' : 'Switch'}
+					</button>
+				</div>
+				{#if quarterChangeError}
+					<div class="mt-2 text-sm text-red-600 dark:text-red-400">{quarterChangeError}</div>
+				{/if}
+				{#if quarterChangeSuccess}
+					<div class="mt-2 text-sm text-green-600 dark:text-green-400">{quarterChangeSuccess}</div>
+				{/if}
+			</div>
+		</div>
+		{/if}
 
 		<!-- Registries -->
 		<div class="col-span-full mt-6">

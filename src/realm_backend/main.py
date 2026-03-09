@@ -326,6 +326,49 @@ def join_realm(profile: str, preferred_quarter: text) -> RealmResponse:
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
+@update
+def change_quarter(new_quarter_canister_id: text) -> RealmResponse:
+    """Change the caller's assigned quarter."""
+    try:
+        from ggg import Quarter, Realm
+        caller = ic.caller().to_str()
+
+        # Validate the target quarter exists and is active
+        realm = Realm.load("1")
+        if not realm:
+            return RealmResponse(success=False, data=RealmResponseData(error="Realm not found"))
+
+        quarters = list(Quarter.instances())
+        target = None
+        for q in quarters:
+            if q.canister_id == new_quarter_canister_id and q.status == "active":
+                target = q
+                break
+
+        if not target:
+            return RealmResponse(
+                success=False,
+                data=RealmResponseData(error=f"Quarter '{new_quarter_canister_id}' not found or not active"),
+            )
+
+        # Run codex eligibility check if available
+        codex = realm.federation_codex
+        if codex and codex.code:
+            ns = {}
+            exec(str(codex.code), ns)
+            assign_fn = ns.get("assign_quarter")
+            if assign_fn:
+                assign_fn(caller, [target], new_quarter_canister_id)
+
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(message=new_quarter_canister_id),
+        )
+    except Exception as e:
+        logger.error(f"Error changing quarter: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
 @query
 def get_my_principal() -> text:
     return ic.caller().to_str()

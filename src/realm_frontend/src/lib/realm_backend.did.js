@@ -92,6 +92,7 @@ service : () -> {
   get_verification_link : (text) -> (text);
   http_transform : (HttpTransformArgs) -> (HttpResponse) query;
   initialize : () -> ();
+  change_quarter : (text) -> (RealmResponse);
   join_realm : (text, text) -> (RealmResponse);
   list_extensions : (text) -> (RealmResponse) query;
   register_realm_with_registry : (text, text, text, text) -> (text);
