@@ -220,6 +220,40 @@ def status() -> RealmResponse:
 
 
 @query
+def get_quarter_info() -> RealmResponse:
+    """Get quarter information for this realm (workaround for Basilisk Record field limitation)"""
+    try:
+        import json as _json
+        from ggg import Quarter, Realm
+
+        quarters = []
+        is_quarter = False
+        parent_realm_canister_id = ""
+
+        first_realm = Realm.load("1")
+        if first_realm:
+            is_quarter = bool(getattr(first_realm, 'is_quarter', False))
+            parent_realm_canister_id = getattr(first_realm, 'federation_realm_id', '') or ''
+            for q in Quarter.instances():
+                quarters.append({
+                    "name": q.name or "",
+                    "canister_id": q.canister_id or "",
+                    "population": q.population or 0,
+                    "status": q.status or "active",
+                })
+
+        result = _json.dumps({
+            "quarters": quarters,
+            "is_quarter": is_quarter,
+            "parent_realm_canister_id": parent_realm_canister_id,
+        })
+        return RealmResponse(success=True, data=RealmResponseData(message=result))
+    except Exception as e:
+        logger.error(f"Error getting quarter info: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@query
 def get_extensions() -> RealmResponse:
     """Get all available extensions with their metadata"""
     return list_extensions(ic.caller().to_str())

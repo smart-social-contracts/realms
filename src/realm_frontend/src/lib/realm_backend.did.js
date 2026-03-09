@@ -80,6 +80,7 @@ service : () -> {
   get_canister_id : () -> (text) query;
   get_current_application_id : (text) -> (text) query;
   get_extensions : () -> (RealmResponse) query;
+  get_quarter_info : () -> (RealmResponse) query;
   get_my_principal : () -> (text) query;
   get_my_user_status : () -> (RealmResponse) query;
   get_objects : (vec record { text; text }) -> (RealmResponse) query;

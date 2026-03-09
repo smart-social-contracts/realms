@@ -65,11 +65,25 @@ const createRealmInfoStore = () => {
 						welcomeMessage: status.realm_welcome_message || '',
 						description: status.realm_description || '',
 						registries: status.registries || [],
-						quarters: status.quarters || [],
-						isQuarter: status.is_quarter || false,
-						parentRealmCanisterId: status.parent_realm_canister_id || '',
 						loading: false
 					}));
+
+					// Fetch quarter info from dedicated endpoint
+					// (workaround: Basilisk doesn't regenerate StatusRecord fields)
+					try {
+						const qResponse = await currentActor.get_quarter_info();
+						if (qResponse.success && qResponse.data.message) {
+							const qData = JSON.parse(qResponse.data.message);
+							update(state => ({
+								...state,
+								quarters: qData.quarters || [],
+								isQuarter: qData.is_quarter || false,
+								parentRealmCanisterId: qData.parent_realm_canister_id || '',
+							}));
+						}
+					} catch (qErr) {
+						console.warn('Could not fetch quarter info:', qErr);
+					}
 				} else {
 					throw new Error('Failed to fetch realm info');
 				}
