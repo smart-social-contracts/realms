@@ -32,6 +32,44 @@ if TYPE_CHECKING:
 
 logger = get_logger("execution")
 
+_codex_lazy_loading_installed = False
+
+
+def _ensure_codex_lazy_loading():
+    """Patch wasi-stub modules with __getattr__ so codex source loads on first use.
+
+    Modules placed by basilisk as empty stubs (with __file__ == '<wasi-stub>')
+    get a __getattr__ that, on first attribute access, finds the matching Codex
+    entity and exec's its source into the module dict.  After that first load
+    __getattr__ is never called again for cached attributes.
+
+    This is idempotent — safe to call on every run_code / execute_code_shell
+    invocation; the actual patching only happens once.
+    """
+    global _codex_lazy_loading_installed
+    if _codex_lazy_loading_installed:
+        return
+    _codex_lazy_loading_installed = True
+
+    for name, mod in list(sys.modules.items()):
+        # Check __dict__ directly to avoid triggering _LazyMod.__getattr__
+        if mod.__dict__.get('__file__') != '<wasi-stub>':
+            continue
+        if '__getattr__' in mod.__dict__:
+            continue
+
+        def _lazy_codex_getattr(attr, _mod=mod):
+            from ggg import Codex
+            for c in Codex.instances():
+                if c.name == _mod.__name__ and c.code:
+                    exec(compile(c.code, _mod.__name__ + '.py', 'exec'), _mod.__dict__)
+                    if attr in _mod.__dict__:
+                        return _mod.__dict__[attr]
+                    break
+            raise AttributeError(f"module '{_mod.__name__}' has no attribute '{attr}'")
+
+        mod.__getattr__ = _lazy_codex_getattr
+
 
 def create_task_entity_class(task_name):
     """Create a TaskEntity base class that automatically uses task name as namespace.
@@ -66,6 +104,7 @@ def run_code(source_code, locals={}, task: Optional["Task"] = None, task_executi
     """
 
     logger.info("run_code start")
+    _ensure_codex_lazy_loading()
     # logger.info("running code: ************************ %s" % source_code)
     # Use current globals to ensure built-ins and proper scope
     safe_globals = globals().copy()

@@ -1678,6 +1678,8 @@ def execute_code_shell(code: str) -> str:
     import io
     import sys
     import traceback
+    from core.execution import _ensure_codex_lazy_loading
+    _ensure_codex_lazy_loading()
 
     stdout = io.StringIO()
     stderr = io.StringIO()
