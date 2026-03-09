@@ -451,6 +451,17 @@ def _generate_deployment_scripts(
         frontend_name: frontend_config,
     }
     
+    # Add quarter backend canisters if manifest specifies quarters > 1
+    num_quarters = realm_manifest.get("quarters", 1) if realm_manifest else 1
+    if num_quarters > 1:
+        for q_idx in range(1, num_quarters):
+            quarter_name = f"quarter_{q_idx}_backend"
+            quarter_config = copy.deepcopy(dfx_config["canisters"]["realm_backend"])
+            quarter_config.pop("remote", None)
+            realm_canisters[quarter_name] = quarter_config
+            if not quiet:
+                console.print(f"   ✅ Including {quarter_name} (quarter {q_idx + 1} of {num_quarters})")
+    
     # For local networks, include additional canisters (Internet Identity, ckBTC, etc.)
     is_local_network = network.startswith("local")
     

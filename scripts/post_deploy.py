@@ -276,6 +276,69 @@ else:
     print(f"\nℹ️  No manifest.json found, skipping realm config update...")
 
 
+# Register quarter backends with the main backend
+try:
+    print(f"\n🏘️  Checking for quarter backends to register...")
+    
+    # Load manifest to check quarters count
+    manifest_path = os.path.join(realm_dir, 'manifest.json')
+    num_quarters = 1
+    if os.path.exists(manifest_path):
+        with open(manifest_path, 'r') as f:
+            manifest = json.load(f)
+        num_quarters = manifest.get('quarters', 1)
+    
+    if num_quarters > 1:
+        # Load dfx.json to find quarter backend canister names
+        dfx_json_path = os.path.join(realm_dir, 'dfx.json')
+        if os.path.exists(dfx_json_path):
+            with open(dfx_json_path, 'r') as f:
+                dfx_config = json.load(f)
+            
+            quarter_canisters = [
+                name for name in dfx_config.get("canisters", {}).keys()
+                if name.startswith("quarter_") and name.endswith("_backend")
+            ]
+            
+            for q_canister in quarter_canisters:
+                try:
+                    # Get the quarter's canister ID
+                    result = subprocess.run(
+                        ['dfx', 'canister', 'id', q_canister, '--network', network],
+                        capture_output=True, text=True, timeout=10
+                    )
+                    if result.returncode != 0:
+                        print(f"   ⚠️  Could not get canister ID for {q_canister}: {result.stderr}")
+                        continue
+                    
+                    quarter_canister_id = result.stdout.strip()
+                    # Derive a human-readable name from canister name: quarter_1_backend -> Quarter 1
+                    q_index = q_canister.replace("quarter_", "").replace("_backend", "")
+                    quarter_name = f"Quarter {q_index}"
+                    
+                    print(f"   Registering {quarter_name} ({quarter_canister_id}) on main backend...")
+                    
+                    register_args = f'("{quarter_canister_id}", "{quarter_name}")'
+                    register_cmd = [
+                        'dfx', 'canister', 'call', backend_name, 'register_quarter',
+                        register_args,
+                        '--network', network
+                    ]
+                    reg_result = subprocess.run(register_cmd, cwd=realm_dir, capture_output=True, text=True)
+                    if reg_result.returncode == 0:
+                        print(f"   ✅ Registered {quarter_name} (canister: {quarter_canister_id})")
+                    else:
+                        print(f"   ⚠️  Failed to register {quarter_name}: {reg_result.stderr}")
+                except Exception as qe:
+                    print(f"   ⚠️  Error registering {q_canister}: {qe}")
+        else:
+            print(f"   ⚠️  No dfx.json found, cannot detect quarter canisters")
+    else:
+        print(f"   ℹ️  No quarters configured (quarters={num_quarters}), skipping")
+except Exception as e:
+    print(f"   ⚠️  Quarter registration failed: {e} (continuing anyway)")
+
+
 # Import manifest.json as a codex (contains entity_method_overrides)
 manifest_path = os.path.join(realm_dir, 'manifest.json')
 if os.path.exists(manifest_path):

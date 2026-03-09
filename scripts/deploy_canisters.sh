@@ -290,6 +290,11 @@ if [ -n "$BACKENDS" ]; then
     echo ""
     echo "🔧 Generating declarations..."
     for canister in $BACKENDS; do
+        # Skip dfx generate for quarter backends - they share the same WASM/candid as realm_backend
+        if [[ "$canister" == quarter_*_backend ]]; then
+            echo "   Skipping declarations for $canister (shares realm_backend interface)"
+            continue
+        fi
         echo "   Generating for $canister..."
         dfx generate --network "$NETWORK" "$canister"
     done
@@ -298,9 +303,9 @@ if [ -n "$BACKENDS" ]; then
     echo "   📋 Copying declarations to standard names for frontend..."
     if [ -d "src/declarations" ]; then
         for canister in $BACKENDS; do
-            # If canister name matches pattern *_backend (but NOT *_token_backend or *_nft_backend), copy to realm_backend
-            # This ensures only the main backend gets copied, not token/nft backends
-            if [[ "$canister" == *"_backend" ]] && [[ "$canister" != *"token_backend" ]] && [[ "$canister" != *"nft_backend" ]] && [[ "$canister" != "realm_backend" ]] && [[ "$canister" != "realm_registry_backend" ]]; then
+            # If canister name matches pattern *_backend (but NOT *_token_backend, *_nft_backend, or quarter_*_backend), copy to realm_backend
+            # This ensures only the main backend gets copied, not token/nft/quarter backends
+            if [[ "$canister" == *"_backend" ]] && [[ "$canister" != *"token_backend" ]] && [[ "$canister" != *"nft_backend" ]] && [[ "$canister" != quarter_*_backend ]] && [[ "$canister" != "realm_backend" ]] && [[ "$canister" != "realm_registry_backend" ]]; then
                 if [ -d "src/declarations/$canister" ]; then
                     # Remove existing realm_backend to avoid cp -r creating a subdirectory
                     rm -rf "src/declarations/realm_backend"
@@ -693,11 +698,15 @@ with open('$ids_file', 'w') as f:
 }
 
 # Find backend and frontend canisters that match our patterns
-# Skip shared canisters (they shouldn't be aliased to realm_backend)
+# Skip shared canisters and quarter backends (they shouldn't be aliased to realm_backend)
 for canister in $BACKENDS; do
     if [[ "$canister" == *_backend ]]; then
         # Skip shared canisters - they shouldn't override the realm_backend alias
         if echo "$SHARED_CANISTERS" | grep -qw "$canister"; then
+            continue
+        fi
+        # Skip quarter backends - they have their own identity
+        if [[ "$canister" == quarter_*_backend ]]; then
             continue
         fi
         canister_id=$(dfx canister id "$canister" 2>/dev/null || echo "")
