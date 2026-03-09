@@ -269,19 +269,9 @@ for canister in $BACKENDS; do
         existing_id=$(dfx canister id "$canister" --network "$NETWORK" 2>/dev/null || echo "")
         if [ -z "$existing_id" ]; then
             echo "   🆕 Creating canister $canister with initial cycles..."
-            # For quarter backends, create on the same subnet as the main realm_backend
             CREATE_ARGS="--network $NETWORK --with-cycles 1000000000000"
-            if [[ "$canister" == quarter_*_backend ]]; then
-                # Find the main backend canister to determine its subnet
-                main_backend_id=$(dfx canister id "$(echo $BACKENDS | tr ' ' '\n' | grep -v '^quarter_' | grep '_backend$' | grep -v 'token_backend' | grep -v 'nft_backend' | grep -v 'registry_backend' | head -1)" --network "$NETWORK" 2>/dev/null || echo "")
-                if [ -n "$main_backend_id" ]; then
-                    subnet_id=$(dfx canister info "$main_backend_id" --network "$NETWORK" 2>/dev/null | grep -i "subnet" | head -1 | awk '{print $NF}' || echo "")
-                    if [ -n "$subnet_id" ]; then
-                        echo "   🌐 Creating on same subnet as main backend: $subnet_id"
-                        CREATE_ARGS="$CREATE_ARGS --subnet $subnet_id"
-                    fi
-                fi
-            fi
+            # Cycles ledger requires explicit subnet type for new canisters
+            CREATE_ARGS="$CREATE_ARGS --subnet-type application"
             retry_dfx dfx canister create "$canister" $CREATE_ARGS
         fi
         # Top up canister to ensure it has enough cycles for wasm installation
