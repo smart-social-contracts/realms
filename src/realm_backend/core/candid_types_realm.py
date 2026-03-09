@@ -1,4 +1,4 @@
-from _cdk import Opt, Principal, Record, Variant, Vec, float64, nat, text, bool
+from _cdk import Opt, Principal, Record, Variant, Vec, float64, nat, text
 
 
 class PaginationInfo(Record):
