@@ -1568,92 +1568,90 @@ def verify_checksum(content: str, expected_checksum: str) -> Tuple[bool, str]:
 @update
 def execute_code(code: str) -> str:
     """
-    Executes Python code (sync or async) via TaskManager.
+    Executes Python code (sync or async).
 
-    For sync code: executes inline and returns result immediately
-    For async code: schedules task and returns task ID for polling
+    For sync code: executes inline via run_code() and returns stdout + result
+    For async code: schedules via TaskManager and returns task ID for polling
 
     Examples:
         # Sync code
+        print("hello")
         result = 2 + 2
 
-        # Async code
+        # Async code (uses yield for IC inter-canister calls)
         def async_task():
             result = yield some_async_operation()
             return result
     """
+    import ast as _ast
     import json
     import traceback
 
+    from core.execution import run_code, _ensure_codex_lazy_loading
     from core.task_manager import TaskManager
     from ggg import Call, Task, TaskStep, TaskSchedule
 
+    _ensure_codex_lazy_loading()
+
     try:
-        # Detect if code is async (contains 'yield' or defines 'async_task')
-        is_async = "yield" in code or "async_task" in code
+        # AST-based async detection (replaces naive "yield" in code)
+        is_async = False
+        try:
+            tree = _ast.parse(code)
+            is_async = any(
+                isinstance(node, (_ast.Yield, _ast.YieldFrom))
+                for node in _ast.walk(tree)
+            )
+        except SyntaxError:
+            pass
 
-        # Create temporary codex
-        temp_name = f"_shell_{int(ic.time())}"
-        codex = Codex(name=temp_name, code=code)
-
-        # Create call
-        call = Call(is_async=is_async, codex=codex)
-
-        # Create task
-        step = TaskStep(call=call)
-        task = Task(name=f"Shell Task {temp_name}", steps=[step])
-
-        # Create schedule (immediate execution)
-        schedule = TaskSchedule(
-            name=f"Shell Schedule {temp_name}",
-            task=task,
-            run_at=0,  # Execute immediately
-            repeat_every=0,
-            last_run_at=0,
-            disabled=False,
-        )
-
-        # Execute via TaskManager
-        manager = TaskManager()
-        manager.add_task(task)
-        manager.run()
-
-        # Format response
         if is_async:
-            # Async task will complete in timer callback
+            # Async code: schedule via TaskManager
+            temp_name = f"_shell_{int(ic.time())}"
+            codex = Codex(name=temp_name, code=code)
+            call = Call(is_async=True, codex=codex)
+            step = TaskStep(call=call)
+            task = Task(name=f"Shell Task {temp_name}", steps=[step])
+            schedule = TaskSchedule(
+                name=f"Shell Schedule {temp_name}",
+                task=task,
+                run_at=0,
+                repeat_every=0,
+                last_run_at=0,
+                disabled=False,
+            )
+
+            manager = TaskManager()
+            manager.add_task(task)
+            manager.run()
+
             response = {
                 "type": "async",
                 "task_id": task._id,
                 "status": task.status,
-                "message": "Async task scheduled. Check logs for results or use get_task_status() to poll.",
+                "message": "Async task scheduled. Use get_objects('Task', ...) to poll.",
             }
             return json.dumps(response, indent=2)
         else:
-            # Sync task should be completed
-            # Get result from call if available
-            result = getattr(call, "_result", None)
+            # Sync code: execute directly via run_code() to capture stdout
+            result = run_code(code)
 
-            response = {"type": "sync", "status": task.status, "task_id": task._id}
+            response = {
+                "type": "sync",
+                "success": result.get("success", False),
+                "stdout": result.get("stdout_content", ""),
+                "stderr": result.get("stderr_content", ""),
+            }
 
-            if result is not None:
-                if isinstance(result, dict):
-                    response["result"] = result
-                else:
-                    response["result"] = str(result)
+            if result.get("success"):
+                code_result = result.get("result")
+                if code_result is not None:
+                    if isinstance(code_result, dict):
+                        response["result"] = code_result
+                    else:
+                        response["result"] = str(code_result)
             else:
-                response["message"] = "Code executed successfully (no return value)"
-
-            if CLEANUP_SHELL_TASKS:
-                try:
-                    for exc in list(task.executions):
-                        exc.delete()
-                    schedule.delete()
-                    step.delete()
-                    call.delete()
-                    task.delete()
-                    codex.delete()
-                except Exception as cleanup_err:
-                    ic.print(f"Shell task cleanup warning: {cleanup_err}")
+                response["error"] = result.get("error", "Unknown error")
 
             return json.dumps(response, indent=2)
 
@@ -1670,10 +1668,11 @@ def execute_code(code: str) -> str:
 
 @update
 def execute_code_shell(code: str) -> str:
-    """Executes Python code and returns the output.
+    """Executes Python code in an isolated namespace and returns the output.
 
     This is the core function needed for the Basilisk Simple Shell to work.
-    It captures stdout, stderr, and return values from the executed code.
+    It captures stdout and stderr from the executed code.  Each invocation
+    uses a fresh namespace so variables do not leak between calls.
     """
     import io
     import sys
@@ -1681,24 +1680,24 @@ def execute_code_shell(code: str) -> str:
     from core.execution import _ensure_codex_lazy_loading
     _ensure_codex_lazy_loading()
 
+    # Build an isolated namespace with access to canister APIs
+    import ggg
+    import _cdk as basilisk
+
+    ns = {"__builtins__": __builtins__}
+    ns.update({
+        "ggg": ggg,
+        "basilisk": basilisk,
+        "ic": ic,
+    })
+
     stdout = io.StringIO()
     stderr = io.StringIO()
     sys.stdout = stdout
     sys.stderr = stderr
 
     try:
-        # Try to evaluate as an expression
-        result = eval(code, globals())
-        if result is not None:
-            ic.print(repr(result))
-    except SyntaxError:
-        try:
-            # If it's not an expression, execute it as a statement
-            # Use the built-in exec function but with a different name to avoid conflict
-            exec_builtin = exec
-            exec_builtin(code, globals())
-        except Exception:
-            traceback.print_exc()
+        exec(code, ns, ns)
     except Exception:
         traceback.print_exc()
 

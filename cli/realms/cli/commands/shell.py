@@ -1,8 +1,6 @@
 """Shell command for interactive Python console in realm backend canister."""
 
-import ast
 import platform
-import re
 import subprocess
 import sys
 from typing import Optional
@@ -13,6 +11,7 @@ from prompt_toolkit.history import InMemoryHistory
 from rich.console import Console
 
 from ..utils import is_repo_mode, get_effective_cwd
+from ._dfx_utils import build_dfx_call_cmd, parse_candid_string_output
 
 console = Console()
 
@@ -30,101 +29,17 @@ class RealmsShell:
 
     def execute(self, code: str) -> str:
         """
-        Sends Python code to the canister's execute_code method and returns the result.
+        Sends Python code to the canister's execute_code_shell method and returns the result.
         """
-        # Escape double quotes in the code
         escaped_code = code.replace('"', '\\"')
-
-        # Prepare the dfx command
-        cmd = ["dfx", "canister", "call"]
-
-        # Add network parameter if provided
-        if self.network:
-            cmd.extend(["--network", self.network])
-
-        # Add the rest of the command
-        cmd.extend([self.canister_name, "execute_code_shell", f'("{escaped_code}")'])
+        cmd = build_dfx_call_cmd(
+            self.canister_name, "execute_code_shell",
+            f'("{escaped_code}")', self.network,
+        )
 
         try:
-            # Execute the dfx command from the realm folder if specified
             result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=self.cwd)
-
-            # Parse the output
-            output = result.stdout.strip()
-
-            # First, check if the output is from a Python collection function like dir()
-            # These typically return a tuple with a string representation of a list
-            # Example: ("['item1', 'item2']\n",)
-
-            # Remove trailing commas and parentheses that might cause parsing issues
-            cleaned_output = output.strip().rstrip(",)").lstrip("(")
-
-            # Check if it looks like a string representation of a list
-            if cleaned_output.strip().startswith('"[') and (
-                "\n" in cleaned_output or ']"' in cleaned_output
-            ):
-                # Extract just the list string (between quotes)
-                list_str_match = re.search(r'"(.*)"', cleaned_output, re.DOTALL)
-                if list_str_match:
-                    list_str = list_str_match.group(1)
-                    try:
-                        # First unescape the string
-                        unescaped_str = ast.literal_eval(f'"{list_str}"')
-                        # Then try to evaluate it as a Python literal (list)
-                        try:
-                            result = ast.literal_eval(unescaped_str)
-                            return str(result)
-                        except (SyntaxError, ValueError):
-                            # If it can't be parsed as a list, return the unescaped string
-                            return unescaped_str
-                    except (SyntaxError, ValueError):
-                        # Basic fallback
-                        return list_str.replace("\\n", "\n").replace('\\"', '"')
-
-            # General tuple pattern: (  "content"  )
-            tuple_match = re.search(r'\(\s*"(.*)"\s*\)', output, re.DOTALL)
-            if tuple_match:
-                tuple_content = tuple_match.group(1)
-                try:
-                    # Properly unescape the string content inside the tuple
-                    unescaped_content = ast.literal_eval(f'"{tuple_content}"')
-                    # If it's a list representation, evaluate it as such
-                    if unescaped_content.startswith("[") and unescaped_content.endswith(
-                        "]"
-                    ):
-                        try:
-                            # Try to parse it as a list if it looks like one
-                            list_content = ast.literal_eval(unescaped_content)
-                            return str(list_content)
-                        except (SyntaxError, ValueError):
-                            # If it can't be parsed as a list, return as string
-                            return unescaped_content
-                    return unescaped_content
-                except (SyntaxError, ValueError):
-                    # Fallback to basic unescaping
-                    unescaped_content = tuple_content.replace("\\n", "\n").replace(
-                        '\\"', '"'
-                    )
-                    return unescaped_content
-
-            # If not a tuple, try the standard pattern: ("content")
-            standard_match = re.search(r'\("(.*)"\)', output)
-            if standard_match:
-                # Extract the content between quotes, preserving escaped characters
-                response = standard_match.group(1)
-
-                # Properly unescape all escape sequences using ast.literal_eval
-                try:
-                    # Add quotes around the string and use ast.literal_eval to handle all escape sequences
-                    unescaped_response = ast.literal_eval(f'"{response}"')
-                    return unescaped_response
-                except (SyntaxError, ValueError):
-                    # Fallback to the basic unescaping if ast.literal_eval fails
-                    response = response.replace("\\n", "\n").replace('\\"', '"')
-                    return response
-
-            # If no patterns matched, return the raw output
-            return output
+            return parse_candid_string_output(result.stdout)
         except subprocess.CalledProcessError as e:
             return f"Error calling canister: {e.stderr}"
         except Exception as e:
