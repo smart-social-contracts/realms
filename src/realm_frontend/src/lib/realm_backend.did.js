@@ -33,6 +33,12 @@ type RealmResponseData = variant {
   error : text;
   message : text;
 };
+type QuarterInfoRecord = record {
+  name : text;
+  canister_id : text;
+  population : nat;
+  status : text;
+};
 type StatusRecord = record {
   status : text;
   demo_mode : bool;
@@ -52,11 +58,15 @@ type StatusRecord = record {
   licenses_count : nat;
   users_count : nat;
   trades_count : nat;
+  quarters : vec QuarterInfoRecord;
+  is_quarter : bool;
+  parent_realm_canister_id : text;
 };
 type UserGetRecord = record {
   "principal" : principal;
   profile_picture_url : text;
   profiles : vec text;
+  assigned_quarter : text;
 };
 service : () -> {
   check_verification_status : (text) -> (text);
@@ -71,6 +81,7 @@ service : () -> {
   get_canister_id : () -> (text) query;
   get_current_application_id : (text) -> (text) query;
   get_extensions : () -> (RealmResponse) query;
+  get_quarter_info : () -> (RealmResponse) query;
   get_my_principal : () -> (text) query;
   get_my_user_status : () -> (RealmResponse) query;
   get_objects : (vec record { text; text }) -> (RealmResponse) query;
@@ -81,10 +92,14 @@ service : () -> {
   get_verification_link : (text) -> (text);
   http_transform : (HttpTransformArgs) -> (HttpResponse) query;
   initialize : () -> ();
-  join_realm : (text) -> (RealmResponse);
+  change_quarter : (text) -> (RealmResponse);
+  join_realm : (text, text) -> (RealmResponse);
   list_extensions : (text) -> (RealmResponse) query;
   register_realm_with_registry : (text, text, text, text) -> (text);
   reload_entity_method_overrides : () -> (text);
+  register_quarter : (text, text) -> (RealmResponse);
+  deregister_quarter : (text) -> (RealmResponse);
+  set_quarter_config : (text) -> (RealmResponse);
   set_application_id : (text) -> (text);
   status : () -> (RealmResponse) query;
   stop_task : (text) -> (text);

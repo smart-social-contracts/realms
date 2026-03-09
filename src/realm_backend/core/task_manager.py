@@ -71,6 +71,111 @@ def _format_logs(logs_data) -> str:
     return str(logs_data)[:4999]
 
 
+def _check_and_schedule_next_step(task: Task) -> void:
+    """Check if task has more steps and schedule the next one"""
+
+    try:
+        logger.info(
+            f"Checking next step for task {task.name}. Current step: {task.step_to_execute}, Total steps: {len(task.steps)}"
+        )
+
+        if task.step_to_execute < len(task.steps):
+            step = list(task.steps)[task.step_to_execute]
+            logger.info(
+                f"Scheduling next step {task.step_to_execute}/{len(task.steps)} for task {task.name}"
+            )
+
+            callback_function = _create_timer_callback(step, task)
+            step.timer_id = ic.set_timer(
+                Duration(step.run_next_after), callback_function
+            )
+            step.status = TaskStatus.RUNNING
+            task.step_to_execute += 1
+        else:
+            logger.info(f"Task {task.name} completed all steps")
+            task.status = TaskStatus.COMPLETED
+
+            now = get_now()
+
+            # Check if this is a recurring task and schedule next execution
+            for schedule in task.schedules:
+                if schedule.repeat_every and schedule.repeat_every > 0:
+                    logger.info(
+                        f"Task {task.name} is recurring, scheduling next execution in {schedule.repeat_every}s"
+                    )
+                    task.status = TaskStatus.RUNNING
+                    task.step_to_execute = 0
+                    # Reset all step statuses
+                    for step in task.steps:
+                        step.status = TaskStatus.PENDING
+                    step = list(task.steps)[task.step_to_execute]
+                    callback_function = _create_timer_callback(step, task)
+
+                    in_seconds = schedule.repeat_every
+
+                    logger.info(f"schedule.last_run_at : {schedule.last_run_at}")
+                    logger.info(f"schedule.repeat_every: {schedule.repeat_every}")
+                    logger.info(f"now                  : {now}")
+                    logger.info(f"in_seconds           : {in_seconds}")
+
+                    schedule.last_run_at = now
+
+                    if schedule.disabled:
+                        logger.info(
+                            f"Skipping disabled schedule for task {task.name}"
+                        )
+                        continue
+
+                    logger.info(f"Scheduling time in {in_seconds} seconds")
+                    step.timer_id = ic.set_timer(
+                        Duration(in_seconds), callback_function
+                    )
+
+    except Exception as e:
+        logger.error(
+            f"Error checking next step for task {task.name}: {traceback.format_exc()}"
+        )
+
+
+def _create_timer_callback(step: TaskStep, task: Task) -> Callable:
+    """Create a timer callback function for task execution.
+
+    NOTE: This MUST be a module-level function, not a class method.
+    Closures created inside class methods do not survive as IC timer
+    callbacks in the basilisk WASM runtime.
+    """
+    # Capture entity IDs for re-loading inside callback
+    step_id = str(step._id)
+    task_id = str(task._id)
+    is_async = step.call.is_async
+
+    def timer_callback():
+        # Re-load entities inside callback to avoid stale references
+        _task = Task.load(task_id)
+        _step = list(_task.steps)[[str(s._id) for s in _task.steps].index(step_id)]
+        logger.info(f"Executing {'async' if is_async else 'sync'} timer callback for task {_task.name}")
+        task_execution = _task.new_task_execution()
+        try:
+            task_execution.status = TaskExecutionStatus.RUNNING
+            result = _step.call._function(task_execution)()
+            logger.info(f"Timer callback completed with result: {result}")
+
+            task_execution.status = TaskExecutionStatus.COMPLETED
+            _step.status = TaskStatus.COMPLETED
+            _check_and_schedule_next_step(_task)
+        except Exception as e:
+            logger.error(f"Timer callback failed: {e}")
+            logger.error(traceback.format_exc())
+
+            task_execution.status = TaskExecutionStatus.FAILED
+            task_execution.result = str(e)[:4999]
+
+            _step.status = TaskStatus.FAILED
+            _task.status = TaskStatus.FAILED
+
+    return timer_callback
+
+
 class TaskManager:
     tasks: List[Task] = []
     last_execution: int = 0
@@ -83,165 +188,6 @@ class TaskManager:
         return (
             f"TaskManager(tasks={self.tasks}, task_to_execute={self.task_to_execute})"
         )
-
-    def _create_timer_callback(self, step: TaskStep, task: Task) -> Callable:
-        """Create a proper timer callback function that can handle both sync and async calls"""
-
-        if step.call.is_async:
-
-            def async_timer_callback() -> void:
-                logger.info(f"Executing async timer callback for {step.call}")
-                task_execution = task.new_task_execution()
-                try:
-                    task_execution.status = TaskExecutionStatus.RUNNING
-
-                    # _function() now iterates generators internally, so no yield needed
-                    result = step.call._function(task_execution)()
-                    logger.info(f"Async timer callback completed with result: {result}")
-
-                    task_execution.status = TaskExecutionStatus.COMPLETED
-                    step.status = TaskStatus.COMPLETED
-                    self._check_and_schedule_next_step(task)
-                except Exception as e:
-                    logger.error(f"Async timer callback failed: {e}")
-                    logger.error(traceback.format_exc())
-
-                    task_execution.status = TaskExecutionStatus.FAILED
-                    task_execution.result = str(e)[:4999]
-
-                    step.status = TaskStatus.FAILED
-                    task.status = TaskStatus.FAILED
-
-            return async_timer_callback
-        elif not step.call.is_async:
-
-            def sync_timer_callback() -> void:
-                logger.info(f"Executing sync timer callback for {step.call}")
-                logger.info(
-                    f"step.call.task_step.task.name: {step.call.task_step.task.name}"
-                )
-                task_execution: TaskExecution = task.new_task_execution()
-                try:
-                    # # Create execution record (defensive - don't fail if this errors)
-                    # try:
-                    #     execution = TaskExecution(
-                    #         name=f"{task.name}_execution",
-                    #         task=task,
-                    #         status="running",
-                    #         logs="",
-                    #         result="",
-                    #     )
-                    # except Exception as exec_error:
-                    #     logger.warning(
-                    #         f"Failed to create TaskExecution record: {exec_error}"
-                    #     )
-
-                    # Execute the task and capture result
-                    task_execution.status = TaskExecutionStatus.RUNNING
-                    result = step.call._function(task_execution)()
-
-                    # # Update execution record with result (defensive)
-                    # if execution:
-                    #     try:
-                    #         execution.status = "completed"
-                    #         if result and isinstance(result, dict):
-                    #             execution.logs = _format_logs(result.get("logs", []))
-                    #             execution.result = str(result.get("result", "completed"))[:4999]
-                    #         else:
-                    #             execution.result = str(result)[:4999] if result else "completed"
-                    #             execution.logs = "Execution completed successfully"
-                    #     except Exception as exec_error:
-                    #         logger.warning(
-                    #             f"Failed to update TaskExecution record: {exec_error}"
-                    #         )
-                    task_execution.status = TaskExecutionStatus.COMPLETED
-                    step.status = TaskStatus.COMPLETED
-                    self._check_and_schedule_next_step(task)
-                except Exception as e:
-                    logger.error(f"Sync timer callback failed: {traceback.format_exc()}")
-
-                    # # Update execution record with error (defensive)
-                    # if execution:
-                    #     try:
-                    #         execution.status = "failed"
-                    #         execution.result = "failed"
-                    #         error_log = f"Error: {str(e)}\n{traceback.format_exc()}"
-                    #         execution.logs = error_log[:4999]  # Truncate to max length
-                    #     except Exception as exec_error:
-                    #         logger.warning(
-                    #             f"Failed to update TaskExecution error: {exec_error}"
-                    #         )
-
-                    task_execution.status = TaskExecutionStatus.FAILED
-                    step.status = TaskStatus.FAILED
-                    task.status = TaskStatus.FAILED
-
-            return sync_timer_callback
-
-    def _check_and_schedule_next_step(self, task: Task) -> void:
-        """Check if task has more steps and schedule the next one"""
-
-        try:
-            logger.info(
-                f"Checking next step for task {task.name}. Current step: {task.step_to_execute}, Total steps: {len(task.steps)}"
-            )
-
-            if task.step_to_execute < len(task.steps):
-                step = list(task.steps)[task.step_to_execute]
-                logger.info(
-                    f"Scheduling next step {task.step_to_execute}/{len(task.steps)} for task {task.name}"
-                )
-
-                callback_function = self._create_timer_callback(step, task)
-                step.timer_id = ic.set_timer(
-                    Duration(step.run_next_after), callback_function
-                )
-                step.status = TaskStatus.RUNNING
-                task.step_to_execute += 1
-            else:
-                logger.info(f"Task {task.name} completed all steps")
-                task.status = TaskStatus.COMPLETED
-
-                now = get_now()
-
-                # Check if this is a recurring task and schedule next execution
-                for schedule in task.schedules:
-                    if schedule.repeat_every and schedule.repeat_every > 0:
-                        logger.info(
-                            f"Task {task.name} is recurring, scheduling next execution in {schedule.repeat_every}s"
-                        )
-                        task.status = TaskStatus.RUNNING
-                        task.step_to_execute = 0
-                        # Reset all step statuses
-                        for step in task.steps:
-                            step.status = TaskStatus.PENDING
-                        step = list(task.steps)[task.step_to_execute]
-                        callback_function = self._create_timer_callback(step, task)
-
-                        in_seconds = schedule.repeat_every
-
-                        logger.info(f"schedule.last_run_at : {schedule.last_run_at}")
-                        logger.info(f"schedule.repeat_every: {schedule.repeat_every}")
-                        logger.info(f"now                  : {now}")
-                        logger.info(f"in_seconds           : {in_seconds}")
-
-                        schedule.last_run_at = now
-
-                        if schedule.disabled:
-                            logger.info(
-                                f"Skipping disabled schedule for task {task.name}"
-                            )
-                            continue
-
-                        logger.info(f"Scheduling time in {in_seconds} seconds")
-                        step.timer_id = ic.set_timer(
-                            Duration(in_seconds), callback_function
-                        )
-
-        except Exception as e:
-            logger.error(
-                f"Error checking next step for task {task.name}: {traceback.format_exc()}"
-            )
 
     def _update_timers(self) -> void:
         logger.info("Updating timers")
@@ -336,7 +282,7 @@ class TaskManager:
                                 f"Starting task {task.name} - executing step {task.step_to_execute}/{len(task.steps)}"
                             )
 
-                            callback_function = self._create_timer_callback(step, task)
+                            callback_function = _create_timer_callback(step, task)
                             schedule.last_run_at = now
                             step.timer_id = ic.set_timer(
                                 Duration(step.run_next_after), callback_function

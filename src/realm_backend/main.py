@@ -65,6 +65,13 @@ class CanisterInfo(Record):
     canister_type: text
 
 
+class QuarterInfoRecord(Record):
+    name: text
+    canister_id: text
+    population: nat
+    status: text
+
+
 class StatusRecord(Record):
     version: text
     status: text
@@ -95,12 +102,16 @@ class StatusRecord(Record):
     registries: Vec[CanisterInfo]
     dependencies: Vec[text]
     python_version: text
+    quarters: Vec[QuarterInfoRecord]
+    is_quarter: bool
+    parent_realm_canister_id: text
 
 
 class UserGetRecord(Record):
     principal: Principal
     profiles: Vec[text]
     profile_picture_url: text
+    assigned_quarter: text
 
 
 class ObjectsListRecordPaginated(Record):
@@ -210,13 +221,78 @@ def status() -> RealmResponse:
 
 
 @query
+def get_quarter_info() -> RealmResponse:
+    """Get quarter information for this realm (workaround for Basilisk Record field limitation)"""
+    try:
+        import json as _json
+        from ggg import Quarter, Realm
+
+        quarters = []
+        is_quarter = False
+        parent_realm_canister_id = ""
+
+        first_realm = Realm.load("1")
+        if first_realm:
+            is_quarter = bool(getattr(first_realm, 'is_quarter', False))
+            parent_realm_canister_id = getattr(first_realm, 'federation_realm_id', '') or ''
+            for q in Quarter.instances():
+                quarters.append({
+                    "name": q.name or "",
+                    "canister_id": q.canister_id or "",
+                    "population": q.population or 0,
+                    "status": q.status or "active",
+                })
+
+        result = _json.dumps({
+            "quarters": quarters,
+            "is_quarter": is_quarter,
+            "parent_realm_canister_id": parent_realm_canister_id,
+        })
+        return RealmResponse(success=True, data=RealmResponseData(message=result))
+    except Exception as e:
+        logger.error(f"Error getting quarter info: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@query
 def get_extensions() -> RealmResponse:
     """Get all available extensions with their metadata"""
     return list_extensions(ic.caller().to_str())
 
 
+def _assign_quarter(principal: str, realm, quarters, preferred_quarter: str) -> str:
+    """Assign a quarter via federation_codex, or fall back to random.
+
+    The federation codex may define an ``assign_quarter(principal, quarters,
+    preferred_quarter)`` function.  It receives the list of active Quarter
+    entities and should return a canister_id string.  If the codex raises,
+    the error propagates to the caller so the user gets a clear rejection
+    reason (e.g. "quarter is full").
+
+    When no codex is present the default behaviour is deterministic random
+    assignment (hash of principal) which guarantees uniform load.
+    """
+    active_quarters = [q for q in quarters if q.status == "active"]
+    if not active_quarters:
+        return ""
+
+    codex = realm.federation_codex
+    if codex and codex.code:
+        ns = {}
+        exec(str(codex.code), ns)
+        assign_fn = ns.get("assign_quarter")
+        if assign_fn:
+            result = assign_fn(principal, active_quarters, preferred_quarter)
+            if result:
+                return str(result)
+
+    # Default: deterministic random (hash-based)
+    idx = hash(principal) % len(active_quarters)
+    return active_quarters[idx].canister_id
+
+
 @update
-def join_realm(profile: str) -> RealmResponse:
+def join_realm(profile: str, preferred_quarter: text) -> RealmResponse:
     try:
         user = user_register(ic.caller().to_str(), profile)
         profiles = Vec[text]()
@@ -224,18 +300,72 @@ def join_realm(profile: str) -> RealmResponse:
             for p in user["profiles"]:
                 profiles.append(p)
 
+        # Quarter assignment (no-op for single-quarter realms)
+        assigned_quarter_canister_id = ""
+        from ggg import Quarter, Realm
+        realm = Realm.load("1")
+        quarters = list(Quarter.instances()) if realm else []
+        if realm and quarters:
+            assigned_quarter_canister_id = _assign_quarter(
+                ic.caller().to_str(), realm, quarters, preferred_quarter
+            )
+
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                userGet=UserGetRecord(  # TODO: fix this
+                userGet=UserGetRecord(
                     principal=Principal.from_str(user["principal"]),
                     profiles=profiles,
                     profile_picture_url=user.get("profile_picture_url", ""),
+                    assigned_quarter=assigned_quarter_canister_id,
                 )
             ),
         )
     except Exception as e:
         logger.error(f"Error registering user: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@update
+def change_quarter(new_quarter_canister_id: text) -> RealmResponse:
+    """Change the caller's assigned quarter."""
+    try:
+        from ggg import Quarter, Realm
+        caller = ic.caller().to_str()
+
+        # Validate the target quarter exists and is active
+        realm = Realm.load("1")
+        if not realm:
+            return RealmResponse(success=False, data=RealmResponseData(error="Realm not found"))
+
+        quarters = list(Quarter.instances())
+        target = None
+        for q in quarters:
+            if q.canister_id == new_quarter_canister_id and q.status == "active":
+                target = q
+                break
+
+        if not target:
+            return RealmResponse(
+                success=False,
+                data=RealmResponseData(error=f"Quarter '{new_quarter_canister_id}' not found or not active"),
+            )
+
+        # Run codex eligibility check if available
+        codex = realm.federation_codex
+        if codex and codex.code:
+            ns = {}
+            exec(str(codex.code), ns)
+            assign_fn = ns.get("assign_quarter")
+            if assign_fn:
+                assign_fn(caller, [target], new_quarter_canister_id)
+
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(message=new_quarter_canister_id),
+        )
+    except Exception as e:
+        logger.error(f"Error changing quarter: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
@@ -294,6 +424,114 @@ def set_canister_config(
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
+@update
+def register_quarter(quarter_name: text, quarter_canister_id: text) -> RealmResponse:
+    """
+    Register a new quarter under this realm.
+    Creates a Quarter entity linked to the realm.
+
+    Args:
+        quarter_name: Human-readable name for the quarter
+        quarter_canister_id: The canister principal ID of the quarter backend
+    """
+    try:
+        from ggg import Quarter, Realm
+
+        realm = Realm.load("1")
+        if not realm:
+            return RealmResponse(
+                success=False,
+                data=RealmResponseData(error="Realm not found")
+            )
+
+        # Check for duplicate canister ID
+        for q in Quarter.instances():
+            if q.canister_id == quarter_canister_id:
+                return RealmResponse(
+                    success=False,
+                    data=RealmResponseData(error=f"Quarter with canister ID {quarter_canister_id} already registered")
+                )
+
+        quarter = Quarter(
+            name=quarter_name,
+            canister_id=quarter_canister_id,
+        )
+        quarter.federation = realm
+
+        logger.info(f"Registered quarter '{quarter_name}' (canister: {quarter_canister_id})")
+
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(message=f"Quarter '{quarter_name}' registered with ID {quarter._id}")
+        )
+    except Exception as e:
+        logger.error(f"Error registering quarter: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@update
+def deregister_quarter(quarter_canister_id: text) -> RealmResponse:
+    """
+    Remove a quarter from this realm by its canister ID.
+
+    Args:
+        quarter_canister_id: The canister principal ID of the quarter to remove
+    """
+    try:
+        from ggg import Quarter
+
+        for q in Quarter.instances():
+            if q.canister_id == quarter_canister_id:
+                q.delete()
+                logger.info(f"Deregistered quarter with canister ID {quarter_canister_id}")
+                return RealmResponse(
+                    success=True,
+                    data=RealmResponseData(message=f"Quarter '{q.name}' deregistered")
+                )
+
+        return RealmResponse(
+            success=False,
+            data=RealmResponseData(error=f"Quarter with canister ID {quarter_canister_id} not found")
+        )
+    except Exception as e:
+        logger.error(f"Error deregistering quarter: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@update
+def set_quarter_config(parent_realm_canister_id: text) -> RealmResponse:
+    """
+    Configure this realm as a quarter of a parent realm.
+    Sets is_quarter=True and stores the parent realm's canister ID.
+
+    Args:
+        parent_realm_canister_id: The canister principal ID of the parent realm
+    """
+    try:
+        from ggg import Realm
+
+        realm = Realm.load("1")
+        if not realm:
+            return RealmResponse(
+                success=False,
+                data=RealmResponseData(error="Realm not found")
+            )
+
+        realm.is_quarter = True
+        realm.federation_realm_id = parent_realm_canister_id
+        realm.save()
+
+        logger.info(f"Configured realm as quarter of parent {parent_realm_canister_id}")
+
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(message=f"Realm configured as quarter of {parent_realm_canister_id}")
+        )
+    except Exception as e:
+        logger.error(f"Error setting quarter config: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
 @query
 def get_zones(resolution: nat = 6) -> text:
     """
@@ -336,6 +574,7 @@ def get_my_user_status() -> RealmResponse:
                     principal=Principal.from_str(user["principal"]),
                     profiles=profiles,
                     profile_picture_url=user["profile_picture_url"],
+                    assigned_quarter="",
                 )
             ),
         )
@@ -360,6 +599,7 @@ def update_my_profile_picture(profile_picture_url: str) -> RealmResponse:
                     principal=ic.caller(),
                     profiles=Vec[text](),
                     profile_picture_url=result["profile_picture_url"],
+                    assigned_quarter="",
                 )
             ),
         )
@@ -1905,7 +2145,7 @@ def create_scheduled_task(
         logger.info(f"Auto-detected is_async={is_async} for task {name}")
 
         # Create call and step
-        call = Call(codex=codex)
+        call = Call(codex=codex, is_async=is_async)
         step = TaskStep(call=call, run_next_after=0)
 
         # Create task (using TaskManager Task, not GGG Task)

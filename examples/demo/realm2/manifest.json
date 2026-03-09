@@ -29,6 +29,7 @@
     "service_payment_cycle": 600,
     "license_review_cycle": 600
   },
+  "quarters": 2,
   "options": {
     "random": {
       "members": 30,

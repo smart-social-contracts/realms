@@ -1,0 +1,41 @@
+{
+  "type": "realm",
+  "name": "Syntropia",
+  "description": "A full-featured representative democracy with separation of powers, progressive taxation, welfare benefits, land treaties, licensed private service providers, zones of action, and ZK passport-based citizenship.",
+  "logo": "emblem.png",
+  "welcome_image": "background.png",
+  "welcome_message": "Welcome to Syntropia. A self-governing community built on transparency, fair taxation, and universal welfare. Verify your passport to join.",
+  "codex": {
+    "package": {
+      "name": "syntropia",
+      "version": "latest"
+    }
+  },
+  "token": {
+    "name": "Syntropia Token",
+    "symbol": "SYN"
+  },
+  "land_token": {
+    "name": "Syntropia Land",
+    "symbol": "SLAND",
+    "description": "Land ownership NFT for Syntropia realm",
+    "supply_cap": 10000
+  },
+  "calendar": {
+    "fiscal_period": 600,
+    "voting_window": 120,
+    "codex_release_cycle": 900,
+    "benefit_cycle": 300,
+    "service_payment_cycle": 600,
+    "license_review_cycle": 600
+  },
+  "options": {
+    "random": {
+      "members": 50,
+      "organizations": 5,
+      "transactions": 100,
+      "disputes": 10,
+      "seed": 7
+    }
+  }
+}

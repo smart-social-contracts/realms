@@ -13,6 +13,13 @@ class CanisterInfo(Record):
     canister_type: text
 
 
+class QuarterInfoRecord(Record):
+    name: text
+    canister_id: text
+    population: nat
+    status: text
+
+
 class StatusRecord(Record):
     version: text
     status: text
@@ -43,12 +50,16 @@ class StatusRecord(Record):
     registries: Vec[CanisterInfo]
     dependencies: Vec[text]
     python_version: text
+    quarters: Vec[QuarterInfoRecord]
+    is_quarter: bool
+    parent_realm_canister_id: text
 
 
 class UserGetRecord(Record):
     principal: Principal
     profiles: Vec[text]
     profile_picture_url: text
+    assigned_quarter: text
 
 
 # New GGG response records

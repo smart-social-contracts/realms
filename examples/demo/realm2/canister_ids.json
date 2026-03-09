@@ -5,6 +5,9 @@
   "realm_frontend": {
     "staging": "3gpbx-xaaaa-aaaac-qcylq-cai"
   },
+  "quarter_1_backend": {
+    "staging": "rhszc-gyaaa-aaaac-qfnra-cai"
+  },
   "token_backend": {
     "staging": "tbo2x-cqaaa-aaaah-qq46a-cai"
   },

@@ -5,6 +5,7 @@
 		import { _ } from 'svelte-i18n';
 	import { isAuthenticated } from '$lib/stores/auth';
 		import { realmInfo, realmLogo, realmName } from '$lib/stores/realmInfo';
+	import QuarterSelector from '$lib/components/QuarterSelector.svelte';
 	import { onMount } from 'svelte';
 	import {
 		DarkMode,
@@ -54,8 +55,9 @@
 		</a>
 	</div>
 	
-	<!-- Right: User Menu -->
-	<div class="ms-auto flex items-center text-gray-500 dark:text-gray-400">
+	<!-- Right: Quarter Selector + User Menu -->
+	<div class="ms-auto flex items-center gap-2 text-gray-500 dark:text-gray-400">
+		<QuarterSelector />
 		<UserMenu {...Users[4]} />
 	</div>
 </Navbar>
