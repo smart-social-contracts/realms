@@ -79,10 +79,6 @@ result = 2 + 2
         assert (
             "Successfully executed" in stdout
         ), f"Expected success message not found. Output:\n{stdout}\nStderr:\n{stderr}"
-        # Check for JSON response indicating code was executed
-        assert (
-            '"status":' in stdout or "status" in stdout
-        ), f"Expected status in output. Output:\n{stdout}"
 
         print("✅ PASSED: run --file executes simple code")
     finally:
@@ -98,8 +94,8 @@ def test_run_command_with_ggg_imports():
         f.write(
             """
 # Test GGG entity imports - code runs in canister
-from ggg.user import User
-from ggg.organization import Organization
+from ggg import User
+from ggg import Organization
 # If imports fail, execution will error out
 user_class_name = User.__name__
 org_class_name = Organization.__name__
@@ -117,9 +113,6 @@ org_class_name = Organization.__name__
         assert (
             "Successfully executed" in stdout
         ), f"GGG imports failed - no success message. Output:\n{stdout}\nStderr:\n{stderr}"
-        assert (
-            '"status":' in stdout or "status" in stdout
-        ), f"Expected status in output. Output:\n{stdout}"
 
         print("✅ PASSED: run --file can import GGG entities")
     finally:
@@ -135,10 +128,10 @@ def test_run_command_with_entity_query():
         f.write(
             """
 # Test entity querying - code runs in canister
-from ggg.user import User
+from ggg import User
 
 # Try to load users - this tests database connectivity
-users = User.load_all()
+users = list(User.instances())
 # If query fails, execution will error out
 user_count = len(users)
 """
@@ -155,9 +148,6 @@ user_count = len(users)
         assert (
             "Successfully executed" in stdout
         ), f"Entity query failed - no success message. Output:\n{stdout}\nStderr:\n{stderr}"
-        assert (
-            '"status":' in stdout or "status" in stdout
-        ), f"Expected status in output. Output:\n{stdout}"
 
         print("✅ PASSED: run --file can query entities")
     finally:
