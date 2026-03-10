@@ -94,8 +94,8 @@ def test_run_command_with_ggg_imports():
         f.write(
             """
 # Test GGG entity imports - code runs in canister
-from ggg.user import User
-from ggg.organization import Organization
+from ggg import User
+from ggg import Organization
 # If imports fail, execution will error out
 user_class_name = User.__name__
 org_class_name = Organization.__name__
@@ -128,7 +128,7 @@ def test_run_command_with_entity_query():
         f.write(
             """
 # Test entity querying - code runs in canister
-from ggg.user import User
+from ggg import User
 
 # Try to load users - this tests database connectivity
 users = User.load_all()

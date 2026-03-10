@@ -163,7 +163,7 @@ def test_execute_code_with_ggg_entities():
     print("  - test_execute_code_with_ggg_entities...", end=" ")
 
     # Code that queries GGG entities
-    code = """from ggg.user import User
+    code = """from ggg import User
 users = User.all()
 result = len(list(users))"""
 

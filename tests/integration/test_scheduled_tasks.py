@@ -66,9 +66,8 @@ def test_task_with_future_run_at():
         print(f"\n    [DEBUG] current_time={current_time}, future_time={future_time}")
 
         code = f"""from ggg import Codex
-from ggg.task import Task
-from ggg.task_schedule import TaskSchedule
-from core.task_manager import Call, TaskStep, TaskManager
+from ggg import Task, TaskSchedule, Call, TaskStep
+from core.task_manager import TaskManager
 
 # Create codex
 codex = Codex(name="future_task", code="result = 'future execution'")
@@ -121,9 +120,8 @@ def test_recurring_task():
 
     try:
         code = """from ggg import Codex
-from ggg.task import Task
-from ggg.task_schedule import TaskSchedule
-from core.task_manager import Call, TaskStep, TaskManager
+from ggg import Task, TaskSchedule, Call, TaskStep
+from core.task_manager import TaskManager
 
 # Create codex
 codex = Codex(name="recurring_task", code="result = 'recurring execution'")
@@ -176,9 +174,7 @@ def test_disabled_schedule():
 
     try:
         code = """from ggg import Codex
-from ggg.task import Task
-from ggg.task_schedule import TaskSchedule
-from core.task_manager import Call, TaskStep
+from ggg import Task, TaskSchedule, Call, TaskStep
 
 # Create codex
 codex = Codex(name="disabled_task", code="result = 'should not execute'")
@@ -231,9 +227,8 @@ def test_multi_step_task():
 
     try:
         code = """from ggg import Codex
-from ggg.task import Task
-from ggg.task_schedule import TaskSchedule
-from core.task_manager import Call, TaskStep, TaskManager
+from ggg import Task, TaskSchedule, Call, TaskStep
+from core.task_manager import TaskManager
 
 # Create codexes for each step
 codex1 = Codex(name="step1", code="result = 'step 1'")
@@ -295,9 +290,7 @@ def test_task_schedule_persistence():
     try:
         # First create a scheduled task
         create_code = """from ggg import Codex
-from ggg.task import Task
-from ggg.task_schedule import TaskSchedule
-from core.task_manager import Call, TaskStep
+from ggg import Task, TaskSchedule, Call, TaskStep
 
 codex = Codex(name="persistent_task", code="result = 'test'")
 call = Call(is_async=False, codex=codex)
@@ -332,7 +325,7 @@ result = {"schedule_id": schedule._id}"""
         ), f"Failed to create persistent schedule. Exit code: {exit_code}, Output: {output}"
 
         # Now query all TaskSchedule entities
-        query_code = """from ggg.task_schedule import TaskSchedule
+        query_code = """from ggg import TaskSchedule
 schedules = list(TaskSchedule.all())
 result = {"count": len(schedules), "has_persistent": any(s.name == "persistent_schedule" for s in schedules)}"""
 
@@ -364,9 +357,8 @@ def test_task_manager_integration():
 
     try:
         code = """from ggg import Codex
-from ggg.task import Task
-from ggg.task_schedule import TaskSchedule
-from core.task_manager import Call, TaskStep, TaskManager
+from ggg import Task, TaskSchedule, Call, TaskStep
+from core.task_manager import TaskManager
 
 # Create a task
 codex = Codex(name="tm_test", code="result = 'tm executed'")
@@ -424,9 +416,7 @@ def test_schedule_with_past_run_at():
         print(f"\n    [DEBUG] past_time={past_time}")
 
         code = f"""from ggg import Codex
-from ggg.task import Task
-from ggg.task_schedule import TaskSchedule
-from core.task_manager import Call, TaskStep
+from ggg import Task, TaskSchedule, Call, TaskStep
 
 codex = Codex(name="past_task", code="result = 'executed from past'")
 call = Call(is_async=False, codex=codex)
@@ -473,9 +463,7 @@ def test_update_schedule_properties():
 
     try:
         code = """from ggg import Codex
-from ggg.task import Task
-from ggg.task_schedule import TaskSchedule
-from core.task_manager import Call, TaskStep
+from ggg import Task, TaskSchedule, Call, TaskStep
 
 # Create task and schedule
 codex = Codex(name="update_test", code="result = 'test'")
@@ -528,9 +516,7 @@ def test_async_multi_step_task():
 
     try:
         code = '''from ggg import Codex
-from ggg.task import Task
-from ggg.task_schedule import TaskSchedule
-from core.task_manager import Call, TaskStep
+from ggg import Task, TaskSchedule, Call, TaskStep
 
 # Create async codex
 async_code = """def async_task():

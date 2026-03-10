@@ -76,7 +76,7 @@ def _ensure_codex_lazy_loading():
         if '__getattr__' in mod.__dict__:
             continue
         # Skip stdlib modules that are wasi-stubs but not codex modules
-        if name in _SKIP_MODULES or '.' in name:
+        if name in _SKIP_MODULES or name.split('.')[0] in _SKIP_MODULES:
             continue
 
         def _lazy_codex_getattr(attr, _mod=mod):
