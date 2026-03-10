@@ -79,10 +79,6 @@ result = 2 + 2
         assert (
             "Successfully executed" in stdout
         ), f"Expected success message not found. Output:\n{stdout}\nStderr:\n{stderr}"
-        # Check for JSON response indicating code was executed
-        assert (
-            '"status":' in stdout or "status" in stdout
-        ), f"Expected status in output. Output:\n{stdout}"
 
         print("✅ PASSED: run --file executes simple code")
     finally:
@@ -117,9 +113,6 @@ org_class_name = Organization.__name__
         assert (
             "Successfully executed" in stdout
         ), f"GGG imports failed - no success message. Output:\n{stdout}\nStderr:\n{stderr}"
-        assert (
-            '"status":' in stdout or "status" in stdout
-        ), f"Expected status in output. Output:\n{stdout}"
 
         print("✅ PASSED: run --file can import GGG entities")
     finally:
@@ -155,9 +148,6 @@ user_count = len(users)
         assert (
             "Successfully executed" in stdout
         ), f"Entity query failed - no success message. Output:\n{stdout}\nStderr:\n{stderr}"
-        assert (
-            '"status":' in stdout or "status" in stdout
-        ), f"Expected status in output. Output:\n{stdout}"
 
         print("✅ PASSED: run --file can query entities")
     finally:

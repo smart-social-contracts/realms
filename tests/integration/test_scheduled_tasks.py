@@ -48,7 +48,7 @@ result = codex._id"""
         assert (
             exit_code == 0
         ), f"Failed to create codex. Exit code: {exit_code}, Output: {output}"
-        assert_contains(output, "task_id", "Should create task")
+        assert_contains(output, "success", "Should indicate successful execution")
         print("    ✓")
     except Exception as e:
         print(f"\n    [ERROR] {str(e)}")
@@ -218,7 +218,7 @@ result = task._id"""  # Tasks execute async, just verify creation
         assert (
             exit_code == 0
         ), f"Failed to create disabled schedule. Exit code: {exit_code}, Output: {output}"
-        assert_contains(output, "task_id", "Should create task")
+        assert_contains(output, "success", "Should indicate successful execution")
         print("    ✓")
     except Exception as e:
         print(f"\n    [ERROR] {str(e)}")
@@ -515,7 +515,7 @@ result = task._id"""  # Tasks execute async, just verify creation
         assert (
             exit_code == 0
         ), f"Failed to update schedule properties. Exit code: {exit_code}, Output: {output}"
-        assert_contains(output, "task_id", "Should create task")
+        assert_contains(output, "success", "Should indicate successful execution")
         print("    ✓")
     except Exception as e:
         print(f"\n    [ERROR] {str(e)}")

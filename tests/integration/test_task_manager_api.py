@@ -37,8 +37,7 @@ def test_execute_sync_code():
 
     assert code == 0, f"execute_code failed with code {code}, output: {output}"
     assert_contains(output, "sync", "Should indicate sync execution")
-    # Sync tasks also return "running" and complete via timer callbacks
-    assert_contains(output, "task_id", "Should return task ID")
+    assert_contains(output, "success", "Should indicate success")
     print("✓")
 
 
@@ -57,9 +56,10 @@ def test_execute_sync_code_with_result():
     print(f"    Output: {output[:200]}...")
 
     assert code == 0, f"execute_code failed with code {code}, output: {output}"
-    # Should return sync type and task info
+    # Should return sync type with success and result
     assert_contains(output, "sync", "Should indicate sync execution")
-    assert_contains(output, "task_id", "Should include task ID")
+    assert_contains(output, "success", "Should indicate success")
+    assert_contains(output, "50", "Should contain result value 50")
     print("✓")
 
 
@@ -74,11 +74,10 @@ def test_execute_code_with_error():
 
     output, code = dfx_call("realm_backend", "execute_code", args, is_update=True)
 
-    # Even with syntax errors, task is created and scheduled
-    # Errors are captured in task execution logs, not in creation response
+    # With direct run_code(), syntax errors are caught and returned immediately
     assert code == 0, f"dfx call failed with code {code}"
-    # Should still create a task (error happens during execution)
-    assert_contains(output, "task_id", "Should create task even with invalid code")
+    # Should return an error in the response
+    assert_contains(output, "error", "Should report error for invalid code")
     print("✓")
 
 
@@ -86,9 +85,9 @@ def test_execute_async_code():
     """Test asynchronous code execution."""
     print("  - test_execute_async_code...", end=" ")
 
-    # Async code pattern with yield
+    # Async code pattern — must contain yield for AST-based detection
     code = """def async_task():
-    result = 42
+    result = yield 42
     return result"""
 
     escaped_code = code.replace('"', '\\"').replace("\n", "\\n")
@@ -128,7 +127,7 @@ def test_get_task_status():
         exit_code == 0
     ), f"Failed to execute code, exit_code: {exit_code}, output: {output}"
 
-    # Extract task_id from JSON response
+    # Extract task_id from JSON response (only present for async tasks)
     if "task_id" in output:
         # Parse the task_id from the JSON in the Candid response
         # Response format: ("{{json}}")
@@ -174,9 +173,9 @@ result = len(list(users))"""
     output, code = dfx_call("realm_backend", "execute_code", args, is_update=True)
 
     assert code == 0, f"execute_code failed with code {code}"
-    # Should successfully create task that uses GGG entities
+    # Should successfully execute code that uses GGG entities
     assert_contains(output, "sync", "Should indicate sync execution")
-    assert_contains(output, "task_id", "Should return task ID")
+    assert_contains(output, "success", "Should indicate success")
     print("✓")
 
 
