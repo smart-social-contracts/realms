@@ -1,22 +1,35 @@
 <script lang="ts">
 	import { Chart, Card, A, Button, Dropdown, DropdownItem } from 'flowbite-svelte';
 	import { ChevronRightOutline, ChevronDownOutline } from 'flowbite-svelte-icons';
+	import { createEventDispatcher } from 'svelte';
 
-	export let title;
-	export let description;
+	export let title: string;
+	export let description: string;
 	export let dateValues: [string[], number[]] = [[], []];
+	export let percentChange: number | null = null;
+	export let seriesName: string = '';
+	export let reportLabel: string = '';
+	export let reportLink: string = '';
+	export let color: string = '#1A56DB';
 
-	console.log(`dateValues (2)`, dateValues);
-
+	const dispatch = createEventDispatcher();
 	let chart;
+	let selectedRange = 'Last 30 days';
+
+	$: effectiveSeriesName = seriesName || title;
+	$: hasData = dateValues && dateValues[0] && dateValues[0].length > 0;
+
+	function selectRange(days: number, label: string) {
+		selectedRange = label;
+		dispatch('rangeChange', days);
+	}
 
 	$: if (chart && dateValues) {
-		console.log('Updating chart with new data:', dateValues);
 		chart.updateOptions({
 			series: [{
-				name: 'New users',
+				name: effectiveSeriesName,
 				data: dateValues[1],
-				color: '#1A56DB'
+				color: color
 			}],
 			xaxis: {
 				categories: dateValues[0]
@@ -29,9 +42,9 @@
 
 	$: seriesData = [
 		{
-			name: 'New users',
+			name: effectiveSeriesName,
 			data: dateValues[1],
-			color: '#1A56DB'
+			color: color
 		}
 	];
 
@@ -129,14 +142,22 @@
 			<h5 class="pb-2 text-3xl font-bold leading-none text-gray-900">{title}</h5>
 			<p class="text-base font-normal text-gray-500">{description}</p>
 		</div>
-		<div
-			class="flex items-center px-2.5 py-0.5 text-center text-base font-semibold text-green-500"
-		>
-			12%
-			<ChevronRightOutline class="ms-1 h-6 w-6" />
-		</div>
+		{#if percentChange !== null}
+			<div
+				class="flex items-center px-2.5 py-0.5 text-center text-base font-semibold {percentChange >= 0 ? 'text-green-500' : 'text-red-500'}"
+			>
+				{percentChange >= 0 ? '+' : ''}{percentChange}%
+				<ChevronRightOutline class="ms-1 h-6 w-6" />
+			</div>
+		{/if}
 	</div>
-	<Chart bind:chart={chart} {options} class="py-6" />
+	{#if hasData}
+		<Chart bind:chart={chart} {options} class="py-6" />
+	{:else}
+		<div class="flex items-center justify-center py-20 text-gray-400">
+			<p class="text-lg">No data available yet</p>
+		</div>
+	{/if}
 	<div
 		class="grid grid-cols-1 items-center justify-between border-t border-gray-200"
 	>
@@ -144,22 +165,23 @@
 			<Button
 				class="inline-flex items-center bg-transparent py-0 text-center text-sm font-medium text-gray-500 hover:bg-transparent hover:text-gray-900 focus:ring-transparent"
 			>
-				Last 7 days<ChevronDownOutline class="m-2.5 ms-1.5 w-2.5" /></Button
+				{selectedRange}<ChevronDownOutline class="m-2.5 ms-1.5 w-2.5" /></Button
 			>
 			<Dropdown class="w-40" offset="-6">
-				<DropdownItem>Yesterday</DropdownItem>
-				<DropdownItem>Today</DropdownItem>
-				<DropdownItem>Last 7 days</DropdownItem>
-				<DropdownItem>Last 30 days</DropdownItem>
-				<DropdownItem>Last 90 days</DropdownItem>
+				<DropdownItem on:click={() => selectRange(1, 'Yesterday')}>Yesterday</DropdownItem>
+				<DropdownItem on:click={() => selectRange(7, 'Last 7 days')}>Last 7 days</DropdownItem>
+				<DropdownItem on:click={() => selectRange(30, 'Last 30 days')}>Last 30 days</DropdownItem>
+				<DropdownItem on:click={() => selectRange(90, 'Last 90 days')}>Last 90 days</DropdownItem>
 			</Dropdown>
-			<A
-				href="/"
-				class="hover:text-primary-700 rounded-lg px-3 py-2 text-sm font-semibold uppercase hover:bg-gray-100 hover:no-underline"
-			>
-				Users Report
-				<ChevronRightOutline class="ms-1.5 h-2.5 w-2.5" />
-			</A>
+			{#if reportLabel && reportLink}
+				<A
+					href={reportLink}
+					class="hover:text-primary-700 rounded-lg px-3 py-2 text-sm font-semibold uppercase hover:bg-gray-100 hover:no-underline"
+				>
+					{reportLabel}
+					<ChevronRightOutline class="ms-1.5 h-2.5 w-2.5" />
+				</A>
+			{/if}
 		</div>
 	</div>
 </Card>
