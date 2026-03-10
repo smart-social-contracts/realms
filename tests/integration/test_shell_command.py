@@ -131,7 +131,7 @@ def test_run_command_with_entity_query():
 from ggg import User
 
 # Try to load users - this tests database connectivity
-users = User.load_all()
+users = list(User.instances())
 # If query fails, execution will error out
 user_count = len(users)
 """
