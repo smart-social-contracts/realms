@@ -51,11 +51,32 @@ def _ensure_codex_lazy_loading():
         return
     _codex_lazy_loading_installed = True
 
+    # Stdlib modules that basilisk stubs as wasi-stub but should never be
+    # treated as codex modules.
+    _SKIP_MODULES = frozenset({
+        'ast', 'json', 'traceback', 'io', 'sys', 'os', 'math', 'time',
+        'datetime', 'collections', 'functools', 'itertools', 'operator',
+        'copy', 'types', 'abc', 'enum', 're', 'string', 'textwrap',
+        'struct', 'hashlib', 'hmac', 'base64', 'binascii', 'logging',
+        'warnings', 'contextlib', 'inspect', 'dis', 'token', 'tokenize',
+        'keyword', 'pprint', 'decimal', 'fractions', 'random', 'statistics',
+        'pathlib', 'posixpath', 'ntpath', 'genericpath', 'fnmatch', 'glob',
+        'shutil', 'tempfile', 'csv', 'configparser', 'argparse', 'getopt',
+        'unittest', 'doctest', 'pdb', 'profile', 'cProfile', 'timeit',
+        'pickle', 'shelve', 'marshal', 'copyreg', 'socket', 'select',
+        'selectors', 'signal', 'errno', 'ctypes', 'threading', 'queue',
+        'multiprocessing', 'subprocess', 'sched', 'http', 'urllib',
+        'email', 'html', 'xml', 'webbrowser', 'cgi', 'cgitb',
+    })
+
     for name, mod in list(sys.modules.items()):
         # Check __dict__ directly to avoid triggering _LazyMod.__getattr__
         if mod.__dict__.get('__file__') != '<wasi-stub>':
             continue
         if '__getattr__' in mod.__dict__:
+            continue
+        # Skip stdlib modules that are wasi-stubs but not codex modules
+        if name in _SKIP_MODULES or '.' in name:
             continue
 
         def _lazy_codex_getattr(attr, _mod=mod):

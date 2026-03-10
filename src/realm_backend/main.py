@@ -1583,9 +1583,27 @@ def execute_code(code: str) -> str:
             result = yield some_async_operation()
             return result
     """
-    import ast as _ast
     import json
     import traceback
+
+    # --- AST-based async detection ---
+    # MUST happen before _ensure_codex_lazy_loading(), because the lazy
+    # loader patches wasi-stub modules (including 'ast') with __getattr__,
+    # which breaks ast.parse / ast.walk.
+    is_async = False
+    try:
+        import ast as _ast
+        tree = _ast.parse(code)
+        is_async = any(
+            isinstance(node, (_ast.Yield, _ast.YieldFrom))
+            for node in _ast.walk(tree)
+        )
+    except SyntaxError:
+        pass
+    except Exception:
+        # If ast module is unavailable (e.g. wasi-stub), fall back to
+        # simple string check so we don't break entirely.
+        is_async = "yield " in code or "yield\n" in code
 
     from core.execution import run_code, _ensure_codex_lazy_loading
     from core.task_manager import TaskManager
@@ -1594,16 +1612,6 @@ def execute_code(code: str) -> str:
     _ensure_codex_lazy_loading()
 
     try:
-        # AST-based async detection (replaces naive "yield" in code)
-        is_async = False
-        try:
-            tree = _ast.parse(code)
-            is_async = any(
-                isinstance(node, (_ast.Yield, _ast.YieldFrom))
-                for node in _ast.walk(tree)
-            )
-        except SyntaxError:
-            pass
 
         if is_async:
             # Async code: schedule via TaskManager
