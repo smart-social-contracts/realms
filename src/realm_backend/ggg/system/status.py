@@ -1,15 +1,18 @@
+"""
+GGG Status Enums
+
+OS-level statuses (TaskStatus, TaskExecutionStatus) are re-exported from
+basilisk_os.  Application-level statuses remain defined here.
+
+See: https://github.com/smart-social-contracts/realms/issues/153
+"""
+
 from enum import Enum
 
-# trade status
-# dispute status
-# user status
-# proposal status
-# mandate status
-# organization status
-# realm status
-# permission status
-# vote status
-# instrument status
+# --- OS-level statuses (canonical source: basilisk/basilisk/os/status.py) ---
+from basilisk.os.status import TaskStatus, TaskExecutionStatus  # noqa: F401
+
+# --- Application-level statuses (realms-specific) ---
 
 
 class TradeStatus(Enum):
@@ -67,17 +70,3 @@ class OrganizationStatus(Enum):
     INACTIVE = "inactive"
     SUSPENDED = "suspended"
     BANNED = "banned"
-
-
-class TaskStatus(Enum):
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-
-class TaskExecutionStatus(Enum):
-    IDLE = "idle"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
