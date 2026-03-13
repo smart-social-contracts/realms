@@ -1703,6 +1703,8 @@ def execute_code_shell(code: str) -> str:
             "basilisk": basilisk,
             "ic": ic,
         })
+        for _name in ggg.__all__:
+            _shell_ns_by_principal[caller][_name] = getattr(ggg, _name)
     ns = _shell_ns_by_principal[caller]
 
     stdout = io.StringIO()
