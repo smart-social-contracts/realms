@@ -404,7 +404,7 @@
 	class=""
 	activeUrl={mainSidebarUrl}
 	activeClass="bg-gray-50 dark:bg-gray-700"
-	asideClass="fixed top-0 left-0 z-40 flex-none h-screen w-64 pt-16 border-r border-gray-200 dark:border-gray-600 transition-transform duration-500 ease-in-out {drawerHidden ? '-translate-x-full' : 'translate-x-0'}"
+	asideClass="fixed top-0 left-0 z-40 flex-none h-[calc(100vh-4rem)] w-64 mt-16 border-r border-gray-200 dark:border-gray-600 transition-transform duration-500 ease-in-out {drawerHidden ? '-translate-x-full' : 'translate-x-0'}"
 >
 	<h4 class="sr-only">{$_('common.main_menu')}</h4>
 	<SidebarWrapper

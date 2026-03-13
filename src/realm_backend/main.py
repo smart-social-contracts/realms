@@ -1674,13 +1674,17 @@ def execute_code(code: str) -> str:
         return json.dumps(response, indent=2)
 
 
+_shell_ns_by_principal = {}
+
 @update
 def execute_code_shell(code: str) -> str:
-    """Executes Python code in an isolated namespace and returns the output.
+    """Executes Python code in a persistent namespace and returns the output.
 
     This is the core function needed for the Basilisk Simple Shell to work.
-    It captures stdout and stderr from the executed code.  Each invocation
-    uses a fresh namespace so variables do not leak between calls.
+    It captures stdout and stderr from the executed code.  The namespace
+    persists across calls per caller principal, so variables defined in one
+    command are available in subsequent commands (like a normal interactive
+    Python session).  Each principal gets its own isolated session.
     """
     import io
     import sys
@@ -1688,16 +1692,18 @@ def execute_code_shell(code: str) -> str:
     from core.execution import _ensure_codex_lazy_loading
     _ensure_codex_lazy_loading()
 
-    # Build an isolated namespace with access to canister APIs
-    import ggg
-    import _cdk as basilisk
-
-    ns = {"__builtins__": __builtins__}
-    ns.update({
-        "ggg": ggg,
-        "basilisk": basilisk,
-        "ic": ic,
-    })
+    global _shell_ns_by_principal
+    caller = str(ic.caller())
+    if caller not in _shell_ns_by_principal:
+        import ggg
+        import _cdk as basilisk
+        _shell_ns_by_principal[caller] = {"__builtins__": __builtins__}
+        _shell_ns_by_principal[caller].update({
+            "ggg": ggg,
+            "basilisk": basilisk,
+            "ic": ic,
+        })
+    ns = _shell_ns_by_principal[caller]
 
     stdout = io.StringIO()
     stderr = io.StringIO()

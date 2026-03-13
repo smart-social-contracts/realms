@@ -43,7 +43,7 @@
 	<div class="absolute left-1/2 transform -translate-x-1/2">
 		<a href="/" class="flex items-center cursor-pointer">
 			<img
-				src={$realmLogo || "/images/logo_horizontal.svg"}
+				src={$realmLogo || "/images/logo_sphere_only.svg"}
 				class="h-8 sm:h-10 pointer-events-none"
 				alt={$realmName || "Realms Logo"}
 			/>
@@ -55,9 +55,8 @@
 		</a>
 	</div>
 	
-	<!-- Right: Quarter Selector + User Menu -->
+	<!-- Right: User Menu -->
 	<div class="ms-auto flex items-center gap-2 text-gray-500 dark:text-gray-400">
-		<QuarterSelector />
 		<UserMenu {...Users[4]} />
 	</div>
 </Navbar>

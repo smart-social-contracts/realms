@@ -64,25 +64,27 @@
 	console.log("Layout is rendering"); // Debugging line
 </script>
 
-<header
-	class="sticky top-0 z-50 mx-auto w-full flex-none border-b border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800"
->
-	<Navbar bind:drawerHidden />
-</header>
-<div class="min-h-screen lg:flex">
-	<!-- Sidebar -->
-	<Sidebar bind:drawerHidden />
+<div class="flex h-screen flex-col overflow-hidden">
+	<header
+		class="flex-none z-50 mx-auto w-full border-b border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800"
+	>
+		<Navbar bind:drawerHidden />
+	</header>
+	<div class="flex flex-1 overflow-hidden">
+		<!-- Sidebar -->
+		<Sidebar bind:drawerHidden />
 
-	<!-- Main Content -->
-	<div class="relative h-full w-full overflow-x-hidden bg-white transition-[margin] duration-500 ease-in-out {drawerHidden ? '' : 'lg:ml-64'} lg:pl-6">
-		<!-- Demo Banner -->
-		<div class="px-4 lg:px-0">
-			<DemoBanner />
+		<!-- Main Content -->
+		<div class="relative flex-1 overflow-y-auto overflow-x-hidden bg-white transition-[margin] duration-500 ease-in-out {drawerHidden ? '' : 'lg:ml-64'} lg:pl-6">
+			<!-- Demo Banner -->
+			<div class="px-4 lg:px-0">
+				<DemoBanner />
+			</div>
+			
+			<slot />
+			{#if !($page.url.pathname.includes('/extensions/') && $page.url.pathname.includes('/llm_chat'))}
+				<Footer />
+			{/if}
 		</div>
-		
-		<slot />
-		{#if !($page.url.pathname.includes('/extensions/') && $page.url.pathname.includes('/llm_chat'))}
-			<Footer />
-		{/if}
 	</div>
 </div>
