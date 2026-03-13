@@ -1311,6 +1311,50 @@ def http_transform(args: HttpTransformArgs) -> HttpResponse:
     return http_response
 
 
+@update
+def download_to_file(url: str, dest: str) -> Async[str]:
+    """Download a file from a URL and save it to the canister filesystem.
+
+    Makes an HTTP outcall via the IC management canister, then writes
+    the response body (decoded as UTF-8) to *dest* on the in-memory
+    filesystem.  Returns a human-readable status string.
+    """
+    http_result: CallResult[HttpResponse] = yield management_canister.http_request(
+        {
+            "url": url,
+            "max_response_bytes": 2_000_000,
+            "method": {"get": None},
+            "headers": [
+                {"name": "User-Agent", "value": "Basilisk/1.0"},
+                {"name": "Accept-Encoding", "value": "identity"},
+            ],
+            "body": None,
+            "transform": {
+                "function": (ic.id(), "http_transform"),
+                "context": bytes(),
+            },
+        }
+    ).with_cycles(30_000_000_000)
+
+    def _handle_ok(response: HttpResponse) -> str:
+        try:
+            content = response["body"].decode("utf-8")
+        except UnicodeDecodeError as e:
+            return f"Error: failed to decode response as UTF-8: {e}"
+        import os
+        parent = os.path.dirname(dest)
+        if parent and parent != "/":
+            os.makedirs(parent, exist_ok=True)
+        with open(dest, "w") as f:
+            f.write(content)
+        return f"Downloaded {len(content)} bytes to {dest}"
+
+    def _handle_err(err: str) -> str:
+        return f"Download failed: {err}"
+
+    return match(http_result, {"Ok": _handle_ok, "Err": _handle_err})
+
+
 # @update
 # def set_timer(delay: Duration) -> TimerId:
 #     ic.call_self("timer_callback")
