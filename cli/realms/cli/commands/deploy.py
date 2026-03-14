@@ -69,6 +69,105 @@ def _query_canister_cycles(canister_id: str, network: str, cwd: str = ".") -> Op
     return None
 
 
+def _inject_version_placeholders(folder_path: Path, logger) -> None:
+    """Replace version/commit/dependency placeholders in source files before build.
+
+    This mirrors the sed replacements done in ci-main.yml so that local
+    deployments via ``realms deploy`` also get correct version info baked
+    into the canister WASM.
+    """
+    # --- Gather values -------------------------------------------------------
+    # Git commit hash & datetime (from the realms project root)
+    project_root = folder_path
+    # Walk up to find .git directory (project root)
+    for parent in [folder_path] + list(folder_path.parents):
+        if (parent / ".git").exists():
+            project_root = parent
+            break
+
+    commit_hash = ""
+    commit_datetime = ""
+    try:
+        commit_hash = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(project_root),
+            stderr=subprocess.DEVNULL,
+        ).decode().strip()
+        commit_datetime = subprocess.check_output(
+            ["git", "log", "--format=%cd", "--date=iso8601", "-1"],
+            cwd=str(project_root),
+            stderr=subprocess.DEVNULL,
+        ).decode().strip()
+    except Exception as e:
+        logger.warning(f"Could not get git info for placeholders: {e}")
+
+    # Version from version.txt (project root)
+    version = ""
+    for candidate in [folder_path / "version.txt", project_root / "version.txt"]:
+        if candidate.exists():
+            version = candidate.read_text().strip()
+            break
+
+    # Dependency versions from the realm folder's own requirements.txt
+    dep_versions = {}
+    req_path = folder_path / "requirements.txt"
+    if not req_path.exists():
+        req_path = project_root / "requirements.txt"
+    if req_path.exists():
+        for line in req_path.read_text().splitlines():
+            line = line.strip()
+            if "==" in line:
+                pkg, ver = line.split("==", 1)
+                dep_versions[pkg.strip()] = ver.strip()
+
+    basilisk_version = dep_versions.get("ic-basilisk", "")
+    ic_python_db_version = dep_versions.get("ic-python-db", "")
+    ic_python_logging_version = dep_versions.get("ic-python-logging", "")
+
+    # --- Build replacement map -----------------------------------------------
+    replacements = {
+        "COMMIT_HASH_PLACEHOLDER": commit_hash,
+        "COMMIT_DATETIME_PLACEHOLDER": commit_datetime,
+        "VERSION_PLACEHOLDER": version,
+        "BASILISK_VERSION_PLACEHOLDER": basilisk_version,
+        "IC_PYTHON_DB_VERSION_PLACEHOLDER": ic_python_db_version,
+        "IC_PYTHON_LOGGING_VERSION_PLACEHOLDER": ic_python_logging_version,
+    }
+
+    # --- Target files (relative to realm folder) -----------------------------
+    target_files = [
+        "src/realm_backend/api/status.py",
+        "src/realm_registry_backend/api/status.py",
+        "src/realm_frontend/src/app.html",
+        "src/realm_registry_frontend/src/app.html",
+    ]
+
+    replaced_count = 0
+    for rel_path in target_files:
+        fpath = folder_path / rel_path
+        if not fpath.exists():
+            continue
+        content = fpath.read_text()
+        original = content
+        for placeholder, value in replacements.items():
+            if value:
+                content = content.replace(placeholder, value)
+        if content != original:
+            fpath.write_text(content)
+            replaced_count += 1
+            logger.info(f"Injected version placeholders in {rel_path}")
+
+    if replaced_count:
+        logger.info(
+            f"Replaced placeholders in {replaced_count} file(s): "
+            f"version={version}, commit={commit_hash[:12]}, "
+            f"basilisk={basilisk_version}, db={ic_python_db_version}, "
+            f"logging={ic_python_logging_version}"
+        )
+    else:
+        logger.info("No placeholder files found to update (may already be replaced)")
+
+
 def _deploy_realm_internal(
     config_file: Optional[str],
     folder: str,
@@ -152,6 +251,9 @@ def _deploy_realm_internal(
         if not env:
             env = os.environ.copy()
         env["REALMS_VERBOSE"] = "1"
+
+    # Inject version/commit/dependency placeholders into source files before build
+    _inject_version_placeholders(folder_path, logger)
 
     # Validate all scripts exist before starting
     for script_name in scripts:

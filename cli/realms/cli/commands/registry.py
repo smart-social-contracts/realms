@@ -506,6 +506,10 @@ def registry_deploy_command(
     console.print(f"📡 Network: {network}")
     console.print(f"🔄 Mode: {mode}\n")
     
+    # Inject version/commit/dependency placeholders into source files before build
+    from .deploy import _inject_version_placeholders
+    _inject_version_placeholders(registry_dir.resolve(), logger)
+    
     # Find deploy_canisters.sh
     repo_root = Path.cwd()
     deploy_script = repo_root / "scripts" / "deploy_canisters.sh"
