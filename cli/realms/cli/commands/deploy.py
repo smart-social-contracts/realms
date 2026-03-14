@@ -125,14 +125,16 @@ def _inject_version_placeholders(folder_path: Path, logger) -> None:
     ic_python_logging_version = dep_versions.get("ic-python-logging", "")
 
     # --- Build replacement map -----------------------------------------------
-    replacements = {
-        "COMMIT_HASH_PLACEHOLDER": commit_hash,
-        "COMMIT_DATETIME_PLACEHOLDER": commit_datetime,
-        "VERSION_PLACEHOLDER": version,
-        "BASILISK_VERSION_PLACEHOLDER": basilisk_version,
-        "IC_PYTHON_DB_VERSION_PLACEHOLDER": ic_python_db_version,
-        "IC_PYTHON_LOGGING_VERSION_PLACEHOLDER": ic_python_logging_version,
-    }
+    # Order matters: specific placeholders that contain "VERSION_PLACEHOLDER"
+    # as a substring must be replaced BEFORE the generic "VERSION_PLACEHOLDER"
+    replacements = [
+        ("COMMIT_HASH_PLACEHOLDER", commit_hash),
+        ("COMMIT_DATETIME_PLACEHOLDER", commit_datetime),
+        ("BASILISK_VERSION_PLACEHOLDER", basilisk_version),
+        ("IC_PYTHON_DB_VERSION_PLACEHOLDER", ic_python_db_version),
+        ("IC_PYTHON_LOGGING_VERSION_PLACEHOLDER", ic_python_logging_version),
+        ("VERSION_PLACEHOLDER", version),
+    ]
 
     # --- Target files (relative to realm folder) -----------------------------
     target_files = [
@@ -149,7 +151,7 @@ def _inject_version_placeholders(folder_path: Path, logger) -> None:
             continue
         content = fpath.read_text()
         original = content
-        for placeholder, value in replacements.items():
+        for placeholder, value in replacements:
             if value:
                 content = content.replace(placeholder, value)
         if content != original:
