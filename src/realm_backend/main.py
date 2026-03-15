@@ -1172,19 +1172,32 @@ def post_upgrade_() -> void:
 
 @update
 def test_timer() -> text:
-    """Diagnostic: set a minimal timer to verify timer callbacks persist state."""
+    """Diagnostic: create entity now, set timer to modify it.
+
+    1. Creates a TaskExecution with result='waiting' (verifiable immediately)
+    2. Sets a 5s timer that changes result to 'timer_fired'
+    3. Check later: if result is 'timer_fired', timers persist state
+    """
     from _cdk import ic
     from ggg import TaskExecution
 
+    te = TaskExecution(name="timer_diag", status="idle", result="waiting")
+    te_id = str(te._id)
+
     def _test_cb():
         try:
-            te = TaskExecution(name="timer_diag", status="completed", result="timer_fired")
-            ic.print(f"TIMER DIAG: created TaskExecution id={te._id}")
+            _te = TaskExecution.load(te_id)
+            if _te:
+                _te.result = "timer_fired"
+                _te.status = "completed"
+                ic.print(f"TIMER DIAG OK: updated {te_id}")
+            else:
+                ic.print(f"TIMER DIAG: could not load {te_id}")
         except Exception as e:
             ic.print(f"TIMER DIAG ERROR: {e}")
 
     tid = ic.set_timer(5, _test_cb)
-    return f"Diagnostic timer set with id={tid}, will fire in 5s"
+    return f"Created TaskExecution id={te_id} result=waiting, timer id={tid} fires in 5s"
 
 
 @update
