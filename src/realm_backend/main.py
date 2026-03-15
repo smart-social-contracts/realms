@@ -1171,6 +1171,23 @@ def post_upgrade_() -> void:
 
 
 @update
+def test_timer() -> text:
+    """Diagnostic: set a minimal timer to verify timer callbacks persist state."""
+    from _cdk import ic
+    from ggg import TaskExecution
+
+    def _test_cb():
+        try:
+            te = TaskExecution(name="timer_diag", status="completed", result="timer_fired")
+            ic.print(f"TIMER DIAG: created TaskExecution id={te._id}")
+        except Exception as e:
+            ic.print(f"TIMER DIAG ERROR: {e}")
+
+    tid = ic.set_timer(5, _test_cb)
+    return f"Diagnostic timer set with id={tid}, will fire in 5s"
+
+
+@update
 def start_task_manager() -> text:
     """Start TaskManager to schedule pending tasks.
 
