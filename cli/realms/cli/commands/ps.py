@@ -199,7 +199,7 @@ def ps_ls_command(
             task_status = task.get('status', 'unknown')
             
             # Find schedules for this task
-            task_schedules = [s for s in schedules_objects if str(s.get('task_id')) == str(task_id)]
+            task_schedules = [s for s in schedules_objects if str(s.get('task') or s.get('task_id')) == str(task_id)]
             
             if not task_schedules:
                 # Task without schedule
