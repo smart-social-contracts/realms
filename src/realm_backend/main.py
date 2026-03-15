@@ -1133,6 +1133,20 @@ def initialize() -> void:
             f"❌ Critical error during extension initialization: {str(e)}\n{traceback.format_exc()}"
         )
 
+    # Start TaskManager to schedule pending tasks with enabled schedules.
+    # Timer callbacks MUST be created in init/post_upgrade context — closures
+    # created from execute_code_shell do not survive IC call boundaries.
+    try:
+        manager = TaskManager()
+        for t in Task.instances():
+            manager.add_task(t)
+        manager.run()
+        logger.info(f"✅ TaskManager started with {len(manager.tasks)} task(s)")
+    except Exception as e:
+        logger.error(
+            f"❌ Error starting TaskManager: {str(e)}\n{traceback.format_exc()}"
+        )
+
 
 @init
 def init_() -> void:
