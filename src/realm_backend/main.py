@@ -1136,9 +1136,17 @@ def initialize() -> void:
     # Start TaskManager to schedule pending tasks with enabled schedules.
     # Timer callbacks MUST be created in init/post_upgrade context — closures
     # created from execute_code_shell do not survive IC call boundaries.
+    # After an upgrade, any in-progress tasks lost their timers, so reset
+    # non-completed tasks back to pending before scheduling.
     try:
         manager = TaskManager()
         for t in Task.instances():
+            if t.status and t.status != "completed":
+                t.status = "pending"
+                t.step_to_execute = 0
+                for step in t.steps:
+                    step.status = "pending"
+                    step.timer_id = None
             manager.add_task(t)
         manager.run()
         logger.info(f"✅ TaskManager started with {len(manager.tasks)} task(s)")
