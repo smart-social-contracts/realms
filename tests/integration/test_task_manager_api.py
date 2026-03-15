@@ -2,15 +2,14 @@
 """Integration tests for Task Manager and Code Execution API.
 
 These tests verify the actual canister endpoints for:
-- execute_code() - Sync and async code execution
-- get_task_status() - Task status polling
+- execute_code_shell() - Code execution in persistent shell namespace
+- get_objects_paginated() - Task status queries
 - TaskManager integration with Codex entities
 """
 
 import json
 import os
 import sys
-import time
 import traceback
 
 # Add fixtures to path
@@ -20,225 +19,142 @@ from fixtures.dfx_helpers import assert_contains, dfx_call, dfx_call_json
 
 
 def test_execute_sync_code():
-    """Test synchronous code execution via execute_code."""
+    """Test synchronous code execution via execute_code_shell."""
     print("  - test_execute_sync_code...", end=" ")
 
-    # Simple synchronous Python code
-    code = "result = 2 + 2"
-
-    # Escape code for Candid string
+    code = "print(2 + 2)"
     escaped_code = code.replace('"', '\\"')
     args = f'("{escaped_code}")'
 
-    print(f"\n    Command: dfx canister call realm_backend execute_code '{args}'")
-    output, code = dfx_call("realm_backend", "execute_code", args, is_update=True)
-    print(f"    Exit code: {code}")
-    print(f"    Output: {output[:200]}...")
+    output, exit_code = dfx_call("realm_backend", "execute_code_shell", args, is_update=True)
+    print(f"\n    Exit code: {exit_code}")
+    print(f"    Output: {output[:200]}")
 
-    assert code == 0, f"execute_code failed with code {code}, output: {output}"
-    assert_contains(output, "sync", "Should indicate sync execution")
-    assert_contains(output, "success", "Should indicate success")
-    print("✓")
+    assert exit_code == 0, f"execute_code_shell failed with code {exit_code}, output: {output}"
+    assert_contains(output, "4", "Should contain result value 4")
+    print("\u2713")
 
 
 def test_execute_sync_code_with_result():
-    """Test sync code execution returns response."""
+    """Test sync code execution returns printed output."""
     print("  - test_execute_sync_code_with_result...", end=" ")
 
-    # Code that returns a value
-    code = "result = 10 * 5"
+    code = "print(10 * 5)"
     escaped_code = code.replace('"', '\\"')
     args = f'("{escaped_code}")'
 
-    print(f"\n    Command: dfx canister call realm_backend execute_code '{args}'")
-    output, code = dfx_call("realm_backend", "execute_code", args, is_update=True)
-    print(f"    Exit code: {code}")
-    print(f"    Output: {output[:200]}...")
+    output, exit_code = dfx_call("realm_backend", "execute_code_shell", args, is_update=True)
+    print(f"\n    Exit code: {exit_code}")
+    print(f"    Output: {output[:200]}")
 
-    assert code == 0, f"execute_code failed with code {code}, output: {output}"
-    # Should return sync type with success and result
-    assert_contains(output, "sync", "Should indicate sync execution")
-    assert_contains(output, "success", "Should indicate success")
+    assert exit_code == 0, f"execute_code_shell failed with code {exit_code}, output: {output}"
     assert_contains(output, "50", "Should contain result value 50")
-    print("✓")
+    print("\u2713")
 
 
 def test_execute_code_with_error():
     """Test code execution with syntax error."""
     print("  - test_execute_code_with_error...", end=" ")
 
-    # Invalid Python syntax
     code = "invalid syntax ==="
     escaped_code = code.replace('"', '\\"')
     args = f'("{escaped_code}")'
 
-    output, code = dfx_call("realm_backend", "execute_code", args, is_update=True)
+    output, exit_code = dfx_call("realm_backend", "execute_code_shell", args, is_update=True)
 
-    # With direct run_code(), syntax errors are caught and returned immediately
-    assert code == 0, f"dfx call failed with code {code}"
-    # Should return an error in the response
-    assert_contains(output, "error", "Should report error for invalid code")
-    print("✓")
-
-
-def test_execute_async_code():
-    """Test asynchronous code execution."""
-    print("  - test_execute_async_code...", end=" ")
-
-    # Async code pattern — must contain yield for AST-based detection
-    code = """def async_task():
-    result = yield 42
-    return result"""
-
-    escaped_code = code.replace('"', '\\"').replace("\n", "\\n")
-    args = f'("{escaped_code}")'
-
-    print(
-        f"\n    Command: dfx canister call realm_backend execute_code '{args[:100]}...'"
-    )
-    output, code = dfx_call("realm_backend", "execute_code", args, is_update=True)
-    print(f"    Exit code: {code}")
-    print(f"    Output: {output[:200]}...")
-
-    assert code == 0, f"execute_code failed with code {code}, output: {output}"
-    assert_contains(output, "async", "Should indicate async execution")
-    assert_contains(output, "task_id", "Should return task ID for polling")
-    print("✓")
-
-
-def test_get_task_status():
-    """Test retrieving task status using get_objects()."""
-    print("  - test_get_task_status...", end=" ")
-
-    # First execute some code to create a task
-    code = "result = 'test'"
-    escaped_code = code.replace('"', '\\"')
-    execute_args = f'("{escaped_code}")'
-
-    print(
-        f"\n    Command: dfx canister call realm_backend execute_code '{execute_args}'"
-    )
-    output, exit_code = dfx_call(
-        "realm_backend", "execute_code", execute_args, is_update=True
-    )
-    print(f"    Exit code: {exit_code}")
-    print(f"    Output: {output[:200]}...")
-    assert (
-        exit_code == 0
-    ), f"Failed to execute code, exit_code: {exit_code}, output: {output}"
-
-    # Extract task_id from JSON response (only present for async tasks)
-    if "task_id" in output:
-        # Parse the task_id from the JSON in the Candid response
-        # Response format: ("{{json}}")
-        import re
-
-        match = re.search(r'"task_id":\s*"(\d+)"', output)
-        if match:
-            task_id = match.group(1)
-            # Use get_objects() to query the Task - note the correct Candid vec syntax
-            status_args = f'(vec {{ record {{ 0 = "Task"; 1 = "{task_id}" }} }})'
-
-            print(
-                f"\n    Command: dfx canister call realm_backend get_objects '{status_args}'"
-            )
-            output, code = dfx_call("realm_backend", "get_objects", status_args)
-            print(f"    Exit code: {code}")
-            print(f"    Output: {output[:200]}...")
-
-            # The call should work
-            assert code == 0, f"get_objects failed with code {code}, output: {output}"
-            # Should contain task data
-            assert_contains(output, "Task", "Should return Task object")
-            print("✓")
-        else:
-            print("✓ (could not extract task_id, but execution succeeded)")
-    else:
-        # If no task_id in sync execution, that's expected
-        print("✓ (sync execution, no task tracking)")
+    assert exit_code == 0, f"dfx call failed with code {exit_code}"
+    # execute_code_shell catches errors and returns traceback in stderr
+    assert_contains(output, "SyntaxError", "Should report SyntaxError for invalid code")
+    print("\u2713")
 
 
 def test_execute_code_with_ggg_entities():
     """Test code execution that uses GGG entities."""
     print("  - test_execute_code_with_ggg_entities...", end=" ")
 
-    # Code that queries GGG entities
-    code = """from ggg import User
-users = User.all()
-result = len(list(users))"""
-
-    escaped_code = code.replace('"', '\\"').replace("\n", "\\n")
+    code = 'from ggg import User; print("ggg_ok")'
+    escaped_code = code.replace('"', '\\"')
     args = f'("{escaped_code}")'
 
-    output, code = dfx_call("realm_backend", "execute_code", args, is_update=True)
+    output, exit_code = dfx_call("realm_backend", "execute_code_shell", args, is_update=True)
 
-    assert code == 0, f"execute_code failed with code {code}"
-    # Should successfully execute code that uses GGG entities
-    assert_contains(output, "sync", "Should indicate sync execution")
-    assert_contains(output, "success", "Should indicate success")
-    print("✓")
+    assert exit_code == 0, f"execute_code_shell failed with code {exit_code}"
+    assert_contains(output, "ggg_ok", "Should successfully import and use GGG entities")
+    print("\u2713")
 
 
 def test_execute_multiple_tasks_sequentially():
-    """Test executing multiple tasks in sequence."""
+    """Test executing multiple code snippets in sequence."""
     print("  - test_execute_multiple_tasks_sequentially...", end=" ")
 
     tasks = [
-        "result = 1 + 1",
-        "result = 'hello'",
-        "result = [1, 2, 3]",
+        "print(1 + 1)",
+        "print('hello')",
+        "print([1, 2, 3])",
     ]
 
     for task_code in tasks:
         escaped = task_code.replace('"', '\\"')
         args = f'("{escaped}")'
 
-        output, code = dfx_call("realm_backend", "execute_code", args, is_update=True)
-        assert code == 0, f"Task execution failed: {task_code}"
+        output, exit_code = dfx_call("realm_backend", "execute_code_shell", args, is_update=True)
+        assert exit_code == 0, f"Task execution failed: {task_code}"
 
-    print("✓")
+    print("\u2713")
 
 
 def test_execute_code_with_logging():
-    """Test code execution that produces logs."""
+    """Test code execution that produces print output."""
     print("  - test_execute_code_with_logging...", end=" ")
 
-    # Code that should produce log output
-    code = '''import sys
-print("Test log message")
-result = "logged"'''
-
-    escaped_code = code.replace('"', '\\"').replace("\n", "\\n")
+    code = 'print("Test log message")'
+    escaped_code = code.replace('"', '\\"')
     args = f'("{escaped_code}")'
 
-    output, code = dfx_call("realm_backend", "execute_code", args, is_update=True)
+    output, exit_code = dfx_call("realm_backend", "execute_code_shell", args, is_update=True)
 
-    assert code == 0, f"execute_code failed"
-    # Should execute successfully even with print statements
-    print("✓")
+    assert exit_code == 0, f"execute_code_shell failed"
+    assert_contains(output, "Test log message", "Should contain printed output")
+    print("\u2713")
 
 
 def test_task_status_format():
-    """Test that get_objects() returns proper Task format."""
+    """Test that get_objects_paginated() returns proper Task format."""
     print("  - test_task_status_format...", end=" ")
 
-    # First, list tasks using get_objects_paginated to find an existing task ID
     list_args = '("Task", 0, 1, "desc")'
-    print(
-        f"\n    Command: dfx canister call realm_backend get_objects_paginated '{list_args}'"
-    )
-    output, code = dfx_call("realm_backend", "get_objects_paginated", list_args)
-    print(f"    Exit code: {code}")
-    print(f"    Output: {output[:200]}...")
+    output, exit_code = dfx_call("realm_backend", "get_objects_paginated", list_args)
+    print(f"\n    Exit code: {exit_code}")
+    print(f"    Output: {output[:200]}")
 
-    # Should not crash, should return structured response
-    assert code == 0, f"get_objects_paginated failed with code {code}, output: {output}"
+    assert exit_code == 0, f"get_objects_paginated failed with code {exit_code}, output: {output}"
 
-    # Should contain task data or pagination info
     has_response = "success" in output or "objects" in output or "pagination" in output
     assert has_response, f"Should return structured response. Got: {output[:300]}"
 
-    print("✓")
+    print("\u2713")
+
+
+def test_shell_namespace_persistence():
+    """Test that shell namespace persists across calls."""
+    print("  - test_shell_namespace_persistence...", end=" ")
+
+    # Set a variable
+    code1 = "_test_persist_var = 42"
+    escaped1 = code1.replace('"', '\\"')
+    args1 = f'("{escaped1}")'
+    output, exit_code = dfx_call("realm_backend", "execute_code_shell", args1, is_update=True)
+    assert exit_code == 0, f"Failed to set variable: {output}"
+
+    # Read it back
+    code2 = "print(_test_persist_var)"
+    escaped2 = code2.replace('"', '\\"')
+    args2 = f'("{escaped2}")'
+    output, exit_code = dfx_call("realm_backend", "execute_code_shell", args2, is_update=True)
+    assert exit_code == 0, f"Failed to read variable: {output}"
+    assert_contains(output, "42", "Should contain persisted variable value")
+
+    print("\u2713")
 
 
 if __name__ == "__main__":
@@ -252,12 +168,11 @@ if __name__ == "__main__":
         test_execute_sync_code,
         test_execute_sync_code_with_result,
         test_execute_code_with_error,
-        test_execute_async_code,
-        test_get_task_status,
         test_execute_code_with_ggg_entities,
         test_execute_multiple_tasks_sequentially,
         test_execute_code_with_logging,
         test_task_status_format,
+        test_shell_namespace_persistence,
     ]
 
     print("Running tests:")
@@ -267,7 +182,7 @@ if __name__ == "__main__":
         try:
             test()
         except Exception as e:
-            print(f"✗")
+            print(f"\u2717")
             print(f"    Error: {e}")
             print(f"    Traceback:")
             traceback.print_exc()
@@ -276,11 +191,11 @@ if __name__ == "__main__":
 
     print("\n" + "=" * 60)
     if failed == 0:
-        print("✅ All task manager integration tests passed!")
+        print("\u2705 All task manager integration tests passed!")
         print("=" * 60)
         sys.exit(0)
     else:
-        print(f"❌ {failed} test(s) failed")
+        print(f"\u274c {failed} test(s) failed")
         print("\nFailed tests:")
         for test_name, error in failed_tests:
             print(f"  - {test_name}: {error}")

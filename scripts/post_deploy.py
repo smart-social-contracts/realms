@@ -502,7 +502,7 @@ else:
 '''
         # Escape the code for shell
         escaped_code = python_code.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
-        seed_cmd = ['dfx', 'canister', 'call', backend_name, 'execute_code', f'("{escaped_code}")']
+        seed_cmd = ['dfx', 'canister', 'call', backend_name, 'execute_code_shell', f'("{escaped_code}")']
         if network != 'local':
             seed_cmd.extend(['--network', network])
         result = subprocess.run(seed_cmd, cwd=realm_dir, capture_output=True, text=True)
@@ -795,7 +795,7 @@ else:
 '''
     # Escape the code for shell
     escaped_code = accounting_seed_code.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
-    seed_cmd = ['dfx', 'canister', 'call', backend_name, 'execute_code', f'("{escaped_code}")']
+    seed_cmd = ['dfx', 'canister', 'call', backend_name, 'execute_code_shell', f'("{escaped_code}")']
     if network != 'local':
         seed_cmd.extend(['--network', network])
     result = subprocess.run(seed_cmd, cwd=realm_dir, capture_output=True, text=True)

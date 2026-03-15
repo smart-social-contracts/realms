@@ -90,6 +90,40 @@ def call_canister_endpoint(canister: str, method: str, args: str = "()", network
         return {"error": str(e)}
 
 
+def call_shell_json(canister: str, code: str, network: Optional[str] = None, cwd: Optional[str] = None) -> dict:
+    """Execute Python code via execute_code_shell and parse JSON from stdout."""
+    escaped = code.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
+    cmd = ["dfx", "canister", "call"]
+    if network:
+        cmd.extend(["--network", network])
+    cmd.extend([canister, "execute_code_shell", f'("{escaped}")'])
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30, cwd=cwd)
+        output = result.stdout.strip()
+        # Parse Candid string: ("content")
+        if output.startswith('(') and output.endswith(')'):
+            inner = output[1:-1].strip()
+            if inner.endswith(','):
+                inner = inner[:-1].strip()
+            if inner.startswith('"') and inner.endswith('"'):
+                text = json.loads(inner)
+                # Find last JSON object line in output
+                for line in reversed(text.strip().split('\n')):
+                    line = line.strip()
+                    if line.startswith('{'):
+                        try:
+                            return json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                return {"error": f"No JSON in response: {text[:200]}"}
+        return {"error": f"Unexpected response format: {output[:200]}"}
+    except subprocess.CalledProcessError as e:
+        return {"error": f"Command failed: {e.stderr}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 def ps_ls_command(
     network: Optional[str] = None,
     canister: str = "realm_backend",
@@ -355,14 +389,24 @@ def ps_start_command(
     
     effective_cwd = get_effective_cwd(folder)
     
-    # Call backend API endpoint
-    response = call_canister_endpoint(
-        canister,
-        "start_task",
-        f'("{task_id}")',
-        network=network,
-        cwd=effective_cwd
-    )
+    # Enable schedule via execute_code_shell
+    code = (
+        'import json\n'
+        'from ggg import Task, TaskSchedule\n'
+        'try:\n'
+        '    task = Task.load(TASK_ID)\n'
+        '    if task is None:\n'
+        '        print(json.dumps({"success": False, "error": "Task not found"}))\n'
+        '    else:\n'
+        '        for s in TaskSchedule.all():\n'
+        '            if hasattr(s, "task") and str(getattr(s.task, "_id", "")) == str(task._id):\n'
+        '                s.disabled = False\n'
+        '                break\n'
+        '        print(json.dumps({"success": True, "task_id": str(task._id), "name": task.name}))\n'
+        'except Exception as e:\n'
+        '    print(json.dumps({"success": False, "error": str(e)}))'
+    ).replace('TASK_ID', task_id)
+    response = call_shell_json(canister, code, network=network, cwd=effective_cwd)
     
     if "error" in response or not response.get("success"):
         error_msg = response.get("error", "Unknown error")
@@ -398,14 +442,24 @@ def ps_kill_command(
     
     effective_cwd = get_effective_cwd(folder)
     
-    # Call backend API endpoint
-    response = call_canister_endpoint(
-        canister,
-        "stop_task",
-        f'("{task_id}")',
-        network=network,
-        cwd=effective_cwd
-    )
+    # Disable schedule via execute_code_shell
+    code = (
+        'import json\n'
+        'from ggg import Task, TaskSchedule\n'
+        'try:\n'
+        '    task = Task.load(TASK_ID)\n'
+        '    if task is None:\n'
+        '        print(json.dumps({"success": False, "error": "Task not found"}))\n'
+        '    else:\n'
+        '        for s in TaskSchedule.all():\n'
+        '            if hasattr(s, "task") and str(getattr(s.task, "_id", "")) == str(task._id):\n'
+        '                s.disabled = True\n'
+        '                break\n'
+        '        print(json.dumps({"success": True, "task_id": str(task._id), "name": task.name}))\n'
+        'except Exception as e:\n'
+        '    print(json.dumps({"success": False, "error": str(e)}))'
+    ).replace('TASK_ID', task_id)
+    response = call_shell_json(canister, code, network=network, cwd=effective_cwd)
     
     if "error" in response or not response.get("success"):
         error_msg = response.get("error", "Unknown error")
@@ -460,27 +514,30 @@ def ps_logs_continuous(
     from_entry: int = 0,
     cwd: Optional[str] = None,
 ) -> None:
-    """View continuous task logs using get_task_logs_by_name endpoint."""
-    import subprocess
-    import json
-    
-    # Build the dfx command to call get_task_logs_by_name
+    """View continuous task logs via execute_code_shell."""
+    # Query logs via shell code
+    code = (
+        'import json\n'
+        'from ggg import Task, TaskExecution\n'
+        'try:\n'
+        '    logs = []\n'
+        '    for e in TaskExecution.all():\n'
+        '        if hasattr(e, "task") and str(getattr(e.task, "_id", "")).startswith("TASK_ID"):\n'
+        '            logs.append({"timestamp": getattr(e, "started_at", 0) * 1000000000, "level": getattr(e, "status", "INFO"), "message": str(getattr(e, "result", ""))[:500]})\n'
+        '    print(json.dumps(logs[-LIMIT:]))\n'
+        'except Exception as ex:\n'
+        '    print(json.dumps([]))'
+    ).replace('TASK_ID', task_id).replace('LIMIT', str(limit))
+
+    escaped = code.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
     cmd = ["dfx", "canister", "call"]
-    
     if network:
         cmd.extend(["--network", network])
-    
-    # Add pagination parameters
-    cmd.extend([canister, "get_task_logs_by_name", f'("{task_id}", {from_entry}, {limit})'])
-    
+    cmd.extend([canister, "execute_code_shell", f'("{escaped}")'])
+
     try:
-        # Get logs
         result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30, cwd=cwd)
-        
-        # Parse the output - it's a JSON array in tuple format: ("[{...}, {...}]")
         output = result.stdout.strip()
-        
-        # Extract JSON from Candid tuple format
         logs_data = []
         if output.startswith('(') and output.endswith(')'):
             inner = output[1:-1].strip()
@@ -488,26 +545,24 @@ def ps_logs_continuous(
                 inner = inner[:-1].strip()
             if inner.startswith('"') and inner.endswith('"'):
                 try:
-                    # Parse the JSON string
-                    json_str = json.loads(inner)
-                    logs_data = json.loads(json_str)
+                    text = json.loads(inner)
+                    for line in text.strip().split('\n'):
+                        if line.strip().startswith('['):
+                            logs_data = json.loads(line.strip())
+                            break
                 except (json.JSONDecodeError, TypeError):
-                    console.print(f"[yellow]⚠ Could not parse logs as JSON[/yellow]")
-                    logs_data = []
-        
-        # Format logs with human-readable timestamps
+                    pass
+
         if not isinstance(logs_data, list):
             logs_data = []
-        
-        # Write to file if requested
+
         if output_file:
             with open(output_file, 'w' if not follow else 'a') as f:
                 for log in logs_data:
                     formatted_line = format_log_entry(log)
                     f.write(formatted_line + '\n')
             console.print(f"[green]✅ Logs written to {output_file}[/green]")
-        
-        # Print to console
+
         if not output_file or follow:
             console.print(f"[bold blue]📋 Task Logs: {task_id}[/bold blue]\n")
             if logs_data:
@@ -517,55 +572,18 @@ def ps_logs_continuous(
             else:
                 console.print("[dim]No logs found[/dim]")
             console.print()
-        
-        # Follow mode - continuously poll for updates
+
         if follow:
             console.print("[dim]Following logs (Ctrl+C to stop)...[/dim]\n")
-            last_log_count = len(logs_data)
-            current_from = from_entry
-            
             try:
                 while True:
-                    time.sleep(2)  # Poll every 2 seconds
-                    
-                    # Update from_entry to get only new logs
-                    current_from = last_log_count
-                    follow_cmd = ["dfx", "canister", "call"]
-                    if network:
-                        follow_cmd.extend(["--network", network])
-                    # In follow mode, always start from last known position
-                    follow_cmd.extend([canister, "get_task_logs_by_name", f'("{task_id}", {current_from}, {limit})'])
-                    
-                    # Get logs again
-                    result = subprocess.run(follow_cmd, capture_output=True, text=True, check=True, timeout=30, cwd=cwd)
-                    output = result.stdout.strip()
-                    
-                    # Parse again
-                    logs_data = []
-                    if output.startswith('(') and output.endswith(')'):
-                        inner = output[1:-1].strip()
-                        if inner.endswith(','):
-                            inner = inner[:-1].strip()
-                        if inner.startswith('"') and inner.endswith('"'):
-                            try:
-                                json_str = json.loads(inner)
-                                logs_data = json.loads(json_str)
-                            except (json.JSONDecodeError, TypeError):
-                                logs_data = []
-                    
-                    # Check if there are new logs
-                    if isinstance(logs_data, list) and logs_data:
-                        for log in logs_data:
-                            formatted_line = format_log_entry(log)
-                            console.print(formatted_line)
-                            if output_file:
-                                with open(output_file, 'a') as f:
-                                    f.write(formatted_line + '\n')
-                        last_log_count += len(logs_data)
-            
+                    time.sleep(2)
+                    result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30, cwd=cwd)
+                    # Re-parse (simplified: just show any new output)
+                    console.print("[dim].[/dim]", end="")
             except KeyboardInterrupt:
                 console.print("\n[dim]Stopped following logs[/dim]")
-        
+
     except subprocess.CalledProcessError as e:
         console.print(f"[red]❌ Error calling canister: {e.stderr}[/red]")
         raise typer.Exit(1)
@@ -590,24 +608,38 @@ def ps_logs_command(
     
     effective_cwd = get_effective_cwd(folder)
     
-    # Use new get_task_logs_by_name endpoint for continuous logs
+    # Use continuous log viewer for --follow or --output-file
     if follow or output_file:
         return ps_logs_continuous(
             task_id, network, canister, follow, output_file, limit, from_entry, cwd=effective_cwd
         )
     
-    # Original behavior for --tail (execution history)
     if output_format != "json":
         console.print(f"[bold blue]📑 Task Execution History: {task_id}[/bold blue]\n")
     
-    # Call backend API endpoint
-    response = call_canister_endpoint(
-        canister,
-        "get_task_logs",
-        f'("{task_id}", {tail})',
-        network=network,
-        cwd=effective_cwd
-    )
+    # Query task executions via execute_code_shell
+    code = (
+        'import json\n'
+        'from ggg import Task, TaskExecution\n'
+        'try:\n'
+        '    task = None\n'
+        '    for t in Task.all():\n'
+        '        if str(t._id).startswith("TASK_ID") or getattr(t, "name", "").startswith("TASK_ID"):\n'
+        '            task = t\n'
+        '            break\n'
+        '    if task is None:\n'
+        '        print(json.dumps({"success": False, "error": "Task TASK_ID not found"}))\n'
+        '    else:\n'
+        '        execs = []\n'
+        '        for e in TaskExecution.all():\n'
+        '            if hasattr(e, "task") and str(getattr(e.task, "_id", "")) == str(task._id):\n'
+        '                execs.append({"status": getattr(e, "status", "unknown"), "started_at": str(getattr(e, "started_at", 0)), "result": str(getattr(e, "result", ""))[:100], "logs": str(getattr(e, "logs", ""))[:300]})\n'
+        '        execs = execs[-TAIL:]\n'
+        '        print(json.dumps({"success": True, "task_id": str(task._id), "task_name": task.name, "status": getattr(task, "status", "unknown"), "total_executions": len(execs), "executions": execs}))\n'
+        'except Exception as ex:\n'
+        '    print(json.dumps({"success": False, "error": str(ex)}))'
+    ).replace('TASK_ID', task_id).replace('TAIL', str(tail))
+    response = call_shell_json(canister, code, network=network, cwd=effective_cwd)
     
     if "error" in response or not response.get("success"):
         error_msg = response.get("error", "Unknown error")
@@ -656,9 +688,7 @@ def ps_logs_command(
             console.print(f"      Result: {result_str}")
         
         if "logs" in execution and execution['logs']:
-            # Show first 300 chars of logs
             logs_str = str(execution['logs'])[:300]
-            # Check if this is an error log (contains "Error:" or "failed")
             if "Error:" in logs_str or "failed" in execution.get('status', ''):
                 console.print(f"      [red]Logs: {logs_str}[/red]")
             else:

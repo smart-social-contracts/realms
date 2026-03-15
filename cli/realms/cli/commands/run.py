@@ -2,7 +2,6 @@
 
 import json
 import subprocess
-import time
 from typing import Optional
 
 import typer
@@ -12,10 +11,6 @@ from ..utils import get_effective_cwd
 from ._dfx_utils import build_dfx_call_cmd, parse_candid_string_output, parse_candid_json_response
 
 console = Console()
-
-# Configuration constants for async task polling
-DEFAULT_TASK_TIMEOUT_SECONDS = 60
-DEFAULT_POLL_INTERVAL_SECONDS = 2
 
 class RealmsRunner:
     """Task runner for Realms backend canister."""
@@ -29,11 +24,11 @@ class RealmsRunner:
 
     def execute(self, code: str) -> str:
         """
-        Sends Python code to the canister's execute_code method and returns the result.
+        Sends Python code to the canister's execute_code_shell method and returns the result.
         """
         escaped_code = code.replace('"', '\\"')
         cmd = build_dfx_call_cmd(
-            self.canister_name, "execute_code",
+            self.canister_name, "execute_code_shell",
             f'("{escaped_code}")', self.network,
         )
 
@@ -296,73 +291,8 @@ def execute_python_file(file_path: str, canister: str, network: Optional[str], w
 
     try:
         raw_result = runner.execute(code_content)
-        if not raw_result:
-            console.print(f"[green]✅ Successfully executed {Path(file_path).name}[/green]")
-            return
-
-        # Try to parse as JSON (new execute_code format)
-        try:
-            result_data = json.loads(raw_result)
-        except (json.JSONDecodeError, TypeError):
-            # Not JSON — legacy plain-text response
+        if raw_result:
             console.print(raw_result)
-            console.print(f"[green]✅ Successfully executed {Path(file_path).name}[/green]")
-            return
-
-        # Display stdout if present
-        stdout = result_data.get("stdout", "")
-        if stdout:
-            console.print(stdout)
-
-        # Display stderr if present
-        stderr = result_data.get("stderr", "")
-        if stderr:
-            console.print(f"[yellow]{stderr}[/yellow]")
-
-        # Handle errors
-        if result_data.get("type") == "error":
-            console.print(f"[red]❌ {result_data.get('error', 'Unknown error')}[/red]")
-            raise typer.Exit(1)
-
-        if not result_data.get("success", True) and "error" in result_data:
-            console.print(f"[red]{result_data['error']}[/red]")
-            raise typer.Exit(1)
-
-        # Handle async tasks with --wait
-        if result_data.get("type") == "async" and "task_id" in result_data:
-            if wait is not None:
-                task_id = result_data["task_id"]
-                timeout_seconds = wait if wait > 0 else DEFAULT_TASK_TIMEOUT_SECONDS
-                console.print(f"\n[cyan]⏳ Waiting for async task {task_id} to complete (timeout: {timeout_seconds}s)...[/cyan]")
-
-                poll_interval = DEFAULT_POLL_INTERVAL_SECONDS
-                max_polls = timeout_seconds // poll_interval
-                polls = 0
-
-                while polls < max_polls:
-                    time.sleep(poll_interval)
-                    status_data = runner.poll_task_status(task_id)
-
-                    if "error" in status_data:
-                        console.print(f"[red]❌ Error polling task: {status_data['error']}[/red]")
-                        break
-
-                    status = status_data.get("status", "unknown")
-                    console.print(f"[dim]Status: {status}[/dim]", end="\r")
-
-                    if status == "completed":
-                        console.print(f"\n[green]✅ Task completed successfully[/green]")
-                        break
-                    elif status == "failed":
-                        console.print(f"\n[red]❌ Task failed[/red]")
-                        break
-
-                    polls += 1
-
-                if polls >= max_polls:
-                    console.print(f"\n[yellow]⚠️  Timeout waiting for task completion[/yellow]")
-            else:
-                console.print(f"[dim]Async task scheduled: {result_data.get('task_id')}[/dim]")
 
         console.print(f"[green]✅ Successfully executed {Path(file_path).name}[/green]")
     except typer.Exit:
@@ -413,10 +343,13 @@ def schedule_python_file(file_path: str, canister: str, network: Optional[str], 
         console.print(f"[cyan]Repeat:[/cyan] one-time execution")
     console.print()
 
-    # Call the backend API endpoint
+    # Wrap as single-step config for create_multi_step_scheduled_task
+    steps_json = json.dumps([{"code": encoded_code}])
+    steps_json_escaped = steps_json.replace('"', '\\"')
+
     cmd = build_dfx_call_cmd(
-        canister, "create_scheduled_task",
-        f'("{file_name}", "{encoded_code}", {interval}, {delay})',
+        canister, "create_multi_step_scheduled_task",
+        f'("{file_name}", "{steps_json_escaped}", {interval}, {delay})',
         network,
     )
     
