@@ -1,4 +1,4 @@
-from _cdk import Opt, Principal, Record, Variant, Vec, float64, nat, text
+from _cdk import Opt, Principal, Record, Variant, Vec, nat, text
 
 
 class PaginationInfo(Record):
@@ -91,21 +91,7 @@ class RealmResponse(Record):
     data: RealmResponseData
 
 
-# Define argument types
-class ExtensionArgument(Variant):
-    String: text
-    Number: float64
-    Boolean: bool
-    # Add other types as needed
-
-
-# Define key-value pair for kwargs
-class KeyValuePair(Record):
-    key: text
-    value: ExtensionArgument
-
-
-# Then use these types in ExtensionCallArgs
+# Extension call types
 class ExtensionCallArgs(Record):
     extension_name: text
     function_name: text
@@ -115,14 +101,3 @@ class ExtensionCallArgs(Record):
 class ExtensionCallResponse(Record):
     success: bool
     response: text
-
-
-class ExtensionInfo(Record):
-    name: text
-    description: text
-    version: text
-    author: text
-    categories: Vec[text]
-    profiles: Vec[text]
-    icon: text
-    url: text
