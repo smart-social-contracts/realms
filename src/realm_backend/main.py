@@ -1170,6 +1170,36 @@ def post_upgrade_() -> void:
     logger.info("Realm canister initialized")
 
 
+@update
+def start_task_manager() -> text:
+    """Start TaskManager to schedule pending tasks.
+
+    Call this after data import to set up IC timers in the proper
+    canister update context.  Timer callbacks created from
+    execute_code_shell do NOT survive IC call boundaries.
+    """
+    try:
+        manager = TaskManager()
+        count = 0
+        for t in Task.instances():
+            if t.status and t.status != "completed":
+                t.status = "pending"
+                t.step_to_execute = 0
+                for step in t.steps:
+                    step.status = "pending"
+                    step.timer_id = None
+            manager.add_task(t)
+            count += 1
+        manager.run()
+        msg = f"TaskManager started with {count} task(s)"
+        logger.info(msg)
+        return msg
+    except Exception as e:
+        err = f"Error starting TaskManager: {str(e)}\n{traceback.format_exc()}"
+        logger.error(err)
+        return err
+
+
 @query
 def extension_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
     """Query version of extension call for read-only operations like get_entity_types."""
