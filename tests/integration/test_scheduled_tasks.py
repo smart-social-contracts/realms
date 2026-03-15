@@ -229,7 +229,7 @@ print(f"schedule_id={schedule._id}")"""
 
         # Now query all TaskSchedule entities
         query_code = """from ggg import TaskSchedule
-schedules = list(TaskSchedule.all())
+schedules = list(TaskSchedule.instances())
 print(f"count={len(schedules)}")"""
 
         output, exit_code = _shell_exec(query_code)
