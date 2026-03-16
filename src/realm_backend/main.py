@@ -1139,6 +1139,15 @@ def initialize() -> void:
     # After an upgrade, any in-progress tasks lost their timers, so reset
     # non-completed tasks back to pending before scheduling.
     try:
+        # Eagerly load related entities so ManyToOne descriptors resolve and
+        # populate bidirectional _relations on Task (steps, schedules) before
+        # any property modifications trigger _save() which would otherwise
+        # serialize entities with empty _relations, losing relationship data.
+        list(Task.instances())
+        list(Call.instances())
+        list(TaskStep.instances())
+        list(TaskSchedule.instances())
+
         manager = TaskManager()
         for t in Task.instances():
             if t.status and t.status != "completed":
@@ -1209,6 +1218,14 @@ def start_task_manager() -> text:
     execute_code_shell do NOT survive IC call boundaries.
     """
     try:
+        # Eagerly load related entities so ManyToOne descriptors resolve and
+        # populate bidirectional _relations on Task (steps, schedules) before
+        # any property modifications trigger _save().
+        list(Task.instances())
+        list(Call.instances())
+        list(TaskStep.instances())
+        list(TaskSchedule.instances())
+
         manager = TaskManager()
         count = 0
         for t in Task.instances():
