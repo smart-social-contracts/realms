@@ -744,6 +744,49 @@ def find_objects(class_name: str, params: Vec[Tuple[str, str]]) -> RealmResponse
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
+@query
+def get_my_invoices() -> RealmResponse:
+    """
+    Get all invoices belonging to the calling user.
+
+    Filters Invoice entities where invoice.user.id == ic.caller().
+    Returns invoices sorted by most recent first.
+
+    Example:
+    $ dfx canister call --output json canister_id get_my_invoices '()'
+
+    Response:
+    {
+      "data": {
+        "objectsList": {
+          "objects": [
+            "{\"id\": \"inv_001\", \"amount\": 0.001, \"status\": \"Pending\", ...}"
+          ]
+        }
+      },
+      "success": true
+    }
+    """
+    try:
+        caller = ic.caller().to_str()
+        logger.info(f"Getting invoices for caller: {caller}")
+        from ggg import Invoice
+        all_invoices = Invoice.instances()
+        user_invoices = [
+            inv for inv in all_invoices
+            if inv.user and inv.user.id == caller
+        ]
+        objects_json = [json.dumps(inv.serialize()) for inv in user_invoices]
+        logger.info(f"Found {len(objects_json)} invoices for {caller}")
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(objectsList=ObjectsListRecord(objects=objects_json)),
+        )
+    except Exception as e:
+        logger.error(f"Error getting invoices: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
 def create_foundational_objects() -> void:
     """Create the foundational objects required for every realm to operate."""
     from ggg import Calendar, Identity, Profiles, Realm, Treasury, User, UserProfile
