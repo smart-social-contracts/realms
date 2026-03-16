@@ -13,8 +13,8 @@
 	async function checkDemoMode() {
 		try {
 			const response = await backend.status();
-			if (response && response.success && response.data && response.data.Status) {
-				const isDemoMode = response.data.Status.demo_mode;
+			if (response && response.success && response.data && response.data.status) {
+				const isDemoMode = response.data.status.demo_mode;
 				const wasDismissed = localStorage.getItem(DEMO_BANNER_DISMISSED_KEY) === 'true';
 				
 				showBanner = isDemoMode && !wasDismissed;

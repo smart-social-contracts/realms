@@ -135,6 +135,12 @@ export async function loadUserProfiles() {
                 loading: false
             }));
             console.log("User profiles loaded:", profiles);
+        } else if (response && !response.success) {
+            profileState.update(state => ({
+                ...state,
+                profiles: [],
+                loading: false
+            }));
         } else {
             console.error("Invalid backend response format:", response);
             throw new Error('Invalid response format');

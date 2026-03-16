@@ -127,8 +127,8 @@
       const response = await backend.join_realm(selectedProfile, '');
       if (response.success) {
         currentStep = 'success';
-      } else if (response.data && response.data.Error) {
-        error = response.data.Error;
+      } else if (response.data && response.data.error) {
+        error = response.data.error;
       } else {
         error = 'Unknown error occurred';
       }

@@ -164,7 +164,7 @@ deploy_registry() {
         (cd "$registry_dir/src/realm_registry_frontend" && npm run build)
         
         echo -e "${GREEN}🚀 Deploying registry frontend to $NETWORK...${NC}"
-        (cd "$registry_dir" && dfx deploy realm_registry_frontend --network "$NETWORK")
+        (cd "$registry_dir" && dfx deploy realm_registry_frontend --network "$NETWORK" --yes)
     fi
     
     if [ "$DEPLOY_BACKEND" = true ]; then
@@ -177,7 +177,7 @@ deploy_registry() {
         fi
         
         echo -e "${GREEN}🚀 Deploying registry backend to $NETWORK...${NC}"
-        (cd "$registry_dir" && dfx deploy realm_registry_backend --network "$NETWORK" --mode upgrade)
+        (cd "$registry_dir" && dfx deploy realm_registry_backend --network "$NETWORK" --mode upgrade --yes)
     fi
 }
 
@@ -247,7 +247,7 @@ deploy_realm() {
         (cd "$realm_dir/src/realm_frontend" && npm run build)
         
         echo -e "${GREEN}🚀 Deploying realm frontend to $NETWORK...${NC}"
-        (cd "$realm_dir" && dfx deploy realm_frontend --network "$NETWORK")
+        (cd "$realm_dir" && dfx deploy realm_frontend --network "$NETWORK" --yes)
     fi
     
     if [ "$DEPLOY_BACKEND" = true ]; then
@@ -285,7 +285,7 @@ deploy_realm() {
         fi
         
         echo -e "${GREEN}🚀 Deploying realm backend to $NETWORK...${NC}"
-        (cd "$realm_dir" && dfx deploy realm_backend --network "$NETWORK" --mode upgrade)
+        (cd "$realm_dir" && dfx deploy realm_backend --network "$NETWORK" --mode upgrade --yes)
         
         # Deactivate venv
         if [ -f "$realm_dir/venv/bin/activate" ]; then

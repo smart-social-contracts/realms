@@ -1074,7 +1074,7 @@ def initialize() -> void:
                             if not target_codex:
                                 logger.warning(f"Codex not found: {parts[1]}")
                                 continue
-                            ns = {}
+                            ns = {"ic": ic}
                             exec(str(target_codex.code), ns)
                             func = ns.get(parts[2])
                             if not func:
