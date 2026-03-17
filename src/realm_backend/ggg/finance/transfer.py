@@ -17,8 +17,8 @@ class Transfer(Entity, TimestampedMixin):
     """
     Represents a token transfer on the ledger.
     
-    When a transfer is to the vault with a subaccount, it may be linked
-    to an Invoice that it paid.
+    Uses basilisk.os.Wallet natively for ICRC-1 transfers.
+    Pre/post hooks allow custom logic via Codex overrides.
     
     Accounting Integration:
     - Call record_accounting() after creating a Transfer to auto-generate LedgerEntry
@@ -39,7 +39,93 @@ class Transfer(Entity, TimestampedMixin):
     ledger_entries = OneToMany("LedgerEntry", "transfer")
 
     def execute(self):
-        raise NotImplementedError("Transfer execution is not implemented")
+        """
+        Execute this transfer via basilisk.os.Wallet (ICRC-1).
+        
+        Calls pre_execute_hook() before and post_execute_hook() after.
+        Either hook can be overridden via Codex for custom logic.
+        
+        Must be called with ``yield``::
+        
+            result = yield transfer.execute()
+        
+        Returns:
+            dict with {"ok": tx_id} on success or {"err": ...} on failure.
+        """
+        from basilisk.os.wallet import Wallet
+
+        token_name = self.instrument or "ckBTC"
+        logger.info(
+            f"Transfer.execute: {self.amount} {token_name} "
+            f"from {self.principal_from} to {self.principal_to}"
+        )
+
+        # Pre-execute hook (overridable via Codex)
+        pre_result = self.pre_execute_hook()
+        if pre_result is not None:
+            # Hook returned a value — abort the transfer
+            logger.info(f"Transfer.execute: pre_execute_hook returned {pre_result}, aborting")
+            self.status = "aborted"
+            return pre_result
+
+        self.status = "executing"
+
+        try:
+            wallet = Wallet()
+
+            # Convert hex subaccount strings to bytes if present
+            to_sub = bytes.fromhex(self.subaccount) if self.subaccount else None
+
+            result = yield wallet.transfer(
+                token_name=token_name,
+                to_principal=self.principal_to,
+                amount=self.amount,
+                to_subaccount=to_sub,
+            )
+
+            if isinstance(result, dict) and "ok" in result:
+                tx_id = str(result["ok"])
+                if not self.id:
+                    self.id = tx_id
+                self.status = "completed"
+                logger.info(f"Transfer.execute: completed, tx_id={tx_id}")
+            else:
+                self.status = "failed"
+                logger.error(f"Transfer.execute: failed — {result}")
+
+        except Exception as e:
+            self.status = "failed"
+            result = {"err": str(e)}
+            logger.error(f"Transfer.execute: exception — {e}")
+
+        # Post-execute hook (overridable via Codex)
+        self.post_execute_hook(result)
+
+        return result
+
+    @staticmethod
+    def pre_execute_hook(transfer=None):
+        """
+        Called before executing the ICRC-1 transfer.
+        Override via Codex to add custom validation or side-effects.
+        
+        Return None to proceed with the transfer.
+        Return any other value to abort (that value becomes the result).
+        """
+        return None
+
+    @staticmethod
+    def post_execute_hook(transfer=None, result=None):
+        """
+        Called after the ICRC-1 transfer completes (success or failure).
+        Override via Codex to add custom post-transfer logic
+        (e.g., record accounting, send notifications).
+        
+        Args:
+            transfer: The Transfer instance
+            result: The transfer result dict ({"ok": tx_id} or {"err": ...})
+        """
+        pass
 
     def record_accounting(
         self,

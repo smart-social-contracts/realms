@@ -988,7 +988,7 @@ def initialize() -> void:
                         )
                         func_name = parts[-1]
 
-                        impl_module = importlib.import_module(module_path)
+                        impl_module = __import__(module_path, fromlist=[func_name])
                         impl_func = getattr(impl_module, func_name, None)
 
                         if not impl_func:
@@ -1117,7 +1117,10 @@ def initialize() -> void:
                             if not target_codex:
                                 logger.warning(f"Codex not found: {parts[1]}")
                                 continue
-                            ns = {"ic": ic}
+                            from ic_python_logging import get_logger as _get_logger
+                            from _cdk import Async as _Async
+                            import ggg as _ggg
+                            ns = {"ic": ic, "logger": _get_logger(f"codex.{parts[1]}"), "ggg": _ggg, "Async": _Async}
                             exec(str(target_codex.code), ns)
                             func = ns.get(parts[2])
                             if not func:
@@ -1849,7 +1852,10 @@ def reload_entity_method_overrides() -> str:
                     continue
                 
                 logger.info(f"    ✅ Found codex '{codex_name}' (code length: {len(str(target_codex.code))} chars)")
-                ns = {}
+                from ic_python_logging import get_logger as _get_logger
+                from _cdk import Async as _Async
+                import ggg as _ggg
+                ns = {"ic": ic, "logger": _get_logger(f"codex.{codex_name}"), "ggg": _ggg, "Async": _Async}
                 exec(str(target_codex.code), ns)
                 func = ns.get(func_name)
                 if not func:

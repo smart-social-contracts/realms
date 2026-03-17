@@ -341,7 +341,7 @@ for item in sorted(os.listdir(ext_pkg)):
             with open(mp) as f:
                 manifests[item] = json.load(f)
 content = '\"\"\"\\nStatic extension manifest registry.\\nAuto-generated. DO NOT EDIT MANUALLY.\\n\"\"\"\\n\\nEXTENSION_MANIFESTS = '
-content += json.dumps(manifests, indent=4)
+content += repr(manifests).replace('{', '{\\n    ').replace('}', '\\n}') if not manifests else json.dumps(manifests, indent=4).replace(': true', ': True').replace(': false', ': False').replace(': null', ': None')
 content += '\\n\\ndef get_all_extension_manifests() -> dict:\\n    return EXTENSION_MANIFESTS\\n'
 with open(os.path.join(ext_pkg, 'extension_manifests.py'), 'w') as f:
     f.write(content)

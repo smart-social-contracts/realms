@@ -472,32 +472,32 @@ try:
     print(f"   📊 Tokens to seed: {len(tokens_to_seed)}")
     
     # Seed each token via execute_code (since upsert_object doesn't exist)
+    # Token is now the Basilisk OS Token (re-exported by GGG) with fields:
+    #   name (alias), ledger, indexer, decimals, fee + GGG extensions: symbol, token_type, enabled
     for token in tokens_to_seed:
-        # Build Python code to create the Token entity
+        # Build Python code to create/update the Token entity
         python_code = f'''
 from ggg import Token
-# Check if token already exists using direct load (O(1) vs O(n) for instances())
-t = Token.load("{token['symbol']}")
+# Alias lookup: Token.__alias__ = "name" (Basilisk OS Token)
+t = Token["{token['symbol']}"]
 if t:
-    t.symbol = "{token['symbol']}"
-    t.name = "{token['name']}"
-    t.ledger_canister_id = "{token['ledger_canister_id']}"
-    t.indexer_canister_id = "{token['indexer_canister_id']}"
+    t.ledger = "{token['ledger_canister_id']}"
+    t.indexer = "{token['indexer_canister_id']}"
     t.decimals = {token['decimals']}
+    t.symbol = "{token['symbol']}"
     t.token_type = "{token['token_type']}"
     t.enabled = "{token['enabled']}"
     "updated"
 else:
-    Token(
-        id="{token['symbol']}",
-        symbol="{token['symbol']}",
-        name="{token['name']}",
-        ledger_canister_id="{token['ledger_canister_id']}",
-        indexer_canister_id="{token['indexer_canister_id']}",
+    t = Token(
+        name="{token['symbol']}",
+        ledger="{token['ledger_canister_id']}",
+        indexer="{token['indexer_canister_id']}",
         decimals={token['decimals']},
-        token_type="{token['token_type']}",
-        enabled="{token['enabled']}"
     )
+    t.symbol = "{token['symbol']}"
+    t.token_type = "{token['token_type']}"
+    t.enabled = "{token['enabled']}"
     "created"
 '''
         # Escape the code for shell
@@ -809,5 +809,20 @@ else:
 
 except Exception as e:
     print(f"   ⚠️  Accounting data seeding failed: {e} (continuing anyway)")
+
+# Start TaskManager to schedule tasks created during data import.
+# Timer callbacks MUST be created in an update call context (not execute_code_shell).
+print("\n⏱️  Starting TaskManager...")
+try:
+    start_cmd = ['dfx', 'canister', 'call', backend_name, 'start_task_manager']
+    if network != 'local':
+        start_cmd.extend(['--network', network])
+    result = subprocess.run(start_cmd, cwd=realm_dir, capture_output=True, text=True)
+    if result.returncode == 0:
+        print(f"   ✅ TaskManager: {result.stdout.strip()}")
+    else:
+        print(f"   ⚠️  Failed to start TaskManager: {result.stderr}")
+except Exception as e:
+    print(f"   ⚠️  TaskManager start failed: {e} (continuing anyway)")
 
 print("\n✅ Post-deployment tasks completed")
