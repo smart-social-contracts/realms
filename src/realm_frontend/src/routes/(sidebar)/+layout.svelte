@@ -26,6 +26,17 @@
 		saveSidebarState(drawerHidden);
 	}
 
+	// Lock body scroll when sidebar is open on mobile
+	$: if (browser) {
+		if (!drawerHidden && typeof window !== 'undefined' && window.innerWidth < 1024) {
+			document.body.classList.add('overflow-hidden');
+			document.body.style.touchAction = 'none';
+		} else {
+			document.body.classList.remove('overflow-hidden');
+			document.body.style.touchAction = '';
+		}
+	}
+
 	onMount(() => {
 		if (browser) {
 			// Ensure light mode is applied by removing dark class

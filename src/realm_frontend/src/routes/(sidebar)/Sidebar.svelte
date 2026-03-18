@@ -501,8 +501,9 @@
 
 <div
 	hidden={drawerHidden}
-	class="fixed inset-0 z-20 bg-gray-900/50 dark:bg-gray-900/60 lg:hidden"
+	class="fixed inset-0 z-20 bg-gray-900/50 dark:bg-gray-900/60 lg:hidden touch-none overscroll-none"
 	on:click={closeDrawer}
 	on:keydown={closeDrawer}
+	on:touchmove|preventDefault
 	role="presentation"
 ></div>

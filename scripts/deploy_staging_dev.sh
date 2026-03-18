@@ -226,6 +226,11 @@ deploy_realm() {
                 if [ -d "$ext_dir/i18n" ]; then
                     mkdir -p "$realm_dir/src/realm_frontend/src/i18n"
                     cp -r "$ext_dir/i18n/"* "$realm_dir/src/realm_frontend/src/i18n/"
+                    # Also copy to lib/i18n where import.meta.glob resolves
+                    mkdir -p "$realm_dir/src/realm_frontend/src/lib/i18n/locales/extensions"
+                    if [ -d "$ext_dir/i18n/locales/extensions/$ext_name" ]; then
+                        cp -r "$ext_dir/i18n/locales/extensions/$ext_name" "$realm_dir/src/realm_frontend/src/lib/i18n/locales/extensions/"
+                    fi
                 fi
             fi
         done
