@@ -14,7 +14,9 @@ export { authClient };
 
 export async function initializeAuthClient() {
   if (!authClient) {
-    authClient = await AuthClient.create();
+    authClient = await AuthClient.create({
+      idleOptions: { disableIdle: true }
+    });
     console.log('Auth client initialized');
   }
   return authClient;
@@ -26,6 +28,7 @@ export async function login() {
   return new Promise((resolve) => {
     client.login({
       identityProvider: II_URL,
+      maxTimeToLive: BigInt(7 * 24 * 60 * 60 * 1_000_000_000), // 7 days
       onSuccess: () => {
         const identity = client.getIdentity();
         const principal = identity.getPrincipal();
