@@ -7,6 +7,7 @@
 	import { _ } from 'svelte-i18n';
 	import { isAuthenticated } from '$lib/stores/auth';
 	import { hasJoined } from '$lib/stores/profiles';
+	import { DEMO_MODE } from '$lib/config.js';
 
 	export let data;
 
@@ -16,7 +17,7 @@
 	const subtitle: string = $_('extensions.public_dashboard.title');
 
 	onMount(() => {
-		if (get(isAuthenticated) && hasJoined()) {
+		if (DEMO_MODE || (get(isAuthenticated) && hasJoined())) {
 			goto('/extensions/member_dashboard');
 		} else {
 			goto('/extensions/public_dashboard');

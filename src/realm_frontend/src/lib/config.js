@@ -13,4 +13,7 @@ export const CONFIG = {
   token_backend_canister_id: 'xbkkh-syaaa-aaaah-qq3ya-cai',
 };
 
+// Set to true to bypass auth guards (for demo/testing). Set to false for production.
+export const DEMO_MODE = true;
+
 export const DEV_PORT = 8000;
