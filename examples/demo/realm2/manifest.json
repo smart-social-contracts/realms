@@ -1,7 +1,7 @@
 {
   "type": "realm",
   "name": "Agora",
-  "description": "A vision of what modern democracies could become if their original spirit were preserved and enhanced through smart social contracts and the Realms GOS — transparent, participatory, and accountable by design.",
+  "description": "A direct democracy funded by monthly membership dues. Citizens verify their identity via ZK passport and pay monthly bills to stay active. Active members submit and vote on proposals to change the codex code, fund services, or redistribute wealth as social welfare. Every transaction is recorded in real-time double-entry accounting.",
   "logo": "emblem.png",
   "welcome_image": "background.png",
   "welcome_message": "Welcome to Agora! Join our transparent, participatory community where every citizen has a voice and governance serves the people.",

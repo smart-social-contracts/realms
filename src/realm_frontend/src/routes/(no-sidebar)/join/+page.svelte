@@ -446,10 +446,10 @@
           </p>
           
           <a
-            href="/"
+            href="/extensions/member_dashboard"
             class="inline-flex items-center justify-center w-full py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all gap-2"
           >
-            <span>Go to Dashboard</span>
+            <span>Go to Member Dashboard</span>
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
             </svg>
