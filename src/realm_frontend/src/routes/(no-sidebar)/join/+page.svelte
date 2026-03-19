@@ -141,9 +141,9 @@
   }
 </script>
 
-<div class="h-screen lg:bg-gradient-to-br lg:from-gray-50 lg:to-gray-100 flex" style="transform: none !important;">
+<div class="h-screen grid grid-cols-1 md:grid-cols-2" style="transform: none !important;">
   <!-- Left Brand Panel with Background Image -->
-  <div class="hidden lg:flex lg:w-[50%] text-white flex-col justify-between relative overflow-hidden">
+  <div class="hidden md:flex md:col-start-1 text-white flex-col justify-between relative">
     <!-- Background Image - no overlay, full opacity -->
     <div class="absolute inset-0 z-0">
       <img 
@@ -178,9 +178,9 @@
   </div>
 
   <!-- Right Form Panel -->
-  <div class="flex-1 flex items-center justify-center p-6 lg:p-12 relative">
+  <div class="flex items-center justify-center p-6 md:p-12 relative bg-gradient-to-br from-gray-50 to-gray-100 md:col-start-2">
     <!-- Mobile background image -->
-    <div class="lg:hidden absolute inset-0 z-0">
+    <div class="md:hidden absolute inset-0 z-0">
       <img 
         src={welcomeImageUrl} 
         alt="{realmName} background"
@@ -188,7 +188,7 @@
       />
     </div>
     
-    <div class="w-full max-w-md relative z-10 lg:bg-transparent lg:backdrop-blur-none lg:rounded-none lg:p-0 bg-white/80 backdrop-blur-sm rounded-2xl p-4">
+    <div class="w-full max-w-md relative z-10 md:bg-transparent md:backdrop-blur-none md:rounded-none md:p-0 bg-white/80 backdrop-blur-sm rounded-2xl p-4">
 
       <!-- Step Indicator -->
       {#if currentStep !== 'success'}
