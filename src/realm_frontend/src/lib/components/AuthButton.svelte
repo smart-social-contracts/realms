@@ -2,7 +2,7 @@
 <script>
 	import { login, logout, isAuthenticated as checkAuth, initializeAuthClient } from '$lib/auth';
 	import { isAuthenticated, userIdentity, principal } from '$lib/stores/auth';
-	import { loadUserProfiles, resetProfileState, userProfiles } from '$lib/stores/profiles';
+	import { loadUserProfiles, resetProfileState, userProfiles, hasJoined } from '$lib/stores/profiles';
 	import { goto } from '$app/navigation';
 	import { Avatar, Button } from 'flowbite-svelte';
 	import { onMount } from 'svelte';
@@ -65,6 +65,11 @@
 		// Load user profiles
 		await loadUserProfiles();
 		await loadUserProfilePicture();
+
+		// Redirect members to their dashboard after login
+		if (hasJoined()) {
+			goto('/extensions/member_dashboard');
+		}
 	}
 
 	async function handleLogout() {
