@@ -92,8 +92,7 @@ jobs:
           target: demo
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}
-          cache-from: type=gha,scope=realms-demo
-          cache-to: type=gha,mode=max,scope=realms-demo
+          no-cache: true
 
       - name: Build and push test image
         uses: docker/build-push-action@v4
@@ -102,8 +101,7 @@ jobs:
           target: test
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }}
-          cache-from: type=gha,scope=realms-test
-          cache-to: type=gha,mode=max,scope=realms-test
+          no-cache: true
 
       - name: Build and push ui-test image
         uses: docker/build-push-action@v4
@@ -112,8 +110,7 @@ jobs:
           target: ui-test
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/realms:ui-test-${{ github.sha }}
-          cache-from: type=gha,scope=realms-ui-test
-          cache-to: type=gha,mode=max,scope=realms-ui-test
+          no-cache: true
       
       - name: Verify Docker images
         if: always()
