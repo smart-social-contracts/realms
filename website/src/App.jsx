@@ -167,6 +167,7 @@ function App() {
             {t('mission.title')}
           </h2>
           <p className="text-base text-slate-600 leading-relaxed text-justify" dangerouslySetInnerHTML={{ __html: t('mission.description') }} />
+          {/* Temporarily hidden — paper website under construction
           <a 
             href={t('mission.learnMoreUrl')}
             target="_blank"
@@ -176,6 +177,7 @@ function App() {
             {t('mission.learnMore')}
             <ExternalLink className="w-4 h-4" />
           </a>
+          */}
         </div>
       </section>
 
