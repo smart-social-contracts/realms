@@ -15,6 +15,7 @@ export { authClient };
 export async function initializeAuthClient() {
   if (!authClient) {
     authClient = await AuthClient.create({
+      keyType: 'Ed25519',
       idleOptions: { disableIdle: true }
     });
     console.log('Auth client initialized');
