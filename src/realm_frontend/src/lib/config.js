@@ -13,7 +13,9 @@ export const CONFIG = {
   token_backend_canister_id: 'xbkkh-syaaa-aaaah-qq3ya-cai',
 };
 
-// Set to true to bypass auth guards (for demo/testing). Set to false for production.
-export const DEMO_MODE = true;
+// Demo mode: allows any visitor to access all pages even without authentication.
+// Automatically enabled for staging deployments.
+const network = import.meta.env.DFX_NETWORK || 'local';
+export const DEMO_MODE = network === 'staging';
 
 export const DEV_PORT = 8000;

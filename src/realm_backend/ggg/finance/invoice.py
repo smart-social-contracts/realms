@@ -294,6 +294,54 @@ class Invoice(Entity, TimestampedMixin):
         logger.info(f"Created {len(created)} payment entries for Invoice {self.id}")
         return created
 
+    def refresh(self) -> "Async[dict]":
+        """
+        Check if this invoice has been paid by querying token balances
+        on the invoice's subaccount via basilisk OS Wallet.
+
+        Must be called with ``yield``::
+
+            result = yield invoice.refresh()
+
+        Returns a dict with refresh results per token and updated invoice status.
+        """
+        return self._refresh()
+
+    def _refresh(self) -> "Async[dict]":
+        from basilisk.os import Wallet
+        from .token import Token
+
+        wallet = Wallet()
+        subaccount = self.get_subaccount()
+        result = {}
+
+        for token in Token.instances():
+            if not token.indexer:
+                continue
+            try:
+                token_result = yield wallet.refresh(
+                    token.name, subaccount=subaccount
+                )
+                result[token.name] = token_result
+                balance = token_result.get("balance", 0)
+                if balance > 0 and self.status == "Pending":
+                    logger.info(
+                        f"Invoice {self.id}: payment detected on {token.name}, "
+                        f"balance={balance}"
+                    )
+                    self.mark_paid()
+            except Exception as e:
+                logger.error(
+                    f"Invoice {self.id}: error refreshing {token.name}: {e}"
+                )
+                result[token.name] = {"error": str(e)}
+
+        return {
+            "invoice_id": self.id,
+            "status": self.status,
+            "results": result,
+        }
+
     @staticmethod
     def accounting_hook(
         invoice: "Invoice" = None,

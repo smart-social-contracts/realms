@@ -787,6 +787,35 @@ def get_my_invoices() -> RealmResponse:
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
+@update
+def refresh_invoice(args: text) -> Async[text]:
+    """
+    Refresh payment status for an invoice by querying token balances
+    on the invoice's subaccount via basilisk OS Wallet.
+
+    Args (JSON): {"invoice_id": "inv_xxx"}
+    Returns (JSON): {"success": true, "data": {...}} or {"success": false, "error": "..."}
+    """
+    try:
+        params = json.loads(args)
+        invoice_id = params.get("invoice_id")
+        if not invoice_id:
+            return json.dumps({"success": False, "error": "invoice_id is required"})
+
+        from ggg import Invoice
+        invoice = Invoice[invoice_id]
+        if invoice is None:
+            return json.dumps({"success": False, "error": f"Invoice '{invoice_id}' not found"})
+
+        result = yield invoice.refresh()
+
+        return json.dumps({"success": True, "data": result})
+
+    except Exception as e:
+        logger.error(f"Error in refresh_invoice: {str(e)}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
 def create_foundational_objects() -> void:
     """Create the foundational objects required for every realm to operate."""
     from ggg import Calendar, Identity, Profiles, Realm, Treasury, User, UserProfile
