@@ -4,6 +4,7 @@ Status API for Realm DAO system
 Provides health check and system status information
 """
 
+import json
 import sys
 from typing import Any
 
@@ -86,20 +87,20 @@ def get_status() -> "dict[str, Any]":
         # Realm might not exist yet
         pass
 
-    # Simplified extension discovery - cache module names
-    extension_names = []
+    # Extension discovery with version, commit, and datetime from manifests
+    extensions_commit = "EXTENSIONS_COMMIT_HASH_PLACEHOLDER"
+    extensions_commit_datetime = "EXTENSIONS_COMMIT_DATETIME_PLACEHOLDER"
+    extension_entries = []
     try:
-        import extension_packages.extension_imports
-
-        # Only get unique extension names from already loaded modules
-        extension_names = list(
-            {
-                module_name.split(".")[1]
-                for module_name in sys.modules
-                if module_name.startswith("extension_packages.")
-                and len(module_name.split(".")) > 1
-            }
-        )
+        from api.extensions import get_all_extension_manifests
+        manifests = get_all_extension_manifests()
+        for ext_name, manifest in manifests.items():
+            extension_entries.append(json.dumps({
+                "name": ext_name,
+                "version": manifest.get("version", ""),
+                "commit": extensions_commit,
+                "commit_datetime": extensions_commit_datetime,
+            }))
     except Exception as e:
         logger.warning(f"Could not list extensions: {e}")
 
@@ -208,7 +209,7 @@ def get_status() -> "dict[str, Any]":
         "votes_count": votes_count,
         "commit": commit_hash,
         "commit_datetime": commit_datetime,
-        "extensions": extension_names,
+        "extensions": extension_entries,
         "demo_mode": demo_mode,
         "task_manager": task_manager_status,
         "canisters": canisters,
