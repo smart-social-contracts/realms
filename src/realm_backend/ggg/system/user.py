@@ -48,7 +48,23 @@ class User(Entity, TimestampedMixin):
 
     @staticmethod
     def user_register_posthook(user: "User"):
-        """Hook called after user registration. Can be overridden by extensions."""
+        """Hook called after user registration. Dynamically loads codex override if available."""
+        try:
+            from ggg.governance.codex import Codex
+            for codex in Codex.instances():
+                if codex.name == "user_registration_hook_codex" and codex.code:
+                    import ggg as _ggg
+                    from _cdk import ic as _ic
+                    ns = {"ic": _ic, "ggg": _ggg, "__builtins__": __builtins__}
+                    exec(compile(codex.code, "user_registration_hook_codex.py", "exec"), ns)
+                    if "user_register_posthook" in ns:
+                        logger.info(f"Executing codex user_register_posthook for user {user.id}")
+                        ns["user_register_posthook"](user)
+                        return
+        except Exception as e:
+            logger.error(f"Error executing user_registration_hook_codex: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
         logger.info(f"Hook called after user registration. User {user.id} registered with profile {user.profiles}")
         return
 

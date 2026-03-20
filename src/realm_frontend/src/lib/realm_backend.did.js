@@ -96,6 +96,7 @@ service : () -> {
   join_realm : (text, text) -> (RealmResponse);
   list_extensions : (text) -> (RealmResponse) query;
   register_realm_with_registry : (text, text, text, text) -> (text);
+  refresh_invoice : (text) -> (text);
   reload_entity_method_overrides : () -> (text);
   register_quarter : (text, text) -> (RealmResponse);
   deregister_quarter : (text) -> (RealmResponse);
