@@ -605,12 +605,14 @@ class RealmGenerator:
         # Generate user registration hook codex
         user_reg_hook_codex = self.generate_user_registration_hook_codex()
         
-        # Return Realm first, then additional data
+        # Return entities in dependency order: referenced entities first.
+        # serialize() skips OneToMany and serializes OneToOne on one
+        # deterministic side, so import order must match dependency order.
         ret = [realm]
         ret += users
-        ret += identities
         ret += humans
         ret += members
+        ret += identities
         ret += organizations
         ret += instruments
         ret += transfers

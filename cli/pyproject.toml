@@ -35,7 +35,7 @@ dependencies = [
     "prompt-toolkit>=3.0.0",
     "ic-basilisk==0.10.6",
     "ic-python-logging==0.3.1",
-    "ic-python-db==0.7.5",
+    "ic-python-db==0.7.6",
 ]
 
 [project.optional-dependencies]
