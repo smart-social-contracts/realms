@@ -589,7 +589,7 @@ class RealmGenerator:
         members = self.generate_members(users)
         organizations = self.generate_organizations(params.get('organizations', 5))
         instruments = self.generate_instruments()
-        transfers = self.generate_transfers(users, instruments, params.get('transactions', 100))
+        # transfers = self.generate_transfers(users, instruments, params.get('transactions', 100))
         disputes = self.generate_disputes(params.get('disputes', 10))
         mandates = self.generate_mandates()
         
@@ -615,7 +615,7 @@ class RealmGenerator:
         ret += identities
         ret += organizations
         ret += instruments
-        ret += transfers
+        # ret += transfers
         ret += disputes
         ret += mandates
         ret += zones
