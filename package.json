@@ -17,11 +17,11 @@
     "src/realm_registry_frontend"
   ],
   "dependencies": {
-    "@dfinity/agent": "^2.4.1",
-    "@dfinity/auth-client": "^2.4.1",
-    "@dfinity/candid": "^2.4.1",
-    "@dfinity/identity": "^2.4.1",
-    "@dfinity/principal": "^2.4.1",
+    "@dfinity/agent": "^3.4.3",
+    "@dfinity/auth-client": "^3.4.3",
+    "@dfinity/candid": "^3.4.3",
+    "@dfinity/identity": "^3.4.3",
+    "@dfinity/principal": "^3.4.3",
     "svelte-markdown": "^0.4.1"
   },
   "devDependencies": {
