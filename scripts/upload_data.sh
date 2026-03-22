@@ -36,7 +36,9 @@ if [ "$NETWORK" != "local" ]; then
 fi
 
 # Check if realm_data.json exists and has content
-if [ -f "realm_data.json" ] && [ -s "realm_data.json" ]; then
+if [ -n "$NO_DEMO_DATA" ]; then
+    echo "ℹ️  Skipping realm data upload (--no-demo-data)"
+elif [ -f "realm_data.json" ] && [ -s "realm_data.json" ]; then
     echo "📥 Uploading realm data..."
     $REALMS_CMD realm_data.json
     if [ $? -eq 0 ]; then
@@ -73,6 +75,10 @@ else
 fi
 
 # Automatically discover and import extension data files
+# Skip if NO_DEMO_DATA is set (these are demo/fake entities)
+if [ -n "$NO_DEMO_DATA" ]; then
+    echo "🔌 Skipping extension demo data (--no-demo-data)"
+else
 echo "🔌 Discovering extension data files..."
 EXTENSION_DATA_COUNT=0
 
@@ -105,6 +111,7 @@ if [ $EXTENSION_DATA_COUNT -eq 0 ]; then
 else
     echo "  ✅ Imported $EXTENSION_DATA_COUNT extension data file(s)"
 fi
+fi  # end NO_DEMO_DATA check
 
 # Exit with success even if some uploads failed
 echo ""
