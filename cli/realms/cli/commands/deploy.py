@@ -180,12 +180,14 @@ def _deploy_realm_internal(
     bare: bool = False,
     plain_logs: bool = False,
     registry: Optional[str] = None,
+    no_demo_data: bool = False,
 ) -> None:
     """Internal deployment logic (can be called directly from Python).
     
     Args:
         bare: If True, only deploy canisters (skip extensions, data, post-deploy)
         plain_logs: If True, show full verbose output instead of progress UI
+        no_demo_data: If True, skip demo/fake data seeding in post-deploy
     """
     log_dir = Path(folder).absolute()
     
@@ -253,6 +255,13 @@ def _deploy_realm_internal(
         if not env:
             env = os.environ.copy()
         env["REALMS_VERBOSE"] = "1"
+    
+    # Set NO_DEMO_DATA for post_deploy.py to skip demo data seeding
+    if no_demo_data:
+        if not env:
+            env = os.environ.copy()
+        env["NO_DEMO_DATA"] = "1"
+        logger.info("Demo data seeding disabled (--no-demo-data)")
 
     # Inject version/commit/dependency placeholders into source files before build
     _inject_version_placeholders(folder_path, logger)

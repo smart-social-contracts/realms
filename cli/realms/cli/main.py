@@ -243,6 +243,9 @@ def mundus_create(
     mode: str = typer.Option(
         "auto", "--mode", "-m", help="Deploy mode: 'auto', 'upgrade' or 'reinstall' (auto picks install/upgrade)"
     ),
+    no_demo_data: bool = typer.Option(
+        False, "--no-demo-data", help="Skip generating demo/fake data (users, orgs, accounting). Extensions and codex files are still included."
+    ),
 ) -> None:
     """Create a new multi-realm mundus from a manifest."""
     mundus_create_command(
@@ -253,6 +256,7 @@ def mundus_create(
         deploy,
         identity,
         mode,
+        no_demo_data=no_demo_data,
     )
 
 
@@ -270,9 +274,12 @@ def mundus_deploy(
     mode: str = typer.Option(
         "auto", "--mode", "-m", help="Deploy mode: 'auto', 'upgrade' or 'reinstall'"
     ),
+    no_demo_data: bool = typer.Option(
+        False, "--no-demo-data", help="Skip generating demo/fake data (users, orgs, accounting). Extensions and codex files are still included."
+    ),
 ) -> None:
     """Deploy all realms and registry in an existing mundus."""
-    mundus_deploy_command(mundus_dir, network, identity, mode)
+    mundus_deploy_command(mundus_dir, network, identity, mode, no_demo_data=no_demo_data)
 
 
 @mundus_app.command("status")
@@ -337,6 +344,9 @@ def realm_create(
     bare: bool = typer.Option(
         False, "--bare", help="Create minimal realm (canisters only, no extensions or data)"
     ),
+    no_demo_data: bool = typer.Option(
+        False, "--no-demo-data", help="Skip generating demo/fake data (users, orgs, accounting). Extensions and codex files are still included."
+    ),
     plain_logs: bool = typer.Option(
         False, "--plain-logs", help="Show full verbose output instead of progress UI during deployment"
     ),
@@ -360,6 +370,7 @@ def realm_create(
         identity,
         mode,
         bare,
+        no_demo_data,
         plain_logs,
         registry=registry,
     )

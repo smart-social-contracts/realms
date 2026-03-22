@@ -24,6 +24,14 @@ on:
           - upgrade
           - reinstall
         default: upgrade
+      demo_data:
+        description: 'Populate realms with demo/fake data (users, orgs, accounting, etc.)'
+        required: false
+        type: choice
+        options:
+          - 'yes'
+          - 'no'
+        default: 'no'
 
 jobs:
   deploy-staging:
@@ -39,6 +47,7 @@ jobs:
           echo "Effective commit: ${{ github.event.inputs.commit || github.sha }}"
           echo "Deployment type: ${{ github.event.inputs.type }}"
           echo "Deploy mode: ${{ github.event.inputs.mode }}"
+          echo "Demo data: ${{ github.event.inputs.demo_data }}"
           echo "Actor: ${{ github.actor }}"
           echo "Event: ${{ github.event_name }}"
           echo "==========================="
@@ -72,7 +81,7 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/realms:demo-${{ steps.commit.outputs.deploy_commit }} \
             bash -c "(dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
                      dfx identity use my-identity && \
-                     bash scripts/manual-deploy-staging.sh '${{ github.event.inputs.type }}' '${{ github.event.inputs.mode }}'); \
+                     bash scripts/manual-deploy-staging.sh '${{ github.event.inputs.type }}' '${{ github.event.inputs.mode }}' '${{ github.event.inputs.demo_data }}'); \
                      EXIT_CODE=\$?; \
                      mkdir -p /app/deploy-logs && \
                      cp -f dfx.log /app/deploy-logs/ 2>/dev/null || true && \

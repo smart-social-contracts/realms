@@ -159,6 +159,7 @@ def create_command(
     identity: Optional[str] = None,
     mode: str = "auto",
     bare: bool = False,
+    no_demo_data: bool = False,
     plain_logs: bool = False,
     registry: Optional[str] = None,
 ) -> None:
@@ -166,6 +167,7 @@ def create_command(
     
     Args:
         bare: If True, skip data generation and only deploy canisters (no extensions/data)
+        no_demo_data: If True, skip generating demo/fake data (users, orgs, accounting) but keep extensions and codex files
         plain_logs: If True, show full verbose output instead of progress UI during deployment
     """
     from ..utils import generate_output_dir_name
@@ -292,15 +294,20 @@ def create_command(
         generator = RealmGenerator(gen_seed, quiet=quiet) if gen_seed else RealmGenerator(quiet=quiet)
         
         # Generate realm data
-        if not quiet:
-            console.print("[dim]Generating realm data...[/dim]")
-        realm_data = generator.generate_realm_data(
-            members=gen_members,
-            organizations=gen_organizations,
-            transactions=gen_transactions,
-            disputes=gen_disputes,
-            realm_name=realm_name
-        )
+        if no_demo_data:
+            if not quiet:
+                console.print("[dim]Skipping demo data generation (--no-demo-data)[/dim]")
+            realm_data = generator.generate_minimal_realm_data(realm_name=realm_name)
+        else:
+            if not quiet:
+                console.print("[dim]Generating realm data...[/dim]")
+            realm_data = generator.generate_realm_data(
+                members=gen_members,
+                organizations=gen_organizations,
+                transactions=gen_transactions,
+                disputes=gen_disputes,
+                realm_name=realm_name
+            )
         
         # Save realm data JSON
         json_file = output_path / "realm_data.json"
@@ -362,7 +369,7 @@ def create_command(
     can_generate_scripts = (cli_dir / "dfx.template.json").exists() or (repo_root / "dfx.template.json").exists()
     
     if can_generate_scripts:
-        _generate_deployment_scripts(output_path, network, realm_name, random, repo_root, deploy, identity, mode, bare, plain_logs, in_repo_mode=in_repo_mode, realm_manifest=realm_manifest, registry=registry)
+        _generate_deployment_scripts(output_path, network, realm_name, random, repo_root, deploy, identity, mode, bare, plain_logs, in_repo_mode=in_repo_mode, realm_manifest=realm_manifest, registry=registry, no_demo_data=no_demo_data)
     else:
         console.print(f"\n[yellow]⚠️  Deployment scripts not generated (bundled files not found)[/yellow]")
         console.print(f"[dim]Searched: {cli_dir / 'dfx.template.json'}, {repo_root / 'dfx.template.json'}[/dim]")
@@ -385,12 +392,14 @@ def _generate_deployment_scripts(
     in_repo_mode: bool = True,
     realm_manifest: Optional[Dict[str, Any]] = None,
     registry: Optional[str] = None,
+    no_demo_data: bool = False,
 ):
     """Generate deployment scripts and dfx.json for independent realm.
     
     Args:
         bare: If True, skip extensions and data upload during deployment
         plain_logs: If True, show full verbose output instead of progress UI
+        no_demo_data: If True, skip demo/fake data seeding in post-deploy
     """
     # Suppress verbose output when deploying with progress display
     quiet = deploy and not plain_logs
@@ -743,6 +752,7 @@ def _generate_deployment_scripts(
                 bare=bare,
                 plain_logs=plain_logs,
                 registry=registry,
+                no_demo_data=no_demo_data,
             )
         except typer.Exit as e:
             console.print(

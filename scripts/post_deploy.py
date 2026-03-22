@@ -515,10 +515,14 @@ except Exception as e:
     print(f"   ⚠️  Token seeding failed: {e} (continuing anyway)")
 
 # Seed demo accounting data (Fund, FiscalPeriod, Budget, LedgerEntry)
-print("\n📊 Seeding demo accounting data...")
-try:
-    # Python code to create demo accounting data
-    accounting_seed_code = '''
+# Skip if NO_DEMO_DATA env var is set (--no-demo-data flag)
+if os.environ.get('NO_DEMO_DATA'):
+    print("\n📊 Skipping demo accounting data (--no-demo-data)")
+else:
+    print("\n📊 Seeding demo accounting data...")
+    try:
+        # Python code to create demo accounting data
+        accounting_seed_code = '''
 from ggg import Fund, FiscalPeriod, Budget, LedgerEntry
 from ggg import FundType, FiscalPeriodStatus, BudgetStatus, EntryType, Category
 from datetime import datetime
@@ -793,22 +797,22 @@ else:
     
     "seeded"
 '''
-    # Escape the code for shell
-    escaped_code = accounting_seed_code.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
-    seed_cmd = ['dfx', 'canister', 'call', backend_name, 'execute_code_shell', f'("{escaped_code}")']
-    if network != 'local':
-        seed_cmd.extend(['--network', network])
-    result = subprocess.run(seed_cmd, cwd=realm_dir, capture_output=True, text=True)
-    if result.returncode == 0:
-        if "already_seeded" in result.stdout:
-            print(f"   ℹ️  Accounting data already exists, skipping")
+        # Escape the code for shell
+        escaped_code = accounting_seed_code.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
+        seed_cmd = ['dfx', 'canister', 'call', backend_name, 'execute_code_shell', f'("{escaped_code}")']
+        if network != 'local':
+            seed_cmd.extend(['--network', network])
+        result = subprocess.run(seed_cmd, cwd=realm_dir, capture_output=True, text=True)
+        if result.returncode == 0:
+            if "already_seeded" in result.stdout:
+                print(f"   ℹ️  Accounting data already exists, skipping")
+            else:
+                print(f"   ✅ Demo accounting data seeded successfully")
         else:
-            print(f"   ✅ Demo accounting data seeded successfully")
-    else:
-        print(f"   ⚠️  Failed to seed accounting data: {result.stderr}")
+            print(f"   ⚠️  Failed to seed accounting data: {result.stderr}")
 
-except Exception as e:
-    print(f"   ⚠️  Accounting data seeding failed: {e} (continuing anyway)")
+    except Exception as e:
+        print(f"   ⚠️  Accounting data seeding failed: {e} (continuing anyway)")
 
 # Start TaskManager to schedule tasks created during data import.
 # Timer callbacks MUST be created in an update call context (not execute_code_shell).

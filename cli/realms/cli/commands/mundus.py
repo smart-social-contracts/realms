@@ -28,6 +28,7 @@ def mundus_create_command(
     deploy: bool,
     identity: Optional[str],
     mode: str,
+    no_demo_data: bool = False,
 ) -> None:
     """Create a new multi-realm mundus by calling realm and registry commands."""
     
@@ -113,6 +114,7 @@ def mundus_create_command(
                 seed=realm_config.get("seed"),
                 network=network,
                 deploy=False,  # Don't deploy individual realms yet
+                no_demo_data=no_demo_data,
             )
             
             # Find the created realm directory (most recent realm_* directory)
@@ -207,7 +209,7 @@ def mundus_create_command(
     
     if deploy:
         console.print("\n[bold yellow]🚀 Starting deployment...[/bold yellow]\n")
-        mundus_deploy_command(str(mundus_dir), network, identity, mode)
+        mundus_deploy_command(str(mundus_dir), network, identity, mode, no_demo_data=no_demo_data)
 
 
 def _create_mundus_deploy_script(
@@ -378,6 +380,7 @@ def mundus_deploy_command(
     network: str,
     identity: Optional[str],
     mode: str,
+    no_demo_data: bool = False,
 ) -> None:
     """Deploy all realms and registry in a mundus by calling individual deploy commands."""
     
@@ -646,6 +649,7 @@ def mundus_deploy_command(
         'REGISTRY_CANISTER_ID': os.environ.get('REGISTRY_CANISTER_ID'),
         'REALMS_TOKEN_CANISTER_ID': os.environ.get('REALMS_TOKEN_CANISTER_ID'),
         'CANISTER_MARKETPLACE_BACKEND_ID': os.environ.get('CANISTER_MARKETPLACE_BACKEND_ID'),
+        'NO_DEMO_DATA': '1' if no_demo_data else '',
     }
     
     # Use ProcessPoolExecutor for parallel deployment
