@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from ic_python_db import Entity, ManyToMany, ManyToOne, OneToMany, OneToOne, String, TimestampedMixin
@@ -160,7 +160,7 @@ def case_file(
     if not case_number:
         # Generate case number: COURT-YYYY-NNNN
         import uuid
-        year = datetime.utcnow().year
+        year = datetime.now(timezone.utc).year
         case_number = f"{court.name[:3].upper()}-{year}-{uuid.uuid4().hex[:8].upper()}"
     
     case = Case(
@@ -168,7 +168,7 @@ def case_file(
         title=title,
         description=description,
         status=CaseStatus.FILED,
-        filed_date=datetime.utcnow().isoformat(),
+        filed_date=datetime.now(timezone.utc).isoformat(),
         court=court,
         plaintiff=plaintiff,
         defendant=defendant,
@@ -240,7 +240,7 @@ def case_issue_verdict(
     verdict = Verdict(
         decision=decision,
         reasoning=reasoning,
-        issued_date=datetime.utcnow().isoformat(),
+        issued_date=datetime.now(timezone.utc).isoformat(),
         case=case,
         issued_by=case.judges[0] if case.judges else None  # Primary judge
     )
@@ -279,7 +279,7 @@ def case_close(case: "Case") -> "Case":
         raise ValueError(f"Cannot close case in status {case.status}")
     
     case.status = CaseStatus.CLOSED
-    case.closed_date = datetime.utcnow().isoformat()
+    case.closed_date = datetime.now(timezone.utc).isoformat()
     
     Case.case_closed_posthook(case)
     return case

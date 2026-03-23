@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from ic_python_db import Entity, ManyToOne, OneToMany, OneToOne, String, TimestampedMixin
@@ -105,7 +105,7 @@ def appeal_file(
         id=appeal_id,
         grounds=grounds,
         status=AppealStatus.FILED,
-        filed_date=datetime.utcnow().isoformat(),
+        filed_date=datetime.now(timezone.utc).isoformat(),
         original_case=case,
         original_verdict=case.verdict,
         appellate_court=appellate_court,
@@ -146,7 +146,7 @@ def appeal_decide(
     
     appeal.decision = decision
     appeal.decision_reasoning = reasoning
-    appeal.decided_date = datetime.utcnow().isoformat()
+    appeal.decided_date = datetime.now(timezone.utc).isoformat()
     
     if decision in ("upheld", "denied"):
         appeal.status = AppealStatus.DENIED
@@ -158,7 +158,7 @@ def appeal_decide(
             new_verdict = Verdict(
                 decision=new_verdict_data.get("decision", ""),
                 reasoning=new_verdict_data.get("reasoning", ""),
-                issued_date=datetime.utcnow().isoformat(),
+                issued_date=datetime.now(timezone.utc).isoformat(),
                 case=appeal.original_case
             )
             appeal.new_verdict = new_verdict
