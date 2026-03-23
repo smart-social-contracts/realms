@@ -110,6 +110,9 @@ class LedgerEntry(Entity, TimestampedMixin):
     penalty = ManyToOne("Penalty", "ledger_entries")
     appeal = ManyToOne("Appeal", "ledger_entries")
     
+    # Currency denomination
+    currency = String(max_length=16)  # Currency symbol for this entry (e.g., "ckUSDC")
+    
     # Metadata
     description = String(max_length=512)
     reference = String(max_length=128)  # External reference number

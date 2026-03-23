@@ -158,6 +158,17 @@ def get_status() -> "dict[str, Any]":
     except Exception as e:
         logger.warning(f"Could not load registries: {e}")
 
+    # Accounting currency
+    accounting_currency = "ckBTC"
+    accounting_currency_decimals = 8
+    try:
+        first_realm = Realm.load("1")
+        if first_realm:
+            accounting_currency = getattr(first_realm, 'accounting_currency', None) or "ckBTC"
+            accounting_currency_decimals = getattr(first_realm, 'accounting_currency_decimals', None) or 8
+    except Exception as e:
+        logger.warning(f"Could not load accounting currency: {e}")
+
     # Quarter discovery
     quarters = []
     is_quarter = False
@@ -219,4 +230,6 @@ def get_status() -> "dict[str, Any]":
         "quarters": quarters,
         "is_quarter": is_quarter,
         "parent_realm_canister_id": parent_realm_canister_id,
+        "accounting_currency": accounting_currency,
+        "accounting_currency_decimals": accounting_currency_decimals,
     }

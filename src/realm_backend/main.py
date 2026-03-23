@@ -99,6 +99,8 @@ class StatusRecord(Record):
     quarters: Vec[QuarterInfoRecord]
     is_quarter: bool
     parent_realm_canister_id: text
+    accounting_currency: text
+    accounting_currency_decimals: nat
 
 
 class UserGetRecord(Record):
@@ -890,12 +892,15 @@ def create_foundational_objects() -> void:
                     realm_welcome_image = manifest.get("welcome_image", "")
                     realm_welcome_message = manifest.get("welcome_message", "")
                     calendar_config = manifest.get("calendar", {})
+                    acct_currency_config = manifest.get("accounting_currency", {})
                     logger.info(f"Loaded realm config from {manifest_path}: name={realm_name}")
                     break
             calendar_config = locals().get("calendar_config", {})
+            acct_currency_config = locals().get("acct_currency_config", {})
         except Exception as e:
             logger.warning(f"Could not load manifest.json: {e}, using defaults")
             calendar_config = {}
+            acct_currency_config = {}
         
         realm = Realm(
             name=realm_name,
@@ -903,6 +908,8 @@ def create_foundational_objects() -> void:
             logo=realm_logo,
             welcome_image=realm_welcome_image,
             welcome_message=realm_welcome_message,
+            accounting_currency=acct_currency_config.get("symbol", "ckBTC"),
+            accounting_currency_decimals=acct_currency_config.get("decimals", 8),
             principal_id="",
         )
 

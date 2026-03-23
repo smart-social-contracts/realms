@@ -53,6 +53,8 @@ class StatusRecord(Record):
     quarters: Vec[QuarterInfoRecord]
     is_quarter: bool
     parent_realm_canister_id: text
+    accounting_currency: text
+    accounting_currency_decimals: nat
 
 
 class UserGetRecord(Record):

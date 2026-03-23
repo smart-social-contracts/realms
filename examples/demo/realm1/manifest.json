@@ -11,6 +11,10 @@
       "version": "latest"
     }
   },
+  "accounting_currency": {
+    "symbol": "ckUSDC",
+    "decimals": 6
+  },
   "token": {
     "name": "Dominion Token",
     "symbol": "DOM"

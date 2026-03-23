@@ -355,9 +355,13 @@ class Proposal(Entity):
 # ---------------------------------------------------------------------------
 
 class Invoice(Entity):
-    """Invoice entity — represents a payable ckBTC invoice.
+    """Invoice entity — denominated in the realm's accounting currency.
 
     Alias: ``id`` (auto-generated as ``inv_XXXXXXXXXXXX`` if not provided)
+
+    Multi-currency: invoices are denominated in accounting currency (e.g., ckUSDC).
+    Payments can arrive in any registered Token; FX rates convert to accounting
+    currency equivalent on refresh.
 
     ⚠️  ``metadata`` is max 256 chars.
     ⚠️  ``recipient`` is ManyToOne(User) — may cause serialization issues in shell.
@@ -367,10 +371,10 @@ class Invoice(Entity):
     """Invoice ID (max 32 chars, auto-generated if not provided)"""
 
     amount: Optional[float]
-    """Amount in ckBTC (e.g., 0.001 = 100,000 satoshis)"""
+    """Amount in accounting currency (e.g., 10.00 ckUSDC)"""
 
     currency: Optional[str]
-    """Currency code (max 16 chars, default: 'ckBTC')"""
+    """Accounting currency symbol (max 16 chars, default: 'ckBTC')"""
 
     due_on: Optional[str]
     """ISO timestamp for due date (max 64 chars) — NOT 'due_date'!"""
@@ -397,6 +401,18 @@ class Invoice(Entity):
     metadata: Optional[str]
     """Short metadata string (⚠️  max 256 chars!)"""
 
+    # Multi-currency payment fields (populated on payment)
+    payment_currency: Optional[str]
+    """Token symbol actually used to pay (e.g., 'ckBTC') (max 16 chars)"""
+    payment_amount: Optional[float]
+    """Amount received in payment currency"""
+    payment_amount_raw: Optional[int]
+    """Raw amount in smallest unit of payment currency"""
+    fx_rate: Optional[float]
+    """FX rate used: 1 unit of payment currency = fx_rate units of accounting currency"""
+    fx_rate_timestamp: Optional[str]
+    """When the FX rate was captured (max 64 chars)"""
+
     def __init__(
         self,
         *,
@@ -410,6 +426,11 @@ class Invoice(Entity):
         paid_on: Optional[str] = ...,
         type: Optional[str] = ...,
         metadata: Optional[str] = ...,
+        payment_currency: Optional[str] = ...,
+        payment_amount: Optional[float] = ...,
+        payment_amount_raw: Optional[int] = ...,
+        fx_rate: Optional[float] = ...,
+        fx_rate_timestamp: Optional[str] = ...,
         **kwargs,
     ) -> None: ...
 
@@ -430,12 +451,19 @@ class Invoice(Entity):
         """Look up an Invoice by its subaccount bytes."""
         ...
 
-    def get_amount_raw(self) -> int:
-        """Get the invoice amount in raw satoshis."""
+    def get_amount_raw(self, decimals: int = ...) -> int:
+        """Get the invoice amount in raw units of accounting currency."""
         ...
 
-    def mark_paid(self) -> None:
-        """Mark this invoice as paid with current timestamp."""
+    def mark_paid(
+        self,
+        payment_currency: str = ...,
+        payment_amount: float = ...,
+        payment_amount_raw: int = ...,
+        fx_rate: float = ...,
+        fx_rate_timestamp: str = ...,
+    ) -> None:
+        """Mark this invoice as paid with current timestamp and payment details."""
         ...
 
     @classmethod
@@ -892,10 +920,14 @@ class Realm(Entity):
     """OneToOne: realm calendar"""
     treasury: Optional[Treasury]
     """OneToOne: realm treasury"""
+    accounting_currency: Optional[str]
+    """Accounting/reference currency symbol (max 16 chars, default: 'ckBTC')"""
+    accounting_currency_decimals: Optional[int]
+    """Decimal places for accounting currency (default: 8)"""
     principal_id: Optional[str]
     """Canister principal ID (max 64 chars)"""
 
-    def __init__(self, *, name: Optional[str] = ..., description: Optional[str] = ..., logo: Optional[str] = ..., welcome_image: Optional[str] = ..., welcome_message: Optional[str] = ..., principal_id: Optional[str] = ..., **kwargs) -> None: ...
+    def __init__(self, *, name: Optional[str] = ..., description: Optional[str] = ..., logo: Optional[str] = ..., welcome_image: Optional[str] = ..., welcome_message: Optional[str] = ..., accounting_currency: Optional[str] = ..., accounting_currency_decimals: Optional[int] = ..., principal_id: Optional[str] = ..., **kwargs) -> None: ...
     @classmethod
     def instances(cls) -> List["Realm"]: ...
     @classmethod
@@ -1641,6 +1673,9 @@ class LedgerEntry(Entity):
 
     contract: Optional[Contract]
     """ManyToOne: linked contract (optional)"""
+
+    currency: Optional[str]
+    """Currency denomination for this entry (max 16 chars, e.g., 'ckUSDC')"""
 
     description: Optional[str]
     """Description (max 512 chars)"""
