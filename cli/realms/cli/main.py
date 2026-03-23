@@ -43,6 +43,7 @@ from .commands.registry import (
 )
 from .commands.run import run_command
 from .commands.shell import shell_command
+from .commands.test import test_command
 from .constants import MAX_BATCH_SIZE, REALM_FOLDER
 from .utils import (
     check_dependencies,
@@ -142,6 +143,23 @@ def export_data(
 
 # Register deploy command directly from commands module
 app.command("deploy", rich_help_panel="Lifecycle")(deploy_command)
+
+
+@app.command("test", rich_help_panel="Development")
+def test(
+    path: str = typer.Argument(".", help="Path to codices directory, realm directory, or test file"),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Show verbose output including passing test details"
+    ),
+) -> None:
+    """Run codex tests locally using the mock ggg framework.
+
+    Examples:
+        realms test codices/agora
+        realms test codices/
+        realms test codices/agora/tests/test_financial_setup.py
+    """
+    test_command(path, verbose)
 
 
 @app.command("status", rich_help_panel="Utility")
