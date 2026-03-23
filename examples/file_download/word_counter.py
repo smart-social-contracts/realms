@@ -7,7 +7,7 @@ This codex demonstrates:
 3. Async task pattern with yield
 
 Usage:
-    realms run --file examples/file_download/word_counter_codex.py --every 300
+    realms run --file examples/file_download/word_counter.py --every 300
 """
 
 from _cdk import ic, Async, CallResult, match

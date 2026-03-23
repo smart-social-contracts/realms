@@ -260,8 +260,8 @@ Test coverage:
 ## Examples
 
 See `/examples` directory:
-- `batch_processing_codex.py` - Complete batch processing example
-- `multi_state_codex.py` - Multiple state variables
+- `batch_processing.py` - Complete batch processing example
+- `multi_state.py` - Multiple state variables
 - `TASKENTITY_README.md` - User documentation
 
 ## Integration with Task System

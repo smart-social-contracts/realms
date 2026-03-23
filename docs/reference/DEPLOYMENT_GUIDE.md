@@ -127,7 +127,7 @@ cd .realms/realm_YourRealm_*/
    - Uses `realms import` command with admin_dashboard extension
 
 2. **Codex Import:**
-   - Discovers all `*_codex.py` files in realm directory
+   - Discovers all codex `.py` files in realm directory
    - Imports each codex file with `--type codex` flag
    - Codexes contain automation scripts for governance, taxes, benefits, etc.
 
@@ -196,7 +196,7 @@ python scripts/4-post-deploy.py [NETWORK]
 ┌─────────────────────────────────────────────────────────────────┐
 │                      3-upload-data.sh                            │
 │  • Import realm_data.json (entities)                            │
-│  • Import *_codex.py files (automation scripts)                 │
+│  • Import codex .py files (automation scripts)                 │
 │  • Import extension data files                                   │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -608,7 +608,7 @@ realms import prod_users.json --network ic --identity production
 realms import governance.json --network ic --identity production
 
 # Import codexes
-realms import tax_codex.py --type codex --network ic --identity production
+realms import tax_collection.py --type codex --network ic --identity production
 ```
 
 ---

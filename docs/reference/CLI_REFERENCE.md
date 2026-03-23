@@ -169,7 +169,7 @@ Import data into realm.
 realms import realm_data.json
 
 # Import codex
-realms import tax_codex.py --type codex
+realms import tax_collection.py --type codex
 
 # Batch import
 realms import large_dataset.json --batch-size 50

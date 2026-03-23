@@ -420,7 +420,7 @@ class RealmGenerator:
         Note: entity_method_overrides configuration is stored separately in a Storage entry
         """
         codex = Codex(
-            name="user_registration_hook_codex",
+            name="user_registration_hook",
             description="Custom user registration hook",
             code=""  # Will be populated when codex file is imported
         )
@@ -437,7 +437,7 @@ class RealmGenerator:
                     "entity": "User",
                     "method": "user_register_posthook",
                     "type": "staticmethod",
-                    "implementation": "Codex.user_registration_hook_codex.user_register_posthook",
+                    "implementation": "Codex.user_registration_hook.user_register_posthook",
                     "description": "Custom post-registration hook for new users"
                 }
             ]
@@ -455,7 +455,7 @@ class RealmGenerator:
         # Create Codex entity (code will be set during import)
         # Note: Name must match the codex file name (without .py) for import to update it
         codex = Codex(
-            name="satoshi_transfer_codex",
+            name="satoshi_transfer",
             description="Sends 1 satoshi every 60 seconds",
             code=""  # Will be populated when codex file is imported
         )
@@ -478,7 +478,7 @@ class RealmGenerator:
             name="Satoshi Transfer Task",
             metadata=json.dumps({
                 "description": "Automated satoshi transfer every 60 seconds",
-                "codex_name": "satoshi_transfer_codex",
+                "codex_name": "satoshi_transfer",
                 "target_principal": "64fpo-jgpms-fpewi-hrskb-f3n6u-3z5fy-bv25f-zxjzg-q5m55-xmfpq-hqe",
                 "amount": 1
             }),

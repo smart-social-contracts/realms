@@ -9,7 +9,7 @@ examples/demo/
 ├── manifest.json          # Top-level manifest defining realms and registries
 ├── realm1/               # First demo realm
 │   ├── manifest.json     # Realm-specific configuration
-│   ├── adjustments.py    # Post-deployment script
+│   ├── init.py           # Post-deployment script
 │   ├── README.md         # Realm documentation
 │   └── *.py             # Codex files (tax, benefits, governance, etc.)
 ├── realm2/               # Second demo realm
@@ -74,14 +74,14 @@ Each realm subfolder contains:
 
 ### Configuration Files
 - **manifest.json**: Realm name and entity method overrides
-- **adjustments.py**: Post-deployment script that applies manifest settings
+- **init.py**: Post-deployment script that applies manifest settings
 - **README.md**: Documentation specific to that realm
 
 ### Codex Files
-- **tax_collection_codex.py**: Progressive tax system
-- **social_benefits_codex.py**: Social benefits distribution
-- **governance_automation_codex.py**: Democratic governance
-- **user_registration_hook_codex.py**: Custom registration hooks
+- **tax_collection.py**: Progressive tax system
+- **social_benefits.py**: Social benefits distribution
+- **governance_automation.py**: Democratic governance
+- **user_registration_hook.py**: Custom registration hooks
 
 ## Registry Configuration
 

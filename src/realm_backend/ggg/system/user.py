@@ -52,11 +52,11 @@ class User(Entity, TimestampedMixin):
         try:
             from ggg.governance.codex import Codex
             for codex in Codex.instances():
-                if codex.name == "user_registration_hook_codex" and codex.code:
+                if codex.name == "user_registration_hook" and codex.code:
                     import ggg as _ggg
                     from _cdk import ic as _ic
                     ns = {"ic": _ic, "ggg": _ggg, "__builtins__": __builtins__}
-                    exec(compile(codex.code, "user_registration_hook_codex.py", "exec"), ns)
+                    exec(compile(codex.code, "user_registration_hook.py", "exec"), ns)
                     if "user_register_posthook" in ns:
                         logger.info(f"Executing codex user_register_posthook for user {user.id}")
                         ns["user_register_posthook"](user)

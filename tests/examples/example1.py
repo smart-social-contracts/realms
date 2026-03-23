@@ -9,9 +9,9 @@ mandate = Mandate(name="pensions")
 
 
 ts = TaskSchedule(_id="end_of_month", cron_expression="0 0 L * *")  # every end of month
-# Use the directory of the current file to locate tax_codex.py
+# Use the directory of the current file to locate tax.py
 current_dir = os.path.dirname(os.path.abspath(__file__))
-codex_path = os.path.join(current_dir, "tax_codex.py")
+codex_path = os.path.join(current_dir, "tax.py")
 task = Task(
     _id="pay_pensions", schedules=[ts], codex=Codex(code=open(codex_path).read())
 )

@@ -54,7 +54,7 @@ fi
 
 echo "📜 Uploading codex files..."
 CODEX_COUNT=0
-for codex_file in *_codex.py; do
+for codex_file in *.py; do
     if [ -f "$codex_file" ]; then
         echo "  Importing $(basename $codex_file)..."
         $REALMS_CMD "$codex_file" --type codex
@@ -122,6 +122,6 @@ else
     echo "⚠️  No data was uploaded (this may be expected if no data files exist)"
     echo "   If you expected data to be uploaded, check that:"
     echo "   1. The admin_dashboard extension is installed"
-    echo "   2. Data files (realm_data.json, *_codex.py) exist in this directory"
+    echo "   2. Data files (realm_data.json, *.py codex files) exist in this directory"
     exit 0  # Exit with success to allow deployment to continue
 fi

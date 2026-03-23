@@ -18,10 +18,10 @@ ICP canisters can make HTTP requests to external services using the management c
 
 ```bash
 # Run the simple download example once
-realms run --file examples/file_download/simple_download_codex.py
+realms run --file examples/file_download/simple_download.py
 
 # Run the word counter every 5 minutes
-realms run --file examples/file_download/word_counter_codex.py --every 300
+realms run --file examples/file_download/word_counter.py --every 300
 
 # Monitor the task
 realms ps ls
@@ -65,7 +65,7 @@ def async_task() -> Async[str]:
 
 ## Full Example: Word Counter
 
-The [word_counter_codex.py](../examples/file_download/word_counter_codex.py) demonstrates:
+The [word_counter.py](../examples/file_download/word_counter.py) demonstrates:
 
 ### 1. HTTP Outcall with Headers
 
@@ -188,10 +188,10 @@ For consensus, all replicas must agree on the response. Use a transform function
 
 ```bash
 # Run every 60 seconds
-realms run --file examples/file_download/word_counter_codex.py --every 60
+realms run --file examples/file_download/word_counter.py --every 60
 
 # Run every 5 minutes, starting after 10 seconds
-realms run --file examples/file_download/word_counter_codex.py --every 300 --after 10
+realms run --file examples/file_download/word_counter.py --every 300 --after 10
 
 # List all scheduled tasks
 realms ps ls
@@ -217,5 +217,5 @@ realms ps kill <schedule_id>
 
 | File | Description |
 |------|-------------|
-| [`examples/file_download/simple_download_codex.py`](../examples/file_download/simple_download_codex.py) | Minimal download example |
-| [`examples/file_download/word_counter_codex.py`](../examples/file_download/word_counter_codex.py) | Full example with state persistence |
+| [`examples/file_download/simple_download.py`](../examples/file_download/simple_download.py) | Minimal download example |
+| [`examples/file_download/word_counter.py`](../examples/file_download/word_counter.py) | Full example with state persistence |

@@ -441,7 +441,7 @@ Bulk data import through admin_dashboard extension.
 realms import realm_data.json
 
 # Import codex
-realms import tax_codex.py --type codex
+realms import tax_collection.py --type codex
 ```
 
 ### Export via CLI

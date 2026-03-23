@@ -6,17 +6,17 @@ This folder contains examples of downloading files from the internet within ICP 
 
 | File | Description |
 |------|-------------|
-| `simple_download_codex.py` | Minimal example - download and print content |
-| `word_counter_codex.py` | Full example with state persistence and word counting |
+| `simple_download.py` | Minimal example - download and print content |
+| `word_counter.py` | Full example with state persistence and word counting |
 
 ## Quick Start
 
 ```bash
 # Run once (simple example)
-realms run --file examples/file_download/simple_download_codex.py
+realms run --file examples/file_download/simple_download.py
 
 # Run word counter every 5 minutes
-realms run --file examples/file_download/word_counter_codex.py --every 300
+realms run --file examples/file_download/word_counter.py --every 300
 
 # Check task status
 realms ps ls

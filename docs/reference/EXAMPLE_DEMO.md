@@ -49,7 +49,7 @@ sequenceDiagram
     B->>B: user_register(principal, profile)
     B->>H: User.user_register_posthook(user)
     
-    Note over H: Codex: user_registration_hook_codex.py
+    Note over H: Codex: user_registration_hook.py
     H->>I: Create Invoice(1 ckBTC, 5 min expiry)
     I-->>H: invoice.id, subaccount_hex
     H-->>B: Hook complete
@@ -151,14 +151,14 @@ When a new user registers, a custom hook creates a welcome invoice for ckBTC pay
       "entity": "User",
       "method": "user_register_posthook",
       "type": "staticmethod",
-      "implementation": "Codex.user_registration_hook_codex.user_register_posthook",
+      "implementation": "Codex.user_registration_hook.user_register_posthook",
       "description": "Custom post-registration hook for new users"
     }
   ]
 }
 ```
 
-**Implementation**: [`examples/demo/realm1/user_registration_hook_codex.py`](../examples/demo/realm1/user_registration_hook_codex.py)
+**Implementation**: [`examples/demo/realm1/user_registration_hook.py`](../examples/demo/realm1/user_registration_hook.py)
 ```python
 def user_register_posthook(user):
     """Custom user registration hook - creates welcome invoice."""
@@ -211,7 +211,7 @@ flowchart LR
 | Component | Location | Description |
 |-----------|----------|-------------|
 | **Vault Extension** | [`extensions/vault/`](https://github.com/smart-social-contracts/realms-extension-vault) | Overrides treasury methods for blockchain transfers |
-| **Registration Hook Codex** | [`examples/demo/realm1/user_registration_hook_codex.py`](../examples/demo/realm1/user_registration_hook_codex.py) | Custom logic executed after user registration |
+| **Registration Hook Codex** | [`examples/demo/realm1/user_registration_hook.py`](../examples/demo/realm1/user_registration_hook.py) | Custom logic executed after user registration |
 | **Realm Manifest** | [`examples/demo/realm1/manifest.json`](../examples/demo/realm1/manifest.json) | Configures entity method overrides |
 | **User Entity** | [`src/realm_backend/ggg/user.py`](../src/realm_backend/ggg/user.py) | Core user entity with hook extension points |
 | **Demo Folder** | [`examples/demo/`](../examples/demo/) | Complete mundus configuration |
@@ -231,7 +231,7 @@ Code lives in the **extension package**:
 
 Code lives in **realm-specific codexes**:
 - Defined in realm's [`manifest.json`](../examples/demo/realm1/manifest.json)
-- Implementation in [`*_codex.py`](../examples/demo/realm1/user_registration_hook_codex.py) files
+- Implementation in codex `.py` files (e.g., [`user_registration_hook.py`](../examples/demo/realm1/user_registration_hook.py))
 - Deployed with realm data via `3-upload-data.sh`
 - Referenced as `Codex.{codex_name}.{function_name}`
 

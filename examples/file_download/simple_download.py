@@ -5,7 +5,7 @@ This is a stripped-down version showing only the essential parts
 of making an HTTP request from an ICP canister.
 
 Usage:
-    realms run --file examples/file_download/simple_download_codex.py
+    realms run --file examples/file_download/simple_download.py
 """
 
 from _cdk import ic, Async, CallResult, match
