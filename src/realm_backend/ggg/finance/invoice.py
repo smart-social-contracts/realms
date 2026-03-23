@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 try:
@@ -134,7 +134,7 @@ class Invoice(Entity, TimestampedMixin):
             fx_rate_timestamp: When the FX rate was captured
         """
         self.status = "Paid"
-        self.paid_at = datetime.utcnow().isoformat()
+        self.paid_at = datetime.now(timezone.utc).isoformat()
         if payment_currency:
             self.payment_currency = payment_currency
         if payment_amount is not None:
@@ -264,7 +264,7 @@ class Invoice(Entity, TimestampedMixin):
         
         # Default out-of-the-box: Record receivable and deferred revenue
         transaction_id = f"TXN-INV-{self.id}"
-        entry_date = datetime.utcnow().isoformat()
+        entry_date = datetime.now(timezone.utc).isoformat()
         desc = description or f"Invoice {self.id}"
         acct_currency = self._get_accounting_currency()
         amount_raw = self.get_amount_raw()
@@ -348,7 +348,7 @@ class Invoice(Entity, TimestampedMixin):
         
         # Default out-of-the-box: Record cash receipt and revenue recognition
         transaction_id = f"TXN-INV-PAY-{self.id}"
-        entry_date = self.paid_at or datetime.utcnow().isoformat()
+        entry_date = self.paid_at or datetime.now(timezone.utc).isoformat()
         desc = description or f"Invoice {self.id} payment"
         rev_cat = revenue_category or Category.FEE
         acct_currency = self._get_accounting_currency()
