@@ -38,3 +38,6 @@ class Realm(Entity, TimestampedMixin):
     federation_realm_id = String(max_length=64)  # parent realm ID if this is a quarter
     quarter_ids = OneToMany("Quarter", "federation")
     federation_codex = OneToOne("Codex", "federation")
+    # Comma-separated canister principal IDs trusted for inter-canister calls
+    # (DAO controllers, AI agents, parent realms). These bypass User-based access checks.
+    trusted_principals = String(max_length=2048, default="")

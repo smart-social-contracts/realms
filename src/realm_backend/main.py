@@ -375,7 +375,7 @@ def get_canister_id() -> text:
 
 
 @update
-@require(Operations.REALM_CONFIGURE)
+@require(Operations.REALM_ADMIN)
 def set_canister_config(
     frontend_canister_id: Opt[text],
     token_canister_id: Opt[text],
@@ -798,7 +798,7 @@ def get_my_invoices() -> RealmResponse:
 
 
 @update
-@require(Operations.INVOICE_REFRESH)
+@require(Operations.SELF_INVOICE_REFRESH)
 def refresh_invoice(args: text) -> Async[text]:
     """
     Refresh payment status for an invoice by querying token balances
@@ -958,6 +958,31 @@ def create_foundational_objects() -> void:
         raise
 
 
+def _register_wallet_transfer_hook():
+    """Register the GGG permission check as the Basilisk OS Wallet pre-transfer hook."""
+    try:
+        from basilisk.os.wallet import Wallet
+        from core.access import _check_access
+
+        def realm_transfer_hook(token_name, to_principal, amount,
+                                from_subaccount=None, to_subaccount=None):
+            caller = ic.caller().to_str()
+            canister_id = ic.id().to_str()
+            if caller == canister_id:
+                return None
+            if not _check_access(caller, Operations.TRANSFER_CREATE):
+                logger.warning(
+                    f"Transfer blocked: {caller} lacks {Operations.TRANSFER_CREATE}"
+                )
+                return f"Access denied: principal {caller} lacks transfer.create permission"
+            return None
+
+        Wallet._pre_transfer_hook = realm_transfer_hook
+        logger.info("Registered realm transfer hook on Basilisk OS Wallet")
+    except Exception as e:
+        logger.error(f"Failed to register wallet transfer hook: {e}")
+
+
 def initialize() -> void:
     # Register all entity types from ggg
     import ggg
@@ -975,6 +1000,9 @@ def initialize() -> void:
 
     # Create foundational objects after entity registration
     create_foundational_objects()
+
+    # Register OS-level wallet transfer hook for permission enforcement
+    _register_wallet_transfer_hook()
 
     # Initialize all installed extensions
     logger.info("Discovering and initializing extensions...")
@@ -1271,7 +1299,7 @@ def post_upgrade_() -> void:
 
 
 @update
-@require(Operations.TASK_RUN)
+@require(Operations.REALM_ADMIN)
 def test_timer() -> text:
     """Diagnostic: create entity now, set timer to modify it.
 
@@ -1302,7 +1330,7 @@ def test_timer() -> text:
 
 
 @update
-@require(Operations.TASK_MANAGER_START)
+@require(Operations.REALM_ADMIN)
 def start_task_manager() -> text:
     """Start TaskManager to schedule pending tasks.
 
@@ -1857,7 +1885,7 @@ def update_realm_config(config_json: str) -> str:
 
 
 @update
-@require(Operations.REALM_CONFIGURE)
+@require(Operations.REALM_CONFIGURE_CODEX)
 def reload_entity_method_overrides() -> str:
     """
     Admin function to reload entity method overrides from Realm manifest.

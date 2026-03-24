@@ -35,6 +35,7 @@ def _check_access(caller_principal: str, operation: str) -> bool:
     """Check if a caller has permission to perform an operation.
 
     Resolution order:
+      0. Check trusted_principals on the Realm (canister-to-canister trust)
       1. Look up User by principal
       2. Check each of the user's profiles for the operation (coarse RBAC)
       3. Check fine-grained Permission entities on the user
@@ -43,8 +44,18 @@ def _check_access(caller_principal: str, operation: str) -> bool:
 
     Returns True if allowed, False otherwise.
     """
-    from ggg import User
+    from ggg import Realm, User
     from ggg.system.user_profile import Operations
+
+    # 0. Trusted principal whitelist (DAO, AI agents, parent realms)
+    try:
+        realm = Realm.load("1")
+        if realm and realm.trusted_principals:
+            trusted = [p.strip() for p in str(realm.trusted_principals).split(",") if p.strip()]
+            if caller_principal in trusted:
+                return True
+    except Exception:
+        pass
 
     user = User[caller_principal]
     if not user:

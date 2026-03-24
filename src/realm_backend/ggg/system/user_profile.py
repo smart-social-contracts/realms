@@ -35,13 +35,14 @@ class Operations:
     TASK_CANCEL = "task.cancel"
 
     # Realm administration
+    REALM_ADMIN = "realm.admin"
     REALM_CONFIGURE = "realm.configure"
+    REALM_CONFIGURE_CODEX = "realm.configure.codex"
     REALM_REGISTER = "realm.register"
     QUARTER_REGISTER = "quarter.register"
     QUARTER_DEREGISTER = "quarter.deregister"
     QUARTER_CONFIGURE = "quarter.configure"
     SHELL_EXECUTE = "shell.execute"
-    TASK_MANAGER_START = "task_manager.start"
 
     # Governance
     MANDATE_CREATE = "mandate.create"
@@ -90,6 +91,7 @@ class Operations:
     SELF_JOIN = "self.join"
     SELF_PROFILE_PICTURE = "self.profile_picture"
     SELF_CHANGE_QUARTER = "self.change_quarter"
+    SELF_INVOICE_REFRESH = "self.invoice_refresh"
 
 
 class Profiles:
@@ -98,6 +100,7 @@ class Profiles:
         Operations.SELF_JOIN,
         Operations.SELF_PROFILE_PICTURE,
         Operations.SELF_CHANGE_QUARTER,
+        Operations.SELF_INVOICE_REFRESH,
         Operations.PROPOSAL_VOTE,
         Operations.DISPUTE_CREATE,
         Operations.DISPUTE_VIEW,
@@ -146,12 +149,13 @@ class Profiles:
         Operations.NFT_MINT,
     ]}
     OPERATOR = {"name": "operator", "allowed_to": [
+        Operations.REALM_ADMIN,
         Operations.REALM_CONFIGURE,
+        Operations.REALM_CONFIGURE_CODEX,
         Operations.QUARTER_REGISTER,
         Operations.QUARTER_DEREGISTER,
         Operations.QUARTER_CONFIGURE,
         Operations.REALM_REGISTER,
-        Operations.TASK_MANAGER_START,
     ]}
     DEVELOPER = {"name": "developer", "allowed_to": [
         Operations.SHELL_EXECUTE,
