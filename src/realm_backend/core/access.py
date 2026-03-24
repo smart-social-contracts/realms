@@ -98,9 +98,9 @@ def require(operation: str):
     the generator transparently.
     """
     def decorator(fn):
-        import inspect
+        _is_gen = getattr(fn, '__code__', None) is not None and (fn.__code__.co_flags & 0x20)
 
-        if inspect.isgeneratorfunction(fn):
+        if _is_gen:
             @wraps(fn)
             def async_wrapper(*args, **kwargs):
                 caller = ic.caller().to_str()
