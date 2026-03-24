@@ -31,23 +31,39 @@ class AccessDenied(Exception):
     pass
 
 
+# Controller principal captured at @init / @post_upgrade time.
+# The controller always bypasses permission checks.
+_controller_principal: str = ""
+
+
+def set_controller(principal: str) -> None:
+    """Store the canister controller principal (called once at init)."""
+    global _controller_principal
+    _controller_principal = principal
+
+
 def _check_access(caller_principal: str, operation: str) -> bool:
     """Check if a caller has permission to perform an operation.
 
     Resolution order:
-      0. Check trusted_principals on the Realm (canister-to-canister trust)
-      1. Look up User by principal
-      2. Check each of the user's profiles for the operation (coarse RBAC)
-      3. Check fine-grained Permission entities on the user
-      4. Check fine-grained Permission entities on the user's profiles
+      0. Controller bypass (principal captured at init/post_upgrade)
+      1. Check trusted_principals on the Realm (canister-to-canister trust)
+      2. Look up User by principal
+      3. Check each of the user's profiles for the operation (coarse RBAC)
+      4. Check fine-grained Permission entities on the user
+      5. Check fine-grained Permission entities on the user's profiles
       A profile with Operations.ALL grants everything.
 
     Returns True if allowed, False otherwise.
     """
+    # 0. Controller always allowed
+    if _controller_principal and caller_principal == _controller_principal:
+        return True
+
     from ggg import Realm, User
     from ggg.system.user_profile import Operations
 
-    # 0. Trusted principal whitelist (DAO, AI agents, parent realms)
+    # 1. Trusted principal whitelist (DAO, AI agents, parent realms)
     try:
         realm = Realm.load("1")
         if realm and realm.trusted_principals:
@@ -61,13 +77,13 @@ def _check_access(caller_principal: str, operation: str) -> bool:
     if not user:
         return False
 
-    # 1. Profile-level check (coarse RBAC)
+    # 3. Profile-level check (coarse RBAC)
     for profile in user.profiles:
         allowed = str(profile.allowed_to or "").split(",")
         if Operations.ALL in allowed or operation in allowed:
             return True
 
-    # 2. Per-user Permission entities (fine-grained)
+    # 4. Per-user Permission entities (fine-grained)
     try:
         for perm in user.permissions:
             if perm.name == operation:
@@ -75,7 +91,7 @@ def _check_access(caller_principal: str, operation: str) -> bool:
     except Exception:
         pass
 
-    # 3. Per-profile Permission entities (fine-grained)
+    # 5. Per-profile Permission entities (fine-grained)
     try:
         for profile in user.profiles:
             for perm in profile.permissions:

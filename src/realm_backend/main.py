@@ -16,7 +16,7 @@ from api.nft import mint_land_nft, get_nft_canister_id
 from api.status import get_status
 from api.zones import get_zone_aggregation
 from api.user import user_get, user_register, user_update_profile_picture
-from core.access import require
+from core.access import require, set_controller
 from core.task_manager import TaskManager
 from ggg import Call, Codex, Task, TaskStep, TaskSchedule
 from ggg.system.user_profile import Operations
@@ -1287,6 +1287,7 @@ def initialize() -> void:
 @init
 def init_() -> void:
     logger.info("Initializing Realm canister")
+    set_controller(ic.caller().to_str())
     initialize()
     logger.info("Realm canister initialized")
 
@@ -1294,6 +1295,7 @@ def init_() -> void:
 @post_upgrade
 def post_upgrade_() -> void:
     logger.info("Post-upgrade initializing Realm canister")
+    set_controller(ic.caller().to_str())
     initialize()
     logger.info("Realm canister initialized")
 
