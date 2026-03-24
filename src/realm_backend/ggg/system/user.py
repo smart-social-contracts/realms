@@ -37,6 +37,7 @@ class User(Entity, TimestampedMixin):
     cases_as_defendant = OneToMany("Case", "defendant")
     penalties_received = OneToMany("Penalty", "target_user")
     appeals_filed = OneToMany("Appeal", "appellant")
+    permissions = ManyToMany(["Permission"], "users")
     # transfers_from = OneToMany("Transfer", "from_user")
     # transfers_to = OneToMany("Transfer", "to_user")
     # trades_a = OneToMany("Trade", "user_a")

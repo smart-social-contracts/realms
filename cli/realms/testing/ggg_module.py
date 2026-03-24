@@ -215,8 +215,20 @@ UserProfile = _entity("UserProfile", alias="name", methods={
 })
 
 # --- Governance ---
-Member = _entity("Member", alias="id")
-Proposal = _entity("Proposal", alias="proposal_id")
+Member = _entity("Member", alias="id", methods={
+    "is_active": _dm.member_is_active,
+    "activate": _dm.member_activate,
+    "deactivate": _dm.member_deactivate,
+    "reactivate": _dm.member_reactivate,
+})
+Member.for_user = classmethod(_dm.member_for_user)
+Member.count_active = classmethod(_dm.member_count_active)
+Proposal = _entity("Proposal", alias="proposal_id", methods={
+    "tally": _dm.proposal_tally,
+    "is_quorum_met": _dm.proposal_is_quorum_met,
+    "is_approved": _dm.proposal_is_approved,
+    "resolve": _dm.proposal_resolve,
+})
 Vote = _entity("Vote")
 Notification = _entity("Notification")
 Codex = _entity("Codex", alias="name")
@@ -262,6 +274,8 @@ LedgerEntry = _entity("LedgerEntry", alias="id", methods={
 LedgerEntry.create_transaction = classmethod(_dm.ledger_create_transaction)
 LedgerEntry.validate_transaction = classmethod(_dm.ledger_validate_transaction)
 LedgerEntry.get_balance = classmethod(_dm.ledger_get_balance)
+LedgerEntry.get_balance_sheet = classmethod(_dm.ledger_get_balance_sheet)
+LedgerEntry.get_income_statement = classmethod(_dm.ledger_get_income_statement)
 
 # --- Territory ---
 Land = _entity("Land", alias="id")

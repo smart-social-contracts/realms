@@ -16,8 +16,10 @@ from api.nft import mint_land_nft, get_nft_canister_id
 from api.status import get_status
 from api.zones import get_zone_aggregation
 from api.user import user_get, user_register, user_update_profile_picture
+from core.access import require
 from core.task_manager import TaskManager
 from ggg import Call, Codex, Task, TaskStep, TaskSchedule
+from ggg.system.user_profile import Operations
 from _cdk import (
     Async,
     Func,
@@ -318,6 +320,7 @@ def join_realm(profile: str, preferred_quarter: text) -> RealmResponse:
 
 
 @update
+@require(Operations.SELF_CHANGE_QUARTER)
 def change_quarter(new_quarter_canister_id: text) -> RealmResponse:
     """Change the caller's assigned quarter."""
     try:
@@ -372,6 +375,7 @@ def get_canister_id() -> text:
 
 
 @update
+@require(Operations.REALM_CONFIGURE)
 def set_canister_config(
     frontend_canister_id: Opt[text],
     token_canister_id: Opt[text],
@@ -416,6 +420,7 @@ def set_canister_config(
 
 
 @update
+@require(Operations.QUARTER_REGISTER)
 def register_quarter(quarter_name: text, quarter_canister_id: text) -> RealmResponse:
     """
     Register a new quarter under this realm.
@@ -461,6 +466,7 @@ def register_quarter(quarter_name: text, quarter_canister_id: text) -> RealmResp
 
 
 @update
+@require(Operations.QUARTER_DEREGISTER)
 def deregister_quarter(quarter_canister_id: text) -> RealmResponse:
     """
     Remove a quarter from this realm by its canister ID.
@@ -490,6 +496,7 @@ def deregister_quarter(quarter_canister_id: text) -> RealmResponse:
 
 
 @update
+@require(Operations.QUARTER_CONFIGURE)
 def set_quarter_config(parent_realm_canister_id: text) -> RealmResponse:
     """
     Configure this realm as a quarter of a parent realm.
@@ -575,6 +582,7 @@ def get_my_user_status() -> RealmResponse:
 
 
 @update
+@require(Operations.SELF_PROFILE_PICTURE)
 def update_my_profile_picture(profile_picture_url: str) -> RealmResponse:
     try:
         result = user_update_profile_picture(ic.caller().to_str(), profile_picture_url)
@@ -790,6 +798,7 @@ def get_my_invoices() -> RealmResponse:
 
 
 @update
+@require(Operations.INVOICE_REFRESH)
 def refresh_invoice(args: text) -> Async[text]:
     """
     Refresh payment status for an invoice by querying token balances
@@ -831,20 +840,20 @@ def create_foundational_objects() -> void:
         return
 
     try:
-        # 1. Create user profiles
-        admin_profile = UserProfile(
-            name=Profiles.ADMIN["name"],
-            allowed_to=",".join(Profiles.ADMIN["allowed_to"]),
-            description="Admin user profile",
-        )
+        # 1. Create user profiles (all default profiles from Profiles.ALL_PROFILES)
+        created_profiles = {}
+        for profile_def in Profiles.ALL_PROFILES:
+            p = UserProfile(
+                name=profile_def["name"],
+                allowed_to=",".join(profile_def["allowed_to"]),
+                description=f"{profile_def['name'].capitalize()} user profile",
+            )
+            created_profiles[profile_def["name"]] = p
 
-        member_profile = UserProfile(
-            name=Profiles.MEMBER["name"],
-            allowed_to=",".join(Profiles.MEMBER["allowed_to"]),
-            description="Member user profile",
-        )
+        profile_names = list(created_profiles.keys())
+        logger.info(f"Created {len(profile_names)} user profiles: {', '.join(profile_names)}")
 
-        logger.info("Created user profiles: admin, member")
+        admin_profile = created_profiles["admin"]
 
         # 2. Create system user
         system_user = User(
@@ -1262,6 +1271,7 @@ def post_upgrade_() -> void:
 
 
 @update
+@require(Operations.TASK_RUN)
 def test_timer() -> text:
     """Diagnostic: create entity now, set timer to modify it.
 
@@ -1292,6 +1302,7 @@ def test_timer() -> text:
 
 
 @update
+@require(Operations.TASK_MANAGER_START)
 def start_task_manager() -> text:
     """Start TaskManager to schedule pending tasks.
 
@@ -1354,6 +1365,7 @@ def extension_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
 
 
 @update
+@require(Operations.EXTENSION_SYNC_CALL)
 def extension_sync_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
     try:
         logger.debug(
@@ -1377,6 +1389,7 @@ def extension_sync_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
 
 
 @update
+@require(Operations.EXTENSION_ASYNC_CALL)
 def extension_async_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse]:
     try:
         logger.debug(
@@ -1472,6 +1485,7 @@ def http_transform(args: HttpTransformArgs) -> HttpResponse:
 _shell_ns_by_principal = {}
 
 @update
+@require(Operations.SHELL_EXECUTE)
 def execute_code_shell(code: str) -> str:
     """Executes Python code in a persistent namespace and returns the output.
 
@@ -1524,6 +1538,7 @@ def execute_code_shell(code: str) -> str:
 
 
 @update
+@require(Operations.TASK_CREATE)
 def create_multi_step_scheduled_task(
     name: str,
     steps_config: str,
@@ -1642,6 +1657,7 @@ def create_multi_step_scheduled_task(
 
 
 @update
+@require(Operations.REALM_REGISTER)
 def register_realm_with_registry(
     registry_canister_id: text,
     realm_name: text,
@@ -1708,6 +1724,7 @@ def get_realm_registry_info() -> text:
 
 
 @update
+@require(Operations.NFT_MINT)
 def mint_land_nft_for_parcel(
     land_id: text,
     owner_principal: text,
@@ -1786,6 +1803,7 @@ def get_nft_config() -> text:
 
 
 @update
+@require(Operations.REALM_CONFIGURE)
 def update_realm_config(config_json: str) -> str:
     """
     Update the realm configuration (name, description, logo, welcome_image, welcome_message).
@@ -1839,6 +1857,7 @@ def update_realm_config(config_json: str) -> str:
 
 
 @update
+@require(Operations.REALM_CONFIGURE)
 def reload_entity_method_overrides() -> str:
     """
     Admin function to reload entity method overrides from Realm manifest.
