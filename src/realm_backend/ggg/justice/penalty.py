@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
 from ic_python_db import Entity, Float, ManyToOne, OneToMany, String, TimestampedMixin
@@ -135,7 +135,7 @@ def penalty_execute(penalty: "Penalty") -> "Penalty":
         raise ValueError("Penalty execution blocked by prehook")
     
     penalty.status = "executed"
-    penalty.executed_date = datetime.now(timezone.utc).isoformat()
+    penalty.executed_date = datetime.utcnow().isoformat()
     
     # Record accounting if financial
     if penalty.is_financial():
