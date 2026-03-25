@@ -16,7 +16,7 @@ from api.nft import mint_land_nft, get_nft_canister_id
 from api.status import get_status
 from api.zones import get_zone_aggregation
 from api.user import user_get, user_register, user_update_profile_picture
-from core.access import require, set_controller
+from core.access import require, set_controller, _check_access
 from core.task_manager import TaskManager
 from ggg import Call, Codex, Task, TaskStep, TaskSchedule
 from ggg.system.user_profile import Operations
@@ -1395,9 +1395,14 @@ def extension_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
 
 
 @update
-@require(Operations.EXTENSION_SYNC_CALL)
 def extension_sync_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
     try:
+        caller = ic.caller().to_str()
+        if not _check_access(caller, Operations.EXTENSION_SYNC_CALL):
+            return ExtensionCallResponse(
+                success=False,
+                response=f"Access denied: user {caller} lacks permission '{Operations.EXTENSION_SYNC_CALL}'",
+            )
         logger.debug(
             f"Sync calling extension '{args['extension_name']}' entry point '{args['function_name']}' with args {args['args']}"
         )
@@ -1419,9 +1424,14 @@ def extension_sync_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
 
 
 @update
-@require(Operations.EXTENSION_ASYNC_CALL)
 def extension_async_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse]:
     try:
+        caller = ic.caller().to_str()
+        if not _check_access(caller, Operations.EXTENSION_ASYNC_CALL):
+            return ExtensionCallResponse(
+                success=False,
+                response=f"Access denied: user {caller} lacks permission '{Operations.EXTENSION_ASYNC_CALL}'",
+            )
         logger.debug(
             f"Async calling extension '{args['extension_name']}' entry point '{args['function_name']}' with args {args['args']}"
         )

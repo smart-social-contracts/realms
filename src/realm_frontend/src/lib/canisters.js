@@ -65,20 +65,46 @@ function isLocalDevelopment() {
 // Create a writable store for the backend actor
 export const backendStore = writable(buildingOrTesting ? dummyActor() : null);
 
+// Singleton promise so concurrent callers all wait for the same init.
+let _initBackendPromise = null;
+
 // Initialize the backend store after imports are loaded
-async function initializeBackendStore() {
-	if (buildingOrTesting) return;
+function initializeBackendStore() {
+	if (buildingOrTesting) return Promise.resolve();
+	if (_initBackendPromise) return _initBackendPromise;
 
-	await initializeImports();
+	_initBackendPromise = (async () => {
+		await initializeImports();
 
-	const actor = createActor(canisterId);
-	backendStore.set(actor);
+		// Try to use an existing authenticated session so the initial actor
+		// is not anonymous on page refresh (avoids race with initBackendWithIdentity).
+		try {
+			const client = authClient || (await initializeAuthClient());
+			if (await client.isAuthenticated()) {
+				const identity = client.getIdentity();
+				const agent = new HttpAgent({ identity });
+				if (isLocalDevelopment()) {
+					await agent.fetchRootKey().catch(() => {});
+				}
+				const actor = createActor(canisterId, { agent });
+				backendStore.set(actor);
+				console.log('Backend store initialized with authenticated identity');
+				return;
+			}
+		} catch (e) {
+			console.warn('Could not check auth during init, falling back to anonymous:', e);
+		}
+
+		const actor = createActor(canisterId);
+		backendStore.set(actor);
+	})();
+
+	return _initBackendPromise;
 }
 
-// Initialize immediately if not building/testing
-if (!buildingOrTesting) {
-	initializeBackendStore();
-}
+// Initialize immediately if not building/testing.
+// Export the promise so components can await full init (including auth).
+export const backendReady = buildingOrTesting ? Promise.resolve() : initializeBackendStore();
 
 // Create a proxy that always uses the latest actor from the store
 export const backend = new Proxy(

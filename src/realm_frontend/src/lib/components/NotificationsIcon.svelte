@@ -4,8 +4,10 @@
     import { ToolbarButton, Badge } from 'flowbite-svelte';
     import { BellSolid } from 'flowbite-svelte-icons';
     import { unreadCount, loadNotifications } from '$lib/stores/notifications';
+    import { backendReady } from '$lib/canisters';
 
-    onMount(() => {
+    onMount(async () => {
+        await backendReady;
         loadNotifications();
         // TODO: temporarily disabled
         // const interval = setInterval(loadNotifications, 30000);

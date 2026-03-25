@@ -131,6 +131,12 @@ class TestProfilesConsistency:
         assert Operations.SELF_CHANGE_QUARTER in member_ops
         assert Operations.SELF_INVOICE_REFRESH in member_ops
 
+    def test_member_has_extension_calls(self):
+        """Members must be able to call extensions — the frontend uses these for dashboards."""
+        member_ops = Profiles.MEMBER["allowed_to"]
+        assert Operations.EXTENSION_SYNC_CALL in member_ops
+        assert Operations.EXTENSION_ASYNC_CALL in member_ops
+
     def test_treasurer_has_transfer_create(self):
         assert Operations.TRANSFER_CREATE in Profiles.TREASURER["allowed_to"]
 

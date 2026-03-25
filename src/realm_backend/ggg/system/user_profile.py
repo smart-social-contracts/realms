@@ -104,6 +104,8 @@ class Profiles:
         Operations.PROPOSAL_VOTE,
         Operations.DISPUTE_CREATE,
         Operations.DISPUTE_VIEW,
+        Operations.EXTENSION_SYNC_CALL,
+        Operations.EXTENSION_ASYNC_CALL,
     ]}
     OBSERVER = {"name": "observer", "allowed_to": []}
     LEGISLATOR = {"name": "legislator", "allowed_to": [
