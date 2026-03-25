@@ -155,6 +155,43 @@ Database.init(db_storage=storage, audit_enabled=True)
 
 logger = get_logger("main")
 
+
+def _make_codex_proxy(codex_name: str, func_name: str, method_type: str = "method"):
+    """Create a dynamic proxy that always exec()s the latest Codex code.
+
+    Instead of caching a function extracted from codex code at bind time,
+    this proxy re-reads the codex on every call so that governance proposals
+    that update a codex take effect immediately without a canister restart
+    or a reload_entity_method_overrides() call.
+    """
+    def _proxy(*args, **kwargs):
+        from ggg import Codex as _Codex
+        from ic_python_logging import get_logger as _get_logger
+        from _cdk import Async as _Async
+        import ggg as _ggg
+
+        target = _Codex[codex_name]
+        if not target or not target.code:
+            raise RuntimeError(f"Codex '{codex_name}' not found or has no code")
+        ns = {
+            "ic": ic,
+            "logger": _get_logger(f"codex.{codex_name}"),
+            "ggg": _ggg,
+            "Async": _Async,
+        }
+        exec(str(target.code), ns)
+        fn = ns.get(func_name)
+        if not fn:
+            raise RuntimeError(
+                f"Function '{func_name}' not found in Codex '{codex_name}'"
+            )
+        return fn(*args, **kwargs)
+
+    _proxy.__qualname__ = f"codex_proxy<{codex_name}.{func_name}>"
+    _proxy.__name__ = func_name
+    return _proxy
+
+
 # HTTP types used by http_transform endpoint
 from _cdk import (
     HttpResponse,
@@ -1190,19 +1227,11 @@ def initialize() -> void:
                             if not target_codex:
                                 logger.warning(f"Codex not found: {parts[1]}")
                                 continue
-                            from ic_python_logging import get_logger as _get_logger
-                            from _cdk import Async as _Async
-                            import ggg as _ggg
-                            ns = {"ic": ic, "logger": _get_logger(f"codex.{parts[1]}"), "ggg": _ggg, "Async": _Async}
-                            exec(str(target_codex.code), ns)
-                            func = ns.get(parts[2])
-                            if not func:
-                                logger.warning(f"Function not found in codex: {parts[2]}")
-                                continue
                             method_type = o.get("type", "method")
-                            wrapper = classmethod(func) if method_type == "classmethod" else staticmethod(func) if method_type == "staticmethod" else func
+                            proxy = _make_codex_proxy(parts[1], parts[2], method_type)
+                            wrapper = classmethod(proxy) if method_type == "classmethod" else staticmethod(proxy) if method_type == "staticmethod" else proxy
                             setattr(entity_class, o["method"], wrapper)
-                            logger.info(f"  ✓ {o['entity']}.{o['method']}() [{method_type}] -> {o['implementation']}")
+                            logger.info(f"  ✓ {o['entity']}.{o['method']}() [{method_type}] -> {o['implementation']} [dynamic proxy]")
                         except Exception as e:
                             logger.error(f"Codex override error for {o}: {e}")
                 else:
@@ -1947,22 +1976,13 @@ def reload_entity_method_overrides() -> str:
                     continue
                 
                 logger.info(f"    ✅ Found codex '{codex_name}' (code length: {len(str(target_codex.code))} chars)")
-                from ic_python_logging import get_logger as _get_logger
-                from _cdk import Async as _Async
-                import ggg as _ggg
-                ns = {"ic": ic, "logger": _get_logger(f"codex.{codex_name}"), "ggg": _ggg, "Async": _Async}
-                exec(str(target_codex.code), ns)
-                func = ns.get(func_name)
-                if not func:
-                    logger.warning(f"    ⚠️ Skipping - function '{func_name}' not found in codex")
-                    logger.info(f"    📦 Available names in codex: {list(ns.keys())}")
-                    continue
                 
                 method_type = o.get("type", "method")
-                wrapper = classmethod(func) if method_type == "classmethod" else staticmethod(func) if method_type == "staticmethod" else func
+                proxy = _make_codex_proxy(codex_name, func_name, method_type)
+                wrapper = classmethod(proxy) if method_type == "classmethod" else staticmethod(proxy) if method_type == "staticmethod" else proxy
                 setattr(entity_class, o["method"], wrapper)
                 loaded_overrides.append(f"{o['entity']}.{o['method']}() -> {o['implementation']}")
-                logger.info(f"    ✅ Successfully loaded {o['entity']}.{o['method']}() [{method_type}] -> {o['implementation']}")
+                logger.info(f"    ✅ Successfully loaded {o['entity']}.{o['method']}() [{method_type}] -> {o['implementation']} [dynamic proxy]")
             except Exception as e:
                 logger.error(f"    ❌ Failed to reload override: {e}")
         
