@@ -6,7 +6,7 @@ export interface NotificationItem {
     id: string;
     title: string;
     message: string;
-    timestamp: string;
+    timestamp_ms: number;
     read: boolean;
     icon?: string;
     href?: string;
