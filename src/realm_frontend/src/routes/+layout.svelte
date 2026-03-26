@@ -63,11 +63,10 @@
 		<slot />
 	{:else}
 		<div class="loading">
-			<div class="loading-content">
-				<div class="spinner"></div>
-				<div class="loading-bar">
-					<div class="loading-bar-progress"></div>
-				</div>
+			<div class="loading-dots">
+				<span></span>
+				<span></span>
+				<span></span>
 			</div>
 		</div>
 	{/if}
@@ -87,60 +86,38 @@
 		height: 100vh;
 		height: 100dvh;
 		background: #ffffff;
-		position: relative;
-		overflow: hidden;
 	}
 	
-	.loading-content {
+	.loading-dots {
 		display: flex;
-		flex-direction: column;
+		gap: 0.5rem;
 		align-items: center;
-		gap: 2rem;
 	}
 	
-	.spinner {
-		width: 40px;
-		height: 40px;
-		border: 3px solid #e5e5e5;
-		border-top-color: #525252;
+	.loading-dots span {
+		width: 8px;
+		height: 8px;
 		border-radius: 50%;
-		animation: spin 0.8s linear infinite;
+		background: #a3a3a3;
+		animation: dot-pulse 1.4s ease-in-out infinite;
 	}
 	
-	.loading-bar {
-		width: 200px;
-		height: 2px;
-		background: #e5e5e5;
-		border-radius: 2px;
-		overflow: hidden;
-		position: relative;
+	.loading-dots span:nth-child(2) {
+		animation-delay: 0.2s;
 	}
 	
-	.loading-bar-progress {
-		position: absolute;
-		top: 0;
-		left: 0;
-		height: 100%;
-		width: 50%;
-		background: linear-gradient(
-			90deg,
-			transparent 0%,
-			#404040 50%,
-			transparent 100%
-		);
-		animation: progress 1.5s ease-in-out infinite;
+	.loading-dots span:nth-child(3) {
+		animation-delay: 0.4s;
 	}
 	
-	@keyframes spin {
-		to { transform: rotate(360deg); }
-	}
-	
-	@keyframes progress {
-		0% {
-			left: -50%;
+	@keyframes dot-pulse {
+		0%, 80%, 100% {
+			opacity: 0.3;
+			transform: scale(0.8);
 		}
-		100% {
-			left: 100%;
+		40% {
+			opacity: 1;
+			transform: scale(1);
 		}
 	}
 </style>
