@@ -15,7 +15,8 @@ from api.registry import get_registry_info, register_realm
 from api.nft import mint_land_nft, get_nft_canister_id
 from api.status import get_status
 from api.zones import get_zone_aggregation
-from api.user import user_get, user_register, user_update_profile_picture
+from api.user import user_get, user_register, user_update_public_profile, user_update_private_data
+from api.vetkeys import get_vetkey_public_key, derive_vetkey
 from core.access import require, set_controller, _check_access
 from core.task_manager import TaskManager
 from ggg import Call, Codex, Task, TaskStep, TaskSchedule
@@ -103,12 +104,15 @@ class StatusRecord(Record):
     parent_realm_canister_id: text
     accounting_currency: text
     accounting_currency_decimals: nat
+    private_data_fields: text
 
 
 class UserGetRecord(Record):
     principal: Principal
     profiles: Vec[text]
-    profile_picture_url: text
+    nickname: text
+    avatar: text
+    private_data: text
     assigned_quarter: text
 
 
@@ -346,7 +350,9 @@ def join_realm(profile: str, preferred_quarter: text) -> RealmResponse:
                 userGet=UserGetRecord(
                     principal=Principal.from_str(user["principal"]),
                     profiles=profiles,
-                    profile_picture_url=user.get("profile_picture_url", ""),
+                    nickname=user.get("nickname", ""),
+                    avatar=user.get("avatar", ""),
+                    private_data=user.get("private_data", ""),
                     assigned_quarter=assigned_quarter_canister_id,
                 )
             ),
@@ -608,7 +614,9 @@ def get_my_user_status() -> RealmResponse:
                 userGet=UserGetRecord(
                     principal=Principal.from_str(user["principal"]),
                     profiles=profiles,
-                    profile_picture_url=user["profile_picture_url"],
+                    nickname=user.get("nickname", ""),
+                    avatar=user.get("avatar", ""),
+                    private_data=user.get("private_data", ""),
                     assigned_quarter="",
                 )
             ),
@@ -619,10 +627,10 @@ def get_my_user_status() -> RealmResponse:
 
 
 @update
-@require(Operations.SELF_PROFILE_PICTURE)
-def update_my_profile_picture(profile_picture_url: str) -> RealmResponse:
+@require(Operations.SELF_UPDATE_PUBLIC_PROFILE)
+def update_my_public_profile(nickname: str, avatar: str) -> RealmResponse:
     try:
-        result = user_update_profile_picture(ic.caller().to_str(), profile_picture_url)
+        result = user_update_public_profile(ic.caller().to_str(), nickname, avatar)
         if not result["success"]:
             return RealmResponse(
                 success=False, data=RealmResponseData(error=result["error"])
@@ -634,15 +642,97 @@ def update_my_profile_picture(profile_picture_url: str) -> RealmResponse:
                 userGet=UserGetRecord(
                     principal=ic.caller(),
                     profiles=Vec[text](),
-                    profile_picture_url=result["profile_picture_url"],
+                    nickname=result["nickname"],
+                    avatar=result["avatar"],
+                    private_data="",
                     assigned_quarter="",
                 )
             ),
         )
     except Exception as e:
         logger.error(
-            f"Error updating profile picture: {str(e)}\n{traceback.format_exc()}"
+            f"Error updating public profile: {str(e)}\n{traceback.format_exc()}"
         )
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@update
+@require(Operations.SELF_UPDATE_PRIVATE_DATA)
+def update_my_private_data(private_data: str) -> RealmResponse:
+    try:
+        result = user_update_private_data(ic.caller().to_str(), private_data)
+        if not result["success"]:
+            return RealmResponse(
+                success=False, data=RealmResponseData(error=result["error"])
+            )
+
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                userGet=UserGetRecord(
+                    principal=ic.caller(),
+                    profiles=Vec[text](),
+                    nickname="",
+                    avatar="",
+                    private_data=result["private_data"],
+                    assigned_quarter="",
+                )
+            ),
+        )
+    except Exception as e:
+        logger.error(
+            f"Error updating private data: {str(e)}\n{traceback.format_exc()}"
+        )
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@update
+@require(Operations.SELF_UPDATE_PRIVATE_DATA)
+def get_my_vetkey_public_key() -> RealmResponse:
+    """Get the vetKD public key for the caller's encryption context.
+
+    The returned hex-encoded BLS12-381 G2 public key is used by the frontend
+    to verify encrypted keys and set up the IBE scheme.
+    """
+    try:
+        result = yield get_vetkey_public_key(ic.caller().to_str())
+        if not result["success"]:
+            return RealmResponse(
+                success=False, data=RealmResponseData(error=result["error"])
+            )
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(message=result["public_key_hex"]),
+        )
+    except Exception as e:
+        logger.error(f"Error getting vetkey public key: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@update
+@require(Operations.SELF_UPDATE_PRIVATE_DATA)
+def derive_my_vetkey(transport_public_key_hex: text) -> RealmResponse:
+    """Derive an encrypted vetKey for the caller.
+
+    The caller must supply a 48-byte BLS12-381 G1 transport public key
+    (hex-encoded, 96 chars).  The management canister encrypts the derived
+    symmetric key under this transport key so it can only be decrypted by
+    the caller's frontend.
+    """
+    try:
+        result = yield derive_vetkey(
+            ic.caller().to_str(), transport_public_key_hex
+        )
+        if not result["success"]:
+            return RealmResponse(
+                success=False, data=RealmResponseData(error=result["error"])
+            )
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(message=result["encrypted_key_hex"]),
+        )
+    except Exception as e:
+        logger.error(f"Error deriving vetkey: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
@@ -895,7 +985,6 @@ def create_foundational_objects() -> void:
         # 2. Create system user
         system_user = User(
             id="system",
-            profile_picture_url="",
         )
         # Link system user to admin profile
         system_user.profiles.add(admin_profile)
