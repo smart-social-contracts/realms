@@ -39,6 +39,10 @@ type QuarterInfoRecord = record {
   population : nat;
   status : text;
 };
+type CanisterInfo = record {
+  canister_id : text;
+  canister_type : text;
+};
 type StatusRecord = record {
   status : text;
   demo_mode : bool;
@@ -50,6 +54,7 @@ type StatusRecord = record {
   extensions : vec text;
   disputes_count : nat;
   commit : text;
+  commit_datetime : text;
   instruments_count : nat;
   organizations_count : nat;
   mandates_count : nat;
@@ -58,13 +63,28 @@ type StatusRecord = record {
   licenses_count : nat;
   users_count : nat;
   trades_count : nat;
+  user_profiles_count : nat;
+  canisters : vec CanisterInfo;
+  registries : vec CanisterInfo;
+  dependencies : vec text;
+  python_version : text;
   quarters : vec QuarterInfoRecord;
   is_quarter : bool;
   parent_realm_canister_id : text;
+  realm_name : text;
+  realm_logo : text;
+  realm_description : text;
+  realm_welcome_image : text;
+  realm_welcome_message : text;
+  accounting_currency : text;
+  accounting_currency_decimals : nat;
+  private_data_fields : text;
 };
 type UserGetRecord = record {
   "principal" : principal;
-  profile_picture_url : text;
+  nickname : text;
+  avatar : text;
+  private_data : text;
   profiles : vec text;
   assigned_quarter : text;
 };
@@ -105,5 +125,8 @@ service : () -> {
   status : () -> (RealmResponse) query;
   stop_task : (text) -> (text);
   test_mixed_sync_async_task : () -> ();
-  update_my_profile_picture : (text) -> (RealmResponse);
+  update_my_public_profile : (text, text) -> (RealmResponse);
+  update_my_private_data : (text) -> (RealmResponse);
+  get_my_vetkey_public_key : () -> (RealmResponse);
+  derive_my_vetkey : (text) -> (RealmResponse);
 }

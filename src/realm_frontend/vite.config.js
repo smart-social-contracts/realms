@@ -60,6 +60,7 @@ export default defineConfig({
         global: "globalThis",
       },
     },
+    exclude: ['ic-vetkd-utils'],
     include: [
       '@dfinity/agent',
       '@dfinity/principal',
