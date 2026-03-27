@@ -60,7 +60,9 @@ class StatusRecord(Record):
 class UserGetRecord(Record):
     principal: Principal
     profiles: Vec[text]
-    profile_picture_url: text
+    nickname: text
+    avatar: text
+    private_data: text
     assigned_quarter: text
 
 
@@ -91,6 +93,57 @@ class RealmResponseData(Variant):
 class RealmResponse(Record):
     success: bool
     data: RealmResponseData
+
+
+# Crypto envelope & group types
+
+
+class EnvelopeRecord(Record):
+    scope: text
+    principal_id: text
+    wrapped_dek: text
+
+
+class EnvelopeListRecord(Record):
+    envelopes: Vec["EnvelopeRecord"]
+
+
+class ScopeListRecord(Record):
+    scopes: Vec[text]
+
+
+class GroupRecord(Record):
+    name: text
+    description: text
+
+
+class GroupListRecord(Record):
+    groups: Vec["GroupRecord"]
+
+
+class GroupMemberRecord(Record):
+    principal_id: text
+    role: text
+
+
+class GroupMembersRecord(Record):
+    members: Vec["GroupMemberRecord"]
+
+
+class CryptoResponseData(Variant):
+    envelope: EnvelopeRecord
+    envelopeList: EnvelopeListRecord
+    scopeList: ScopeListRecord
+    group: GroupRecord
+    groupList: GroupListRecord
+    groupMembers: GroupMembersRecord
+    error: text
+    message: text
+
+
+class CryptoResponse(Record):
+    success: bool
+    data: CryptoResponseData
 
 
 # Extension call types

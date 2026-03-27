@@ -113,27 +113,46 @@ export async function deriveAesKey(backend: any): Promise<CryptoKey> {
 /**
  * Encrypt a UTF-8 string with AES-256-GCM.
  *
- * Output format (hex): `<12-byte IV><ciphertext+tag>`
+ * Output format: `enc:v=2:iv=<12-byte-hex>:d=<ciphertext-hex>`
+ * (basilisk OS standard ciphertext format)
  */
 export async function aesGcmEncrypt(key: CryptoKey, plaintext: string): Promise<string> {
 	const iv = crypto.getRandomValues(new Uint8Array(12));
 	const encoded = new TextEncoder().encode(plaintext);
 	const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
 	const cipher = new Uint8Array(cipherBuf);
-	const combined = new Uint8Array(iv.length + cipher.length);
-	combined.set(iv);
-	combined.set(cipher, iv.length);
-	return bytesToHex(combined);
+	return `enc:v=2:iv=${bytesToHex(iv)}:d=${bytesToHex(cipher)}`;
 }
 
 /**
- * Decrypt a hex blob produced by `aesGcmEncrypt`.
+ * Decrypt a ciphertext string produced by `aesGcmEncrypt`.
+ *
+ * Accepts both:
+ *   - New format: `enc:v=2:iv=<hex>:d=<hex>`
+ *   - Legacy format: raw hex `<12-byte IV><ciphertext+tag>`
  */
-export async function aesGcmDecrypt(key: CryptoKey, ciphertextHex: string): Promise<string> {
-	const combined = hexToBytes(ciphertextHex);
-	const iv = combined.slice(0, 12);
-	const ciphertext = combined.slice(12);
-	const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+export async function aesGcmDecrypt(key: CryptoKey, ciphertext: string): Promise<string> {
+	let iv: Uint8Array;
+	let data: Uint8Array;
+
+	if (ciphertext.startsWith('enc:v=2:')) {
+		// New basilisk OS format
+		const parts: Record<string, string> = {};
+		for (const seg of ciphertext.slice('enc:v=2:'.length).split(':')) {
+			const eq = seg.indexOf('=');
+			if (eq > 0) parts[seg.slice(0, eq)] = seg.slice(eq + 1);
+		}
+		if (!parts.iv || !parts.d) throw new Error('Invalid enc:v=2 format');
+		iv = hexToBytes(parts.iv);
+		data = hexToBytes(parts.d);
+	} else {
+		// Legacy raw hex format
+		const combined = hexToBytes(ciphertext);
+		iv = combined.slice(0, 12);
+		data = combined.slice(12);
+	}
+
+	const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
 	return new TextDecoder().decode(plainBuf);
 }
 
@@ -144,7 +163,7 @@ export async function aesGcmDecrypt(key: CryptoKey, ciphertextHex: string): Prom
 /**
  * Encrypt a private-data JSON object for storage.
  *
- * Returns a hex string that can be passed to `update_my_private_data`.
+ * Returns an `enc:v=2:iv=...:d=...` string for `update_my_private_data`.
  */
 export async function encryptPrivateData(
 	backend: any,
@@ -155,22 +174,28 @@ export async function encryptPrivateData(
 }
 
 /**
- * Decrypt a stored private-data hex blob back into a JSON object.
+ * Decrypt a stored private-data blob back into a JSON object.
  *
+ * Accepts both `enc:v=2:…` format and legacy raw hex.
  * Returns `null` if the data is empty or decryption fails (e.g. legacy
  * unencrypted data).
  */
 export async function decryptPrivateData(
 	backend: any,
-	ciphertextHex: string
+	ciphertextOrHex: string
 ): Promise<Record<string, string> | null> {
-	if (!ciphertextHex || ciphertextHex.length < 26) {
+	if (!ciphertextOrHex) return null;
+
+	// New format check
+	const isEncV2 = ciphertextOrHex.startsWith('enc:v=2:');
+	if (!isEncV2 && ciphertextOrHex.length < 26) {
 		// Too short to be iv+ciphertext; likely empty or legacy plaintext
 		return null;
 	}
+
 	const key = await deriveAesKey(backend);
 	try {
-		const plaintext = await aesGcmDecrypt(key, ciphertextHex);
+		const plaintext = await aesGcmDecrypt(key, ciphertextOrHex);
 		return JSON.parse(plaintext);
 	} catch {
 		// Decryption or parsing failed — probably legacy unencrypted JSON

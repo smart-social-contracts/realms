@@ -1,5 +1,6 @@
 from typing import Any
 
+from basilisk.os.crypto import EncryptedString
 from ic_python_db import (
     Entity,
     ManyToMany,
@@ -18,7 +19,12 @@ logger = get_logger("entity.user")
 class User(Entity, TimestampedMixin):
     __alias__ = "id"
     id = String()
-    profile_picture_url = String(max_length=512)
+    # Public data (visible to community)
+    nickname = String(max_length=256)
+    avatar = String(max_length=512)
+    # Private data (encrypted at rest via vetKeys + basilisk OS crypto)
+    # JSON blob — schema defined in realm manifest
+    private_data = EncryptedString()
     profiles = ManyToMany(["UserProfile"], "users")
     human = OneToOne("Human", "user")
     member = OneToOne("Member", "user")
@@ -52,21 +58,28 @@ class User(Entity, TimestampedMixin):
         """Hook called after user registration. Dynamically loads codex override if available."""
         try:
             from ggg.governance.codex import Codex
+
             for codex in Codex.instances():
                 if codex.name == "user_registration_hook" and codex.code:
                     import ggg as _ggg
                     from _cdk import ic as _ic
+
                     ns = {"ic": _ic, "ggg": _ggg, "__builtins__": __builtins__}
                     exec(compile(codex.code, "user_registration_hook.py", "exec"), ns)
                     if "user_register_posthook" in ns:
-                        logger.info(f"Executing codex user_register_posthook for user {user.id}")
+                        logger.info(
+                            f"Executing codex user_register_posthook for user {user.id}"
+                        )
                         ns["user_register_posthook"](user)
                         return
         except Exception as e:
             logger.error(f"Error executing user_registration_hook_codex: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
-        logger.info(f"Hook called after user registration. User {user.id} registered with profile {user.profiles}")
+        logger.info(
+            f"Hook called after user registration. User {user.id} registered with profile {user.profiles}"
+        )
         return
 
 
@@ -94,5 +107,7 @@ def user_register(principal: str, profile: str) -> dict[str, Any]:
     return {
         "principal": user.id,
         "profiles": [profile.name for profile in user.profiles],
-        "profile_picture_url": user.profile_picture_url or "",
+        "nickname": user.nickname or "",
+        "avatar": user.avatar or "",
+        "private_data": user.private_data or "",
     }

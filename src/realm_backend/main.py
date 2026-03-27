@@ -5,22 +5,6 @@ import sys
 import traceback
 
 import api
-from api.extensions import list_extensions
-from api.ggg_entities import (
-    list_objects,
-    list_objects_paginated,
-    search_objects,
-)
-from api.registry import get_registry_info, register_realm
-from api.nft import mint_land_nft, get_nft_canister_id
-from api.status import get_status
-from api.zones import get_zone_aggregation
-from api.user import user_get, user_register, user_update_public_profile, user_update_private_data
-from api.vetkeys import get_vetkey_public_key, derive_vetkey
-from core.access import require, set_controller, _check_access
-from core.task_manager import TaskManager
-from ggg import Call, Codex, Task, TaskStep, TaskSchedule
-from ggg.system.user_profile import Operations
 from _cdk import (
     Async,
     Func,
@@ -43,12 +27,48 @@ from _cdk import (
     update,
     void,
 )
+from api.crypto import get_envelope as crypto_get_envelope
+from api.crypto import group_add_member as crypto_group_add
+from api.crypto import group_create as crypto_group_create
+from api.crypto import group_delete as crypto_group_delete
+from api.crypto import group_list as crypto_group_list
+from api.crypto import group_members as crypto_group_members
+from api.crypto import group_remove_member as crypto_group_remove
+from api.crypto import list_envelopes as crypto_list_envelopes
+from api.crypto import list_scopes as crypto_list_scopes
+from api.crypto import revoke_group as crypto_revoke_group
+from api.crypto import revoke_principal as crypto_revoke_principal
+from api.crypto import share_with_group as crypto_share_group
+from api.crypto import share_with_principal as crypto_share_principal
+from api.crypto import store_envelope as crypto_store_envelope
+from api.extensions import list_extensions
+from api.ggg_entities import (
+    list_objects,
+    list_objects_paginated,
+    search_objects,
+)
+from api.nft import get_nft_canister_id, mint_land_nft
+from api.registry import get_registry_info, register_realm
+from api.status import get_status
+from api.user import (
+    user_get,
+    user_register,
+    user_update_private_data,
+    user_update_public_profile,
+)
+from api.vetkeys import derive_vetkey, get_vetkey_public_key
+from api.zones import get_zone_aggregation
+from core.access import _check_access, require, set_controller
+from core.task_manager import TaskManager
+from ggg import Call, Codex, Task, TaskSchedule, TaskStep
+from ggg.system.user_profile import Operations
 from ic_python_db import Database
 from ic_python_logging import get_logger
 
 # NOTE: Record/Variant types MUST be defined in this file (not imported from
 # another module) because basilisk's Candid .did generator only parses main.py's
 # AST for type definitions.  Duplicated from core/candid_types_realm.py.
+
 
 class PaginationInfo(Record):
     page_num: int
@@ -144,6 +164,54 @@ class RealmResponse(Record):
     data: RealmResponseData
 
 
+class EnvelopeRecord(Record):
+    scope: text
+    principal_id: text
+    wrapped_dek: text
+
+
+class EnvelopeListRecord(Record):
+    envelopes: Vec["EnvelopeRecord"]
+
+
+class ScopeListRecord(Record):
+    scopes: Vec[text]
+
+
+class GroupRecord(Record):
+    name: text
+    description: text
+
+
+class GroupListRecord(Record):
+    groups: Vec["GroupRecord"]
+
+
+class GroupMemberRecord(Record):
+    principal_id: text
+    role: text
+
+
+class GroupMembersRecord(Record):
+    members: Vec["GroupMemberRecord"]
+
+
+class CryptoResponseData(Variant):
+    envelope: EnvelopeRecord
+    envelopeList: EnvelopeListRecord
+    scopeList: ScopeListRecord
+    group: GroupRecord
+    groupList: GroupListRecord
+    groupMembers: GroupMembersRecord
+    error: text
+    message: text
+
+
+class CryptoResponse(Record):
+    success: bool
+    data: CryptoResponseData
+
+
 class ExtensionCallArgs(Record):
     extension_name: text
     function_name: text
@@ -153,6 +221,7 @@ class ExtensionCallArgs(Record):
 class ExtensionCallResponse(Record):
     success: bool
     response: text
+
 
 storage = StableBTreeMap[str, str](memory_id=1, max_key_size=100, max_value_size=10000)
 Database.init(db_storage=storage, audit_enabled=True)
@@ -168,11 +237,12 @@ def _make_codex_proxy(codex_name: str, func_name: str, method_type: str = "metho
     that update a codex take effect immediately without a canister restart
     or a reload_entity_method_overrides() call.
     """
+
     def _proxy(*args, **kwargs):
+        import ggg as _ggg
+        from _cdk import Async as _Async
         from ggg import Codex as _Codex
         from ic_python_logging import get_logger as _get_logger
-        from _cdk import Async as _Async
-        import ggg as _ggg
 
         target = _Codex[codex_name]
         if not target or not target.code:
@@ -259,6 +329,7 @@ def get_quarter_info() -> RealmResponse:
     """Get quarter information for this realm (workaround for Basilisk Record field limitation)"""
     try:
         import json as _json
+
         from ggg import Quarter, Realm
 
         quarters = []
@@ -267,21 +338,27 @@ def get_quarter_info() -> RealmResponse:
 
         first_realm = Realm.load("1")
         if first_realm:
-            is_quarter = bool(getattr(first_realm, 'is_quarter', False))
-            parent_realm_canister_id = getattr(first_realm, 'federation_realm_id', '') or ''
+            is_quarter = bool(getattr(first_realm, "is_quarter", False))
+            parent_realm_canister_id = (
+                getattr(first_realm, "federation_realm_id", "") or ""
+            )
             for q in Quarter.instances():
-                quarters.append({
-                    "name": q.name or "",
-                    "canister_id": q.canister_id or "",
-                    "population": q.population or 0,
-                    "status": q.status or "active",
-                })
+                quarters.append(
+                    {
+                        "name": q.name or "",
+                        "canister_id": q.canister_id or "",
+                        "population": q.population or 0,
+                        "status": q.status or "active",
+                    }
+                )
 
-        result = _json.dumps({
-            "quarters": quarters,
-            "is_quarter": is_quarter,
-            "parent_realm_canister_id": parent_realm_canister_id,
-        })
+        result = _json.dumps(
+            {
+                "quarters": quarters,
+                "is_quarter": is_quarter,
+                "parent_realm_canister_id": parent_realm_canister_id,
+            }
+        )
         return RealmResponse(success=True, data=RealmResponseData(message=result))
     except Exception as e:
         logger.error(f"Error getting quarter info: {str(e)}\n{traceback.format_exc()}")
@@ -337,6 +414,7 @@ def join_realm(profile: str, preferred_quarter: text) -> RealmResponse:
         # Quarter assignment (no-op for single-quarter realms)
         assigned_quarter_canister_id = ""
         from ggg import Quarter, Realm
+
         realm = Realm.load("1")
         quarters = list(Quarter.instances()) if realm else []
         if realm and quarters:
@@ -368,12 +446,15 @@ def change_quarter(new_quarter_canister_id: text) -> RealmResponse:
     """Change the caller's assigned quarter."""
     try:
         from ggg import Quarter, Realm
+
         caller = ic.caller().to_str()
 
         # Validate the target quarter exists and is active
         realm = Realm.load("1")
         if not realm:
-            return RealmResponse(success=False, data=RealmResponseData(error="Realm not found"))
+            return RealmResponse(
+                success=False, data=RealmResponseData(error="Realm not found")
+            )
 
         quarters = list(Quarter.instances())
         target = None
@@ -385,7 +466,9 @@ def change_quarter(new_quarter_canister_id: text) -> RealmResponse:
         if not target:
             return RealmResponse(
                 success=False,
-                data=RealmResponseData(error=f"Quarter '{new_quarter_canister_id}' not found or not active"),
+                data=RealmResponseData(
+                    error=f"Quarter '{new_quarter_canister_id}' not found or not active"
+                ),
             )
 
         # Run codex eligibility check if available
@@ -422,12 +505,12 @@ def get_canister_id() -> text:
 def set_canister_config(
     frontend_canister_id: Opt[text],
     token_canister_id: Opt[text],
-    nft_canister_id: Opt[text]
+    nft_canister_id: Opt[text],
 ) -> RealmResponse:
     """
     Set canister IDs for this realm (admin only).
     Called post-deployment to enable canister discovery via status().
-    
+
     Args:
         frontend_canister_id: The realm_frontend canister ID
         token_canister_id: Optional token_backend canister ID
@@ -435,30 +518,32 @@ def set_canister_config(
     """
     try:
         from ggg import Realm
-        
+
         realm = Realm.load("1")
         if not realm:
             return RealmResponse(
-                success=False,
-                data=RealmResponseData(error="Realm not found")
+                success=False, data=RealmResponseData(error="Realm not found")
             )
-        
+
         if frontend_canister_id:
             realm.frontend_canister_id = frontend_canister_id
         if token_canister_id:
             realm.token_canister_id = token_canister_id
         if nft_canister_id:
             realm.nft_canister_id = nft_canister_id
-        
+
         realm.save()
-        logger.info(f"Updated canister config: frontend={frontend_canister_id}, token={token_canister_id}, nft={nft_canister_id}")
-        
+        logger.info(
+            f"Updated canister config: frontend={frontend_canister_id}, token={token_canister_id}, nft={nft_canister_id}"
+        )
+
         return RealmResponse(
-            success=True,
-            data=RealmResponseData(message="Canister config updated")
+            success=True, data=RealmResponseData(message="Canister config updated")
         )
     except Exception as e:
-        logger.error(f"Error setting canister config: {str(e)}\n{traceback.format_exc()}")
+        logger.error(
+            f"Error setting canister config: {str(e)}\n{traceback.format_exc()}"
+        )
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
@@ -479,8 +564,7 @@ def register_quarter(quarter_name: text, quarter_canister_id: text) -> RealmResp
         realm = Realm.load("1")
         if not realm:
             return RealmResponse(
-                success=False,
-                data=RealmResponseData(error="Realm not found")
+                success=False, data=RealmResponseData(error="Realm not found")
             )
 
         # Check for duplicate canister ID
@@ -488,7 +572,9 @@ def register_quarter(quarter_name: text, quarter_canister_id: text) -> RealmResp
             if q.canister_id == quarter_canister_id:
                 return RealmResponse(
                     success=False,
-                    data=RealmResponseData(error=f"Quarter with canister ID {quarter_canister_id} already registered")
+                    data=RealmResponseData(
+                        error=f"Quarter with canister ID {quarter_canister_id} already registered"
+                    ),
                 )
 
         quarter = Quarter(
@@ -497,11 +583,15 @@ def register_quarter(quarter_name: text, quarter_canister_id: text) -> RealmResp
         )
         quarter.federation = realm
 
-        logger.info(f"Registered quarter '{quarter_name}' (canister: {quarter_canister_id})")
+        logger.info(
+            f"Registered quarter '{quarter_name}' (canister: {quarter_canister_id})"
+        )
 
         return RealmResponse(
             success=True,
-            data=RealmResponseData(message=f"Quarter '{quarter_name}' registered with ID {quarter._id}")
+            data=RealmResponseData(
+                message=f"Quarter '{quarter_name}' registered with ID {quarter._id}"
+            ),
         )
     except Exception as e:
         logger.error(f"Error registering quarter: {str(e)}\n{traceback.format_exc()}")
@@ -523,15 +613,19 @@ def deregister_quarter(quarter_canister_id: text) -> RealmResponse:
         for q in Quarter.instances():
             if q.canister_id == quarter_canister_id:
                 q.delete()
-                logger.info(f"Deregistered quarter with canister ID {quarter_canister_id}")
+                logger.info(
+                    f"Deregistered quarter with canister ID {quarter_canister_id}"
+                )
                 return RealmResponse(
                     success=True,
-                    data=RealmResponseData(message=f"Quarter '{q.name}' deregistered")
+                    data=RealmResponseData(message=f"Quarter '{q.name}' deregistered"),
                 )
 
         return RealmResponse(
             success=False,
-            data=RealmResponseData(error=f"Quarter with canister ID {quarter_canister_id} not found")
+            data=RealmResponseData(
+                error=f"Quarter with canister ID {quarter_canister_id} not found"
+            ),
         )
     except Exception as e:
         logger.error(f"Error deregistering quarter: {str(e)}\n{traceback.format_exc()}")
@@ -554,8 +648,7 @@ def set_quarter_config(parent_realm_canister_id: text) -> RealmResponse:
         realm = Realm.load("1")
         if not realm:
             return RealmResponse(
-                success=False,
-                data=RealmResponseData(error="Realm not found")
+                success=False, data=RealmResponseData(error="Realm not found")
             )
 
         realm.is_quarter = True
@@ -566,10 +659,14 @@ def set_quarter_config(parent_realm_canister_id: text) -> RealmResponse:
 
         return RealmResponse(
             success=True,
-            data=RealmResponseData(message=f"Realm configured as quarter of {parent_realm_canister_id}")
+            data=RealmResponseData(
+                message=f"Realm configured as quarter of {parent_realm_canister_id}"
+            ),
         )
     except Exception as e:
-        logger.error(f"Error setting quarter config: {str(e)}\n{traceback.format_exc()}")
+        logger.error(
+            f"Error setting quarter config: {str(e)}\n{traceback.format_exc()}"
+        )
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
@@ -578,10 +675,10 @@ def get_zones(resolution: nat = 6) -> text:
     """
     Get H3 zone aggregation data for users in this realm.
     Returns zones with user counts at each H3 cell.
-    
+
     Args:
         resolution: H3 resolution level (0-15). Default 6.
-    
+
     Returns:
         JSON string with zone data
     """
@@ -680,9 +777,7 @@ def update_my_private_data(private_data: str) -> RealmResponse:
             ),
         )
     except Exception as e:
-        logger.error(
-            f"Error updating private data: {str(e)}\n{traceback.format_exc()}"
-        )
+        logger.error(f"Error updating private data: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
@@ -705,7 +800,9 @@ def get_my_vetkey_public_key() -> RealmResponse:
             data=RealmResponseData(message=result["public_key_hex"]),
         )
     except Exception as e:
-        logger.error(f"Error getting vetkey public key: {str(e)}\n{traceback.format_exc()}")
+        logger.error(
+            f"Error getting vetkey public key: {str(e)}\n{traceback.format_exc()}"
+        )
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
@@ -720,9 +817,7 @@ def derive_my_vetkey(transport_public_key_hex: text) -> RealmResponse:
     the caller's frontend.
     """
     try:
-        result = yield derive_vetkey(
-            ic.caller().to_str(), transport_public_key_hex
-        )
+        result = yield derive_vetkey(ic.caller().to_str(), transport_public_key_hex)
         if not result["success"]:
             return RealmResponse(
                 success=False, data=RealmResponseData(error=result["error"])
@@ -734,6 +829,308 @@ def derive_my_vetkey(transport_public_key_hex: text) -> RealmResponse:
     except Exception as e:
         logger.error(f"Error deriving vetkey: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+# ---------------------------------------------------------------------------
+# Crypto envelope & group endpoints
+# ---------------------------------------------------------------------------
+
+
+@update
+@require(Operations.SELF_UPDATE_PRIVATE_DATA)
+def crypto_store_my_envelope(scope: text, wrapped_dek: text) -> CryptoResponse:
+    """Store (or update) a wrapped DEK envelope for the caller."""
+    try:
+        result = crypto_store_envelope(ic.caller().to_str(), scope, wrapped_dek)
+        if not result["success"]:
+            return CryptoResponse(
+                success=False, data=CryptoResponseData(error=result["error"])
+            )
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(
+                envelope=EnvelopeRecord(
+                    scope=result["scope"],
+                    principal_id=result["principal"],
+                    wrapped_dek=result["wrapped_dek"],
+                )
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error storing envelope: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+@query
+@require(Operations.SELF_UPDATE_PRIVATE_DATA)
+def crypto_get_my_envelope(scope: text) -> CryptoResponse:
+    """Get the caller's envelope for a scope."""
+    try:
+        result = crypto_get_envelope(ic.caller().to_str(), scope)
+        if not result["success"]:
+            return CryptoResponse(
+                success=False, data=CryptoResponseData(error=result["error"])
+            )
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(
+                envelope=EnvelopeRecord(
+                    scope=result["scope"],
+                    principal_id=result["principal"],
+                    wrapped_dek=result["wrapped_dek"],
+                )
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error getting envelope: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+@query
+@require(Operations.SELF_UPDATE_PRIVATE_DATA)
+def crypto_get_my_scopes() -> CryptoResponse:
+    """List all scopes the caller has access to."""
+    try:
+        result = crypto_list_scopes(ic.caller().to_str())
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(scopeList=ScopeListRecord(scopes=result["scopes"])),
+        )
+    except Exception as e:
+        logger.error(f"Error listing scopes: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+@query
+@require(Operations.REALM_ADMIN)
+def crypto_get_envelopes(scope: text) -> CryptoResponse:
+    """List all envelopes for a scope (admin only)."""
+    try:
+        result = crypto_list_envelopes(scope)
+        envelopes = Vec["EnvelopeRecord"]()
+        for e in result["envelopes"]:
+            envelopes.append(
+                EnvelopeRecord(
+                    scope=e["scope"],
+                    principal_id=e["principal"],
+                    wrapped_dek=e["wrapped_dek"],
+                )
+            )
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(
+                envelopeList=EnvelopeListRecord(envelopes=envelopes)
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error listing envelopes: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+@update
+@require(Operations.REALM_ADMIN)
+def crypto_share(
+    scope: text, target_principal: text, wrapped_dek: text
+) -> CryptoResponse:
+    """Share access to a scope with another principal (admin only)."""
+    try:
+        result = crypto_share_principal(scope, target_principal, wrapped_dek)
+        if not result["success"]:
+            return CryptoResponse(
+                success=False, data=CryptoResponseData(error=result["error"])
+            )
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(
+                message=f"Shared scope {scope} with {target_principal}"
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error sharing: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+@update
+@require(Operations.REALM_ADMIN)
+def crypto_revoke(scope: text, target_principal: text) -> CryptoResponse:
+    """Revoke a principal's access to a scope (admin only)."""
+    try:
+        result = crypto_revoke_principal(scope, target_principal)
+        if not result["success"]:
+            return CryptoResponse(
+                success=False, data=CryptoResponseData(error=result["error"])
+            )
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(
+                message=f"Revoked {target_principal} from scope {scope}"
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error revoking: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+@update
+@require(Operations.REALM_ADMIN)
+def crypto_create_group(name: text, description: text) -> CryptoResponse:
+    """Create a new crypto group (admin only)."""
+    try:
+        result = crypto_group_create(name, description)
+        if not result["success"]:
+            return CryptoResponse(
+                success=False, data=CryptoResponseData(error=result["error"])
+            )
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(
+                group=GroupRecord(
+                    name=result["name"], description=result["description"]
+                )
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error creating group: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+@update
+@require(Operations.REALM_ADMIN)
+def crypto_delete_group(name: text) -> CryptoResponse:
+    """Delete a crypto group (admin only)."""
+    try:
+        result = crypto_group_delete(name)
+        if not result["success"]:
+            return CryptoResponse(
+                success=False, data=CryptoResponseData(error=result["error"])
+            )
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(message=f"Deleted group {name}"),
+        )
+    except Exception as e:
+        logger.error(f"Error deleting group: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+@update
+@require(Operations.REALM_ADMIN)
+def crypto_add_group_member(
+    group_name: text, principal: text, role: text
+) -> CryptoResponse:
+    """Add a principal to a crypto group (admin only)."""
+    try:
+        result = crypto_group_add(group_name, principal, role or "member")
+        if not result["success"]:
+            return CryptoResponse(
+                success=False, data=CryptoResponseData(error=result["error"])
+            )
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(message=f"Added {principal} to group {group_name}"),
+        )
+    except Exception as e:
+        logger.error(f"Error adding group member: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+@update
+@require(Operations.REALM_ADMIN)
+def crypto_remove_group_member(group_name: text, principal: text) -> CryptoResponse:
+    """Remove a principal from a crypto group (admin only)."""
+    try:
+        result = crypto_group_remove(group_name, principal)
+        if not result["success"]:
+            return CryptoResponse(
+                success=False, data=CryptoResponseData(error=result["error"])
+            )
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(
+                message=f"Removed {principal} from group {group_name}"
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error removing group member: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+@query
+def crypto_list_groups() -> CryptoResponse:
+    """List all crypto groups."""
+    try:
+        result = crypto_group_list()
+        groups = Vec["GroupRecord"]()
+        for g in result["groups"]:
+            groups.append(GroupRecord(name=g["name"], description=g["description"]))
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(groupList=GroupListRecord(groups=groups)),
+        )
+    except Exception as e:
+        logger.error(f"Error listing groups: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+@query
+def crypto_get_group_members(group_name: text) -> CryptoResponse:
+    """List members of a crypto group."""
+    try:
+        result = crypto_group_members(group_name)
+        members = Vec["GroupMemberRecord"]()
+        for m in result["members"]:
+            members.append(
+                GroupMemberRecord(principal_id=m["principal"], role=m["role"])
+            )
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(groupMembers=GroupMembersRecord(members=members)),
+        )
+    except Exception as e:
+        logger.error(f"Error listing group members: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+@update
+@require(Operations.REALM_ADMIN)
+def crypto_share_with_group(scope: text, group_name: text) -> CryptoResponse:
+    """Share access to a scope with all members of a group (admin only)."""
+    try:
+        result = crypto_share_group(scope, group_name)
+        if not result["success"]:
+            return CryptoResponse(
+                success=False, data=CryptoResponseData(error=result["error"])
+            )
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(
+                message=f"Shared scope {scope} with group {group_name} ({result['envelopes_created']} envelopes)"
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error sharing with group: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+@update
+@require(Operations.REALM_ADMIN)
+def crypto_revoke_from_group(scope: text, group_name: text) -> CryptoResponse:
+    """Revoke all group members' access to a scope (admin only)."""
+    try:
+        result = crypto_revoke_group(scope, group_name)
+        if not result["success"]:
+            return CryptoResponse(
+                success=False, data=CryptoResponseData(error=result["error"])
+            )
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(
+                message=f"Revoked group {group_name} from scope {scope} ({result['envelopes_deleted']} envelopes)"
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error revoking group: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
 
 
 # New GGG API endpoints
@@ -908,10 +1305,10 @@ def get_my_invoices() -> RealmResponse:
         caller = ic.caller().to_str()
         logger.info(f"Getting invoices for caller: {caller}")
         from ggg import Invoice
+
         all_invoices = Invoice.instances()
         user_invoices = [
-            inv for inv in all_invoices
-            if inv.user and inv.user.id == caller
+            inv for inv in all_invoices if inv.user and inv.user.id == caller
         ]
         objects_json = [json.dumps(inv.serialize()) for inv in user_invoices]
         logger.info(f"Found {len(objects_json)} invoices for {caller}")
@@ -941,9 +1338,12 @@ def refresh_invoice(args: text) -> Async[text]:
             return json.dumps({"success": False, "error": "invoice_id is required"})
 
         from ggg import Invoice
+
         invoice = Invoice[invoice_id]
         if invoice is None:
-            return json.dumps({"success": False, "error": f"Invoice '{invoice_id}' not found"})
+            return json.dumps(
+                {"success": False, "error": f"Invoice '{invoice_id}' not found"}
+            )
 
         result = yield invoice.refresh()
 
@@ -978,7 +1378,9 @@ def create_foundational_objects() -> void:
             created_profiles[profile_def["name"]] = p
 
         profile_names = list(created_profiles.keys())
-        logger.info(f"Created {len(profile_names)} user profiles: {', '.join(profile_names)}")
+        logger.info(
+            f"Created {len(profile_names)} user profiles: {', '.join(profile_names)}"
+        )
 
         admin_profile = created_profiles["admin"]
 
@@ -1007,9 +1409,10 @@ def create_foundational_objects() -> void:
         realm_logo = ""
         realm_welcome_image = ""
         realm_welcome_message = ""
-        
-        import os
+
         import json
+        import os
+
         try:
             # Look for manifest.json in common locations
             manifest_paths = [
@@ -1019,7 +1422,7 @@ def create_foundational_objects() -> void:
             ]
             for manifest_path in manifest_paths:
                 if os.path.exists(manifest_path):
-                    with open(manifest_path, 'r') as f:
+                    with open(manifest_path, "r") as f:
                         manifest = json.load(f)
                     realm_name = manifest.get("name", realm_name)
                     realm_description = manifest.get("description", realm_description)
@@ -1028,7 +1431,9 @@ def create_foundational_objects() -> void:
                     realm_welcome_message = manifest.get("welcome_message", "")
                     calendar_config = manifest.get("calendar", {})
                     acct_currency_config = manifest.get("accounting_currency", {})
-                    logger.info(f"Loaded realm config from {manifest_path}: name={realm_name}")
+                    logger.info(
+                        f"Loaded realm config from {manifest_path}: name={realm_name}"
+                    )
                     break
             calendar_config = locals().get("calendar_config", {})
             acct_currency_config = locals().get("acct_currency_config", {})
@@ -1036,7 +1441,7 @@ def create_foundational_objects() -> void:
             logger.warning(f"Could not load manifest.json: {e}, using defaults")
             calendar_config = {}
             acct_currency_config = {}
-        
+
         realm = Realm(
             name=realm_name,
             description=realm_description,
@@ -1056,16 +1461,30 @@ def create_foundational_objects() -> void:
             name=f"{realm.name} Calendar",
             realm=realm,
             epoch=calendar_config.get("epoch", calendar_epoch),
-            fiscal_period=calendar_config.get("fiscal_period", CALENDAR_DEFAULTS["fiscal_period"]),
-            voting_window=calendar_config.get("voting_window", CALENDAR_DEFAULTS["voting_window"]),
-            codex_release_cycle=calendar_config.get("codex_release_cycle", CALENDAR_DEFAULTS["codex_release_cycle"]),
-            benefit_cycle=calendar_config.get("benefit_cycle", CALENDAR_DEFAULTS["benefit_cycle"]),
-            service_payment_cycle=calendar_config.get("service_payment_cycle", CALENDAR_DEFAULTS["service_payment_cycle"]),
-            license_review_cycle=calendar_config.get("license_review_cycle", CALENDAR_DEFAULTS["license_review_cycle"]),
+            fiscal_period=calendar_config.get(
+                "fiscal_period", CALENDAR_DEFAULTS["fiscal_period"]
+            ),
+            voting_window=calendar_config.get(
+                "voting_window", CALENDAR_DEFAULTS["voting_window"]
+            ),
+            codex_release_cycle=calendar_config.get(
+                "codex_release_cycle", CALENDAR_DEFAULTS["codex_release_cycle"]
+            ),
+            benefit_cycle=calendar_config.get(
+                "benefit_cycle", CALENDAR_DEFAULTS["benefit_cycle"]
+            ),
+            service_payment_cycle=calendar_config.get(
+                "service_payment_cycle", CALENDAR_DEFAULTS["service_payment_cycle"]
+            ),
+            license_review_cycle=calendar_config.get(
+                "license_review_cycle", CALENDAR_DEFAULTS["license_review_cycle"]
+            ),
             custom_cycles=json.dumps(calendar_config.get("custom_cycles", {})),
         )
 
-        logger.info(f"Created calendar: epoch={calendar_epoch}, fiscal_period={calendar.fiscal_period}s, benefit_cycle={calendar.benefit_cycle}s")
+        logger.info(
+            f"Created calendar: epoch={calendar_epoch}, fiscal_period={calendar.fiscal_period}s, benefit_cycle={calendar.benefit_cycle}s"
+        )
 
         # 6. Create treasury linked to realm
         treasury = Treasury(
@@ -1090,8 +1509,9 @@ def _register_wallet_transfer_hook():
         from basilisk.os.wallet import Wallet
         from core.access import _check_access
 
-        def realm_transfer_hook(token_name, to_principal, amount,
-                                from_subaccount=None, to_subaccount=None):
+        def realm_transfer_hook(
+            token_name, to_principal, amount, from_subaccount=None, to_subaccount=None
+        ):
             caller = ic.caller().to_str()
             canister_id = ic.id().to_str()
             if caller == canister_id:
@@ -1122,6 +1542,18 @@ def initialize() -> void:
         except Exception as e:
             logger.error(
                 f"Error registering entity type {name}: {str(e)}\n{traceback.format_exc()}"
+            )
+
+    # Register basilisk OS crypto entities
+    from basilisk.os.crypto import CryptoGroup, CryptoGroupMember, KeyEnvelope
+
+    for crypto_entity in (KeyEnvelope, CryptoGroup, CryptoGroupMember):
+        try:
+            Database.get_instance().register_entity_type(crypto_entity)
+            logger.info(f"Registered crypto entity type {crypto_entity.__name__}")
+        except Exception as e:
+            logger.error(
+                f"Error registering crypto entity {crypto_entity.__name__}: {e}"
             )
 
     # Create foundational objects after entity registration
@@ -1284,33 +1716,50 @@ def initialize() -> void:
             extension_status[extension_id] = status
 
         # Load entity method overrides from Realm manifest
-        logger.info("\n🔧 Checking for Codex entity method overrides from Realm manifest...")
+        logger.info(
+            "\n🔧 Checking for Codex entity method overrides from Realm manifest..."
+        )
         try:
-            from ggg import Codex, Realm
             import json
-            
+
+            from ggg import Codex, Realm
+
             realm = list(Realm.instances())[0] if Realm.instances() else None
             logger.info(f"Realm found: {realm.name if realm else 'None'}")
-            
+
             if realm:
                 logger.info(f"Has manifest_data: {bool(realm.manifest_data)}")
                 if realm.manifest_data:
-                    logger.info(f"manifest_data length: {len(str(realm.manifest_data))}")
+                    logger.info(
+                        f"manifest_data length: {len(str(realm.manifest_data))}"
+                    )
                     manifest = json.loads(str(realm.manifest_data))
                     logger.info(f"Parsed manifest keys: {list(manifest.keys())}")
-                    
+
                     overrides = manifest.get("entity_method_overrides", [])
                     logger.info(f"Found {len(overrides)} entity method overrides")
-                    
+
                     for o in overrides:
                         try:
-                            if not all([o.get("entity"), o.get("method"), o.get("implementation")]):
+                            if not all(
+                                [
+                                    o.get("entity"),
+                                    o.get("method"),
+                                    o.get("implementation"),
+                                ]
+                            ):
                                 logger.warning(f"Skipping incomplete override: {o}")
                                 continue
                             entity_class = getattr(ggg, o["entity"], None)
                             parts = o["implementation"].split(".")
-                            if not entity_class or len(parts) != 3 or parts[0] != "Codex":
-                                logger.warning(f"Invalid override config: entity_class={entity_class}, parts={parts}")
+                            if (
+                                not entity_class
+                                or len(parts) != 3
+                                or parts[0] != "Codex"
+                            ):
+                                logger.warning(
+                                    f"Invalid override config: entity_class={entity_class}, parts={parts}"
+                                )
                                 continue
                             target_codex = Codex[parts[1]]
                             if not target_codex:
@@ -1318,15 +1767,27 @@ def initialize() -> void:
                                 continue
                             method_type = o.get("type", "method")
                             proxy = _make_codex_proxy(parts[1], parts[2], method_type)
-                            wrapper = classmethod(proxy) if method_type == "classmethod" else staticmethod(proxy) if method_type == "staticmethod" else proxy
+                            wrapper = (
+                                classmethod(proxy)
+                                if method_type == "classmethod"
+                                else (
+                                    staticmethod(proxy)
+                                    if method_type == "staticmethod"
+                                    else proxy
+                                )
+                            )
                             setattr(entity_class, o["method"], wrapper)
-                            logger.info(f"  ✓ {o['entity']}.{o['method']}() [{method_type}] -> {o['implementation']} [dynamic proxy]")
+                            logger.info(
+                                f"  ✓ {o['entity']}.{o['method']}() [{method_type}] -> {o['implementation']} [dynamic proxy]"
+                            )
                         except Exception as e:
                             logger.error(f"Codex override error for {o}: {e}")
                 else:
                     logger.warning("Realm.manifest_data is empty")
         except Exception as e:
-            logger.error(f"Failed to load entity method overrides from Realm manifest: {e}")
+            logger.error(
+                f"Failed to load entity method overrides from Realm manifest: {e}"
+            )
 
         # Print summary as a table
         logger.info("")
@@ -1446,7 +1907,9 @@ def test_timer() -> text:
             ic.print(f"TIMER DIAG ERROR: {e}")
 
     tid = ic.set_timer(5, _test_cb)
-    return f"Created TaskExecution id={te_id} result=waiting, timer id={tid} fires in 5s"
+    return (
+        f"Created TaskExecution id={te_id} result=waiting, timer id={tid} fires in 5s"
+    )
 
 
 @update
@@ -1504,7 +1967,11 @@ def extension_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
             f"Got extension result from {args['extension_name']} function {args['function_name']}: {extension_result}"
         )
 
-        response = extension_result if isinstance(extension_result, str) else json.dumps(extension_result)
+        response = (
+            extension_result
+            if isinstance(extension_result, str)
+            else json.dumps(extension_result)
+        )
         return ExtensionCallResponse(success=True, response=response)
 
     except Exception as e:
@@ -1533,7 +2000,11 @@ def extension_sync_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
             f"Got extension result from {args['extension_name']} function {args['function_name']}: {extension_result}, type: {type(extension_result)}"
         )
 
-        response = extension_result if isinstance(extension_result, str) else json.dumps(extension_result)
+        response = (
+            extension_result
+            if isinstance(extension_result, str)
+            else json.dumps(extension_result)
+        )
         return ExtensionCallResponse(success=True, response=response)
 
     except Exception as e:
@@ -1563,7 +2034,11 @@ def extension_async_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse
             f"Got extension result from {args['extension_name']} function {args['function_name']}: {extension_result}, type: {type(extension_result)}"
         )
 
-        response = extension_result if isinstance(extension_result, str) else json.dumps(extension_result)
+        response = (
+            extension_result
+            if isinstance(extension_result, str)
+            else json.dumps(extension_result)
+        )
         return ExtensionCallResponse(success=True, response=response)
 
     except Exception as e:
@@ -1575,7 +2050,10 @@ def http_request_core(data):
     d = json.dumps(data)
     return {
         "status_code": 200,
-        "headers": [("Content-Type", "application/json"), ("Access-Control-Allow-Origin", "*")],
+        "headers": [
+            ("Content-Type", "application/json"),
+            ("Access-Control-Allow-Origin", "*"),
+        ],
         "body": bytes(d + "\n", "ascii"),
         "streaming_strategy": None,
         "upgrade": False,
@@ -1585,7 +2063,10 @@ def http_request_core(data):
 def http_request_404():
     return {
         "status_code": 404,
-        "headers": [("Content-Type", "application/json"), ("Access-Control-Allow-Origin", "*")],
+        "headers": [
+            ("Content-Type", "application/json"),
+            ("Access-Control-Allow-Origin", "*"),
+        ],
         "body": b'{"error": "Not found"}\n',
         "streaming_strategy": None,
         "upgrade": False,
@@ -1598,9 +2079,9 @@ def http_request(req: HttpRequest) -> HttpResponseIncoming:
     try:
         method = req["method"]
         url = req["url"]
-        
+
         logger.info(f"HTTP {method} request to {url}")
-        
+
         not_found = HttpResponseIncoming(
             status_code=404,
             headers=[],
@@ -1608,18 +2089,18 @@ def http_request(req: HttpRequest) -> HttpResponseIncoming:
             streaming_strategy=None,
             upgrade=False,
         )
-        
+
         if method == "GET":
             # Strip leading slash and query params
             path = url.lstrip("/").split("?")[0]
-            
+
             # Handle /status
             if path == "status" or path == "":
                 return http_request_core(get_status())
             # Handle /extensions
             elif path == "extensions":
                 return http_request_core({"extensions": list_extensions()})
-        
+
         return not_found
     except Exception as e:
         logger.error(f"Error handling HTTP request: {str(e)}\n{traceback.format_exc()}")
@@ -1642,6 +2123,7 @@ def http_transform(args: HttpTransformArgs) -> HttpResponse:
 
 _shell_ns_by_principal = {}
 
+
 @update
 @require(Operations.SHELL_EXECUTE)
 def execute_code_shell(code: str) -> str:
@@ -1656,20 +2138,25 @@ def execute_code_shell(code: str) -> str:
     import io
     import sys
     import traceback
+
     from core.execution import _ensure_codex_lazy_loading
+
     _ensure_codex_lazy_loading()
 
     global _shell_ns_by_principal
     caller = str(ic.caller())
     if caller not in _shell_ns_by_principal:
-        import ggg
         import _cdk as basilisk
+        import ggg
+
         _shell_ns_by_principal[caller] = {"__builtins__": __builtins__}
-        _shell_ns_by_principal[caller].update({
-            "ggg": ggg,
-            "basilisk": basilisk,
-            "ic": ic,
-        })
+        _shell_ns_by_principal[caller].update(
+            {
+                "ggg": ggg,
+                "basilisk": basilisk,
+                "ic": ic,
+            }
+        )
         for _name in ggg.__all__:
             _shell_ns_by_principal[caller][_name] = getattr(ggg, _name)
     ns = _shell_ns_by_principal[caller]
@@ -1851,10 +2338,9 @@ def register_realm_with_registry(
                 "token_canister_id": parts[1] if len(parts) > 1 else "",
                 "nft_canister_id": parts[2] if len(parts) > 2 else "",
             }
-        
+
         result = yield register_realm(
-            registry_canister_id, realm_name, frontend_url, logo_url, "",
-            canister_ids
+            registry_canister_id, realm_name, frontend_url, logo_url, "", canister_ids
         )
         return json.dumps(result, indent=2)
     except Exception as e:
@@ -1906,17 +2392,19 @@ def mint_land_nft_for_parcel(
     """
     try:
         from ggg import Land
-        
+
         # Get the land parcel
         land = Land[land_id]
         if not land:
             return json.dumps({"success": False, "error": f"Land {land_id} not found"})
-        
+
         # Get NFT canister ID from config if not provided
         canister_id = nft_canister_id or get_nft_canister_id()
         if not canister_id:
-            return json.dumps({"success": False, "error": "NFT canister ID not configured"})
-        
+            return json.dumps(
+                {"success": False, "error": "NFT canister ID not configured"}
+            )
+
         # Mint the NFT
         result = yield mint_land_nft(
             nft_canister_id=canister_id,
@@ -1927,12 +2415,12 @@ def mint_land_nft_for_parcel(
             y_coordinate=land.y_coordinate,
             land_type=land.land_type,
         )
-        
+
         # Update land with NFT token ID if successful
         if result.get("success"):
             land.nft_token_id = result.get("token_id", "")
             logger.info(f"Updated land {land_id} with nft_token_id={land.nft_token_id}")
-        
+
         return json.dumps(result, indent=2)
     except Exception as e:
         logger.error(f"Error in mint_land_nft_for_parcel: {e}")
@@ -1950,11 +2438,14 @@ def get_nft_config() -> text:
     """
     try:
         canister_id = get_nft_canister_id()
-        return json.dumps({
-            "success": True,
-            "nft_canister_id": canister_id or "",
-            "configured": bool(canister_id),
-        }, indent=2)
+        return json.dumps(
+            {
+                "success": True,
+                "nft_canister_id": canister_id or "",
+                "configured": bool(canister_id),
+            },
+            indent=2,
+        )
     except Exception as e:
         logger.error(f"Error in get_nft_config: {e}")
         return json.dumps({"success": False, "error": str(e)}, indent=2)
@@ -1966,47 +2457,50 @@ def update_realm_config(config_json: str) -> str:
     """
     Update the realm configuration (name, description, logo, welcome_image, welcome_message).
     This should be called after deployment with the manifest.json data.
-    
+
     Args:
         config_json: JSON string containing realm configuration fields
     """
     logger.info("🔧 update_realm_config() called")
     try:
-        from ggg import Realm
         import json
-        
+
+        from ggg import Realm
+
         config = json.loads(config_json)
         logger.info(f"📋 Config received: {list(config.keys())}")
-        
+
         # Get the first realm
         realms = list(Realm.instances())
         if not realms:
             logger.error("❌ No realm found")
             return json.dumps({"success": False, "error": "No realm found"})
-        
+
         realm = realms[0]
         updated_fields = []
-        
+
         if "name" in config and config["name"]:
             realm.name = config["name"]
             updated_fields.append(f"name={config['name']}")
-            
+
         if "description" in config and config["description"]:
             realm.description = config["description"]
             updated_fields.append(f"description={config['description'][:50]}...")
-            
+
         if "logo" in config:
             realm.logo = config["logo"] or ""
             updated_fields.append(f"logo={config['logo']}")
-            
+
         if "welcome_image" in config:
             realm.welcome_image = config["welcome_image"] or ""
             updated_fields.append(f"welcome_image={config['welcome_image']}")
-            
+
         if "welcome_message" in config:
             realm.welcome_message = config["welcome_message"] or ""
-            updated_fields.append(f"welcome_message={config['welcome_message'][:50] if config['welcome_message'] else ''}...")
-        
+            updated_fields.append(
+                f"welcome_message={config['welcome_message'][:50] if config['welcome_message'] else ''}..."
+            )
+
         logger.info(f"✅ Realm config updated: {', '.join(updated_fields)}")
         return json.dumps({"success": True, "updated_fields": updated_fields})
     except Exception as e:
@@ -2023,39 +2517,50 @@ def reload_entity_method_overrides() -> str:
     """
     logger.info("🔄 reload_entity_method_overrides() called")
     try:
-        from ggg import Codex, Realm
-        import ggg
         import json
-        
+
+        import ggg
+        from ggg import Codex, Realm
+
         logger.info("📜 Looking for Codex['manifest']...")
         realm_manifest = Codex["manifest"]
         if not realm_manifest:
             logger.error("❌ No Codex['manifest'] found")
             return json.dumps({"success": False, "error": "No realm manifest found"})
-        
-        logger.info(f"✅ Found manifest codex (code length: {len(str(realm_manifest.code))} chars)")
+
+        logger.info(
+            f"✅ Found manifest codex (code length: {len(str(realm_manifest.code))} chars)"
+        )
         manifest = json.loads(str(realm_manifest.code))
         overrides = manifest.get("entity_method_overrides", [])
         logger.info(f"📋 Found {len(overrides)} override(s) in manifest")
-        
+
         loaded_overrides = []
         for i, o in enumerate(overrides):
-            logger.info(f"  [{i+1}/{len(overrides)}] Processing: {o.get('entity', '?')}.{o.get('method', '?')}()")
+            logger.info(
+                f"  [{i+1}/{len(overrides)}] Processing: {o.get('entity', '?')}.{o.get('method', '?')}()"
+            )
             try:
                 if not all([o.get("entity"), o.get("method"), o.get("implementation")]):
-                    logger.warning(f"    ⚠️ Skipping - missing required fields (entity/method/implementation)")
+                    logger.warning(
+                        f"    ⚠️ Skipping - missing required fields (entity/method/implementation)"
+                    )
                     continue
-                    
+
                 entity_class = getattr(ggg, o["entity"], None)
                 if not entity_class:
-                    logger.warning(f"    ⚠️ Skipping - entity class '{o['entity']}' not found in ggg")
+                    logger.warning(
+                        f"    ⚠️ Skipping - entity class '{o['entity']}' not found in ggg"
+                    )
                     continue
-                    
+
                 parts = o["implementation"].split(".")
                 if len(parts) != 3 or parts[0] != "Codex":
-                    logger.warning(f"    ⚠️ Skipping - invalid implementation format: {o['implementation']} (expected Codex.name.function)")
+                    logger.warning(
+                        f"    ⚠️ Skipping - invalid implementation format: {o['implementation']} (expected Codex.name.function)"
+                    )
                     continue
-                
+
                 codex_name = parts[1]
                 func_name = parts[2]
                 logger.info(f"    🔍 Looking for Codex['{codex_name}']...")
@@ -2063,20 +2568,34 @@ def reload_entity_method_overrides() -> str:
                 if not target_codex:
                     logger.warning(f"    ⚠️ Skipping - Codex['{codex_name}'] not found")
                     continue
-                
-                logger.info(f"    ✅ Found codex '{codex_name}' (code length: {len(str(target_codex.code))} chars)")
-                
+
+                logger.info(
+                    f"    ✅ Found codex '{codex_name}' (code length: {len(str(target_codex.code))} chars)"
+                )
+
                 method_type = o.get("type", "method")
                 proxy = _make_codex_proxy(codex_name, func_name, method_type)
-                wrapper = classmethod(proxy) if method_type == "classmethod" else staticmethod(proxy) if method_type == "staticmethod" else proxy
+                wrapper = (
+                    classmethod(proxy)
+                    if method_type == "classmethod"
+                    else staticmethod(proxy) if method_type == "staticmethod" else proxy
+                )
                 setattr(entity_class, o["method"], wrapper)
-                loaded_overrides.append(f"{o['entity']}.{o['method']}() -> {o['implementation']}")
-                logger.info(f"    ✅ Successfully loaded {o['entity']}.{o['method']}() [{method_type}] -> {o['implementation']} [dynamic proxy]")
+                loaded_overrides.append(
+                    f"{o['entity']}.{o['method']}() -> {o['implementation']}"
+                )
+                logger.info(
+                    f"    ✅ Successfully loaded {o['entity']}.{o['method']}() [{method_type}] -> {o['implementation']} [dynamic proxy]"
+                )
             except Exception as e:
                 logger.error(f"    ❌ Failed to reload override: {e}")
-        
-        logger.info(f"🏁 Completed: {len(loaded_overrides)}/{len(overrides)} overrides loaded successfully")
-        return json.dumps({"success": True, "loaded_overrides": loaded_overrides}, indent=2)
+
+        logger.info(
+            f"🏁 Completed: {len(loaded_overrides)}/{len(overrides)} overrides loaded successfully"
+        )
+        return json.dumps(
+            {"success": True, "loaded_overrides": loaded_overrides}, indent=2
+        )
     except Exception as e:
         logger.error(f"❌ reload_entity_method_overrides failed: {e}")
         return json.dumps({"success": False, "error": str(e)}, indent=2)
