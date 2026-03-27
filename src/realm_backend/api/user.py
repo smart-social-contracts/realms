@@ -16,7 +16,9 @@ def user_get(principal: str) -> dict[str, Any]:
         "success": True,
         "principal": user.id,
         "profiles": [profile.name for profile in user.profiles],
-        "profile_picture_url": user.profile_picture_url or "",
+        "nickname": user.nickname or "",
+        "avatar": user.avatar or "",
+        "private_data": user.private_data or "",
     }
 
 
@@ -25,30 +27,45 @@ def user_list() -> dict[str, Any]:
     return {"users": [user.serialize() for user in User.instances()]}
 
 
-def user_update_profile_picture(
-    principal: str, profile_picture_url: str
+def user_update_public_profile(
+    principal: str, nickname: str, avatar: str
 ) -> dict[str, Any]:
-    logger.info(f"Updating profile picture for user {principal}")
+    logger.info(f"Updating public profile for user {principal}")
     user = User[principal]
     if not user:
         return {"success": False, "error": f"User with principal {principal} not found"}
 
-    user.profile_picture_url = profile_picture_url
+    user.nickname = nickname
+    user.avatar = avatar
     return {
         "success": True,
-        "profile_picture_url": user.profile_picture_url,
+        "nickname": user.nickname or "",
+        "avatar": user.avatar or "",
+    }
+
+
+def user_update_private_data(principal: str, private_data: str) -> dict[str, Any]:
+    logger.info(f"Updating private data for user {principal}")
+    user = User[principal]
+    if not user:
+        return {"success": False, "error": f"User with principal {principal} not found"}
+
+    user.private_data = private_data
+    return {
+        "success": True,
+        "private_data": user.private_data or "",
     }
 
 
 def user_register(principal: str, profile: str) -> dict[str, Any]:
     """
     Register a new user or add a profile to an existing user.
-    
+
     Args:
         principal: User principal ID
         profile: Profile name to assign to the user
-        
+
     Returns:
-        Dictionary with user data including principal, profiles, and profile_picture_url
+        Dictionary with user data including principal, profiles, nickname, avatar, and private_data
     """
     return ggg_user_register(principal, profile)

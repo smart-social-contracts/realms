@@ -121,7 +121,7 @@
 		try {
 			const response = await backend.get_my_user_status();
 			if (response && response.success && response.data && response.data.userGet) {
-				userProfilePictureUrl = response.data.userGet.profile_picture_url || '';
+				userProfilePictureUrl = response.data.userGet.avatar || '';
 			}
 		} catch (error) {
 			console.error('Error loading user profile picture:', error);

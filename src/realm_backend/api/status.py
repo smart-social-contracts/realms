@@ -8,6 +8,7 @@ import json
 import sys
 from typing import Any
 
+from _cdk import ic
 from ggg import (
     Codex,
     Dispute,
@@ -26,7 +27,6 @@ from ggg import (
     UserProfile,
     Vote,
 )
-from _cdk import ic
 from ic_python_logging import get_logger
 
 # Initialize logger
@@ -72,17 +72,23 @@ def get_status() -> "dict[str, Any]":
         if first_realm:
             realm_name = first_realm.name or ""
             # Convert logo filename to full path - logo is copied to /images/realm_logo.{ext} during deployment
-            logo_filename = getattr(first_realm, 'logo', None) or ""
+            logo_filename = getattr(first_realm, "logo", None) or ""
             if logo_filename:
-                logo_ext = logo_filename.split('.')[-1] if '.' in logo_filename else 'svg'
+                logo_ext = (
+                    logo_filename.split(".")[-1] if "." in logo_filename else "svg"
+                )
                 realm_logo = f"/images/realm_logo.{logo_ext}"
             # Convert welcome image filename to full path - welcome image is copied to /images/welcome.{ext} during deployment
-            welcome_image_filename = getattr(first_realm, 'welcome_image', None) or ""
+            welcome_image_filename = getattr(first_realm, "welcome_image", None) or ""
             if welcome_image_filename:
-                welcome_ext = welcome_image_filename.split('.')[-1] if '.' in welcome_image_filename else 'png'
+                welcome_ext = (
+                    welcome_image_filename.split(".")[-1]
+                    if "." in welcome_image_filename
+                    else "png"
+                )
                 realm_welcome_image = f"/images/welcome.{welcome_ext}"
-            realm_welcome_message = getattr(first_realm, 'welcome_message', None) or ""
-            realm_description = getattr(first_realm, 'description', None) or ""
+            realm_welcome_message = getattr(first_realm, "welcome_message", None) or ""
+            realm_description = getattr(first_realm, "description", None) or ""
     except Exception:
         # Realm might not exist yet
         pass
@@ -93,14 +99,19 @@ def get_status() -> "dict[str, Any]":
     extension_entries = []
     try:
         from api.extensions import get_all_extension_manifests
+
         manifests = get_all_extension_manifests()
         for ext_name, manifest in manifests.items():
-            extension_entries.append(json.dumps({
-                "name": ext_name,
-                "version": manifest.get("version", ""),
-                "commit": extensions_commit,
-                "commit_datetime": extensions_commit_datetime,
-            }))
+            extension_entries.append(
+                json.dumps(
+                    {
+                        "name": ext_name,
+                        "version": manifest.get("version", ""),
+                        "commit": extensions_commit,
+                        "commit_datetime": extensions_commit_datetime,
+                    }
+                )
+            )
     except Exception as e:
         logger.warning(f"Could not list extensions: {e}")
 
@@ -116,33 +127,39 @@ def get_status() -> "dict[str, Any]":
 
     # Get canister IDs - backend is self, others from Realm entity
     canisters = []
-    
+
     # Backend canister (self)
     try:
         backend_id = ic.id().to_str()
         canisters.append({"canister_id": backend_id, "canister_type": "realm_backend"})
     except Exception as e:
         logger.warning(f"Could not get backend canister ID: {e}")
-    
+
     # Load other canister IDs from Realm entity (set via set_canister_config)
     try:
         first_realm = Realm.load("1")
         if first_realm:
-            if getattr(first_realm, 'frontend_canister_id', None):
-                canisters.append({
-                    "canister_id": first_realm.frontend_canister_id,
-                    "canister_type": "realm_frontend"
-                })
-            if getattr(first_realm, 'token_canister_id', None):
-                canisters.append({
-                    "canister_id": first_realm.token_canister_id,
-                    "canister_type": "token_backend"
-                })
-            if getattr(first_realm, 'nft_canister_id', None):
-                canisters.append({
-                    "canister_id": first_realm.nft_canister_id,
-                    "canister_type": "nft_backend"
-                })
+            if getattr(first_realm, "frontend_canister_id", None):
+                canisters.append(
+                    {
+                        "canister_id": first_realm.frontend_canister_id,
+                        "canister_type": "realm_frontend",
+                    }
+                )
+            if getattr(first_realm, "token_canister_id", None):
+                canisters.append(
+                    {
+                        "canister_id": first_realm.token_canister_id,
+                        "canister_type": "token_backend",
+                    }
+                )
+            if getattr(first_realm, "nft_canister_id", None):
+                canisters.append(
+                    {
+                        "canister_id": first_realm.nft_canister_id,
+                        "canister_type": "nft_backend",
+                    }
+                )
     except Exception as e:
         logger.warning(f"Could not load canister IDs from Realm entity: {e}")
 
@@ -150,13 +167,25 @@ def get_status() -> "dict[str, Any]":
     registries = []
     try:
         for reg in Registry.instances():
-            if getattr(reg, 'principal_id', None):
-                registries.append({
-                    "canister_id": reg.principal_id,
-                    "canister_type": "registry"
-                })
+            if getattr(reg, "principal_id", None):
+                registries.append(
+                    {"canister_id": reg.principal_id, "canister_type": "registry"}
+                )
     except Exception as e:
         logger.warning(f"Could not load registries: {e}")
+
+    # Private data fields schema from realm manifest
+    private_data_fields = "[]"
+    try:
+        first_realm = Realm.load("1")
+        if first_realm:
+            manifest_data = getattr(first_realm, "manifest_data", None) or ""
+            if manifest_data:
+                manifest_obj = json.loads(manifest_data)
+                fields = manifest_obj.get("private_data_fields", [])
+                private_data_fields = json.dumps(fields)
+    except Exception as e:
+        logger.warning(f"Could not load private_data_fields: {e}")
 
     # Accounting currency
     accounting_currency = "ckBTC"
@@ -164,8 +193,12 @@ def get_status() -> "dict[str, Any]":
     try:
         first_realm = Realm.load("1")
         if first_realm:
-            accounting_currency = getattr(first_realm, 'accounting_currency', None) or "ckBTC"
-            accounting_currency_decimals = getattr(first_realm, 'accounting_currency_decimals', None) or 8
+            accounting_currency = (
+                getattr(first_realm, "accounting_currency", None) or "ckBTC"
+            )
+            accounting_currency_decimals = (
+                getattr(first_realm, "accounting_currency_decimals", None) or 8
+            )
     except Exception as e:
         logger.warning(f"Could not load accounting currency: {e}")
 
@@ -176,15 +209,19 @@ def get_status() -> "dict[str, Any]":
     try:
         first_realm = Realm.load("1")
         if first_realm:
-            is_quarter = getattr(first_realm, 'is_quarter', False) or False
-            parent_realm_canister_id = getattr(first_realm, 'federation_realm_id', '') or ''
+            is_quarter = getattr(first_realm, "is_quarter", False) or False
+            parent_realm_canister_id = (
+                getattr(first_realm, "federation_realm_id", "") or ""
+            )
             for q in Quarter.instances():
-                quarters.append({
-                    "name": q.name or "",
-                    "canister_id": q.canister_id or "",
-                    "population": q.population or 0,
-                    "status": q.status or "active",
-                })
+                quarters.append(
+                    {
+                        "name": q.name or "",
+                        "canister_id": q.canister_id or "",
+                        "population": q.population or 0,
+                        "status": q.status or "active",
+                    }
+                )
     except Exception as e:
         logger.warning(f"Could not load quarter info: {e}")
 
@@ -232,4 +269,5 @@ def get_status() -> "dict[str, Any]":
         "parent_realm_canister_id": parent_realm_canister_id,
         "accounting_currency": accounting_currency,
         "accounting_currency_decimals": accounting_currency_decimals,
+        "private_data_fields": private_data_fields,
     }

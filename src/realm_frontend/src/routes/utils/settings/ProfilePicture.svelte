@@ -76,7 +76,7 @@
 		}
 	}
 
-	$: displaySrc = profilePictureUrl || src;
+	$: displaySrc = profilePictureUrl || src || undefined;
 </script>
 
 <Card

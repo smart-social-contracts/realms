@@ -1,8 +1,6 @@
 <script lang="ts">
 	console.log("Settings Svelte script loaded (top of file)");
 
-	import ProfilePicture from '../../utils/settings/ProfilePicture.svelte';
-	import MessagingHandles from '../../utils/settings/MessagingHandles.svelte';
 	import { Breadcrumb, BreadcrumbItem, Heading } from 'flowbite-svelte';
 	import { SITE_NAME } from '$lib/globals';
 	import MetaTag from '../../utils/MetaTag.svelte';
@@ -18,7 +16,6 @@
 
 	let principal: string = '';
 	let profiles: string[] = [];
-	let avatar: string | undefined = undefined;
 	let loadingUserStatus = true;
 	let userStatusError = '';
 	let assignedQuarter: string = '';
@@ -69,7 +66,6 @@
 			if (response && response.success && response.data && response.data.userGet) {
 				principal = response.data.userGet.principal;
 				profiles = response.data.userGet.profiles || [];
-				avatar = response.data.userGet.avatar;
 				assignedQuarter = response.data.userGet.assigned_quarter || '';
 				selectedQuarter = assignedQuarter;
 			} else {
@@ -109,16 +105,6 @@
 					<div><span class="font-semibold">Profiles:</span> {profiles.length > 0 ? profiles.join(', ') : 'None'}</div>
 				</div>
 			{/if}
-		</div>
-		
-		<!-- Simplified settings with profile and messaging handles -->
-		<div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-			<div class="space-y-6">
-				<ProfilePicture src={avatar} />
-			</div>
-			<div class="space-y-6">
-				<MessagingHandles />
-			</div>
 		</div>
 
 		<!-- Quarter Assignment -->

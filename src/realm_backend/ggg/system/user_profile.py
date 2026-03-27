@@ -89,86 +89,124 @@ class Operations:
 
     # Self-service (any authenticated user)
     SELF_JOIN = "self.join"
-    SELF_PROFILE_PICTURE = "self.profile_picture"
+    SELF_UPDATE_PUBLIC_PROFILE = "self.update_public_profile"
+    SELF_UPDATE_PRIVATE_DATA = "self.update_private_data"
     SELF_CHANGE_QUARTER = "self.change_quarter"
     SELF_INVOICE_REFRESH = "self.invoice_refresh"
 
 
 class Profiles:
     ADMIN = {"name": "admin", "allowed_to": [Operations.ALL]}
-    MEMBER = {"name": "member", "allowed_to": [
-        Operations.SELF_JOIN,
-        Operations.SELF_PROFILE_PICTURE,
-        Operations.SELF_CHANGE_QUARTER,
-        Operations.SELF_INVOICE_REFRESH,
-        Operations.PROPOSAL_VOTE,
-        Operations.DISPUTE_CREATE,
-        Operations.DISPUTE_VIEW,
-        Operations.EXTENSION_SYNC_CALL,
-        Operations.EXTENSION_ASYNC_CALL,
-    ]}
+    MEMBER = {
+        "name": "member",
+        "allowed_to": [
+            Operations.SELF_JOIN,
+            Operations.SELF_UPDATE_PUBLIC_PROFILE,
+            Operations.SELF_UPDATE_PRIVATE_DATA,
+            Operations.SELF_CHANGE_QUARTER,
+            Operations.SELF_INVOICE_REFRESH,
+            Operations.PROPOSAL_VOTE,
+            Operations.DISPUTE_CREATE,
+            Operations.DISPUTE_VIEW,
+            Operations.EXTENSION_SYNC_CALL,
+            Operations.EXTENSION_ASYNC_CALL,
+        ],
+    }
     OBSERVER = {"name": "observer", "allowed_to": []}
-    LEGISLATOR = {"name": "legislator", "allowed_to": [
-        Operations.MANDATE_CREATE,
-        Operations.PROPOSAL_CREATE,
-        Operations.CONTRACT_CREATE_UNDER_MANDATE,
-        Operations.GOVERNANCE_UPDATE,
-    ]}
-    EXECUTOR = {"name": "executor", "allowed_to": [
-        Operations.MANDATE_ASSIGN_EXECUTOR,
-        Operations.TRADE_EXECUTE,
-        Operations.RESOURCE_REASSIGN,
-        Operations.ENFORCEMENT_RECORD,
-    ]}
-    JUDGE = {"name": "judge", "allowed_to": [
-        Operations.DISPUTE_ACCEPT,
-        Operations.DISPUTE_REJECT,
-        Operations.DISPUTE_ASSIGN,
-        Operations.DISPUTE_VIEW_ALL,
-        Operations.EVIDENCE_EVALUATE,
-        Operations.RESOLUTION_DRAFT,
-        Operations.RESOLUTION_ISSUE,
-        Operations.RESOLUTION_FINALIZE,
-        Operations.APPEAL_ALLOW,
-    ]}
-    ENFORCER = {"name": "enforcer", "allowed_to": [
-        Operations.FINE_APPLY,
-        Operations.ACCESS_REVOKE,
-        Operations.CONTRACT_TERMINATE,
-        Operations.INSTRUMENT_LOCK,
-        Operations.USER_UPDATE_STATUS,
-        Operations.ENFORCEMENT_ESCALATE,
-    ]}
-    TREASURER = {"name": "treasurer", "allowed_to": [
-        Operations.TRANSFER_CREATE,
-        Operations.TRANSFER_REVERT,
-        Operations.LICENSE_ISSUE,
-        Operations.LICENSE_REVOKE,
-        Operations.INVOICE_REFRESH,
-    ]}
-    MERCHANT = {"name": "merchant", "allowed_to": [
-        Operations.TRADE_EXECUTE,
-        Operations.NFT_MINT,
-    ]}
-    OPERATOR = {"name": "operator", "allowed_to": [
-        Operations.REALM_ADMIN,
-        Operations.REALM_CONFIGURE,
-        Operations.REALM_CONFIGURE_CODEX,
-        Operations.QUARTER_REGISTER,
-        Operations.QUARTER_DEREGISTER,
-        Operations.QUARTER_CONFIGURE,
-        Operations.REALM_REGISTER,
-    ]}
-    DEVELOPER = {"name": "developer", "allowed_to": [
-        Operations.SHELL_EXECUTE,
-        Operations.EXTENSION_CALL,
-        Operations.EXTENSION_SYNC_CALL,
-        Operations.EXTENSION_ASYNC_CALL,
-    ]}
+    LEGISLATOR = {
+        "name": "legislator",
+        "allowed_to": [
+            Operations.MANDATE_CREATE,
+            Operations.PROPOSAL_CREATE,
+            Operations.CONTRACT_CREATE_UNDER_MANDATE,
+            Operations.GOVERNANCE_UPDATE,
+        ],
+    }
+    EXECUTOR = {
+        "name": "executor",
+        "allowed_to": [
+            Operations.MANDATE_ASSIGN_EXECUTOR,
+            Operations.TRADE_EXECUTE,
+            Operations.RESOURCE_REASSIGN,
+            Operations.ENFORCEMENT_RECORD,
+        ],
+    }
+    JUDGE = {
+        "name": "judge",
+        "allowed_to": [
+            Operations.DISPUTE_ACCEPT,
+            Operations.DISPUTE_REJECT,
+            Operations.DISPUTE_ASSIGN,
+            Operations.DISPUTE_VIEW_ALL,
+            Operations.EVIDENCE_EVALUATE,
+            Operations.RESOLUTION_DRAFT,
+            Operations.RESOLUTION_ISSUE,
+            Operations.RESOLUTION_FINALIZE,
+            Operations.APPEAL_ALLOW,
+        ],
+    }
+    ENFORCER = {
+        "name": "enforcer",
+        "allowed_to": [
+            Operations.FINE_APPLY,
+            Operations.ACCESS_REVOKE,
+            Operations.CONTRACT_TERMINATE,
+            Operations.INSTRUMENT_LOCK,
+            Operations.USER_UPDATE_STATUS,
+            Operations.ENFORCEMENT_ESCALATE,
+        ],
+    }
+    TREASURER = {
+        "name": "treasurer",
+        "allowed_to": [
+            Operations.TRANSFER_CREATE,
+            Operations.TRANSFER_REVERT,
+            Operations.LICENSE_ISSUE,
+            Operations.LICENSE_REVOKE,
+            Operations.INVOICE_REFRESH,
+        ],
+    }
+    MERCHANT = {
+        "name": "merchant",
+        "allowed_to": [
+            Operations.TRADE_EXECUTE,
+            Operations.NFT_MINT,
+        ],
+    }
+    OPERATOR = {
+        "name": "operator",
+        "allowed_to": [
+            Operations.REALM_ADMIN,
+            Operations.REALM_CONFIGURE,
+            Operations.REALM_CONFIGURE_CODEX,
+            Operations.QUARTER_REGISTER,
+            Operations.QUARTER_DEREGISTER,
+            Operations.QUARTER_CONFIGURE,
+            Operations.REALM_REGISTER,
+        ],
+    }
+    DEVELOPER = {
+        "name": "developer",
+        "allowed_to": [
+            Operations.SHELL_EXECUTE,
+            Operations.EXTENSION_CALL,
+            Operations.EXTENSION_SYNC_CALL,
+            Operations.EXTENSION_ASYNC_CALL,
+        ],
+    }
 
     ALL_PROFILES = [
-        ADMIN, MEMBER, OBSERVER, LEGISLATOR, EXECUTOR,
-        JUDGE, ENFORCER, TREASURER, MERCHANT, OPERATOR, DEVELOPER,
+        ADMIN,
+        MEMBER,
+        OBSERVER,
+        LEGISLATOR,
+        EXECUTOR,
+        JUDGE,
+        ENFORCER,
+        TREASURER,
+        MERCHANT,
+        OPERATOR,
+        DEVELOPER,
     ]
 
 
