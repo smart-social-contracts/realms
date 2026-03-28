@@ -7,28 +7,19 @@
  * browser, where it is decrypted locally using an ephemeral BLS12-381 key pair.
  *
  * Flow:
- *   1. get_my_vetkey_public_key  → IBE master public key (hex)
- *   2. generate TransportSecretKey (random 32-byte seed)
- *   3. derive_my_vetkey(tpk_hex) → encrypted symmetric key (hex)
- *   4. tsk.decrypt_and_hash(…)    → 32-byte AES-256-GCM key
- *   5. AES-GCM encrypt / decrypt
+ *   1. get_my_vetkey_public_key  → derived public key (hex)
+ *   2. generate TransportSecretKey.random() (BLS12-381 G1, 48-byte compressed)
+ *   3. derive_my_vetkey(tpk_hex) → encrypted vetKey (hex)
+ *   4. EncryptedVetKey.decryptAndVerify(…)  → VetKey
+ *   5. VetKey.deriveSymmetricKey(…)  → 32-byte AES-256-GCM key
+ *   6. AES-GCM encrypt / decrypt
  */
 
-// ---------------------------------------------------------------------------
-// WASM initialisation  (ic-vetkd-utils is a wasm-pack crate)
-// ---------------------------------------------------------------------------
-
-let vetkdModule: typeof import('ic-vetkd-utils') | null = null;
-
-async function getVetkdModule(): Promise<typeof import('ic-vetkd-utils')> {
-	if (vetkdModule) return vetkdModule;
-
-	const mod = await import('ic-vetkd-utils');
-	// Initialise WASM – the .wasm file is served from /wasm/ in static/
-	await mod.default('/wasm/ic_vetkd_utils_bg.wasm');
-	vetkdModule = mod;
-	return mod;
-}
+import {
+	TransportSecretKey,
+	DerivedPublicKey,
+	EncryptedVetKey
+} from '@dfinity/vetkeys';
 
 // ---------------------------------------------------------------------------
 // Hex helpers
@@ -53,8 +44,8 @@ function bytesToHex(bytes: Uint8Array): string {
 // Key derivation
 // ---------------------------------------------------------------------------
 
-/** Associated data baked into the KDF so the key is bound to our cipher. */
-const AES_GCM_AD = new TextEncoder().encode('aes-256-gcm-realms-private-data');
+/** Domain separator for symmetric key derivation from VetKey. */
+const AES_GCM_DOMAIN_SEP = 'aes-256-gcm-realms-private-data';
 
 /**
  * Derive a 32-byte AES-256-GCM key for the currently authenticated user.
@@ -63,9 +54,7 @@ const AES_GCM_AD = new TextEncoder().encode('aes-256-gcm-realms-private-data');
  * @returns A `CryptoKey` ready for `encrypt` / `decrypt`.
  */
 export async function deriveAesKey(backend: any): Promise<CryptoKey> {
-	const { TransportSecretKey } = await getVetkdModule();
-
-	// 1. Fetch the vetKD public key for this user's context
+	// 1. Fetch the vetKD derived public key for this user's context
 	const pkResp = await backend.get_my_vetkey_public_key();
 	if (!pkResp.success || !pkResp.data?.message) {
 		throw new Error(
@@ -73,12 +62,13 @@ export async function deriveAesKey(backend: any): Promise<CryptoKey> {
 		);
 	}
 	const publicKeyHex: string = pkResp.data.message;
+	console.log('vetKD public key hex:', publicKeyHex.substring(0, 80) + '...', 'hex len:', publicKeyHex.length, 'bytes:', publicKeyHex.length / 2);
 	const publicKeyBytes = hexToBytes(publicKeyHex);
+	const dpk = DerivedPublicKey.deserialize(publicKeyBytes);
 
-	// 2. Generate ephemeral transport key pair
-	const seed = crypto.getRandomValues(new Uint8Array(32));
-	const tsk = new TransportSecretKey(seed);
-	const tpkHex = bytesToHex(tsk.public_key());
+	// 2. Generate ephemeral transport key pair (48-byte compressed G1)
+	const tsk = TransportSecretKey.random();
+	const tpkHex = bytesToHex(tsk.publicKeyBytes());
 
 	// 3. Ask the canister to derive the encrypted key
 	const deriveResp = await backend.derive_my_vetkey(tpkHex);
@@ -89,17 +79,15 @@ export async function deriveAesKey(backend: any): Promise<CryptoKey> {
 	}
 	const encryptedKeyBytes = hexToBytes(deriveResp.data.message);
 
-	// 4. Decrypt & hash → 32-byte symmetric key
-	//    derivation_id is empty (matches backend input_hex="")
-	const symmetricKeyRaw = tsk.decrypt_and_hash(
-		encryptedKeyBytes,
-		publicKeyBytes,
-		new Uint8Array(), // derivation_id
-		32, // 256 bits
-		AES_GCM_AD
-	);
+	// 4. Decrypt & verify → VetKey (BLS signature)
+	//    input is empty (matches backend input_hex="")
+	const encryptedVetKey = EncryptedVetKey.deserialize(encryptedKeyBytes);
+	const vetKey = encryptedVetKey.decryptAndVerify(tsk, dpk, new Uint8Array());
 
-	// 5. Import into Web Crypto
+	// 5. Derive 32-byte symmetric key via HKDF
+	const symmetricKeyRaw = vetKey.deriveSymmetricKey(AES_GCM_DOMAIN_SEP, 32);
+
+	// 6. Import into Web Crypto
 	return crypto.subtle.importKey('raw', symmetricKeyRaw, { name: 'AES-GCM' }, false, [
 		'encrypt',
 		'decrypt'

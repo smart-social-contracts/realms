@@ -78,7 +78,6 @@ type StatusRecord = record {
   realm_welcome_message : text;
   accounting_currency : text;
   accounting_currency_decimals : nat;
-  private_data_fields : text;
 };
 type UserGetRecord = record {
   "principal" : principal;

@@ -77,8 +77,10 @@
 							try {
 								await encryptPrivateData(backend, {});
 								encryptionAvailable = true;
-							} catch {
+							} catch (probeErr) {
+								console.warn('Encryption probe failed:', probeErr);
 								encryptionAvailable = false;
+								encryptionError = 'Encryption not available on this subnet';
 							}
 						}
 					} catch (decErr) {
@@ -88,8 +90,15 @@
 						} catch {
 							privateData = {};
 						}
-						encryptionAvailable = false;
-						encryptionError = 'Encryption not available on this subnet';
+						// Probe whether encryption is actually available
+						try {
+							await encryptPrivateData(backend, {});
+							encryptionAvailable = true;
+						} catch (probeErr) {
+							console.warn('Encryption probe failed:', probeErr);
+							encryptionAvailable = false;
+							encryptionError = 'Encryption not available on this subnet';
+						}
 					}
 				} else {
 					// No private data yet — probe encryption
