@@ -1413,6 +1413,7 @@ def create_foundational_objects() -> void:
         import json
         import os
 
+        manifest_json_str = "{}"  # default if no manifest.json found
         try:
             # Look for manifest.json in common locations
             manifest_paths = [
@@ -1431,6 +1432,7 @@ def create_foundational_objects() -> void:
                     realm_welcome_message = manifest.get("welcome_message", "")
                     calendar_config = manifest.get("calendar", {})
                     acct_currency_config = manifest.get("accounting_currency", {})
+                    manifest_json_str = json.dumps(manifest)
                     logger.info(
                         f"Loaded realm config from {manifest_path}: name={realm_name}"
                     )
@@ -1451,6 +1453,7 @@ def create_foundational_objects() -> void:
             accounting_currency=acct_currency_config.get("symbol", "ckBTC"),
             accounting_currency_decimals=acct_currency_config.get("decimals", 8),
             principal_id="",
+            manifest_data=manifest_json_str,
         )
 
         logger.info(f"Created realm: {realm_name}")
