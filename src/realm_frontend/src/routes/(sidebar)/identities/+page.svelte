@@ -114,36 +114,37 @@
 					(ext: any) => ext.identity_provider && ext.enabled !== false
 				);
 
-				const providers: IdentityProvider[] = [];
-				for (const ext of providerExtensions) {
-					const ip = ext.identity_provider;
-					let verified = false;
+				// Show providers immediately from manifest data (no canister calls)
+				identityProviders = providerExtensions.map((ext: any) => ({
+					extensionName: ext.name,
+					name: ext.identity_provider.name || ext.name,
+					providerUrl: ext.identity_provider.provider_url || '',
+					logo: ext.identity_provider.logo || '',
+					description: ext.identity_provider.description || ext.description || '',
+					verified: false
+				}));
 
-					try {
-						const statusResponse = await backend.extension_sync_call({
-							extension_name: ext.name,
-							function_name: 'get_identity_status',
-							args: ''
-						});
-						if (statusResponse.success) {
-							const statusData = JSON.parse(statusResponse.response);
-							verified = statusData.verified === true;
+				// Then check verification status in parallel (DB reads, no external calls)
+				Promise.all(
+					providerExtensions.map(async (ext: any, i: number) => {
+						try {
+							const statusResponse = await backend.extension_sync_call({
+								extension_name: ext.name,
+								function_name: 'get_identity_status',
+								args: ''
+							});
+							if (statusResponse.success) {
+								const statusData = JSON.parse(statusResponse.response);
+								if (statusData.verified) {
+									identityProviders[i] = { ...identityProviders[i], verified: true };
+									identityProviders = identityProviders; // trigger reactivity
+								}
+							}
+						} catch (err) {
+							console.error(`Error checking identity status for ${ext.name}:`, err);
 						}
-					} catch (err) {
-						console.error(`Error checking identity status for ${ext.name}:`, err);
-					}
-
-					providers.push({
-						extensionName: ext.name,
-						name: ip.name || ext.name,
-						providerUrl: ip.provider_url || '',
-						logo: ip.logo || '',
-						description: ip.description || ext.description || '',
-						verified
-					});
-				}
-
-				identityProviders = providers;
+					})
+				);
 			}
 		} catch (error) {
 			console.error('Error loading identity providers:', error);
