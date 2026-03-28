@@ -6,7 +6,6 @@
 	import { FingerprintOutline } from 'flowbite-svelte-icons';
 	import { backend } from '$lib/canisters';
 	import { onMount } from 'svelte';
-	import { realmInfo } from '$lib/stores/realmInfo';
 	import { principal } from '$lib/stores/auth';
 	import { encryptPrivateData, decryptPrivateData } from '$lib/crypto/vetkeys';
 
@@ -39,6 +38,16 @@
 	let privateMessage = '';
 	let encryptionAvailable = false;
 	let encryptionError = '';
+
+	const privateDataFields = [
+		{ key: 'first_name', label: 'First Name', type: 'text' },
+		{ key: 'last_name', label: 'Last Name', type: 'text' },
+		{ key: 'photo', label: 'Photo URL', type: 'url' },
+		{ key: 'birth_date', label: 'Date of Birth', type: 'date' },
+		{ key: 'address', label: 'Address', type: 'text' },
+		{ key: 'email', label: 'Email', type: 'email' },
+		{ key: 'phone', label: 'Phone Number', type: 'tel' }
+	];
 
 	$: displayAvatar = avatarUrl?.trim() || `https://api.dicebear.com/9.x/glass/svg?seed=${$principal}`;
 
@@ -280,51 +289,49 @@
 	</Card>
 
 	<!-- Private Data -->
-	{#if $realmInfo.privateDataFields.length > 0}
-		<Card size="xl">
-			<Heading tag="h3" class="mb-2 text-xl font-bold dark:text-white">Private Data</Heading>
-				{#if encryptionAvailable}
-				<div class="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-					<p class="text-sm text-green-800 dark:text-green-200">
-						&#x1f512; Your private data is <strong>end-to-end encrypted</strong> using IC vetKeys. Only you can decrypt it.
-					</p>
-				</div>
-			{:else}
-				<div class="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-					<p class="text-sm text-yellow-800 dark:text-yellow-200">
-						Encryption is not available{encryptionError ? `: ${encryptionError}` : ''}. Data will be stored unencrypted.
-					</p>
-				</div>
-			{/if}
-			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-				{#each $realmInfo.privateDataFields as field}
-					<div>
-						<Label for="private-{field.key}" class="mb-2">
-							{field.label}{#if field.required}<span class="text-red-500 ml-1">*</span>{/if}
-						</Label>
-						{#if field.type === 'date'}
-							<Input id="private-{field.key}" type="date" value={privateData[field.key] || ''} on:input={(e) => { privateData[field.key] = e.currentTarget.value; }} />
-						{:else if field.type === 'email'}
-							<Input id="private-{field.key}" type="email" value={privateData[field.key] || ''} on:input={(e) => { privateData[field.key] = e.currentTarget.value; }} placeholder="email@example.com" />
-						{:else if field.type === 'tel'}
-							<Input id="private-{field.key}" type="tel" value={privateData[field.key] || ''} on:input={(e) => { privateData[field.key] = e.currentTarget.value; }} placeholder="+1 234 567 890" />
-						{:else if field.type === 'url'}
-							<Input id="private-{field.key}" type="url" value={privateData[field.key] || ''} on:input={(e) => { privateData[field.key] = e.currentTarget.value; }} placeholder="https://..." />
-						{:else}
-							<Input id="private-{field.key}" type="text" value={privateData[field.key] || ''} on:input={(e) => { privateData[field.key] = e.currentTarget.value; }} />
-						{/if}
-					</div>
-				{/each}
+	<Card size="xl">
+		<Heading tag="h3" class="mb-2 text-xl font-bold dark:text-white">Private Data</Heading>
+			{#if encryptionAvailable}
+			<div class="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+				<p class="text-sm text-green-800 dark:text-green-200">
+					&#x1f512; Your private data is <strong>end-to-end encrypted</strong> using IC vetKeys. Only you can decrypt it.
+				</p>
 			</div>
-			{#if privateMessage}
-				<p class="mt-3 text-sm {privateMessage.includes('success') ? 'text-green-600' : 'text-red-600'}">{privateMessage}</p>
-			{/if}
-			<div class="mt-4">
-				<Button size="sm" color="alternative" on:click={savePrivateData} disabled={privateSaving}>
-					{privateSaving ? 'Saving...' : 'Save'}
-				</Button>
+		{:else}
+			<div class="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+				<p class="text-sm text-yellow-800 dark:text-yellow-200">
+					Encryption is not available{encryptionError ? `: ${encryptionError}` : ''}. Data will be stored unencrypted.
+				</p>
 			</div>
-		</Card>
-	{/if}
+		{/if}
+		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+			{#each privateDataFields as field}
+				<div>
+					<Label for="private-{field.key}" class="mb-2">
+						{field.label}
+					</Label>
+					{#if field.type === 'date'}
+						<Input id="private-{field.key}" type="date" value={privateData[field.key] || ''} on:input={(e) => { privateData[field.key] = e.currentTarget.value; }} />
+					{:else if field.type === 'email'}
+						<Input id="private-{field.key}" type="email" value={privateData[field.key] || ''} on:input={(e) => { privateData[field.key] = e.currentTarget.value; }} placeholder="email@example.com" />
+					{:else if field.type === 'tel'}
+						<Input id="private-{field.key}" type="tel" value={privateData[field.key] || ''} on:input={(e) => { privateData[field.key] = e.currentTarget.value; }} placeholder="+1 234 567 890" />
+					{:else if field.type === 'url'}
+						<Input id="private-{field.key}" type="url" value={privateData[field.key] || ''} on:input={(e) => { privateData[field.key] = e.currentTarget.value; }} placeholder="https://..." />
+					{:else}
+						<Input id="private-{field.key}" type="text" value={privateData[field.key] || ''} on:input={(e) => { privateData[field.key] = e.currentTarget.value; }} />
+					{/if}
+				</div>
+			{/each}
+		</div>
+		{#if privateMessage}
+			<p class="mt-3 text-sm {privateMessage.includes('success') ? 'text-green-600' : 'text-red-600'}">{privateMessage}</p>
+		{/if}
+		<div class="mt-4">
+			<Button size="sm" color="alternative" on:click={savePrivateData} disabled={privateSaving}>
+				{privateSaving ? 'Saving...' : 'Save'}
+			</Button>
+		</div>
+	</Card>
 
 </div>

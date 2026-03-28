@@ -174,19 +174,6 @@ def get_status() -> "dict[str, Any]":
     except Exception as e:
         logger.warning(f"Could not load registries: {e}")
 
-    # Private data fields schema from realm manifest
-    private_data_fields = "[]"
-    try:
-        first_realm = Realm.load("1")
-        if first_realm:
-            manifest_data = getattr(first_realm, "manifest_data", None) or ""
-            if manifest_data:
-                manifest_obj = json.loads(manifest_data)
-                fields = manifest_obj.get("private_data_fields", [])
-                private_data_fields = json.dumps(fields)
-    except Exception as e:
-        logger.warning(f"Could not load private_data_fields: {e}")
-
     # Accounting currency
     accounting_currency = "ckBTC"
     accounting_currency_decimals = 8
@@ -269,5 +256,4 @@ def get_status() -> "dict[str, Any]":
         "parent_realm_canister_id": parent_realm_canister_id,
         "accounting_currency": accounting_currency,
         "accounting_currency_decimals": accounting_currency_decimals,
-        "private_data_fields": private_data_fields,
     }

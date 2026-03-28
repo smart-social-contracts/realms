@@ -124,7 +124,6 @@ class StatusRecord(Record):
     parent_realm_canister_id: text
     accounting_currency: text
     accounting_currency_decimals: nat
-    private_data_fields: text
 
 
 class UserGetRecord(Record):

@@ -13,13 +13,6 @@ interface QuarterInfo {
 	status: string;
 }
 
-interface PrivateDataField {
-	key: string;
-	label: string;
-	type: string;
-	required: boolean;
-}
-
 interface RealmInfo {
 	name: string;
 	logo: string;
@@ -30,7 +23,6 @@ interface RealmInfo {
 	quarters: QuarterInfo[];
 	isQuarter: boolean;
 	parentRealmCanisterId: string;
-	privateDataFields: PrivateDataField[];
 	loading: boolean;
 	error: string | null;
 }
@@ -46,7 +38,6 @@ const createRealmInfoStore = () => {
 		quarters: [],
 		isQuarter: false,
 		parentRealmCanisterId: '',
-		privateDataFields: [],
 		loading: true,
 		error: null
 	});
@@ -77,7 +68,6 @@ const createRealmInfoStore = () => {
 						quarters: status.quarters || [],
 						isQuarter: status.is_quarter || false,
 						parentRealmCanisterId: status.parent_realm_canister_id || '',
-						privateDataFields: status.private_data_fields ? JSON.parse(status.private_data_fields) : [],
 						loading: false
 					}));
 				} else {
