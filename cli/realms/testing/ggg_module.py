@@ -327,6 +327,8 @@ Appeal = _entity("Appeal", alias="id", methods={
 
 # --- Federation ---
 Quarter = _entity("Quarter", alias="name")
+QuarterConfig = _entity("QuarterConfig", alias="id")
+GuestUser = _entity("GuestUser", alias="id")
 
 # --- Services ---
 Service = _entity("Service", alias="service_id")

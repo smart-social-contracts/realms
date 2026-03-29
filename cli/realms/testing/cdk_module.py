@@ -30,11 +30,15 @@ class _MockPrincipal:
 class _MockIC:
     """Mock of the ``ic`` canister SDK object."""
 
+    def __init__(self):
+        self._canister_id = "test-canister-principal"
+        self._caller_id = "test-caller-principal"
+
     def print(self, *args, **kwargs):
         print(*args, **kwargs)
 
     def caller(self):
-        return _MockPrincipal("test-caller-principal")
+        return _MockPrincipal(self._caller_id)
 
     def time(self):
         """Return current time in nanoseconds (matches IC convention)."""
@@ -42,7 +46,15 @@ class _MockIC:
 
     def id(self):
         """Return mock canister principal."""
-        return _MockPrincipal("test-canister-principal")
+        return _MockPrincipal(self._canister_id)
+
+    def set_id(self, canister_id):
+        """Test helper: simulate running on a specific canister."""
+        self._canister_id = canister_id
+
+    def set_caller(self, caller_id):
+        """Test helper: simulate a specific caller principal."""
+        self._caller_id = caller_id
 
     def msg_cycles_available(self):
         return 1_000_000_000_000
