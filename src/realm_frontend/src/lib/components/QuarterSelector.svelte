@@ -7,6 +7,7 @@
 	let quarters = [];
 	let selectedId = null;
 	let open = false;
+	let homeQuarterId = null;
 
 	// React to realmInfo changes to get quarters list
 	$: quarters = $realmInfo?.quarters || [];
@@ -14,6 +15,13 @@
 
 	// Sync local selection with store
 	$: selectedId = $activeQuarterId;
+
+	// Read cached home quarter for guest/home tagging
+	onMount(() => {
+		if (typeof localStorage !== 'undefined') {
+			homeQuarterId = localStorage.getItem('home_quarter');
+		}
+	});
 
 	function selectQuarter(quarterId) {
 		if (quarterId === selectedId) {
@@ -89,8 +97,13 @@
 						on:click={() => selectQuarter(quarter.canister_id)}
 						class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 {selectedId === quarter.canister_id ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}"
 					>
-						<span class="text-xs">🏘️</span>
+						<span class="text-xs">{quarter.canister_id === homeQuarterId ? '�' : '�🏘️'}</span>
 						<span class="flex-1 truncate">{quarter.name}</span>
+						{#if quarter.canister_id === homeQuarterId}
+							<span class="text-xs text-green-600 font-medium">Home</span>
+						{:else if homeQuarterId}
+							<span class="text-xs text-gray-400 italic">Guest</span>
+						{/if}
 						<span class="text-xs text-gray-400">{quarter.population || 0}</span>
 						{#if selectedId === quarter.canister_id}
 							<span class="text-blue-500 text-xs">✓</span>

@@ -22,6 +22,8 @@ class User(Entity, TimestampedMixin):
     # Public data (visible to community)
     nickname = String(max_length=256)
     avatar = String(max_length=512)
+    # Quarter federation
+    home_quarter = String(max_length=64)  # Canister ID of user's home quarter
     # Private data (encrypted at rest via vetKeys + basilisk OS crypto)
     # JSON blob — schema defined in realm manifest
     private_data = EncryptedString()
@@ -110,4 +112,5 @@ def user_register(principal: str, profile: str) -> dict[str, Any]:
         "nickname": user.nickname or "",
         "avatar": user.avatar or "",
         "private_data": user.private_data or "",
+        "home_quarter": user.home_quarter or "",
     }

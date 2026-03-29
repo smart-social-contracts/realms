@@ -11,6 +11,7 @@ export interface QuarterInfo {
 export interface QuartersState {
 	quarters: QuarterInfo[];
 	isQuarter: boolean;
+	isCapital: boolean;
 	parentRealmCanisterId: string;
 	loading: boolean;
 	error: string | null;
@@ -20,6 +21,7 @@ const createQuartersStore = () => {
 	const { subscribe, set, update } = writable<QuartersState>({
 		quarters: [],
 		isQuarter: false,
+		isCapital: false,
 		parentRealmCanisterId: '',
 		loading: true,
 		error: null
@@ -44,6 +46,7 @@ const createQuartersStore = () => {
 						...state,
 						quarters: status.quarters || [],
 						isQuarter: status.is_quarter || false,
+						isCapital: status.is_capital || false,
 						parentRealmCanisterId: status.parent_realm_canister_id || '',
 						loading: false
 					}));
@@ -75,3 +78,6 @@ export const hasQuarters = derived(quartersStore, ($s: QuartersState) => $s.quar
 
 // Derived: whether this backend is itself a quarter
 export const isQuarter = derived(quartersStore, ($s: QuartersState) => $s.isQuarter);
+
+// Derived: whether this backend is the capital quarter of a federation
+export const isCapital = derived(quartersStore, ($s: QuartersState) => $s.isCapital);

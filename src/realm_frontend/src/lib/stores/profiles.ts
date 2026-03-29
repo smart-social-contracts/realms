@@ -135,6 +135,27 @@ export async function loadUserProfiles() {
                 loading: false
             }));
             console.log("User profiles loaded:", profiles);
+
+            // Auto-route to home quarter if assigned
+            const assignedQuarter = response.data.userGet.assigned_quarter;
+            if (assignedQuarter) {
+                try {
+                    // @ts-ignore
+                    const { setActiveQuarter } = await import('$lib/canisters');
+                    // @ts-ignore
+                    const { activeQuarterId } = await import('$lib/stores/quarters');
+                    activeQuarterId.set(assignedQuarter);
+                    await setActiveQuarter(assignedQuarter);
+                    console.log("🏘️ Auto-routed to home quarter:", assignedQuarter);
+
+                    // Cache in localStorage for instant reconnect
+                    if (typeof localStorage !== 'undefined') {
+                        localStorage.setItem('home_quarter', assignedQuarter);
+                    }
+                } catch (qErr) {
+                    console.error("Failed to auto-route to home quarter:", qErr);
+                }
+            }
         } else if (response && !response.success) {
             profileState.update(state => ({
                 ...state,

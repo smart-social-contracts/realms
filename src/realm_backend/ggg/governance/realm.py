@@ -35,6 +35,7 @@ class Realm(Entity, TimestampedMixin):
     nft_canister_id = String(max_length=64)
     # Quarter/Federation fields (dormant for single-quarter realms)
     is_quarter = Boolean(default=False)
+    is_capital = Boolean(default=False)  # This quarter coordinates federation governance
     federation_realm_id = String(max_length=64)  # parent realm ID if this is a quarter
     quarter_ids = OneToMany("Quarter", "federation")
     federation_codex = OneToOne("Codex", "federation")

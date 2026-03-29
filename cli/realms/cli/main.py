@@ -675,11 +675,14 @@ def realm_quarter_create(
     plain_logs: bool = typer.Option(
         False, "--plain-logs", help="Show full verbose output instead of progress UI"
     ),
+    capital: bool = typer.Option(
+        False, "--capital", help="Designate this quarter as the federation capital"
+    ),
 ) -> None:
     """Create a new quarter backend and register it with a parent realm."""
     quarter_create_command(
         realm_ref, quarter_name, network, identity, mode,
-        output_dir, deploy, manifest, bare, plain_logs,
+        output_dir, deploy, manifest, bare, plain_logs, capital,
     )
 
 
@@ -721,6 +724,28 @@ def realm_quarter_remove(
 ) -> None:
     """Remove a quarter from a realm."""
     quarter_remove_command(realm_ref, quarter_ref, network)
+
+
+@quarter_app.command("secede")
+def realm_quarter_secede(
+    quarter_ref: str = typer.Argument(help="Quarter canister ID to declare independence"),
+    network: str = typer.Option("local", "--network", "-n", help="Network to use"),
+) -> None:
+    """Declare independence — secede a quarter from its federation."""
+    from .commands.quarter import quarter_secede_command
+    quarter_secede_command(quarter_ref, network)
+
+
+@quarter_app.command("join-federation")
+def realm_quarter_join_federation(
+    quarter_ref: str = typer.Argument(help="Quarter canister ID to join a federation"),
+    capital_canister_id: str = typer.Option(..., "--capital", help="Capital canister ID of the target federation"),
+    as_capital: bool = typer.Option(False, "--as-capital", help="Join as the capital of the federation"),
+    network: str = typer.Option("local", "--network", "-n", help="Network to use"),
+) -> None:
+    """Join an existing federation as a quarter."""
+    from .commands.quarter import quarter_join_federation_command
+    quarter_join_federation_command(quarter_ref, capital_canister_id, as_capital, network)
 
 
 # Create registry subcommand group

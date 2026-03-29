@@ -4,8 +4,9 @@
   import { principal, isAuthenticated } from '$lib/stores/auth';
   import { login, initializeAuthClient } from '$lib/auth';
   import { CONFIG } from '$lib/config.js';
-  import { backend, initBackendWithIdentity } from '$lib/canisters.js';
+  import { backend, initBackendWithIdentity, setActiveQuarter } from '$lib/canisters.js';
   import { loadUserProfiles, hasJoined, profilesLoading } from '$lib/stores/profiles';
+  import { activeQuarterId } from '$lib/stores/quarters';
   import { realmInfo, realmLogo, realmName as realmNameStore, realmWelcomeImage, realmWelcomeMessage, realmDescription } from '$lib/stores/realmInfo';
   import { cn } from '$lib/theme/utilities';
   import { _ } from 'svelte-i18n';
@@ -124,8 +125,29 @@
     try {
       loading = true;
       console.log(`Joining realm with profile: ${selectedProfile}`);
+      // Step 1: Register on the capital (current backend) — gets quarter assignment
       const response = await backend.join_realm(selectedProfile, '');
       if (response.success) {
+        // Step 2: If assigned to a quarter, switch to it and register there too
+        const assignedQuarter = response.data?.userGet?.assigned_quarter;
+        if (assignedQuarter) {
+          console.log(`Assigned to quarter: ${assignedQuarter}, switching...`);
+          activeQuarterId.set(assignedQuarter);
+          await setActiveQuarter(assignedQuarter);
+
+          // Register on the assigned quarter backend
+          try {
+            await backend.join_realm(selectedProfile, '');
+            console.log('Registered on assigned quarter');
+          } catch (qErr) {
+            console.warn('Quarter registration deferred:', qErr);
+          }
+
+          // Cache in localStorage for instant reconnect
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('home_quarter', assignedQuarter);
+          }
+        }
         currentStep = 'success';
       } else if (response.data && response.data.error) {
         error = response.data.error;

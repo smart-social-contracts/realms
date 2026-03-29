@@ -63,6 +63,7 @@ def quarter_create_command(
     manifest: Optional[str],
     bare: bool,
     plain_logs: bool,
+    capital: bool = False,
 ) -> None:
     """Create a new quarter backend and register it with the parent realm."""
 
@@ -158,6 +159,16 @@ def quarter_create_command(
         )
         console.print(f"  ✅ Quarter configured (parent: {parent_canister_id})")
 
+        # If --capital, designate as federation capital
+        if capital:
+            _call_canister(
+                quarter_canister_id,
+                "join_federation",
+                f'("{parent_canister_id}", true)',
+                effective_network,
+            )
+            console.print(f"  ✅ Quarter designated as federation capital")
+
         # Register quarter on parent realm
         _call_canister(
             parent_canister_id,
@@ -171,7 +182,8 @@ def quarter_create_command(
         console.print("[dim]You can retry with: realms realm quarter register ...[/dim]")
         raise typer.Exit(1)
 
-    console.print(f"\n[green]✅ Quarter '{quarter_name}' created and registered successfully![/green]")
+    role = " (capital)" if capital else ""
+    console.print(f"\n[green]✅ Quarter '{quarter_name}'{role} created and registered successfully![/green]")
 
 
 def quarter_register_command(
@@ -412,4 +424,82 @@ def quarter_remove_command(
         console.print(f"[dim]Note: The quarter canister ({quarter_canister_id}) still exists. Delete it manually with dfx if needed.[/dim]")
     except RuntimeError as e:
         console.print(f"[red]❌ Failed to remove quarter: {e}[/red]")
+        raise typer.Exit(1)
+
+
+def quarter_secede_command(
+    quarter_ref: str,
+    network: str,
+) -> None:
+    """Declare independence — secede a quarter from its federation."""
+
+    effective_network, _ = get_effective_network_and_canister(network, None, quiet=True)
+
+    console.print(f"[bold red]🏴 Declaring Independence[/bold red]\n")
+    console.print(f"  Quarter: [cyan]{quarter_ref}[/cyan]")
+    console.print(f"  Network: [dim]{effective_network}[/dim]\n")
+
+    try:
+        response = _call_canister(
+            quarter_ref, "declare_independence", "()", effective_network
+        )
+        if isinstance(response, dict) and response.get("success") is False:
+            error = response.get("data", {}).get("error", "Unknown error")
+            console.print(f"[red]❌ {error}[/red]")
+            raise typer.Exit(1)
+        console.print(f"[green]✅ Quarter has seceded and is now an independent realm.[/green]")
+        console.print(f"[dim]The canister retains all users, data, and governance. Deploy a frontend to complete independence.[/dim]")
+    except RuntimeError as e:
+        console.print(f"[red]❌ Failed: {e}[/red]")
+        raise typer.Exit(1)
+
+
+def quarter_join_federation_command(
+    quarter_ref: str,
+    capital_canister_id: str,
+    as_capital: bool,
+    network: str,
+) -> None:
+    """Join an existing federation as a quarter."""
+
+    effective_network, _ = get_effective_network_and_canister(network, None, quiet=True)
+
+    role = "capital" if as_capital else "quarter"
+    console.print(f"[bold cyan]🤝 Joining Federation as {role}[/bold cyan]\n")
+    console.print(f"  Quarter:    [cyan]{quarter_ref}[/cyan]")
+    console.print(f"  Capital:    [cyan]{capital_canister_id}[/cyan]")
+    console.print(f"  Network:    [dim]{effective_network}[/dim]\n")
+
+    as_capital_str = "true" if as_capital else "false"
+    try:
+        response = _call_canister(
+            quarter_ref,
+            "join_federation",
+            f'("{capital_canister_id}", {as_capital_str})',
+            effective_network,
+        )
+        if isinstance(response, dict) and response.get("success") is False:
+            error = response.get("data", {}).get("error", "Unknown error")
+            console.print(f"[red]❌ {error}[/red]")
+            raise typer.Exit(1)
+
+        console.print(f"[green]✅ Joined federation as {role}![/green]")
+
+        # Also register with the capital
+        try:
+            # Get realm name from the quarter's own status
+            q_status = _call_canister(quarter_ref, "status", "()", effective_network)
+            quarter_name = q_status.get("data", {}).get("status", {}).get("realm_name", quarter_ref[:12])
+            _call_canister(
+                capital_canister_id,
+                "register_quarter",
+                f'("{quarter_name}", "{quarter_ref}")',
+                effective_network,
+            )
+            console.print(f"  ✅ Registered on capital's quarter list")
+        except RuntimeError as e:
+            console.print(f"  [yellow]⚠️  Could not auto-register on capital: {e}[/yellow]")
+            console.print(f"  [dim]Register manually: realms realm quarter register <capital> --quarter-name <name> --canister-id {quarter_ref}[/dim]")
+    except RuntimeError as e:
+        console.print(f"[red]❌ Failed: {e}[/red]")
         raise typer.Exit(1)

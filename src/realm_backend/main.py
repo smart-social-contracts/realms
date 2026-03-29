@@ -333,11 +333,13 @@ def get_quarter_info() -> RealmResponse:
 
         quarters = []
         is_quarter = False
+        is_capital = False
         parent_realm_canister_id = ""
 
         first_realm = Realm.load("1")
         if first_realm:
             is_quarter = bool(getattr(first_realm, "is_quarter", False))
+            is_capital = bool(getattr(first_realm, "is_capital", False))
             parent_realm_canister_id = (
                 getattr(first_realm, "federation_realm_id", "") or ""
             )
@@ -355,6 +357,7 @@ def get_quarter_info() -> RealmResponse:
             {
                 "quarters": quarters,
                 "is_quarter": is_quarter,
+                "is_capital": is_capital,
                 "parent_realm_canister_id": parent_realm_canister_id,
             }
         )
@@ -412,7 +415,7 @@ def join_realm(profile: str, preferred_quarter: text) -> RealmResponse:
 
         # Quarter assignment (no-op for single-quarter realms)
         assigned_quarter_canister_id = ""
-        from ggg import Quarter, Realm
+        from ggg import Quarter, Realm, User
 
         realm = Realm.load("1")
         quarters = list(Quarter.instances()) if realm else []
@@ -420,6 +423,10 @@ def join_realm(profile: str, preferred_quarter: text) -> RealmResponse:
             assigned_quarter_canister_id = _assign_quarter(
                 ic.caller().to_str(), realm, quarters, preferred_quarter
             )
+            # Persist the assignment on the User entity
+            u = User[ic.caller().to_str()]
+            if u and assigned_quarter_canister_id:
+                u.home_quarter = assigned_quarter_canister_id
 
         return RealmResponse(
             success=True,
@@ -478,6 +485,13 @@ def change_quarter(new_quarter_canister_id: text) -> RealmResponse:
             assign_fn = ns.get("assign_quarter")
             if assign_fn:
                 assign_fn(caller, [target], new_quarter_canister_id)
+
+        # Persist the new assignment on the User entity
+        from ggg import User
+
+        u = User[caller]
+        if u:
+            u.home_quarter = new_quarter_canister_id
 
         return RealmResponse(
             success=True,
@@ -669,6 +683,96 @@ def set_quarter_config(parent_realm_canister_id: text) -> RealmResponse:
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
+@update
+@require(Operations.QUARTER_SECEDE)
+def declare_independence() -> RealmResponse:
+    """Secede from the federation, becoming an independent realm.
+
+    Sets is_quarter=False, is_capital=False, clears federation_realm_id.
+    All local users, data, governance, and extensions remain intact.
+    """
+    try:
+        from ggg import Realm
+
+        realm = Realm.load("1")
+        if not realm:
+            return RealmResponse(
+                success=False, data=RealmResponseData(error="Realm not found")
+            )
+
+        if not realm.is_quarter:
+            return RealmResponse(
+                success=False,
+                data=RealmResponseData(error="This realm is not a quarter of any federation"),
+            )
+
+        old_federation = realm.federation_realm_id or "unknown"
+        realm.is_quarter = False
+        realm.is_capital = False
+        realm.federation_realm_id = ""
+        realm.save()
+
+        logger.info(f"Declared independence from federation {old_federation}")
+
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                message=f"Independence declared. Former federation: {old_federation}"
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error declaring independence: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@update
+@require(Operations.QUARTER_JOIN_FEDERATION)
+def join_federation(capital_canister_id: text, as_capital: bool = False) -> RealmResponse:
+    """Join an existing federation as a quarter.
+
+    Sets is_quarter=True, stores the capital's canister ID, and optionally
+    designates this quarter as the capital.
+
+    Args:
+        capital_canister_id: The canister principal ID of the federation's capital
+        as_capital: If True, designate this quarter as the capital
+    """
+    try:
+        from ggg import Realm
+
+        realm = Realm.load("1")
+        if not realm:
+            return RealmResponse(
+                success=False, data=RealmResponseData(error="Realm not found")
+            )
+
+        if realm.is_quarter:
+            return RealmResponse(
+                success=False,
+                data=RealmResponseData(
+                    error=f"Already a quarter of federation {realm.federation_realm_id}"
+                ),
+            )
+
+        realm.is_quarter = True
+        realm.is_capital = as_capital
+        realm.federation_realm_id = capital_canister_id
+        realm.save()
+
+        role = "capital" if as_capital else "quarter"
+        logger.info(f"Joined federation {capital_canister_id} as {role}")
+
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                message=f"Joined federation {capital_canister_id} as {role}"
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error joining federation: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
 @query
 def get_zones(resolution: nat = 6) -> text:
     """
@@ -713,7 +817,7 @@ def get_my_user_status() -> RealmResponse:
                     nickname=user.get("nickname", ""),
                     avatar=user.get("avatar", ""),
                     private_data=user.get("private_data", ""),
-                    assigned_quarter="",
+                    assigned_quarter=user.get("home_quarter", ""),
                 )
             ),
         )

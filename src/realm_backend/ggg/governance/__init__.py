@@ -6,6 +6,7 @@ from .contract import Contract
 from .license import License, LicenseType, license_issue, license_revoke
 from .mandate import Mandate
 from .proposal import Proposal
+from .guest_user import GuestUser
 from .quarter import Quarter, QuarterStatus
 from .realm import Realm, RealmStatus
 from .registry import Registry
@@ -21,6 +22,7 @@ __all__ = [
     "license_revoke",
     "Mandate",
     "Proposal",
+    "GuestUser",
     "Quarter",
     "QuarterStatus",
     "Realm",

@@ -42,6 +42,8 @@ class Operations:
     QUARTER_REGISTER = "quarter.register"
     QUARTER_DEREGISTER = "quarter.deregister"
     QUARTER_CONFIGURE = "quarter.configure"
+    QUARTER_SECEDE = "quarter.secede"
+    QUARTER_JOIN_FEDERATION = "quarter.join_federation"
     SHELL_EXECUTE = "shell.execute"
 
     # Governance
@@ -182,6 +184,8 @@ class Profiles:
             Operations.QUARTER_REGISTER,
             Operations.QUARTER_DEREGISTER,
             Operations.QUARTER_CONFIGURE,
+            Operations.QUARTER_SECEDE,
+            Operations.QUARTER_JOIN_FEDERATION,
             Operations.REALM_REGISTER,
         ],
     }

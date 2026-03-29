@@ -10,7 +10,7 @@
 	import { quintOut } from 'svelte/easing';
 	import { _ } from 'svelte-i18n';
 	import T from '$lib/components/T.svelte';
-	import { initBackendWithIdentity, backend } from '$lib/canisters';
+	import { initBackendWithIdentity, backend, setActiveQuarter } from '$lib/canisters';
 
 	let principalText = '';
 	let showDropdown = false;
@@ -88,6 +88,12 @@
 			sessionStorage.removeItem('auth_userIdentity');
 			sessionStorage.removeItem('auth_principal');
 		}
+
+		// Reset quarter routing
+		if (typeof localStorage !== 'undefined') {
+			localStorage.removeItem('home_quarter');
+		}
+		setActiveQuarter(null);
 
 		console.log('Principal after logout:', principalText);
 		showDropdown = false;

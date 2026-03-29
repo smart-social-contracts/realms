@@ -19,6 +19,7 @@ def user_get(principal: str) -> dict[str, Any]:
         "nickname": user.nickname or "",
         "avatar": user.avatar or "",
         "private_data": user.private_data or "",
+        "home_quarter": user.home_quarter or "",
     }
 
 
