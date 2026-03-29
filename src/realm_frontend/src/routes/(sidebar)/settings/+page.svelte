@@ -130,7 +130,7 @@
 						>
 							{#each $realmInfo.quarters.filter(q => q.status === 'active') as quarter}
 								<option value={quarter.canister_id}>
-									{quarter.name} — {quarter.population} residents ({quarter.canister_id})
+									{quarter.name} — {quarter.population} users ({quarter.canister_id})
 								</option>
 							{/each}
 						</select>
