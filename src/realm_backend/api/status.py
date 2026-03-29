@@ -192,13 +192,26 @@ def get_status() -> "dict[str, Any]":
     # Quarter discovery
     quarters = []
     is_quarter = False
+    is_capital = False
     parent_realm_canister_id = ""
     try:
         first_realm = Realm.load("1")
         if first_realm:
             is_quarter = getattr(first_realm, "is_quarter", False) or False
+            is_capital = getattr(first_realm, "is_capital", False) or False
             parent_realm_canister_id = (
                 getattr(first_realm, "federation_realm_id", "") or ""
+            )
+            # Include the capital (self) as quarter 0
+            capital_population = User.count()
+            quarters.append(
+                {
+                    "name": "Capital",
+                    "canister_id": ic.id().to_str(),
+                    "population": capital_population,
+                    "status": "active",
+                    "is_capital": True,
+                }
             )
             for q in Quarter.instances():
                 quarters.append(
@@ -207,6 +220,7 @@ def get_status() -> "dict[str, Any]":
                         "canister_id": q.canister_id or "",
                         "population": q.population or 0,
                         "status": q.status or "active",
+                        "is_capital": False,
                     }
                 )
     except Exception as e:
@@ -253,6 +267,7 @@ def get_status() -> "dict[str, Any]":
         "python_version": sys.version,
         "quarters": quarters,
         "is_quarter": is_quarter,
+        "is_capital": is_capital,
         "parent_realm_canister_id": parent_realm_canister_id,
         "accounting_currency": accounting_currency,
         "accounting_currency_decimals": accounting_currency_decimals,
