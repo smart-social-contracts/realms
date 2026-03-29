@@ -343,6 +343,18 @@ def get_quarter_info() -> RealmResponse:
             parent_realm_canister_id = (
                 getattr(first_realm, "federation_realm_id", "") or ""
             )
+            # Include the capital (self) as quarter 0
+            from ggg import User
+            capital_population = len(list(User.instances()))
+            quarters.append(
+                {
+                    "name": "Capital",
+                    "canister_id": ic.id().to_str(),
+                    "population": capital_population,
+                    "status": "active",
+                    "is_capital": True,
+                }
+            )
             for q in Quarter.instances():
                 quarters.append(
                     {
@@ -350,6 +362,7 @@ def get_quarter_info() -> RealmResponse:
                         "canister_id": q.canister_id or "",
                         "population": q.population or 0,
                         "status": q.status or "active",
+                        "is_capital": False,
                     }
                 )
 
@@ -462,20 +475,25 @@ def change_quarter(new_quarter_canister_id: text) -> RealmResponse:
                 success=False, data=RealmResponseData(error="Realm not found")
             )
 
-        quarters = list(Quarter.instances())
-        target = None
-        for q in quarters:
-            if q.canister_id == new_quarter_canister_id and q.status == "active":
-                target = q
-                break
+        # The capital (self) counts as quarter 0
+        own_canister_id = ic.id().to_str()
+        is_capital_target = new_quarter_canister_id == own_canister_id
 
-        if not target:
-            return RealmResponse(
-                success=False,
-                data=RealmResponseData(
-                    error=f"Quarter '{new_quarter_canister_id}' not found or not active"
-                ),
-            )
+        if not is_capital_target:
+            quarters = list(Quarter.instances())
+            target = None
+            for q in quarters:
+                if q.canister_id == new_quarter_canister_id and q.status == "active":
+                    target = q
+                    break
+
+            if not target:
+                return RealmResponse(
+                    success=False,
+                    data=RealmResponseData(
+                        error=f"Quarter '{new_quarter_canister_id}' not found or not active"
+                    ),
+                )
 
         # Run codex eligibility check if available
         codex = realm.federation_codex
@@ -484,7 +502,8 @@ def change_quarter(new_quarter_canister_id: text) -> RealmResponse:
             exec(str(codex.code), ns)
             assign_fn = ns.get("assign_quarter")
             if assign_fn:
-                assign_fn(caller, [target], new_quarter_canister_id)
+                target = target if not is_capital_target else None
+                assign_fn(caller, [target] if target else [], new_quarter_canister_id)
 
         # Persist the new assignment on the User entity
         from ggg import User

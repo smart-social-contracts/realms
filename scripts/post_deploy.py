@@ -318,7 +318,7 @@ try:
                     
                     print(f"   Registering {quarter_name} ({quarter_canister_id}) on main backend...")
                     
-                    register_args = f'("{quarter_canister_id}", "{quarter_name}")'
+                    register_args = f'("{quarter_name}", "{quarter_canister_id}")'
                     register_cmd = [
                         'dfx', 'canister', 'call', backend_name, 'register_quarter',
                         register_args,

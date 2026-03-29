@@ -51,14 +51,14 @@ def dfx_call(canister, method, args="()", is_update=False):
     env = os.environ.copy()
     env["DFX_WARNING"] = "-mainnet_plaintext_identity"
 
-    cmd = [
-        "dfx", "canister", "call",
+    cmd = ["dfx", "canister", "call"]
+    if not is_update:
+        cmd.append("--query")
+    cmd.extend([
         "--network", NETWORK,
         "--output", "json",
         canister, method, args,
-    ]
-    if not is_update:
-        cmd.insert(4, "--query")  # insert --query after 'call'
+    ])
 
     cmd_display = " ".join(cmd)
     print(f"    [CMD] {cmd_display}")
@@ -113,7 +113,12 @@ def test_get_quarter_info():
     info = json.loads(resp["data"]["message"])
 
     quarters = info["quarters"]
-    assert len(quarters) >= 2, f"Expected >=2 quarters, got {len(quarters)}: {quarters}"
+    assert len(quarters) >= 2, f"Expected >=2 quarters (capital + at least 1 quarter), got {len(quarters)}: {quarters}"
+
+    # First quarter should be the capital
+    assert quarters[0].get("is_capital") is True, (
+        f"First quarter should be capital: {quarters[0]}"
+    )
 
     for q in quarters:
         assert q.get("canister_id"), f"Quarter missing canister_id: {q}"
@@ -138,8 +143,11 @@ def test_get_quarter_info():
 
 
 def test_quarter_backends_reachable(quarters):
-    """Verify each quarter backend canister is reachable via status call."""
+    """Verify each non-capital quarter backend canister is reachable via status call."""
     for q in quarters:
+        if q.get("is_capital"):
+            print(f"    ℹ️  Skipping capital ({q['canister_id']}) — already reachable")
+            continue
         cid = q["canister_id"]
         try:
             resp = dfx_call(cid, "status")
