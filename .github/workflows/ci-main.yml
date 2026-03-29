@@ -486,3 +486,32 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+      - name: Run quarter staging integration tests
+        run: |
+          echo "${{ secrets.IC_IDENTITY_PEM }}" > identity.pem
+          chmod 600 identity.pem
+          
+          mkdir -p quarter-test-logs
+          
+          docker run --rm \
+            -v "$(pwd)/identity.pem:/app/identity.pem" \
+            -v "$(pwd)/quarter-test-logs:/app/quarter-test-logs" \
+            -v "$(pwd)/tests/staging/test_quarters_staging.py:/app/tests/staging/test_quarters_staging.py" \
+            -e DFX_WARNING="-mainnet_plaintext_identity" \
+            -e DFX_NETWORK=staging \
+            -e AGORA_BACKEND=3bohd-2yaaa-aaaac-qcyla-cai \
+            ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
+            bash -c "dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
+                     dfx identity use my-identity && \
+                     python3 tests/staging/test_quarters_staging.py 2>&1 | tee /app/quarter-test-logs/quarters.log"
+          
+          rm -f identity.pem
+      
+      - name: Upload quarter test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quarter-staging-test-logs
+          path: quarter-test-logs/
+          retention-days: 7
+
