@@ -344,23 +344,35 @@ def get_quarter_info() -> RealmResponse:
                 getattr(first_realm, "federation_realm_id", "") or ""
             )
             # Include the capital (self) as quarter 0
+            # Compute population dynamically from User.home_quarter
             from ggg import User
-            capital_population = len(list(User.instances()))
+            own_id = ic.id().to_str()
+            all_users = list(User.instances())
+            quarter_entities = list(Quarter.instances())
+            capital_pop = sum(
+                1 for u in all_users
+                if (getattr(u, "home_quarter", "") or "") in ("", own_id)
+            )
             quarters.append(
                 {
                     "name": "Capital",
-                    "canister_id": ic.id().to_str(),
-                    "population": capital_population,
+                    "canister_id": own_id,
+                    "population": capital_pop,
                     "status": "active",
                     "is_capital": True,
                 }
             )
-            for q in Quarter.instances():
+            for q in quarter_entities:
+                qcid = q.canister_id or ""
+                q_pop = sum(
+                    1 for u in all_users
+                    if (getattr(u, "home_quarter", "") or "") == qcid
+                )
                 quarters.append(
                     {
                         "name": q.name or "",
-                        "canister_id": q.canister_id or "",
-                        "population": q.population or 0,
+                        "canister_id": qcid,
+                        "population": q_pop,
                         "status": q.status or "active",
                         "is_capital": False,
                     }
