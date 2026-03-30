@@ -39,7 +39,7 @@ class StatusRecord(Record):
     commit: text
     commit_datetime: text
     extensions: Vec[text]
-    demo_mode: bool
+    test_mode: bool
     realm_name: text
     realm_logo: text
     realm_description: text

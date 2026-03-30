@@ -119,7 +119,7 @@ def get_status() -> "dict[str, Any]":
     commit_hash = "COMMIT_HASH_PLACEHOLDER"
     commit_datetime = "COMMIT_DATETIME_PLACEHOLDER"
     version = "VERSION_PLACEHOLDER"
-    demo_mode = False
+    test_mode = False
 
     # Skip expensive TaskManager status to stay under instruction limit
     # TaskManager status can be queried via separate endpoint if needed
@@ -272,7 +272,7 @@ def get_status() -> "dict[str, Any]":
         "commit": commit_hash,
         "commit_datetime": commit_datetime,
         "extensions": extension_entries,
-        "demo_mode": demo_mode,
+        "test_mode": test_mode,
         "task_manager": task_manager_status,
         "canisters": canisters,
         "registries": registries,

@@ -45,9 +45,9 @@
     "title": "Notifications"
   },
   "demo_banner": {
-    "title": "Demo Mode Active",
-    "description": "This application is running in demonstration mode with sample data. Features and data shown are for demonstration purposes only.",
-    "dismiss_label": "Dismiss demo mode notice"
+    "title": "Test Mode Active",
+    "description": "This application is running in test mode. Some features may behave differently than in production.",
+    "dismiss_label": "Dismiss test mode notice"
   },
   "categories": {
     "public_services": "Public Services",

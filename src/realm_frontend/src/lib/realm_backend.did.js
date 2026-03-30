@@ -45,7 +45,7 @@ type CanisterInfo = record {
 };
 type StatusRecord = record {
   status : text;
-  demo_mode : bool;
+  test_mode : bool;
   transfers_count : nat;
   codexes_count : nat;
   proposals_count : nat;

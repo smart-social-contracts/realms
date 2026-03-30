@@ -2,29 +2,12 @@
 	import { onMount } from 'svelte';
 	import { Alert, Button } from 'flowbite-svelte';
 	import { CloseOutline, InfoCircleSolid } from 'flowbite-svelte-icons';
-	import { backend } from '$lib/canisters';
+	import { TEST_MODE } from '$lib/config.js';
 	import { _ } from 'svelte-i18n';
 	
 	let showBanner = false;
-	let isLoading = true;
 	
 	const DEMO_BANNER_DISMISSED_KEY = 'demo_banner_dismissed';
-	
-	async function checkDemoMode() {
-		try {
-			const response = await backend.status();
-			if (response && response.success && response.data && response.data.status) {
-				const isDemoMode = response.data.status.demo_mode;
-				const wasDismissed = localStorage.getItem(DEMO_BANNER_DISMISSED_KEY) === 'true';
-				
-				showBanner = isDemoMode && !wasDismissed;
-			}
-		} catch (error) {
-			console.error('Error checking demo mode:', error);
-		} finally {
-			isLoading = false;
-		}
-	}
 	
 	function dismissBanner() {
 		showBanner = false;
@@ -32,11 +15,14 @@
 	}
 	
 	onMount(() => {
-		checkDemoMode();
+		if (TEST_MODE) {
+			const wasDismissed = localStorage.getItem(DEMO_BANNER_DISMISSED_KEY) === 'true';
+			showBanner = !wasDismissed;
+		}
 	});
 </script>
 
-{#if !isLoading && showBanner}
+{#if showBanner}
 	<div class="relative">
 		<Alert color="blue" class="mb-4 border-l-4 border-blue-500">
 			<InfoCircleSolid slot="icon" class="w-4 h-4" />

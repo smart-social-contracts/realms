@@ -3,7 +3,7 @@
   import { onMount } from 'svelte';
   import { principal, isAuthenticated } from '$lib/stores/auth';
   import { login, initializeAuthClient } from '$lib/auth';
-  import { CONFIG } from '$lib/config.js';
+  import { CONFIG, TEST_MODE, TEST_MODE_II_BYPASS, TEST_MODE_ADMIN_SELF_REGISTRATION, TEST_MODE_SKIP_TERMS } from '$lib/config.js';
   import { backend, initBackendWithIdentity, setActiveQuarter } from '$lib/canisters.js';
   import { loadUserProfiles, hasJoined, profilesLoading } from '$lib/stores/profiles';
   import { activeQuarterId } from '$lib/stores/quarters';
@@ -21,7 +21,7 @@
   let selectedProfile = ''; // No default - user must choose
   
   // Available profiles with icon names (rendered as SVGs)
-  const profiles = [
+  const allProfiles = [
     { 
       value: 'member', 
       name: 'Member',
@@ -35,6 +35,9 @@
       description: 'Full access to manage realm settings and users'
     },
   ];
+
+  // Only show admin profile when TEST_MODE_ADMIN_SELF_REGISTRATION is active
+  $: profiles = allProfiles.filter(p => p.value !== 'admin' || TEST_MODE_ADMIN_SELF_REGISTRATION);
 
   // Default fallback image if realm has no welcome image configured
   const defaultWelcomeImage = '/images/default_welcome.jpg';
@@ -52,7 +55,7 @@
       if (userHasJoined && (currentStep === 'auth' || currentStep === 'terms')) {
         currentStep = 'already_joined';
       } else if (!userHasJoined && currentStep === 'auth') {
-        currentStep = 'terms';
+        currentStep = TEST_MODE_SKIP_TERMS ? 'profile' : 'terms';
       }
     }
   }
@@ -65,6 +68,13 @@
       realmName = $realmNameStore;
     }
     
+    // In test mode with II bypass, auto-login if not already authenticated
+    if (TEST_MODE_II_BYPASS && !$isAuthenticated) {
+      console.log('[JOIN PAGE] [TEST MODE] Auto-login triggered');
+      await handleLogin();
+      return;
+    }
+
     // If user is already authenticated, load their profiles to check join status
     if ($isAuthenticated) {
       console.log('[JOIN PAGE v2] Loading profiles for authenticated user...');
@@ -379,7 +389,7 @@
         <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
           <div class="flex items-center justify-between mb-2">
             <h2 class="text-2xl font-bold text-gray-900">Select Profile</h2>
-            <span class="px-3 py-1 bg-gray-200 text-gray-600 text-xs font-medium rounded-full">Demo</span>
+{#if TEST_MODE}<span class="px-3 py-1 bg-gray-200 text-gray-600 text-xs font-medium rounded-full">Test Mode</span>{/if}
           </div>
           <p class="text-gray-500 mb-6">Choose how you want to participate</p>
           
@@ -424,12 +434,14 @@
             {/each}
           </div>
           
+{#if TEST_MODE}
           <p class="text-xs text-gray-500 mb-6 p-3 bg-gray-100 rounded-lg flex items-start gap-2">
             <svg class="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span>In demo mode, you can select any profile. In production, this would be determined by your organization role.</span>
+            <span>In test mode, you can select any profile. In production, this would be determined by your organization role.</span>
           </p>
+{/if}
           
           <div class="flex gap-3">
             <button

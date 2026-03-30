@@ -11,6 +11,7 @@
 	import { _ } from 'svelte-i18n';
 	import T from '$lib/components/T.svelte';
 	import { initBackendWithIdentity, backend, setActiveQuarter } from '$lib/canisters';
+	import { TEST_MODE_II_BYPASS } from '$lib/config.js';
 
 	let principalText = '';
 	let showDropdown = false;
@@ -18,23 +19,29 @@
 	// Using the centralized profile loading function from the store
 
 	onMount(async () => {
-		const authStatus = await checkAuth();
-		isAuthenticated.set(authStatus);
-		if (authStatus) {
-			// Get existing identity without triggering new login
-			const client = await initializeAuthClient();
-			const identity = client.getIdentity();
-			const userPrincipal = identity.getPrincipal();
-			principalText = userPrincipal.toText();
-			userIdentity.set(principalText);
-			principal.set(principalText);
+		// In test mode, auto-login immediately with deterministic identity
+		if (TEST_MODE_II_BYPASS && !(await checkAuth())) {
+			console.log('[TEST MODE] Auto-login triggered');
+			await handleLogin();
+		} else {
+			const authStatus = await checkAuth();
+			isAuthenticated.set(authStatus);
+			if (authStatus) {
+				// Get existing identity without triggering new login
+				const client = await initializeAuthClient();
+				const identity = client.getIdentity();
+				const userPrincipal = identity.getPrincipal();
+				principalText = userPrincipal.toText();
+				userIdentity.set(principalText);
+				principal.set(principalText);
 
-			console.log('Principal restored from existing session:', principalText);
-		// Initialize backend with authenticated identity
-		await initBackendWithIdentity();
-		// Load user profiles
-		await loadUserProfiles();
-		await loadUserProfilePicture();
+				console.log('Principal restored from existing session:', principalText);
+				// Initialize backend with authenticated identity
+				await initBackendWithIdentity();
+				// Load user profiles
+				await loadUserProfiles();
+				await loadUserProfilePicture();
+			}
 		}
 		
 		// Add a click handler to close dropdown when clicking outside
