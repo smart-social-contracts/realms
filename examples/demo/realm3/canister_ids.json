@@ -1,14 +1,16 @@
 {
   "realm_backend": {
-    "staging": "2lbfz-yiaaa-aaaac-qcyma-cai"
+    "demo": "2lbfz-yiaaa-aaaac-qcyma-cai",
+    "staging": "jnope-2yaaa-aaaac-beh4a-cai"
   },
   "realm_frontend": {
-    "staging": "2madn-vqaaa-aaaac-qcymq-cai"
+    "demo": "2madn-vqaaa-aaaac-qcymq-cai",
+    "staging": "jkpjq-xaaaa-aaaac-beh4q-cai"
   },
   "token_backend": {
-    "staging": "tgp4d-piaaa-aaaah-qq46q-cai"
+    "demo": "tgp4d-piaaa-aaaah-qq46q-cai"
   },
   "nft_backend": {
-    "staging": "4bj2c-byaaa-aaaaf-qdoka-cai"
+    "demo": "4bj2c-byaaa-aaaaf-qdoka-cai"
   }
 }

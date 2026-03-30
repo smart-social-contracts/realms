@@ -25,6 +25,7 @@ CLEAN_BUILD=false
 DEPLOY_FRONTEND=false
 DEPLOY_BACKEND=false
 MUNDUS_DIR=""
+NETWORK_SET=false
 
 usage() {
     echo "Usage: $0 [OPTIONS]"
@@ -39,6 +40,7 @@ usage() {
     echo "  -R, --realm NUM      Target specific realm number (1=Dominion, 2=Agora, 3=Syntropia)"
     echo "  -a, --all            Target all (registry + all realms)"
     echo "  -c, --clean          Clean build (remove .svelte-kit, vite cache, .basilisk cache)"
+    echo "  -n, --network NET    Target network: staging (default) or demo"
     echo "  -m, --mundus DIR     Path to mundus directory (default: latest in .realms/mundus/)"
     echo "  -h, --help           Show this help message"
     echo ""
@@ -84,6 +86,11 @@ while [[ $# -gt 0 ]]; do
         -b|--backend)
             DEPLOY_BACKEND=true
             shift
+            ;;
+        -n|--network)
+            NETWORK="$2"
+            NETWORK_SET=true
+            shift 2
             ;;
         -m|--mundus)
             MUNDUS_DIR="$2"
