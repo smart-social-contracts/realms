@@ -682,12 +682,26 @@ class RealmGenerator:
             if pkg_manifest_path.exists():
                 with open(pkg_manifest_path, 'r') as f:
                     pkg_manifest = json.load(f)
-                # Merge package overrides with common overrides
+                # Merge package overrides with common overrides (deduplicate by entity+method)
                 pkg_overrides = pkg_manifest.get("entity_method_overrides", [])
                 pkg_extensions = pkg_manifest.get("extensions", [])
                 if pkg_overrides:
-                    entity_method_overrides.extend(pkg_overrides)
-                    print(f"    Added {len(pkg_overrides)} method overrides from {codex_name}/manifest.json")
+                    existing_keys = {(o["entity"], o["method"]) for o in entity_method_overrides}
+                    added = 0
+                    for override in pkg_overrides:
+                        key = (override["entity"], override["method"])
+                        if key in existing_keys:
+                            # Package override replaces common override
+                            entity_method_overrides = [
+                                o for o in entity_method_overrides
+                                if (o["entity"], o["method"]) != key
+                            ]
+                            entity_method_overrides.append(override)
+                        else:
+                            entity_method_overrides.append(override)
+                        existing_keys.add(key)
+                        added += 1
+                    print(f"    Added {added} method overrides from {codex_name}/manifest.json (deduped)")
                 if pkg_extensions:
                     extensions.extend(pkg_extensions)
             

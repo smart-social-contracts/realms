@@ -93,7 +93,8 @@ def user_register(principal: str, profile: str) -> dict[str, Any]:
         raise ValueError(f"Profile {profile} not found")
 
     user = User[principal]
-    if not user:
+    is_new_user = user is None
+    if is_new_user:
         user = User(id=principal, profiles=[user_profi])
         logger.info(f"Created new user {principal} with profile {profile}")
     else:
@@ -104,7 +105,8 @@ def user_register(principal: str, profile: str) -> dict[str, Any]:
         else:
             logger.info(f"User {principal} already has profile {profile}")
 
-    User.user_register_posthook(user)  # type: ignore[arg-type]
+    if is_new_user:
+        User.user_register_posthook(user)  # type: ignore[arg-type]
 
     return {
         "principal": user.id,

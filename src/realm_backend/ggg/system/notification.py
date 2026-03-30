@@ -10,6 +10,8 @@ class Notification(Entity, TimestampedMixin):
     topic = String(max_length=64)
     title = String(max_length=256)
     message = String(max_length=2048)
+    sender = String(max_length=128)
+    recipient = String(max_length=128)
     user = ManyToOne("User", "notifications")
     read = Boolean()
     metadata = String(max_length=256)
