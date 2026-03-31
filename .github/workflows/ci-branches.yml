@@ -355,6 +355,7 @@ jobs:
             -e VITE_TEST_MODE=true \
             -e VITE_TEST_MODE_II_BYPASS=true \
             -e VITE_TEST_MODE_ADMIN_SELF_REGISTRATION=true \
+            -e VITE_TEST_MODE_SKIP_TERMS=true \
             ghcr.io/${{ github.repository_owner }}/realms:ui-test-${{ github.sha }} bash -c "
           (realms realm create --random && \
           realms realm deploy --plain-logs && \
