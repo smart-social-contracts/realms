@@ -13,12 +13,6 @@
           "name": "candid:service"
         }
       ],
-      "remote": {
-        "id": {
-          "demo": "h5vpp-qyaaa-aaaac-qai3a-cai",
-          "staging": "5mf73-iiaaa-aaaau-aggxq-cai"
-        }
-      },
       "tech_stack": {
         "cdk": {
           "basilisk": {}
@@ -35,13 +29,7 @@
         "src/realm_frontend/dist"
       ],
       "type": "assets",
-      "workspace": "realm_frontend",
-      "remote": {
-        "id": {
-          "demo": "gzya5-jyaaa-aaaac-qai5a-cai",
-          "staging": "7ryrt-3aaaa-aaaau-aggya-cai"
-        }
-      }
+      "workspace": "realm_frontend"
     },
     "realm_registry_backend": {
       "build": "python -m basilisk realm_registry_backend src/realm_registry_backend/main.py",
