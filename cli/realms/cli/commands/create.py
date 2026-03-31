@@ -444,12 +444,15 @@ def _generate_deployment_scripts(
             console.print(f"   ✅ Using unique canister names: {backend_name}, {frontend_name}")
     
     # Deep copy and update canister configs to avoid reference issues
-    # Strip remote block - it's only for CLI commands, not for realm deployments
+    # For local networks, strip remote block - it's only needed for persistent networks (demo/staging)
     import copy
     backend_config = copy.deepcopy(dfx_config["canisters"]["realm_backend"])
-    backend_config.pop("remote", None)
     frontend_config = copy.deepcopy(dfx_config["canisters"]["realm_frontend"])
-    frontend_config.pop("remote", None)
+    
+    # Keep remote.id for persistent networks (demo/staging), strip for local
+    if network.startswith("local"):
+        backend_config.pop("remote", None)
+        frontend_config.pop("remote", None)
     
     # IMPORTANT: Keep workspace as "realm_frontend" (not unique name)
     # because src/ directories are copied with standard names
@@ -466,7 +469,9 @@ def _generate_deployment_scripts(
         for q_idx in range(1, num_quarters):
             quarter_name = f"quarter_{q_idx}_backend"
             quarter_config = copy.deepcopy(dfx_config["canisters"]["realm_backend"])
-            quarter_config.pop("remote", None)
+            # Keep remote.id for persistent networks
+            if network.startswith("local"):
+                quarter_config.pop("remote", None)
             realm_canisters[quarter_name] = quarter_config
             if not quiet:
                 console.print(f"   ✅ Including {quarter_name} (quarter {q_idx + 1} of {num_quarters})")
