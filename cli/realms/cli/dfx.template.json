@@ -13,6 +13,12 @@
           "name": "candid:service"
         }
       ],
+      "remote": {
+        "id": {
+          "demo": "h5vpp-qyaaa-aaaac-qai3a-cai",
+          "staging": "5mf73-iiaaa-aaaau-aggxq-cai"
+        }
+      },
       "tech_stack": {
         "cdk": {
           "basilisk": {}
@@ -29,7 +35,13 @@
         "src/realm_frontend/dist"
       ],
       "type": "assets",
-      "workspace": "realm_frontend"
+      "workspace": "realm_frontend",
+      "remote": {
+        "id": {
+          "demo": "gzya5-jyaaa-aaaac-qai5a-cai",
+          "staging": "7ryrt-3aaaa-aaaau-aggya-cai"
+        }
+      }
     },
     "realm_registry_backend": {
       "build": "python -m basilisk realm_registry_backend src/realm_registry_backend/main.py",
@@ -45,7 +57,8 @@
       ],
       "remote": {
         "id": {
-          "staging": "rhw4p-gqaaa-aaaac-qbw7q-cai"
+          "demo": "rhw4p-gqaaa-aaaac-qbw7q-cai",
+          "staging": "7wzxh-wyaaa-aaaau-aggyq-cai"
         }
       },
       "tech_stack": {
@@ -105,7 +118,7 @@
       "wasm": "https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/token_backend.wasm",
       "remote": {
         "id": {
-          "staging": "xbkkh-syaaa-aaaah-qq3ya-cai"
+          "demo": "xbkkh-syaaa-aaaah-qq3ya-cai"
         }
       },
       "init_arg": "(record { name = \"Simple Token\"; symbol = \"SMPL\"; decimals = 8 : nat8; total_supply = 100_000_000_000_000_000 : nat; fee = 10_000 : nat; test = opt true })"
@@ -117,7 +130,7 @@
       "frontend": {},
       "remote": {
         "id": {
-          "staging": "xglmt-7aaaa-aaaah-qq3yq-cai"
+          "demo": "xglmt-7aaaa-aaaah-qq3yq-cai"
         }
       }
     },
@@ -127,7 +140,7 @@
       "wasm": "https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/nft_backend.wasm",
       "remote": {
         "id": {
-          "staging": "6hrip-iiaaa-aaaaf-qdoha-cai"
+          "demo": "6hrip-iiaaa-aaaaf-qdoha-cai"
         }
       },
       "init_arg": "(record { name = \"Land NFT\"; symbol = \"LAND\"; description = opt \"Land ownership NFT for realm\"; supply_cap = opt 10000 : opt nat; test = opt true })"
@@ -139,7 +152,7 @@
       "frontend": {},
       "remote": {
         "id": {
-          "staging": "6aqo3-fqaaa-aaaaf-qdohq-cai"
+          "demo": "6aqo3-fqaaa-aaaaf-qdohq-cai"
         }
       }
     },
@@ -149,7 +162,7 @@
       "wasm": "https://github.com/smart-social-contracts/kybra-simple-marketplace/releases/latest/download/marketplace_backend.wasm",
       "remote": {
         "id": {
-          "staging": "ehyfg-wyaaa-aaaae-qg3qq-cai"
+          "demo": "ehyfg-wyaaa-aaaae-qg3qq-cai"
         }
       }
     }
@@ -166,6 +179,10 @@
       "type": "ephemeral"
     },
     "staging": {
+      "providers": ["https://icp0.io"],
+      "type": "persistent"
+    },
+    "demo": {
       "providers": ["https://icp0.io"],
       "type": "persistent"
     },
