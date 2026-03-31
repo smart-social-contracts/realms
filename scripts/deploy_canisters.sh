@@ -265,21 +265,40 @@ for canister in $BACKENDS; do
         # For local, let dfx decide mode (clean = install, otherwise upgrade)
         retry_dfx dfx deploy "$canister" --yes
     else
-        # Ensure canister exists and has cycles before deploying wasm
-        existing_id=$(dfx canister id "$canister" --network "$NETWORK" 2>/dev/null || echo "")
-        if [ -z "$existing_id" ]; then
-            echo "   🆕 Creating canister $canister with initial cycles..."
-            CREATE_ARGS="--network $NETWORK --with-cycles 1000000000000"
-            # Cycles ledger requires explicit subnet type for new canisters
-            CREATE_ARGS="$CREATE_ARGS --subnet-type application"
-            retry_dfx dfx canister create "$canister" $CREATE_ARGS
+        # For demo/staging networks, canisters already exist - skip create, just deploy
+        # Get canister ID from dfx.json remote.id or use dfx to find it
+        canister_id=""
+        if [ -f "dfx.json" ]; then
+            # Try to get canister ID from remote.id in dfx.json
+            canister_id=$(python3 -c "
+import json
+import sys
+try:
+    with open('dfx.json') as f:
+        dfx = json.load(f)
+    if 'canisters' in dfx and '$canister' in dfx['canisters']:
+        remote = dfx['canisters']['$canister'].get('remote', {})
+        if 'id' in remote and '$NETWORK' in remote['id']:
+            print(remote['id']['$NETWORK'])
+except: pass
+" 2>/dev/null || echo "")
         fi
+        
+        # If not found in dfx.json, try dfx directly
+        if [ -z "$canister_id" ]; then
+            canister_id=$(dfx canister id "$canister" --network "$NETWORK" 2>/dev/null || echo "")
+        fi
+        
+        if [ -z "$canister_id" ]; then
+            echo "   ⚠️  Canister $canister not found on network $NETWORK, skipping..."
+            continue
+        fi
+        
+        echo "   ✅ Found canister $canister at $canister_id"
+        
         # Top up canister to ensure it has enough cycles for wasm installation
-        canister_id=$(dfx canister id "$canister" --network "$NETWORK" 2>/dev/null || echo "")
-        if [ -n "$canister_id" ]; then
-            echo "   💰 Topping up $canister ($canister_id) with 1 TC..."
-            dfx cycles top-up "$canister_id" 1000000000000 --network "$NETWORK" 2>/dev/null || true
-        fi
+        echo "   💰 Topping up $canister ($canister_id) with 1 TC..."
+        dfx cycles top-up "$canister_id" 1000000000000 --network "$NETWORK" 2>/dev/null || true
         # Detect if canister has WASM installed; if not, force install mode
         CANISTER_MODE="$MODE"
         if [ "$CANISTER_MODE" = "upgrade" ] && [ -n "$canister_id" ]; then
