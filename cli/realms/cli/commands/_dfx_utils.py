@@ -1,6 +1,6 @@
-"""Shared utilities for CLI commands that interact with dfx canisters.
+"""Shared utilities for CLI commands that interact with ICP canisters.
 
-Provides dfx command construction and Candid output parsing, used by
+Provides icp command construction and Candid output parsing, used by
 both ``shell.py`` and ``run.py`` to avoid code duplication.
 """
 
@@ -15,18 +15,18 @@ console = Console()
 
 
 # ---------------------------------------------------------------------------
-# dfx command helpers
+# icp command helpers
 # ---------------------------------------------------------------------------
 
-def build_dfx_call_cmd(
+def build_icp_call_cmd(
     canister_name: str,
     method: str,
     args: str,
     network: Optional[str] = None,
     output_format: Optional[str] = None,
 ) -> list[str]:
-    """Build a ``dfx canister call`` command list."""
-    cmd = ["dfx", "canister", "call"]
+    """Build an ``icp canister call`` command list."""
+    cmd = ["icp", "canister", "call"]
     if network:
         cmd.extend(["--network", network])
     cmd.extend([canister_name, method, args])
@@ -35,7 +35,11 @@ def build_dfx_call_cmd(
     return cmd
 
 
-def run_dfx_call(
+# Backward-compatible aliases
+build_dfx_call_cmd = build_icp_call_cmd
+
+
+def run_icp_call(
     canister_name: str,
     method: str,
     args: str,
@@ -44,9 +48,13 @@ def run_dfx_call(
     output_format: Optional[str] = None,
     timeout: int = 30,
 ) -> subprocess.CompletedProcess:
-    """Run a ``dfx canister call`` and return the CompletedProcess."""
-    cmd = build_dfx_call_cmd(canister_name, method, args, network, output_format)
+    """Run an ``icp canister call`` and return the CompletedProcess."""
+    cmd = build_icp_call_cmd(canister_name, method, args, network, output_format)
     return subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=cwd, timeout=timeout)
+
+
+# Backward-compatible aliases
+run_dfx_call = run_icp_call
 
 
 # ---------------------------------------------------------------------------
@@ -54,7 +62,7 @@ def run_dfx_call(
 # ---------------------------------------------------------------------------
 
 def parse_candid_string_output(output: str) -> str:
-    """Parse a Candid-encoded string response from dfx.
+    """Parse a Candid-encoded string response from icp CLI.
 
     Handles the various string representations:
     - Tuple format: (  "content"  )
@@ -118,7 +126,7 @@ def parse_candid_string_output(output: str) -> str:
 def parse_candid_json_response(output: str) -> dict:
     """Parse a Candid-encoded JSON string response into a dict.
 
-    The output from dfx is typically: ("{\\"key\\": \\"value\\"}",)
+    The output from icp CLI is typically: ("{\\"key\\": \\"value\\"}",)
     This function extracts and parses the inner JSON.
     """
     import json

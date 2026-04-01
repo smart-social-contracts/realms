@@ -336,7 +336,7 @@ def is_repo_mode() -> bool:
     # Must have ALL of these to be considered repo mode
     repo_markers = [
         cwd / "scripts" / "realm_generator.py",
-        cwd / "dfx.template.json",  # Only exists in repo root, not in deployments
+        cwd / "dfx.template.json",  # Legacy marker — only exists in repo root
     ]
     return all(marker.exists() for marker in repo_markers)
 
@@ -681,7 +681,7 @@ def run_command_with_progress(
 
 def check_dependencies() -> bool:
     """Check if required dependencies are available."""
-    required_tools = ["dfx", "npm", "python3"]
+    required_tools = ["icp", "npm", "python3"]
     missing_tools = []
 
     for tool in required_tools:
@@ -731,8 +731,10 @@ def get_project_root() -> Path:
     """Get the project root directory."""
     current_path = Path.cwd()
 
-    # Look for dfx.template.json or pyproject.toml to identify project root
+    # Look for icp.yaml / dfx.template.json or pyproject.toml to identify project root
     while current_path != current_path.parent:
+        if (current_path / "icp.yaml").exists():
+            return current_path
         if (current_path / "dfx.template.json").exists():
             return current_path
         if (current_path / "pyproject.toml").exists() and (current_path / "cli").exists():
@@ -768,70 +770,66 @@ def get_current_branch() -> str:
         return "main"
 
 
-def is_dfx_running(network: str = "local") -> bool:
-    """Check if dfx replica is running."""
+def is_local_network_running(network: str = "local") -> bool:
+    """Check if local ICP replica is running."""
     try:
         result = subprocess.run(
-            ["dfx", "ping", network],
+            ["icp", "canister", "status", "--network", network, "aaaaa-aa"],
             capture_output=True,
-            timeout=2
+            timeout=5
         )
         return result.returncode == 0
     except Exception:
         return False
 
 
-def ensure_dfx_running(
+def ensure_local_network_running(
     log_dir: Path,
     network: str = "local",
     clean: bool = True,
     port: Optional[int] = None
 ) -> bool:
-    """Ensure dfx replica is running for local network.
+    """Ensure local ICP replica is running.
     
     Args:
-        log_dir: Directory where dfx.log will be created
-        network: Network name (only 'local' triggers dfx start)
+        log_dir: Directory where icp logs will be created
+        network: Network name (only 'local' triggers network start)
         clean: Whether to start with --clean flag
         port: Optional port number. If None, uses branch-based port.
     
     Returns:
-        True if dfx is running (either already was or just started)
+        True if network is running (either already was or just started)
     
     Side effects:
-        - Sets SKIP_DFX_START=true env var to prevent deploy scripts from starting dfx
-        - Creates dfx.log in log_dir
+        - Sets SKIP_DFX_START=true env var to prevent deploy scripts from starting network
+        - Creates icp.log in log_dir
     """
     if network != "local":
         return True
     
-    # Always set this so deploy scripts don't try to start dfx
+    # Always set this so deploy scripts don't try to start the network
     os.environ['SKIP_DFX_START'] = 'true'
     
-    if is_dfx_running(network):
-        console.print("🌐 dfx already running\n")
+    if is_local_network_running(network):
+        console.print("🌐 Local network already running\n")
         return True
     
-    console.print("🌐 Starting dfx...\n")
+    console.print("🌐 Starting local network...\n")
     
-    # Stop any existing dfx
-    subprocess.run(["dfx", "stop"], capture_output=True)
+    # Stop any existing network
+    subprocess.run(["icp", "network", "stop"], capture_output=True)
     
     # Determine port
     if port is None:
         branch = get_current_branch()
         port = generate_port_from_branch(branch)
     
-    # Start dfx with logging
-    # dfx.log = dfx CLI logs (via --logfile)
-    # dfx2.log = canister/replica logs (via stderr - requires NOT using --background)
-    dfx_log_path = Path(log_dir) / "dfx.log"
-    dfx2_log_path = Path(log_dir) / "dfx2.log"
+    # Start network with logging
+    icp_log_path = Path(log_dir) / "icp.log"
+    icp2_log_path = Path(log_dir) / "icp2.log"
     
-    # Run dfx WITHOUT --background to capture canister logs from stderr
-    # Redirect all file descriptors to fully detach process
-    # (required for docker exec to return properly when running in containers)
-    cmd = f"dfx start {'--clean ' if clean else ''}--log file --logfile {dfx_log_path} --host 127.0.0.1:{port} </dev/null >/dev/null 2>{dfx2_log_path} &"
+    # Run icp network start in the background
+    cmd = f"icp network start {'--clean ' if clean else ''}-d </dev/null >/dev/null 2>{icp2_log_path} &"
     
     subprocess.Popen(
         cmd,
@@ -843,14 +841,14 @@ def ensure_dfx_running(
         start_new_session=True
     )
     
-    console.print(f"[dim]dfx CLI log: {dfx_log_path}[/dim]")
-    console.print(f"[dim]dfx canister log: {dfx2_log_path}[/dim]")
-    console.print(f"[dim]dfx port: {port}[/dim]\n")
+    console.print(f"[dim]icp log: {icp_log_path}[/dim]")
+    console.print(f"[dim]icp canister log: {icp2_log_path}[/dim]")
+    console.print(f"[dim]port: {port}[/dim]\n")
     
-    # Wait for dfx to be ready
+    # Wait for network to be ready
     time.sleep(5)
     
-    return is_dfx_running(network)
+    return is_local_network_running(network)
 
 
 def wait_for_canister_ready(
@@ -869,7 +867,7 @@ def wait_for_canister_ready(
         while time.time() - start_time < timeout:
             try:
                 result = subprocess.run(
-                    ["dfx", "canister", "status", canister_name, "--network", network],
+                    ["icp", "canister", "status", canister_name, "--network", network],
                     capture_output=True,
                     check=True,
                 )
@@ -1062,7 +1060,7 @@ def unset_current_realm_folder() -> None:
 
 
 def get_effective_cwd(folder: Optional[str] = None) -> Optional[str]:
-    """Get the effective working directory for dfx commands.
+    """Get the effective working directory for icp commands.
     
     Priority:
     1. Explicit folder parameter
@@ -1136,40 +1134,48 @@ def list_realm_folders(base_dir: Optional[str] = None) -> List[Dict[str, Any]]:
         except Exception:
             pass
         
-        # Check for dfx.json to determine network config
-        dfx_json_path = realm_dir / "dfx.json"
-        if dfx_json_path.exists():
-            try:
-                with open(dfx_json_path, "r") as f:
-                    dfx_config = json.load(f)
-                # Check networks config
-                networks = dfx_config.get("networks", {})
-                if "ic" in networks:
-                    realm_info["network"] = "ic"
-                elif "staging" in networks:
-                    realm_info["network"] = "staging"
-                else:
-                    realm_info["network"] = "local"
-            except Exception:
-                pass
+        # Check for icp.yaml or dfx.json to determine network config
+        for config_name in ("icp.yaml", "dfx.json"):
+            config_path = realm_dir / config_name
+            if config_path.exists():
+                try:
+                    with open(config_path, "r") as f:
+                        if config_name.endswith(".yaml"):
+                            import yaml
+                            config_data = yaml.safe_load(f)
+                        else:
+                            config_data = json.load(f)
+                    # Check networks/environments config
+                    networks = config_data.get("networks", config_data.get("environments", {}))
+                    if "ic" in networks:
+                        realm_info["network"] = "ic"
+                    elif "staging" in networks:
+                        realm_info["network"] = "staging"
+                    else:
+                        realm_info["network"] = "local"
+                except Exception:
+                    pass
+                break
         
-        # Check for .dfx folder to determine deployment status
-        dfx_folder = realm_dir / ".dfx"
-        if dfx_folder.exists():
-            # Check for canister_ids.json in local or network folders
-            for network_dir in dfx_folder.iterdir():
-                if network_dir.is_dir():
-                    canister_ids_file = network_dir / "canister_ids.json"
-                    if canister_ids_file.exists():
-                        realm_info["status"] = "deployed"
-                        realm_info["network"] = network_dir.name
-                        try:
-                            with open(canister_ids_file, "r") as f:
-                                canister_ids = json.load(f)
-                                realm_info["canister_count"] = len(canister_ids)
-                        except Exception:
-                            pass
-                        break
+        # Check for .icp or .dfx folder to determine deployment status
+        for data_folder_name in (".icp", ".dfx"):
+            data_folder = realm_dir / data_folder_name
+            if data_folder.exists():
+                # Check for canister_ids.json in local or network folders
+                for network_dir in data_folder.iterdir():
+                    if network_dir.is_dir():
+                        canister_ids_file = network_dir / "canister_ids.json"
+                        if canister_ids_file.exists():
+                            realm_info["status"] = "deployed"
+                            realm_info["network"] = network_dir.name
+                            try:
+                                with open(canister_ids_file, "r") as f:
+                                    canister_ids = json.load(f)
+                                    realm_info["canister_count"] = len(canister_ids)
+                            except Exception:
+                                pass
+                            break
+                break
         
         realms.append(realm_info)
     
@@ -1228,7 +1234,7 @@ def resolve_realm_details(
     try:
         # Call registry to get realm details
         cmd = [
-            "dfx",
+            "icp",
             "canister",
             "call",
             "--network",
@@ -1328,7 +1334,7 @@ def get_canister_urls(
     """Extract canister IDs and URLs from a deployment directory.
     
     Args:
-        working_dir: Directory containing dfx.json and .dfx directory
+        working_dir: Directory containing icp.yaml/dfx.json and .icp/.dfx directory
         network: Network name (local, staging, ic, etc.)
         
     Returns:
@@ -1339,35 +1345,36 @@ def get_canister_urls(
     canisters = {}
     working_dir = Path(working_dir).absolute()
     
-    # Read dfx.json to get list of canisters
-    dfx_json_path = working_dir / "dfx.json"
-    if not dfx_json_path.exists():
+    # Read icp.yaml or dfx.json to get list of canisters
+    config_data = None
+    for config_name in ("icp.yaml", "dfx.json"):
+        config_path = working_dir / config_name
+        if config_path.exists():
+            try:
+                with open(config_path, 'r') as f:
+                    if config_name.endswith(".yaml"):
+                        import yaml
+                        config_data = yaml.safe_load(f)
+                    else:
+                        config_data = json.load(f)
+            except Exception:
+                pass
+            break
+    
+    if not config_data:
         return canisters
     
     try:
-        with open(dfx_json_path, 'r') as f:
-            dfx_config = json.load(f)
-        
-        canister_names = dfx_config.get("canisters", {}).keys()
+        canister_names = config_data.get("canisters", {}).keys()
         
         # Determine port for local network (default 4943)
         port = 4943
-        if network == "local":
-            try:
-                result = subprocess.run(
-                    ["dfx", "info", "webserver-port"],
-                    capture_output=True, text=True, timeout=5, cwd=working_dir
-                )
-                if result.returncode == 0 and result.stdout.strip():
-                    port = int(result.stdout.strip())
-            except:
-                pass  # Use default 4943
         
         # Get canister IDs and construct URLs
         for canister_name in canister_names:
             try:
                 id_result = subprocess.run(
-                    ["dfx", "canister", "id", canister_name],
+                    ["icp", "canister", "status", canister_name, "--network", network],
                     capture_output=True,
                     text=True,
                     timeout=5,
@@ -1432,29 +1439,9 @@ def display_canister_urls_json(
     
     # Determine Candid UI canister ID for local networks
     candid_ui_id = None
-    if network == "local":
-        try:
-            result = subprocess.run(
-                ["dfx", "canister", "id", "__Candid_UI"],
-                capture_output=True, text=True, timeout=5, cwd=working_dir
-            )
-            if result.returncode == 0:
-                candid_ui_id = result.stdout.strip()
-        except Exception:
-            pass
     
     # Determine port for local network
-    port = 8000
-    if network == "local":
-        try:
-            result = subprocess.run(
-                ["dfx", "info", "webserver-port"],
-                capture_output=True, text=True, timeout=5, cwd=working_dir
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                port = int(result.stdout.strip())
-        except Exception:
-            pass
+    port = 4943
     
     console.print("")
     for name, info in canisters.items():
@@ -1489,8 +1476,8 @@ def display_canister_urls_json(
 def get_registry_canister_id(network: str = "local") -> str:
     """Get the registry canister ID for a given network.
     
-    Reads from dfx.json remote.id section for non-local networks.
-    For local network, returns the canister name (dfx will resolve it).
+    Reads from icp.yaml/dfx.json remote.id section for non-local networks.
+    For local network, returns the canister name (icp will resolve it).
     
     Args:
         network: Network name (local, staging, ic)
@@ -1501,22 +1488,26 @@ def get_registry_canister_id(network: str = "local") -> str:
     if network == "local":
         return "realm_registry_backend"
     
-    # Try to read from dfx.json
+    # Try to read from icp.yaml or dfx.json
     project_root = get_project_root()
-    dfx_json_path = project_root / "dfx.json"
-    
-    if dfx_json_path.exists():
-        try:
-            with open(dfx_json_path, "r") as f:
-                dfx_config = json.load(f)
-            
-            registry_config = dfx_config.get("canisters", {}).get("realm_registry_backend", {})
-            remote_ids = registry_config.get("remote", {}).get("id", {})
-            
-            if network in remote_ids:
-                return remote_ids[network]
-        except (json.JSONDecodeError, IOError):
-            pass
+    for config_name in ("icp.yaml", "dfx.json"):
+        config_path = project_root / config_name
+        if config_path.exists():
+            try:
+                with open(config_path, "r") as f:
+                    if config_name.endswith(".yaml"):
+                        import yaml
+                        config_data = yaml.safe_load(f)
+                    else:
+                        config_data = json.load(f)
+                
+                registry_config = config_data.get("canisters", {}).get("realm_registry_backend", {})
+                remote_ids = registry_config.get("remote", {}).get("id", {})
+                
+                if network in remote_ids:
+                    return remote_ids[network]
+            except (json.JSONDecodeError, IOError, Exception):
+                pass
     
     # Fallback to canister name (may fail if not deployed locally)
     return "realm_registry_backend"
@@ -1575,7 +1566,7 @@ def resolve_realm_ref_to_canister_id(
     try:
         # Get all realms from registry
         cmd = [
-            "dfx", "canister", "call",
+            "icp", "canister", "call",
             "--network", network,
             effective_registry,
             "list_realms"

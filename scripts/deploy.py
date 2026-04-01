@@ -30,16 +30,15 @@ except ImportError:
     sys.exit(1)
 
 
-def _detect_dfx_cli() -> str:
-    """Detect available CLI: prefer 'icp' over legacy 'dfx'."""
-    for cmd in ("icp", "dfx"):
-        if shutil.which(cmd):
-            return cmd
-    print("❌ Neither 'icp' nor 'dfx' CLI found on PATH")
+def _detect_icp_cli() -> str:
+    """Detect the icp CLI on PATH."""
+    if shutil.which("icp"):
+        return "icp"
+    print("❌ 'icp' CLI not found on PATH. Install with: npm install -g @icp-sdk/icp-cli")
     sys.exit(1)
 
 
-DFX_CLI = _detect_dfx_cli()
+ICP_CLI = _detect_icp_cli()
 
 
 # ── Constants ──────────────────────────────────────────────────────────────────
@@ -222,10 +221,9 @@ def resolve_canister_ids_from_registry(
 
     try:
         result = subprocess.run(
-            [DFX_CLI, "canister", "call", "--network", network,
+            [ICP_CLI, "canister", "call", "--network", network,
              registry_canister_id, "list_realms", "--query"],
             capture_output=True, text=True, timeout=30,
-            env={**os.environ, "DFX_WARNING": "-mainnet_plaintext_identity"},
         )
         if result.returncode != 0:
             print(f"   ⚠️  Registry query failed: {result.stderr.strip()}")
@@ -305,7 +303,6 @@ def resolve_canister_ids_from_files(network: str, manifest_path: str) -> dict:
 def set_vite_env_vars(parameters: dict) -> dict:
     """Convert deployment parameters to VITE_* environment variables."""
     env = os.environ.copy()
-    env["DFX_WARNING"] = "-mainnet_plaintext_identity"
 
     for param_name, value in parameters.items():
         vite_key = VITE_PARAM_MAP.get(param_name)
@@ -354,17 +351,21 @@ def deploy_backend(
 
     # Build backend WASM
     # Set CANISTER_CANDID_PATH — required by Basilisk.
-    # icp/dfx sets this automatically; we must do it manually for direct builds.
+    # icp sets this automatically; we must do it manually for direct builds.
     candid_path = Path("src/realm_backend/realm_backend.did")
     if candid_path.exists():
         env["CANISTER_CANDID_PATH"] = str(candid_path.resolve())
     else:
-        # Try dfx.json / dfx.template.json to find the candid path
-        for dfx_file in ("dfx.json", "dfx.template.json"):
-            if Path(dfx_file).exists():
-                with open(dfx_file) as f:
-                    dfx_config = json.load(f)
-                cp = dfx_config.get("canisters", {}).get("realm_backend", {}).get("candid", "")
+        # Try icp.yaml / dfx.json to find the candid path
+        for config_file in ("icp.yaml", "dfx.json"):
+            config_path = Path(config_file)
+            if config_path.exists():
+                with open(config_path) as f:
+                    if config_file.endswith(".yaml"):
+                        config = yaml.safe_load(f)
+                    else:
+                        config = json.load(f)
+                cp = config.get("canisters", {}).get("realm_backend", {}).get("candid", "")
                 if cp and Path(cp).exists():
                     env["CANISTER_CANDID_PATH"] = str(Path(cp).resolve())
                     break
@@ -388,12 +389,12 @@ def deploy_backend(
 
     # Top up cycles first
     subprocess.run(
-        [DFX_CLI, "cycles", "top-up", backend_id, "1000000000000", "--network", network],
+        [ICP_CLI, "canister", "top-up", backend_id, "1000000000000", "--network", network],
         env=env, capture_output=True,
     )
 
     result = subprocess.run(
-        [DFX_CLI, "canister", "install", backend_id,
+        [ICP_CLI, "canister", "install", backend_id,
          "--wasm", wasm_path,
          "--network", network,
          "--mode", mode,
@@ -426,11 +427,11 @@ def deploy_backend(
             quarter_wasm = f".basilisk/{quarter_name}/{quarter_name}.wasm"
             if Path(quarter_wasm).exists():
                 subprocess.run(
-                    [DFX_CLI, "cycles", "top-up", quarter_id, "1000000000000", "--network", network],
+                    [ICP_CLI, "canister", "top-up", quarter_id, "1000000000000", "--network", network],
                     env=env, capture_output=True,
                 )
                 result = subprocess.run(
-                    [DFX_CLI, "canister", "install", quarter_id,
+                    [ICP_CLI, "canister", "install", quarter_id,
                      "--wasm", quarter_wasm,
                      "--network", network,
                      "--mode", mode,
@@ -473,7 +474,7 @@ def deploy_frontend(
         for img_name in ("emblem.png", "logo.svg", "logo.png"):
             src = manifest_dir / img_name
             if src.exists():
-                dest = static_images / "realm_logo" + src.suffix
+                dest = static_images / ("realm_logo" + src.suffix)
                 shutil.copy2(src, dest)
                 print(f"   🖼️  Copied {img_name} → {dest}")
 
@@ -483,6 +484,52 @@ def deploy_frontend(
                 dest = static_images / ("welcome" + src.suffix)
                 shutil.copy2(src, dest)
                 print(f"   🖼️  Copied {img_name} → {dest}")
+
+    # Ensure declarations/realm_backend exists (normally created during full deploy)
+    decl_dir = frontend_dir / "src" / "lib" / "declarations" / "realm_backend"
+    if not decl_dir.exists():
+        print("   📋 Generating declarations for realm_backend...")
+        backend_id = canister_ids.get("realm_backend", "")
+
+        # Find the JS IDL factory from a previous deploy in .realms/
+        did_js_src = None
+        realms_dir = Path(".realms")
+        if realms_dir.exists():
+            import glob
+            candidates = sorted(
+                glob.glob(str(realms_dir / "**/declarations/realm_backend/realm_backend.did.js"), recursive=True),
+                key=os.path.getmtime, reverse=True,
+            )
+            if candidates:
+                did_js_src = candidates[0]
+
+        if did_js_src:
+            decl_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(did_js_src, decl_dir / "realm_backend.did.js")
+
+            index_js = (
+                'import { Actor, HttpAgent } from "@dfinity/agent";\n'
+                'import { idlFactory } from "./realm_backend.did.js";\n'
+                'export { idlFactory } from "./realm_backend.did.js";\n'
+                f'export const canisterId = "{backend_id}";\n'
+                'export const createActor = (canisterId, options = {}) => {\n'
+                '  const agent = options.agent || new HttpAgent({ ...options.agentOptions });\n'
+                '  if (options.agent && options.agentOptions) {\n'
+                '    console.warn("Detected both agent and agentOptions passed to createActor. Ignoring agentOptions and proceeding with the provided agent.");\n'
+                '  }\n'
+                '  if (process.env.DFX_NETWORK !== "ic") {\n'
+                '    agent.fetchRootKey().catch((err) => {\n'
+                '      console.warn("Unable to fetch root key. Check to ensure that your local replica is running");\n'
+                '      console.error(err);\n'
+                '    });\n'
+                '  }\n'
+                '  return Actor.createActor(idlFactory, { agent, canisterId, ...options.actorOptions });\n'
+                '};\n'
+            )
+            (decl_dir / "index.js").write_text(index_js)
+            print(f"   ✅ Declarations generated (canisterId={backend_id})")
+        else:
+            print("   ⚠️  No previous declarations found in .realms/. Run a full deploy first.")
 
     # Install npm deps and build
     print("   📥 Installing npm dependencies...")
@@ -500,14 +547,13 @@ def deploy_frontend(
     # Deploy frontend assets
     print(f"   📦 Deploying to {frontend_id}...")
     subprocess.run(
-        [DFX_CLI, "cycles", "top-up", frontend_id, "500000000000", "--network", network],
+        [ICP_CLI, "canister", "top-up", frontend_id, "500000000000", "--network", network],
         env=env, capture_output=True,
     )
 
-    # Use icp deploy with the canister name if available, or install directly
     result = subprocess.run(
-        [DFX_CLI, "deploy", "realm_frontend",
-         "--network", network,
+        [ICP_CLI, "deploy", "realm_frontend",
+         "-e", network,
          "--mode", mode,
          "--yes"],
         env=env,
@@ -618,7 +664,7 @@ Examples:
     )
     parser.add_argument(
         "--identity",
-        help="Identity PEM file or icp identity name",
+        help="Identity PEM file or identity name",
     )
     parser.add_argument(
         "--dry-run", action="store_true",
@@ -671,18 +717,18 @@ Examples:
             # PEM file — import it
             print(f"🔐 Importing identity from {args.identity}...")
             subprocess.run(
-                [DFX_CLI, "identity", "import", "--force", "--storage-mode",
+                [ICP_CLI, "identity", "import", "--force", "--storage-mode",
                  "plaintext", "deploy_identity", args.identity],
                 env=env, check=True,
             )
             subprocess.run(
-                [DFX_CLI, "identity", "use", "deploy_identity"],
+                [ICP_CLI, "identity", "default", "deploy_identity"],
                 env=env, check=True,
             )
         else:
             # Identity name
             subprocess.run(
-                [DFX_CLI, "identity", "use", args.identity],
+                [ICP_CLI, "identity", "default", args.identity],
                 env=env, check=True,
             )
 

@@ -17,7 +17,7 @@ from rich.table import Table
 from .create import create_command
 from .marketplace import marketplace_create_command
 from .registry import registry_create_command
-from ..utils import console, generate_output_dir_name, get_project_root, display_canister_urls_json, get_canister_urls, ensure_dfx_running
+from ..utils import console, generate_output_dir_name, get_project_root, display_canister_urls_json, get_canister_urls, ensure_local_network_running
 
 
 def mundus_create_command(
@@ -398,10 +398,10 @@ def mundus_deploy_command(
     console.print(f"📡 Network: {network}")
     console.print(f"🔄 Mode: {mode}\n")
     
-    # For local network, manage shared dfx instance
+    # For local network, manage shared local replica
     if network == "local":
-        # Ensure dfx is running (creates dfx.log in mundus dir)
-        ensure_dfx_running(log_dir=mundus_path, network=network)
+        # Ensure local network is running (creates icp.log in mundus dir)
+        ensure_local_network_running(log_dir=mundus_path, network=network)
     
     # Import deploy commands
     from .deploy import deploy_command as realm_deploy_command
