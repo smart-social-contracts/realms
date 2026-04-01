@@ -4,7 +4,7 @@ set -e
 
 PYTHON_VERSION="3.10"
 NODE_VERSION="22"
-DFX_VERSION="0.29.0"
+ICP_CLI_VERSION="0.2"
 BASILISK_VERSION="0.8.0"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -95,27 +95,23 @@ install_node() {
     fi
 }
 
-install_dfx() {
-    if command -v dfx >/dev/null 2>&1; then
-        current_dfx_version=$(dfx --version | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
-        if [[ "$current_dfx_version" == "$DFX_VERSION" ]]; then
-            log "DFX $DFX_VERSION already installed"
-            return
-        fi
+install_icp_cli() {
+    if command -v icp >/dev/null 2>&1; then
+        log "icp CLI already installed"
+        return
     fi
     
-    log "Installing DFX $DFX_VERSION..."
+    log "Installing icp CLI..."
     
-    DFX_VERSION="$DFX_VERSION" DFXVM_INIT_YES=true sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
+    npm install -g @icp-sdk/icp-cli
     
-    export PATH="$HOME/.local/share/dfx/bin:$PATH"
-    echo 'export PATH="$HOME/.local/share/dfx/bin:$PATH"' >> ~/.bashrc
+    export PATH="$HOME/.local/share/icp/bin:$PATH"
+    echo 'export PATH="$HOME/.local/share/icp/bin:$PATH"' >> ~/.bashrc
     
-    dfx_version=$(dfx --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1 || echo "")
-    if [[ "$dfx_version" == "$DFX_VERSION" ]]; then
-        log "DFX $DFX_VERSION installed successfully"
+    if command -v icp >/dev/null 2>&1; then
+        log "icp CLI installed successfully: $(icp --version)"
     else
-        error "Failed to install DFX $DFX_VERSION. Current version: $dfx_version"
+        error "Failed to install icp CLI"
     fi
 }
 
@@ -130,7 +126,7 @@ install_basilisk() {
         pip install --no-cache-dir "ic-basilisk==$BASILISK_VERSION"
     fi
     
-    log "Installing Basilisk DFX extension..."
+    log "Installing Basilisk extension..."
     python -m basilisk install-dfx-extension
     
     log "Basilisk installed successfully"
@@ -139,7 +135,7 @@ install_basilisk() {
 install_basilisk_prerequisites() {
     log "Installing Basilisk prerequisites by deploying test canister..."
     
-    export PATH="$HOME/.local/share/dfx/bin:$PATH"
+    export PATH="$HOME/.local/share/icp/bin:$PATH"
     # Ensure Python 3.10 is active
     pyenv shell "$PYTHON_VERSION"
     
@@ -152,11 +148,11 @@ install_basilisk_prerequisites() {
 def greet() -> text:
     return "Hello"' > main.py
     
-    echo '{"canisters":{"test":{"type":"basilisk","main":"main.py"}}}' > dfx.json
+    printf 'canisters:\n- name: test\n  build:\n    steps:\n    - type: script\n      commands:\n      - CANISTER_CANDID_PATH=.basilisk/test/test.did python -m basilisk test main.py\n      - cp .basilisk/test/test.wasm "$ICP_WASM_OUTPUT_PATH"\n' > icp.yaml
     
-    dfx start --background --clean
-    dfx deploy --no-wallet
-    dfx stop
+    icp network start -d
+    icp deploy
+    icp network stop
     
     cd "$PROJECT_ROOT"
     rm -rf "$temp_dir"
@@ -198,13 +194,13 @@ setup_project_dependencies() {
 verify_installation() {
     log "Verifying installation..."
     
-    export PATH="$HOME/.local/share/dfx/bin:$PATH"
+    export PATH="$HOME/.local/share/icp/bin:$PATH"
     # Ensure Python 3.10 is active
     pyenv shell "$PYTHON_VERSION"
     
     log "Python version: $(python --version)"
     log "Node version: $(node --version)"
-    log "DFX version: $(dfx --version)"
+    log "icp version: $(icp --version)"
     
     if python -c "import basilisk; print(f'Basilisk version: {basilisk.__version__}')" 2>/dev/null; then
         log "Basilisk installation verified"
@@ -217,16 +213,14 @@ verify_installation() {
 
 cleanup_on_error() {
     log "Cleaning up due to error..."
-    if pgrep dfx >/dev/null; then
-        dfx stop 2>/dev/null || true
-    fi
+    icp network stop 2>/dev/null || true
 }
 
 main() {
     trap cleanup_on_error ERR
     
     log "Starting ICP development environment setup..."
-    log "Target versions: Python $PYTHON_VERSION, Node $NODE_VERSION, DFX $DFX_VERSION, Basilisk $BASILISK_VERSION"
+    log "Target versions: Python $PYTHON_VERSION, Node $NODE_VERSION, icp CLI, Basilisk $BASILISK_VERSION"
     log "Note: This script installs core dependencies only. No canisters will be built or deployed."
     
     check_ubuntu
@@ -234,7 +228,7 @@ main() {
     install_pyenv
     install_python
     install_node
-    install_dfx
+    install_icp_cli
     install_basilisk
     install_basilisk_prerequisites
     setup_project_dependencies

@@ -46,7 +46,7 @@ else
     log_info "Will copy test files after container start (CI mode)"
 fi
 
-# Start container (let realms realm deploy handle dfx startup)
+# Start container (let realms realm deploy handle icp startup)
 log_info "Starting container..."
 docker run -d \
   --name "$CONTAINER_NAME" \
@@ -54,7 +54,7 @@ docker run -d \
   "$DOCKER_IMAGE" \
   sleep infinity
 
-# Deploy realm (this will block until complete - handles dfx startup internally)
+# Deploy realm (this will block until complete - handles icp startup internally)
 log_info "Creating and deploying realm (this takes ~2-3 minutes)..."
 if ! docker exec "$CONTAINER_NAME" bash -c "realms realm create --random --members $MEMBERS_COUNT && realms realm deploy --plain-logs"; then
     log_error "Realm deployment failed"
@@ -67,7 +67,7 @@ fi
 
 log_success "Realm deployed successfully!"
 
-# Find the deployed realm directory (needed for dfx context)
+# Find the deployed realm directory (needed for icp context)
 log_info "Finding realm directory..."
 REALM_DIR=$(docker exec "$CONTAINER_NAME" bash -c "ls -td /app/.realms/realm_* 2>/dev/null | head -1" || echo "")
 if [ -z "$REALM_DIR" ]; then
@@ -95,7 +95,7 @@ if [ "$USE_VOLUMES" != "true" ]; then
     }
 fi
 
-# Run integration tests (pass REALM_DIR so dfx can find .dfx/ state)
+# Run integration tests (pass REALM_DIR so icp can find .dfx/ state)
 if [ -n "$TEST_FILES" ]; then
     log_info "Running specific integration tests: $TEST_FILES"
     set +e  # Don't exit on test failure

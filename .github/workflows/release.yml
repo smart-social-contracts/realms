@@ -212,7 +212,7 @@ jobs:
             **Deploy Canisters:**
             ```bash
             # Download the .wasm.gz and .did files
-            dfx deploy --network ic
+            icp deploy -e ic
             ```
             
             **Run Docker Image:**

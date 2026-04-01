@@ -28,25 +28,25 @@ echo ""
 
 # Check current cycles balance
 echo "💰 Current cycles balance:"
-dfx cycles balance --network "$NETWORK" 2>/dev/null || echo "   (could not check balance)"
+icp cycles balance -e "$NETWORK" 2>/dev/null || echo "   (could not check balance)"
 echo ""
 
 # Check canister status
 echo "📊 Canister status:"
-dfx canister status --network "$NETWORK" "$CANISTER_ID" 2>/dev/null || echo "   (could not get status)"
+icp canister status -e "$NETWORK" "$CANISTER_ID" 2>/dev/null || echo "   (could not get status)"
 echo ""
 
 # Stop the canister first
 echo "⏹️  Stopping canister..."
-dfx canister stop --network "$NETWORK" "$CANISTER_ID" 2>/dev/null || echo "   (already stopped or not found)"
+icp canister stop -e "$NETWORK" "$CANISTER_ID" 2>/dev/null || echo "   (already stopped or not found)"
 
 # Delete and recover cycles
 echo "🗑️  Deleting canister and recovering cycles..."
-dfx canister delete --network "$NETWORK" "$CANISTER_ID" --yes
+icp canister delete -e "$NETWORK" "$CANISTER_ID" --yes
 
 echo ""
 echo "💰 New cycles balance:"
-dfx cycles balance --network "$NETWORK" 2>/dev/null || echo "   (could not check balance)"
+icp cycles balance -e "$NETWORK" 2>/dev/null || echo "   (could not check balance)"
 
 echo ""
 echo "✅ Done."

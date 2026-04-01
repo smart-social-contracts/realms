@@ -1,7 +1,7 @@
 #!/bin/bash
 # Fast staging deployment script for iterative development
 # Deploys specific canisters directly to staging network, bypassing CI/CD pipeline
-# Requires: dfx identity with staging deploy permissions, existing mundus deployment in .realms/
+# Requires: icp identity with staging deploy permissions, existing mundus deployment in .realms/
 
 set -e
 
@@ -134,8 +134,8 @@ echo -e "${BLUE}Mundus: $(basename "$MUNDUS_DIR")${NC}"
 echo -e "${BLUE}Network: $NETWORK${NC}"
 echo ""
 
-# Check dfx identity
-IDENTITY=$(dfx identity whoami 2>/dev/null || echo "unknown")
+# Check icp identity
+IDENTITY=$(icp identity whoami 2>/dev/null || echo "unknown")
 echo -e "${BLUE}Identity: $IDENTITY${NC}"
 echo ""
 
@@ -171,7 +171,7 @@ deploy_registry() {
         (cd "$registry_dir/src/realm_registry_frontend" && npm run build)
         
         echo -e "${GREEN}🚀 Deploying registry frontend to $NETWORK...${NC}"
-        (cd "$registry_dir" && dfx deploy realm_registry_frontend --network "$NETWORK" --yes)
+        (cd "$registry_dir" && icp deploy realm_registry_frontend -e "$NETWORK" --yes)
     fi
     
     if [ "$DEPLOY_BACKEND" = true ]; then
@@ -184,7 +184,7 @@ deploy_registry() {
         fi
         
         echo -e "${GREEN}🚀 Deploying registry backend to $NETWORK...${NC}"
-        (cd "$registry_dir" && dfx deploy realm_registry_backend --network "$NETWORK" --mode upgrade --yes)
+        (cd "$registry_dir" && icp deploy realm_registry_backend -e "$NETWORK" --mode upgrade --yes)
     fi
 }
 
@@ -259,7 +259,7 @@ deploy_realm() {
         (cd "$realm_dir/src/realm_frontend" && npm run build)
         
         echo -e "${GREEN}🚀 Deploying realm frontend to $NETWORK...${NC}"
-        (cd "$realm_dir" && dfx deploy realm_frontend --network "$NETWORK" --yes)
+        (cd "$realm_dir" && icp deploy realm_frontend -e "$NETWORK" --yes)
     fi
     
     if [ "$DEPLOY_BACKEND" = true ]; then
@@ -373,7 +373,7 @@ with open(os.path.join(ext_pkg, 'extension_manifests.py'), 'w') as f:
         fi
         
         echo -e "${GREEN}🚀 Deploying realm backend to $NETWORK...${NC}"
-        (cd "$realm_dir" && dfx deploy realm_backend --network "$NETWORK" --mode upgrade --yes)
+        (cd "$realm_dir" && icp deploy realm_backend -e "$NETWORK" --mode upgrade --yes)
         
         # Deactivate venv
         if [ -f "$realm_dir/venv/bin/activate" ]; then

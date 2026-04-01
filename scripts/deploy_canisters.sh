@@ -6,11 +6,11 @@ set -e
 # Enable verbose trace mode only if REALMS_VERBOSE is set (for --plain-logs)
 [ "$REALMS_VERBOSE" = "1" ] && set -x
 
-# Suppress dfx plaintext identity warning for mainnet
+# Suppress icp plaintext identity warning for mainnet
 export DFX_WARNING="-mainnet_plaintext_identity"
 
-# Retry wrapper for dfx commands (handles transient 503 errors)
-retry_dfx() {
+# Retry wrapper for icp commands (handles transient 503 errors)
+retry_icp() {
     local max_attempts=3
     local attempt=1
     local delay=5
@@ -33,7 +33,7 @@ retry_dfx() {
 }
 
 # Parameters
-WORKING_DIR="${1:-.}"           # Directory containing dfx.json (default: current dir)
+WORKING_DIR="${1:-.}"           # Directory containing icp.yaml/dfx.json (default: current dir)
 NETWORK="${2:-local}"           # Network: local, staging, ic
 MODE="${3:-auto}"               # Mode: auto, upgrade, reinstall, install (auto picks install/upgrade automatically)
 IDENTITY_FILE="${4:-}"          # Optional: Identity file for IC deployment
@@ -54,13 +54,13 @@ cd "$WORKING_DIR" || {
 }
 WORKING_DIR="$(pwd)"  # Convert to absolute path
 
-# Verify dfx.json exists
+# Verify dfx.json exists (config file still named dfx.json for now)
 if [ ! -f "dfx.json" ]; then
     echo "❌ Error: dfx.json not found in $WORKING_DIR"
     exit 1
 fi
 
-# Find repo root by looking for dfx.template.json (using absolute path)
+# Find repo root by looking for dfx.template.json (config templates still use dfx naming)
 REPO_ROOT="$WORKING_DIR"
 while [ ! -f "$REPO_ROOT/dfx.template.json" ] && [ "$REPO_ROOT" != "/" ]; do
     REPO_ROOT=$(dirname "$REPO_ROOT")
@@ -100,11 +100,11 @@ fi
 # Handle identity for IC deployments
 if [ -n "$IDENTITY_FILE" ] && [ -f "$IDENTITY_FILE" ]; then
     echo "🔐 Using identity file: $IDENTITY_FILE"
-    dfx identity import --force --storage-mode plaintext temp_deploy "$IDENTITY_FILE"
-    dfx identity use temp_deploy
+    icp identity import --force --storage-mode plaintext temp_deploy "$IDENTITY_FILE"
+    icp identity use temp_deploy
 fi
 
-# Start dfx for local network (unless SKIP_DFX_START is set)
+# Start local network (unless SKIP_DFX_START is set)
 if [ "$NETWORK" = "local" ] && [ "$SKIP_DFX_START" != "true" ]; then
     # Determine port based on branch (if git available)
     if command -v git &> /dev/null && git rev-parse --git-dir > /dev/null 2>&1; then
@@ -118,28 +118,28 @@ if [ "$NETWORK" = "local" ] && [ "$SKIP_DFX_START" != "true" ]; then
         PORT=8000
     fi
     
-    # Check if dfx is already running on this port
+    # Check if icp is already running on this port
     if lsof -ti:$PORT >/dev/null 2>&1; then
-        echo "🌐 dfx already running on port $PORT (reusing existing instance)"
+        echo "🌐 icp already running on port $PORT (reusing existing instance)"
     else
-        echo "🌐 Starting local dfx replica on port $PORT..."
+        echo "🌐 Starting local icp replica on port $PORT..."
         
-        # Stop any existing dfx processes
-        dfx stop 2>/dev/null || true
+        # Stop any existing icp processes
+        icp network stop 2>/dev/null || true
         
-        # Start dfx WITHOUT --background to capture canister logs from stderr
+        # Start icp WITHOUT --background to capture canister logs from stderr
         # dfx.log = CLI logs, dfx2.log = canister/replica logs
         # Note: All file descriptors must be redirected for docker exec to return properly
-        dfx start --clean --log file --logfile dfx.log --host 127.0.0.1:$PORT </dev/null >/dev/null 2>dfx2.log &
+        icp network start --clean --log file --logfile dfx.log --host 127.0.0.1:$PORT </dev/null >/dev/null 2>dfx2.log &
         disown
         
         # Wait for initialization with health check
-        echo "⏳ Waiting for dfx to initialize..."
+        echo "⏳ Waiting for icp to initialize..."
         MAX_WAIT=10
         ELAPSED=0
         while [ $ELAPSED -lt $MAX_WAIT ]; do
-            if dfx ping local >/dev/null 2>&1; then
-                echo "✅ dfx is ready (took ${ELAPSED}s)"
+            if icp ping local >/dev/null 2>&1; then
+                echo "✅ icp is ready (took ${ELAPSED}s)"
                 break
             fi
             sleep 1
@@ -147,13 +147,13 @@ if [ "$NETWORK" = "local" ] && [ "$SKIP_DFX_START" != "true" ]; then
         done
         
         if [ $ELAPSED -ge $MAX_WAIT ]; then
-            echo "❌ Error: dfx failed to start after ${MAX_WAIT} seconds"
+            echo "❌ Error: icp failed to start after ${MAX_WAIT} seconds"
             echo "Check dfx.log for details"
             exit 1
         fi
     fi
 elif [ "$SKIP_DFX_START" = "true" ]; then
-    echo "🌐 Using existing dfx instance (SKIP_DFX_START=true)"
+    echo "🌐 Using existing icp instance (SKIP_DFX_START=true)"
 fi
 
 # Get all backend canisters from dfx.json
@@ -219,7 +219,7 @@ if [ "$NETWORK" = "local" ]; then
 
     for shared_canister in $SHARED_CANISTERS; do
         # Check if already deployed
-        existing_id=$(dfx canister id "$shared_canister" --network "$NETWORK" 2>/dev/null || echo "")
+        existing_id=$(icp canister id "$shared_canister" -e "$NETWORK" 2>/dev/null || echo "")
         if [ -n "$existing_id" ]; then
             echo "🔗 $shared_canister already deployed: $existing_id. Skipping..."
         else
@@ -233,18 +233,18 @@ if [ "$NETWORK" = "local" ]; then
                     echo "   ⚠️  ckbtc_ledger not found in dfx.json, skipping indexer"
                     continue
                 fi
-                ledger_id=$(dfx canister id "$ledger_name" --network "$NETWORK" 2>/dev/null || echo "")
+                ledger_id=$(icp canister id "$ledger_name" -e "$NETWORK" 2>/dev/null || echo "")
                 if [ -z "$ledger_id" ]; then
                     echo "   ⚠️  $ledger_name not deployed yet, skipping indexer"
                     continue
                 fi
                 echo "   📎 Configuring indexer with ledger_id: $ledger_id"
-                retry_dfx dfx deploy "$shared_canister" --yes --argument "(opt variant { Init = record { ledger_id = principal \"$ledger_id\" } })"
+                retry_icp icp deploy "$shared_canister" --yes --argument "(opt variant { Init = record { ledger_id = principal \"$ledger_id\" } })"
             else
-                retry_dfx dfx deploy "$shared_canister" --yes
+                retry_icp icp deploy "$shared_canister" --yes
             fi
             
-            dfx canister start --network "$NETWORK" "$shared_canister" 2>/dev/null || true
+            icp canister start -e "$NETWORK" "$shared_canister" 2>/dev/null || true
         fi
     done
     "$REPO_ROOT/scripts/set_canister_config.py" "$NETWORK"
@@ -262,8 +262,8 @@ for canister in $BACKENDS; do
     
     echo "   📦 Deploying $canister..."
     if [ "$NETWORK" = "local" ]; then
-        # For local, let dfx decide mode (clean = install, otherwise upgrade)
-        retry_dfx dfx deploy "$canister" --yes
+        # For local, let icp decide mode (clean = install, otherwise upgrade)
+        retry_icp icp deploy "$canister" --yes
     else
         # For demo/staging networks, canisters already exist - skip create, just deploy
         # Get canister ID from dfx.json remote.id or use dfx to find it
@@ -284,9 +284,9 @@ except: pass
 " 2>/dev/null || echo "")
         fi
         
-        # If not found in dfx.json, try dfx directly
+        # If not found in dfx.json, try icp directly
         if [ -z "$canister_id" ]; then
-            canister_id=$(dfx canister id "$canister" --network "$NETWORK" 2>/dev/null || echo "")
+            canister_id=$(icp canister id "$canister" -e "$NETWORK" 2>/dev/null || echo "")
         fi
         
         if [ -z "$canister_id" ]; then
@@ -298,22 +298,22 @@ except: pass
         
         # Top up canister to ensure it has enough cycles for wasm installation
         echo "   💰 Topping up $canister ($canister_id) with 1 TC..."
-        dfx cycles top-up "$canister_id" 1000000000000 --network "$NETWORK" 2>/dev/null || true
+        icp cycles top-up "$canister_id" 1000000000000 -e "$NETWORK" 2>/dev/null || true
         # Detect if canister has WASM installed; if not, force install mode
         CANISTER_MODE="$MODE"
         if [ "$CANISTER_MODE" = "upgrade" ] && [ -n "$canister_id" ]; then
-            module_hash=$(dfx canister info "$canister_id" --network "$NETWORK" 2>/dev/null | grep -i "module hash" | grep -i "none" || true)
+            module_hash=$(icp canister info "$canister_id" -e "$NETWORK" 2>/dev/null | grep -i "module hash" | grep -i "none" || true)
             if [ -n "$module_hash" ]; then
                 echo "   ⚠️  $canister has no WASM module, switching to install mode"
                 CANISTER_MODE="install"
             fi
         fi
         # Now deploy (canister already created and funded)
-        retry_dfx dfx deploy --network "$NETWORK" --yes "$canister" --mode="$CANISTER_MODE"
+        retry_icp icp deploy -e "$NETWORK" --yes "$canister" --mode="$CANISTER_MODE"
     fi
     
     # Start canister
-    dfx canister start --network "$NETWORK" "$canister" 2>/dev/null || true
+    icp canister start -e "$NETWORK" "$canister" 2>/dev/null || true
 done
 
 # Generate declarations
@@ -321,13 +321,13 @@ if [ -n "$BACKENDS" ]; then
     echo ""
     echo "🔧 Generating declarations..."
     for canister in $BACKENDS; do
-        # Skip dfx generate for quarter backends - they share the same WASM/candid as realm_backend
+        # Skip icp generate for quarter backends - they share the same WASM/candid as realm_backend
         if [[ "$canister" == quarter_*_backend ]]; then
             echo "   Skipping declarations for $canister (shares realm_backend interface)"
             continue
         fi
         echo "   Generating for $canister..."
-        dfx generate --network "$NETWORK" "$canister"
+        icp generate -e "$NETWORK" "$canister"
     done
     
     # Copy declarations to standard names for frontend compatibility
@@ -361,7 +361,7 @@ if [ -n "$BACKENDS" ]; then
         # Replace process.env.CANISTER_ID_* with actual canister IDs
         echo "   🔧 Injecting canister IDs into declarations..."
         for canister in $BACKENDS; do
-            canister_id=$(dfx canister id "$canister" --network "$NETWORK" 2>/dev/null || echo "")
+            canister_id=$(icp canister id "$canister" -e "$NETWORK" 2>/dev/null || echo "")
             if [ -n "$canister_id" ]; then
                 canister_upper=$(echo "$canister" | tr '[:lower:]' '[:upper:]')
                 decl_file="src/realm_frontend/src/lib/declarations/$canister/index.js"
@@ -600,20 +600,20 @@ if [ -n "$FRONTENDS" ]; then
         # Deploy frontend
         echo "   📦 Deploying $canister..."
         if [ "$NETWORK" = "local" ]; then
-            retry_dfx dfx deploy "$canister"
+            retry_icp icp deploy "$canister"
         else
             # Ensure canister exists and has cycles before deploying assets
-            existing_id=$(dfx canister id "$canister" --network "$NETWORK" 2>/dev/null || echo "")
+            existing_id=$(icp canister id "$canister" -e "$NETWORK" 2>/dev/null || echo "")
             if [ -z "$existing_id" ]; then
                 echo "   🆕 Creating canister $canister with initial cycles..."
-                retry_dfx dfx canister create "$canister" --network "$NETWORK" --with-cycles 500000000000
+                retry_icp icp canister create "$canister" -e "$NETWORK" --with-cycles 500000000000
             fi
-            canister_id=$(dfx canister id "$canister" --network "$NETWORK" 2>/dev/null || echo "")
+            canister_id=$(icp canister id "$canister" -e "$NETWORK" 2>/dev/null || echo "")
             if [ -n "$canister_id" ]; then
                 echo "   💰 Topping up $canister ($canister_id)..."
-                dfx cycles top-up "$canister_id" 500000000000 --network "$NETWORK" 2>/dev/null || true
+                icp cycles top-up "$canister_id" 500000000000 -e "$NETWORK" 2>/dev/null || true
             fi
-            retry_dfx dfx deploy --network "$NETWORK" --yes "$canister" --mode "$MODE"
+            retry_icp icp deploy -e "$NETWORK" --yes "$canister" --mode "$MODE"
         fi
     done
 fi
@@ -625,16 +625,16 @@ echo ""
 # Configure vault extension with local canister IDs (if local network)
 if [ "$NETWORK" = "local" ]; then
     echo "🔧 Configuring vault extension with local canister IDs..."
-    ledger_id=$(dfx canister id ckbtc_ledger --network "$NETWORK" 2>/dev/null || echo "")
-    indexer_id=$(dfx canister id ckbtc_indexer --network "$NETWORK" 2>/dev/null || echo "")
-    backend_id=$(dfx canister id realm_backend --network "$NETWORK" 2>/dev/null || echo "")
+    ledger_id=$(icp canister id ckbtc_ledger -e "$NETWORK" 2>/dev/null || echo "")
+    indexer_id=$(icp canister id ckbtc_indexer -e "$NETWORK" 2>/dev/null || echo "")
+    backend_id=$(icp canister id realm_backend -e "$NETWORK" 2>/dev/null || echo "")
     
     if [ -n "$ledger_id" ] && [ -n "$indexer_id" ] && [ -n "$backend_id" ]; then
         echo "   📎 Setting ckBTC ledger: $ledger_id"
-        dfx canister call "$backend_id" extension_sync_call "(record { extension_name = \"vault\"; function_name = \"set_canister\"; args = \"{\\\"canister_name\\\": \\\"ckBTC ledger\\\", \\\"principal_id\\\": \\\"$ledger_id\\\"}\" })" --network "$NETWORK" >/dev/null 2>&1 || true
+        icp canister call "$backend_id" extension_sync_call "(record { extension_name = \"vault\"; function_name = \"set_canister\"; args = \"{\\\"canister_name\\\": \\\"ckBTC ledger\\\", \\\"principal_id\\\": \\\"$ledger_id\\\"}\" })" -e "$NETWORK" >/dev/null 2>&1 || true
         
         echo "   📎 Setting ckBTC indexer: $indexer_id"
-        dfx canister call "$backend_id" extension_sync_call "(record { extension_name = \"vault\"; function_name = \"set_canister\"; args = \"{\\\"canister_name\\\": \\\"ckBTC indexer\\\", \\\"principal_id\\\": \\\"$indexer_id\\\"}\" })" --network "$NETWORK" >/dev/null 2>&1 || true
+        icp canister call "$backend_id" extension_sync_call "(record { extension_name = \"vault\"; function_name = \"set_canister\"; args = \"{\\\"canister_name\\\": \\\"ckBTC indexer\\\", \\\"principal_id\\\": \\\"$indexer_id\\\"}\" })" -e "$NETWORK" >/dev/null 2>&1 || true
         
         echo "   ✅ Vault configured with local canisters"
     else
@@ -646,10 +646,10 @@ fi
 if [ "$NETWORK" = "local" ]; then
     echo "🌐 Canister URLs:"
     
-    # Get port from dfx info or detect from running dfx
+    # Get port from icp info or detect from running process
     if [ -z "$PORT" ]; then
-        # Try to get port from dfx info (use --webserver-port, not replica-port)
-        PORT=$(dfx info webserver-port 2>/dev/null || dfx info --webserver-port 2>/dev/null)
+        # Try to get port from icp info (use --webserver-port, not replica-port)
+        PORT=$(icp info webserver-port 2>/dev/null || icp info --webserver-port 2>/dev/null)
         
         # If that fails, detect from running process
         if [ -z "$PORT" ]; then
@@ -664,7 +664,7 @@ if [ "$NETWORK" = "local" ]; then
     
     # Show URLs for each frontend canister
     for canister in $FRONTENDS; do
-        canister_id=$(dfx canister id "$canister" 2>/dev/null || echo "")
+        canister_id=$(icp canister id "$canister" 2>/dev/null || echo "")
         if [ -n "$canister_id" ]; then
             echo "   🌐 $canister: http://$canister_id.localhost:$PORT/"
         fi
@@ -672,7 +672,7 @@ if [ "$NETWORK" = "local" ]; then
     
     # Show Candid UI for each backend canister
     for canister in $BACKENDS; do
-        canister_id=$(dfx canister id "$canister" 2>/dev/null || echo "")
+        canister_id=$(icp canister id "$canister" 2>/dev/null || echo "")
         if [ -n "$canister_id" ]; then
             echo "   🔧 $canister (Candid UI): http://localhost:$PORT/?canisterId=$canister_id"
         fi
@@ -740,7 +740,7 @@ for canister in $BACKENDS; do
         if [[ "$canister" == quarter_*_backend ]]; then
             continue
         fi
-        canister_id=$(dfx canister id "$canister" 2>/dev/null || echo "")
+        canister_id=$(icp canister id "$canister" 2>/dev/null || echo "")
         if [ -n "$canister_id" ]; then
             echo "   Adding alias: realm_backend -> $canister ($canister_id)"
             # Add to working directory's canister_ids.json (create if doesn't exist)
@@ -758,7 +758,7 @@ done
 
 for canister in $FRONTENDS; do
     if [[ "$canister" == *_frontend ]]; then
-        canister_id=$(dfx canister id "$canister" 2>/dev/null || echo "")
+        canister_id=$(icp canister id "$canister" 2>/dev/null || echo "")
         if [ -n "$canister_id" ]; then
             echo "   Adding alias: realm_frontend -> $canister ($canister_id)"
             # Add to working directory's canister_ids.json (create if doesn't exist)

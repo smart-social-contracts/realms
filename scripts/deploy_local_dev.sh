@@ -163,17 +163,17 @@ deploy_repo_root() {
     
     if [ "$DEPLOY_FRONTEND" = true ]; then
         echo -e "${GREEN}🚀 Deploying frontend...${NC}"
-        (cd "$REPO_ROOT" && dfx deploy realm_frontend)
+        (cd "$REPO_ROOT" && icp deploy realm_frontend)
     fi
     
     if [ "$DEPLOY_BACKEND" = true ]; then
         echo -e "${GREEN}🚀 Deploying backend...${NC}"
-        (cd "$REPO_ROOT" && dfx deploy realm_backend)
+        (cd "$REPO_ROOT" && icp deploy realm_backend)
     fi
     
     if [ "$DEPLOY_REGISTRY_BACKEND" = true ]; then
         echo -e "${GREEN}🚀 Deploying registry backend...${NC}"
-        (cd "$REPO_ROOT" && dfx deploy realm_registry_backend)
+        (cd "$REPO_ROOT" && icp deploy realm_registry_backend)
     fi
 }
 
@@ -246,7 +246,7 @@ deploy_single_realm() {
     
     if [ "$DEPLOY_FRONTEND" = true ]; then
         echo -e "${GREEN}� Deploying frontend...${NC}"
-        (cd "$SINGLE_REALM_PATH" && dfx deploy realm_frontend)
+        (cd "$SINGLE_REALM_PATH" && icp deploy realm_frontend)
     fi
     
     if [ "$DEPLOY_BACKEND" = true ]; then
@@ -257,7 +257,7 @@ deploy_single_realm() {
         fi
         
         echo -e "${GREEN}🚀 Deploying backend...${NC}"
-        (cd "$SINGLE_REALM_PATH" && dfx deploy realm_backend)
+        (cd "$SINGLE_REALM_PATH" && icp deploy realm_backend)
         
         deactivate 2>/dev/null || true
     fi
@@ -292,12 +292,12 @@ deploy_registry() {
     
     if [ "$DEPLOY_FRONTEND" = true ]; then
         echo -e "${GREEN}🚀 Deploying registry frontend...${NC}"
-        (cd "$registry_dir" && dfx deploy realm_registry_frontend)
+        (cd "$registry_dir" && icp deploy realm_registry_frontend)
     fi
     
     if [ "$DEPLOY_BACKEND" = true ]; then
         echo -e "${GREEN}🚀 Deploying registry backend...${NC}"
-        (cd "$registry_dir" && dfx deploy realm_registry_backend)
+        (cd "$registry_dir" && icp deploy realm_registry_backend)
     fi
 }
 
@@ -389,7 +389,7 @@ deploy_mundus_realm() {
     
     if [ "$DEPLOY_FRONTEND" = true ]; then
         echo -e "${GREEN}🚀 Deploying realm $realm_num frontend...${NC}"
-        (cd "$realm_dir" && dfx deploy realm_frontend)
+        (cd "$realm_dir" && icp deploy realm_frontend)
     fi
     
     if [ "$DEPLOY_BACKEND" = true ]; then
@@ -400,7 +400,7 @@ deploy_mundus_realm() {
         fi
         
         echo -e "${GREEN}🚀 Deploying realm $realm_num backend...${NC}"
-        (cd "$realm_dir" && dfx deploy realm_backend)
+        (cd "$realm_dir" && icp deploy realm_backend)
         
         deactivate 2>/dev/null || true
     fi

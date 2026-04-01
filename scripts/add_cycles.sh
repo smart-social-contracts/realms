@@ -16,35 +16,35 @@ echo "Amount:   ${AMOUNT}T cycles (${AMOUNT} trillion)"
 echo "======================================"
 echo
 
-# Check if dfx is running
-if ! dfx ping &>/dev/null; then
-    echo "❌ Error: dfx replica is not running"
-    echo "   Start it with: dfx start --background"
+# Check if icp is running
+if ! icp ping &>/dev/null; then
+    echo "❌ Error: icp replica is not running"
+    echo "   Start it with: icp network start -d"
     exit 1
 fi
 
 # Check if canister exists
-if ! dfx canister id "$CANISTER" &>/dev/null; then
+if ! icp canister id "$CANISTER" &>/dev/null; then
     echo "❌ Error: Canister '$CANISTER' not found"
-    echo "   Deploy it first with: dfx deploy $CANISTER"
+    echo "   Deploy it first with: icp deploy $CANISTER"
     exit 1
 fi
 
 # Get current cycle balance
 echo "📊 Current cycle balance:"
-dfx canister status "$CANISTER" | grep "Balance:" || echo "   (Unable to read balance)"
+icp canister status "$CANISTER" | grep "Balance:" || echo "   (Unable to read balance)"
 echo
 
-# Add cycles using dfx canister deposit-cycles
+# Add cycles using icp canister deposit-cycles
 # This works for local development - amount is in cycles with T/M/K suffixes
 echo "💰 Adding ${AMOUNT}T cycles to $CANISTER..."
 
-if dfx canister deposit-cycles "${AMOUNT}T" "$CANISTER" 2>&1; then
+if icp canister deposit-cycles "${AMOUNT}T" "$CANISTER" 2>&1; then
     echo
     echo "✅ Successfully added ${AMOUNT}T cycles!"
     echo
     echo "📊 New cycle balance:"
-    dfx canister status "$CANISTER" | grep "Balance:" || echo "   (Unable to read balance)"
+    icp canister status "$CANISTER" | grep "Balance:" || echo "   (Unable to read balance)"
 else
     echo
     echo "❌ Failed to add cycles"
