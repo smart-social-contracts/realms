@@ -1,6 +1,7 @@
 import { building } from '$app/environment';
 import { writable, get } from 'svelte/store';
-import { authClient, initializeAuthClient } from '$lib/auth';
+import { authClient, initializeAuthClient, login } from '$lib/auth';
+import { TEST_MODE_II_BYPASS } from '$lib/config.js';
 
 let createActor, canisterId, HttpAgent;
 let importsInitialized = false;
@@ -80,6 +81,13 @@ function initializeBackendStore() {
 		// is not anonymous on page refresh (avoids race with initBackendWithIdentity).
 		try {
 			const client = authClient || (await initializeAuthClient());
+
+			// In test mode, auto-login before checking auth to avoid race condition
+			// where components mount and make calls before AuthButton triggers login
+			if (TEST_MODE_II_BYPASS && !(await client.isAuthenticated())) {
+				await login();
+			}
+
 			if (await client.isAuthenticated()) {
 				const identity = client.getIdentity();
 				const agent = new HttpAgent({ identity });
