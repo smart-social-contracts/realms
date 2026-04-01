@@ -9,7 +9,7 @@ from rich.table import Table
 
 from .commands.create import create_command
 from .commands.db import db_command, db_find_command, db_get_command, db_schema_command
-from .commands.deploy import deploy_command
+from .commands.deploy import deploy_command, deploy_from_descriptor
 from .commands.fs import fs_cat_command, fs_ls_command, fs_rm_command, fs_write_command
 from .commands.import_data import import_codex_command, import_data_command
 from .commands.export_data import export_data_command
@@ -420,8 +420,37 @@ def realm_deploy(
     registry: Optional[str] = typer.Option(
         None, "--registry", help="Registry canister ID for realm registration"
     ),
+    descriptor: Optional[str] = typer.Option(
+        None, "--descriptor", "-d",
+        help="Path to deployment descriptor YAML (see issue #160)"
+    ),
+    subtypes: Optional[str] = typer.Option(
+        None, "--subtypes",
+        help="Override subtypes from descriptor (e.g. 'backend', 'frontend', 'all')"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run",
+        help="Print deployment plan without executing (descriptor mode only)"
+    ),
 ) -> None:
-    """Deploy a realm to the specified network."""
+    """Deploy a realm to the specified network.
+    
+    Two modes:
+      1. Classic: realms realm deploy --folder <path> --network <net>
+      2. Descriptor: realms realm deploy --descriptor deployments/staging-realm2-backend.yml
+    
+    See: https://github.com/smart-social-contracts/realms/issues/160
+    """
+    if descriptor:
+        deploy_from_descriptor(
+            descriptor_path=descriptor,
+            subtypes_override=subtypes,
+            network_override=network if network != "local" else None,
+            mode_override=mode if mode != "auto" else None,
+            identity=identity,
+            dry_run=dry_run,
+        )
+        return
     deploy_command(config_file, folder, network, clean, identity, mode, plain_logs, registry=registry)
 
 

@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import re
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -26,6 +27,60 @@ from ..utils import (
 )
 
 console = Console()
+
+
+def deploy_from_descriptor(
+    descriptor_path: str,
+    subtypes_override: Optional[str] = None,
+    network_override: Optional[str] = None,
+    mode_override: Optional[str] = None,
+    identity: Optional[str] = None,
+    dry_run: bool = False,
+) -> None:
+    """Deploy using a deployment descriptor YAML file.
+    
+    Delegates to scripts/deploy.py which parses the YAML and executes
+    the appropriate deployment.
+    
+    See: https://github.com/smart-social-contracts/realms/issues/160
+    """
+    descriptor = Path(descriptor_path)
+    if not descriptor.exists():
+        console.print(f"[red]❌ Deployment descriptor not found: {descriptor_path}[/red]")
+        raise typer.Exit(1)
+
+    # Find scripts/deploy.py relative to the repo root
+    # Try common locations
+    script = None
+    for candidate in [
+        Path("scripts/deploy.py"),
+        Path(__file__).resolve().parents[4] / "scripts" / "deploy.py",
+    ]:
+        if candidate.exists():
+            script = candidate
+            break
+
+    if not script:
+        console.print("[red]❌ scripts/deploy.py not found[/red]")
+        raise typer.Exit(1)
+
+    cmd = [sys.executable, str(script), "--file", str(descriptor.resolve())]
+
+    if subtypes_override:
+        cmd.extend(["--subtypes", subtypes_override])
+    if network_override:
+        cmd.extend(["--network", network_override])
+    if mode_override:
+        cmd.extend(["--mode", mode_override])
+    if identity:
+        cmd.extend(["--identity", identity])
+    if dry_run:
+        cmd.append("--dry-run")
+
+    console.print(f"[dim]📄 Using deployment descriptor: {descriptor_path}[/dim]")
+    result = subprocess.run(cmd)
+    if result.returncode != 0:
+        raise typer.Exit(result.returncode)
 
 
 def _query_cycles_balance(network: str, cwd: str = ".") -> Optional[float]:
@@ -484,10 +539,41 @@ def deploy_command(
         False, "--plain-logs", help="Show full verbose output instead of progress UI"
     ),
     registry: Optional[str] = None,
+    descriptor: Optional[str] = typer.Option(
+        None, "--descriptor", "-d",
+        help="Path to deployment descriptor YAML (see issue #160)"
+    ),
+    subtypes: Optional[str] = typer.Option(
+        None, "--subtypes",
+        help="Override subtypes from descriptor (e.g. 'backend', 'frontend', 'all')"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run",
+        help="Print deployment plan without executing (descriptor mode only)"
+    ),
 ) -> None:
-    """Deploy a realm to the specified network."""
+    """Deploy a realm to the specified network.
     
-    # If folder not provided, try to auto-detect
+    Two modes:
+      1. Classic: realms deploy --folder <path> --network <net>
+      2. Descriptor: realms deploy --descriptor deployments/staging-realm2-backend.yml
+    
+    See: https://github.com/smart-social-contracts/realms/issues/160
+    """
+    
+    # Descriptor mode: dispatch to deploy_from_descriptor
+    if descriptor:
+        deploy_from_descriptor(
+            descriptor_path=descriptor,
+            subtypes_override=subtypes,
+            network_override=network if network != "local" else None,
+            mode_override=mode if mode != "auto" else None,
+            identity=identity,
+            dry_run=dry_run,
+        )
+        return
+    
+    # Classic mode: auto-detect folder and deploy
     if not folder:
         realm_base = Path(REALM_FOLDER)
         

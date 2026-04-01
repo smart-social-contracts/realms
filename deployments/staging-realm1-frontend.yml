@@ -1,0 +1,24 @@
+# Unified deployment descriptor — Frontend-only fix for Dominion (realm1) on staging
+# Usage: realms deploy --file deployments/staging-realm1-frontend.yml
+# See: https://github.com/smart-social-contracts/realms/issues/160
+version: 1
+
+object:
+  type: realm
+  subtypes: frontend
+  quarters: 1
+  manifest: ./examples/demo/realm1/manifest.json
+  core_codebase:
+    path: ./src
+  extensions_codebase:
+    path: none
+  codices_codebase:
+    path: none
+  network: staging
+  id_in_registry: 1
+  mode: upgrade
+  parameters:
+    TEST_MODE: true
+    TEST_MODE_II_BYPASS: true
+    TEST_MODE_ADMIN_SELF_REGISTRATION: true
+    TEST_MODE_SKIP_TERMS: true

@@ -1,0 +1,63 @@
+# Deployment Descriptor for Realms
+# See: https://github.com/smart-social-contracts/realms/issues/160
+#
+# Usage:
+#   realms deploy --descriptor <this-file>
+#   python scripts/deploy.py --file <this-file>
+#
+# Concrete examples in deployments/ directory.
+version: 1
+
+object:
+  # What to deploy: realm | registry | mundus
+  type: realm
+
+  # Which canister types to deploy (comma-separated)
+  # Valid: backend, frontend, token, nft, marketplace, all
+  subtypes: backend, frontend
+
+  # Number of backend quarters
+  # 1 = main realm_backend only
+  # 2+ = main + quarter_1_backend, quarter_2_backend, etc.
+  quarters: 1
+
+  # Realm/mundus manifest — local path or remote URL
+  manifest: ./examples/demo/realm2/manifest.json  # or http://..../manifest.json
+
+  # Source of core realms codebase (backend + frontend)
+  # Formats:
+  #   Local path:  ./src
+  #   Git ref:     git@github.com:smart-social-contracts/realms.git@abc123def456
+  #   Version:     0.3.1
+  core_codebase:
+    path: ./src
+
+  # Source of extensions code
+  # Same formats as core_codebase, plus:
+  #   "bundled" = use what's in core_codebase
+  #   "none"    = skip extension installation
+  extensions_codebase:
+    path: bundled
+
+  # Source of codices code
+  codices_codebase:
+    path: git@github.com:smart-social-contracts/realms-codices.git@main
+
+  # Target network: local | staging | demo | ic
+  network: staging
+
+  # Realm identity in the registry
+  # Integer index (position in list) or canister ID string
+  # Used to resolve target canister IDs for upgrade deploys
+  id_in_registry: 2  # this is Agora in demo network
+
+  # Deploy mode: upgrade | reinstall
+  mode: upgrade
+
+  # Parameters passed as env vars during build/deploy
+  parameters:
+    TEST_MODE: true
+    TEST_MODE_II_BYPASS: true
+    TEST_MODE_ADMIN_SELF_REGISTRATION: true
+    TEST_MODE_DEMO_DATA: true
+    TEST_MODE_SKIP_TERMS: true

@@ -1,0 +1,20 @@
+# Unified deployment descriptor — Backend hotfix for Dominion (realm1) on staging
+# Usage: realms deploy --file deployments/staging-realm1-backend.yml
+# See: https://github.com/smart-social-contracts/realms/issues/160
+version: 1
+
+object:
+  type: realm
+  subtypes: backend
+  quarters: 1
+  manifest: ./examples/demo/realm1/manifest.json
+  core_codebase:
+    path: ./src
+  extensions_codebase:
+    path: none
+  codices_codebase:
+    path: none
+  network: staging
+  id_in_registry: 1
+  mode: upgrade
+  parameters: {}
