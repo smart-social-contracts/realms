@@ -30,6 +30,18 @@ except ImportError:
     sys.exit(1)
 
 
+def _detect_dfx_cli() -> str:
+    """Detect available CLI: prefer 'icp' over legacy 'dfx'."""
+    for cmd in ("icp", "dfx"):
+        if shutil.which(cmd):
+            return cmd
+    print("❌ Neither 'icp' nor 'dfx' CLI found on PATH")
+    sys.exit(1)
+
+
+DFX_CLI = _detect_dfx_cli()
+
+
 # ── Constants ──────────────────────────────────────────────────────────────────
 
 VALID_TYPES = ("realm", "registry", "mundus")
@@ -210,7 +222,7 @@ def resolve_canister_ids_from_registry(
 
     try:
         result = subprocess.run(
-            ["icp", "canister", "call", "--network", network,
+            [DFX_CLI, "canister", "call", "--network", network,
              registry_canister_id, "list_realms", "--query"],
             capture_output=True, text=True, timeout=30,
             env={**os.environ, "DFX_WARNING": "-mainnet_plaintext_identity"},
@@ -376,12 +388,12 @@ def deploy_backend(
 
     # Top up cycles first
     subprocess.run(
-        ["icp", "cycles", "top-up", backend_id, "1000000000000", "--network", network],
+        [DFX_CLI, "cycles", "top-up", backend_id, "1000000000000", "--network", network],
         env=env, capture_output=True,
     )
 
     result = subprocess.run(
-        ["icp", "canister", "install", backend_id,
+        [DFX_CLI, "canister", "install", backend_id,
          "--wasm", wasm_path,
          "--network", network,
          "--mode", mode,
@@ -414,11 +426,11 @@ def deploy_backend(
             quarter_wasm = f".basilisk/{quarter_name}/{quarter_name}.wasm"
             if Path(quarter_wasm).exists():
                 subprocess.run(
-                    ["icp", "cycles", "top-up", quarter_id, "1000000000000", "--network", network],
+                    [DFX_CLI, "cycles", "top-up", quarter_id, "1000000000000", "--network", network],
                     env=env, capture_output=True,
                 )
                 result = subprocess.run(
-                    ["icp", "canister", "install", quarter_id,
+                    [DFX_CLI, "canister", "install", quarter_id,
                      "--wasm", quarter_wasm,
                      "--network", network,
                      "--mode", mode,
@@ -488,13 +500,13 @@ def deploy_frontend(
     # Deploy frontend assets
     print(f"   📦 Deploying to {frontend_id}...")
     subprocess.run(
-        ["icp", "cycles", "top-up", frontend_id, "500000000000", "--network", network],
+        [DFX_CLI, "cycles", "top-up", frontend_id, "500000000000", "--network", network],
         env=env, capture_output=True,
     )
 
     # Use icp deploy with the canister name if available, or install directly
     result = subprocess.run(
-        ["icp", "deploy", "realm_frontend",
+        [DFX_CLI, "deploy", "realm_frontend",
          "--network", network,
          "--mode", mode,
          "--yes"],
@@ -659,18 +671,18 @@ Examples:
             # PEM file — import it
             print(f"🔐 Importing identity from {args.identity}...")
             subprocess.run(
-                ["icp", "identity", "import", "--force", "--storage-mode",
+                [DFX_CLI, "identity", "import", "--force", "--storage-mode",
                  "plaintext", "deploy_identity", args.identity],
                 env=env, check=True,
             )
             subprocess.run(
-                ["icp", "identity", "use", "deploy_identity"],
+                [DFX_CLI, "identity", "use", "deploy_identity"],
                 env=env, check=True,
             )
         else:
             # Identity name
             subprocess.run(
-                ["icp", "identity", "use", args.identity],
+                [DFX_CLI, "identity", "use", args.identity],
                 env=env, check=True,
             )
 
