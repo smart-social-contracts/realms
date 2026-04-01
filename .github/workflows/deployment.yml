@@ -170,7 +170,8 @@ jobs:
             -e DFX_WARNING="-mainnet_plaintext_identity" \
             -w /workspace \
             ghcr.io/smart-social-contracts/icp-dev-env:b26e7e9 \
-            bash -c "(pip install -q -r requirements.txt && \
+            bash -c "(dfxvm install 0.29.0 && \
+                     pip install -q -r requirements.txt && \
                      pip install -q pyyaml && \
                      pip install -q -e cli/ && \
                      dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
