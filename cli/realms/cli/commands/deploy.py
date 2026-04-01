@@ -539,18 +539,9 @@ def deploy_command(
         False, "--plain-logs", help="Show full verbose output instead of progress UI"
     ),
     registry: Optional[str] = None,
-    descriptor: Optional[str] = typer.Option(
-        None, "--descriptor", "-d",
-        help="Path to deployment descriptor YAML (see issue #160)"
-    ),
-    subtypes: Optional[str] = typer.Option(
-        None, "--subtypes",
-        help="Override subtypes from descriptor (e.g. 'backend', 'frontend', 'all')"
-    ),
-    dry_run: bool = typer.Option(
-        False, "--dry-run",
-        help="Print deployment plan without executing (descriptor mode only)"
-    ),
+    descriptor: Optional[str] = None,
+    subtypes: Optional[str] = None,
+    dry_run: bool = False,
 ) -> None:
     """Deploy a realm to the specified network.
     
