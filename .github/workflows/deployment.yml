@@ -152,7 +152,7 @@ jobs:
           chmod 600 identity.pem
 
           # Use the base dev-env image with checked-out code mounted
-          docker pull ghcr.io/smart-social-contracts/icp-dev-env:b26e7e9
+          docker pull ghcr.io/smart-social-contracts/icp-dev-env:af049ab
 
           # Build override flags
           OVERRIDE_FLAGS=""
@@ -169,7 +169,7 @@ jobs:
             -v "$(pwd)/deploy-logs:/app/deploy-logs" \
             -e DFX_WARNING="-mainnet_plaintext_identity" \
             -w /workspace \
-            ghcr.io/smart-social-contracts/icp-dev-env:b26e7e9 \
+            ghcr.io/smart-social-contracts/icp-dev-env:af049ab \
             bash -c "(dfxvm install 0.29.0 && \
                      pip install -q -r requirements.txt && \
                      pip install -q pyyaml && \
