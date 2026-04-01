@@ -443,14 +443,14 @@ def mundus_deploy_command(
                 for canister in shared_canister_names:
                     try:
                         result = subprocess.run(
-                            ["dfx", "deploy", canister, "--network", network],
+                            ["icp", "deploy", canister, "-e", network],
                             cwd=first_realm, capture_output=True, text=True
                         )
                         if result.returncode == 0:
                             console.print(f"   ✅ {canister} deployed")
                             # Get the canister ID
                             id_result = subprocess.run(
-                                ["dfx", "canister", "id", canister, "--network", network],
+                                ["icp", "canister", "id", canister, "--network", network],
                                 cwd=first_realm, capture_output=True, text=True
                             )
                             if id_result.returncode == 0:
@@ -508,14 +508,14 @@ def mundus_deploy_command(
                     # Deploy REALMS token from mundus directory
                     try:
                         result = subprocess.run(
-                            ["dfx", "deploy", "realms_token", "--network", network, "--yes"],
+                            ["icp", "deploy", "realms_token", "-e", network, "--yes"],
                             cwd=mundus_path, capture_output=True, text=True
                         )
                         if result.returncode == 0:
                             console.print(f"   ✅ realms_token deployed as '{token_name}' ({token_symbol})")
                             # Get the canister ID
                             id_result = subprocess.run(
-                                ["dfx", "canister", "id", "realms_token", "--network", network],
+                                ["icp", "canister", "id", "realms_token", "--network", network],
                                 cwd=mundus_path, capture_output=True, text=True
                             )
                             if id_result.returncode == 0:
@@ -553,7 +553,7 @@ def mundus_deploy_command(
                 for canister in ["realm_registry_backend", "realm_registry_frontend"]:
                     try:
                         id_result = subprocess.run(
-                            ["dfx", "canister", "id", canister, "--network", network],
+                            ["icp", "canister", "id", canister, "--network", network],
                             cwd=registry_dir, capture_output=True, text=True
                         )
                         if id_result.returncode == 0:
@@ -620,7 +620,7 @@ def mundus_deploy_command(
                 # Capture marketplace backend canister ID
                 try:
                     id_result = subprocess.run(
-                        ["dfx", "canister", "id", "marketplace_backend", "--network", network],
+                        ["icp", "canister", "id", "marketplace_backend", "--network", network],
                         cwd=marketplace_dir, capture_output=True, text=True
                     )
                     if id_result.returncode == 0:
@@ -780,7 +780,7 @@ def mundus_status_command(
                     # Check deployment status
                     try:
                         id_result = subprocess.run(
-                            ["dfx", "canister", "id", "realms_token", "--network", network],
+                            ["icp", "canister", "id", "realms_token", "--network", network],
                             capture_output=True, text=True, timeout=5, cwd=mundus_path
                         )
                         if id_result.returncode == 0:
@@ -826,7 +826,7 @@ def mundus_status_command(
                     for canister_name in sorted(ckbtc_canisters):
                         try:
                             id_result = subprocess.run(
-                                ["dfx", "canister", "id", canister_name, "--network", network],
+                                ["icp", "canister", "id", canister_name, "--network", network],
                                 capture_output=True, text=True, timeout=5, cwd=ckbtc_cwd
                             )
                             if id_result.returncode == 0:
@@ -859,7 +859,7 @@ def mundus_status_command(
                     console.print("   [bold]🔐 Identity:[/bold]")
                     try:
                         id_result = subprocess.run(
-                            ["dfx", "canister", "id", "internet_identity", "--network", network],
+                            ["icp", "canister", "id", "internet_identity", "--network", network],
                             capture_output=True, text=True, timeout=5, cwd=ii_cwd
                         )
                         if id_result.returncode == 0:
@@ -905,19 +905,28 @@ def _print_deployment_status(deploy_dir: Path, network: str) -> None:
     dir_name = deploy_dir.name
     console.print(f"      [cyan]{dir_name}[/cyan]")
     
-    # Check for dfx.json
-    dfx_json = deploy_dir / "dfx.json"
-    if not dfx_json.exists():
-        console.print(f"         [yellow]⚠️  No dfx.json found[/yellow]")
+    # Check for icp.yaml or dfx.json
+    config_data = None
+    for config_name in ("icp.yaml", "dfx.json"):
+        config_path = deploy_dir / config_name
+        if config_path.exists():
+            try:
+                with open(config_path, 'r') as f:
+                    if config_name.endswith(".yaml"):
+                        import yaml
+                        config_data = yaml.safe_load(f)
+                    else:
+                        config_data = json.load(f)
+            except:
+                console.print(f"         [yellow]⚠️  Could not read {config_name}[/yellow]")
+                return
+            break
+    
+    if config_data is None:
+        console.print(f"         [yellow]⚠️  No icp.yaml or dfx.json found[/yellow]")
         return
     
-    try:
-        with open(dfx_json, 'r') as f:
-            dfx_config = json.load(f)
-        all_canister_names = list(dfx_config.get("canisters", {}).keys())
-    except:
-        console.print(f"         [yellow]⚠️  Could not read dfx.json[/yellow]")
-        return
+    all_canister_names = list(config_data.get("canisters", {}).keys())
     
     # Filter to only deployment-specific canisters (not shared infrastructure)
     # Shared canisters like internet_identity, ckbtc_*, __Candid_UI are managed separately
@@ -946,7 +955,7 @@ def _print_deployment_status(deploy_dir: Path, network: str) -> None:
         console.print(f"         [yellow]⚠️  No deployment canisters found[/yellow]")
         return
     
-    # Verify actual deployment status using dfx canister status
+    # Verify actual deployment status using icp canister status
     deployed_canisters = []
     created_only_canisters = []
     not_created_canisters = []
@@ -955,7 +964,7 @@ def _print_deployment_status(deploy_dir: Path, network: str) -> None:
         try:
             # First check if canister ID exists
             id_result = subprocess.run(
-                ["dfx", "canister", "id", canister_name, "--network", network],
+                ["icp", "canister", "id", canister_name, "--network", network],
                 capture_output=True, text=True, timeout=5, cwd=deploy_dir
             )
             if id_result.returncode != 0:
@@ -966,7 +975,7 @@ def _print_deployment_status(deploy_dir: Path, network: str) -> None:
             
             # Now verify it's actually deployed by checking status
             status_result = subprocess.run(
-                ["dfx", "canister", "status", canister_name, "--network", network],
+                ["icp", "canister", "status", canister_name, "--network", network],
                 capture_output=True, text=True, timeout=10, cwd=deploy_dir
             )
             

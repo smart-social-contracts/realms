@@ -158,11 +158,11 @@ cd ..
 # Deploy
 echo "🌐 Deploying canisters..."
 if [ "$NETWORK" == "local" ]; then
-    dfx deploy marketplace_backend --yes
-    dfx deploy marketplace_frontend --yes
+    icp deploy marketplace_backend --yes
+    icp deploy marketplace_frontend --yes
 else
-    dfx deploy marketplace_backend --network "$NETWORK" --yes
-    dfx deploy marketplace_frontend --network "$NETWORK" --yes
+    icp deploy marketplace_backend -e "$NETWORK" --yes
+    icp deploy marketplace_frontend -e "$NETWORK" --yes
 fi
 
 echo "✅ Marketplace deployed successfully!"

@@ -91,7 +91,7 @@ def _query_cycles_balance(network: str, cwd: str = ".") -> Optional[float]:
         env = os.environ.copy()
         env["DFX_WARNING"] = "-mainnet_plaintext_identity"
         result = subprocess.run(
-            ["dfx", "cycles", "balance", "--network", network],
+            ["icp", "cycles", "balance", "-e", network],
             capture_output=True, text=True, timeout=30, cwd=cwd, env=env,
         )
         if result.returncode == 0:
@@ -112,7 +112,7 @@ def _query_canister_cycles(canister_id: str, network: str, cwd: str = ".") -> Op
         env = os.environ.copy()
         env["DFX_WARNING"] = "-mainnet_plaintext_identity"
         result = subprocess.run(
-            ["dfx", "canister", "status", canister_id, "--network", network],
+            ["icp", "canister", "status", canister_id, "-e", network],
             capture_output=True, text=True, timeout=30, cwd=cwd, env=env,
         )
         if result.returncode == 0:
@@ -528,9 +528,9 @@ def deploy_command(
     network: str = typer.Option(
         "local", "--network", "-n", help="Target network for deployment"
     ),
-    clean: bool = typer.Option(False, "--clean", help="Clean deployment (restart dfx)"),
+    clean: bool = typer.Option(False, "--clean", help="Clean deployment (restart local network)"),
     identity: Optional[str] = typer.Option(
-        None, "--identity", help="Path to identity PEM file or identity name for dfx"
+        None, "--identity", help="Path to identity PEM file or identity name"
     ),
     mode: str = typer.Option(
         "auto", "--mode", "-m", help="Deploy mode: 'auto', 'upgrade' or 'reinstall' (auto picks install/upgrade)"

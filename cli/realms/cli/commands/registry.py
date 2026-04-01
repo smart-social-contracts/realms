@@ -16,14 +16,14 @@ from .create import create_command
 from ..utils import console, generate_output_dir_name, get_project_root, display_canister_urls_json, get_realms_logger, set_log_dir, run_command, get_registry_canister_id
 
 
-def _run_dfx_command(
+def _run_icp_command(
     method: str,
     args: list = None,
     network: str = "local",
     canister_id: str = "realm_registry_backend",
 ) -> dict:
-    """Run a dfx canister call command and return the result"""
-    cmd = ["dfx", "canister", "call", "--network", network, canister_id, method]
+    """Run an icp canister call command and return the result"""
+    cmd = ["icp", "canister", "call", "-e", network, canister_id, method]
 
     if args:
         cmd.extend(args)
@@ -58,7 +58,7 @@ def registry_list_command(
     console.print("[bold blue]📋 Listing Registered Realms[/bold blue]\n")
 
     effective_registry = canister_id or get_registry_canister_id(network)
-    result = _run_dfx_command(
+    result = _run_icp_command(
         "list_realms", None, network, effective_registry
     )
 
@@ -77,7 +77,7 @@ def registry_list_command(
     console.print(data)
 
     # Also get the count
-    count_result = _run_dfx_command(
+    count_result = _run_icp_command(
         "realm_count", None, network, effective_registry
     )
 
@@ -112,7 +112,7 @@ def registry_get_command(
     if not _is_canister_id(realm_id):
         # Search for the realm by name
         search_args = [f'("{realm_id}")']
-        search_result = _run_dfx_command(
+        search_result = _run_icp_command(
             "search_realms", search_args, network, effective_registry
         )
         
@@ -131,7 +131,7 @@ def registry_get_command(
                     break
     
     args = [f'("{lookup_id}")']
-    result = _run_dfx_command(
+    result = _run_icp_command(
         "get_realm", args, network, effective_registry
     )
 
@@ -164,7 +164,7 @@ def registry_remove_command(
 
     effective_registry = canister_id or get_registry_canister_id(network)
     args = [f'("{realm_id}")']
-    result = _run_dfx_command(
+    result = _run_icp_command(
         "remove_realm", args, network, effective_registry
     )
 
@@ -192,7 +192,7 @@ def registry_search_command(
 
     effective_registry = canister_id or get_registry_canister_id(network)
     args = [f'("{query}")']
-    result = _run_dfx_command(
+    result = _run_icp_command(
         "search_realms", args, network, effective_registry
     )
 
@@ -211,7 +211,7 @@ def registry_count_command(
     console.print("[bold blue]📊 Realm Count[/bold blue]\n")
 
     effective_registry = canister_id or get_registry_canister_id(network)
-    result = _run_dfx_command(
+    result = _run_icp_command(
         "realm_count", None, network, effective_registry
     )
 
@@ -240,7 +240,7 @@ def registry_status_command(
     console.print(f"[dim]Registry: {effective_registry}[/dim]")
     console.print(f"[dim]Network: {network}[/dim]\n")
 
-    result = _run_dfx_command(
+    result = _run_icp_command(
         "status", None, network, effective_registry
     )
 
@@ -565,7 +565,7 @@ def billing_balance_command(
     console.print("[bold blue]💰 User Balance[/bold blue]\n")
 
     effective_registry = canister_id or get_registry_canister_id(network)
-    result = _run_dfx_command(
+    result = _run_icp_command(
         "get_credits", [f'("{principal_id}")'], network, effective_registry
     )
 
@@ -613,7 +613,7 @@ def billing_add_credits_command(
 
     effective_registry = canister_id or get_registry_canister_id(network)
     args = f'("{principal_id}", {amount} : nat64, "{stripe_session_id}", "{description}")'
-    result = _run_dfx_command(
+    result = _run_icp_command(
         "add_credits", [args], network, effective_registry
     )
 
@@ -647,7 +647,7 @@ def billing_deduct_credits_command(
 
     effective_registry = canister_id or get_registry_canister_id(network)
     args = f'("{principal_id}", {amount} : nat64, "{description}")'
-    result = _run_dfx_command(
+    result = _run_icp_command(
         "deduct_credits", [args], network, effective_registry
     )
 
@@ -680,7 +680,7 @@ def billing_status_command(
     console.print(f"[dim]Registry: {effective_registry}[/dim]")
     console.print(f"[dim]Network: {network}[/dim]\n")
 
-    result = _run_dfx_command(
+    result = _run_icp_command(
         "billing_status", None, network, effective_registry
     )
 

@@ -47,13 +47,13 @@ def export_data_command(
         console.print("📊 Fetching data from backend...")
 
         cmd = [
-            "dfx",
+            "icp",
             "canister",
             "call",
             "realm_backend",
             "extension_sync_call",
             f'(record {{ extension_name = "admin_dashboard"; function_name = "export_data"; args = "{escaped_args}"; }})',
-            "--network",
+            "-e",
             network,
             "--output",
             "json",
@@ -68,7 +68,7 @@ def export_data_command(
             capture_output=True,
         )
 
-        # Parse the dfx response
+        # Parse the icp response
         if result and result.stdout:
             # Parse the Candid response
             if "'success': True" not in result.stdout and "success = true" not in result.stdout.lower():
@@ -167,7 +167,7 @@ def export_data_command(
             display_error_panel("Backend Export Failed", result.stderr)
             raise typer.Exit(1)
         else:
-            display_error_panel("Backend Export Failed", "dfx command failed with no output")
+            display_error_panel("Backend Export Failed", "icp command failed with no output")
             raise typer.Exit(1)
 
     except Exception as e:

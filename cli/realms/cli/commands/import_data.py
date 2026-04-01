@@ -90,13 +90,13 @@ def import_data_command(
             args_b64 = base64.b64encode(args_json.encode()).decode()
 
             cmd = [
-                "dfx",
+                "icp",
                 "canister",
                 "call",
                 canister,
                 "extension_sync_call",
                 f'(record {{ extension_name = "admin_dashboard"; function_name = "import_data"; args = "base64:{args_b64}"; }})',
-                "--network",
+                "-e",
                 network,
                 "--output",
                 "json",
@@ -105,7 +105,7 @@ def import_data_command(
             if identity:
                 cmd.extend(["--identity", identity])
 
-            # Run from realm folder so dfx can find .dfx/local/canister_ids.json
+            # Run from realm folder so icp can find canister IDs
             effective_cwd = get_effective_cwd(folder)
             result = run_command(
                 cmd,
@@ -113,7 +113,7 @@ def import_data_command(
                 capture_output=True,
             )
 
-            # Parse the dfx response to check for backend errors
+            # Parse the icp response to check for backend errors
             if result and result.stdout:
                 # Check for success in response (handle both JSON double quotes and Python single quotes)
                 if (
@@ -126,13 +126,13 @@ def import_data_command(
                     raise typer.Exit(1)
 
             elif result and result.stderr:
-                # dfx command had stderr output
+                # icp command had stderr output
                 display_error_panel("Backend Import Chunk Failed", result.stderr)
                 raise typer.Exit(1)
             else:
-                # dfx command failed completely
+                # icp command failed completely
                 display_error_panel(
-                    "Backend Import Data Failed", "dfx command failed with no output"
+                    "Backend Import Data Failed", "icp command failed with no output"
                 )
                 raise typer.Exit(1)
 
@@ -197,20 +197,20 @@ def import_codex_command(
         escaped_args = args_json.replace('"', '\\"')
 
         cmd = [
-            "dfx",
+            "icp",
             "canister",
             "call",
             canister,
             "extension_sync_call",
             f'(record {{ extension_name = "admin_dashboard"; function_name = "import_data"; args = "{escaped_args}"; }})',
-            "--network",
+            "-e",
             network,
         ]
 
         if identity:
             cmd.extend(["--identity", identity])
 
-        # Run from realm folder so dfx can find .dfx/local/canister_ids.json
+        # Run from realm folder so icp can find canister IDs
         effective_cwd = get_effective_cwd(folder)
         result = run_command(
             cmd,

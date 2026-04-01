@@ -205,7 +205,7 @@ def create_command(
     if not in_repo_mode:
         # In pip-installed mode - use bundled files from package
         # The package includes src, extensions, scripts via symlinks at realms/ level
-        # dfx.template.json and requirements.txt are in cli/ directory
+        # dfx.template.json (legacy config template) and requirements.txt are in cli/ directory
         package_root = Path(__file__).parent.parent.parent  # cli/commands -> cli -> realms
         repo_root = package_root
         if not quiet:
@@ -366,13 +366,13 @@ def create_command(
     # Generate deployment scripts after data generation
     # Check if we can generate scripts - look in cli directory first (pip-installed), then repo root
     cli_dir = Path(__file__).parent.parent  # cli/commands -> cli
-    can_generate_scripts = (cli_dir / "dfx.template.json").exists() or (repo_root / "dfx.template.json").exists()
+    can_generate_scripts = (cli_dir / "dfx.template.json").exists() or (repo_root / "dfx.template.json").exists() or (repo_root / "icp.template.yaml").exists()
     
     if can_generate_scripts:
         _generate_deployment_scripts(output_path, network, realm_name, random, repo_root, deploy, identity, mode, bare, plain_logs, in_repo_mode=in_repo_mode, realm_manifest=realm_manifest, registry=registry, no_demo_data=no_demo_data)
     else:
         console.print(f"\n[yellow]⚠️  Deployment scripts not generated (bundled files not found)[/yellow]")
-        console.print(f"[dim]Searched: {cli_dir / 'dfx.template.json'}, {repo_root / 'dfx.template.json'}[/dim]")
+        console.print(f"[dim]Searched: {cli_dir}, {repo_root}[/dim]")
     
     if not quiet:
         console.print(f"\n[green]✅ Realm created successfully at: {output_path.absolute()}[/green]")
@@ -394,7 +394,7 @@ def _generate_deployment_scripts(
     registry: Optional[str] = None,
     no_demo_data: bool = False,
 ):
-    """Generate deployment scripts and dfx.json for independent realm.
+    """Generate deployment scripts and dfx.json/icp.yaml for independent realm.
     
     Args:
         bare: If True, skip extensions and data upload during deployment
@@ -408,6 +408,8 @@ def _generate_deployment_scripts(
         console.print("\n🔧 Generating deployment configuration...")
 
     # 1. Generate dfx.json for this independent realm
+    # NOTE: We still generate dfx.json because icp CLI can read it.
+    # A future iteration may generate icp.yaml instead.
     if not quiet:
         console.print("\n📝 Creating dfx.json...")
     
@@ -456,7 +458,7 @@ def _generate_deployment_scripts(
     
     # IMPORTANT: Keep workspace as "realm_frontend" (not unique name)
     # because src/ directories are copied with standard names
-    # The workspace field tells dfx where to find package.json, which is at src/realm_frontend/
+    # The workspace field tells icp/dfx where to find package.json, which is at src/realm_frontend/
     
     realm_canisters = {
         backend_name: backend_config,
@@ -484,7 +486,7 @@ def _generate_deployment_scripts(
     if is_local_network:
         try:
             result = subprocess.run(
-                ["dfx", "identity", "get-principal"],
+                ["icp", "identity", "principal"],
                 capture_output=True, text=True, check=True
             )
             deployer_principal = result.stdout.strip()
@@ -720,7 +722,6 @@ def _generate_deployment_scripts(
     additional_scripts = [
         "download_wasms.sh",
         "set_canister_config.py",
-        "clean_dfx.sh",
     ]
     for script_name in additional_scripts:
         source_script = scripts_path / script_name

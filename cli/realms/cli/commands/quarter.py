@@ -38,14 +38,14 @@ def _call_canister(canister_id: str, method: str, args: str, network: str) -> di
     env = os.environ.copy()
     env["DFX_WARNING"] = "-mainnet_plaintext_identity"
     cmd = [
-        "dfx", "canister", "call",
-        "--network", network,
+        "icp", "canister", "call",
+        "-e", network,
         "--output", "json",
         canister_id, method, args,
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, env=env)
     if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or f"dfx call failed with exit code {result.returncode}")
+        raise RuntimeError(result.stderr.strip() or f"icp call failed with exit code {result.returncode}")
     try:
         return json.loads(result.stdout)
     except json.JSONDecodeError:
@@ -421,7 +421,7 @@ def quarter_remove_command(
             effective_network,
         )
         console.print(f"[green]✅ Quarter '{quarter_name}' removed from realm '{parent_name}'[/green]")
-        console.print(f"[dim]Note: The quarter canister ({quarter_canister_id}) still exists. Delete it manually with dfx if needed.[/dim]")
+        console.print(f"[dim]Note: The quarter canister ({quarter_canister_id}) still exists. Delete it manually with icp if needed.[/dim]")
     except RuntimeError as e:
         console.print(f"[red]❌ Failed to remove quarter: {e}[/red]")
         raise typer.Exit(1)
