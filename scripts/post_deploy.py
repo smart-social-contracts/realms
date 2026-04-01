@@ -135,7 +135,7 @@ try:
                     frontend_url = f"{frontend_id}.ic0.app"
                     if realm_logo:
                         logo_url = f"https://{frontend_id}.ic0.app/images/realm_logo{logo_ext}"
-                elif network == 'staging':
+                elif network in ('staging', 'demo'):
                     frontend_url = f"{frontend_id}.icp0.io"
                     if realm_logo:
                         logo_url = f"https://{frontend_id}.icp0.io/images/realm_logo{logo_ext}"
@@ -156,7 +156,7 @@ try:
                 backend_id = result.stdout.strip()
                 if network == 'ic':
                     backend_url = f"{backend_id}.ic0.app"
-                elif network == 'staging':
+                elif network in ('staging', 'demo'):
                     backend_url = f"{backend_id}.icp0.io"
                 else:  # local
                     backend_url = f"{backend_id}.localhost:{local_port}"
