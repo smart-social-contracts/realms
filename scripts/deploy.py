@@ -210,7 +210,7 @@ def resolve_canister_ids_from_registry(
 
     try:
         result = subprocess.run(
-            ["dfx", "canister", "call", "--network", network,
+            ["icp", "canister", "call", "--network", network,
              registry_canister_id, "list_realms", "--query"],
             capture_output=True, text=True, timeout=30,
             env={**os.environ, "DFX_WARNING": "-mainnet_plaintext_identity"},
@@ -342,7 +342,7 @@ def deploy_backend(
 
     # Build backend WASM
     # Set CANISTER_CANDID_PATH — required by Basilisk.
-    # dfx sets this automatically; we must do it manually for direct builds.
+    # icp/dfx sets this automatically; we must do it manually for direct builds.
     candid_path = Path("src/realm_backend/realm_backend.did")
     if candid_path.exists():
         env["CANISTER_CANDID_PATH"] = str(candid_path.resolve())
@@ -351,8 +351,8 @@ def deploy_backend(
         for dfx_file in ("dfx.json", "dfx.template.json"):
             if Path(dfx_file).exists():
                 with open(dfx_file) as f:
-                    dfx = json.load(f)
-                cp = dfx.get("canisters", {}).get("realm_backend", {}).get("candid", "")
+                    dfx_config = json.load(f)
+                cp = dfx_config.get("canisters", {}).get("realm_backend", {}).get("candid", "")
                 if cp and Path(cp).exists():
                     env["CANISTER_CANDID_PATH"] = str(Path(cp).resolve())
                     break
@@ -376,12 +376,12 @@ def deploy_backend(
 
     # Top up cycles first
     subprocess.run(
-        ["dfx", "cycles", "top-up", backend_id, "1000000000000", "--network", network],
+        ["icp", "cycles", "top-up", backend_id, "1000000000000", "--network", network],
         env=env, capture_output=True,
     )
 
     result = subprocess.run(
-        ["dfx", "canister", "install", backend_id,
+        ["icp", "canister", "install", backend_id,
          "--wasm", wasm_path,
          "--network", network,
          "--mode", mode,
@@ -414,11 +414,11 @@ def deploy_backend(
             quarter_wasm = f".basilisk/{quarter_name}/{quarter_name}.wasm"
             if Path(quarter_wasm).exists():
                 subprocess.run(
-                    ["dfx", "cycles", "top-up", quarter_id, "1000000000000", "--network", network],
+                    ["icp", "cycles", "top-up", quarter_id, "1000000000000", "--network", network],
                     env=env, capture_output=True,
                 )
                 result = subprocess.run(
-                    ["dfx", "canister", "install", quarter_id,
+                    ["icp", "canister", "install", quarter_id,
                      "--wasm", quarter_wasm,
                      "--network", network,
                      "--mode", mode,
@@ -488,14 +488,13 @@ def deploy_frontend(
     # Deploy frontend assets
     print(f"   📦 Deploying to {frontend_id}...")
     subprocess.run(
-        ["dfx", "cycles", "top-up", frontend_id, "500000000000", "--network", network],
+        ["icp", "cycles", "top-up", frontend_id, "500000000000", "--network", network],
         env=env, capture_output=True,
     )
 
-    # We need a dfx.json that maps realm_frontend to the correct canister
-    # Use dfx deploy with the canister name if available, or install directly
+    # Use icp deploy with the canister name if available, or install directly
     result = subprocess.run(
-        ["dfx", "deploy", "realm_frontend",
+        ["icp", "deploy", "realm_frontend",
          "--network", network,
          "--mode", mode,
          "--yes"],
@@ -607,7 +606,7 @@ Examples:
     )
     parser.add_argument(
         "--identity",
-        help="Identity PEM file or dfx identity name",
+        help="Identity PEM file or icp identity name",
     )
     parser.add_argument(
         "--dry-run", action="store_true",
@@ -660,18 +659,18 @@ Examples:
             # PEM file — import it
             print(f"🔐 Importing identity from {args.identity}...")
             subprocess.run(
-                ["dfx", "identity", "import", "--force", "--storage-mode",
+                ["icp", "identity", "import", "--force", "--storage-mode",
                  "plaintext", "deploy_identity", args.identity],
                 env=env, check=True,
             )
             subprocess.run(
-                ["dfx", "identity", "use", "deploy_identity"],
+                ["icp", "identity", "use", "deploy_identity"],
                 env=env, check=True,
             )
         else:
             # Identity name
             subprocess.run(
-                ["dfx", "identity", "use", args.identity],
+                ["icp", "identity", "use", args.identity],
                 env=env, check=True,
             )
 

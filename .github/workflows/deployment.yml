@@ -129,8 +129,8 @@ jobs:
             -v "$(pwd)/deploy-logs:/app/deploy-logs" \
             -e DFX_WARNING="-mainnet_plaintext_identity" \
             ghcr.io/${{ github.repository_owner }}/realms:demo-${DEPLOY_COMMIT} \
-            bash -c "(dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
-                     dfx identity use my-identity && \
+            bash -c "(icp identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
+                     icp identity use my-identity && \
                      pip install -q pyyaml && \
                      python scripts/deploy.py --file /app/${{ inputs.descriptor }} \
                        --identity my-identity \
@@ -170,12 +170,11 @@ jobs:
             -e DFX_WARNING="-mainnet_plaintext_identity" \
             -w /workspace \
             ghcr.io/smart-social-contracts/icp-dev-env:b26e7e9 \
-            bash -c "(dfxvm install 0.29.0 && \
-                     pip install -q -r requirements.txt && \
+            bash -c "(pip install -q -r requirements.txt && \
                      pip install -q pyyaml && \
                      pip install -q -e cli/ && \
-                     dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
-                     dfx identity use my-identity && \
+                     icp identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
+                     icp identity use my-identity && \
                      python scripts/deploy.py --file ${{ inputs.descriptor }} \
                        --identity my-identity \
                        $OVERRIDE_FLAGS); \
