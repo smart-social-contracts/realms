@@ -141,8 +141,118 @@ def export_data(
     export_data_command(output_dir, entity_types, network, identity, include_codexes)
 
 
-# Register deploy command directly from commands module
-app.command("deploy", rich_help_panel="Lifecycle")(deploy_command)
+@app.command("deploy", rich_help_panel="Lifecycle")
+def deploy(
+    descriptor: Optional[str] = typer.Argument(
+        None,
+        help="Path to deployment descriptor YAML file (e.g. deployments/staging-mundus.yml)",
+    ),
+    subtypes: Optional[str] = typer.Option(
+        None, "--subtypes", "-s",
+        help="Override subtypes: backend, frontend, all, token, nft, marketplace",
+    ),
+    mode: Optional[str] = typer.Option(
+        None, "--mode", "-m",
+        help="Override deploy mode: upgrade, reinstall",
+    ),
+    network: Optional[str] = typer.Option(
+        None, "--network", "-n",
+        help="Override target network: local, staging, demo, ic",
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", "-i",
+        help="Identity name or PEM file path for deployment",
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run",
+        help="Print deployment plan without executing",
+    ),
+    folder: Optional[str] = typer.Option(
+        None, "--folder", "-f",
+        help="[Classic mode] Path to realm folder (used when no descriptor given)",
+    ),
+    clean: bool = typer.Option(
+        False, "--clean",
+        help="[Classic mode] Clean deployment (wipes state)",
+    ),
+    plain_logs: bool = typer.Option(
+        False, "--plain-logs",
+        help="[Classic mode] Show full verbose output instead of progress UI",
+    ),
+    registry: Optional[str] = typer.Option(
+        None, "--registry",
+        help="[Classic mode] Registry canister ID for realm registration",
+    ),
+) -> None:
+    """Deploy realms using a deployment descriptor or classic folder-based deploy.
+
+    \b
+    DESCRIPTOR MODE (recommended):
+      realms deploy <descriptor.yml> [--subtypes X] [--mode X] [--identity X]
+    \b
+    CLASSIC MODE (legacy):
+      realms deploy --folder <path> --network <net> [--mode X] [--identity X]
+    \b
+    EXAMPLES:
+    \b
+      # Full mundus deploy to staging
+      realms deploy deployments/staging-mundus.yml
+    \b
+      # Backend-only hotfix for Agora
+      realms deploy deployments/staging-realm2-backend.yml
+    \b
+      # Frontend-only redeploy for Dominion
+      realms deploy deployments/staging-realm1-frontend.yml
+    \b
+      # Override subtypes at deploy time
+      realms deploy deployments/staging-mundus.yml --subtypes backend
+    \b
+      # Dry run (print plan without executing)
+      realms deploy deployments/staging-mundus.yml --dry-run
+    \b
+      # Force reinstall instead of upgrade
+      realms deploy deployments/staging-realm1-backend.yml --mode reinstall
+    \b
+      # Classic folder-based deploy (legacy)
+      realms deploy --folder ./my_realms/realm_dominion --network staging
+    \b
+    DESCRIPTORS:
+      YAML files in deployments/ define what to deploy declaratively.
+      See deployment_file_example.yml for the full schema.
+      Create new descriptors by copying an existing one and adjusting fields.
+    \b
+    AVAILABLE DESCRIPTORS:
+      staging-mundus.yml            Full mundus (all realms + registry) to staging
+      demo-mundus.yml               Full mundus to demo
+      staging-realm1-backend.yml    Backend hotfix for Dominion (realm1) on staging
+      staging-realm2-backend.yml    Backend hotfix for Agora (realm2) on staging
+      staging-realm3-backend.yml    Backend hotfix for Syntropia (realm3) on staging
+      staging-realm1-frontend.yml   Frontend fix for Dominion (realm1) on staging
+      staging-registry.yml          Registry deployment to staging
+    \b
+    See: https://github.com/smart-social-contracts/realms/issues/160
+    """
+    if descriptor:
+        deploy_from_descriptor(
+            descriptor_path=descriptor,
+            subtypes_override=subtypes,
+            network_override=network,
+            mode_override=mode,
+            identity=identity,
+            dry_run=dry_run,
+        )
+        return
+    # Classic mode fallback
+    deploy_command(
+        config_file=None,
+        folder=folder,
+        network=network or "local",
+        clean=clean,
+        identity=identity,
+        mode=mode or "auto",
+        plain_logs=plain_logs,
+        registry=registry,
+    )
 
 
 @app.command("test", rich_help_panel="Development")
