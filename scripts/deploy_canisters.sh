@@ -239,7 +239,22 @@ if [ "$NETWORK" = "local" ]; then
                 echo "   📎 Configuring indexer with ledger_id: $ledger_id"
                 retry_icp icp deploy "$shared_canister" --yes --argument "(opt variant { Init = record { ledger_id = principal \"$ledger_id\" } })"
             else
-                retry_icp icp deploy "$shared_canister" --yes
+                # Extract init_arg from dfx.json if present (icp deploy doesn't read dfx.json)
+                init_arg=$(python3 -c "
+import json, sys
+try:
+    with open('dfx.json') as f:
+        c = json.load(f).get('canisters',{}).get('$shared_canister',{})
+    arg = c.get('init_arg','')
+    if arg: print(arg)
+except: pass
+" 2>/dev/null || echo "")
+                if [ -n "$init_arg" ]; then
+                    echo "   📎 Using init_arg from dfx.json"
+                    retry_icp icp deploy "$shared_canister" --yes --argument "$init_arg"
+                else
+                    retry_icp icp deploy "$shared_canister" --yes
+                fi
             fi
             
             icp canister start -e "$NETWORK" "$shared_canister" 2>/dev/null || true
