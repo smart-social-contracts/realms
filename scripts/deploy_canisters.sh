@@ -129,10 +129,18 @@ if [ "$NETWORK" = "local" ] && [ "$SKIP_DFX_START" != "true" ]; then
         
         # Start icp in background mode (-d waits until network is healthy)
         # Redirect output to log files for debugging
+        echo "  icp version: $(icp --version 2>&1 || echo 'not found')"
+        echo "  icp binary: $(which icp 2>&1 || echo 'not found')"
+        echo "  Working directory: $(pwd)"
+        echo "  dfx.json exists: $(test -f dfx.json && echo yes || echo no)"
+        echo "  icp.yaml exists: $(test -f icp.yaml && echo yes || echo no)"
         icp network start -d </dev/null >dfx.log 2>dfx2.log || {
-            echo "❌ Error: icp network start failed"
-            echo "Check dfx.log for details"
+            echo "❌ Error: icp network start failed (exit code: $?)"
+            echo "--- stdout (dfx.log) ---"
             cat dfx.log 2>/dev/null || true
+            echo "--- stderr (dfx2.log) ---"
+            cat dfx2.log 2>/dev/null || true
+            echo "--- end logs ---"
             exit 1
         }
         echo "✅ icp network is ready"
