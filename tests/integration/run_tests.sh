@@ -32,10 +32,10 @@ mkdir -p "$LOGS_DIR"
 echo "🔋 Topping up canister cycles..."
 CYCLES_AMOUNT="10T"  # 10 trillion cycles
 
-# Check if dfx is running and canister exists
-if dfx canister status realm_backend &>/dev/null; then
+# Check if icp is running and canister exists
+if icp canister status realm_backend &>/dev/null; then
     echo "   Adding $CYCLES_AMOUNT cycles to realm_backend canister..."
-    if dfx canister deposit-cycles "$CYCLES_AMOUNT" realm_backend 2>&1 | tee -a "$LOGS_DIR/cycle-topup.log"; then
+    if icp canister deposit-cycles "$CYCLES_AMOUNT" realm_backend 2>&1 | tee -a "$LOGS_DIR/cycle-topup.log"; then
         echo "   ✅ Cycles added successfully"
     else
         echo "   ⚠️  Warning: Could not add cycles (continuing anyway)"

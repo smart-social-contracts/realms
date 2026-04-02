@@ -32,10 +32,10 @@ def test_download_file_with_checksum_verification():
     print(f"💾 Target Codex: {codex_name}")
 
     try:
-        # Call download_file via dfx
-        print("\n🔧 Calling download_file via dfx...")
+        # Call download_file via icp
+        print("\n🔧 Calling download_file via icp...")
         cmd = [
-            "dfx",
+            "icp",
             "canister",
             "call",
             "realm_backend",
@@ -95,11 +95,9 @@ def test_download_file_with_checksum_verification():
                 codex_found = False
 
                 verify_cmd = [
-                    "dfx",
+                    "icp",
                     "canister",
                     "call",
-                    "--output",
-                    "json",
                     "realm_backend",
                     "get_objects",
                     f"""(vec {{ record {{ 0 = "Codex"; 1 = "{codex_name}" }}; }})""",
@@ -179,7 +177,7 @@ def test_download_file_with_checksum_verification():
         print(f"\n❌ TEST FAILED: Command timed out")
         return False
     except subprocess.CalledProcessError as e:
-        print(f"\n❌ TEST FAILED: dfx command failed")
+        print(f"\n❌ TEST FAILED: icp command failed")
         print(f"Error: {e.stderr}")
         return False
     except Exception as e:

@@ -41,15 +41,15 @@ def run_cli_json(*args):
 
 
 def run_dfx_query(canister, method, args="()"):
-    """Run dfx canister query command."""
+    """Run icp canister call command."""
     result = subprocess.run(
-        ["dfx", "canister", "call", "--query", canister, method, args],
+        ["icp", "canister", "call", canister, method, args],
         capture_output=True,
         text=True,
         cwd=Path(__file__).parent.parent.parent
     )
     if result.returncode != 0:
-        raise RuntimeError(f"dfx query failed: {result.stderr}")
+        raise RuntimeError(f"icp call failed: {result.stderr}")
     return result.stdout.strip()
 
 

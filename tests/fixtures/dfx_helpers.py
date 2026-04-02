@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Helper utilities for dfx canister calls."""
+"""Helper utilities for icp canister calls."""
 
 import json
 import subprocess
@@ -25,40 +25,36 @@ def dfx_call(
     Returns:
         Tuple of (stdout, exit_code)
     """
-    cmd = ["dfx", "canister", "call", canister, method]
+    cmd = ["icp", "canister", "call", canister, method]
     if args:
         cmd.append(args)
-    if not is_update:
-        cmd.append("--query")  # Most realm_backend methods are queries
     if output_json:
-        cmd.extend(["--output", "json"])
+        cmd.append("--json")
 
     # Log the full command with proper quoting for args
-    cmd_display = ["dfx", "canister", "call", canister, method]
+    cmd_display = ["icp", "canister", "call", canister, method]
     if args:
         cmd_display.append(f'"{args}"')  # Add quotes around args for display
-    if not is_update:
-        cmd_display.append("--query")
     if output_json:
-        cmd_display.extend(["--output", "json"])
+        cmd_display.append("--json")
     cmd_str = " ".join(cmd_display)
-    print(f"    [DFX CMD] {cmd_str}")
+    print(f"    [ICP CMD] {cmd_str}")
 
     result = subprocess.run(cmd, capture_output=True, text=True)
 
     # Log exit code
-    print(f"    [DFX EXIT CODE] {result.returncode}")
+    print(f"    [ICP EXIT CODE] {result.returncode}")
 
     # Log full stdout (no truncation)
     if result.stdout:
-        print(f"    [DFX STDOUT] {len(result.stdout)} bytes:")
+        print(f"    [ICP STDOUT] {len(result.stdout)} bytes:")
         print(result.stdout)
     else:
-        print(f"    [DFX STDOUT] (empty)")
+        print(f"    [ICP STDOUT] (empty)")
 
     # Log full stderr if present (no truncation)
     if result.stderr:
-        print(f"    [DFX STDERR]:")
+        print(f"    [ICP STDERR]:")
         print(result.stderr)
 
     return result.stdout, result.returncode
@@ -81,14 +77,14 @@ def dfx_call_json(
     Raises:
         RuntimeError: If call fails or JSON parsing fails
     """
-    print(f"    [DFX JSON CALL] {canister}.{method}({args})")
+    print(f"    [ICP JSON CALL] {canister}.{method}({args})")
     output, code = dfx_call(
         canister, method, args, output_json=True, is_update=is_update
     )
 
     if code != 0:
-        print(f"    [ERROR] dfx call failed with exit code {code}")
-        raise RuntimeError(f"dfx call failed with code {code}: {output}")
+        print(f"    [ERROR] icp call failed with exit code {code}")
+        raise RuntimeError(f"icp call failed with code {code}: {output}")
 
     try:
         parsed = json.loads(output)
