@@ -816,6 +816,22 @@ def ensure_local_network_running(
     
     console.print("🌐 Starting local network...\n")
     
+    # Ensure icp.yaml exists (icp-cli requires it to find the project root)
+    icp_yaml_path = Path(log_dir) / "icp.yaml"
+    if not icp_yaml_path.exists():
+        dfx_json_path = Path(log_dir) / "dfx.json"
+        if dfx_json_path.exists():
+            # Try to generate from dfx.json using the conversion script
+            gen_script = get_project_root() / "scripts" / "generate_icp_yaml.py"
+            if gen_script.exists():
+                subprocess.run(
+                    ["python3", str(gen_script), str(dfx_json_path), str(icp_yaml_path)],
+                    capture_output=True
+                )
+        if not icp_yaml_path.exists():
+            # Fallback: create minimal icp.yaml
+            icp_yaml_path.write_text("canisters: []\n")
+    
     # Stop any existing network
     subprocess.run(["icp", "network", "stop"], capture_output=True)
     

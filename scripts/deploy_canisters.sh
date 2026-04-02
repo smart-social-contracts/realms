@@ -104,6 +104,16 @@ if [ -n "$IDENTITY_FILE" ] && [ -f "$IDENTITY_FILE" ]; then
     icp identity default temp_deploy
 fi
 
+# Generate icp.yaml from dfx.json (icp-cli requires icp.yaml to find the project root)
+if [ -f "dfx.json" ] && [ ! -f "icp.yaml" ]; then
+    echo "📝 Generating icp.yaml from dfx.json..."
+    python3 "$REPO_ROOT/scripts/generate_icp_yaml.py" dfx.json icp.yaml 2>/dev/null || {
+        # Fallback: create minimal icp.yaml
+        echo "canisters: []" > icp.yaml
+        echo "   ⚠️  Fallback: created minimal icp.yaml"
+    }
+fi
+
 # Start local network (unless SKIP_DFX_START is set)
 if [ "$NETWORK" = "local" ] && [ "$SKIP_DFX_START" != "true" ]; then
     # Determine port based on branch (if git available)
@@ -129,11 +139,6 @@ if [ "$NETWORK" = "local" ] && [ "$SKIP_DFX_START" != "true" ]; then
         
         # Start icp in background mode (-d waits until network is healthy)
         # Redirect output to log files for debugging
-        echo "  icp version: $(icp --version 2>&1 || echo 'not found')"
-        echo "  icp binary: $(which icp 2>&1 || echo 'not found')"
-        echo "  Working directory: $(pwd)"
-        echo "  dfx.json exists: $(test -f dfx.json && echo yes || echo no)"
-        echo "  icp.yaml exists: $(test -f icp.yaml && echo yes || echo no)"
         icp network start -d </dev/null >dfx.log 2>dfx2.log || {
             echo "❌ Error: icp network start failed (exit code: $?)"
             echo "--- stdout (dfx.log) ---"

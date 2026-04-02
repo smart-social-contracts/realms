@@ -581,6 +581,28 @@ def _generate_deployment_scripts(
     if not quiet:
         console.print(f"   ✅ dfx.json created")
 
+    # Generate icp.yaml from dfx.json (icp-cli requires icp.yaml to find project root)
+    gen_script = repo_root / "scripts" / "generate_icp_yaml.py"
+    icp_yaml_path = output_path / "icp.yaml"
+    if gen_script.exists():
+        try:
+            subprocess.run(
+                ["python3", str(gen_script), str(dfx_json_path), str(icp_yaml_path)],
+                capture_output=True, check=True
+            )
+            if not quiet:
+                console.print(f"   ✅ icp.yaml generated")
+        except Exception:
+            # Fallback: create minimal icp.yaml
+            icp_yaml_path.write_text("canisters: []\n")
+            if not quiet:
+                console.print(f"   ⚠️  icp.yaml created (minimal)")
+    else:
+        # Script not found - create minimal icp.yaml
+        icp_yaml_path.write_text("canisters: []\n")
+        if not quiet:
+            console.print(f"   ⚠️  icp.yaml created (minimal)")
+
     # Copy src directories so the realm is fully self-contained and portable
     # This is crucial: deploy_canisters.sh cd's into the realm directory and expects src/ there
     src_dest = output_path / "src"
