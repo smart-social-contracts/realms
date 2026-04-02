@@ -926,7 +926,13 @@ def _print_deployment_status(deploy_dir: Path, network: str) -> None:
         console.print(f"         [yellow]⚠️  No icp.yaml or dfx.json found[/yellow]")
         return
     
-    all_canister_names = list(config_data.get("canisters", {}).keys())
+    canisters_raw = config_data.get("canisters", {})
+    if isinstance(canisters_raw, list):
+        # icp.yaml format: list of objects with 'name' key
+        all_canister_names = [c.get("name", "") for c in canisters_raw if isinstance(c, dict)]
+    else:
+        # dfx.json format: dict keyed by canister name
+        all_canister_names = list(canisters_raw.keys())
     
     # Filter to only deployment-specific canisters (not shared infrastructure)
     # Shared canisters like internet_identity, ckbtc_*, __Candid_UI are managed separately

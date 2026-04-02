@@ -40,7 +40,6 @@ def _call_canister(canister_id: str, method: str, args: str, network: str) -> di
     cmd = [
         "icp", "canister", "call",
         "-e", network,
-        "--json",
         canister_id, method, args,
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, env=env)
