@@ -37,7 +37,7 @@ class TestExecutePython:
         with patch("subprocess.run", return_value=mock_result) as mock_run:
             _execute_python("print('ok')", "realm_backend", "ic")
             cmd = mock_run.call_args[0][0]
-            assert "--network" in cmd
+            assert "-e" in cmd
             assert "ic" in cmd
 
     def test_execution_without_network(self):
@@ -49,7 +49,7 @@ class TestExecutePython:
         with patch("subprocess.run", return_value=mock_result) as mock_run:
             _execute_python("print('ok')", "realm_backend", None)
             cmd = mock_run.call_args[0][0]
-            assert "--network" not in cmd
+            assert "-e" not in cmd
 
     def test_execution_error(self):
         """Test handling of subprocess error."""

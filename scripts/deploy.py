@@ -221,7 +221,7 @@ def resolve_canister_ids_from_registry(
 
     try:
         result = subprocess.run(
-            [ICP_CLI, "canister", "call", "--network", network,
+            [ICP_CLI, "canister", "call", "-e", network,
              registry_canister_id, "list_realms", "--query"],
             capture_output=True, text=True, timeout=30,
         )
@@ -389,14 +389,14 @@ def deploy_backend(
 
     # Top up cycles first
     subprocess.run(
-        [ICP_CLI, "canister", "top-up", backend_id, "1000000000000", "--network", network],
+        [ICP_CLI, "canister", "top-up", backend_id, "--amount", "1000000000000", "-e", network],
         env=env, capture_output=True,
     )
 
     result = subprocess.run(
         [ICP_CLI, "canister", "install", backend_id,
          "--wasm", wasm_path,
-         "--network", network,
+         "-e", network,
          "--mode", mode,
          "--yes"],
         env=env,
@@ -427,13 +427,13 @@ def deploy_backend(
             quarter_wasm = f".basilisk/{quarter_name}/{quarter_name}.wasm"
             if Path(quarter_wasm).exists():
                 subprocess.run(
-                    [ICP_CLI, "canister", "top-up", quarter_id, "1000000000000", "--network", network],
+                    [ICP_CLI, "canister", "top-up", quarter_id, "--amount", "1000000000000", "-e", network],
                     env=env, capture_output=True,
                 )
                 result = subprocess.run(
                     [ICP_CLI, "canister", "install", quarter_id,
                      "--wasm", quarter_wasm,
-                     "--network", network,
+                     "-e", network,
                      "--mode", mode,
                      "--yes"],
                     env=env,
@@ -547,7 +547,7 @@ def deploy_frontend(
     # Deploy frontend assets
     print(f"   📦 Deploying to {frontend_id}...")
     subprocess.run(
-        [ICP_CLI, "canister", "top-up", frontend_id, "500000000000", "--network", network],
+        [ICP_CLI, "canister", "top-up", frontend_id, "--amount", "500000000000", "-e", network],
         env=env, capture_output=True,
     )
 
@@ -717,8 +717,8 @@ Examples:
             # PEM file — import it
             print(f"🔐 Importing identity from {args.identity}...")
             subprocess.run(
-                [ICP_CLI, "identity", "import", "--force", "--storage-mode",
-                 "plaintext", "deploy_identity", args.identity],
+                [ICP_CLI, "identity", "import", "--from-pem", args.identity,
+                 "--storage", "plaintext", "deploy_identity"],
                 env=env, check=True,
             )
             subprocess.run(

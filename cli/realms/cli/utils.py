@@ -774,7 +774,7 @@ def is_local_network_running(network: str = "local") -> bool:
     """Check if local ICP replica is running."""
     try:
         result = subprocess.run(
-            ["icp", "canister", "status", "--network", network, "aaaaa-aa"],
+            ["icp", "network", "ping"],
             capture_output=True,
             timeout=5
         )
@@ -829,7 +829,7 @@ def ensure_local_network_running(
     icp2_log_path = Path(log_dir) / "icp2.log"
     
     # Run icp network start in the background
-    cmd = f"icp network start {'--clean ' if clean else ''}-d </dev/null >/dev/null 2>{icp2_log_path} &"
+    cmd = f"icp network start -d </dev/null >/dev/null 2>{icp2_log_path} &"
     
     subprocess.Popen(
         cmd,
@@ -867,7 +867,7 @@ def wait_for_canister_ready(
         while time.time() - start_time < timeout:
             try:
                 result = subprocess.run(
-                    ["icp", "canister", "status", canister_name, "--network", network],
+                    ["icp", "canister", "status", canister_name, "-e", network],
                     capture_output=True,
                     check=True,
                 )
@@ -1237,7 +1237,7 @@ def resolve_realm_details(
             "icp",
             "canister",
             "call",
-            "--network",
+            "-e",
             effective_registry_network,
             registry_canister,
             "get_realm",
@@ -1374,7 +1374,7 @@ def get_canister_urls(
         for canister_name in canister_names:
             try:
                 id_result = subprocess.run(
-                    ["icp", "canister", "status", canister_name, "--network", network],
+                    ["icp", "canister", "status", canister_name, "-e", network, "--id-only"],
                     capture_output=True,
                     text=True,
                     timeout=5,
@@ -1567,7 +1567,7 @@ def resolve_realm_ref_to_canister_id(
         # Get all realms from registry
         cmd = [
             "icp", "canister", "call",
-            "--network", network,
+            "-e", network,
             effective_registry,
             "list_realms"
         ]

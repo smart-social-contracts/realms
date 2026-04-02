@@ -450,7 +450,7 @@ def mundus_deploy_command(
                             console.print(f"   ✅ {canister} deployed")
                             # Get the canister ID
                             id_result = subprocess.run(
-                                ["icp", "canister", "id", canister, "--network", network],
+                                ["icp", "canister", "status", canister, "-e", network, "--id-only"],
                                 cwd=first_realm, capture_output=True, text=True
                             )
                             if id_result.returncode == 0:
@@ -515,7 +515,7 @@ def mundus_deploy_command(
                             console.print(f"   ✅ realms_token deployed as '{token_name}' ({token_symbol})")
                             # Get the canister ID
                             id_result = subprocess.run(
-                                ["icp", "canister", "id", "realms_token", "--network", network],
+                                ["icp", "canister", "status", "realms_token", "-e", network, "--id-only"],
                                 cwd=mundus_path, capture_output=True, text=True
                             )
                             if id_result.returncode == 0:
@@ -553,7 +553,7 @@ def mundus_deploy_command(
                 for canister in ["realm_registry_backend", "realm_registry_frontend"]:
                     try:
                         id_result = subprocess.run(
-                            ["icp", "canister", "id", canister, "--network", network],
+                            ["icp", "canister", "status", canister, "-e", network, "--id-only"],
                             cwd=registry_dir, capture_output=True, text=True
                         )
                         if id_result.returncode == 0:
@@ -620,7 +620,7 @@ def mundus_deploy_command(
                 # Capture marketplace backend canister ID
                 try:
                     id_result = subprocess.run(
-                        ["icp", "canister", "id", "marketplace_backend", "--network", network],
+                        ["icp", "canister", "status", "marketplace_backend", "-e", network, "--id-only"],
                         cwd=marketplace_dir, capture_output=True, text=True
                     )
                     if id_result.returncode == 0:
@@ -780,7 +780,7 @@ def mundus_status_command(
                     # Check deployment status
                     try:
                         id_result = subprocess.run(
-                            ["icp", "canister", "id", "realms_token", "--network", network],
+                            ["icp", "canister", "status", "realms_token", "-e", network, "--id-only"],
                             capture_output=True, text=True, timeout=5, cwd=mundus_path
                         )
                         if id_result.returncode == 0:
@@ -826,7 +826,7 @@ def mundus_status_command(
                     for canister_name in sorted(ckbtc_canisters):
                         try:
                             id_result = subprocess.run(
-                                ["icp", "canister", "id", canister_name, "--network", network],
+                                ["icp", "canister", "status", canister_name, "-e", network, "--id-only"],
                                 capture_output=True, text=True, timeout=5, cwd=ckbtc_cwd
                             )
                             if id_result.returncode == 0:
@@ -859,7 +859,7 @@ def mundus_status_command(
                     console.print("   [bold]🔐 Identity:[/bold]")
                     try:
                         id_result = subprocess.run(
-                            ["icp", "canister", "id", "internet_identity", "--network", network],
+                            ["icp", "canister", "status", "internet_identity", "-e", network, "--id-only"],
                             capture_output=True, text=True, timeout=5, cwd=ii_cwd
                         )
                         if id_result.returncode == 0:
@@ -964,7 +964,7 @@ def _print_deployment_status(deploy_dir: Path, network: str) -> None:
         try:
             # First check if canister ID exists
             id_result = subprocess.run(
-                ["icp", "canister", "id", canister_name, "--network", network],
+                ["icp", "canister", "status", canister_name, "-e", network, "--id-only"],
                 capture_output=True, text=True, timeout=5, cwd=deploy_dir
             )
             if id_result.returncode != 0:
@@ -975,7 +975,7 @@ def _print_deployment_status(deploy_dir: Path, network: str) -> None:
             
             # Now verify it's actually deployed by checking status
             status_result = subprocess.run(
-                ["icp", "canister", "status", canister_name, "--network", network],
+                ["icp", "canister", "status", canister_name, "-e", network],
                 capture_output=True, text=True, timeout=10, cwd=deploy_dir
             )
             

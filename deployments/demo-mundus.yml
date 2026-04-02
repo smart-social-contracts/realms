@@ -14,7 +14,7 @@ object:
   codices_codebase:
     path: bundled
   network: demo
-  mode: upgrade
+  mode: reinstall
   parameters:
     TEST_MODE: false
     TEST_MODE_II_BYPASS: false

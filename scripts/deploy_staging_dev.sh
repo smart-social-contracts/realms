@@ -135,7 +135,7 @@ echo -e "${BLUE}Network: $NETWORK${NC}"
 echo ""
 
 # Check icp identity
-IDENTITY=$(icp identity whoami 2>/dev/null || echo "unknown")
+IDENTITY=$(icp identity default 2>/dev/null || echo "unknown")
 echo -e "${BLUE}Identity: $IDENTITY${NC}"
 echo ""
 

@@ -7,7 +7,7 @@ object:
   type: realm
   subtypes: frontend
   quarters: 1
-  manifest: ./examples/demo/realm1/manifest.json
+  manifest: ./examples/demo/realm2/manifest.json
   core_codebase:
     path: ./src
   extensions_codebase:
@@ -15,10 +15,10 @@ object:
   codices_codebase:
     path: none
   network: staging
-  id_in_registry: 1
+  id_in_registry: 2
   mode: upgrade
-  parameters:
-    TEST_MODE: true
-    TEST_MODE_II_BYPASS: true
-    TEST_MODE_ADMIN_SELF_REGISTRATION: true
-    TEST_MODE_SKIP_TERMS: true
+  # parameters:
+  #   TEST_MODE: true
+  #   TEST_MODE_II_BYPASS: true
+  #   TEST_MODE_ADMIN_SELF_REGISTRATION: true
+  #   TEST_MODE_SKIP_TERMS: true

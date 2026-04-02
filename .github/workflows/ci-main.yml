@@ -383,8 +383,8 @@ jobs:
             -v "$(pwd)/deploy-logs:/app/deploy-logs" \
             -e DFX_WARNING="-mainnet_plaintext_identity" \
             ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
-            bash -c "(icp identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
-                     icp identity use my-identity && \
+            bash -c "(icp identity import --from-pem /app/identity.pem --storage plaintext my-identity && \
+                     icp identity default my-identity && \
                      realms mundus create --manifest examples/demo/manifest.json --deploy --network staging); \
                      EXIT_CODE=\$?; \
                      mkdir -p /app/deploy-logs && \
@@ -418,8 +418,8 @@ jobs:
             -e DFX_NETWORK=staging \
             -e AGORA_BACKEND=3bohd-2yaaa-aaaac-qcyla-cai \
             ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
-            bash -c "icp identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
-                     icp identity use my-identity && \
+            bash -c "icp identity import --from-pem /app/identity.pem --storage plaintext my-identity && \
+                     icp identity default my-identity && \
                      python3 tests/staging/test_quarters_staging.py 2>&1 | tee /app/quarter-test-logs/quarters.log"
           
           rm -f identity.pem
@@ -508,8 +508,8 @@ jobs:
             -e RUN_DURATION_MINUTES=10 \
             -e LOGS_DIR=/app/agent_logs \
             ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
-            bash -c "icp identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
-                     icp identity use my-identity && \
+            bash -c "icp identity import --from-pem /app/identity.pem --storage plaintext my-identity && \
+                     icp identity default my-identity && \
                      pip install git+https://github.com/smart-social-contracts/geister.git realms-gos && \
                      cp dfx.template.json dfx.json && \
                      python examples/demo/realm_common/tests/test_agent_swarm.py"

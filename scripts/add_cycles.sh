@@ -17,14 +17,14 @@ echo "======================================"
 echo
 
 # Check if icp is running
-if ! icp ping &>/dev/null; then
+if ! icp network ping &>/dev/null; then
     echo "❌ Error: icp replica is not running"
     echo "   Start it with: icp network start -d"
     exit 1
 fi
 
 # Check if canister exists
-if ! icp canister id "$CANISTER" &>/dev/null; then
+if ! icp canister status "$CANISTER" --id-only &>/dev/null; then
     echo "❌ Error: Canister '$CANISTER' not found"
     echo "   Deploy it first with: icp deploy $CANISTER"
     exit 1
@@ -39,7 +39,7 @@ echo
 # This works for local development - amount is in cycles with T/M/K suffixes
 echo "💰 Adding ${AMOUNT}T cycles to $CANISTER..."
 
-if icp canister deposit-cycles "${AMOUNT}T" "$CANISTER" 2>&1; then
+if icp canister top-up "$CANISTER" --amount "${AMOUNT}t" 2>&1; then
     echo
     echo "✅ Successfully added ${AMOUNT}T cycles!"
     echo
