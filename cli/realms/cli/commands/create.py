@@ -520,7 +520,7 @@ def _generate_deployment_scripts(
                         # Replace minting_account and initial_balances in existing init_arg
                         init_arg = ledger_config["init_arg"]
                         init_arg = init_arg.replace('principal "aaaaa-aa"', f'principal "{deployer_principal}"')
-                        init_arg = init_arg.replace('initial_balances = vec {}', f'initial_balances = vec {{ record {{ record {{ owner = principal "{deployer_principal}"; subaccount = null }}; 100_000_000_000 }} }}')
+                        init_arg = init_arg.replace('initial_balances = vec {}', f'initial_balances = vec {{ record {{ record {{ owner = principal "{deployer_principal}"; subaccount = null }}; 100_000_000_000 : nat }} }}')
                         ledger_config["init_arg"] = init_arg
                         if not quiet:
                             console.print(f"   ✅ Configured {ledger_name} with 1000 ckBTC initial balance for deployer")
