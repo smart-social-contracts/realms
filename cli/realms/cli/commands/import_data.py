@@ -112,17 +112,25 @@ def import_data_command(
             )
 
             # Parse the icp response to check for backend errors
-            if result and result.stdout:
-                # Check for success in response (handle both JSON double quotes and Python single quotes)
-                if (
-                    '"success": true' in result.stdout.lower()
-                    or "'success': True" in result.stdout
-                ):
-                    display_success_panel("Import Chunk Complete! 🎉", result.stdout)
-                else:
-                    display_error_panel("Backend Import Chunk Failed", result.stdout)
-                    raise typer.Exit(1)
+            # icp canister call output is Candid text with escaped quotes:
+            #   2_718_740_097 = "{\"success\":true,...}";
+            # Check multiple formats: escaped/unescaped, with/without spaces
+            response = result.stdout if result and result.stdout else ""
+            response_lower = response.lower()
+            is_success = (
+                '"success": true' in response_lower
+                or '"success":true' in response_lower
+                or '\\"success\\":true' in response_lower
+                or '\\"success\\": true' in response_lower
+                or "'success': true" in response_lower
+                or "success = true" in response_lower
+            )
 
+            if response and is_success:
+                display_success_panel("Import Chunk Complete! 🎉", response)
+            elif response:
+                display_error_panel("Backend Import Chunk Failed", response)
+                raise typer.Exit(1)
             elif result and result.stderr:
                 # icp command had stderr output
                 display_error_panel("Backend Import Chunk Failed", result.stderr)
