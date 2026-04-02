@@ -129,7 +129,15 @@ def test_task_status_format():
 
     assert exit_code == 0, f"get_objects_paginated failed with code {exit_code}, output: {output}"
 
-    has_response = "success" in output or "objects" in output or "pagination" in output
+    # Parse Candid output to check for structured response
+    from fixtures.candid_parser import parse_candid
+    try:
+        parsed = parse_candid(output)
+        has_response = isinstance(parsed, dict) and (
+            "success" in parsed or "objects" in parsed or "pagination" in parsed
+        )
+    except Exception:
+        has_response = False
     assert has_response, f"Should return structured response. Got: {output[:300]}"
 
     print("\u2713")

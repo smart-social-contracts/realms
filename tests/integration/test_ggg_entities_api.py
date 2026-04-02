@@ -7,7 +7,7 @@ import traceback
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from fixtures.dfx_helpers import dfx_call
+from fixtures.dfx_helpers import assert_success, dfx_call
 
 
 def test_list_users():
@@ -76,7 +76,7 @@ def test_find_objects_by_id():
     )
 
     assert code == 0, f"find_objects (User by id) failed with code {code}"
-    assert "success" in output and "true" in output.lower(), "find_objects should return success"
+    assert_success(output, "find_objects should return success")
     print("✓")
 
 
@@ -88,7 +88,7 @@ def test_find_objects_no_match():
     )
 
     assert code == 0, f"find_objects (no match) failed with code {code}"
-    assert "success" in output and "true" in output.lower(), "find_objects should return success even with no matches"
+    assert_success(output, "find_objects should return success even with no matches")
     print("✓")
 
 

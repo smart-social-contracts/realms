@@ -274,10 +274,9 @@ jobs:
             tests: "test_status_api.py test_extensions_api.py test_ggg_entities_api.py"
           - name: "Task Management"
             tests: "test_task_manager_api.py test_scheduled_tasks.py"
-          - name: "System Operations"
-            tests: "test_db_command.py test_shell_command.py"
-          - name: "CLI"
-            tests: "test_cli.py"
+          # System Operations (test_db_command.py, test_shell_command.py) and
+          # CLI (test_cli.py) removed: commands realms db/shell/ps were removed
+          # in ed6a677a (migrate CLI from dfx to icp, remove dead commands)
     steps:
       - name: Checkout code
         uses: actions/checkout@v3

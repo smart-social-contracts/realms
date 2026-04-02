@@ -39,8 +39,8 @@ def test_extensions_have_required_fields():
     # Extensions should have substantial metadata
     assert len(output) > 100, "Should return substantial data about extensions"
 
-    # Check for expected structure (Candid or JSON)
-    assert "success" in output
+    # Check for expected structure
+    assert_success(output, "extensions should succeed")
     print("✓")
 
 
