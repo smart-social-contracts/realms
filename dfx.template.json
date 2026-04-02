@@ -87,7 +87,7 @@
           "ic": "mxzaz-hqaaa-aaaar-qaada-cai"
         }
       },
-      "init_arg": "(variant { Init = record { token_name = \"ckBTC\"; token_symbol = \"ckBTC\"; minting_account = record { owner = principal \"aaaaa-aa\" }; initial_balances = vec {}; metadata = vec {}; transfer_fee = 10 : nat; archive_options = record { trigger_threshold = 2000 : nat; num_blocks_to_archive = 1000 : nat; controller_id = principal \"aaaaa-aa\" }; feature_flags = opt record { icrc2 = true }; } })"
+      "init_arg": "(variant { Init = record { token_name = \"ckBTC\"; token_symbol = \"ckBTC\"; minting_account = record { owner = principal \"aaaaa-aa\" }; initial_balances = vec {}; metadata = vec {}; transfer_fee = 10 : nat; archive_options = record { trigger_threshold = 2000 : nat64; num_blocks_to_archive = 1000 : nat64; controller_id = principal \"aaaaa-aa\" }; feature_flags = opt record { icrc2 = true }; } })"
     },
     "ckbtc_indexer": {
       "type": "custom",
