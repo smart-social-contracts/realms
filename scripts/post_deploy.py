@@ -344,7 +344,7 @@ else:
 
 # Reload entity method overrides after adjustments
 print("\n🔄 Reloading entity method overrides...")
-reload_cmd = ['icp', 'canister', 'call', backend_name, 'reload_entity_method_overrides']
+reload_cmd = ['icp', 'canister', 'call', backend_name, 'reload_entity_method_overrides', '()']
 if network != 'local':
     reload_cmd.extend(['-e', network])
 try:
@@ -806,7 +806,7 @@ else:
 # Timer callbacks MUST be created in an update call context (not execute_code_shell).
 print("\n⏱️  Starting TaskManager...")
 try:
-    start_cmd = ['icp', 'canister', 'call', backend_name, 'start_task_manager']
+    start_cmd = ['icp', 'canister', 'call', backend_name, 'start_task_manager', '()']
     if network != 'local':
         start_cmd.extend(['-e', network])
     result = subprocess.run(start_cmd, cwd=realm_dir, capture_output=True, text=True)

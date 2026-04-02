@@ -40,8 +40,7 @@ if [ -n "$NO_DEMO_DATA" ]; then
     echo "ℹ️  Skipping realm data upload (--no-demo-data)"
 elif [ -f "realm_data.json" ] && [ -s "realm_data.json" ]; then
     echo "📥 Uploading realm data..."
-    $REALMS_CMD realm_data.json
-    if [ $? -eq 0 ]; then
+    if $REALMS_CMD realm_data.json; then
         echo "  ✅ Realm data uploaded successfully"
         UPLOAD_SUCCESS=true
     else
@@ -57,8 +56,7 @@ CODEX_COUNT=0
 for codex_file in *.py; do
     if [ -f "$codex_file" ]; then
         echo "  Importing $(basename $codex_file)..."
-        $REALMS_CMD "$codex_file" --type codex
-        if [ $? -eq 0 ]; then
+        if $REALMS_CMD "$codex_file" --type codex; then
             echo "    ✅ Imported successfully"
             CODEX_COUNT=$((CODEX_COUNT + 1))
             UPLOAD_SUCCESS=true
@@ -92,8 +90,7 @@ if [ -d "extensions" ]; then
             for data_file in "${extension_dir}data/"*.json; do
                 if [ -f "$data_file" ]; then
                     echo "    📥 Importing $(basename "$data_file")..."
-                    $REALMS_CMD "$data_file"
-                    if [ $? -eq 0 ]; then
+                    if $REALMS_CMD "$data_file"; then
                         echo "      ✅ Imported successfully"
                         EXTENSION_DATA_COUNT=$((EXTENSION_DATA_COUNT + 1))
                         UPLOAD_SUCCESS=true

@@ -98,7 +98,6 @@ def import_data_command(
                 f'(record {{ extension_name = "admin_dashboard"; function_name = "import_data"; args = "base64:{args_b64}"; }})',
                 "-e",
                 network,
-                "--json",
             ]
 
             if identity:
