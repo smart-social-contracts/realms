@@ -729,7 +729,7 @@ if [ -n "$FRONTENDS" ]; then
         # Deploy frontend
         echo "   📦 Deploying $canister..."
         if [ "$NETWORK" = "local" ]; then
-            retry_icp icp deploy "$canister"
+            retry_icp icp deploy "$canister" --yes
         else
             # Ensure canister exists and has cycles before deploying assets
             existing_id=$(icp canister status "$canister" -e "$NETWORK" --id-only 2>/dev/null || echo "")

@@ -33,15 +33,30 @@ def convert_dfx_to_icp_yaml(dfx_path="dfx.json", output_path="icp.yaml"):
         source_dirs = config.get("source", [])
 
         lines.append(f"- name: {name}")
+
+        if canister_type == "assets":
+            # Asset canister: use pre-built assetstorage WASM + asset sync
+            asset_dir = source_dirs[0] if source_dirs else f"src/{name}/dist"
+            lines.append("  build:")
+            lines.append("    steps:")
+            lines.append("    - type: pre-built")
+            lines.append("      url: https://github.com/dfinity/sdk/raw/refs/tags/0.30.2/src/distributed/assetstorage.wasm.gz")
+            lines.append("  sync:")
+            lines.append("    steps:")
+            lines.append("    - type: assets")
+            lines.append(f"      dir: {asset_dir}")
+            if init_arg:
+                escaped = init_arg.replace('\\', '\\\\').replace('"', '\\"')
+                lines.append(f'  init_args: "{escaped}"')
+            continue
+
+        # Non-asset canisters: use build steps
         lines.append("  build:")
         lines.append("    steps:")
         lines.append("    - type: script")
         lines.append("      commands:")
 
-        if canister_type == "assets":
-            # Asset canister: no-op build (deploy_canisters.sh handles npm build)
-            lines.append(f"      - echo asset canister {name}")
-        elif build_cmd:
+        if build_cmd:
             # Custom canister with a build command (e.g., basilisk backends)
             if candid_path and not candid_path.startswith("http"):
                 lines.append(f"      - CANISTER_CANDID_PATH={candid_path} {build_cmd}")
