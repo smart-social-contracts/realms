@@ -91,7 +91,7 @@ async def main():
         # Get backend canister ID (vault)
         import subprocess
         result = subprocess.run(
-            ["dfx", "canister", "id", "realm_backend", "--network", network],
+            ["icp", "canister", "status", "realm_backend", "--id-only"] + (["-e", network] if network != "local" else []),
             capture_output=True, text=True, cwd=folder
         )
         backend_id = result.stdout.strip()
@@ -102,7 +102,7 @@ async def main():
             ledger_id = "mxzaz-hqaaa-aaaar-qaada-cai"  # IC mainnet ckBTC ledger
         else:
             result = subprocess.run(
-                ["dfx", "canister", "id", "ckbtc_ledger", "--network", network],
+                ["icp", "canister", "status", "ckbtc_ledger", "--id-only"] + (["-e", network] if network != "local" else []),
                 capture_output=True, text=True, cwd=folder
             )
             ledger_id = result.stdout.strip()

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Update frontend config.js with canister IDs from dfx."""
+"""Update frontend config.js with canister IDs from icp CLI."""
 
 import subprocess
 import sys
@@ -11,10 +11,11 @@ CONFIG_FILE_FRONTEND = Path("src/realm_frontend/src/lib/config.js")
 
 
 def get_canister_id(canister_name: str, network: str = "local") -> str:
-    """Get canister ID from dfx."""
+    """Get canister ID from icp CLI."""
     try:
+        network_args = ["-e", network] if network != "local" else []
         result = subprocess.run(
-            ["dfx", "canister", "id", canister_name, "--network", network],
+            ["icp", "canister", "status", canister_name, "--id-only"] + network_args,
             capture_output=True, text=True, check=True
         )
         return result.stdout.strip()
@@ -23,14 +24,21 @@ def get_canister_id(canister_name: str, network: str = "local") -> str:
 
 
 def get_local_port() -> str:
-    """Get the local dfx port."""
+    """Get the local replica port."""
     try:
         result = subprocess.run(
-            ["dfx", "info", "webserver-port"],
+            ["icp", "network", "status", "--json"],
             capture_output=True, text=True, timeout=5
         )
         if result.returncode == 0 and result.stdout.strip():
-            return result.stdout.strip()
+            import json
+            data = json.loads(result.stdout)
+            # Try to extract port from replica URL
+            url = data.get("replica_url", "") or data.get("url", "")
+            if ":" in url:
+                port = url.rsplit(":", 1)[-1].rstrip("/")
+                if port.isdigit():
+                    return port
     except:
         pass
     return "8000"
