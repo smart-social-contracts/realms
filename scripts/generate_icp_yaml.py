@@ -29,6 +29,7 @@ def convert_dfx_to_icp_yaml(dfx_path="dfx.json", output_path="icp.yaml"):
         build_cmd = config.get("build", "")
         wasm_path = config.get("wasm", "")
         candid_path = config.get("candid", "")
+        init_arg = config.get("init_arg", "")
         source_dirs = config.get("source", [])
 
         lines.append(f"- name: {name}")
@@ -57,6 +58,12 @@ def convert_dfx_to_icp_yaml(dfx_path="dfx.json", output_path="icp.yaml"):
         else:
             # Fallback: no-op build
             lines.append(f"      - echo no build for {name}")
+
+        # Add init_args if present (icp deploy reads these from icp.yaml)
+        if init_arg:
+            # YAML quoting: use double quotes and escape internal double quotes
+            escaped = init_arg.replace('\\', '\\\\').replace('"', '\\"')
+            lines.append(f'  init_args: "{escaped}"')
 
     with open(output_path, "w") as f:
         f.write("\n".join(lines) + "\n")
