@@ -2,9 +2,10 @@
 """Helper utilities for icp canister calls."""
 
 import json
-import re
 import subprocess
 from typing import Tuple
+
+from fixtures.candid_parser import parse_candid
 
 
 def dfx_call(
@@ -57,34 +58,13 @@ def dfx_call(
     return result.stdout, result.returncode
 
 
-def _extract_json_from_candid(output: str) -> str:
-    """Extract JSON string from Candid text output.
-
-    icp canister call returns Candid text like:
-        ("{\\"success\\":true,...}")
-    or:
-        (record { ... })
-    This extracts the inner JSON string if present.
-    """
-    # Try to find a JSON string inside Candid text (quoted with escaped quotes)
-    # Pattern: look for content between outer quotes that contains JSON
-    # The Candid output has backslash-escaped quotes inside strings
-    match = re.search(r'"((?:\\.|[^"\\])*)"', output)
-    if match:
-        raw = match.group(1)
-        # Unescape Candid string escapes
-        unescaped = raw.replace('\\"', '"').replace('\\\\', '\\')
-        return unescaped
-    return output
-
-
 def dfx_call_json(
     canister: str, method: str, args: str = "()", is_update: bool = False
 ) -> dict:
-    """Call a canister method and parse JSON response.
+    """Call a canister method and parse the response into a Python dict.
 
-    Gets Candid text output and extracts JSON from it, since
-    icp --json outputs CLI metadata, not the canister response.
+    Uses the Candid text parser to convert hash-based field names back
+    to their original names.
 
     Args:
         canister: Canister name
@@ -93,10 +73,10 @@ def dfx_call_json(
         is_update: Whether this is an update call (default: query)
 
     Returns:
-        Parsed JSON response
+        Parsed response as a Python dict
 
     Raises:
-        RuntimeError: If call fails or JSON parsing fails
+        RuntimeError: If call fails or parsing fails
     """
     print(f"    [ICP JSON CALL] {canister}.{method}({args})")
     output, code = dfx_call(
@@ -107,17 +87,16 @@ def dfx_call_json(
         print(f"    [ERROR] icp call failed with exit code {code}")
         raise RuntimeError(f"icp call failed with code {code}: {output}")
 
-    # Extract JSON from Candid text output
-    json_str = _extract_json_from_candid(output)
-
     try:
-        parsed = json.loads(json_str)
-        print(f"    [JSON PARSED] Successfully parsed JSON response")
+        parsed = parse_candid(output)
+        print(f"    [CANDID PARSED] Successfully parsed Candid response")
+        if isinstance(parsed, dict):
+            print(f"    [CANDID KEYS] {list(parsed.keys())[:10]}")
         return parsed
-    except json.JSONDecodeError as e:
-        print(f"    [ERROR] JSON parsing failed: {e}")
-        print(f"    [DEBUG] Extracted string: {json_str[:200]}")
-        raise RuntimeError(f"Failed to parse JSON response: {e}\nOutput: {output}")
+    except Exception as e:
+        print(f"    [ERROR] Candid parsing failed: {e}")
+        print(f"    [DEBUG] First 300 chars: {output[:300]}")
+        raise RuntimeError(f"Failed to parse Candid response: {e}\nOutput: {output[:500]}")
 
 
 def assert_success(output: str, message: str = "") -> None:
@@ -130,7 +109,15 @@ def assert_success(output: str, message: str = "") -> None:
     Raises:
         AssertionError: If call was not successful
     """
-    # Check multiple formats: Candid escaped, JSON, Candid record
+    # Try parsing the Candid output to check success field
+    try:
+        parsed = parse_candid(output)
+        if isinstance(parsed, dict) and parsed.get("success") is True:
+            return
+    except Exception:
+        pass
+
+    # Fallback: text-based checks for various output formats
     lower = output.lower()
     if (
         '"success": true' in lower
@@ -140,8 +127,9 @@ def assert_success(output: str, message: str = "") -> None:
         or "success = true" in lower
     ):
         return
+
     error_msg = f"Expected successful call{': ' + message if message else ''}"
-    error_msg += f"\nGot output: {output}"
+    error_msg += f"\nGot output: {output[:500]}"
     raise AssertionError(error_msg)
 
 
