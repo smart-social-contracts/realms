@@ -83,18 +83,8 @@ try:
         backend_url = ""
         backend_id = ""
         
-        # Detect dfx webserver port for local network
+        # Default webserver port for local network
         local_port = 8000
-        if network == 'local':
-            try:
-                port_result = subprocess.run(
-                    ['dfx', 'info', 'webserver-port'],
-                    capture_output=True, text=True, timeout=5, cwd=realm_dir
-                )
-                if port_result.returncode == 0 and port_result.stdout.strip():
-                    local_port = int(port_result.stdout.strip())
-            except Exception:
-                pass
         
         try:
             # Find canister names from dfx.json
@@ -124,7 +114,7 @@ try:
             
             # Get frontend canister ID
             result = subprocess.run(
-                ['dfx', 'canister', 'id', frontend_name, '--network', network],
+                ['icp', 'canister', 'status', frontend_name, '--id-only'] + (['-e', network] if network != 'local' else []),
                 capture_output=True, text=True, timeout=5
             )
             if result.returncode == 0:
@@ -149,7 +139,7 @@ try:
             
             # Get backend canister ID
             result = subprocess.run(
-                ['dfx', 'canister', 'id', backend_name_local, '--network', network],
+                ['icp', 'canister', 'status', backend_name_local, '--id-only'] + (['-e', network] if network != 'local' else []),
                 capture_output=True, text=True, timeout=5
             )
             if result.returncode == 0:
@@ -181,10 +171,9 @@ try:
             canister_ids_packed = "||"  # frontend|token|nft - empty for now
             register_args = f'("{registry_canister_id}", "{realm_name}", "{frontend_url}", "{logo_url}", "{canister_ids_packed}")'
             register_cmd = [
-                'dfx', 'canister', 'call', backend_name_local, 'register_realm_with_registry',
+                'icp', 'canister', 'call', backend_name_local, 'register_realm_with_registry',
                 register_args,
-                '--network', network
-            ]
+            ] + (['-e', network] if network != 'local' else [])
             
             register_result = subprocess.run(register_cmd, cwd=realm_dir, capture_output=True, text=True)
             if register_result.returncode == 0:
@@ -265,9 +254,9 @@ if os.path.exists(manifest_path):
         # which dfx Candid parser doesn't understand
         config_json = json.dumps(config, ensure_ascii=False).replace('"', '\\"')
         
-        update_cmd = ['dfx', 'canister', 'call', backend_name, 'update_realm_config', f'("{config_json}")']
+        update_cmd = ['icp', 'canister', 'call', backend_name, 'update_realm_config', f'("{config_json}")']
         if network != 'local':
-            update_cmd.extend(['--network', network])
+            update_cmd.extend(['-e', network])
         result = run_command(update_cmd)
         print(f"   ✅ Realm config updated: {result}")
     except Exception as e:
@@ -304,7 +293,7 @@ try:
                 try:
                     # Get the quarter's canister ID
                     result = subprocess.run(
-                        ['dfx', 'canister', 'id', q_canister, '--network', network],
+                        ['icp', 'canister', 'status', q_canister, '--id-only'] + (['-e', network] if network != 'local' else []),
                         capture_output=True, text=True, timeout=10
                     )
                     if result.returncode != 0:
@@ -320,10 +309,9 @@ try:
                     
                     register_args = f'("{quarter_name}", "{quarter_canister_id}")'
                     register_cmd = [
-                        'dfx', 'canister', 'call', backend_name, 'register_quarter',
+                        'icp', 'canister', 'call', backend_name, 'register_quarter',
                         register_args,
-                        '--network', network
-                    ]
+                    ] + (['-e', network] if network != 'local' else [])
                     reg_result = subprocess.run(register_cmd, cwd=realm_dir, capture_output=True, text=True)
                     if reg_result.returncode == 0:
                         print(f"   ✅ Registered {quarter_name} (canister: {quarter_canister_id})")
@@ -356,9 +344,9 @@ else:
 
 # Reload entity method overrides after adjustments
 print("\n🔄 Reloading entity method overrides...")
-reload_cmd = ['dfx', 'canister', 'call', backend_name, 'reload_entity_method_overrides']
+reload_cmd = ['icp', 'canister', 'call', backend_name, 'reload_entity_method_overrides']
 if network != 'local':
-    reload_cmd.extend(['--network', network])
+    reload_cmd.extend(['-e', network])
 try:
     result = run_command(reload_cmd)
     print(f"   ✅ Entity method overrides reloaded: {result}")
@@ -383,13 +371,13 @@ try:
     ckbtc_indexer_id = None
     try:
         result = subprocess.run(
-            ['dfx', 'canister', 'id', 'ckbtc_ledger', '--network', network],
+            ['icp', 'canister', 'status', 'ckbtc_ledger', '--id-only'] + (['-e', network] if network != 'local' else []),
             capture_output=True, text=True, timeout=5
         )
         if result.returncode == 0:
             ckbtc_ledger_id = result.stdout.strip()
             result = subprocess.run(
-                ['dfx', 'canister', 'id', 'ckbtc_indexer', '--network', network],
+                ['icp', 'canister', 'status', 'ckbtc_indexer', '--id-only'] + (['-e', network] if network != 'local' else []),
                 capture_output=True, text=True, timeout=5
             )
             ckbtc_indexer_id = result.stdout.strip() if result.returncode == 0 else ckbtc_ledger_id
@@ -438,7 +426,7 @@ try:
     realm_token_id = None
     try:
         result = subprocess.run(
-            ['dfx', 'canister', 'id', 'token_backend', '--network', network],
+            ['icp', 'canister', 'status', 'token_backend', '--id-only'] + (['-e', network] if network != 'local' else []),
             capture_output=True, text=True, timeout=5
         )
         if result.returncode == 0:
@@ -502,9 +490,9 @@ else:
 '''
         # Escape the code for shell
         escaped_code = python_code.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
-        seed_cmd = ['dfx', 'canister', 'call', backend_name, 'execute_code_shell', f'("{escaped_code}")']
+        seed_cmd = ['icp', 'canister', 'call', backend_name, 'execute_code_shell', f'("{escaped_code}")']
         if network != 'local':
-            seed_cmd.extend(['--network', network])
+            seed_cmd.extend(['-e', network])
         result = subprocess.run(seed_cmd, cwd=realm_dir, capture_output=True, text=True)
         if result.returncode == 0:
             print(f"   ✅ Seeded token: {token['symbol']} ({token['name']})")
@@ -799,9 +787,9 @@ else:
 '''
         # Escape the code for shell
         escaped_code = accounting_seed_code.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
-        seed_cmd = ['dfx', 'canister', 'call', backend_name, 'execute_code_shell', f'("{escaped_code}")']
+        seed_cmd = ['icp', 'canister', 'call', backend_name, 'execute_code_shell', f'("{escaped_code}")']
         if network != 'local':
-            seed_cmd.extend(['--network', network])
+            seed_cmd.extend(['-e', network])
         result = subprocess.run(seed_cmd, cwd=realm_dir, capture_output=True, text=True)
         if result.returncode == 0:
             if "already_seeded" in result.stdout:
@@ -818,9 +806,9 @@ else:
 # Timer callbacks MUST be created in an update call context (not execute_code_shell).
 print("\n⏱️  Starting TaskManager...")
 try:
-    start_cmd = ['dfx', 'canister', 'call', backend_name, 'start_task_manager']
+    start_cmd = ['icp', 'canister', 'call', backend_name, 'start_task_manager']
     if network != 'local':
-        start_cmd.extend(['--network', network])
+        start_cmd.extend(['-e', network])
     result = subprocess.run(start_cmd, cwd=realm_dir, capture_output=True, text=True)
     if result.returncode == 0:
         print(f"   ✅ TaskManager: {result.stdout.strip()}")

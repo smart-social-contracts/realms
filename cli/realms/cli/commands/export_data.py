@@ -55,8 +55,7 @@ def export_data_command(
             f'(record {{ extension_name = "admin_dashboard"; function_name = "export_data"; args = "{escaped_args}"; }})',
             "-e",
             network,
-            "--output",
-            "json",
+            "--json",
         ]
         
         if identity:
