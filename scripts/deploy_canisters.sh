@@ -443,7 +443,7 @@ if [ -n "$BACKENDS" ]; then
             continue
         fi
         echo "   Generating for $canister..."
-        generate_declarations "$canister"
+        generate_declarations "$canister" || true
     done
     
     # Copy declarations to standard names for frontend compatibility
