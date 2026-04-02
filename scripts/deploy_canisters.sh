@@ -454,10 +454,23 @@ if [ -n "$BACKENDS" ]; then
             # This ensures only the main backend gets copied, not token/nft/quarter backends
             if [[ "$canister" == *"_backend" ]] && [[ "$canister" != *"token_backend" ]] && [[ "$canister" != *"nft_backend" ]] && [[ "$canister" != quarter_*_backend ]] && [[ "$canister" != "realm_backend" ]] && [[ "$canister" != "realm_registry_backend" ]]; then
                 if [ -d "src/declarations/$canister" ]; then
-                    # Remove existing realm_backend to avoid cp -r creating a subdirectory
-                    rm -rf "src/declarations/realm_backend"
-                    cp -r "src/declarations/$canister" "src/declarations/realm_backend"
-                    echo "      📋 Copied $canister → realm_backend"
+                    # Only overwrite realm_backend if source has a valid .did.js
+                    # The unique-named backend shares realm_backend's interface, so use its reference .did.js
+                    local src_didjs="src/declarations/$canister/$canister.did.js"
+                    if [ ! -f "$src_didjs" ]; then
+                        # Copy reference .did.js from realm_backend if available
+                        local rb_didjs="src/declarations/realm_backend/realm_backend.did.js"
+                        if [ -f "$rb_didjs" ]; then
+                            cp "$rb_didjs" "$src_didjs"
+                        fi
+                    fi
+                    if [ -f "$src_didjs" ]; then
+                        rm -rf "src/declarations/realm_backend"
+                        cp -r "src/declarations/$canister" "src/declarations/realm_backend"
+                        echo "      📋 Copied $canister → realm_backend"
+                    else
+                        echo "      ⚠️  Skipping $canister → realm_backend (no .did.js)"
+                    fi
                 fi
             fi
         done
