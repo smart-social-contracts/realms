@@ -18,7 +18,7 @@ class Balance(Entity, TimestampedMixin):
     Per-user, per-instrument balance in the realm's accounting layer.
 
     Links to a User and tracks a token balance.  ``refresh()`` queries
-    the on-chain balance via basilisk.os.Wallet and updates the cached
+    the on-chain balance via ic-basilisk-toolkit Wallet and updates the cached
     amount.  Override ``pre_refresh_hook`` / ``post_refresh_hook`` via
     Codex for custom logic.
     """
@@ -33,7 +33,7 @@ class Balance(Entity, TimestampedMixin):
 
     def refresh(self):
         """
-        Refresh this balance from the on-chain ledger via basilisk.os.Wallet.
+        Refresh this balance from the on-chain ledger via ic-basilisk-toolkit Wallet.
 
         Must be called with ``yield``::
 
@@ -42,7 +42,7 @@ class Balance(Entity, TimestampedMixin):
         Returns:
             dict with the updated balance amount or error info.
         """
-        from basilisk.os.wallet import Wallet
+        from ic_basilisk_toolkit.wallet import Wallet
 
         token_name = self.instrument or "ckBTC"
 

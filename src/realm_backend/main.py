@@ -1643,7 +1643,7 @@ def create_foundational_objects() -> void:
 def _register_wallet_transfer_hook():
     """Register the GGG permission check as the Basilisk OS Wallet pre-transfer hook."""
     try:
-        from basilisk.os.wallet import Wallet
+        from ic_basilisk_toolkit.wallet import Wallet
         from core.access import _check_access
 
         def realm_transfer_hook(
@@ -1681,8 +1681,8 @@ def initialize() -> void:
                 f"Error registering entity type {name}: {str(e)}\n{traceback.format_exc()}"
             )
 
-    # Register basilisk OS crypto entities
-    from basilisk.os.crypto import CryptoGroup, CryptoGroupMember, KeyEnvelope
+    # Register ic-basilisk-toolkit crypto entities
+    from ic_basilisk_toolkit.crypto import CryptoGroup, CryptoGroupMember, KeyEnvelope
 
     for crypto_entity in (KeyEnvelope, CryptoGroup, CryptoGroupMember):
         try:

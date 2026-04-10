@@ -206,7 +206,7 @@ class Invoice(Entity, TimestampedMixin):
             acct_xrc = acct_xrc[2:]
         
         try:
-            from basilisk.os.entities import FXPair
+            from ic_basilisk_toolkit.entities import FXPair
             
             # Try direct pair: TOKEN/ACCOUNTING (e.g., BTC/USDC)
             pair_key = f"{xrc_symbol}/{acct_xrc}"
@@ -432,7 +432,7 @@ class Invoice(Entity, TimestampedMixin):
         return self._refresh()
 
     def _refresh(self) -> "Async[dict]":
-        from basilisk.os import Wallet
+        from ic_basilisk_toolkit.wallet import Wallet
         from .token import Token
 
         wallet = Wallet()

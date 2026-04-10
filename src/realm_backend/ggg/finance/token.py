@@ -1,8 +1,8 @@
 """
 Token Entity - GGG Standard
 
-Re-exported from basilisk.os (canonical source: basilisk/basilisk/os/entities.py).
-The Basilisk OS Token is the single source of truth for ICRC-1 token registry.
+Re-exported from ic-basilisk-toolkit (canonical source: ic_basilisk_toolkit/entities.py).
+The Basilisk Toolkit Token is the single source of truth for ICRC-1 token registry.
 GGG adds convenience properties for realm-specific metadata (symbol, token_type, enabled).
 
 Basilisk OS Token fields (stored in DB):
@@ -19,7 +19,7 @@ GGG adds (via dynamic properties, stored as _prop_ fields in DB):
     token_type   — "shared" or "realm"
     enabled      — "true" or "false" for UI display
 """
-from basilisk.os.entities import Token  # noqa: F401 — canonical source
+from ic_basilisk_toolkit.entities import Token  # noqa: F401 — canonical source
 from ic_python_logging import get_logger
 
 logger = get_logger("entity.token")
