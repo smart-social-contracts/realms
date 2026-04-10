@@ -24,7 +24,7 @@ from ggg import (
     Call, Notification, Permission, Service, Task, TaskExecution, TaskSchedule,
     TaskStep, User, UserProfile, Operations, Profiles,
 )
-from basilisk.os.entities import WalletBalance, WalletTransfer
+from ic_basilisk_toolkit.entities import WalletBalance, WalletTransfer
 from ic_python_logging import get_logger
 
 logger = get_logger("api.ggg_entities")

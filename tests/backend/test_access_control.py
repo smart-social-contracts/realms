@@ -28,11 +28,13 @@ for submod in [
     "basilisk.canisters",
     "basilisk.canisters.management",
     "basilisk.canisters.icrc",
-    "basilisk.os",
-    "basilisk.os.entities",
-    "basilisk.os.status",
-    "basilisk.os.wallet",
-    "basilisk.os.task_manager",
+    "ic_basilisk_toolkit",
+    "ic_basilisk_toolkit.entities",
+    "ic_basilisk_toolkit.status",
+    "ic_basilisk_toolkit.wallet",
+    "ic_basilisk_toolkit.task_manager",
+    "ic_basilisk_toolkit.crypto",
+    "ic_basilisk_toolkit.execution",
 ]:
     sys.modules[submod] = _mock_basilisk
 

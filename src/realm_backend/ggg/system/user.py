@@ -1,6 +1,6 @@
 from typing import Any
 
-from basilisk.os.crypto import EncryptedString
+from ic_basilisk_toolkit.crypto import EncryptedString
 from ic_python_db import (
     Entity,
     ManyToMany,

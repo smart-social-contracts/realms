@@ -2,15 +2,15 @@
 GGG Status Enums
 
 OS-level statuses (TaskStatus, TaskExecutionStatus) are re-exported from
-basilisk_os.  Application-level statuses remain defined here.
+ic-basilisk-toolkit.  Application-level statuses remain defined here.
 
 See: https://github.com/smart-social-contracts/realms/issues/153
 """
 
 from enum import Enum
 
-# --- OS-level statuses (canonical source: basilisk/basilisk/os/status.py) ---
-from basilisk.os.status import TaskStatus, TaskExecutionStatus  # noqa: F401
+# --- OS-level statuses (canonical source: ic_basilisk_toolkit/status.py) ---
+from ic_basilisk_toolkit.status import TaskStatus, TaskExecutionStatus  # noqa: F401
 
 # --- Application-level statuses (realms-specific) ---
 

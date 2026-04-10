@@ -1,12 +1,12 @@
 """Crypto API — envelope & group management for realm-level encryption.
 
-Wraps the basilisk OS CryptoService to expose envelope CRUD,
+Wraps the ic-basilisk-toolkit CryptoService to expose envelope CRUD,
 group management, and scope queries to Candid endpoints in main.py.
 """
 
 from typing import Any
 
-from basilisk.os.crypto import (
+from ic_basilisk_toolkit.crypto import (
     CryptoGroup,
     CryptoGroupMember,
     CryptoService,

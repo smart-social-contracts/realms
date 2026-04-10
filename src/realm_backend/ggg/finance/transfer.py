@@ -17,7 +17,7 @@ class Transfer(Entity, TimestampedMixin):
     """
     Represents a token transfer on the ledger.
     
-    Uses basilisk.os.Wallet natively for ICRC-1 transfers.
+    Uses ic-basilisk-toolkit Wallet natively for ICRC-1 transfers.
     Pre/post hooks allow custom logic via Codex overrides.
     
     Accounting Integration:
@@ -40,7 +40,7 @@ class Transfer(Entity, TimestampedMixin):
 
     def execute(self):
         """
-        Execute this transfer via basilisk.os.Wallet (ICRC-1).
+        Execute this transfer via ic-basilisk-toolkit Wallet (ICRC-1).
         
         Calls pre_execute_hook() before and post_execute_hook() after.
         Either hook can be overridden via Codex for custom logic.
@@ -52,7 +52,7 @@ class Transfer(Entity, TimestampedMixin):
         Returns:
             dict with {"ok": tx_id} on success or {"err": ...} on failure.
         """
-        from basilisk.os.wallet import Wallet
+        from ic_basilisk_toolkit.wallet import Wallet
 
         token_name = self.instrument or "ckBTC"
         logger.info(

@@ -1,14 +1,14 @@
 """
-Codex Entity — Realms extension of the Basilisk OS Codex.
+Codex Entity — Realms extension of the Basilisk Toolkit Codex.
 
-Base Codex (name, url, checksum, code property, calls) comes from basilisk.os.
+Base Codex (name, url, checksum, code property, calls) comes from ic-basilisk-toolkit.
 This module adds realms-specific relationships: courts and federation.
 
 See: https://github.com/smart-social-contracts/realms/issues/153
 """
 
 from ic_python_db import OneToMany, OneToOne
-from basilisk.os.entities import Codex as _BaseCodex
+from ic_basilisk_toolkit.entities import Codex as _BaseCodex
 
 
 class Codex(_BaseCodex):

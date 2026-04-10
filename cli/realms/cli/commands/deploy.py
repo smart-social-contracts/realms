@@ -175,9 +175,21 @@ def _inject_version_placeholders(folder_path: Path, logger) -> None:
                 pkg, ver = line.split("==", 1)
                 dep_versions[pkg.strip()] = ver.strip()
 
-    basilisk_version = dep_versions.get("ic-basilisk", "")
-    ic_python_db_version = dep_versions.get("ic-python-db", "")
-    ic_python_logging_version = dep_versions.get("ic-python-logging", "")
+    # Resolve versions: prefer requirements.txt pins, fall back to installed package metadata
+    def _get_dep_version(pkg_name):
+        ver = dep_versions.get(pkg_name, "")
+        if not ver:
+            try:
+                from importlib.metadata import version as pkg_version
+                ver = pkg_version(pkg_name)
+            except Exception:
+                pass
+        return ver
+
+    basilisk_version = _get_dep_version("ic-basilisk")
+    ic_basilisk_toolkit_version = _get_dep_version("ic-basilisk-toolkit")
+    ic_python_db_version = _get_dep_version("ic-python-db")
+    ic_python_logging_version = _get_dep_version("ic-python-logging")
 
     # --- Build replacement map -----------------------------------------------
     # Order matters: specific placeholders that contain "VERSION_PLACEHOLDER"
@@ -186,6 +198,7 @@ def _inject_version_placeholders(folder_path: Path, logger) -> None:
         ("COMMIT_HASH_PLACEHOLDER", commit_hash),
         ("COMMIT_DATETIME_PLACEHOLDER", commit_datetime),
         ("BASILISK_VERSION_PLACEHOLDER", basilisk_version),
+        ("IC_BASILISK_TOOLKIT_VERSION_PLACEHOLDER", ic_basilisk_toolkit_version),
         ("IC_PYTHON_DB_VERSION_PLACEHOLDER", ic_python_db_version),
         ("IC_PYTHON_LOGGING_VERSION_PLACEHOLDER", ic_python_logging_version),
         ("VERSION_PLACEHOLDER", version),

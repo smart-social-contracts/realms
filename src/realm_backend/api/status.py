@@ -242,6 +242,7 @@ def get_status() -> "dict[str, Any]":
     # Dependency versions injected at build time (runtime detection doesn't work in WASM)
     dependencies = [
         "ic-basilisk==BASILISK_VERSION_PLACEHOLDER",
+        "ic-basilisk-toolkit==IC_BASILISK_TOOLKIT_VERSION_PLACEHOLDER",
         "ic-python-db==IC_PYTHON_DB_VERSION_PLACEHOLDER",
         "ic-python-logging==IC_PYTHON_LOGGING_VERSION_PLACEHOLDER",
     ]
