@@ -1,4 +1,4 @@
 ic-basilisk
-ic-python-logging==0.3.2
-ic-python-db==0.7.6
+ic-python-logging==0.3.4
+ic-python-db==0.7.9
 h3>=4.0.0
