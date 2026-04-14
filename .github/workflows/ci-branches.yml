@@ -36,6 +36,9 @@ jobs:
         with:
           submodules: recursive
       
+      - name: Pull latest extensions from main
+        run: git submodule update --remote extensions
+      
       - name: Insert commit hash and datetime
         run: |
           COMMIT_HASH=$(git rev-parse HEAD)

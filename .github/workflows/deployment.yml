@@ -80,6 +80,9 @@ jobs:
           ref: ${{ steps.commit.outputs.deploy_commit }}
           submodules: recursive
 
+      - name: Pull latest extensions from main
+        run: git submodule update --remote extensions
+
       - name: Print deployment parameters
         run: |
           echo "╭────────────────────────────────────────╮"
