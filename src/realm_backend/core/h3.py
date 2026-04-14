@@ -958,6 +958,27 @@ def geo_to_h3(lat, lng, resolution):
     return format(h, 'x')
 
 
+def latlng_to_cell(lat, lng, resolution):
+    """Alias for geo_to_h3 matching h3 v4 API."""
+    return geo_to_h3(lat, lng, resolution)
+
+
+def cell_to_latlng(h3_index):
+    """Get the center lat/lng of an H3 cell.
+
+    Args:
+        h3_index: H3 cell index as a hex string.
+
+    Returns:
+        Tuple of (lat, lng) in degrees.
+    """
+    h = int(h3_index, 16)
+    face, ijk, res = _h3_to_face_ijk(h)
+    hx, hy = _ijk_to_hex2d(*ijk)
+    v = _hex2d_to_vec3(hx, hy, face, res, 0)
+    return _vec3d_to_geo(v)
+
+
 def h3_to_geo_boundary(h3_index):
     """Get the boundary vertices of an H3 cell.
 
