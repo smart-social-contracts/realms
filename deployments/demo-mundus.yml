@@ -16,8 +16,8 @@ object:
   network: demo
   mode: upgrade
   parameters:
-    TEST_MODE: false
+    TEST_MODE: true
     TEST_MODE_II_BYPASS: false
-    TEST_MODE_ADMIN_SELF_REGISTRATION: false
-    TEST_MODE_DEMO_DATA: false
+    TEST_MODE_ADMIN_SELF_REGISTRATION: true
+    TEST_MODE_DEMO_DATA: true
     TEST_MODE_SKIP_TERMS: false
