@@ -105,10 +105,10 @@ def get_zone_boundaries(h3_index: str) -> Dict[str, Any]:
         Dictionary with boundary coordinates as GeoJSON-style polygon
     """
     try:
-        import h3
+        from core.h3 import h3_to_geo_boundary
         
         # Get boundary as list of [lat, lng] pairs
-        boundary = h3.h3_to_geo_boundary(h3_index)
+        boundary = h3_to_geo_boundary(h3_index)
         
         # Convert to GeoJSON format [lng, lat]
         coordinates = [[lng, lat] for lat, lng in boundary]
@@ -153,8 +153,8 @@ def update_human_location(human_id: str, latitude: float, longitude: float) -> D
         
         # Compute H3 index
         try:
-            import h3
-            h3_index = h3.geo_to_h3(latitude, longitude, DEFAULT_H3_RESOLUTION)
+            from core.h3 import geo_to_h3
+            h3_index = geo_to_h3(latitude, longitude, DEFAULT_H3_RESOLUTION)
             human.h3_index = h3_index
         except ImportError:
             h3_index = None
