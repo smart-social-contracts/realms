@@ -88,6 +88,8 @@ class Operations:
     EXTENSION_CALL = "extension.call"
     EXTENSION_SYNC_CALL = "extension.sync_call"
     EXTENSION_ASYNC_CALL = "extension.async_call"
+    EXTENSION_INSTALL = "extension.install"
+    EXTENSION_UNINSTALL = "extension.uninstall"
 
     # Self-service (any authenticated user)
     SELF_JOIN = "self.join"

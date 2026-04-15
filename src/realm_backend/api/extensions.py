@@ -16,15 +16,13 @@ logger = get_logger("api.extensions")
 
 
 def get_all_extension_manifests():
-    """Lazy import of extension manifests to avoid init failure when no extensions installed"""
+    """Get all extension manifests from runtime loader (+ baked-in fallback)."""
     try:
-        from extension_packages.extension_manifests import (
-            get_all_extension_manifests as _get_manifests,
-        )
+        from core.runtime_extensions import get_all_extension_manifests as _get_manifests
 
         return _get_manifests()
     except ImportError:
-        logger.error("No extension_manifests.py found - no extensions installed")
+        logger.error("runtime_extensions not available")
         return {}
 
 

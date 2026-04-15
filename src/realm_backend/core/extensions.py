@@ -50,7 +50,7 @@ def call_extension_function(extension_name: str, function_name: str, args: str):
     logger.debug(f"Calling extension '{extension_name}' function '{function_name}'")
 
     try:
-        from extension_packages.registry import get_func
+        from core.runtime_extensions import get_func
 
         func = get_func(extension_name, function_name)
         logger.debug(f"Got function from registry: {func}")

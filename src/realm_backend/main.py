@@ -2736,3 +2736,87 @@ def reload_entity_method_overrides() -> str:
     except Exception as e:
         logger.error(f"❌ reload_entity_method_overrides failed: {e}")
         return json.dumps({"success": False, "error": str(e)}, indent=2)
+
+
+# ---------------------------------------------------------------------------
+# Runtime Extension Management (Layer 2)
+# See: https://github.com/smart-social-contracts/realms/issues/168
+# ---------------------------------------------------------------------------
+
+
+@update
+@require(Operations.EXTENSION_INSTALL)
+def install_extension(args: text) -> text:
+    """Install a runtime extension from uploaded files.
+
+    Args (JSON): {
+        "extension_id": str,
+        "files": {"filename": "content", ...}
+    }
+
+    At minimum, files must include "entry.py" and "manifest.json".
+    Files are written to /extensions/{extension_id}/ on the persistent filesystem.
+    """
+    try:
+        params = json.loads(args)
+        ext_id = params.get("extension_id")
+        files = params.get("files", {})
+
+        if not ext_id:
+            return json.dumps({"success": False, "error": "extension_id is required"})
+        if not files:
+            return json.dumps({"success": False, "error": "files dict is required"})
+
+        from core.runtime_extensions import install_extension as _install
+
+        ok = _install(ext_id, files)
+        if ok:
+            return json.dumps({"success": True, "extension_id": ext_id, "files_count": len(files)})
+        else:
+            return json.dumps({"success": False, "error": f"Failed to load extension '{ext_id}' after install"})
+    except Exception as e:
+        logger.error(f"install_extension error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+@require(Operations.EXTENSION_UNINSTALL)
+def uninstall_extension(args: text) -> text:
+    """Uninstall a runtime extension.
+
+    Args (JSON): {"extension_id": str}
+    """
+    try:
+        params = json.loads(args)
+        ext_id = params.get("extension_id")
+
+        if not ext_id:
+            return json.dumps({"success": False, "error": "extension_id is required"})
+
+        from core.runtime_extensions import uninstall_extension as _uninstall
+
+        ok = _uninstall(ext_id)
+        if ok:
+            return json.dumps({"success": True, "extension_id": ext_id})
+        else:
+            return json.dumps({"success": False, "error": f"Extension '{ext_id}' not found"})
+    except Exception as e:
+        logger.error(f"uninstall_extension error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def list_runtime_extensions() -> text:
+    """List all runtime-installed extensions with their manifests."""
+    try:
+        from core.runtime_extensions import list_installed, get_all_extension_manifests
+
+        installed = list_installed()
+        manifests = get_all_extension_manifests()
+        return json.dumps({
+            "success": True,
+            "runtime_extensions": installed,
+            "all_manifests": manifests,
+        })
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
