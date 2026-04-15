@@ -15,8 +15,6 @@ This module replaces the build-time-generated:
 See: https://github.com/smart-social-contracts/realms/issues/168
 """
 
-import importlib
-import importlib.util
 import json
 import os
 import sys
@@ -48,7 +46,11 @@ def _ext_dir(ext_id: str) -> str:
 
 
 def _load_module(ext_id: str, force=False) -> Optional[Any]:
-    """Load (or reload) an extension's entry.py as a Python module."""
+    """Load (or reload) an extension's entry.py as a Python module.
+
+    Uses exec/compile instead of importlib.util which is not available
+    in the CPython WASM environment used by basilisk.
+    """
     if ext_id in _loaded_modules and not force:
         return _loaded_modules[ext_id]
 
@@ -59,13 +61,21 @@ def _load_module(ext_id: str, force=False) -> Optional[Any]:
 
     module_name = f"_runtime_ext_{ext_id}"
     try:
-        spec = importlib.util.spec_from_file_location(module_name, entry_path)
-        if spec is None or spec.loader is None:
-            logger.error(f"Extension {ext_id}: failed to create module spec")
-            return None
-        module = importlib.util.module_from_spec(spec)
+        # Create a module object (type(sys) == <class 'module'> on CPython WASM)
+        ModuleType = type(sys)
+        module = ModuleType(module_name)
+        module.__file__ = entry_path
+        module.__name__ = module_name
+
+        # Read and compile the source
+        with open(entry_path, "r") as f:
+            source = f.read()
+        code = compile(source, entry_path, "exec")
+
+        # Execute in the module's namespace
+        exec(code, module.__dict__)
+
         sys.modules[module_name] = module
-        spec.loader.exec_module(module)
         _loaded_modules[ext_id] = module
         logger.info(f"Extension {ext_id}: loaded from {entry_path}")
         return module
@@ -224,13 +234,17 @@ def uninstall_extension(ext_id: str) -> bool:
         logger.warning(f"Extension {ext_id}: not installed")
         return False
 
-    # Remove all files
-    for root, dirs, files in os.walk(ext_path, topdown=False):
-        for name in files:
-            os.remove(os.path.join(root, name))
-        for name in dirs:
-            os.rmdir(os.path.join(root, name))
-    os.rmdir(ext_path)
+    # Remove all files (os.walk not available on CPython WASM)
+    def _rmtree(path):
+        for item in os.listdir(path):
+            item_path = os.path.join(path, item)
+            if os.path.isdir(item_path):
+                _rmtree(item_path)
+            else:
+                os.remove(item_path)
+        os.rmdir(path)
+
+    _rmtree(ext_path)
 
     # Clear caches
     _loaded_modules.pop(ext_id, None)
