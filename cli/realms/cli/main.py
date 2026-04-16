@@ -14,6 +14,7 @@ from .commands.fs import fs_cat_command, fs_ls_command, fs_rm_command, fs_write_
 from .commands.import_data import import_codex_command, import_data_command
 from .commands.export_data import export_data_command
 from .commands.extension import extension_command, codex_command
+from .commands.wasm_registry import wasm_command
 from .commands.marketplace import marketplace_create_command, marketplace_deploy_command
 from .commands.mundus import mundus_create_command, mundus_deploy_command, mundus_status_command
 from .commands.quarter import (
@@ -142,6 +143,19 @@ def codex(
 ) -> None:
     """Manage Realm codex packages."""
     codex_command(action, codex_id, source_dir, canister, network, identity, raw_json, registry, version, run_init)
+
+
+@app.command("wasm", hidden=True)
+def wasm(
+    action: str = typer.Argument(..., help="Action: list, pull"),
+    registry: Optional[str] = typer.Option(None, "--registry", "-r", help="Mundus file registry canister ID"),
+    version: Optional[str] = typer.Option(None, "--version", "-v", help="Version to pull (default: latest)"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path"),
+    network: str = typer.Option("ic", "--network", "-n", help="Network: local, ic"),
+    identity: Optional[str] = typer.Option(None, "--identity", help="dfx identity to use"),
+) -> None:
+    """Manage realm base WASM (Layer 1)."""
+    wasm_command(action, registry, version, output, network, identity)
 
 
 @app.command("export", hidden=True)
