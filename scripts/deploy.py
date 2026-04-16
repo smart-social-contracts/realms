@@ -570,18 +570,41 @@ def deploy_frontend(
         env=env, capture_output=True,
     )
 
-    # We need a dfx.json that maps realm_frontend to the correct canister
-    # Use dfx deploy with the canister name if available, or install directly
-    result = subprocess.run(
-        ["dfx", "deploy", "realm_frontend",
-         "--network", network,
-         "--mode", mode,
-         "--yes"],
-        env=env,
-    )
-    if result.returncode != 0:
-        print("❌ Frontend deploy failed")
-        sys.exit(1)
+    # `dfx deploy realm_frontend --network <net>` looks up the target
+    # canister id from canister_ids.json. That file may map
+    # realm_frontend to a different canister than the one we want to
+    # target here (e.g. a legacy dev canister). Temporarily rewrite
+    # canister_ids.json so dfx targets the resolved `frontend_id`, then
+    # restore the original file.
+    ids_file = Path("canister_ids.json")
+    original_ids = None
+    if ids_file.exists():
+        original_ids = ids_file.read_text()
+        data = json.loads(original_ids)
+    else:
+        data = {}
+    data.setdefault("realm_frontend", {})[network] = frontend_id
+    ids_file.write_text(json.dumps(data, indent=2))
+    print(f"   🔒 Pinned realm_frontend[{network}] = {frontend_id} "
+          f"(canister_ids.json)")
+
+    try:
+        result = subprocess.run(
+            ["dfx", "deploy", "realm_frontend",
+             "--network", network,
+             "--mode", mode,
+             "--yes"],
+            env=env,
+        )
+        if result.returncode != 0:
+            print("❌ Frontend deploy failed")
+            sys.exit(1)
+    finally:
+        if original_ids is not None:
+            ids_file.write_text(original_ids)
+            print(f"   ♻️  Restored original canister_ids.json")
+        else:
+            ids_file.unlink(missing_ok=True)
 
     print(f"   ✅ Frontend deployed to {frontend_id}")
 
