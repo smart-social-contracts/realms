@@ -1,6 +1,6 @@
-# Publish Base WASM to Mundus File Registry
+# Publish Base WASM to File Registry
 #
-# Builds the realm backend WASM (Layer 1) and uploads it to the mundus file
+# Builds the realm backend WASM (Layer 1) and uploads it to the file
 # registry canister under namespace: wasm/
 # File path: realm-base-{version}.wasm.gz
 #

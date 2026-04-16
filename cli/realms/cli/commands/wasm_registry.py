@@ -1,5 +1,5 @@
 """
-WASM Registry commands — pull base WASM from the mundus file registry.
+WASM Registry commands — pull base WASM from the file registry.
 
 Provides functionality for downloading the base realm WASM from the on-chain
 file registry canister, used in the layered deployment architecture.
@@ -53,7 +53,7 @@ def _dfx_call(canister, method, arg, network, identity=None, is_query=False, tim
 
 
 def wasm_list_command(registry: str, network: str = "ic", identity: Optional[str] = None):
-    """List available base WASM versions in the mundus file registry."""
+    """List available base WASM versions in the file registry."""
     console.print(f"[blue]Listing base WASM files from {registry} ({network})...[/blue]")
 
     payload = json.dumps({"namespace": "wasm"})
@@ -100,7 +100,7 @@ def wasm_pull_command(
     network: str = "ic",
     identity: Optional[str] = None,
 ):
-    """Pull a base WASM from the mundus file registry.
+    """Pull a base WASM from the file registry.
 
     If version is not specified, pulls the latest version by scanning
     available files in the wasm/ namespace.
@@ -186,7 +186,7 @@ def wasm_command(
         help="Action to perform: list, pull",
     ),
     registry: Optional[str] = typer.Option(
-        None, "--registry", "-r", help="Mundus file registry canister ID"
+        None, "--registry", "-r", help="File registry canister ID"
     ),
     version: Optional[str] = typer.Option(
         None, "--version", "-v", help="Version to pull (default: latest)"

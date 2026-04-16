@@ -2950,14 +2950,14 @@ def list_codex_packages() -> text:
 
 
 # ---------------------------------------------------------------------------
-# Registry-based install endpoints (inter-canister pull from mundus file registry)
+# Registry-based install endpoints (inter-canister pull from file registry)
 # ---------------------------------------------------------------------------
 
 
 @update
 @require(Operations.EXTENSION_INSTALL)
 def install_extension_from_registry(args: text) -> Async[text]:
-    """Install an extension by pulling backend files from the mundus file registry.
+    """Install an extension by pulling backend files from the file registry.
 
     Args (JSON): {
         "registry_canister_id": str,
@@ -2988,7 +2988,7 @@ def install_extension_from_registry(args: text) -> Async[text]:
 @update
 @require(Operations.CODEX_INSTALL)
 def install_codex_from_registry(args: text) -> Async[text]:
-    """Install a codex package by pulling files from the mundus file registry.
+    """Install a codex package by pulling files from the file registry.
 
     Args (JSON): {
         "registry_canister_id": str,

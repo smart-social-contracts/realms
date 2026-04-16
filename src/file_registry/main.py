@@ -1,7 +1,7 @@
 """
-Mundus File Registry — on-chain file store for realm layer objects
+File Registry — on-chain file store for realm layer objects
 
-Enhanced file registry for mundus-level storage of:
+Generic file registry canister for storage of:
   - Base realm WASM (Layer 1):      namespace "wasm", path "realm-base-{version}.wasm"
   - Extensions (Layer 2):           namespace "ext/{ext_id}/{version}", paths under backend/ and frontend/
   - Codices (Layer 3):              namespace "codex/{codex_id}/{version}", paths *.py

@@ -1237,7 +1237,7 @@ def runtime_list_command(canister: str, network: str = "local", identity: Option
 
 
 def registry_install_command(canister: str, registry: str, ext_id: str, version: Optional[str] = None, network: str = "local", identity: Optional[str] = None):
-    """Install an extension from the mundus file registry via the realm canister."""
+    """Install an extension from the file registry via the realm canister."""
     console.print(f"[blue]Installing extension '{ext_id}' from registry {registry} on {canister} ({network})...[/blue]")
     if version:
         console.print(f"  Version: {version}")
@@ -1385,7 +1385,7 @@ def codex_runtime_list_command(canister: str, network: str = "local", identity: 
 
 
 def codex_registry_install_command(canister: str, registry: str, codex_id: str, version: Optional[str] = None, run_init: bool = True, network: str = "local", identity: Optional[str] = None):
-    """Install a codex package from the mundus file registry via the realm canister."""
+    """Install a codex package from the file registry via the realm canister."""
     console.print(f"[blue]Installing codex '{codex_id}' from registry {registry} on {canister} ({network})...[/blue]")
     if version:
         console.print(f"  Version: {version}")
@@ -1447,7 +1447,7 @@ def extension_command(
         False, "--json", help="Output raw JSON (for runtime-list)"
     ),
     registry: Optional[str] = typer.Option(
-        None, "--registry", "-r", help="Mundus file registry canister ID (for registry-install)"
+        None, "--registry", "-r", help="File registry canister ID (for registry-install)"
     ),
     version: Optional[str] = typer.Option(
         None, "--version", "-v", help="Version to install (for registry-install, default: latest)"
@@ -1547,7 +1547,7 @@ def codex_command(
         False, "--json", help="Output raw JSON (for runtime-list)"
     ),
     registry: Optional[str] = typer.Option(
-        None, "--registry", "-r", help="Mundus file registry canister ID (for registry-install)"
+        None, "--registry", "-r", help="File registry canister ID (for registry-install)"
     ),
     version: Optional[str] = typer.Option(
         None, "--version", "-v", help="Version to install (for registry-install, default: latest)"

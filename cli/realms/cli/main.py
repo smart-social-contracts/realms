@@ -121,7 +121,7 @@ def extension(
     network: str = typer.Option("local", "--network", "-n", help="Network: local, ic"),
     identity: Optional[str] = typer.Option(None, "--identity", help="dfx identity to use"),
     raw_json: bool = typer.Option(False, "--json", help="Output raw JSON (for runtime-list)"),
-    registry: Optional[str] = typer.Option(None, "--registry", "-r", help="Mundus file registry canister ID"),
+    registry: Optional[str] = typer.Option(None, "--registry", "-r", help="File registry canister ID"),
     version: Optional[str] = typer.Option(None, "--version", "-v", help="Version to install (default: latest)"),
 ) -> None:
     """Manage Realm extensions."""
@@ -137,7 +137,7 @@ def codex(
     network: str = typer.Option("local", "--network", "-n", help="Network: local, ic"),
     identity: Optional[str] = typer.Option(None, "--identity", help="dfx identity to use"),
     raw_json: bool = typer.Option(False, "--json", help="Output raw JSON (for runtime-list)"),
-    registry: Optional[str] = typer.Option(None, "--registry", "-r", help="Mundus file registry canister ID"),
+    registry: Optional[str] = typer.Option(None, "--registry", "-r", help="File registry canister ID"),
     version: Optional[str] = typer.Option(None, "--version", "-v", help="Version to install (default: latest)"),
     run_init: bool = typer.Option(True, "--run-init/--no-init", help="Run init.py after install"),
 ) -> None:
@@ -148,7 +148,7 @@ def codex(
 @app.command("wasm", hidden=True)
 def wasm(
     action: str = typer.Argument(..., help="Action: list, pull"),
-    registry: Optional[str] = typer.Option(None, "--registry", "-r", help="Mundus file registry canister ID"),
+    registry: Optional[str] = typer.Option(None, "--registry", "-r", help="File registry canister ID"),
     version: Optional[str] = typer.Option(None, "--version", "-v", help="Version to pull (default: latest)"),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path"),
     network: str = typer.Option("ic", "--network", "-n", help="Network: local, ic"),

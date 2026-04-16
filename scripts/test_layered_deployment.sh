@@ -9,7 +9,7 @@
 #   - Run from the realms repo root
 #
 # What this tests:
-#   Phase 1: File registry canister (mundus_file_registry)
+#   Phase 1: File registry canister (file_registry)
 #     - Deploy locally
 #     - store_file, list_files, get_file
 #     - Publish gate (unpublished namespace invisible to latest_version)
@@ -99,84 +99,84 @@ phase1() {
     dfx start --background --clean 2>&1
 
     # Deploy file registry only
-    info "Deploying mundus_file_registry..."
-    dfx deploy mundus_file_registry 2>&1
+    info "Deploying file_registry..."
+    dfx deploy file_registry 2>&1
 
-    REGISTRY=$(dfx canister id mundus_file_registry)
+    REGISTRY=$(dfx canister id file_registry)
     info "Registry canister: $REGISTRY"
 
     # --- Test 1: store_file ---
     info "\nTest: store_file"
     CONTENT_B64=$(echo -n '{"name":"test_ext","version":"1.0.0"}' | base64 -w0)
-    RESULT=$(dfx_call mundus_file_registry store_file '{"namespace":"ext/test_ext/1.0.0","path":"manifest.json","content_b64":"'"$CONTENT_B64"'","content_type":"application/json"}')
+    RESULT=$(dfx_call file_registry store_file '{"namespace":"ext/test_ext/1.0.0","path":"manifest.json","content_b64":"'"$CONTENT_B64"'","content_type":"application/json"}')
     assert_contains "$RESULT" "ok" "store_file returns ok"
 
     # --- Test 2: list_files ---
     info "\nTest: list_files"
-    RESULT=$(dfx_query mundus_file_registry list_files '{"namespace":"ext/test_ext/1.0.0"}')
+    RESULT=$(dfx_query file_registry list_files '{"namespace":"ext/test_ext/1.0.0"}')
     assert_contains "$RESULT" "manifest.json" "list_files shows uploaded file"
 
     # --- Test 3: get_file ---
     info "\nTest: get_file"
-    RESULT=$(dfx_query mundus_file_registry get_file '{"namespace":"ext/test_ext/1.0.0","path":"manifest.json"}')
+    RESULT=$(dfx_query file_registry get_file '{"namespace":"ext/test_ext/1.0.0","path":"manifest.json"}')
     assert_contains "$RESULT" "content_b64" "get_file returns content"
     assert_contains "$RESULT" "sha256" "get_file returns sha256"
 
     # --- Test 4: publish gate — unpublished namespace invisible ---
     info "\nTest: publish gate (unpublished)"
-    RESULT=$(dfx_query mundus_file_registry list_extensions '()')
+    RESULT=$(dfx_query file_registry list_extensions '()')
     assert_not_contains "$RESULT" "test_ext" "list_extensions hides unpublished namespace"
 
-    RESULT=$(dfx_query mundus_file_registry latest_version '{"category":"ext","item_id":"test_ext"}')
+    RESULT=$(dfx_query file_registry latest_version '{"category":"ext","item_id":"test_ext"}')
     assert_contains "$RESULT" "error" "latest_version returns error for unpublished"
 
-    RESULT=$(dfx_query mundus_file_registry get_backend_files '{"category":"ext","item_id":"test_ext","version":"1.0.0"}')
+    RESULT=$(dfx_query file_registry get_backend_files '{"category":"ext","item_id":"test_ext","version":"1.0.0"}')
     assert_contains "$RESULT" "not yet published" "get_backend_files rejects unpublished namespace"
 
     # --- Test 5: publish_namespace makes it visible ---
     info "\nTest: publish_namespace"
-    RESULT=$(dfx_call mundus_file_registry publish_namespace '{"namespace":"ext/test_ext/1.0.0"}')
+    RESULT=$(dfx_call file_registry publish_namespace '{"namespace":"ext/test_ext/1.0.0"}')
     assert_contains "$RESULT" "ok" "publish_namespace returns ok"
 
-    RESULT=$(dfx_query mundus_file_registry list_extensions '()')
+    RESULT=$(dfx_query file_registry list_extensions '()')
     assert_contains "$RESULT" "test_ext" "list_extensions shows published namespace"
 
-    RESULT=$(dfx_query mundus_file_registry latest_version '{"category":"ext","item_id":"test_ext"}')
+    RESULT=$(dfx_query file_registry latest_version '{"category":"ext","item_id":"test_ext"}')
     assert_contains "$RESULT" "1.0.0" "latest_version resolves published version"
 
-    RESULT=$(dfx_query mundus_file_registry get_backend_files '{"category":"ext","item_id":"test_ext","version":"1.0.0"}')
+    RESULT=$(dfx_query file_registry get_backend_files '{"category":"ext","item_id":"test_ext","version":"1.0.0"}')
     assert_contains "$RESULT" "manifest.json" "get_backend_files serves published files"
 
     # --- Test 6: Multi-version with publish gate ---
     info "\nTest: multi-version publish gate"
     # Upload v1.1.0 but don't publish
     CONTENT_B64=$(echo -n '{"name":"test_ext","version":"1.1.0"}' | base64 -w0)
-    dfx_call mundus_file_registry store_file '{"namespace":"ext/test_ext/1.1.0","path":"manifest.json","content_b64":"'"$CONTENT_B64"'","content_type":"application/json"}' > /dev/null
+    dfx_call file_registry store_file '{"namespace":"ext/test_ext/1.1.0","path":"manifest.json","content_b64":"'"$CONTENT_B64"'","content_type":"application/json"}' > /dev/null
 
-    RESULT=$(dfx_query mundus_file_registry latest_version '{"category":"ext","item_id":"test_ext"}')
+    RESULT=$(dfx_query file_registry latest_version '{"category":"ext","item_id":"test_ext"}')
     assert_contains "$RESULT" "1.0.0" "latest_version still returns 1.0.0 (1.1.0 unpublished)"
     assert_not_contains "$RESULT" "1.1.0" "latest_version does NOT return unpublished 1.1.0"
 
     # Now publish v1.1.0
-    dfx_call mundus_file_registry publish_namespace '{"namespace":"ext/test_ext/1.1.0"}' > /dev/null
-    RESULT=$(dfx_query mundus_file_registry latest_version '{"category":"ext","item_id":"test_ext"}')
+    dfx_call file_registry publish_namespace '{"namespace":"ext/test_ext/1.1.0"}' > /dev/null
+    RESULT=$(dfx_query file_registry latest_version '{"category":"ext","item_id":"test_ext"}')
     assert_contains "$RESULT" "1.1.0" "latest_version updates to 1.1.0 after publish"
 
     # --- Test 7: Codex namespace ---
     info "\nTest: codex namespace"
     CONTENT_B64=$(echo -n 'print("hello from codex")' | base64 -w0)
-    dfx_call mundus_file_registry store_file '{"namespace":"codex/test_codex/1.0.0","path":"init.py","content_b64":"'"$CONTENT_B64"'","content_type":"text/plain"}' > /dev/null
-    dfx_call mundus_file_registry publish_namespace '{"namespace":"codex/test_codex/1.0.0"}' > /dev/null
+    dfx_call file_registry store_file '{"namespace":"codex/test_codex/1.0.0","path":"init.py","content_b64":"'"$CONTENT_B64"'","content_type":"text/plain"}' > /dev/null
+    dfx_call file_registry publish_namespace '{"namespace":"codex/test_codex/1.0.0"}' > /dev/null
 
-    RESULT=$(dfx_query mundus_file_registry list_codices '()')
+    RESULT=$(dfx_query file_registry list_codices '()')
     assert_contains "$RESULT" "test_codex" "list_codices shows published codex"
 
-    RESULT=$(dfx_query mundus_file_registry latest_version '{"category":"codex","item_id":"test_codex"}')
+    RESULT=$(dfx_query file_registry latest_version '{"category":"codex","item_id":"test_codex"}')
     assert_contains "$RESULT" "1.0.0" "latest_version works for codex"
 
     # --- Test 8: get_stats ---
     info "\nTest: get_stats"
-    RESULT=$(dfx_query mundus_file_registry get_stats '()')
+    RESULT=$(dfx_query file_registry get_stats '()')
     assert_contains "$RESULT" "namespaces" "get_stats returns namespace count"
     assert_contains "$RESULT" "total_files" "get_stats returns file count"
 
@@ -202,7 +202,7 @@ phase2() {
     info "Phase 2: Extension Registry Install (E2E)"
     info "═══════════════════════════════════════════\n"
 
-    REGISTRY=$(dfx canister id mundus_file_registry 2>/dev/null || echo "")
+    REGISTRY=$(dfx canister id file_registry 2>/dev/null || echo "")
     if [ -z "$REGISTRY" ]; then
         warn "File registry not deployed. Run phase 1 first."
         return
@@ -224,27 +224,27 @@ phase2() {
 
     # Upload manifest
     CONTENT_B64=$(base64 -w0 "$EXT_DIR/manifest.json")
-    dfx_call mundus_file_registry store_file '{"namespace":"'"$NS"'","path":"manifest.json","content_b64":"'"$CONTENT_B64"'","content_type":"application/json"}' > /dev/null
+    dfx_call file_registry store_file '{"namespace":"'"$NS"'","path":"manifest.json","content_b64":"'"$CONTENT_B64"'","content_type":"application/json"}' > /dev/null
 
     # Upload backend files
     if [ -d "$EXT_DIR/backend" ]; then
         find "$EXT_DIR/backend" -name "*.py" -type f | while read -r f; do
             REL="backend/$(echo "$f" | sed "s|$EXT_DIR/backend/||")"
             B64=$(base64 -w0 "$f")
-            dfx_call mundus_file_registry store_file '{"namespace":"'"$NS"'","path":"'"$REL"'","content_b64":"'"$B64"'","content_type":"text/plain"}' > /dev/null
+            dfx_call file_registry store_file '{"namespace":"'"$NS"'","path":"'"$REL"'","content_b64":"'"$B64"'","content_type":"text/plain"}' > /dev/null
             echo "  Uploaded $REL"
         done
     fi
 
     # Publish
-    dfx_call mundus_file_registry publish_namespace '{"namespace":"'"$NS"'"}' > /dev/null
+    dfx_call file_registry publish_namespace '{"namespace":"'"$NS"'"}' > /dev/null
     pass "test_bench extension uploaded and published to local registry"
 
     # Verify it shows up
-    RESULT=$(dfx_query mundus_file_registry list_extensions '()')
+    RESULT=$(dfx_query file_registry list_extensions '()')
     assert_contains "$RESULT" "test_bench" "test_bench visible in list_extensions"
 
-    RESULT=$(dfx_query mundus_file_registry get_backend_files '{"category":"ext","item_id":"test_bench","version":null}')
+    RESULT=$(dfx_query file_registry get_backend_files '{"category":"ext","item_id":"test_bench","version":null}')
     assert_contains "$RESULT" "entry.py" "get_backend_files returns test_bench backend files"
 
     info "\n--- Realm backend install-from-registry test ---"
@@ -268,7 +268,7 @@ phase3() {
     info "Phase 3: Codex Registry Install (E2E)"
     info "═══════════════════════════════════════════\n"
 
-    REGISTRY=$(dfx canister id mundus_file_registry 2>/dev/null || echo "")
+    REGISTRY=$(dfx canister id file_registry 2>/dev/null || echo "")
     if [ -z "$REGISTRY" ]; then
         warn "File registry not deployed. Run phase 1 first."
         return
@@ -288,26 +288,26 @@ print(f"Test codex initialized: {manifest.get('name', 'unknown')}")
 PYEOF
 )
     B64=$(echo -n "$INIT_PY" | base64 -w0)
-    dfx_call mundus_file_registry store_file '{"namespace":"'"$NS"'","path":"init.py","content_b64":"'"$B64"'","content_type":"text/plain"}' > /dev/null
+    dfx_call file_registry store_file '{"namespace":"'"$NS"'","path":"init.py","content_b64":"'"$B64"'","content_type":"text/plain"}' > /dev/null
 
     # manifest.json
     MANIFEST='{"name":"test_codex_e2e","version":"1.0.0","description":"Test codex for e2e validation"}'
     B64=$(echo -n "$MANIFEST" | base64 -w0)
-    dfx_call mundus_file_registry store_file '{"namespace":"'"$NS"'","path":"manifest.json","content_b64":"'"$B64"'","content_type":"application/json"}' > /dev/null
+    dfx_call file_registry store_file '{"namespace":"'"$NS"'","path":"manifest.json","content_b64":"'"$B64"'","content_type":"application/json"}' > /dev/null
 
     # helper.py (tests multi-file dependency)
     HELPER_PY='def greet(name): return f"Hello {name} from test codex"'
     B64=$(echo -n "$HELPER_PY" | base64 -w0)
-    dfx_call mundus_file_registry store_file '{"namespace":"'"$NS"'","path":"helper.py","content_b64":"'"$B64"'","content_type":"text/plain"}' > /dev/null
+    dfx_call file_registry store_file '{"namespace":"'"$NS"'","path":"helper.py","content_b64":"'"$B64"'","content_type":"text/plain"}' > /dev/null
 
     # Publish
-    dfx_call mundus_file_registry publish_namespace '{"namespace":"'"$NS"'"}' > /dev/null
+    dfx_call file_registry publish_namespace '{"namespace":"'"$NS"'"}' > /dev/null
     pass "test_codex_e2e uploaded (3 files) and published"
 
-    RESULT=$(dfx_query mundus_file_registry list_codices '()')
+    RESULT=$(dfx_query file_registry list_codices '()')
     assert_contains "$RESULT" "test_codex_e2e" "test_codex_e2e visible in list_codices"
 
-    RESULT=$(dfx_query mundus_file_registry get_backend_files '{"category":"codex","item_id":"test_codex_e2e","version":"1.0.0"}')
+    RESULT=$(dfx_query file_registry get_backend_files '{"category":"codex","item_id":"test_codex_e2e","version":"1.0.0"}')
     assert_contains "$RESULT" "init.py" "get_backend_files returns init.py"
     assert_contains "$RESULT" "helper.py" "get_backend_files returns helper.py"
     assert_contains "$RESULT" "manifest.json" "get_backend_files returns manifest.json"
@@ -332,7 +332,7 @@ phase4() {
     info "Phase 4: CLI Commands"
     info "═══════════════════════════════════════════\n"
 
-    REGISTRY=$(dfx canister id mundus_file_registry 2>/dev/null || echo "")
+    REGISTRY=$(dfx canister id file_registry 2>/dev/null || echo "")
     if [ -z "$REGISTRY" ]; then
         warn "File registry not deployed. Run phase 1 first."
         return

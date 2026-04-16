@@ -1,8 +1,8 @@
 """
-File Registry client — inter-canister interface to mundus file registry.
+File Registry client — inter-canister interface to the file registry.
 
 Provides async functions for realm canisters to pull extension backend files
-and codex packages from the mundus file registry canister.
+and codex packages from a file registry canister.
 
 Usage from main.py (async/generator pattern):
     result = yield from install_extension_from_registry(registry_id, ext_id, version)
@@ -32,10 +32,10 @@ class FileRegistryService(Service):
 def install_extension_from_registry(
     registry_canister_id: str, ext_id: str, version: str = None
 ) -> Async[str]:
-    """Pull extension backend files from the mundus file registry and install them.
+    """Pull extension backend files from the file registry and install them.
 
     Args:
-        registry_canister_id: Canister ID of the mundus file registry
+        registry_canister_id: Canister ID of the file registry
         ext_id: Extension identifier (e.g. "voting")
         version: Specific version or None for latest
 
@@ -104,10 +104,10 @@ def install_extension_from_registry(
 def install_codex_from_registry(
     registry_canister_id: str, codex_id: str, version: str = None, run_init: bool = True
 ) -> Async[str]:
-    """Pull codex package files from the mundus file registry and install them.
+    """Pull codex package files from the file registry and install them.
 
     Args:
-        registry_canister_id: Canister ID of the mundus file registry
+        registry_canister_id: Canister ID of the file registry
         codex_id: Codex identifier (e.g. "syntropia/membership")
         version: Specific version or None for latest
         run_init: Whether to run init.py after install
