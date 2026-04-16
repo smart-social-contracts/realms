@@ -124,6 +124,11 @@ jobs:
                      pip install -q -r requirements.txt; \
                      dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force; \
                      dfx identity use my-identity; \
+                     echo '── Pre-flight: identity + cycles balance ──'; \
+                     echo \"Principal:  \$(dfx identity get-principal)\"; \
+                     echo -n 'Cycles:     '; dfx cycles balance --network ${{ inputs.network }} || true; \
+                     echo -n 'Wallet:     '; dfx identity get-wallet --network ${{ inputs.network }} 2>&1 | head -1 || true; \
+                     echo '───────────────────────────────────────────'; \
                      bash scripts/deploy_runtime_extension_to_staging.sh \
                        --network ${{ inputs.network }} \
                        --realm-backend ${{ inputs.realm_backend }} \
