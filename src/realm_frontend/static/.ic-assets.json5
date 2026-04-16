@@ -14,7 +14,10 @@
         "security_policy": "standard",
 
         "headers": {
-            "Content-Security-Policy": "default-src 'self';script-src 'self' 'unsafe-eval' 'unsafe-inline';connect-src 'self' http://localhost:* http://*.localhost:8000 https://icp0.io https://*.icp0.io https://icp-api.io https://*.ic0.app https://*.realmsgos.ch https://*.realmsgos.dev https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com;img-src 'self' data: https: http://*.localhost:8000;style-src * 'unsafe-inline';style-src-elem * 'unsafe-inline';font-src *;object-src 'none';base-uri 'self';frame-ancestors 'none';form-action 'self';worker-src blob: 'self';upgrade-insecure-requests;",
+            // script-src / script-src-elem allow dynamic-import of runtime
+            // extension frontends served from file_registry (on *.localhost:*
+            // locally and *.icp0.io in production). See Issue #168.
+            "Content-Security-Policy": "default-src 'self';script-src 'self' 'unsafe-eval' 'unsafe-inline' http://*.localhost:* https://*.icp0.io;script-src-elem 'self' 'unsafe-eval' 'unsafe-inline' http://*.localhost:* https://*.icp0.io;connect-src 'self' http://localhost:* http://*.localhost:* https://icp0.io https://*.icp0.io https://icp-api.io https://*.ic0.app https://*.realmsgos.ch https://*.realmsgos.dev https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com;img-src 'self' data: https: http://*.localhost:8000;style-src * 'unsafe-inline';style-src-elem * 'unsafe-inline';font-src *;object-src 'none';base-uri 'self';frame-ancestors 'none';form-action 'self';worker-src blob: 'self';upgrade-insecure-requests;",
         }
     }
 ]

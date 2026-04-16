@@ -199,9 +199,37 @@
 		}
 	}
 
+	// --- Runtime extensions (Issue #168 Layer 2) -------------------------
+	// These are extensions installed at runtime (not baked into the WASM)
+	// that are dynamic-imported by /extensions/[id] from file_registry.
+	type RuntimeExtensionEntry = { id: string; name: string; version?: string };
+	let runtimeExtensions: RuntimeExtensionEntry[] = [];
+
+	async function loadRuntimeExtensions() {
+		try {
+			const raw = await (backend as any).list_runtime_extensions();
+			const parsed = JSON.parse(raw);
+			if (!parsed?.success) {
+				runtimeExtensions = [];
+				return;
+			}
+			const ids: string[] = parsed.runtime_extensions ?? [];
+			const manifests: Record<string, any> = parsed.all_manifests ?? {};
+			runtimeExtensions = ids.map((id: string) => ({
+				id,
+				name: (manifests?.[id]?.name as string) ?? id,
+				version: manifests?.[id]?.version as string | undefined,
+			}));
+		} catch (e) {
+			console.warn('[Sidebar] list_runtime_extensions failed:', e);
+			runtimeExtensions = [];
+		}
+	}
+
 	// Load extensions on component mount
 	onMount(() => {
 		loadExtensionsFromBackend();
+		loadRuntimeExtensions();
 	});
 	
 	/**
@@ -480,6 +508,33 @@
 					{/if}
 				{/each}
 
+
+				<!-- Runtime Extensions (Issue #168 Layer 2) -->
+				{#if runtimeExtensions.length > 0}
+					<SidebarGroup ulClass={groupClass} class="mb-3">
+						<li class="px-3 py-2">
+							<h3 class={styles.sidebar.categoryHeader()}>Runtime Extensions</h3>
+						</li>
+						{#each runtimeExtensions as ext (ext.id)}
+							<li>
+								<a
+									href={`/extensions/${ext.id}`}
+									data-sveltekit-reload
+									class={itemClass}
+									title={ext.version ? `${ext.name} v${ext.version} — runtime-loaded` : ext.name}
+								>
+									<svelte:component this={LayersSolid} class={iconClass} />
+									<span class="ml-3">
+										{ext.name}
+										{#if ext.version}
+											<span class="ml-1 text-xs opacity-60">v{ext.version}</span>
+										{/if}
+									</span>
+								</a>
+							</li>
+						{/each}
+					</SidebarGroup>
+				{/if}
 
 				<!-- External Links -->
 				<SidebarGroup ulClass={groupClass}>

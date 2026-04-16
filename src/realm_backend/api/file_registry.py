@@ -83,7 +83,12 @@ def install_extension_from_registry(
 
     from core.runtime_extensions import install_extension as _install
 
-    ok = _install(ext_id, files)
+    ok = _install(
+        ext_id,
+        files,
+        source_registry_id=registry_canister_id,
+        source_version=resolved_version,
+    )
     if ok:
         return json.dumps({
             "success": True,
@@ -91,6 +96,7 @@ def install_extension_from_registry(
             "version": resolved_version,
             "files_count": len(files),
             "source": "registry",
+            "registry_canister_id": registry_canister_id,
         })
     else:
         return json.dumps({

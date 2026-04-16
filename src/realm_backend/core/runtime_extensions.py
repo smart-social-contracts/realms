@@ -177,13 +177,39 @@ def list_installed() -> List[str]:
     return sorted(installed)
 
 
-def install_extension(ext_id: str, files: Dict[str, str]) -> bool:
+def get_extension_source(ext_id: str) -> Optional[dict]:
+    """Return the registry info recorded when this extension was installed.
+
+    Returns a dict like {"registry_canister_id": "...", "version": "..."}
+    or None if no _source.json exists (e.g. baked-in or manually installed).
+    """
+    src_path = os.path.join(_ext_dir(ext_id), "_source.json")
+    if not os.path.exists(src_path):
+        return None
+    try:
+        with open(src_path, "r") as f:
+            return json.loads(f.read())
+    except Exception as e:
+        logger.warning(f"Extension {ext_id}: could not read _source.json — {e}")
+        return None
+
+
+def install_extension(
+    ext_id: str,
+    files: Dict[str, str],
+    source_registry_id: Optional[str] = None,
+    source_version: Optional[str] = None,
+) -> bool:
     """Install an extension from a dict of {filename: content}.
 
     Args:
         ext_id: Extension identifier (e.g. "voting", "vault")
         files: Dict mapping relative filenames to their text content.
                Must include at minimum "manifest.json" and "entry.py".
+        source_registry_id: (optional) Canister ID of the file_registry the
+            extension was pulled from. When set, written to ``_source.json``
+            so the realm can discover where to pull frontend assets from.
+        source_version: (optional) Resolved version string from the registry.
 
     Returns:
         True if installation succeeded.
@@ -201,6 +227,16 @@ def install_extension(ext_id: str, files: Dict[str, str]) -> bool:
         with open(filepath, "w") as f:
             f.write(content)
         logger.info(f"Extension {ext_id}: wrote {filename} ({len(content)} bytes)")
+
+    if source_registry_id:
+        try:
+            with open(os.path.join(ext_path, "_source.json"), "w") as f:
+                f.write(json.dumps({
+                    "registry_canister_id": source_registry_id,
+                    "version": source_version or "",
+                }))
+        except Exception as e:
+            logger.warning(f"Extension {ext_id}: could not write _source.json — {e}")
 
     # Clear caches to force reload
     _loaded_modules.pop(ext_id, None)

@@ -2809,14 +2809,66 @@ def uninstall_extension(args: text) -> text:
 def list_runtime_extensions() -> text:
     """List all runtime-installed extensions with their manifests."""
     try:
-        from core.runtime_extensions import list_installed, get_all_extension_manifests
+        from core.runtime_extensions import (
+            get_all_extension_manifests,
+            get_extension_source,
+            list_installed,
+        )
 
         installed = list_installed()
         manifests = get_all_extension_manifests()
+        sources = {ext_id: get_extension_source(ext_id) for ext_id in installed}
         return json.dumps({
             "success": True,
             "runtime_extensions": installed,
             "all_manifests": manifests,
+            "sources": sources,
+        })
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def get_extension_frontend_info(args: text) -> text:
+    """Return file_registry coordinates for an extension's frontend assets.
+
+    Args (JSON): {"extension_id": str}
+    Response (JSON): {
+        "success": bool,
+        "extension_id": str,
+        "version": str,
+        "registry_canister_id": str,        # canister id hosting the assets
+        "namespace": str,                   # "ext/<id>/<version>"
+        "frontend_path": "frontend/dist/index.js"
+    }
+
+    realm_frontend uses this to dynamic-import an extension's compiled UI
+    bundle from file_registry without baking the registry id into its WASM
+    (Issue #168 Layer 2).
+    """
+    try:
+        from core.runtime_extensions import get_extension_source
+
+        params = json.loads(args) if args else {}
+        ext_id = params.get("extension_id")
+        if not ext_id:
+            return json.dumps({"success": False, "error": "extension_id is required"})
+
+        src = get_extension_source(ext_id)
+        if not src or not src.get("registry_canister_id"):
+            return json.dumps({
+                "success": False,
+                "error": f"No registry source recorded for extension '{ext_id}'",
+            })
+
+        version = src.get("version") or ""
+        return json.dumps({
+            "success": True,
+            "extension_id": ext_id,
+            "version": version,
+            "registry_canister_id": src["registry_canister_id"],
+            "namespace": f"ext/{ext_id}/{version}" if version else f"ext/{ext_id}",
+            "frontend_path": "frontend/dist/index.js",
         })
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})

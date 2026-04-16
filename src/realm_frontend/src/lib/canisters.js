@@ -103,7 +103,11 @@ function initializeBackendStore() {
 			console.warn('Could not check auth during init, falling back to anonymous:', e);
 		}
 
-		const actor = createActor(canisterId);
+		const agent = new HttpAgent();
+		if (isLocalDevelopment()) {
+			await agent.fetchRootKey().catch(() => {});
+		}
+		const actor = createActor(canisterId, { agent });
 		backendStore.set(actor);
 	})();
 
