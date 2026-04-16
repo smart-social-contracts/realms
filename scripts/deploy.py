@@ -534,7 +534,10 @@ def deploy_frontend(
             shutil.copytree(src_decls / "realm_backend", target)
             print(f"   📋 Copied declarations → {target}")
 
-            # Inject actual canister id (vite won't have process.env.CANISTER_ID_*)
+            # Patch generated index.js:
+            #   - inject real canister id (vite has no process.env.CANISTER_ID_*)
+            #   - dfx 0.31 emits @icp-sdk/core/agent imports; the frontend
+            #     still uses @dfinity/agent, so rewrite both variants.
             idx = target / "index.js"
             if idx.exists():
                 text = idx.read_text()
@@ -542,6 +545,8 @@ def deploy_frontend(
                     "process.env.CANISTER_ID_REALM_BACKEND",
                     f'"{backend_id}"',
                 )
+                text = text.replace("@icp-sdk/core/agent", "@dfinity/agent")
+                text = text.replace("@icp-sdk/core/candid", "@dfinity/candid")
                 idx.write_text(text)
                 print(f"   💉 Injected CANISTER_ID_REALM_BACKEND = {backend_id}")
 
