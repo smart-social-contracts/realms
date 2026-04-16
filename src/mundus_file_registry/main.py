@@ -181,8 +181,18 @@ def _ensure_namespace_exists(namespace: str, caller_str: str):
             "created": ic.time(),
             "owner": caller_str,
             "description": "",
+            "published": False,
         }
         _save_namespaces(namespaces)
+
+
+def _is_published(ns_info: dict) -> bool:
+    """Check whether a namespace is published.
+
+    Legacy namespaces without a 'published' key are treated as published.
+    The 'wasm' namespace (non-versioned) is always considered published.
+    """
+    return ns_info.get("published", True)
 
 
 # ---------------------------------------------------------------------------
@@ -199,14 +209,16 @@ def _parse_semver(version_str: str) -> tuple:
 
 
 def _find_latest_version(namespaces: dict, prefix: str) -> str:
-    """Find the highest semver among namespaces matching a prefix.
+    """Find the highest semver among *published* namespaces matching a prefix.
 
     E.g. prefix="ext/voting/" scans "ext/voting/1.0.0", "ext/voting/1.0.3" -> "1.0.3"
+    Unpublished namespaces are skipped so that partially-uploaded versions
+    are never resolved as 'latest'.
     """
     best_version = ""
     best_tuple = (-1,)
-    for ns_name in namespaces:
-        if ns_name.startswith(prefix):
+    for ns_name, ns_info in namespaces.items():
+        if ns_name.startswith(prefix) and _is_published(ns_info):
             version = ns_name[len(prefix):]
             if "/" in version:
                 continue
@@ -359,8 +371,10 @@ def list_extensions() -> text:
     namespaces = _load_namespaces()
     extensions = {}
 
-    for ns_name in namespaces:
+    for ns_name, ns_info in namespaces.items():
         if not ns_name.startswith(NS_PREFIX_EXT):
+            continue
+        if not _is_published(ns_info):
             continue
         # Parse "ext/{ext_id}/{version}"
         rest = ns_name[len(NS_PREFIX_EXT):]
@@ -409,8 +423,10 @@ def list_codices() -> text:
     namespaces = _load_namespaces()
     codices = {}
 
-    for ns_name in namespaces:
+    for ns_name, ns_info in namespaces.items():
         if not ns_name.startswith(NS_PREFIX_CODEX):
+            continue
+        if not _is_published(ns_info):
             continue
         # Parse "codex/{codex_id}/{version}"
         rest = ns_name[len(NS_PREFIX_CODEX):]
@@ -544,6 +560,9 @@ def get_backend_files(args: text) -> text:
 
     if ns not in namespaces:
         return json.dumps({"error": f"Namespace '{ns}' not found"})
+
+    if not _is_published(namespaces[ns]):
+        return json.dumps({"error": f"Namespace '{ns}' is not yet published"})
 
     meta = _load_meta(ns)
     all_files = meta.get("files", {})
@@ -679,6 +698,38 @@ def update_namespace(args: text) -> text:
         return json.dumps({"error": f"Namespace '{namespace}' not found"})
 
     namespaces[namespace]["description"] = description
+    _save_namespaces(namespaces)
+
+    return json.dumps({"ok": True, "namespace": namespace})
+
+
+@update
+def publish_namespace(args: text) -> text:
+    """Mark a namespace as published, making it visible to queries.
+
+    Namespaces start unpublished when the first file is stored.
+    Call this after all files have been uploaded so that consumers
+    (list_extensions, list_codices, latest_version, get_backend_files)
+    never see a partially-uploaded version.
+
+    Caller must be a controller or namespace publisher.
+
+    Args (JSON): {"namespace": str}
+    Returns JSON: {"ok": true, "namespace": str} or {"error": str}
+    """
+    params = json.loads(args)
+    namespace = params["namespace"]
+
+    err = _require_publisher(namespace)
+    if err:
+        return err
+
+    namespaces = _load_namespaces()
+    if namespace not in namespaces:
+        return json.dumps({"error": f"Namespace '{namespace}' not found"})
+
+    namespaces[namespace]["published"] = True
+    namespaces[namespace]["published_at"] = ic.time()
     _save_namespaces(namespaces)
 
     return json.dumps({"ok": True, "namespace": namespace})
