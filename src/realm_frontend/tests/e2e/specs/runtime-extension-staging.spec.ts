@@ -76,4 +76,60 @@ test.describe('Staging runtime-loaded extension', () => {
 			[],
 		);
 	});
+
+	test('Dominion frontend dynamically loads member_dashboard from file_registry', async ({
+		page,
+	}) => {
+		// member_dashboard is a runtime-installed extension (path C of #168):
+		// its UI is an ESM bundle uploaded to file_registry, not compiled into
+		// realm_frontend. Verifies /extensions/member_dashboard loads and mounts
+		// that bundle and performs a round-trip to realm_backend.
+		const extUrl = `${FE_URL}/extensions/member_dashboard`;
+		const bundlePath = '/ext/member_dashboard/1.0.4/frontend/dist/index.js';
+
+		const bundleResponses: { url: string; status: number; contentType?: string }[] = [];
+		page.on('response', async (resp) => {
+			const url = resp.url();
+			if (url.includes(bundlePath)) {
+				bundleResponses.push({
+					url,
+					status: resp.status(),
+					contentType: resp.headers()['content-type'],
+				});
+			}
+		});
+
+		const consoleErrors: string[] = [];
+		page.on('console', (msg) => {
+			if (msg.type() === 'error') consoleErrors.push(msg.text());
+		});
+		page.on('pageerror', (err) => consoleErrors.push(err.message));
+
+		await page.goto(extUrl, { waitUntil: 'domcontentloaded' });
+
+		// Bundle must mount and render its "runtime-loaded" marker.
+		await expect(page.getByText('(runtime-loaded)')).toBeVisible({ timeout: 40_000 });
+		await expect(page.getByText('v1.0.4')).toBeVisible();
+		// Headers from the dashboard structure we know exists.
+		await expect(page.getByRole('heading', { name: /Invoices/i })).toBeVisible({
+			timeout: 20_000,
+		});
+		await expect(page.getByRole('heading', { name: /Notifications/i })).toBeVisible();
+		await expect(page.getByRole('heading', { name: /Payment accounts/i })).toBeVisible();
+
+		expect(bundleResponses.length, 'expected GET for bundle').toBeGreaterThan(0);
+		const hit = bundleResponses.find((r) => r.url.includes(`${REG_ID}.`));
+		expect(hit, `bundle should come from ${REG_ID}`).toBeTruthy();
+		expect(hit!.status).toBe(200);
+		expect(hit!.contentType ?? '').toMatch(/javascript/);
+
+		const loaderErrors = consoleErrors.filter((e) =>
+			/Refused to (load|execute)|mountExtension|extension-loader|Failed to fetch dynamically/.test(
+				e,
+			),
+		);
+		expect(loaderErrors, `no CSP / loader errors; got:\n${loaderErrors.join('\n')}`).toEqual(
+			[],
+		);
+	});
 });

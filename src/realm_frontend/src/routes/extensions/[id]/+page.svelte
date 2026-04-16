@@ -4,6 +4,7 @@
 	import { browser } from '$app/environment';
 	import { Spinner, Alert } from 'flowbite-svelte';
 	import { backend } from '$lib/canisters';
+	import { principal, isAuthenticated } from '$lib/stores/auth';
 	import { mountExtension, resolveExtensionVersion, type MountResult } from '$lib/extension-loader';
 
 	let mountPoint: HTMLDivElement | undefined;
@@ -33,6 +34,11 @@
 				backend,
 				extensionId: id,
 				version,
+				// Extensions that need to identify the current user (e.g.
+				// member_dashboard) receive principal + auth state as props.
+				// Bundle MUST read these as props, not reach into host stores.
+				principal: $principal || '',
+				isAuthenticated: $isAuthenticated,
 			});
 			debugInfo = `Mounted ${id}@${version}`;
 			status = 'ready';
