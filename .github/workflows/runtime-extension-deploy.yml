@@ -49,6 +49,11 @@ on:
         required: false
         default: ''
 
+      topup_icp:
+        description: 'Convert N ICP to cycles on the CI identity before deploying (leave empty to skip).  e.g. 0.5'
+        required: false
+        default: ''
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -127,8 +132,15 @@ jobs:
                      echo '── Pre-flight: identity + cycles balance ──'; \
                      echo \"Principal:  \$(dfx identity get-principal)\"; \
                      echo -n 'Cycles:     '; dfx cycles balance --network ${{ inputs.network }} || true; \
+                     echo -n 'ICP:        '; dfx ledger balance --network ${{ inputs.network }} 2>&1 | head -1 || true; \
                      echo -n 'Wallet:     '; dfx identity get-wallet --network ${{ inputs.network }} 2>&1 | head -1 || true; \
                      echo '───────────────────────────────────────────'; \
+                     if [ -n '${{ inputs.topup_icp }}' ]; then \
+                       echo '⚡ Converting ${{ inputs.topup_icp }} ICP to cycles on ${{ inputs.network }}...'; \
+                       dfx cycles convert --amount ${{ inputs.topup_icp }} --network ${{ inputs.network }} --yes; \
+                       echo -n 'New cycles:  '; dfx cycles balance --network ${{ inputs.network }}; \
+                       echo '───────────────────────────────────────────'; \
+                     fi; \
                      bash scripts/deploy_runtime_extension_to_staging.sh \
                        --network ${{ inputs.network }} \
                        --realm-backend ${{ inputs.realm_backend }} \
