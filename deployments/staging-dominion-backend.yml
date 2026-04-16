@@ -1,0 +1,37 @@
+# Unified deployment descriptor — Backend upgrade for Dominion on staging.
+#
+# Pins the target by canister ID so it is unambiguous (the existing
+# staging-realm{1,2,3} descriptors use `id_in_registry: 1..3` which is a
+# 1-based INDEX into realm_registry_backend.list_realms() and — on the
+# current staging registry — does NOT line up with the file-system
+# realm{1,2,3} directory numbering).
+#
+# Resolution: realm_registry_backend.list_realms() on staging returned, in
+# order: [Syntropia (#1), Agora (#2), Dominion (#3)].
+#
+# Usage:
+#   gh workflow run Deploy --repo smart-social-contracts/realms \
+#       --ref feat/layered-deployment \
+#       -f descriptor=deployments/staging-dominion-backend.yml \
+#       -f source=checkout -f commit=<sha> -f mode_override=upgrade
+#
+# Related: https://github.com/smart-social-contracts/realms/issues/168
+version: 1
+
+object:
+  type: realm
+  subtypes: backend
+  quarters: 1
+  manifest: ./examples/demo/realm1/manifest.json
+  core_codebase:
+    path: ./src
+  extensions_codebase:
+    path: none
+  codices_codebase:
+    path: none
+  network: staging
+  # Use the canister id directly so we always land on Dominion regardless of
+  # the registry's internal numbering.
+  id_in_registry: ijdaw-dyaaa-aaaac-beh2a-cai
+  mode: reinstall
+  parameters: {}
