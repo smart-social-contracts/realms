@@ -24,7 +24,12 @@ object:
   codices_codebase:
     path: none
   network: staging
-  id_in_registry: ijdaw-dyaaa-aaaac-beh2a-cai
+  # id_in_registry: 3 corresponds to Dominion on the current staging
+  # realm_registry_backend.list_realms() ordering
+  # ([Syntropia, Agora, Dominion]). A canister-id string would also be
+  # accepted but scripts/deploy.py's string path only resolves realm_backend,
+  # not realm_frontend — integer is the only path that resolves both.
+  id_in_registry: 3
   mode: reinstall
   parameters:
     TEST_MODE: true
