@@ -1,72 +1,153 @@
-# Deploying runtime-loaded extensions to staging — Path A (Dominion / realm1)
+# Deploying runtime-loaded extensions to staging — Path A (Dominion)
 
 This runbook deploys the **Layer 2 (runtime extension frontends)** work
 from [#168](https://github.com/smart-social-contracts/realms/issues/168)
 onto a single staging realm. It is the "fast proof" path: the
 realm_backend / realm_frontend code goes through the existing
-GitHub Actions pipeline; the file_registry deploy + bundle publication +
-runtime install of the extension are wrapped by
-`scripts/deploy_runtime_extension_to_staging.sh`.
+GitHub Actions pipeline, and the file_registry deploy + bundle
+publication + runtime install of the extension are wrapped by
+`scripts/deploy_runtime_extension_to_staging.sh` (runnable either
+locally or from CI via the **Runtime Extension Deploy** workflow).
 
-The plan deploys to **Dominion (realm1)** first because it already has
-dedicated backend and frontend descriptors
-(`deployments/staging-realm1-backend.yml`,
-`deployments/staging-realm1-frontend.yml`). Once it works on Dominion,
-the same script can be re-run against Agora (realm2) and Syntropia
-(realm3) by changing `--realm-backend`.
+The plan targets **Dominion** on staging using the canister-ID-pinned
+descriptors `deployments/staging-dominion-{backend,frontend}.yml`.
+
+> ⚠️ **Important — realm numbering on staging is NOT 1→Dominion.**
+>
+> The pre-existing `staging-realm{1,2,3}-*.yml` descriptors use
+> `id_in_registry: 1..3`, which is a **1-based INDEX into
+> `realm_registry_backend.list_realms()`**. On the current staging
+> registry the ordering is:
+>
+> | id_in_registry | Realm | realm_backend canister id |
+> |---|---|---|
+> | 1 | Syntropia | `jnope-2yaaa-aaaac-beh4a-cai` |
+> | 2 | Agora | `ihbn6-yiaaa-aaaac-beh3a-cai` |
+> | 3 | Dominion | `ijdaw-dyaaa-aaaac-beh2a-cai` |
+>
+> i.e. `staging-realm1-backend.yml` actually upgrades **Syntropia**,
+> not Dominion (contrary to its header comment). The new
+> `staging-dominion-*.yml` descriptors pin by canister ID and are
+> unambiguous.
 
 ## Prerequisites
 
+You can run the rollout two ways:
+
+1. **Locally** — from your own dfx identity that has controller rights
+   and a funded cycles wallet on staging. Use
+   `scripts/deploy_runtime_extension_to_staging.sh` directly.
+2. **From CI** — via the new **Runtime Extension Deploy** workflow,
+   which executes the same script inside
+   `ghcr.io/smart-social-contracts/icp-dev-env:b26e7e9` using the
+   `secrets.IC_IDENTITY_PEM` identity (same one used by the main
+   **Deploy** workflow). This is preferred because it matches the
+   production rollout flow and reuses existing secrets.
+
+### Identity + cycles
+
+> ❗ **`file_registry` is a brand-new canister on staging; creating it
+> costs ~0.5 T cycles from the deploying identity's wallet.** Plain
+> `dfx canister upgrade` calls (what the main Deploy workflow does)
+> do not require cycles on the deployer, but `dfx deploy file_registry`
+> does.
+>
+> The CI identity behind `secrets.IC_IDENTITY_PEM` currently has
+> `0.000 TC` on staging (verified 2026-04-16, see
+> [run 24530392518](https://github.com/smart-social-contracts/realms/actions/runs/24530392518)
+> which failed with `Insufficient cycles balance to create the canister`).
+>
+> **Before re-running step 2 (the Runtime Extension Deploy workflow),
+> you must either:**
+>
+> - Top up the CI identity's cycles wallet on staging (~1 T cycles
+>   is plenty), **or**
+> - Deploy `file_registry` once manually from a funded identity and
+>   pass its canister id to the workflow via the `file_registry`
+>   input (skips the `dfx deploy file_registry` step).
+
+To run **locally** you additionally need:
+
 - A `dfx` identity with controller rights on the staging canisters and
-  cycles to create a new canister on staging:
+  a funded wallet:
   ```
   dfx identity use my-staging-identity
-  dfx identity get-principal     # confirm
-  dfx wallet --network staging balance
+  dfx identity get-principal
+  DFX_WARNING=-mainnet_plaintext_identity dfx cycles balance --network staging
   ```
-- A local checkout of `realms-extensions` next to `realms`:
-  ```
-  ~/dev/.../realms
-  ~/dev/.../realms-extensions
-  ```
-  (or pass `--extensions-repo <path>` to the script).
-- `node`, `npm`, `python3`, `curl`, `dfx` available locally.
-- The branch `feat/layered-deployment` (or its merged-to-main equivalent)
-  available so the GitHub Actions workflow can check it out.
+- A local checkout of `realms-extensions` next to `realms`
+  (or pass `--extensions-repo <path>`).
+- `node`, `npm`, `python3`, `curl`, `dfx` available.
 
-## Step 1 — Deploy `realm_backend` code to Dominion
+## Step 1 — Deploy `realm_backend` code to Dominion ✅ done
 
 The new query method `get_extension_frontend_info` and the `_source.json`
 write logic must be live on Dominion before the script's install step
 can succeed.
 
-1. Open the [`Deploy` workflow](https://github.com/smart-social-contracts/realms/actions/workflows/deployment.yml).
-2. **Run workflow** with:
-   - Descriptor: `deployments/staging-realm1-backend.yml`
-   - Source: `checkout`
-   - Commit: HEAD of `feat/layered-deployment` (e.g. `d2b23323`)
-   - **Mode override: `upgrade`** (the descriptor default is `reinstall`,
-     which would wipe stable storage including any installed extensions —
-     do **not** use `reinstall` here).
-3. Wait for the workflow to succeed.
-4. Sanity-check from your shell:
-   ```
-   dfx canister --network staging call <dominion_realm_backend> list_runtime_extensions
-   ```
-   The response should include the new `sources` field
-   (it may be `{}` until the next step).
+This step was completed in
+[run 24530259620](https://github.com/smart-social-contracts/realms/actions/runs/24530259620)
+(commit `435596fd`). To re-run for a newer commit:
 
-## Step 2 — Publish the extension bundle and install it
+```
+gh workflow run Deploy --repo smart-social-contracts/realms \
+  --ref feat/layered-deployment \
+  -f descriptor=deployments/staging-dominion-backend.yml \
+  -f source=checkout \
+  -f commit=<full-sha> \
+  -f mode_override=upgrade
+```
 
-Run the script. On the first run (or first time on a new network) it
-also deploys `file_registry`.
+> ℹ️ The descriptor `staging-dominion-backend.yml` pins the target by
+> canister id (`ijdaw-dyaaa-aaaac-beh2a-cai`). Do **not** use
+> `staging-realm1-backend.yml`; that one resolves to Syntropia.
+>
+> **Mode override must be `upgrade`** — the descriptor default is
+> `reinstall`, which would wipe stable storage.
+
+Sanity-check:
+```
+DFX_WARNING=-mainnet_plaintext_identity \
+  dfx canister call --network staging --query \
+    ijdaw-dyaaa-aaaac-beh2a-cai \
+    get_extension_frontend_info '("{\"extension_id\":\"test_bench\"}")'
+```
+It should return `success:false, error:"No registry source recorded…"`
+until step 2 completes.
+
+## Step 2 — Publish the extension bundle and install it  🚫 blocked on cycles
+
+Two ways to run it:
+
+### 2a — From CI (preferred, once cycles are available)
+
+```
+gh workflow run "Runtime Extension Deploy" \
+  --repo smart-social-contracts/realms \
+  --ref feat/layered-deployment \
+  -f network=staging \
+  -f realm_backend=ijdaw-dyaaa-aaaac-beh2a-cai \
+  -f extension_id=test_bench \
+  -f extensions_branch=feat/runtime-frontend-bundle \
+  -f commit=<realms-sha>
+```
+
+See [run 24530392518](https://github.com/smart-social-contracts/realms/actions/runs/24530392518)
+for the shape of this workflow's logs. That run failed with
+`Insufficient cycles balance` because the CI wallet on staging is
+empty — see the Prerequisites section.
+
+If you pre-deployed `file_registry` from a funded identity, add
+`-f file_registry=<its-canister-id>` to skip canister creation.
+
+### 2b — Locally (requires a funded staging identity)
 
 ```
 cd realms
 dfx identity use my-staging-identity
 
 bash scripts/deploy_runtime_extension_to_staging.sh \
-    --realm-backend <dominion_realm_backend_canister_id> \
+    --realm-backend ijdaw-dyaaa-aaaac-beh2a-cai \
     --network staging
 ```
 
