@@ -413,40 +413,58 @@ def deploy_backend(
                     break
     env["CANISTER_CANDID_PATH"] = str(candid_path.resolve())
 
-    print("   🔨 Building backend WASM...")
-    result = subprocess.run(
-        ["python", "-m", "basilisk", "realm_backend", "src/realm_backend/main.py"],
-        env=env,
-    )
-    if result.returncode != 0:
-        print("❌ Backend build failed")
-        sys.exit(1)
-
-    wasm_path = ".basilisk/realm_backend/realm_backend.wasm"
-    if not Path(wasm_path).exists():
-        print(f"❌ WASM not found at {wasm_path}")
-        sys.exit(1)
-
-    # Deploy
-    print(f"   📦 Installing WASM to {backend_id}...")
-
     # Top up cycles first
+    print(f"   💰 Topping up {backend_id}...")
     subprocess.run(
         ["dfx", "cycles", "top-up", backend_id, "1000000000000", "--network", network],
         env=env, capture_output=True,
     )
 
-    result = subprocess.run(
-        ["dfx", "canister", "install", backend_id,
-         "--wasm", wasm_path,
-         "--network", network,
-         "--mode", mode,
-         "--yes"],
-        env=env,
-    )
-    if result.returncode != 0:
-        print("❌ Backend deploy failed")
-        sys.exit(1)
+    # Build + deploy via `dfx deploy realm_backend` — this matches the
+    # proven `realms mundus/realm create` pipeline. We deliberately avoid
+    # the two-step (`python -m basilisk …` then `dfx canister install
+    # --wasm`) flow here because running basilisk as a bare subprocess at
+    # the repo root hits a Python 3.10 modulefinder bug
+    # (AttributeError: 'NoneType' object has no attribute 'is_package')
+    # once all ~16 extension_packages/* modules are registered on the
+    # import path. dfx-driven basilisk runs don't trip it.
+    #
+    # `dfx deploy realm_backend --network <net>` picks the target
+    # canister id from canister_ids.json. That file may map
+    # realm_backend to a different canister than the one we want to hit
+    # here (e.g. a legacy dev canister), so we temporarily rewrite it
+    # to point realm_backend at the resolved `backend_id` and restore
+    # the original file afterwards.
+    ids_file = Path("canister_ids.json")
+    original_ids = None
+    if ids_file.exists():
+        original_ids = ids_file.read_text()
+        data = json.loads(original_ids)
+    else:
+        data = {}
+    data.setdefault("realm_backend", {})[network] = backend_id
+    ids_file.write_text(json.dumps(data, indent=2))
+    print(f"   🔒 Pinned realm_backend[{network}] = {backend_id} "
+          f"(canister_ids.json)")
+
+    print(f"   🔨 Building + deploying realm_backend via dfx (mode={mode})...")
+    try:
+        result = subprocess.run(
+            ["dfx", "deploy", "realm_backend",
+             "--network", network,
+             "--mode", mode,
+             "--yes"],
+            env=env,
+        )
+        if result.returncode != 0:
+            print("❌ Backend deploy failed")
+            sys.exit(1)
+    finally:
+        if original_ids is not None:
+            ids_file.write_text(original_ids)
+            print(f"   ♻️  Restored original canister_ids.json")
+        else:
+            ids_file.unlink(missing_ok=True)
 
     print(f"   ✅ Backend deployed to {backend_id}")
 
