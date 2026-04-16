@@ -2947,3 +2947,72 @@ def list_codex_packages() -> text:
         })
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
+
+
+# ---------------------------------------------------------------------------
+# Registry-based install endpoints (inter-canister pull from mundus file registry)
+# ---------------------------------------------------------------------------
+
+
+@update
+@require(Operations.EXTENSION_INSTALL)
+def install_extension_from_registry(args: text) -> Async[text]:
+    """Install an extension by pulling backend files from the mundus file registry.
+
+    Args (JSON): {
+        "registry_canister_id": str,
+        "ext_id": str,
+        "version": str|null  (null = latest)
+    }
+    """
+    try:
+        params = json.loads(args)
+        registry_id = params.get("registry_canister_id")
+        ext_id = params.get("ext_id")
+        version = params.get("version")
+
+        if not registry_id:
+            return json.dumps({"success": False, "error": "registry_canister_id is required"})
+        if not ext_id:
+            return json.dumps({"success": False, "error": "ext_id is required"})
+
+        from api.file_registry import install_extension_from_registry as _install
+
+        result = yield from _install(registry_id, ext_id, version)
+        return result
+    except Exception as e:
+        logger.error(f"install_extension_from_registry error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+@require(Operations.CODEX_INSTALL)
+def install_codex_from_registry(args: text) -> Async[text]:
+    """Install a codex package by pulling files from the mundus file registry.
+
+    Args (JSON): {
+        "registry_canister_id": str,
+        "codex_id": str,           ("realm_type/codex_id" e.g. "syntropia/membership")
+        "version": str|null,       (null = latest)
+        "run_init": bool           (optional, default true)
+    }
+    """
+    try:
+        params = json.loads(args)
+        registry_id = params.get("registry_canister_id")
+        codex_id = params.get("codex_id")
+        version = params.get("version")
+        run_init = params.get("run_init", True)
+
+        if not registry_id:
+            return json.dumps({"success": False, "error": "registry_canister_id is required"})
+        if not codex_id:
+            return json.dumps({"success": False, "error": "codex_id is required"})
+
+        from api.file_registry import install_codex_from_registry as _install
+
+        result = yield from _install(registry_id, codex_id, version, run_init)
+        return result
+    except Exception as e:
+        logger.error(f"install_codex_from_registry error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
