@@ -91,6 +91,10 @@ class Operations:
     EXTENSION_INSTALL = "extension.install"
     EXTENSION_UNINSTALL = "extension.uninstall"
 
+    # Codex packages
+    CODEX_INSTALL = "codex.install"
+    CODEX_UNINSTALL = "codex.uninstall"
+
     # Self-service (any authenticated user)
     SELF_JOIN = "self.join"
     SELF_UPDATE_PUBLIC_PROFILE = "self.update_public_profile"

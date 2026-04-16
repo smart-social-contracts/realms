@@ -2820,3 +2820,130 @@ def list_runtime_extensions() -> text:
         })
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
+
+
+# ---------------------------------------------------------------------------
+# Codex package management endpoints
+# ---------------------------------------------------------------------------
+
+
+@update
+@require(Operations.CODEX_INSTALL)
+def install_codex(args: text) -> text:
+    """Install a codex package from uploaded files.
+
+    Args (JSON): {
+        "codex_id": str,
+        "files": {"filename": "content", ...},
+        "run_init": bool  (optional, default true)
+    }
+
+    Files should include manifest.json and *.py codex modules.
+    Each .py file (except init.py) creates/updates a Codex entity.
+    If run_init is true and init.py is present, it is executed after install.
+    """
+    try:
+        params = json.loads(args)
+        codex_id = params.get("codex_id")
+        files = params.get("files", {})
+        run_init = params.get("run_init", True)
+
+        if not codex_id:
+            return json.dumps({"success": False, "error": "codex_id is required"})
+        if not files:
+            return json.dumps({"success": False, "error": "files dict is required"})
+
+        from core.runtime_codex import install_codex_package, run_codex_init
+
+        ok = install_codex_package(codex_id, files)
+        if not ok:
+            return json.dumps({"success": False, "error": f"Failed to install codex package '{codex_id}'"})
+
+        init_error = None
+        if run_init:
+            init_error = run_codex_init(codex_id)
+
+        result = {"success": True, "codex_id": codex_id, "files_count": len(files)}
+        if init_error:
+            result["init_warning"] = init_error
+        return json.dumps(result)
+    except Exception as e:
+        logger.error(f"install_codex error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+@require(Operations.CODEX_UNINSTALL)
+def uninstall_codex(args: text) -> text:
+    """Uninstall a codex package and its Codex entities.
+
+    Args (JSON): {"codex_id": str}
+    """
+    try:
+        params = json.loads(args)
+        codex_id = params.get("codex_id")
+
+        if not codex_id:
+            return json.dumps({"success": False, "error": "codex_id is required"})
+
+        from core.runtime_codex import uninstall_codex_package
+
+        ok = uninstall_codex_package(codex_id)
+        if ok:
+            return json.dumps({"success": True, "codex_id": codex_id})
+        else:
+            return json.dumps({"success": False, "error": f"Codex package '{codex_id}' not found"})
+    except Exception as e:
+        logger.error(f"uninstall_codex error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+@require(Operations.CODEX_INSTALL)
+def reload_codex(args: text) -> text:
+    """Reload all Codex entities from a codex package's files on disk.
+
+    Args (JSON): {"codex_id": str, "run_init": bool (optional, default false)}
+    """
+    try:
+        params = json.loads(args)
+        codex_id = params.get("codex_id")
+        run_init = params.get("run_init", False)
+
+        if not codex_id:
+            return json.dumps({"success": False, "error": "codex_id is required"})
+
+        from core.runtime_codex import reload_codex_package, run_codex_init
+
+        ok = reload_codex_package(codex_id)
+        if not ok:
+            return json.dumps({"success": False, "error": f"Codex package '{codex_id}' not found"})
+
+        init_error = None
+        if run_init:
+            init_error = run_codex_init(codex_id)
+
+        result = {"success": True, "codex_id": codex_id}
+        if init_error:
+            result["init_warning"] = init_error
+        return json.dumps(result)
+    except Exception as e:
+        logger.error(f"reload_codex error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def list_codex_packages() -> text:
+    """List all installed codex packages with their manifests."""
+    try:
+        from core.runtime_codex import list_installed, get_all_codex_manifests
+
+        installed = list_installed()
+        manifests = get_all_codex_manifests()
+        return json.dumps({
+            "success": True,
+            "codex_packages": installed,
+            "manifests": manifests,
+        })
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
