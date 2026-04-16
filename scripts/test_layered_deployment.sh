@@ -247,14 +247,25 @@ phase2() {
     RESULT=$(dfx_query file_registry get_backend_files '{"category":"ext","item_id":"test_bench","version":null}')
     assert_contains "$RESULT" "entry.py" "get_backend_files returns test_bench backend files"
 
-    info "\n--- Realm backend install-from-registry test ---"
-    info "(This requires realm_backend deployed locally.)"
-    info "If realm_backend is deployed, run:"
-    info "  dfx canister call realm_backend install_extension_from_registry"
-    info "    '(\"{ \\\"registry_canister_id\\\": \\\"$REGISTRY\\\", \\\"extension_id\\\": \\\"test_bench\\\" }\")'"
-    info ""
-    info "Or via CLI:"
-    info "  realms extension registry-install -c \$(dfx canister id realm_backend) -r $REGISTRY --extension-id test_bench -n local"
+    # Deploy realm_backend if not already deployed
+    BACKEND=$(dfx canister id realm_backend 2>/dev/null || echo "")
+    if [ -z "$BACKEND" ]; then
+        info "\nDeploying realm_backend..."
+        dfx deploy realm_backend 2>&1
+        BACKEND=$(dfx canister id realm_backend)
+    fi
+    info "Realm backend: $BACKEND"
+
+    # Inter-canister install: extension from registry
+    info "\nTest: install_extension_from_registry (inter-canister)"
+    RESULT=$(dfx canister call realm_backend install_extension_from_registry "(\"{ \\\"registry_canister_id\\\": \\\"$REGISTRY\\\", \\\"ext_id\\\": \\\"test_bench\\\" }\")" 2>&1)
+    assert_contains "$RESULT" "success" "install_extension_from_registry returns success"
+    assert_contains "$RESULT" "test_bench" "install_extension_from_registry installs test_bench"
+
+    # Verify extension is listed in realm
+    info "\nTest: list_runtime_extensions"
+    RESULT=$(dfx canister call --query realm_backend list_runtime_extensions '()' 2>&1)
+    assert_contains "$RESULT" "test_bench" "test_bench listed in runtime extensions"
 
     info "\nPhase 2 complete."
 }
@@ -278,12 +289,12 @@ phase3() {
     info "Uploading test codex to registry..."
     NS="codex/test_codex_e2e/1.0.0"
 
-    # init.py
+    # init.py — uses json.loads (not json.load) for WASM CPython compat
     INIT_PY=$(cat <<'PYEOF'
 import json, os
 manifest_path = os.path.join(os.path.dirname(__file__), 'manifest.json')
 with open(manifest_path, 'r') as f:
-    manifest = json.load(f)
+    manifest = json.loads(f.read())
 print(f"Test codex initialized: {manifest.get('name', 'unknown')}")
 PYEOF
 )
@@ -312,13 +323,23 @@ PYEOF
     assert_contains "$RESULT" "helper.py" "get_backend_files returns helper.py"
     assert_contains "$RESULT" "manifest.json" "get_backend_files returns manifest.json"
 
-    info "\n--- Realm backend install-from-registry test ---"
-    info "If realm_backend is deployed, run:"
-    info "  dfx canister call realm_backend install_codex_from_registry"
-    info "    '(\"{ \\\"registry_canister_id\\\": \\\"$REGISTRY\\\", \\\"codex_id\\\": \\\"test_codex_e2e\\\" }\")'"
-    info ""
-    info "Or via CLI:"
-    info "  realms codex registry-install -c \$(dfx canister id realm_backend) -r $REGISTRY --codex-id test_codex_e2e -n local"
+    # Inter-canister install: codex from registry
+    BACKEND=$(dfx canister id realm_backend 2>/dev/null || echo "")
+    if [ -z "$BACKEND" ]; then
+        info "\nDeploying realm_backend..."
+        dfx deploy realm_backend 2>&1
+        BACKEND=$(dfx canister id realm_backend)
+    fi
+
+    info "\nTest: install_codex_from_registry (inter-canister)"
+    RESULT=$(dfx canister call realm_backend install_codex_from_registry "(\"{ \\\"registry_canister_id\\\": \\\"$REGISTRY\\\", \\\"codex_id\\\": \\\"test_codex_e2e\\\" }\")" 2>&1)
+    assert_contains "$RESULT" "success" "install_codex_from_registry returns success"
+    assert_contains "$RESULT" "test_codex_e2e" "install_codex_from_registry installs test_codex_e2e"
+
+    # Verify codex is listed
+    info "\nTest: list_codex_packages"
+    RESULT=$(dfx canister call --query realm_backend list_codex_packages '()' 2>&1)
+    assert_contains "$RESULT" "test_codex_e2e" "test_codex_e2e listed in codex packages"
 
     info "\nPhase 3 complete."
 }
@@ -348,20 +369,12 @@ phase4() {
         pass "realms wasm list runs without errors"
     fi
 
-    # Test: realms codex runtime-install (with a local test package)
-    info "\nTest: realms codex CLI (requires deployed realm_backend)"
+    # Test: realms codex CLI
     BACKEND=$(dfx canister id realm_backend 2>/dev/null || echo "")
     if [ -z "$BACKEND" ]; then
         warn "realm_backend not deployed, skipping CLI runtime tests"
-        info "To test manually after deploying realm_backend:"
-        info "  realms codex runtime-list -c <canister_id> -n local"
-        info "  realms codex runtime-install -c <canister_id> --source-dir <codex_dir> --codex-id my_codex -n local"
-        info "  realms codex runtime-uninstall -c <canister_id> --codex-id my_codex -n local"
-        info "  realms codex registry-install -c <canister_id> -r $REGISTRY --codex-id test_codex_e2e -n local"
     else
-        info "Testing CLI with realm_backend at $BACKEND"
-
-        # runtime-list
+        info "\nTest: realms codex runtime-list (CLI)"
         RESULT=$(realms codex runtime-list -c "$BACKEND" -n local 2>&1 || true)
         if echo "$RESULT" | grep -qE "Traceback|ModuleNotFoundError"; then
             fail "realms codex runtime-list crashed"
@@ -369,12 +382,12 @@ phase4() {
             pass "realms codex runtime-list works"
         fi
 
-        # registry-install
-        RESULT=$(realms codex registry-install -c "$BACKEND" -r "$REGISTRY" --codex-id test_codex_e2e -n local 2>&1 || true)
+        info "\nTest: realms extension runtime-list (CLI)"
+        RESULT=$(realms extension runtime-list -c "$BACKEND" -n local 2>&1 || true)
         if echo "$RESULT" | grep -qE "Traceback|ModuleNotFoundError"; then
-            fail "realms codex registry-install crashed"
+            fail "realms extension runtime-list crashed"
         else
-            pass "realms codex registry-install works"
+            pass "realms extension runtime-list works"
         fi
     fi
 

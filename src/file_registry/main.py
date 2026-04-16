@@ -519,29 +519,8 @@ def get_extension_manifest(args: text) -> text:
         return json.dumps({"error": f"Invalid JSON in manifest.json for {ns}"})
 
 
-@query
-def get_backend_files(args: text) -> text:
-    """Return all backend files for an extension or codex as {filename: content}.
-
-    Designed for inter-canister pull: realm calls this to get files to install.
-
-    Args (JSON): {
-        "category": "ext"|"codex",
-        "item_id": str,              (ext_id or "realm_type/codex_id")
-        "version": str|null          (null = latest)
-    }
-
-    Returns JSON: {
-        "files": {filename: content_str, ...},
-        "version": str,
-        "namespace": str,
-    } or {"error": str}
-    """
-    params = json.loads(args)
-    category = params["category"]
-    item_id = params["item_id"]
-    version = params.get("version")
-
+def _get_backend_files_impl(category: str, item_id: str, version: str) -> str:
+    """Shared implementation for get_backend_files and the ICC variant."""
     namespaces = _load_namespaces()
 
     if category == "ext":
@@ -567,8 +546,6 @@ def get_backend_files(args: text) -> text:
     meta = _load_meta(ns)
     all_files = meta.get("files", {})
 
-    # For extensions, return only backend/ files + manifest.json
-    # For codices, return all files (they're all Python)
     files = {}
     for path in all_files:
         if category == "ext":
@@ -593,6 +570,33 @@ def get_backend_files(args: text) -> text:
         "namespace": ns,
         "file_count": len(files),
     })
+
+
+@query
+def get_backend_files(args: text) -> text:
+    """Return all backend files for an extension or codex as {filename: content}.
+
+    Args (JSON): {
+        "category": "ext"|"codex",
+        "item_id": str,
+        "version": str|null          (null = latest)
+    }
+    """
+    params = json.loads(args)
+    return _get_backend_files_impl(
+        params["category"], params["item_id"], params.get("version")
+    )
+
+
+@query
+def get_backend_files_icc(category: text, item_id: text, version: text) -> text:
+    """Inter-canister variant of get_backend_files with split parameters.
+
+    Basilisk's Candid encoder parses {} as record syntax, so inter-canister
+    calls cannot pass JSON strings. This endpoint accepts separate text args.
+    Pass empty string for version to get the latest.
+    """
+    return _get_backend_files_impl(category, item_id, version or None)
 
 
 # ---------------------------------------------------------------------------

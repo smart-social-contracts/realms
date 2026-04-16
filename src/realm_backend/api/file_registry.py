@@ -20,10 +20,7 @@ logger = get_logger("api.file_registry")
 
 class FileRegistryService(Service):
     @service_query
-    def get_backend_files(self, args: text) -> text: ...
-
-    @service_query
-    def latest_version(self, args: text) -> text: ...
+    def get_backend_files_icc(self, category: text, item_id: text, version: text) -> text: ...
 
     @service_query
     def get_extension_manifest(self, args: text) -> text: ...
@@ -49,13 +46,8 @@ def install_extension_from_registry(
 
     registry = FileRegistryService(Principal.from_str(registry_canister_id))
 
-    # Fetch backend files from registry
-    result: CallResult = yield registry.get_backend_files(
-        json.dumps({
-            "category": "ext",
-            "item_id": ext_id,
-            "version": version,
-        })
+    result: CallResult = yield registry.get_backend_files_icc(
+        "ext", ext_id, version or ""
     )
 
     # Extract response (basilisk returns dict or object)
@@ -74,15 +66,21 @@ def install_extension_from_registry(
     if "error" in data:
         return json.dumps({"success": False, "error": data["error"]})
 
-    files = data.get("files", {})
+    raw_files = data.get("files", {})
     resolved_version = data.get("version", version or "unknown")
 
-    if not files:
+    if not raw_files:
         return json.dumps({"success": False, "error": f"No backend files found for extension '{ext_id}'"})
+
+    # Strip "backend/" prefix — registry stores as backend/entry.py but
+    # runtime_extensions expects entry.py at the extension root.
+    files = {}
+    for path, content in raw_files.items():
+        clean = path.removeprefix("backend/") if path.startswith("backend/") else path
+        files[clean] = content
 
     logger.info(f"Got {len(files)} files from registry (version {resolved_version})")
 
-    # Install via runtime_extensions
     from core.runtime_extensions import install_extension as _install
 
     ok = _install(ext_id, files)
@@ -122,13 +120,8 @@ def install_codex_from_registry(
 
     registry = FileRegistryService(Principal.from_str(registry_canister_id))
 
-    # Fetch codex files from registry
-    result: CallResult = yield registry.get_backend_files(
-        json.dumps({
-            "category": "codex",
-            "item_id": codex_id,
-            "version": version,
-        })
+    result: CallResult = yield registry.get_backend_files_icc(
+        "codex", codex_id, version or ""
     )
 
     # Extract response
