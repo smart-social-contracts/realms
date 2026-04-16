@@ -31,6 +31,29 @@
       "type": "assets",
       "workspace": "realm_frontend"
     },
+    "mundus_file_registry": {
+      "build": "python -m basilisk mundus_file_registry src/mundus_file_registry/main.py",
+      "candid": "src/mundus_file_registry/mundus_file_registry.did",
+      "declarations": {
+        "node_compatibility": true
+      },
+      "gzip": true,
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ],
+      "tech_stack": {
+        "cdk": {
+          "basilisk": {}
+        },
+        "language": {
+          "python": {}
+        }
+      },
+      "type": "custom",
+      "wasm": ".basilisk/mundus_file_registry/mundus_file_registry.wasm"
+    },
     "realm_registry_backend": {
       "build": "python -m basilisk realm_registry_backend src/realm_registry_backend/main.py",
       "candid": "src/realm_registry_backend/realm_registry_backend.did",
