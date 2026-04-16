@@ -474,6 +474,57 @@ def deploy_frontend(
                 shutil.copy2(src, dest)
                 print(f"   🖼️  Copied {img_name} → {dest}")
 
+    # Generate realm_backend declarations for the frontend bundle.
+    # The candid file is git-ignored (Basilisk generates it on backend
+    # build); for frontend-only deploys we fetch the live interface
+    # from the already-deployed canister via canister metadata.
+    backend_id = canister_ids.get("realm_backend")
+    if backend_id:
+        candid_path = Path("src/realm_backend/realm_backend.did")
+        if not candid_path.exists():
+            candid_path.parent.mkdir(parents=True, exist_ok=True)
+            print(f"   📜 Fetching candid from {backend_id}...")
+            meta = subprocess.run(
+                ["dfx", "canister", "metadata", backend_id,
+                 "candid:service", "--network", network],
+                env=env, capture_output=True, text=True,
+            )
+            if meta.returncode != 0 or not meta.stdout.strip():
+                print(f"   ❌ Failed to fetch candid: {meta.stderr.strip()}")
+                sys.exit(1)
+            candid_path.write_text(meta.stdout)
+            print(f"   ✅ Wrote {candid_path} ({len(meta.stdout)} bytes)")
+
+        print("   🔧 Running dfx generate realm_backend...")
+        gen = subprocess.run(
+            ["dfx", "generate", "realm_backend", "--network", network],
+            env=env, capture_output=True, text=True,
+        )
+        if gen.returncode != 0:
+            print(f"   ❌ dfx generate failed:\n{gen.stderr}")
+            sys.exit(1)
+
+        lib_decls = frontend_dir / "src" / "lib" / "declarations"
+        lib_decls.mkdir(parents=True, exist_ok=True)
+        src_decls = Path("src/declarations")
+        if src_decls.exists():
+            target = lib_decls / "realm_backend"
+            if target.exists():
+                shutil.rmtree(target)
+            shutil.copytree(src_decls / "realm_backend", target)
+            print(f"   📋 Copied declarations → {target}")
+
+            # Inject actual canister id (vite won't have process.env.CANISTER_ID_*)
+            idx = target / "index.js"
+            if idx.exists():
+                text = idx.read_text()
+                text = text.replace(
+                    "process.env.CANISTER_ID_REALM_BACKEND",
+                    f'"{backend_id}"',
+                )
+                idx.write_text(text)
+                print(f"   💉 Injected CANISTER_ID_REALM_BACKEND = {backend_id}")
+
     # Install npm deps and build
     print("   📥 Installing npm dependencies...")
     subprocess.run(
