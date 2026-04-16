@@ -4,7 +4,7 @@ Mundus File Registry — on-chain file store for realm layer objects
 Enhanced file registry for mundus-level storage of:
   - Base realm WASM (Layer 1):      namespace "wasm", path "realm-base-{version}.wasm"
   - Extensions (Layer 2):           namespace "ext/{ext_id}/{version}", paths under backend/ and frontend/
-  - Codices (Layer 3):              namespace "codex/{realm_type}/{codex_id}/{version}", paths *.py
+  - Codices (Layer 3):              namespace "codex/{codex_id}/{version}", paths *.py
 
 Inherits all base file registry functionality:
   - HTTP serving with CORS (browser fetch / script src)
@@ -397,10 +397,12 @@ def list_extensions() -> text:
 
 @query
 def list_codices() -> text:
-    """List all codices grouped by realm type with their available versions.
+    """List all codex packages with their available versions.
+
+    Namespace convention: codex/{codex_id}/{version}
 
     Returns JSON: [
-        {"realm_type": str, "codex_id": str, "versions": [str], "latest": str},
+        {"codex_id": str, "versions": [str], "latest": str},
         ...
     ]
     """
@@ -410,21 +412,19 @@ def list_codices() -> text:
     for ns_name in namespaces:
         if not ns_name.startswith(NS_PREFIX_CODEX):
             continue
-        # Parse "codex/{realm_type}/{codex_id}/{version}"
+        # Parse "codex/{codex_id}/{version}"
         rest = ns_name[len(NS_PREFIX_CODEX):]
-        parts = rest.split("/", 2)
-        if len(parts) != 3:
+        parts = rest.split("/", 1)
+        if len(parts) != 2:
             continue
-        realm_type, codex_id, version = parts
+        codex_id, version = parts
 
-        key = f"{realm_type}/{codex_id}"
-        if key not in codices:
-            codices[key] = {
-                "realm_type": realm_type,
+        if codex_id not in codices:
+            codices[codex_id] = {
                 "codex_id": codex_id,
                 "versions": [],
             }
-        codices[key]["versions"].append(version)
+        codices[codex_id]["versions"].append(version)
 
     result = []
     for key, info in sorted(codices.items()):
