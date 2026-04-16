@@ -447,7 +447,7 @@ def deploy_backend(
     wasm_in_cwd = src_backend / ".basilisk" / "realm_backend" / "realm_backend.wasm"
     print(f"   🔨 Building realm_backend WASM (cwd={src_backend})...")
     result = subprocess.run(
-        ["python", "-m", "basilisk", "realm_backend", "main.py"],
+        ["python", "-m", "basilisk", "-v", "realm_backend", "main.py"],
         cwd=str(src_backend),
         env=env,
     )
