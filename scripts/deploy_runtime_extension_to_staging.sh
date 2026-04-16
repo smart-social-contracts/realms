@@ -183,9 +183,11 @@ if [ -z "$FILE_REGISTRY" ]; then
     warn "file_registry has no canister id on $NETWORK — deploying it now."
     info "    (this creates a new canister and burns ~T cycles from your wallet)"
     # Lower --with-cycles (default is 3T) so creation succeeds even on a
-    # modestly funded wallet. 300 G cycles is enough for bootstrapping;
-    # top up the canister afterwards via `dfx canister deposit-cycles`.
-    CREATE_WITH_CYCLES="${FILE_REGISTRY_INITIAL_CYCLES:-300000000000}"
+    # modestly funded wallet. NOTE: the IC canister-creation fee on
+    # ICP-network is 500 G cycles, so --with-cycles MUST be > 500 G.
+    # Default to 1 T (0.5 T fee + 0.5 T initial endowment); top up the
+    # canister afterwards via `dfx canister deposit-cycles`.
+    CREATE_WITH_CYCLES="${FILE_REGISTRY_INITIAL_CYCLES:-1000000000000}"
     info "    Using --with-cycles=$CREATE_WITH_CYCLES (override via FILE_REGISTRY_INITIAL_CYCLES)"
     dfx deploy file_registry --network "$NETWORK" --with-cycles "$CREATE_WITH_CYCLES" --yes 2>&1 | tail -8
     FILE_REGISTRY=$(dfx canister id file_registry --network "$NETWORK" 2>/dev/null || true)
