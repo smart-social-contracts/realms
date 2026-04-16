@@ -483,17 +483,37 @@ def deploy_frontend(
         candid_path = Path("src/realm_backend/realm_backend.did")
         if not candid_path.exists():
             candid_path.parent.mkdir(parents=True, exist_ok=True)
+            # Try fetching candid from the deployed canister first (fast).
             print(f"   📜 Fetching candid from {backend_id}...")
             meta = subprocess.run(
                 ["dfx", "canister", "metadata", backend_id,
                  "candid:service", "--network", network],
                 env=env, capture_output=True, text=True,
             )
-            if meta.returncode != 0 or not meta.stdout.strip():
-                print(f"   ❌ Failed to fetch candid: {meta.stderr.strip()}")
-                sys.exit(1)
-            candid_path.write_text(meta.stdout)
-            print(f"   ✅ Wrote {candid_path} ({len(meta.stdout)} bytes)")
+            if meta.returncode == 0 and meta.stdout.strip():
+                candid_path.write_text(meta.stdout)
+                print(f"   ✅ Wrote {candid_path} from canister metadata "
+                      f"({len(meta.stdout)} bytes)")
+            else:
+                # Older canisters don't embed candid:service metadata.
+                # Fall back to running Basilisk, which emits realm_backend.did
+                # as a side effect of building the WASM.
+                print("   ⚙️  Metadata unavailable — running Basilisk to "
+                      "generate candid...")
+                build_env = env.copy()
+                build_env["CANISTER_CANDID_PATH"] = str(candid_path.resolve())
+                bres = subprocess.run(
+                    ["python", "-m", "basilisk",
+                     "realm_backend", "src/realm_backend/main.py"],
+                    env=build_env, capture_output=True, text=True,
+                )
+                if bres.returncode != 0 or not candid_path.exists():
+                    print(f"   ❌ Basilisk build failed:\n"
+                          f"STDOUT:\n{bres.stdout[-2000:]}\n"
+                          f"STDERR:\n{bres.stderr[-2000:]}")
+                    sys.exit(1)
+                print(f"   ✅ Basilisk wrote {candid_path} "
+                      f"({candid_path.stat().st_size} bytes)")
 
         print("   🔧 Running dfx generate realm_backend...")
         gen = subprocess.run(
