@@ -16,6 +16,8 @@ on:
           - deployments/staging-realm2-backend.yml
           - deployments/staging-realm3-backend.yml
           - deployments/staging-realm1-frontend.yml
+          - deployments/staging-dominion-backend.yml
+          - deployments/staging-dominion-frontend.yml
           - deployments/staging-registry.yml
           - deployments/demo-mundus.yml
         default: deployments/staging-mundus.yml
