@@ -16,5 +16,5 @@ object:
     path: none
   network: staging
   id_in_registry: 3
-  mode: upgrade
+  mode: reinstall
   parameters: {}

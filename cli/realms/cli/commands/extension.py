@@ -8,6 +8,7 @@ in the Smart Social Contracts platform.
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import zipfile
@@ -1040,10 +1041,205 @@ def install_from_source_command(source_dir: str = "extensions"):
     return success_count == len(extension_dirs)
 
 
+def _parse_candid_string(raw: str) -> str:
+    """Parse a Candid text response from dfx canister call."""
+    raw = raw.strip()
+    if raw.startswith("(") and raw.endswith(")"):
+        raw = raw[1:-1].strip()
+    if raw.endswith(","):
+        raw = raw[:-1].strip()
+    if raw.startswith('"') and raw.endswith('"'):
+        raw = raw[1:-1]
+    raw = raw.replace("\\n", "\n").replace('\\"', '"').replace("\\\\", "\\")
+    return raw
+
+
+def _dfx_call(canister, method, arg, network, identity, is_query=False, timeout=120):
+    """Run a dfx canister call and return parsed output."""
+    cmd = ["dfx", "canister", "call"]
+    if identity:
+        cmd.extend(["--identity", identity])
+    if network:
+        cmd.extend(["--network", network])
+    if is_query:
+        cmd.append("--query")
+    cmd.extend([canister, method, arg])
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        if result.returncode != 0:
+            console.print(f"[red]Error: {result.stderr.strip()}[/red]")
+            raise typer.Exit(1)
+        return _parse_candid_string(result.stdout)
+    except subprocess.TimeoutExpired:
+        console.print(f"[red]Error: canister call timed out ({timeout}s)[/red]")
+        raise typer.Exit(1)
+    except FileNotFoundError:
+        console.print("[red]Error: dfx not found. Install the DFINITY SDK.[/red]")
+        raise typer.Exit(1)
+
+
+def _collect_runtime_extension_files(source_dir: str) -> dict:
+    """Collect extension files from a source directory into a {filename: content} dict.
+
+    Reads manifest.json from the root, and all .py files from backend/.
+    Backend files are flattened: backend/entry.py -> entry.py
+    """
+    files = {}
+
+    manifest_path = os.path.join(source_dir, "manifest.json")
+    if not os.path.exists(manifest_path):
+        console.print(f"[red]Error: manifest.json not found in {source_dir}[/red]")
+        raise typer.Exit(1)
+    with open(manifest_path, "r") as f:
+        files["manifest.json"] = f.read()
+
+    backend_dir = os.path.join(source_dir, "backend")
+    if os.path.isdir(backend_dir):
+        for root, _dirs, filenames in os.walk(backend_dir):
+            for fname in filenames:
+                if fname.endswith(".py"):
+                    full_path = os.path.join(root, fname)
+                    rel = os.path.relpath(full_path, backend_dir)
+                    with open(full_path, "r") as f:
+                        files[rel] = f.read()
+    else:
+        entry_path = os.path.join(source_dir, "entry.py")
+        if os.path.exists(entry_path):
+            with open(entry_path, "r") as f:
+                files["entry.py"] = f.read()
+
+    if "entry.py" not in files:
+        console.print(f"[red]Error: entry.py not found in {source_dir}/backend/ or {source_dir}/[/red]")
+        raise typer.Exit(1)
+
+    return files
+
+
+def runtime_install_command(canister: str, source_dir: str, network: str = "local", identity: Optional[str] = None):
+    """Install an extension on a deployed realm canister at runtime.
+
+    Reads backend files from the source directory and uploads them to the
+    canister's persistent filesystem via the install_extension endpoint.
+    """
+    source_dir = os.path.abspath(source_dir)
+    if not os.path.isdir(source_dir):
+        console.print(f"[red]Error: {source_dir} is not a directory[/red]")
+        raise typer.Exit(1)
+
+    manifest_path = os.path.join(source_dir, "manifest.json")
+    with open(manifest_path, "r") as f:
+        manifest = json.loads(f.read())
+    ext_id = manifest.get("name") or os.path.basename(source_dir)
+
+    console.print(f"[blue]Installing extension '{ext_id}' on {canister} ({network})...[/blue]")
+
+    files = _collect_runtime_extension_files(source_dir)
+    total_bytes = sum(len(v) for v in files.values())
+    console.print(f"  Files: {len(files)} ({total_bytes:,} bytes)")
+    for fname, content in sorted(files.items()):
+        console.print(f"    {fname} ({len(content):,} bytes)")
+
+    payload = json.dumps({"extension_id": ext_id, "files": files})
+    candid_arg = '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
+
+    console.print("  Uploading to canister...")
+    raw = _dfx_call(canister, "install_extension", candid_arg, network, identity, timeout=300)
+
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        console.print(f"  Response: {raw}")
+        return
+
+    if result.get("success"):
+        console.print(f"[green]  ✓ Extension '{ext_id}' installed successfully[/green]")
+    else:
+        console.print(f"[red]  ✗ Installation failed: {result.get('error', 'unknown error')}[/red]")
+        raise typer.Exit(1)
+
+
+def runtime_uninstall_command(canister: str, extension_id: str, network: str = "local", identity: Optional[str] = None):
+    """Uninstall a runtime extension from a deployed realm canister."""
+    console.print(f"[blue]Uninstalling extension '{extension_id}' from {canister} ({network})...[/blue]")
+
+    payload = json.dumps({"extension_id": extension_id})
+    candid_arg = '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
+
+    raw = _dfx_call(canister, "uninstall_extension", candid_arg, network, identity)
+
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        console.print(f"  Response: {raw}")
+        return
+
+    if result.get("success"):
+        console.print(f"[green]  ✓ Extension '{extension_id}' uninstalled[/green]")
+    else:
+        console.print(f"[red]  ✗ Uninstall failed: {result.get('error', 'unknown error')}[/red]")
+        raise typer.Exit(1)
+
+
+def runtime_list_command(canister: str, network: str = "local", identity: Optional[str] = None, raw_json: bool = False):
+    """List runtime-installed extensions on a deployed realm canister."""
+    raw = _dfx_call(canister, "list_runtime_extensions", "()", network, identity, is_query=True)
+
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        console.print(raw)
+        return
+
+    if raw_json:
+        console.print(json.dumps(result, indent=2))
+        return
+
+    if not result.get("success"):
+        console.print(f"[red]Error: {result.get('error', 'unknown')}[/red]")
+        raise typer.Exit(1)
+
+    extensions = result.get("runtime_extensions", [])
+    manifests = result.get("all_manifests", {})
+
+    if not extensions and not manifests:
+        console.print("[yellow]No extensions installed.[/yellow]")
+        return
+
+    if extensions:
+        table = Table(title=f"Runtime Extensions ({len(extensions)})")
+        table.add_column("ID", style="cyan")
+        table.add_column("Version", style="green")
+        table.add_column("Description", style="white")
+
+        for ext_id in extensions:
+            m = manifests.get(ext_id, {})
+            version = m.get("version", "?")
+            desc = m.get("description", "")
+            table.add_row(ext_id, version, desc[:60] + "..." if len(desc) > 60 else desc)
+
+        console.print(table)
+
+    baked = [k for k in manifests if k not in extensions]
+    if baked:
+        table = Table(title=f"Baked-in Extensions ({len(baked)})")
+        table.add_column("ID", style="cyan")
+        table.add_column("Version", style="green")
+        table.add_column("Description", style="white")
+
+        for ext_id in baked:
+            m = manifests[ext_id]
+            version = m.get("version", "?")
+            desc = m.get("description", "")
+            table.add_row(ext_id, version, desc[:60] + "..." if len(desc) > 60 else desc)
+
+        console.print(table)
+
+
 def extension_command(
     action: str = typer.Argument(
         ...,
-        help="Action to perform: list, install-from-source, package, install, uninstall, generate-manifests",
+        help="Action to perform: list, install-from-source, package, install, uninstall, generate-manifests, runtime-install, runtime-uninstall, runtime-list",
     ),
     extension_id: Optional[str] = typer.Option(
         None, "--extension-id", help="Extension ID for package/uninstall operations"
@@ -1056,6 +1252,18 @@ def extension_command(
     ),
     all_extensions: bool = typer.Option(
         False, "--all", help="Uninstall all extensions (only for uninstall action)"
+    ),
+    canister: Optional[str] = typer.Option(
+        None, "--canister", "-c", help="Target realm canister ID (for runtime-* actions)"
+    ),
+    network: str = typer.Option(
+        "local", "--network", "-n", help="Network: local, ic (for runtime-* actions)"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="dfx identity to use (for runtime-* actions)"
+    ),
+    raw_json: bool = typer.Option(
+        False, "--json", help="Output raw JSON (for runtime-list)"
     ),
 ) -> None:
     """Manage Realm extensions."""
@@ -1091,9 +1299,27 @@ def extension_command(
                 "[red]Error: Either --extension-id or --all is required for uninstall action[/red]"
             )
             raise typer.Exit(1)
+    elif action == "runtime-install":
+        if not canister:
+            console.print("[red]Error: --canister is required for runtime-install[/red]")
+            raise typer.Exit(1)
+        runtime_install_command(canister, source_dir, network, identity)
+    elif action == "runtime-uninstall":
+        if not canister:
+            console.print("[red]Error: --canister is required for runtime-uninstall[/red]")
+            raise typer.Exit(1)
+        if not extension_id:
+            console.print("[red]Error: --extension-id is required for runtime-uninstall[/red]")
+            raise typer.Exit(1)
+        runtime_uninstall_command(canister, extension_id, network, identity)
+    elif action == "runtime-list":
+        if not canister:
+            console.print("[red]Error: --canister is required for runtime-list[/red]")
+            raise typer.Exit(1)
+        runtime_list_command(canister, network, identity, raw_json)
     else:
         console.print(f"[red]Unknown action: {action}[/red]")
         console.print(
-            "[yellow]Available actions: list, install-from-source, generate-manifests, package, install, uninstall[/yellow]"
+            "[yellow]Available actions: list, install-from-source, generate-manifests, package, install, uninstall, runtime-install, runtime-uninstall, runtime-list[/yellow]"
         )
         raise typer.Exit(1)

@@ -14,7 +14,7 @@ object:
   codices_codebase:
     path: none
   network: staging
-  mode: upgrade
+  mode: reinstall
   parameters:
     TEST_MODE: true
     TEST_MODE_II_BYPASS: true

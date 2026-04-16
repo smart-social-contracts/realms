@@ -116,9 +116,13 @@ def extension(
     package_path: Optional[str] = typer.Option(None, "--package-path", help="Package path"),
     source_dir: str = typer.Option("extensions", "--source-dir", help="Source directory"),
     all_extensions: bool = typer.Option(False, "--all", help="All extensions"),
+    canister: Optional[str] = typer.Option(None, "--canister", "-c", help="Target realm canister ID (for runtime-* actions)"),
+    network: str = typer.Option("local", "--network", "-n", help="Network: local, ic (for runtime-* actions)"),
+    identity: Optional[str] = typer.Option(None, "--identity", help="dfx identity to use (for runtime-* actions)"),
+    raw_json: bool = typer.Option(False, "--json", help="Output raw JSON (for runtime-list)"),
 ) -> None:
     """Manage Realm extensions."""
-    extension_command(action, extension_id, package_path, source_dir, all_extensions)
+    extension_command(action, extension_id, package_path, source_dir, all_extensions, canister, network, identity, raw_json)
 
 
 @app.command("export", hidden=True)
