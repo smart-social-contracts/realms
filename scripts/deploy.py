@@ -463,7 +463,7 @@ def deploy_frontend(
         for img_name in ("emblem.png", "logo.svg", "logo.png"):
             src = manifest_dir / img_name
             if src.exists():
-                dest = static_images / "realm_logo" + src.suffix
+                dest = static_images / ("realm_logo" + src.suffix)
                 shutil.copy2(src, dest)
                 print(f"   🖼️  Copied {img_name} → {dest}")
 
