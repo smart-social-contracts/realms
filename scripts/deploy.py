@@ -184,6 +184,54 @@ def resolve_codebase(path: str, label: str, temp_dir: str) -> str:
     sys.exit(1)
 
 
+def install_extensions_from_source(extensions_path: str, env: dict) -> None:
+    """Populate src/realm_backend/extension_packages/ and
+    src/realm_frontend/src/lib/extensions/... from a local extensions tree.
+
+    Mirrors what the full `realms mundus/realm create` pipeline does, so
+    targeted backend/frontend redeploys (i.e. this script's
+    `deploy_backend` / `deploy_frontend` paths) still pick up every
+    build-time extension. Without this step the targeted paths produce
+    builds with an empty `extension_packages/` and no extension UI —
+    which is why Dominion's sidebar lost its extensions after the first
+    targeted redeploy (see issue #168).
+
+    No-op when `extensions_codebase.path` is `none`, `bundled`, or empty:
+      - `none`   → descriptor explicitly opts out of extensions
+      - `bundled`→ handled upstream by the realms CLI mundus/realm path
+      - ``      → same as `bundled`
+    """
+    if not extensions_path or extensions_path in ("none", "bundled"):
+        return
+
+    src = Path(extensions_path).resolve()
+    if not src.exists():
+        print(f"⚠️  extensions path {src} does not exist — skipping extension install")
+        return
+
+    # The realms repo ships a submodule at `extensions/`, whose content is
+    # itself a directory `extensions/` holding every extension (nested
+    # layout). Accept either form and prefer the nested layout when
+    # present and non-empty so callers can set
+    # `extensions_codebase.path: ./extensions` in descriptors without
+    # having to know whether the submodule is flat or nested.
+    nested = src / "extensions"
+    if nested.exists() and any(nested.iterdir()):
+        install_dir = nested
+    else:
+        install_dir = src
+
+    print(f"   🧩 Installing extensions from {install_dir} into src/ tree...")
+    result = subprocess.run(
+        ["realms", "extension", "install-from-source",
+         "--source-dir", str(install_dir)],
+        env=env,
+    )
+    if result.returncode != 0:
+        print("❌ `realms extension install-from-source` failed")
+        sys.exit(1)
+
+
 # ── Registry Resolution ──────────────────────────────────────────────────────
 
 def resolve_canister_ids_from_registry(
@@ -324,6 +372,12 @@ def deploy_backend(
 
     print(f"\n⚡ Deploying backend to {backend_id} on {network} (mode={mode})")
 
+    # Populate build-time extensions into the src tree so that the
+    # backend WASM build picks them up (see comment on
+    # install_extensions_from_source for why this is needed on the
+    # targeted path).
+    install_extensions_from_source(extensions_path, env)
+
     # Install backend dependencies
     print("   📦 Installing backend dependencies...")
     for backend_dir in Path("src").glob("*_backend"):
@@ -440,6 +494,7 @@ def deploy_frontend(
     core_path: str,
     manifest_path: str,
     env: dict,
+    extensions_path: str = "none",
 ) -> None:
     """Deploy frontend canister only."""
     frontend_id = canister_ids.get("realm_frontend")
@@ -453,6 +508,12 @@ def deploy_frontend(
     if not frontend_dir.exists():
         print(f"❌ Frontend source not found: {frontend_dir}")
         sys.exit(1)
+
+    # Populate build-time extension UI (routes, lib, i18n) into the
+    # frontend src tree so vite picks it up. No-op for
+    # `extensions_codebase.path: none`. See comment on
+    # install_extensions_from_source.
+    install_extensions_from_source(extensions_path, env)
 
     # Copy realm assets from manifest directory
     if manifest_path:
@@ -833,6 +894,7 @@ Examples:
                     core_path=core_path,
                     manifest_path=descriptor["manifest"],
                     env=env,
+                    extensions_path=extensions_path,
                 )
 
             # Token and NFT subtypes would follow the same pattern

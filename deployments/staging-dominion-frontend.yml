@@ -19,8 +19,12 @@ object:
   manifest: ./examples/demo/realm1/manifest.json
   core_codebase:
     path: ./src
+  # Point at the realms-extensions submodule so the targeted frontend
+  # deploy path populates src/realm_frontend/src/{lib/extensions,routes,
+  # lib/i18n/locales/extensions} before running vite. Without this, the
+  # sidebar and /extensions routes ship empty (see issue #168).
   extensions_codebase:
-    path: none
+    path: ./extensions
   codices_codebase:
     path: none
   network: staging
