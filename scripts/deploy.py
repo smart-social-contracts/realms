@@ -696,11 +696,16 @@ Examples:
                     descriptor["id_in_registry"],
                     descriptor["network"],
                 )
-            if not canister_ids:
-                canister_ids = resolve_canister_ids_from_files(
-                    descriptor["network"],
-                    descriptor["manifest"],
-                )
+            # Merge in file-based fallback so missing canister ids (e.g.
+            # realm_frontend when the registry entry doesn't expose one,
+            # or when id_in_registry is a canister-id string that only
+            # resolves realm_backend) are filled in from canister_ids.json.
+            file_ids = resolve_canister_ids_from_files(
+                descriptor["network"],
+                descriptor["manifest"],
+            )
+            for name, cid in file_ids.items():
+                canister_ids.setdefault(name, cid)
 
             if not canister_ids:
                 print("❌ Could not resolve canister IDs. Provide id_in_registry or canister_ids.json.")
