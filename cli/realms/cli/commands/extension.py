@@ -1236,10 +1236,191 @@ def runtime_list_command(canister: str, network: str = "local", identity: Option
         console.print(table)
 
 
+def registry_install_command(canister: str, registry: str, ext_id: str, version: Optional[str] = None, network: str = "local", identity: Optional[str] = None):
+    """Install an extension from the mundus file registry via the realm canister."""
+    console.print(f"[blue]Installing extension '{ext_id}' from registry {registry} on {canister} ({network})...[/blue]")
+    if version:
+        console.print(f"  Version: {version}")
+    else:
+        console.print("  Version: latest")
+
+    payload = json.dumps({
+        "registry_canister_id": registry,
+        "ext_id": ext_id,
+        "version": version,
+    })
+    candid_arg = '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
+
+    raw = _dfx_call(canister, "install_extension_from_registry", candid_arg, network, identity, timeout=300)
+
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        console.print(f"  Response: {raw}")
+        return
+
+    if result.get("success"):
+        console.print(f"[green]  ✓ Extension '{ext_id}' installed (version {result.get('version', '?')})[/green]")
+    else:
+        console.print(f"[red]  ✗ Installation failed: {result.get('error', 'unknown error')}[/red]")
+        raise typer.Exit(1)
+
+
+# ---------------------------------------------------------------------------
+# Codex CLI commands
+# ---------------------------------------------------------------------------
+
+
+def _collect_codex_files(source_dir: str) -> dict:
+    """Collect codex files from a source directory into a {filename: content} dict."""
+    files = {}
+    for root, _dirs, filenames in os.walk(source_dir):
+        for fname in filenames:
+            if fname.endswith(".py") or fname == "manifest.json":
+                full_path = os.path.join(root, fname)
+                rel = os.path.relpath(full_path, source_dir)
+                with open(full_path, "r") as f:
+                    files[rel] = f.read()
+    return files
+
+
+def codex_runtime_install_command(canister: str, source_dir: str, codex_id: Optional[str] = None, run_init: bool = True, network: str = "local", identity: Optional[str] = None):
+    """Install a codex package on a deployed realm canister at runtime."""
+    source_dir = os.path.abspath(source_dir)
+    if not os.path.isdir(source_dir):
+        console.print(f"[red]Error: {source_dir} is not a directory[/red]")
+        raise typer.Exit(1)
+
+    if not codex_id:
+        codex_id = os.path.basename(source_dir)
+
+    console.print(f"[blue]Installing codex '{codex_id}' on {canister} ({network})...[/blue]")
+
+    files = _collect_codex_files(source_dir)
+    total_bytes = sum(len(v) for v in files.values())
+    console.print(f"  Files: {len(files)} ({total_bytes:,} bytes)")
+    for fname, content in sorted(files.items()):
+        console.print(f"    {fname} ({len(content):,} bytes)")
+
+    payload = json.dumps({"codex_id": codex_id, "files": files, "run_init": run_init})
+    candid_arg = '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
+
+    console.print("  Uploading to canister...")
+    raw = _dfx_call(canister, "install_codex", candid_arg, network, identity, timeout=300)
+
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        console.print(f"  Response: {raw}")
+        return
+
+    if result.get("success"):
+        console.print(f"[green]  ✓ Codex '{codex_id}' installed successfully[/green]")
+        if result.get("init_warning"):
+            console.print(f"[yellow]  ⚠ init.py warning: {result['init_warning']}[/yellow]")
+    else:
+        console.print(f"[red]  ✗ Installation failed: {result.get('error', 'unknown error')}[/red]")
+        raise typer.Exit(1)
+
+
+def codex_runtime_uninstall_command(canister: str, codex_id: str, network: str = "local", identity: Optional[str] = None):
+    """Uninstall a codex package from a deployed realm canister."""
+    console.print(f"[blue]Uninstalling codex '{codex_id}' from {canister} ({network})...[/blue]")
+
+    payload = json.dumps({"codex_id": codex_id})
+    candid_arg = '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
+
+    raw = _dfx_call(canister, "uninstall_codex", candid_arg, network, identity)
+
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        console.print(f"  Response: {raw}")
+        return
+
+    if result.get("success"):
+        console.print(f"[green]  ✓ Codex '{codex_id}' uninstalled[/green]")
+    else:
+        console.print(f"[red]  ✗ Uninstall failed: {result.get('error', 'unknown error')}[/red]")
+        raise typer.Exit(1)
+
+
+def codex_runtime_list_command(canister: str, network: str = "local", identity: Optional[str] = None, raw_json: bool = False):
+    """List codex packages installed on a deployed realm canister."""
+    raw = _dfx_call(canister, "list_codex_packages", "()", network, identity, is_query=True)
+
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        console.print(raw)
+        return
+
+    if raw_json:
+        console.print(json.dumps(result, indent=2))
+        return
+
+    if not result.get("success"):
+        console.print(f"[red]Error: {result.get('error', 'unknown')}[/red]")
+        raise typer.Exit(1)
+
+    packages = result.get("codex_packages", [])
+    manifests = result.get("manifests", {})
+
+    if not packages:
+        console.print("[yellow]No codex packages installed.[/yellow]")
+        return
+
+    table = Table(title=f"Codex Packages ({len(packages)})")
+    table.add_column("ID", style="cyan")
+    table.add_column("Version", style="green")
+    table.add_column("Description", style="white")
+
+    for pkg_id in packages:
+        m = manifests.get(pkg_id, {})
+        version = m.get("version", "?")
+        desc = m.get("description", "")
+        table.add_row(pkg_id, version, desc[:60] + "..." if len(desc) > 60 else desc)
+
+    console.print(table)
+
+
+def codex_registry_install_command(canister: str, registry: str, codex_id: str, version: Optional[str] = None, run_init: bool = True, network: str = "local", identity: Optional[str] = None):
+    """Install a codex package from the mundus file registry via the realm canister."""
+    console.print(f"[blue]Installing codex '{codex_id}' from registry {registry} on {canister} ({network})...[/blue]")
+    if version:
+        console.print(f"  Version: {version}")
+    else:
+        console.print("  Version: latest")
+
+    payload = json.dumps({
+        "registry_canister_id": registry,
+        "codex_id": codex_id,
+        "version": version,
+        "run_init": run_init,
+    })
+    candid_arg = '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
+
+    raw = _dfx_call(canister, "install_codex_from_registry", candid_arg, network, identity, timeout=300)
+
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        console.print(f"  Response: {raw}")
+        return
+
+    if result.get("success"):
+        console.print(f"[green]  ✓ Codex '{codex_id}' installed (version {result.get('version', '?')})[/green]")
+        if result.get("init_warning"):
+            console.print(f"[yellow]  ⚠ init.py warning: {result['init_warning']}[/yellow]")
+    else:
+        console.print(f"[red]  ✗ Installation failed: {result.get('error', 'unknown error')}[/red]")
+        raise typer.Exit(1)
+
+
 def extension_command(
     action: str = typer.Argument(
         ...,
-        help="Action to perform: list, install-from-source, package, install, uninstall, generate-manifests, runtime-install, runtime-uninstall, runtime-list",
+        help="Action to perform: list, install-from-source, package, install, uninstall, generate-manifests, runtime-install, runtime-uninstall, runtime-list, registry-install",
     ),
     extension_id: Optional[str] = typer.Option(
         None, "--extension-id", help="Extension ID for package/uninstall operations"
@@ -1254,16 +1435,22 @@ def extension_command(
         False, "--all", help="Uninstall all extensions (only for uninstall action)"
     ),
     canister: Optional[str] = typer.Option(
-        None, "--canister", "-c", help="Target realm canister ID (for runtime-* actions)"
+        None, "--canister", "-c", help="Target realm canister ID (for runtime-*/registry-* actions)"
     ),
     network: str = typer.Option(
-        "local", "--network", "-n", help="Network: local, ic (for runtime-* actions)"
+        "local", "--network", "-n", help="Network: local, ic (for runtime-*/registry-* actions)"
     ),
     identity: Optional[str] = typer.Option(
-        None, "--identity", help="dfx identity to use (for runtime-* actions)"
+        None, "--identity", help="dfx identity to use (for runtime-*/registry-* actions)"
     ),
     raw_json: bool = typer.Option(
         False, "--json", help="Output raw JSON (for runtime-list)"
+    ),
+    registry: Optional[str] = typer.Option(
+        None, "--registry", "-r", help="Mundus file registry canister ID (for registry-install)"
+    ),
+    version: Optional[str] = typer.Option(
+        None, "--version", "-v", help="Version to install (for registry-install, default: latest)"
     ),
 ) -> None:
     """Manage Realm extensions."""
@@ -1317,9 +1504,92 @@ def extension_command(
             console.print("[red]Error: --canister is required for runtime-list[/red]")
             raise typer.Exit(1)
         runtime_list_command(canister, network, identity, raw_json)
+    elif action == "registry-install":
+        if not canister:
+            console.print("[red]Error: --canister is required for registry-install[/red]")
+            raise typer.Exit(1)
+        if not registry:
+            console.print("[red]Error: --registry is required for registry-install[/red]")
+            raise typer.Exit(1)
+        if not extension_id:
+            console.print("[red]Error: --extension-id is required for registry-install[/red]")
+            raise typer.Exit(1)
+        registry_install_command(canister, registry, extension_id, version, network, identity)
     else:
         console.print(f"[red]Unknown action: {action}[/red]")
         console.print(
-            "[yellow]Available actions: list, install-from-source, generate-manifests, package, install, uninstall, runtime-install, runtime-uninstall, runtime-list[/yellow]"
+            "[yellow]Available actions: list, install-from-source, generate-manifests, package, install, uninstall, runtime-install, runtime-uninstall, runtime-list, registry-install[/yellow]"
+        )
+        raise typer.Exit(1)
+
+
+def codex_command(
+    action: str = typer.Argument(
+        ...,
+        help="Action to perform: runtime-install, runtime-uninstall, runtime-list, registry-install",
+    ),
+    codex_id: Optional[str] = typer.Option(
+        None, "--codex-id", help="Codex package ID"
+    ),
+    source_dir: str = typer.Option(
+        ".", "--source-dir", help="Source directory for codex package"
+    ),
+    canister: Optional[str] = typer.Option(
+        None, "--canister", "-c", help="Target realm canister ID"
+    ),
+    network: str = typer.Option(
+        "local", "--network", "-n", help="Network: local, ic"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="dfx identity to use"
+    ),
+    raw_json: bool = typer.Option(
+        False, "--json", help="Output raw JSON (for runtime-list)"
+    ),
+    registry: Optional[str] = typer.Option(
+        None, "--registry", "-r", help="Mundus file registry canister ID (for registry-install)"
+    ),
+    version: Optional[str] = typer.Option(
+        None, "--version", "-v", help="Version to install (for registry-install, default: latest)"
+    ),
+    run_init: bool = typer.Option(
+        True, "--run-init/--no-init", help="Run init.py after install (default: true)"
+    ),
+) -> None:
+    """Manage Realm codex packages."""
+
+    if action == "runtime-install":
+        if not canister:
+            console.print("[red]Error: --canister is required for runtime-install[/red]")
+            raise typer.Exit(1)
+        codex_runtime_install_command(canister, source_dir, codex_id, run_init, network, identity)
+    elif action == "runtime-uninstall":
+        if not canister:
+            console.print("[red]Error: --canister is required for runtime-uninstall[/red]")
+            raise typer.Exit(1)
+        if not codex_id:
+            console.print("[red]Error: --codex-id is required for runtime-uninstall[/red]")
+            raise typer.Exit(1)
+        codex_runtime_uninstall_command(canister, codex_id, network, identity)
+    elif action == "runtime-list":
+        if not canister:
+            console.print("[red]Error: --canister is required for runtime-list[/red]")
+            raise typer.Exit(1)
+        codex_runtime_list_command(canister, network, identity, raw_json)
+    elif action == "registry-install":
+        if not canister:
+            console.print("[red]Error: --canister is required for registry-install[/red]")
+            raise typer.Exit(1)
+        if not registry:
+            console.print("[red]Error: --registry is required for registry-install[/red]")
+            raise typer.Exit(1)
+        if not codex_id:
+            console.print("[red]Error: --codex-id is required for registry-install[/red]")
+            raise typer.Exit(1)
+        codex_registry_install_command(canister, registry, codex_id, version, run_init, network, identity)
+    else:
+        console.print(f"[red]Unknown action: {action}[/red]")
+        console.print(
+            "[yellow]Available actions: runtime-install, runtime-uninstall, runtime-list, registry-install[/yellow]"
         )
         raise typer.Exit(1)

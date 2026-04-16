@@ -13,7 +13,7 @@ from .commands.deploy import deploy_command, deploy_from_descriptor
 from .commands.fs import fs_cat_command, fs_ls_command, fs_rm_command, fs_write_command
 from .commands.import_data import import_codex_command, import_data_command
 from .commands.export_data import export_data_command
-from .commands.extension import extension_command
+from .commands.extension import extension_command, codex_command
 from .commands.marketplace import marketplace_create_command, marketplace_deploy_command
 from .commands.mundus import mundus_create_command, mundus_deploy_command, mundus_status_command
 from .commands.quarter import (
@@ -116,13 +116,32 @@ def extension(
     package_path: Optional[str] = typer.Option(None, "--package-path", help="Package path"),
     source_dir: str = typer.Option("extensions", "--source-dir", help="Source directory"),
     all_extensions: bool = typer.Option(False, "--all", help="All extensions"),
-    canister: Optional[str] = typer.Option(None, "--canister", "-c", help="Target realm canister ID (for runtime-* actions)"),
-    network: str = typer.Option("local", "--network", "-n", help="Network: local, ic (for runtime-* actions)"),
-    identity: Optional[str] = typer.Option(None, "--identity", help="dfx identity to use (for runtime-* actions)"),
+    canister: Optional[str] = typer.Option(None, "--canister", "-c", help="Target realm canister ID"),
+    network: str = typer.Option("local", "--network", "-n", help="Network: local, ic"),
+    identity: Optional[str] = typer.Option(None, "--identity", help="dfx identity to use"),
     raw_json: bool = typer.Option(False, "--json", help="Output raw JSON (for runtime-list)"),
+    registry: Optional[str] = typer.Option(None, "--registry", "-r", help="Mundus file registry canister ID"),
+    version: Optional[str] = typer.Option(None, "--version", "-v", help="Version to install (default: latest)"),
 ) -> None:
     """Manage Realm extensions."""
-    extension_command(action, extension_id, package_path, source_dir, all_extensions, canister, network, identity, raw_json)
+    extension_command(action, extension_id, package_path, source_dir, all_extensions, canister, network, identity, raw_json, registry, version)
+
+
+@app.command("codex", hidden=True)
+def codex(
+    action: str = typer.Argument(..., help="Action: runtime-install, runtime-uninstall, runtime-list, registry-install"),
+    codex_id: Optional[str] = typer.Option(None, "--codex-id", help="Codex package ID"),
+    source_dir: str = typer.Option(".", "--source-dir", help="Source directory for codex package"),
+    canister: Optional[str] = typer.Option(None, "--canister", "-c", help="Target realm canister ID"),
+    network: str = typer.Option("local", "--network", "-n", help="Network: local, ic"),
+    identity: Optional[str] = typer.Option(None, "--identity", help="dfx identity to use"),
+    raw_json: bool = typer.Option(False, "--json", help="Output raw JSON (for runtime-list)"),
+    registry: Optional[str] = typer.Option(None, "--registry", "-r", help="Mundus file registry canister ID"),
+    version: Optional[str] = typer.Option(None, "--version", "-v", help="Version to install (default: latest)"),
+    run_init: bool = typer.Option(True, "--run-init/--no-init", help="Run init.py after install"),
+) -> None:
+    """Manage Realm codex packages."""
+    codex_command(action, codex_id, source_dir, canister, network, identity, raw_json, registry, version, run_init)
 
 
 @app.command("export", hidden=True)
