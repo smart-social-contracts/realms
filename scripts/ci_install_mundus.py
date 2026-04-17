@@ -275,6 +275,13 @@ def stage2_install(descriptor: Dict[str, Any], infra_ids: Dict[str, str]) -> Non
     base_version = (artifacts.get("base_wasm") or {}).get("version") or "0.0.0-dev"
     file_registry = infra_ids["file_registry"]
     realm_installer = infra_ids["realm_installer"]
+    # Default install mode: 'upgrade' preserves stable storage (admin
+    # permissions, user data, codex registrations) on already-installed
+    # canisters — correct for staging/ic where we redeploy on every push
+    # to main without wiping the world. The local descriptor sets
+    # `install_mode: reinstall` because every CI run starts on a fresh
+    # ephemeral replica where there's nothing to upgrade.
+    default_mode = (descriptor.get("install_mode") or "upgrade").strip()
 
     print("\n┌─ stage 2: install mundus members " + "─" * 32)
 
@@ -285,7 +292,8 @@ def stage2_install(descriptor: Dict[str, Any], infra_ids: Dict[str, str]) -> Non
             _dfx("canister", "create", name, network=network)
             canister_id = _canister_id(name, network)
 
-        print(f"\n   ▸ {name} ({canister_id})")
+        member_mode = (member.get("install_mode") or default_mode).strip()
+        print(f"\n   ▸ {name} ({canister_id})  [mode={member_mode}]")
         _add_controller(canister_id, realm_installer, network)
 
         # Install (or upgrade) the WASM via realm_installer.
@@ -296,7 +304,7 @@ def stage2_install(descriptor: Dict[str, Any], infra_ids: Dict[str, str]) -> Non
             "--installer", realm_installer,
             "--registry", file_registry,
             "--network", network,
-            "--mode", "reinstall",
+            "--mode", member_mode,
         ], capture_output=True)
         # realms wasm install exits 0 even when the underlying installer
         # canister returns success=false — surface that here so the
