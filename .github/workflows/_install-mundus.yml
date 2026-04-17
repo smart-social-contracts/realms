@@ -55,10 +55,12 @@ jobs:
         env:
           IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
         run: |
-          mkdir -p ~/.config/dfx/identity/ci
-          printf '%s' "$IC_IDENTITY_PEM" > ~/.config/dfx/identity/ci/identity.pem
-          chmod 600 ~/.config/dfx/identity/ci/identity.pem
+          printf '%s' "$IC_IDENTITY_PEM" > /tmp/identity.pem
+          chmod 600 /tmp/identity.pem
+          dfx identity import ci /tmp/identity.pem --storage-mode=plaintext --force
           dfx identity use ci
+          rm -f /tmp/identity.pem
+          echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
 
       - name: Start local replica (local only)
         if: ${{ inputs.network == 'local' }}
