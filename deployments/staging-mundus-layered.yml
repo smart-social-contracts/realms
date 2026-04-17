@@ -65,8 +65,8 @@ mundus:
 
 verify:
   e2e_specs:
-    - src/realm_frontend/tests/e2e/specs/layered-parity.spec.ts
+    - tests/e2e/specs/layered-parity.spec.ts
   integration_tests:
-    - tests/backend/test_status_api.py
-    - tests/backend/test_extensions_api.py
+    - tests/integration/test_status_api.py
+    - tests/integration/test_extensions_api.py
     - tests/backend/test_realm_registry.py
