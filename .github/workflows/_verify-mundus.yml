@@ -65,9 +65,11 @@ jobs:
       - name: Install Playwright + project deps
         working-directory: src/realm_frontend
         run: |
-          # --legacy-peer-deps: svelte-markdown@0.4.1 declares a peer
-          # range that doesn't intersect the svelte version we pin.
-          npm ci --legacy-peer-deps
+          # `npm install` (not `npm ci`) because the root lockfile lags
+          # the workspace list (file_registry_frontend was added without
+          # regenerating). --legacy-peer-deps because svelte-markdown@0.4.1
+          # declares a peer range that doesn't intersect our svelte pin.
+          npm install --legacy-peer-deps --no-audit --no-fund
           npx playwright install --with-deps chromium
       - name: Run spec ${{ matrix.spec }}
         working-directory: src/realm_frontend
