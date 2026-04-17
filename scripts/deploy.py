@@ -96,6 +96,20 @@ def load_descriptor(file_path: str) -> dict:
         print(f"❌ Invalid mode: '{mode}'. Valid: {VALID_MODES}")
         sys.exit(1)
 
+    # Layered install strategy (Issue #168). When set to "layered", the
+    # backend WASM is installed via realm_installer + file_registry rather
+    # than `dfx canister install --wasm <local-path>`, and extensions/
+    # codices are published to file_registry and `install_*_from_registry`
+    # is called on the target realm canister.
+    install_strategy = (obj.get("install_strategy") or "bundled").strip().lower()
+    if install_strategy not in ("bundled", "layered"):
+        print(
+            f"❌ Invalid install_strategy: '{install_strategy}'. "
+            "Valid: bundled, layered"
+        )
+        sys.exit(1)
+    layered = obj.get("layered") or {}
+
     return {
         "version": data.get("version", 1),
         "type": obj_type,
@@ -109,6 +123,8 @@ def load_descriptor(file_path: str) -> dict:
         "id_in_registry": obj.get("id_in_registry"),
         "mode": mode,
         "parameters": obj.get("parameters", {}),
+        "install_strategy": install_strategy,
+        "layered": layered,
     }
 
 
@@ -712,6 +728,226 @@ def deploy_frontend(
     print(f"   ✅ Frontend deployed to {frontend_id}")
 
 
+# ── Layered install strategy (Issue #168) ─────────────────────────────────────
+
+def _list_layered_extensions(
+    extensions_path: str, only: list,
+) -> list:
+    """Return a list of (ext_id, ext_dir) for every extension that should be
+    published in layered mode.
+
+    ``only`` is the value of ``descriptor['layered']['extensions']``:
+        - ``"all"`` or empty → every extension dir under
+          ``<extensions_path>/extensions/<id>/`` containing manifest.json
+        - list of ids → exactly those (still must contain manifest.json)
+    """
+    base = Path(extensions_path)
+    # Repo layout: extensions_path can be either the realms-extensions repo
+    # root (with an `extensions/` subdir) or the `extensions/` dir itself.
+    if (base / "extensions").is_dir():
+        base = base / "extensions"
+    if not base.is_dir():
+        print(f"   ⚠️  extensions path not found for layered publish: {base}")
+        return []
+    out = []
+    if only in (None, "", "all", ["all"]):
+        for child in sorted(base.iterdir()):
+            if not child.is_dir() or child.name.startswith("_"):
+                continue
+            if (child / "manifest.json").exists():
+                out.append((child.name, child))
+    else:
+        if isinstance(only, str):
+            only = [s.strip() for s in only.split(",") if s.strip()]
+        for ext_id in only:
+            ext_dir = base / ext_id
+            if not (ext_dir / "manifest.json").exists():
+                print(f"   ⚠️  layered extension '{ext_id}' missing manifest.json — skipping")
+                continue
+            out.append((ext_id, ext_dir))
+    return out
+
+
+def _list_layered_codices(
+    codices_path: str, only: list,
+) -> list:
+    """Return a list of (codex_id, codex_dir) for every codex that should be
+    published in layered mode."""
+    base = Path(codices_path)
+    if (base / "codices").is_dir():
+        base = base / "codices"
+    if not base.is_dir():
+        print(f"   ⚠️  codices path not found for layered publish: {base}")
+        return []
+    skip = {"_common", "common"}
+    out = []
+    if only in (None, "", "all", ["all"]):
+        for child in sorted(base.iterdir()):
+            if not child.is_dir() or child.name in skip:
+                continue
+            if any(p.suffix == ".py" for p in child.iterdir()):
+                out.append((child.name, child))
+    else:
+        if isinstance(only, str):
+            only = [s.strip() for s in only.split(",") if s.strip()]
+        for cid in only:
+            cd = base / cid
+            if not cd.is_dir():
+                print(f"   ⚠️  layered codex '{cid}' not found — skipping")
+                continue
+            out.append((cid, cd))
+    return out
+
+
+def deploy_layered_backend(
+    network: str,
+    mode: str,
+    canister_ids: dict,
+    layered: dict,
+    extensions_path: str,
+    codices_path: str,
+    env: dict,
+    realms_cli: list = None,
+) -> None:
+    """Layered install (Issue #168):
+
+      1. ``realms wasm install`` → realm_installer pulls the base WASM out
+         of file_registry in chunks and calls
+         ``ic.management_canister.install_chunked_code`` on the target.
+      2. For each layered extension: ``realms extension publish`` + ``realms
+         extension registry-install``.
+      3. For each layered codex: ``realms codex publish`` + ``realms codex
+         registry-install``.
+
+    Required ``layered`` fields:
+        file_registry:    canister id of file_registry on this network
+        realm_installer:  canister id of realm_installer on this network
+        base_wasm_version: version of the base WASM to install (the
+                           realm_installer will look up
+                           ``wasm/realm-base-<version>.wasm.gz`` under that
+                           file_registry).
+
+    Optional fields:
+        extensions:    "all" | comma-string | list of ext ids   (default: all)
+        codices:       "all" | comma-string | list of codex ids (default: all)
+        wasm_path:     full registry path override               (default:
+                       realm-base-<base_wasm_version>.wasm.gz)
+        publish:       bool (default true) — set false to skip publishing
+                       step (e.g. a CI step already published the artifacts).
+    """
+    backend_id = canister_ids.get("realm_backend")
+    if not backend_id:
+        print("❌ No realm_backend canister ID resolved. Cannot do layered install.")
+        sys.exit(1)
+    file_registry = layered.get("file_registry")
+    if not file_registry:
+        print("❌ layered.file_registry is required for install_strategy=layered")
+        sys.exit(1)
+    realm_installer = layered.get("realm_installer")
+    if not realm_installer:
+        print("❌ layered.realm_installer is required for install_strategy=layered")
+        sys.exit(1)
+    base_wasm_version = layered.get("base_wasm_version")
+    if not base_wasm_version:
+        print("❌ layered.base_wasm_version is required for install_strategy=layered")
+        sys.exit(1)
+
+    realms_cli = realms_cli or ["realms"]
+    do_publish = bool(layered.get("publish", True))
+
+    print(f"\n🧱 Layered backend install (Issue #168)")
+    print(f"   target:           {backend_id} on {network}")
+    print(f"   file_registry:    {file_registry}")
+    print(f"   realm_installer:  {realm_installer}")
+    print(f"   base_wasm_version: {base_wasm_version}")
+    print(f"   mode:             {mode}")
+    print(f"   publish step:     {'on' if do_publish else 'off'}")
+
+    # ---- 1. Install base WASM via realm_installer ------------------------
+    cmd = realms_cli + [
+        "wasm", "install",
+        "--registry", file_registry,
+        "--installer", realm_installer,
+        "--target", backend_id,
+        "--version", str(base_wasm_version),
+        "--mode", mode if mode in ("install", "reinstall", "upgrade") else "upgrade",
+        "--network", network,
+    ]
+    if layered.get("wasm_path"):
+        cmd.extend(["--wasm-path", layered["wasm_path"]])
+    print(f"\n   🚚 {' '.join(cmd)}")
+    rc = subprocess.run(cmd, env=env).returncode
+    if rc != 0:
+        print(f"❌ realm_installer install failed (rc={rc})")
+        sys.exit(1)
+
+    # ---- 2. Publish + install all layered extensions ---------------------
+    ext_list = _list_layered_extensions(
+        extensions_path, layered.get("extensions", "all")
+    )
+    print(f"\n   🧩 layered extensions: {len(ext_list)} "
+          f"({', '.join(e[0] for e in ext_list) if ext_list else 'none'})")
+    for ext_id, ext_dir in ext_list:
+        if do_publish:
+            pub = realms_cli + [
+                "extension", "publish",
+                "--registry", file_registry,
+                "--source-dir", str(ext_dir),
+                "--network", network,
+            ]
+            print(f"      📤 {' '.join(pub)}")
+            rc = subprocess.run(pub, env=env).returncode
+            if rc != 0:
+                print(f"      ❌ publish failed for {ext_id} (rc={rc})")
+                sys.exit(1)
+        inst = realms_cli + [
+            "extension", "registry-install",
+            "--canister", backend_id,
+            "--registry", file_registry,
+            "--extension-id", ext_id,
+            "--network", network,
+        ]
+        print(f"      🔌 {' '.join(inst)}")
+        rc = subprocess.run(inst, env=env).returncode
+        if rc != 0:
+            print(f"      ❌ registry-install failed for {ext_id} (rc={rc})")
+            sys.exit(1)
+
+    # ---- 3. Publish + install all layered codices ------------------------
+    cdx_list = _list_layered_codices(
+        codices_path, layered.get("codices", "all")
+    )
+    print(f"\n   📜 layered codices: {len(cdx_list)} "
+          f"({', '.join(c[0] for c in cdx_list) if cdx_list else 'none'})")
+    for cid, cdir in cdx_list:
+        if do_publish:
+            pub = realms_cli + [
+                "codex", "publish",
+                "--registry", file_registry,
+                "--source-dir", str(cdir),
+                "--network", network,
+            ]
+            print(f"      📤 {' '.join(pub)}")
+            rc = subprocess.run(pub, env=env).returncode
+            if rc != 0:
+                print(f"      ❌ publish failed for codex {cid} (rc={rc})")
+                sys.exit(1)
+        inst = realms_cli + [
+            "codex", "registry-install",
+            "--canister", backend_id,
+            "--registry", file_registry,
+            "--codex-id", cid,
+            "--network", network,
+        ]
+        print(f"      🔌 {' '.join(inst)}")
+        rc = subprocess.run(inst, env=env).returncode
+        if rc != 0:
+            print(f"      ❌ registry-install failed for codex {cid} (rc={rc})")
+            sys.exit(1)
+
+    print(f"\n   ✅ Layered backend install complete on {backend_id}")
+
+
 def deploy_full(
     descriptor: dict,
     env: dict,
@@ -847,6 +1083,14 @@ Examples:
     print(f"📜 Codices:     {descriptor['codices_codebase']}")
     if descriptor["id_in_registry"]:
         print(f"🔢 Registry ID: {descriptor['id_in_registry']}")
+    print(f"🧱 Strategy:    {descriptor.get('install_strategy', 'bundled')}")
+    if descriptor.get("install_strategy") == "layered":
+        layered = descriptor.get("layered", {})
+        print(f"   file_registry:   {layered.get('file_registry')}")
+        print(f"   realm_installer: {layered.get('realm_installer')}")
+        print(f"   base_wasm_ver:   {layered.get('base_wasm_version')}")
+        print(f"   extensions:      {layered.get('extensions', 'all')}")
+        print(f"   codices:         {layered.get('codices', 'all')}")
     if descriptor["parameters"]:
         print(f"⚙️  Parameters:  {descriptor['parameters']}")
     print()
@@ -918,15 +1162,26 @@ Examples:
                 print(f"   {name}: {cid}")
 
             if "backend" in subtypes:
-                deploy_backend(
-                    network=descriptor["network"],
-                    mode=descriptor["mode"],
-                    canister_ids=canister_ids,
-                    core_path=core_path,
-                    extensions_path=extensions_path,
-                    quarters=descriptor["quarters"],
-                    env=env,
-                )
+                if descriptor.get("install_strategy") == "layered":
+                    deploy_layered_backend(
+                        network=descriptor["network"],
+                        mode=descriptor["mode"],
+                        canister_ids=canister_ids,
+                        layered=descriptor["layered"],
+                        extensions_path=extensions_path,
+                        codices_path=codices_path,
+                        env=env,
+                    )
+                else:
+                    deploy_backend(
+                        network=descriptor["network"],
+                        mode=descriptor["mode"],
+                        canister_ids=canister_ids,
+                        core_path=core_path,
+                        extensions_path=extensions_path,
+                        quarters=descriptor["quarters"],
+                        env=env,
+                    )
 
             if "frontend" in subtypes:
                 deploy_frontend(

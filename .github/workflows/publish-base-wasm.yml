@@ -89,30 +89,13 @@ jobs:
 
       - name: Build base WASM
         run: |
-          # Build without baked-in extensions (extension_packages stays minimal)
-          # The base WASM contains core realm backend only
-          mkdir -p src/realm_backend/extension_packages
-          echo '"""Extension packages directory (empty for base WASM)."""' > src/realm_backend/extension_packages/__init__.py
-
-          # Create minimal registry.py stub
-          cat > src/realm_backend/extension_packages/registry.py << 'EOF'
-          """Extension registry stub for base WASM."""
-          def get_func(extension_name, function_name):
-              raise ValueError(f"Extension '{extension_name}' not available in base WASM. Install extensions at runtime.")
-          EOF
-
-          # Create minimal manifests stub
-          cat > src/realm_backend/extension_packages/extension_manifests.py << 'EOF'
-          """Extension manifests stub for base WASM."""
-          EXTENSION_MANIFESTS = {}
-          def get_all_extension_manifests():
-              return EXTENSION_MANIFESTS
-          EOF
-
-          # Create stub imports
-          echo '# No baked-in extensions in base WASM' > src/realm_backend/extension_packages/extension_imports.py
-
-          python -m basilisk realm_backend src/realm_backend/main.py
+          # Layered Realm (Issue #168): build a true base WASM with zero
+          # bundled extensions. The recipe lives in scripts/build_base_wasm.py
+          # so it stays identical between this CI workflow, the
+          # `layered-deploy-dominion.yml` workflow, and any operator running
+          # the build locally. Do NOT inline-fork the recipe here — change
+          # `scripts/build_base_wasm.py` instead.
+          python3 scripts/build_base_wasm.py --keep-stubs
           ls -la .basilisk/realm_backend/realm_backend.wasm
 
       - name: Compress WASM

@@ -46,8 +46,11 @@ export interface ExtensionFrontendInfo {
 /**
  * Build the HTTP base URL for a file_registry canister, valid for both
  * local `dfx` (subdomain on localhost) and production ICP gateways.
+ *
+ * Exported because the i18n loader (`$lib/i18n`) needs to fetch translation
+ * JSON from the same canister using the same URL convention.
  */
-function fileRegistryBaseUrlFor(canisterId: string): string {
+export function fileRegistryBaseUrlFor(canisterId: string): string {
   const host = typeof window !== 'undefined' ? window.location.host : '';
   const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
 

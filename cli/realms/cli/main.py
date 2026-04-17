@@ -112,7 +112,12 @@ def import_data(
 
 @app.command("extension", hidden=True)
 def extension(
-    action: str = typer.Argument(..., help="Action to perform"),
+    action: str = typer.Argument(
+        ...,
+        help="Action to perform (list, install-from-source, package, install, uninstall, "
+        "generate-manifests, runtime-install, runtime-uninstall, runtime-list, "
+        "registry-install, publish)",
+    ),
     extension_id: Optional[str] = typer.Option(None, "--extension-id", help="Extension ID"),
     package_path: Optional[str] = typer.Option(None, "--package-path", help="Package path"),
     source_dir: str = typer.Option("extensions", "--source-dir", help="Source directory"),
@@ -121,41 +126,159 @@ def extension(
     network: str = typer.Option("local", "--network", "-n", help="Network: local, ic"),
     identity: Optional[str] = typer.Option(None, "--identity", help="dfx identity to use"),
     raw_json: bool = typer.Option(False, "--json", help="Output raw JSON (for runtime-list)"),
-    registry: Optional[str] = typer.Option(None, "--registry", "-r", help="File registry canister ID"),
-    version: Optional[str] = typer.Option(None, "--version", "-v", help="Version to install (default: latest)"),
+    registry: Optional[str] = typer.Option(
+        None, "--registry", "-r",
+        help="File registry canister ID (registry-install or publish)",
+    ),
+    version: Optional[str] = typer.Option(
+        None, "--version", "-v",
+        help="Version to install/publish (default: registry-install→latest, "
+        "publish→manifest.json)",
+    ),
+    bundle_path: Optional[str] = typer.Option(
+        None, "--bundle-path",
+        help="Pre-built ESM frontend bundle (override <source>/frontend-rt/dist/index.js for publish)",
+    ),
+    namespace_prefix: str = typer.Option(
+        "ext", "--namespace-prefix",
+        help="Registry namespace prefix for publish (default: ext)",
+    ),
+    skip_publish_marker: bool = typer.Option(
+        False, "--skip-publish",
+        help="Upload files but do not call publish_namespace (publish action only)",
+    ),
 ) -> None:
     """Manage Realm extensions."""
-    extension_command(action, extension_id, package_path, source_dir, all_extensions, canister, network, identity, raw_json, registry, version)
+    extension_command(
+        action,
+        extension_id,
+        package_path,
+        source_dir,
+        all_extensions,
+        canister,
+        network,
+        identity,
+        raw_json,
+        registry,
+        version,
+        bundle_path,
+        namespace_prefix,
+        skip_publish_marker,
+    )
 
 
 @app.command("codex", hidden=True)
 def codex(
-    action: str = typer.Argument(..., help="Action: runtime-install, runtime-uninstall, runtime-list, registry-install"),
+    action: str = typer.Argument(
+        ...,
+        help="Action: runtime-install, runtime-uninstall, runtime-list, registry-install, publish",
+    ),
     codex_id: Optional[str] = typer.Option(None, "--codex-id", help="Codex package ID"),
     source_dir: str = typer.Option(".", "--source-dir", help="Source directory for codex package"),
     canister: Optional[str] = typer.Option(None, "--canister", "-c", help="Target realm canister ID"),
     network: str = typer.Option("local", "--network", "-n", help="Network: local, ic"),
     identity: Optional[str] = typer.Option(None, "--identity", help="dfx identity to use"),
     raw_json: bool = typer.Option(False, "--json", help="Output raw JSON (for runtime-list)"),
-    registry: Optional[str] = typer.Option(None, "--registry", "-r", help="File registry canister ID"),
-    version: Optional[str] = typer.Option(None, "--version", "-v", help="Version to install (default: latest)"),
+    registry: Optional[str] = typer.Option(
+        None, "--registry", "-r",
+        help="File registry canister ID (registry-install or publish)",
+    ),
+    version: Optional[str] = typer.Option(
+        None, "--version", "-v",
+        help="Version to install/publish (default: registry-install→latest, "
+        "publish→manifest.json)",
+    ),
     run_init: bool = typer.Option(True, "--run-init/--no-init", help="Run init.py after install"),
+    namespace_prefix: str = typer.Option(
+        "codex", "--namespace-prefix",
+        help="Registry namespace prefix for publish (default: codex)",
+    ),
+    skip_publish_marker: bool = typer.Option(
+        False, "--skip-publish",
+        help="Upload files but do not call publish_namespace (publish action only)",
+    ),
 ) -> None:
     """Manage Realm codex packages."""
-    codex_command(action, codex_id, source_dir, canister, network, identity, raw_json, registry, version, run_init)
+    codex_command(
+        action,
+        codex_id,
+        source_dir,
+        canister,
+        network,
+        identity,
+        raw_json,
+        registry,
+        version,
+        run_init,
+        namespace_prefix,
+        skip_publish_marker,
+    )
 
 
 @app.command("wasm", hidden=True)
 def wasm(
-    action: str = typer.Argument(..., help="Action: list, pull"),
+    action: str = typer.Argument(..., help="Action: list, pull, install, hash"),
     registry: Optional[str] = typer.Option(None, "--registry", "-r", help="File registry canister ID"),
-    version: Optional[str] = typer.Option(None, "--version", "-v", help="Version to pull (default: latest)"),
+    installer: Optional[str] = typer.Option(
+        None, "--installer", "-I",
+        help="realm_installer canister ID (required for install/hash)",
+    ),
+    target: Optional[str] = typer.Option(
+        None, "--target", "-t",
+        help="Target canister ID to install onto (required for install)",
+    ),
+    version: Optional[str] = typer.Option(None, "--version", "-v", help="Version to pull/install (default: latest)"),
+    wasm_path: Optional[str] = typer.Option(
+        None, "--wasm-path",
+        help="Override default 'realm-base-{version}.wasm.gz' path in the registry",
+    ),
+    namespace: str = typer.Option(
+        "wasm", "--namespace", help="Registry namespace for the WASM (default: wasm)"
+    ),
+    mode: str = typer.Option(
+        "upgrade", "--mode", "-m",
+        help="Install mode for install action: install | reinstall | upgrade",
+    ),
+    init_arg_b64: str = typer.Option(
+        "", "--init-arg-b64",
+        help="Optional base64-encoded candid blob to pass as init/post-upgrade arg",
+    ),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path"),
     network: str = typer.Option("ic", "--network", "-n", help="Network: local, ic"),
     identity: Optional[str] = typer.Option(None, "--identity", help="dfx identity to use"),
 ) -> None:
-    """Manage realm base WASM (Layer 1)."""
-    wasm_command(action, registry, version, output, network, identity)
+    """Manage realm base WASM (Layer 1).
+
+    Subcommands:
+      list     — list base WASMs available in the file registry
+      pull     — download a base WASM from the registry to disk
+      install  — stream a base WASM from the registry to a target canister
+                 via the realm_installer (no local download)
+      hash     — compute the sha256 of a registry-stored WASM through the
+                 realm_installer (smoke test before install)
+
+    Examples:
+      realms wasm list -r <registry> --network staging
+      realms wasm pull -r <registry> --network staging
+      realms wasm install -r <registry> -I <installer> -t <target> \\
+          --version 0.1.0 --mode upgrade --network staging
+      realms wasm hash -r <registry> -I <installer> --version 0.1.0 \\
+          --network staging
+    """
+    wasm_command(
+        action,
+        registry,
+        installer,
+        target,
+        version,
+        wasm_path,
+        namespace,
+        mode,
+        init_arg_b64,
+        output,
+        network,
+        identity,
+    )
 
 
 @app.command("export", hidden=True)

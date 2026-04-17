@@ -48,35 +48,86 @@ def _ext_dir(ext_id: str) -> str:
 def _load_module(ext_id: str, force=False) -> Optional[Any]:
     """Load (or reload) an extension's entry.py as a Python module.
 
-    Uses exec/compile instead of importlib.util which is not available
-    in the CPython WASM environment used by basilisk.
+    Treats the extension directory as a *package* so that ``entry.py`` can
+    use relative imports like ``from .models import X`` to pull in sibling
+    .py files. Uses exec/compile instead of importlib.util which is not
+    available in the CPython WASM environment used by basilisk.
+
+    Returns None if the extension has no ``entry.py`` (i.e. it's a
+    frontend-only extension); callers must treat that as a separate
+    state from a load *failure*.
     """
     if ext_id in _loaded_modules and not force:
         return _loaded_modules[ext_id]
 
-    entry_path = os.path.join(_ext_dir(ext_id), "entry.py")
+    ext_path = _ext_dir(ext_id)
+    entry_path = os.path.join(ext_path, "entry.py")
     if not os.path.exists(entry_path):
-        logger.warning(f"Extension {ext_id}: entry.py not found at {entry_path}")
+        logger.info(f"Extension {ext_id}: no entry.py at {entry_path} (frontend-only)")
         return None
 
-    module_name = f"_runtime_ext_{ext_id}"
+    package_name = f"_runtime_ext_{ext_id}"
     try:
-        # Create a module object (type(sys) == <class 'module'> on CPython WASM)
         ModuleType = type(sys)
-        module = ModuleType(module_name)
-        module.__file__ = entry_path
-        module.__name__ = module_name
 
-        # Read and compile the source
+        # 1. Build a package shell so relative imports resolve.
+        package = ModuleType(package_name)
+        package.__file__ = os.path.join(ext_path, "__init__.py")
+        package.__name__ = package_name
+        package.__path__ = [ext_path]
+        package.__package__ = package_name
+        sys.modules[package_name] = package
+
+        # 2. Pre-load every sibling .py as <package>.<stem> so subsequent
+        #    relative imports inside entry.py find them in sys.modules.
+        for fname in sorted(os.listdir(ext_path)):
+            if not fname.endswith(".py"):
+                continue
+            if fname in ("entry.py", "__init__.py"):
+                continue
+            sib_path = os.path.join(ext_path, fname)
+            stem = fname[:-3]
+            sib_full = f"{package_name}.{stem}"
+            sib_module = ModuleType(sib_full)
+            sib_module.__file__ = sib_path
+            sib_module.__name__ = sib_full
+            sib_module.__package__ = package_name
+            try:
+                with open(sib_path, "r") as f:
+                    sib_source = f.read()
+                sib_code = compile(sib_source, sib_path, "exec")
+                exec(sib_code, sib_module.__dict__)
+                sys.modules[sib_full] = sib_module
+                setattr(package, stem, sib_module)
+            except Exception as e:
+                logger.warning(
+                    f"Extension {ext_id}: sibling module {fname} failed to "
+                    f"pre-load ({e}); relative imports against it will fail."
+                )
+
+        # 3. Load entry.py as the package's main entry point.
+        entry_full = f"{package_name}.entry"
+        module = ModuleType(entry_full)
+        module.__file__ = entry_path
+        module.__name__ = entry_full
+        module.__package__ = package_name
+
         with open(entry_path, "r") as f:
             source = f.read()
         code = compile(source, entry_path, "exec")
-
-        # Execute in the module's namespace
         exec(code, module.__dict__)
 
-        sys.modules[module_name] = module
+        sys.modules[entry_full] = module
+        # Public name (what get_func() looks up) points at the entry module
+        # but is also reachable via the package alias for older callers.
+        sys.modules[package_name + "_entry_alias"] = module
         _loaded_modules[ext_id] = module
+        # Mirror entry's public symbols on the package so legacy code that
+        # imports `_runtime_ext_<id>` still finds them.
+        for attr_name, attr_val in module.__dict__.items():
+            if attr_name.startswith("_"):
+                continue
+            setattr(package, attr_name, attr_val)
         logger.info(f"Extension {ext_id}: loaded from {entry_path}")
         return module
     except Exception as e:
@@ -238,21 +289,34 @@ def install_extension(
         except Exception as e:
             logger.warning(f"Extension {ext_id}: could not write _source.json — {e}")
 
-    # Clear caches to force reload
     _loaded_modules.pop(ext_id, None)
     _loaded_manifests.pop(ext_id, None)
 
-    # Verify it loads
-    module = _load_module(ext_id, force=True)
     manifest = _load_manifest(ext_id, force=True)
-
-    if module is None:
-        logger.error(f"Extension {ext_id}: installed but failed to load entry.py")
-        return False
     if manifest is None:
-        logger.warning(f"Extension {ext_id}: installed but no manifest.json")
+        logger.error(f"Extension {ext_id}: installed but missing manifest.json")
+        return False
 
-    logger.info(f"Extension {ext_id}: installed successfully ({len(files)} files)")
+    has_entry = os.path.exists(os.path.join(ext_path, "entry.py"))
+    if has_entry:
+        # Backend-bearing extension — entry.py MUST load cleanly, otherwise
+        # subsequent extension_sync_call will fail in confusing ways.
+        module = _load_module(ext_id, force=True)
+        if module is None:
+            logger.error(
+                f"Extension {ext_id}: installed but failed to load entry.py"
+            )
+            return False
+        logger.info(
+            f"Extension {ext_id}: installed successfully (backend, {len(files)} files)"
+        )
+    else:
+        # Frontend-only extension — no entry.py, so nothing to import. The
+        # manifest is enough for sidebar/manifest queries; the bundle is
+        # served separately by the realm_frontend pulling from file_registry.
+        logger.info(
+            f"Extension {ext_id}: installed successfully (frontend-only, {len(files)} files)"
+        )
     return True
 
 

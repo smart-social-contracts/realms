@@ -1,0 +1,105 @@
+# Unified deployment descriptor — LAYERED deploy for Dominion on staging.
+#
+# This descriptor flips Dominion to the 3-layer architecture (Issue #168):
+#
+#   Layer 1 — base realm WASM:
+#     installed via `realms wasm install` → realm_installer canister
+#     pulls the gzipped WASM out of file_registry in chunks and calls
+#     ic.management_canister.install_chunked_code on the target.
+#     The base WASM has ZERO bundled extensions and ZERO bundled codices.
+#
+#   Layer 2 — extensions (frontend + backend):
+#     each extension's source is pushed to file_registry under
+#         ext/<ext_id>/<version>/{manifest.json, backend/*, frontend/dist/index.js, frontend/i18n/**}
+#     and then `realms extension registry-install` tells the realm_backend
+#     to copy backend/*.py + manifest.json into its stable storage so that
+#     extension_sync_call can route to it. realm_frontend dynamic-imports
+#     the per-extension ESM bundle at runtime via extension-loader.ts.
+#
+#   Layer 3 — codices:
+#     each codex package's .py files + manifest are pushed to file_registry
+#     under codex/<codex_id>/<version>/ and `realms codex registry-install`
+#     loads them into the realm_backend's codex registry so the codex
+#     scheduler can tick them.
+#
+# End-user experience MUST be identical to the bundled deploy. The only
+# operator-visible difference is HOW the artifacts arrive on the canister.
+#
+# Prerequisites — these canisters must already be deployed on staging:
+#
+#   1. file_registry — long-lived, holds every artifact this realm needs.
+#   2. realm_installer — must be a CONTROLLER of the target realm canister
+#      (otherwise upload_chunk + install_chunked_code on the IC management
+#      canister will fail). Add it via:
+#         dfx canister update-settings <dominion_realm_backend> \
+#             --add-controller <realm_installer> --network staging
+#   3. The base WASM at  wasm/realm-base-<version>.wasm.gz  must already
+#      have been published to file_registry (e.g. by .github/workflows/
+#      publish-base-wasm.yml).
+#   4. Every extension referenced under layered.extensions must already
+#      have its frontend-rt/dist/index.js built. See
+#      .github/workflows/layered-deploy-dominion.yml for the canonical
+#      build + publish + install pipeline that wraps this descriptor.
+#
+# Usage (CI):
+#   gh workflow run "Layered Deploy Dominion" \
+#     --repo smart-social-contracts/realms \
+#     --ref feat/layered-deployment \
+#     -f base_wasm_version=0.5.0 \
+#     -f mode_override=reinstall
+#
+# Usage (local, against staging):
+#   python scripts/deploy.py --file deployments/staging-dominion-layered.yml \
+#       --identity <your-staging-identity>
+#
+# Related: https://github.com/smart-social-contracts/realms/issues/168
+version: 1
+
+object:
+  type: realm
+  subtypes: backend
+  quarters: 1
+  manifest: ./examples/demo/realm1/manifest.json
+  # core_codebase is unused by the layered branch (the WASM is fetched from
+  # file_registry, not built locally), but we keep a sane default so the
+  # descriptor still loads cleanly with the bundled deploy path if someone
+  # toggles install_strategy back to "bundled" without editing this file.
+  core_codebase:
+    path: ./src
+  # Repo path used for layered.extensions=all discovery + publish step.
+  extensions_codebase:
+    path: ../realms-extensions
+  # Repo path used for layered.codices=all discovery + publish step.
+  codices_codebase:
+    path: ./codices
+  network: staging
+  # Pin Dominion by canister id (matches staging-dominion-backend.yml).
+  id_in_registry: ijdaw-dyaaa-aaaac-beh2a-cai
+  # `reinstall` wipes Dominion's stable storage so the layered install
+  # boots from a clean slate. Switch to `upgrade` for hot-reloads of an
+  # already-layered realm.
+  mode: reinstall
+  parameters: {}
+
+  # ─── NEW: layered install strategy (Issue #168) ────────────────────────
+  install_strategy: layered
+  layered:
+    # file_registry canister id on staging.
+    # TODO(operator): replace with actual canister id (or have CI inject
+    # via `--with-overrides` if your workflow exposes that).
+    file_registry: TODO_STAGING_FILE_REGISTRY_CANISTER_ID
+    # realm_installer canister id on staging — must be a controller of
+    # the target realm canister.
+    realm_installer: TODO_STAGING_REALM_INSTALLER_CANISTER_ID
+    # The base WASM the realm_installer should fetch from file_registry,
+    # i.e. the bytes stored under wasm/realm-base-<version>.wasm.gz.
+    base_wasm_version: "0.5.0"
+    # Which extensions to publish + install. "all" means every extension
+    # under <extensions_codebase.path>/extensions/ that has manifest.json.
+    extensions: all
+    # Which codices to publish + install. "all" means every dir under
+    # <codices_codebase.path>/codices/ excluding _common/common.
+    codices: all
+    # Set to false to skip the publish step (when CI already published the
+    # artifacts in a separate job).
+    publish: true

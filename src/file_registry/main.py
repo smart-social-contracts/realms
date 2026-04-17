@@ -285,9 +285,22 @@ def list_files(args: text) -> text:
     """Return JSON list of files in a namespace.
 
     Args (JSON): {"namespace": str}
+
+    Returns ``"[]"`` for an unknown / partial namespace prefix (callers
+    typically iterate prefixes during exploration). Returns
+    ``{"error": "..."}`` only for genuinely malformed JSON input — never
+    traps, so HTTP and UI callers can probe freely.
     """
-    params = json.loads(args)
+    try:
+        params = json.loads(args) if args else {}
+    except (json.JSONDecodeError, ValueError) as e:
+        return json.dumps({"error": f"invalid args (not JSON): {e}"})
+    if not isinstance(params, dict) or "namespace" not in params:
+        return json.dumps({"error": "expected JSON object with 'namespace' field"})
     namespace = params["namespace"]
+    namespaces = _load_namespaces()
+    if namespace not in namespaces:
+        return "[]"
     meta = _load_meta(namespace)
     files = meta.get("files", {})
     result = [
@@ -329,6 +342,129 @@ def get_file(args: text) -> text:
         "size": len(content),
         "sha256": file_info.get("sha256") or hashlib.sha256(content).hexdigest(),
     })
+
+
+@query
+def get_file_size(args: text) -> text:
+    """Return the byte size of a stored file.
+
+    Used by the realm_installer canister (Motoko) to know how many
+    chunks it needs to pull when assembling a base WASM that is too
+    large (~3-15 MB) to fit in a single inter-canister message
+    (~2 MiB Candid encoding budget).
+
+    Args (JSON): {"namespace": str, "path": str}
+    Returns JSON: {"size": int, "content_type": str, "sha256": str}
+                  | {"error": str}
+    """
+    params = json.loads(args)
+    namespace = params["namespace"]
+    path = params["path"].lstrip("/")
+
+    fp = _file_path(namespace, path)
+    try:
+        size = os.path.getsize(fp)
+    except FileNotFoundError:
+        return json.dumps({"error": f"Not found: {namespace}/{path}"})
+
+    meta = _load_meta(namespace)
+    file_info = meta.get("files", {}).get(path, {})
+    return json.dumps({
+        "size": size,
+        "content_type": file_info.get("content_type") or _guess_content_type(path),
+        "sha256": file_info.get("sha256", ""),
+    })
+
+
+# Maximum chunk size the chunked-read API will return per call.
+# Conservative choice (768 KB raw → ~1 MB base64) so we stay well under
+# the 2 MiB Candid encoding limit for inter-canister responses, and
+# matches the upload chunk size used by publish-base-wasm.yml so that a
+# round-trip up-then-down behaves uniformly.
+_MAX_CHUNK_READ_BYTES = 768 * 1024
+
+
+@query
+def get_file_chunk(args: text) -> text:
+    """Return a slice of a stored file as base64.
+
+    Args (JSON): {
+        "namespace": str,
+        "path": str,
+        "offset": int,                 (byte offset, default 0)
+        "length": int                  (bytes to read; capped to ~768KB)
+    }
+    Returns JSON: {
+        "content_b64": str,            (base64 of the slice)
+        "offset": int,
+        "length": int,                 (actual bytes returned)
+        "total_size": int,
+        "eof": bool
+    } | {"error": str}
+
+    Used by realm_installer to pull a multi-MB realm-base WASM from the
+    registry one chunk at a time before calling the IC management
+    canister's `install_chunked_code`.
+    """
+    params = json.loads(args)
+    namespace = params["namespace"]
+    path = params["path"].lstrip("/")
+    offset = int(params.get("offset", 0))
+    length = int(params.get("length", _MAX_CHUNK_READ_BYTES))
+    if length <= 0 or length > _MAX_CHUNK_READ_BYTES:
+        length = _MAX_CHUNK_READ_BYTES
+
+    fp = _file_path(namespace, path)
+    try:
+        size = os.path.getsize(fp)
+    except FileNotFoundError:
+        return json.dumps({"error": f"Not found: {namespace}/{path}"})
+
+    if offset < 0 or offset > size:
+        return json.dumps({"error": f"Offset {offset} out of range (size={size})"})
+
+    with open(fp, "rb") as f:
+        f.seek(offset)
+        chunk = f.read(length)
+
+    return json.dumps({
+        "content_b64": base64.b64encode(chunk).decode("ascii"),
+        "offset": offset,
+        "length": len(chunk),
+        "total_size": size,
+        "eof": (offset + len(chunk)) >= size,
+    })
+
+
+@query
+def get_file_chunk_icc(
+    namespace: text, path: text, offset: text, length: text
+) -> text:
+    """Inter-canister variant of get_file_chunk.
+
+    Basilisk's Candid encoder treats `{}` as record syntax, so cross-canister
+    calls cannot pass JSON dict strings reliably. This endpoint exposes the
+    same logic with positional text arguments. `offset` and `length` are
+    decimal strings parsed to int; pass "0"/"" for length to use default.
+    """
+    try:
+        off = int(offset) if offset else 0
+        ln = int(length) if length else _MAX_CHUNK_READ_BYTES
+    except (TypeError, ValueError):
+        return json.dumps({"error": "offset and length must be integers"})
+
+    return get_file_chunk(json.dumps({
+        "namespace": namespace,
+        "path": path,
+        "offset": off,
+        "length": ln,
+    }))
+
+
+@query
+def get_file_size_icc(namespace: text, path: text) -> text:
+    """Inter-canister variant of get_file_size."""
+    return get_file_size(json.dumps({"namespace": namespace, "path": path}))
 
 
 @query
@@ -897,6 +1033,11 @@ def store_file_chunk(args: text) -> text:
 def finalize_chunked_file(args: text) -> text:
     """Assemble previously uploaded chunks into the final file.
 
+    All-in-one variant: concatenates every chunk and computes the SHA-256
+    in a single update message. Suitable for files up to ~600 KB on the
+    WASI Python runtime; larger files exceed the 40B-instruction
+    per-message budget — use ``finalize_chunked_file_step`` for those.
+
     Args (JSON): {"namespace": str, "path": str}
     """
     params = json.loads(args)
@@ -957,6 +1098,144 @@ def finalize_chunked_file(args: text) -> text:
         "path": path,
         "size": total_size,
         "sha256": sha256,
+    })
+
+
+@update
+def finalize_chunked_file_step(args: text) -> text:
+    """Incremental variant of finalize_chunked_file.
+
+    Each call concatenates up to ``batch_size`` chunks (default 1) into the
+    output file and returns progress. Caller polls until ``done=true``.
+
+    This avoids the per-message instruction budget (40B) being blown by
+    multi-MB files, which the single-shot ``finalize_chunked_file`` does
+    on the WASI Python runtime — observed on the 1.8 MB gz base WASM.
+
+    The on-chain SHA-256 computation is *skipped*: hashing N MB of bytes
+    with Python's hashlib costs ~30M instructions/MB, which dominates the
+    finalize cost for any non-trivial file. Caller passes the SHA-256
+    they computed locally (e.g. the same SHA the IC management canister
+    expects for ``install_chunked_code``); the registry stores it as-is
+    and serves it back via ``get_file`` / ``list_files``. Trust model is
+    unchanged: the caller already authenticated via the namespace ACL.
+
+    Args (JSON): {
+        "namespace": str,
+        "path": str,
+        "expected_sha256": str (optional) — full-file sha256 hex; stored
+            on commit. Cached after the first call so callers only need
+            to send it once.
+        "batch_size": int (optional, default 1) — chunks to process this
+            call. Use 1 for multi-MB chunks, larger for many small chunks.
+    }
+    Returns JSON: {
+        "ok": True,
+        "done": bool,            # true once every chunk has been
+                                 # concatenated and meta has been written
+        "processed": int,        # chunks consumed so far
+        "total": int,            # total chunks in the upload
+        "size": int,             # only set when done=true
+        "sha256": str,           # only set when done=true (may be "")
+    }
+    """
+    try:
+        params = json.loads(args)
+    except (json.JSONDecodeError, ValueError) as e:
+        return json.dumps({"error": f"invalid args (not JSON): {e}"})
+
+    namespace = params["namespace"]
+    path = params["path"].lstrip("/")
+    batch_size = max(1, int(params.get("batch_size", 1)))
+    expected_sha256 = params.get("expected_sha256", "") or ""
+
+    err = _require_publisher(namespace)
+    if err:
+        return err
+
+    pending_path = _pending_meta_path(namespace, path)
+    try:
+        with open(pending_path, "r") as f:
+            pending = json.loads(f.read())
+    except FileNotFoundError:
+        return json.dumps({"error": f"No pending upload for {namespace}/{path}"})
+
+    total_chunks = int(pending["total_chunks"])
+    content_type = pending.get("content_type") or _guess_content_type(path)
+    processed = int(pending.get("processed_chunks", 0))
+    output_size = int(pending.get("output_size", 0))
+
+    # Cache caller's expected sha on the first call so subsequent calls
+    # don't have to repeat it.
+    if expected_sha256 and not pending.get("expected_sha256"):
+        pending["expected_sha256"] = expected_sha256
+    if not expected_sha256:
+        expected_sha256 = pending.get("expected_sha256", "")
+
+    fp = _file_path(namespace, path)
+
+    # First step: validate every chunk file exists, prep the output.
+    if processed == 0:
+        for i in range(total_chunks):
+            if not os.path.exists(_chunk_file_path(namespace, path, i)):
+                return json.dumps({"error": f"Missing chunk {i} of {total_chunks}"})
+        caller_str = ic.caller().to_str()
+        _ensure_namespace_exists(namespace, caller_str)
+        os.makedirs(os.path.dirname(fp), exist_ok=True)
+        # Truncate any prior partial output so retries are idempotent.
+        open(fp, "wb").close()
+        output_size = 0
+
+    # Process this batch.
+    end = min(processed + batch_size, total_chunks)
+    with open(fp, "ab") as out:
+        for i in range(processed, end):
+            chunk_path = _chunk_file_path(namespace, path, i)
+            with open(chunk_path, "rb") as cf:
+                chunk = cf.read()
+            out.write(chunk)
+            output_size += len(chunk)
+            os.remove(chunk_path)
+    processed = end
+
+    pending["processed_chunks"] = processed
+    pending["output_size"] = output_size
+
+    if processed < total_chunks:
+        # Save resume state.
+        with open(pending_path, "w") as f:
+            f.write(json.dumps(pending))
+        return json.dumps({
+            "ok": True,
+            "done": False,
+            "processed": processed,
+            "total": total_chunks,
+        })
+
+    # All chunks consumed — commit metadata and clean up.
+    try:
+        os.remove(pending_path)
+    except OSError:
+        pass
+
+    meta = _load_meta(namespace)
+    meta.setdefault("files", {})[path] = {
+        "size": output_size,
+        "content_type": content_type,
+        "sha256": expected_sha256,
+        "updated": ic.time(),
+    }
+    _save_meta(namespace, meta)
+
+    return json.dumps({
+        "ok": True,
+        "done": True,
+        "processed": processed,
+        "total": total_chunks,
+        "namespace": namespace,
+        "path": path,
+        "size": output_size,
+        "sha256": expected_sha256,
     })
 
 

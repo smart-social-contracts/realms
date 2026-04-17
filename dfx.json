@@ -54,6 +54,29 @@
       "type": "custom",
       "wasm": ".basilisk/file_registry/file_registry.wasm"
     },
+    "realm_installer": {
+      "build": "python -m basilisk realm_installer src/realm_installer/main.py",
+      "candid": "src/realm_installer/realm_installer.did",
+      "declarations": {
+        "node_compatibility": true
+      },
+      "gzip": true,
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ],
+      "tech_stack": {
+        "cdk": {
+          "basilisk": {}
+        },
+        "language": {
+          "python": {}
+        }
+      },
+      "type": "custom",
+      "wasm": ".basilisk/realm_installer/realm_installer.wasm"
+    },
     "realm_registry_backend": {
       "build": "python -m basilisk realm_registry_backend src/realm_registry_backend/main.py",
       "candid": "src/realm_registry_backend/realm_registry_backend.did",
@@ -178,7 +201,7 @@
       }
     }
   },
-  "defaults": { 
+  "defaults": {
     "build": {
       "args": "",
       "packtool": ""
@@ -190,22 +213,28 @@
       "type": "ephemeral"
     },
     "staging": {
-      "providers": ["https://icp0.io"],
+      "providers": [
+        "https://icp0.io"
+      ],
       "type": "persistent"
     },
     "demo": {
-      "providers": ["https://icp0.io"],
+      "providers": [
+        "https://icp0.io"
+      ],
       "type": "persistent"
     },
     "ic": {
-      "providers": ["https://icp0.io"],
+      "providers": [
+        "https://icp0.io"
+      ],
       "type": "persistent"
     }
   },
   "metadata": [
-   {
-     "name": "candid:service"
-   }
+    {
+      "name": "candid:service"
+    }
   ],
   "output_env_file": ".env",
   "version": 1

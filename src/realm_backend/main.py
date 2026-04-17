@@ -2829,6 +2829,76 @@ def list_runtime_extensions() -> text:
 
 
 @query
+def get_sidebar_manifests() -> text:
+    """Return the slim sidebar-relevant slice of every installed extension's
+    manifest, intended to be the single source of truth for the sidebar
+    (Issue #168 — Layered Realm).
+
+    Combines runtime-installed extensions and any still-bundled extensions
+    so the realm_frontend Sidebar.svelte can call exactly one backend
+    method regardless of how an extension was installed. The "kind" field
+    reflects how it got there:
+
+      - ``runtime``: installed via install_extension / install_extension_from_registry,
+                     loaded as ESM at runtime via /extensions/<id>.
+      - ``bundled``: shipped inside this realm_backend WASM (legacy path).
+
+    Response (JSON):
+      {
+        "success": True,
+        "manifests": [
+          {
+            "id":               "voting",
+            "name":             "voting",
+            "version":          "1.0.3",
+            "icon":             "ClipboardListSolid",   # name in iconMap
+            "url_path":         null,                    # use /extensions/<id> by default
+            "categories":       ["public_services"],
+            "profiles":         ["admin", "member"],
+            "show_in_sidebar":  true,
+            "sidebar_label":    {"en": "Voting", "de": "Abstimmung"},
+            "kind":             "runtime"               # or "bundled"
+          },
+          ...
+        ]
+      }
+    """
+    try:
+        from core.runtime_extensions import (
+            get_all_extension_manifests,
+            list_installed as _list_runtime_installed,
+        )
+
+        runtime_ids = set(_list_runtime_installed())
+        manifests = get_all_extension_manifests()  # merged: runtime + bundled
+
+        out = []
+        for ext_id, m in manifests.items():
+            if not isinstance(m, dict):
+                continue
+            label_obj = m.get("sidebar_label")
+            if isinstance(label_obj, str):
+                label_obj = {"en": label_obj}
+            out.append({
+                "id": ext_id,
+                "name": m.get("name") or ext_id,
+                "version": m.get("version"),
+                "icon": m.get("icon"),
+                "url_path": m.get("url_path"),
+                "categories": m.get("categories") or ["other"],
+                "profiles": m.get("profiles") or [],
+                "show_in_sidebar": m.get("show_in_sidebar", True) is not False,
+                "sidebar_label": label_obj,
+                "kind": "runtime" if ext_id in runtime_ids else "bundled",
+            })
+
+        out.sort(key=lambda e: (e["categories"][0] if e["categories"] else "z", e["id"]))
+        return json.dumps({"success": True, "manifests": out})
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
 def get_extension_frontend_info(args: text) -> text:
     """Return file_registry coordinates for an extension's frontend assets.
 

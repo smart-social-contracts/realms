@@ -45,6 +45,11 @@
 		doc_url?: string;
 		show_in_sidebar?: boolean;
 		enabled?: boolean;
+		// Layered Realm extras (Issue #168) — populated by get_sidebar_manifests()
+		// or back-filled from list_runtime_extensions for runtime entries.
+		version?: string;
+		sidebar_label?: Record<string, string> | string | null;
+		kind?: 'runtime' | 'bundled';
 	}
 	import { getIcon } from '$lib/utils/iconMap';
 	// Import user profiles store
@@ -154,44 +159,146 @@
 		activeMainSidebar = navigation.to?.url.pathname ?? '';
 	});
 
-	// Get all extensions from backend instead of filesystem
+	// ---------------------------------------------------------------------
+	// Sidebar data source — unified across bundled + runtime extensions
+	// ---------------------------------------------------------------------
+	// Issue #168 (Layered Realm): the sidebar gets ALL extension metadata
+	// from realm_backend.get_sidebar_manifests(), which returns a single
+	// shape regardless of whether an extension is baked into the WASM
+	// ("bundled") or installed at runtime from file_registry ("runtime").
+	//
+	// This means the sidebar code does not need to special-case runtime
+	// extensions. It also means an operator can flip a realm from bundled
+	// to layered without ANY frontend changes — only the install method
+	// changes; the metadata contract is identical.
+	//
+	// For older realm_backend WASMs that don't yet expose this method,
+	// we fall back to the previous code paths (get_extensions() for
+	// bundled, list_runtime_extensions() for runtime) so the sidebar
+	// keeps working during the rollout window.
 	let extensions: ExtensionMetadataWithPath[] = [];
 	let extensionsLoaded = false;
 	let extensionsLoading = false;
 
-	async function loadExtensionsFromBackend() {
+	function manifestEntryToExtension(entry: any): ExtensionMetadataWithPath {
+		return {
+			id: entry.id,
+			name: entry.name ?? entry.id,
+			icon: entry.icon,
+			url_path: entry.url_path ?? null,
+			categories: Array.isArray(entry.categories) && entry.categories.length > 0
+				? entry.categories
+				: ['other'],
+			profiles: Array.isArray(entry.profiles) ? entry.profiles : [],
+			show_in_sidebar: entry.show_in_sidebar !== false,
+			// Carry version + sidebar_label + kind through so we can render
+			// nicer tooltips and use localized labels below.
+			...(entry.version ? { version: entry.version } : {}),
+			...(entry.sidebar_label ? { sidebar_label: entry.sidebar_label } : {}),
+			...(entry.kind ? { kind: entry.kind } : {}),
+		} as any;
+	}
+
+	async function loadFromGetSidebarManifests(): Promise<boolean> {
+		const fn = (backend as any)?.get_sidebar_manifests;
+		if (typeof fn !== 'function') return false;
+		try {
+			const raw = await fn.call(backend);
+			const parsed = JSON.parse(raw);
+			if (!parsed?.success || !Array.isArray(parsed.manifests)) {
+				return false;
+			}
+			extensions = parsed.manifests.map(manifestEntryToExtension);
+			console.log(
+				'[Sidebar] get_sidebar_manifests →',
+				extensions.length,
+				'entries (',
+				extensions.filter((e: any) => e.kind === 'runtime').length,
+				'runtime,',
+				extensions.filter((e: any) => e.kind !== 'runtime').length,
+				'bundled )',
+			);
+			return true;
+		} catch (e) {
+			console.warn('[Sidebar] get_sidebar_manifests failed, will fall back:', e);
+			return false;
+		}
+	}
+
+	async function loadFromLegacyEndpoints(): Promise<void> {
+		// Bundled extensions (legacy realm_backend without get_sidebar_manifests).
+		const bundled: ExtensionMetadataWithPath[] = [];
+		try {
+			const response = await backend.get_extensions();
+			if (response?.success && response.data?.extensionsList) {
+				const extensionData = response.data.extensionsList.extensions.map(
+					(ext: string) => JSON.parse(ext),
+				);
+				for (const ext of extensionData) {
+					bundled.push({
+						id: ext.name,
+						name: ext.name,
+						icon: ext.icon,
+						url_path: ext.url_path,
+						categories: ext.categories || ['other'],
+						profiles: ext.profiles || [],
+						show_in_sidebar: ext.show_in_sidebar !== false,
+						...(ext.kind ? { kind: ext.kind } : { kind: 'bundled' }),
+					} as any);
+				}
+			}
+		} catch (e) {
+			console.warn('[Sidebar] get_extensions() fallback failed:', e);
+		}
+
+		// Runtime extensions (still loaded from list_runtime_extensions on legacy).
+		const runtime: ExtensionMetadataWithPath[] = [];
+		try {
+			const raw = await (backend as any).list_runtime_extensions();
+			const parsed = JSON.parse(raw);
+			if (parsed?.success) {
+				const ids: string[] = parsed.runtime_extensions ?? [];
+				const manifests: Record<string, any> = parsed.all_manifests ?? {};
+				for (const id of ids) {
+					const m = manifests?.[id] ?? {};
+					runtime.push(
+						manifestEntryToExtension({
+							id,
+							name: m.name ?? id,
+							version: m.version,
+							icon: m.icon,
+							url_path: m.url_path,
+							categories: m.categories,
+							profiles: m.profiles,
+							show_in_sidebar: m.show_in_sidebar,
+							sidebar_label: m.sidebar_label,
+							kind: 'runtime',
+						}),
+					);
+				}
+			}
+		} catch (e) {
+			console.warn('[Sidebar] list_runtime_extensions fallback failed:', e);
+		}
+
+		// Runtime takes precedence over bundled with the same id.
+		const byId = new Map<string, ExtensionMetadataWithPath>();
+		for (const e of bundled) byId.set(e.id as string, e);
+		for (const e of runtime) byId.set(e.id as string, e);
+		extensions = Array.from(byId.values());
+	}
+
+	async function loadSidebarExtensions() {
 		extensionsLoading = true;
 		try {
-			console.log('Calling backend.get_extensions()...');
-			const response = await backend.get_extensions();
-			console.log('Backend response:', response);
-			console.log('Response type:', typeof response);
-			console.log('Response success:', response?.success);
-			console.log('Response data:', response?.data);
-			
-			if (response.success && response.data.extensionsList) {
-				console.log('Extensions list:', response.data.extensionsList.extensions);
-				const extensionData = response.data.extensionsList.extensions.map(ext => JSON.parse(ext));
-				console.log('Raw extension data:', extensionData);
-				
-				extensions = extensionData.map(ext => ({
-					id: ext.name,
-					name: ext.name,
-					icon: ext.icon,
-					url_path: ext.url_path,
-					categories: ext.categories || ['other'],
-					profiles: ext.profiles || [],
-					show_in_sidebar: ext.show_in_sidebar !== false
-				}));
-				console.log('Processed extensions:', extensions);
-				extensionsLoaded = true;
-			} else {
-				console.log('Invalid response format or no extensions data');
-				extensions = [];
-				extensionsLoaded = true;
+			const ok = await loadFromGetSidebarManifests();
+			if (!ok) {
+				console.log('[Sidebar] Falling back to legacy get_extensions + list_runtime_extensions');
+				await loadFromLegacyEndpoints();
 			}
-		} catch (error) {
-			console.error('Error loading extensions from backend:', error);
+			extensionsLoaded = true;
+		} catch (e) {
+			console.error('[Sidebar] Failed to load extensions:', e);
 			extensions = [];
 			extensionsLoaded = true;
 		} finally {
@@ -199,37 +306,8 @@
 		}
 	}
 
-	// --- Runtime extensions (Issue #168 Layer 2) -------------------------
-	// These are extensions installed at runtime (not baked into the WASM)
-	// that are dynamic-imported by /extensions/[id] from file_registry.
-	type RuntimeExtensionEntry = { id: string; name: string; version?: string };
-	let runtimeExtensions: RuntimeExtensionEntry[] = [];
-
-	async function loadRuntimeExtensions() {
-		try {
-			const raw = await (backend as any).list_runtime_extensions();
-			const parsed = JSON.parse(raw);
-			if (!parsed?.success) {
-				runtimeExtensions = [];
-				return;
-			}
-			const ids: string[] = parsed.runtime_extensions ?? [];
-			const manifests: Record<string, any> = parsed.all_manifests ?? {};
-			runtimeExtensions = ids.map((id: string) => ({
-				id,
-				name: (manifests?.[id]?.name as string) ?? id,
-				version: manifests?.[id]?.version as string | undefined,
-			}));
-		} catch (e) {
-			console.warn('[Sidebar] list_runtime_extensions failed:', e);
-			runtimeExtensions = [];
-		}
-	}
-
-	// Load extensions on component mount
 	onMount(() => {
-		loadExtensionsFromBackend();
-		loadRuntimeExtensions();
+		loadSidebarExtensions();
 	});
 	
 	/**
@@ -386,17 +464,37 @@
 						// Use custom path from url_path field
 						href = `/${ext.url_path}`;
 					}
-					
+
 					// Consistent handling for all extensions
 					const iconComponent = getIcon(ext.icon) || LayersSolid;
 					console.log(`Extension ${ext.id}: icon="${ext.icon}", resolved to:`, iconComponent);
 					console.log(`Extension ${ext.id}: href="${href}"`);
-					
+
+					// Resolve a display label, in this order:
+					//   1) manifest.sidebar_label[currentLocale] (or "en" or first key)
+					//   2) i18n key extensions.<id>.sidebar (legacy bundled-style)
+					//   3) manifest.name
+					//   4) ext.id
+					let inlineLabel: string | undefined;
+					const sl = ext.sidebar_label as any;
+					if (sl) {
+						if (typeof sl === 'string') {
+							inlineLabel = sl;
+						} else if (typeof sl === 'object') {
+							const cur = ($locale ?? 'en') as string;
+							inlineLabel =
+								sl[cur] ??
+								sl[cur.split('-')[0]] ??
+								sl.en ??
+								sl[Object.keys(sl)[0]];
+						}
+					}
+
 					const navItem = {
-						translationKey: `extensions.${ext.id}.sidebar`,
-						name: ext.name || ext.id, // Fallback if translation doesn't exist
+						translationKey: inlineLabel ? undefined : `extensions.${ext.id}.sidebar`,
+						name: inlineLabel ?? ext.name ?? ext.id,
 						icon: iconComponent,
-						href
+						href,
 					};
 					console.log(`Created nav item for ${ext.id}:`, navItem);
 					return navItem;
@@ -509,32 +607,14 @@
 				{/each}
 
 
-				<!-- Runtime Extensions (Issue #168 Layer 2) -->
-				{#if runtimeExtensions.length > 0}
-					<SidebarGroup ulClass={groupClass} class="mb-3">
-						<li class="px-3 py-2">
-							<h3 class={styles.sidebar.categoryHeader()}>Runtime Extensions</h3>
-						</li>
-						{#each runtimeExtensions as ext (ext.id)}
-							<li>
-								<a
-									href={`/extensions/${ext.id}`}
-									data-sveltekit-reload
-									class={itemClass}
-									title={ext.version ? `${ext.name} v${ext.version} — runtime-loaded` : ext.name}
-								>
-									<svelte:component this={LayersSolid} class={iconClass} />
-									<span class="ml-3">
-										{ext.name}
-										{#if ext.version}
-											<span class="ml-1 text-xs opacity-60">v{ext.version}</span>
-										{/if}
-									</span>
-								</a>
-							</li>
-						{/each}
-					</SidebarGroup>
-				{/if}
+				<!--
+					NOTE: Runtime extensions used to render in their own
+					"Runtime Extensions" group here. With Layered Realm
+					(Issue #168) they are now indistinguishable from
+					bundled ones at the sidebar level — they appear in
+					their proper category above, sourced from the same
+					get_sidebar_manifests() call.
+				-->
 
 				<!-- External Links -->
 				<SidebarGroup ulClass={groupClass}>
