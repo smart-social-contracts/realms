@@ -271,10 +271,15 @@ def _step_publish_base_wasm(
             if cp.returncode != 0:
                 print(cp.stderr, file=sys.stderr)
                 return cp.returncode
-            # dfx wraps the response as ("...escaped json...").
-            raw = cp.stdout.strip()
+            # dfx wraps the response as a Candid record:
+            #   ("{\"ok\":true,...}",)   -- single line, OR
+            #   (\n  "{\"ok\":true,...}",\n)   -- multi-line
+            # Extract the json string between the first `"` and the last `"`.
+            raw = cp.stdout
             try:
-                inner = raw[2:-2].encode("utf-8").decode("unicode_escape")
+                start = raw.index('"')
+                end = raw.rindex('"')
+                inner = raw[start + 1:end].encode("utf-8").decode("unicode_escape")
                 resp = json.loads(inner)
             except Exception as e:
                 print(f"  could not parse step response: {raw!r} ({e})",
