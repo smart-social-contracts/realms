@@ -38,26 +38,30 @@ mundus:
     extensions: []
     codices: []
 
+  # Codex installation is an admin-bound, one-time operation per realm —
+  # not something CI should re-run on every push. Stage 1 still publishes
+  # all codices to file_registry; admins install them once via the realms
+  # CLI / file_registry UI. CI refreshes base WASM + extensions only.
   - name: dominion
     type: realm
     canister_id: ijdaw-dyaaa-aaaac-beh2a-cai
     manifest: examples/demo/realm1/manifest.json
     extensions: inherit_from_artifacts
-    codices: [dominion]
+    codices: []
 
   - name: agora
     type: realm
     canister_id: ihbn6-yiaaa-aaaac-beh3a-cai
     manifest: examples/demo/realm2/manifest.json
     extensions: inherit_from_artifacts
-    codices: [agora]
+    codices: []
 
   - name: syntropia
     type: realm
     canister_id: jnope-2yaaa-aaaac-beh4a-cai
     manifest: examples/demo/realm3/manifest.json
     extensions: inherit_from_artifacts
-    codices: [syntropia]
+    codices: []
 
 verify:
   e2e_specs:
