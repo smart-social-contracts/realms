@@ -1,6 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { test, expect, type Page } from '@playwright/test';
+
+// __dirname is not defined in ESM scope (Playwright loads .spec.ts as ESM
+// when "type": "module" is in package.json or via tsconfig). Derive it.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Layered Realm parity snapshots — Issue #168.
