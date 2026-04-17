@@ -66,9 +66,9 @@ jobs:
         id: commit
         run: |
           if [ -n "${{ inputs.commit }}" ]; then
-            echo "deploy_commit=${{ inputs.commit }}" >> $GITHUB_OUTPUT
+            echo "deploy_commit=${{ inputs.commit }}" >> "$GITHUB_OUTPUT"
           else
-            echo "deploy_commit=${{ github.sha }}" >> $GITHUB_OUTPUT
+            echo "deploy_commit=${{ github.sha }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Configure git for submodules

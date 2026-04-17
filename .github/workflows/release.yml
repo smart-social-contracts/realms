@@ -75,7 +75,7 @@ jobs:
           sed -i "s|DEFAULT_DOCKER_IMAGE = \"ghcr.io/smart-social-contracts/realms:v.*\"|DEFAULT_DOCKER_IMAGE = \"ghcr.io/smart-social-contracts/realms:v${NEW_VERSION}\"|" cli/realms/cli/constants.py
           
           # Store new version for later use
-          echo "NEW_VERSION=${NEW_VERSION}" >> $GITHUB_OUTPUT
+          echo "NEW_VERSION=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
       
       - name: Check if release already exists
         run: |
