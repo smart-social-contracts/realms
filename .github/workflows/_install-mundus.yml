@@ -1,0 +1,77 @@
+# _install-mundus.yml — reusable workflow.
+#
+# Stages 2 + 3 of the layered CI pipeline: for every member declared in
+# the descriptor's `mundus` list, ensure a canister exists, add
+# realm_installer as a controller, install the base WASM via
+# `realms wasm install`, then registry-install each requested extension
+# and codex.
+
+name: _install-mundus
+
+on:
+  workflow_call:
+    inputs:
+      network:
+        required: true
+        type: string
+      descriptor:
+        required: true
+        type: string
+      infra-ids:
+        required: true
+        type: string
+    secrets:
+      DFX_IDENTITY_PEM:
+        required: false
+
+env:
+  PYTHON_VERSION: "3.10"
+  DFX_VERSION: "0.31.0"
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dfx ${{ env.DFX_VERSION }}
+        run: |
+          DFXVM_INIT_YES=1 sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
+          echo "$HOME/.local/share/dfx/bin" >> "$GITHUB_PATH"
+
+      - name: Install realms CLI + deps
+        run: |
+          pip install -e cli/
+          pip install pyyaml
+
+      - name: Configure dfx identity (non-local only)
+        if: ${{ inputs.network != 'local' }}
+        env:
+          DFX_IDENTITY_PEM: ${{ secrets.DFX_IDENTITY_PEM }}
+        run: |
+          mkdir -p ~/.config/dfx/identity/ci
+          printf '%s' "$DFX_IDENTITY_PEM" > ~/.config/dfx/identity/ci/identity.pem
+          chmod 600 ~/.config/dfx/identity/ci/identity.pem
+          dfx identity use ci
+
+      - name: Start local replica (local only)
+        if: ${{ inputs.network == 'local' }}
+        run: |
+          dfx start --background --clean --host 127.0.0.1:4943
+          sleep 3
+
+      - name: Materialize infra ids into env
+        run: |
+          echo '${{ inputs.infra-ids }}' | jq -r 'to_entries[] | "\(.key | ascii_upcase)_CANISTER_ID=\(.value)"' >> "$GITHUB_ENV"
+
+      - name: Run stages 2 + 3 (install + verify)
+        run: |
+          python3 scripts/ci_install_mundus.py \
+              --file ${{ inputs.descriptor }} \
+              --stages 2,3

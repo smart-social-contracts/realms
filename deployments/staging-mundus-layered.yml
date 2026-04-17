@@ -1,0 +1,65 @@
+# Mundus descriptor — STAGING (smart-social-contracts staging IC subnet).
+#
+# Same schema as deployments/local-mundus.yml. The infrastructure canisters
+# already exist on staging (file_registry, realm_installer, etc.) so the
+# bootstrap stage is a no-op for them — the workflow just verifies they
+# respond and that realm_installer is a controller of every member.
+#
+# Triggered by .github/workflows/ci-main.yml on every push to main, and
+# manually by .github/workflows/layered-deploy-dominion.yml.
+
+version: 2
+network: staging
+
+# Pre-existing infrastructure on the staging subnet.
+# These are NOT installed by CI; they're long-lived. CI only verifies them.
+infrastructure_overrides:
+  file_registry:
+    canister_id: iebdk-kqaaa-aaaau-agoxq-cai
+  file_registry_frontend:
+    canister_id: rbex3-xyaaa-aaaah-qumma-cai
+  realm_installer:
+    canister_id: ${{ vars.REALM_INSTALLER_CANISTER_ID }}
+
+artifacts:
+  base_wasm:
+    source: src/realm_backend
+    version: ${{ inputs.base_wasm_version || github.sha }}
+  extensions: all
+  codices: all
+
+mundus:
+  - name: registry
+    type: realm_registry
+    canister_id: ${{ vars.STAGING_REGISTRY_CANISTER_ID }}
+    extensions: []
+    codices: []
+
+  - name: dominion
+    type: realm
+    canister_id: ijdaw-dyaaa-aaaac-beh2a-cai
+    manifest: examples/demo/dominion/manifest.json
+    extensions: inherit_from_artifacts
+    codices: inherit_from_artifacts
+
+  - name: realm_1
+    type: realm
+    canister_id: ${{ vars.STAGING_REALM_1_CANISTER_ID }}
+    manifest: examples/demo/realm1/manifest.json
+    extensions: [voting, vault, admin_dashboard, citizen_dashboard]
+    codices: [basic_governance]
+
+  - name: realm_2
+    type: realm
+    canister_id: ${{ vars.STAGING_REALM_2_CANISTER_ID }}
+    manifest: examples/demo/realm2/manifest.json
+    extensions: [voting, vault]
+    codices: [basic_governance]
+
+verify:
+  e2e_specs:
+    - src/realm_frontend/tests/e2e/specs/layered-parity.spec.ts
+  integration_tests:
+    - tests/backend/test_status_api.py
+    - tests/backend/test_extensions_api.py
+    - tests/backend/test_realm_registry.py

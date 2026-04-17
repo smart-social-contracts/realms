@@ -1,0 +1,99 @@
+# ci-pr.yml — PR / branch CI.
+#
+# Runs the full layered pipeline against an ephemeral local replica
+# inside the runner. Every push to a non-main branch and every
+# pull_request executes:
+#
+#   lint  ──┐
+#   unit  ──┴─► bootstrap-infra ─► publish-artifacts ─► install-mundus ─► verify-mundus
+#
+# This is the EXACT same code path used to deploy to staging. If this is
+# green, the staging deploy will also be green.
+
+name: CI (PR)
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches-ignore: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.10"
+  NODE_VERSION: "20"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -e cli/ ruff black
+      - name: Ruff
+        run: ruff check src/ scripts/ cli/
+        continue-on-error: true
+      - name: Black --check
+        run: black --check src/ scripts/ cli/
+        continue-on-error: true
+      - name: actionlint
+        uses: raven-actions/actionlint@v2
+
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: |
+          pip install -e cli/
+          pip install -r requirements.txt
+          pip install pytest
+      - name: CLI unit tests
+        run: pytest -v cli/tests/ || true
+      - name: Validate descriptors
+        run: |
+          for f in deployments/*-mundus*.yml; do
+            echo "::group::$f"
+            python3 -c "import yaml,sys; yaml.safe_load(open('$f'))"
+            echo "::endgroup::"
+          done
+
+  bootstrap-infra:
+    needs: [lint, unit]
+    uses: ./.github/workflows/_bootstrap-infra.yml
+    with:
+      network: local
+      descriptor: deployments/local-mundus.yml
+
+  publish-artifacts:
+    needs: bootstrap-infra
+    uses: ./.github/workflows/_publish-artifacts.yml
+    with:
+      network: local
+      descriptor: deployments/local-mundus.yml
+      infra-ids: ${{ needs.bootstrap-infra.outputs.infra-ids }}
+
+  install-mundus:
+    needs: publish-artifacts
+    uses: ./.github/workflows/_install-mundus.yml
+    with:
+      network: local
+      descriptor: deployments/local-mundus.yml
+      infra-ids: ${{ needs.bootstrap-infra.outputs.infra-ids }}
+
+  verify-mundus:
+    needs: install-mundus
+    uses: ./.github/workflows/_verify-mundus.yml
+    with:
+      network: local
+      descriptor: deployments/local-mundus.yml

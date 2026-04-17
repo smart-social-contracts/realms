@@ -1,543 +1,96 @@
-name: Main Pipeline - Build, Test & Deploy
+# ci-main.yml — main pipeline.
+#
+# Same code path as ci-pr.yml, but two phases:
+#   Phase A — local gating (everything PR CI does), against a fresh replica
+#             inside the runner, to avoid promoting broken code to staging.
+#   Phase B — staging deploy: re-run stages 1+2+3 against the real staging
+#             subnet, reusing the long-lived file_registry / realm_installer
+#             that already live there.
+#
+# If you want to push to mainnet (`ic`), use the manual workflow
+# `layered-deploy-dominion.yml` (which composes the same reusable
+# building blocks).
+
+name: CI (main)
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      canister:
-        description: 'Canister to deploy (leave empty for all)'
-        required: false
-        default: ''
 
+concurrency:
+  # Serialize main pushes — never have two staging deploys racing.
+  group: ci-main
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: "3.10"
+  NODE_VERSION: "20"
+
+# ── Phase A: local gating (fast feedback, no IC cycles spent) ────────────────
 jobs:
-  build:
-    # Skip this workflow if the commit message contains "Bump version"
-    if: "!contains(github.event.head_commit.message, 'Bump version')"
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Configure git for submodules
-        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
-      
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
-      
-      - name: Pull latest extensions from main
-        run: git submodule update --remote extensions
-      
-      - name: Insert commit hash and datetime
-        run: |
-          COMMIT_HASH=$(git rev-parse HEAD)
-          sed -i "s/COMMIT_HASH_PLACEHOLDER/$COMMIT_HASH/g" src/realm_backend/api/status.py
-          sed -i "s/COMMIT_HASH_PLACEHOLDER/$COMMIT_HASH/g" src/realm_registry_backend/api/status.py
-          sed -i "s/COMMIT_HASH_PLACEHOLDER/$COMMIT_HASH/g" src/realm_frontend/src/app.html
-          sed -i "s/COMMIT_HASH_PLACEHOLDER/$COMMIT_HASH/g" src/realm_registry_frontend/src/app.html
+  bootstrap-infra-local:
+    uses: ./.github/workflows/_bootstrap-infra.yml
+    with:
+      network: local
+      descriptor: deployments/local-mundus.yml
 
-          COMMIT_DATETIME=$(git log --format="%cd" --date=iso8601 -1)
-          sed -i "s/COMMIT_DATETIME_PLACEHOLDER/$COMMIT_DATETIME/g" src/realm_backend/api/status.py
-          sed -i "s/COMMIT_DATETIME_PLACEHOLDER/$COMMIT_DATETIME/g" src/realm_registry_backend/api/status.py
-          sed -i "s/COMMIT_DATETIME_PLACEHOLDER/$COMMIT_DATETIME/g" src/realm_frontend/src/app.html
-          sed -i "s/COMMIT_DATETIME_PLACEHOLDER/$COMMIT_DATETIME/g" src/realm_registry_frontend/src/app.html
+  publish-artifacts-local:
+    needs: bootstrap-infra-local
+    uses: ./.github/workflows/_publish-artifacts.yml
+    with:
+      network: local
+      descriptor: deployments/local-mundus.yml
+      infra-ids: ${{ needs.bootstrap-infra-local.outputs.infra-ids }}
 
-          BASILISK_VERSION=$(grep 'ic-basilisk==' requirements.txt | sed 's/ic-basilisk==//')
-          IC_PYTHON_DB_VERSION=$(grep 'ic-python-db==' requirements.txt | sed 's/ic-python-db==//')
-          IC_PYTHON_LOGGING_VERSION=$(grep 'ic-python-logging==' requirements.txt | sed 's/ic-python-logging==//')
-          sed -i "s/BASILISK_VERSION_PLACEHOLDER/$BASILISK_VERSION/g" src/realm_backend/api/status.py
-          sed -i "s/BASILISK_VERSION_PLACEHOLDER/$BASILISK_VERSION/g" src/realm_registry_backend/api/status.py
-          sed -i "s/IC_PYTHON_DB_VERSION_PLACEHOLDER/$IC_PYTHON_DB_VERSION/g" src/realm_backend/api/status.py
-          sed -i "s/IC_PYTHON_DB_VERSION_PLACEHOLDER/$IC_PYTHON_DB_VERSION/g" src/realm_registry_backend/api/status.py
-          sed -i "s/IC_PYTHON_LOGGING_VERSION_PLACEHOLDER/$IC_PYTHON_LOGGING_VERSION/g" src/realm_backend/api/status.py
-          sed -i "s/IC_PYTHON_LOGGING_VERSION_PLACEHOLDER/$IC_PYTHON_LOGGING_VERSION/g" src/realm_registry_backend/api/status.py
+  install-mundus-local:
+    needs: publish-artifacts-local
+    uses: ./.github/workflows/_install-mundus.yml
+    with:
+      network: local
+      descriptor: deployments/local-mundus.yml
+      infra-ids: ${{ needs.bootstrap-infra-local.outputs.infra-ids }}
 
-          VERSION=$(cat version.txt)
-          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" src/realm_backend/api/status.py
-          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" src/realm_registry_backend/api/status.py
-          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" src/realm_frontend/src/app.html
-          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" src/realm_registry_frontend/src/app.html
-      
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      
-      - name: Build and push base image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          target: base
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/realms:latest
-          no-cache: true
-      
-      - name: Build and push demo image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          target: demo
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/realms:demo-latest
-          no-cache: true
+  verify-mundus-local:
+    needs: install-mundus-local
+    uses: ./.github/workflows/_verify-mundus.yml
+    with:
+      network: local
+      descriptor: deployments/local-mundus.yml
 
-      - name: Build and push test image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          target: test
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/realms:test-latest
-          no-cache: true
+  # ── Phase B: staging deploy (gated on Phase A) ─────────────────────────────
+  bootstrap-infra-staging:
+    needs: verify-mundus-local
+    uses: ./.github/workflows/_bootstrap-infra.yml
+    with:
+      network: staging
+      descriptor: deployments/staging-mundus-layered.yml
+    secrets:
+      DFX_IDENTITY_PEM: ${{ secrets.DFX_IDENTITY_PEM }}
 
-      - name: Build and push ui-test image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          target: ui-test
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/realms:ui-test-${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/realms:ui-test-latest
-          no-cache: true
-      
-      - name: Verify Docker images
-        if: always()
-        run: |
-          mkdir -p build-logs
-          # Check if the base image was built successfully
-          if docker image inspect ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }} >/dev/null 2>&1; then
-            echo "✅ Base Docker image built successfully"
-            docker images | grep ${{ github.sha }} || true
-          else
-            echo "❌ Base Docker image build failed"
-            echo "Base Docker build failed" > build-logs/build-failed.txt
-          fi
+  publish-artifacts-staging:
+    needs: bootstrap-infra-staging
+    uses: ./.github/workflows/_publish-artifacts.yml
+    with:
+      network: staging
+      descriptor: deployments/staging-mundus-layered.yml
+      infra-ids: ${{ needs.bootstrap-infra-staging.outputs.infra-ids }}
+    secrets:
+      DFX_IDENTITY_PEM: ${{ secrets.DFX_IDENTITY_PEM }}
 
-          # Check if the demo image was built successfully
-          if docker image inspect ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} >/dev/null 2>&1; then
-            echo "✅ Demo Docker image built successfully"
-            docker images | grep demo-${{ github.sha }} || true
-          else
-            echo "❌ Demo Docker image build failed"
-            echo "Demo Docker build failed" > build-logs/demo-build-failed.txt
-          fi
+  install-mundus-staging:
+    needs: publish-artifacts-staging
+    uses: ./.github/workflows/_install-mundus.yml
+    with:
+      network: staging
+      descriptor: deployments/staging-mundus-layered.yml
+      infra-ids: ${{ needs.bootstrap-infra-staging.outputs.infra-ids }}
+    secrets:
+      DFX_IDENTITY_PEM: ${{ secrets.DFX_IDENTITY_PEM }}
 
-          # Check if the test image was built successfully
-          if docker image inspect ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }} >/dev/null 2>&1; then
-            echo "✅ Test Docker image built successfully"
-            docker images | grep test-${{ github.sha }} || true
-          else
-            echo "❌ Test Docker image build failed"
-            echo "Test Docker build failed" > build-logs/test-build-failed.txt
-          fi
-
-          # Check if the ui-test image was built successfully
-          if docker image inspect ghcr.io/${{ github.repository_owner }}/realms:ui-test-${{ github.sha }} >/dev/null 2>&1; then
-            echo "✅ UI Test Docker image built successfully"
-            docker images | grep ui-test-${{ github.sha }} || true
-          else
-            echo "❌ UI Test Docker image build failed"
-            echo "UI Test Docker build failed" > build-logs/ui-test-build-failed.txt
-          fi
-      
-      - name: Save build metadata
-        if: always()
-        run: |
-          echo "Commit: ${{ github.sha }}" > build-logs/build-info.txt
-          echo "Image: ghcr.io/${{ github.repository_owner }}/realms:${{ github.sha }}" >> build-logs/build-info.txt
-          echo "Branch: ${{ github.ref_name }}" >> build-logs/build-info.txt
-          echo "Timestamp: $(date -u)" >> build-logs/build-info.txt
-      
-      - name: Upload build logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs-main
-          path: build-logs/
-          retention-days: 7
-
-  test-cli:
-    runs-on: ubuntu-latest
-    needs: build
-    continue-on-error: true
-    if: "!contains(github.event.head_commit.message, 'Bump version')"
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-      
-      - name: Install build dependencies
-        run: pip install build
-      
-      - name: Build CLI wheel
-        working-directory: cli
-        run: python -m build
-      
-      - name: Test CLI pip install and deployment
-        run: |
-          mkdir -p cli/tests
-          docker run --rm \
-            -v ${{ github.workspace }}/cli/dist:/dist \
-            ghcr.io/smart-social-contracts/icp-dev-env:b26e7e9 \
-            bash -c "pip install /dist/realms_gos-*.whl && realms realm create --deploy --plain-logs" \
-            2>&1 | tee cli/tests/cli-pip-test.log
-      
-      - name: Upload CLI test logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cli-test-logs-main
-          path: cli/tests/*.log
-          retention-days: 7
-          if-no-files-found: ignore
-
-  linting:
-    runs-on: ubuntu-latest
-    needs: build
-    continue-on-error: true
-    if: "!contains(github.event.head_commit.message, 'Bump version')"
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      
-      - name: Run linting checks
-        run: |
-          mkdir -p lint-logs
-          # First fix formatting issues
-          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }} ./scripts/run_linters.sh --fix > lint-logs/lint-fix.log 2>&1 || true
-          # Then verify all issues are fixed
-          docker run --rm ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }} ./scripts/run_linters.sh > lint-logs/lint-check.log 2>&1 || true
-      
-      - name: Upload lint logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: lint-logs-main
-          path: lint-logs/
-          retention-days: 7
-  
-  test-extensions:
-    runs-on: ubuntu-latest
-    needs: build
-    continue-on-error: true
-    if: "!contains(github.event.head_commit.message, 'Bump version')"
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
-      
-      - name: Pull latest extensions from main
-        run: git submodule update --remote extensions
-      
-      - name: Run extension tests
-        run: |
-          docker run --rm \
-            -v "$(pwd)/extension-logs:/app/extension-logs" \
-            ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }} bash -c "
-          ./tests/test_extensions.py; \
-          EXIT_CODE=\$?; \
-          mkdir -p /app/extension-logs && \
-          cp -f dfx.log /app/extension-logs/ 2>/dev/null || true && \
-          cp -f realms.log /app/extension-logs/ 2>/dev/null || true; \
-          exit \$EXIT_CODE"
-      
-      - name: Upload extension test logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: extension-test-logs-main
-          path: extension-logs/
-          retention-days: 7
-
-  test-backend-integration:
-    runs-on: ubuntu-latest
-    needs: build
-    if: "!contains(github.event.head_commit.message, 'Bump version')"
-    strategy:
-      fail-fast: false
-      matrix:
-        test-group:
-          - name: "API Basics"
-            tests: "test_status_api.py test_extensions_api.py test_ggg_entities_api.py"
-          - name: "Task Management"
-            tests: "test_task_manager_api.py test_scheduled_tasks.py"
-          - name: "System Operations"
-            tests: "test_db_command.py test_shell_command.py"
-          - name: "CLI"
-            tests: "test_cli.py"
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      
-      - name: Run integration tests (${{ matrix.test-group.name }})
-        id: integration_tests
-        continue-on-error: true
-        run: |
-          CONTAINER_NAME="realms-api-test-${{ github.sha }}-$(echo '${{ matrix.test-group.name }}' | tr ' ' '-')"
-          ./scripts/run_integration_tests.sh \
-            "ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }}" \
-            "$CONTAINER_NAME" \
-            10 \
-            false \
-            "${{ matrix.test-group.tests }}"
-      
-      - name: Upload integration test logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: integration-test-logs-${{ matrix.test-group.name }}
-          path: integration-test-logs/
-          retention-days: 7
-      
-      - name: Check test results
-        if: steps.integration_tests.outcome == 'failure'
-        run: |
-          echo "::error::Integration tests (${{ matrix.test-group.name }}) failed. Check the job summary for details."
-          exit 1
-
-  test-realm-registry:
-    runs-on: ubuntu-latest
-    needs: build
-    continue-on-error: true
-    if: "!contains(github.event.head_commit.message, 'Bump version')"
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      
-      - name: Run realm registry tests
-        run: |
-          docker run --rm \
-            ghcr.io/${{ github.repository_owner }}/realms:test-${{ github.sha }} \
-            python3 tests/backend/test_realm_registry.py
-
-  test-ui-e2e:
-    runs-on: ubuntu-latest
-    needs: build
-    continue-on-error: true
-    if: "!contains(github.event.head_commit.message, 'Bump version')"
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      
-      - name: Run Playwright tests
-        run: |
-          docker run --rm \
-            -v "$(pwd)/test-logs:/app/test-logs" \
-            -e VITE_TEST_MODE=true \
-            -e VITE_TEST_MODE_II_BYPASS=true \
-            -e VITE_TEST_MODE_ADMIN_SELF_REGISTRATION=true \
-            -e VITE_TEST_MODE_SKIP_TERMS=true \
-            ghcr.io/${{ github.repository_owner }}/realms:ui-test-${{ github.sha }} bash -c "
-          (realms realm create --random && \
-          realms realm deploy --plain-logs && \
-          src/realm_frontend/run-e2e-tests.sh specs/workflows.spec.ts specs/multilingual.spec.ts --reporter=line); \
-          EXIT_CODE=\$?; \
-          mkdir -p /app/test-logs && \
-          cp -f dfx.log /app/test-logs/ 2>/dev/null || true && \
-          cp -f dfx2.log /app/test-logs/ 2>/dev/null || true && \
-          cp -f realms.log /app/test-logs/ 2>/dev/null || true && \
-          cp -f src/realm_frontend/test-results/*.* /app/test-logs/ 2>/dev/null || true; \
-          exit \$EXIT_CODE"
-      
-      - name: Upload test logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-test-logs-main
-          path: test-logs/
-          retention-days: 7
-
-  deploy-staging:
-    runs-on: ubuntu-latest
-    needs: [linting, test-extensions, test-backend-integration, test-realm-registry, test-ui-e2e, test-cli]
-    if: "!contains(github.event.head_commit.message, 'Bump version')"
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Deploy to staging
-        run: |
-          # Store identity in a temporary file
-          echo "${{ secrets.IC_IDENTITY_PEM }}" > identity.pem
-          chmod 600 identity.pem
-          
-          # Pull the image that was tested
-          docker pull ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}
-          
-          # Deploy mundus (3 realms + registry) from examples/demo
-          docker run --rm \
-            -v "$(pwd)/identity.pem:/app/identity.pem" \
-            -v "$(pwd)/deploy-logs:/app/deploy-logs" \
-            -e DFX_WARNING="-mainnet_plaintext_identity" \
-            ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
-            bash -c "(dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
-                     dfx identity use my-identity && \
-                     realms mundus create --manifest examples/demo/manifest.json --deploy --network staging); \
-                     EXIT_CODE=\$?; \
-                     mkdir -p /app/deploy-logs && \
-                     cp -f dfx.log /app/deploy-logs/ 2>/dev/null || true && \
-                     cp -f dfx2.log /app/deploy-logs/ 2>/dev/null || true && \
-                     cp -f realms.log /app/deploy-logs/ 2>/dev/null || true; \
-                     exit \$EXIT_CODE"
-
-  test-staging-quarters:
-    runs-on: ubuntu-latest
-    needs: [deploy-staging]
-    if: "!contains(github.event.head_commit.message, 'Bump version')"
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Run quarter staging integration tests
-        run: |
-          echo "${{ secrets.IC_IDENTITY_PEM }}" > identity.pem
-          chmod 600 identity.pem
-          
-          mkdir -p quarter-test-logs
-          
-          docker pull ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}
-          
-          docker run --rm \
-            -v "$(pwd)/identity.pem:/app/identity.pem" \
-            -v "$(pwd)/quarter-test-logs:/app/quarter-test-logs" \
-            -v "$(pwd)/tests/staging/test_quarters_staging.py:/app/tests/staging/test_quarters_staging.py" \
-            -e DFX_WARNING="-mainnet_plaintext_identity" \
-            -e DFX_NETWORK=staging \
-            -e AGORA_BACKEND=3bohd-2yaaa-aaaac-qcyla-cai \
-            ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
-            bash -c "dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
-                     dfx identity use my-identity && \
-                     python3 tests/staging/test_quarters_staging.py 2>&1 | tee /app/quarter-test-logs/quarters.log"
-          
-          rm -f identity.pem
-      
-      - name: Upload quarter test logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: quarter-staging-test-logs
-          path: quarter-test-logs/
-          retention-days: 7
-
-  test-staging-post-deployment:
-    runs-on: ubuntu-latest
-    needs: [deploy-staging, test-staging-quarters]
-    continue-on-error: true  # Optional: failures won't block the workflow
-    if: "!contains(github.event.head_commit.message, 'Bump version')"
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      # NOTE: test_invoice_payment.py and test_create_proposal.py moved to tests_TODO_review_or_delete/
-      # Skipping these tests until they are reviewed and restored
-
-      - name: Ensure Ollama pod is running
-        if: env.RUNPOD_API_KEY != ''
-        env:
-          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
-        run: |
-          pip install runpod requests >/dev/null 2>&1
-          python3 - <<'WAKE_SCRIPT'
-          import runpod, os, time, requests as r
-          runpod.api_key = os.environ["RUNPOD_API_KEY"]
-          OLLAMA_URL = "https://geister-ollama.realmsgos.dev"
-          pods = runpod.get_pods()
-          pod = next((p for p in pods if p["name"].startswith("geister-main-")), None)
-          if not pod:
-            print("::warning::No geister-main pod found, skipping wake"); exit(0)
-          status = pod.get("desiredStatus", "UNKNOWN")
-          print(f"Pod {pod['id']}: {status}")
-          if status != "RUNNING":
-            print("Starting pod...")
-            runpod.resume_pod(pod_id=pod["id"], gpu_count=1)
-            for i in range(60):
-              time.sleep(5)
-              pods = runpod.get_pods()
-              p = next((x for x in pods if x["id"] == pod["id"]), None)
-              if p and p.get("desiredStatus") == "RUNNING":
-                print("Pod is RUNNING"); break
-            else:
-              print("::warning::Pod did not reach RUNNING within 5min"); exit(0)
-          print("Waiting for Ollama to be healthy...")
-          for i in range(36):
-            try:
-              resp = r.get(OLLAMA_URL, timeout=10)
-              if resp.status_code == 200:
-                print("Ollama is healthy!"); exit(0)
-            except Exception:
-              pass
-            time.sleep(10)
-          print("::warning::Ollama not healthy after 6min, proceeding anyway")
-          WAKE_SCRIPT
-
-      - name: Run geister agent swarm test on staging
-        run: |
-          # Store identity in a temporary file
-          echo "${{ secrets.IC_IDENTITY_PEM }}" > identity.pem
-          chmod 600 identity.pem
-          
-          # Create logs directory for artifacts
-          mkdir -p agent_logs
-          
-          # Pull the image that was tested
-          docker pull ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }}
-          
-          # Run agent swarm test inside Docker container (needs dfx for registry list)
-          docker run --rm \
-            -v "$(pwd)/identity.pem:/app/identity.pem" \
-            -v "$(pwd)/agent_logs:/app/agent_logs" \
-            -v "$(pwd)/examples/demo/realm_common/tests/test_agent_swarm.py:/app/examples/demo/realm_common/tests/test_agent_swarm.py" \
-            -e DFX_WARNING="-mainnet_plaintext_identity" \
-            -e DFX_NETWORK=staging \
-            -e AGENTS_COUNT=3 \
-            -e NETWORK=staging \
-            -e AGENT_TIMEOUT_SECONDS=180 \
-            -e RUN_DURATION_MINUTES=10 \
-            -e LOGS_DIR=/app/agent_logs \
-            ghcr.io/${{ github.repository_owner }}/realms:demo-${{ github.sha }} \
-            bash -c "dfx identity import my-identity /app/identity.pem --storage-mode=plaintext --force && \
-                     dfx identity use my-identity && \
-                     pip install git+https://github.com/smart-social-contracts/geister.git realms-gos && \
-                     cp dfx.template.json dfx.json && \
-                     python examples/demo/realm_common/tests/test_agent_swarm.py"
-          
-          # Clean up
-          rm identity.pem
-      
-      - name: Upload agent logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: agent-swarm-logs
-          path: agent_logs/
-          retention-days: 14
-
-      - name: Upload issues report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: agent-swarm-issues-report
-          path: agent_logs/issues-report.md
-          retention-days: 14
-          if-no-files-found: ignore
-
-
+  verify-mundus-staging:
+    needs: install-mundus-staging
+    uses: ./.github/workflows/_verify-mundus.yml
+    with:
+      network: staging
+      descriptor: deployments/staging-mundus-layered.yml
