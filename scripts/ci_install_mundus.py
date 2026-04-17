@@ -210,24 +210,41 @@ def _build_canister_wasm(canister: str, network: str) -> Path:
     _run([
         sys.executable, "-m", "basilisk", canister, str(main_py),
     ], cwd=REPO_ROOT, env=env)
-    candidates = [
-        out_dir / f"{canister}.wasm.gz",
+    raw_candidates = [
         out_dir / f"{canister}.wasm",
         # dfx-build artifacts as a last-resort fallback for environments
         # that already produced one (e.g. an interactive `dfx build` run).
         REPO_ROOT / ".dfx" / network / "canisters" / canister
-            / f"{canister}.wasm.gz",
-        REPO_ROOT / ".dfx" / network / "canisters" / canister
             / f"{canister}.wasm",
     ]
-    for c in candidates:
-        if c.exists():
-            print(f"   • {canister} WASM built at {c} ({c.stat().st_size:,} bytes)")
-            return c
-    raise SystemExit(
-        f"ERROR: basilisk build for {canister} produced no WASM in any "
-        f"expected location: {candidates}"
+    raw: Optional[Path] = next((c for c in raw_candidates if c.exists()), None)
+    if raw is None:
+        # Maybe a .wasm.gz already exists (dfx prebuilt).
+        for c in (out_dir / f"{canister}.wasm.gz",
+                  REPO_ROOT / ".dfx" / network / "canisters" / canister
+                      / f"{canister}.wasm.gz"):
+            if c.exists():
+                print(f"   • {canister} WASM (pre-gzipped) at {c} "
+                      f"({c.stat().st_size:,} bytes)")
+                return c
+        raise SystemExit(
+            f"ERROR: basilisk build for {canister} produced no WASM in any "
+            f"expected location: {raw_candidates}"
+        )
+
+    # Gzip the WASM so it (a) is named consistently with the registry
+    # path template (.wasm.gz) and (b) fits under file_registry's
+    # per-file size limit. dfx does this automatically when a canister
+    # has `gzip: true` in dfx.json; basilisk does not.
+    import gzip as _gzip
+    gz = raw.with_suffix(raw.suffix + ".gz")
+    with raw.open("rb") as fin, _gzip.open(gz, "wb", compresslevel=9) as fout:
+        shutil.copyfileobj(fin, fout)
+    print(
+        f"   • {canister} WASM built at {raw} ({raw.stat().st_size:,} bytes), "
+        f"gzipped → {gz} ({gz.stat().st_size:,} bytes)"
     )
+    return gz
 
 
 # Map of mundus member `type:` → (source canister to build, registry path
