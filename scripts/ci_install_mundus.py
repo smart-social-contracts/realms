@@ -172,12 +172,37 @@ def stage0_bootstrap(descriptor: Dict[str, Any]) -> Dict[str, str]:
 # ---------------------------------------------------------------------------
 
 
+def _build_base_wasm(network: str) -> Path:
+    """Build the realm_backend canister and return the path to the
+    resulting wasm.gz. Used by stage 1 so we can pass the path to
+    publish_layered.py.
+    """
+    print("   • building realm_backend (base WASM) ...")
+    _run(["dfx", "build", "realm_backend", "--network", network])
+    candidates = [
+        REPO_ROOT / ".dfx" / network / "canisters" / "realm_backend"
+            / "realm_backend.wasm.gz",
+        REPO_ROOT / ".dfx" / network / "canisters" / "realm_backend"
+            / "realm_backend.wasm",
+        REPO_ROOT / ".basilisk" / "realm_backend" / "realm_backend.wasm",
+    ]
+    for c in candidates:
+        if c.exists():
+            print(f"   • base WASM built at {c} ({c.stat().st_size:,} bytes)")
+            return c
+    raise SystemExit(
+        "ERROR: dfx build realm_backend ran but no realm_backend.wasm[.gz] "
+        f"was found in expected locations: {candidates}"
+    )
+
+
 def stage1_publish(descriptor: Dict[str, Any], infra_ids: Dict[str, str]) -> None:
     network = descriptor["network"]
     file_registry = infra_ids["file_registry"]
     artifacts = descriptor.get("artifacts") or {}
     base_wasm = artifacts.get("base_wasm") or {}
     base_version = base_wasm.get("version") or "0.0.0-dev"
+    skip_base_wasm = bool(base_wasm.get("skip"))
     only_exts = artifacts.get("extensions")
     only_codices = artifacts.get("codices")
 
@@ -187,10 +212,19 @@ def stage1_publish(descriptor: Dict[str, Any], infra_ids: Dict[str, str]) -> Non
         sys.executable, str(REPO_ROOT / "scripts" / "publish_layered.py"),
         "--registry", file_registry,
         "--network", network,
-        "--base-wasm-version", base_version,
         "--extensions-repo", str(REPO_ROOT),
         "--codices-root", str(CODICES_ROOT),
     ]
+
+    if skip_base_wasm:
+        cmd += ["--skip-base-wasm"]
+    else:
+        wasm_path = _build_base_wasm(network)
+        cmd += [
+            "--base-wasm", str(wasm_path),
+            "--base-wasm-version", base_version,
+        ]
+
     if isinstance(only_exts, list):
         cmd += ["--only-extensions", ",".join(only_exts)]
     elif only_exts is None or only_exts == []:
