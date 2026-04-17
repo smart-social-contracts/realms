@@ -54,6 +54,13 @@
       "type": "custom",
       "wasm": ".basilisk/file_registry/file_registry.wasm"
     },
+    "file_registry_frontend": {
+      "source": [
+        "src/file_registry_frontend/dist"
+      ],
+      "type": "assets",
+      "workspace": "file_registry_frontend"
+    },
     "realm_installer": {
       "build": "python -m basilisk realm_installer src/realm_installer/main.py",
       "candid": "src/realm_installer/realm_installer.did",
@@ -201,7 +208,7 @@
       }
     }
   },
-  "defaults": {
+  "defaults": { 
     "build": {
       "args": "",
       "packtool": ""
@@ -213,28 +220,22 @@
       "type": "ephemeral"
     },
     "staging": {
-      "providers": [
-        "https://icp0.io"
-      ],
+      "providers": ["https://icp0.io"],
       "type": "persistent"
     },
     "demo": {
-      "providers": [
-        "https://icp0.io"
-      ],
+      "providers": ["https://icp0.io"],
       "type": "persistent"
     },
     "ic": {
-      "providers": [
-        "https://icp0.io"
-      ],
+      "providers": ["https://icp0.io"],
       "type": "persistent"
     }
   },
   "metadata": [
-    {
-      "name": "candid:service"
-    }
+   {
+     "name": "candid:service"
+   }
   ],
   "output_env_file": ".env",
   "version": 1
