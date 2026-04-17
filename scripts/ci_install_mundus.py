@@ -92,10 +92,12 @@ def load_descriptor(path: Path) -> Dict[str, Any]:
 
 
 def _run(cmd: List[str], *, env: Optional[Dict[str, str]] = None,
-         check: bool = True, cwd: Optional[Path] = None) -> subprocess.CompletedProcess:
+         check: bool = True, cwd: Optional[Path] = None,
+         capture_output: bool = False) -> subprocess.CompletedProcess:
     print("$", " ".join(cmd), flush=True)
     return subprocess.run(cmd, env=env or os.environ.copy(),
-                          check=check, cwd=str(cwd) if cwd else None)
+                          check=check, cwd=str(cwd) if cwd else None,
+                          capture_output=capture_output, text=capture_output)
 
 
 def _dfx(*args: str, network: str, check: bool = True) -> subprocess.CompletedProcess:
@@ -287,7 +289,7 @@ def stage2_install(descriptor: Dict[str, Any], infra_ids: Dict[str, str]) -> Non
         _add_controller(canister_id, realm_installer, network)
 
         # Install (or upgrade) the WASM via realm_installer.
-        _run([
+        cp = _run([
             "realms", "wasm", "install",
             "--target", canister_id,
             "--version", base_version,
@@ -295,7 +297,19 @@ def stage2_install(descriptor: Dict[str, Any], infra_ids: Dict[str, str]) -> Non
             "--registry", file_registry,
             "--network", network,
             "--mode", "reinstall",
-        ])
+        ], capture_output=True)
+        # realms wasm install exits 0 even when the underlying installer
+        # canister returns success=false — surface that here so the
+        # pipeline doesn't silently proceed to install codices on an
+        # empty canister.
+        if "\"success\":false" in (cp.stdout or "") + (cp.stderr or ""):
+            print(cp.stdout)
+            print(cp.stderr, file=sys.stderr)
+            raise SystemExit(
+                f"ERROR: realm_installer.install_realm_backend failed for {name}"
+            )
+        else:
+            print(cp.stdout)
 
         for ext in _resolve_member_extensions(member, artifacts):
             _run([
