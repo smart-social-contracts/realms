@@ -237,12 +237,56 @@ def _step_publish_base_wasm(
                 if rc != 0:
                     print(f"  chunk {i + 1}/{total_chunks} upload failed", file=sys.stderr)
                     return rc
-        rc = _dfx_call(
-            "finalize_chunked_file",
-            {"namespace": namespace, "path": registry_path},
-        )
-        if rc != 0:
-            return rc
+        # Use the *incremental* finalize_chunked_file_step rather than the
+        # single-shot finalize_chunked_file: a multi-MB WASM running through
+        # SHA-256 in WASI Python costs >40B instructions and trips the
+        # per-message instruction budget. We compute the SHA-256 locally
+        # and pass it on the first step call; the registry stores it as-is.
+        import hashlib as _hashlib
+        h = _hashlib.sha256()
+        with base_wasm_path.open("rb") as fh:
+            for blob in iter(lambda: fh.read(1024 * 1024), b""):
+                h.update(blob)
+        expected_sha = h.hexdigest()
+        print(f"  finalizing incrementally (sha256={expected_sha[:16]}…)")
+
+        first = True
+        while True:
+            payload = {"namespace": namespace, "path": registry_path,
+                       "batch_size": 1}
+            if first:
+                payload["expected_sha256"] = expected_sha
+                first = False
+            # Capture stdout so we can parse {"done": true/false, ...}.
+            import subprocess as _sp
+            cmd = ["dfx", "canister", "call"]
+            if identity:
+                cmd.extend(["--identity", identity])
+            if network:
+                cmd.extend(["--network", network])
+            candid = '("' + json.dumps(payload).replace("\\", "\\\\").replace('"', '\\"') + '")'
+            cmd.extend([registry, "finalize_chunked_file_step", candid])
+            print("$", " ".join(cmd), flush=True)
+            cp = _sp.run(cmd, capture_output=True, text=True)
+            if cp.returncode != 0:
+                print(cp.stderr, file=sys.stderr)
+                return cp.returncode
+            # dfx wraps the response as ("...escaped json...").
+            raw = cp.stdout.strip()
+            try:
+                inner = raw[2:-2].encode("utf-8").decode("unicode_escape")
+                resp = json.loads(inner)
+            except Exception as e:
+                print(f"  could not parse step response: {raw!r} ({e})",
+                      file=sys.stderr)
+                return 1
+            if resp.get("error"):
+                print(f"  finalize step error: {resp['error']}", file=sys.stderr)
+                return 1
+            print(f"  step ok: processed={resp.get('processed')}/"
+                  f"{resp.get('total')} done={resp.get('done')}")
+            if resp.get("done"):
+                break
 
     return _dfx_call("publish_namespace", {"namespace": namespace})
 
