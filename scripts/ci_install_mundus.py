@@ -178,6 +178,12 @@ def _build_base_wasm(network: str) -> Path:
     publish_layered.py.
     """
     print("   • building realm_backend (base WASM) ...")
+    # Allocate a canister id so `dfx build` has somewhere to write the
+    # candid metadata. We never actually install code into this canister
+    # — the WASM is published to file_registry and installed by
+    # realm_installer into the per-realm canisters.
+    _run(["dfx", "canister", "create", "realm_backend",
+          "--network", network], check=False)
     _run(["dfx", "build", "realm_backend", "--network", network])
     candidates = [
         REPO_ROOT / ".dfx" / network / "canisters" / "realm_backend"
