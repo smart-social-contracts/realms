@@ -15,9 +15,15 @@
     "demo": "h5vpp-qyaaa-aaaac-qai3a-cai",
     "staging": "5mf73-iiaaa-aaaau-aggxq-cai"
   },
+  "realm_installer": {
+    "staging": "lusjm-wqaaa-aaaau-ago7q-cai"
+  },
   "realm_frontend": {
     "demo": "gzya5-jyaaa-aaaac-qai5a-cai",
     "staging": "7ryrt-3aaaa-aaaau-aggya-cai"
+  },
+  "realm_installer": {
+    "staging": "lusjm-wqaaa-aaaau-ago7q-cai"
   },
   "realm_registry_backend": {
     "demo": "rhw4p-gqaaa-aaaac-qbw7q-cai",

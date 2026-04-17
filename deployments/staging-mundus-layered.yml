@@ -19,7 +19,7 @@ infrastructure_overrides:
   file_registry_frontend:
     canister_id: rbex3-xyaaa-aaaah-qumma-cai
   realm_installer:
-    canister_id: ${{ vars.REALM_INSTALLER_CANISTER_ID }}
+    canister_id: lusjm-wqaaa-aaaau-ago7q-cai
 
 artifacts:
   base_wasm:
@@ -28,33 +28,36 @@ artifacts:
   extensions: all
   codices: all
 
+# Pre-existing staging canisters. CI reuses these on every run; it never
+# creates new ones. The only canister that doesn't already exist is
+# realm_installer (see infrastructure_overrides).
 mundus:
-  - name: registry
+  - name: realm_registry_backend
     type: realm_registry
-    canister_id: ${{ vars.STAGING_REGISTRY_CANISTER_ID }}
+    canister_id: 7wzxh-wyaaa-aaaau-aggyq-cai
     extensions: []
     codices: []
 
   - name: dominion
     type: realm
     canister_id: ijdaw-dyaaa-aaaac-beh2a-cai
-    manifest: examples/demo/dominion/manifest.json
-    extensions: inherit_from_artifacts
-    codices: inherit_from_artifacts
-
-  - name: realm_1
-    type: realm
-    canister_id: ${{ vars.STAGING_REALM_1_CANISTER_ID }}
     manifest: examples/demo/realm1/manifest.json
-    extensions: [voting, vault, admin_dashboard, citizen_dashboard]
-    codices: [basic_governance]
+    extensions: inherit_from_artifacts
+    codices: [dominion]
 
-  - name: realm_2
+  - name: agora
     type: realm
-    canister_id: ${{ vars.STAGING_REALM_2_CANISTER_ID }}
+    canister_id: ihbn6-yiaaa-aaaac-beh3a-cai
     manifest: examples/demo/realm2/manifest.json
-    extensions: [voting, vault]
-    codices: [basic_governance]
+    extensions: inherit_from_artifacts
+    codices: [agora]
+
+  - name: syntropia
+    type: realm
+    canister_id: jnope-2yaaa-aaaac-beh4a-cai
+    manifest: examples/demo/realm3/manifest.json
+    extensions: inherit_from_artifacts
+    codices: [syntropia]
 
 verify:
   e2e_specs:
