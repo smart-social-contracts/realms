@@ -35,6 +35,11 @@
 version: 2
 network: local
 
+# Local CI starts on a fresh ephemeral replica every run, so every
+# canister is empty when stage 2 runs — the only legal install mode is
+# 'reinstall' (== install, since there's nothing to upgrade).
+install_mode: reinstall
+
 # --- Stage 1: artifacts to publish to file_registry --------------------------
 artifacts:
   base_wasm:
