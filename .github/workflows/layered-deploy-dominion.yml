@@ -38,7 +38,7 @@ jobs:
       network: staging
       descriptor: deployments/staging-mundus-layered.yml
     secrets:
-      DFX_IDENTITY_PEM: ${{ secrets.DFX_IDENTITY_PEM }}
+      IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
 
   publish-artifacts:
     if: ${{ !inputs.skip_publish }}
@@ -49,7 +49,7 @@ jobs:
       descriptor: deployments/staging-mundus-layered.yml
       infra-ids: ${{ needs.bootstrap-infra.outputs.infra-ids }}
     secrets:
-      DFX_IDENTITY_PEM: ${{ secrets.DFX_IDENTITY_PEM }}
+      IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
 
   install-mundus:
     needs: [bootstrap-infra, publish-artifacts]
@@ -60,7 +60,7 @@ jobs:
       descriptor: deployments/staging-mundus-layered.yml
       infra-ids: ${{ needs.bootstrap-infra.outputs.infra-ids }}
     secrets:
-      DFX_IDENTITY_PEM: ${{ secrets.DFX_IDENTITY_PEM }}
+      IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
 
   verify-mundus:
     needs: install-mundus

@@ -27,7 +27,7 @@ on:
         description: "JSON {file_registry, file_registry_frontend, realm_installer}"
         value: ${{ jobs.bootstrap.outputs.infra-ids }}
     secrets:
-      DFX_IDENTITY_PEM:
+      IC_IDENTITY_PEM:
         required: false
 
 env:
@@ -59,10 +59,10 @@ jobs:
       - name: Configure dfx identity (non-local only)
         if: ${{ inputs.network != 'local' }}
         env:
-          DFX_IDENTITY_PEM: ${{ secrets.DFX_IDENTITY_PEM }}
+          IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
         run: |
           mkdir -p ~/.config/dfx/identity/ci
-          printf '%s' "$DFX_IDENTITY_PEM" > ~/.config/dfx/identity/ci/identity.pem
+          printf '%s' "$IC_IDENTITY_PEM" > ~/.config/dfx/identity/ci/identity.pem
           chmod 600 ~/.config/dfx/identity/ci/identity.pem
           dfx identity use ci
 
