@@ -194,15 +194,26 @@ def _build_canister_wasm(canister: str, network: str) -> Path:
     """
     print(f"   • building {canister} (WASM) ...")
     main_py = REPO_ROOT / "src" / canister / "main.py"
+    candid = REPO_ROOT / "src" / canister / f"{canister}.did"
     if not main_py.exists():
         raise SystemExit(
             f"ERROR: cannot build {canister}: {main_py} does not exist"
         )
+    if not candid.exists():
+        raise SystemExit(
+            f"ERROR: cannot build {canister}: candid file {candid} does not exist "
+            f"(basilisk needs CANISTER_CANDID_PATH)"
+        )
     out_dir = REPO_ROOT / ".basilisk" / canister
     out_dir.mkdir(parents=True, exist_ok=True)
+    # Basilisk reads CANISTER_CANDID_PATH from the env (dfx normally
+    # sets this from dfx.json's `candid:` field for us). When invoking
+    # basilisk directly we have to set it ourselves.
+    env = os.environ.copy()
+    env["CANISTER_CANDID_PATH"] = str(candid)
     _run([
         sys.executable, "-m", "basilisk", canister, str(main_py),
-    ], cwd=REPO_ROOT)
+    ], cwd=REPO_ROOT, env=env)
     candidates = [
         out_dir / f"{canister}.wasm.gz",
         out_dir / f"{canister}.wasm",
