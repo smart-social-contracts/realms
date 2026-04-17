@@ -1,0 +1,307 @@
+# Layered Deploy Dominion (Issue #168)
+#
+# End-to-end deploy of Dominion in the layered configuration:
+#
+#   1. Build the realm "base" WASM (no bundled extensions, no bundled
+#      codices). Reuses the same stub-injection trick as
+#      publish-base-wasm.yml.
+#
+#   2. Publish that gzipped WASM to file_registry under
+#         wasm/realm-base-<version>.wasm.gz
+#      using chunked upload (since it exceeds the IC ingress limit).
+#
+#   3. For every extension under realms-extensions/extensions/<id>:
+#        a. npm install + vite build the per-extension frontend-rt/ ESM bundle
+#        b. realms extension publish — uploads manifest, backend Python files,
+#           the ESM bundle, and any i18n JSON to file_registry under
+#              ext/<id>/<version>/{manifest.json, backend/*, frontend/dist/index.js, frontend/i18n/**}
+#
+#   4. For every codex under codices/codices/<id> (excluding _common/common):
+#        a. realms codex publish — uploads manifest + .py files to
+#              codex/<id>/<version>/
+#
+#   5. Run scripts/deploy.py with deployments/staging-dominion-layered.yml.
+#      The "layered" install_strategy in that descriptor causes deploy.py to:
+#        a. realms wasm install   (realm_installer pulls the WASM out of
+#           file_registry in chunks and calls
+#           ic.management_canister.install_chunked_code on Dominion)
+#        b. realms extension registry-install — for every extension
+#        c. realms codex     registry-install — for every codex
+#
+# Required repository configuration:
+#   vars.FILE_REGISTRY_CANISTER_ID         file_registry canister id (staging)
+#   vars.REALM_INSTALLER_CANISTER_ID       realm_installer canister id (staging)
+#                                          must already be a controller of
+#                                          the target realm canister.
+#   vars.DOMINION_REALM_BACKEND_CANISTER   target realm canister id (staging)
+#                                          (used only for documentation +
+#                                          a post-deploy smoke check).
+#   secrets.DFX_IDENTITY_PEM               PEM-encoded identity used for both
+#                                          publishing artifacts and calling
+#                                          realm_installer / realm_backend.
+#
+# Trigger manually via:
+#   gh workflow run "Layered Deploy Dominion" \
+#       --repo smart-social-contracts/realms \
+#       --ref feat/layered-deployment \
+#       -f base_wasm_version=0.5.0 \
+#       -f mode_override=reinstall
+
+name: Layered Deploy Dominion
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_wasm_version:
+        description: "Version label for the base WASM (e.g. 0.5.0)."
+        required: true
+        type: string
+        default: "0.5.0"
+      mode_override:
+        description: "Install mode for the realm canister"
+        required: true
+        type: choice
+        options:
+          - upgrade
+          - reinstall
+          - install
+        default: upgrade
+      skip_base_wasm:
+        description: "Skip building + publishing the base WASM (assume already up-to-date)"
+        required: false
+        type: boolean
+        default: false
+      skip_publish:
+        description: "Skip publishing extensions+codices (assume already up-to-date)"
+        required: false
+        type: boolean
+        default: false
+      only_extensions:
+        description: "Comma-separated extension ids to publish (default: all)"
+        required: false
+        type: string
+        default: ""
+      only_codices:
+        description: "Comma-separated codex ids to publish (default: all)"
+        required: false
+        type: string
+        default: ""
+
+env:
+  PYTHON_VERSION: "3.10"
+  NODE_VERSION: "20"
+  DFX_VERSION: "0.31.0"
+  CHUNK_SIZE_BYTES: "786432" # 768 KB per chunk (under 2 MB ingress limit after b64)
+  NETWORK: "staging"
+
+jobs:
+  layered-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository (with realms-extensions submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Set up Node.js (for per-extension Vite builds)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dfx
+        uses: dfinity/setup-dfx@main
+        with:
+          dfx-version: ${{ env.DFX_VERSION }}
+
+      - name: Configure dfx identity
+        run: |
+          mkdir -p ~/.config/dfx/identity/ci
+          echo "${{ secrets.DFX_IDENTITY_PEM }}" > ~/.config/dfx/identity/ci/identity.pem
+          chmod 600 ~/.config/dfx/identity/ci/identity.pem
+          dfx identity use ci
+          echo "Identity principal:"
+          dfx identity get-principal
+
+      - name: Install Python dependencies
+        run: |
+          pip install -q -r src/realm_backend/requirements.txt 2>/dev/null || true
+          pip install -q basilisk pyyaml typer rich
+          pip install -q -e cli/
+
+      # ── 1. Build + publish the base WASM ─────────────────────────────────
+      - name: "[1] Build base WASM (no bundled extensions, no bundled codices)"
+        if: ${{ !inputs.skip_base_wasm }}
+        run: |
+          # Layered Realm (Issue #168): use the shared build helper so this
+          # CI step produces the *same* base WASM that operators get when
+          # running locally and that publish-base-wasm.yml uploads. Any
+          # change to the stubs goes in scripts/build_base_wasm.py.
+          python3 scripts/build_base_wasm.py --gzip --keep-stubs
+          ls -la .basilisk/realm_backend/realm_backend.wasm
+          ls -la .basilisk/realm_backend/realm_backend.wasm.gz
+          echo "wasm_path=.basilisk/realm_backend/realm_backend.wasm.gz" >> $GITHUB_ENV
+          echo "wasm_size=$(stat -c %s .basilisk/realm_backend/realm_backend.wasm.gz)" >> $GITHUB_ENV
+
+      - name: "[2] Publish base WASM to file_registry (chunked)"
+        if: ${{ !inputs.skip_base_wasm }}
+        env:
+          REGISTRY_CANISTER: ${{ vars.FILE_REGISTRY_CANISTER_ID }}
+        run: |
+          if [ -z "$REGISTRY_CANISTER" ]; then
+            echo "::error::FILE_REGISTRY_CANISTER_ID variable not set"
+            exit 1
+          fi
+
+          VERSION="${{ inputs.base_wasm_version }}"
+          NAMESPACE="wasm"
+          FILE_PATH="realm-base-${VERSION}.wasm.gz"
+          TOTAL_CHUNKS=$(( (wasm_size + CHUNK_SIZE_BYTES - 1) / CHUNK_SIZE_BYTES ))
+
+          echo "Uploading $FILE_PATH (${wasm_size} bytes, $TOTAL_CHUNKS chunks)"
+
+          for ((i=0; i<TOTAL_CHUNKS; i++)); do
+            SKIP=$((i * CHUNK_SIZE_BYTES))
+            CHUNK_B64=$(dd if="$wasm_path" bs=1 skip=$SKIP count=$CHUNK_SIZE_BYTES 2>/dev/null | base64 -w0)
+            PAYLOAD=$(python -c "
+          import json
+          print(json.dumps({
+              'namespace': '${NAMESPACE}',
+              'path': '${FILE_PATH}',
+              'chunk_index': $i,
+              'total_chunks': $TOTAL_CHUNKS,
+              'data_b64': '${CHUNK_B64}',
+              'content_type': 'application/wasm'
+          }))
+          ")
+            CANDID_ARG="(\"$(echo "$PAYLOAD" | sed 's/\\/\\\\/g; s/"/\\"/g')\")"
+            echo "  chunk $((i+1))/$TOTAL_CHUNKS"
+            dfx canister call --network "$NETWORK" "$REGISTRY_CANISTER" \
+              store_file_chunk "$CANDID_ARG"
+          done
+
+          FINALIZE_PAYLOAD=$(python -c "import json; print(json.dumps({'namespace': '${NAMESPACE}', 'path': '${FILE_PATH}'}))")
+          CANDID_ARG="(\"$(echo "$FINALIZE_PAYLOAD" | sed 's/\\/\\\\/g; s/"/\\"/g')\")"
+          dfx canister call --network "$NETWORK" "$REGISTRY_CANISTER" \
+            finalize_chunked_file "$CANDID_ARG"
+
+          PUB_PAYLOAD=$(python -c "import json; print(json.dumps({'namespace': '${NAMESPACE}'}))")
+          PUB_ARG="(\"$(echo "$PUB_PAYLOAD" | sed 's/\\/\\\\/g; s/"/\\"/g')\")"
+          dfx canister call --network "$NETWORK" "$REGISTRY_CANISTER" \
+            publish_namespace "$PUB_ARG"
+
+          echo "✅ Base WASM published: ${NAMESPACE}/${FILE_PATH}"
+
+      # ── 3. Scaffold + build all per-extension frontend-rt/ bundles ───────
+      - name: "[3a] Scaffold any missing frontend-rt/ directories"
+        run: |
+          python scripts/scaffold_runtime_bundles.py \
+              --extensions-repo realms-extensions
+
+      - name: "[3b] Build all per-extension frontend bundles"
+        run: |
+          ARGS=()
+          if [ -n "${{ inputs.only_extensions }}" ]; then
+            ARGS+=(--only "${{ inputs.only_extensions }}")
+          fi
+          python scripts/build_runtime_bundles.py \
+              --extensions-repo realms-extensions \
+              --jobs 4 \
+              "${ARGS[@]}"
+
+      # ── 4. Publish extensions + codices to file_registry ─────────────────
+      - name: "[4] Publish extensions + codices to file_registry"
+        if: ${{ !inputs.skip_publish }}
+        env:
+          REGISTRY_CANISTER: ${{ vars.FILE_REGISTRY_CANISTER_ID }}
+        run: |
+          if [ -z "$REGISTRY_CANISTER" ]; then
+            echo "::error::FILE_REGISTRY_CANISTER_ID variable not set"
+            exit 1
+          fi
+
+          ARGS=()
+          if [ -n "${{ inputs.only_extensions }}" ]; then
+            ARGS+=(--only-extensions "${{ inputs.only_extensions }}")
+          fi
+          if [ -n "${{ inputs.only_codices }}" ]; then
+            ARGS+=(--only-codices "${{ inputs.only_codices }}")
+          fi
+
+          python scripts/publish_layered.py \
+              --registry "$REGISTRY_CANISTER" \
+              --network "$NETWORK" \
+              --identity ci \
+              --extensions-repo realms-extensions \
+              --codices-root codices/codices \
+              --skip-frontend-build \
+              --skip-base-wasm \
+              "${ARGS[@]}"
+
+      # ── 5. Layered install on the target realm canister ──────────────────
+      - name: "[5] Materialise descriptor with concrete canister IDs"
+        env:
+          REGISTRY_CANISTER: ${{ vars.FILE_REGISTRY_CANISTER_ID }}
+          INSTALLER_CANISTER: ${{ vars.REALM_INSTALLER_CANISTER_ID }}
+        run: |
+          if [ -z "$REGISTRY_CANISTER" ] || [ -z "$INSTALLER_CANISTER" ]; then
+            echo "::error::Both FILE_REGISTRY_CANISTER_ID and REALM_INSTALLER_CANISTER_ID must be set"
+            exit 1
+          fi
+          # Replace TODO_* placeholders in the descriptor with the actual
+          # canister IDs from repo variables, and inject the version chosen
+          # at workflow_dispatch time.
+          sed -i \
+            -e "s|TODO_STAGING_FILE_REGISTRY_CANISTER_ID|$REGISTRY_CANISTER|g" \
+            -e "s|TODO_STAGING_REALM_INSTALLER_CANISTER_ID|$INSTALLER_CANISTER|g" \
+            -e "s|base_wasm_version: \"0\\.5\\.0\"|base_wasm_version: \"${{ inputs.base_wasm_version }}\"|g" \
+            -e "s|publish: true|publish: false|g" \
+            deployments/staging-dominion-layered.yml
+          echo "─── Materialised descriptor ───"
+          cat deployments/staging-dominion-layered.yml
+
+      - name: "[5] Run layered deploy on the target realm canister"
+        run: |
+          python scripts/deploy.py \
+              --file deployments/staging-dominion-layered.yml \
+              --mode "${{ inputs.mode_override }}" \
+              --identity ci
+
+      # ── 6. Post-deploy smoke checks ──────────────────────────────────────
+      - name: "[6] Smoke check — list_runtime_extensions"
+        env:
+          DOMINION_BACKEND: ${{ vars.DOMINION_REALM_BACKEND_CANISTER }}
+        run: |
+          if [ -z "$DOMINION_BACKEND" ]; then
+            echo "DOMINION_REALM_BACKEND_CANISTER not set — skipping smoke check"
+            exit 0
+          fi
+          echo "─── runtime extensions installed on $DOMINION_BACKEND ───"
+          dfx canister call --network "$NETWORK" "$DOMINION_BACKEND" \
+              list_runtime_extensions || true
+          echo
+          echo "─── codex packages installed on $DOMINION_BACKEND ───"
+          dfx canister call --network "$NETWORK" "$DOMINION_BACKEND" \
+              list_codex_packages || true
+
+      - name: Summary
+        run: |
+          echo "## 🧱 Layered Dominion Deploy" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| | |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Network | \`${NETWORK}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Base WASM version | \`${{ inputs.base_wasm_version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Install mode | \`${{ inputs.mode_override }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Skip base WASM | \`${{ inputs.skip_base_wasm }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Skip publish | \`${{ inputs.skip_publish }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Only extensions | \`${{ inputs.only_extensions || 'all' }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Only codices | \`${{ inputs.only_codices || 'all' }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| file_registry | \`${{ vars.FILE_REGISTRY_CANISTER_ID }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| realm_installer | \`${{ vars.REALM_INSTALLER_CANISTER_ID }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| target realm | \`${{ vars.DOMINION_REALM_BACKEND_CANISTER }}\` |" >> $GITHUB_STEP_SUMMARY

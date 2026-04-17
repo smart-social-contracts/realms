@@ -499,10 +499,10 @@ def realm_count() -> nat64:
     """Get the total number of registered realms"""
     try:
         count = count_registered_realms()
-        return nat64(count)
+        return count
     except Exception as e:
         logger.error(f"Error in realm_count: {str(e)}")
-        return nat64(0)
+        return 0
 
 
 @query
@@ -523,9 +523,9 @@ def get_credits(principal_id: text) -> GetCreditsResult:
             return {
                 "Ok": {
                     "principal_id": credits["principal_id"],
-                    "balance": nat64(credits["balance"]),
-                    "total_purchased": nat64(credits["total_purchased"]),
-                    "total_spent": nat64(credits["total_spent"]),
+                    "balance": credits["balance"],
+                    "total_purchased": credits["total_purchased"],
+                    "total_spent": credits["total_spent"],
                 }
             }
         else:
@@ -558,9 +558,9 @@ def add_credits(principal_id: text, amount: nat64, stripe_session_id: text = "",
             return {
                 "Ok": {
                     "principal_id": credits["principal_id"],
-                    "balance": nat64(credits["balance"]),
-                    "total_purchased": nat64(credits["total_purchased"]),
-                    "total_spent": nat64(credits["total_spent"]),
+                    "balance": credits["balance"],
+                    "total_purchased": credits["total_purchased"],
+                    "total_spent": credits["total_spent"],
                 }
             }
         else:
@@ -591,9 +591,9 @@ def deduct_credits(principal_id: text, amount: nat64, description: text = "Credi
             return {
                 "Ok": {
                     "principal_id": credits["principal_id"],
-                    "balance": nat64(credits["balance"]),
-                    "total_purchased": nat64(credits["total_purchased"]),
-                    "total_spent": nat64(credits["total_spent"]),
+                    "balance": credits["balance"],
+                    "total_purchased": credits["total_purchased"],
+                    "total_spent": credits["total_spent"],
                 }
             }
         else:
@@ -604,7 +604,7 @@ def deduct_credits(principal_id: text, amount: nat64, description: text = "Credi
 
 
 @query
-def get_transactions(principal_id: text, limit: nat64 = nat64(50)) -> TransactionHistoryResult:
+def get_transactions(principal_id: text, limit: nat64 = 50) -> TransactionHistoryResult:
     """Get a user's transaction history"""
     try:
         result = get_user_transactions(principal_id, int(limit))
@@ -613,7 +613,7 @@ def get_transactions(principal_id: text, limit: nat64 = nat64(50)) -> Transactio
                 {
                     "id": tx["id"],
                     "principal_id": tx["principal_id"],
-                    "amount": nat64(abs(tx["amount"])),
+                    "amount": abs(tx["amount"]),
                     "transaction_type": tx["transaction_type"],
                     "description": tx["description"],
                     "stripe_session_id": tx["stripe_session_id"],
@@ -638,10 +638,10 @@ def billing_status() -> GetBillingStatusResult:
             billing = result["billing"]
             return {
                 "Ok": BillingStatusRecord(
-                    users_count=nat64(billing["users_count"]),
-                    total_balance=nat64(billing["total_balance"]),
-                    total_purchased=nat64(billing["total_purchased"]),
-                    total_spent=nat64(billing["total_spent"]),
+                    users_count=billing["users_count"],
+                    total_balance=billing["total_balance"],
+                    total_purchased=billing["total_purchased"],
+                    total_spent=billing["total_spent"],
                 )
             }
         else:

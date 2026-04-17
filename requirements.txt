@@ -4,8 +4,6 @@
 #
 #    pip-compile --allow-unsafe --output-file=requirements.txt --strip-extras requirements.in
 #
-h3==4.4.2
-    # via -r requirements.in
 ic-basilisk==0.11.25
     # via ic-basilisk-toolkit
 ic-basilisk-toolkit==0.1.5

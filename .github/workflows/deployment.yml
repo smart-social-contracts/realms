@@ -16,6 +16,8 @@ on:
           - deployments/staging-realm2-backend.yml
           - deployments/staging-realm3-backend.yml
           - deployments/staging-realm1-frontend.yml
+          - deployments/staging-dominion-backend.yml
+          - deployments/staging-dominion-frontend.yml
           - deployments/staging-registry.yml
           - deployments/demo-mundus.yml
         default: deployments/staging-mundus.yml
@@ -173,7 +175,7 @@ jobs:
             -e DFX_WARNING="-mainnet_plaintext_identity" \
             -w /workspace \
             ghcr.io/smart-social-contracts/icp-dev-env:b26e7e9 \
-            bash -c "(dfxvm install 0.29.0 && \
+            bash -c "(dfxvm install 0.31.0 && \
                      pip install -q -r requirements.txt && \
                      pip install -q pyyaml && \
                      pip install -q -e cli/ && \

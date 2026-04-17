@@ -8,6 +8,7 @@ in the Smart Social Contracts platform.
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import zipfile
@@ -1040,10 +1041,780 @@ def install_from_source_command(source_dir: str = "extensions"):
     return success_count == len(extension_dirs)
 
 
+def _parse_candid_string(raw: str) -> str:
+    """Parse a Candid text response from dfx canister call."""
+    raw = raw.strip()
+    if raw.startswith("(") and raw.endswith(")"):
+        raw = raw[1:-1].strip()
+    if raw.endswith(","):
+        raw = raw[:-1].strip()
+    if raw.startswith('"') and raw.endswith('"'):
+        raw = raw[1:-1]
+    raw = raw.replace("\\n", "\n").replace('\\"', '"').replace("\\\\", "\\")
+    return raw
+
+
+def _dfx_call(canister, method, arg, network, identity, is_query=False, timeout=120):
+    """Run a dfx canister call and return parsed output.
+
+    For large candid arguments (≥ 100 KiB) the argument is written to a
+    temporary file and passed via ``--argument-file``, otherwise Linux's
+    per-argument size limit (MAX_ARG_STRLEN, 128 KiB) blows up before
+    dfx ever sees the call.
+    """
+    import tempfile as _tempfile
+
+    cmd = ["dfx", "canister", "call"]
+    if identity:
+        cmd.extend(["--identity", identity])
+    if network:
+        cmd.extend(["--network", network])
+    if is_query:
+        cmd.append("--query")
+
+    arg_file = None
+    arg_size = len(arg.encode("utf-8")) if isinstance(arg, str) else len(arg)
+    if arg_size >= 100 * 1024:
+        fd, arg_file = _tempfile.mkstemp(prefix="dfx-arg-", suffix=".did")
+        try:
+            with os.fdopen(fd, "w") as fh:
+                fh.write(arg)
+            cmd.extend([canister, method, "--argument-file", arg_file])
+        except Exception:
+            try:
+                os.unlink(arg_file)
+            except OSError:
+                pass
+            raise
+    else:
+        cmd.extend([canister, method, arg])
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        if result.returncode != 0:
+            console.print(f"[red]Error: {result.stderr.strip()}[/red]")
+            raise typer.Exit(1)
+        return _parse_candid_string(result.stdout)
+    except subprocess.TimeoutExpired:
+        console.print(f"[red]Error: canister call timed out ({timeout}s)[/red]")
+        raise typer.Exit(1)
+    except FileNotFoundError:
+        console.print("[red]Error: dfx not found. Install the DFINITY SDK.[/red]")
+        raise typer.Exit(1)
+    finally:
+        if arg_file:
+            try:
+                os.unlink(arg_file)
+            except OSError:
+                pass
+
+
+def _collect_runtime_extension_files(source_dir: str) -> dict:
+    """Collect extension files from a source directory into a {filename: content} dict.
+
+    Reads manifest.json from the root, and all .py files from backend/.
+    Backend files are flattened: backend/entry.py -> entry.py
+    """
+    files = {}
+
+    manifest_path = os.path.join(source_dir, "manifest.json")
+    if not os.path.exists(manifest_path):
+        console.print(f"[red]Error: manifest.json not found in {source_dir}[/red]")
+        raise typer.Exit(1)
+    with open(manifest_path, "r") as f:
+        files["manifest.json"] = f.read()
+
+    backend_dir = os.path.join(source_dir, "backend")
+    if os.path.isdir(backend_dir):
+        for root, _dirs, filenames in os.walk(backend_dir):
+            for fname in filenames:
+                if fname.endswith(".py"):
+                    full_path = os.path.join(root, fname)
+                    rel = os.path.relpath(full_path, backend_dir)
+                    with open(full_path, "r") as f:
+                        files[rel] = f.read()
+    else:
+        entry_path = os.path.join(source_dir, "entry.py")
+        if os.path.exists(entry_path):
+            with open(entry_path, "r") as f:
+                files["entry.py"] = f.read()
+
+    if "entry.py" not in files:
+        console.print(f"[red]Error: entry.py not found in {source_dir}/backend/ or {source_dir}/[/red]")
+        raise typer.Exit(1)
+
+    return files
+
+
+def runtime_install_command(canister: str, source_dir: str, network: str = "local", identity: Optional[str] = None):
+    """Install an extension on a deployed realm canister at runtime.
+
+    Reads backend files from the source directory and uploads them to the
+    canister's persistent filesystem via the install_extension endpoint.
+    """
+    source_dir = os.path.abspath(source_dir)
+    if not os.path.isdir(source_dir):
+        console.print(f"[red]Error: {source_dir} is not a directory[/red]")
+        raise typer.Exit(1)
+
+    manifest_path = os.path.join(source_dir, "manifest.json")
+    with open(manifest_path, "r") as f:
+        manifest = json.loads(f.read())
+    ext_id = manifest.get("name") or os.path.basename(source_dir)
+
+    console.print(f"[blue]Installing extension '{ext_id}' on {canister} ({network})...[/blue]")
+
+    files = _collect_runtime_extension_files(source_dir)
+    total_bytes = sum(len(v) for v in files.values())
+    console.print(f"  Files: {len(files)} ({total_bytes:,} bytes)")
+    for fname, content in sorted(files.items()):
+        console.print(f"    {fname} ({len(content):,} bytes)")
+
+    payload = json.dumps({"extension_id": ext_id, "files": files})
+    candid_arg = '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
+
+    console.print("  Uploading to canister...")
+    raw = _dfx_call(canister, "install_extension", candid_arg, network, identity, timeout=300)
+
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        console.print(f"  Response: {raw}")
+        return
+
+    if result.get("success"):
+        console.print(f"[green]  ✓ Extension '{ext_id}' installed successfully[/green]")
+    else:
+        console.print(f"[red]  ✗ Installation failed: {result.get('error', 'unknown error')}[/red]")
+        raise typer.Exit(1)
+
+
+def runtime_uninstall_command(canister: str, extension_id: str, network: str = "local", identity: Optional[str] = None):
+    """Uninstall a runtime extension from a deployed realm canister."""
+    console.print(f"[blue]Uninstalling extension '{extension_id}' from {canister} ({network})...[/blue]")
+
+    payload = json.dumps({"extension_id": extension_id})
+    candid_arg = '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
+
+    raw = _dfx_call(canister, "uninstall_extension", candid_arg, network, identity)
+
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        console.print(f"  Response: {raw}")
+        return
+
+    if result.get("success"):
+        console.print(f"[green]  ✓ Extension '{extension_id}' uninstalled[/green]")
+    else:
+        console.print(f"[red]  ✗ Uninstall failed: {result.get('error', 'unknown error')}[/red]")
+        raise typer.Exit(1)
+
+
+def runtime_list_command(canister: str, network: str = "local", identity: Optional[str] = None, raw_json: bool = False):
+    """List runtime-installed extensions on a deployed realm canister."""
+    raw = _dfx_call(canister, "list_runtime_extensions", "()", network, identity, is_query=True)
+
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        console.print(raw)
+        return
+
+    if raw_json:
+        console.print(json.dumps(result, indent=2))
+        return
+
+    if not result.get("success"):
+        console.print(f"[red]Error: {result.get('error', 'unknown')}[/red]")
+        raise typer.Exit(1)
+
+    extensions = result.get("runtime_extensions", [])
+    manifests = result.get("all_manifests", {})
+
+    if not extensions and not manifests:
+        console.print("[yellow]No extensions installed.[/yellow]")
+        return
+
+    if extensions:
+        table = Table(title=f"Runtime Extensions ({len(extensions)})")
+        table.add_column("ID", style="cyan")
+        table.add_column("Version", style="green")
+        table.add_column("Description", style="white")
+
+        for ext_id in extensions:
+            m = manifests.get(ext_id, {})
+            version = m.get("version", "?")
+            desc = m.get("description", "")
+            table.add_row(ext_id, version, desc[:60] + "..." if len(desc) > 60 else desc)
+
+        console.print(table)
+
+    baked = [k for k in manifests if k not in extensions]
+    if baked:
+        table = Table(title=f"Baked-in Extensions ({len(baked)})")
+        table.add_column("ID", style="cyan")
+        table.add_column("Version", style="green")
+        table.add_column("Description", style="white")
+
+        for ext_id in baked:
+            m = manifests[ext_id]
+            version = m.get("version", "?")
+            desc = m.get("description", "")
+            table.add_row(ext_id, version, desc[:60] + "..." if len(desc) > 60 else desc)
+
+        console.print(table)
+
+
+def registry_install_command(canister: str, registry: str, ext_id: str, version: Optional[str] = None, network: str = "local", identity: Optional[str] = None):
+    """Install an extension from the file registry via the realm canister."""
+    console.print(f"[blue]Installing extension '{ext_id}' from registry {registry} on {canister} ({network})...[/blue]")
+    if version:
+        console.print(f"  Version: {version}")
+    else:
+        console.print("  Version: latest")
+
+    payload = json.dumps({
+        "registry_canister_id": registry,
+        "ext_id": ext_id,
+        "version": version,
+    })
+    candid_arg = '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
+
+    raw = _dfx_call(canister, "install_extension_from_registry", candid_arg, network, identity, timeout=300)
+
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        console.print(f"  Response: {raw}")
+        return
+
+    if result.get("success"):
+        console.print(f"[green]  ✓ Extension '{ext_id}' installed (version {result.get('version', '?')})[/green]")
+    else:
+        console.print(f"[red]  ✗ Installation failed: {result.get('error', 'unknown error')}[/red]")
+        raise typer.Exit(1)
+
+
+# ---------------------------------------------------------------------------
+# Codex CLI commands
+# ---------------------------------------------------------------------------
+
+
+def _collect_codex_files(source_dir: str) -> dict:
+    """Collect codex files from a source directory into a {filename: content} dict."""
+    files = {}
+    for root, _dirs, filenames in os.walk(source_dir):
+        for fname in filenames:
+            if fname.endswith(".py") or fname == "manifest.json":
+                full_path = os.path.join(root, fname)
+                rel = os.path.relpath(full_path, source_dir)
+                with open(full_path, "r") as f:
+                    files[rel] = f.read()
+    return files
+
+
+def codex_runtime_install_command(canister: str, source_dir: str, codex_id: Optional[str] = None, run_init: bool = True, network: str = "local", identity: Optional[str] = None):
+    """Install a codex package on a deployed realm canister at runtime."""
+    source_dir = os.path.abspath(source_dir)
+    if not os.path.isdir(source_dir):
+        console.print(f"[red]Error: {source_dir} is not a directory[/red]")
+        raise typer.Exit(1)
+
+    if not codex_id:
+        codex_id = os.path.basename(source_dir)
+
+    console.print(f"[blue]Installing codex '{codex_id}' on {canister} ({network})...[/blue]")
+
+    files = _collect_codex_files(source_dir)
+    total_bytes = sum(len(v) for v in files.values())
+    console.print(f"  Files: {len(files)} ({total_bytes:,} bytes)")
+    for fname, content in sorted(files.items()):
+        console.print(f"    {fname} ({len(content):,} bytes)")
+
+    payload = json.dumps({"codex_id": codex_id, "files": files, "run_init": run_init})
+    candid_arg = '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
+
+    console.print("  Uploading to canister...")
+    raw = _dfx_call(canister, "install_codex", candid_arg, network, identity, timeout=300)
+
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        console.print(f"  Response: {raw}")
+        return
+
+    if result.get("success"):
+        console.print(f"[green]  ✓ Codex '{codex_id}' installed successfully[/green]")
+        if result.get("init_warning"):
+            console.print(f"[yellow]  ⚠ init.py warning: {result['init_warning']}[/yellow]")
+    else:
+        console.print(f"[red]  ✗ Installation failed: {result.get('error', 'unknown error')}[/red]")
+        raise typer.Exit(1)
+
+
+def codex_runtime_uninstall_command(canister: str, codex_id: str, network: str = "local", identity: Optional[str] = None):
+    """Uninstall a codex package from a deployed realm canister."""
+    console.print(f"[blue]Uninstalling codex '{codex_id}' from {canister} ({network})...[/blue]")
+
+    payload = json.dumps({"codex_id": codex_id})
+    candid_arg = '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
+
+    raw = _dfx_call(canister, "uninstall_codex", candid_arg, network, identity)
+
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        console.print(f"  Response: {raw}")
+        return
+
+    if result.get("success"):
+        console.print(f"[green]  ✓ Codex '{codex_id}' uninstalled[/green]")
+    else:
+        console.print(f"[red]  ✗ Uninstall failed: {result.get('error', 'unknown error')}[/red]")
+        raise typer.Exit(1)
+
+
+def codex_runtime_list_command(canister: str, network: str = "local", identity: Optional[str] = None, raw_json: bool = False):
+    """List codex packages installed on a deployed realm canister."""
+    raw = _dfx_call(canister, "list_codex_packages", "()", network, identity, is_query=True)
+
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        console.print(raw)
+        return
+
+    if raw_json:
+        console.print(json.dumps(result, indent=2))
+        return
+
+    if not result.get("success"):
+        console.print(f"[red]Error: {result.get('error', 'unknown')}[/red]")
+        raise typer.Exit(1)
+
+    packages = result.get("codex_packages", [])
+    manifests = result.get("manifests", {})
+
+    if not packages:
+        console.print("[yellow]No codex packages installed.[/yellow]")
+        return
+
+    table = Table(title=f"Codex Packages ({len(packages)})")
+    table.add_column("ID", style="cyan")
+    table.add_column("Version", style="green")
+    table.add_column("Description", style="white")
+
+    for pkg_id in packages:
+        m = manifests.get(pkg_id, {})
+        version = m.get("version", "?")
+        desc = m.get("description", "")
+        table.add_row(pkg_id, version, desc[:60] + "..." if len(desc) > 60 else desc)
+
+    console.print(table)
+
+
+# ---------------------------------------------------------------------------
+# Publish commands — upload extensions / codices to file_registry
+# ---------------------------------------------------------------------------
+
+# Files larger than this are uploaded via store_file_chunk + finalize_chunked_file
+# (anything above ~1.4 MiB blows the IC ingress message limit when base64 inflates by ~4/3).
+_PUBLISH_CHUNK_THRESHOLD_BYTES = 768 * 1024  # 768 KiB raw -> ~1 MiB after base64
+_PUBLISH_CHUNK_SIZE_BYTES = 768 * 1024
+
+
+def _content_type_for(name: str) -> str:
+    name_lower = name.lower()
+    if name_lower.endswith(".json"):
+        return "application/json"
+    if name_lower.endswith(".js") or name_lower.endswith(".mjs"):
+        return "application/javascript"
+    if name_lower.endswith(".css"):
+        return "text/css"
+    if name_lower.endswith(".html"):
+        return "text/html"
+    if name_lower.endswith(".wasm") or name_lower.endswith(".wasm.gz"):
+        return "application/wasm"
+    if name_lower.endswith(".py"):
+        return "text/x-python"
+    if name_lower.endswith(".svg"):
+        return "image/svg+xml"
+    if name_lower.endswith(".png"):
+        return "image/png"
+    if name_lower.endswith(".jpg") or name_lower.endswith(".jpeg"):
+        return "image/jpeg"
+    if name_lower.endswith(".md") or name_lower.endswith(".txt"):
+        return "text/plain"
+    return "application/octet-stream"
+
+
+def _upload_one_file(
+    registry: str,
+    namespace: str,
+    registry_path: str,
+    local_path: str,
+    network: str,
+    identity: Optional[str],
+):
+    """Upload a single file to file_registry, picking single-shot or chunked upload."""
+    import base64 as _b64
+
+    size = os.path.getsize(local_path)
+    content_type = _content_type_for(local_path)
+
+    if size <= _PUBLISH_CHUNK_THRESHOLD_BYTES:
+        with open(local_path, "rb") as fh:
+            blob = fh.read()
+        payload = json.dumps({
+            "namespace": namespace,
+            "path": registry_path,
+            "content_b64": _b64.b64encode(blob).decode("ascii"),
+            "content_type": content_type,
+        })
+        candid_arg = '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
+        raw = _dfx_call(
+            registry, "store_file", candid_arg, network, identity, timeout=300
+        )
+        try:
+            res = json.loads(raw)
+        except json.JSONDecodeError:
+            res = {"raw": raw}
+        if isinstance(res, dict) and (res.get("ok") is True or res.get("success") is True):
+            console.print(f"  [green]✓[/green] {namespace}/{registry_path} ({size:,} bytes)")
+            return True
+        console.print(
+            f"  [red]✗[/red] failed to store {registry_path}: {res}"
+        )
+        return False
+
+    # Chunked upload
+    total_chunks = (size + _PUBLISH_CHUNK_SIZE_BYTES - 1) // _PUBLISH_CHUNK_SIZE_BYTES
+    console.print(
+        f"  [blue]…[/blue] chunked upload of {namespace}/{registry_path} "
+        f"({size:,} bytes, {total_chunks} chunks)"
+    )
+    with open(local_path, "rb") as fh:
+        for chunk_index in range(total_chunks):
+            blob = fh.read(_PUBLISH_CHUNK_SIZE_BYTES)
+            payload = json.dumps({
+                "namespace": namespace,
+                "path": registry_path,
+                "chunk_index": chunk_index,
+                "total_chunks": total_chunks,
+                "data_b64": _b64.b64encode(blob).decode("ascii"),
+                "content_type": content_type,
+            })
+            candid_arg = '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
+            raw = _dfx_call(
+                registry,
+                "store_file_chunk",
+                candid_arg,
+                network,
+                identity,
+                timeout=600,
+            )
+            try:
+                res = json.loads(raw)
+            except json.JSONDecodeError:
+                res = {"raw": raw}
+            if not (isinstance(res, dict) and (res.get("ok") is True or res.get("success") is True)):
+                console.print(
+                    f"  [red]✗[/red] chunk {chunk_index + 1}/{total_chunks} of "
+                    f"{registry_path} failed: {res}"
+                )
+                return False
+
+    finalize_payload = json.dumps({"namespace": namespace, "path": registry_path})
+    candid_arg = '("' + finalize_payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
+    raw = _dfx_call(
+        registry,
+        "finalize_chunked_file",
+        candid_arg,
+        network,
+        identity,
+        timeout=600,
+    )
+    try:
+        res = json.loads(raw)
+    except json.JSONDecodeError:
+        res = {"raw": raw}
+    if isinstance(res, dict) and (res.get("ok") is True or res.get("success") is True):
+        console.print(f"  [green]✓[/green] {namespace}/{registry_path} ({size:,} bytes, chunked)")
+        return True
+    console.print(f"  [red]✗[/red] finalize failed for {registry_path}: {res}")
+    return False
+
+
+def _publish_namespace(
+    registry: str,
+    namespace: str,
+    network: str,
+    identity: Optional[str],
+):
+    payload = json.dumps({"namespace": namespace})
+    candid_arg = '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
+    raw = _dfx_call(
+        registry, "publish_namespace", candid_arg, network, identity, timeout=120
+    )
+    try:
+        res = json.loads(raw)
+    except json.JSONDecodeError:
+        res = {"raw": raw}
+    if isinstance(res, dict) and (res.get("ok") is True or res.get("success") is True):
+        console.print(f"  [green]✓[/green] published namespace {namespace}")
+        return True
+    console.print(f"  [red]✗[/red] publish_namespace({namespace}) failed: {res}")
+    return False
+
+
+def publish_extension_command(
+    registry: str,
+    source_dir: str,
+    extension_id: Optional[str] = None,
+    version: Optional[str] = None,
+    bundle_path: Optional[str] = None,
+    namespace_prefix: str = "ext",
+    skip_publish: bool = False,
+    network: str = "ic",
+    identity: Optional[str] = None,
+):
+    """Publish an extension (manifest, backend/, optional frontend-rt bundle, i18n)
+    to a file_registry canister under ``{namespace_prefix}/<id>/<version>/``.
+
+    Layout uploaded:
+      manifest.json
+      backend/<py files>
+      frontend/dist/index.js                      (if bundle exists)
+      frontend/i18n/locales/<locale>.json         (if frontend/i18n/ exists)
+
+    Then, unless ``skip_publish`` is set, marks the namespace as published so
+    realm canisters can install it via ``install_extension_from_registry``.
+    """
+    source_dir = os.path.abspath(source_dir)
+    if not os.path.isdir(source_dir):
+        console.print(f"[red]Error: source dir not found: {source_dir}[/red]")
+        raise typer.Exit(1)
+
+    manifest_path = os.path.join(source_dir, "manifest.json")
+    if not os.path.exists(manifest_path):
+        console.print(f"[red]Error: manifest.json not found in {source_dir}[/red]")
+        raise typer.Exit(1)
+    with open(manifest_path, "r") as fh:
+        manifest = json.load(fh)
+
+    ext_id = extension_id or manifest.get("name") or os.path.basename(source_dir)
+    ver = version or manifest.get("version") or "0.0.0"
+    namespace = f"{namespace_prefix}/{ext_id}/{ver}"
+
+    console.print(
+        f"[blue]Publishing extension '{ext_id}' v{ver} → {namespace} on "
+        f"{registry} ({network})…[/blue]"
+    )
+
+    failed = 0
+
+    # Manifest
+    if not _upload_one_file(
+        registry, namespace, "manifest.json", manifest_path, network, identity
+    ):
+        failed += 1
+
+    # Backend Python files (flattened — backend/foo.py → backend/foo.py)
+    backend_dir = os.path.join(source_dir, "backend")
+    if os.path.isdir(backend_dir):
+        for root, _dirs, files in os.walk(backend_dir):
+            for fname in sorted(files):
+                if not fname.endswith(".py"):
+                    continue
+                local = os.path.join(root, fname)
+                rel = os.path.relpath(local, backend_dir).replace(os.sep, "/")
+                if not _upload_one_file(
+                    registry, namespace, f"backend/{rel}", local, network, identity
+                ):
+                    failed += 1
+
+    # Frontend runtime bundle (preferred input order):
+    #   1. explicit --bundle-path
+    #   2. <source_dir>/frontend-rt/dist/index.js
+    bundles = []
+    if bundle_path:
+        bundles.append(bundle_path)
+    auto_bundle = os.path.join(source_dir, "frontend-rt", "dist", "index.js")
+    if not bundle_path and os.path.exists(auto_bundle):
+        bundles.append(auto_bundle)
+
+    for b in bundles:
+        if not os.path.exists(b):
+            console.print(f"  [yellow]![/yellow] bundle not found, skipping: {b}")
+            continue
+        if not _upload_one_file(
+            registry, namespace, "frontend/dist/index.js", b, network, identity
+        ):
+            failed += 1
+
+    # Frontend i18n: prefer explicit per-extension folder, fall back to bundled
+    # frontend/i18n/locales/extensions/<ext>/ tree (in monorepo layout).
+    i18n_candidates = [
+        os.path.join(source_dir, "frontend", "i18n", "locales"),
+        os.path.join(source_dir, "frontend", "i18n", "locales", "extensions", ext_id),
+        os.path.join(source_dir, "i18n"),
+    ]
+    for i18n_root in i18n_candidates:
+        if not os.path.isdir(i18n_root):
+            continue
+        for root, _dirs, files in os.walk(i18n_root):
+            for fname in sorted(files):
+                if not fname.endswith(".json"):
+                    continue
+                local = os.path.join(root, fname)
+                rel = os.path.relpath(local, i18n_root).replace(os.sep, "/")
+                if not _upload_one_file(
+                    registry,
+                    namespace,
+                    f"frontend/i18n/{rel}",
+                    local,
+                    network,
+                    identity,
+                ):
+                    failed += 1
+        break  # only use the first i18n root that exists
+
+    if not skip_publish:
+        if not _publish_namespace(registry, namespace, network, identity):
+            failed += 1
+
+    if failed:
+        console.print(f"[red]Publish completed with {failed} failures[/red]")
+        raise typer.Exit(1)
+
+    console.print(
+        f"[green]✓ Published {ext_id}@{ver} to {registry}:{namespace}[/green]"
+    )
+
+
+def publish_codex_command(
+    registry: str,
+    source_dir: str,
+    codex_id: Optional[str] = None,
+    version: Optional[str] = None,
+    namespace_prefix: str = "codex",
+    skip_publish: bool = False,
+    network: str = "ic",
+    identity: Optional[str] = None,
+):
+    """Publish a codex package (manifest + .py files) to a file_registry canister."""
+    source_dir = os.path.abspath(source_dir)
+    if not os.path.isdir(source_dir):
+        console.print(f"[red]Error: source dir not found: {source_dir}[/red]")
+        raise typer.Exit(1)
+
+    manifest_path = os.path.join(source_dir, "manifest.json")
+    if os.path.exists(manifest_path):
+        with open(manifest_path, "r") as fh:
+            manifest = json.load(fh)
+    else:
+        manifest = {}
+
+    cid = (
+        codex_id
+        or manifest.get("name")
+        or manifest.get("id")
+        or os.path.basename(source_dir)
+    )
+    ver = version or manifest.get("version") or "0.0.0"
+    namespace = f"{namespace_prefix}/{cid}/{ver}"
+
+    console.print(
+        f"[blue]Publishing codex '{cid}' v{ver} → {namespace} on "
+        f"{registry} ({network})…[/blue]"
+    )
+
+    failed = 0
+
+    if os.path.exists(manifest_path):
+        if not _upload_one_file(
+            registry, namespace, "manifest.json", manifest_path, network, identity
+        ):
+            failed += 1
+    else:
+        synthetic = json.dumps(
+            {"name": cid, "version": ver, "description": f"Codex package {cid}"}
+        )
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False
+        ) as tmp:
+            tmp.write(synthetic)
+            tmp_path = tmp.name
+        try:
+            if not _upload_one_file(
+                registry, namespace, "manifest.json", tmp_path, network, identity
+            ):
+                failed += 1
+        finally:
+            os.unlink(tmp_path)
+
+    for root, _dirs, files in os.walk(source_dir):
+        for fname in sorted(files):
+            if not fname.endswith(".py"):
+                continue
+            local = os.path.join(root, fname)
+            rel = os.path.relpath(local, source_dir).replace(os.sep, "/")
+            if not _upload_one_file(
+                registry, namespace, rel, local, network, identity
+            ):
+                failed += 1
+
+    if not skip_publish:
+        if not _publish_namespace(registry, namespace, network, identity):
+            failed += 1
+
+    if failed:
+        console.print(f"[red]Publish completed with {failed} failures[/red]")
+        raise typer.Exit(1)
+
+    console.print(
+        f"[green]✓ Published codex {cid}@{ver} to {registry}:{namespace}[/green]"
+    )
+
+
+def codex_registry_install_command(canister: str, registry: str, codex_id: str, version: Optional[str] = None, run_init: bool = True, network: str = "local", identity: Optional[str] = None):
+    """Install a codex package from the file registry via the realm canister."""
+    console.print(f"[blue]Installing codex '{codex_id}' from registry {registry} on {canister} ({network})...[/blue]")
+    if version:
+        console.print(f"  Version: {version}")
+    else:
+        console.print("  Version: latest")
+
+    payload = json.dumps({
+        "registry_canister_id": registry,
+        "codex_id": codex_id,
+        "version": version,
+        "run_init": run_init,
+    })
+    candid_arg = '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
+
+    raw = _dfx_call(canister, "install_codex_from_registry", candid_arg, network, identity, timeout=300)
+
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        console.print(f"  Response: {raw}")
+        return
+
+    if result.get("success"):
+        console.print(f"[green]  ✓ Codex '{codex_id}' installed (version {result.get('version', '?')})[/green]")
+        if result.get("init_warning"):
+            console.print(f"[yellow]  ⚠ init.py warning: {result['init_warning']}[/yellow]")
+    else:
+        console.print(f"[red]  ✗ Installation failed: {result.get('error', 'unknown error')}[/red]")
+        raise typer.Exit(1)
+
+
 def extension_command(
     action: str = typer.Argument(
         ...,
-        help="Action to perform: list, install-from-source, package, install, uninstall, generate-manifests",
+        help="Action to perform: list, install-from-source, package, install, uninstall, generate-manifests, runtime-install, runtime-uninstall, runtime-list, registry-install, publish",
     ),
     extension_id: Optional[str] = typer.Option(
         None, "--extension-id", help="Extension ID for package/uninstall operations"
@@ -1056,6 +1827,39 @@ def extension_command(
     ),
     all_extensions: bool = typer.Option(
         False, "--all", help="Uninstall all extensions (only for uninstall action)"
+    ),
+    canister: Optional[str] = typer.Option(
+        None, "--canister", "-c", help="Target realm canister ID (for runtime-*/registry-* actions)"
+    ),
+    network: str = typer.Option(
+        "local", "--network", "-n", help="Network: local, ic (for runtime-*/registry-* actions)"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="dfx identity to use (for runtime-*/registry-* actions)"
+    ),
+    raw_json: bool = typer.Option(
+        False, "--json", help="Output raw JSON (for runtime-list)"
+    ),
+    registry: Optional[str] = typer.Option(
+        None, "--registry", "-r", help="File registry canister ID (for registry-install or publish)"
+    ),
+    version: Optional[str] = typer.Option(
+        None, "--version", "-v", help="Version to install/publish (default: registry-install→latest, publish→manifest.json)"
+    ),
+    bundle_path: Optional[str] = typer.Option(
+        None,
+        "--bundle-path",
+        help="Path to a pre-built ESM frontend bundle (overrides <source>/frontend-rt/dist/index.js for publish)",
+    ),
+    namespace_prefix: str = typer.Option(
+        "ext",
+        "--namespace-prefix",
+        help="Registry namespace prefix for publish (default: ext)",
+    ),
+    skip_publish_marker: bool = typer.Option(
+        False,
+        "--skip-publish",
+        help="Upload files but do not call publish_namespace (publish action only)",
     ),
 ) -> None:
     """Manage Realm extensions."""
@@ -1091,9 +1895,158 @@ def extension_command(
                 "[red]Error: Either --extension-id or --all is required for uninstall action[/red]"
             )
             raise typer.Exit(1)
+    elif action == "runtime-install":
+        if not canister:
+            console.print("[red]Error: --canister is required for runtime-install[/red]")
+            raise typer.Exit(1)
+        runtime_install_command(canister, source_dir, network, identity)
+    elif action == "runtime-uninstall":
+        if not canister:
+            console.print("[red]Error: --canister is required for runtime-uninstall[/red]")
+            raise typer.Exit(1)
+        if not extension_id:
+            console.print("[red]Error: --extension-id is required for runtime-uninstall[/red]")
+            raise typer.Exit(1)
+        runtime_uninstall_command(canister, extension_id, network, identity)
+    elif action == "runtime-list":
+        if not canister:
+            console.print("[red]Error: --canister is required for runtime-list[/red]")
+            raise typer.Exit(1)
+        runtime_list_command(canister, network, identity, raw_json)
+    elif action == "registry-install":
+        if not canister:
+            console.print("[red]Error: --canister is required for registry-install[/red]")
+            raise typer.Exit(1)
+        if not registry:
+            console.print("[red]Error: --registry is required for registry-install[/red]")
+            raise typer.Exit(1)
+        if not extension_id:
+            console.print("[red]Error: --extension-id is required for registry-install[/red]")
+            raise typer.Exit(1)
+        registry_install_command(canister, registry, extension_id, version, network, identity)
+    elif action == "publish":
+        if not registry:
+            console.print("[red]Error: --registry is required for publish[/red]")
+            raise typer.Exit(1)
+        # For publish, --source-dir points to a single extension dir (containing manifest.json),
+        # not the parent directory. We accept either the typer default ('extensions') or an
+        # explicit path. Prefer the explicit path if it has a manifest.json.
+        candidate = source_dir
+        if extension_id and os.path.isdir(os.path.join(source_dir, extension_id)):
+            candidate = os.path.join(source_dir, extension_id)
+        publish_extension_command(
+            registry=registry,
+            source_dir=candidate,
+            extension_id=extension_id,
+            version=version,
+            bundle_path=bundle_path,
+            namespace_prefix=namespace_prefix,
+            skip_publish=skip_publish_marker,
+            network=network,
+            identity=identity,
+        )
     else:
         console.print(f"[red]Unknown action: {action}[/red]")
         console.print(
-            "[yellow]Available actions: list, install-from-source, generate-manifests, package, install, uninstall[/yellow]"
+            "[yellow]Available actions: list, install-from-source, generate-manifests, package, install, uninstall, runtime-install, runtime-uninstall, runtime-list, registry-install, publish[/yellow]"
+        )
+        raise typer.Exit(1)
+
+
+def codex_command(
+    action: str = typer.Argument(
+        ...,
+        help="Action to perform: runtime-install, runtime-uninstall, runtime-list, registry-install, publish",
+    ),
+    codex_id: Optional[str] = typer.Option(
+        None, "--codex-id", help="Codex package ID"
+    ),
+    source_dir: str = typer.Option(
+        ".", "--source-dir", help="Source directory for codex package"
+    ),
+    canister: Optional[str] = typer.Option(
+        None, "--canister", "-c", help="Target realm canister ID"
+    ),
+    network: str = typer.Option(
+        "local", "--network", "-n", help="Network: local, ic"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="dfx identity to use"
+    ),
+    raw_json: bool = typer.Option(
+        False, "--json", help="Output raw JSON (for runtime-list)"
+    ),
+    registry: Optional[str] = typer.Option(
+        None, "--registry", "-r", help="File registry canister ID (for registry-install or publish)"
+    ),
+    version: Optional[str] = typer.Option(
+        None, "--version", "-v", help="Version to install/publish (default: registry-install→latest, publish→manifest.json)"
+    ),
+    run_init: bool = typer.Option(
+        True, "--run-init/--no-init", help="Run init.py after install (default: true)"
+    ),
+    namespace_prefix: str = typer.Option(
+        "codex",
+        "--namespace-prefix",
+        help="Registry namespace prefix for publish (default: codex)",
+    ),
+    skip_publish_marker: bool = typer.Option(
+        False,
+        "--skip-publish",
+        help="Upload files but do not call publish_namespace (publish action only)",
+    ),
+) -> None:
+    """Manage Realm codex packages."""
+
+    if action == "runtime-install":
+        if not canister:
+            console.print("[red]Error: --canister is required for runtime-install[/red]")
+            raise typer.Exit(1)
+        codex_runtime_install_command(canister, source_dir, codex_id, run_init, network, identity)
+    elif action == "runtime-uninstall":
+        if not canister:
+            console.print("[red]Error: --canister is required for runtime-uninstall[/red]")
+            raise typer.Exit(1)
+        if not codex_id:
+            console.print("[red]Error: --codex-id is required for runtime-uninstall[/red]")
+            raise typer.Exit(1)
+        codex_runtime_uninstall_command(canister, codex_id, network, identity)
+    elif action == "runtime-list":
+        if not canister:
+            console.print("[red]Error: --canister is required for runtime-list[/red]")
+            raise typer.Exit(1)
+        codex_runtime_list_command(canister, network, identity, raw_json)
+    elif action == "registry-install":
+        if not canister:
+            console.print("[red]Error: --canister is required for registry-install[/red]")
+            raise typer.Exit(1)
+        if not registry:
+            console.print("[red]Error: --registry is required for registry-install[/red]")
+            raise typer.Exit(1)
+        if not codex_id:
+            console.print("[red]Error: --codex-id is required for registry-install[/red]")
+            raise typer.Exit(1)
+        codex_registry_install_command(canister, registry, codex_id, version, run_init, network, identity)
+    elif action == "publish":
+        if not registry:
+            console.print("[red]Error: --registry is required for publish[/red]")
+            raise typer.Exit(1)
+        candidate = source_dir
+        if codex_id and os.path.isdir(os.path.join(source_dir, codex_id)):
+            candidate = os.path.join(source_dir, codex_id)
+        publish_codex_command(
+            registry=registry,
+            source_dir=candidate,
+            codex_id=codex_id,
+            version=version,
+            namespace_prefix=namespace_prefix,
+            skip_publish=skip_publish_marker,
+            network=network,
+            identity=identity,
+        )
+    else:
+        console.print(f"[red]Unknown action: {action}[/red]")
+        console.print(
+            "[yellow]Available actions: runtime-install, runtime-uninstall, runtime-list, registry-install, publish[/yellow]"
         )
         raise typer.Exit(1)

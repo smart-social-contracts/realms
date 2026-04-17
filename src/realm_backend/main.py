@@ -2736,3 +2736,405 @@ def reload_entity_method_overrides() -> str:
     except Exception as e:
         logger.error(f"❌ reload_entity_method_overrides failed: {e}")
         return json.dumps({"success": False, "error": str(e)}, indent=2)
+
+
+# ---------------------------------------------------------------------------
+# Runtime Extension Management (Layer 2)
+# See: https://github.com/smart-social-contracts/realms/issues/168
+# ---------------------------------------------------------------------------
+
+
+@update
+@require(Operations.EXTENSION_INSTALL)
+def install_extension(args: text) -> text:
+    """Install a runtime extension from uploaded files.
+
+    Args (JSON): {
+        "extension_id": str,
+        "files": {"filename": "content", ...}
+    }
+
+    At minimum, files must include "entry.py" and "manifest.json".
+    Files are written to /extensions/{extension_id}/ on the persistent filesystem.
+    """
+    try:
+        params = json.loads(args)
+        ext_id = params.get("extension_id")
+        files = params.get("files", {})
+
+        if not ext_id:
+            return json.dumps({"success": False, "error": "extension_id is required"})
+        if not files:
+            return json.dumps({"success": False, "error": "files dict is required"})
+
+        from core.runtime_extensions import install_extension as _install
+
+        ok = _install(ext_id, files)
+        if ok:
+            return json.dumps({"success": True, "extension_id": ext_id, "files_count": len(files)})
+        else:
+            return json.dumps({"success": False, "error": f"Failed to load extension '{ext_id}' after install"})
+    except Exception as e:
+        logger.error(f"install_extension error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+@require(Operations.EXTENSION_UNINSTALL)
+def uninstall_extension(args: text) -> text:
+    """Uninstall a runtime extension.
+
+    Args (JSON): {"extension_id": str}
+    """
+    try:
+        params = json.loads(args)
+        ext_id = params.get("extension_id")
+
+        if not ext_id:
+            return json.dumps({"success": False, "error": "extension_id is required"})
+
+        from core.runtime_extensions import uninstall_extension as _uninstall
+
+        ok = _uninstall(ext_id)
+        if ok:
+            return json.dumps({"success": True, "extension_id": ext_id})
+        else:
+            return json.dumps({"success": False, "error": f"Extension '{ext_id}' not found"})
+    except Exception as e:
+        logger.error(f"uninstall_extension error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def list_runtime_extensions() -> text:
+    """List all runtime-installed extensions with their manifests."""
+    try:
+        from core.runtime_extensions import (
+            get_all_extension_manifests,
+            get_extension_source,
+            list_installed,
+        )
+
+        installed = list_installed()
+        manifests = get_all_extension_manifests()
+        sources = {ext_id: get_extension_source(ext_id) for ext_id in installed}
+        return json.dumps({
+            "success": True,
+            "runtime_extensions": installed,
+            "all_manifests": manifests,
+            "sources": sources,
+        })
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def get_sidebar_manifests() -> text:
+    """Return the slim sidebar-relevant slice of every installed extension's
+    manifest, intended to be the single source of truth for the sidebar
+    (Issue #168 — Layered Realm).
+
+    Combines runtime-installed extensions and any still-bundled extensions
+    so the realm_frontend Sidebar.svelte can call exactly one backend
+    method regardless of how an extension was installed. The "kind" field
+    reflects how it got there:
+
+      - ``runtime``: installed via install_extension / install_extension_from_registry,
+                     loaded as ESM at runtime via /extensions/<id>.
+      - ``bundled``: shipped inside this realm_backend WASM (legacy path).
+
+    Response (JSON):
+      {
+        "success": True,
+        "manifests": [
+          {
+            "id":               "voting",
+            "name":             "voting",
+            "version":          "1.0.3",
+            "icon":             "ClipboardListSolid",   # name in iconMap
+            "url_path":         null,                    # use /extensions/<id> by default
+            "categories":       ["public_services"],
+            "profiles":         ["admin", "member"],
+            "show_in_sidebar":  true,
+            "sidebar_label":    {"en": "Voting", "de": "Abstimmung"},
+            "kind":             "runtime"               # or "bundled"
+          },
+          ...
+        ]
+      }
+    """
+    try:
+        from core.runtime_extensions import (
+            get_all_extension_manifests,
+            list_installed as _list_runtime_installed,
+        )
+
+        runtime_ids = set(_list_runtime_installed())
+        manifests = get_all_extension_manifests()  # merged: runtime + bundled
+
+        out = []
+        for ext_id, m in manifests.items():
+            if not isinstance(m, dict):
+                continue
+            label_obj = m.get("sidebar_label")
+            if isinstance(label_obj, str):
+                label_obj = {"en": label_obj}
+            out.append({
+                "id": ext_id,
+                "name": m.get("name") or ext_id,
+                "version": m.get("version"),
+                "icon": m.get("icon"),
+                "url_path": m.get("url_path"),
+                "categories": m.get("categories") or ["other"],
+                "profiles": m.get("profiles") or [],
+                "show_in_sidebar": m.get("show_in_sidebar", True) is not False,
+                "sidebar_label": label_obj,
+                "kind": "runtime" if ext_id in runtime_ids else "bundled",
+            })
+
+        out.sort(key=lambda e: (e["categories"][0] if e["categories"] else "z", e["id"]))
+        return json.dumps({"success": True, "manifests": out})
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def get_extension_frontend_info(args: text) -> text:
+    """Return file_registry coordinates for an extension's frontend assets.
+
+    Args (JSON): {"extension_id": str}
+    Response (JSON): {
+        "success": bool,
+        "extension_id": str,
+        "version": str,
+        "registry_canister_id": str,        # canister id hosting the assets
+        "namespace": str,                   # "ext/<id>/<version>"
+        "frontend_path": "frontend/dist/index.js"
+    }
+
+    realm_frontend uses this to dynamic-import an extension's compiled UI
+    bundle from file_registry without baking the registry id into its WASM
+    (Issue #168 Layer 2).
+    """
+    try:
+        from core.runtime_extensions import get_extension_source
+
+        params = json.loads(args) if args else {}
+        ext_id = params.get("extension_id")
+        if not ext_id:
+            return json.dumps({"success": False, "error": "extension_id is required"})
+
+        src = get_extension_source(ext_id)
+        if not src or not src.get("registry_canister_id"):
+            return json.dumps({
+                "success": False,
+                "error": f"No registry source recorded for extension '{ext_id}'",
+            })
+
+        version = src.get("version") or ""
+        return json.dumps({
+            "success": True,
+            "extension_id": ext_id,
+            "version": version,
+            "registry_canister_id": src["registry_canister_id"],
+            "namespace": f"ext/{ext_id}/{version}" if version else f"ext/{ext_id}",
+            "frontend_path": "frontend/dist/index.js",
+        })
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+# ---------------------------------------------------------------------------
+# Codex package management endpoints
+# ---------------------------------------------------------------------------
+
+
+@update
+@require(Operations.CODEX_INSTALL)
+def install_codex(args: text) -> text:
+    """Install a codex package from uploaded files.
+
+    Args (JSON): {
+        "codex_id": str,
+        "files": {"filename": "content", ...},
+        "run_init": bool  (optional, default true)
+    }
+
+    Files should include manifest.json and *.py codex modules.
+    Each .py file (except init.py) creates/updates a Codex entity.
+    If run_init is true and init.py is present, it is executed after install.
+    """
+    try:
+        params = json.loads(args)
+        codex_id = params.get("codex_id")
+        files = params.get("files", {})
+        run_init = params.get("run_init", True)
+
+        if not codex_id:
+            return json.dumps({"success": False, "error": "codex_id is required"})
+        if not files:
+            return json.dumps({"success": False, "error": "files dict is required"})
+
+        from core.runtime_codex import install_codex_package, run_codex_init
+
+        ok = install_codex_package(codex_id, files)
+        if not ok:
+            return json.dumps({"success": False, "error": f"Failed to install codex package '{codex_id}'"})
+
+        init_error = None
+        if run_init:
+            init_error = run_codex_init(codex_id)
+
+        result = {"success": True, "codex_id": codex_id, "files_count": len(files)}
+        if init_error:
+            result["init_warning"] = init_error
+        return json.dumps(result)
+    except Exception as e:
+        logger.error(f"install_codex error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+@require(Operations.CODEX_UNINSTALL)
+def uninstall_codex(args: text) -> text:
+    """Uninstall a codex package and its Codex entities.
+
+    Args (JSON): {"codex_id": str}
+    """
+    try:
+        params = json.loads(args)
+        codex_id = params.get("codex_id")
+
+        if not codex_id:
+            return json.dumps({"success": False, "error": "codex_id is required"})
+
+        from core.runtime_codex import uninstall_codex_package
+
+        ok = uninstall_codex_package(codex_id)
+        if ok:
+            return json.dumps({"success": True, "codex_id": codex_id})
+        else:
+            return json.dumps({"success": False, "error": f"Codex package '{codex_id}' not found"})
+    except Exception as e:
+        logger.error(f"uninstall_codex error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+@require(Operations.CODEX_INSTALL)
+def reload_codex(args: text) -> text:
+    """Reload all Codex entities from a codex package's files on disk.
+
+    Args (JSON): {"codex_id": str, "run_init": bool (optional, default false)}
+    """
+    try:
+        params = json.loads(args)
+        codex_id = params.get("codex_id")
+        run_init = params.get("run_init", False)
+
+        if not codex_id:
+            return json.dumps({"success": False, "error": "codex_id is required"})
+
+        from core.runtime_codex import reload_codex_package, run_codex_init
+
+        ok = reload_codex_package(codex_id)
+        if not ok:
+            return json.dumps({"success": False, "error": f"Codex package '{codex_id}' not found"})
+
+        init_error = None
+        if run_init:
+            init_error = run_codex_init(codex_id)
+
+        result = {"success": True, "codex_id": codex_id}
+        if init_error:
+            result["init_warning"] = init_error
+        return json.dumps(result)
+    except Exception as e:
+        logger.error(f"reload_codex error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def list_codex_packages() -> text:
+    """List all installed codex packages with their manifests."""
+    try:
+        from core.runtime_codex import list_installed, get_all_codex_manifests
+
+        installed = list_installed()
+        manifests = get_all_codex_manifests()
+        return json.dumps({
+            "success": True,
+            "codex_packages": installed,
+            "manifests": manifests,
+        })
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+# ---------------------------------------------------------------------------
+# Registry-based install endpoints (inter-canister pull from file registry)
+# ---------------------------------------------------------------------------
+
+
+@update
+@require(Operations.EXTENSION_INSTALL)
+def install_extension_from_registry(args: text) -> Async[text]:
+    """Install an extension by pulling backend files from the file registry.
+
+    Args (JSON): {
+        "registry_canister_id": str,
+        "ext_id": str,
+        "version": str|null  (null = latest)
+    }
+    """
+    try:
+        params = json.loads(args)
+        registry_id = params.get("registry_canister_id")
+        ext_id = params.get("ext_id")
+        version = params.get("version")
+
+        if not registry_id:
+            return json.dumps({"success": False, "error": "registry_canister_id is required"})
+        if not ext_id:
+            return json.dumps({"success": False, "error": "ext_id is required"})
+
+        from api.file_registry import install_extension_from_registry as _install
+
+        result = yield from _install(registry_id, ext_id, version)
+        return result
+    except Exception as e:
+        logger.error(f"install_extension_from_registry error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+@require(Operations.CODEX_INSTALL)
+def install_codex_from_registry(args: text) -> Async[text]:
+    """Install a codex package by pulling files from the file registry.
+
+    Args (JSON): {
+        "registry_canister_id": str,
+        "codex_id": str,           ("realm_type/codex_id" e.g. "syntropia/membership")
+        "version": str|null,       (null = latest)
+        "run_init": bool           (optional, default true)
+    }
+    """
+    try:
+        params = json.loads(args)
+        registry_id = params.get("registry_canister_id")
+        codex_id = params.get("codex_id")
+        version = params.get("version")
+        run_init = params.get("run_init", True)
+
+        if not registry_id:
+            return json.dumps({"success": False, "error": "registry_canister_id is required"})
+        if not codex_id:
+            return json.dumps({"success": False, "error": "codex_id is required"})
+
+        from api.file_registry import install_codex_from_registry as _install
+
+        result = yield from _install(registry_id, codex_id, version, run_init)
+        return result
+    except Exception as e:
+        logger.error(f"install_codex_from_registry error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
