@@ -66,22 +66,22 @@ jobs:
         id: commit
         run: |
           if [ -n "${{ inputs.commit }}" ]; then
-            echo "deploy_commit=${{ inputs.commit }}" >> $GITHUB_OUTPUT
+            echo "deploy_commit=${{ inputs.commit }}" >> "$GITHUB_OUTPUT"
           else
-            echo "deploy_commit=${{ github.sha }}" >> $GITHUB_OUTPUT
+            echo "deploy_commit=${{ github.sha }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Configure git for submodules
         run: git config --global url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Checkout realms
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ steps.commit.outputs.deploy_commit }}
           submodules: false
 
       - name: Checkout realms-extensions @ ${{ inputs.extensions_branch }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: smart-social-contracts/realms-extensions
           ref: ${{ inputs.extensions_branch }}

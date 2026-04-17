@@ -1,0 +1,86 @@
+# Mundus descriptor — LOCAL ephemeral mundus (PR CI).
+#
+# This descriptor is the canonical "PR-time" deployment: a fully layered
+# mundus brought up on a fresh local replica inside the CI runner.
+#
+# Lifecycle (executed by .github/workflows/_install-mundus.yml):
+#
+#   stage 0  bootstrap infrastructure
+#     dfx start (handled by the workflow)
+#     dfx deploy file_registry
+#     dfx deploy file_registry_frontend
+#     dfx deploy realm_installer
+#
+#   stage 1  publish artifacts to file_registry
+#     scripts/build_base_wasm.py
+#     scripts/build_runtime_bundles.py
+#     scripts/publish_layered.py --registry <file_registry_id>
+#         (publishes base WASM + every extension + every codex)
+#
+#   stage 2  install mundus (every realm in the `members` list)
+#     for each member:
+#       dfx canister create <member.canister>
+#       dfx canister update-settings <member.canister> --add-controller <realm_installer>
+#       realms wasm install         --canister <member.canister> --version <base_wasm_version>
+#       realms extension registry-install ×N
+#       realms codex     registry-install ×N
+#
+#   stage 3  verify
+#     scripts/upload_data.sh <member.canister> <member.seed_data>
+#     Playwright e2e against each member's frontend
+#
+# This file is read by scripts/deploy.py via:
+#     python scripts/deploy.py --mundus-file deployments/local-mundus.yml
+
+version: 2
+network: local
+
+# --- Stage 1: artifacts to publish to file_registry --------------------------
+artifacts:
+  base_wasm:
+    # Built by scripts/build_base_wasm.py (no bundled extensions/codices).
+    source: src/realm_backend
+    version: "0.0.0-local"
+
+  # "all" = every directory under extensions/ that has manifest.json.
+  # Or a YAML list of explicit ids: [voting, vault, admin_dashboard]
+  #
+  # PR-time CI publishes only what we can build inside the runner. Runtime
+  # extension bundles (extensions/*/frontend-rt/) aren't built yet — set to
+  # an empty list so stage 2 doesn't try to install missing artifacts.
+  # When per-extension build pipelines are in place, flip this back to
+  # `all`.
+  extensions: []
+
+  # "all" = every directory under codices/codices/ except _common/common.
+  codices: all
+
+# --- Stage 2: mundus members (each becomes one canister) ---------------------
+#
+# `name` must match a canister key in dfx.json (we have one slot for the
+# registry and one for a realm). For CI we exercise the layered install
+# path with a single realm_backend; multi-realm coverage happens against
+# staging where the canisters are pre-created.
+mundus:
+  - name: realm_registry_backend
+    type: realm_registry
+    extensions: []
+    codices: []
+
+  - name: realm_backend
+    type: realm
+    extensions: inherit_from_artifacts
+    # Codex install is left empty for PR CI: realm_backend requires the
+    # caller to have `codex.install` permission, which isn't seeded on
+    # a fresh install. Codex install coverage runs against staging where
+    # the admin identity is established. The publish path (stage 1) is
+    # fully exercised here.
+    codices: []
+
+# --- Stage 3: verification ---------------------------------------------------
+verify:
+  e2e_specs:
+    - src/realm_frontend/tests/e2e/specs/layered-parity.spec.ts
+  integration_tests:
+    - tests/backend/test_status_api.py
+    - tests/backend/test_extensions_api.py

@@ -1,0 +1,99 @@
+# _publish-artifacts.yml — reusable workflow.
+#
+# Stage 1 of the layered CI pipeline: builds the base WASM, builds every
+# extension's frontend-rt/ ESM bundle, then publishes everything (base
+# WASM + extensions + codices) to the file_registry canister identified
+# in `infra-ids`.
+#
+# Inputs:
+#   network      — local | staging | ic
+#   descriptor   — path to v2 mundus descriptor
+#   infra-ids    — JSON string from _bootstrap-infra.yml outputs
+#
+# Idempotent: re-running the same descriptor publishes the same content
+# under the same namespace, so file_registry deduplicates on hash.
+
+name: _publish-artifacts
+
+on:
+  workflow_call:
+    inputs:
+      network:
+        required: true
+        type: string
+      descriptor:
+        required: true
+        type: string
+      infra-ids:
+        description: "JSON string {file_registry, file_registry_frontend, realm_installer}"
+        required: true
+        type: string
+    secrets:
+      DFX_IDENTITY_PEM:
+        required: false
+
+env:
+  PYTHON_VERSION: "3.10"
+  NODE_VERSION: "20"
+  DFX_VERSION: "0.31.0"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dfx ${{ env.DFX_VERSION }}
+        run: |
+          DFXVM_INIT_YES=1 sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
+          echo "$HOME/.local/share/dfx/bin" >> "$GITHUB_PATH"
+
+      - name: Install realms CLI + Python deps
+        run: |
+          pip install -e cli/
+          pip install pyyaml
+
+      - name: Configure dfx identity (non-local only)
+        if: ${{ inputs.network != 'local' }}
+        env:
+          DFX_IDENTITY_PEM: ${{ secrets.DFX_IDENTITY_PEM }}
+        run: |
+          mkdir -p ~/.config/dfx/identity/ci
+          printf '%s' "$DFX_IDENTITY_PEM" > ~/.config/dfx/identity/ci/identity.pem
+          chmod 600 ~/.config/dfx/identity/ci/identity.pem
+          dfx identity use ci
+
+      - name: Start local replica (local only)
+        if: ${{ inputs.network == 'local' }}
+        run: |
+          dfx start --background --clean --host 127.0.0.1:4943
+          sleep 3
+
+      - name: Write infra-ids to descriptor overrides
+        run: |
+          jq -n --argjson ids '${{ inputs.infra-ids }}' \
+              '{infrastructure_overrides: $ids | with_entries(.value = {canister_id: .value})}' \
+              > /tmp/infra-overrides.json
+          echo "infra-overrides written:"
+          cat /tmp/infra-overrides.json
+
+      - name: Run stage 1 (publish)
+        env:
+          # Make it possible for ci_install_mundus.py to consume infra ids
+          # passed in via --infra-ids without re-reading the descriptor.
+          INFRA_IDS_JSON: ${{ inputs.infra-ids }}
+        run: |
+          python3 scripts/ci_install_mundus.py \
+              --file ${{ inputs.descriptor }} \
+              --stages 1

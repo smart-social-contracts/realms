@@ -58,10 +58,11 @@ from basilisk.canisters.management import (
 # Maximum bytes per management.upload_chunk call (IC mgmt enforces 1 MiB).
 MAX_UPLOAD_CHUNK_BYTES = 1024 * 1024  # 1 MiB
 
-# Maximum bytes per file_registry chunk-read. Must match
-# `_MAX_CHUNK_READ_BYTES` in src/file_registry/main.py (768 KiB) to stay
-# under the 2 MiB inter-canister message limit after base64 inflation.
-MAX_REGISTRY_READ_BYTES = 768 * 1024  # 768 KiB
+# Maximum bytes per file_registry chunk-read. Must match (or be ≤)
+# `_MAX_CHUNK_READ_BYTES` in src/file_registry/main.py. Sized so that
+# base64-encoding the slice in WASI Python stays well under the 40B
+# per-message instruction budget on the file_registry side.
+MAX_REGISTRY_READ_BYTES = 128 * 1024  # 128 KiB
 
 
 # ---------------------------------------------------------------------------
@@ -136,13 +137,36 @@ def _unwrap_call_result(result):
 
 
 def _extract_chunk_hash(up_data) -> bytes:
-    """Pull the `hash` blob out of an `upload_chunk` reply."""
+    """Pull the `hash` blob out of an `upload_chunk` reply.
+
+    The IC management canister's upload_chunk returns ``record { hash :
+    blob }``. Basilisk's Candid decoder may yield this as one of:
+      * ``{"hash": <bytes>}``                            (named)
+      * ``{"_1158164430_": <bytes>}`` / ``{"_1158164430": <bytes>}``
+        (IDL field-name hash; depends on basilisk version)
+      * an object with attribute ``hash``
+    Be liberal in what we accept.
+    """
     if up_data is None:
         raise RuntimeError("upload_chunk returned no data")
+
+    h = None
     if isinstance(up_data, dict):
         h = up_data.get("hash") or up_data.get("Hash")
+        if h is None:
+            # IDL hash of the field name "hash" → 1158164430.
+            for key in ("_1158164430_", "_1158164430"):
+                if key in up_data:
+                    h = up_data[key]
+                    break
+        if h is None and len(up_data) == 1:
+            # Last-resort: a single-field record likely IS the hash.
+            only_val = next(iter(up_data.values()))
+            if isinstance(only_val, (bytes, bytearray, list, str)):
+                h = only_val
     else:
         h = getattr(up_data, "hash", None)
+
     if h is None:
         raise RuntimeError(f"upload_chunk returned unexpected payload: {up_data!r}")
     if isinstance(h, str):
@@ -150,6 +174,8 @@ def _extract_chunk_hash(up_data) -> bytes:
             return bytes.fromhex(h)
         except ValueError:
             return h.encode("latin-1")
+    if isinstance(h, list):
+        return bytes(h)
     return bytes(h)
 
 

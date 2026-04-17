@@ -8,6 +8,7 @@ Realms GOS (Governance Operating System) is a platform for building and deployin
 - [Extension Development](#extension-development)
 - [Running Python Code in Realms](#running-python-code-in-realms)
 - [Creating a New Realm](#creating-a-new-realm)
+- [Layered Deployment Architecture](#layered-deployment-architecture)
 - [Multi-Realm Deployment (Mundus)](#multi-realm-deployment-mundus)
 - [Sandbox](#sandbox)
 
@@ -429,6 +430,213 @@ Manage realm data:
 - **Via CLI**: `realms import <data.json>` or `realms import <codex.py> --type codex`
 - **Via UI**: Use the Admin Dashboard extension (admin-only access)
 - **Via Extensions**: Extensions can provide custom data management interfaces
+
+---
+
+## Layered Deployment Architecture
+
+Realms supports two deployment models that produce **the same end-user experience**:
+
+- **Bundled (default, used by `realms realm create --deploy` and `realms mundus create`):** The `realm_backend` WASM ships with every extension and codex baked in. One `dfx deploy` and you're done. Best for local dev and quick demos.
+- **Layered (used in production for long-lived realms like Dominion):** The base WASM, every extension, every codex, every i18n bundle, and every sidebar manifest are stored in a separate `file_registry` canister and pulled in at install time. Best for upgrading large fleets of realms without rebuilding/redeploying each one.
+
+Both modes coexist. The runtime loader inside `realm_backend` falls back to bundled artifacts when nothing is registered in stable storage, so existing realms keep working unchanged.
+
+### The three layers
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ Layer 3 — Realm data                                                 │
+│   Members, organizations, treasuries, votes, …                       │
+│   Lives in realm_backend stable memory. Created by `upload_data`.    │
+└──────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│ Layer 2 — Extensions, codices, i18n, sidebar manifests               │
+│   Per-extension ESM frontend bundle (self-contained Tailwind +       │
+│   Flowbite + svelte-i18n), backend Python modules, manifest.json,    │
+│   per-locale i18n JSON, codex .py files.                             │
+│   Published to file_registry, installed into realm_backend stable    │
+│   storage at registry-install time, dynamically mounted by           │
+│   realm_frontend at runtime.                                         │
+└──────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│ Layer 1 — Base realm_backend WASM                                    │
+│   No bundled extensions, no bundled codices. Just the runtime        │
+│   loader, ggg entities, TaskManager, and the file_registry client.   │
+│   Published to file_registry (chunked), installed via realm_installer│
+│   calling ic.management_canister.install_chunked_code.               │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Canisters involved
+
+| Canister | Role |
+|---|---|
+| `realm_backend` | The realm itself. In layered mode this is just the base WASM; everything else is loaded from registry into stable storage. |
+| `file_registry` | Versioned artifact store. HTTP gateway for read, inter-canister calls for write. Holds WASM, ESM bundles, Python modules, manifests, i18n JSON, codices. |
+| `file_registry_frontend` | Static asset canister. Admin UI for browsing, uploading (with auto-chunking), and deleting registry contents. Authenticates via Internet Identity for write calls. |
+| `realm_installer` | Small Basilisk bootstrapper canister. Reads chunked WASM out of `file_registry` and calls `ic.management_canister.install_chunked_code` on the target realm. Must be a controller of the target realm. |
+| `realm_frontend` | SvelteKit app. In layered mode it dynamically `import()`s extension bundles from `file_registry` over the HTTP gateway, fetches per-extension i18n on demand, and renders the sidebar from `get_sidebar_manifests`. |
+
+### File-registry namespaces
+
+```
+wasm/realm-base-<version>.wasm.gz
+ext/<extension_id>/<version>/manifest.json
+ext/<extension_id>/<version>/backend/*.py
+ext/<extension_id>/<version>/frontend/dist/index.js     # ESM bundle, exports mount(target, props)
+ext/<extension_id>/<version>/frontend/i18n/<locale>.json
+codex/<codex_id>/<version>/manifest.json
+codex/<codex_id>/<version>/*.py
+```
+
+Every artifact is content-addressed via SHA-256 and chunked when it exceeds the IC ingress limit (~2 MB after base64).
+
+### Publishing artifacts (writer side)
+
+```bash
+# Publish an extension to file_registry (manifest + backend Python
+# + ESM frontend bundle + i18n JSON)
+realms extension publish \
+    --extension-id voting \
+    --network ic \
+    --registry <FILE_REGISTRY_CANISTER_ID>
+
+# Publish a codex to file_registry
+realms codex publish \
+    --codex-id basic_governance \
+    --network ic \
+    --registry <FILE_REGISTRY_CANISTER_ID>
+
+# Build and publish the base WASM (Layer 1)
+python scripts/build_base_wasm.py            # produces a stripped .wasm.gz
+realms wasm publish --wasm <path> --version <semver> --network ic
+```
+
+For a full repository-wide publish (every extension + every codex + base WASM), use the orchestrator:
+
+```bash
+python scripts/publish_layered.py \
+    --network ic \
+    --registry <FILE_REGISTRY_CANISTER_ID> \
+    --base-wasm-version 0.5.0
+```
+
+Helper scripts that the publish flow relies on:
+
+- `scripts/scaffold_runtime_bundles.py` — generates the per-extension `frontend-rt/` directory (Vite + Tailwind + Flowbite + `svelte-i18n`, all self-contained) for any extension that doesn't have one yet.
+- `scripts/build_runtime_bundles.py` — runs `npm install` + `vite build` over every `frontend-rt/`.
+- `scripts/build_base_wasm.py` — strips bundled extensions/codices, rebuilds and gzips the WASM.
+- `scripts/add_sidebar_labels.py` — idempotent injection of multilingual `sidebar_label` entries into extension manifests.
+
+### Installing artifacts on a realm (reader side)
+
+```bash
+# Install (or upgrade) the realm_backend WASM by pulling it out of
+# file_registry in chunks via realm_installer.
+realms wasm install \
+    --canister <REALM_BACKEND_CANISTER_ID> \
+    --version 0.5.0 \
+    --installer <REALM_INSTALLER_CANISTER_ID> \
+    --registry <FILE_REGISTRY_CANISTER_ID> \
+    --mode upgrade \
+    --network ic
+
+# Pull an extension out of file_registry into the realm's stable storage
+realms extension registry-install \
+    --extension-id voting \
+    --version 1.0.3 \
+    --canister <REALM_BACKEND_CANISTER_ID> \
+    --registry <FILE_REGISTRY_CANISTER_ID> \
+    --network ic
+
+# Same for a codex
+realms codex registry-install \
+    --codex-id basic_governance \
+    --version 1.0.0 \
+    --canister <REALM_BACKEND_CANISTER_ID> \
+    --registry <FILE_REGISTRY_CANISTER_ID> \
+    --network ic
+```
+
+For an end-to-end layered deploy of a single realm, write a deployment descriptor:
+
+```yaml
+# deployments/staging-dominion-layered.yml
+name: dominion-staging
+network: staging
+install_strategy: layered
+realm_backend: <REALM_BACKEND_CANISTER_ID>
+realm_installer: <REALM_INSTALLER_CANISTER_ID>
+file_registry: <FILE_REGISTRY_CANISTER_ID>
+base_wasm_version: 0.5.0
+extensions: [voting, vault, admin_dashboard, …]
+codices:    [basic_governance, …]
+```
+
+Then run:
+
+```bash
+python scripts/deploy.py deployments/staging-dominion-layered.yml
+```
+
+`scripts/deploy.py`'s `deploy_layered_backend` will (1) call `realms wasm install`, (2) `realms extension registry-install` for each extension, (3) `realms codex registry-install` for each codex.
+
+### How `realm_frontend` consumes Layer 2
+
+At runtime, on every page load:
+
+1. Frontend asks the realm: `realm_backend.get_sidebar_manifests()` → returns the merged set of bundled + runtime extension manifests with multilingual labels.
+2. For each navigated extension, frontend resolves `realm_backend.get_extension_frontend_info(<id>)` → returns the registry URL of the ESM bundle.
+3. Frontend dynamically imports the bundle: `await import(/* @vite-ignore */ bundleUrl)` and calls its exported `mount(target, props)`.
+4. The bundle, being self-contained, fetches its own i18n JSON from `file_registry` via `loadExtensionTranslationsFromRegistry`.
+
+The plumbing lives in `src/realm_frontend/src/lib/extension-loader.ts`, `src/realm_frontend/src/lib/i18n/index.ts`, and `src/realm_frontend/src/routes/extensions/[id]/+page.svelte`.
+
+### `file_registry_frontend` admin UI
+
+A standalone asset canister (`src/file_registry_frontend/`) ships a vanilla-JS dashboard for the registry: namespace browser, file list, drag-and-drop upload with auto-chunking above 400 KB, delete (controller-only), and Internet Identity login. The `@dfinity/*` client SDK is pre-bundled into `dist/dfinity.js` via `src/file_registry_frontend/scripts/build-dfinity-bundle.sh` (`esbuild`) so there's no CDN dependency.
+
+### CI / GitHub Actions
+
+Three operator workflows under `.github/workflows/` automate the layered flow. All are manual (`workflow_dispatch`).
+
+| Workflow | Purpose |
+|---|---|
+| `Publish Base WASM` | Builds Layer 1 and uploads it to `file_registry` at `wasm/realm-base-<version>.wasm.gz` (chunked). |
+| `Runtime Extension Deploy` | Tight inner loop: publish + registry-install **one** extension on a chosen realm. Useful while iterating on a single extension. |
+| `Layered Deploy Dominion` | End-to-end: build + publish base WASM, build + publish every extension and codex, then run `scripts/deploy.py` against `deployments/staging-dominion-layered.yml` to reinstall the target realm. |
+
+Required repository configuration:
+
+```
+vars.FILE_REGISTRY_CANISTER_ID        # file_registry canister id (per network)
+vars.REALM_INSTALLER_CANISTER_ID      # realm_installer canister id (per network)
+                                       # — must already be a controller of the
+                                       #   target realm canister
+vars.DOMINION_REALM_BACKEND_CANISTER  # target realm canister id (Layered Deploy
+                                       #   Dominion only)
+secrets.DFX_IDENTITY_PEM              # PEM-encoded identity used to publish
+                                       #   artifacts and to call realm_installer
+                                       #   / realm_backend
+```
+
+### When to use which mode
+
+| Situation | Mode |
+|---|---|
+| Local development (`dfx start --clean`) | Bundled (`realms realm create --deploy`) |
+| Multi-realm local demo (`realms mundus create`) | Bundled |
+| Single-realm staging or prod deploy you'll redeploy frequently | Either; bundled is simpler |
+| Long-lived realm (e.g. Dominion) where you want to roll out new extensions/codices without rebuilding the WASM | Layered |
+| Fleet of realms sharing the same WASM and extension set | Layered (publish once, install many) |
+
+Both modes pass the same Playwright snapshot tests (`src/realm_frontend/tests/e2e/specs/layered-parity.spec.ts`) — visual parity with the bundled build is part of the contract.
+
+### Reference
+
+- Issue tracker: [#168 — Layered realm deployment](https://github.com/smart-social-contracts/realms/issues/168)
+- Detailed runtime-extension staging walkthrough: [`docs/reference/RUNTIME_EXTENSION_STAGING_DEPLOY.md`](./docs/reference/RUNTIME_EXTENSION_STAGING_DEPLOY.md)
 
 ---
 

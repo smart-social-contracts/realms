@@ -1,0 +1,94 @@
+# _bootstrap-infra.yml — reusable workflow.
+#
+# Stage 0 of the layered CI pipeline: brings up the artifact-distribution
+# plane (file_registry, file_registry_frontend, realm_installer) on the
+# target network. For the `local` network it spins up a clean replica
+# inside the runner; for `staging` / `ic` it just verifies the
+# pre-existing canisters respond and writes their ids out as JSON.
+#
+# Outputs:
+#   infra-ids: JSON object {file_registry, file_registry_frontend, realm_installer}
+
+name: _bootstrap-infra
+
+on:
+  workflow_call:
+    inputs:
+      network:
+        description: "Target network: local | staging | ic"
+        required: true
+        type: string
+      descriptor:
+        description: "Path to v2 mundus descriptor (e.g. deployments/local-mundus.yml)"
+        required: true
+        type: string
+    outputs:
+      infra-ids:
+        description: "JSON {file_registry, file_registry_frontend, realm_installer}"
+        value: ${{ jobs.bootstrap.outputs.infra-ids }}
+    secrets:
+      DFX_IDENTITY_PEM:
+        required: false
+
+env:
+  PYTHON_VERSION: "3.10"
+  DFX_VERSION: "0.31.0"
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    outputs:
+      infra-ids: ${{ steps.write.outputs.json }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dfx ${{ env.DFX_VERSION }}
+        run: |
+          DFXVM_INIT_YES=1 sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
+          echo "$HOME/.local/share/dfx/bin" >> "$GITHUB_PATH"
+
+      - name: Install Python deps
+        run: pip install pyyaml
+
+      - name: Configure dfx identity (non-local only)
+        if: ${{ inputs.network != 'local' }}
+        env:
+          DFX_IDENTITY_PEM: ${{ secrets.DFX_IDENTITY_PEM }}
+        run: |
+          mkdir -p ~/.config/dfx/identity/ci
+          printf '%s' "$DFX_IDENTITY_PEM" > ~/.config/dfx/identity/ci/identity.pem
+          chmod 600 ~/.config/dfx/identity/ci/identity.pem
+          dfx identity use ci
+
+      - name: Start local replica (local only)
+        if: ${{ inputs.network == 'local' }}
+        run: |
+          dfx start --background --clean --host 127.0.0.1:4943
+          sleep 3
+          dfx ping
+
+      - name: Run stage 0
+        id: stage0
+        run: |
+          python3 scripts/ci_install_mundus.py \
+              --file ${{ inputs.descriptor }} \
+              --stages 0 \
+              --infra-ids-out infra-ids.json
+
+      - name: Emit infra-ids JSON output
+        id: write
+        run: |
+          echo "json=$(jq -c '.' infra-ids.json)" >> "$GITHUB_OUTPUT"
+          jq '.' infra-ids.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: infra-ids-${{ inputs.network }}
+          path: infra-ids.json
+          retention-days: 1

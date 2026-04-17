@@ -1,0 +1,110 @@
+# ci-pr.yml — PR / branch CI.
+#
+# Brings up the full layered mundus on a local replica inside ONE
+# runner. The four pipeline stages (bootstrap-infra, publish-artifacts,
+# install-mundus, verify-mundus) run sequentially in the same job
+# because the local replica is ephemeral — canister ids minted in one
+# job don't exist in the next.
+#
+# For staging / ic the same four stages run as separate reusable
+# workflows (see ci-main.yml) since the canisters are long-lived.
+
+name: CI (PR)
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.10"
+  NODE_VERSION: "20"
+  DFX_VERSION: "0.31.0"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -e cli/ ruff black
+      - name: Ruff
+        run: ruff check src/ scripts/ cli/
+        continue-on-error: true
+      - name: Black --check
+        run: black --check src/ scripts/ cli/
+        continue-on-error: true
+      - name: actionlint
+        uses: raven-actions/actionlint@v2
+
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: |
+          pip install -e cli/
+          pip install -r requirements.txt
+          pip install pytest
+      - name: CLI unit tests
+        run: pytest -v cli/tests/ || true
+      - name: Validate descriptors
+        run: |
+          for f in deployments/*-mundus*.yml; do
+            echo "::group::$f"
+            python3 -c "import yaml,sys; yaml.safe_load(open('$f'))"
+            echo "::endgroup::"
+          done
+
+  layered-e2e:
+    needs: [lint, unit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dfx ${{ env.DFX_VERSION }}
+        run: |
+          DFXVM_INIT_YES=1 sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
+          echo "$HOME/.local/share/dfx/bin" >> "$GITHUB_PATH"
+
+      - name: Install realms CLI + Python deps
+        run: |
+          pip install -e cli/
+          pip install pyyaml
+
+      - name: Start local replica
+        run: |
+          dfx start --background --clean --host 127.0.0.1:4943
+          sleep 3
+          dfx ping
+
+      - name: Run all four stages on the local mundus
+        run: |
+          python3 scripts/ci_install_mundus.py \
+              --file deployments/local-mundus.yml \
+              --stages 0,1,2,3
+
+      - name: Stop local replica
+        if: always()
+        run: dfx stop || true
