@@ -472,6 +472,19 @@ def main(argv: Iterable[str]) -> int:
         default="realm-base-{version}.wasm.gz",
         help="Path template inside the namespace (default: realm-base-{version}.wasm.gz)",
     )
+    parser.add_argument(
+        "--extra-wasm",
+        action="append",
+        default=[],
+        metavar="PATH:VERSION:REGISTRY_PATH[:NAMESPACE]",
+        help=(
+            "Publish an additional WASM to the registry. Repeatable. "
+            "Format: <path>:<version>:<registry_path>[:<namespace>]. "
+            "Example: --extra-wasm out/realm_registry.wasm.gz:0.5.0:realm-registry-{version}.wasm.gz "
+            "Use this to publish per-canister-type WASMs (e.g. realm_registry_backend) "
+            "alongside the realm base WASM."
+        ),
+    )
 
     parser.add_argument(
         "--ext-namespace-prefix",
@@ -548,6 +561,33 @@ def main(argv: Iterable[str]) -> int:
         )
         if rc != 0:
             print("\nERROR: base WASM publish failed", file=sys.stderr)
+            return rc
+
+    # 2b. Publish extra WASMs (e.g. realm_registry, file_registry) ----------
+    for spec in args.extra_wasm:
+        parts = spec.split(":")
+        if len(parts) < 3 or len(parts) > 4:
+            print(
+                f"ERROR: --extra-wasm must be PATH:VERSION:REGISTRY_PATH[:NAMESPACE], "
+                f"got {spec!r}",
+                file=sys.stderr,
+            )
+            return 1
+        ew_path, ew_version, ew_template = parts[0], parts[1], parts[2]
+        ew_namespace = parts[3] if len(parts) == 4 else "wasm"
+        ew_registry_path = ew_template.format(version=ew_version)
+        rc = _step_publish_base_wasm(
+            realms_cli=realms_cli,
+            registry=args.registry,
+            network=args.network,
+            identity=args.identity,
+            base_wasm_path=Path(ew_path).expanduser().resolve(),
+            base_wasm_version=ew_version,
+            namespace=ew_namespace,
+            registry_path=ew_registry_path,
+        )
+        if rc != 0:
+            print(f"\nERROR: extra WASM publish failed for {spec}", file=sys.stderr)
             return rc
 
     # 3. Publish extensions -------------------------------------------------

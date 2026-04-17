@@ -37,6 +37,14 @@ mundus:
     canister_id: 7wzxh-wyaaa-aaaau-aggyq-cai
     extensions: []
     codices: []
+    # One-time recovery: a previous CI run mistakenly installed the
+    # realm_backend WASM into this canister (everything got the same
+    # base WASM regardless of `type:`), so its stable storage is
+    # incompatible with the real registry WASM. Reinstall once to get
+    # back onto realm_registry_backend.wasm; subsequent runs will pick
+    # up the descriptor-default `upgrade` mode and preserve state.
+    # TODO: revert to default after this lands cleanly on main.
+    install_mode: reinstall
 
   # Codex installation is an admin-bound, one-time operation per realm —
   # not something CI should re-run on every push. Stage 1 still publishes
