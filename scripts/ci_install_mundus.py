@@ -289,7 +289,7 @@ def stage2_install(descriptor: Dict[str, Any], infra_ids: Dict[str, str]) -> Non
         # Install (or upgrade) the WASM via realm_installer.
         _run([
             "realms", "wasm", "install",
-            "--canister", canister_id,
+            "--target", canister_id,
             "--version", base_version,
             "--installer", realm_installer,
             "--registry", file_registry,

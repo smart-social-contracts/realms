@@ -44,32 +44,33 @@ artifacts:
 
   # "all" = every directory under extensions/ that has manifest.json.
   # Or a YAML list of explicit ids: [voting, vault, admin_dashboard]
-  extensions: all
+  #
+  # PR-time CI publishes only what we can build inside the runner. Runtime
+  # extension bundles (extensions/*/frontend-rt/) aren't built yet — set to
+  # an empty list so stage 2 doesn't try to install missing artifacts.
+  # When per-extension build pipelines are in place, flip this back to
+  # `all`.
+  extensions: []
 
   # "all" = every directory under codices/codices/ except _common/common.
   codices: all
 
 # --- Stage 2: mundus members (each becomes one canister) ---------------------
+#
+# `name` must match a canister key in dfx.json (we have one slot for the
+# registry and one for a realm). For CI we exercise the layered install
+# path with a single realm_backend; multi-realm coverage happens against
+# staging where the canisters are pre-created.
 mundus:
-  - name: registry
+  - name: realm_registry_backend
     type: realm_registry
     extensions: []
     codices: []
 
-  - name: realm_1
+  - name: realm_backend
     type: realm
-    manifest: examples/demo/realm1/manifest.json
-    seed_data: examples/demo/realm1/data.json
-    # Per-realm extension/codex selection. Empty list = no install.
-    # Use `inherit_from_artifacts` to install everything published in stage 1.
     extensions: inherit_from_artifacts
-    codices: inherit_from_artifacts
-
-  - name: realm_2
-    type: realm
-    manifest: examples/demo/realm2/manifest.json
-    extensions: [voting, vault]
-    codices: [basic_governance]
+    codices: [dominion]   # smoke a single codex to keep the run fast
 
 # --- Stage 3: verification ---------------------------------------------------
 verify:
