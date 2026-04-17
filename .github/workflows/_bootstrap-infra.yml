@@ -40,11 +40,11 @@ jobs:
     outputs:
       infra-ids: ${{ steps.write.outputs.json }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -84,8 +84,8 @@ jobs:
       - name: Emit infra-ids JSON output
         id: write
         run: |
-          echo "json=$(cat infra-ids.json | jq -c '.')" >> "$GITHUB_OUTPUT"
-          cat infra-ids.json
+          echo "json=$(jq -c '.' infra-ids.json)" >> "$GITHUB_OUTPUT"
+          jq '.' infra-ids.json
 
       - uses: actions/upload-artifact@v4
         with:

@@ -75,13 +75,13 @@ jobs:
         run: git config --global url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Checkout realms
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ steps.commit.outputs.deploy_commit }}
           submodules: false
 
       - name: Checkout realms-extensions @ ${{ inputs.extensions_branch }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: smart-social-contracts/realms-extensions
           ref: ${{ inputs.extensions_branch }}

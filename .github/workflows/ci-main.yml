@@ -44,7 +44,7 @@ jobs:
       infra-ids: ${{ needs.bootstrap-infra-local.outputs.infra-ids }}
 
   install-mundus-local:
-    needs: publish-artifacts-local
+    needs: [bootstrap-infra-local, publish-artifacts-local]
     uses: ./.github/workflows/_install-mundus.yml
     with:
       network: local
@@ -79,7 +79,7 @@ jobs:
       DFX_IDENTITY_PEM: ${{ secrets.DFX_IDENTITY_PEM }}
 
   install-mundus-staging:
-    needs: publish-artifacts-staging
+    needs: [bootstrap-infra-staging, publish-artifacts-staging]
     uses: ./.github/workflows/_install-mundus.yml
     with:
       network: staging

@@ -53,7 +53,7 @@ jobs:
 
   install-mundus:
     needs: [bootstrap-infra, publish-artifacts]
-    if: ${{ always() && needs.bootstrap-infra.result == 'success' }}
+    if: ${{ always() && needs.bootstrap-infra.result == 'success' && (needs.publish-artifacts.result == 'success' || needs.publish-artifacts.result == 'skipped') }}
     uses: ./.github/workflows/_install-mundus.yml
     with:
       network: staging

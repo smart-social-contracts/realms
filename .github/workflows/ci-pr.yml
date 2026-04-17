@@ -15,8 +15,6 @@ name: CI (PR)
 on:
   pull_request:
     branches: [main]
-  push:
-    branches-ignore: [main]
   workflow_dispatch:
 
 concurrency:
@@ -31,8 +29,8 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: pip install -e cli/ ruff black
@@ -48,10 +46,10 @@ jobs:
   unit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: |
@@ -84,7 +82,7 @@ jobs:
       infra-ids: ${{ needs.bootstrap-infra.outputs.infra-ids }}
 
   install-mundus:
-    needs: publish-artifacts
+    needs: [bootstrap-infra, publish-artifacts]
     uses: ./.github/workflows/_install-mundus.yml
     with:
       network: local

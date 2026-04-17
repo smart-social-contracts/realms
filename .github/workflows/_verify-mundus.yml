@@ -29,8 +29,8 @@ jobs:
       e2e-specs: ${{ steps.read.outputs.e2e }}
       integration-tests: ${{ steps.read.outputs.integration }}
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: pip install pyyaml
@@ -55,7 +55,7 @@ jobs:
       matrix:
         spec: ${{ fromJSON(needs.parse-descriptor.outputs.e2e-specs) }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
       - uses: actions/setup-node@v4
@@ -88,10 +88,10 @@ jobs:
       matrix:
         test: ${{ fromJSON(needs.parse-descriptor.outputs.integration-tests) }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install deps
