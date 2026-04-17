@@ -70,7 +70,12 @@ mundus:
   - name: realm_backend
     type: realm
     extensions: inherit_from_artifacts
-    codices: [dominion]   # smoke a single codex to keep the run fast
+    # Codex install is left empty for PR CI: realm_backend requires the
+    # caller to have `codex.install` permission, which isn't seeded on
+    # a fresh install. Codex install coverage runs against staging where
+    # the admin identity is established. The publish path (stage 1) is
+    # fully exercised here.
+    codices: []
 
 # --- Stage 3: verification ---------------------------------------------------
 verify:
