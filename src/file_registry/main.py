@@ -377,11 +377,12 @@ def get_file_size(args: text) -> text:
 
 
 # Maximum chunk size the chunked-read API will return per call.
-# Conservative choice (768 KB raw → ~1 MB base64) so we stay well under
-# the 2 MiB Candid encoding limit for inter-canister responses, and
-# matches the upload chunk size used by publish-base-wasm.yml so that a
-# round-trip up-then-down behaves uniformly.
-_MAX_CHUNK_READ_BYTES = 768 * 1024
+# Per-chunk read size for inter-canister chunk fetches. Dropped from
+# 768 KB → 128 KB because base64-encoding the slice in WASI Python costs
+# ~30M instructions per 100 KB; at 768 KB per call we blow the 40B
+# per-message instruction budget. Smaller chunks → more round-trips but
+# each call stays well under budget.
+_MAX_CHUNK_READ_BYTES = 128 * 1024
 
 
 @query
