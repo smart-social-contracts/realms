@@ -1,14 +1,13 @@
 # ci-pr.yml — PR / branch CI.
 #
-# Runs the full layered pipeline against an ephemeral local replica
-# inside the runner. Every push to a non-main branch and every
-# pull_request executes:
+# Brings up the full layered mundus on a local replica inside ONE
+# runner. The four pipeline stages (bootstrap-infra, publish-artifacts,
+# install-mundus, verify-mundus) run sequentially in the same job
+# because the local replica is ephemeral — canister ids minted in one
+# job don't exist in the next.
 #
-#   lint  ──┐
-#   unit  ──┴─► bootstrap-infra ─► publish-artifacts ─► install-mundus ─► verify-mundus
-#
-# This is the EXACT same code path used to deploy to staging. If this is
-# green, the staging deploy will also be green.
+# For staging / ic the same four stages run as separate reusable
+# workflows (see ci-main.yml) since the canisters are long-lived.
 
 name: CI (PR)
 
@@ -24,6 +23,7 @@ concurrency:
 env:
   PYTHON_VERSION: "3.10"
   NODE_VERSION: "20"
+  DFX_VERSION: "0.31.0"
 
 jobs:
   lint:
@@ -66,32 +66,45 @@ jobs:
             echo "::endgroup::"
           done
 
-  bootstrap-infra:
+  layered-e2e:
     needs: [lint, unit]
-    uses: ./.github/workflows/_bootstrap-infra.yml
-    with:
-      network: local
-      descriptor: deployments/local-mundus.yml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-  publish-artifacts:
-    needs: bootstrap-infra
-    uses: ./.github/workflows/_publish-artifacts.yml
-    with:
-      network: local
-      descriptor: deployments/local-mundus.yml
-      infra-ids: ${{ needs.bootstrap-infra.outputs.infra-ids }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
-  install-mundus:
-    needs: [bootstrap-infra, publish-artifacts]
-    uses: ./.github/workflows/_install-mundus.yml
-    with:
-      network: local
-      descriptor: deployments/local-mundus.yml
-      infra-ids: ${{ needs.bootstrap-infra.outputs.infra-ids }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
-  verify-mundus:
-    needs: install-mundus
-    uses: ./.github/workflows/_verify-mundus.yml
-    with:
-      network: local
-      descriptor: deployments/local-mundus.yml
+      - name: Install dfx ${{ env.DFX_VERSION }}
+        run: |
+          DFXVM_INIT_YES=1 sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
+          echo "$HOME/.local/share/dfx/bin" >> "$GITHUB_PATH"
+
+      - name: Install realms CLI + Python deps
+        run: |
+          pip install -e cli/
+          pip install pyyaml
+
+      - name: Start local replica
+        run: |
+          dfx start --background --clean --host 127.0.0.1:4943
+          sleep 3
+          dfx ping
+
+      - name: Run all four stages on the local mundus
+        run: |
+          python3 scripts/ci_install_mundus.py \
+              --file deployments/local-mundus.yml \
+              --stages 0,1,2,3
+
+      - name: Stop local replica
+        if: always()
+        run: dfx stop || true

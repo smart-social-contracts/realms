@@ -66,11 +66,9 @@ jobs:
           dfx start --background --clean --host 127.0.0.1:4943
           sleep 3
 
-      - name: Materialize infra ids into env
-        run: |
-          echo '${{ inputs.infra-ids }}' | jq -r 'to_entries[] | "\(.key | ascii_upcase)_CANISTER_ID=\(.value)"' >> "$GITHUB_ENV"
-
       - name: Run stages 2 + 3 (install + verify)
+        env:
+          INFRA_IDS_JSON: ${{ inputs.infra-ids }}
         run: |
           python3 scripts/ci_install_mundus.py \
               --file ${{ inputs.descriptor }} \

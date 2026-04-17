@@ -333,6 +333,20 @@ def main(argv: Optional[List[str]] = None) -> int:
     infra_ids = {n: (overrides.get(n) or {}).get("canister_id") or ""
                  for n in INFRA_CANISTERS}
 
+    # Allow upstream CI jobs to inject infra ids via env so we don't have
+    # to re-discover them from dfx (and don't depend on the descriptor
+    # being able to express them statically — which it can't for the
+    # ephemeral local case).
+    env_ids = os.environ.get("INFRA_IDS_JSON")
+    if env_ids:
+        try:
+            for k, v in json.loads(env_ids).items():
+                if v:
+                    infra_ids[k] = v
+            print(f"   • infrastructure (from INFRA_IDS_JSON): {infra_ids}")
+        except json.JSONDecodeError as e:
+            print(f"   ⚠️  ignoring malformed INFRA_IDS_JSON: {e}")
+
     if 0 in stages:
         infra_ids = stage0_bootstrap(descriptor)
     else:
