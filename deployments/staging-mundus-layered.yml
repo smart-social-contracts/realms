@@ -66,7 +66,11 @@ mundus:
 verify:
   e2e_specs:
     - tests/e2e/specs/layered-parity.spec.ts
-  integration_tests:
-    - tests/integration/test_status_api.py
-    - tests/integration/test_extensions_api.py
-    - tests/backend/test_realm_registry.py
+  # The existing tests/integration/* and tests/backend/* suites all
+  # invoke `dfx canister call ... realm_backend ...` against an
+  # *implicit local* replica with seeded data — they're authoring-time
+  # fixtures, not staging-deploy verifiers. Staging verification is
+  # done end-to-end through Playwright in the e2e job above. A proper
+  # @dfinity/agent-based integration suite for staging is tracked
+  # separately.
+  integration_tests: []
