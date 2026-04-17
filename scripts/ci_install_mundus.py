@@ -174,34 +174,72 @@ def stage0_bootstrap(descriptor: Dict[str, Any]) -> Dict[str, str]:
 # ---------------------------------------------------------------------------
 
 
-def _build_base_wasm(network: str) -> Path:
-    """Build the realm_backend canister and return the path to the
-    resulting wasm.gz. Used by stage 1 so we can pass the path to
-    publish_layered.py.
+def _build_canister_wasm(canister: str, network: str) -> Path:
+    """Build a canister and return the path to its resulting wasm[.gz].
+
+    Used by stage 1 so we can publish per-canister-type WASMs to
+    file_registry. We never actually install code into the locally-built
+    canister — `dfx canister create` is only required so `dfx build` has
+    a slot to write the candid metadata into.
     """
-    print("   • building realm_backend (base WASM) ...")
-    # Allocate a canister id so `dfx build` has somewhere to write the
-    # candid metadata. We never actually install code into this canister
-    # — the WASM is published to file_registry and installed by
-    # realm_installer into the per-realm canisters.
-    _run(["dfx", "canister", "create", "realm_backend",
+    print(f"   • building {canister} (WASM) ...")
+    _run(["dfx", "canister", "create", canister,
           "--network", network], check=False)
-    _run(["dfx", "build", "realm_backend", "--network", network])
+    _run(["dfx", "build", canister, "--network", network])
     candidates = [
-        REPO_ROOT / ".dfx" / network / "canisters" / "realm_backend"
-            / "realm_backend.wasm.gz",
-        REPO_ROOT / ".dfx" / network / "canisters" / "realm_backend"
-            / "realm_backend.wasm",
-        REPO_ROOT / ".basilisk" / "realm_backend" / "realm_backend.wasm",
+        REPO_ROOT / ".dfx" / network / "canisters" / canister
+            / f"{canister}.wasm.gz",
+        REPO_ROOT / ".dfx" / network / "canisters" / canister
+            / f"{canister}.wasm",
+        REPO_ROOT / ".basilisk" / canister / f"{canister}.wasm",
     ]
     for c in candidates:
         if c.exists():
-            print(f"   • base WASM built at {c} ({c.stat().st_size:,} bytes)")
+            print(f"   • {canister} WASM built at {c} ({c.stat().st_size:,} bytes)")
             return c
     raise SystemExit(
-        "ERROR: dfx build realm_backend ran but no realm_backend.wasm[.gz] "
+        f"ERROR: dfx build {canister} ran but no {canister}.wasm[.gz] "
         f"was found in expected locations: {candidates}"
     )
+
+
+# Map of mundus member `type:` → (source canister to build, registry path
+# template). Members can also override per-instance via `wasm_path:` /
+# `wasm_source:` in the descriptor; this map is just the default.
+_TYPE_TO_WASM: Dict[str, Dict[str, str]] = {
+    "realm": {
+        "source": "realm_backend",
+        "path_template": "realm-base-{version}.wasm.gz",
+    },
+    "realm_registry": {
+        "source": "realm_registry_backend",
+        "path_template": "realm-registry-{version}.wasm.gz",
+    },
+}
+
+
+def _wasm_spec_for_member(
+    member: Dict[str, Any], version: str
+) -> Dict[str, str]:
+    """Resolve which WASM (and registry path) a mundus member should get.
+
+    Order of precedence:
+      1. Explicit `wasm_path:` on the member (final, template not expanded).
+      2. Explicit `wasm_source:` on the member → builds <source> + uses
+         standard path template `<source>-{version}.wasm.gz`.
+      3. `type:` on the member, looked up in _TYPE_TO_WASM.
+      4. Hard default: realm_backend / realm-base-{version}.wasm.gz.
+    """
+    if member.get("wasm_path"):
+        return {"source": member.get("wasm_source", "realm_backend"),
+                "path": member["wasm_path"]}
+    if member.get("wasm_source"):
+        src = member["wasm_source"]
+        return {"source": src, "path": f"{src}-{version}.wasm.gz"}
+    mtype = member.get("type") or "realm"
+    spec = _TYPE_TO_WASM.get(mtype) or _TYPE_TO_WASM["realm"]
+    return {"source": spec["source"],
+            "path": spec["path_template"].format(version=version)}
 
 
 def stage1_publish(descriptor: Dict[str, Any], infra_ids: Dict[str, str]) -> None:
@@ -224,14 +262,38 @@ def stage1_publish(descriptor: Dict[str, Any], infra_ids: Dict[str, str]) -> Non
         "--codices-root", str(CODICES_ROOT),
     ]
 
+    # Collect every distinct WASM source required by the mundus members
+    # so we can build and publish exactly those (no duplicates). The
+    # `realm_backend` source is the conventional "base" WASM published
+    # under realm-base-{version}.wasm.gz; everything else (e.g.
+    # realm_registry_backend) is published under
+    # <source>-{version}.wasm.gz unless overridden.
+    sources_needed: Dict[str, str] = {}  # source -> registry_path
+    for member in (descriptor.get("mundus") or []):
+        spec = _wasm_spec_for_member(member, base_version)
+        sources_needed.setdefault(spec["source"], spec["path"])
+
     if skip_base_wasm:
         cmd += ["--skip-base-wasm"]
     else:
-        wasm_path = _build_base_wasm(network)
+        # Always build/publish the realm_backend "base" WASM under the
+        # canonical realm-base-{version}.wasm.gz path so existing
+        # consumers of `wasm/realm-base-*` keep working.
+        base_wasm_path = _build_canister_wasm("realm_backend", network)
         cmd += [
-            "--base-wasm", str(wasm_path),
+            "--base-wasm", str(base_wasm_path),
             "--base-wasm-version", base_version,
         ]
+        sources_needed.pop("realm_backend", None)
+
+        # Build & publish every other distinct WASM (e.g.
+        # realm_registry_backend → realm-registry-{version}.wasm.gz).
+        for source, registry_path in sorted(sources_needed.items()):
+            extra_path = _build_canister_wasm(source, network)
+            cmd += [
+                "--extra-wasm",
+                f"{extra_path}:{base_version}:{registry_path}",
+            ]
 
     if isinstance(only_exts, list):
         cmd += ["--only-extensions", ",".join(only_exts)]
@@ -293,10 +355,18 @@ def stage2_install(descriptor: Dict[str, Any], infra_ids: Dict[str, str]) -> Non
             canister_id = _canister_id(name, network)
 
         member_mode = (member.get("install_mode") or default_mode).strip()
-        print(f"\n   ▸ {name} ({canister_id})  [mode={member_mode}]")
+        wasm_spec = _wasm_spec_for_member(member, base_version)
+        print(
+            f"\n   ▸ {name} ({canister_id})  [mode={member_mode}]"
+            f"  [wasm={wasm_spec['source']} → {wasm_spec['path']}]"
+        )
         _add_controller(canister_id, realm_installer, network)
 
-        # Install (or upgrade) the WASM via realm_installer.
+        # Install (or upgrade) the WASM via realm_installer. We pass
+        # --wasm-path explicitly so each member gets its own canister-
+        # type WASM (realm_backend for realms, realm_registry_backend
+        # for the registry, etc.) rather than blindly installing the
+        # realm-base WASM into every member.
         cp = _run([
             "realms", "wasm", "install",
             "--target", canister_id,
@@ -305,6 +375,7 @@ def stage2_install(descriptor: Dict[str, Any], infra_ids: Dict[str, str]) -> Non
             "--registry", file_registry,
             "--network", network,
             "--mode", member_mode,
+            "--wasm-path", wasm_spec["path"],
         ], capture_output=True)
         # realms wasm install exits 0 even when the underlying installer
         # canister returns success=false — surface that here so the
