@@ -178,28 +178,48 @@ def _build_canister_wasm(canister: str, network: str) -> Path:
     """Build a canister and return the path to its resulting wasm[.gz].
 
     Used by stage 1 so we can publish per-canister-type WASMs to
-    file_registry. We never actually install code into the locally-built
-    canister — `dfx canister create` is only required so `dfx build` has
-    a slot to write the candid metadata into.
+    file_registry.
+
+    We deliberately avoid `dfx build` here: some canisters (e.g.
+    realm_registry_backend) are declared `remote` on staging/ic in
+    dfx.json, and dfx refuses to build remote canisters on the network
+    they're remote on:
+
+        Error: Canister 'X' is a remote canister on network 'staging',
+        and cannot be created from here.
+
+    Since the WASM is byte-identical regardless of which network we
+    build for, we bypass dfx entirely and invoke the underlying basilisk
+    build command directly — same command that's recorded in dfx.json.
     """
     print(f"   • building {canister} (WASM) ...")
-    _run(["dfx", "canister", "create", canister,
-          "--network", network], check=False)
-    _run(["dfx", "build", canister, "--network", network])
+    main_py = REPO_ROOT / "src" / canister / "main.py"
+    if not main_py.exists():
+        raise SystemExit(
+            f"ERROR: cannot build {canister}: {main_py} does not exist"
+        )
+    out_dir = REPO_ROOT / ".basilisk" / canister
+    out_dir.mkdir(parents=True, exist_ok=True)
+    _run([
+        sys.executable, "-m", "basilisk", canister, str(main_py),
+    ], cwd=REPO_ROOT)
     candidates = [
+        out_dir / f"{canister}.wasm.gz",
+        out_dir / f"{canister}.wasm",
+        # dfx-build artifacts as a last-resort fallback for environments
+        # that already produced one (e.g. an interactive `dfx build` run).
         REPO_ROOT / ".dfx" / network / "canisters" / canister
             / f"{canister}.wasm.gz",
         REPO_ROOT / ".dfx" / network / "canisters" / canister
             / f"{canister}.wasm",
-        REPO_ROOT / ".basilisk" / canister / f"{canister}.wasm",
     ]
     for c in candidates:
         if c.exists():
             print(f"   • {canister} WASM built at {c} ({c.stat().st_size:,} bytes)")
             return c
     raise SystemExit(
-        f"ERROR: dfx build {canister} ran but no {canister}.wasm[.gz] "
-        f"was found in expected locations: {candidates}"
+        f"ERROR: basilisk build for {canister} produced no WASM in any "
+        f"expected location: {candidates}"
     )
 
 
