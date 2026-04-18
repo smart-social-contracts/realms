@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import ItemCard from '$lib/components/ItemCard.svelte';
   import Spinner from '$lib/components/Spinner.svelte';
   import { isAuthenticated } from '$lib/auth';
   import { marketplaceClient, type ExtensionListing } from '$lib/marketplace-client';
+
+  type SortKey = 'newest' | 'installs' | 'likes';
 
   let items: ExtensionListing[] = [];
   let total = 0;
@@ -13,10 +14,28 @@
   let error = '';
   let searchQuery = '';
   let verifiedOnly = false;
+  let sortBy: SortKey = 'newest';
   let likedSet = new Set<string>();
 
   $: void load(page, perPage, verifiedOnly);
   $: void refreshLikes($isAuthenticated);
+
+  // Re-sort whenever the sort key changes — purely client-side over
+  // the page we already have in memory (the backend returns items
+  // sorted by updated_at; we re-sort here for the dropdown).
+  $: sorted = applySort(items, sortBy);
+
+  function applySort(list: ExtensionListing[], key: SortKey): ExtensionListing[] {
+    const copy = [...list];
+    if (key === 'installs') {
+      copy.sort((a, b) => b.installs - a.installs || b.likes - a.likes);
+    } else if (key === 'likes') {
+      copy.sort((a, b) => b.likes - a.likes || b.installs - a.installs);
+    } else {
+      copy.sort((a, b) => b.updated_at - a.updated_at);
+    }
+    return copy;
+  }
 
   async function refreshLikes(_authed: boolean) {
     if (!_authed) {
@@ -71,6 +90,14 @@
     on:keydown={(e) => e.key === 'Enter' && doSearch()}
   />
   <button class="btn" on:click={doSearch}>Search</button>
+  <label class="sort">
+    Sort
+    <select bind:value={sortBy}>
+      <option value="newest">Newest</option>
+      <option value="installs">Most installs</option>
+      <option value="likes">Most likes</option>
+    </select>
+  </label>
   <label class="verified-toggle">
     <input type="checkbox" bind:checked={verifiedOnly} />
     Verified only
@@ -81,13 +108,13 @@
   <div class="state"><Spinner /></div>
 {:else if error}
   <div class="state error">⚠️ {error}</div>
-{:else if items.length === 0}
+{:else if sorted.length === 0}
   <div class="state empty">
     <p>No extensions found. <a href="/upload">Upload one →</a></p>
   </div>
 {:else}
   <div class="grid">
-    {#each items as ext}
+    {#each sorted as ext}
       <ItemCard
         kind="ext"
         id={ext.extension_id}
@@ -131,6 +158,11 @@
     border-radius: 0.5rem; background: var(--surface); font-size: 0.95rem;
   }
   .verified-toggle { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--text-muted); font-size: 0.85rem; }
+  .sort { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--text-muted); font-size: 0.85rem; }
+  .sort select {
+    border: 1px solid var(--border); background: var(--surface);
+    border-radius: 0.4rem; padding: 0.35rem 0.5rem; font: inherit; color: var(--text);
+  }
   .btn {
     background: var(--primary); color: #fff; border: 1px solid var(--primary);
     padding: 0.7rem 1rem; border-radius: 0.5rem;

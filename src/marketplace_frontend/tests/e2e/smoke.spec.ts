@@ -50,17 +50,29 @@ test.describe('marketplace_frontend smoke', () => {
     await expect(page.getByText(/built on the/i)).toBeVisible();
   });
 
-  test('extensions page renders search input and verified-only filter', async ({ page }) => {
+  test('extensions page renders search input, sort dropdown, and verified-only filter', async ({ page }) => {
     await page.goto('/extensions');
     await expect(page.getByRole('heading', { name: 'Extensions' })).toBeVisible();
     await expect(page.getByPlaceholder('Search extensions…')).toBeVisible();
     await expect(page.getByText(/Verified only/i)).toBeVisible();
+    // Sort dropdown with the three options the plan calls out.
+    const sort = page.locator('select');
+    await expect(sort).toBeVisible();
+    const optionTexts = await sort.locator('option').allInnerTexts();
+    expect(optionTexts).toEqual(expect.arrayContaining(['Newest', 'Most installs', 'Most likes']));
+    // Switching sort should not throw.
+    await sort.selectOption('installs');
+    await sort.selectOption('likes');
   });
 
-  test('codices page renders search input', async ({ page }) => {
+  test('codices page renders search input + sort dropdown', async ({ page }) => {
     await page.goto('/codices');
     await expect(page.getByRole('heading', { name: 'Codices' })).toBeVisible();
     await expect(page.getByPlaceholder('Search codices…')).toBeVisible();
+    const sort = page.locator('select');
+    await expect(sort).toBeVisible();
+    const optionTexts = await sort.locator('option').allInnerTexts();
+    expect(optionTexts).toEqual(expect.arrayContaining(['Newest', 'Most installs', 'Most likes']));
   });
 
   test('upload page gates on sign-in', async ({ page }) => {

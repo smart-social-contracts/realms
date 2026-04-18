@@ -4,6 +4,8 @@
   import { isAuthenticated } from '$lib/auth';
   import { marketplaceClient, type CodexListing } from '$lib/marketplace-client';
 
+  type SortKey = 'newest' | 'installs' | 'likes';
+
   let items: CodexListing[] = [];
   let total = 0;
   let page = 1;
@@ -12,10 +14,24 @@
   let error = '';
   let searchQuery = '';
   let verifiedOnly = false;
+  let sortBy: SortKey = 'newest';
   let likedSet = new Set<string>();
 
   $: void load(page, perPage, verifiedOnly);
   $: void refreshLikes($isAuthenticated);
+  $: sorted = applySort(items, sortBy);
+
+  function applySort(list: CodexListing[], key: SortKey): CodexListing[] {
+    const copy = [...list];
+    if (key === 'installs') {
+      copy.sort((a, b) => b.installs - a.installs || b.likes - a.likes);
+    } else if (key === 'likes') {
+      copy.sort((a, b) => b.likes - a.likes || b.installs - a.installs);
+    } else {
+      copy.sort((a, b) => b.updated_at - a.updated_at);
+    }
+    return copy;
+  }
 
   async function refreshLikes(_authed: boolean) {
     if (!_authed) {
@@ -70,6 +86,14 @@
     on:keydown={(e) => e.key === 'Enter' && doSearch()}
   />
   <button class="btn" on:click={doSearch}>Search</button>
+  <label class="sort">
+    Sort
+    <select bind:value={sortBy}>
+      <option value="newest">Newest</option>
+      <option value="installs">Most installs</option>
+      <option value="likes">Most likes</option>
+    </select>
+  </label>
   <label class="verified-toggle">
     <input type="checkbox" bind:checked={verifiedOnly} />
     Verified only
@@ -80,13 +104,13 @@
   <div class="state"><Spinner /></div>
 {:else if error}
   <div class="state error">⚠️ {error}</div>
-{:else if items.length === 0}
+{:else if sorted.length === 0}
   <div class="state empty">
     <p>No codices found. <a href="/upload">Upload one →</a></p>
   </div>
 {:else}
   <div class="grid">
-    {#each items as c}
+    {#each sorted as c}
       <ItemCard
         kind="codex"
         id={c.codex_id}
@@ -117,6 +141,11 @@
     border-radius: 0.5rem; background: var(--surface); font-size: 0.95rem;
   }
   .verified-toggle { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--text-muted); font-size: 0.85rem; }
+  .sort { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--text-muted); font-size: 0.85rem; }
+  .sort select {
+    border: 1px solid var(--border); background: var(--surface);
+    border-radius: 0.4rem; padding: 0.35rem 0.5rem; font: inherit; color: var(--text);
+  }
   .btn { background: var(--primary); color: #fff; border: 1px solid var(--primary); padding: 0.7rem 1rem; border-radius: 0.5rem; }
   .btn:hover { background: var(--primary-hover); }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 1.25rem; }
