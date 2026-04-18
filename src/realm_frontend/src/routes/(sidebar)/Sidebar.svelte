@@ -308,6 +308,22 @@
 
 	onMount(() => {
 		loadSidebarExtensions();
+		// Re-load when an extension is installed or uninstalled at runtime
+		// (e.g. via the package_manager extension), so the new entry appears
+		// without a full page reload. Components dispatch this event after
+		// a successful install_*/uninstall_* call.
+		const onChanged = () => {
+			console.log('[Sidebar] realms:extensions-changed → reloading manifests');
+			loadSidebarExtensions();
+		};
+		if (typeof window !== 'undefined') {
+			window.addEventListener('realms:extensions-changed', onChanged);
+		}
+		return () => {
+			if (typeof window !== 'undefined') {
+				window.removeEventListener('realms:extensions-changed', onChanged);
+			}
+		};
 	});
 	
 	/**

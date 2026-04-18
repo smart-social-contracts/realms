@@ -418,3 +418,66 @@ graph LR
 - **Manifest validation**: CLI validates extension structure
 - **Sandboxed execution**: Extensions run in canister environment
 - **Input validation**: JSON schema validation for API calls
+
+## Package Manager Extension
+
+Realm administrators can install, update and uninstall both runtime
+extensions and codex packages directly from the realm's frontend, without
+re-deploying the WASM, by using the `package_manager` extension shipped
+under `extensions/extensions/package_manager/`.
+
+### What it does
+
+The extension is an admin-only sidebar entry (profiles: `["admin"]`,
+category: `other`) that wraps the existing realm_backend endpoints into
+a three-tab UI:
+
+| Tab        | What it does                                                                 | Backend calls                                                                 |
+|------------|-------------------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| Installed  | Lists every runtime extension and codex package currently installed on the realm. Marks rows that have a newer version available in a connected registry. Offers Update / Reload (codex) / Uninstall. | `list_runtime_extensions`, `list_codex_packages`, `uninstall_extension`, `uninstall_codex`, `reload_codex`, plus `install_extension_from_registry` / `install_codex_from_registry` for updates |
+| Browse     | For each `file_registry` canister this realm is linked to (`status().registries`), fetches `/api/extensions` and `/api/codices` and shows everything publishable. Cross-references with the installed list to show install / update buttons. | HTTP GET to `{registry}/api/extensions` + `{registry}/api/codices` (via `$lib/file-registry-client`), then `install_extension_from_registry` / `install_codex_from_registry` |
+| Upload     | Lets the admin pick a folder of files (using `<input webkitdirectory>`) and pushes them in a single update call. Useful for one-off installs or local dev. Warns when the total payload exceeds the ~1.8 MB ICP ingress safe limit. | `install_extension({extension_id, files})` or `install_codex({codex_id, files, run_init})` |
+
+### Permissions
+
+All four mutating endpoints are gated by either `Operations.EXTENSION_INSTALL`
+/ `Operations.EXTENSION_UNINSTALL` or `Operations.CODEX_INSTALL` /
+`Operations.CODEX_UNINSTALL`. The default `ADMIN` profile (`Profiles.ADMIN`
+in `src/realm_backend/ggg/system/user_profile.py`) is granted
+`Operations.ALL` and therefore passes those checks. No new role wiring is
+required for the package manager to work.
+
+If you want a finer-grained role (e.g. a "package manager" sub-admin who
+can install but not configure other parts of the realm), grant
+`EXTENSION_INSTALL`, `EXTENSION_UNINSTALL`, `CODEX_INSTALL`, and
+`CODEX_UNINSTALL` to a custom profile in `Profiles`.
+
+### Sidebar live-reload
+
+After every successful install / uninstall the extension dispatches a
+`window` event (`realms:extensions-changed`). `Sidebar.svelte` listens for
+this event and re-runs `get_sidebar_manifests()` so the new entry appears
+immediately, without a full page reload.
+
+### Caveats
+
+- **Hot-loading**: backend extensions reload via `_load_module(force=True)`
+  in `core/runtime_extensions.py`. Codex `init.py` runs synchronously inside
+  the install update call, so a buggy `init.py` surfaces as the install
+  response — the UI displays the `init_warning` field returned by the
+  install call.
+- **Frontend bundle**: a runtime extension's compiled UI is fetched from
+  the file_registry the extension was installed from
+  (see `extension-loader.ts`). After install the extension routes are
+  available immediately, but the user may need to navigate to the new
+  sidebar entry to mount the bundle.
+- **Trust**: an admin can install arbitrary code from any registry the
+  realm is linked to. There is no signature/checksum verification step in
+  the runtime install path; if you need a "trusted publishers" gate, add
+  it on top of `install_extension_from_registry` (the registry has an ACL
+  for *publishing*, not for *consuming*).
+- **Ingress limits**: ICP update calls have a ~2 MB ingress limit. The
+  Upload tab warns when the total payload exceeds ~1.8 MB; for larger
+  payloads, publish the extension to a `file_registry` and use the Browse
+  tab instead — the registry-pull path uses inter-canister calls and
+  isn't subject to the same limit.
