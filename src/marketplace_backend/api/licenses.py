@@ -76,7 +76,9 @@ def record_license_payment(
     """Called by the billing service after Stripe success (or by a controller).
 
     Either creates a new license or extends an existing one by
-    ``duration_seconds``.
+    ``duration_seconds``. Internally ``expires_at`` is stored in
+    nanoseconds (the same unit as ``ic.time()``) so the caller-friendly
+    seconds input is converted on the way in.
     """
     caller = str(ic.caller())
     billing_principal = get_billing_service_principal()
@@ -87,13 +89,14 @@ def record_license_payment(
     if duration_seconds <= 0:
         return {"success": False, "error": "duration_seconds must be positive"}
 
-    now = _now()
+    now_ns = _now()
+    duration_ns = float(duration_seconds) * 1_000_000_000
     lic = DeveloperLicenseEntity[principal]
     if lic is None:
         lic = DeveloperLicenseEntity(
             principal=principal,
-            created_at=now,
-            expires_at=now + duration_seconds,
+            created_at=now_ns,
+            expires_at=now_ns + duration_ns,
             last_payment_id=stripe_session_id,
             payment_method=payment_method,
             note=note,
@@ -103,8 +106,8 @@ def record_license_payment(
     else:
         # Extend from the later of (now, current expiry) so we never shorten
         # an active license.
-        base = max(now, float(lic.expires_at or 0))
-        lic.expires_at = base + duration_seconds
+        base = max(now_ns, float(lic.expires_at or 0))
+        lic.expires_at = base + duration_ns
         lic.last_payment_id = stripe_session_id or lic.last_payment_id
         lic.payment_method = payment_method or lic.payment_method
         lic.note = note or lic.note

@@ -538,19 +538,19 @@ def _ext_listing_record(d: dict) -> "ExtensionListing":
         name=d["name"],
         description=d["description"],
         version=d["version"],
-        price_e8s=nat64(d["price_e8s"]),
+        price_e8s=int(d["price_e8s"]),
         icon=d["icon"],
         categories=d["categories"],
         file_registry_canister_id=d["file_registry_canister_id"],
         file_registry_namespace=d["file_registry_namespace"],
         download_url=d.get("download_url", ""),
-        installs=nat64(d["installs"]),
-        likes=nat64(d["likes"]),
+        installs=int(d["installs"]),
+        likes=int(d["likes"]),
         verification_status=d["verification_status"],
         verification_notes=d["verification_notes"],
         is_active=bool(d["is_active"]),
-        created_at=float64(d["created_at"]),
-        updated_at=float64(d["updated_at"]),
+        created_at=float(d["created_at"]),
+        updated_at=float(d["updated_at"]),
     )
 
 
@@ -563,26 +563,26 @@ def _codex_listing_record(d: dict) -> "CodexListing":
         name=d["name"],
         description=d["description"],
         version=d["version"],
-        price_e8s=nat64(d["price_e8s"]),
+        price_e8s=int(d["price_e8s"]),
         icon=d["icon"],
         categories=d["categories"],
         file_registry_canister_id=d["file_registry_canister_id"],
         file_registry_namespace=d["file_registry_namespace"],
-        installs=nat64(d["installs"]),
-        likes=nat64(d["likes"]),
+        installs=int(d["installs"]),
+        likes=int(d["likes"]),
         verification_status=d["verification_status"],
         verification_notes=d["verification_notes"],
         is_active=bool(d["is_active"]),
-        created_at=float64(d["created_at"]),
-        updated_at=float64(d["updated_at"]),
+        created_at=float(d["created_at"]),
+        updated_at=float(d["updated_at"]),
     )
 
 
 def _license_record(d: dict) -> "DeveloperLicense":
     return DeveloperLicense(
         principal=d["principal"],
-        created_at=float64(d["created_at"]),
-        expires_at=float64(d["expires_at"]),
+        created_at=float(d["created_at"]),
+        expires_at=float(d["expires_at"]),
         last_payment_id=d["last_payment_id"],
         payment_method=d["payment_method"],
         note=d["note"],
@@ -646,15 +646,15 @@ def status() -> StatusResult:
             commit=s["commit"],
             commit_datetime=s["commit_datetime"],
             status=s["status"],
-            extensions_count=nat64(s["extensions_count"]),
-            codices_count=nat64(s["codices_count"]),
-            purchases_count=nat64(s["purchases_count"]),
-            likes_count=nat64(s["likes_count"]),
-            licenses_count=nat64(s["licenses_count"]),
+            extensions_count=int(s["extensions_count"]),
+            codices_count=int(s["codices_count"]),
+            purchases_count=int(s["purchases_count"]),
+            likes_count=int(s["likes_count"]),
+            licenses_count=int(s["licenses_count"]),
             file_registry_canister_id=s["file_registry_canister_id"],
             billing_service_principal=s["billing_service_principal"],
-            license_price_usd_cents=nat64(s["license_price_usd_cents"]),
-            license_duration_seconds=nat64(s["license_duration_seconds"]),
+            license_price_usd_cents=int(s["license_price_usd_cents"]),
+            license_duration_seconds=int(s["license_duration_seconds"]),
             is_caller_controller=bool(s["is_caller_controller"]),
             dependencies=s["dependencies"],
             python_version=s["python_version"],
@@ -671,8 +671,8 @@ def get_marketplace_config() -> ConfigResult:
         return {"Ok": ConfigRecord(
             file_registry_canister_id=cfg["file_registry_canister_id"],
             billing_service_principal=cfg["billing_service_principal"],
-            license_price_usd_cents=nat64(cfg["license_price_usd_cents"]),
-            license_duration_seconds=nat64(cfg["license_duration_seconds"]),
+            license_price_usd_cents=int(cfg["license_price_usd_cents"]),
+            license_duration_seconds=int(cfg["license_duration_seconds"]),
         )}
     except Exception as e:
         return {"Err": f"Internal error: {e}"}
@@ -716,8 +716,8 @@ def set_billing_service_principal(principal: text) -> GenericResult:
 def get_license_pricing_q() -> LicensePricingRecord:
     p = get_license_pricing()["pricing"]
     return LicensePricingRecord(
-        license_price_usd_cents=nat64(p["license_price_usd_cents"]),
-        license_duration_seconds=nat64(p["license_duration_seconds"]),
+        license_price_usd_cents=int(p["license_price_usd_cents"]),
+        license_duration_seconds=int(p["license_duration_seconds"]),
     )
 
 
@@ -792,13 +792,13 @@ def list_marketplace_extensions(page: nat64, per_page: nat64, verified_only: boo
         r = list_extensions_impl(int(page), int(per_page), bool(verified_only))
         return ExtensionListResult(
             listings=[_ext_listing_record(d) for d in r["listings"]],
-            total_count=nat64(r["total_count"]),
-            page=nat64(r["page"]),
-            per_page=nat64(r["per_page"]),
+            total_count=int(r["total_count"]),
+            page=int(r["page"]),
+            per_page=int(r["per_page"]),
         )
     except Exception as e:
         logger.error(f"list_marketplace_extensions: {e}")
-        return ExtensionListResult(listings=[], total_count=nat64(0), page=page, per_page=per_page)
+        return ExtensionListResult(listings=[], total_count=int(0), page=page, per_page=per_page)
 
 
 @query
@@ -881,13 +881,13 @@ def list_marketplace_codices(page: nat64, per_page: nat64, verified_only: bool) 
         r = list_codices_impl(int(page), int(per_page), bool(verified_only))
         return CodexListResult(
             listings=[_codex_listing_record(d) for d in r["listings"]],
-            total_count=nat64(r["total_count"]),
-            page=nat64(r["page"]),
-            per_page=nat64(r["per_page"]),
+            total_count=int(r["total_count"]),
+            page=int(r["page"]),
+            per_page=int(r["per_page"]),
         )
     except Exception as e:
         logger.error(f"list_marketplace_codices: {e}")
-        return CodexListResult(listings=[], total_count=nat64(0), page=page, per_page=per_page)
+        return CodexListResult(listings=[], total_count=int(0), page=page, per_page=per_page)
 
 
 @query
@@ -961,8 +961,8 @@ def get_my_purchases() -> Vec[PurchaseRecord]:
             item_kind=r["item_kind"],
             item_id=r["item_id"],
             developer=r["developer"],
-            price_paid_e8s=nat64(r["price_paid_e8s"]),
-            purchased_at=float64(r["purchased_at"]),
+            price_paid_e8s=int(r["price_paid_e8s"]),
+            purchased_at=float(r["purchased_at"]),
         ) for r in rows]
     except Exception as e:
         logger.error(f"get_my_purchases: {e}")
@@ -1010,7 +1010,7 @@ def my_likes() -> Vec[LikeRecord]:
             LikeRecord(
                 item_kind=r["item_kind"],
                 item_id=r["item_id"],
-                created_at=float64(r["created_at"]),
+                created_at=float(r["created_at"]),
             )
             for r in my_likes_impl(caller)
         ]
@@ -1165,7 +1165,7 @@ def list_pending_audits() -> Vec[PendingAudit]:
                 name=r["name"],
                 developer=r["developer"],
                 version=r["version"],
-                updated_at=float64(r["updated_at"]),
+                updated_at=float(r["updated_at"]),
             )
             for r in list_pending_audits_impl()
         ]
