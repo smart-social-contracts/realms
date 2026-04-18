@@ -37,10 +37,8 @@ else
     echo "Warning: No extensions directory found"
 fi
 
-# Install marketplace if it exists at top level
-if [ -d "extensions/marketplace" ]; then
-    echo "Installing marketplace extension..."
-    realms extension install-from-source --source-dir extensions
-fi
+# Marketplace canisters now live in src/marketplace_* (not in the
+# extensions submodule). They are deployed via `realms marketplace deploy`
+# and don't need to be installed as regular extensions.
 
 echo "Extensions installation complete"

@@ -15,7 +15,11 @@ from .commands.import_data import import_codex_command, import_data_command
 from .commands.export_data import export_data_command
 from .commands.extension import extension_command, codex_command
 from .commands.wasm_registry import wasm_command
-from .commands.marketplace import marketplace_create_command, marketplace_deploy_command
+from .commands.marketplace import (
+    marketplace_call_command,
+    marketplace_deploy_command,
+    marketplace_status_command,
+)
 from .commands.mundus import mundus_create_command, mundus_deploy_command, mundus_status_command
 from .commands.quarter import (
     quarter_create_command,
@@ -1378,80 +1382,57 @@ marketplace_app = typer.Typer(name="marketplace", help="Extension marketplace op
 app.add_typer(marketplace_app, name="marketplace", rich_help_panel="Lifecycle")
 
 
-@marketplace_app.command("create")
-def marketplace_create(
-    marketplace_name: Optional[str] = typer.Option(None, "--name", help="Marketplace name"),
-    output_dir: str = typer.Option(".realms", "--output-dir", "-o", help="Base output directory"),
-    network: str = typer.Option("local", "--network", "-n", help="Network to deploy to"),
-    deploy: bool = typer.Option(
-        False, "--deploy", help="Deploy the marketplace after creation"
-    ),
-    identity: Optional[str] = typer.Option(
-        None, "--identity", help="Path to identity PEM file or identity name for dfx"
-    ),
-    mode: str = typer.Option(
-        "auto", "--mode", "-m", help="Deploy mode: 'auto', 'upgrade' or 'reinstall'"
-    ),
-) -> None:
-    """Create a new marketplace instance."""
-    marketplace_create_command(marketplace_name, output_dir, network, deploy, identity, mode)
-
-
 @marketplace_app.command("deploy")
 def marketplace_deploy(
-    folder: str = typer.Option(..., "--folder", "-f", help="Path to marketplace directory"),
     network: str = typer.Option("local", "--network", "-n", help="Network to deploy to"),
-    mode: str = typer.Option("auto", "--mode", "-m", help="Deployment mode (auto, upgrade, reinstall)"),
-    identity: Optional[str] = typer.Option(None, "--identity", help="Identity file for IC deployment"),
+    mode: str = typer.Option("auto", "--mode", "-m", help="Deploy mode: auto, install, upgrade, reinstall"),
+    identity: Optional[str] = typer.Option(None, "--identity", help="dfx identity name or PEM file"),
+    with_registry: Optional[bool] = typer.Option(
+        None,
+        "--with-registry/--no-with-registry",
+        help="Also deploy file_registry alongside the marketplace (default: True for local, False elsewhere).",
+    ),
+    file_registry_canister_id: Optional[str] = typer.Option(
+        None,
+        "--file-registry-canister-id",
+        help="file_registry canister id to wire into the marketplace (defaults to dfx-resolved id).",
+    ),
+    billing_service_principal: Optional[str] = typer.Option(
+        None,
+        "--billing-service-principal",
+        help="Off-chain billing service principal allowed to call record_license_payment.",
+    ),
 ) -> None:
-    """Deploy a marketplace instance."""
-    marketplace_deploy_command(folder, network, mode, identity)
+    """Deploy the marketplace canisters from src/marketplace_*."""
+    marketplace_deploy_command(
+        network=network,
+        mode=mode,
+        identity=identity,
+        with_registry=with_registry,
+        file_registry_canister_id=file_registry_canister_id,
+        billing_service_principal=billing_service_principal,
+    )
 
 
 @marketplace_app.command("call")
 def marketplace_call(
-    method: str = typer.Argument(help="Backend method to call (e.g. status, list_extensions)"),
+    method: str = typer.Argument(help="Backend method to call (e.g. status, list_marketplace_extensions)"),
     args: str = typer.Argument("()", help="Candid arguments for the method"),
     network: str = typer.Option("local", "--network", "-n", help="Network to use"),
-    canister_id: str = typer.Option(..., "--canister-id", help="Marketplace canister ID"),
+    canister_id: Optional[str] = typer.Option(None, "--canister-id", help="Override marketplace canister ID"),
     output: str = typer.Option("json", "--output", "-o", help="Output format: json or candid"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show verbose output"),
 ) -> None:
-    """Call a method on the marketplace backend canister directly."""
-    import subprocess
-    import sys
+    """Call a method on the marketplace_backend canister directly."""
+    marketplace_call_command(method, args, network, canister_id, output, verbose)
 
-    if output not in ("json", "candid"):
-        console.print(f"[red]❌ Invalid output format: {output}. Use 'json' or 'candid'[/red]")
-        raise typer.Exit(1)
 
-    if verbose:
-        console.print(f"[dim]Marketplace Canister: {canister_id}[/dim]")
-        console.print(f"[dim]Network: {network}[/dim]")
-        console.print(f"[dim]Method: {method}[/dim]")
-        console.print(f"[dim]Args: {args}[/dim]\n")
-
-    cmd = ["dfx", "canister", "call", "--network", network, canister_id, method, args]
-    if output == "json":
-        cmd.extend(["--output", "json"])
-
-    try:
-        import os
-        env = os.environ.copy()
-        env["DFX_WARNING"] = "-mainnet_plaintext_identity"
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, env=env)
-        if result.returncode == 0:
-            print(result.stdout.strip())
-        else:
-            if result.stderr:
-                sys.stderr.write(f"Error: {result.stderr}\n")
-            raise typer.Exit(1)
-    except subprocess.TimeoutExpired:
-        sys.stderr.write("Error: Call timed out\n")
-        raise typer.Exit(1)
-    except Exception as e:
-        sys.stderr.write(f"Error: {e}\n")
-        raise typer.Exit(1)
+@marketplace_app.command("status")
+def marketplace_status(
+    network: str = typer.Option("local", "--network", "-n", help="Network to query"),
+) -> None:
+    """Pretty-print the marketplace_backend status()."""
+    marketplace_status_command(network=network)
 
 
 # ============== Billing Commands ==============

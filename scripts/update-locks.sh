@@ -23,16 +23,13 @@ echo "    cli/realms/cli/requirements.txt"
 ${COMPILE} --output-file=src/realm_registry_backend/requirements.txt src/realm_registry_backend/requirements.in
 echo "    src/realm_registry_backend/requirements.txt"
 
+${COMPILE} --output-file=src/marketplace_backend/requirements.txt src/marketplace_backend/requirements.in
+echo "    src/marketplace_backend/requirements.txt"
+
 echo "==> Compiling extensions submodule lockfiles..."
 
 ${COMPILE} --output-file=extensions/extensions/vault/requirements.txt extensions/extensions/vault/requirements.in
 echo "    extensions/extensions/vault/requirements.txt"
-
-${COMPILE} --output-file=extensions/marketplace/requirements.txt extensions/marketplace/requirements.in
-echo "    extensions/marketplace/requirements.txt"
-
-${COMPILE} --output-file=extensions/marketplace/marketplace_backend/requirements.txt extensions/marketplace/marketplace_backend/requirements.in
-echo "    extensions/marketplace/marketplace_backend/requirements.txt"
 
 echo ""
 echo "Done. Review changes with: git diff **/requirements.txt"
