@@ -392,19 +392,38 @@ def mundus_deploy_command(
     registry_dirs = sorted(mundus_path.glob("registry_*"))
     realm_dirs = sorted(mundus_path.glob("realm_*"))
     
-    if not realm_dirs:
-        console.print("[yellow]⚠️  No realms found in mundus directory[/yellow]")
-        return
-    
-    # Track shared canister IDs to inject into each realm
-    shared_canister_ids = {}
-    
-    # Load mundus manifest for token config
+    # Load mundus manifest early so we can decide what to deploy even
+    # when there are no realms in the mundus subtree (e.g. a
+    # marketplace-only deploy).
     mundus_manifest_path = mundus_path / "manifest.json"
     mundus_config = {}
     if mundus_manifest_path.exists():
         with open(mundus_manifest_path, 'r') as f:
             mundus_config = json.load(f)
+    
+    if not realm_dirs:
+        # Marketplace v2 lives in src/marketplace_* (not in the mundus
+        # subtree), so it's worth deploying even when no realms or
+        # registries are present in this mundus.
+        if mundus_config.get("marketplace"):
+            console.print("[yellow]⚠️  No realms found in mundus directory — proceeding to marketplace deploy only.[/yellow]\n")
+            try:
+                from .marketplace import marketplace_deploy_command
+                marketplace_deploy_command(
+                    network=network,
+                    mode=mode,
+                    identity=identity,
+                    with_registry=None,
+                )
+                console.print("\n[green]✅ Marketplace deployed (no realms in this mundus).[/green]")
+            except SystemExit:
+                pass
+            return
+        console.print("[yellow]⚠️  No realms found in mundus directory[/yellow]")
+        return
+    
+    # Track shared canister IDs to inject into each realm
+    shared_canister_ids = {}
     
     # 1. Deploy shared canisters (local only - on IC, production canisters are used)
     if network == "local":

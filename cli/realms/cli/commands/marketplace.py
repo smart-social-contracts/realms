@@ -123,7 +123,7 @@ def marketplace_deploy_command(
         raise typer.Exit(1)
 
     if network == "local":
-        ensure_dfx_running()
+        ensure_dfx_running(log_dir=project_root, network=network, clean=False)
 
     # Default --with-registry behaviour: True for local, False elsewhere.
     if with_registry is None:
