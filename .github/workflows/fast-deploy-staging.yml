@@ -119,22 +119,28 @@ jobs:
           echo "🆔 Identity:      $(dfx identity get-principal)"
 
       - name: Run stages 1 + 2 against ${{ inputs.descriptor }}
+        env:
+          # Surface descriptor + filter inputs as plain env vars so the
+          # bash below can quote them safely without going through GHA
+          # `${{ ... }}` expansion inside `if`/`set --` (which trips
+          # shellcheck SC2054 about commas inside array literals).
+          DESCRIPTOR: ${{ inputs.descriptor }}
+          ONLY_REALMS: ${{ inputs.realms }}
+          ONLY_EXTENSIONS: ${{ inputs.extensions }}
+          SKIP_BASE_WASM: ${{ inputs.skip_base_wasm }}
         run: |
-          ARGS=(
-            --file "${{ inputs.descriptor }}"
-            --stages 1,2
-          )
-          if [ -n "${{ inputs.realms }}" ]; then
-            ARGS+=( --only-realms "${{ inputs.realms }}" )
+          set -- --file "$DESCRIPTOR" --stages 1,2
+          if [ -n "$ONLY_REALMS" ]; then
+            set -- "$@" --only-realms "$ONLY_REALMS"
           fi
-          if [ -n "${{ inputs.extensions }}" ]; then
-            ARGS+=( --only-extensions "${{ inputs.extensions }}" )
+          if [ -n "$ONLY_EXTENSIONS" ]; then
+            set -- "$@" --only-extensions "$ONLY_EXTENSIONS"
           fi
-          if [ "${{ inputs.skip_base_wasm }}" = "true" ]; then
-            ARGS+=( --skip-base-wasm )
+          if [ "$SKIP_BASE_WASM" = "true" ]; then
+            set -- "$@" --skip-base-wasm
           fi
-          echo "→ python3 scripts/ci_install_mundus.py ${ARGS[*]}"
-          python3 scripts/ci_install_mundus.py "${ARGS[@]}"
+          echo "→ python3 scripts/ci_install_mundus.py $*"
+          python3 scripts/ci_install_mundus.py "$@"
 
       - name: Print frontend URLs
         if: success()
