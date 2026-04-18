@@ -8,7 +8,8 @@ const config = {
     adapter: adapter({
       pages: 'dist',
       assets: 'dist',
-      fallback: undefined,
+      // SPA fallback for dynamic routes (`extensions/[id]`, `codices/[id]`).
+      fallback: 'index.html',
       precompress: false,
       strict: true,
     }),
