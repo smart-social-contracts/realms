@@ -28,6 +28,18 @@ artifacts:
   extensions: all
   codices: all
 
+# Build-time parameters surfaced to the realm_frontend Vite build via
+# VITE_* env vars (see VITE_PARAM_MAP in scripts/deploy.py). On staging
+# we keep TEST_MODE on so operators can flip individual sub-flags
+# without rebuilding the whole bundle.
+#   * TEST_MODE_ADMIN_SELF_REGISTRATION exposes the "Administrator"
+#     profile card on the join page so we can self-uprole on staging
+#     without an out-of-band admin assignment. Production must keep
+#     this off.
+parameters:
+  TEST_MODE: true
+  TEST_MODE_ADMIN_SELF_REGISTRATION: true
+
 # Pre-existing staging canisters. CI reuses these on every run; it never
 # creates new ones. The only canister that doesn't already exist is
 # realm_installer (see infrastructure_overrides).
