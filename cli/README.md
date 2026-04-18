@@ -373,6 +373,24 @@ ls extensions/
 - Validate configuration: `realms validate`
 - Use dry-run mode: `realms realm deploy --dry-run`
 
+## GUI alternative: the Package Manager extension
+
+Most extension and codex management actions exposed by this CLI
+(`realms extension registry-install`, `realms extension runtime-install`,
+`realms extension runtime-uninstall`, `realms codex install`, ...) are
+also available to realm administrators directly from the realm's
+frontend, via the `package_manager` extension.
+
+The extension provides three tabs (Installed / Browse / Upload) wired
+to the same `install_extension*` / `install_codex*` /
+`uninstall_extension` / `uninstall_codex` backend endpoints used by this
+CLI. Once a realm has the package_manager extension installed, an admin
+no longer needs CLI access to the host machine to add or remove
+packages — they can do everything through the browser.
+
+See `docs/reference/EXTENSION_ARCHITECTURE.md → Package Manager Extension`
+for the full feature list, permissions model and caveats.
+
 ## Contributing
 
 1. Fork the repository
