@@ -150,22 +150,18 @@ def marketplace_deploy_command(
     else:
         console.print("[yellow]⚠️  No file_registry canister id resolved — marketplace will be configured later via set_file_registry_canister_id.[/yellow]")
 
-    # 2. marketplace_backend with init arg (only honoured on first install).
+    # 2. marketplace_backend.
+    # We always pass `(null)` as the install/upgrade arg and rely on the
+    # post-deploy `set_*` calls below to wire config. pocket-ic 0.31
+    # occasionally rejects record-shaped install args mid-call (the
+    # replica drops the connection) and the post-deploy update is
+    # idempotent anyway; this avoids a fragile install path while
+    # preserving the same end state.
     console.print(Panel.fit("🛒 Deploying marketplace_backend", style="bold blue"))
-    init_arg_parts = []
-    if fr_id:
-        init_arg_parts.append(f'file_registry = opt "{fr_id}"')
-    if billing_service_principal:
-        init_arg_parts.append(f'billing_service_principal = opt "{billing_service_principal}"')
-    init_arg = (
-        f'(opt record {{ {"; ".join(init_arg_parts)} }})'
-        if init_arg_parts
-        else "(null)"
-    )
     deploy_args = [
         "dfx", "deploy", MARKETPLACE_BACKEND,
         "--network", network, "--yes",
-        "--argument", init_arg,
+        "--argument", "(null)",
     ]
     if mode != "auto":
         deploy_args.extend(["--mode", mode])
