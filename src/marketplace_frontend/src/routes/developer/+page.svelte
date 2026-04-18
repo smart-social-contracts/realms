@@ -13,6 +13,7 @@
   let myExtensions: ExtensionListing[] = [];
   let myCodices: CodexListing[] = [];
   let buyingLicense = false;
+  let licenseError = '';
 
   $: void load($isAuthenticated);
 
@@ -40,6 +41,7 @@
   async function buyLicense() {
     if (buyingLicense || !$principalStore) return;
     buyingLicense = true;
+    licenseError = '';
     try {
       const url = `${CONFIG.billing_service_url.replace(/\/$/, '')}/marketplace/license/checkout`;
       const returnUrl = `${window.location.origin}/developer?license_status=success`;
@@ -53,14 +55,20 @@
         }),
       });
       if (!resp.ok) {
-        const txt = await resp.text();
-        throw new Error(`HTTP ${resp.status}: ${txt}`);
+        const txt = await resp.text().catch(() => '');
+        throw new Error(`HTTP ${resp.status}${txt ? `: ${txt}` : ''}`);
       }
       const data = await resp.json();
-      if (!data.checkout_url) throw new Error('No checkout_url in response');
+      if (!data.checkout_url) throw new Error('billing service returned no checkout_url');
       window.location.href = data.checkout_url;
     } catch (e: any) {
-      alert(`Could not start checkout: ${e?.message ?? e}\n\nIf you're running locally, ask a controller to call grant_manual_license() instead.`);
+      // Graceful "Service unavailable" degradation — keep the user in
+      // the marketplace UI with a clear next step (controller can grant
+      // a manual license via /admin during local dev or before the
+      // billing service is up).
+      licenseError =
+        `Billing service unavailable: ${e?.message ?? e}. ` +
+        `If you're running locally, ask a controller to grant a manual license from /admin.`;
     } finally {
       buyingLicense = false;
     }
@@ -125,6 +133,9 @@
       <button class="btn primary" disabled={buyingLicense} on:click={buyLicense}>
         {buyingLicense ? 'Redirecting…' : 'Pay with credit card →'}
       </button>
+      {#if licenseError}
+        <p class="license-error">⚠️ {licenseError}</p>
+      {/if}
       <p class="small muted">
         Powered by the off-chain billing service at <code>{CONFIG.billing_service_url}</code>.
         Local dev tip: ask a controller to call <code>grant_manual_license</code>.
@@ -202,6 +213,15 @@
   .card h2 { margin: 0 0 0.85rem; font-size: 1.1rem; }
   .ok { color: var(--success); font-weight: 500; }
   .price { font-size: 1.5rem; font-weight: 700; margin: 0.85rem 0; color: var(--text); }
+  .license-error {
+    margin: 0.75rem 0 0;
+    padding: 0.65rem 0.85rem;
+    background: #FEE2E2;
+    border: 1px solid var(--danger);
+    color: #991B1B;
+    border-radius: 0.5rem;
+    font-size: 0.85rem;
+  }
   .benefits { margin: 0.5rem 0 0.85rem 1.25rem; color: var(--text-muted); }
   .small { font-size: 0.8rem; }
   .muted { color: var(--text-faint); }
