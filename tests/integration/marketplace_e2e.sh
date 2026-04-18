@@ -133,6 +133,23 @@ expect "grant_manual_license Ok=created" 'Ok = "created"' "$out"
 out=$(dfx canister call "$MP" check_license '("aaaaa-aa")')
 expect "check_license is_active=true" "is_active = true" "$out"
 
+# request_audit before our caller has its own license -> Err.
+# (Default dfx identity owns the demo-voting listing but does not yet
+# have an active license.)
+out=$(dfx canister call "$MP" request_audit '("ext", "demo-voting")')
+expect "request_audit denied without license" 'license' "$out"
+
+# Grant a license to our own caller and retry — should succeed because
+# we are also the listing owner.
+SELF=$(dfx identity get-principal)
+dfx canister call "$MP" grant_manual_license "(\"$SELF\", 31536000 : nat64, \"smoke-self\")" >/dev/null
+out=$(dfx canister call "$MP" request_audit '("ext", "demo-voting")')
+expect "request_audit succeeds after license + ownership" 'pending_audit' "$out"
+
+# Pending audits queue should now include the demo-voting listing.
+out=$(dfx canister call "$MP" list_pending_audits)
+expect "list_pending_audits includes demo-voting" 'item_id = "demo-voting"' "$out"
+
 out=$(dfx canister call "$MP" set_verification_status '("ext", "demo-voting", "verified", "smoke ok")')
 expect "set_verification_status verified" 'Ok = "verified"' "$out"
 
