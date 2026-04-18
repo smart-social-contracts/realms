@@ -46,7 +46,9 @@ def _check_access(caller_principal: str, operation: str) -> bool:
     """Check if a caller has permission to perform an operation.
 
     Resolution order:
-      0. Controller bypass (principal captured at init/post_upgrade)
+      0a. IC-level controller bypass (anyone in the canister settings'
+          controllers list — captured by the platform, not by us)
+      0b. Init-time controller bypass (principal captured at init/post_upgrade)
       1. Check trusted_principals on the Realm (canister-to-canister trust)
       2. Look up User by principal
       3. Check each of the user's profiles for the operation (coarse RBAC)
@@ -56,7 +58,21 @@ def _check_access(caller_principal: str, operation: str) -> bool:
 
     Returns True if allowed, False otherwise.
     """
-    # 0. Controller always allowed
+    # 0a. IC-level controllers always allowed. This is critical for
+    # layered deployments where realm_installer (a controller) drives
+    # post-install bootstrapping (registry registration, codex install,
+    # ...) and the deploying CI principal needs admin to bootstrap even
+    # though no explicit User record exists for it after a reinstall.
+    try:
+        if ic.is_controller(ic.caller()):
+            return True
+    except Exception:
+        # Older basilisk runtimes may not expose is_controller; the
+        # init-time _controller_principal fallback below still handles
+        # the original deployer in those cases.
+        pass
+
+    # 0b. First-deploy controller fallback (principal captured at init).
     if _controller_principal and caller_principal == _controller_principal:
         return True
 

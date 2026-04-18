@@ -44,24 +44,33 @@ mundus:
   # CLI / file_registry UI. CI refreshes base WASM + extensions only.
   - name: dominion
     type: realm
+    display_name: Dominion
     canister_id: ijdaw-dyaaa-aaaac-beh2a-cai
+    frontend_canister_id: iocgc-oaaaa-aaaac-beh2q-cai
     manifest: examples/demo/realm1/manifest.json
     extensions: inherit_from_artifacts
     codices: []
+    register_with_registry: true
 
   - name: agora
     type: realm
+    display_name: Agora
     canister_id: ihbn6-yiaaa-aaaac-beh3a-cai
+    frontend_canister_id: iaalk-vqaaa-aaaac-beh3q-cai
     manifest: examples/demo/realm2/manifest.json
     extensions: inherit_from_artifacts
     codices: []
+    register_with_registry: true
 
   - name: syntropia
     type: realm
+    display_name: Syntropia
     canister_id: jnope-2yaaa-aaaac-beh4a-cai
+    frontend_canister_id: jkpjq-xaaaa-aaaac-beh4q-cai
     manifest: examples/demo/realm3/manifest.json
     extensions: inherit_from_artifacts
     codices: []
+    register_with_registry: true
 
 verify:
   e2e_specs:
