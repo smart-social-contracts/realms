@@ -41,10 +41,18 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 # The realms-extensions submodule has a nested layout — manifests live at
-# `extensions/extensions/<name>/manifest.json` (the outer dir holds the
-# repo's README, marketplace/, etc.). publish_layered.py uses the same
-# inner directory; we must match it here, otherwise stage 2 silently
-# resolves "all extensions" to [] and never installs anything.
+# `extensions/extensions/<name>/manifest.json` (the outer dir is the
+# submodule root and holds the repo's README, marketplace/, testing/,
+# etc., which would otherwise be iterated as if they were extensions).
+#
+# publish_layered.py and build_runtime_bundles.py go through their own
+# `_resolve_extensions_root(repo)` helper which auto-detects either the
+# nested layout (this repo) or the flat layout (a standalone
+# realms-extensions checkout). We must match the *nested* path here
+# because stage 2 walks `EXTENSIONS_ROOT` directly when a member has
+# `extensions: all` — and getting that wrong used to silently resolve
+# "all extensions" to [] (root cause of issue: package_manager not
+# publishing on staging in the run for #183).
 EXTENSIONS_ROOT = REPO_ROOT / "extensions" / "extensions"
 CODICES_ROOT = REPO_ROOT / "codices" / "codices"
 

@@ -84,6 +84,51 @@ def _run(cmd: List[str], cwd: Optional[Path] = None) -> int:
     return proc.returncode
 
 
+def _resolve_extensions_root(repo: Path) -> Path:
+    """Return the directory that holds per-extension subdirectories.
+
+    The ``realms-extensions`` submodule has a nested layout — extensions
+    live under ``<repo>/extensions/extensions/<name>/manifest.json`` (the
+    outer ``extensions/`` dir is the submodule root, which also contains
+    README.md, marketplace/, testing/, etc. and would otherwise be
+    iterated as if they were extensions).
+
+    But when this script is invoked against a *standalone* checkout of
+    the ``realms-extensions`` repo (the historical local-dev mode, e.g.
+    ``--extensions-repo ../realms-extensions``) the layout is flat:
+    ``<repo>/extensions/<name>/manifest.json``.
+
+    Try the nested layout first, fall back to the flat one. Fail loud
+    if neither contains any ``manifest.json`` — silently iterating an
+    empty dir and "publishing" zero extensions is exactly the bug that
+    let ``package_manager`` fail to install on staging in #183.
+    """
+    nested = repo / "extensions" / "extensions"
+    flat = repo / "extensions"
+
+    def _has_manifests(candidate: Path) -> bool:
+        if not candidate.is_dir():
+            return False
+        for child in candidate.iterdir():
+            if not child.is_dir() or child.name in SKIP_EXTENSION_IDS:
+                continue
+            if (child / "manifest.json").exists():
+                return True
+        return False
+
+    if _has_manifests(nested):
+        return nested
+    if _has_manifests(flat):
+        return flat
+    raise SystemExit(
+        "ERROR: no extension manifests found under either of:\n"
+        f"  {nested}  (nested realms+submodule layout)\n"
+        f"  {flat}  (standalone realms-extensions checkout layout)\n"
+        "Did the realms-extensions submodule fail to initialize? Try:\n"
+        "  git submodule update --init --recursive"
+    )
+
+
 def _list_extensions(extensions_root: Path, only: Optional[List[str]]) -> List[Path]:
     if not extensions_root.is_dir():
         raise FileNotFoundError(f"Extensions root not found: {extensions_root}")
@@ -306,10 +351,26 @@ def _step_publish_extensions(
     only: Optional[List[str]],
     namespace_prefix: str,
 ) -> int:
-    ext_dirs = _list_extensions(extensions_repo / "extensions", only)
+    ext_dirs = _list_extensions(_resolve_extensions_root(extensions_repo), only)
     if not ext_dirs:
-        print("No extensions to publish.")
-        return 0
+        # _resolve_extensions_root guarantees the dir has at least one
+        # manifest.json, so an empty `ext_dirs` here means the `--only`
+        # filter excluded everything. That's a user mistake, not an
+        # auto-recoverable no-op — fail loud.
+        if only:
+            raise SystemExit(
+                f"ERROR: --only-extensions={only} matched zero extensions "
+                f"under {_resolve_extensions_root(extensions_repo)}. "
+                "Available: "
+                f"{sorted(p.name for p in _resolve_extensions_root(extensions_repo).iterdir() if p.is_dir())}"
+            )
+        # Genuinely empty (no extensions at all) is also unexpected and
+        # would be silently ignored historically — surface it.
+        raise SystemExit(
+            "ERROR: zero extensions found. This used to silently succeed "
+            "and is the root cause of issue: package_manager not "
+            "publishing on staging."
+        )
     print(f"\nPublishing {len(ext_dirs)} extensions → {registry}:{namespace_prefix}/<id>/<ver>")
     failures: List[str] = []
     for ext_dir in ext_dirs:

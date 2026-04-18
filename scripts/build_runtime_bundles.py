@@ -47,8 +47,54 @@ SKIP_EXTENSION_IDS = {"_shared"}
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _resolve_extensions_root(repo: Path) -> Path:
+    """Return the directory that holds per-extension subdirectories.
+
+    Mirrors ``scripts/publish_layered.py::_resolve_extensions_root``. The
+    ``realms-extensions`` submodule has a nested layout
+    (``<repo>/extensions/extensions/<name>/``); a standalone
+    ``realms-extensions`` checkout has a flat layout
+    (``<repo>/extensions/<name>/``). Try nested first, fall back to
+    flat. Fail loud if neither contains any extension dirs.
+
+    A "valid" candidate is a dir with at least one child that is itself
+    a dir (excluding ``_shared``) — even if that child has no
+    ``frontend-rt/`` (most don't). The frontend-rt presence check is
+    the caller's job; here we just resolve which dir to walk.
+    """
+    nested = repo / "extensions" / "extensions"
+    flat = repo / "extensions"
+
+    def _has_extension_dirs(candidate: Path) -> bool:
+        if not candidate.is_dir():
+            return False
+        for child in candidate.iterdir():
+            if not child.is_dir() or child.name in SKIP_EXTENSION_IDS:
+                continue
+            # An extension dir is one that has either a manifest.json
+            # (any kind of extension) or a frontend-rt/ (the only thing
+            # this script cares about). Either signal proves the layout.
+            if (child / "manifest.json").exists() or (
+                child / "frontend-rt" / "package.json"
+            ).exists():
+                return True
+        return False
+
+    if _has_extension_dirs(nested):
+        return nested
+    if _has_extension_dirs(flat):
+        return flat
+    raise SystemExit(
+        "ERROR: no extension directories found under either of:\n"
+        f"  {nested}  (nested realms+submodule layout)\n"
+        f"  {flat}  (standalone realms-extensions checkout layout)\n"
+        "Did the realms-extensions submodule fail to initialize? Try:\n"
+        "  git submodule update --init --recursive"
+    )
+
+
 def _list_rt_dirs(extensions_root: Path, only: Optional[List[str]]) -> List[Path]:
-    """Return every realms-extensions/extensions/<ext>/frontend-rt that has a package.json."""
+    """Return every <extensions_root>/<ext>/frontend-rt that has a package.json."""
     if not extensions_root.is_dir():
         raise FileNotFoundError(f"Extensions root not found: {extensions_root}")
     out: List[Path] = []
@@ -192,7 +238,9 @@ def main(argv: Iterable[str]) -> int:
         print(f"ERROR: npm binary not found in PATH: {args.npm}", file=sys.stderr)
         return 1
 
-    extensions_root = Path(args.extensions_repo).expanduser().resolve() / "extensions"
+    extensions_root = _resolve_extensions_root(
+        Path(args.extensions_repo).expanduser().resolve()
+    )
     only_list: Optional[List[str]] = None
     if args.only:
         only_list = [s.strip() for s in args.only.split(",") if s.strip()]
@@ -204,7 +252,19 @@ def main(argv: Iterable[str]) -> int:
         return 1
 
     if not rt_dirs:
-        print("No frontend-rt/ directories found to build.")
+        # It's legitimate for a repo to have extensions but none with a
+        # frontend-rt/ — that just means there's nothing to bundle. Don't
+        # fail loud here (unlike publish_layered._step_publish_extensions);
+        # the caller's `--only` filter may simply target an extension
+        # without a frontend-rt/. Just print and return success.
+        if only_list:
+            print(
+                f"No frontend-rt/ directories found under {extensions_root} "
+                f"matching --only={only_list}. Available with frontend-rt: "
+                f"{sorted(p.parent.name for p in _list_rt_dirs(extensions_root, None))}"
+            )
+        else:
+            print(f"No frontend-rt/ directories found to build under {extensions_root}.")
         return 0
 
     print(f"Building {len(rt_dirs)} runtime bundles from {extensions_root}")
