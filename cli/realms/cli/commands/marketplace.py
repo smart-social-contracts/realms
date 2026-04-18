@@ -17,10 +17,10 @@ Subcommands:
   realms marketplace call <method> [args]      — forward to dfx canister call
   realms marketplace status                    — pretty-print status() output
 
-The legacy ``realms marketplace create`` subcommand (which copied the
-old extensions/marketplace folder into a new directory) is no longer
-needed and has been removed; use ``realms marketplace deploy`` from
-the repo root instead.
+The legacy ``realms marketplace create`` subcommand (which used to
+copy the old submodule-hosted marketplace folder into a new
+directory) is no longer needed and has been removed; use
+``realms marketplace deploy`` from the repo root instead.
 """
 
 from __future__ import annotations

@@ -50,7 +50,8 @@ RUN echo '"""' > src/realm_backend/extension_packages/extension_manifests.py && 
 # Demo stage: extends base and adds extensions folder for testing/demos
 FROM base AS demo
 COPY extensions/extensions ./extensions/extensions
-# (extensions/marketplace is no longer used; marketplace lives in src/marketplace_*)
+# Marketplace v2 lives in src/marketplace_* (not in the submodule).
+# See docs/reference/MARKETPLACE.md for the full architecture.
 
 FROM demo AS test
 
