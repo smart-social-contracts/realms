@@ -382,6 +382,10 @@ graph LR
     VER --> RELEASE
     RELEASE --> PUBLISH
     PUBLISH --> MARKET
+    %% MARKET = src/marketplace_* canister pair (Basilisk + SvelteKit).
+    %% Files live in file_registry; the marketplace stores metadata
+    %% pointers, likes, ranking, purchases, audit/verification status,
+    %% and developer licenses. See docs/reference/MARKETPLACE.md.
     
     style CREATE fill:#e1f5ff
     style BACKEND fill:#f3e5f5
