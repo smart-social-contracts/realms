@@ -31,6 +31,9 @@ export const CONFIG = {
   internet_identity_canister_id: pick('CANISTER_ID_INTERNET_IDENTITY'),
 
   // Off-chain billing service that handles credit-card → Stripe → license payment.
+  // Plan §4.3.1 names this BILLING_SERVICE_URL; we also accept the
+  // VITE_-prefixed form so it can be set per Vite's standard env-loader
+  // convention without needing the dfx-style CANISTER_ prefix.
   billing_service_url:
-    pick('VITE_BILLING_SERVICE_URL') || 'https://billing.realmsgos.dev',
+    pick('BILLING_SERVICE_URL', 'VITE_BILLING_SERVICE_URL') || 'https://billing.realmsgos.dev',
 };

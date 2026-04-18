@@ -42,6 +42,11 @@ export default defineConfig({
     sveltekit(),
     environment('all', { prefix: 'CANISTER_' }),
     environment('all', { prefix: 'DFX_' }),
+    // Plan §4.3.1: BILLING_SERVICE_URL — bare name, not VITE_-prefixed.
+    // Default to empty string so unset envs don't crash the build; the
+    // CONFIG.billing_service_url helper in src/lib/config.ts then falls
+    // back to the production URL.
+    environment({ BILLING_SERVICE_URL: '' }, { defineOn: 'process.env' }),
   ],
   resolve: {
     alias: [

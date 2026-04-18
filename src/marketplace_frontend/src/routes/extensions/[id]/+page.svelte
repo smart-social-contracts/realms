@@ -110,6 +110,20 @@
     }
   }
 
+  async function doDelist() {
+    if (!item) return;
+    if (!confirm(`Delist '${item.extension_id}'? It will be removed from listings and rankings.`)) return;
+    try {
+      await marketplaceClient.delistExtension(item.extension_id);
+      auditMsg = '✅ Delisted.';
+      item = null;
+      // Bounce back to the browse page after a short delay.
+      setTimeout(() => { window.location.href = '/extensions'; }, 800);
+    } catch (e: any) {
+      auditMsg = `⚠️ Could not delist: ${e?.message ?? e}`;
+    }
+  }
+
   function isOwner(): boolean {
     return Boolean(item && $principalStore && $principalStore.toText() === item.developer);
   }
@@ -192,6 +206,8 @@
           <button class="btn" disabled={busyAudit} on:click={doRequestAudit}>
             {busyAudit ? 'Working…' : 'Request audit'}
           </button>
+          <a class="btn" href={`/upload?prefill=${encodeURIComponent(item.extension_id)}`}>Edit / new version</a>
+          <button class="btn danger" on:click={doDelist}>Delist</button>
           {#if auditMsg}<span class="audit-msg">{auditMsg}</span>{/if}
         </div>
         {#if item.verification_notes}
@@ -268,7 +284,10 @@
   .small { font-size: 0.8rem; }
   .error { color: var(--danger); }
   .owner h2 { color: var(--accent); }
-  .owner-actions { display: flex; gap: 0.75rem; align-items: center; }
+  .owner-actions { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+  .owner-actions .btn.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+  .owner-actions .btn.danger:hover { opacity: 0.92; }
+  .owner-actions a.btn { text-decoration: none; }
   .audit-msg { color: var(--text-muted); font-size: 0.85rem; }
   .audit-notes { margin-top: 0.85rem; background: var(--surface-2); padding: 0.75rem 1rem; border-radius: 0.5rem; }
 

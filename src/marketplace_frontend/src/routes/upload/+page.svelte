@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import Spinner from '$lib/components/Spinner.svelte';
   import { isAuthenticated, principalStore } from '$lib/auth';
@@ -38,6 +40,43 @@
 
   // <input webkitdirectory> isn't in the standard HTML typings; pass via spread.
   const dirInputAttrs: Record<string, string> = { webkitdirectory: '', directory: '' };
+
+  // ?prefill=<id> deep-link from listing detail pages — pre-fills the
+  // metadata form with the existing listing's values so the developer
+  // can publish a new version without re-typing everything. We default
+  // to extension kind unless the id contains a "/", which only codex
+  // ids ever do (see api/codices._validate_id).
+  onMount(async () => {
+    const prefill = $page.url.searchParams.get('prefill');
+    if (!prefill) return;
+    const looksLikeCodex = prefill.includes('/');
+    kind = looksLikeCodex ? 'codex' : 'ext';
+    id = prefill;
+    try {
+      if (looksLikeCodex) {
+        const detail = await marketplaceClient.getCodexDetails(prefill);
+        if (detail) {
+          name = detail.name;
+          description = detail.description;
+          version = detail.version;
+          icon = detail.icon;
+          categoriesStr = detail.categories;
+          realmType = detail.realm_type;
+        }
+      } else {
+        const detail = await marketplaceClient.getExtensionDetails(prefill);
+        if (detail) {
+          name = detail.name;
+          description = detail.description;
+          version = detail.version;
+          icon = detail.icon;
+          categoriesStr = detail.categories;
+        }
+      }
+    } catch {
+      // listing was delisted or not found — leave fields blank.
+    }
+  });
   $: ns = (() => {
     if (!id || !version) return '';
     if (kind === 'ext') return `ext/${id}/${version}`;
