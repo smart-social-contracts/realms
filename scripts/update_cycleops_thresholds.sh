@@ -41,6 +41,11 @@ declare -A ALL_CANISTERS=(
   ["rhw4p-gqaaa-aaaac-qbw7q-cai"]="demo-registry_backend"
   ["2zaor-5yaaa-aaaac-qbxaa-cai"]="demo-registry_frontend"
   # --- Marketplace ---
+  # NOTE: These IDs are from the legacy Kybra-based marketplace
+  # (kybra-simple-marketplace). Marketplace v2 (src/marketplace_*)
+  # is built locally with Basilisk and gets fresh canister IDs on
+  # first deploy per network. After the first staging/demo deploy,
+  # update these entries (or replace them) with the new IDs.
   ["jji3o-uyaaa-aaaah-qreja-cai"]="marketplace_backend"
   ["joj52-zaaaa-aaaah-qrejq-cai"]="marketplace_frontend"
   # --- Website ---
