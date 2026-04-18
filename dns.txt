@@ -1,7 +1,0 @@
-CNAME Record		_acme-challenge.demo	_acme-challenge.demo.realmsgos.org.icp2.io.
-CNAME Record		demo			demo.realmsgos.org.icp1.io.
-TXT Record		_canister-id.demo	2zaor-5yaaa-aaaac-qbxaa-cai
-
-CNAME Record		_acme-challenge.test1	_acme-challenge.test1.realmsgos.org.icp2.io.
-CNAME Record		test1			test1.realmsgos.org.icp1.io.
-TXT Record		_canister-id.test1	77243-aqaaa-aaaau-aggza-cai
