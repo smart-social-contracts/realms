@@ -113,6 +113,7 @@ service : () -> {
   initialize : () -> ();
   change_quarter : (text) -> (RealmResponse);
   join_realm : (text, text) -> (RealmResponse);
+  join_realm_with_invite : (text, text, text) -> (RealmResponse);
   list_extensions : (text) -> (RealmResponse) query;
   register_realm_with_registry : (text, text, text, text) -> (text);
   refresh_invoice : (text) -> (text);

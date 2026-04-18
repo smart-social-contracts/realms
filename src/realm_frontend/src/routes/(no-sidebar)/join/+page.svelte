@@ -19,6 +19,13 @@
   let loading = false;
   let realmName = 'Realm';
   let selectedProfile = ''; // No default - user must choose
+
+  // Invitation state (populated from ?invite=<code> in the URL)
+  let inviteCode = '';
+  let inviteValidating = false;
+  let inviteProfile = ''; // 'member' | 'admin' | '' (no/invalid invite)
+  let inviteInfo = null;  // raw payload from validate_registration_code
+  let inviteError = '';   // human-readable rejection reason if invalid
   
   // Available profiles with icon names (rendered as SVGs)
   const allProfiles = [
@@ -36,8 +43,26 @@
     },
   ];
 
-  // Only show admin profile when TEST_MODE_ADMIN_SELF_REGISTRATION is active
-  $: profiles = allProfiles.filter(p => p.value !== 'admin' || TEST_MODE_ADMIN_SELF_REGISTRATION);
+  // Reactive list of profile cards to render in the wizard.
+  //   - With a valid invite, only the card matching the invite's role is shown.
+  //   - Without an invite, only "Member" is shown by default. The "Administrator"
+  //     card is additionally shown when TEST_MODE_ADMIN_SELF_REGISTRATION is on
+  //     (legacy dev/test path).
+  $: profiles = (() => {
+    if (inviteProfile) {
+      return allProfiles.filter(p => p.value === inviteProfile);
+    }
+    if (TEST_MODE_ADMIN_SELF_REGISTRATION) {
+      return allProfiles;
+    }
+    return allProfiles.filter(p => p.value === 'member');
+  })();
+
+  // Auto-select the only available profile so the user doesn't have to click
+  // when there is exactly one option (the common case once we filter by invite).
+  $: if (profiles.length === 1 && selectedProfile !== profiles[0].value) {
+    selectedProfile = profiles[0].value;
+  }
 
   // Default fallback image if realm has no welcome image configured
   const defaultWelcomeImage = '/images/default_welcome.jpg';
@@ -60,6 +85,49 @@
     }
   }
   
+  /**
+   * Parse the `?invite=<code>` URL parameter (with `?code=` accepted as a
+   * legacy alias) and ask the realm backend to validate the code through
+   * the admin_dashboard extension. On success, sets `inviteProfile` so
+   * the wizard renders only the matching profile card.
+   */
+  async function loadInviteFromUrl() {
+    if (typeof window === 'undefined') return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('invite') || params.get('code') || '';
+      if (!code) return;
+
+      inviteCode = code;
+      inviteValidating = true;
+      const response = await backend.extension_sync_call({
+        extension_name: 'admin_dashboard',
+        function_name: 'validate_registration_code',
+        args: JSON.stringify({ code })
+      });
+      let result;
+      try {
+        result = JSON.parse(response.response);
+      } catch (e) {
+        console.warn('[JOIN PAGE] Could not parse invite validation response', e);
+        return;
+      }
+      if (result && result.success) {
+        inviteInfo = result.data || {};
+        inviteProfile = inviteInfo.profile || 'member';
+        inviteError = '';
+      } else {
+        inviteError = (result && result.error) || 'Invitation code is not valid';
+        inviteProfile = '';
+        inviteInfo = null;
+      }
+    } catch (e) {
+      console.warn('[JOIN PAGE] Invite validation failed:', e);
+    } finally {
+      inviteValidating = false;
+    }
+  }
+
   onMount(async () => {
     console.log('[JOIN PAGE v2] onMount - isAuthenticated:', $isAuthenticated);
     // Fetch realm info
@@ -67,6 +135,10 @@
     if ($realmNameStore) {
       realmName = $realmNameStore;
     }
+
+    // Validate any ?invite=<code> in the URL up-front so the profile step
+    // already knows which card to render the moment the user gets there.
+    await loadInviteFromUrl();
     
     // In test mode with II bypass, auto-login if not already authenticated
     if (TEST_MODE_II_BYPASS && !$isAuthenticated) {
@@ -134,9 +206,16 @@
     
     try {
       loading = true;
-      console.log(`Joining realm with profile: ${selectedProfile}`);
-      // Step 1: Register on the capital (current backend) — gets quarter assignment
-      const response = await backend.join_realm(selectedProfile, '');
+      console.log(
+        `Joining realm with profile: ${selectedProfile}` +
+        (inviteCode ? ` (invite: ${inviteCode})` : '')
+      );
+      // Step 1: Register on the capital (current backend) — gets quarter assignment.
+      // When an invite code was presented in the URL, use the invite-aware
+      // endpoint so the realm canister can verify and consume the code.
+      const response = inviteCode
+        ? await backend.join_realm_with_invite(selectedProfile, '', inviteCode)
+        : await backend.join_realm(selectedProfile, '');
       if (response.success) {
         // Step 2: If assigned to a quarter, switch to it and register there too
         const assignedQuarter = response.data?.userGet?.assigned_quarter;
@@ -145,7 +224,10 @@
           activeQuarterId.set(assignedQuarter);
           await setActiveQuarter(assignedQuarter);
 
-          // Register on the assigned quarter backend
+          // Register on the assigned quarter backend.
+          // The invite has already been consumed on the capital; on the
+          // quarter we just record membership with the same profile and
+          // never re-attempt to consume the (now-used) code.
           try {
             await backend.join_realm(selectedProfile, '');
             console.log('Registered on assigned quarter');
@@ -388,10 +470,28 @@
       {:else if currentStep === 'profile'}
         <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
           <div class="flex items-center justify-between mb-2">
-            <h2 class="text-2xl font-bold text-gray-900">Select Profile</h2>
+            <h2 class="text-2xl font-bold text-gray-900">
+              {inviteProfile ? 'Confirm your role' : 'Select Profile'}
+            </h2>
 {#if TEST_MODE}<span class="px-3 py-1 bg-gray-200 text-gray-600 text-xs font-medium rounded-full">Test Mode</span>{/if}
           </div>
-          <p class="text-gray-500 mb-6">Choose how you want to participate</p>
+          {#if inviteProfile}
+            <p class="text-gray-500 mb-4">
+              You've been invited to join {realmName} as
+              <strong class="text-gray-700">{inviteProfile === 'admin' ? 'an Administrator' : 'a Member'}</strong>.
+            </p>
+          {:else if inviteError}
+            <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+              <strong>Invitation problem:</strong> {inviteError}.
+              You can still join as a Member.
+            </div>
+            <p class="text-gray-500 mb-6">Choose how you want to participate</p>
+          {:else}
+            <p class="text-gray-500 mb-6">
+              Anyone can join {realmName} as a Member. To join as an Administrator
+              you need an invitation link from an existing administrator.
+            </p>
+          {/if}
           
           <div class="space-y-3 mb-6">
             {#each profiles as profile}
