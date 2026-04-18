@@ -95,4 +95,21 @@ test.describe('marketplace_frontend smoke', () => {
     await expect(page.getByRole('heading', { name: 'Developer' })).toBeVisible();
     await expect(page.getByText(/Sign in required/i)).toBeVisible();
   });
+
+  test('extension detail renders Overview/Files tabs (when listing exists)', async ({ page }) => {
+    // Browse extensions and follow the first card if any exist; otherwise
+    // skip — this makes the test backend-aware without hard-coding ids.
+    await page.goto('/extensions');
+    // Give the SPA a moment to fetch listings before deciding.
+    await page.waitForTimeout(2500);
+    const firstLink = page.locator('a.card').first();
+    if ((await firstLink.count()) === 0) {
+      test.skip(true, 'No extensions listed in this environment');
+    }
+    await firstLink.click();
+    await expect(page.getByRole('tab', { name: 'Overview' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /^Files/ })).toBeVisible();
+    await page.getByRole('tab', { name: /^Files/ }).click();
+    await expect(page.getByRole('tab', { name: /^Files/ })).toHaveAttribute('aria-selected', 'true');
+  });
 });

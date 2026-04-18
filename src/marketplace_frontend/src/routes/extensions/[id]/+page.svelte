@@ -17,6 +17,8 @@
   } from '$lib/marketplace-client';
   import { categories, formatCount, formatPrice, formatTimeAgo, shortPrincipal } from '$lib/format';
 
+  type Tab = 'overview' | 'files';
+
   let item: ExtensionListing | null = null;
   let loading = true;
   let error = '';
@@ -27,6 +29,7 @@
   let busy = false;
   let busyAudit = false;
   let auditMsg = '';
+  let activeTab: Tab = 'overview';
 
   $: id = decodeURIComponent($page.params.id);
   $: void load(id);
@@ -163,41 +166,66 @@
       </div>
     </header>
 
-    <section class="block">
-      <h2>About</h2>
-      <p>{item.description || 'No description provided.'}</p>
-    </section>
+    <div class="tabs" role="tablist">
+      <button
+        class="tab"
+        class:active={activeTab === 'overview'}
+        on:click={() => (activeTab = 'overview')}
+        role="tab"
+        aria-selected={activeTab === 'overview'}
+      >Overview</button>
+      <button
+        class="tab"
+        class:active={activeTab === 'files'}
+        on:click={() => (activeTab = 'files')}
+        role="tab"
+        aria-selected={activeTab === 'files'}
+      >Files {files.length ? `(${files.length})` : ''}</button>
+    </div>
 
-    <section class="block">
-      <h2>Files</h2>
-      {#if !item.file_registry_canister_id || !item.file_registry_namespace}
-        <p class="muted">No file_registry namespace attached to this listing.</p>
-      {:else if filesError}
-        <p class="error">⚠️ Could not load files from registry: {filesError}</p>
-      {:else if files.length === 0}
-        <p class="muted">No files published in <code>{item.file_registry_namespace}</code> yet.</p>
-      {:else}
-        <table class="files">
-          <thead><tr><th>Path</th><th>Size</th><th>Type</th><th></th></tr></thead>
-          <tbody>
-            {#each files as f}
-              <tr>
-                <td><code>{f.path}</code></td>
-                <td>{formatBytes(f.size)}</td>
-                <td><code>{f.content_type}</code></td>
-                <td>
-                  <a class="link" href={fileUrl(item.file_registry_canister_id, item.file_registry_namespace, f.path)} target="_blank" rel="noreferrer">Open ↗</a>
-                </td>
-              </tr>
+    {#if activeTab === 'overview'}
+      <section class="block" role="tabpanel">
+        <p class="description">{item.description || 'No description provided.'}</p>
+        {#if categories(item.categories).length > 0}
+          <h3>Categories</h3>
+          <div class="badges">
+            {#each categories(item.categories) as c}
+              <span class="badge cat">{c.replace(/_/g, ' ')}</span>
             {/each}
-          </tbody>
-        </table>
-        <p class="muted small">
-          Served from <code>{item.file_registry_canister_id}</code>
-          (<a href={fileRegistryBaseUrl(item.file_registry_canister_id)} target="_blank" rel="noreferrer">registry root ↗</a>)
-        </p>
-      {/if}
-    </section>
+          </div>
+        {/if}
+      </section>
+    {:else if activeTab === 'files'}
+      <section class="block" role="tabpanel">
+        {#if !item.file_registry_canister_id || !item.file_registry_namespace}
+          <p class="muted">No file_registry namespace attached to this listing.</p>
+        {:else if filesError}
+          <p class="error">⚠️ Could not load files from registry: {filesError}</p>
+        {:else if files.length === 0}
+          <p class="muted">No files published in <code>{item.file_registry_namespace}</code> yet.</p>
+        {:else}
+          <table class="files">
+            <thead><tr><th>Path</th><th>Size</th><th>Type</th><th></th></tr></thead>
+            <tbody>
+              {#each files as f}
+                <tr>
+                  <td><code>{f.path}</code></td>
+                  <td>{formatBytes(f.size)}</td>
+                  <td><code>{f.content_type}</code></td>
+                  <td>
+                    <a class="link" href={fileUrl(item.file_registry_canister_id, item.file_registry_namespace, f.path)} target="_blank" rel="noreferrer">Open ↗</a>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+          <p class="muted small">
+            Served from <code>{item.file_registry_canister_id}</code>
+            (<a href={fileRegistryBaseUrl(item.file_registry_canister_id)} target="_blank" rel="noreferrer">registry root ↗</a>)
+          </p>
+        {/if}
+      </section>
+    {/if}
 
     {#if isOwner()}
       <section class="block owner">
@@ -267,9 +295,23 @@
   .btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
   .btn.primary:hover:not(:disabled) { background: var(--primary-hover); }
   .btn.big { padding: 0.7rem 1.4rem; font-size: 0.95rem; }
+  .tabs {
+    display: flex; gap: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1.5rem;
+  }
+  .tab {
+    background: transparent; border: none; padding: 0.7rem 1rem;
+    color: var(--text-muted); border-bottom: 2px solid transparent;
+    font-size: 0.9rem; cursor: pointer; transition: color 0.15s;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--text); border-bottom-color: var(--primary); font-weight: 500; }
   .block { margin-bottom: 2rem; }
   .block h2 { font-size: 1.1rem; margin: 0 0 0.85rem; }
+  .block h3 { font-size: 0.85rem; margin: 1.25rem 0 0.5rem; color: var(--text-faint); font-weight: 500; }
   .block p { color: var(--text-muted); margin: 0; line-height: 1.7; }
+  .block .description { color: var(--text); }
   .files {
     width: 100%; border-collapse: collapse;
   }
