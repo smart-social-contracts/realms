@@ -86,4 +86,66 @@ export function compareVersions(a: string, b: string): number {
   return a < b ? -1 : 1;
 }
 
+/**
+ * Fetch a specific version's manifest from the file_registry over HTTP.
+ *
+ * Returns null if the manifest is missing (404), unparseable, or the
+ * fetch itself fails. Callers should treat null as "no manifest
+ * available", not as an error to surface to the user.
+ *
+ * The URL convention matches `extension-loader.ts`:
+ *   {base}/ext/{extId}/{version}/manifest.json
+ *
+ * Useful for the package_manager UI when it wants to show richer
+ * metadata (description, icon, categories, sidebar_label) for a
+ * version that the listing endpoint summarises but does not include
+ * a manifest for.
+ */
+export async function getExtensionManifest(
+  registryCanisterId: string,
+  extId: string,
+  version: string,
+): Promise<Record<string, unknown> | null> {
+  const base = fileRegistryBaseUrlFor(registryCanisterId);
+  const url = `${base}/ext/${extId}/${version}/manifest.json`;
+  try {
+    const resp = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!resp.ok) return null;
+    return (await resp.json()) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Look up the latest published version of a single extension or codex
+ * in the given file_registry canister.
+ *
+ * `category` must be either `'ext'` (extension) or `'codex'`.
+ *
+ * Implementation note: this delegates to the same HTTP listing
+ * endpoints (`/api/extensions`, `/api/codices`) used by
+ * `listRegistryExtensions` / `listRegistryCodices`, rather than
+ * constructing a separate `@dfinity/agent` Actor for the registry
+ * canister's candid `latest_version` query. The HTTP response already
+ * carries `latest`; using it here keeps the file_registry client free
+ * of a per-canister Actor (matching the rationale in this file's
+ * top-level docstring) and avoids bundling a second IDL into
+ * realm_frontend just to read a single field.
+ *
+ * Returns undefined if the item is not present in the registry.
+ */
+export async function latestVersion(
+  registryCanisterId: string,
+  category: 'ext' | 'codex',
+  itemId: string,
+): Promise<string | undefined> {
+  if (category === 'ext') {
+    const exts = await listRegistryExtensions(registryCanisterId);
+    return exts.find((e) => e.ext_id === itemId)?.latest;
+  }
+  const codices = await listRegistryCodices(registryCanisterId);
+  return codices.find((c) => c.codex_id === itemId)?.latest;
+}
+
 export const _internal = { fetchJson };
