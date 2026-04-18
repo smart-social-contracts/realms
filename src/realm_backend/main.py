@@ -429,10 +429,138 @@ def _assign_quarter(principal: str, realm, quarters, preferred_quarter: str) -> 
     return active_quarters[idx].canister_id
 
 
-@update
-def join_realm(profile: str, preferred_quarter: text) -> RealmResponse:
+def _has_any_admin_user() -> bool:
+    """True if at least one User in the realm has the `admin` profile.
+
+    Used by the bootstrap-admin path of ``join_realm``: on a freshly
+    deployed realm with zero admins, the canister controller is allowed
+    to claim the ``admin`` profile without an invite code. Once an
+    admin exists, every subsequent ``admin`` join requires a valid
+    invitation.
+    """
     try:
-        user = user_register(ic.caller().to_str(), profile)
+        from ggg import User
+        from ggg.system.user_profile import Operations
+
+        for u in User.instances():
+            for p in u.profiles:
+                allowed = str(p.allowed_to or "").split(",")
+                if Operations.ALL in allowed:
+                    return True
+        return False
+    except Exception:
+        return False
+
+
+def _consume_invite_code(invite_code: str, caller: str) -> dict:
+    """Atomically validate and redeem an invite code via the
+    admin_dashboard extension. Returns the parsed extension result.
+
+    Returns ``{"success": False, "error": "..."}`` if the extension is
+    not available so callers can decide how to handle the failure.
+    """
+    if not invite_code:
+        return {"success": False, "error": "No invite code provided"}
+    try:
+        import json as _json
+
+        raw = api.extensions.extension_sync_call(
+            "admin_dashboard",
+            "consume_registration_code",
+            _json.dumps({"code": invite_code, "principal": caller}),
+        )
+        if isinstance(raw, str):
+            try:
+                return _json.loads(raw)
+            except Exception:
+                return {"success": False, "error": str(raw)}
+        if isinstance(raw, dict):
+            return raw
+        return {"success": False, "error": "Unexpected extension response"}
+    except Exception as e:
+        logger.error(
+            f"Error consuming invite code via admin_dashboard: {e}\n{traceback.format_exc()}"
+        )
+        return {"success": False, "error": f"Invitation system unavailable: {e}"}
+
+
+def _do_join_realm(
+    profile: str, preferred_quarter: text, invite_code: str
+) -> RealmResponse:
+    """Internal join-realm worker shared by ``join_realm`` and
+    ``join_realm_with_invite``.
+
+    Profile rules:
+      * ``member``: anyone authenticated can self-join as a member, no
+        invitation required.
+      * ``admin``: only allowed when **one** of these conditions holds:
+          1. There are no admin Users yet **and** the caller is the
+             canister controller (bootstrap admin — typically the realm
+             creator from the registry).
+          2. The caller presented a valid, non-expired, non-revoked
+             ``invite_code`` whose ``profile`` is ``"admin"``. The code
+             is atomically consumed by ``admin_dashboard``'s
+             ``consume_registration_code`` extension method.
+
+      * Any other (non-``member``, non-``admin``) profile is treated as
+        a free member-equivalent today, but if an ``invite_code`` is
+        supplied it must match.
+
+    When ``invite_code`` is non-empty it is consumed regardless of the
+    requested ``profile``: the granted profile is the one stored on the
+    code, not the one the caller asked for.
+    """
+    try:
+        caller = ic.caller().to_str()
+
+        granted_profile = profile or "member"
+
+        if invite_code:
+            consumption = _consume_invite_code(invite_code, caller)
+            if not consumption.get("success"):
+                return RealmResponse(
+                    success=False,
+                    data=RealmResponseData(
+                        error=consumption.get("error") or "Invalid invitation code"
+                    ),
+                )
+            granted_profile = (
+                consumption.get("data", {}).get("profile") or "member"
+            )
+        elif granted_profile == "admin":
+            from core.access import _controller_principal
+
+            try:
+                is_controller = ic.is_controller(ic.caller())
+            except Exception:
+                is_controller = False
+            is_init_controller = bool(
+                _controller_principal and caller == _controller_principal
+            )
+
+            if _has_any_admin_user():
+                return RealmResponse(
+                    success=False,
+                    data=RealmResponseData(
+                        error=(
+                            "An admin invitation code is required to join as "
+                            "Administrator. Ask an existing administrator to "
+                            "send you an invite link."
+                        )
+                    ),
+                )
+            if not (is_controller or is_init_controller):
+                return RealmResponse(
+                    success=False,
+                    data=RealmResponseData(
+                        error=(
+                            "Only the realm creator can claim the bootstrap "
+                            "administrator role on a fresh realm."
+                        )
+                    ),
+                )
+
+        user = user_register(caller, granted_profile)
         profiles = Vec[text]()
         if "profiles" in user and user["profiles"]:
             for p in user["profiles"]:
@@ -446,10 +574,10 @@ def join_realm(profile: str, preferred_quarter: text) -> RealmResponse:
         quarters = list(Quarter.instances()) if realm else []
         if realm and quarters:
             assigned_quarter_canister_id = _assign_quarter(
-                ic.caller().to_str(), realm, quarters, preferred_quarter
+                caller, realm, quarters, preferred_quarter
             )
             # Persist the assignment on the User entity
-            u = User[ic.caller().to_str()]
+            u = User[caller]
             if u and assigned_quarter_canister_id:
                 u.home_quarter = assigned_quarter_canister_id
 
@@ -469,6 +597,31 @@ def join_realm(profile: str, preferred_quarter: text) -> RealmResponse:
     except Exception as e:
         logger.error(f"Error registering user: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@update
+def join_realm(profile: str, preferred_quarter: text) -> RealmResponse:
+    """Backwards-compatible 2-arg join. See ``_do_join_realm`` for full
+    semantics. Equivalent to ``join_realm_with_invite(profile,
+    preferred_quarter, "")``: anyone can self-join as a member, and the
+    ``admin`` profile is only granted on the bootstrap path (no admin
+    Users yet AND caller is the canister controller).
+    """
+    return _do_join_realm(profile, preferred_quarter, "")
+
+
+@update
+def join_realm_with_invite(
+    profile: str, preferred_quarter: text, invite_code: text
+) -> RealmResponse:
+    """Join the realm using an invitation code (member or admin).
+
+    The invitation code is atomically consumed by the
+    ``admin_dashboard`` extension's ``consume_registration_code`` call.
+    The granted profile is the one stored on the code, regardless of
+    the requested ``profile``.
+    """
+    return _do_join_realm(profile, preferred_quarter, invite_code or "")
 
 
 @update
