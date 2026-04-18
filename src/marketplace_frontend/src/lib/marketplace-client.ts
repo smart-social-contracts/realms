@@ -1,0 +1,454 @@
+// Typed wrapper around the marketplace_backend actor.
+//
+// The auto-generated declarations cover the candid layer; this module
+// adds two affordances:
+//
+//   * Result/Variant unwrapping: every {Ok, Err} variant gets unwrapped
+//     into a discriminated union or a thrown error, depending on the
+//     caller's preference.
+//   * BigInt → number coercion for fields the UI treats as plain
+//     numbers (likes, installs, timestamps).
+
+import { marketplace } from './canisters';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function toNumber(v: any): number {
+  if (typeof v === 'bigint') return Number(v);
+  if (typeof v === 'number') return v;
+  if (v == null) return 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function unwrap<T>(variant: any): T {
+  if (!variant) throw new Error('empty result');
+  if ('Ok' in variant) return variant.Ok as T;
+  if ('Err' in variant) throw new Error(String(variant.Err));
+  return variant as T;
+}
+
+// ---------------------------------------------------------------------------
+// Types (mirroring the candid records)
+// ---------------------------------------------------------------------------
+
+export interface ExtensionListing {
+  extension_id: string;
+  developer: string;
+  name: string;
+  description: string;
+  version: string;
+  price_e8s: number;
+  icon: string;
+  categories: string;
+  file_registry_canister_id: string;
+  file_registry_namespace: string;
+  download_url: string;
+  installs: number;
+  likes: number;
+  verification_status: string;
+  verification_notes: string;
+  is_active: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface CodexListing {
+  codex_id: string;
+  codex_alias: string;
+  realm_type: string;
+  developer: string;
+  name: string;
+  description: string;
+  version: string;
+  price_e8s: number;
+  icon: string;
+  categories: string;
+  file_registry_canister_id: string;
+  file_registry_namespace: string;
+  installs: number;
+  likes: number;
+  verification_status: string;
+  verification_notes: string;
+  is_active: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface ExtensionInput {
+  extension_id: string;
+  name: string;
+  description: string;
+  version: string;
+  price_e8s: bigint;
+  icon: string;
+  categories: string;
+  file_registry_canister_id: string;
+  file_registry_namespace: string;
+  download_url: string;
+}
+
+export interface CodexInput {
+  codex_id: string;
+  realm_type: string;
+  name: string;
+  description: string;
+  version: string;
+  price_e8s: bigint;
+  icon: string;
+  categories: string;
+  file_registry_canister_id: string;
+  file_registry_namespace: string;
+}
+
+export interface PurchaseRecord {
+  purchase_id: string;
+  realm_principal: string;
+  item_kind: string;
+  item_id: string;
+  developer: string;
+  price_paid_e8s: number;
+  purchased_at: number;
+}
+
+export interface LikeRecord {
+  item_kind: string;
+  item_id: string;
+  created_at: number;
+}
+
+export interface DeveloperLicense {
+  principal: string;
+  created_at: number;
+  expires_at: number;
+  last_payment_id: string;
+  payment_method: string;
+  note: string;
+  is_active: boolean;
+}
+
+export interface PendingAudit {
+  item_kind: string;
+  item_id: string;
+  name: string;
+  developer: string;
+  version: string;
+  updated_at: number;
+}
+
+export interface MarketplaceStatus {
+  version: string;
+  commit: string;
+  commit_datetime: string;
+  status: string;
+  extensions_count: number;
+  codices_count: number;
+  purchases_count: number;
+  likes_count: number;
+  licenses_count: number;
+  file_registry_canister_id: string;
+  billing_service_principal: string;
+  license_price_usd_cents: number;
+  license_duration_seconds: number;
+  is_caller_controller: boolean;
+  dependencies: string[];
+  python_version: string;
+}
+
+// ---------------------------------------------------------------------------
+// Normalisers
+// ---------------------------------------------------------------------------
+
+function normExt(raw: any): ExtensionListing {
+  return {
+    extension_id: String(raw.extension_id ?? ''),
+    developer: String(raw.developer ?? ''),
+    name: String(raw.name ?? ''),
+    description: String(raw.description ?? ''),
+    version: String(raw.version ?? ''),
+    price_e8s: toNumber(raw.price_e8s),
+    icon: String(raw.icon ?? ''),
+    categories: String(raw.categories ?? ''),
+    file_registry_canister_id: String(raw.file_registry_canister_id ?? ''),
+    file_registry_namespace: String(raw.file_registry_namespace ?? ''),
+    download_url: String(raw.download_url ?? ''),
+    installs: toNumber(raw.installs),
+    likes: toNumber(raw.likes),
+    verification_status: String(raw.verification_status ?? 'unverified'),
+    verification_notes: String(raw.verification_notes ?? ''),
+    is_active: Boolean(raw.is_active),
+    created_at: toNumber(raw.created_at),
+    updated_at: toNumber(raw.updated_at),
+  };
+}
+
+function normCodex(raw: any): CodexListing {
+  return {
+    codex_id: String(raw.codex_id ?? ''),
+    codex_alias: String(raw.codex_alias ?? ''),
+    realm_type: String(raw.realm_type ?? ''),
+    developer: String(raw.developer ?? ''),
+    name: String(raw.name ?? ''),
+    description: String(raw.description ?? ''),
+    version: String(raw.version ?? ''),
+    price_e8s: toNumber(raw.price_e8s),
+    icon: String(raw.icon ?? ''),
+    categories: String(raw.categories ?? ''),
+    file_registry_canister_id: String(raw.file_registry_canister_id ?? ''),
+    file_registry_namespace: String(raw.file_registry_namespace ?? ''),
+    installs: toNumber(raw.installs),
+    likes: toNumber(raw.likes),
+    verification_status: String(raw.verification_status ?? 'unverified'),
+    verification_notes: String(raw.verification_notes ?? ''),
+    is_active: Boolean(raw.is_active),
+    created_at: toNumber(raw.created_at),
+    updated_at: toNumber(raw.updated_at),
+  };
+}
+
+function normPurchase(raw: any): PurchaseRecord {
+  return {
+    purchase_id: String(raw.purchase_id ?? ''),
+    realm_principal: String(raw.realm_principal ?? ''),
+    item_kind: String(raw.item_kind ?? ''),
+    item_id: String(raw.item_id ?? ''),
+    developer: String(raw.developer ?? ''),
+    price_paid_e8s: toNumber(raw.price_paid_e8s),
+    purchased_at: toNumber(raw.purchased_at),
+  };
+}
+
+function normLike(raw: any): LikeRecord {
+  return {
+    item_kind: String(raw.item_kind ?? ''),
+    item_id: String(raw.item_id ?? ''),
+    created_at: toNumber(raw.created_at),
+  };
+}
+
+function normLicense(raw: any): DeveloperLicense {
+  return {
+    principal: String(raw.principal ?? ''),
+    created_at: toNumber(raw.created_at),
+    expires_at: toNumber(raw.expires_at),
+    last_payment_id: String(raw.last_payment_id ?? ''),
+    payment_method: String(raw.payment_method ?? ''),
+    note: String(raw.note ?? ''),
+    is_active: Boolean(raw.is_active),
+  };
+}
+
+function normPendingAudit(raw: any): PendingAudit {
+  return {
+    item_kind: String(raw.item_kind ?? ''),
+    item_id: String(raw.item_id ?? ''),
+    name: String(raw.name ?? ''),
+    developer: String(raw.developer ?? ''),
+    version: String(raw.version ?? ''),
+    updated_at: toNumber(raw.updated_at),
+  };
+}
+
+function normStatus(raw: any): MarketplaceStatus {
+  return {
+    version: String(raw.version ?? ''),
+    commit: String(raw.commit ?? ''),
+    commit_datetime: String(raw.commit_datetime ?? ''),
+    status: String(raw.status ?? ''),
+    extensions_count: toNumber(raw.extensions_count),
+    codices_count: toNumber(raw.codices_count),
+    purchases_count: toNumber(raw.purchases_count),
+    likes_count: toNumber(raw.likes_count),
+    licenses_count: toNumber(raw.licenses_count),
+    file_registry_canister_id: String(raw.file_registry_canister_id ?? ''),
+    billing_service_principal: String(raw.billing_service_principal ?? ''),
+    license_price_usd_cents: toNumber(raw.license_price_usd_cents),
+    license_duration_seconds: toNumber(raw.license_duration_seconds),
+    is_caller_controller: Boolean(raw.is_caller_controller),
+    dependencies: Array.isArray(raw.dependencies) ? raw.dependencies.map(String) : [],
+    python_version: String(raw.python_version ?? ''),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+export const marketplaceClient = {
+  // --- status / config -------------------------------------------------
+  async getStatus(): Promise<MarketplaceStatus> {
+    const r = await marketplace.status();
+    return normStatus(unwrap<any>(r));
+  },
+  async getFileRegistryCanisterId(): Promise<string> {
+    return String(await marketplace.get_file_registry_canister_id_q());
+  },
+  async getLicensePricing() {
+    const r = await marketplace.get_license_pricing_q();
+    return {
+      license_price_usd_cents: toNumber(r.license_price_usd_cents),
+      license_duration_seconds: toNumber(r.license_duration_seconds),
+    };
+  },
+
+  // --- extensions ------------------------------------------------------
+  async createExtension(input: ExtensionInput): Promise<string> {
+    const r = await marketplace.create_extension(input);
+    return unwrap<string>(r);
+  },
+  async updateExtension(input: ExtensionInput): Promise<string> {
+    const r = await marketplace.update_extension(input);
+    return unwrap<string>(r);
+  },
+  async delistExtension(extensionId: string): Promise<string> {
+    const r = await marketplace.delist_extension(extensionId);
+    return unwrap<string>(r);
+  },
+  async getExtensionDetails(id: string): Promise<ExtensionListing> {
+    const r = await marketplace.get_extension_details(id);
+    return normExt(unwrap<any>(r));
+  },
+  async listExtensions(page: number, perPage: number, verifiedOnly = false): Promise<{
+    listings: ExtensionListing[];
+    total_count: number;
+    page: number;
+    per_page: number;
+  }> {
+    const r = await marketplace.list_marketplace_extensions(BigInt(page), BigInt(perPage), verifiedOnly);
+    return {
+      listings: r.listings.map(normExt),
+      total_count: toNumber(r.total_count),
+      page: toNumber(r.page),
+      per_page: toNumber(r.per_page),
+    };
+  },
+  async searchExtensions(q: string, verifiedOnly = false): Promise<ExtensionListing[]> {
+    const r = await marketplace.search_extensions(q, verifiedOnly);
+    return (r as any[]).map(normExt);
+  },
+  async getMyExtensions(): Promise<ExtensionListing[]> {
+    const r = await marketplace.get_my_extensions();
+    return (r as any[]).map(normExt);
+  },
+
+  // --- codices ---------------------------------------------------------
+  async createCodex(input: CodexInput): Promise<string> {
+    const r = await marketplace.create_codex(input);
+    return unwrap<string>(r);
+  },
+  async delistCodex(codexId: string): Promise<string> {
+    const r = await marketplace.delist_codex(codexId);
+    return unwrap<string>(r);
+  },
+  async getCodexDetails(id: string): Promise<CodexListing> {
+    const r = await marketplace.get_codex_details(id);
+    return normCodex(unwrap<any>(r));
+  },
+  async listCodices(page: number, perPage: number, verifiedOnly = false): Promise<{
+    listings: CodexListing[];
+    total_count: number;
+    page: number;
+    per_page: number;
+  }> {
+    const r = await marketplace.list_marketplace_codices(BigInt(page), BigInt(perPage), verifiedOnly);
+    return {
+      listings: r.listings.map(normCodex),
+      total_count: toNumber(r.total_count),
+      page: toNumber(r.page),
+      per_page: toNumber(r.per_page),
+    };
+  },
+  async searchCodices(q: string, verifiedOnly = false): Promise<CodexListing[]> {
+    const r = await marketplace.search_codices(q, verifiedOnly);
+    return (r as any[]).map(normCodex);
+  },
+  async getMyCodices(): Promise<CodexListing[]> {
+    const r = await marketplace.get_my_codices();
+    return (r as any[]).map(normCodex);
+  },
+
+  // --- purchases / likes ----------------------------------------------
+  async buyExtension(id: string): Promise<string> {
+    return unwrap<string>(await marketplace.buy_extension(id));
+  },
+  async buyCodex(id: string): Promise<string> {
+    return unwrap<string>(await marketplace.buy_codex(id));
+  },
+  async hasPurchasedExtension(realm: string, id: string): Promise<boolean> {
+    return Boolean(await marketplace.has_purchased_extension(realm, id));
+  },
+  async hasPurchasedCodex(realm: string, id: string): Promise<boolean> {
+    return Boolean(await marketplace.has_purchased_codex(realm, id));
+  },
+  async getMyPurchases(): Promise<PurchaseRecord[]> {
+    const r = await marketplace.get_my_purchases();
+    return (r as any[]).map(normPurchase);
+  },
+  async likeItem(kind: 'ext' | 'codex', id: string): Promise<string> {
+    return unwrap<string>(await marketplace.like_item(kind, id));
+  },
+  async unlikeItem(kind: 'ext' | 'codex', id: string): Promise<string> {
+    return unwrap<string>(await marketplace.unlike_item(kind, id));
+  },
+  async hasLiked(principal: string, kind: 'ext' | 'codex', id: string): Promise<boolean> {
+    return Boolean(await marketplace.has_liked(principal, kind, id));
+  },
+  async myLikes(): Promise<LikeRecord[]> {
+    const r = await marketplace.my_likes();
+    return (r as any[]).map(normLike);
+  },
+
+  // --- rankings --------------------------------------------------------
+  async topExtensionsByDownloads(n = 20, verifiedOnly = false): Promise<ExtensionListing[]> {
+    const r = await marketplace.top_extensions_by_downloads(BigInt(n), verifiedOnly);
+    return (r as any[]).map(normExt);
+  },
+  async topExtensionsByLikes(n = 20, verifiedOnly = false): Promise<ExtensionListing[]> {
+    const r = await marketplace.top_extensions_by_likes(BigInt(n), verifiedOnly);
+    return (r as any[]).map(normExt);
+  },
+  async topCodicesByDownloads(n = 20, verifiedOnly = false): Promise<CodexListing[]> {
+    const r = await marketplace.top_codices_by_downloads(BigInt(n), verifiedOnly);
+    return (r as any[]).map(normCodex);
+  },
+  async topCodicesByLikes(n = 20, verifiedOnly = false): Promise<CodexListing[]> {
+    const r = await marketplace.top_codices_by_likes(BigInt(n), verifiedOnly);
+    return (r as any[]).map(normCodex);
+  },
+
+  // --- licenses --------------------------------------------------------
+  async checkLicense(principal: string): Promise<DeveloperLicense> {
+    const r = await marketplace.check_license(principal);
+    return normLicense(unwrap<any>(r));
+  },
+  async getLicenseStatus(): Promise<DeveloperLicense | null> {
+    try {
+      const r = await marketplace.get_license_status();
+      return normLicense(unwrap<any>(r));
+    } catch {
+      return null;
+    }
+  },
+  async grantManualLicense(principal: string, durationSeconds: number, note: string): Promise<string> {
+    return unwrap<string>(await marketplace.grant_manual_license(principal, BigInt(durationSeconds), note));
+  },
+  async revokeLicense(principal: string): Promise<string> {
+    return unwrap<string>(await marketplace.revoke_license(principal));
+  },
+
+  // --- verification ----------------------------------------------------
+  async requestAudit(kind: 'ext' | 'codex', id: string): Promise<string> {
+    return unwrap<string>(await marketplace.request_audit(kind, id));
+  },
+  async setVerificationStatus(kind: 'ext' | 'codex', id: string, status: string, notes: string): Promise<string> {
+    return unwrap<string>(await marketplace.set_verification_status(kind, id, status, notes));
+  },
+  async listPendingAudits(): Promise<PendingAudit[]> {
+    const r = await marketplace.list_pending_audits();
+    return (r as any[]).map(normPendingAudit);
+  },
+};
+
+export type { ExtensionListing as ExtensionListingType, CodexListing as CodexListingType };
