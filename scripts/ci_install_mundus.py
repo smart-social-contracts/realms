@@ -40,7 +40,12 @@ from typing import Any, Dict, List, Optional
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-EXTENSIONS_ROOT = REPO_ROOT / "extensions"
+# The realms-extensions submodule has a nested layout — manifests live at
+# `extensions/extensions/<name>/manifest.json` (the outer dir holds the
+# repo's README, marketplace/, etc.). publish_layered.py uses the same
+# inner directory; we must match it here, otherwise stage 2 silently
+# resolves "all extensions" to [] and never installs anything.
+EXTENSIONS_ROOT = REPO_ROOT / "extensions" / "extensions"
 CODICES_ROOT = REPO_ROOT / "codices" / "codices"
 
 
@@ -375,12 +380,83 @@ def _resolve_member_codices(member: Dict[str, Any], artifacts: Dict[str, Any]) -
     return list(spec or [])
 
 
+def _find_registry_member(descriptor: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Return the mundus member whose `type` is `realm_registry`, if any."""
+    for member in descriptor.get("mundus") or []:
+        if (member.get("type") or "").strip() == "realm_registry":
+            return member
+    return None
+
+
+def _frontend_url(canister_id: str, network: str) -> str:
+    if not canister_id:
+        return ""
+    if network == "ic":
+        return f"{canister_id}.ic0.app"
+    if network == "staging":
+        return f"{canister_id}.icp0.io"
+    return f"{canister_id}.localhost:8000"
+
+
+def _register_realm_with_registry(
+    member: Dict[str, Any],
+    registry_canister_id: str,
+    network: str,
+) -> None:
+    """Best-effort: tell a realm member to register itself with the registry.
+
+    Calls realm_backend.register_realm_with_registry from the CI principal.
+    Requires the CI principal to be either a controller of the realm
+    canister (covered by access._check_access ic.is_controller bypass) or
+    to hold the REALM_REGISTER permission. Any error is logged but
+    non-fatal — the realm can be registered manually after the fact.
+    """
+    name = member["name"]
+    canister_id = member["canister_id"]
+    realm_name = member.get("display_name") or name.title()
+    frontend_canister_id = (
+        member.get("frontend_canister_id")
+        or (member.get("canisters") or {}).get("frontend", "")
+    )
+    frontend_url = member.get("frontend_url") or _frontend_url(
+        frontend_canister_id, network
+    )
+    backend_url = member.get("backend_url") or _frontend_url(canister_id, network)
+    logo_url = member.get("logo_url", "")
+    canister_ids_packed = "|".join([
+        frontend_canister_id or "",
+        member.get("token_canister_id", ""),
+        member.get("nft_canister_id", ""),
+    ])
+    args = (
+        f'("{registry_canister_id}", "{realm_name}", "{frontend_url}", '
+        f'"{logo_url}", "{canister_ids_packed}")'
+    )
+    print(f"   • registering {name} with registry {registry_canister_id}")
+    try:
+        cp = subprocess.run(
+            ["dfx", "canister", "call", "--network", network,
+             canister_id, "register_realm_with_registry", args],
+            capture_output=True, text=True, check=True, timeout=120,
+        )
+        # The endpoint always returns a JSON string (success or error
+        # is inside it), even on canister-side failure paths.
+        print(f"     ↳ {cp.stdout.strip()[:300]}")
+    except subprocess.CalledProcessError as e:
+        print(
+            f"   ⚠️  failed to register {name}: {(e.stderr or e.stdout or '').strip()[:500]}"
+        )
+    except subprocess.TimeoutExpired:
+        print(f"   ⚠️  registration of {name} timed out after 120s")
+
+
 def stage2_install(descriptor: Dict[str, Any], infra_ids: Dict[str, str]) -> None:
     network = descriptor["network"]
     artifacts = descriptor.get("artifacts") or {}
     base_version = (artifacts.get("base_wasm") or {}).get("version") or "0.0.0-dev"
     file_registry = infra_ids["file_registry"]
     realm_installer = infra_ids["realm_installer"]
+    registry_member = _find_registry_member(descriptor)
     # Default install mode: 'upgrade' preserves stable storage (admin
     # permissions, user data, codex registrations) on already-installed
     # canisters — correct for staging/ic where we redeploy on every push
@@ -451,6 +527,22 @@ def stage2_install(descriptor: Dict[str, Any], infra_ids: Dict[str, str]) -> Non
                 "--registry", file_registry,
                 "--network", network,
             ])
+
+        # Register this realm with the central registry (best-effort,
+        # non-fatal). Only realm-type members that explicitly opt in
+        # via `register_with_registry: true` are registered, and only
+        # if the descriptor actually contains a registry member.
+        if (
+            (member.get("type") or "realm").strip() == "realm"
+            and bool(member.get("register_with_registry"))
+            and registry_member is not None
+        ):
+            _register_realm_with_registry(
+                member,
+                registry_member.get("canister_id")
+                or _canister_id(registry_member["name"], network) or "",
+                network,
+            )
 
     print("\n   ✅ mundus installed")
 
