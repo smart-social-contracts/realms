@@ -23,7 +23,6 @@ COPY mypy.ini ./mypy.ini
 COPY tsconfig.json ./tsconfig.json
 COPY dfx.template.json ./dfx.template.json
 COPY pyproject.toml ./pyproject.toml
-COPY realm_config.json ./realm_config.json
 COPY canister_ids.json ./canister_ids.json
 
 # Source code

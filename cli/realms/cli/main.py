@@ -2588,9 +2588,8 @@ def main(
     🏛️ Build and deploy digital government platforms on the Internet Computer.
 
     Quick start:
-    1. Copy and modify example_realm_config.json
-    2. realms realm deploy --file your_config.json
-    3. realms status
+    1. realms realm create --random --deploy
+    2. realms status
     """
     if version_flag:
         version()

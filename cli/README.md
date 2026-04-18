@@ -62,81 +62,69 @@ pip install -e .
 
 ## Quick Start
 
-### 1. Initialize a New Realm
+### 1. Create a New Realm
 
 ```bash
-realms init --name "My Government Realm" --id my_gov_realm
+realms realm create --realm-name "My Government Realm" --random --deploy
 ```
 
-This creates a complete project structure with:
+This creates a complete project structure (under `.realms/realm_*/`) with:
 - Backend canister (Python/Basilisk)
 - Frontend canister (SvelteKit)
 - Extension system
 - Configuration files
 - Deployment scripts
 
-### 2. Deploy Your Realm
-
-```bash
-cd my_gov_realm
-realms realm deploy --file realm_config.json
-```
-
-Your realm will be available at `http://localhost:8000`
+Your realm will be available at `http://<canister_id>.localhost:8000`
 
 ## Commands
 
-### `realms init`
+### `realms realm create`
 
-Initialize a new Realms project with scaffolding.
+Create (and optionally deploy) a new realm.
 
 ```bash
-realms init [OPTIONS]
+realms realm create [OPTIONS]
 
-Options:
-  -n, --name TEXT           Realm name
-  --id TEXT                 Realm ID (lowercase, underscores)
-  --admin TEXT              Admin principal ID
-  --network TEXT            Target network [local|staging|ic]
-  --interactive/--no-interactive  Interactive mode (default: true)
-  -o, --output TEXT         Output directory (default: current)
-```
-
-**Example:**
-```bash
-realms init --name "City Services" --id city_services --admin "2vxsx-fae"
+Common options:
+  --realm-name TEXT         Realm name
+  --random                  Populate with random demo data
+  --citizens INTEGER        Number of citizens to generate
+  --organizations INTEGER   Number of organizations to generate
+  --transactions INTEGER    Number of transactions to generate
+  --seed INTEGER            Deterministic seed for random data
+  -n, --network TEXT        Target network [local|staging|ic]
+  --deploy                  Deploy after creation
+  -m, --mode TEXT           Deploy mode: 'auto', 'upgrade' or 'reinstall'
 ```
 
 ### `realms realm deploy`
 
-Deploy a Realms project based on configuration.
+Deploy a previously-created realm folder.
 
 ```bash
 realms realm deploy [OPTIONS]
 
 Options:
-  -f, --file TEXT           Configuration file (default: realm_config.json)
-  -n, --network TEXT        Override network from config
-  --skip-extensions         Skip extension deployment
-  --skip-post-deployment    Skip post-deployment actions
-  --phases TEXT             Deploy specific phases only
-  --dry-run                 Show deployment plan without executing
-  --identity TEXT           Identity file for authentication
+  --folder TEXT             Path to generated realm folder
+  -n, --network TEXT        Target network (default: local)
+  --clean                   Clean deployment (restart dfx)
+  --identity TEXT           Identity PEM file or dfx identity name
+  -m, --mode TEXT           Deploy mode: 'auto', 'upgrade' or 'reinstall'
+  --plain-logs              Show full verbose output instead of progress UI
+  --descriptor TEXT         Deploy from a YAML descriptor (see deployments/)
 ```
 
 **Examples:**
 ```bash
-# Basic deployment
+# Basic deployment (auto-detects single realm folder under .realms/)
 realms realm deploy
 
-# Deploy to IC mainnet
+# Deploy to IC mainnet with a specific identity
 realms realm deploy --network ic --identity ~/.config/dfx/identity/production/identity.pem
 
-# Deploy only specific extension phases
-realms realm deploy --phases q1,q2
-
-# Dry run to see what would be deployed
-realms realm deploy --dry-run
+# Deploy from a descriptor file (layered architecture)
+realms realm deploy --descriptor deployments/staging-mundus-layered.yml
 ```
 
 ### `realms registry create`
@@ -177,76 +165,34 @@ Show the current status of your Realms project.
 realms status
 ```
 
-### `realms validate`
-
-Validate a realm configuration file.
-
-```bash
-realms validate [--file realm_config.json]
-```
-
 ## Configuration
 
-Realms projects are configured via `realm_config.json`:
+Each generated realm folder contains a `manifest.json` describing the realm:
 
 ```json
 {
-  "realm": {
-    "id": "my_government_realm",
-    "name": "My Government Realm",
-    "description": "A digital government platform",
-    "admin_principal": "2vxsx-fae",
-    "version": "1.0.0"
-  },
-  "deployment": {
-    "network": "local",
-    "clean_deploy": true
-  },
-  "extensions": {
-    "initial": [
-      {"name": "public_dashboard", "enabled": true},
-      {"name": "citizen_dashboard", "enabled": true}
-    ],
-    "q1": [
-      {"name": "vault", "enabled": true}
-    ]
-  },
-  "post_deployment": {
-    "actions": [
-      {
-        "type": "extension_call",
-        "name": "Load demo data",
-        "extension_name": "demo_loader",
-        "function_name": "load",
-        "args": {"step": "base_setup"}
-      }
-    ]
+  "type": "realm",
+  "name": "My Custom Realm",
+  "options": {
+    "random": {
+      "members": 100,
+      "organizations": 10,
+      "transactions": 200,
+      "disputes": 15,
+      "seed": 42
+    }
   }
 }
 ```
 
+For multi-realm (mundus) deployments, see the manifests under
+`examples/demo/` and the YAML descriptors under `deployments/`.
+
 ### Configuration Schema
 
-- **realm**: Basic realm metadata (id, name, admin, etc.)
-- **deployment**: Deployment settings (network, port, identity)
-- **extensions**: Extensions organized by deployment phases
-- **post_deployment**: Actions to run after deployment
-
-## Extension Phases
-
-Extensions can be organized into deployment phases:
-
-- `initial`: Core extensions deployed first
-- `q1`, `q2`, `q3`, `q4`: Quarterly rollout phases
-- `phase_1`, `phase_2`, etc.: Custom phases
-
-## Post-Deployment Actions
-
-Automate setup tasks after deployment:
-
-- **extension_call**: Call extension functions
-- **script**: Run shell scripts
-- **wait**: Add delays between actions
+- **type**: Always `realm` for a single-realm manifest
+- **name**: Display name for the realm
+- **options.random**: Optional knobs for generated demo data
 
 ## Installation
 
@@ -297,8 +243,8 @@ pytest
 ### Code Formatting
 
 ```bash
-black realms_cli/
-isort realms_cli/
+black realms/
+isort realms/
 ```
 
 ## Examples
@@ -306,40 +252,19 @@ isort realms_cli/
 ### Government Services Platform
 
 ```bash
-realms init \
-  --name "Digital Government Services" \
-  --id gov_services \
-  --admin "rdmx6-jaaaa-aaaaa-aaadq-cai"
-
-cd gov_services
-realms realm deploy
+realms realm create \
+  --realm-name "Digital Government Services" \
+  --random --citizens 50 --organizations 5 --deploy
 ```
 
-### Multi-Phase Deployment
+### Multi-Realm (Mundus) Deployment
 
-```json
-{
-  "extensions": {
-    "initial": [
-      {"name": "public_dashboard", "enabled": true}
-    ],
-    "q1": [
-      {"name": "citizen_dashboard", "enabled": true},
-      {"name": "notifications", "enabled": true}
-    ],
-    "q2": [
-      {"name": "land_registry", "enabled": true},
-      {"name": "justice_litigation", "enabled": true}
-    ]
-  }
-}
-```
-
-Deploy phases incrementally:
 ```bash
-realms realm deploy --phases initial
-realms realm deploy --phases q1
-realms realm deploy --phases q2
+# Create a multi-realm ecosystem with a shared registry
+realms mundus create --deploy
+
+# Or use a custom manifest
+realms mundus create --manifest examples/demo/manifest.json --deploy
 ```
 
 ## Troubleshooting
@@ -369,9 +294,9 @@ ls extensions/
 
 ### Getting Help
 
+- Show available commands: `realms --help`
+- Show subcommand help: `realms realm --help`, `realms mundus --help`, etc.
 - Check project status: `realms status`
-- Validate configuration: `realms validate`
-- Use dry-run mode: `realms realm deploy --dry-run`
 
 ## GUI alternative: the Package Manager extension
 
@@ -405,6 +330,4 @@ MIT License - see LICENSE file for details.
 
 ## Support
 
-- 📖 [Documentation](https://docs.realms.dev)
-- 🐛 [Issue Tracker](https://github.com/smartsocialcontracts/realms/issues)
-- 💬 [Discord Community](https://discord.gg/realms)
+- 🐛 [Issue Tracker](https://github.com/smart-social-contracts/realms/issues)
