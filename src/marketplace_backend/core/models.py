@@ -135,16 +135,20 @@ class DeveloperLicenseEntity(Entity):
 
     Anyone can publish without a license; the license unlocks the audit
     flow run by Smart Social Contracts curators (controllers).
+    ``last_payment_amount_usd_cents`` mirrors what the user actually
+    paid for the most recent extension/renewal, kept on the row purely
+    as an audit trail.
     """
     __alias__ = "principal"
 
-    principal       = String(max_length=128)
-    created_at      = Float()
-    expires_at      = Float()
-    last_payment_id = String(max_length=128)             # Stripe checkout session id
-    payment_method  = String(max_length=32)              # stripe | manual | voucher
-    note            = String(max_length=512)
-    is_active       = Boolean()
+    principal                     = String(max_length=128)
+    created_at                    = Float()
+    expires_at                    = Float()
+    last_payment_id               = String(max_length=128)  # Stripe checkout session id
+    last_payment_amount_usd_cents = Integer()
+    payment_method                = String(max_length=32)   # stripe | manual | voucher
+    note                          = String(max_length=512)
+    is_active                     = Boolean()
 
 
 # ---------------------------------------------------------------------------

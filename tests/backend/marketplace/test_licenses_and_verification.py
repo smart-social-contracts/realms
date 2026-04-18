@@ -81,10 +81,18 @@ def test_record_license_payment_works_for_billing_principal(as_caller):
 
     as_caller("billing-svc", controller=False)
     r = lic_api.record_license_payment(
-        principal="dev-1", stripe_session_id="cs_xyz", duration_seconds=86400
+        principal="dev-1",
+        stripe_session_id="cs_xyz",
+        duration_seconds=86400,
+        amount_usd_cents=9900,
     )
     assert r["success"] is True
     assert lic_api.has_active_license("dev-1") is True
+    # amount_usd_cents persisted for audit trail.
+    chk = lic_api.check_license("dev-1")
+    assert chk["success"] is True
+    assert chk["license"]["last_payment_amount_usd_cents"] == 9900
+    assert chk["license"]["last_payment_id"] == "cs_xyz"
 
 
 def test_grant_manual_license_controller_only(as_caller):

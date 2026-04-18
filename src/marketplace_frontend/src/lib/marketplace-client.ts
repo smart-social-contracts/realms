@@ -124,6 +124,7 @@ export interface DeveloperLicense {
   created_at: number;
   expires_at: number;
   last_payment_id: string;
+  last_payment_amount_usd_cents: number;
   payment_method: string;
   note: string;
   is_active: boolean;
@@ -234,6 +235,7 @@ function normLicense(raw: any): DeveloperLicense {
     created_at: toNumber(raw.created_at),
     expires_at: toNumber(raw.expires_at),
     last_payment_id: String(raw.last_payment_id ?? ''),
+    last_payment_amount_usd_cents: toNumber(raw.last_payment_amount_usd_cents),
     payment_method: String(raw.payment_method ?? ''),
     note: String(raw.note ?? ''),
     is_active: Boolean(raw.is_active),

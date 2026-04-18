@@ -490,6 +490,7 @@ class DeveloperLicense(Record):
     created_at: float64
     expires_at: float64
     last_payment_id: text
+    last_payment_amount_usd_cents: nat64
     payment_method: text
     note: text
     is_active: bool
@@ -503,7 +504,8 @@ class LicenseResult(Variant, total=False):
 class LicensePaymentInput(Record):
     principal: text
     stripe_session_id: text
-    duration_seconds: nat64
+    amount_usd_cents: nat64    # what the user actually paid (audit trail)
+    duration_seconds: nat64    # how long to extend the license by
     payment_method: text
     note: text
 
@@ -584,6 +586,7 @@ def _license_record(d: dict) -> "DeveloperLicense":
         created_at=float(d["created_at"]),
         expires_at=float(d["expires_at"]),
         last_payment_id=d["last_payment_id"],
+        last_payment_amount_usd_cents=int(d.get("last_payment_amount_usd_cents", 0) or 0),
         payment_method=d["payment_method"],
         note=d["note"],
         is_active=bool(d["is_active"]),
@@ -1101,6 +1104,7 @@ def record_license_payment(payment: LicensePaymentInput) -> GenericResult:
         r = record_license_payment_impl(
             principal=payment["principal"],
             stripe_session_id=payment.get("stripe_session_id", ""),
+            amount_usd_cents=int(payment.get("amount_usd_cents", 0)),
             duration_seconds=int(payment["duration_seconds"]),
             payment_method=payment.get("payment_method", "stripe"),
             note=payment.get("note", ""),

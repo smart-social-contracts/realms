@@ -44,6 +44,7 @@ def _to_dict(lic: DeveloperLicenseEntity) -> Dict[str, Any]:
         "created_at": float(lic.created_at or 0),
         "expires_at": float(lic.expires_at or 0),
         "last_payment_id": str(lic.last_payment_id or ""),
+        "last_payment_amount_usd_cents": int(getattr(lic, "last_payment_amount_usd_cents", 0) or 0),
         "payment_method": str(lic.payment_method or ""),
         "note": str(lic.note or ""),
         "is_active": bool(lic.is_active) if lic.is_active is not None else False,
@@ -70,6 +71,7 @@ def record_license_payment(
     principal: str,
     stripe_session_id: str,
     duration_seconds: int,
+    amount_usd_cents: int = 0,
     payment_method: str = "stripe",
     note: str = "",
 ) -> Dict:
@@ -98,6 +100,7 @@ def record_license_payment(
             created_at=now_ns,
             expires_at=now_ns + duration_ns,
             last_payment_id=stripe_session_id,
+            last_payment_amount_usd_cents=int(amount_usd_cents),
             payment_method=payment_method,
             note=note,
             is_active=True,
@@ -109,6 +112,8 @@ def record_license_payment(
         base = max(now_ns, float(lic.expires_at or 0))
         lic.expires_at = base + duration_ns
         lic.last_payment_id = stripe_session_id or lic.last_payment_id
+        if amount_usd_cents:
+            lic.last_payment_amount_usd_cents = int(amount_usd_cents)
         lic.payment_method = payment_method or lic.payment_method
         lic.note = note or lic.note
         lic.is_active = True

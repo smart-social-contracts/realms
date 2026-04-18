@@ -171,8 +171,10 @@ marketplace integration:
 - `POST /marketplace/license/webhook` (Stripe → service)
 
   On Stripe success the service calls
-  `marketplace_backend.record_license_payment(record { principal = ...; stripe_session_id = ...; duration_seconds = ...; payment_method = "stripe"; note = "" })`
+  `marketplace_backend.record_license_payment(record { principal = ...; stripe_session_id = ...; amount_usd_cents = ...; duration_seconds = ...; payment_method = "stripe"; note = "" })`
   from the principal stored in `config.billing_service_principal`.
+  The `amount_usd_cents` field is stored on the developer's license
+  row as `last_payment_amount_usd_cents` for audit-trail purposes.
 
 The service's principal must be configured on the marketplace via
 `set_billing_service_principal(<principal>)` from a controller. The
