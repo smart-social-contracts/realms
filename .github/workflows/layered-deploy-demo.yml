@@ -1,0 +1,69 @@
+# layered-deploy-demo.yml — manual full layered deploy to demo network.
+#
+# Same structure as layered-deploy-dominion.yml (staging) but targeting
+# the demo canisters. Trigger from the Actions UI.
+#
+# All actual logic lives in:
+#   .github/workflows/_bootstrap-infra.yml
+#   .github/workflows/_publish-artifacts.yml
+#   .github/workflows/_install-mundus.yml
+#   .github/workflows/_verify-mundus.yml
+# and in scripts/ci_install_mundus.py.
+
+name: Layered Deploy Demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_wasm_version:
+        description: "Base WASM version label (defaults to commit SHA)"
+        required: false
+        type: string
+        default: ""
+      skip_publish:
+        description: "Skip republishing artifacts (assume file_registry already up-to-date)"
+        required: false
+        type: boolean
+        default: false
+
+env:
+  DESCRIPTOR: deployments/demo-mundus-layered.yml
+  NETWORK: demo
+
+jobs:
+  bootstrap-infra:
+    uses: ./.github/workflows/_bootstrap-infra.yml
+    with:
+      network: demo
+      descriptor: deployments/demo-mundus-layered.yml
+    secrets:
+      IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
+
+  publish-artifacts:
+    if: ${{ !inputs.skip_publish }}
+    needs: bootstrap-infra
+    uses: ./.github/workflows/_publish-artifacts.yml
+    with:
+      network: demo
+      descriptor: deployments/demo-mundus-layered.yml
+      infra-ids: ${{ needs.bootstrap-infra.outputs.infra-ids }}
+    secrets:
+      IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
+
+  install-mundus:
+    needs: [bootstrap-infra, publish-artifacts]
+    if: ${{ always() && needs.bootstrap-infra.result == 'success' && (needs.publish-artifacts.result == 'success' || needs.publish-artifacts.result == 'skipped') }}
+    uses: ./.github/workflows/_install-mundus.yml
+    with:
+      network: demo
+      descriptor: deployments/demo-mundus-layered.yml
+      infra-ids: ${{ needs.bootstrap-infra.outputs.infra-ids }}
+    secrets:
+      IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
+
+  verify-mundus:
+    needs: install-mundus
+    uses: ./.github/workflows/_verify-mundus.yml
+    with:
+      network: demo
+      descriptor: deployments/demo-mundus-layered.yml

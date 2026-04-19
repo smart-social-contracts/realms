@@ -12,6 +12,10 @@ network: demo
 infrastructure_overrides:
   file_registry:
     canister_id: vi64l-3aaaa-aaaae-qj4va-cai
+  realm_installer:
+    canister_id: 2s4td-daaaa-aaaao-bazmq-cai
+  realm_installer:
+    canister_id: 2s4td-daaaa-aaaao-bazmq-cai
 
 artifacts:
   base_wasm:
