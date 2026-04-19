@@ -113,22 +113,29 @@ from ic_python_db import (
 # errors).  This combination is fatal for inter-canister calls whose
 # arguments contain JSON strings like '{"key":"val"}'.
 #
-# We replace __init__ to skip the broken text-encoding path entirely.
-# The Rust-side typed encoding (encode_service_call_args Priority 1) handles
-# the actual serialisation when _python_call_args + _candid_arg_type are set.
+# When the Service class provides _arg_types for a method, we skip the
+# broken text-encoding path and let the Rust-side typed encoding handle
+# serialisation via _python_call_args + _candid_arg_type.  For methods
+# WITHOUT _arg_types (e.g. FileRegistryService), we fall back to the
+# original __init__ which works fine for simple string arguments.
 # ---------------------------------------------------------------------------
 try:
     import basilisk as _bsk
     _SC = _bsk._ServiceCall
+    _original_sc_init = _SC.__init__
 
     def _safe_sc_init(self, canister_principal, method_name, call_args=None,
                       payment=0, arg_type=None):
-        self._python_call_args = call_args if call_args else ()
-        self._candid_arg_type = arg_type
-        self._raw_args = b'DIDL\x00\x00'
-        self.canister_principal = canister_principal
-        self.method_name = method_name
-        self.payment = payment
+        if arg_type is not None:
+            self._python_call_args = call_args if call_args else ()
+            self._candid_arg_type = arg_type
+            self._raw_args = b'DIDL\x00\x00'
+            self.canister_principal = canister_principal
+            self.method_name = method_name
+            self.payment = payment
+        else:
+            _original_sc_init(self, canister_principal, method_name,
+                              call_args, payment, arg_type)
 
     _SC.__init__ = _safe_sc_init
 except Exception:
