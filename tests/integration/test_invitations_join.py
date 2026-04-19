@@ -88,6 +88,38 @@ def _join_with_invite(profile: str, invite_code: str) -> dict:
     )
 
 
+def _set_creator_principal(principal: str) -> dict:
+    return dfx_call_json(
+        REALM_BACKEND,
+        "set_creator_principal",
+        f'("{_candid_quote(principal)}")',
+        is_update=True,
+    )
+
+
+def _mint_bootstrap_admin_invite(expires_in_hours: int = 24) -> dict:
+    return dfx_call_json(
+        REALM_BACKEND,
+        "mint_bootstrap_admin_invite",
+        f"({int(expires_in_hours)} : nat)",
+        is_update=True,
+    )
+
+
+def _get_my_principal() -> str:
+    """Return the principal the realm currently sees as the caller."""
+    out, code = dfx_call(REALM_BACKEND, "get_my_principal", "()")
+    if code != 0:
+        raise RuntimeError(f"get_my_principal failed: {out}")
+    # Candid output for a query returning text looks like: ("aaaaa-aa")
+    text = out.strip()
+    if text.startswith("(") and text.endswith(")"):
+        text = text[1:-1].strip()
+    if text.startswith('"') and text.endswith('"'):
+        text = text[1:-1]
+    return text
+
+
 def _has_admin_dashboard_installed() -> bool:
     """Return True when extension_sync_call to admin_dashboard responds.
 
@@ -287,6 +319,105 @@ def test_invalid_invite_code_is_rejected():
     print("✓")
 
 
+def test_set_creator_principal_records_value():
+    """set_creator_principal stores the value, is idempotent, but won't overwrite.
+
+    Runs before any admin Users exist. Uses the current dfx identity's
+    principal as the creator (because in the integration harness the
+    dfx identity is the canister controller, so the call is allowed).
+    Re-setting to the same value succeeds; setting a different value
+    is rejected.
+    """
+    print("  - test_set_creator_principal_records_value...", end=" ")
+    me = _get_my_principal()
+    first = _set_creator_principal(me)
+    assert first.get("success"), first
+    msg = (first.get("data") or {}).get("message", "")
+    assert msg == me, f"Expected message to echo the principal; got {msg!r}"
+
+    same_again = _set_creator_principal(me)
+    assert same_again.get("success"), (
+        f"Re-setting creator_principal to the same value must be idempotent; "
+        f"got: {same_again}"
+    )
+
+    # Pick a syntactically-valid different principal to attempt overwrite.
+    other = "aaaaa-aa"  # IC management canister id, definitely != us
+    if other == me:
+        other = "2vxsx-fae"  # arbitrary anonymous-ish principal
+    overwrite = _set_creator_principal(other)
+    assert not overwrite.get("success"), (
+        f"set_creator_principal must refuse silent overwrite; got: {overwrite}"
+    )
+    err = ((overwrite.get("data") or {}).get("error") or "").lower()
+    assert "already set" in err or "overwrite" in err, (
+        f"Expected an 'already set / refusing to overwrite' error; got: {err!r}"
+    )
+    print("✓")
+
+
+def test_mint_bootstrap_admin_invite_when_no_admin_yet():
+    """mint_bootstrap_admin_invite returns a usable single-use admin invite.
+
+    Must run BEFORE any admin User exists in the realm. Asserts that the
+    response carries a plaintext code distinct from its hash (the
+    plaintext is returned exactly once, by design) and that the invite
+    can be redeemed via consume_registration_code for an admin profile.
+    """
+    print("  - test_mint_bootstrap_admin_invite_when_no_admin_yet...", end=" ")
+    response = _mint_bootstrap_admin_invite(24)
+    assert response.get("success"), response
+    raw_message = (response.get("data") or {}).get("message", "")
+    try:
+        payload = json.loads(raw_message)
+    except json.JSONDecodeError as e:
+        raise AssertionError(
+            f"Could not parse mint_bootstrap_admin_invite payload: {e}\n"
+            f"Raw: {raw_message!r}"
+        )
+    assert payload.get("profile") == "admin", payload
+    code = payload.get("code")
+    code_hash = payload.get("code_hash")
+    assert code, f"Expected plaintext code in payload; got: {payload}"
+    assert code_hash, f"Expected code_hash in payload; got: {payload}"
+    assert code != code_hash, (
+        f"Plaintext and hash must differ: {payload}"
+    )
+
+    # Ask the extension to confirm the code resolves and carries the
+    # admin profile. We don't redeem it via join_realm_with_invite here
+    # because consuming it would create a User with the test caller as
+    # admin and pollute the rest of the suite — validate is enough.
+    validated = _extension_call("validate_registration_code", {"code": code})
+    assert validated.get("success"), validated
+    assert validated.get("data", {}).get("profile") == "admin", validated
+    print("✓")
+
+
+def test_mint_bootstrap_admin_invite_rejected_after_admin_exists():
+    """Once an admin exists, mint_bootstrap_admin_invite must be refused.
+
+    Must run AFTER ``test_join_realm_without_invite_rejects_admin_when_admin_exists``,
+    which is the test that actually creates the first admin via the
+    bootstrap path. Subsequent admin invites have to be minted by
+    existing admins through admin_dashboard, not via this convenience
+    endpoint.
+    """
+    print(
+        "  - test_mint_bootstrap_admin_invite_rejected_after_admin_exists...",
+        end=" ",
+    )
+    response = _mint_bootstrap_admin_invite(24)
+    assert not response.get("success"), (
+        f"Bootstrap mint must be rejected once admin exists; got: {response}"
+    )
+    err = ((response.get("data") or {}).get("error") or "").lower()
+    assert "admin" in err and ("already" in err or "exist" in err), (
+        f"Expected an 'already has admin' error; got: {err!r}"
+    )
+    print("✓")
+
+
 # ---------------------------------------------------------------------------
 # Tiny custom skip mechanism (no pytest dependency on this script)
 # ---------------------------------------------------------------------------
@@ -303,8 +434,11 @@ if __name__ == "__main__":
         test_mint_member_invite_returns_member_profile,
         test_listing_does_not_leak_plaintext_code,
         test_validate_returns_admin_profile,
+        test_set_creator_principal_records_value,
+        test_mint_bootstrap_admin_invite_when_no_admin_yet,
         test_join_realm_with_invite_grants_invite_profile,
         test_join_realm_without_invite_rejects_admin_when_admin_exists,
+        test_mint_bootstrap_admin_invite_rejected_after_admin_exists,
         test_invalid_invite_code_is_rejected,
     ]
 
