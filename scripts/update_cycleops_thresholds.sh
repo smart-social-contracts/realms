@@ -48,6 +48,7 @@ declare -A ALL_CANISTERS=(
   ["joj52-zaaaa-aaaah-qrejq-cai"]="staging-marketplace_frontend"
   ["ehyfg-wyaaa-aaaae-qg3qq-cai"]="demo-marketplace_backend"
   ["ulsvn-pyaaa-aaaae-qj4tq-cai"]="demo-marketplace_frontend"
+  ["vi64l-3aaaa-aaaae-qj4va-cai"]="demo-file_registry"
   # --- Website ---
   ["6kdvx-3yaaa-aaaah-qqo5a-cai"]="atlas_website"
   # --- Tokens ---
