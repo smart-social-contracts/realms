@@ -6,6 +6,7 @@ from typing import Any, Dict
 from _cdk import ic
 from api.config import get_config
 from core.models import (
+    AssistantListingEntity,
     CodexListingEntity,
     DeveloperLicenseEntity,
     ExtensionListingEntity,
@@ -28,6 +29,10 @@ def get_status() -> Dict[str, Any]:
         codices_count = len(list(CodexListingEntity.instances()))
     except Exception:
         codices_count = 0
+    try:
+        assistants_count = len(list(AssistantListingEntity.instances()))
+    except Exception:
+        assistants_count = 0
     try:
         purchases_count = len(list(PurchaseEntity.instances()))
     except Exception:
@@ -56,6 +61,7 @@ def get_status() -> Dict[str, Any]:
         "status": "ok",
         "extensions_count": extensions_count,
         "codices_count": codices_count,
+        "assistants_count": assistants_count,
         "purchases_count": purchases_count,
         "likes_count": likes_count,
         "licenses_count": licenses_count,

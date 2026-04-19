@@ -241,6 +241,16 @@ from _cdk import (
     update,
     void,
 )
+from api.assistants import (
+    buy_assistant as buy_assistant_impl,
+    create_assistant as create_assistant_impl,
+    delist_assistant as delist_assistant_impl,
+    get_assistant_details as get_assistant_details_impl,
+    get_developer_assistants,
+    has_purchased_assistant as has_purchased_assistant_impl,
+    list_assistants as list_assistants_impl,
+    search_assistants as search_assistants_impl,
+)
 from api.codices import (
     buy_codex as buy_codex_impl,
     create_codex as create_codex_impl,
@@ -286,6 +296,8 @@ from api.likes import (
     unlike_item as unlike_item_impl,
 )
 from api.rankings import (
+    top_assistants_by_downloads as top_assistants_by_downloads_impl,
+    top_assistants_by_likes as top_assistants_by_likes_impl,
     top_codices_by_downloads as top_codices_by_downloads_impl,
     top_codices_by_likes as top_codices_by_likes_impl,
     top_extensions_by_downloads as top_extensions_by_downloads_impl,
@@ -325,6 +337,7 @@ class StatusRecord(Record):
     status: text
     extensions_count: nat64
     codices_count: nat64
+    assistants_count: nat64
     purchases_count: nat64
     likes_count: nat64
     licenses_count: nat64
@@ -465,6 +478,73 @@ class CodexListResult(Record):
     per_page: nat64
 
 
+# ----- Assistants ------------------------------------------------------------
+
+class AssistantInput(Record):
+    assistant_id: text
+    name: text
+    description: text
+    version: text
+    price_e8s: nat64
+    pricing_summary: text
+    icon: text
+    categories: text
+    runtime: text
+    endpoint_url: text
+    base_model: text
+    requested_role: text
+    requested_permissions: text
+    domains: text
+    languages: text
+    training_data_summary: text
+    eval_report_url: text
+    file_registry_canister_id: text
+    file_registry_namespace: text
+
+
+class AssistantListing(Record):
+    assistant_id: text
+    assistant_alias: text
+    developer: text
+    name: text
+    description: text
+    version: text
+    price_e8s: nat64
+    pricing_summary: text
+    icon: text
+    categories: text
+    runtime: text
+    endpoint_url: text
+    base_model: text
+    requested_role: text
+    requested_permissions: text
+    domains: text
+    languages: text
+    training_data_summary: text
+    eval_report_url: text
+    file_registry_canister_id: text
+    file_registry_namespace: text
+    installs: nat64
+    likes: nat64
+    verification_status: text
+    verification_notes: text
+    is_active: bool
+    created_at: float64
+    updated_at: float64
+
+
+class AssistantResult(Variant, total=False):
+    Ok: AssistantListing
+    Err: text
+
+
+class AssistantListResult(Record):
+    listings: Vec[AssistantListing]
+    total_count: nat64
+    page: nat64
+    per_page: nat64
+
+
 # ----- Purchases / likes -----------------------------------------------------
 
 class PurchaseRecord(Record):
@@ -580,6 +660,39 @@ def _codex_listing_record(d: dict) -> "CodexListing":
     )
 
 
+def _assistant_listing_record(d: dict) -> "AssistantListing":
+    return AssistantListing(
+        assistant_id=d["assistant_id"],
+        assistant_alias=d["assistant_alias"],
+        developer=d["developer"],
+        name=d["name"],
+        description=d["description"],
+        version=d["version"],
+        price_e8s=int(d["price_e8s"]),
+        pricing_summary=d["pricing_summary"],
+        icon=d["icon"],
+        categories=d["categories"],
+        runtime=d["runtime"],
+        endpoint_url=d["endpoint_url"],
+        base_model=d["base_model"],
+        requested_role=d["requested_role"],
+        requested_permissions=d["requested_permissions"],
+        domains=d["domains"],
+        languages=d["languages"],
+        training_data_summary=d["training_data_summary"],
+        eval_report_url=d["eval_report_url"],
+        file_registry_canister_id=d["file_registry_canister_id"],
+        file_registry_namespace=d["file_registry_namespace"],
+        installs=int(d["installs"]),
+        likes=int(d["likes"]),
+        verification_status=d["verification_status"],
+        verification_notes=d["verification_notes"],
+        is_active=bool(d["is_active"]),
+        created_at=float(d["created_at"]),
+        updated_at=float(d["updated_at"]),
+    )
+
+
 def _license_record(d: dict) -> "DeveloperLicense":
     return DeveloperLicense(
         principal=d["principal"],
@@ -651,6 +764,7 @@ def status() -> StatusResult:
             status=s["status"],
             extensions_count=int(s["extensions_count"]),
             codices_count=int(s["codices_count"]),
+            assistants_count=int(s["assistants_count"]),
             purchases_count=int(s["purchases_count"]),
             likes_count=int(s["likes_count"]),
             licenses_count=int(s["licenses_count"]),
@@ -913,6 +1027,104 @@ def get_my_codices() -> Vec[CodexListing]:
 
 
 # ===========================================================================
+# Assistants
+# ===========================================================================
+
+
+def _assistant_input_to_kwargs(a: AssistantInput) -> dict:
+    return {
+        "assistant_id": a["assistant_id"],
+        "name": a["name"],
+        "description": a["description"],
+        "version": a["version"],
+        "price_e8s": int(a["price_e8s"]),
+        "pricing_summary": a.get("pricing_summary", ""),
+        "icon": a["icon"],
+        "categories": a["categories"],
+        "runtime": a.get("runtime", ""),
+        "endpoint_url": a.get("endpoint_url", ""),
+        "base_model": a.get("base_model", ""),
+        "requested_role": a.get("requested_role", ""),
+        "requested_permissions": a.get("requested_permissions", ""),
+        "domains": a.get("domains", ""),
+        "languages": a.get("languages", ""),
+        "training_data_summary": a.get("training_data_summary", ""),
+        "eval_report_url": a.get("eval_report_url", ""),
+        "file_registry_canister_id": a["file_registry_canister_id"],
+        "file_registry_namespace": a["file_registry_namespace"],
+    }
+
+
+@update
+def create_assistant(a: AssistantInput) -> GenericResult:
+    try:
+        caller = str(ic.caller())
+        r = create_assistant_impl(developer=caller, **_assistant_input_to_kwargs(a))
+        return {"Ok": f"{r.get('action', 'ok')}:{r.get('assistant_id', a['assistant_id'])}"} if r["success"] else {"Err": r["error"]}
+    except Exception as e:
+        logger.error(f"create_assistant: {e}\n{traceback.format_exc()}")
+        return {"Err": str(e)}
+
+
+@update
+def update_assistant(a: AssistantInput) -> GenericResult:
+    return create_assistant(a)
+
+
+@update
+def delist_assistant(assistant_id: text) -> GenericResult:
+    try:
+        caller = str(ic.caller())
+        r = delist_assistant_impl(caller, assistant_id)
+        return {"Ok": r["message"]} if r["success"] else {"Err": r["error"]}
+    except Exception as e:
+        return {"Err": str(e)}
+
+
+@query
+def get_assistant_details(assistant_id: text) -> AssistantResult:
+    try:
+        r = get_assistant_details_impl(assistant_id)
+        return {"Ok": _assistant_listing_record(r["assistant"])} if r["success"] else {"Err": r["error"]}
+    except Exception as e:
+        return {"Err": str(e)}
+
+
+@query
+def list_marketplace_assistants(page: nat64, per_page: nat64, verified_only: bool) -> AssistantListResult:
+    try:
+        r = list_assistants_impl(int(page), int(per_page), bool(verified_only))
+        return AssistantListResult(
+            listings=[_assistant_listing_record(d) for d in r["listings"]],
+            total_count=int(r["total_count"]),
+            page=int(r["page"]),
+            per_page=int(r["per_page"]),
+        )
+    except Exception as e:
+        logger.error(f"list_marketplace_assistants: {e}")
+        return AssistantListResult(listings=[], total_count=int(0), page=page, per_page=per_page)
+
+
+@query
+def search_assistants(query_text: text, verified_only: bool) -> Vec[AssistantListing]:
+    try:
+        return [_assistant_listing_record(d) for d in search_assistants_impl(query_text, bool(verified_only))]
+    except Exception as e:
+        logger.error(f"search_assistants: {e}")
+        return []
+
+
+@query
+def get_my_assistants() -> Vec[AssistantListing]:
+    try:
+        caller = str(ic.caller())
+        return [_assistant_listing_record(d) for d in get_developer_assistants(caller)]
+    except Exception as e:
+        logger.error(f"get_my_assistants: {e}")
+        return []
+
+
+# ===========================================================================
 # Purchases
 # ===========================================================================
 
@@ -937,6 +1149,22 @@ def buy_codex(codex_id: text) -> GenericResult:
         return {"Err": str(e)}
 
 
+@update
+def buy_assistant(assistant_id: text) -> GenericResult:
+    """Record that the caller (typically a realm) hired this assistant.
+
+    The actual realm-side runtime install runs in the separate
+    ``assistant_runner`` extension + ``hire_assistant`` codex, and
+    fires after the realm's governance vote on the hire passes.
+    """
+    try:
+        caller = str(ic.caller())
+        r = buy_assistant_impl(caller, assistant_id)
+        return {"Ok": r["purchase_id"]} if r["success"] else {"Err": r["error"]}
+    except Exception as e:
+        return {"Err": str(e)}
+
+
 @query
 def has_purchased_extension(realm: text, extension_id: text) -> bool:
     try:
@@ -949,6 +1177,14 @@ def has_purchased_extension(realm: text, extension_id: text) -> bool:
 def has_purchased_codex(realm: text, codex_id: text) -> bool:
     try:
         return bool(has_purchased_codex_impl(realm, codex_id))
+    except Exception:
+        return False
+
+
+@query
+def has_purchased_assistant(realm: text, assistant_id: text) -> bool:
+    try:
+        return bool(has_purchased_assistant_impl(realm, assistant_id))
     except Exception:
         return False
 
@@ -1071,6 +1307,24 @@ def top_codices_by_likes(n: nat64, verified_only: bool) -> Vec[CodexListing]:
         return [_codex_listing_record(d) for d in top_codices_by_likes_impl(int(n), bool(verified_only))]
     except Exception as e:
         logger.error(f"top_codices_by_likes: {e}")
+        return []
+
+
+@query
+def top_assistants_by_downloads(n: nat64, verified_only: bool) -> Vec[AssistantListing]:
+    try:
+        return [_assistant_listing_record(d) for d in top_assistants_by_downloads_impl(int(n), bool(verified_only))]
+    except Exception as e:
+        logger.error(f"top_assistants_by_downloads: {e}")
+        return []
+
+
+@query
+def top_assistants_by_likes(n: nat64, verified_only: bool) -> Vec[AssistantListing]:
+    try:
+        return [_assistant_listing_record(d) for d in top_assistants_by_likes_impl(int(n), bool(verified_only))]
+    except Exception as e:
+        logger.error(f"top_assistants_by_likes: {e}")
         return []
 
 

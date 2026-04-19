@@ -13,6 +13,7 @@ from typing import Any, Dict, List
 from _cdk import ic
 from api.licenses import has_active_license
 from core.models import (
+    AssistantListingEntity,
     CodexListingEntity,
     ExtensionListingEntity,
 )
@@ -22,7 +23,7 @@ logger = get_logger("api.verification")
 
 
 VALID_STATUSES = ("unverified", "pending_audit", "verified", "rejected")
-VALID_KINDS = ("ext", "codex")
+VALID_KINDS = ("ext", "codex", "assistant")
 
 
 def _is_controller() -> bool:
@@ -36,11 +37,17 @@ def _safe_codex_alias(codex_id: str) -> str:
     return (codex_id or "").replace("/", "__")
 
 
+def _safe_assistant_alias(assistant_id: str) -> str:
+    return (assistant_id or "").replace("/", "__")
+
+
 def _get_listing(item_kind: str, item_id: str):
     if item_kind == "ext":
         return ExtensionListingEntity[item_id]
     if item_kind == "codex":
         return CodexListingEntity[_safe_codex_alias(item_id)]
+    if item_kind == "assistant":
+        return AssistantListingEntity[_safe_assistant_alias(item_id)]
     return None
 
 
@@ -99,6 +106,16 @@ def list_pending_audits() -> List[Dict[str, Any]]:
                 "developer": str(c.developer),
                 "version": str(c.version),
                 "updated_at": float(c.updated_at or 0),
+            })
+    for a in AssistantListingEntity.instances():
+        if str(a.verification_status) == "pending_audit":
+            out.append({
+                "item_kind": "assistant",
+                "item_id": str(a.assistant_id),
+                "name": str(a.name),
+                "developer": str(a.developer),
+                "version": str(a.version),
+                "updated_at": float(a.updated_at or 0),
             })
     out.sort(key=lambda r: r.get("updated_at", 0), reverse=True)
     return out

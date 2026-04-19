@@ -7,9 +7,14 @@ materialised top-N caches.
 
 from typing import Dict, List
 
+from api.assistants import _to_dict as _assistant_to_dict
 from api.codices import _to_dict as _codex_to_dict
 from api.extensions import _to_dict as _ext_to_dict
-from core.models import CodexListingEntity, ExtensionListingEntity
+from core.models import (
+    AssistantListingEntity,
+    CodexListingEntity,
+    ExtensionListingEntity,
+)
 
 
 def _clamp_n(n: int) -> int:
@@ -61,3 +66,25 @@ def top_codices_by_likes(n: int, verified_only: bool = False) -> List[Dict]:
     items = _filter_active_codices(verified_only)
     items.sort(key=lambda c: (int(c.likes or 0), int(c.installs or 0)), reverse=True)
     return [_codex_to_dict(c) for c in items[: _clamp_n(n)]]
+
+
+def _filter_active_assistants(verified_only: bool) -> List[AssistantListingEntity]:
+    items = [
+        a for a in AssistantListingEntity.instances()
+        if (a.is_active if a.is_active is not None else True)
+    ]
+    if verified_only:
+        items = [a for a in items if str(a.verification_status) == "verified"]
+    return items
+
+
+def top_assistants_by_downloads(n: int, verified_only: bool = False) -> List[Dict]:
+    items = _filter_active_assistants(verified_only)
+    items.sort(key=lambda a: (int(a.installs or 0), int(a.likes or 0)), reverse=True)
+    return [_assistant_to_dict(a) for a in items[: _clamp_n(n)]]
+
+
+def top_assistants_by_likes(n: int, verified_only: bool = False) -> List[Dict]:
+    items = _filter_active_assistants(verified_only)
+    items.sort(key=lambda a: (int(a.likes or 0), int(a.installs or 0)), reverse=True)
+    return [_assistant_to_dict(a) for a in items[: _clamp_n(n)]]

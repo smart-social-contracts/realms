@@ -56,6 +56,60 @@ class ExtensionListingEntity(Entity, TimestampedMixin):
     updated_at                = Float()
 
 
+class AssistantListingEntity(Entity, TimestampedMixin):
+    """AI-assistant listing — a realm-hireable governance agent.
+
+    Marketplace v2.1 third item kind. Stores **what the assistant is**
+    (id, runtime, endpoint, model, requested role + permissions,
+    training disclosure, eval report) and the standard listing plumbing
+    (price, likes, installs, verification, file_registry pointer).
+
+    The realm-side runtime that actually loads a hired assistant runs
+    elsewhere (separate ``assistant_runner`` extension + ``hire_assistant``
+    codex; out of scope for this canister). This entity is the catalog
+    record, not the runtime.
+
+    ``assistant_id`` may contain a single ``/`` to namespace by author
+    (e.g. ``"smart-social-contracts/ashoka"``); the entity's alias key
+    is the slash-safe form (``"smart-social-contracts__ashoka"``),
+    same trick used by ``CodexListingEntity``.
+    """
+    __alias__ = "assistant_alias"
+
+    assistant_alias               = String(max_length=128)
+    assistant_id                  = String(max_length=128)
+    developer                     = String(max_length=128)
+    name                          = String(max_length=256)
+    description                   = String(max_length=2048)
+    version                       = String(max_length=32)
+    price_e8s                     = Integer()
+    pricing_summary               = String(max_length=512)   # free-text e.g. "$200/year per realm"
+    icon                          = String(max_length=64)
+    categories                    = String(max_length=256)
+
+    # AI-specific fields
+    runtime                       = String(max_length=32)    # runpod | openai | anthropic | on_chain_llm | self_hosted
+    endpoint_url                  = String(max_length=512)
+    base_model                    = String(max_length=128)
+    requested_role                = String(max_length=64)    # User role the assistant asks for
+    requested_permissions         = String(max_length=2048)  # comma-separated realm operations
+    domains                       = String(max_length=256)   # governance,tax,justice,…
+    languages                     = String(max_length=128)   # en,es,zh,…
+    training_data_summary         = String(max_length=2048)
+    eval_report_url               = String(max_length=512)
+
+    # Standard listing plumbing (mirrors ExtensionListingEntity / CodexListingEntity)
+    file_registry_canister_id     = String(max_length=64)
+    file_registry_namespace       = String(max_length=256)   # e.g. "assistant/smart-social-contracts/ashoka/0.4.2"
+    installs                      = Integer()
+    likes                         = Integer()
+    verification_status           = String(max_length=32)
+    verification_notes            = String(max_length=1024)
+    is_active                     = Boolean()
+    created_at                    = Float()
+    updated_at                    = Float()
+
+
 class CodexListingEntity(Entity, TimestampedMixin):
     """One row per codex package.
 

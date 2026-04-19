@@ -9,6 +9,7 @@ from typing import Any, Dict, List
 
 from _cdk import ic
 from core.models import (
+    AssistantListingEntity,
     CodexListingEntity,
     ExtensionListingEntity,
     LikeEntity,
@@ -18,7 +19,7 @@ from ic_python_logging import get_logger
 logger = get_logger("api.likes")
 
 
-VALID_KINDS = ("ext", "codex")
+VALID_KINDS = ("ext", "codex", "assistant")
 
 
 def _now() -> float:
@@ -33,6 +34,10 @@ def _safe_codex_alias(codex_id: str) -> str:
     return (codex_id or "").replace("/", "__")
 
 
+def _safe_assistant_alias(assistant_id: str) -> str:
+    return (assistant_id or "").replace("/", "__")
+
+
 def _adjust_counter(item_kind: str, item_id: str, delta: int) -> None:
     if item_kind == "ext":
         ext = ExtensionListingEntity[item_id]
@@ -44,6 +49,11 @@ def _adjust_counter(item_kind: str, item_id: str, delta: int) -> None:
         if c is not None:
             new_val = max(0, int(c.likes or 0) + delta)
             c.likes = new_val
+    elif item_kind == "assistant":
+        a = AssistantListingEntity[_safe_assistant_alias(item_id)]
+        if a is not None:
+            new_val = max(0, int(a.likes or 0) + delta)
+            a.likes = new_val
 
 
 def like_item(principal: str, item_kind: str, item_id: str) -> Dict:
@@ -116,5 +126,7 @@ def recount_listing_likes() -> Dict:
         ext.likes = by_key.get(f"ext|{ext.extension_id}", 0)
     for c in CodexListingEntity.instances():
         c.likes = by_key.get(f"codex|{c.codex_id}", 0)
+    for a in AssistantListingEntity.instances():
+        a.likes = by_key.get(f"assistant|{a.assistant_id}", 0)
 
     return {"success": True, "counters": by_key, "items": len(by_key)}
