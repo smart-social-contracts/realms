@@ -137,8 +137,43 @@ def test_mint_member_invite_returns_member_profile():
     data = result.get("data", {})
     assert data.get("profile") == "member", data
     assert data.get("code"), data
+    assert data.get("code_hash"), (
+        f"Expected code_hash in mint response (used by admin UI for revoke "
+        f"without the plaintext): {data}"
+    )
+    assert data["code"] != data["code_hash"], (
+        f"Plaintext code and code_hash must differ: {data}"
+    )
     assert data.get("registration_url", "").endswith(f"/join?invite={data['code']}"), (
         data.get("registration_url"),
+    )
+    print("✓")
+
+
+def test_listing_does_not_leak_plaintext_code():
+    """get_registration_codes must expose only code_hash, never plaintext."""
+    print("  - test_listing_does_not_leak_plaintext_code...", end=" ")
+    # Mint at least one so the listing is non-empty.
+    _extension_call(
+        "generate_registration_url",
+        {
+            "user_id": "ittest_no_leak",
+            "created_by": "test",
+            "frontend_url": "http://localhost:8000",
+            "expires_in_hours": 24,
+            "profile": "member",
+            "max_uses": 1,
+        },
+    )
+    listing = _extension_call(
+        "get_registration_codes", {"include_used": True, "include_revoked": True}
+    )
+    assert listing.get("success"), listing
+    rows = listing.get("data") or []
+    leaked = [r for r in rows if r.get("code") or r.get("registration_url")]
+    assert not leaked, (
+        f"Listing leaked plaintext for {len(leaked)} row(s); only code_hash "
+        f"should be returned. Sample: {leaked[:1]}"
     )
     print("✓")
 
@@ -266,6 +301,7 @@ if __name__ == "__main__":
     tests = [
         test_environment_ready,
         test_mint_member_invite_returns_member_profile,
+        test_listing_does_not_leak_plaintext_code,
         test_validate_returns_admin_profile,
         test_join_realm_with_invite_grants_invite_profile,
         test_join_realm_without_invite_rejects_admin_when_admin_exists,
