@@ -104,6 +104,36 @@ from ic_python_db import (
     TimestampedMixin,
 )
 
+# ---------------------------------------------------------------------------
+# Monkey-patch: fix Basilisk's _ServiceCall to avoid trap on string encoding.
+#
+# The built-in _ServiceCall.__init__ calls _to_candid_text (which doesn't
+# escape inner quotes in strings) followed by _basilisk_ic.candid_encode()
+# (which calls ic_cdk::trap instead of raising a Python exception on parse
+# errors).  This combination is fatal for inter-canister calls whose
+# arguments contain JSON strings like '{"key":"val"}'.
+#
+# We replace __init__ to skip the broken text-encoding path entirely.
+# The Rust-side typed encoding (encode_service_call_args Priority 1) handles
+# the actual serialisation when _python_call_args + _candid_arg_type are set.
+# ---------------------------------------------------------------------------
+try:
+    import basilisk as _bsk
+    _SC = _bsk._ServiceCall
+
+    def _safe_sc_init(self, canister_principal, method_name, call_args=None,
+                      payment=0, arg_type=None):
+        self._python_call_args = call_args if call_args else ()
+        self._candid_arg_type = arg_type
+        self._raw_args = b'DIDL\x00\x00'
+        self.canister_principal = canister_principal
+        self.method_name = method_name
+        self.payment = payment
+
+    _SC.__init__ = _safe_sc_init
+except Exception:
+    pass
+
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -138,7 +168,10 @@ _NEXT_STEP_DELAY_S = 0
 _db_storage = StableBTreeMap[str, str](
     memory_id=1, max_key_size=200, max_value_size=10000
 )
-Database.init(db_storage=_db_storage, audit_enabled=False)
+try:
+    Database.init(db_storage=_db_storage, audit_enabled=False)
+except RuntimeError:
+    pass  # already initialized (canister upgrade re-runs module code)
 
 
 # ---------------------------------------------------------------------------
@@ -164,6 +197,11 @@ class FileRegistryService(Service):
 # ---------------------------------------------------------------------------
 
 class RealmTargetService(Service):
+    _arg_types = {
+        "install_extension_from_registry": "text",
+        "install_codex_from_registry": "text",
+    }
+
     @service_update
     def install_extension_from_registry(self, args: text) -> text: ...
 
@@ -835,18 +873,17 @@ def _execute_step(task: DeployTask, step: DeployStep):
 
 
 def _schedule_step_runner(task_id: str, delay_s: int = 0) -> None:
-    """Set an IC timer that, on fire, advances ``task_id`` by one step.
+    """Set an IC timer that runs ALL remaining steps for ``task_id``.
 
-    Each fire is its own update message → fresh ~40B instruction
-    budget → no risk of hitting the per-message limit no matter how
-    large the manifest.
+    Uses a single timer callback with a loop: each ``yield`` within a
+    step gives the IC a fresh instruction budget, so there's no risk
+    of hitting the per-message limit.  This avoids the timer-chain
+    pattern (timer → step → schedule next timer) which breaks in
+    Basilisk when a generator callback schedules another generator
+    callback.
     """
     def _cb():
-        # CRITICAL: any uncaught exception in a timer callback traps the
-        # runtime and rolls back state.  Wrap everything.
         try:
-            # Re-load entities inside the callback so we see the latest
-            # writes from the previous step's update message.
             list(DeployStep.instances())
             list(DeployTask.instances())
             task = DeployTask[task_id]
@@ -864,16 +901,23 @@ def _schedule_step_runner(task_id: str, delay_s: int = 0) -> None:
                 task.status = "running"
                 task.started_at = _now_s()
 
-            step = _next_pending_step(task)
-            if step is None:
-                _finalize_task(task)
-                return
+            while True:
+                step = _next_pending_step(task)
+                if step is None:
+                    _finalize_task(task)
+                    return
 
-            yield from _execute_step(task, step)
+                # Check for cancellation between steps.
+                list(DeployTask.instances())
+                task = DeployTask[task_id]
+                if not task or (task.status or "") in _TERMINAL_TASK_STATUSES:
+                    ic.print(
+                        f"[realm_installer] deploy {task_id}: "
+                        f"cancelled mid-run, stopping"
+                    )
+                    return
 
-            # Keep going.  If the just-finished step was the last pending
-            # step, the next callback will finalize the task.
-            _schedule_step_runner(task_id, _NEXT_STEP_DELAY_S)
+                yield from _execute_step(task, step)
         except Exception as e:
             ic.print(
                 f"[realm_installer] timer callback fatal error for "
@@ -1163,6 +1207,125 @@ def _on_init() -> None:
 def _on_post_upgrade() -> None:
     ic.print("[realm_installer] post_upgrade — resuming in-flight deploys")
     _resume_in_flight_deploys()
+
+
+# ---------------------------------------------------------------------------
+# Shell (for basilisk exec / basilisk shell)
+# ---------------------------------------------------------------------------
+
+_shell_namespaces: dict = {}
+
+@update
+def execute_code_shell(code: str) -> str:
+    import io as _io
+    import sys as _sys
+    import traceback as _tb
+
+    caller = str(ic.caller())
+    if caller not in _shell_namespaces:
+        _shell_namespaces[caller] = {
+            "__builtins__": __builtins__,
+            "ic": ic,
+            "json": json,
+            "DeployTask": DeployTask,
+            "DeployStep": DeployStep,
+            "Database": Database,
+            "_db_storage": _db_storage,
+        }
+    ns = _shell_namespaces[caller]
+    out, err = _io.StringIO(), _io.StringIO()
+    _sys.stdout, _sys.stderr = out, err
+    try:
+        exec(code, ns, ns)
+    except Exception:
+        _tb.print_exc()
+    _sys.stdout, _sys.stderr = _sys.__stdout__, _sys.__stderr__
+    return out.getvalue() + err.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# Diagnostic endpoint — manual resume for stuck deploys
+# ---------------------------------------------------------------------------
+
+@update
+def debug_run_one_step(args: text) -> Async[text]:
+    """Directly execute the next pending step for a task, bypassing timers.
+
+    This is a diagnostic endpoint to isolate timer-vs-generator issues.
+    """
+    try:
+        task_id = args.strip()
+        list(DeployStep.instances())
+        list(DeployTask.instances())
+        task = DeployTask[task_id]
+        if not task:
+            return _err(f"task {task_id} not found")
+
+        step = _next_pending_step(task)
+        if step is None:
+            return _ok({"message": "no pending steps", "task_status": task.status})
+
+        if (task.status or "queued") == "queued":
+            task.status = "running"
+            task.started_at = _now_s()
+
+        ic.print(
+            f"[debug_run_one_step] executing step {step.idx} "
+            f"({step.kind} {step.label}) for {task_id}"
+        )
+        yield from _execute_step(task, step)
+
+        remaining = len([s for s in task.steps if s.status == "pending"])
+        return _ok({
+            "step_idx": int(step.idx),
+            "step_kind": step.kind,
+            "step_label": step.label,
+            "step_status": step.status,
+            "step_error": step.error or "",
+            "remaining_pending": remaining,
+        })
+    except Exception as e:
+        ic.print(f"[debug_run_one_step] error: {e}")
+        return _err(f"{type(e).__name__}: {e}")
+
+
+@update
+def debug_resume_deploys(args: text) -> text:
+    """Manually resume any stuck (running/queued) deploys.
+
+    This is a diagnostic/recovery endpoint.  It does the same thing as
+    post_upgrade's _resume_in_flight_deploys but can be called without
+    upgrading the canister.  Returns a summary of what was resumed.
+    """
+    try:
+        list(DeployStep.instances())
+        resumed = []
+        for t in DeployTask.instances():
+            try:
+                if (t.status or "queued") in _ACTIVE_TASK_STATUSES:
+                    pending_steps = [s for s in t.steps if s.status == "pending"]
+                    running_steps = [s for s in t.steps if s.status == "running"]
+                    for s in t.steps:
+                        if s.status == "running":
+                            s.status = "pending"
+                            s.started_at = 0
+                    t.status = "queued"
+                    _schedule_step_runner(t.name, 0)
+                    resumed.append({
+                        "task_id": t.name,
+                        "target": t.target_canister_id,
+                        "pending_steps": len(pending_steps),
+                        "reset_running_steps": len(running_steps),
+                    })
+                    ic.print(
+                        f"[realm_installer] debug_resume: restarting {t.name} "
+                        f"({len(pending_steps)} pending, {len(running_steps)} running→pending)"
+                    )
+            except Exception as e:
+                resumed.append({"task_id": str(t), "error": str(e)})
+        return json.dumps({"success": True, "resumed": resumed})
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
 
 
 # ---------------------------------------------------------------------------
