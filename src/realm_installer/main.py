@@ -120,7 +120,7 @@ MAX_REGISTRY_READ_BYTES = 128 * 1024  # 128 KiB
 
 # Terminal task statuses — used both as filter values and to short-circuit
 # step execution if the task was somehow finalized between callbacks.
-_TERMINAL_TASK_STATUSES = ("completed", "partial", "failed")
+_TERMINAL_TASK_STATUSES = ("completed", "partial", "failed", "cancelled")
 _ACTIVE_TASK_STATUSES = ("queued", "running")
 
 # Per-step short retry/spacing.  All of our steps are essentially I/O
@@ -998,6 +998,71 @@ def deploy_realm(args: text) -> text:
         )
 
 
+@update
+def cancel_deploy(task_id: text) -> text:
+    """Mark a queued/running deploy as ``cancelled`` so timers no-op.
+
+    Returns ``{success, task_id, prev_status, status, cancelled_steps}``.
+
+    Semantics:
+      - Idempotent: cancelling an already-terminal task returns
+        ``success: true`` with ``status`` unchanged.
+      - Pending steps are flipped to ``cancelled``; any step already
+        ``running`` (i.e. the in-flight inter-canister call right now)
+        will complete normally — the next timer fire then sees the
+        terminal task status and exits cleanly.  This avoids leaving
+        the IC management chunk-store in an indeterminate state.
+      - The concurrency interlock against the same target releases
+        immediately (because ``cancelled`` is in
+        ``_TERMINAL_TASK_STATUSES``), so a fresh ``deploy_realm`` for
+        that target succeeds right away.
+
+    Useful for: aborting a known-bad manifest, freeing the target lock
+    after a stuck deploy, and DAO/UI-driven workflows that want a
+    "stop" button.
+    """
+    try:
+        list(DeployStep.instances())
+        list(DeployTask.instances())
+        task = DeployTask[task_id]
+        if task is None:
+            return _err(f"unknown task_id: {task_id}")
+        prev = task.status or "queued"
+        if prev in _TERMINAL_TASK_STATUSES:
+            return _ok({
+                "task_id": task_id,
+                "prev_status": prev,
+                "status": prev,
+                "cancelled_steps": 0,
+                "noop": True,
+            })
+
+        cancelled_steps = 0
+        for s in task.steps:
+            if (s.status or "pending") == "pending":
+                s.status = "cancelled"
+                s.completed_at = _now_s()
+                cancelled_steps += 1
+
+        task.status = "cancelled"
+        task.completed_at = _now_s()
+        if not task.error:
+            task.error = "cancelled by cancel_deploy"
+        ic.print(
+            f"[realm_installer] cancelled deploy {task_id} "
+            f"(prev={prev}, cancelled_steps={cancelled_steps})"
+        )
+        return _ok({
+            "task_id": task_id,
+            "prev_status": prev,
+            "status": "cancelled",
+            "cancelled_steps": cancelled_steps,
+            "noop": False,
+        })
+    except Exception as e:
+        return _err(f"{type(e).__name__}: {e}")
+
+
 @query
 def get_deploy_status(task_id: text) -> text:
     """Return current status + per-step results for a ``deploy_realm`` task.
@@ -1143,6 +1208,11 @@ def info() -> text:
                 "name": "deploy_realm",
                 "kind": "update",
                 "description": "End-to-end realm deploy from a manifest. Returns a task_id immediately; work runs async via IC timers.",
+            },
+            {
+                "name": "cancel_deploy",
+                "kind": "update",
+                "description": "Cancel an in-flight deploy_realm task; releases the per-target concurrency lock.",
             },
             {
                 "name": "get_deploy_status",

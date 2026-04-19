@@ -25,6 +25,7 @@ from realms.cli.commands.installer import (
     _load_manifest,
     _override,
     _unwrap_candid_text,
+    installer_cancel_command,
     installer_deploy_command,
     installer_list_command,
     installer_status_command,
@@ -325,6 +326,52 @@ class TestInstallerStatus:
                    return_value=_mock_dfx(body)):
             with pytest.raises(typer.Exit):
                 installer_status_command(
+                    installer="rinst", task_id="deploy_99", network="local",
+                )
+
+
+class TestInstallerCancel:
+    def test_cancel_active_task(self):
+        body = _candid_wrap(json.dumps({
+            "success": True,
+            "task_id": "deploy_42",
+            "prev_status": "running",
+            "status": "cancelled",
+            "cancelled_steps": 3,
+            "noop": False,
+        }))
+        with patch("realms.cli.commands.installer.subprocess.run",
+                   return_value=_mock_dfx(body)) as run:
+            installer_cancel_command(
+                installer="rinst", task_id="deploy_42", network="local",
+            )
+        argv = run.call_args[0][0]
+        # cancel is an update call
+        assert "--query" not in argv
+        assert "cancel_deploy" in argv
+
+    def test_cancel_terminal_is_noop(self):
+        # Cancelling an already-completed task should print a friendly
+        # warning but not raise.
+        body = _candid_wrap(json.dumps({
+            "success": True, "task_id": "deploy_42",
+            "prev_status": "completed", "status": "completed",
+            "cancelled_steps": 0, "noop": True,
+        }))
+        with patch("realms.cli.commands.installer.subprocess.run",
+                   return_value=_mock_dfx(body)):
+            installer_cancel_command(
+                installer="rinst", task_id="deploy_42", network="local",
+            )
+
+    def test_cancel_unknown_task_exits(self):
+        body = _candid_wrap(json.dumps({
+            "success": False, "error": "unknown task_id: deploy_99",
+        }))
+        with patch("realms.cli.commands.installer.subprocess.run",
+                   return_value=_mock_dfx(body)):
+            with pytest.raises(typer.Exit):
+                installer_cancel_command(
                     installer="rinst", task_id="deploy_99", network="local",
                 )
 

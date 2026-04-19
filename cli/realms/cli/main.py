@@ -16,6 +16,7 @@ from .commands.export_data import export_data_command
 from .commands.extension import extension_command, codex_command
 from .commands.wasm_registry import wasm_command
 from .commands.installer import (
+    installer_cancel_command,
     installer_deploy_command,
     installer_list_command,
     installer_status_command,
@@ -399,6 +400,28 @@ def installer_status(
 ) -> None:
     """Print the current status + per-step results for a deploy task."""
     installer_status_command(
+        installer=installer, task_id=task_id,
+        network=network, identity=identity,
+    )
+
+
+@installer_app.command("cancel")
+def installer_cancel(
+    installer: str = typer.Option(
+        ..., "--installer", "-I", help="realm_installer canister ID"
+    ),
+    task_id: str = typer.Option(
+        ..., "--task-id", help="task_id of the deploy to cancel"
+    ),
+    network: str = typer.Option(
+        "ic", "--network", "-n", help="Network: local, staging, ic"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="dfx identity to use"
+    ),
+) -> None:
+    """Cancel an in-flight deploy_realm task (idempotent)."""
+    installer_cancel_command(
         installer=installer, task_id=task_id,
         network=network, identity=identity,
     )

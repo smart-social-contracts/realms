@@ -349,6 +349,44 @@ def installer_deploy_command(
     raise typer.Exit(1)
 
 
+def installer_cancel_command(
+    installer: str,
+    task_id: str,
+    network: str = "ic",
+    identity: Optional[str] = None,
+) -> None:
+    """Cancel an in-flight ``deploy_realm`` task.
+
+    Idempotent: cancelling a terminal task is a no-op success.  Useful
+    for freeing the per-target concurrency lock after a stuck deploy
+    or for aborting a known-bad manifest.
+    """
+    body = _dfx_call(
+        installer, "cancel_deploy",
+        _candid_text_arg(task_id),
+        network, identity=identity, timeout=60,
+    )
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError:
+        console.print(f"[red]unparseable cancel response: {body[:200]}[/red]")
+        raise typer.Exit(1)
+    if not data.get("success"):
+        console.print(f"[red]Error: {data.get('error')}[/red]")
+        raise typer.Exit(1)
+    if data.get("noop"):
+        console.print(
+            f"[yellow]task {task_id} already terminal "
+            f"(status={data.get('status')}); no-op[/yellow]"
+        )
+        return
+    console.print(
+        f"[green]✓ cancelled[/green] {task_id} "
+        f"(prev={data.get('prev_status')}, "
+        f"cancelled_steps={data.get('cancelled_steps')})"
+    )
+
+
 def installer_status_command(
     installer: str,
     task_id: str,

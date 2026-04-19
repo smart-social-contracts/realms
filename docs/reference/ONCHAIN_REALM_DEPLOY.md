@@ -51,6 +51,7 @@ beyond firing the initial call.
 ```candid
 service : {
   "deploy_realm"      : (text) -> (text);
+  "cancel_deploy"     : (text) -> (text);
   "get_deploy_status" : (text) -> (text) query;
   "list_deploys"      : ()     -> (text) query;
   …
@@ -136,6 +137,25 @@ Terminal statuses:
 * `failed`    — fatal error in the orchestrator itself
   (e.g. couldn't load the task from stable memory).
 
+### `cancel_deploy(task_id) → cancel_json`
+
+Mark an in-flight deploy as `cancelled` so subsequent timer fires no-op.
+
+```json
+{ "success": true, "task_id": "deploy_…",
+  "prev_status": "running", "status": "cancelled",
+  "cancelled_steps": 2, "noop": false }
+```
+
+* **Idempotent** — cancelling a task that's already terminal returns
+  `success: true` with `noop: true` and the existing status.
+* Steps already in flight (the inter-canister call running *right
+  now*) finish normally; the next timer fire sees the terminal task
+  status and exits without scheduling more work.
+* The per-target concurrency lock is released immediately, so a
+  fresh `deploy_realm` against the same `target_canister_id`
+  succeeds right away.
+
 ### `list_deploys() → list_json`
 
 Returns a summary of every `DeployTask` ever recorded by this
@@ -158,6 +178,9 @@ realms installer deploy -I <id> -m manifest.json --no-wait
 
 # poll an existing task
 realms installer status -I <id> --task-id deploy_…  --network staging
+
+# cancel an in-flight task (idempotent)
+realms installer cancel -I <id> --task-id deploy_…  --network staging
 
 # list everything this installer has run
 realms installer list   -I <id> --network staging
@@ -182,9 +205,9 @@ one (instead of `Σ` of all of them).
 
 `deploy_realm` rejects a new request if any task with status
 `queued | running` exists for the same `target_canister_id`. To force a
-retry after a crash you currently need to wait until the in-flight
-task drains (or recreate the installer). A future iteration may add an
-explicit `cancel_deploy(task_id)` endpoint.
+retry after a stuck deploy, call `cancel_deploy(task_id)` — it flips
+the task to `cancelled` (a terminal status), which releases the
+per-target lock immediately so a fresh `deploy_realm` succeeds.
 
 ### Upgrade-mid-deploy
 

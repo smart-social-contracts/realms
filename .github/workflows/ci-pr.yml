@@ -105,6 +105,23 @@ jobs:
               --file deployments/local-mundus.yml \
               --stages 0,1,2,3
 
+      # Run the realm_installer (#192) integration suite against the
+      # live replica that stages 0-3 just bootstrapped.  Both files
+      # auto-skip with exit 0 when their prereqs are missing, so it's
+      # safe to leave them on even if a future CI variant doesn't
+      # deploy the installer.
+      - name: realm_installer integration tests
+        run: |
+          set +e
+          python3 tests/integration/test_realm_installer_api.py
+          api_rc=$?
+          python3 tests/integration/test_realm_installer_e2e.py
+          e2e_rc=$?
+          if [ $api_rc -ne 0 ] || [ $e2e_rc -ne 0 ]; then
+            echo "::error::realm_installer integration tests failed (api=$api_rc e2e=$e2e_rc)"
+            exit 1
+          fi
+
       - name: Stop local replica
         if: always()
         run: dfx stop || true
