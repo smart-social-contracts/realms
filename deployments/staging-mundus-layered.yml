@@ -12,7 +12,13 @@ version: 2
 network: staging
 
 # Pre-existing infrastructure on the staging subnet.
-# These are NOT installed by CI; they're long-lived. CI only verifies them.
+# These are NOT installed by CI; they're long-lived.  CI only verifies
+# them (stage 0 skips `dfx deploy` when a canister_id is pinned).
+#
+# realm_installer is pinned but ALSO upgraded by bootstrap-infra (see
+# the "Upgrade realm_installer" step) so it always matches the code on
+# main.  This is required since ci_install_mundus.py stage 2 now calls
+# deploy_realm, which must exist on the installer canister.
 infrastructure_overrides:
   file_registry:
     canister_id: iebdk-kqaaa-aaaau-agoxq-cai
