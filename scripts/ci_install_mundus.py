@@ -458,6 +458,294 @@ def _register_realm_with_registry(
         print(f"   ⚠️  registration of {name} timed out after 120s")
 
 
+# ---------------------------------------------------------------------------
+# Stage 2 — install mundus members via realm_installer.deploy_realm
+#
+# Each realm's WASM + extensions + codices are bundled into a single
+# manifest and handed to `realm_installer.deploy_realm` in one inter-
+# canister call. The installer drives every step on-chain via IC
+# timers (each step is its own update message). We poll
+# `get_deploy_status` until terminal and surface per-step failures.
+#
+# This replaces the previous per-realm sequence of:
+#     realms wasm install    (1×)
+#   + realms extension registry-install  (N×)
+#   + realms codex registry-install      (M×)
+# with a single dfx call per realm.  The on-chain installer is now the
+# source of truth for "what got installed where", which is the
+# prerequisite for blackholing realm_installer / removing the CI
+# principal as a controller of every realm in production.
+# ---------------------------------------------------------------------------
+
+
+def _build_deploy_manifest(
+    member: Dict[str, Any],
+    *,
+    target_canister_id: str,
+    file_registry: str,
+    base_version: str,
+    install_mode: str,
+    artifacts: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Build the manifest that goes into ``deploy_realm``.
+
+    Mirrors the per-step work the old per-realm loop did, but as a
+    single declarative payload the on-chain installer can iterate over.
+    """
+    wasm_spec = _wasm_spec_for_member(member, base_version)
+    manifest: Dict[str, Any] = {
+        "target_canister_id": target_canister_id,
+        "registry_canister_id": file_registry,
+        "wasm": {
+            "namespace": "wasm",
+            "path": wasm_spec["path"],
+            "mode": install_mode,
+            # Empty init arg matches the existing realms-cli default —
+            # canisters with non-trivial init args set them outside of
+            # the deploy flow today (issue #168).
+            "init_arg_b64": "",
+        },
+    }
+    extensions = _resolve_member_extensions(member, artifacts)
+    if extensions:
+        manifest["extensions"] = [{"id": e, "version": None} for e in extensions]
+    codices = _resolve_member_codices(member, artifacts)
+    if codices:
+        # run_init defaults to True on the installer side. We still
+        # serialize it explicitly so reading the manifest from logs
+        # makes the behavior obvious without cross-referencing the
+        # endpoint docs.
+        manifest["codices"] = [
+            {"id": c, "version": None, "run_init": True} for c in codices
+        ]
+    return manifest
+
+
+def _dfx_call_text(
+    canister: str,
+    method: str,
+    arg_text: str,
+    network: str,
+    *,
+    query: bool = False,
+    timeout: int = 600,
+) -> str:
+    """Call ``canister.method(arg_text)`` where the candid arg is `text`.
+
+    We round-trip the JSON through a temp `--argument-file` because the
+    JSON contains characters (quotes, braces) that are painful to
+    escape on a shell command line.
+
+    Returns the stripped stdout of `dfx canister call`.  The caller is
+    responsible for parsing the returned candid text payload.
+    """
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".did", delete=False
+    ) as fh:
+        # dfx --argument-file accepts a candid expression directly.
+        # text values are written as candid string literals — escape
+        # backslashes and double-quotes per Candid's text rules.
+        escaped = arg_text.replace("\\", "\\\\").replace("\"", "\\\"")
+        fh.write(f'("{escaped}")')
+        arg_path = fh.name
+    try:
+        cmd = ["dfx", "canister", "call", "--network", network]
+        if query:
+            cmd.append("--query")
+        cmd += [canister, method, "--argument-file", arg_path,
+                "--output", "raw"]
+        # --output raw returns the candid hex bytes; we instead want the
+        # decoded text, so drop it and parse the default output below.
+        cmd = [c for c in cmd if c not in ("--output", "raw")]
+        cp = subprocess.run(
+            cmd, capture_output=True, text=True, check=True, timeout=timeout
+        )
+        return (cp.stdout or "").strip()
+    finally:
+        try:
+            os.unlink(arg_path)
+        except OSError:
+            pass
+
+
+_CANDID_TEXT_RE = re.compile(r'^\s*\(\s*"((?:[^"\\]|\\.)*)"\s*,?\s*\)\s*$', re.DOTALL)
+
+
+def _unwrap_candid_text(out: str) -> str:
+    """Extract the inner string from a `("...",)` candid wrapper.
+
+    Handles dfx's standard candid record-printer output for a single
+    text return value.  Falls back to returning the raw output so we
+    don't lose any error context if the format ever changes.
+    """
+    m = _CANDID_TEXT_RE.match(out)
+    if not m:
+        return out
+    raw = m.group(1)
+    # Undo candid escapes for the characters we're likely to encounter
+    # in JSON. dfx escapes backslashes, double-quotes, and a few
+    # whitespace chars.
+    return (
+        raw.replace("\\\\", "\\")
+        .replace('\\"', '"')
+        .replace("\\n", "\n")
+        .replace("\\r", "\r")
+        .replace("\\t", "\t")
+    )
+
+
+def _format_deploy_failures(status: Dict[str, Any]) -> str:
+    """Pretty-print per-step failures in a deploy_realm status payload."""
+    lines: List[str] = []
+    wasm = status.get("wasm")
+    if wasm and wasm.get("status") == "failed":
+        lines.append(f"     ✗ wasm ({wasm.get('label')}): {wasm.get('error')}")
+    for ext in status.get("extensions") or []:
+        if ext.get("status") == "failed":
+            lines.append(
+                f"     ✗ extension {ext.get('label')}: {ext.get('error')}"
+            )
+    for cdx in status.get("codices") or []:
+        if cdx.get("status") == "failed":
+            lines.append(f"     ✗ codex {cdx.get('label')}: {cdx.get('error')}")
+    return "\n".join(lines) if lines else "     (no per-step failures recorded)"
+
+
+def _kickoff_deploy(
+    member: Dict[str, Any],
+    *,
+    realm_installer: str,
+    file_registry: str,
+    base_version: str,
+    default_mode: str,
+    artifacts: Dict[str, Any],
+    network: str,
+) -> Dict[str, Any]:
+    """Resolve canister id, add controller, fire deploy_realm.
+
+    Returns ``{"member", "canister_id", "task_id", "steps_count"}`` for
+    use by the polling phase.  Raises SystemExit on hard errors so a
+    bad realm aborts the whole CI run instead of silently scheduling a
+    no-op poll.
+    """
+    name = member["name"]
+    canister_id = member.get("canister_id") or _canister_id(name, network)
+    if not canister_id:
+        _dfx("canister", "create", name, network=network)
+        canister_id = _canister_id(name, network)
+
+    member_mode = (member.get("install_mode") or default_mode).strip()
+    wasm_spec = _wasm_spec_for_member(member, base_version)
+    print(
+        f"\n   ▸ {name} ({canister_id})  [mode={member_mode}]"
+        f"  [wasm={wasm_spec['source']} → {wasm_spec['path']}]"
+    )
+    # realm_installer must be a controller of the target realm so its
+    # inter-canister calls into install_extension_from_registry /
+    # install_codex_from_registry are accepted by realm_backend's
+    # controller-bypass auth path (core/access.py).
+    _add_controller(canister_id, realm_installer, network)
+
+    manifest = _build_deploy_manifest(
+        member,
+        target_canister_id=canister_id,
+        file_registry=file_registry,
+        base_version=base_version,
+        install_mode=member_mode,
+        artifacts=artifacts,
+    )
+    manifest_json = json.dumps(manifest)
+    print(f"     manifest: {manifest_json}")
+
+    kickoff = _unwrap_candid_text(_dfx_call_text(
+        realm_installer, "deploy_realm", manifest_json,
+        network=network, timeout=120,
+    ))
+    try:
+        kickoff_data = json.loads(kickoff)
+    except json.JSONDecodeError as e:
+        raise SystemExit(
+            f"ERROR: deploy_realm returned non-JSON for {name}: "
+            f"{kickoff[:300]} ({e})"
+        )
+    if not kickoff_data.get("success"):
+        raise SystemExit(
+            f"ERROR: deploy_realm rejected for {name}: "
+            f"{kickoff_data.get('error')}"
+        )
+    task_id = kickoff_data["task_id"]
+    print(
+        f"     queued deploy_realm task_id={task_id} "
+        f"(steps={kickoff_data.get('steps_count')})"
+    )
+    return {
+        "member": member,
+        "canister_id": canister_id,
+        "task_id": task_id,
+        "steps_count": int(kickoff_data.get("steps_count", 0)),
+    }
+
+
+def _poll_all_deploys(
+    realm_installer: str,
+    pending: List[Dict[str, Any]],
+    network: str,
+    *,
+    timeout: int = 1800,
+    interval: float = 5.0,
+) -> Dict[str, Dict[str, Any]]:
+    """Poll every queued deploy in ``pending`` until each reaches terminal.
+
+    All N tasks share one polling loop so we only sleep `interval`
+    seconds between rounds (instead of N × interval). Each round
+    fires a query per still-active task (queries are cheap and concurrent
+    on the IC).
+
+    Returns ``{task_id: final_status_dict}``.
+    """
+    deadline = time.time() + timeout
+    remaining = {p["task_id"]: p for p in pending}
+    finals: Dict[str, Dict[str, Any]] = {}
+    last_status: Dict[str, str] = {}
+
+    while remaining and time.time() < deadline:
+        for task_id in list(remaining.keys()):
+            out = _dfx_call_text(
+                realm_installer, "get_deploy_status", task_id,
+                network=network, query=True, timeout=60,
+            )
+            body = _unwrap_candid_text(out)
+            try:
+                data = json.loads(body)
+            except json.JSONDecodeError:
+                print(f"   ⚠️  unparseable get_deploy_status({task_id}): "
+                      f"{body[:200]}")
+                continue
+            if not data.get("success", True):
+                raise SystemExit(
+                    f"ERROR: get_deploy_status({task_id}) returned: "
+                    f"{data.get('error')}"
+                )
+            status = data.get("status", "")
+            if status != last_status.get(task_id, ""):
+                name = remaining[task_id]["member"].get("name", "?")
+                print(f"   • {name:<24s} {task_id}: {status}")
+                last_status[task_id] = status
+            if status in ("completed", "partial", "failed"):
+                finals[task_id] = data
+                del remaining[task_id]
+        if remaining:
+            time.sleep(interval)
+
+    if remaining:
+        names = ", ".join(p["member"].get("name", "?") for p in remaining.values())
+        raise SystemExit(
+            f"ERROR: deploys did not reach terminal status within {timeout}s: "
+            f"{names}"
+        )
+    return finals
+
+
 def stage2_install(descriptor: Dict[str, Any], infra_ids: Dict[str, str]) -> None:
     network = descriptor["network"]
     artifacts = descriptor.get("artifacts") or {}
@@ -473,73 +761,58 @@ def stage2_install(descriptor: Dict[str, Any], infra_ids: Dict[str, str]) -> Non
     # ephemeral replica where there's nothing to upgrade.
     default_mode = (descriptor.get("install_mode") or "upgrade").strip()
 
-    print("\n┌─ stage 2: install mundus members " + "─" * 32)
+    print("\n┌─ stage 2: install mundus members (via deploy_realm) "
+          + "─" * 14)
 
-    for member in descriptor.get("mundus") or []:
-        name = member["name"]
-        canister_id = member.get("canister_id") or _canister_id(name, network)
-        if not canister_id:
-            _dfx("canister", "create", name, network=network)
-            canister_id = _canister_id(name, network)
+    members = descriptor.get("mundus") or []
+    if not members:
+        print("   (no mundus members)")
+        return
 
-        member_mode = (member.get("install_mode") or default_mode).strip()
-        wasm_spec = _wasm_spec_for_member(member, base_version)
-        print(
-            f"\n   ▸ {name} ({canister_id})  [mode={member_mode}]"
-            f"  [wasm={wasm_spec['source']} → {wasm_spec['path']}]"
-        )
-        _add_controller(canister_id, realm_installer, network)
+    # PHASE 1: add controllers + fire deploy_realm for every member.
+    # All kickoffs are independent and fast (<1s each) so we do them
+    # serially for predictable log output. The expensive part — waiting
+    # for the actual install — runs in parallel in PHASE 2.
+    pending: List[Dict[str, Any]] = []
+    for member in members:
+        pending.append(_kickoff_deploy(
+            member,
+            realm_installer=realm_installer,
+            file_registry=file_registry,
+            base_version=base_version,
+            default_mode=default_mode,
+            artifacts=artifacts,
+            network=network,
+        ))
 
-        # Install (or upgrade) the WASM via realm_installer. We pass
-        # --wasm-path explicitly so each member gets its own canister-
-        # type WASM (realm_backend for realms, realm_registry_backend
-        # for the registry, etc.) rather than blindly installing the
-        # realm-base WASM into every member.
-        cp = _run([
-            "realms", "wasm", "install",
-            "--target", canister_id,
-            "--version", base_version,
-            "--installer", realm_installer,
-            "--registry", file_registry,
-            "--network", network,
-            "--mode", member_mode,
-            "--wasm-path", wasm_spec["path"],
-        ], capture_output=True)
-        # realms wasm install exits 0 even when the underlying installer
-        # canister returns success=false — surface that here so the
-        # pipeline doesn't silently proceed to install codices on an
-        # empty canister.
-        if "\"success\":false" in (cp.stdout or "") + (cp.stderr or ""):
-            print(cp.stdout)
-            print(cp.stderr, file=sys.stderr)
-            raise SystemExit(
-                f"ERROR: realm_installer.install_realm_backend failed for {name}"
-            )
-        else:
-            print(cp.stdout)
+    # PHASE 2: poll every in-flight deploy in a single shared loop. The
+    # target realms are independent canisters → their installs run
+    # concurrently on different IC subnet replicas. With ~3 realms this
+    # collapses ~13m of serial work into ~5m wall-clock.
+    print(f"\n   ⏳ awaiting {len(pending)} deploy(s) (timeout 1800s)…")
+    finals = _poll_all_deploys(
+        realm_installer, pending, network,
+        timeout=1800, interval=5.0,
+    )
 
-        for ext in _resolve_member_extensions(member, artifacts):
-            _run([
-                "realms", "extension", "registry-install",
-                "--extension-id", ext,
-                "--canister", canister_id,
-                "--registry", file_registry,
-                "--network", network,
-            ])
-
-        for codex in _resolve_member_codices(member, artifacts):
-            _run([
-                "realms", "codex", "registry-install",
-                "--codex-id", codex,
-                "--canister", canister_id,
-                "--registry", file_registry,
-                "--network", network,
-            ])
+    # PHASE 3: validate per-realm outcomes + register with registry.
+    failures: List[str] = []
+    for p in pending:
+        name = p["member"].get("name", "?")
+        final = finals.get(p["task_id"]) or {}
+        terminal = final.get("status")
+        if terminal != "completed":
+            print(f"\n   ✗ {name} deploy ended in status '{terminal}':")
+            print(_format_deploy_failures(final))
+            failures.append(name)
+            continue
+        print(f"   ✅ {name} deploy completed (task_id={p['task_id']})")
 
         # Register this realm with the central registry (best-effort,
         # non-fatal). Only realm-type members that explicitly opt in
         # via `register_with_registry: true` are registered, and only
         # if the descriptor actually contains a registry member.
+        member = p["member"]
         if (
             (member.get("type") or "realm").strip() == "realm"
             and bool(member.get("register_with_registry"))
@@ -551,6 +824,12 @@ def stage2_install(descriptor: Dict[str, Any], infra_ids: Dict[str, str]) -> Non
                 or _canister_id(registry_member["name"], network) or "",
                 network,
             )
+
+    if failures:
+        raise SystemExit(
+            f"ERROR: {len(failures)} realm deploy(s) did not complete: "
+            f"{', '.join(failures)}"
+        )
 
     print("\n   ✅ mundus installed")
 
