@@ -80,8 +80,9 @@ sys.modules["_cdk"] = sys.modules["_cdk_marketplace"]
 
 _short_aliases = ["core", "core.models", "api"]
 _api_short_modules = [
-    "api.config", "api.extensions", "api.codices", "api.likes",
-    "api.rankings", "api.licenses", "api.verification",
+    "api.config", "api.extensions", "api.codices", "api.assistants",
+    "api.likes", "api.rankings", "api.licenses", "api.verification",
+    "api.status",
 ]
 
 # 1. Install short-name aliases pointing at marketplace_backend.*.
@@ -167,6 +168,7 @@ def _reset_state():
     _ensure_db()
     """Wipe all marketplace entities before each test."""
     from marketplace_backend.core.models import (
+        AssistantListingEntity,
         CodexListingEntity,
         DeveloperLicenseEntity,
         ExtensionListingEntity,
@@ -177,6 +179,7 @@ def _reset_state():
     for cls in (
         ExtensionListingEntity,
         CodexListingEntity,
+        AssistantListingEntity,
         PurchaseEntity,
         LikeEntity,
         DeveloperLicenseEntity,

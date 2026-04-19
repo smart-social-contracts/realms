@@ -27,11 +27,14 @@ realms marketplace deploy --network ic --identity my-pem \
 
 ## What you get
 
-### Two kinds of listings
+### Three kinds of listings
 
 - **Extensions** — keyed by `extension_id`, namespace `ext/<id>/<version>`.
 - **Codices** — keyed by `codex_id` (may contain a `/` for `realm_type/codex_id`),
   namespace `codex/<id>/<version>`.
+- **AI Assistants** — keyed by `assistant_id` (may contain a `/` for
+  `author/assistant_id`), namespace `assistant/<id>/<version>`. See
+  the [Assistants section](#ai-assistants) below for the full field set.
 
 Both kinds share:
 
@@ -48,16 +51,19 @@ row count in `LikeEntity`. `my_likes()` returns the caller's likes.
 
 ### Rankings (Top Charts)
 
-Four query endpoints, each returns top-N by the relevant metric and
+Six query endpoints, each returns top-N by the relevant metric and
 respects an optional `verified_only` flag:
 
 - `top_extensions_by_downloads(n: nat64, verified_only: bool)`
 - `top_extensions_by_likes(n: nat64, verified_only: bool)`
 - `top_codices_by_downloads(n: nat64, verified_only: bool)`
 - `top_codices_by_likes(n: nat64, verified_only: bool)`
+- `top_assistants_by_downloads(n: nat64, verified_only: bool)`
+- `top_assistants_by_likes(n: nat64, verified_only: bool)`
 
 The frontend's homepage exposes them via two toggles
-(extensions ⇄ codices, downloads ⇄ likes) plus the verified filter.
+(extensions ⇄ codices ⇄ assistants, downloads ⇄ likes) plus the
+verified filter.
 
 ### Open uploads
 
@@ -123,10 +129,100 @@ Stable storage uses ic_python_db Entities:
 
 - `ExtensionListingEntity` — keyed by `extension_id`.
 - `CodexListingEntity` — keyed by a slash-safe alias (`syntropia/membership` ↔ `syntropia__membership`). Original id is preserved as a separate field.
-- `PurchaseEntity` — one row per `buy_*` call. `item_kind = "ext" | "codex"`.
+- `AssistantListingEntity` — keyed by a slash-safe alias (`smart-social-contracts/ashoka` ↔ `smart-social-contracts__ashoka`). Carries AI-specific fields (runtime, endpoint_url, base_model, requested_role, requested_permissions, domains, languages, training_data_summary, eval_report_url, pricing_summary) on top of the standard listing fields.
+- `PurchaseEntity` — one row per `buy_*` call. `item_kind = "ext" | "codex" | "assistant"`.
 - `LikeEntity` — one row per `(principal, item_kind, item_id)` tuple, composite key `"{principal}|{kind}|{id}"`.
 - `DeveloperLicenseEntity` — keyed by principal.
 - `MarketplaceConfigEntity` — singleton (`alias = "config"`) holding the file_registry canister id, billing service principal, and license pricing.
+
+## AI Assistants
+
+A third item kind that lets developers publish realm-hireable AI
+governance agents — Ashoka, Geister, and the like. The marketplace
+catalogs **what the assistant is** (where the model lives, what role
+and permissions it requests, what specialties it claims, what
+training data it discloses); the runtime that actually loads a hired
+assistant lives on the realm side and is the subject of a separate
+follow-up PR (`assistant_runner` extension + `hire_assistant` codex).
+
+### Lifecycle
+
+1. **Author publishes** the assistant via `/upload` (or
+   `dfx canister call marketplace_backend create_assistant`). Files
+   (system prompt, MCP tool manifest, eval transcripts) get uploaded
+   to the file_registry namespace `assistant/<id>/<version>`. The
+   listing carries a pointer to that namespace plus the AI-specific
+   metadata.
+2. **A realm hires the assistant** via a normal governance proposal
+   (drafted from the marketplace UI's Hire button → goes through the
+   realm's `hire_assistant_codex`). On approval the realm's
+   `assistant_runner` extension allocates a service principal,
+   creates a `User` entity for the assistant with the requested role
+   and permissions, and starts subscribing to the realm's event feed.
+3. **Consumer extensions** (`llm_chat`, `codex_viewer`, future
+   surfaces) query `realm_backend.list_active_assistants()` and route
+   their calls to the right one — directly via the assistant's
+   declared `endpoint_url`/`runtime`.
+
+### Listing fields
+
+Standard marketplace fields (id, name, description, version, price,
+icon, categories, file_registry pointer, likes, installs,
+verification status) plus AI-specific ones:
+
+| Field | Purpose |
+|---|---|
+| `runtime` | `runpod` / `openai` / `anthropic` / `on_chain_llm` / `self_hosted` — host needs to know how to call the model. |
+| `endpoint_url` | HTTPS URL or canister id for inference. |
+| `base_model` | e.g. `"gpt-4o"`, `"llama-3.1-70b"`, `"geister-mistral-7b-finetune"`. Disclosure for users + audit. |
+| `requested_role` | The User role the assistant asks the realm to assign it (`auditor`, `analyst`, `proposer`, …). |
+| `requested_permissions` | Comma-separated realm operations (e.g. `read_proposals,read_treasury,submit_proposal`). The hire-vote decides whether to grant. |
+| `domains` | Comma-separated specialty tags (`governance,tax,justice`). Browse page filter. |
+| `languages` | Comma-separated language tags (`en,es,zh`). |
+| `training_data_summary` | Free-text disclosure for the audit process. |
+| `eval_report_url` | External link or path inside the file_registry namespace pointing at evaluation transcripts. |
+| `pricing_summary` | Free-text shape (e.g. `"$200/year per realm"`). The numeric `price_e8s` remains display-only. |
+
+### Endpoints
+
+Same shape as extensions and codices, suffix `_assistant`:
+
+```
+create_assistant(AssistantInput) -> GenericResult
+update_assistant(AssistantInput) -> GenericResult
+delist_assistant(text) -> GenericResult
+get_assistant_details(text) -> AssistantResult
+list_marketplace_assistants(page, per_page, verified_only) -> AssistantListResult
+search_assistants(text, verified_only) -> Vec[AssistantListing]
+get_my_assistants() -> Vec[AssistantListing]
+buy_assistant(text) -> GenericResult
+has_purchased_assistant(text, text) -> bool
+top_assistants_by_downloads(nat64, bool) -> Vec[AssistantListing]
+top_assistants_by_likes(nat64, bool) -> Vec[AssistantListing]
+```
+
+`like_item("assistant", id)` and `request_audit("assistant", id)`
+work via the existing generic endpoints — `VALID_KINDS` was extended
+to include `"assistant"`.
+
+### Realm-side hiring (out of this canister)
+
+The hiring flow itself is a governance act, not a marketplace act.
+The marketplace's `buy_assistant` is **bookkeeping only** — it
+records the install and credits the developer. The actual flow is:
+
+1. UI (e.g. the realm's `package_manager` extension) drafts a
+   `HireAssistantProposal` carrying the marketplace listing pointer
+   and the realm-scope permission manifest.
+2. Realm's normal voting rules apply.
+3. On approval, realm_backend creates the assistant's `User`, assigns
+   the requested role/permissions, registers its endpoint config,
+   starts its event-feed subscription.
+4. From that moment, `llm_chat` / `codex_viewer` / any other consumer
+   surface routes its calls to the active assistant.
+
+This realm-side wiring lives in a separate PR — see the
+follow-up plan in the repo's plan artifacts.
 
 ## CLI
 

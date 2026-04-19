@@ -126,7 +126,57 @@ expect "top_extensions_by_downloads contains demo-voting" 'extension_id = "demo-
 out=$(dfx canister call "$MP" top_extensions_by_likes '(5 : nat64, false)')
 expect "top_extensions_by_likes contains demo-voting"     'extension_id = "demo-voting"' "$out"
 
-echo "=== 6. Codex flow"
+echo "=== 6a. Assistant flow"
+out=$(dfx canister call "$MP" create_assistant '(record {
+  assistant_id = "smart-social-contracts/ashoka";
+  name = "Ashoka";
+  description = "Governance LLM agent — smoke test";
+  version = "0.4.2";
+  price_e8s = 0 : nat64;
+  pricing_summary = "$200/year per realm";
+  icon = "🤖";
+  categories = "oversight";
+  runtime = "openai";
+  endpoint_url = "https://api.openai.com/v1/chat/completions";
+  base_model = "gpt-4o";
+  requested_role = "auditor";
+  requested_permissions = "read_proposals,read_treasury,submit_proposal";
+  domains = "governance,tax";
+  languages = "en,es";
+  training_data_summary = "smoke";
+  eval_report_url = "https://example.org/evals/ashoka.md";
+  file_registry_canister_id = "'"$FR"'";
+  file_registry_namespace = "assistant/smart-social-contracts/ashoka/0.4.2";
+})')
+case "$out" in
+  *'Ok = "created:smart-social-contracts/ashoka"'*|*'Ok = "updated:smart-social-contracts/ashoka"'*)
+    green "  ✓ create_assistant Ok=created|updated"
+    ;;
+  *)
+    red   "  ✗ create_assistant — got: $out"
+    exit 1
+    ;;
+esac
+
+out=$(dfx canister call "$MP" buy_assistant '("smart-social-contracts/ashoka")')
+expect "buy_assistant Ok" "Ok" "$out"
+
+out=$(dfx canister call "$MP" like_item '("assistant", "smart-social-contracts/ashoka")')
+case "$out" in
+  *'Ok = "created"'*|*'Ok = "exists"'*)
+    green "  ✓ like_item assistant returns Ok"
+    ;;
+  *)
+    red   "  ✗ like_item assistant — got: $out"; exit 1 ;;
+esac
+
+out=$(dfx canister call "$MP" top_assistants_by_downloads '(5 : nat64, false)')
+expect "top_assistants_by_downloads contains ashoka" 'assistant_id = "smart-social-contracts/ashoka"' "$out"
+
+out=$(dfx canister call "$MP" status)
+expect "status reports assistants_count >= 1" "assistants_count" "$out"
+
+echo "=== 6b. Codex flow"
 out=$(dfx canister call "$MP" create_codex '(record {
   codex_id = "syntropia/membership"; realm_type = "syntropia";
   name = "Membership"; description = "onboarding"; version = "0.1.0";

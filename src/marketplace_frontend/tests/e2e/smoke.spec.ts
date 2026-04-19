@@ -75,6 +75,21 @@ test.describe('marketplace_frontend smoke', () => {
     expect(optionTexts).toEqual(expect.arrayContaining(['Newest', 'Most installs', 'Most likes']));
   });
 
+  test('assistants page renders search input, domain + sort dropdowns', async ({ page }) => {
+    await page.goto('/assistants');
+    await expect(page.getByRole('heading', { name: 'AI Assistants' })).toBeVisible();
+    await expect(page.getByPlaceholder('Search assistants…')).toBeVisible();
+    // Domain + sort selects both present.
+    const selects = page.locator('select');
+    await expect(selects).toHaveCount(2);
+  });
+
+  test('top charts has Assistants kind toggle', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: /^Assistants$/ })).toBeVisible();
+    await page.getByRole('button', { name: /^Assistants$/ }).click();
+  });
+
   test('upload page gates on sign-in', async ({ page }) => {
     await page.goto('/upload');
     await expect(page.getByRole('heading', { name: 'Upload' })).toBeVisible();

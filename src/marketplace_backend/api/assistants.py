@@ -240,7 +240,8 @@ def search_assistants(query: str, verified_only: bool) -> List[Dict]:
         haystack = " ".join([
             str(a.name or ""), str(a.description or ""), str(a.categories or ""),
             str(a.assistant_id or ""), str(a.domains or ""), str(a.base_model or ""),
-            str(a.requested_role or ""),
+            str(a.requested_role or ""), str(a.runtime or ""),
+            str(a.languages or ""),
         ]).lower()
         if q and q in haystack:
             out.append(_to_dict(a))
