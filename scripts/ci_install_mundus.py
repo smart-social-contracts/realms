@@ -628,7 +628,7 @@ def _try_deploy_with_cancel_retry(
             network=network, timeout=120,
         ))
         try:
-            data = json.loads(raw)
+            data = json.loads(raw, strict=False)
         except json.JSONDecodeError as e:
             raise SystemExit(
                 f"ERROR: deploy_realm returned non-JSON for {name}: "
@@ -773,7 +773,7 @@ def _poll_all_deploys(
             )
             body = _unwrap_candid_text(out)
             try:
-                data = json.loads(body)
+                data = json.loads(body, strict=False)
             except json.JSONDecodeError:
                 print(f"   ⚠️  unparseable get_deploy_status({task_id}): "
                       f"{body[:200]}")
