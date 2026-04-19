@@ -1,0 +1,62 @@
+# Mundus descriptor — DEMO (smart-social-contracts demo IC subnet).
+#
+# Same schema as staging-mundus-layered.yml but targeting the demo
+# canisters. The demo network is defined in dfx.json as "demo".
+#
+# Triggered manually via .github/workflows/fast-deploy-staging.yml
+# (select demo-mundus-layered.yml from the dropdown).
+
+version: 2
+network: demo
+
+infrastructure_overrides:
+  file_registry:
+    canister_id: vi64l-3aaaa-aaaae-qj4va-cai
+
+artifacts:
+  base_wasm:
+    source: src/realm_backend
+    version: ${{ inputs.base_wasm_version || github.sha }}
+  extensions: all
+  codices: all
+
+mundus:
+  - name: realm_registry_backend
+    type: realm_registry
+    canister_id: rhw4p-gqaaa-aaaac-qbw7q-cai
+    extensions: []
+    codices: []
+
+  - name: dominion
+    type: realm
+    display_name: Dominion
+    canister_id: h5vpp-qyaaa-aaaac-qai3a-cai
+    frontend_canister_id: gzya5-jyaaa-aaaac-qai5a-cai
+    manifest: examples/demo/realm1/manifest.json
+    extensions: inherit_from_artifacts
+    codices: []
+    register_with_registry: true
+
+  - name: agora
+    type: realm
+    display_name: Agora
+    canister_id: 3bohd-2yaaa-aaaac-qcyla-cai
+    frontend_canister_id: 3gpbx-xaaaa-aaaac-qcylq-cai
+    manifest: examples/demo/realm2/manifest.json
+    extensions: inherit_from_artifacts
+    codices: []
+    register_with_registry: true
+
+  - name: syntropia
+    type: realm
+    display_name: Syntropia
+    canister_id: 2lbfz-yiaaa-aaaac-qcyma-cai
+    frontend_canister_id: 2madn-vqaaa-aaaac-qcymq-cai
+    manifest: examples/demo/realm3/manifest.json
+    extensions: inherit_from_artifacts
+    codices: []
+    register_with_registry: true
+
+verify:
+  e2e_specs: []
+  integration_tests: []
