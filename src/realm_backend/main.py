@@ -528,7 +528,28 @@ def _do_join_realm(
                 consumption.get("data", {}).get("profile") or "member"
             )
         elif granted_profile == "admin":
+            # Bootstrap-admin path. Allowed only when the realm has zero
+            # admin Users yet AND the caller can be identified as the
+            # legitimate creator. Three resolution rules, in order:
+            #
+            #   1. Realm.creator_principal is set and matches the caller.
+            #      This is the registry-driven flow: canister-management
+            #      calls set_creator_principal(<human II principal>) right
+            #      after install, recording the human's principal that
+            #      will be presented when they sign in to the realm.
+            #
+            #   2. ic.is_controller(caller) is true. Manual dfx deploy
+            #      path — the developer that ran `dfx canister install`
+            #      is automatically a controller and can self-promote
+            #      to admin once. Also covers any future deployment
+            #      scheme where the canister-management service deploys
+            #      AND remains a controller AND happens to be the same
+            #      principal that joins (rare but legal).
+            #
+            #   3. Init-time controller fallback for older basilisk
+            #      runtimes that don't expose ic.is_controller.
             from core.access import _controller_principal
+            from ggg import Realm
 
             try:
                 is_controller = ic.is_controller(ic.caller())
@@ -537,6 +558,13 @@ def _do_join_realm(
             is_init_controller = bool(
                 _controller_principal and caller == _controller_principal
             )
+            realm_entity = Realm.load("1")
+            creator_principal = (
+                getattr(realm_entity, "creator_principal", "") or ""
+                if realm_entity
+                else ""
+            )
+            is_creator = bool(creator_principal) and caller == creator_principal
 
             if _has_any_admin_user():
                 return RealmResponse(
@@ -549,13 +577,16 @@ def _do_join_realm(
                         )
                     ),
                 )
-            if not (is_controller or is_init_controller):
+            if not (is_creator or is_controller or is_init_controller):
                 return RealmResponse(
                     success=False,
                     data=RealmResponseData(
                         error=(
                             "Only the realm creator can claim the bootstrap "
-                            "administrator role on a fresh realm."
+                            "administrator role on a fresh realm. If the "
+                            "realm was deployed by canister-management on "
+                            "your behalf, ask the registry to issue you a "
+                            "bootstrap admin invitation link."
                         )
                     ),
                 )
@@ -622,6 +653,198 @@ def join_realm_with_invite(
     the requested ``profile``.
     """
     return _do_join_realm(profile, preferred_quarter, invite_code or "")
+
+
+def _caller_is_canister_controller() -> bool:
+    """True if the calling principal is registered as a controller of
+    this canister (via IC management settings) or matches the init-time
+    controller principal captured at install time."""
+    from core.access import _controller_principal
+
+    caller = ic.caller().to_str()
+    try:
+        if ic.is_controller(ic.caller()):
+            return True
+    except Exception:
+        pass
+    return bool(_controller_principal) and caller == _controller_principal
+
+
+@update
+def set_creator_principal(principal: text) -> RealmResponse:
+    """Record the principal of the human that triggered this realm's creation.
+
+    Intended to be called exactly once, by a canister controller,
+    immediately after install — typically by the canister-management
+    service that deployed the realm on the human's behalf. The principal
+    written here is the **realm-side** Internet Identity principal the
+    human will present when they sign in to the deployed realm (which,
+    because II principals are per-origin, is generally different from
+    the principal the same human had on the registry frontend).
+
+    Once set, the value can be re-affirmed (no-op when called again
+    with the same principal) but cannot be silently overwritten:
+    re-pointing the creator at a different principal is rejected to
+    prevent a compromised controller from quietly transferring
+    bootstrap-admin rights. To genuinely change the creator, the new
+    creator must first claim admin (e.g. via an invite minted by a
+    current admin) and the realm operators can then update the field
+    through governance.
+    """
+    try:
+        if not principal or not principal.strip():
+            return RealmResponse(
+                success=False,
+                data=RealmResponseData(error="principal must not be empty"),
+            )
+        if not _caller_is_canister_controller():
+            return RealmResponse(
+                success=False,
+                data=RealmResponseData(
+                    error=(
+                        "Only a canister controller can set the realm "
+                        "creator principal."
+                    )
+                ),
+            )
+
+        from ggg import Realm
+
+        realm = Realm.load("1")
+        if not realm:
+            return RealmResponse(
+                success=False,
+                data=RealmResponseData(error="Realm entity not initialized"),
+            )
+
+        existing = (getattr(realm, "creator_principal", "") or "").strip()
+        new_value = principal.strip()
+        if existing and existing != new_value:
+            return RealmResponse(
+                success=False,
+                data=RealmResponseData(
+                    error=(
+                        "creator_principal is already set to a different "
+                        "principal; refusing to overwrite. Use governance "
+                        "to change the realm creator."
+                    )
+                ),
+            )
+
+        realm.creator_principal = new_value
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(message=new_value),
+        )
+    except Exception as e:
+        logger.error(
+            f"Error in set_creator_principal: {str(e)}\n{traceback.format_exc()}"
+        )
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@update
+def mint_bootstrap_admin_invite(expires_in_hours: nat) -> RealmResponse:
+    """Mint a single-use admin invitation for the realm's bootstrap admin.
+
+    Callable only by a canister controller, only while the realm has
+    zero admin Users. Designed to be invoked by the canister-management
+    service immediately after install: the returned URL is what the
+    registry hands the human as their "Claim your realm" button.
+
+    The plaintext invitation code is generated inside the
+    ``admin_dashboard`` extension, returned **once** in this response so
+    the caller can build the URL it needs to display, and is never
+    persisted in canister state (only its SHA-256 hash is stored).
+    Subsequent attempts to mint a bootstrap invite once an admin
+    already exists are rejected — by then admins should be minting
+    further invites through ``admin_dashboard`` themselves.
+
+    Args:
+        expires_in_hours: Lifetime of the invite. Defaults to 24 when 0.
+    """
+    try:
+        if not _caller_is_canister_controller():
+            return RealmResponse(
+                success=False,
+                data=RealmResponseData(
+                    error=(
+                        "Only a canister controller can mint a bootstrap "
+                        "admin invitation."
+                    )
+                ),
+            )
+        if _has_any_admin_user():
+            return RealmResponse(
+                success=False,
+                data=RealmResponseData(
+                    error=(
+                        "Realm already has at least one admin; mint "
+                        "further admin invites through admin_dashboard."
+                    )
+                ),
+            )
+
+        import json as _json
+
+        ttl = int(expires_in_hours) if expires_in_hours else 24
+        args = _json.dumps(
+            {
+                "user_id": "realm_creator",
+                "profile": "admin",
+                "max_uses": 1,
+                "expires_in_hours": ttl,
+                "frontend_url": "",
+                "created_by": ic.caller().to_str(),
+            }
+        )
+        raw = api.extensions.extension_sync_call(
+            "admin_dashboard", "generate_registration_url", args
+        )
+        if isinstance(raw, str):
+            try:
+                ext_response = _json.loads(raw)
+            except Exception:
+                ext_response = {"success": False, "error": str(raw)}
+        elif isinstance(raw, dict):
+            ext_response = raw
+        else:
+            ext_response = {"success": False, "error": "Unexpected extension response"}
+
+        if not ext_response.get("success"):
+            return RealmResponse(
+                success=False,
+                data=RealmResponseData(
+                    error=ext_response.get("error")
+                    or "admin_dashboard rejected the bootstrap invite"
+                ),
+            )
+
+        # The plaintext code lives in ext_response["data"]["code"] and
+        # is intentionally returned to the controller exactly once. The
+        # realm canister itself never persists it. We pack the relevant
+        # fields into the message field for convenience; the controller
+        # parses this JSON to extract the code / URL.
+        payload = ext_response.get("data") or {}
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(
+                message=_json.dumps(
+                    {
+                        "code": payload.get("code", ""),
+                        "code_hash": payload.get("code_hash", ""),
+                        "expires_at": payload.get("expires_at", ""),
+                        "profile": payload.get("profile", "admin"),
+                    }
+                )
+            ),
+        )
+    except Exception as e:
+        logger.error(
+            f"Error in mint_bootstrap_admin_invite: {str(e)}\n"
+            f"{traceback.format_exc()}"
+        )
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
 @update

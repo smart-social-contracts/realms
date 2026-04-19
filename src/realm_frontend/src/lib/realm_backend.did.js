@@ -114,6 +114,8 @@ service : () -> {
   change_quarter : (text) -> (RealmResponse);
   join_realm : (text, text) -> (RealmResponse);
   join_realm_with_invite : (text, text, text) -> (RealmResponse);
+  set_creator_principal : (text) -> (RealmResponse);
+  mint_bootstrap_admin_invite : (nat) -> (RealmResponse);
   list_extensions : (text) -> (RealmResponse) query;
   register_realm_with_registry : (text, text, text, text) -> (text);
   refresh_invoice : (text) -> (text);

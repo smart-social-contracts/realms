@@ -42,3 +42,13 @@ class Realm(Entity, TimestampedMixin):
     # Comma-separated canister principal IDs trusted for inter-canister calls
     # (DAO controllers, AI agents, parent realms). These bypass User-based access checks.
     trusted_principals = String(max_length=2048, default="")
+    # Principal of the human that triggered this realm's creation. Set once
+    # at deploy time by the canister controller (typically the
+    # canister-management service deploying on the human's behalf, or
+    # the dfx identity for manual deploys) via set_creator_principal.
+    # Used to authorize the bootstrap-admin path in join_realm: the
+    # creator principal is allowed to claim the first 'admin' profile
+    # on a fresh realm, even when they are not themselves a canister
+    # controller. After that first admin exists, every subsequent
+    # admin claim requires a valid invitation code.
+    creator_principal = String(max_length=64, default="")
