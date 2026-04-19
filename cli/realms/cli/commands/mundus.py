@@ -15,7 +15,6 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .create import create_command
-from .marketplace import marketplace_create_command
 from .registry import registry_create_command
 from ..utils import console, generate_output_dir_name, get_project_root, display_canister_urls_json, get_canister_urls, ensure_dfx_running
 
@@ -172,32 +171,14 @@ def mundus_create_command(
     finally:
         os.chdir(orig_dir)
     
-    # Create marketplace (if specified in manifest)
+    # Marketplace canisters now live in the realms repo proper
+    # (src/marketplace_backend, src/marketplace_frontend) and are deployed
+    # directly via `realms marketplace deploy` during mundus deployment —
+    # no per-mundus folder is needed. Honour mundus_config["marketplace"]
+    # only as a flag to enable the post-realm marketplace deploy step.
     marketplace_dir = None
-    marketplace_config = mundus_config.get("marketplace", {})
-    if marketplace_config:
-        console.print(f"  🛒 Creating marketplace...")
-        try:
-            orig_dir = os.getcwd()
-            os.chdir(project_root)
-            
-            marketplace_dir = marketplace_create_command(
-                marketplace_name=marketplace_config.get("name", "ExtensionMarketplace"),
-                output_dir=str(mundus_dir),
-                network=network,
-            )
-            
-            # Copy canister_ids.json for marketplace if it exists in manifest directory
-            marketplace_canister_ids_src = manifest_path.parent / "marketplace" / "canister_ids.json"
-            if marketplace_canister_ids_src.exists():
-                marketplace_ids_dest = marketplace_dir / "canister_ids.json"
-                shutil.copy2(marketplace_canister_ids_src, marketplace_ids_dest)
-                console.print(f"     ✅ Copied canister_ids.json for existing marketplace canisters")
-            
-            console.print(f"     ✅ Marketplace created\n")
-            
-        finally:
-            os.chdir(orig_dir)
+    if mundus_config.get("marketplace"):
+        console.print(f"  🛒 Marketplace will be deployed from src/marketplace_* during 'mundus deploy'\n")
     
     # Create mundus deployment orchestration script
     _create_mundus_deploy_script(mundus_dir, created_realms, registry_dir, network)
@@ -411,19 +392,38 @@ def mundus_deploy_command(
     registry_dirs = sorted(mundus_path.glob("registry_*"))
     realm_dirs = sorted(mundus_path.glob("realm_*"))
     
-    if not realm_dirs:
-        console.print("[yellow]⚠️  No realms found in mundus directory[/yellow]")
-        return
-    
-    # Track shared canister IDs to inject into each realm
-    shared_canister_ids = {}
-    
-    # Load mundus manifest for token config
+    # Load mundus manifest early so we can decide what to deploy even
+    # when there are no realms in the mundus subtree (e.g. a
+    # marketplace-only deploy).
     mundus_manifest_path = mundus_path / "manifest.json"
     mundus_config = {}
     if mundus_manifest_path.exists():
         with open(mundus_manifest_path, 'r') as f:
             mundus_config = json.load(f)
+    
+    if not realm_dirs:
+        # Marketplace v2 lives in src/marketplace_* (not in the mundus
+        # subtree), so it's worth deploying even when no realms or
+        # registries are present in this mundus.
+        if mundus_config.get("marketplace"):
+            console.print("[yellow]⚠️  No realms found in mundus directory — proceeding to marketplace deploy only.[/yellow]\n")
+            try:
+                from .marketplace import marketplace_deploy_command
+                marketplace_deploy_command(
+                    network=network,
+                    mode=mode,
+                    identity=identity,
+                    with_registry=None,
+                )
+                console.print("\n[green]✅ Marketplace deployed (no realms in this mundus).[/green]")
+            except SystemExit:
+                pass
+            return
+        console.print("[yellow]⚠️  No realms found in mundus directory[/yellow]")
+        return
+    
+    # Track shared canister IDs to inject into each realm
+    shared_canister_ids = {}
     
     # 1. Deploy shared canisters (local only - on IC, production canisters are used)
     if network == "local":
@@ -601,41 +601,44 @@ def mundus_deploy_command(
             os.environ["REALMS_TOKEN_CANISTER_ID"] = realms_token_id
             console.print(f"   Set REALMS_TOKEN_CANISTER_ID={realms_token_id}")
     
-    # 2.5. Deploy marketplace (if present)
-    marketplace_dirs = sorted(mundus_path.glob("marketplace_*"))
-    if marketplace_dirs:
+    # 2.5. Deploy marketplace (always, so realms can link to it)
+    # The marketplace lives in the realms repo (src/marketplace_*); we
+    # invoke the new deploy command which also brings up file_registry
+    # locally. After deploy, expose the canister ids to subsequent steps.
+    marketplace_was_deployed = False
+    try:
         from .marketplace import marketplace_deploy_command
         
         console.print("🛒 Deploying marketplace...")
-        for marketplace_dir in marketplace_dirs:
+        try:
+            marketplace_deploy_command(
+                network=network,
+                mode=mode,
+                identity=identity,
+                with_registry=None,  # default: True for local, False elsewhere
+            )
+            marketplace_was_deployed = True
+        except SystemExit as e:
+            console.print(f"[yellow]   ⚠️  Marketplace deploy returned non-zero ({e})[/yellow]")
+            console.print(f"[yellow]   Continuing with realm deployment...[/yellow]")
+        
+        # Capture marketplace backend canister ID for realm frontend builds.
+        if marketplace_was_deployed:
             try:
-                marketplace_deploy_command(
-                    folder=str(marketplace_dir),
-                    network=network,
-                    mode=mode,
-                    identity=identity,
+                id_result = subprocess.run(
+                    ["dfx", "canister", "id", "marketplace_backend", "--network", network],
+                    cwd=project_root, capture_output=True, text=True
                 )
-                console.print(f"   ✅ {marketplace_dir.name} deployed\n")
-                
-                # Capture marketplace backend canister ID
-                try:
-                    id_result = subprocess.run(
-                        ["dfx", "canister", "id", "marketplace_backend", "--network", network],
-                        cwd=marketplace_dir, capture_output=True, text=True
-                    )
-                    if id_result.returncode == 0:
-                        marketplace_backend_id = id_result.stdout.strip()
-                        # Set as env var for realm frontend builds
-                        # The vite config picks up CANISTER_* prefixed env vars
-                        os.environ["CANISTER_MARKETPLACE_BACKEND_ID"] = marketplace_backend_id
-                        console.print(f"   Set CANISTER_MARKETPLACE_BACKEND_ID={marketplace_backend_id}")
-                except Exception:
-                    pass
-                    
-            except Exception as e:
-                console.print(f"[yellow]   ⚠️  Failed to deploy {marketplace_dir.name}: {e}[/yellow]")
-                console.print(f"[yellow]   Continuing with realm deployment...[/yellow]")
-        console.print("")
+                if id_result.returncode == 0:
+                    marketplace_backend_id = id_result.stdout.strip()
+                    os.environ["CANISTER_MARKETPLACE_BACKEND_ID"] = marketplace_backend_id
+                    console.print(f"   Set CANISTER_MARKETPLACE_BACKEND_ID={marketplace_backend_id}")
+            except Exception:
+                pass
+    except Exception as e:
+        console.print(f"[yellow]   ⚠️  Failed to deploy marketplace: {e}[/yellow]")
+        console.print(f"[yellow]   Continuing with realm deployment...[/yellow]")
+    console.print("")
     
     # 3. Deploy all realms (last) - in parallel for speed
     console.print(f"🏛️  Deploying {len(realm_dirs)} realm(s) in parallel...\n")

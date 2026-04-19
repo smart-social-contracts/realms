@@ -145,14 +145,35 @@
       }
     },
     "marketplace_backend": {
-      "type": "custom",
-      "candid": "https://github.com/smart-social-contracts/kybra-simple-marketplace/releases/latest/download/marketplace_backend.did",
-      "wasm": "https://github.com/smart-social-contracts/kybra-simple-marketplace/releases/latest/download/marketplace_backend.wasm",
-      "remote": {
-        "id": {
-          "demo": "ehyfg-wyaaa-aaaae-qg3qq-cai"
+      "build": "python -m basilisk marketplace_backend src/marketplace_backend/main.py",
+      "candid": "src/marketplace_backend/marketplace_backend.did",
+      "declarations": {
+        "node_compatibility": true
+      },
+      "gzip": true,
+      "metadata": [
+        {
+          "name": "candid:service"
         }
-      }
+      ],
+      "tech_stack": {
+        "cdk": {
+          "basilisk": {}
+        },
+        "language": {
+          "python": {}
+        }
+      },
+      "type": "custom",
+      "wasm": ".basilisk/marketplace_backend/marketplace_backend.wasm"
+    },
+    "marketplace_frontend": {
+      "source": [
+        "src/marketplace_frontend/dist"
+      ],
+      "type": "assets",
+      "workspace": "marketplace_frontend",
+      "dependencies": ["marketplace_backend"]
     }
   },
   "defaults": { 

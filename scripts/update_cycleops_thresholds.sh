@@ -40,9 +40,15 @@ declare -A ALL_CANISTERS=(
   ["2madn-vqaaa-aaaac-qcymq-cai"]="demo-syntropia_frontend"
   ["rhw4p-gqaaa-aaaac-qbw7q-cai"]="demo-registry_backend"
   ["2zaor-5yaaa-aaaac-qbxaa-cai"]="demo-registry_frontend"
-  # --- Marketplace ---
-  ["jji3o-uyaaa-aaaah-qreja-cai"]="marketplace_backend"
-  ["joj52-zaaaa-aaaah-qrejq-cai"]="marketplace_frontend"
+  # --- Marketplace v2 (Basilisk) ---
+  # Staging reuses the legacy Kybra IDs (reinstalled with the new wasm).
+  # Demo reuses the previously-empty backend canister ID + a freshly
+  # allocated frontend canister.
+  ["jji3o-uyaaa-aaaah-qreja-cai"]="staging-marketplace_backend"
+  ["joj52-zaaaa-aaaah-qrejq-cai"]="staging-marketplace_frontend"
+  ["ehyfg-wyaaa-aaaae-qg3qq-cai"]="demo-marketplace_backend"
+  ["ulsvn-pyaaa-aaaae-qj4tq-cai"]="demo-marketplace_frontend"
+  ["vi64l-3aaaa-aaaae-qj4va-cai"]="demo-file_registry"
   # --- Website ---
   ["6kdvx-3yaaa-aaaah-qqo5a-cai"]="atlas_website"
   # --- Tokens ---

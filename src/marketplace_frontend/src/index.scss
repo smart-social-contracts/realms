@@ -1,0 +1,42 @@
+/* Marketplace global styles. */
+
+:root {
+  --bg: #FAFAFA;
+  --surface: #FFFFFF;
+  --surface-2: #F5F5F5;
+  --border: #E5E5E5;
+  --border-strong: #D4D4D4;
+  --text: #171717;
+  --text-muted: #525252;
+  --text-faint: #737373;
+  --primary: #171717;
+  --primary-hover: #262626;
+  --accent: #2563EB;
+  --success: #16A34A;
+  --warning: #D97706;
+  --danger: #DC2626;
+  --verified: #166534;
+  --verified-bg: #DCFCE7;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.55;
+}
+
+a { color: inherit; }
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+code, pre {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}

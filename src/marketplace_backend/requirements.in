@@ -1,0 +1,4 @@
+ic-basilisk
+ic-basilisk-toolkit
+ic-python-db==0.7.9
+ic-python-logging==0.3.4

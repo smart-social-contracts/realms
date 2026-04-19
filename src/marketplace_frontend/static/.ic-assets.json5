@@ -1,0 +1,45 @@
+[
+  {
+    // Explicitly allow .well-known directory for domain verification
+    "match": ".well-known",
+    "ignore": false
+  },
+  {
+    "match": ".well-known/*",
+    "ignore": false,
+    "headers": {
+      "Content-Type": "text/plain"
+    }
+  },
+  {
+    // SVG files need explicit content-type for proper certification
+    "match": "**/*.svg",
+    "headers": {
+      "Content-Type": "image/svg+xml",
+      "Cache-Control": "public, max-age=31536000, immutable"
+    }
+  },
+  {
+    "match": "**/*",
+
+    // Standard security policy with the connect-src allow-list extended for:
+    //   - Internet Identity (https://identity.ic0.app, *.ic0.app)
+    //   - ICP gateways (icp0.io, icp-api.io, *.icp0.io)
+    //   - Local replica (http://localhost:*, http://*.localhost:*)
+    //   - Off-chain billing service used for the developer-license
+    //     Stripe checkout flow (billing.realmsgos.dev)
+    //   - File registry served from any *.icp0.io / *.localhost subdomain
+    //     (already covered by the wildcard above) — the marketplace
+    //     frontend fetches extension/codex files directly from the
+    //     file_registry HTTP gateway via fileRegistryBaseUrl().
+    //
+    // Stripe Checkout itself runs in the Stripe-hosted UI which the
+    // user is redirected to (window.location.href = checkout_url), so
+    // we do NOT need to allow checkout.stripe.com in connect-src.
+    "security_policy": "standard",
+
+    "headers": {
+      "Content-Security-Policy": "default-src 'self';script-src 'self' 'unsafe-eval' 'unsafe-inline';connect-src 'self' http://localhost:* http://*.localhost:* https://icp0.io https://*.icp0.io https://icp-api.io https://*.ic0.app https://billing.realmsgos.dev https://raw.githubusercontent.com;img-src 'self' data: http://*.localhost:* https://*.icp0.io https://*.ic0.app;style-src * 'unsafe-inline';style-src-elem * 'unsafe-inline';font-src *;object-src 'none';base-uri 'self';frame-ancestors 'none';form-action 'self';upgrade-insecure-requests;"
+    }
+  }
+]
