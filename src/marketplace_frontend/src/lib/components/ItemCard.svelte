@@ -4,7 +4,7 @@
   import RankBadge from './RankBadge.svelte';
   import { categories, formatCount, formatPrice, shortPrincipal } from '$lib/format';
 
-  export let kind: 'ext' | 'codex';
+  export let kind: 'ext' | 'codex' | 'assistant';
   export let id: string;
   export let name: string;
   export let description: string;
@@ -26,7 +26,7 @@
     {#if rank != null}
       <RankBadge {rank} />
     {/if}
-    <div class="icon">{icon || (kind === 'codex' ? '📜' : '🧩')}</div>
+    <div class="icon">{icon || (kind === 'codex' ? '📜' : kind === 'assistant' ? '🤖' : '🧩')}</div>
     <div class="title-block">
       <div class="title-line">
         <h3>{name}</h3>

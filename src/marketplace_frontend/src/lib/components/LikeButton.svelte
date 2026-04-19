@@ -3,8 +3,8 @@
   import { isAuthenticated } from '$lib/auth';
   import { marketplaceClient } from '$lib/marketplace-client';
 
-  /** Item kind: "ext" | "codex" */
-  export let kind: 'ext' | 'codex';
+  /** Item kind: "ext" | "codex" | "assistant" */
+  export let kind: 'ext' | 'codex' | 'assistant';
   export let itemId: string;
   /** Initial like state from the server. */
   export let liked: boolean = false;

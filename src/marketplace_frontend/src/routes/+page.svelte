@@ -4,12 +4,13 @@
   import Spinner from '$lib/components/Spinner.svelte';
   import {
     marketplaceClient,
+    type AssistantListing,
     type CodexListing,
     type ExtensionListing,
   } from '$lib/marketplace-client';
   import { isAuthenticated, principalStore } from '$lib/auth';
 
-  type Kind = 'ext' | 'codex';
+  type Kind = 'ext' | 'codex' | 'assistant';
   type Metric = 'downloads' | 'likes';
 
   let kind: Kind = 'ext';
@@ -17,7 +18,7 @@
   let verifiedOnly = false;
   let loading = true;
   let error = '';
-  let items: (ExtensionListing | CodexListing)[] = [];
+  let items: (ExtensionListing | CodexListing | AssistantListing)[] = [];
   let likedSet = new Set<string>();
 
   $: void load(kind, metric, verifiedOnly);
@@ -46,10 +47,14 @@
         items = m === 'downloads'
           ? await marketplaceClient.topExtensionsByDownloads(20, v)
           : await marketplaceClient.topExtensionsByLikes(20, v);
-      } else {
+      } else if (k === 'codex') {
         items = m === 'downloads'
           ? await marketplaceClient.topCodicesByDownloads(20, v)
           : await marketplaceClient.topCodicesByLikes(20, v);
+      } else {
+        items = m === 'downloads'
+          ? await marketplaceClient.topAssistantsByDownloads(20, v)
+          : await marketplaceClient.topAssistantsByLikes(20, v);
       }
     } catch (e: any) {
       error = e?.message ?? String(e);
@@ -59,25 +64,39 @@
     }
   }
 
-  function idOf(it: ExtensionListing | CodexListing): string {
-    return (it as any).extension_id ?? (it as any).codex_id ?? '';
+  function idOf(it: ExtensionListing | CodexListing | AssistantListing): string {
+    return (it as any).extension_id ?? (it as any).codex_id ?? (it as any).assistant_id ?? '';
   }
 
-  function hrefOf(k: Kind, it: ExtensionListing | CodexListing): string {
+  function hrefOf(k: Kind, it: ExtensionListing | CodexListing | AssistantListing): string {
     if (k === 'ext') return `/extensions/${encodeURIComponent(idOf(it))}`;
-    return `/codices/${encodeURIComponent(idOf(it))}`;
+    if (k === 'codex') return `/codices/${encodeURIComponent(idOf(it))}`;
+    return `/assistants/${encodeURIComponent(idOf(it))}`;
+  }
+
+  function defaultIcon(k: Kind): string {
+    if (k === 'codex') return '📜';
+    if (k === 'assistant') return '🤖';
+    return '🧩';
+  }
+
+  function categoriesFor(it: ExtensionListing | CodexListing | AssistantListing): string {
+    if (it.categories) return it.categories;
+    if ((it as AssistantListing).domains) return (it as AssistantListing).domains;
+    return '';
   }
 </script>
 
 <section class="hero">
   <h1>Top Charts</h1>
-  <p>Discover the most popular extensions and codices powering Realms.</p>
+  <p>Discover the most popular extensions, codices, and AI assistants powering Realms.</p>
 </section>
 
 <div class="controls">
   <div class="toggle">
     <button class:active={kind === 'ext'} on:click={() => (kind = 'ext')}>Extensions</button>
     <button class:active={kind === 'codex'} on:click={() => (kind = 'codex')}>Codices</button>
+    <button class:active={kind === 'assistant'} on:click={() => (kind = 'assistant')}>Assistants</button>
   </div>
   <div class="toggle">
     <button class:active={metric === 'downloads'} on:click={() => (metric = 'downloads')}>Most Downloaded</button>
@@ -108,11 +127,11 @@
         description={it.description}
         version={it.version}
         developer={it.developer}
-        icon={it.icon}
+        icon={it.icon || defaultIcon(kind)}
         priceE8s={it.price_e8s}
         installs={it.installs}
         likes={it.likes}
-        categoriesStr={it.categories}
+        categoriesStr={categoriesFor(it)}
         verificationStatus={it.verification_status}
         liked={likedSet.has(`${kind}|${idOf(it)}`)}
         rank={i + 1}

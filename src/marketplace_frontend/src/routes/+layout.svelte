@@ -54,6 +54,7 @@
     <a href="/" class:active={routeIsActive('/')}>Top Charts</a>
     <a href="/extensions" class:active={routeIsActive('/extensions')}>Extensions</a>
     <a href="/codices" class:active={routeIsActive('/codices')}>Codices</a>
+    <a href="/assistants" class:active={routeIsActive('/assistants')}>Assistants</a>
     <a href="/upload" class:active={routeIsActive('/upload')}>Upload</a>
     <a href="/my-purchases" class:active={routeIsActive('/my-purchases')}>My Purchases</a>
     <a href="/developer" class:active={routeIsActive('/developer')}>Developer</a>

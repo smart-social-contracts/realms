@@ -7,7 +7,7 @@
   import { uploadAndPublish, type UploadFolderItem, type UploadProgress } from '$lib/file-registry-client';
   import { marketplaceClient } from '$lib/marketplace-client';
 
-  type Kind = 'ext' | 'codex';
+  type Kind = 'ext' | 'codex' | 'assistant';
 
   let step: 1 | 2 | 3 | 4 = 1;
   let kind: Kind = 'ext';
@@ -21,6 +21,18 @@
   let priceUsdCents = 0;     // display-only, stored as e8s
   let icon = '';
   let categoriesStr = 'other';
+
+  // Assistant-specific (only when kind === 'assistant')
+  let runtime = 'openai';
+  let endpointUrl = '';
+  let baseModel = '';
+  let requestedRole = '';
+  let requestedPermissions = '';
+  let domains = 'governance';
+  let languages = 'en';
+  let trainingDataSummary = '';
+  let evalReportUrl = '';
+  let pricingSummary = '';
 
   // Step 2 — files
   let pickedFiles: File[] = [];
@@ -36,6 +48,8 @@
   // Step 4 — done
   let listingHref = '';
 
+  // Extensions may not contain '/' (api/extensions._validate_id rejects it).
+  // Codices and assistants accept a single '/' for namespacing.
   $: if (kind === 'ext' && id.includes('/')) id = id.replace(/\//g, '_');
 
   // <input webkitdirectory> isn't in the standard HTML typings; pass via spread.
@@ -49,29 +63,40 @@
   onMount(async () => {
     const prefill = $page.url.searchParams.get('prefill');
     if (!prefill) return;
-    const looksLikeCodex = prefill.includes('/');
-    kind = looksLikeCodex ? 'codex' : 'ext';
     id = prefill;
+    // Try assistant first (most specific lookup), then codex (slash-id),
+    // then extension. Any one that returns a hit decides the kind.
     try {
-      if (looksLikeCodex) {
-        const detail = await marketplaceClient.getCodexDetails(prefill);
-        if (detail) {
-          name = detail.name;
-          description = detail.description;
-          version = detail.version;
-          icon = detail.icon;
-          categoriesStr = detail.categories;
-          realmType = detail.realm_type;
+      const a = await marketplaceClient.getAssistantDetails(prefill);
+      if (a) {
+        kind = 'assistant';
+        name = a.name; description = a.description; version = a.version;
+        icon = a.icon; categoriesStr = a.categories;
+        runtime = a.runtime; endpointUrl = a.endpoint_url; baseModel = a.base_model;
+        requestedRole = a.requested_role; requestedPermissions = a.requested_permissions;
+        domains = a.domains; languages = a.languages;
+        trainingDataSummary = a.training_data_summary; evalReportUrl = a.eval_report_url;
+        pricingSummary = a.pricing_summary;
+        return;
+      }
+    } catch { /* not an assistant */ }
+    if (prefill.includes('/')) {
+      try {
+        const c = await marketplaceClient.getCodexDetails(prefill);
+        if (c) {
+          kind = 'codex';
+          name = c.name; description = c.description; version = c.version;
+          icon = c.icon; categoriesStr = c.categories; realmType = c.realm_type;
+          return;
         }
-      } else {
-        const detail = await marketplaceClient.getExtensionDetails(prefill);
-        if (detail) {
-          name = detail.name;
-          description = detail.description;
-          version = detail.version;
-          icon = detail.icon;
-          categoriesStr = detail.categories;
-        }
+      } catch { /* not a codex */ }
+    }
+    try {
+      const e = await marketplaceClient.getExtensionDetails(prefill);
+      if (e) {
+        kind = 'ext';
+        name = e.name; description = e.description; version = e.version;
+        icon = e.icon; categoriesStr = e.categories;
       }
     } catch {
       // listing was delisted or not found — leave fields blank.
@@ -80,6 +105,7 @@
   $: ns = (() => {
     if (!id || !version) return '';
     if (kind === 'ext') return `ext/${id}/${version}`;
+    if (kind === 'assistant') return `assistant/${id}/${version}`;
     return `codex/${id}/${version}`;
   })();
 
@@ -152,7 +178,7 @@
           download_url: '',
         });
         listingHref = `/extensions/${encodeURIComponent(id)}`;
-      } else {
+      } else if (kind === 'codex') {
         await marketplaceClient.createCodex({
           codex_id: id,
           realm_type: realmType,
@@ -166,6 +192,29 @@
           file_registry_namespace: ns,
         });
         listingHref = `/codices/${encodeURIComponent(id)}`;
+      } else {
+        await marketplaceClient.createAssistant({
+          assistant_id: id,
+          name,
+          description,
+          version,
+          price_e8s: priceE8s,
+          pricing_summary: pricingSummary,
+          icon,
+          categories: categoriesStr,
+          runtime,
+          endpoint_url: endpointUrl,
+          base_model: baseModel,
+          requested_role: requestedRole,
+          requested_permissions: requestedPermissions,
+          domains,
+          languages,
+          training_data_summary: trainingDataSummary,
+          eval_report_url: evalReportUrl,
+          file_registry_canister_id: registryCanisterId,
+          file_registry_namespace: ns,
+        });
+        listingHref = `/assistants/${encodeURIComponent(id)}`;
       }
       step = 4;
     } catch (e: any) {
@@ -210,12 +259,17 @@
         <div class="kind-switch">
           <button class:active={kind === 'ext'} on:click={() => (kind = 'ext')}>🧩 Extension</button>
           <button class:active={kind === 'codex'} on:click={() => (kind = 'codex')}>📜 Codex</button>
+          <button class:active={kind === 'assistant'} on:click={() => (kind = 'assistant')}>🤖 Assistant</button>
         </div>
 
         <div class="grid">
           <label>
-            <span>{kind === 'ext' ? 'extension_id' : 'codex_id'}</span>
-            <input type="text" placeholder={kind === 'ext' ? 'voting' : 'syntropia/membership'} bind:value={id} />
+            <span>{kind === 'ext' ? 'extension_id' : kind === 'codex' ? 'codex_id' : 'assistant_id'}</span>
+            <input
+              type="text"
+              placeholder={kind === 'ext' ? 'voting' : kind === 'codex' ? 'syntropia/membership' : 'smart-social-contracts/ashoka'}
+              bind:value={id}
+            />
           </label>
           {#if kind === 'codex'}
             <label>
@@ -261,8 +315,14 @@
       <section class="card">
         <h2>Pick the files to publish</h2>
         <p class="muted">
-          Choose a folder. For extensions we expect <code>manifest.json</code>, <code>backend/…</code>, <code>frontend/dist/index.js</code>.
-          For codices, flat <code>*.py</code> files.
+          Choose a folder.
+          {#if kind === 'ext'}
+            For extensions we expect <code>manifest.json</code>, <code>backend/…</code>, <code>frontend/dist/index.js</code>.
+          {:else if kind === 'codex'}
+            For codices, flat <code>*.py</code> files.
+          {:else}
+            For assistants we expect prompts (<code>prompts/system.txt</code>), MCP tool manifests (<code>mcp/manifest.json</code>), and eval transcripts (<code>evals/…</code>).
+          {/if}
         </p>
         <input
           type="file"
@@ -332,7 +392,7 @@
     {:else if step === 4}
       <section class="card success">
         <h2>✅ Published!</h2>
-        <p>Your {kind === 'ext' ? 'extension' : 'codex'} is live. Files served from the file_registry canister.</p>
+        <p>Your {kind === 'ext' ? 'extension' : kind === 'codex' ? 'codex' : 'assistant'} is live. Files served from the file_registry canister.</p>
         <div class="actions">
           <a class="btn primary" href={listingHref}>View listing →</a>
           <button class="btn ghost" on:click={reset}>Upload another</button>

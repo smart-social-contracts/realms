@@ -103,6 +103,59 @@ export interface CodexInput {
   file_registry_namespace: string;
 }
 
+export interface AssistantListing {
+  assistant_id: string;
+  assistant_alias: string;
+  developer: string;
+  name: string;
+  description: string;
+  version: string;
+  price_e8s: number;
+  pricing_summary: string;
+  icon: string;
+  categories: string;
+  runtime: string;
+  endpoint_url: string;
+  base_model: string;
+  requested_role: string;
+  requested_permissions: string;
+  domains: string;
+  languages: string;
+  training_data_summary: string;
+  eval_report_url: string;
+  file_registry_canister_id: string;
+  file_registry_namespace: string;
+  installs: number;
+  likes: number;
+  verification_status: string;
+  verification_notes: string;
+  is_active: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface AssistantInput {
+  assistant_id: string;
+  name: string;
+  description: string;
+  version: string;
+  price_e8s: bigint;
+  pricing_summary: string;
+  icon: string;
+  categories: string;
+  runtime: string;
+  endpoint_url: string;
+  base_model: string;
+  requested_role: string;
+  requested_permissions: string;
+  domains: string;
+  languages: string;
+  training_data_summary: string;
+  eval_report_url: string;
+  file_registry_canister_id: string;
+  file_registry_namespace: string;
+}
+
 export interface PurchaseRecord {
   purchase_id: string;
   realm_principal: string;
@@ -146,6 +199,7 @@ export interface MarketplaceStatus {
   status: string;
   extensions_count: number;
   codices_count: number;
+  assistants_count: number;
   purchases_count: number;
   likes_count: number;
   licenses_count: number;
@@ -184,6 +238,40 @@ function normExt(raw: any): ExtensionListing {
     updated_at: toNumber(raw.updated_at),
   };
 }
+
+function normAssistant(raw: any): AssistantListing {
+  return {
+    assistant_id: String(raw.assistant_id ?? ''),
+    assistant_alias: String(raw.assistant_alias ?? ''),
+    developer: String(raw.developer ?? ''),
+    name: String(raw.name ?? ''),
+    description: String(raw.description ?? ''),
+    version: String(raw.version ?? ''),
+    price_e8s: toNumber(raw.price_e8s),
+    pricing_summary: String(raw.pricing_summary ?? ''),
+    icon: String(raw.icon ?? ''),
+    categories: String(raw.categories ?? ''),
+    runtime: String(raw.runtime ?? ''),
+    endpoint_url: String(raw.endpoint_url ?? ''),
+    base_model: String(raw.base_model ?? ''),
+    requested_role: String(raw.requested_role ?? ''),
+    requested_permissions: String(raw.requested_permissions ?? ''),
+    domains: String(raw.domains ?? ''),
+    languages: String(raw.languages ?? ''),
+    training_data_summary: String(raw.training_data_summary ?? ''),
+    eval_report_url: String(raw.eval_report_url ?? ''),
+    file_registry_canister_id: String(raw.file_registry_canister_id ?? ''),
+    file_registry_namespace: String(raw.file_registry_namespace ?? ''),
+    installs: toNumber(raw.installs),
+    likes: toNumber(raw.likes),
+    verification_status: String(raw.verification_status ?? 'unverified'),
+    verification_notes: String(raw.verification_notes ?? ''),
+    is_active: Boolean(raw.is_active),
+    created_at: toNumber(raw.created_at),
+    updated_at: toNumber(raw.updated_at),
+  };
+}
+
 
 function normCodex(raw: any): CodexListing {
   return {
@@ -261,6 +349,7 @@ function normStatus(raw: any): MarketplaceStatus {
     status: String(raw.status ?? ''),
     extensions_count: toNumber(raw.extensions_count),
     codices_count: toNumber(raw.codices_count),
+    assistants_count: toNumber(raw.assistants_count),
     purchases_count: toNumber(raw.purchases_count),
     likes_count: toNumber(raw.likes_count),
     licenses_count: toNumber(raw.licenses_count),
@@ -371,6 +460,52 @@ export const marketplaceClient = {
     return (r as any[]).map(normCodex);
   },
 
+  // --- assistants -----------------------------------------------------
+  async createAssistant(input: AssistantInput): Promise<string> {
+    const r = await marketplace.create_assistant(input);
+    return unwrap<string>(r);
+  },
+  async updateAssistant(input: AssistantInput): Promise<string> {
+    const r = await marketplace.update_assistant(input);
+    return unwrap<string>(r);
+  },
+  async delistAssistant(assistantId: string): Promise<string> {
+    const r = await marketplace.delist_assistant(assistantId);
+    return unwrap<string>(r);
+  },
+  async getAssistantDetails(id: string): Promise<AssistantListing> {
+    const r = await marketplace.get_assistant_details(id);
+    return normAssistant(unwrap<any>(r));
+  },
+  async listAssistants(page: number, perPage: number, verifiedOnly = false): Promise<{
+    listings: AssistantListing[];
+    total_count: number;
+    page: number;
+    per_page: number;
+  }> {
+    const r = await marketplace.list_marketplace_assistants(BigInt(page), BigInt(perPage), verifiedOnly);
+    return {
+      listings: r.listings.map(normAssistant),
+      total_count: toNumber(r.total_count),
+      page: toNumber(r.page),
+      per_page: toNumber(r.per_page),
+    };
+  },
+  async searchAssistants(q: string, verifiedOnly = false): Promise<AssistantListing[]> {
+    const r = await marketplace.search_assistants(q, verifiedOnly);
+    return (r as any[]).map(normAssistant);
+  },
+  async getMyAssistants(): Promise<AssistantListing[]> {
+    const r = await marketplace.get_my_assistants();
+    return (r as any[]).map(normAssistant);
+  },
+  async buyAssistant(id: string): Promise<string> {
+    return unwrap<string>(await marketplace.buy_assistant(id));
+  },
+  async hasPurchasedAssistant(realm: string, id: string): Promise<boolean> {
+    return Boolean(await marketplace.has_purchased_assistant(realm, id));
+  },
+
   // --- purchases / likes ----------------------------------------------
   async buyExtension(id: string): Promise<string> {
     return unwrap<string>(await marketplace.buy_extension(id));
@@ -388,13 +523,13 @@ export const marketplaceClient = {
     const r = await marketplace.get_my_purchases();
     return (r as any[]).map(normPurchase);
   },
-  async likeItem(kind: 'ext' | 'codex', id: string): Promise<string> {
+  async likeItem(kind: 'ext' | 'codex' | 'assistant', id: string): Promise<string> {
     return unwrap<string>(await marketplace.like_item(kind, id));
   },
-  async unlikeItem(kind: 'ext' | 'codex', id: string): Promise<string> {
+  async unlikeItem(kind: 'ext' | 'codex' | 'assistant', id: string): Promise<string> {
     return unwrap<string>(await marketplace.unlike_item(kind, id));
   },
-  async hasLiked(principal: string, kind: 'ext' | 'codex', id: string): Promise<boolean> {
+  async hasLiked(principal: string, kind: 'ext' | 'codex' | 'assistant', id: string): Promise<boolean> {
     return Boolean(await marketplace.has_liked(principal, kind, id));
   },
   async myLikes(): Promise<LikeRecord[]> {
@@ -419,6 +554,14 @@ export const marketplaceClient = {
     const r = await marketplace.top_codices_by_likes(BigInt(n), verifiedOnly);
     return (r as any[]).map(normCodex);
   },
+  async topAssistantsByDownloads(n = 20, verifiedOnly = false): Promise<AssistantListing[]> {
+    const r = await marketplace.top_assistants_by_downloads(BigInt(n), verifiedOnly);
+    return (r as any[]).map(normAssistant);
+  },
+  async topAssistantsByLikes(n = 20, verifiedOnly = false): Promise<AssistantListing[]> {
+    const r = await marketplace.top_assistants_by_likes(BigInt(n), verifiedOnly);
+    return (r as any[]).map(normAssistant);
+  },
 
   // --- licenses --------------------------------------------------------
   async checkLicense(principal: string): Promise<DeveloperLicense> {
@@ -441,10 +584,10 @@ export const marketplaceClient = {
   },
 
   // --- verification ----------------------------------------------------
-  async requestAudit(kind: 'ext' | 'codex', id: string): Promise<string> {
+  async requestAudit(kind: 'ext' | 'codex' | 'assistant', id: string): Promise<string> {
     return unwrap<string>(await marketplace.request_audit(kind, id));
   },
-  async setVerificationStatus(kind: 'ext' | 'codex', id: string, status: string, notes: string): Promise<string> {
+  async setVerificationStatus(kind: 'ext' | 'codex' | 'assistant', id: string, status: string, notes: string): Promise<string> {
     return unwrap<string>(await marketplace.set_verification_status(kind, id, status, notes));
   },
   async listPendingAudits(): Promise<PendingAudit[]> {
@@ -453,4 +596,8 @@ export const marketplaceClient = {
   },
 };
 
-export type { ExtensionListing as ExtensionListingType, CodexListing as CodexListingType };
+export type {
+  ExtensionListing as ExtensionListingType,
+  CodexListing as CodexListingType,
+  AssistantListing as AssistantListingType,
+};
