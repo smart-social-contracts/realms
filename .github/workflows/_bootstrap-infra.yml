@@ -54,7 +54,9 @@ jobs:
           echo "$HOME/.local/share/dfx/bin" >> "$GITHUB_PATH"
 
       - name: Install Python deps
-        run: pip install pyyaml
+        run: |
+          pip install pyyaml
+          pip install -r requirements.txt
 
       - name: Configure dfx identity (non-local only)
         if: ${{ inputs.network != 'local' }}
@@ -82,6 +84,28 @@ jobs:
               --file ${{ inputs.descriptor }} \
               --stages 0 \
               --infra-ids-out infra-ids.json
+
+      # realm_installer is pinned in the staging descriptor (so stage 0
+      # skips it), but we must upgrade it on every push so it has the
+      # latest endpoints (e.g. deploy_realm from #192).  Build with
+      # basilisk and install via dfx canister install --mode upgrade.
+      - name: Upgrade realm_installer (non-local)
+        if: ${{ inputs.network != 'local' }}
+        run: |
+          INSTALLER_ID=$(python3 -c "import json; print(json.load(open('infra-ids.json')).get('realm_installer',''))")
+          if [ -z "$INSTALLER_ID" ]; then
+            echo "::warning::realm_installer not in infra-ids.json — skipping upgrade"
+            exit 0
+          fi
+          echo "Building realm_installer wasm…"
+          CANISTER_CANDID_PATH=src/realm_installer/realm_installer.did \
+            python3 -m basilisk realm_installer src/realm_installer/main.py
+          echo "Upgrading $INSTALLER_ID on ${{ inputs.network }}…"
+          dfx canister install "$INSTALLER_ID" \
+              --wasm .basilisk/realm_installer/realm_installer.wasm \
+              --mode upgrade --yes \
+              --network ${{ inputs.network }}
+          echo "✅ realm_installer upgraded"
 
       - name: Emit infra-ids JSON output
         id: write
