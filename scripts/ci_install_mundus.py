@@ -611,6 +611,53 @@ def _format_deploy_failures(status: Dict[str, Any]) -> str:
     return "\n".join(lines) if lines else "     (no per-step failures recorded)"
 
 
+def _try_deploy_with_cancel_retry(
+    realm_installer: str,
+    manifest_json: str,
+    name: str,
+    network: str,
+) -> Dict[str, Any]:
+    """Call deploy_realm; if rejected for concurrency, cancel the stale task and retry.
+
+    Returns the parsed kickoff JSON dict on success, raises SystemExit on hard
+    errors.
+    """
+    for attempt in range(2):
+        raw = _unwrap_candid_text(_dfx_call_text(
+            realm_installer, "deploy_realm", manifest_json,
+            network=network, timeout=120,
+        ))
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as e:
+            raise SystemExit(
+                f"ERROR: deploy_realm returned non-JSON for {name}: "
+                f"{raw[:300]} ({e})"
+            )
+        if data.get("success"):
+            return data
+
+        conflicting_id = data.get("conflicting_task_id")
+        if conflicting_id and attempt == 0:
+            print(
+                f"   ⚠ {name}: concurrency conflict with {conflicting_id}, "
+                f"cancelling stale deploy…"
+            )
+            cancel_raw = _unwrap_candid_text(_dfx_call_text(
+                realm_installer, "cancel_deploy", conflicting_id,
+                network=network, timeout=60,
+            ))
+            print(f"     cancel result: {cancel_raw[:200]}")
+            time.sleep(2)
+            continue
+
+        raise SystemExit(
+            f"ERROR: deploy_realm rejected for {name}: "
+            f"{data.get('error')}"
+        )
+    raise SystemExit(f"ERROR: deploy_realm still rejected for {name} after cancel")
+
+
 def _kickoff_deploy(
     member: Dict[str, Any],
     *,
@@ -657,22 +704,9 @@ def _kickoff_deploy(
     manifest_json = json.dumps(manifest)
     print(f"     manifest: {manifest_json}")
 
-    kickoff = _unwrap_candid_text(_dfx_call_text(
-        realm_installer, "deploy_realm", manifest_json,
-        network=network, timeout=120,
-    ))
-    try:
-        kickoff_data = json.loads(kickoff)
-    except json.JSONDecodeError as e:
-        raise SystemExit(
-            f"ERROR: deploy_realm returned non-JSON for {name}: "
-            f"{kickoff[:300]} ({e})"
-        )
-    if not kickoff_data.get("success"):
-        raise SystemExit(
-            f"ERROR: deploy_realm rejected for {name}: "
-            f"{kickoff_data.get('error')}"
-        )
+    kickoff_data = _try_deploy_with_cancel_retry(
+        realm_installer, manifest_json, name, network,
+    )
     task_id = kickoff_data["task_id"]
     print(
         f"     queued deploy_realm task_id={task_id} "
@@ -686,13 +720,35 @@ def _kickoff_deploy(
     }
 
 
+def _step_progress_summary(data: Dict[str, Any]) -> str:
+    """Build a compact 'completed/total' summary from a get_deploy_status response."""
+    total = done = failed = 0
+    for bucket in ("extensions", "codices"):
+        for s in (data.get(bucket) or []):
+            total += 1
+            if s.get("status") == "completed":
+                done += 1
+            elif s.get("status") == "failed":
+                failed += 1
+    wasm = data.get("wasm")
+    if wasm:
+        total += 1
+        if wasm.get("status") == "completed":
+            done += 1
+        elif wasm.get("status") == "failed":
+            failed += 1
+    if failed:
+        return f"{done}+{failed}err/{total}"
+    return f"{done}/{total}"
+
+
 def _poll_all_deploys(
     realm_installer: str,
     pending: List[Dict[str, Any]],
     network: str,
     *,
-    timeout: int = 1800,
-    interval: float = 5.0,
+    timeout: int = 3600,
+    interval: float = 10.0,
 ) -> Dict[str, Dict[str, Any]]:
     """Poll every queued deploy in ``pending`` until each reaches terminal.
 
@@ -707,6 +763,7 @@ def _poll_all_deploys(
     remaining = {p["task_id"]: p for p in pending}
     finals: Dict[str, Dict[str, Any]] = {}
     last_status: Dict[str, str] = {}
+    last_progress: Dict[str, str] = {}
 
     while remaining and time.time() < deadline:
         for task_id in list(remaining.keys()):
@@ -727,11 +784,20 @@ def _poll_all_deploys(
                     f"{data.get('error')}"
                 )
             status = data.get("status", "")
-            if status != last_status.get(task_id, ""):
-                name = remaining[task_id]["member"].get("name", "?")
-                print(f"   • {name:<24s} {task_id}: {status}")
+            name = remaining[task_id]["member"].get("name", "?")
+
+            step_summary = _step_progress_summary(data)
+            progress_key = f"{status}|{step_summary}"
+            if progress_key != last_progress.get(task_id, ""):
+                elapsed = int(time.time() - (deadline - timeout))
+                print(
+                    f"   • {name:<24s} {task_id}: {status}"
+                    f"  [{step_summary}]  ({elapsed}s)"
+                )
+                last_progress[task_id] = progress_key
                 last_status[task_id] = status
-            if status in ("completed", "partial", "failed"):
+
+            if status in ("completed", "partial", "failed", "cancelled"):
                 finals[task_id] = data
                 del remaining[task_id]
         if remaining:
@@ -739,9 +805,14 @@ def _poll_all_deploys(
 
     if remaining:
         names = ", ".join(p["member"].get("name", "?") for p in remaining.values())
+        elapsed = int(time.time() - (deadline - timeout))
+        for task_id, p in remaining.items():
+            n = p["member"].get("name", "?")
+            prog = last_progress.get(task_id, "?")
+            print(f"   ⚠ {n:<24s} {task_id}: last progress = {prog}")
         raise SystemExit(
-            f"ERROR: deploys did not reach terminal status within {timeout}s: "
-            f"{names}"
+            f"ERROR: deploys did not reach terminal status within {timeout}s "
+            f"({elapsed}s elapsed): {names}"
         )
     return finals
 
@@ -787,12 +858,14 @@ def stage2_install(descriptor: Dict[str, Any], infra_ids: Dict[str, str]) -> Non
 
     # PHASE 2: poll every in-flight deploy in a single shared loop. The
     # target realms are independent canisters → their installs run
-    # concurrently on different IC subnet replicas. With ~3 realms this
-    # collapses ~13m of serial work into ~5m wall-clock.
-    print(f"\n   ⏳ awaiting {len(pending)} deploy(s) (timeout 1800s)…")
+    # concurrently on different IC subnet replicas.  Each extension step
+    # involves inter-canister calls (~3-10s each on real subnets), and
+    # with 20+ extensions per realm the total can exceed 30 minutes.
+    deploy_timeout = 3600
+    print(f"\n   ⏳ awaiting {len(pending)} deploy(s) (timeout {deploy_timeout}s)…")
     finals = _poll_all_deploys(
         realm_installer, pending, network,
-        timeout=1800, interval=5.0,
+        timeout=deploy_timeout, interval=10.0,
     )
 
     # PHASE 3: validate per-realm outcomes + register with registry.
