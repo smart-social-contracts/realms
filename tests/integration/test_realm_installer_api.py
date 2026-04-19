@@ -145,7 +145,11 @@ def test_deploy_realm_rejects_invalid_json():
         "deploy_realm", _candid_text("not json at all {"), timeout=30,
     )
     assert code == 0, f"deploy_realm trapped on non-JSON: {err}"
-    body = json.loads(_unwrap(out))
+    raw = _unwrap(out)
+    # The canister error JSON may embed a Python traceback with literal
+    # newlines/tabs, which strict JSON rejects. Use strict=False so we
+    # tolerate the control characters.
+    body = json.loads(raw, strict=False)
     assert body.get("success") is False, f"expected rejection: {body}"
     assert body.get("error"), f"missing error message: {body}"
     print(f"✓ (error: {body['error'][:60]})")
