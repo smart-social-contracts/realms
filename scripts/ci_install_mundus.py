@@ -1162,16 +1162,26 @@ def _deploy_registry_frontend(descriptor: Dict[str, Any]) -> None:
         _run(["npm", "install", "--legacy-peer-deps"],
              cwd=REPO_ROOT, check=False)
 
-    # Build the SvelteKit frontend.  We invoke vite directly instead of
-    # `npm run build` because the workspace's prebuild hook re-runs
-    # `dfx generate` which overwrites our @icp-sdk→@dfinity patches.
-    # vite is hoisted to root node_modules in npm workspaces.
-    vite_bin = REPO_ROOT / "node_modules" / ".bin" / "vite"
-    _run([str(vite_bin), "build"],
-         cwd=REPO_ROOT / "src" / "realm_registry_frontend")
+    # Build the SvelteKit frontend and deploy via dfx.
+    #
+    # Problem: both `npm run build` (prebuild hook) and `dfx deploy`
+    # (workspace auto-build) re-run `dfx generate` which overwrites
+    # our @icp-sdk→@dfinity patches.  We neutralize the prebuild
+    # script temporarily so neither path triggers a re-generate.
+    fe_pkg = REPO_ROOT / "src" / "realm_registry_frontend" / "package.json"
+    pkg_text = fe_pkg.read_text()
+    if '"prebuild"' in pkg_text:
+        fe_pkg.write_text(pkg_text.replace(
+            '"prebuild": "dfx generate realm_registry_backend",\n    ', ''
+        ).replace(
+            '"prebuild": "dfx generate realm_registry_backend",', ''
+        ))
 
-    # Upload the built assets to the existing canister.
+    # dfx deploy handles npm install + vite build + asset upload.
     _dfx("deploy", "realm_registry_frontend", "--yes", network=network)
+
+    # Restore the original package.json.
+    fe_pkg.write_text(pkg_text)
 
     print(f"   ✅ realm_registry_frontend deployed → "
           f"https://{frontend_id}.icp0.io/")
