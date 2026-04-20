@@ -1165,7 +1165,9 @@ def _deploy_registry_frontend(descriptor: Dict[str, Any]) -> None:
     # Build the SvelteKit frontend.  We invoke vite directly instead of
     # `npm run build` because the workspace's prebuild hook re-runs
     # `dfx generate` which overwrites our @icp-sdk→@dfinity patches.
-    _run(["node_modules/.bin/vite", "build"],
+    # vite is hoisted to root node_modules in npm workspaces.
+    vite_bin = REPO_ROOT / "node_modules" / ".bin" / "vite"
+    _run([str(vite_bin), "build"],
          cwd=REPO_ROOT / "src" / "realm_registry_frontend")
 
     # Upload the built assets to the existing canister.
