@@ -234,6 +234,13 @@
       "type": "assets",
       "workspace": "marketplace_frontend",
       "dependencies": ["marketplace_backend"]
+    },
+    "platform_dashboard_frontend": {
+      "source": [
+        "src/platform_dashboard_frontend/dist"
+      ],
+      "type": "assets",
+      "workspace": "platform_dashboard_frontend"
     }
   },
   "defaults": { 

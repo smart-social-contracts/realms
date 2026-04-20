@@ -1043,6 +1043,64 @@ def _deploy_registry_frontend(descriptor: Dict[str, Any]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Deploy platform_dashboard_frontend (asset canister, outside mundus pipeline)
+# ---------------------------------------------------------------------------
+
+
+def _deploy_dashboard_frontend(descriptor: Dict[str, Any]) -> None:
+    """Build and deploy the platform_dashboard_frontend asset canister.
+
+    The dashboard is an admin-facing SvelteKit frontend that provides a
+    unified directory of all platform canisters, links to each
+    canister's frontend or Candid UI, and an installer deployment
+    dashboard.  It is not part of the mundus realm pipeline — it is
+    deployed as a standalone asset canister alongside the registry
+    frontend.
+    """
+    network = descriptor["network"]
+    frontend_id = _canister_id("platform_dashboard_frontend", network)
+    if not frontend_id:
+        print("   ⚠ platform_dashboard_frontend has no canister id on "
+              f"{network} — skipping dashboard deploy")
+        return
+
+    if not shutil.which("npm"):
+        print("   ⚠ npm not found — skipping platform_dashboard_frontend "
+              "deploy (install Node.js to enable)")
+        return
+
+    print("\n   📦 building & deploying platform_dashboard_frontend …")
+
+    # Ensure all .did files exist for dfx generate (prebuild generates
+    # declarations for registry, installer, marketplace, file_registry,
+    # realm_backend).  Only generate what is missing.
+    for canister_name in [
+        "realm_registry_backend", "realm_installer",
+        "marketplace_backend", "file_registry", "realm_backend",
+    ]:
+        did_stem = canister_name
+        did_path = REPO_ROOT / "src" / canister_name / f"{canister_name}.did"
+        if did_path.exists():
+            _run(["dfx", "generate", canister_name],
+                 cwd=REPO_ROOT, check=False)
+
+    node_modules = REPO_ROOT / "node_modules"
+    if not node_modules.exists():
+        _run(["npm", "install", "--legacy-peer-deps"],
+             cwd=REPO_ROOT, check=False)
+
+    _run(["npm", "run", "build",
+          "--workspace=platform_dashboard_frontend"],
+         cwd=REPO_ROOT)
+
+    _dfx("deploy", "platform_dashboard_frontend", "--yes",
+         network=network)
+
+    print(f"   ✅ platform_dashboard_frontend deployed → "
+          f"https://{frontend_id}.icp0.io/")
+
+
+# ---------------------------------------------------------------------------
 # Stage 3 — verify (seed data, smoke)
 # ---------------------------------------------------------------------------
 
@@ -1182,6 +1240,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if 2 in stages:
         stage2_install(descriptor, infra_ids)
         _deploy_registry_frontend(descriptor)
+        _deploy_dashboard_frontend(descriptor)
     if 3 in stages:
         stage3_verify(descriptor)
 
