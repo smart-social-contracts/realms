@@ -49,6 +49,9 @@ declare -A ALL_CANISTERS=(
   ["ehyfg-wyaaa-aaaae-qg3qq-cai"]="demo-marketplace_backend"
   ["ulsvn-pyaaa-aaaae-qj4tq-cai"]="demo-marketplace_frontend"
   ["vi64l-3aaaa-aaaae-qj4va-cai"]="demo-file_registry"
+  # --- Platform Dashboard ---
+  ["dpgu3-wqaaa-aaaau-agqoa-cai"]="staging-platform_dashboard"
+  ["rxtxq-kyaaa-aaaac-qgora-cai"]="demo-platform_dashboard"
   # --- Website ---
   ["6kdvx-3yaaa-aaaah-qqo5a-cai"]="atlas_website"
   # --- Tokens ---
@@ -59,6 +62,11 @@ declare -A ALL_CANISTERS=(
   ["4tpn3-niaaa-aaaaf-qdoja-cai"]="nft_realm1"
   ["4uolp-aqaaa-aaaaf-qdojq-cai"]="nft_realm2"
   ["4bj2c-byaaa-aaaaf-qdoka-cai"]="nft_realm3"
+  # --- Platform Dashboard ---
+  # Canister IDs are assigned on first deploy; update these after
+  # running: dfx canister id platform_dashboard_frontend --network <staging|demo>
+  # ["<staging-canister-id>"]="staging-platform_dashboard_frontend"
+  # ["<demo-canister-id>"]="demo-platform_dashboard_frontend"
 )
 
 TOPUP_RULE="opt record { threshold = $THRESHOLD : nat; method = variant { to_balance = $TOPUP : nat } }"
