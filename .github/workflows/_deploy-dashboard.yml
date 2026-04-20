@@ -61,7 +61,7 @@ jobs:
           dfx canister id platform_dashboard_frontend --network ${{ inputs.network }} 2>/dev/null || true
 
       - name: Install npm workspace dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Build platform_dashboard_frontend
         run: npm run build
