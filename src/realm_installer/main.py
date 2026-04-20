@@ -164,6 +164,18 @@ _ACTIVE_TASK_STATUSES = ("queued", "running")
 # bound on inter-canister calls, so we don't need to wait between them.
 _NEXT_STEP_DELAY_S = 0
 
+# Transient error retry — "Rejection code 2, Couldn't send message" is a
+# transient IC subnet routing failure; retrying after a delay usually works.
+_RETRYABLE_ERROR_PATTERNS = (
+    "Rejection code 2",
+    "Couldn't send message",
+    "IC0515",          # certified state unavailable
+    "IC0504",          # canister queue full (transient)
+)
+_MAX_STEP_RETRIES = 5
+_RETRY_BASE_DELAY_S = 10  # 10s, 20s, 40s, 80s, 160s
+_step_retry_counts: dict = {}  # in-memory: "taskid_stepidx" → count
+
 
 # ---------------------------------------------------------------------------
 # Persistent storage (stable memory) — DeployTask + DeployStep live here
@@ -273,6 +285,16 @@ class DeployStep(Entity, TimestampedMixin):
 
 def _now_s() -> int:
     return int(round(ic.time() / 1e9))
+
+
+def _is_retryable_error(error_str: str) -> bool:
+    if not error_str:
+        return False
+    return any(pat in error_str for pat in _RETRYABLE_ERROR_PATTERNS)
+
+
+def _step_retry_key(task_id: str, step_idx) -> str:
+    return f"{task_id}_{step_idx}"
 
 
 def _parse_install_mode(mode_str: str) -> InstallCodeMode:
@@ -802,6 +824,8 @@ def _finalize_task(task: DeployTask) -> None:
         f"[realm_installer] deploy {task.name} → {task.status} "
         f"(completed={n_completed}/{n_total}, failed={n_failed})"
     )
+    for s in task.steps:
+        _step_retry_counts.pop(_step_retry_key(task.name, s.idx), None)
 
 
 def _next_pending_step(task: DeployTask):
@@ -925,6 +949,29 @@ def _schedule_step_runner(task_id: str, delay_s: int = 0) -> None:
                     return
 
                 yield from _execute_step(task, step)
+
+                if step.status == "failed" and _is_retryable_error(step.error or ""):
+                    rk = _step_retry_key(task_id, step.idx)
+                    count = _step_retry_counts.get(rk, 0)
+                    if count < _MAX_STEP_RETRIES:
+                        _step_retry_counts[rk] = count + 1
+                        delay = _RETRY_BASE_DELAY_S * (2 ** count)
+                        ic.print(
+                            f"[realm_installer] deploy {task_id} step "
+                            f"{step.idx} transient error, retry "
+                            f"{count + 1}/{_MAX_STEP_RETRIES} in {delay}s"
+                        )
+                        step.status = "pending"
+                        step.error = ""
+                        step.started_at = 0
+                        step.completed_at = 0
+                        _schedule_step_runner(task_id, delay_s=delay)
+                        return
+                    ic.print(
+                        f"[realm_installer] deploy {task_id} step "
+                        f"{step.idx} transient error but retries "
+                        f"exhausted ({_MAX_STEP_RETRIES})"
+                    )
         except Exception as e:
             ic.print(
                 f"[realm_installer] timer callback fatal error for "

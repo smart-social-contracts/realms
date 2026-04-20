@@ -611,6 +611,24 @@ def _format_deploy_failures(status: Dict[str, Any]) -> str:
     return "\n".join(lines) if lines else "     (no per-step failures recorded)"
 
 
+_TRANSIENT_DFX_PATTERNS = (
+    "Rejection code 2",
+    "Couldn't send message",
+    "Could not send message",
+    "transport error",
+    "connection reset",
+    "timed out",
+)
+
+_DFX_TRANSIENT_RETRIES = 3
+_DFX_TRANSIENT_BACKOFF_S = 15
+
+
+def _is_transient_dfx_error(exc: subprocess.CalledProcessError) -> bool:
+    stderr = (exc.stderr or "") + (exc.stdout or "")
+    return any(pat.lower() in stderr.lower() for pat in _TRANSIENT_DFX_PATTERNS)
+
+
 def _try_deploy_with_cancel_retry(
     realm_installer: str,
     manifest_json: str,
@@ -619,14 +637,31 @@ def _try_deploy_with_cancel_retry(
 ) -> Dict[str, Any]:
     """Call deploy_realm; if rejected for concurrency, cancel the stale task and retry.
 
+    Also retries on transient IC/dfx errors (e.g. subnet routing failures)
+    with exponential backoff.
+
     Returns the parsed kickoff JSON dict on success, raises SystemExit on hard
     errors.
     """
     for attempt in range(2):
-        raw = _unwrap_candid_text(_dfx_call_text(
-            realm_installer, "deploy_realm", manifest_json,
-            network=network, timeout=120,
-        ))
+        for transient_try in range(_DFX_TRANSIENT_RETRIES):
+            try:
+                raw = _unwrap_candid_text(_dfx_call_text(
+                    realm_installer, "deploy_realm", manifest_json,
+                    network=network, timeout=120,
+                ))
+                break
+            except subprocess.CalledProcessError as e:
+                if _is_transient_dfx_error(e) and transient_try < _DFX_TRANSIENT_RETRIES - 1:
+                    delay = _DFX_TRANSIENT_BACKOFF_S * (2 ** transient_try)
+                    print(
+                        f"   ⚠ {name}: transient dfx error (attempt "
+                        f"{transient_try + 1}/{_DFX_TRANSIENT_RETRIES}), "
+                        f"retrying in {delay}s…"
+                    )
+                    time.sleep(delay)
+                    continue
+                raise
         try:
             data = json.loads(raw, strict=False)
         except json.JSONDecodeError as e:
@@ -767,10 +802,17 @@ def _poll_all_deploys(
 
     while remaining and time.time() < deadline:
         for task_id in list(remaining.keys()):
-            out = _dfx_call_text(
-                realm_installer, "get_deploy_status", task_id,
-                network=network, query=True, timeout=60,
-            )
+            try:
+                out = _dfx_call_text(
+                    realm_installer, "get_deploy_status", task_id,
+                    network=network, query=True, timeout=60,
+                )
+            except subprocess.CalledProcessError as e:
+                if _is_transient_dfx_error(e):
+                    print(f"   ⚠ transient dfx error polling {task_id}, "
+                          f"will retry next round")
+                    continue
+                raise
             body = _unwrap_candid_text(out)
             try:
                 data = json.loads(body, strict=False)
