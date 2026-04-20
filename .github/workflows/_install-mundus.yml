@@ -26,6 +26,7 @@ on:
 
 env:
   PYTHON_VERSION: "3.10"
+  NODE_VERSION: "20"
   DFX_VERSION: "0.31.0"
 
 jobs:
@@ -39,6 +40,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
       - name: Install dfx ${{ env.DFX_VERSION }}
         run: |

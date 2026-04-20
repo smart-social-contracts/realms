@@ -993,18 +993,42 @@ def _deploy_registry_frontend(descriptor: Dict[str, Any]) -> None:
               f"{network} — skipping frontend deploy")
         return
 
+    if not shutil.which("npm"):
+        print("   ⚠ npm not found — skipping realm_registry_frontend deploy "
+              "(install Node.js to enable)")
+        return
+
     print("\n   📦 building & deploying realm_registry_frontend …")
 
-    # Generate TS declarations from the backend .did file.  The backend
-    # is declared `remote` on staging/demo so dfx reads the local .did
-    # without contacting the canister.
-    _run(["dfx", "generate", "realm_registry_backend"],
-         cwd=REPO_ROOT, check=False)
+    # The frontend's prebuild script runs `dfx generate realm_registry_backend`
+    # which needs the .did file.  In single-job workflows (fast-deploy) stage 1
+    # already built the backend and the .did exists.  In multi-job pipelines
+    # (ci-main) stage 1 ran on a different runner, so we may need to generate
+    # the .did ourselves via a basilisk build.
+    did_path = REPO_ROOT / "src" / "realm_registry_backend" / "realm_registry_backend.did"
+    if not did_path.exists():
+        print("   • .did file missing — building realm_registry_backend to generate it …")
+        env = os.environ.copy()
+        env["CANISTER_CANDID_PATH"] = str(did_path)
+        _run([
+            sys.executable, "-m", "basilisk",
+            "realm_registry_backend",
+            str(REPO_ROOT / "src" / "realm_registry_backend" / "main.py"),
+        ], cwd=REPO_ROOT, env=env, check=False)
 
-    # Build the SvelteKit frontend (npm deps already installed by the
-    # workflow's `npm ci` step).
-    _run(["npm", "run", "build", "--workspace=realm_registry_frontend"],
-         cwd=REPO_ROOT)
+    if did_path.exists():
+        _run(["dfx", "generate", "realm_registry_backend"],
+             cwd=REPO_ROOT, check=False)
+    else:
+        print("   ⚠ could not generate .did file — frontend build may fail")
+
+    # Install npm deps if not already present (idempotent).
+    _run(["npm", "ci", "--ignore-scripts"], cwd=REPO_ROOT, check=False)
+
+    # Build the SvelteKit frontend directly via vite, bypassing the
+    # prebuild hook (we already ran dfx generate above).
+    _run(["npx", "vite", "build"],
+         cwd=REPO_ROOT / "src" / "realm_registry_frontend")
 
     # Upload the built assets to the existing canister.
     _dfx("deploy", "realm_registry_frontend", "--yes", network=network)
