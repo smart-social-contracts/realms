@@ -557,9 +557,20 @@ def _dfx_call_text(
         # --output raw returns the candid hex bytes; we instead want the
         # decoded text, so drop it and parse the default output below.
         cmd = [c for c in cmd if c not in ("--output", "raw")]
-        cp = subprocess.run(
-            cmd, capture_output=True, text=True, check=True, timeout=timeout
-        )
+        try:
+            cp = subprocess.run(
+                cmd, capture_output=True, text=True, check=True, timeout=timeout
+            )
+        except subprocess.CalledProcessError as e:
+            print(
+                f"   ✗ dfx call {canister}.{method} failed "
+                f"(exit {e.returncode})"
+            )
+            if e.stderr:
+                print(f"     stderr: {e.stderr.strip()[:500]}")
+            if e.stdout:
+                print(f"     stdout: {e.stdout.strip()[:500]}")
+            raise
         return (cp.stdout or "").strip()
     finally:
         try:
@@ -661,6 +672,14 @@ def _try_deploy_with_cancel_retry(
                     )
                     time.sleep(delay)
                     continue
+                print(
+                    f"   ✗ {name}: non-transient dfx error "
+                    f"(exit {e.returncode})"
+                )
+                if e.stderr:
+                    print(f"     stderr: {e.stderr.strip()[:500]}")
+                if e.stdout:
+                    print(f"     stdout: {e.stdout.strip()[:500]}")
                 raise
         try:
             data = json.loads(raw, strict=False)

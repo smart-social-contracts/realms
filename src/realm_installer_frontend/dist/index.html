@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Realm Installer - Deploy Dashboard</title>
+  <link rel="stylesheet" href="./app.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Realm Installer Dashboard</h1>
+      <div class="header-meta">
+        <div class="refresh-indicator" id="pulse"></div>
+        <span id="last-refresh">loading...</span>
+      </div>
+    </header>
+    <div id="error-banner" class="error-banner" style="display:none"></div>
+    <div id="stats" class="stats-bar"></div>
+    <div id="content"><div class="loading">Connecting to canister...</div></div>
+  </div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

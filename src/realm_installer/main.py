@@ -158,7 +158,10 @@ MAX_REGISTRY_READ_BYTES = 128 * 1024  # 128 KiB
 # Terminal task statuses — used both as filter values and to short-circuit
 # step execution if the task was somehow finalized between callbacks.
 _TERMINAL_TASK_STATUSES = ("completed", "partial", "failed", "cancelled")
+# Statuses that hold the per-target execution lock (only one at a time).
 _ACTIVE_TASK_STATUSES = ("queued", "running")
+# All non-terminal statuses including waiting (queued in the backlog).
+_ALL_NONTERMINAL_STATUSES = ("waiting", "queued", "running")
 
 # Per-step short retry/spacing.  All of our steps are essentially I/O
 # bound on inter-canister calls, so we don't need to wait between them.
@@ -742,11 +745,12 @@ def _build_steps(task: DeployTask, manifest: dict) -> list:
 
 
 def _find_active_task_for_target(target_id: str):
-    """Return any non-terminal DeployTask currently running for ``target_id``.
+    """Return the DeployTask currently holding the execution lock for ``target_id``.
 
-    Used to enforce "no two concurrent deploys on the same target" — the
-    chunk store on the target is per-canister, and a second concurrent
-    install would corrupt the in-flight one's chunks.
+    A task holds the lock when its status is in ``_ACTIVE_TASK_STATUSES``
+    (queued or running).  Only one such task should exist per target;
+    additional deploys are accepted with status ``waiting`` and
+    auto-promoted when the active task finishes.
     """
     for t in DeployTask.instances():
         try:
@@ -826,6 +830,33 @@ def _finalize_task(task: DeployTask) -> None:
     )
     for s in task.steps:
         _step_retry_counts.pop(_step_retry_key(task.name, s.idx), None)
+    _promote_next_for_target(task.target_canister_id)
+
+
+def _promote_next_for_target(target_id: str) -> None:
+    """Promote the oldest waiting task for ``target_id`` to queued and start it.
+
+    Called after a task reaches terminal status (completed/failed/cancelled)
+    to auto-start the next queued deploy for the same target.
+    """
+    waiting = []
+    for t in DeployTask.instances():
+        try:
+            if (t.target_canister_id == target_id
+                    and (t.status or "queued") == "waiting"):
+                waiting.append(t)
+        except Exception:
+            continue
+    if not waiting:
+        return
+    waiting.sort(key=lambda t: int(t.started_at or 0))
+    nxt = waiting[0]
+    nxt.status = "queued"
+    ic.print(
+        f"[realm_installer] promoting waiting deploy {nxt.name} "
+        f"for target {target_id}"
+    )
+    _schedule_step_runner(nxt.name, 0)
 
 
 def _next_pending_step(task: DeployTask):
@@ -983,6 +1014,7 @@ def _schedule_step_runner(task_id: str, delay_s: int = 0) -> None:
                     t.status = "failed"
                     t.error = (f"timer callback fatal: {e}")[:1990]
                     t.completed_at = _now_s()
+                    _promote_next_for_target(t.target_canister_id)
             except Exception:
                 pass
 
@@ -1042,24 +1074,20 @@ def deploy_realm(args: text) -> text:
         except Exception as e:
             return _err(f"invalid principal: {e}")
 
-        # Concurrency: refuse a new deploy when one is in flight on the
-        # same target.  Two concurrent install_realm_backend calls would
-        # share (and corrupt) the target's chunk store.
+        # Concurrency: only one deploy per target may execute at a time
+        # (the chunk store on the target would be corrupted otherwise).
+        # If one is already active, queue this deploy as "waiting" and
+        # auto-start it when the active one finishes.
         existing = _find_active_task_for_target(target_id)
-        if existing is not None:
-            return _err(
-                f"a deploy is already in progress on {target_id} "
-                f"(task_id={existing.name}, status={existing.status})",
-                conflicting_task_id=existing.name,
-            )
 
         task_id = _gen_task_id()
+        initial_status = "waiting" if existing else "queued"
         # Truncate the manifest blob to fit; we only retain it for
         # diagnostics, so trimming is acceptable.
         manifest_blob = json.dumps(manifest)[:8190]
         task = DeployTask(
             name=task_id,
-            status="queued",
+            status=initial_status,
             started_at=0,
             completed_at=0,
             target_canister_id=target_id,
@@ -1076,6 +1104,28 @@ def deploy_realm(args: text) -> text:
             return _err(f"manifest parse error: {e}", task_id=task_id)
 
         n_steps = len(list(task.steps))
+
+        if existing:
+            # Count position in queue (waiting tasks for same target)
+            position = sum(
+                1 for t in DeployTask.instances()
+                if t.target_canister_id == target_id
+                and (t.status or "queued") == "waiting"
+            )
+            ic.print(
+                f"[realm_installer] deploy_realm waiting {task_id}: "
+                f"{n_steps} step(s) for target {target_id} "
+                f"(behind {existing.name}, position={position})"
+            )
+            return json.dumps({
+                "success": True,
+                "task_id": task_id,
+                "status": "waiting",
+                "steps_count": n_steps,
+                "position": position,
+                "ahead_of": existing.name,
+            })
+
         ic.print(
             f"[realm_installer] deploy_realm queued {task_id}: "
             f"{n_steps} step(s) for target {target_id}"
@@ -1098,7 +1148,7 @@ def deploy_realm(args: text) -> text:
 
 @update
 def cancel_deploy(task_id: text) -> text:
-    """Mark a queued/running deploy as ``cancelled`` so timers no-op.
+    """Mark a queued/running/waiting deploy as ``cancelled`` so timers no-op.
 
     Returns ``{success, task_id, prev_status, status, cancelled_steps}``.
 
@@ -1110,10 +1160,9 @@ def cancel_deploy(task_id: text) -> text:
         will complete normally — the next timer fire then sees the
         terminal task status and exits cleanly.  This avoids leaving
         the IC management chunk-store in an indeterminate state.
-      - The concurrency interlock against the same target releases
-        immediately (because ``cancelled`` is in
-        ``_TERMINAL_TASK_STATUSES``), so a fresh ``deploy_realm`` for
-        that target succeeds right away.
+      - If the cancelled task held the execution lock (queued/running),
+        the next waiting deploy for the same target is auto-promoted.
+      - Cancelling a ``waiting`` task simply removes it from the queue.
 
     Useful for: aborting a known-bad manifest, freeing the target lock
     after a stuck deploy, and DAO/UI-driven workflows that want a
@@ -1150,6 +1199,9 @@ def cancel_deploy(task_id: text) -> text:
             f"[realm_installer] cancelled deploy {task_id} "
             f"(prev={prev}, cancelled_steps={cancelled_steps})"
         )
+        # If the cancelled task held the execution lock, promote next waiting
+        if prev in _ACTIVE_TASK_STATUSES:
+            _promote_next_for_target(task.target_canister_id)
         return _ok({
             "task_id": task_id,
             "prev_status": prev,
@@ -1229,25 +1281,49 @@ def _resume_in_flight_deploys() -> None:
     """
     try:
         list(DeployStep.instances())
+        # Group non-terminal tasks by target so we only schedule one per target.
+        by_target: dict = {}  # target_id -> list of tasks
         for t in DeployTask.instances():
             try:
-                if (t.status or "queued") in _ACTIVE_TASK_STATUSES:
-                    # Reset any half-running step row back to pending so
-                    # we don't skip it in _next_pending_step.
-                    for s in t.steps:
-                        if s.status == "running":
-                            s.status = "pending"
-                            s.started_at = 0
-                    t.status = "queued"
-                    ic.print(
-                        f"[realm_installer] resuming deploy {t.name} "
-                        f"after upgrade"
-                    )
-                    _schedule_step_runner(t.name, 0)
+                status = t.status or "queued"
+                if status in _ALL_NONTERMINAL_STATUSES:
+                    tid = t.target_canister_id
+                    by_target.setdefault(tid, []).append(t)
             except Exception as e:
                 ic.print(
-                    f"[realm_installer] failed to resume {t}: {e}"
+                    f"[realm_installer] failed to inspect task {t}: {e}"
                 )
+
+        for target_id, tasks in by_target.items():
+            # Sort: active (queued/running) first, then waiting, by started_at
+            def _sort_key(t):
+                s = t.status or "queued"
+                if s in _ACTIVE_TASK_STATUSES:
+                    return (0, int(t.started_at or 0))
+                return (1, int(t.started_at or 0))
+            tasks.sort(key=_sort_key)
+
+            # Only the head task gets scheduled; others stay as waiting
+            head = tasks[0]
+            for s in head.steps:
+                if s.status == "running":
+                    s.status = "pending"
+                    s.started_at = 0
+            head.status = "queued"
+            ic.print(
+                f"[realm_installer] resuming deploy {head.name} "
+                f"after upgrade (target {target_id})"
+            )
+            _schedule_step_runner(head.name, 0)
+
+            # Ensure remaining tasks for same target are waiting
+            for t in tasks[1:]:
+                if (t.status or "queued") != "waiting":
+                    t.status = "waiting"
+                    ic.print(
+                        f"[realm_installer] keeping {t.name} as waiting "
+                        f"(behind {head.name})"
+                    )
     except Exception as e:
         ic.print(f"[realm_installer] _resume_in_flight_deploys error: {e}")
 
@@ -1354,29 +1430,47 @@ def debug_resume_deploys(args: text) -> text:
     try:
         list(DeployStep.instances())
         resumed = []
+        # Group by target so we only schedule one per target
+        by_target: dict = {}
         for t in DeployTask.instances():
             try:
-                if (t.status or "queued") in _ACTIVE_TASK_STATUSES:
-                    pending_steps = [s for s in t.steps if s.status == "pending"]
-                    running_steps = [s for s in t.steps if s.status == "running"]
-                    for s in t.steps:
-                        if s.status == "running":
-                            s.status = "pending"
-                            s.started_at = 0
-                    t.status = "queued"
-                    _schedule_step_runner(t.name, 0)
-                    resumed.append({
-                        "task_id": t.name,
-                        "target": t.target_canister_id,
-                        "pending_steps": len(pending_steps),
-                        "reset_running_steps": len(running_steps),
-                    })
-                    ic.print(
-                        f"[realm_installer] debug_resume: restarting {t.name} "
-                        f"({len(pending_steps)} pending, {len(running_steps)} running→pending)"
-                    )
+                status = t.status or "queued"
+                if status in _ACTIVE_TASK_STATUSES:
+                    tid = t.target_canister_id
+                    by_target.setdefault(tid, []).append(t)
             except Exception as e:
                 resumed.append({"task_id": str(t), "error": str(e)})
+
+        for target_id, tasks in by_target.items():
+            tasks.sort(key=lambda t: int(t.started_at or 0))
+            head = tasks[0]
+            pending_steps = [s for s in head.steps if s.status == "pending"]
+            running_steps = [s for s in head.steps if s.status == "running"]
+            for s in head.steps:
+                if s.status == "running":
+                    s.status = "pending"
+                    s.started_at = 0
+            head.status = "queued"
+            _schedule_step_runner(head.name, 0)
+            resumed.append({
+                "task_id": head.name,
+                "target": target_id,
+                "pending_steps": len(pending_steps),
+                "reset_running_steps": len(running_steps),
+            })
+            ic.print(
+                f"[realm_installer] debug_resume: restarting {head.name} "
+                f"({len(pending_steps)} pending, {len(running_steps)} running→pending)"
+            )
+            # Keep others as waiting
+            for t in tasks[1:]:
+                t.status = "waiting"
+                resumed.append({
+                    "task_id": t.name,
+                    "target": target_id,
+                    "status": "waiting",
+                    "note": f"behind {head.name}",
+                })
         return json.dumps({"success": True, "resumed": resumed})
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})

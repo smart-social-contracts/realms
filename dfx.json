@@ -84,6 +84,13 @@
       "type": "custom",
       "wasm": ".basilisk/realm_installer/realm_installer.wasm"
     },
+    "realm_installer_frontend": {
+      "source": [
+        "src/realm_installer_frontend/dist"
+      ],
+      "type": "assets",
+      "workspace": "realm_installer_frontend"
+    },
     "realm_registry_backend": {
       "build": "python -m basilisk realm_registry_backend src/realm_registry_backend/main.py",
       "candid": "src/realm_registry_backend/realm_registry_backend.did",
