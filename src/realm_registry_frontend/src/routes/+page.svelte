@@ -23,6 +23,11 @@
   const H3_RESOLUTION = 6; // Resolution 6 = ~3.2km hex edge (good for city level)
   const MARKER_HIDE_ZOOM = 8; // Hide markers when zoom >= this level (hexes become visible)
 
+  // Marketplace frontend URL (resolved per environment)
+  $: marketplaceUrl = isLocalDevelopment()
+    ? `http://localhost:${(typeof window !== 'undefined' && window.location.port) || '4943'}/?canisterId=marketplace_frontend`
+    : 'https://joj52-zaaaa-aaaah-qrejq-cai.icp0.io';
+
   // Get commit hash from meta tag
   let commitHash = '';
   // Get commit datetime from meta tag
@@ -856,6 +861,15 @@
       </button>
     </div>
     
+    <a href={marketplaceUrl} target="_blank" rel="noopener noreferrer" class="btn btn-ghost marketplace-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <path d="M16 10a4 4 0 0 1-8 0"></path>
+      </svg>
+      {$_('controls.marketplace')}
+    </a>
+
     <a href="/create-realm" class="btn btn-primary add-btn">
       {$_('controls.create_realm')}
     </a>
@@ -1087,7 +1101,7 @@
     <!-- Version info with dynamic data -->
     <div class="footer-version">
       <span>
-{$_('page_title')} {version} ({commitHash}) - {commitDatetime}{typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname.endsWith('.localhost')) ? ` - ${$_('footer.local_deployment')}` : ''}
+{$_('page_title')} {version}{commitHash && commitHash !== 'local' && commitHash !== 'dev' ? ` (${commitHash})` : ''} - {commitDatetime}{typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname.endsWith('.localhost')) ? ` - ${$_('footer.local_deployment')}` : ''}
       </span>
     </div>
   </footer>
@@ -1397,6 +1411,11 @@
 
   .add-btn {
     white-space: nowrap;
+  }
+
+  .marketplace-btn {
+    white-space: nowrap;
+    text-decoration: none;
   }
 
   .view-toggle {

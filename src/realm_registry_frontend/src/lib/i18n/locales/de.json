@@ -9,7 +9,8 @@
   "controls": {
     "list_view": "Listenansicht",
     "map_view": "Kartenansicht",
-    "create_realm": "Realm erstellen"
+    "create_realm": "Realm erstellen",
+    "marketplace": "Marktplatz"
   },
   "modal": {
     "title": "Ein Realm erstellen",

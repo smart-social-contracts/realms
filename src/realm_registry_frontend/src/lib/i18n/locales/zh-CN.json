@@ -9,7 +9,8 @@
   "controls": {
     "list_view": "列表视图",
     "map_view": "地图视图",
-    "create_realm": "创建领域"
+    "create_realm": "创建领域",
+    "marketplace": "市场"
   },
   "modal": {
     "title": "创建领域",

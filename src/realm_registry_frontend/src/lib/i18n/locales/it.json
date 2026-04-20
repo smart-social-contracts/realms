@@ -9,7 +9,8 @@
   "controls": {
     "list_view": "Vista elenco",
     "map_view": "Vista mappa",
-    "create_realm": "Crea Reame"
+    "create_realm": "Crea Reame",
+    "marketplace": "Mercato"
   },
   "modal": {
     "title": "Crea un Reame",

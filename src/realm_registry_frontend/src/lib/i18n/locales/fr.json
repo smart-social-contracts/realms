@@ -9,7 +9,8 @@
   "controls": {
     "list_view": "Vue liste",
     "map_view": "Vue carte",
-    "create_realm": "Créer un Royaume"
+    "create_realm": "Créer un Royaume",
+    "marketplace": "Marché"
   },
   "modal": {
     "title": "Créer un Royaume",
