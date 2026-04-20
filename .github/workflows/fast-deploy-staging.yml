@@ -39,6 +39,16 @@ on:
         required: false
         default: ""
 
+      install_mode:
+        description: "Install mode for realm canisters"
+        required: false
+        type: choice
+        default: upgrade
+        options:
+          - upgrade
+          - reinstall
+          - install
+
       skip_base_wasm:
         description: "Skip rebuilding+publishing realm_backend.wasm.gz. Tick this for frontend/extension-only iteration."
         required: false
@@ -114,6 +124,7 @@ jobs:
           echo "📄 Descriptor:    ${{ inputs.descriptor }}"
           echo "🏛️  Realms:        ${{ inputs.realms || '(all)' }}"
           echo "🧩 Extensions:    ${{ inputs.extensions || '(all from descriptor)' }}"
+          echo "🔧 Install mode:  ${{ inputs.install_mode || 'upgrade' }}"
           echo "⏭  skip_base_wasm: ${{ inputs.skip_base_wasm }}"
           echo "🔀 Ref:           ${{ inputs.ref || github.ref }}"
           echo "🆔 Identity:      $(dfx identity get-principal)"
@@ -128,6 +139,7 @@ jobs:
           ONLY_REALMS: ${{ inputs.realms }}
           ONLY_EXTENSIONS: ${{ inputs.extensions }}
           SKIP_BASE_WASM: ${{ inputs.skip_base_wasm }}
+          INSTALL_MODE: ${{ inputs.install_mode }}
         run: |
           set -- --file "$DESCRIPTOR" --stages 1,2
           if [ -n "$ONLY_REALMS" ]; then
@@ -138,6 +150,9 @@ jobs:
           fi
           if [ "$SKIP_BASE_WASM" = "true" ]; then
             set -- "$@" --skip-base-wasm
+          fi
+          if [ -n "$INSTALL_MODE" ] && [ "$INSTALL_MODE" != "upgrade" ]; then
+            set -- "$@" --install-mode "$INSTALL_MODE"
           fi
           echo "→ python3 scripts/ci_install_mundus.py $*"
           python3 scripts/ci_install_mundus.py "$@"

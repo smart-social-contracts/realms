@@ -1004,6 +1004,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                         help="Skip building+publishing the realm_backend "
                              "(base) WASM in stage 1. Useful when iterating "
                              "on frontend/extensions only.")
+    parser.add_argument("--install-mode", default=None,
+                        choices=["upgrade", "reinstall", "install"],
+                        help="Override the install mode for all realms "
+                             "(default: from descriptor, usually 'upgrade').")
     args = parser.parse_args(argv)
 
     stages = {int(s) for s in args.stages.split(",") if s}
@@ -1076,6 +1080,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.infra_ids_out:
         args.infra_ids_out.write_text(json.dumps(infra_ids, indent=2))
         print(f"📝 wrote {args.infra_ids_out}")
+
+    if args.install_mode:
+        descriptor["install_mode"] = args.install_mode
 
     if 1 in stages:
         stage1_publish(descriptor, infra_ids)
