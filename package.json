@@ -17,7 +17,8 @@
     "src/realm_registry_frontend",
     "src/file_registry_frontend",
     "src/marketplace_frontend",
-    "src/realm_installer_frontend"
+    "src/realm_installer_frontend",
+    "src/platform_dashboard_frontend"
   ],
   "dependencies": {
     "@dfinity/agent": "^3.4.3",
