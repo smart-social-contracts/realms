@@ -11,6 +11,7 @@ Complete reference documentation for the Realms GOS platform.
 - **[Frontend Architecture](./FRONTEND_ARCHITECTURE)** - UI structure and patterns
 
 ### Architecture
+- **[Technical Overview & Canister Diagram](./TECHNICAL_INTRO)** - System architecture and canister relationships
 - **[Extension Architecture](./EXTENSION_ARCHITECTURE)** - Build custom extensions
 - **[Method Override System](./METHOD_OVERRIDE_SYSTEM)** - Extension method injection
 - **[Frontend Architecture](./FRONTEND_ARCHITECTURE)** - Svelte components and routing

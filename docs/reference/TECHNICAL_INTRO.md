@@ -13,15 +13,98 @@ Realms is a **full-stack governance platform** built on the Internet Computer Pr
 - **Authentication**: Internet Identity
 - **Blockchain**: Internet Computer Protocol
 
+### Canister Diagram
+
+```mermaid
+flowchart LR
+    subgraph realms["Each Realm (× N)"]
+        direction TB
+        FE["frontend\n(asset canister)"]
+        BE["backend\n(core logic)"]
+        Q["quarters\n(optional backend\ninstances)"]
+        TOK["token\n(optional, ICRC-1)"]
+        NFT["land NFT\n(optional, ICRC-7)"]
+        FE --> BE
+        BE --- Q
+        BE -.-> TOK
+        BE -.-> NFT
+    end
+
+    subgraph registry["Realm Registry"]
+        direction TB
+        RRF["registry\nfrontend"]
+        RRB["registry\nbackend\n(directory +\ncredits)"]
+        RRF --> RRB
+    end
+
+    subgraph infra["Project Infrastructure"]
+        direction TB
+        FR["file_registry\n(WASM + packages)"]
+        RI["realm_installer\n(deploy orchestrator)"]
+        MP["marketplace\n(extension catalog)"]
+        FRF["file_registry FE"]
+        MF["marketplace FE"]
+        FRF --> FR
+        MF --> MP
+    end
+
+    subgraph external["External"]
+        direction TB
+        II["Internet\nIdentity"]
+        MGMT["IC Mgmt\nCanister"]
+        CKBTC["ckBTC\nLedger"]
+        BILLING["Billing\nService"]
+    end
+
+    %% Realm ↔ Registry
+    BE -->|"register"| RRB
+    RRF -.->|"status"| BE
+
+    %% Installer flow
+    RI -->|"install WASM +\nconfig"| BE
+    RI -->|"stream chunks"| FR
+    RI -->|"chunked install"| MGMT
+    RRF -->|"deploy_realm"| RI
+    RI -->|"push assets"| FE
+
+    %% File registry usage
+    BE -->|"pull files"| FR
+    MF -.->|"upload"| FR
+    RRF -.->|"publish"| FR
+
+    %% External
+    BE -->|"vetKD"| MGMT
+    BE -->|"ICRC-1"| CKBTC
+    FE -.->|"auth"| II
+    RRF -.->|"auth"| II
+    MF -.->|"auth"| II
+    BILLING -.->|"credits"| RRB
+```
+
+The system is organized into four logical layers:
+
+- **Realms** — each realm is a self-contained unit with its own frontend + backend canister pair, optional quarters (additional backend instances for horizontal scaling), and optional per-realm tokens (fungible ICRC-1 and land NFT ICRC-7).
+- **Realm Registry** — central directory where all realms register themselves, plus a credit/billing ledger. The registry frontend also drives realm creation by coordinating with the installer.
+- **Project Infrastructure** — shared services: `file_registry` (on-chain blob store for WASM/manifests/packages), `realm_installer` (timer-driven orchestrator for chunked WASM deploys), and `marketplace` (extension/codex catalog with listings and licenses).
+- **External** — platform-level canisters and services not owned by the project: Internet Identity (auth), IC management canister (vetKD + chunked code install), ckBTC ledger, and an off-chain billing service.
+
 ### Core Components
 
-**Realm Backend Canister** - Python-based business logic, entity management, task execution
+**Realm Backend Canister** — Python-based business logic: entities, governance, finance, zones, extensions, vetKD crypto, and task automation. Each realm deploys its own instance.
 
-**Realm Frontend Canister** - SvelteKit app served directly from blockchain
+**Realm Frontend Canister** — SvelteKit app served directly from blockchain. Connects to its realm backend and optionally to the file registry for extension bundles.
 
-**Registry Canister** - Global realm discovery and registration
+**Quarters** — Optional additional `realm_backend` instances that partition a realm for horizontal scaling. The frontend routes to the appropriate quarter by canister ID.
 
-**Extension System** - Modular plugins for custom functionality
+**Registry Backend** — Global realm discovery, registration, search, and credit ledger for billing. Realm backends self-register here on startup.
+
+**File Registry** — On-chain file store for WASM blobs, extension/codex packages, and manifests. Serves files via both Candid (inter-canister) and HTTP.
+
+**Realm Installer** — Orchestrates multi-step realm deployments: streams WASM chunks from the file registry, installs code via the IC management canister, configures the target backend, and pushes assets to the frontend canister.
+
+**Marketplace** — Catalog for extensions, codices, and assistants with listings, licenses, and verification. Frontends bridge it to the file registry for uploads.
+
+**Extension System** — Modular plugins for custom functionality with backend + frontend components.
 
 ## Key Features
 
