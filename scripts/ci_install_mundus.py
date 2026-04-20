@@ -1022,13 +1022,18 @@ def _deploy_registry_frontend(descriptor: Dict[str, Any]) -> None:
     else:
         print("   ⚠ could not generate .did file — frontend build may fail")
 
-    # Install npm deps if not already present (idempotent).
-    _run(["npm", "ci", "--ignore-scripts"], cwd=REPO_ROOT, check=False)
+    # Install npm workspace deps.  --legacy-peer-deps avoids ERESOLVE
+    # failures when transitive peer ranges conflict across workspaces.
+    node_modules = REPO_ROOT / "node_modules"
+    if not node_modules.exists():
+        _run(["npm", "install", "--legacy-peer-deps"],
+             cwd=REPO_ROOT, check=False)
 
-    # Build the SvelteKit frontend directly via vite, bypassing the
-    # prebuild hook (we already ran dfx generate above).
-    _run(["npx", "vite", "build"],
-         cwd=REPO_ROOT / "src" / "realm_registry_frontend")
+    # Build the SvelteKit frontend via the workspace build command.
+    # The prebuild hook (dfx generate) will succeed because we ensured
+    # the .did file exists above.
+    _run(["npm", "run", "build", "--workspace=realm_registry_frontend"],
+         cwd=REPO_ROOT)
 
     # Upload the built assets to the existing canister.
     _dfx("deploy", "realm_registry_frontend", "--yes", network=network)
