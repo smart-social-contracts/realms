@@ -77,6 +77,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
+      - name: Deploy parameters
+        run: |
+          echo "╭────────────────────────────────────────╮"
+          echo "│ ⚡ Deploy                               │"
+          echo "╰────────────────────────────────────────╯"
+          echo "📄 Descriptor:    ${{ inputs.descriptor }}"
+          echo "🏛️  Realms:        ${{ inputs.realms || '(all)' }}"
+          echo "🧩 Extensions:    ${{ inputs.extensions || '(all from descriptor)' }}"
+          echo "🔧 Install mode:  ${{ inputs.install_mode }}"
+          echo "⏭  Skip base WASM: ${{ inputs.skip_base_wasm }}"
+          echo "🔀 Ref:           ${{ inputs.ref || github.ref }}"
+
       - uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -115,19 +127,6 @@ jobs:
           dfx identity use ci
           rm -f /tmp/identity.pem
           echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
-
-      - name: Print run parameters
-        run: |
-          echo "╭────────────────────────────────────────╮"
-          echo "│ ⚡ Fast deploy (staging)                │"
-          echo "╰────────────────────────────────────────╯"
-          echo "📄 Descriptor:    ${{ inputs.descriptor }}"
-          echo "🏛️  Realms:        ${{ inputs.realms || '(all)' }}"
-          echo "🧩 Extensions:    ${{ inputs.extensions || '(all from descriptor)' }}"
-          echo "🔧 Install mode:  ${{ inputs.install_mode || 'upgrade' }}"
-          echo "⏭  skip_base_wasm: ${{ inputs.skip_base_wasm }}"
-          echo "🔀 Ref:           ${{ inputs.ref || github.ref }}"
-          echo "🆔 Identity:      $(dfx identity get-principal)"
 
       - name: Run stages 1 + 2 against ${{ inputs.descriptor }}
         env:
