@@ -401,7 +401,7 @@ def _frontend_url(canister_id: str, network: str) -> str:
         return ""
     if network == "ic":
         return f"{canister_id}.ic0.app"
-    if network == "staging":
+    if network in ("staging", "demo"):
         return f"{canister_id}.icp0.io"
     return f"{canister_id}.localhost:8000"
 
