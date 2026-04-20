@@ -969,6 +969,51 @@ def stage2_install(descriptor: Dict[str, Any], infra_ids: Dict[str, str]) -> Non
 
 
 # ---------------------------------------------------------------------------
+# Deploy realm_registry_frontend (asset canister, outside mundus pipeline)
+# ---------------------------------------------------------------------------
+
+
+def _deploy_registry_frontend(descriptor: Dict[str, Any]) -> None:
+    """Build and deploy the realm_registry_frontend asset canister.
+
+    The mundus pipeline (stages 0-2) handles backend canisters via the
+    on-chain realm_installer, but the registry *frontend* is a plain
+    asset canister (SvelteKit → dist/ → dfx deploy).  Without this step
+    any frontend changes (marketplace button, i18n, styling) sit in the
+    repo but never reach the live canister.
+    """
+    registry_member = _find_registry_member(descriptor)
+    if not registry_member:
+        return
+
+    network = descriptor["network"]
+    frontend_id = _canister_id("realm_registry_frontend", network)
+    if not frontend_id:
+        print("   ⚠ realm_registry_frontend has no canister id on "
+              f"{network} — skipping frontend deploy")
+        return
+
+    print("\n   📦 building & deploying realm_registry_frontend …")
+
+    # Generate TS declarations from the backend .did file.  The backend
+    # is declared `remote` on staging/demo so dfx reads the local .did
+    # without contacting the canister.
+    _run(["dfx", "generate", "realm_registry_backend"],
+         cwd=REPO_ROOT, check=False)
+
+    # Build the SvelteKit frontend (npm deps already installed by the
+    # workflow's `npm ci` step).
+    _run(["npm", "run", "build", "--workspace=realm_registry_frontend"],
+         cwd=REPO_ROOT)
+
+    # Upload the built assets to the existing canister.
+    _dfx("deploy", "realm_registry_frontend", "--yes", network=network)
+
+    print(f"   ✅ realm_registry_frontend deployed → "
+          f"https://{frontend_id}.icp0.io/")
+
+
+# ---------------------------------------------------------------------------
 # Stage 3 — verify (seed data, smoke)
 # ---------------------------------------------------------------------------
 
@@ -1107,6 +1152,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         stage1_publish(descriptor, infra_ids)
     if 2 in stages:
         stage2_install(descriptor, infra_ids)
+        _deploy_registry_frontend(descriptor)
     if 3 in stages:
         stage3_verify(descriptor)
 
