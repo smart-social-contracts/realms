@@ -1019,6 +1019,21 @@ def _deploy_registry_frontend(descriptor: Dict[str, Any]) -> None:
     if did_path.exists():
         _run(["dfx", "generate", "realm_registry_backend"],
              cwd=REPO_ROOT, check=False)
+        # dfx ≥0.31 generates imports for @icp-sdk/core/agent, but the
+        # project uses @dfinity/agent. Patch the generated declarations.
+        decl_dir = REPO_ROOT / "src" / "declarations" / "realm_registry_backend"
+        for js_file in decl_dir.glob("*.js"):
+            text = js_file.read_text()
+            if "@icp-sdk/core/agent" in text:
+                js_file.write_text(
+                    text.replace("@icp-sdk/core/agent", "@dfinity/agent")
+                )
+        for ts_file in decl_dir.glob("*.ts"):
+            text = ts_file.read_text()
+            if "@icp-sdk/core/agent" in text:
+                ts_file.write_text(
+                    text.replace("@icp-sdk/core/agent", "@dfinity/agent")
+                )
     else:
         print("   ⚠ could not generate .did file — frontend build may fail")
 
