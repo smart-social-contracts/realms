@@ -1162,11 +1162,11 @@ def _deploy_registry_frontend(descriptor: Dict[str, Any]) -> None:
         _run(["npm", "install", "--legacy-peer-deps"],
              cwd=REPO_ROOT, check=False)
 
-    # Build the SvelteKit frontend via the workspace build command.
-    # The prebuild hook (dfx generate) will succeed because we ensured
-    # the .did file exists above.
-    _run(["npm", "run", "build", "--workspace=realm_registry_frontend"],
-         cwd=REPO_ROOT)
+    # Build the SvelteKit frontend.  We invoke vite directly instead of
+    # `npm run build` because the workspace's prebuild hook re-runs
+    # `dfx generate` which overwrites our @icp-sdk→@dfinity patches.
+    _run(["node_modules/.bin/vite", "build"],
+         cwd=REPO_ROOT / "src" / "realm_registry_frontend")
 
     # Upload the built assets to the existing canister.
     _dfx("deploy", "realm_registry_frontend", "--yes", network=network)
