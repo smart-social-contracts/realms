@@ -1,8 +1,8 @@
-# fast-deploy-staging.yml — manual, fast staging deploy for prototyping.
+# fast-deploy-staging.yml — manual, fast deploy for prototyping.
 #
 # A "see it now" path that runs in PARALLEL to ci-main.yml. Trade-offs:
 #   * Skips Phase A (no local-replica e2e gating).
-#   * Skips stage 0 (staging infra is long-lived).
+#   * Skips stage 0 (infrastructure is long-lived).
 #   * Skips stage 4 (no Playwright / no integration tests at the end).
 #   * Collapses stage 1 (publish) + stage 2 (install) into ONE job, so we
 #     pay the runner cold-start tax (checkout submodules, install dfx,
@@ -12,10 +12,10 @@
 #     ~3-5 minutes instead of ~50.
 #
 # Use the regular `CI (main)` pipeline for anything that should be gated
-# by tests before reaching staging. This workflow is a developer tool —
-# not a release pipeline.
+# by tests before reaching staging/demo. This workflow is a developer
+# tool — not a release pipeline.
 
-name: Fast deploy (staging)
+name: Deploy
 
 on:
   workflow_dispatch:
