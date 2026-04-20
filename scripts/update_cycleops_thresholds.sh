@@ -63,10 +63,8 @@ declare -A ALL_CANISTERS=(
   ["4uolp-aqaaa-aaaaf-qdojq-cai"]="nft_realm2"
   ["4bj2c-byaaa-aaaaf-qdoka-cai"]="nft_realm3"
   # --- Platform Dashboard ---
-  # Canister IDs are assigned on first deploy; update these after
-  # running: dfx canister id platform_dashboard_frontend --network <staging|demo>
-  # ["<staging-canister-id>"]="staging-platform_dashboard_frontend"
-  # ["<demo-canister-id>"]="demo-platform_dashboard_frontend"
+  ["dpgu3-wqaaa-aaaau-agqoa-cai"]="staging-platform_dashboard_frontend"
+  ["rxtxq-kyaaa-aaaac-qgora-cai"]="demo-platform_dashboard_frontend"
 )
 
 TOPUP_RULE="opt record { threshold = $THRESHOLD : nat; method = variant { to_balance = $TOPUP : nat } }"

@@ -68,3 +68,10 @@ jobs:
     with:
       network: staging
       descriptor: deployments/staging-mundus-layered.yml
+
+  deploy-dashboard:
+    uses: ./.github/workflows/_deploy-dashboard.yml
+    with:
+      network: staging
+    secrets:
+      IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}

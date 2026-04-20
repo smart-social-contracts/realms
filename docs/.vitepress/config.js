@@ -91,6 +91,7 @@ export default defineConfig({
         {
           text: 'Architecture',
           items: [
+            { text: 'Canister Diagram', link: '/reference/TECHNICAL_INTRO#canister-diagram' },
             { text: 'Frontend Architecture', link: '/reference/FRONTEND_ARCHITECTURE' },
             { text: 'Extension Architecture', link: '/reference/EXTENSION_ARCHITECTURE' },
             { text: 'Method Override System', link: '/reference/METHOD_OVERRIDE_SYSTEM' }

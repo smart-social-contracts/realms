@@ -159,18 +159,36 @@ jobs:
           echo "→ python3 scripts/ci_install_mundus.py $*"
           python3 scripts/ci_install_mundus.py "$@"
 
+      - name: Build and deploy platform dashboard
+        run: |
+          NETWORK=$(python3 -c "import yaml; print(yaml.safe_load(open('${{ inputs.descriptor }}'))['network'])")
+          echo "Building platform_dashboard_frontend for $NETWORK..."
+          cd src/platform_dashboard_frontend && npm run build && cd ../..
+          dfx deploy platform_dashboard_frontend --network "$NETWORK" --yes
+          DASH_ID=$(dfx canister id platform_dashboard_frontend --network "$NETWORK")
+          echo "Dashboard deployed: https://${DASH_ID}.icp0.io"
+
       - name: Print frontend URLs
         if: success()
         run: |
           python3 - <<'PY'
-          import os, yaml
+          import os, yaml, subprocess
           desc = yaml.safe_load(open(os.environ["DESC"]))
+          network = desc["network"]
           print()
           print("✅ Fast deploy complete. Live frontends:")
           for m in desc.get("mundus", []):
               fe = m.get("frontend_canister_id")
               if fe:
                   print(f"   • {m.get('display_name') or m['name']:14s} → https://{fe}.icp0.io/")
+          try:
+              dash_id = subprocess.check_output(
+                  ["dfx", "canister", "id", "platform_dashboard_frontend", "--network", network],
+                  text=True
+              ).strip()
+              print(f"   • {'Dashboard':14s} → https://{dash_id}.icp0.io/")
+          except Exception:
+              pass
           PY
         env:
           DESC: ${{ inputs.descriptor }}

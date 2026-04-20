@@ -151,6 +151,99 @@ def _add_controller(canister: str, controller: str, network: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# CycleOps monitoring — register newly created canisters
+# ---------------------------------------------------------------------------
+
+CYCLEOPS_CANISTER = "qc4nb-ciaaa-aaaap-aawqa-cai"
+CYCLEOPS_BLACKHOLE_V3 = "cpbhu-5iaaa-aaaad-aalta-cai"
+_CYCLEOPS_TEAM = os.environ.get(
+    "CYCLEOPS_TEAM_PRINCIPAL",
+    "xee7m-jddpf-rwyzl-pobzx-izlbn-vhsbt-ublzn-lf4vo-kbvz2-buwfk-xh6",
+)
+
+_CYCLEOPS_THRESHOLD = 2_000_000_000_000  # 2 TC
+_CYCLEOPS_TOPUP = 4_000_000_000_000      # 4 TC
+
+
+def _cycleops_display_name(
+    canister_name: str, network: str, *, suffix: Optional[str] = None
+) -> str:
+    """Build a CycleOps display name following existing nomenclature.
+
+    Convention: ``{network}-{name}[_{suffix}]``
+
+    If *canister_name* already carries a ``_backend`` or ``_frontend``
+    suffix (e.g. ``file_registry_frontend``) or *suffix* is ``None``,
+    nothing is appended.  Otherwise *suffix* (e.g. ``"backend"`` or
+    ``"frontend"``) is appended with an underscore.
+
+    Examples:
+      staging-dominion_backend   — suffix="backend"
+      demo-file_registry         — suffix=None (infra, no role suffix)
+      staging-file_registry_frontend — name already has _frontend
+    """
+    if (
+        suffix
+        and not canister_name.endswith("_frontend")
+        and not canister_name.endswith("_backend")
+    ):
+        return f"{network}-{canister_name}_{suffix}"
+    return f"{network}-{canister_name}"
+
+
+def _register_canister_with_cycleops(
+    canister_id: str,
+    display_name: str,
+    network: str,
+) -> None:
+    """Best-effort: add a canister to the CycleOps team with standard top-up rules.
+
+    Failure to register doesn't block the deploy.  Requires the V3
+    blackhole to be a controller (added separately by ``_add_controller``).
+    """
+    if not canister_id:
+        return
+    team_arg = f'opt principal "{_CYCLEOPS_TEAM}"'
+    topup_rule = (
+        f"opt record {{ threshold = {_CYCLEOPS_THRESHOLD} : nat; "
+        f"method = variant {{ to_balance = {_CYCLEOPS_TOPUP} : nat }} }}"
+    )
+    try:
+        result = subprocess.run(
+            [
+                "dfx", "canister", "call", "--network", "ic",
+                CYCLEOPS_CANISTER, "addCanister",
+                f'(record {{ '
+                f'asTeamPrincipal = {team_arg}; '
+                f'canisterId = principal "{canister_id}"; '
+                f'name = opt "{display_name}"; '
+                f'topupRule = {topup_rule}; '
+                f'}})',
+            ],
+            capture_output=True, text=True, timeout=60,
+        )
+        if "ok" in (result.stdout or "") or "already" in (result.stdout or ""):
+            subprocess.run(
+                [
+                    "dfx", "canister", "call", "--network", "ic",
+                    CYCLEOPS_CANISTER, "verifyBlackholeAddedAsControllerVersioned",
+                    f'(record {{ '
+                    f'asTeamPrincipal = {team_arg}; '
+                    f'canisterId = principal "{canister_id}"; '
+                    f'blackholeVersion = 3 : nat; '
+                    f'}})',
+                ],
+                capture_output=True, text=True, timeout=60,
+            )
+            print(f"   📊 registered {display_name} ({canister_id}) with CycleOps")
+        else:
+            print(f"   ⚠ CycleOps addCanister for {display_name}: "
+                  f"{(result.stdout or result.stderr or '')[:200]}")
+    except Exception as e:
+        print(f"   ⚠ CycleOps registration failed for {display_name}: {e}")
+
+
+# ---------------------------------------------------------------------------
 # Stage 0 — bootstrap infrastructure
 # ---------------------------------------------------------------------------
 
@@ -173,10 +266,19 @@ def stage0_bootstrap(descriptor: Dict[str, Any]) -> Dict[str, str]:
             continue
 
         existing = _canister_id(name, network)
+        newly_created = False
         if not existing:
             _dfx("canister", "create", name, network=network)
+            newly_created = True
         _dfx("deploy", name, "--yes", network=network, check=False)
-        ids[name] = _canister_id(name, network) or ""
+        cid = _canister_id(name, network) or ""
+        ids[name] = cid
+
+        if cid:
+            _add_controller(cid, CYCLEOPS_BLACKHOLE_V3, network)
+        if newly_created and cid:
+            display = _cycleops_display_name(name, network)
+            _register_canister_with_cycleops(cid, display, network)
 
     print(f"   ✅ infrastructure: {ids}")
     return ids
@@ -731,9 +833,11 @@ def _kickoff_deploy(
     """
     name = member["name"]
     canister_id = member.get("canister_id") or _canister_id(name, network)
+    newly_created = False
     if not canister_id:
         _dfx("canister", "create", name, network=network)
         canister_id = _canister_id(name, network)
+        newly_created = True
 
     member_mode = (member.get("install_mode") or default_mode).strip()
     wasm_spec = _wasm_spec_for_member(member, base_version)
@@ -746,6 +850,20 @@ def _kickoff_deploy(
     # install_codex_from_registry are accepted by realm_backend's
     # controller-bypass auth path (core/access.py).
     _add_controller(canister_id, realm_installer, network)
+
+    _add_controller(canister_id, CYCLEOPS_BLACKHOLE_V3, network)
+    if newly_created and canister_id:
+        display = _cycleops_display_name(name, network, suffix="backend")
+        _register_canister_with_cycleops(canister_id, display, network)
+
+    frontend_id = member.get("frontend_canister_id")
+    if frontend_id:
+        _add_controller(frontend_id, CYCLEOPS_BLACKHOLE_V3, network)
+        if newly_created:
+            fe_display = _cycleops_display_name(
+                name, network, suffix="frontend",
+            )
+            _register_canister_with_cycleops(frontend_id, fe_display, network)
 
     manifest = _build_deploy_manifest(
         member,
