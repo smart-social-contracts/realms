@@ -251,7 +251,13 @@ def _register_canister_with_cycleops(
 INFRA_CANISTERS = ["file_registry", "file_registry_frontend", "realm_installer"]
 
 
-def stage0_bootstrap(descriptor: Dict[str, Any]) -> Dict[str, str]:
+def stage0_bootstrap(descriptor: Dict[str, Any], *, upgrade: bool = False) -> Dict[str, str]:
+    """Bootstrap (and optionally upgrade) infrastructure canisters.
+
+    When *upgrade* is True, pinned canisters are redeployed so that code
+    changes (e.g. raised file-store limits in a new basilisk version)
+    take effect on-chain.
+    """
     network = descriptor["network"]
     overrides = descriptor.get("infrastructure_overrides") or {}
 
@@ -260,18 +266,22 @@ def stage0_bootstrap(descriptor: Dict[str, Any]) -> Dict[str, str]:
 
     for name in INFRA_CANISTERS:
         override_id = (overrides.get(name) or {}).get("canister_id")
-        if override_id:
+        if override_id and not upgrade:
             print(f"   • {name} pinned to {override_id} (no install)")
             ids[name] = override_id
             continue
 
-        existing = _canister_id(name, network)
+        existing = override_id or _canister_id(name, network)
         newly_created = False
         if not existing:
             _dfx("canister", "create", name, network=network)
             newly_created = True
+
+        if override_id and upgrade:
+            print(f"   • {name} pinned to {override_id} — upgrading …")
+
         _dfx("deploy", name, "--yes", network=network, check=False)
-        cid = _canister_id(name, network) or ""
+        cid = existing or _canister_id(name, network) or ""
         ids[name] = cid
 
         if cid:
@@ -1640,7 +1650,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"   ⚠️  ignoring malformed INFRA_IDS_JSON: {e}")
 
     if 0 in stages:
-        infra_ids = stage0_bootstrap(descriptor)
+        upgrade_infra = bool(stages & {1, 2})
+        infra_ids = stage0_bootstrap(descriptor, upgrade=upgrade_infra)
     else:
         for n in INFRA_CANISTERS:
             if not infra_ids[n]:
