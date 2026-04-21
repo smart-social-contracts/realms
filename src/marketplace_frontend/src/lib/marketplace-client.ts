@@ -10,6 +10,7 @@
 //     numbers (likes, installs, timestamps).
 
 import { marketplace } from './canisters';
+import { builtinExtensions, builtinCodices } from './builtin-catalog';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -341,6 +342,24 @@ function normPendingAudit(raw: any): PendingAudit {
   };
 }
 
+// Fallback helpers — return built-in catalog items when the backend is
+// empty or unreachable so the marketplace always has content.
+
+function withExtFallback<T extends ExtensionListing[]>(items: T): T {
+  if (items.length > 0) return items;
+  return builtinExtensions as unknown as T;
+}
+
+function withCodexFallback<T extends CodexListing[]>(items: T): T {
+  if (items.length > 0) return items;
+  return builtinCodices as unknown as T;
+}
+
+function matchesQuery(text: string, q: string): boolean {
+  const lower = q.toLowerCase();
+  return text.toLowerCase().includes(lower);
+}
+
 function normStatus(raw: any): MarketplaceStatus {
   return {
     version: String(raw.version ?? ''),
@@ -398,8 +417,14 @@ export const marketplaceClient = {
     return unwrap<string>(r);
   },
   async getExtensionDetails(id: string): Promise<ExtensionListing> {
-    const r = await marketplace.get_extension_details(id);
-    return normExt(unwrap<any>(r));
+    try {
+      const r = await marketplace.get_extension_details(id);
+      return normExt(unwrap<any>(r));
+    } catch {
+      const found = builtinExtensions.find((e) => e.extension_id === id);
+      if (found) return found;
+      throw new Error(`Extension '${id}' not found`);
+    }
   },
   async listExtensions(page: number, perPage: number, verifiedOnly = false): Promise<{
     listings: ExtensionListing[];
@@ -407,17 +432,26 @@ export const marketplaceClient = {
     page: number;
     per_page: number;
   }> {
-    const r = await marketplace.list_marketplace_extensions(BigInt(page), BigInt(perPage), verifiedOnly);
-    return {
-      listings: r.listings.map(normExt),
-      total_count: toNumber(r.total_count),
-      page: toNumber(r.page),
-      per_page: toNumber(r.per_page),
-    };
+    try {
+      const r = await marketplace.list_marketplace_extensions(BigInt(page), BigInt(perPage), verifiedOnly);
+      const listings = r.listings.map(normExt);
+      if (listings.length > 0) {
+        return { listings, total_count: toNumber(r.total_count), page: toNumber(r.page), per_page: toNumber(r.per_page) };
+      }
+    } catch { /* fall through to built-in catalog */ }
+    const start = (page - 1) * perPage;
+    const slice = builtinExtensions.slice(start, start + perPage);
+    return { listings: slice, total_count: builtinExtensions.length, page, per_page: perPage };
   },
   async searchExtensions(q: string, verifiedOnly = false): Promise<ExtensionListing[]> {
-    const r = await marketplace.search_extensions(q, verifiedOnly);
-    return (r as any[]).map(normExt);
+    try {
+      const r = await marketplace.search_extensions(q, verifiedOnly);
+      const items = (r as any[]).map(normExt);
+      if (items.length > 0) return items;
+    } catch { /* fall through */ }
+    return builtinExtensions.filter(
+      (e) => matchesQuery(e.name, q) || matchesQuery(e.description, q) || matchesQuery(e.categories, q),
+    );
   },
   async getMyExtensions(): Promise<ExtensionListing[]> {
     const r = await marketplace.get_my_extensions();
@@ -434,8 +468,14 @@ export const marketplaceClient = {
     return unwrap<string>(r);
   },
   async getCodexDetails(id: string): Promise<CodexListing> {
-    const r = await marketplace.get_codex_details(id);
-    return normCodex(unwrap<any>(r));
+    try {
+      const r = await marketplace.get_codex_details(id);
+      return normCodex(unwrap<any>(r));
+    } catch {
+      const found = builtinCodices.find((c) => c.codex_id === id);
+      if (found) return found;
+      throw new Error(`Codex '${id}' not found`);
+    }
   },
   async listCodices(page: number, perPage: number, verifiedOnly = false): Promise<{
     listings: CodexListing[];
@@ -443,17 +483,26 @@ export const marketplaceClient = {
     page: number;
     per_page: number;
   }> {
-    const r = await marketplace.list_marketplace_codices(BigInt(page), BigInt(perPage), verifiedOnly);
-    return {
-      listings: r.listings.map(normCodex),
-      total_count: toNumber(r.total_count),
-      page: toNumber(r.page),
-      per_page: toNumber(r.per_page),
-    };
+    try {
+      const r = await marketplace.list_marketplace_codices(BigInt(page), BigInt(perPage), verifiedOnly);
+      const listings = r.listings.map(normCodex);
+      if (listings.length > 0) {
+        return { listings, total_count: toNumber(r.total_count), page: toNumber(r.page), per_page: toNumber(r.per_page) };
+      }
+    } catch { /* fall through to built-in catalog */ }
+    const start = (page - 1) * perPage;
+    const slice = builtinCodices.slice(start, start + perPage);
+    return { listings: slice, total_count: builtinCodices.length, page, per_page: perPage };
   },
   async searchCodices(q: string, verifiedOnly = false): Promise<CodexListing[]> {
-    const r = await marketplace.search_codices(q, verifiedOnly);
-    return (r as any[]).map(normCodex);
+    try {
+      const r = await marketplace.search_codices(q, verifiedOnly);
+      const items = (r as any[]).map(normCodex);
+      if (items.length > 0) return items;
+    } catch { /* fall through */ }
+    return builtinCodices.filter(
+      (c) => matchesQuery(c.name, q) || matchesQuery(c.description, q) || matchesQuery(c.categories, q),
+    );
   },
   async getMyCodices(): Promise<CodexListing[]> {
     const r = await marketplace.get_my_codices();
@@ -539,20 +588,36 @@ export const marketplaceClient = {
 
   // --- rankings --------------------------------------------------------
   async topExtensionsByDownloads(n = 20, verifiedOnly = false): Promise<ExtensionListing[]> {
-    const r = await marketplace.top_extensions_by_downloads(BigInt(n), verifiedOnly);
-    return (r as any[]).map(normExt);
+    try {
+      const r = await marketplace.top_extensions_by_downloads(BigInt(n), verifiedOnly);
+      const items = (r as any[]).map(normExt);
+      if (items.length > 0) return items;
+    } catch { /* fall through */ }
+    return builtinExtensions.slice(0, n);
   },
   async topExtensionsByLikes(n = 20, verifiedOnly = false): Promise<ExtensionListing[]> {
-    const r = await marketplace.top_extensions_by_likes(BigInt(n), verifiedOnly);
-    return (r as any[]).map(normExt);
+    try {
+      const r = await marketplace.top_extensions_by_likes(BigInt(n), verifiedOnly);
+      const items = (r as any[]).map(normExt);
+      if (items.length > 0) return items;
+    } catch { /* fall through */ }
+    return builtinExtensions.slice(0, n);
   },
   async topCodicesByDownloads(n = 20, verifiedOnly = false): Promise<CodexListing[]> {
-    const r = await marketplace.top_codices_by_downloads(BigInt(n), verifiedOnly);
-    return (r as any[]).map(normCodex);
+    try {
+      const r = await marketplace.top_codices_by_downloads(BigInt(n), verifiedOnly);
+      const items = (r as any[]).map(normCodex);
+      if (items.length > 0) return items;
+    } catch { /* fall through */ }
+    return builtinCodices.slice(0, n);
   },
   async topCodicesByLikes(n = 20, verifiedOnly = false): Promise<CodexListing[]> {
-    const r = await marketplace.top_codices_by_likes(BigInt(n), verifiedOnly);
-    return (r as any[]).map(normCodex);
+    try {
+      const r = await marketplace.top_codices_by_likes(BigInt(n), verifiedOnly);
+      const items = (r as any[]).map(normCodex);
+      if (items.length > 0) return items;
+    } catch { /* fall through */ }
+    return builtinCodices.slice(0, n);
   },
   async topAssistantsByDownloads(n = 20, verifiedOnly = false): Promise<AssistantListing[]> {
     const r = await marketplace.top_assistants_by_downloads(BigInt(n), verifiedOnly);
