@@ -4,7 +4,7 @@
 #
 #    pip-compile --allow-unsafe --output-file=src/marketplace_backend/requirements.txt --strip-extras src/marketplace_backend/requirements.in
 #
-ic-basilisk==0.11.26
+ic-basilisk==0.11.29
     # via
     #   -r src/marketplace_backend/requirements.in
     #   ic-basilisk-toolkit
