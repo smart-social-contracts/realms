@@ -102,10 +102,3 @@ jobs:
       network: staging
       descriptor: deployments/staging-mundus-layered.yml
 
-  deploy-dashboard-staging:
-    needs: layered-e2e-local
-    uses: ./.github/workflows/_deploy-dashboard.yml
-    with:
-      network: staging
-    secrets:
-      IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}

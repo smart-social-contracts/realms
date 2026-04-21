@@ -374,31 +374,115 @@ _TYPE_TO_WASM: Dict[str, Dict[str, str]] = {
         "source": "realm_registry_backend",
         "path_template": "realm-registry-{version}.wasm.gz",
     },
+    "marketplace": {
+        "source": "marketplace_backend",
+        "path_template": "marketplace-{version}.wasm.gz",
+    },
 }
+
+# Types whose WASM is downloaded from an external URL (descriptor field
+# ``wasm_url``), not built from local source. The downloaded file is
+# published to file_registry under this path template.
+_EXTERNAL_WASM_TYPES: Dict[str, str] = {
+    "token": "token-backend-{version}.wasm.gz",
+    "token_frontend": "token-frontend-{version}.wasm.gz",
+    "nft": "nft-backend-{version}.wasm.gz",
+    "nft_frontend": "nft-frontend-{version}.wasm.gz",
+}
+
+# Frontend-only types: no backend WASM, only an asset canister.
+_FRONTEND_ONLY_TYPES = {"dashboard"}
 
 
 def _wasm_spec_for_member(
     member: Dict[str, Any], version: str
-) -> Dict[str, str]:
+) -> Optional[Dict[str, str]]:
     """Resolve which WASM (and registry path) a mundus member should get.
 
+    Returns ``None`` for frontend-only members (type ``dashboard``) that
+    have no backend WASM.
+
+    For members with ``wasm_url`` (external downloads), returns a dict
+    with ``"external": True`` and the download URL.
+
     Order of precedence:
-      1. Explicit `wasm_path:` on the member (final, template not expanded).
-      2. Explicit `wasm_source:` on the member → builds <source> + uses
-         standard path template `<source>-{version}.wasm.gz`.
-      3. `type:` on the member, looked up in _TYPE_TO_WASM.
-      4. Hard default: realm_backend / realm-base-{version}.wasm.gz.
+      1. Frontend-only type → None.
+      2. Explicit ``wasm_url:`` on the member → external download.
+      3. Explicit ``wasm_path:`` on the member (final, template not expanded).
+      4. Explicit ``wasm_source:`` → builds <source> + standard path.
+      5. ``type:`` looked up in ``_TYPE_TO_WASM``.
+      6. Hard default: realm_backend / realm-base-{version}.wasm.gz.
     """
+    mtype = (member.get("type") or "realm").strip()
+    if mtype in _FRONTEND_ONLY_TYPES:
+        return None
+    if member.get("wasm_url"):
+        path_tpl = _EXTERNAL_WASM_TYPES.get(mtype, f"{mtype}-{{version}}.wasm")
+        return {
+            "source": mtype,
+            "path": path_tpl.format(version=version),
+            "external": True,
+            "url": member["wasm_url"],
+        }
     if member.get("wasm_path"):
         return {"source": member.get("wasm_source", "realm_backend"),
                 "path": member["wasm_path"]}
     if member.get("wasm_source"):
         src = member["wasm_source"]
         return {"source": src, "path": f"{src}-{version}.wasm.gz"}
-    mtype = member.get("type") or "realm"
     spec = _TYPE_TO_WASM.get(mtype) or _TYPE_TO_WASM["realm"]
     return {"source": spec["source"],
             "path": spec["path_template"].format(version=version)}
+
+
+def _download_external_wasm(url: str, dest_dir: Path, filename: str) -> Path:
+    """Download a WASM from an external URL and gzip it.
+
+    Returns the path to the gzipped file (.wasm.gz).
+    """
+    import gzip as _gzip
+    import urllib.request
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    raw_dest = dest_dir / filename
+    print(f"   • downloading {url} → {raw_dest}")
+    urllib.request.urlretrieve(url, raw_dest)
+    raw_size = raw_dest.stat().st_size
+
+    gz_dest = raw_dest.with_suffix(raw_dest.suffix + ".gz")
+    with raw_dest.open("rb") as fin, _gzip.open(gz_dest, "wb", compresslevel=9) as fout:
+        shutil.copyfileobj(fin, fout)
+    gz_size = gz_dest.stat().st_size
+    print(f"     downloaded {raw_size:,} bytes, gzipped → {gz_size:,} bytes")
+    raw_dest.unlink()
+    return gz_dest
+
+
+def _build_marketplace_frontend(network: str) -> Optional[Path]:
+    """Build the marketplace_frontend. Returns dist/ path or None."""
+    for canister_name in ["marketplace_backend"]:
+        did_path = REPO_ROOT / "src" / canister_name / f"{canister_name}.did"
+        if not did_path.exists():
+            env = os.environ.copy()
+            env["CANISTER_CANDID_PATH"] = str(did_path)
+            _run([
+                sys.executable, "-m", "basilisk",
+                canister_name,
+                str(REPO_ROOT / "src" / canister_name / "main.py"),
+            ], cwd=REPO_ROOT, env=env, check=False)
+
+        if did_path.exists():
+            _run(["dfx", "generate", canister_name],
+                 cwd=REPO_ROOT, check=False)
+
+    _run(["npm", "run", "build",
+          "--workspace=marketplace_frontend"],
+         cwd=REPO_ROOT)
+
+    dist = REPO_ROOT / "src" / "marketplace_frontend" / "dist"
+    if dist.is_dir() and any(dist.iterdir()):
+        return dist
+    print("   ⚠ marketplace_frontend build produced no dist/")
+    return None
 
 
 def _build_realm_frontend(
@@ -597,13 +681,26 @@ def stage1_publish(
     # under realm-base-{version}.wasm.gz; everything else (e.g.
     # realm_registry_backend) is published under
     # <source>-{version}.wasm.gz unless overridden.
+    #
+    # External WASMs (token/nft) are downloaded from URLs rather than
+    # built from source. Frontend-only types (dashboard) have no WASM.
     sources_needed: Dict[str, str] = {}  # source -> registry_path
+    external_wasms: Dict[str, Dict[str, str]] = {}  # url -> {path, source}
     for member in (descriptor.get("mundus") or []):
         spec = _wasm_spec_for_member(member, base_version)
-        sources_needed.setdefault(spec["source"], spec["path"])
+        if spec is None:
+            continue
+        if spec.get("external"):
+            external_wasms.setdefault(spec["url"], {
+                "path": spec["path"],
+                "source": spec["source"],
+            })
+        else:
+            sources_needed.setdefault(spec["source"], spec["path"])
 
     if skip_base_wasm:
         cmd += ["--skip-base-wasm"]
+        sources_needed.pop("realm_backend", None)
     else:
         # Always build/publish the realm_backend "base" WASM under the
         # canonical realm-base-{version}.wasm.gz path so existing
@@ -615,13 +712,26 @@ def stage1_publish(
         ]
         sources_needed.pop("realm_backend", None)
 
-        # Build & publish every other distinct WASM (e.g.
-        # realm_registry_backend → realm-registry-{version}.wasm.gz).
-        for source, registry_path in sorted(sources_needed.items()):
-            extra_path = _build_canister_wasm(source, network)
+    # Build & publish every other distinct WASM (e.g.
+    # realm_registry_backend → realm-registry-{version}.wasm.gz,
+    # marketplace_backend → marketplace-{version}.wasm.gz).
+    # These run even when --skip-base-wasm is set.
+    for source, registry_path in sorted(sources_needed.items()):
+        extra_path = _build_canister_wasm(source, network)
+        cmd += [
+            "--extra-wasm",
+            f"{extra_path}:{base_version}:{registry_path}",
+        ]
+
+    # Download & publish external WASMs (token/nft backends+frontends).
+    if external_wasms:
+        download_dir = REPO_ROOT / ".external-wasms"
+        for url, meta in sorted(external_wasms.items(), key=lambda kv: kv[1]["path"]):
+            filename = url.rsplit("/", 1)[-1]
+            local_path = _download_external_wasm(url, download_dir, filename)
             cmd += [
                 "--extra-wasm",
-                f"{extra_path}:{base_version}:{registry_path}",
+                f"{local_path}:{base_version}:{meta['path']}",
             ]
 
     if isinstance(only_exts, list):
@@ -675,7 +785,7 @@ def stage1_publish(
         ids_file.write_text(original_ids_text)
 
     registry_member = _find_registry_member(descriptor)
-    if registry_member:
+    if registry_member and registry_member.get("frontend_canister_id"):
         print("\n   ▸ building realm_registry_frontend …")
         dist = _build_registry_frontend(network)
         if dist:
@@ -687,16 +797,41 @@ def stage1_publish(
                 )
             print(f"   ✅ realm_registry_frontend published → {namespace}")
 
-    print("\n   ▸ building platform_dashboard_frontend …")
-    dist = _build_dashboard_frontend(network)
-    if dist:
-        namespace = "frontend/platform_dashboard_frontend"
-        rc = _publish_frontend_dist(dist, namespace, file_registry, network)
-        if rc != 0:
-            raise SystemExit(
-                "ERROR: failed to publish platform_dashboard_frontend"
-            )
-        print(f"   ✅ platform_dashboard_frontend published → {namespace}")
+    marketplace_members = [
+        m for m in (descriptor.get("mundus") or [])
+        if (m.get("type") or "").strip() == "marketplace"
+        and m.get("frontend_canister_id")
+    ]
+    for member in marketplace_members:
+        print("\n   ▸ building marketplace_frontend …")
+        dist = _build_marketplace_frontend(network)
+        if dist:
+            namespace = f"frontend/{member['name']}"
+            rc = _publish_frontend_dist(dist, namespace, file_registry, network)
+            if rc != 0:
+                raise SystemExit(
+                    "ERROR: failed to publish marketplace_frontend"
+                )
+            print(f"   ✅ marketplace_frontend published → {namespace}")
+
+    dashboard_members = [
+        m for m in (descriptor.get("mundus") or [])
+        if (m.get("type") or "").strip() == "dashboard"
+    ]
+    for member in dashboard_members:
+        fe_id = member.get("frontend_canister_id")
+        if not fe_id:
+            continue
+        print("\n   ▸ building platform_dashboard_frontend …")
+        dist = _build_dashboard_frontend(network)
+        if dist:
+            namespace = f"frontend/{member['name']}"
+            rc = _publish_frontend_dist(dist, namespace, file_registry, network)
+            if rc != 0:
+                raise SystemExit(
+                    "ERROR: failed to publish platform_dashboard_frontend"
+                )
+            print(f"   ✅ platform_dashboard_frontend published → {namespace}")
 
     print("   ✅ all frontends published to file_registry")
 
@@ -828,18 +963,23 @@ def _build_deploy_manifest(
 
     Mirrors the per-step work the old per-realm loop did, but as a
     single declarative payload the on-chain installer can iterate over.
+
+    For frontend-only members (type ``dashboard``), there is no WASM
+    section — only a ``frontend`` section.
     """
     wasm_spec = _wasm_spec_for_member(member, base_version)
     manifest: Dict[str, Any] = {
         "target_canister_id": target_canister_id,
         "registry_canister_id": file_registry,
-        "wasm": {
+    }
+
+    if wasm_spec is not None:
+        manifest["wasm"] = {
             "namespace": "wasm",
             "path": wasm_spec["path"],
             "mode": install_mode,
             "init_arg_b64": "",
-        },
-    }
+        }
 
     frontend_id = member.get("frontend_canister_id")
     if frontend_id:
@@ -1056,6 +1196,43 @@ def _try_deploy_with_cancel_retry(
     raise SystemExit(f"ERROR: deploy_realm still rejected for {name} after cancel")
 
 
+def _grant_frontend_permissions(
+    frontend_canister_id: str,
+    installer_principal: str,
+    network: str,
+) -> None:
+    """Grant Prepare + Commit permissions on an asset canister to the installer.
+
+    The installer needs these to call create_batch / create_chunk /
+    commit_batch on IC asset canisters.
+    """
+    for perm in ("Prepare", "Commit"):
+        try:
+            subprocess.run(
+                [
+                    "dfx", "canister", "call", "--network", network,
+                    frontend_canister_id, "grant_permission",
+                    f'(record {{ to_principal = principal "{installer_principal}"; '
+                    f'permission = variant {{ {perm} }} }})',
+                ],
+                capture_output=True, text=True, check=True, timeout=60,
+            )
+            print(f"   ✓ granted {perm} on {frontend_canister_id}")
+        except subprocess.CalledProcessError as e:
+            stderr = (e.stderr or e.stdout or "").strip()
+            if "already" in stderr.lower():
+                print(f"   ✓ {perm} already granted on {frontend_canister_id}")
+            else:
+                print(f"   ⚠ grant_permission({perm}) on "
+                      f"{frontend_canister_id}: {stderr[:200]}")
+
+
+def _is_asset_canister_frontend(member: Dict[str, Any]) -> bool:
+    """True if this member's frontend is an IC asset canister (not a custom WASM)."""
+    mtype = (member.get("type") or "realm").strip()
+    return mtype not in ("token", "token_frontend", "nft", "nft_frontend")
+
+
 def _kickoff_deploy(
     member: Dict[str, Any],
     *,
@@ -1072,9 +1249,19 @@ def _kickoff_deploy(
     use by the polling phase.  Raises SystemExit on hard errors so a
     bad realm aborts the whole CI run instead of silently scheduling a
     no-op poll.
+
+    For frontend-only members (type ``dashboard``), the target canister
+    is the ``frontend_canister_id`` since there is no backend canister.
     """
     name = member["name"]
-    canister_id = member.get("canister_id") or _canister_id(name, network)
+    mtype = (member.get("type") or "realm").strip()
+    is_frontend_only = mtype in _FRONTEND_ONLY_TYPES
+
+    if is_frontend_only:
+        canister_id = member.get("frontend_canister_id") or _canister_id(name, network) or ""
+    else:
+        canister_id = member.get("canister_id") or _canister_id(name, network)
+
     newly_created = False
     if not canister_id:
         _dfx("canister", "create", name, network=network)
@@ -1083,9 +1270,13 @@ def _kickoff_deploy(
 
     member_mode = (member.get("install_mode") or default_mode).strip()
     wasm_spec = _wasm_spec_for_member(member, base_version)
+    if wasm_spec:
+        wasm_label = f"{wasm_spec['source']} → {wasm_spec['path']}"
+    else:
+        wasm_label = "(frontend-only)"
     print(
         f"\n   ▸ {name} ({canister_id})  [mode={member_mode}]"
-        f"  [wasm={wasm_spec['source']} → {wasm_spec['path']}]"
+        f"  [wasm={wasm_label}]"
     )
     _add_controller(canister_id, realm_installer, network)
 
@@ -1103,10 +1294,19 @@ def _kickoff_deploy(
                 name, network, suffix="frontend",
             )
             _register_canister_with_cycleops(frontend_id, fe_display, network)
+        if _is_asset_canister_frontend(member):
+            _grant_frontend_permissions(frontend_id, realm_installer, network)
+
+    # For frontend-only members the target_canister_id passed to the
+    # installer is the frontend asset canister itself.
+    target_for_manifest = canister_id
+    if is_frontend_only:
+        target_for_manifest = member.get("frontend_canister_id") or canister_id
+        _grant_frontend_permissions(target_for_manifest, realm_installer, network)
 
     manifest = _build_deploy_manifest(
         member,
-        target_canister_id=canister_id,
+        target_canister_id=target_for_manifest,
         file_registry=file_registry,
         base_version=base_version,
         install_mode=member_mode,
@@ -1236,66 +1436,6 @@ def _poll_all_deploys(
     return finals
 
 
-def _deploy_infra_frontends_via_installer(
-    descriptor: Dict[str, Any],
-    realm_installer: str,
-    file_registry: str,
-    network: str,
-) -> None:
-    """Deploy registry + dashboard frontends via the installer's deploy_frontend endpoint.
-
-    These are not mundus members, so they don't go through deploy_realm.
-    Instead we call the standalone deploy_frontend endpoint directly.
-    """
-    infra_frontends = []
-
-    registry_member = _find_registry_member(descriptor)
-    if registry_member:
-        fe_id = _canister_id("realm_registry_frontend", network)
-        if fe_id:
-            infra_frontends.append({
-                "name": "realm_registry_frontend",
-                "canister_id": fe_id,
-                "namespace": "frontend/realm_registry_frontend",
-            })
-
-    dashboard_id = _canister_id("platform_dashboard_frontend", network)
-    if dashboard_id:
-        infra_frontends.append({
-            "name": "platform_dashboard_frontend",
-            "canister_id": dashboard_id,
-            "namespace": "frontend/platform_dashboard_frontend",
-        })
-
-    for fe in infra_frontends:
-        print(f"\n   ▸ deploying {fe['name']} via installer …")
-        _add_controller(fe["canister_id"], realm_installer, network)
-
-        deploy_args = json.dumps({
-            "registry_canister_id": file_registry,
-            "target_canister_id": fe["canister_id"],
-            "frontend_namespace": fe["namespace"],
-        })
-        try:
-            raw = _unwrap_candid_text(_dfx_call_text(
-                realm_installer, "deploy_frontend", deploy_args,
-                network=network, timeout=600,
-            ))
-            data = json.loads(raw, strict=False)
-            if data.get("success"):
-                print(
-                    f"   ✅ {fe['name']} deployed via installer "
-                    f"({data.get('files_deployed', '?')} files)"
-                )
-            else:
-                print(
-                    f"   ✗ {fe['name']} deploy_frontend failed: "
-                    f"{data.get('error', raw[:300])}"
-                )
-        except Exception as e:
-            print(f"   ✗ {fe['name']} deploy_frontend error: {e}")
-
-
 def stage2_install(
     descriptor: Dict[str, Any],
     infra_ids: Dict[str, str],
@@ -1375,10 +1515,6 @@ def stage2_install(
             f"ERROR: {len(failures)} realm deploy(s) did not complete: "
             f"{', '.join(failures)}"
         )
-
-    _deploy_infra_frontends_via_installer(
-        descriptor, realm_installer, file_registry, network,
-    )
 
     print("\n   ✅ mundus installed")
 

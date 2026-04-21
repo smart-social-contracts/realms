@@ -20,7 +20,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 
 class TestBuildDeployManifest:
-    """Verify _build_deploy_manifest includes frontend when member has frontend_canister_id."""
+    """Verify _build_deploy_manifest handles all member types correctly."""
 
     def _import_ci(self):
         import ci_install_mundus as ci
@@ -62,6 +62,63 @@ class TestBuildDeployManifest:
             artifacts={"extensions": [], "codices": []},
         )
         assert "frontend" not in manifest
+
+    def test_manifest_dashboard_frontend_only(self):
+        ci = self._import_ci()
+        member = {
+            "name": "platform_dashboard_frontend",
+            "type": "dashboard",
+            "frontend_canister_id": "rxtxq-kyaaa-aaaac-qgora-cai",
+        }
+        manifest = ci._build_deploy_manifest(
+            member,
+            target_canister_id="rxtxq-kyaaa-aaaac-qgora-cai",
+            file_registry="vi64l-3aaaa-aaaae-qj4va-cai",
+            base_version="0.1.0",
+            install_mode="upgrade",
+            artifacts={"extensions": [], "codices": []},
+        )
+        assert "wasm" not in manifest, "dashboard should have no WASM section"
+        assert "frontend" in manifest
+        assert manifest["frontend"]["target_canister_id"] == "rxtxq-kyaaa-aaaac-qgora-cai"
+        assert manifest["frontend"]["namespace"] == "frontend/platform_dashboard_frontend"
+
+    def test_manifest_marketplace_with_frontend(self):
+        ci = self._import_ci()
+        member = {
+            "name": "marketplace_backend",
+            "type": "marketplace",
+            "frontend_canister_id": "ulsvn-pyaaa-aaaae-qj4tq-cai",
+        }
+        manifest = ci._build_deploy_manifest(
+            member,
+            target_canister_id="ehyfg-wyaaa-aaaae-qg3qq-cai",
+            file_registry="vi64l-3aaaa-aaaae-qj4va-cai",
+            base_version="0.1.0",
+            install_mode="upgrade",
+            artifacts={"extensions": [], "codices": []},
+        )
+        assert "wasm" in manifest
+        assert "frontend" in manifest
+        assert "marketplace" in manifest["wasm"]["path"]
+
+    def test_manifest_external_wasm_token(self):
+        ci = self._import_ci()
+        member = {
+            "name": "token_backend",
+            "type": "token",
+            "wasm_url": "https://example.com/token_backend.wasm",
+        }
+        manifest = ci._build_deploy_manifest(
+            member,
+            target_canister_id="xbkkh-syaaa-aaaah-qq3ya-cai",
+            file_registry="vi64l-3aaaa-aaaae-qj4va-cai",
+            base_version="0.1.0",
+            install_mode="upgrade",
+            artifacts={"extensions": [], "codices": []},
+        )
+        assert "wasm" in manifest
+        assert "token-backend" in manifest["wasm"]["path"]
 
 
 class TestPublishLayeredFrontend:
@@ -189,6 +246,71 @@ class TestInstallerManifestParsing:
         assert "gzip_sha256" in main_text
 
 
+class TestWasmSpecResolution:
+    """Verify _wasm_spec_for_member handles all member types."""
+
+    def _import_ci(self):
+        import ci_install_mundus as ci
+        return ci
+
+    def test_realm_type(self):
+        ci = self._import_ci()
+        spec = ci._wasm_spec_for_member({"type": "realm"}, "1.0.0")
+        assert spec is not None
+        assert spec["source"] == "realm_backend"
+        assert "realm-base-1.0.0" in spec["path"]
+
+    def test_marketplace_type(self):
+        ci = self._import_ci()
+        spec = ci._wasm_spec_for_member({"type": "marketplace"}, "1.0.0")
+        assert spec is not None
+        assert spec["source"] == "marketplace_backend"
+        assert "marketplace-1.0.0" in spec["path"]
+
+    def test_dashboard_type_returns_none(self):
+        ci = self._import_ci()
+        spec = ci._wasm_spec_for_member({"type": "dashboard"}, "1.0.0")
+        assert spec is None, "dashboard type should have no WASM"
+
+    def test_token_external_wasm(self):
+        ci = self._import_ci()
+        member = {
+            "type": "token",
+            "wasm_url": "https://example.com/token_backend.wasm",
+        }
+        spec = ci._wasm_spec_for_member(member, "1.0.0")
+        assert spec is not None
+        assert spec.get("external") is True
+        assert spec["url"] == "https://example.com/token_backend.wasm"
+        assert "token-backend-1.0.0" in spec["path"]
+
+    def test_nft_frontend_external_wasm(self):
+        ci = self._import_ci()
+        member = {
+            "type": "nft_frontend",
+            "wasm_url": "https://example.com/nft_frontend.wasm",
+        }
+        spec = ci._wasm_spec_for_member(member, "1.0.0")
+        assert spec is not None
+        assert spec.get("external") is True
+        assert "nft-frontend-1.0.0" in spec["path"]
+
+    def test_type_to_wasm_has_marketplace(self):
+        ci = self._import_ci()
+        assert "marketplace" in ci._TYPE_TO_WASM
+
+    def test_external_wasm_types_defined(self):
+        ci = self._import_ci()
+        assert "token" in ci._EXTERNAL_WASM_TYPES
+        assert "nft" in ci._EXTERNAL_WASM_TYPES
+        assert "token_frontend" in ci._EXTERNAL_WASM_TYPES
+        assert "nft_frontend" in ci._EXTERNAL_WASM_TYPES
+
+    def test_frontend_only_types_defined(self):
+        ci = self._import_ci()
+        assert "dashboard" in ci._FRONTEND_ONLY_TYPES
+
+
 class TestCIInstallerPipeline:
     """Verify the CI script uses installer for all frontends (no dfx deploy fallback)."""
 
@@ -198,6 +320,7 @@ class TestCIInstallerPipeline:
         assert "_deploy_realm_frontends" not in text
         assert "_deploy_registry_frontend" not in text
         assert "_deploy_dashboard_frontend" not in text
+        assert "_deploy_infra_frontends_via_installer" not in text
 
     def test_stage1_publishes_frontends(self):
         ci_path = REPO_ROOT / "scripts" / "ci_install_mundus.py"
@@ -206,12 +329,35 @@ class TestCIInstallerPipeline:
         assert "_build_realm_frontend" in text
         assert "_build_registry_frontend" in text
         assert "_build_dashboard_frontend" in text
+        assert "_build_marketplace_frontend" in text
 
-    def test_stage2_deploys_infra_frontends_via_installer(self):
+    def test_external_wasm_download_support(self):
         ci_path = REPO_ROOT / "scripts" / "ci_install_mundus.py"
         text = ci_path.read_text()
-        assert "_deploy_infra_frontends_via_installer" in text
-        assert "deploy_frontend" in text
+        assert "_download_external_wasm" in text
+        assert "external_wasms" in text
+
+    def test_grant_frontend_permissions_exists(self):
+        ci_path = REPO_ROOT / "scripts" / "ci_install_mundus.py"
+        text = ci_path.read_text()
+        assert "_grant_frontend_permissions" in text
+        assert "grant_permission" in text
+
+    def test_dashboard_workflow_removed(self):
+        dashboard_wf = REPO_ROOT / ".github" / "workflows" / "_deploy-dashboard.yml"
+        assert not dashboard_wf.exists(), "_deploy-dashboard.yml should be deleted"
+
+    def test_ci_main_no_dashboard_job(self):
+        ci_main = REPO_ROOT / ".github" / "workflows" / "ci-main.yml"
+        text = ci_main.read_text()
+        assert "deploy-dashboard-staging" not in text
+        assert "_deploy-dashboard.yml" not in text
+
+    def test_fast_deploy_has_upgrade_installer_option(self):
+        fast = REPO_ROOT / ".github" / "workflows" / "fast-deploy.yml"
+        text = fast.read_text()
+        assert "upgrade_installer" in text
+        assert "UPGRADE_INSTALLER" in text
 
 
 if __name__ == "__main__":

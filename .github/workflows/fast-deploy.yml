@@ -55,6 +55,12 @@ on:
         type: boolean
         default: false
 
+      upgrade_installer:
+        description: "Run stage 0 (upgrade realm_installer) before stages 1+2. Required when new installer features are needed."
+        required: false
+        type: boolean
+        default: false
+
       ref:
         description: "realms commit/branch to deploy from (defaults to the workflow ref)."
         required: false
@@ -87,6 +93,7 @@ jobs:
           echo "🧩 Extensions:    ${{ inputs.extensions || '(all from descriptor)' }}"
           echo "🔧 Install mode:  ${{ inputs.install_mode }}"
           echo "⏭  Skip base WASM: ${{ inputs.skip_base_wasm }}"
+          echo "🔄 Upgrade installer: ${{ inputs.upgrade_installer }}"
           echo "🔀 Ref:           ${{ inputs.ref || github.ref }}"
 
       - uses: actions/checkout@v4
@@ -131,19 +138,21 @@ jobs:
           rm -f /tmp/identity.pem
           echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
 
-      - name: Run stages 1 + 2 against ${{ inputs.descriptor }}
+      - name: Run deploy against ${{ inputs.descriptor }}
         env:
-          # Surface descriptor + filter inputs as plain env vars so the
-          # bash below can quote them safely without going through GHA
-          # `${{ ... }}` expansion inside `if`/`set --` (which trips
-          # shellcheck SC2054 about commas inside array literals).
           DESCRIPTOR: ${{ inputs.descriptor }}
           ONLY_REALMS: ${{ inputs.realms }}
           ONLY_EXTENSIONS: ${{ inputs.extensions }}
           SKIP_BASE_WASM: ${{ inputs.skip_base_wasm }}
           INSTALL_MODE: ${{ inputs.install_mode }}
+          UPGRADE_INSTALLER: ${{ inputs.upgrade_installer }}
         run: |
-          set -- --file "$DESCRIPTOR" --stages 1,2
+          if [ "$UPGRADE_INSTALLER" = "true" ]; then
+            STAGES="0,1,2"
+          else
+            STAGES="1,2"
+          fi
+          set -- --file "$DESCRIPTOR" --stages "$STAGES"
           if [ -n "$ONLY_REALMS" ]; then
             set -- "$@" --only-realms "$ONLY_REALMS"
           fi
@@ -163,23 +172,18 @@ jobs:
         if: success()
         run: |
           python3 - <<'PY'
-          import os, yaml, subprocess
+          import os, yaml
           desc = yaml.safe_load(open(os.environ["DESC"]))
-          network = desc["network"]
           print()
           print("✅ Fast deploy complete. Live frontends:")
           for m in desc.get("mundus", []):
               fe = m.get("frontend_canister_id")
+              cid = m.get("canister_id")
+              name = m.get("display_name") or m["name"]
               if fe:
-                  print(f"   • {m.get('display_name') or m['name']:14s} → https://{fe}.icp0.io/")
-          try:
-              dash_id = subprocess.check_output(
-                  ["dfx", "canister", "id", "platform_dashboard_frontend", "--network", network],
-                  text=True
-              ).strip()
-              print(f"   • {'Dashboard':14s} → https://{dash_id}.icp0.io/")
-          except Exception:
-              pass
+                  print(f"   • {name:30s} → https://{fe}.icp0.io/")
+              elif cid and m.get("type", "") in ("dashboard",):
+                  print(f"   • {name:30s} → https://{cid}.icp0.io/")
           PY
         env:
           DESC: ${{ inputs.descriptor }}

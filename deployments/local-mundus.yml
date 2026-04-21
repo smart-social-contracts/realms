@@ -75,12 +75,35 @@ mundus:
   - name: realm_backend
     type: realm
     extensions: inherit_from_artifacts
-    # Codex install is left empty for PR CI: realm_backend requires the
-    # caller to have `codex.install` permission, which isn't seeded on
-    # a fresh install. Codex install coverage runs against staging where
-    # the admin identity is established. The publish path (stage 1) is
-    # fully exercised here.
     codices: []
+
+  - name: marketplace_backend
+    type: marketplace
+    extensions: []
+    codices: []
+
+  - name: platform_dashboard_frontend
+    type: dashboard
+
+  - name: token_backend
+    type: token
+    wasm_url: https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/token_backend.wasm
+    extensions: []
+    codices: []
+
+  - name: token_frontend
+    type: token_frontend
+    wasm_url: https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/token_frontend.wasm
+
+  - name: nft_backend
+    type: nft
+    wasm_url: https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/nft_backend.wasm
+    extensions: []
+    codices: []
+
+  - name: nft_frontend
+    type: nft_frontend
+    wasm_url: https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/nft_frontend.wasm
 
 # --- Stage 3: verification ---------------------------------------------------
 verify:

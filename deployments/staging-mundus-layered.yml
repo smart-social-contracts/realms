@@ -41,13 +41,10 @@ mundus:
   - name: realm_registry_backend
     type: realm_registry
     canister_id: 7wzxh-wyaaa-aaaau-aggyq-cai
+    frontend_canister_id: 77243-aqaaa-aaaau-aggza-cai
     extensions: []
     codices: []
 
-  # Codex installation is an admin-bound, one-time operation per realm —
-  # not something CI should re-run on every push. Stage 1 still publishes
-  # all codices to file_registry; admins install them once via the realms
-  # CLI / file_registry UI. CI refreshes base WASM + extensions only.
   - name: dominion
     type: realm
     display_name: Dominion
@@ -77,6 +74,41 @@ mundus:
     extensions: inherit_from_artifacts
     codices: []
     register_with_registry: true
+
+  - name: marketplace_backend
+    type: marketplace
+    canister_id: jji3o-uyaaa-aaaah-qreja-cai
+    frontend_canister_id: joj52-zaaaa-aaaah-qrejq-cai
+    extensions: []
+    codices: []
+
+  - name: platform_dashboard_frontend
+    type: dashboard
+    frontend_canister_id: dpgu3-wqaaa-aaaau-agqoa-cai
+
+  - name: token_backend
+    type: token
+    canister_id: 2rqin-xaaaa-aaaah-qunsq-cai
+    wasm_url: https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/token_backend.wasm
+    extensions: []
+    codices: []
+
+  - name: token_frontend
+    type: token_frontend
+    canister_id: 2ytdr-biaaa-aaaah-qunta-cai
+    wasm_url: https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/token_frontend.wasm
+
+  - name: nft_backend
+    type: nft
+    canister_id: 27sff-mqaaa-aaaah-quntq-cai
+    wasm_url: https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/nft_backend.wasm
+    extensions: []
+    codices: []
+
+  - name: nft_frontend
+    type: nft_frontend
+    canister_id: 3s4bl-dyaaa-aaaah-qunua-cai
+    wasm_url: https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/nft_frontend.wasm
 
 verify:
   e2e_specs:
