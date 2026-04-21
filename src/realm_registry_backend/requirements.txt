@@ -4,7 +4,7 @@
 #
 #    pip-compile --allow-unsafe --output-file=src/realm_registry_backend/requirements.txt --strip-extras src/realm_registry_backend/requirements.in
 #
-ic-basilisk==0.11.30
+ic-basilisk==0.11.31
     # via -r src/realm_registry_backend/requirements.in
 ic-python-db==0.7.9
     # via -r src/realm_registry_backend/requirements.in
