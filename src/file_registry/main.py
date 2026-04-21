@@ -893,27 +893,187 @@ def delete_namespace(args: text) -> text:
     if namespace not in namespaces:
         return json.dumps({"error": f"Namespace '{namespace}' not found"})
 
+    _delete_namespace_impl(namespace, namespaces)
+    _save_namespaces(namespaces)
+
+    return json.dumps({"ok": True, "namespace": namespace})
+
+
+def _delete_namespace_impl(namespace: str, namespaces: dict) -> int:
+    """Delete a namespace's files, meta, and ACL entry. Returns bytes freed."""
     meta = _load_meta(namespace)
+    freed = 0
     for path in list(meta.get("files", {}).keys()):
         fp = _file_path(namespace, path)
         try:
+            freed += os.path.getsize(fp)
             os.remove(fp)
-        except FileNotFoundError:
+        except (FileNotFoundError, OSError):
             pass
-
     try:
         os.remove(_meta_path(namespace))
     except FileNotFoundError:
         pass
-
-    del namespaces[namespace]
-    _save_namespaces(namespaces)
-
+    namespaces.pop(namespace, None)
     acl = _load_acl()
     acl.pop(namespace, None)
     _save_acl(acl)
+    return freed
 
-    return json.dumps({"ok": True, "namespace": namespace})
+
+def _delete_wasm_file(namespace: str, path: str) -> int:
+    """Delete a single file from a namespace. Returns bytes freed."""
+    fp = _file_path(namespace, path)
+    try:
+        size = os.path.getsize(fp)
+        os.remove(fp)
+        meta = _load_meta(namespace)
+        meta.get("files", {}).pop(path, None)
+        _save_meta(namespace, meta)
+        return size
+    except (FileNotFoundError, OSError):
+        return 0
+
+
+@update
+def purge_old_versions(args: text) -> text:
+    """Delete old versions, keeping only the latest N per extension/codex/assistant.
+
+    Also cleans up old WASM files in the 'wasm' namespace. Controller only.
+
+    Args (JSON): {
+        "keep": int           (default 2) — published versions to retain per item
+        "dry_run": bool       (default true) — preview without deleting
+    }
+    Returns JSON: {
+        "ok": true,
+        "dry_run": bool,
+        "deleted_namespaces": [{"namespace": str, "bytes": int}, ...],
+        "deleted_wasm_files": [{"path": str, "bytes": int}, ...],
+        "kept_namespaces": [str, ...],
+        "kept_wasm_files": [str, ...],
+        "total_freed_bytes": int,
+        "orphaned_chunks_freed_bytes": int
+    }
+    """
+    err = _require_controller()
+    if err:
+        return err
+
+    params = json.loads(args) if args else {}
+    keep = max(1, int(params.get("keep", 2)))
+    dry_run = params.get("dry_run", True)
+
+    namespaces = _load_namespaces()
+
+    # ── 1. Group versioned namespaces by (prefix, item_id) ────────────
+    # Covers ext/{id}/{ver}, codex/{id}/{ver}, assistant/{id}/{ver}
+    VERSIONED_PREFIXES = ("ext/", "codex/", "assistant/")
+    groups: dict[str, list[tuple[str, str, dict]]] = {}
+
+    for ns_name, ns_info in namespaces.items():
+        for pfx in VERSIONED_PREFIXES:
+            if ns_name.startswith(pfx):
+                rest = ns_name[len(pfx):]
+                parts = rest.split("/", 1)
+                if len(parts) == 2:
+                    item_id, version = parts
+                    group_key = f"{pfx}{item_id}"
+                    groups.setdefault(group_key, []).append(
+                        (ns_name, version, ns_info)
+                    )
+                break
+
+    deleted_namespaces = []
+    kept_namespaces = []
+    total_freed = 0
+
+    for group_key, entries in groups.items():
+        published = [(ns, ver, info) for ns, ver, info in entries if _is_published(info)]
+        unpublished = [(ns, ver, info) for ns, ver, info in entries if not _is_published(info)]
+
+        published.sort(key=lambda e: _parse_semver(e[1]), reverse=True)
+        to_keep = published[:keep]
+        to_delete = published[keep:] + unpublished
+
+        for ns, ver, info in to_keep:
+            kept_namespaces.append(ns)
+
+        for ns, ver, info in to_delete:
+            meta = _load_meta(ns)
+            ns_bytes = sum(f.get("size", 0) for f in meta.get("files", {}).values())
+            if not dry_run:
+                freed = _delete_namespace_impl(ns, namespaces)
+                ns_bytes = max(ns_bytes, freed)
+            deleted_namespaces.append({"namespace": ns, "bytes": ns_bytes})
+            total_freed += ns_bytes
+
+    # ── 2. Clean up old WASM files in the "wasm" namespace ────────────
+    deleted_wasm = []
+    kept_wasm = []
+
+    if NS_PREFIX_WASM in namespaces:
+        meta = _load_meta(NS_PREFIX_WASM)
+        wasm_files = list(meta.get("files", {}).keys())
+
+        version_map: dict[str, list[tuple[str, str]]] = {}
+        for wf in wasm_files:
+            # Parse "realm-base-{version}.wasm" or "realm-base-{version}.wasm.gz"
+            if wf.startswith("realm-base-") and ".wasm" in wf:
+                after_prefix = wf[len("realm-base-"):]
+                if after_prefix.endswith(".wasm.gz"):
+                    ver = after_prefix[:-len(".wasm.gz")]
+                    key = "realm-base-*.wasm.gz"
+                elif after_prefix.endswith(".wasm"):
+                    ver = after_prefix[:-len(".wasm")]
+                    key = "realm-base-*.wasm"
+                else:
+                    kept_wasm.append(wf)
+                    continue
+                version_map.setdefault(key, []).append((wf, ver))
+            else:
+                kept_wasm.append(wf)
+
+        for key, entries in version_map.items():
+            entries.sort(key=lambda e: _parse_semver(e[1]), reverse=True)
+            for wf, ver in entries[:keep]:
+                kept_wasm.append(wf)
+            for wf, ver in entries[keep:]:
+                file_info = meta.get("files", {}).get(wf, {})
+                wf_bytes = file_info.get("size", 0)
+                if not dry_run:
+                    freed = _delete_wasm_file(NS_PREFIX_WASM, wf)
+                    wf_bytes = max(wf_bytes, freed)
+                deleted_wasm.append({"path": wf, "bytes": wf_bytes})
+                total_freed += wf_bytes
+
+    # ── 3. Clean up orphaned chunks ───────────────────────────────────
+    orphan_freed = 0
+    if not dry_run:
+        try:
+            for entry in os.listdir(CHUNKS_DIR):
+                fp = os.path.join(CHUNKS_DIR, entry)
+                try:
+                    orphan_freed += os.path.getsize(fp)
+                    os.remove(fp)
+                except OSError:
+                    pass
+        except FileNotFoundError:
+            pass
+
+    if not dry_run:
+        _save_namespaces(namespaces)
+
+    return json.dumps({
+        "ok": True,
+        "dry_run": dry_run,
+        "deleted_namespaces": deleted_namespaces,
+        "deleted_wasm_files": deleted_wasm,
+        "kept_namespaces": sorted(kept_namespaces),
+        "kept_wasm_files": sorted(kept_wasm),
+        "total_freed_bytes": total_freed,
+        "orphaned_chunks_freed_bytes": orphan_freed,
+    })
 
 
 @update

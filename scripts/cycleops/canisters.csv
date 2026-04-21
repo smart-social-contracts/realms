@@ -1,0 +1,41 @@
+#,CycleOps Name,Full Canister ID,Network,Repo,Config Path
+1,staging-dominion_backend,ijdaw-dyaaa-aaaac-beh2a-cai,staging,realms,examples/demo/realm1/canister_ids.json
+2,staging-dominion_frontend,iocgc-oaaaa-aaaac-beh2q-cai,staging,realms,examples/demo/realm1/canister_ids.json
+3,staging-agora_backend,ihbn6-yiaaa-aaaac-beh3a-cai,staging,realms,examples/demo/realm2/canister_ids.json
+4,staging-agora_frontend,iaalk-vqaaa-aaaac-beh3q-cai,staging,realms,examples/demo/realm2/canister_ids.json
+5,staging-syntropia_backend,jnope-2yaaa-aaaac-beh4a-cai,staging,realms,examples/demo/realm3/canister_ids.json
+6,staging-syntropia_frontend,jkpjq-xaaaa-aaaac-beh4q-cai,staging,realms,examples/demo/realm3/canister_ids.json
+7,staging-realm_backend,5mf73-iiaaa-aaaau-aggxq-cai,staging,realms,canister_ids.json
+8,staging-realm_frontend,7ryrt-3aaaa-aaaau-aggya-cai,staging,realms,canister_ids.json
+9,staging-registry_backend,7wzxh-wyaaa-aaaau-aggyq-cai,staging,realms,canister_ids.json
+10,staging-registry_frontend,77243-aqaaa-aaaau-aggza-cai,staging,realms,canister_ids.json
+11,staging-file_registry,iebdk-kqaaa-aaaau-agoxq-cai,staging,realms,canister_ids.json
+12,staging-realm_installer,lusjm-wqaaa-aaaau-ago7q-cai,staging,realms,canister_ids.json
+13,demo-realm_installer,2s4td-daaaa-aaaao-bazmq-cai,demo,realms,canister_ids.json
+15,file_registry_frontend,rbex3-xyaaa-aaaah-qumma-cai,ic,realms,canister_ids.json
+16,demo-marketplace_backend,ehyfg-wyaaa-aaaae-qg3qq-cai,demo,realms,canister_ids.json
+17,demo-marketplace_frontend,ulsvn-pyaaa-aaaae-qj4tq-cai,demo,realms,canister_ids.json
+18,demo-file_registry,vi64l-3aaaa-aaaae-qj4va-cai,demo,realms,canister_ids.json
+19,Realm1 backend (Dominion),h5vpp-qyaaa-aaaac-qai3a-cai,demo,realms,examples/demo/realm1/canister_ids.json
+20,Realm1 frontend (Dominion),gzya5-jyaaa-aaaac-qai5a-cai,demo,realms,examples/demo/realm1/canister_ids.json
+21,Realm 2 Backend (Agora),3bohd-2yaaa-aaaac-qcyla-cai,demo,realms,examples/demo/realm2/canister_ids.json
+22,Realm 2 Frontend (Agora),3gpbx-xaaaa-aaaac-qcylq-cai,demo,realms,examples/demo/realm2/canister_ids.json
+23,Realm 3 Backend (Syntropia),2lbfz-yiaaa-aaaac-qcyma-cai,demo,realms,examples/demo/realm3/canister_ids.json
+24,Realm 3 Frontend (Syntropia),2madn-vqaaa-aaaac-qcymq-cai,demo,realms,examples/demo/realm3/canister_ids.json
+25,realm_registry_backend,rhw4p-gqaaa-aaaac-qbw7q-cai,demo,realms,examples/demo/registry/canister_ids.json
+26,Realm Registry Frontend,2zaor-5yaaa-aaaac-qbxaa-cai,demo,realms,examples/demo/registry/canister_ids.json
+27,website,6kdvx-3yaaa-aaaah-qqo5a-cai,ic,realms,website/canister_ids.json
+28,Realm 2 backend - quarter 1,rhszc-gyaaa-aaaac-qfnra-cai,demo,realms,examples/demo/realm2/canister_ids.json
+29,realm1_nft_backend,4tpn3-niaaa-aaaaf-qdoja-cai,demo,ic-python-token,nft/canister_ids.json
+30,realm2_nft_backend,4uolp-aqaaa-aaaaf-qdojq-cai,demo,ic-python-token,nft/canister_ids.json
+31,realm3_nft_backend,4bj2c-byaaa-aaaaf-qdoka-cai,demo,realms,examples/demo/realm3/canister_ids.json
+32,Token REALMS,xbkkh-syaaa-aaaah-qq3ya-cai,staging,ic-python-token,token/canister_ids.json
+33,Token Realm1,tujl2-dyaaa-aaaah-qq45q-cai,demo,realms,examples/demo/realm1/canister_ids.json
+34,Token Realm2 (AGO),tbo2x-cqaaa-aaaah-qq46a-cai,demo,realms,examples/demo/realm2/canister_ids.json
+35,Token Realm3,tgp4d-piaaa-aaaah-qq46q-cai,demo,realms,examples/demo/realm3/canister_ids.json
+36,basilisk toolkit test,ru4ga-siaaa-aaaai-q7f3a-cai,ic,ic-basilisk-toolkit,tests/test_canister/canister_ids.json
+37,basilisk test,2i66l-saaaa-aaaas-qe3sq-cai,ic,basilisk,tests/test_canister/canister_ids.json
+38,db-test,aual3-ayaaa-aaaao-a4kuq-cai,ic,unknown,CycleOps only (billing CSV)
+39,vault (2),guja4-2aaaa-aaaam-qdhjq-cai,ic,unknown,CycleOps only (billing CSV)
+40,canister_main,wxfhb-tqaaa-aaaah-aq2qq-cai,ic,unknown,CycleOps only (billing CSV)
+41,canister_frontend,ctydg-unknown,ic,unknown,Not found in any repo
