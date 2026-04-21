@@ -82,10 +82,23 @@ SKIP_CODEX_IDS = {"_common", "common"}
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _run(cmd: List[str], cwd: Optional[Path] = None) -> int:
-    """Run a subprocess and stream its stdout/stderr live; return rc."""
-    print(f"$ {' '.join(cmd)}")
-    proc = subprocess.run(cmd, cwd=str(cwd) if cwd else None)
+def _run(cmd: List[str], cwd: Optional[Path] = None, *, quiet: bool = False) -> int:
+    """Run a subprocess and stream its stdout/stderr live; return rc.
+
+    When *quiet* is True, the command echo is truncated and stdout is
+    captured (not streamed) to avoid flooding CI logs with base64 data.
+    stderr is still printed on failure.
+    """
+    if not quiet:
+        print(f"$ {' '.join(cmd)}")
+        proc = subprocess.run(cmd, cwd=str(cwd) if cwd else None)
+    else:
+        proc = subprocess.run(
+            cmd, cwd=str(cwd) if cwd else None,
+            capture_output=True,
+        )
+        if proc.returncode != 0 and proc.stderr:
+            sys.stderr.buffer.write(proc.stderr)
     return proc.returncode
 
 
@@ -520,14 +533,14 @@ def _upload_blob_to_registry(
                 with os.fdopen(fd, "w") as fh:
                     fh.write(candid)
                 cmd.extend([registry, method, "--argument-file", arg_path])
-                return _run(cmd)
+                return _run(cmd, quiet=True)
             finally:
                 try:
                     os.unlink(arg_path)
                 except OSError:
                     pass
         cmd.extend([registry, method, candid])
-        return _run(cmd)
+        return _run(cmd, quiet=True)
 
     file_size = len(blob)
     if file_size <= chunk_size:
@@ -633,14 +646,14 @@ def _step_publish_frontend(
                 with os.fdopen(fd, "w") as fh:
                     fh.write(candid)
                 cmd.extend([registry, method, "--argument-file", arg_path])
-                return _run(cmd)
+                return _run(cmd, quiet=True)
             finally:
                 try:
                     os.unlink(arg_path)
                 except OSError:
                     pass
         cmd.extend([registry, method, candid])
-        return _run(cmd)
+        return _run(cmd, quiet=True)
 
     print(
         f"\nPublishing frontend ({len(all_files)} files) from {dist_dir} "
