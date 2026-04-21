@@ -63,6 +63,8 @@ declare -A ALL_CANISTERS=(
   ["joj52-zaaaa-aaaah-qrejq-cai"]="staging-marketplace_frontend"
   ["ehyfg-wyaaa-aaaae-qg3qq-cai"]="demo-marketplace_backend"
   ["ulsvn-pyaaa-aaaae-qj4tq-cai"]="demo-marketplace_frontend"
+  # --- File Registry Frontend ---
+  ["7ja5c-dqaaa-aaaae-qj5oa-cai"]="demo-file_registry_frontend"
   # --- Platform Dashboard ---
   ["dpgu3-wqaaa-aaaau-agqoa-cai"]="staging-platform_dashboard"
   ["rxtxq-kyaaa-aaaac-qgora-cai"]="demo-platform_dashboard"

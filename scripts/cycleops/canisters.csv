@@ -16,6 +16,7 @@
 16,demo-marketplace_backend,ehyfg-wyaaa-aaaae-qg3qq-cai,demo,realms,canister_ids.json
 17,demo-marketplace_frontend,ulsvn-pyaaa-aaaae-qj4tq-cai,demo,realms,canister_ids.json
 18,demo-file_registry,vi64l-3aaaa-aaaae-qj4va-cai,demo,realms,canister_ids.json
+42,demo-file_registry_frontend,7ja5c-dqaaa-aaaae-qj5oa-cai,demo,realms,canister_ids.json
 19,Realm1 backend (Dominion),h5vpp-qyaaa-aaaac-qai3a-cai,demo,realms,examples/demo/realm1/canister_ids.json
 20,Realm1 frontend (Dominion),gzya5-jyaaa-aaaac-qai5a-cai,demo,realms,examples/demo/realm1/canister_ids.json
 21,Realm 2 Backend (Agora),3bohd-2yaaa-aaaac-qcyla-cai,demo,realms,examples/demo/realm2/canister_ids.json

@@ -202,6 +202,7 @@ type GetExchangeRateResult = variant { Ok : ExchangeRate; Err : ExchangeRateErro
 type SendTransactionError = variant { MalformedTransaction : null; QueueFull : null };
 type FileRegistryService = service { get_backend_files_icc : (text, text, text) -> (text) query; get_extension_manifest : (text) -> (text) query };
 type RealmTargetService = service { install_extension_from_registry : (text) -> (text); install_codex_from_registry : (text) -> (text) };
+type AssetCanisterService = service { create_batch : (text) -> (text); create_chunk : (text) -> (text); commit_batch : (text) -> () };
 type NFTService = service { mint : (MintArg) -> (MintResult) };
 type RealmRegistryService = service { register_realm : (text, text, text, text, text) -> (AddRealmResult) };
 type Ledger = service { transfer : (TransferArgs) -> (TransferResult); account_balance : (AccountBalanceArgs) -> (Tokens) query; transfer_fee : (TransferFeeArg) -> (TransferFee) query; query_blocks : (GetBlocksArgs) -> (QueryBlocksResponse) query; symbol : () -> (SymbolResult) query; name : () -> (NameResult) query; decimals : () -> (DecimalsResult) query; archives : () -> (Archives) query };
