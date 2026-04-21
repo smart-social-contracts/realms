@@ -1246,6 +1246,154 @@ def _deploy_dashboard_frontend(descriptor: Dict[str, Any]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Deploy per-realm realm_frontend asset canisters
+#
+# Each mundus member of type "realm" that specifies a frontend_canister_id
+# gets its own SvelteKit asset canister.  The source is always
+# src/realm_frontend but the build is parameterised with the member's
+# backend canister ID (baked into declarations/realm_backend/index.js).
+#
+# This step is intentionally separate from deploy_realm (stage 2's
+# on-chain installer) because the frontend is a plain IC asset canister
+# that dfx uploads directly — it doesn't go through realm_installer.
+# ---------------------------------------------------------------------------
+
+
+def _deploy_realm_frontends(descriptor: Dict[str, Any]) -> None:
+    """Build and deploy realm_frontend for every mundus member that has one.
+
+    Steps per member:
+      1. Pin realm_backend + realm_frontend in canister_ids.json
+      2. Fetch candid from the live backend (or build it)
+      3. dfx generate realm_backend → declarations
+      4. Copy declarations into src/realm_frontend/src/lib/declarations/
+         and patch the canister ID + import paths
+      5. npm run build (workspace)
+      6. dfx deploy realm_frontend
+    """
+    network = descriptor["network"]
+    members = [
+        m for m in (descriptor.get("mundus") or [])
+        if m.get("frontend_canister_id")
+        and (m.get("type") or "realm").strip() == "realm"
+    ]
+    if not members:
+        print("\n   (no realm members with frontend_canister_id — skipping)")
+        return
+
+    if not shutil.which("npm"):
+        print("   ⚠ npm not found — skipping realm_frontend deploy")
+        return
+
+    # One-time setup: install extensions into the frontend source tree
+    # so bundled extension routes (e.g. package_manager) are present.
+    install_script = REPO_ROOT / "scripts" / "install_extensions.sh"
+    if install_script.exists():
+        print("\n   📦 installing extensions into realm_frontend source tree …")
+        _run(["bash", str(install_script)], cwd=REPO_ROOT, check=False)
+
+    # Ensure npm deps are available (workspace-level install).
+    node_modules = REPO_ROOT / "node_modules"
+    if not node_modules.exists():
+        _run(["npm", "install", "--legacy-peer-deps"],
+             cwd=REPO_ROOT, check=False)
+
+    # Snapshot canister_ids.json so we can restore it after all deploys.
+    ids_file = REPO_ROOT / "canister_ids.json"
+    original_ids_text = ids_file.read_text() if ids_file.exists() else "{}"
+
+    fe_dir = REPO_ROOT / "src" / "realm_frontend"
+    lib_decls = fe_dir / "src" / "lib" / "declarations"
+    src_decls = REPO_ROOT / "src" / "declarations"
+
+    print(f"\n┌─ deploying realm_frontend for {len(members)} realm(s) "
+          + "─" * 20)
+
+    try:
+        for member in members:
+            name = member.get("display_name") or member["name"]
+            backend_id = (
+                member.get("canister_id")
+                or _canister_id(member["name"], network) or ""
+            )
+            frontend_id = member["frontend_canister_id"]
+
+            print(f"\n   ▸ {name}  backend={backend_id}  frontend={frontend_id}")
+
+            if not backend_id:
+                print(f"   ⚠ no backend canister id for {name} — skipping")
+                continue
+
+            # --- Pin canister IDs for this member ---
+            ids_data = json.loads(ids_file.read_text()) if ids_file.exists() else {}
+            ids_data.setdefault("realm_backend", {})[network] = backend_id
+            ids_data.setdefault("realm_frontend", {})[network] = frontend_id
+            ids_file.write_text(json.dumps(ids_data, indent=2))
+
+            # --- Ensure candid file exists ---
+            did_path = REPO_ROOT / "src" / "realm_backend" / "realm_backend.did"
+            if not did_path.exists():
+                did_path.parent.mkdir(parents=True, exist_ok=True)
+                print(f"     📜 fetching candid from {backend_id} …")
+                meta = subprocess.run(
+                    ["dfx", "canister", "metadata", backend_id,
+                     "candid:service", "--network", network],
+                    capture_output=True, text=True, timeout=60,
+                )
+                if meta.returncode == 0 and meta.stdout.strip():
+                    did_path.write_text(meta.stdout)
+                else:
+                    print("     ⚠ metadata fetch failed — trying basilisk build")
+                    _run([
+                        sys.executable, "-m", "basilisk",
+                        "realm_backend",
+                        str(REPO_ROOT / "src" / "realm_backend" / "main.py"),
+                    ], cwd=REPO_ROOT, check=False)
+
+            # --- dfx generate → declarations ---
+            if did_path.exists():
+                _run(["dfx", "generate", "realm_backend", "--network", network],
+                     cwd=REPO_ROOT, check=False)
+
+            # --- Copy declarations into frontend and patch canister ID ---
+            if src_decls.exists() and (src_decls / "realm_backend").exists():
+                lib_decls.mkdir(parents=True, exist_ok=True)
+                target = lib_decls / "realm_backend"
+                if target.exists():
+                    shutil.rmtree(target)
+                shutil.copytree(src_decls / "realm_backend", target)
+
+                idx = target / "index.js"
+                if idx.exists():
+                    text = idx.read_text()
+                    text = text.replace(
+                        "process.env.CANISTER_ID_REALM_BACKEND",
+                        f'"{backend_id}"',
+                    )
+                    text = text.replace("@icp-sdk/core/agent", "@dfinity/agent")
+                    text = text.replace("@icp-sdk/core/candid", "@dfinity/candid")
+                    idx.write_text(text)
+                print(f"     💉 declarations patched with backend={backend_id}")
+
+            # --- Build ---
+            print(f"     🔨 building realm_frontend for {name} …")
+            _run(["npm", "run", "build", "--workspace=realm_frontend"],
+                 cwd=REPO_ROOT)
+
+            # --- Deploy ---
+            print(f"     🚀 deploying to {frontend_id} …")
+            _dfx("deploy", "realm_frontend", "--yes", network=network)
+
+            print(f"   ✅ {name} → https://{frontend_id}.icp0.io/")
+
+    finally:
+        # Restore original canister_ids.json regardless of outcome.
+        ids_file.write_text(original_ids_text)
+
+    print(f"\n   ✅ all realm frontends deployed")
+
+
+# ---------------------------------------------------------------------------
 # Stage 3 — verify (seed data, smoke)
 # ---------------------------------------------------------------------------
 
@@ -1384,6 +1532,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         stage1_publish(descriptor, infra_ids)
     if 2 in stages:
         stage2_install(descriptor, infra_ids)
+        _deploy_realm_frontends(descriptor)
         _deploy_registry_frontend(descriptor)
         _deploy_dashboard_frontend(descriptor)
     if 3 in stages:
