@@ -64,7 +64,7 @@ jobs:
         run: npm ci --legacy-peer-deps
 
       - name: Build platform_dashboard_frontend
-        run: npm run build
+        run: npx vite build
         working-directory: src/platform_dashboard_frontend
 
       - name: Deploy platform_dashboard_frontend
