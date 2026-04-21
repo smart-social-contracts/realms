@@ -232,6 +232,23 @@ class RealmTargetService(Service):
 
 
 # ---------------------------------------------------------------------------
+# Inter-canister client: IC asset canister (frontend target)
+#
+# Standard IC asset canister batch API for uploading static content.
+# ---------------------------------------------------------------------------
+
+class AssetCanisterService(Service):
+    @service_update
+    def create_batch(self, args: dict) -> dict: ...
+
+    @service_update
+    def create_chunk(self, arg: dict) -> dict: ...
+
+    @service_update
+    def commit_batch(self, arg: dict) -> None: ...
+
+
+# ---------------------------------------------------------------------------
 # Persistent entities for deploy_realm
 # ---------------------------------------------------------------------------
 
@@ -265,9 +282,10 @@ class DeployTask(Entity, TimestampedMixin):
 class DeployStep(Entity, TimestampedMixin):
     """One artifact install inside a DeployTask.
 
-    ``kind`` is one of ``"wasm" | "extension" | "codex"``; ``label`` is
-    the human-readable identifier (e.g. ``"voting"``,
-    ``"syntropia/membership"``, or ``"realm-base-1.2.3.wasm.gz"``).
+    ``kind`` is one of ``"wasm" | "frontend" | "extension" | "codex"``;
+    ``label`` is the human-readable identifier (e.g. ``"voting"``,
+    ``"frontend/dominion"``, ``"syntropia/membership"``, or
+    ``"realm-base-1.2.3.wasm.gz"``).
     """
 
     task = ManyToOne("DeployTask", "steps")
@@ -392,6 +410,25 @@ def _extract_chunk_hash(up_data) -> bytes:
     if isinstance(h, list):
         return bytes(h)
     return bytes(h)
+
+
+def _extract_named_field(data, field_name: str):
+    """Extract a named field from a Basilisk inter-canister call result.
+
+    Basilisk may return Candid records as dicts with either the original
+    field name (e.g. "batch_id") or the IDL field-name hash (e.g.
+    "_1309252224" for batch_id).  Try the name first, then fall back to
+    any single-value dict.
+    """
+    if data is None:
+        return None
+    if not isinstance(data, dict):
+        return data
+    if field_name in data:
+        return data[field_name]
+    if len(data) == 1:
+        return next(iter(data.values()))
+    return None
 
 
 def _ok(payload: dict) -> str:
@@ -558,6 +595,274 @@ def _install_realm_backend_core(params: dict):
 
 
 # ---------------------------------------------------------------------------
+# Core frontend-deploy routine (yield-based generator)
+#
+# Streams files from file_registry and pushes them into an IC asset
+# canister via the standard batch API (create_batch / create_chunk /
+# commit_batch).  Parallel to _install_realm_backend_core but targets
+# the asset canister instead of management_canister.install_chunked_code.
+# ---------------------------------------------------------------------------
+
+# Maximum bytes to send in a single create_chunk call to the asset canister.
+# The IC message size limit is ~2 MiB; keep well under.
+MAX_ASSET_CHUNK_BYTES = 512 * 1024  # 512 KiB
+
+
+def _deploy_frontend_core(params: dict):
+    """Deploy a frontend to an IC asset canister from file_registry.
+
+    Generator: callers MUST drive it with ``yield from
+    _deploy_frontend_core(...)``.
+    """
+    registry_id = params.get("registry_canister_id")
+    target_id = params.get("target_canister_id")
+    frontend_namespace = params.get("frontend_namespace")
+
+    if not registry_id:
+        raise ValueError("registry_canister_id is required")
+    if not target_id:
+        raise ValueError("target_canister_id (asset canister) is required")
+    if not frontend_namespace:
+        raise ValueError("frontend_namespace is required")
+
+    registry = FileRegistryService(Principal.from_str(registry_id))
+    asset_canister = AssetCanisterService(Principal.from_str(target_id))
+
+    ic.print(
+        f"[realm_installer] frontend deploy: target={target_id} "
+        f"namespace={frontend_namespace}"
+    )
+
+    # ── Step 1: read the manifest from file_registry ──────────────────
+    manifest_path = "_manifest.json"
+    size_call: CallResult = yield registry.get_file_size_icc(
+        frontend_namespace, manifest_path
+    )
+    size_raw = _unwrap_call_result(size_call)
+    if not size_raw:
+        raise RuntimeError(
+            f"file_registry returned empty size for {frontend_namespace}/{manifest_path}"
+        )
+    size_data = json.loads(size_raw) if isinstance(size_raw, str) else size_raw
+    if isinstance(size_data, dict) and "error" in size_data:
+        raise RuntimeError(f"file_registry: {size_data['error']}")
+    manifest_size = int(size_data.get("size", 0))
+    if manifest_size <= 0:
+        raise RuntimeError(
+            f"manifest at {frontend_namespace}/{manifest_path} is empty"
+        )
+
+    manifest_bytes = bytearray()
+    offset = 0
+    while offset < manifest_size:
+        length = min(MAX_REGISTRY_READ_BYTES, manifest_size - offset)
+        chunk_call: CallResult = yield registry.get_file_chunk_icc(
+            frontend_namespace, manifest_path, str(offset), str(length)
+        )
+        chunk_raw = _unwrap_call_result(chunk_call)
+        chunk_data = json.loads(chunk_raw) if isinstance(chunk_raw, str) else chunk_raw
+        if isinstance(chunk_data, dict) and "error" in chunk_data:
+            raise RuntimeError(f"file_registry: {chunk_data['error']}")
+        slice_bytes = _decode_b64(chunk_data.get("content_b64", ""))
+        if not slice_bytes:
+            raise RuntimeError(f"empty manifest chunk at offset {offset}")
+        manifest_bytes.extend(slice_bytes)
+        offset += len(slice_bytes)
+
+    manifest = json.loads(manifest_bytes.decode("utf-8"))
+    files = manifest.get("files", [])
+    if not files:
+        raise RuntimeError("manifest contains no files")
+
+    ic.print(
+        f"[realm_installer] frontend manifest: {len(files)} files, "
+        f"total_size={manifest.get('total_size', '?')}"
+    )
+
+    # ── Step 2: create_batch on the asset canister ────────────────────
+    batch_call: CallResult = yield asset_canister.create_batch({})
+    batch_raw = _unwrap_call_result(batch_call)
+    batch_id = _extract_named_field(batch_raw, "batch_id")
+    if batch_id is None:
+        raise RuntimeError(f"create_batch returned unexpected: {batch_raw!r}")
+    ic.print(f"[realm_installer] created batch: {batch_id}")
+
+    # ── Step 3: for each file, stream from registry -> create_chunk ───
+    # Each file may have multiple encodings (identity + gzip).
+    # file_chunk_map stores one entry per (key, encoding) pair.
+    file_chunk_map = []
+
+    def _stream_file_to_chunks(reg_path, reg_namespace):
+        """Stream a file from registry into asset canister chunks.
+
+        Generator: yields inter-canister calls. Returns (chunk_ids, actual_size).
+        """
+        size_call: CallResult = yield registry.get_file_size_icc(
+            reg_namespace, reg_path
+        )
+        size_raw = _unwrap_call_result(size_call)
+        size_data = json.loads(size_raw) if isinstance(size_raw, str) else size_raw
+        if isinstance(size_data, dict) and "error" in size_data:
+            raise RuntimeError(
+                f"file_registry error for {reg_path}: {size_data['error']}"
+            )
+        actual_size = int(size_data.get("size", 0))
+        if actual_size <= 0:
+            return [], 0
+
+        chunk_ids = []
+        read_offset = 0
+        buffer = bytearray()
+
+        while read_offset < actual_size:
+            read_len = min(MAX_REGISTRY_READ_BYTES, actual_size - read_offset)
+            chunk_call: CallResult = yield registry.get_file_chunk_icc(
+                reg_namespace, reg_path, str(read_offset), str(read_len)
+            )
+            chunk_raw = _unwrap_call_result(chunk_call)
+            chunk_data = (
+                json.loads(chunk_raw)
+                if isinstance(chunk_raw, str) else chunk_raw
+            )
+            if isinstance(chunk_data, dict) and "error" in chunk_data:
+                raise RuntimeError(
+                    f"file_registry: {chunk_data['error']} ({reg_path})"
+                )
+            slice_bytes = _decode_b64(chunk_data.get("content_b64", ""))
+            if not slice_bytes:
+                raise RuntimeError(
+                    f"empty chunk at offset {read_offset} for {reg_path}"
+                )
+            read_offset += len(slice_bytes)
+            buffer.extend(slice_bytes)
+
+            while len(buffer) >= MAX_ASSET_CHUNK_BYTES:
+                head = bytes(buffer[:MAX_ASSET_CHUNK_BYTES])
+                del buffer[:MAX_ASSET_CHUNK_BYTES]
+                cc: CallResult = yield asset_canister.create_chunk(
+                    {"batch_id": batch_id, "content": head}
+                )
+                cc_raw = _unwrap_call_result(cc)
+                cid = _extract_named_field(cc_raw, "chunk_id")
+                chunk_ids.append(cid)
+
+        if buffer:
+            cc: CallResult = yield asset_canister.create_chunk(
+                {"batch_id": batch_id, "content": bytes(buffer)}
+            )
+            cc_raw = _unwrap_call_result(cc)
+            cid = _extract_named_field(cc_raw, "chunk_id")
+            chunk_ids.append(cid)
+
+        return chunk_ids, actual_size
+
+    for file_entry in files:
+        file_path = file_entry["path"]
+        file_key = file_entry.get("key", "/" + file_path)
+        content_type = file_entry.get("content_type", "application/octet-stream")
+        file_sha256 = file_entry.get("sha256")
+        encodings = file_entry.get("encodings", ["identity"])
+
+        # Upload identity (raw) version
+        chunk_ids, actual_size = yield from _stream_file_to_chunks(
+            file_path, frontend_namespace
+        )
+        if actual_size <= 0:
+            ic.print(f"[realm_installer] warning: skipping empty file {file_path}")
+            continue
+
+        file_chunk_map.append({
+            "key": file_key,
+            "content_type": content_type,
+            "content_encoding": "identity",
+            "sha256": file_sha256,
+            "chunk_ids": chunk_ids,
+        })
+
+        # Upload gzip version if the manifest says one exists
+        if "gzip" in encodings:
+            gz_path = file_entry.get("gzip_path", file_path + ".gz")
+            gz_sha256 = file_entry.get("gzip_sha256")
+            gz_chunk_ids, gz_size = yield from _stream_file_to_chunks(
+                gz_path, frontend_namespace
+            )
+            if gz_size > 0:
+                file_chunk_map.append({
+                    "key": file_key,
+                    "content_type": content_type,
+                    "content_encoding": "gzip",
+                    "sha256": gz_sha256,
+                    "chunk_ids": gz_chunk_ids,
+                })
+
+    ic.print(
+        f"[realm_installer] uploaded {len(file_chunk_map)} files "
+        f"to batch {batch_id}"
+    )
+
+    # ── Step 4: build commit_batch operations ─────────────────────────
+    operations = [{"Clear": None}]
+
+    # Group entries by key so we emit one CreateAsset per key, then
+    # SetAssetContent for each encoding variant (identity, gzip, ...).
+    seen_keys = set()
+    for entry in file_chunk_map:
+        key = entry["key"]
+        if key not in seen_keys:
+            seen_keys.add(key)
+            operations.append({
+                "CreateAsset": {
+                    "key": key,
+                    "content_type": entry["content_type"],
+                    "max_age": None,
+                    "headers": None,
+                    "enable_aliasing": None,
+                    "allow_raw_access": None,
+                }
+            })
+
+    for entry in file_chunk_map:
+        sha256_blob = None
+        if entry.get("sha256"):
+            try:
+                sha256_blob = bytes.fromhex(entry["sha256"])
+            except (ValueError, TypeError):
+                sha256_blob = None
+        operations.append({
+            "SetAssetContent": {
+                "key": entry["key"],
+                "content_encoding": entry.get("content_encoding", "identity"),
+                "chunk_ids": entry["chunk_ids"],
+                "sha256": sha256_blob,
+            }
+        })
+
+    # ── Step 5: commit_batch ──────────────────────────────────────────
+    ic.print(
+        f"[realm_installer] committing batch {batch_id} "
+        f"with {len(operations)} operations"
+    )
+    yield asset_canister.commit_batch({"batch_id": batch_id, "operations": operations})
+
+    n_identity = sum(1 for e in file_chunk_map if e.get("content_encoding") == "identity")
+    n_gzip = sum(1 for e in file_chunk_map if e.get("content_encoding") == "gzip")
+    ic.print(
+        f"[realm_installer] frontend deploy complete: {target_id} "
+        f"({n_identity} files, {n_gzip} gzip variants, "
+        f"{len(operations)} batch operations)"
+    )
+
+    return {
+        "success": True,
+        "target_canister_id": target_id,
+        "frontend_namespace": frontend_namespace,
+        "files_deployed": n_identity,
+        "gzip_variants": n_gzip,
+        "operations_count": len(operations),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Public update endpoints — single-step installs (back-compat)
 # ---------------------------------------------------------------------------
 
@@ -591,6 +896,37 @@ def install_realm_backend(args: text) -> Async[text]:
         return _ok(result)
     except Exception as e:
         ic.print(f"[realm_installer] install_realm_backend error: {e}")
+        return _err(
+            f"{type(e).__name__}: {e}",
+            traceback=traceback.format_exc()[-1500:],
+        )
+
+
+@update
+def deploy_frontend(args: text) -> Async[text]:
+    """Deploy a frontend to an IC asset canister from file_registry.
+
+    Args (JSON): {
+        "registry_canister_id": str,        (file_registry canister id)
+        "target_canister_id": str,          (asset canister id)
+        "frontend_namespace": str           (e.g. "frontend/realm_registry_frontend")
+    }
+
+    Returns JSON: {
+        "success": bool,
+        "target_canister_id": str,
+        "frontend_namespace": str,
+        "files_deployed": int,
+        "operations_count": int,
+        "error": str (only on failure)
+    }
+    """
+    try:
+        params = json.loads(args)
+        result = yield from _deploy_frontend_core(params)
+        return _ok(result)
+    except Exception as e:
+        ic.print(f"[realm_installer] deploy_frontend error: {e}")
         return _err(
             f"{type(e).__name__}: {e}",
             traceback=traceback.format_exc()[-1500:],
@@ -702,6 +1038,29 @@ def _build_steps(task: DeployTask, manifest: dict) -> list:
         ))
         idx += 1
 
+    frontend = manifest.get("frontend")
+    if frontend:
+        fe_target = frontend.get("target_canister_id")
+        fe_namespace = frontend.get("namespace")
+        if not fe_target:
+            raise ValueError("manifest.frontend.target_canister_id is required")
+        if not fe_namespace:
+            raise ValueError("manifest.frontend.namespace is required")
+        fe_args = {
+            "registry_canister_id": registry_id,
+            "target_canister_id": fe_target,
+            "frontend_namespace": fe_namespace,
+        }
+        steps.append(DeployStep(
+            task=task,
+            idx=idx,
+            kind="frontend",
+            label=fe_namespace,
+            args_json=json.dumps(fe_args),
+            status="pending",
+        ))
+        idx += 1
+
     for ext in (manifest.get("extensions") or []):
         ext_id = ext.get("id")
         if not ext_id:
@@ -783,11 +1142,13 @@ def _serialize_step(step: DeployStep) -> dict:
 
 def _serialize_task(task: DeployTask) -> dict:
     steps = sorted(list(task.steps), key=lambda s: int(s.idx or 0))
-    by_kind = {"wasm": None, "extensions": [], "codices": []}
+    by_kind = {"wasm": None, "frontend": None, "extensions": [], "codices": []}
     for s in steps:
         ser = _serialize_step(s)
         if s.kind == "wasm":
             by_kind["wasm"] = ser
+        elif s.kind == "frontend":
+            by_kind["frontend"] = ser
         elif s.kind == "extension":
             by_kind["extensions"].append(ser)
         elif s.kind == "codex":
@@ -801,6 +1162,7 @@ def _serialize_task(task: DeployTask) -> dict:
         "target_canister_id": task.target_canister_id,
         "registry_canister_id": task.registry_canister_id,
         "wasm": by_kind["wasm"],
+        "frontend": by_kind["frontend"],
         "extensions": by_kind["extensions"],
         "codices": by_kind["codices"],
     }
@@ -883,6 +1245,10 @@ def _execute_step(task: DeployTask, step: DeployStep):
         args = json.loads(step.args_json or "{}")
         if step.kind == "wasm":
             result = yield from _install_realm_backend_core(args)
+            step.result_json = json.dumps(result)[:1990]
+            step.status = "completed"
+        elif step.kind == "frontend":
+            result = yield from _deploy_frontend_core(args)
             step.result_json = json.dumps(result)[:1990]
             step.status = "completed"
         elif step.kind == "extension":
@@ -1039,6 +1405,10 @@ def deploy_realm(args: text) -> text:
             "path": "realm-base-1.2.3.wasm.gz",
             "mode": "upgrade",                   // install|reinstall|upgrade
             "init_arg_b64": ""
+          },
+          "frontend": {                          // optional
+            "target_canister_id": "gzya5-...",   // asset canister
+            "namespace": "frontend/dominion"     // file_registry namespace
           },
           "extensions": [                        // optional, in order
             {"id": "voting", "version": null},
@@ -1496,12 +1866,13 @@ def info() -> text:
     """Self-description for the realms CLI / UIs."""
     return json.dumps({
         "name": "realm_installer",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "description": (
             "Bootstraps realm canisters by streaming WASM from an on-chain "
             "file_registry through the IC management canister's chunked "
-            "install_chunked_code API, and orchestrates end-to-end realm "
-            "deploys (WASM + extensions + codices) on-chain via "
+            "install_chunked_code API, deploys frontend assets to IC asset "
+            "canisters via the batch API, and orchestrates end-to-end realm "
+            "deploys (WASM + frontend + extensions + codices) on-chain via "
             "deploy_realm."
         ),
         "endpoints": [
@@ -1509,6 +1880,11 @@ def info() -> text:
                 "name": "install_realm_backend",
                 "kind": "update",
                 "description": "Install/upgrade a target canister from a registry-stored WASM.",
+            },
+            {
+                "name": "deploy_frontend",
+                "kind": "update",
+                "description": "Deploy a frontend to an IC asset canister from file_registry.",
             },
             {
                 "name": "fetch_module_hash",

@@ -58,6 +58,11 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import base64
+import gzip
+import hashlib
+import json
+import mimetypes
 import os
 import shutil
 import subprocess
@@ -438,6 +443,313 @@ def _step_publish_codices(
 
 
 # ---------------------------------------------------------------------------
+# Frontend asset publish
+# ---------------------------------------------------------------------------
+
+_CONTENT_TYPE_MAP = {
+    ".html": "text/html",
+    ".js": "application/javascript",
+    ".mjs": "application/javascript",
+    ".css": "text/css",
+    ".json": "application/json",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".ico": "image/x-icon",
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
+    ".ttf": "font/ttf",
+    ".txt": "text/plain",
+    ".xml": "application/xml",
+    ".webmanifest": "application/manifest+json",
+    ".map": "application/json",
+    ".wasm": "application/wasm",
+}
+
+_COMPRESSIBLE_CONTENT_TYPES = {
+    "text/html",
+    "application/javascript",
+    "text/css",
+    "application/json",
+    "image/svg+xml",
+    "text/plain",
+    "application/xml",
+    "application/manifest+json",
+    "application/wasm",
+}
+
+
+def _guess_content_type(path: Path) -> str:
+    ct = _CONTENT_TYPE_MAP.get(path.suffix.lower())
+    if ct:
+        return ct
+    guess, _ = mimetypes.guess_type(str(path))
+    return guess or "application/octet-stream"
+
+
+def _upload_blob_to_registry(
+    blob: bytes,
+    *,
+    registry: str,
+    network: str,
+    identity: Optional[str],
+    namespace: str,
+    path: str,
+    content_type: str,
+    chunk_size: int = 768 * 1024,
+) -> int:
+    """Upload a single blob to file_registry, using chunked upload if needed.
+
+    Returns 0 on success, non-zero on failure.
+    """
+
+    def _dfx_call(method: str, payload: dict) -> int:
+        import tempfile as _tempfile
+        cmd = ["dfx", "canister", "call"]
+        if identity:
+            cmd.extend(["--identity", identity])
+        if network:
+            cmd.extend(["--network", network])
+        candid = '("' + json.dumps(payload).replace("\\", "\\\\").replace('"', '\\"') + '")'
+        if len(candid.encode("utf-8")) >= 100 * 1024:
+            fd, arg_path = _tempfile.mkstemp(prefix="dfx-arg-", suffix=".did")
+            try:
+                with os.fdopen(fd, "w") as fh:
+                    fh.write(candid)
+                cmd.extend([registry, method, "--argument-file", arg_path])
+                return _run(cmd)
+            finally:
+                try:
+                    os.unlink(arg_path)
+                except OSError:
+                    pass
+        cmd.extend([registry, method, candid])
+        return _run(cmd)
+
+    file_size = len(blob)
+    if file_size <= chunk_size:
+        return _dfx_call("store_file", {
+            "namespace": namespace,
+            "path": path,
+            "content_b64": base64.b64encode(blob).decode("ascii"),
+            "content_type": content_type,
+        })
+
+    total_chunks = (file_size + chunk_size - 1) // chunk_size
+    for i in range(total_chunks):
+        start = i * chunk_size
+        end = min(start + chunk_size, file_size)
+        rc = _dfx_call("store_file_chunk", {
+            "namespace": namespace,
+            "path": path,
+            "chunk_index": i,
+            "total_chunks": total_chunks,
+            "data_b64": base64.b64encode(blob[start:end]).decode("ascii"),
+            "content_type": content_type,
+        })
+        if rc != 0:
+            print(f"  chunk {i + 1}/{total_chunks} failed for {path}", file=sys.stderr)
+            return rc
+
+    expected_sha = hashlib.sha256(blob).hexdigest()
+    first = True
+    while True:
+        payload = {"namespace": namespace, "path": path, "batch_size": 1}
+        if first:
+            payload["expected_sha256"] = expected_sha
+            first = False
+        cmd = ["dfx", "canister", "call"]
+        if identity:
+            cmd.extend(["--identity", identity])
+        if network:
+            cmd.extend(["--network", network])
+        candid = '("' + json.dumps(payload).replace("\\", "\\\\").replace('"', '\\"') + '")'
+        cmd.extend([registry, "finalize_chunked_file_step", candid])
+        cp = subprocess.run(cmd, capture_output=True, text=True)
+        if cp.returncode != 0:
+            print(cp.stderr, file=sys.stderr)
+            return cp.returncode
+        raw = cp.stdout
+        try:
+            s = raw.index('"')
+            e = raw.rindex('"')
+            inner = raw[s + 1:e].encode("utf-8").decode("unicode_escape")
+            resp = json.loads(inner)
+        except Exception as exc:
+            print(f"  finalize parse error: {raw!r} ({exc})", file=sys.stderr)
+            return 1
+        if resp.get("error"):
+            print(f"  finalize error: {resp['error']}", file=sys.stderr)
+            return 1
+        if resp.get("done"):
+            break
+
+    return 0
+
+
+def _step_publish_frontend(
+    *,
+    registry: str,
+    network: str,
+    identity: Optional[str],
+    dist_dir: Path,
+    namespace: str,
+) -> int:
+    """Upload every file in *dist_dir* to file_registry under *namespace*,
+    then upload a ``_manifest.json`` listing all files with metadata, and
+    finally ``publish_namespace``.
+
+    For compressible text types (HTML, JS, CSS, JSON, SVG, etc.), we also
+    upload a gzip-compressed variant alongside the identity (raw) version.
+    The manifest records both encodings so the on-chain installer can push
+    both to the asset canister, enabling browsers to receive compressed
+    responses.
+    """
+    if not dist_dir.is_dir():
+        print(f"ERROR: dist dir not found: {dist_dir}", file=sys.stderr)
+        return 1
+
+    all_files = sorted(
+        p for p in dist_dir.rglob("*") if p.is_file()
+    )
+    if not all_files:
+        print(f"ERROR: dist dir is empty: {dist_dir}", file=sys.stderr)
+        return 1
+
+    def _dfx_call(method: str, payload: dict) -> int:
+        import tempfile as _tempfile
+        cmd = ["dfx", "canister", "call"]
+        if identity:
+            cmd.extend(["--identity", identity])
+        if network:
+            cmd.extend(["--network", network])
+        candid = '("' + json.dumps(payload).replace("\\", "\\\\").replace('"', '\\"') + '")'
+        if len(candid.encode("utf-8")) >= 100 * 1024:
+            fd, arg_path = _tempfile.mkstemp(prefix="dfx-arg-", suffix=".did")
+            try:
+                with os.fdopen(fd, "w") as fh:
+                    fh.write(candid)
+                cmd.extend([registry, method, "--argument-file", arg_path])
+                return _run(cmd)
+            finally:
+                try:
+                    os.unlink(arg_path)
+                except OSError:
+                    pass
+        cmd.extend([registry, method, candid])
+        return _run(cmd)
+
+    print(
+        f"\nPublishing frontend ({len(all_files)} files) from {dist_dir} "
+        f"→ {registry}:{namespace}"
+    )
+
+    manifest_entries = []
+
+    for filepath in all_files:
+        rel = filepath.relative_to(dist_dir).as_posix()
+        content_type = _guess_content_type(filepath)
+        raw_bytes = filepath.read_bytes()
+        file_size = len(raw_bytes)
+        file_hash = hashlib.sha256(raw_bytes).hexdigest()
+
+        key = "/" + rel if not rel.startswith("/") else rel
+
+        entry = {
+            "path": rel,
+            "key": key,
+            "content_type": content_type,
+            "size": file_size,
+            "sha256": file_hash,
+            "encodings": ["identity"],
+        }
+
+        # Upload identity (raw) version
+        rc = _upload_blob_to_registry(
+            raw_bytes,
+            registry=registry,
+            network=network,
+            identity=identity,
+            namespace=namespace,
+            path=rel,
+            content_type=content_type,
+        )
+        if rc != 0:
+            print(f"  FAILED to upload {rel}", file=sys.stderr)
+            return rc
+
+        # Upload gzip version for compressible types
+        if content_type in _COMPRESSIBLE_CONTENT_TYPES and file_size > 0:
+            gz_bytes = gzip.compress(raw_bytes, compresslevel=9)
+            savings_pct = (1 - len(gz_bytes) / file_size) * 100 if file_size else 0
+            if len(gz_bytes) < file_size:
+                gz_path = rel + ".gz"
+                gz_hash = hashlib.sha256(gz_bytes).hexdigest()
+                rc = _upload_blob_to_registry(
+                    gz_bytes,
+                    registry=registry,
+                    network=network,
+                    identity=identity,
+                    namespace=namespace,
+                    path=gz_path,
+                    content_type=content_type,
+                )
+                if rc != 0:
+                    print(f"  FAILED to upload {gz_path}", file=sys.stderr)
+                    return rc
+
+                entry["encodings"].append("gzip")
+                entry["gzip_path"] = gz_path
+                entry["gzip_size"] = len(gz_bytes)
+                entry["gzip_sha256"] = gz_hash
+
+                print(
+                    f"  ✓ {rel} ({file_size:,} bytes, {content_type}) "
+                    f"+ gzip ({len(gz_bytes):,} bytes, {savings_pct:.0f}% smaller)"
+                )
+            else:
+                print(f"  ✓ {rel} ({file_size:,} bytes, {content_type}) [gzip not smaller, skipped]")
+        else:
+            print(f"  ✓ {rel} ({file_size:,} bytes, {content_type})")
+
+        manifest_entries.append(entry)
+
+    manifest = {
+        "version": 2,
+        "files": manifest_entries,
+        "total_files": len(manifest_entries),
+        "total_size": sum(e["size"] for e in manifest_entries),
+    }
+    manifest_json = json.dumps(manifest, indent=2)
+    rc = _dfx_call("store_file", {
+        "namespace": namespace,
+        "path": "_manifest.json",
+        "content_b64": base64.b64encode(manifest_json.encode()).decode("ascii"),
+        "content_type": "application/json",
+    })
+    if rc != 0:
+        print("  FAILED to upload _manifest.json", file=sys.stderr)
+        return rc
+    print(f"  ✓ _manifest.json ({len(manifest_entries)} files listed)")
+
+    rc = _dfx_call("publish_namespace", {"namespace": namespace})
+    if rc != 0:
+        print(f"  FAILED to publish namespace {namespace}", file=sys.stderr)
+        return rc
+
+    gzip_count = sum(1 for e in manifest_entries if "gzip" in e.get("encodings", []))
+    print(
+        f"  frontend published: {namespace} "
+        f"({len(manifest_entries)} files, {gzip_count} with gzip, "
+        f"{manifest['total_size']:,} bytes)"
+    )
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -568,6 +880,18 @@ def main(argv: Iterable[str]) -> int:
         help="Skip 'npm install' if frontend-rt/node_modules already exists",
     )
 
+    parser.add_argument(
+        "--publish-frontend",
+        action="append",
+        default=[],
+        metavar="DIST_DIR:NAMESPACE",
+        help=(
+            "Publish a frontend dist/ directory to file_registry. Repeatable. "
+            "Format: <dist_dir>:<namespace>. "
+            "Example: --publish-frontend src/realm_registry_frontend/dist:frontend/realm_registry_frontend"
+        ),
+    )
+
     args = parser.parse_args(list(argv))
 
     if not shutil.which("dfx"):
@@ -679,6 +1003,28 @@ def main(argv: Iterable[str]) -> int:
         )
         if rc != 0:
             print("\nERROR: codex publish failed", file=sys.stderr)
+            return rc
+
+    # 5. Publish frontends ---------------------------------------------------
+    for spec in args.publish_frontend:
+        parts = spec.split(":", 1)
+        if len(parts) != 2:
+            print(
+                f"ERROR: --publish-frontend must be DIST_DIR:NAMESPACE, "
+                f"got {spec!r}",
+                file=sys.stderr,
+            )
+            return 1
+        fe_dist, fe_namespace = parts
+        rc = _step_publish_frontend(
+            registry=args.registry,
+            network=args.network,
+            identity=args.identity,
+            dist_dir=Path(fe_dist).expanduser().resolve(),
+            namespace=fe_namespace,
+        )
+        if rc != 0:
+            print(f"\nERROR: frontend publish failed for {spec}", file=sys.stderr)
             return rc
 
     elapsed = time.time() - started
