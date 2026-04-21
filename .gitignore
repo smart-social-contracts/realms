@@ -45,4 +45,4 @@ cli/build/
 *.egg-info/
 
 # Separate project with its own git
-website2/
+website2/src/realm_registry_frontend/vite.config.js.timestamp-*

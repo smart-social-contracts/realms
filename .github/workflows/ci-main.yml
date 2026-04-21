@@ -50,6 +50,7 @@ jobs:
           echo "$HOME/.local/share/dfx/bin" >> "$GITHUB_PATH"
       - name: Install realms CLI + Python deps
         run: |
+          pip install -r requirements.txt
           pip install -e cli/
           pip install pyyaml
       - name: Start local replica

@@ -53,6 +53,7 @@ jobs:
 
       - name: Install realms CLI + deps
         run: |
+          pip install -r requirements.txt
           pip install -e cli/
           pip install pyyaml
 
