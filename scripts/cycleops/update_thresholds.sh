@@ -1,9 +1,15 @@
 #!/bin/bash
 # Add all project canisters to CycleOps team and set top-up rules.
-# With reinstall mode on staging/demo, memory stays small (~17 MB),
-# so all canisters use a uniform 2 TC threshold / 4 TC top-up.
 #
-# Usage: bash scripts/update_cycleops_thresholds.sh
+# Two tiers:
+#   HIGH_BURN  (realm_installer, file_registry) — 4 TC threshold / 8 TC top-up
+#   STANDARD   (everything else)                — 2 TC threshold / 4 TC top-up
+#
+# The high-burn canisters store large WASM blobs / files and consume cycles
+# proportionally to their storage.  With the upcoming 2.5x protocol memory
+# cost increase, the higher threshold gives a safety buffer of several weeks.
+#
+# Usage: bash scripts/cycleops/update_thresholds.sh
 
 set -e
 
@@ -14,11 +20,23 @@ NETWORK="ic"
 # 1 TC = 1_000_000_000_000 cycles
 TC=1000000000000
 
-# Uniform threshold for all canisters (reinstall keeps memory small)
-THRESHOLD=$((2 * TC))
-TOPUP=$((4 * TC))
+# --- Tier: HIGH_BURN (large storage, fast cycle drain) ---
+HIGH_THRESHOLD=$((4 * TC))
+HIGH_TOPUP=$((8 * TC))
 
-# canister_id:display_name pairs
+# --- Tier: STANDARD (small footprint) ---
+STD_THRESHOLD=$((2 * TC))
+STD_TOPUP=$((4 * TC))
+
+# High-burn canisters (realm_installer + file_registry): 8 TC @ 4 TC
+declare -A HIGH_BURN_CANISTERS=(
+  ["lusjm-wqaaa-aaaau-ago7q-cai"]="staging-realm_installer"
+  ["2s4td-daaaa-aaaao-bazmq-cai"]="demo-realm_installer"
+  ["iebdk-kqaaa-aaaau-agoxq-cai"]="staging-file_registry"
+  ["vi64l-3aaaa-aaaae-qj4va-cai"]="demo-file_registry"
+)
+
+# Standard canisters: 4 TC @ 2 TC
 declare -A ALL_CANISTERS=(
   # --- Staging ---
   ["ijdaw-dyaaa-aaaac-beh2a-cai"]="staging-dominion_backend"
@@ -41,14 +59,10 @@ declare -A ALL_CANISTERS=(
   ["rhw4p-gqaaa-aaaac-qbw7q-cai"]="demo-registry_backend"
   ["2zaor-5yaaa-aaaac-qbxaa-cai"]="demo-registry_frontend"
   # --- Marketplace v2 (Basilisk) ---
-  # Staging reuses the legacy Kybra IDs (reinstalled with the new wasm).
-  # Demo reuses the previously-empty backend canister ID + a freshly
-  # allocated frontend canister.
   ["jji3o-uyaaa-aaaah-qreja-cai"]="staging-marketplace_backend"
   ["joj52-zaaaa-aaaah-qrejq-cai"]="staging-marketplace_frontend"
   ["ehyfg-wyaaa-aaaae-qg3qq-cai"]="demo-marketplace_backend"
   ["ulsvn-pyaaa-aaaae-qj4tq-cai"]="demo-marketplace_frontend"
-  ["vi64l-3aaaa-aaaae-qj4va-cai"]="demo-file_registry"
   # --- Platform Dashboard ---
   ["dpgu3-wqaaa-aaaau-agqoa-cai"]="staging-platform_dashboard"
   ["rxtxq-kyaaa-aaaac-qgora-cai"]="demo-platform_dashboard"
@@ -62,63 +76,26 @@ declare -A ALL_CANISTERS=(
   ["4tpn3-niaaa-aaaaf-qdoja-cai"]="nft_realm1"
   ["4uolp-aqaaa-aaaaf-qdojq-cai"]="nft_realm2"
   ["4bj2c-byaaa-aaaaf-qdoka-cai"]="nft_realm3"
-  # --- Platform Dashboard ---
-  ["dpgu3-wqaaa-aaaau-agqoa-cai"]="staging-platform_dashboard_frontend"
-  ["rxtxq-kyaaa-aaaac-qgora-cai"]="demo-platform_dashboard_frontend"
 )
 
-TOPUP_RULE="opt record { threshold = $THRESHOLD : nat; method = variant { to_balance = $TOPUP : nat } }"
+HIGH_TOPUP_RULE="opt record { threshold = $HIGH_THRESHOLD : nat; method = variant { to_balance = $HIGH_TOPUP : nat } }"
+STD_TOPUP_RULE="opt record { threshold = $STD_THRESHOLD : nat; method = variant { to_balance = $STD_TOPUP : nat } }"
 
-# Step 1: Delete canisters from personal account
-echo "🗑️  Removing canisters from personal account..."
-echo ""
+add_and_verify() {
+  local canister_id="$1"
+  local name="$2"
+  local topup_rule="$3"
 
-for canister_id in "${!ALL_CANISTERS[@]}"; do
-  name="${ALL_CANISTERS[$canister_id]}"
   echo -n "  $name ($canister_id)... "
 
-  result=$(dfx canister call "$CYCLEOPS" deleteCanister "(record {
-    asTeamPrincipal = null;
-    canisterId = principal \"$canister_id\";
-  })" --network "$NETWORK" 2>&1)
-
-  if echo "$result" | grep -q "ok"; then
-    echo "🗑️  removed"
-  else
-    echo "⏭️  (not in personal)"
-  fi
-done
-
-# Also delete from team (clean up prior failed attempts)
-echo ""
-echo "🧹 Cleaning up prior team entries..."
-for canister_id in "${!ALL_CANISTERS[@]}"; do
-  dfx canister call "$CYCLEOPS" deleteCanister "(record {
-    asTeamPrincipal = $TEAM;
-    canisterId = principal \"$canister_id\";
-  })" --network "$NETWORK" > /dev/null 2>&1 || true
-done
-
-# Step 2: Add canisters to team with top-up rules
-echo ""
-echo "🔧 Adding ${#ALL_CANISTERS[@]} canisters to team with top-up rules..."
-echo "   Threshold: 2 TC | Top up to: 4 TC"
-echo ""
-
-for canister_id in "${!ALL_CANISTERS[@]}"; do
-  name="${ALL_CANISTERS[$canister_id]}"
-  echo -n "  $name ($canister_id)... "
-
-  # Try to add (may already be pending verification from prior run)
   add_result=$(dfx canister call "$CYCLEOPS" addCanister "(record {
     asTeamPrincipal = $TEAM;
     canisterId = principal \"$canister_id\";
     name = opt \"$name\";
-    topupRule = $TOPUP_RULE;
+    topupRule = $topup_rule;
   })" --network "$NETWORK" 2>&1)
 
   if echo "$add_result" | grep -q "ok\|notVerified\|already_added"; then
-    # Verify with explicit blackhole version 3
     verify_result=$(dfx canister call "$CYCLEOPS" verifyBlackholeAddedAsControllerVersioned "(record {
       asTeamPrincipal = $TEAM;
       canisterId = principal \"$canister_id\";
@@ -135,7 +112,46 @@ for canister_id in "${!ALL_CANISTERS[@]}"; do
   else
     echo "❌ $add_result"
   fi
+}
+
+cleanup_canister() {
+  local canister_id="$1"
+  dfx canister call "$CYCLEOPS" deleteCanister "(record {
+    asTeamPrincipal = null;
+    canisterId = principal \"$canister_id\";
+  })" --network "$NETWORK" > /dev/null 2>&1 || true
+  dfx canister call "$CYCLEOPS" deleteCanister "(record {
+    asTeamPrincipal = $TEAM;
+    canisterId = principal \"$canister_id\";
+  })" --network "$NETWORK" > /dev/null 2>&1 || true
+}
+
+TOTAL=$(( ${#HIGH_BURN_CANISTERS[@]} + ${#ALL_CANISTERS[@]} ))
+
+# Step 1: Clean up existing entries
+echo "🧹 Cleaning up existing entries for $TOTAL canisters..."
+for canister_id in "${!HIGH_BURN_CANISTERS[@]}"; do cleanup_canister "$canister_id"; done
+for canister_id in "${!ALL_CANISTERS[@]}"; do cleanup_canister "$canister_id"; done
+echo ""
+
+# Step 2: Add high-burn canisters (8 TC @ 4 TC)
+echo "🔥 Adding ${#HIGH_BURN_CANISTERS[@]} HIGH-BURN canisters..."
+echo "   Threshold: 4 TC | Top up to: 8 TC"
+echo ""
+for canister_id in "${!HIGH_BURN_CANISTERS[@]}"; do
+  add_and_verify "$canister_id" "${HIGH_BURN_CANISTERS[$canister_id]}" "$HIGH_TOPUP_RULE"
+done
+
+# Step 3: Add standard canisters (4 TC @ 2 TC)
+echo ""
+echo "🔧 Adding ${#ALL_CANISTERS[@]} standard canisters..."
+echo "   Threshold: 2 TC | Top up to: 4 TC"
+echo ""
+for canister_id in "${!ALL_CANISTERS[@]}"; do
+  add_and_verify "$canister_id" "${ALL_CANISTERS[$canister_id]}" "$STD_TOPUP_RULE"
 done
 
 echo ""
-echo "✅ Done. All ${#ALL_CANISTERS[@]} canisters configured."
+echo "✅ Done. $TOTAL canisters configured."
+echo "   HIGH-BURN (8 TC @ 4 TC): ${#HIGH_BURN_CANISTERS[@]}"
+echo "   Standard  (4 TC @ 2 TC): ${#ALL_CANISTERS[@]}"
