@@ -41,7 +41,8 @@
   },
   "footer": {
     "built_on_ic": "Costruito su Internet Computer",
-    "local_deployment": "Distribuzione locale"
+    "local_deployment": "Distribuzione locale",
+    "platform_dashboard": "Pannello Piattaforma"
   },
   "time": {
     "just_now": "proprio ora",

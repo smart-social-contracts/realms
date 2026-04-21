@@ -41,7 +41,8 @@
   },
   "footer": {
     "built_on_ic": "基于互联网计算机构建",
-    "local_deployment": "本地部署"
+    "local_deployment": "本地部署",
+    "platform_dashboard": "平台仪表盘"
   },
   "time": {
     "just_now": "刚刚",
