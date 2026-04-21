@@ -131,7 +131,7 @@
     const statusIdlFactory = ({ IDL }) => {
       const StatusData = IDL.Record({
         'status': IDL.Text,
-        'demo_mode': IDL.Bool,
+        'test_mode': IDL.Bool,
         'transfers_count': IDL.Nat,
         'codexes_count': IDL.Nat,
         'proposals_count': IDL.Nat,
