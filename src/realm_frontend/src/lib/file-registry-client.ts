@@ -148,4 +148,24 @@ export async function latestVersion(
   return codices.find((c) => c.codex_id === itemId)?.latest;
 }
 
+/**
+ * Return the list of file_registry canister IDs this frontend can browse.
+ *
+ * Currently the build-time `CANISTER_ID_FILE_REGISTRY` env var (injected by
+ * `dfx deploy` / vite-plugin-environment) is the only source.  In the future
+ * the realm backend could expose file_registry IDs alongside the existing
+ * realm_registry IDs in the status response, at which point this function
+ * should merge both sources.
+ *
+ * NOTE: `$realmInfo.registries` contains *realm_registry_backend* canister
+ * IDs (the realm directory), NOT file_registry IDs.  The two canisters serve
+ * completely different purposes — see Issue #168.
+ */
+export function getFileRegistryCanisterIds(): string[] {
+  const id: string | undefined =
+    process.env.CANISTER_ID_FILE_REGISTRY ||
+    (import.meta as any).env?.VITE_FILE_REGISTRY_CANISTER_ID;
+  return id ? [id] : [];
+}
+
 export const _internal = { fetchJson };
