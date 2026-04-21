@@ -20,7 +20,7 @@ ic_python_db
 !src/**/*.did
 *temp
 *.pem
-src/declarations
+!src/declarations/
 *.log
 integration-test-logs/
 playwright-report

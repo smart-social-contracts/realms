@@ -1,0 +1,100 @@
+export const idlFactory = ({ IDL }) => {
+  const UserCreditsRecord = IDL.Record({
+    'total_spent' : IDL.Nat64,
+    'balance' : IDL.Nat64,
+    'principal_id' : IDL.Text,
+    'total_purchased' : IDL.Nat64,
+  });
+  const AddCreditsResult = IDL.Variant({
+    'Ok' : UserCreditsRecord,
+    'Err' : IDL.Text,
+  });
+  const BillingStatusRecord = IDL.Record({
+    'total_spent' : IDL.Nat64,
+    'total_balance' : IDL.Nat64,
+    'total_purchased' : IDL.Nat64,
+    'users_count' : IDL.Nat64,
+  });
+  const GetBillingStatusResult = IDL.Variant({
+    'Ok' : BillingStatusRecord,
+    'Err' : IDL.Text,
+  });
+  const DeductCreditsResult = IDL.Variant({
+    'Ok' : UserCreditsRecord,
+    'Err' : IDL.Text,
+  });
+  const GetCreditsResult = IDL.Variant({
+    'Ok' : UserCreditsRecord,
+    'Err' : IDL.Text,
+  });
+  const RealmRecord = IDL.Record({
+    'id' : IDL.Text,
+    'url' : IDL.Text,
+    'logo' : IDL.Text,
+    'name' : IDL.Text,
+    'created_at' : IDL.Float64,
+    'backend_url' : IDL.Text,
+    'users_count' : IDL.Nat64,
+  });
+  const GetRealmResult = IDL.Variant({ 'Ok' : RealmRecord, 'Err' : IDL.Text });
+  const CreditTransactionRecord = IDL.Record({
+    'id' : IDL.Text,
+    'transaction_type' : IDL.Text,
+    'description' : IDL.Text,
+    'timestamp' : IDL.Float64,
+    'stripe_session_id' : IDL.Text,
+    'principal_id' : IDL.Text,
+    'amount' : IDL.Nat64,
+  });
+  const TransactionHistoryResult = IDL.Variant({
+    'Ok' : IDL.Vec(CreditTransactionRecord),
+    'Err' : IDL.Text,
+  });
+  const AddRealmResult = IDL.Variant({ 'Ok' : IDL.Text, 'Err' : IDL.Text });
+  const StatusRecord = IDL.Record({
+    'python_version' : IDL.Text,
+    'status' : IDL.Text,
+    'realms_count' : IDL.Nat64,
+    'version' : IDL.Text,
+    'dependencies' : IDL.Vec(IDL.Text),
+    'commit' : IDL.Text,
+    'commit_datetime' : IDL.Text,
+  });
+  const GetStatusResult = IDL.Variant({
+    'Ok' : StatusRecord,
+    'Err' : IDL.Text,
+  });
+  return IDL.Service({
+    '__get_candid_interface_tmp_hack' : IDL.Func([], [IDL.Text], ['query']),
+    'add_credits' : IDL.Func(
+        [IDL.Text, IDL.Nat64, IDL.Text, IDL.Text],
+        [AddCreditsResult],
+        [],
+      ),
+    'billing_status' : IDL.Func([], [GetBillingStatusResult], ['query']),
+    'deduct_credits' : IDL.Func(
+        [IDL.Text, IDL.Nat64, IDL.Text],
+        [DeductCreditsResult],
+        [],
+      ),
+    'get_credits' : IDL.Func([IDL.Text], [GetCreditsResult], ['query']),
+    'get_realm' : IDL.Func([IDL.Text], [GetRealmResult], ['query']),
+    'get_transactions' : IDL.Func(
+        [IDL.Text, IDL.Nat64],
+        [TransactionHistoryResult],
+        ['query'],
+      ),
+    'greet' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
+    'list_realms' : IDL.Func([], [IDL.Vec(RealmRecord)], ['query']),
+    'realm_count' : IDL.Func([], [IDL.Nat64], ['query']),
+    'register_realm' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text],
+        [AddRealmResult],
+        [],
+      ),
+    'remove_realm' : IDL.Func([IDL.Text], [AddRealmResult], []),
+    'search_realms' : IDL.Func([IDL.Text], [IDL.Vec(RealmRecord)], ['query']),
+    'status' : IDL.Func([], [GetStatusResult], ['query']),
+  });
+};
+export const init = ({ IDL }) => { return []; };

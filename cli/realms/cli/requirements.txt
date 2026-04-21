@@ -4,7 +4,7 @@
 #
 #    pip-compile --allow-unsafe --output-file=cli/realms/cli/requirements.txt --strip-extras cli/realms/cli/requirements.in
 #
-ic-basilisk==0.11.27
+ic-basilisk==0.11.26
     # via -r cli/realms/cli/requirements.in
 ic-python-db==0.7.9
     # via -r cli/realms/cli/requirements.in
