@@ -163,7 +163,7 @@ jobs:
         run: |
           NETWORK=$(python3 -c "import yaml; print(yaml.safe_load(open('${{ inputs.descriptor }}'))['network'])")
           echo "Building platform_dashboard_frontend for $NETWORK..."
-          cd src/platform_dashboard_frontend && npm run build && cd ../..
+          cd src/platform_dashboard_frontend && npx vite build && cd ../..
           dfx deploy platform_dashboard_frontend --network "$NETWORK" --yes
           DASH_ID=$(dfx canister id platform_dashboard_frontend --network "$NETWORK")
           echo "Dashboard deployed: https://${DASH_ID}.icp0.io"
