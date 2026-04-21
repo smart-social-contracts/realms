@@ -11,7 +11,8 @@
   },
   "file_registry_frontend": {
     "demo": "7ja5c-dqaaa-aaaae-qj5oa-cai",
-    "ic": "rbex3-xyaaa-aaaah-qumma-cai"
+    "ic": "rbex3-xyaaa-aaaah-qumma-cai",
+    "staging": "rbex3-xyaaa-aaaah-qumma-cai"
   },
   "marketplace_backend": {
     "demo": "ehyfg-wyaaa-aaaae-qg3qq-cai",
@@ -42,6 +43,7 @@
     "staging": "7ryrt-3aaaa-aaaau-aggya-cai"
   },
   "realm_installer": {
+    "demo": "2s4td-daaaa-aaaao-bazmq-cai",
     "staging": "lusjm-wqaaa-aaaau-ago7q-cai"
   },
   "realm_registry_backend": {
