@@ -5,6 +5,7 @@ Provides functionality for packaging, installing, and managing extensions
 in the Smart Social Contracts platform.
 """
 
+import hashlib
 import json
 import os
 import shutil
@@ -1449,6 +1450,37 @@ def _content_type_for(name: str) -> str:
     return "application/octet-stream"
 
 
+def _local_file_sha256(path: str) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _fetch_namespace_hashes(
+    registry: str, namespace: str, network: str, identity: Optional[str],
+) -> dict:
+    """Query list_files for a namespace and return {path: sha256} dict.
+
+    Uses --query (free, no cycles burned). Returns empty dict on any error
+    so callers fall through to uploading everything.
+    """
+    try:
+        arg = json.dumps({"namespace": namespace})
+        candid_arg = '("' + arg.replace("\\", "\\\\").replace('"', '\\"') + '")'
+        raw = _dfx_call(
+            registry, "list_files", candid_arg, network, identity,
+            is_query=True, timeout=30,
+        )
+        files = json.loads(raw)
+        if isinstance(files, list):
+            return {f["path"]: f.get("sha256", "") for f in files}
+    except Exception:
+        pass
+    return {}
+
+
 def _upload_one_file(
     registry: str,
     namespace: str,
@@ -1456,11 +1488,25 @@ def _upload_one_file(
     local_path: str,
     network: str,
     identity: Optional[str],
-):
-    """Upload a single file to file_registry, picking single-shot or chunked upload."""
+    existing_hashes: Optional[dict] = None,
+) -> str:
+    """Upload a single file to file_registry, picking single-shot or chunked upload.
+
+    If existing_hashes is provided and the local file's SHA-256 matches
+    the on-chain hash, the upload is skipped entirely (no update call).
+
+    Returns "uploaded", "skipped", or "failed".
+    """
     import base64 as _b64
 
     size = os.path.getsize(local_path)
+
+    if existing_hashes and registry_path in existing_hashes:
+        local_hash = _local_file_sha256(local_path)
+        if local_hash == existing_hashes[registry_path]:
+            console.print(f"  [dim]⊜[/dim] {namespace}/{registry_path} [dim]unchanged[/dim]")
+            return "skipped"
+
     content_type = _content_type_for(local_path)
 
     if size <= _PUBLISH_CHUNK_THRESHOLD_BYTES:
@@ -1482,11 +1528,11 @@ def _upload_one_file(
             res = {"raw": raw}
         if isinstance(res, dict) and (res.get("ok") is True or res.get("success") is True):
             console.print(f"  [green]✓[/green] {namespace}/{registry_path} ({size:,} bytes)")
-            return True
+            return "uploaded"
         console.print(
             f"  [red]✗[/red] failed to store {registry_path}: {res}"
         )
-        return False
+        return "failed"
 
     # Chunked upload
     total_chunks = (size + _PUBLISH_CHUNK_SIZE_BYTES - 1) // _PUBLISH_CHUNK_SIZE_BYTES
@@ -1523,7 +1569,7 @@ def _upload_one_file(
                     f"  [red]✗[/red] chunk {chunk_index + 1}/{total_chunks} of "
                     f"{registry_path} failed: {res}"
                 )
-                return False
+                return "failed"
 
     finalize_payload = json.dumps({"namespace": namespace, "path": registry_path})
     candid_arg = '("' + finalize_payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
@@ -1541,9 +1587,9 @@ def _upload_one_file(
         res = {"raw": raw}
     if isinstance(res, dict) and (res.get("ok") is True or res.get("success") is True):
         console.print(f"  [green]✓[/green] {namespace}/{registry_path} ({size:,} bytes, chunked)")
-        return True
+        return "uploaded"
     console.print(f"  [red]✗[/red] finalize failed for {registry_path}: {res}")
-    return False
+    return "failed"
 
 
 def _publish_namespace(
@@ -1612,13 +1658,23 @@ def publish_extension_command(
         f"{registry} ({network})…[/blue]"
     )
 
+    existing = _fetch_namespace_hashes(registry, namespace, network, identity)
     failed = 0
+    uploaded = 0
+
+    def _upload(reg_path, local):
+        nonlocal failed, uploaded
+        result = _upload_one_file(
+            registry, namespace, reg_path, local, network, identity,
+            existing_hashes=existing,
+        )
+        if result == "failed":
+            failed += 1
+        elif result == "uploaded":
+            uploaded += 1
 
     # Manifest
-    if not _upload_one_file(
-        registry, namespace, "manifest.json", manifest_path, network, identity
-    ):
-        failed += 1
+    _upload("manifest.json", manifest_path)
 
     # Backend Python files (flattened — backend/foo.py → backend/foo.py)
     backend_dir = os.path.join(source_dir, "backend")
@@ -1629,10 +1685,7 @@ def publish_extension_command(
                     continue
                 local = os.path.join(root, fname)
                 rel = os.path.relpath(local, backend_dir).replace(os.sep, "/")
-                if not _upload_one_file(
-                    registry, namespace, f"backend/{rel}", local, network, identity
-                ):
-                    failed += 1
+                _upload(f"backend/{rel}", local)
 
     # Frontend runtime bundle (preferred input order):
     #   1. explicit --bundle-path
@@ -1648,10 +1701,7 @@ def publish_extension_command(
         if not os.path.exists(b):
             console.print(f"  [yellow]![/yellow] bundle not found, skipping: {b}")
             continue
-        if not _upload_one_file(
-            registry, namespace, "frontend/dist/index.js", b, network, identity
-        ):
-            failed += 1
+        _upload("frontend/dist/index.js", b)
 
     # Frontend i18n: prefer explicit per-extension folder, fall back to bundled
     # frontend/i18n/locales/extensions/<ext>/ tree (in monorepo layout).
@@ -1669,18 +1719,16 @@ def publish_extension_command(
                     continue
                 local = os.path.join(root, fname)
                 rel = os.path.relpath(local, i18n_root).replace(os.sep, "/")
-                if not _upload_one_file(
-                    registry,
-                    namespace,
-                    f"frontend/i18n/{rel}",
-                    local,
-                    network,
-                    identity,
-                ):
-                    failed += 1
+                _upload(f"frontend/i18n/{rel}", local)
         break  # only use the first i18n root that exists
 
-    if not skip_publish:
+    if uploaded == 0 and failed == 0:
+        console.print(
+            f"[green]✓ {ext_id}@{ver} already up-to-date on {registry}[/green]"
+        )
+        return
+
+    if not skip_publish and uploaded > 0:
         if not _publish_namespace(registry, namespace, network, identity):
             failed += 1
 
@@ -1730,13 +1778,22 @@ def publish_codex_command(
         f"{registry} ({network})…[/blue]"
     )
 
+    existing = _fetch_namespace_hashes(registry, namespace, network, identity)
     failed = 0
+    uploaded = 0
+
+    def _track(result):
+        nonlocal failed, uploaded
+        if result == "failed":
+            failed += 1
+        elif result == "uploaded":
+            uploaded += 1
 
     if os.path.exists(manifest_path):
-        if not _upload_one_file(
-            registry, namespace, "manifest.json", manifest_path, network, identity
-        ):
-            failed += 1
+        _track(_upload_one_file(
+            registry, namespace, "manifest.json", manifest_path, network, identity,
+            existing_hashes=existing,
+        ))
     else:
         synthetic = json.dumps(
             {"name": cid, "version": ver, "description": f"Codex package {cid}"}
@@ -1747,10 +1804,10 @@ def publish_codex_command(
             tmp.write(synthetic)
             tmp_path = tmp.name
         try:
-            if not _upload_one_file(
-                registry, namespace, "manifest.json", tmp_path, network, identity
-            ):
-                failed += 1
+            _track(_upload_one_file(
+                registry, namespace, "manifest.json", tmp_path, network, identity,
+                existing_hashes=existing,
+            ))
         finally:
             os.unlink(tmp_path)
 
@@ -1760,12 +1817,18 @@ def publish_codex_command(
                 continue
             local = os.path.join(root, fname)
             rel = os.path.relpath(local, source_dir).replace(os.sep, "/")
-            if not _upload_one_file(
-                registry, namespace, rel, local, network, identity
-            ):
-                failed += 1
+            _track(_upload_one_file(
+                registry, namespace, rel, local, network, identity,
+                existing_hashes=existing,
+            ))
 
-    if not skip_publish:
+    if uploaded == 0 and failed == 0:
+        console.print(
+            f"[green]✓ {cid}@{ver} already up-to-date on {registry}[/green]"
+        )
+        return
+
+    if not skip_publish and uploaded > 0:
         if not _publish_namespace(registry, namespace, network, identity):
             failed += 1
 
