@@ -1,15 +1,18 @@
 # fast-deploy.yml — manual, fast deploy for prototyping.
 #
-# A "see it now" path that runs in PARALLEL to ci-main.yml. Trade-offs:
+# Uses deploy_direct.py which deploys WASMs and frontends directly via
+# `dfx canister install` / `dfx deploy` (bypassing the expensive
+# file_registry canister). Extensions and codices still go through
+# file_registry + realm_installer (they are small and cheap).
+#
+# Trade-offs vs ci-main.yml:
 #   * Skips Phase A (no local-replica e2e gating).
-#   * Skips stage 0 (infrastructure is long-lived).
-#   * Skips stage 4 (no Playwright / no integration tests at the end).
-#   * Collapses stage 1 (publish) + stage 2 (install) into ONE job, so we
-#     pay the runner cold-start tax (checkout submodules, install dfx,
-#     install Node + Python deps) only once instead of three times.
+#   * No Playwright / integration tests at the end.
 #   * Optional `realms` / `extensions` filters trim what gets built and
-#     installed, so a frontend-only iteration on a single realm becomes
-#     ~3-5 minutes instead of ~50.
+#     deployed, so a frontend-only iteration on a single realm becomes
+#     ~3-5 minutes.
+#
+# Cost: ~$0.50 per full deploy (vs ~$47 with the old file_registry path).
 #
 # Use the regular `CI (main)` pipeline for anything that should be gated
 # by tests before reaching staging/demo. This workflow is a developer
@@ -146,14 +149,8 @@ jobs:
           ONLY_EXTENSIONS: ${{ inputs.extensions }}
           SKIP_BASE_WASM: ${{ inputs.skip_base_wasm }}
           INSTALL_MODE: ${{ inputs.install_mode }}
-          UPGRADE_INSTALLER: ${{ inputs.upgrade_installer }}
         run: |
-          if [ "$UPGRADE_INSTALLER" = "true" ]; then
-            STAGES="0,1,2"
-          else
-            STAGES="1,2"
-          fi
-          set -- --file "$DESCRIPTOR" --stages "$STAGES"
+          set -- --file "$DESCRIPTOR"
           if [ -n "$ONLY_REALMS" ]; then
             set -- "$@" --only-realms "$ONLY_REALMS"
           fi
@@ -166,8 +163,8 @@ jobs:
           if [ -n "$INSTALL_MODE" ] && [ "$INSTALL_MODE" != "upgrade" ]; then
             set -- "$@" --install-mode "$INSTALL_MODE"
           fi
-          echo "→ python3 scripts/ci_install_mundus.py $*"
-          python3 scripts/ci_install_mundus.py "$@"
+          echo "→ python3 scripts/deploy_direct.py $*"
+          python3 scripts/deploy_direct.py "$@"
 
       - name: Print frontend URLs
         if: success()
