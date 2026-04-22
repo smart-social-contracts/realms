@@ -360,7 +360,7 @@ def _build_realm_frontend(member: Dict[str, Any], network: str) -> Optional[Path
     return None
 
 
-def _build_registry_frontend(network: str) -> Optional[Path]:
+def _build_registry_frontend(network: str, backend_id: str = "") -> Optional[Path]:
     """Build realm_registry_frontend. Returns dist/ or None."""
     did_path = REPO_ROOT / "src" / "realm_registry_backend" / "realm_registry_backend.did"
     if not did_path.exists():
@@ -378,11 +378,17 @@ def _build_registry_frontend(network: str) -> Optional[Path]:
         for f in list(decl_dir.glob("*.js")) + list(decl_dir.glob("*.ts")):
             text = f.read_text()
             if "@icp-sdk/core" in text:
-                f.write_text(
+                text = (
                     text.replace("@icp-sdk/core/agent", "@dfinity/agent")
                     .replace("@icp-sdk/core/principal", "@dfinity/principal")
                     .replace("@icp-sdk/core/candid", "@dfinity/candid")
                 )
+            if backend_id and "process.env.CANISTER_ID_REALM_REGISTRY_BACKEND" in text:
+                text = text.replace(
+                    "process.env.CANISTER_ID_REALM_REGISTRY_BACKEND",
+                    f'"{backend_id}"',
+                )
+            f.write_text(text)
 
     fe_pkg = REPO_ROOT / "src" / "realm_registry_frontend" / "package.json"
     pkg_text = fe_pkg.read_text()
@@ -392,7 +398,11 @@ def _build_registry_frontend(network: str) -> Optional[Path]:
             .replace('"prebuild": "dfx generate realm_registry_backend",', "")
         )
 
-    _run(["npm", "run", "build", "--workspace=realm_registry_frontend"], cwd=REPO_ROOT)
+    build_env = os.environ.copy()
+    if backend_id:
+        build_env["CANISTER_ID_REALM_REGISTRY_BACKEND"] = backend_id
+    build_env["DFX_NETWORK"] = network
+    _run(["npm", "run", "build", "--workspace=realm_registry_frontend"], cwd=REPO_ROOT, env=build_env)
     fe_pkg.write_text(pkg_text)
 
     dist = REPO_ROOT / "src" / "realm_registry_frontend" / "dist"
@@ -1040,7 +1050,8 @@ def deploy_mundus(
 
         if registry_member and registry_member.get("frontend_canister_id"):
             print("\n   ▸ building realm_registry_frontend ...")
-            dist = _build_registry_frontend(network)
+            reg_backend_id = registry_member.get("canister_id") or _canister_id("realm_registry_backend", network) or ""
+            dist = _build_registry_frontend(network, backend_id=reg_backend_id)
             if dist:
                 fe_id = registry_member["frontend_canister_id"]
                 if not _deploy_frontend_direct(fe_id, dist, network):
