@@ -167,8 +167,9 @@ jobs:
           python3 scripts/deploy_direct.py "$@"
 
       - name: Upload build artifacts to deploy service cache
-        if: success()
+        if: always()
         run: |
+          pip install requests
           NETWORK=$(echo "${{ inputs.descriptor }}" | grep -q "demo" && echo "demo" || echo "staging")
           python3 scripts/upload_ci_artifacts.py --network "$NETWORK"
         continue-on-error: true

@@ -112,8 +112,9 @@ jobs:
               --file deployments/staging-mundus-layered.yml
 
       - name: Upload build artifacts to deploy service cache
-        if: success()
+        if: always()
         run: |
+          pip install requests
           python3 scripts/upload_ci_artifacts.py --network staging
         continue-on-error: true
 
