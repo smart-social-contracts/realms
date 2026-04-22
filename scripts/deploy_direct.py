@@ -222,7 +222,7 @@ def _wasm_spec_for_member(
 
 def _build_canister_wasm(canister: str, network: str) -> Path:
     """Build a canister WASM using basilisk. Returns path to .wasm.gz."""
-    print(f"   • building {canister} (WASM) ...")
+    print(f"   • building {canister} (WASM) ...", flush=True)
     main_py = REPO_ROOT / "src" / canister / "main.py"
     if not main_py.exists():
         raise SystemExit(f"ERROR: cannot build {canister}: {main_py} does not exist")
@@ -231,11 +231,14 @@ def _build_canister_wasm(canister: str, network: str) -> Path:
     env = os.environ.copy()
     candid = REPO_ROOT / "src" / canister / f"{canister}.did"
     env["CANISTER_CANDID_PATH"] = str(candid)
-    _run(
+    result = _run(
         [sys.executable, "-m", "basilisk", canister, str(main_py)],
         cwd=REPO_ROOT,
         env=env,
+        check=False,
     )
+    if result.returncode != 0:
+        print(f"   ⚠ basilisk build exited with code {result.returncode}", flush=True)
     raw_candidates = [
         out_dir / f"{canister}.wasm",
         REPO_ROOT / ".dfx" / network / "canisters" / canister / f"{canister}.wasm",

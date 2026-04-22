@@ -77,7 +77,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PYTHON_VERSION: "3.10"
+  PYTHON_VERSION: "3.11"
   NODE_VERSION: "20"
   DFX_VERSION: "0.31.0"
 
