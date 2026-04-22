@@ -98,9 +98,14 @@ def _run(
 ) -> subprocess.CompletedProcess:
     if not quiet:
         print("$", " ".join(cmd), flush=True)
+    run_env = env or os.environ.copy()
+    run_env.setdefault("NO_COLOR", "1")
+    run_env.setdefault("DFX_WARNING", "-mainnet_plaintext_identity")
+    if run_env.get("TERM", "dumb") == "dumb":
+        run_env["TERM"] = "xterm-256color"
     return subprocess.run(
         cmd,
-        env=env or os.environ.copy(),
+        env=run_env,
         check=check,
         cwd=str(cwd) if cwd else None,
         capture_output=capture_output,
@@ -462,11 +467,14 @@ def _deploy_frontend_direct(
     with tempfile.TemporaryDirectory(prefix="dfx_deploy_") as tmpdir:
         tmp = Path(tmpdir)
 
+        local_dist = tmp / "dist"
+        shutil.copytree(dist_dir, local_dist)
+
         dfx_json = {
             "dfx": "0.29.0",
             "canisters": {
                 "frontend": {
-                    "source": [str(dist_dir.resolve())],
+                    "source": ["dist"],
                     "type": "assets",
                 }
             },
@@ -481,16 +489,33 @@ def _deploy_frontend_direct(
             {"frontend": {network: canister_id}}, indent=2,
         ))
 
+        env = os.environ.copy()
+        env["NO_COLOR"] = "1"
+        if env.get("TERM", "dumb") == "dumb":
+            env["TERM"] = "xterm-256color"
+
         try:
             _run(
                 ["dfx", "deploy", "frontend", "--network", network, "--yes"],
                 cwd=tmp,
+                env=env,
             )
             print(f"   ✅ frontend deployed to {canister_id}")
             return True
         except subprocess.CalledProcessError:
-            print(f"   ✗ failed to deploy frontend to {canister_id}")
-            return False
+            print("   ⚠ upgrade failed, retrying with --mode reinstall ...")
+            try:
+                _run(
+                    ["dfx", "deploy", "frontend", "--network", network,
+                     "--yes", "--mode", "reinstall"],
+                    cwd=tmp,
+                    env=env,
+                )
+                print(f"   ✅ frontend deployed to {canister_id} (reinstalled)")
+                return True
+            except subprocess.CalledProcessError:
+                print(f"   ✗ failed to deploy frontend to {canister_id}")
+                return False
 
 
 # ---------------------------------------------------------------------------
@@ -725,10 +750,11 @@ def _install_extensions_via_installer(
 def _verify_wasm_hash(canister_id: str, wasm_path: Path, network: str) -> bool:
     """Verify the on-chain module hash matches the local WASM file."""
     try:
-        info = subprocess.check_output(
+        result = _run(
             ["dfx", "canister", "info", canister_id, "--network", network],
-            text=True, timeout=60,
+            capture_output=True, check=True, quiet=True,
         )
+        info = result.stdout
     except subprocess.CalledProcessError:
         print(f"   ⚠ could not get info for {canister_id}")
         return False
@@ -756,10 +782,10 @@ def _verify_wasm_hash(canister_id: str, wasm_path: Path, network: str) -> bool:
 def _verify_frontend(canister_id: str, network: str) -> bool:
     """Verify a frontend asset canister is serving content."""
     try:
-        result = subprocess.run(
+        result = _run(
             ["dfx", "canister", "call", "--network", network, "--query",
              canister_id, "list", "(record {})"],
-            capture_output=True, text=True, timeout=60,
+            capture_output=True, check=False, quiet=True,
         )
         if result.returncode == 0 and "key" in result.stdout:
             lines = result.stdout.count("key")
