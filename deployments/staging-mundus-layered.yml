@@ -86,6 +86,22 @@ mundus:
     type: dashboard
     frontend_canister_id: dpgu3-wqaaa-aaaau-agqoa-cai
 
+  - name: token_backend
+    type: token
+    canister_id: 2rqin-xaaaa-aaaah-qunsq-cai
+    wasm_url: https://github.com/smart-social-contracts/ic-tokens/releases/latest/download/token_backend.wasm
+    init_arg: '(record { name = "Realms Token"; symbol = "RLM"; decimals = 8 : nat8; total_supply = 1_000_000_000 : nat; fee = 10_000 : nat; test = opt true })'
+    extensions: []
+    codices: []
+
+  - name: nft_backend
+    type: nft
+    canister_id: 27sff-mqaaa-aaaah-quntq-cai
+    wasm_url: https://github.com/smart-social-contracts/ic-tokens/releases/latest/download/nft_backend.wasm
+    init_arg: '(record { name = "Realms Land"; symbol = "RLAND"; description = opt "Land ownership NFT for Realms"; supply_cap = opt (10_000 : nat); test = opt true })'
+    extensions: []
+    codices: []
+
 verify:
   e2e_specs:
     - tests/e2e/specs/layered-parity.spec.ts
