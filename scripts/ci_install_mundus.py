@@ -799,7 +799,7 @@ def stage1_publish(
         print("\n   ▸ building realm_registry_frontend …")
         dist = _build_registry_frontend(network)
         if dist:
-            namespace = "frontend/realm_registry_frontend"
+            namespace = f"frontend/{registry_member['name']}"
             rc = _publish_frontend_dist(dist, namespace, file_registry, network)
             if rc != 0:
                 raise SystemExit(
@@ -1483,7 +1483,7 @@ def stage2_install(
     # concurrently on different IC subnet replicas.  Each extension step
     # involves inter-canister calls (~3-10s each on real subnets), and
     # with 20+ extensions per realm the total can exceed 30 minutes.
-    deploy_timeout = 3600
+    deploy_timeout = 10800
     print(f"\n   ⏳ awaiting {len(pending)} deploy(s) (timeout {deploy_timeout}s)…")
     finals = _poll_all_deploys(
         realm_installer, pending, network,
