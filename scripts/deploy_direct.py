@@ -521,7 +521,6 @@ def _deploy_frontend_direct(
             print(f"     ⚠ assets-hash computation failed: {e}")
 
         dfx_json = {
-            "dfx": "0.29.0",
             "canisters": {
                 "frontend": {
                     "source": ["dist"],

@@ -1,5 +1,5 @@
 {
-  "dfx": "0.29.0",
+  "dfx": "0.31.0",
   "canisters": {
     "realm_backend": {
       "build": "python -m basilisk realm_backend src/realm_backend/main.py",
