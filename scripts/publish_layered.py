@@ -608,6 +608,9 @@ def _upload_blob_to_registry(
     return 0
 
 
+_FRONTEND_UPLOAD_WORKERS = 8
+
+
 def _step_publish_frontend(
     *,
     registry: str,
@@ -625,7 +628,13 @@ def _step_publish_frontend(
     The manifest records both encodings so the on-chain installer can push
     both to the asset canister, enabling browsers to receive compressed
     responses.
+
+    Uploads are parallelized across ``_FRONTEND_UPLOAD_WORKERS`` threads
+    to reduce wall-clock time (each call has ~2-3s of network latency).
     """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    import threading
+
     if not dist_dir.is_dir():
         print(f"ERROR: dist dir not found: {dist_dir}", file=sys.stderr)
         return 1
@@ -665,6 +674,8 @@ def _step_publish_frontend(
         f"→ {registry}:{namespace}"
     )
 
+    # Phase 1: prepare all file data and upload tasks
+    upload_tasks = []  # (blob, path, content_type)
     manifest_entries = []
 
     for filepath in all_files:
@@ -685,56 +696,62 @@ def _step_publish_frontend(
             "encodings": ["identity"],
         }
 
-        # Upload identity (raw) version
-        rc = _upload_blob_to_registry(
-            raw_bytes,
-            registry=registry,
-            network=network,
-            identity=identity,
-            namespace=namespace,
-            path=rel,
-            content_type=content_type,
-        )
-        if rc != 0:
-            print(f"  FAILED to upload {rel}", file=sys.stderr)
-            return rc
+        upload_tasks.append((raw_bytes, rel, content_type))
 
-        # Upload gzip version for compressible types
         if content_type in _COMPRESSIBLE_CONTENT_TYPES and file_size > 0:
             gz_bytes = gzip.compress(raw_bytes, compresslevel=9)
-            savings_pct = (1 - len(gz_bytes) / file_size) * 100 if file_size else 0
             if len(gz_bytes) < file_size:
                 gz_path = rel + ".gz"
                 gz_hash = hashlib.sha256(gz_bytes).hexdigest()
-                rc = _upload_blob_to_registry(
-                    gz_bytes,
-                    registry=registry,
-                    network=network,
-                    identity=identity,
-                    namespace=namespace,
-                    path=gz_path,
-                    content_type=content_type,
-                )
-                if rc != 0:
-                    print(f"  FAILED to upload {gz_path}", file=sys.stderr)
-                    return rc
-
+                upload_tasks.append((gz_bytes, gz_path, content_type))
                 entry["encodings"].append("gzip")
                 entry["gzip_path"] = gz_path
                 entry["gzip_size"] = len(gz_bytes)
                 entry["gzip_sha256"] = gz_hash
 
-                print(
-                    f"  ✓ {rel} ({file_size:,} bytes, {content_type}) "
-                    f"+ gzip ({len(gz_bytes):,} bytes, {savings_pct:.0f}% smaller)"
-                )
-            else:
-                print(f"  ✓ {rel} ({file_size:,} bytes, {content_type}) [gzip not smaller, skipped]")
-        else:
-            print(f"  ✓ {rel} ({file_size:,} bytes, {content_type})")
-
         manifest_entries.append(entry)
 
+    total_uploads = len(upload_tasks)
+    print(f"  {total_uploads} upload tasks ({len(manifest_entries)} files + gzip variants)")
+
+    # Phase 2: upload in parallel
+    progress_lock = threading.Lock()
+    completed_count = [0]
+    first_error = [None]
+
+    def _do_upload(task):
+        blob, path, ct = task
+        rc = _upload_blob_to_registry(
+            blob,
+            registry=registry,
+            network=network,
+            identity=identity,
+            namespace=namespace,
+            path=path,
+            content_type=ct,
+        )
+        with progress_lock:
+            completed_count[0] += 1
+            if completed_count[0] % 50 == 0 or completed_count[0] == total_uploads:
+                print(f"  … {completed_count[0]}/{total_uploads} uploads done",
+                      flush=True)
+        if rc != 0:
+            with progress_lock:
+                if first_error[0] is None:
+                    first_error[0] = path
+            return (path, rc)
+        return (path, 0)
+
+    with ThreadPoolExecutor(max_workers=_FRONTEND_UPLOAD_WORKERS) as pool:
+        futures = {pool.submit(_do_upload, t): t for t in upload_tasks}
+        for fut in as_completed(futures):
+            path, rc = fut.result()
+            if rc != 0:
+                print(f"  FAILED to upload {path}", file=sys.stderr)
+                pool.shutdown(wait=False, cancel_futures=True)
+                return rc
+
+    # Phase 3: upload manifest and publish
     manifest = {
         "version": 2,
         "files": manifest_entries,

@@ -85,25 +85,14 @@ mundus:
   - name: platform_dashboard_frontend
     type: dashboard
 
-  - name: token_backend
-    type: token
-    wasm_url: https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/token_backend.wasm
-    extensions: []
-    codices: []
-
-  - name: token_frontend
-    type: token_frontend
-    wasm_url: https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/token_frontend.wasm
-
-  - name: nft_backend
-    type: nft
-    wasm_url: https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/nft_backend.wasm
-    extensions: []
-    codices: []
-
-  - name: nft_frontend
-    type: nft_frontend
-    wasm_url: https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/nft_frontend.wasm
+  # External WASM canisters (token/nft) are omitted from the local
+  # descriptor because their 14 MB WASMs take >1h to install_code on a
+  # local replica.  Stage 1 still downloads & publishes them to
+  # file_registry; they're deployed to staging/demo via the real IC.
+  # - name: token_backend
+  # - name: token_frontend
+  # - name: nft_backend
+  # - name: nft_frontend
 
 # --- Stage 3: verification ---------------------------------------------------
 verify:
