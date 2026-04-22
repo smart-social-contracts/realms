@@ -113,6 +113,15 @@ def _run(
     )
 
 
+def _dfx_env() -> Dict[str, str]:
+    """Return an env dict with settings that prevent dfx from crashing."""
+    env = os.environ.copy()
+    env.setdefault("DFX_WARNING", "-mainnet_plaintext_identity")
+    if env.get("TERM", "dumb") == "dumb":
+        env["TERM"] = "xterm-256color"
+    return env
+
+
 def _dfx(
     *args: str, network: str, check: bool = True
 ) -> subprocess.CompletedProcess:
@@ -125,6 +134,7 @@ def _canister_id(name: str, network: str) -> Optional[str]:
             ["dfx", "canister", "id", name, "--network", network],
             text=True,
             stderr=subprocess.STDOUT,
+            env=_dfx_env(),
         ).strip()
         return out or None
     except subprocess.CalledProcessError:
@@ -133,7 +143,8 @@ def _canister_id(name: str, network: str) -> Optional[str]:
 
 def _dfx_identity_principal() -> str:
     return subprocess.check_output(
-        ["dfx", "identity", "get-principal"], text=True
+        ["dfx", "identity", "get-principal"], text=True,
+        env=_dfx_env(),
     ).strip()
 
 
@@ -143,6 +154,7 @@ def _add_controller(canister: str, controller: str, network: str) -> None:
             ["dfx", "canister", "info", canister, "--network", network],
             text=True,
             stderr=subprocess.DEVNULL,
+            env=_dfx_env(),
         )
         if controller in info:
             return
@@ -300,7 +312,7 @@ def _build_realm_frontend(member: Dict[str, Any], network: str) -> Optional[Path
         did_path.parent.mkdir(parents=True, exist_ok=True)
         meta = subprocess.run(
             ["dfx", "canister", "metadata", backend_id, "candid:service", "--network", network],
-            capture_output=True, text=True, timeout=60,
+            capture_output=True, text=True, timeout=60, env=_dfx_env(),
         )
         if meta.returncode == 0 and meta.stdout.strip():
             did_path.write_text(meta.stdout)
@@ -349,7 +361,7 @@ def _build_registry_frontend(network: str) -> Optional[Path]:
         )
 
     if did_path.exists():
-        _run(["dfx", "generate", "realm_registry_backend"], cwd=REPO_ROOT, check=False)
+        _run(["dfx", "generate", "realm_registry_backend", "--network", network], cwd=REPO_ROOT, check=False)
         decl_dir = REPO_ROOT / "src" / "declarations" / "realm_registry_backend"
         for f in list(decl_dir.glob("*.js")) + list(decl_dir.glob("*.ts")):
             text = f.read_text()
@@ -391,9 +403,11 @@ def _build_marketplace_frontend(network: str) -> Optional[Path]:
                 cwd=REPO_ROOT, env=env, check=False,
             )
         if did_path.exists():
-            _run(["dfx", "generate", canister_name], cwd=REPO_ROOT, check=False)
+            _run(["dfx", "generate", canister_name, "--network", network], cwd=REPO_ROOT, check=False)
 
-    _run(["npm", "run", "build", "--workspace=marketplace_frontend"], cwd=REPO_ROOT)
+    env = _dfx_env()
+    env["DFX_NETWORK"] = network
+    _run(["npm", "run", "build", "--workspace=marketplace_frontend"], cwd=REPO_ROOT, env=env)
     dist = REPO_ROOT / "src" / "marketplace_frontend" / "dist"
     if dist.is_dir() and any(dist.iterdir()):
         return dist
@@ -409,9 +423,11 @@ def _build_dashboard_frontend(network: str) -> Optional[Path]:
     ]:
         did_path = REPO_ROOT / "src" / canister_name / f"{canister_name}.did"
         if did_path.exists():
-            _run(["dfx", "generate", canister_name], cwd=REPO_ROOT, check=False)
+            _run(["dfx", "generate", canister_name, "--network", network], cwd=REPO_ROOT, check=False)
 
-    _run(["npm", "run", "build", "--workspace=platform_dashboard_frontend"], cwd=REPO_ROOT)
+    env = _dfx_env()
+    env["DFX_NETWORK"] = network
+    _run(["npm", "run", "build", "--workspace=platform_dashboard_frontend"], cwd=REPO_ROOT, env=env)
     dist = REPO_ROOT / "src" / "platform_dashboard_frontend" / "dist"
     if dist.is_dir() and any(dist.iterdir()):
         return dist
@@ -431,7 +447,7 @@ def _install_wasm_direct(
     mode: str = "upgrade",
 ) -> bool:
     """Install a WASM directly via `dfx canister install`. Returns True on success."""
-    print(f"   • installing WASM on {canister_id} (mode={mode}) ...")
+    print(f"   • installing WASM on {canister_id} (mode={mode}) ...", flush=True)
     try:
         _dfx(
             "canister", "install", canister_id,
@@ -442,7 +458,21 @@ def _install_wasm_direct(
         )
         print(f"   ✅ WASM installed on {canister_id}")
         return True
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
+        if mode == "upgrade":
+            print(f"   ↻ upgrade failed, retrying with --mode install ...")
+            try:
+                _dfx(
+                    "canister", "install", canister_id,
+                    "--wasm", str(wasm_path),
+                    "--mode", "install",
+                    "--yes",
+                    network=network,
+                )
+                print(f"   ✅ WASM installed on {canister_id} (fresh install)")
+                return True
+            except subprocess.CalledProcessError:
+                pass
         print(f"   ✗ failed to install WASM on {canister_id}")
         return False
 
@@ -616,7 +646,7 @@ def _dfx_call_text(
         if query:
             cmd.append("--query")
         cmd += [canister, method, "--argument-file", arg_path]
-        cp = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=timeout)
+        cp = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=timeout, env=_dfx_env())
         return (cp.stdout or "").strip()
     finally:
         try:
@@ -634,11 +664,13 @@ def _unwrap_candid_text(out: str) -> str:
         return out
     raw = m.group(1)
     return (
-        raw.replace("\\\\", "\\")
+        raw.replace("\\\\", "\x00")
         .replace('\\"', '"')
+        .replace("\\'", "'")
         .replace("\\n", "\n")
         .replace("\\r", "\r")
         .replace("\\t", "\t")
+        .replace("\x00", "\\")
     )
 
 
@@ -687,8 +719,12 @@ def _install_extensions_via_installer(
             network=network, timeout=120,
         ))
         data = json.loads(raw, strict=False)
-    except (subprocess.CalledProcessError, json.JSONDecodeError) as e:
-        print(f"   ✗ deploy_realm call failed for {name}: {e}")
+    except subprocess.CalledProcessError as exc:
+        detail = (getattr(exc, "stderr", "") or getattr(exc, "stdout", "") or str(exc))[:500]
+        print(f"   ✗ deploy_realm call failed for {name}: {detail}")
+        return False
+    except json.JSONDecodeError as exc:
+        print(f"   ✗ deploy_realm parse error for {name}: {exc}")
         return False
 
     if not data.get("success"):
@@ -710,11 +746,22 @@ def _install_extensions_via_installer(
             print(f"   ✗ deploy_realm rejected for {name}: {data.get('error')}")
             return False
 
+    ahead_of = data.get("ahead_of")
+    if ahead_of and data.get("status") == "waiting":
+        print(f"   ⚠ queued behind stale task {ahead_of}, cancelling it ...")
+        try:
+            _dfx_call_text(realm_installer, "cancel_deploy", ahead_of, network=network, timeout=60)
+            time.sleep(2)
+        except Exception:
+            pass
+
     task_id = data["task_id"]
     steps = data.get("steps_count", 0)
-    print(f"     task_id={task_id} ({steps} steps)")
+    print(f"     task_id={task_id} ({steps} steps)", flush=True)
 
-    deadline = time.time() + 3600
+    start = time.time()
+    deadline = start + 600
+    poll_errors = 0
     while time.time() < deadline:
         time.sleep(10)
         try:
@@ -723,22 +770,29 @@ def _install_extensions_via_installer(
                 network=network, query=True, timeout=60,
             )
             status_data = json.loads(_unwrap_candid_text(out), strict=False)
-        except Exception:
+            poll_errors = 0
+        except Exception as poll_exc:
+            poll_errors += 1
+            elapsed = int(time.time() - start)
+            print(f"     {name}: poll error #{poll_errors} ({elapsed}s): {poll_exc}", flush=True)
+            if poll_errors >= 5:
+                print(f"   ✗ too many poll errors for {name}", flush=True)
+                return False
             continue
 
         status = status_data.get("status", "")
         if status in ("completed", "partial"):
-            print(f"   ✅ extensions installed on {name} (status={status})")
+            print(f"   ✅ extensions installed on {name} (status={status})", flush=True)
             return True
         if status in ("failed", "cancelled"):
-            print(f"   ✗ extension install {status} on {name}")
+            print(f"   ✗ extension install {status} on {name}", flush=True)
             return False
 
-        elapsed = int(time.time() - (deadline - 3600))
+        elapsed = int(time.time() - start)
         if elapsed % 60 < 12:
-            print(f"     {name}: {status} ({elapsed}s)")
+            print(f"     {name}: {status} ({elapsed}s)", flush=True)
 
-    print(f"   ✗ extension install timed out for {name}")
+    print(f"   ✗ extension install timed out for {name}", flush=True)
     return False
 
 
@@ -844,7 +898,7 @@ def _register_realm_with_registry(
         cp = subprocess.run(
             ["dfx", "canister", "call", "--network", network,
              canister_id, "register_realm_with_registry", args],
-            capture_output=True, text=True, check=True, timeout=120,
+            capture_output=True, text=True, check=True, timeout=120, env=_dfx_env(),
         )
         print(f"     ↳ {cp.stdout.strip()[:300]}")
     except subprocess.CalledProcessError as e:
@@ -1020,7 +1074,9 @@ def deploy_mundus(
             print("   publishing extensions/codices to file_registry ...")
             _publish_extensions_codices(descriptor, infra_ids)
 
+            sys.stdout.flush()
             for member in members:
+                print(f"   ▸ processing member: {member.get('name')}", flush=True)
                 ok = _install_extensions_via_installer(
                     member,
                     realm_installer=realm_installer,
