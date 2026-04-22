@@ -82,6 +82,16 @@ def load_descriptor(path: Path) -> Dict[str, Any]:
     return raw
 
 
+BASILISK_WRAPPER = REPO_ROOT / "scripts" / "_run_basilisk.py"
+
+
+def _basilisk_cmd(canister: str, main_py: str) -> List[str]:
+    """Build the command to invoke basilisk with the modulefinder patch."""
+    if BASILISK_WRAPPER.exists():
+        return [sys.executable, str(BASILISK_WRAPPER), canister, main_py]
+    return [sys.executable, "-m", "basilisk", canister, main_py]
+
+
 # ---------------------------------------------------------------------------
 # Shell / dfx helpers
 # ---------------------------------------------------------------------------
@@ -232,7 +242,7 @@ def _build_canister_wasm(canister: str, network: str) -> Path:
     candid = REPO_ROOT / "src" / canister / f"{canister}.did"
     env["CANISTER_CANDID_PATH"] = str(candid)
     result = _run(
-        [sys.executable, "-m", "basilisk", canister, str(main_py)],
+        _basilisk_cmd(canister, str(main_py)),
         cwd=REPO_ROOT,
         env=env,
         check=False,
@@ -321,8 +331,7 @@ def _build_realm_frontend(member: Dict[str, Any], network: str) -> Optional[Path
             did_path.write_text(meta.stdout)
         else:
             _run(
-                [sys.executable, "-m", "basilisk", "realm_backend",
-                 str(REPO_ROOT / "src" / "realm_backend" / "main.py")],
+                _basilisk_cmd("realm_backend", str(REPO_ROOT / "src" / "realm_backend" / "main.py")),
                 cwd=REPO_ROOT, check=False,
             )
 
@@ -358,8 +367,8 @@ def _build_registry_frontend(network: str) -> Optional[Path]:
         env = os.environ.copy()
         env["CANISTER_CANDID_PATH"] = str(did_path)
         _run(
-            [sys.executable, "-m", "basilisk", "realm_registry_backend",
-             str(REPO_ROOT / "src" / "realm_registry_backend" / "main.py")],
+            _basilisk_cmd("realm_registry_backend",
+                          str(REPO_ROOT / "src" / "realm_registry_backend" / "main.py")),
             cwd=REPO_ROOT, env=env, check=False,
         )
 
@@ -401,8 +410,8 @@ def _build_marketplace_frontend(network: str) -> Optional[Path]:
             env = os.environ.copy()
             env["CANISTER_CANDID_PATH"] = str(did_path)
             _run(
-                [sys.executable, "-m", "basilisk", canister_name,
-                 str(REPO_ROOT / "src" / canister_name / "main.py")],
+                _basilisk_cmd(canister_name,
+                              str(REPO_ROOT / "src" / canister_name / "main.py")),
                 cwd=REPO_ROOT, env=env, check=False,
             )
         if did_path.exists():
