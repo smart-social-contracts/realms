@@ -73,3 +73,30 @@ export interface InstallerInfo {
   commit?: string;
   [key: string]: any;
 }
+
+export interface DeploymentJob {
+  job_id: string;
+  status: string;
+  caller_principal: string;
+  network: string;
+  backend_canister_id: string;
+  frontend_canister_id: string;
+  expected_wasm_hash: string;
+  expected_assets_hash: string;
+  actual_wasm_hash: string;
+  wasm_verified: number;
+  error: string;
+  created_at: number;
+  completed_at: number;
+}
+
+export interface VerificationReport {
+  job_id: string;
+  backend_canister_id: string;
+  frontend_canister_id: string;
+  expected_wasm_hash: string;
+  expected_assets_hash: string;
+  actual_wasm_hash: string;
+  wasm_verified: number;
+  status: string;
+}

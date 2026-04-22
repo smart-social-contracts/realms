@@ -247,6 +247,7 @@ from _cdk import (
     Principal,
     Query,
     Record,
+    Service,
     StableBTreeMap,
     Variant,
     Vec,
@@ -259,12 +260,22 @@ from _cdk import (
     nat64,
     post_upgrade,
     query,
+    service_update,
     text,
     update,
     void,
 )
 from ic_python_db import Database
 from ic_python_logging import get_logger
+
+
+# ---------------------------------------------------------------------------
+# Inter-canister client: realm_installer
+# ---------------------------------------------------------------------------
+
+class RealmInstallerService(Service):
+    @service_update
+    def enqueue_deployment(self, manifest_json: text) -> text: ...
 
 # NOTE: Record/Variant types MUST be defined in this file (not imported from
 # another module) because basilisk's Candid .did generator only parses main.py's
@@ -649,3 +660,156 @@ def billing_status() -> GetBillingStatusResult:
     except Exception as e:
         logger.error(f"Error in billing_status: {str(e)}")
         return {"Err": f"Internal error: {str(e)}"}
+
+
+# ============== Deployment Queue Endpoints ==============
+
+# Deployment cost in credits (1 credit = $1).
+DEPLOYMENT_COST_CREDITS = 5
+
+# Known realm_installer canister IDs per network.
+_INSTALLER_CANISTER_IDS = {
+    "staging": "lusjm-wqaaa-aaaau-ago7q-cai",
+    "demo": "2s4td-daaaa-aaaao-bazmq-cai",
+}
+
+
+@update
+def request_deployment(manifest_json: text) -> Async[text]:
+    """Submit a realm deployment request.
+
+    This is the single entry point for all deployments — both CI and
+    user-triggered (via the platform dashboard).
+
+    Flow:
+      1. Validate the caller
+      2. Deduct credits from the caller's balance
+      3. Forward the manifest to ``realm_installer.enqueue_deployment()``
+      4. Return the job_id
+
+    The caller's principal (from Internet Identity for users, or the
+    deployer identity for CI) is used for authentication.
+    """
+    try:
+        caller = str(ic.caller())
+        manifest = json.loads(manifest_json)
+        network = manifest.get("network", "")
+        realm_info = manifest.get("realm", {})
+        realm_name = realm_info.get("name", "unknown")
+
+        logger.info(
+            f"request_deployment: caller={caller}, realm={realm_name}, "
+            f"network={network}"
+        )
+
+        # ── Deduct credits ────────────────────────────────────────────
+        deduct_result = deduct_user_credits(
+            principal_id=caller,
+            amount=DEPLOYMENT_COST_CREDITS,
+            description=f"Realm deployment: {realm_name}",
+        )
+        if not deduct_result.get("success"):
+            error_msg = deduct_result.get("error", "insufficient credits")
+            logger.warning(
+                f"request_deployment: credit deduction failed for "
+                f"{caller}: {error_msg}"
+            )
+            return json.dumps({
+                "success": False,
+                "error": f"Credit deduction failed: {error_msg}",
+            })
+
+        # ── Resolve installer canister ID ─────────────────────────────
+        installer_id = _INSTALLER_CANISTER_IDS.get(network)
+        if not installer_id:
+            installer_id = manifest.get("installer_canister_id", "")
+        if not installer_id:
+            return json.dumps({
+                "success": False,
+                "error": f"No installer canister configured for network '{network}'",
+            })
+
+        # ── Forward to realm_installer ────────────────────────────────
+        installer = RealmInstallerService(Principal.from_str(installer_id))
+        call_result: CallResult = yield installer.enqueue_deployment(
+            manifest_json
+        )
+
+        raw = call_result
+        if hasattr(call_result, "Ok"):
+            raw = call_result.Ok
+        elif isinstance(call_result, dict) and "Ok" in call_result:
+            raw = call_result["Ok"]
+
+        if isinstance(raw, str):
+            result = json.loads(raw)
+        elif isinstance(raw, dict):
+            result = raw
+        else:
+            result = {"raw": str(raw)}
+
+        if result.get("success"):
+            logger.info(
+                f"request_deployment: enqueued job "
+                f"{result.get('job_id', '?')} for {realm_name}"
+            )
+            result["credits_deducted"] = DEPLOYMENT_COST_CREDITS
+            result["caller"] = caller
+            return json.dumps(result)
+        else:
+            logger.error(
+                f"request_deployment: installer rejected: "
+                f"{result.get('error', '?')}"
+            )
+            # Refund credits on failure
+            add_user_credits(
+                principal_id=caller,
+                amount=DEPLOYMENT_COST_CREDITS,
+                description=f"Refund: deployment of {realm_name} rejected",
+            )
+            return json.dumps(result)
+
+    except Exception as e:
+        logger.error(f"request_deployment error: {str(e)}")
+        tb = ""
+        try:
+            tb = traceback.format_exc()[-1000:]
+        except Exception:
+            pass
+        return json.dumps({
+            "success": False,
+            "error": f"Internal error: {str(e)}",
+            "traceback": tb,
+        })
+
+
+@update
+def deployment_failed(job_id: text, reason: text) -> text:
+    """Called by the installer when a deployment fails.
+
+    Refunds the credits to the original requester. The ``job_id``
+    is used to look up which principal initiated the deployment
+    (this info is stored on the installer side; the caller must
+    include it).
+    """
+    try:
+        caller = str(ic.caller())
+        logger.info(
+            f"deployment_failed: job_id={job_id}, caller={caller}, "
+            f"reason={reason}"
+        )
+        # The refund requires knowing the original caller's principal.
+        # For now, log the failure; the installer stores the caller info
+        # and can include it in a future version of this callback.
+        return json.dumps({
+            "success": True,
+            "job_id": job_id,
+            "reason": reason,
+            "note": "failure logged; credit refund pending caller lookup",
+        })
+    except Exception as e:
+        logger.error(f"deployment_failed error: {str(e)}")
+        return json.dumps({
+            "success": False,
+            "error": f"Internal error: {str(e)}",
+        })

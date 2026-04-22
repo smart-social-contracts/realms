@@ -1,0 +1,65 @@
+{
+  "realm": {
+    "name": "dominion",
+    "display_name": "Dominion",
+    "description": "A projection of where the world is likely heading: centralized, technocratic governance where algorithms, surveillance, and simulated consent replace genuine democratic agency.",
+    "welcome_message": "Welcome to Dominion. Efficient governance through algorithmic oversight. Your compliance ensures collective prosperity.",
+    "branding": {
+      "logo": "file_registry://realms/dominion/branding/logo.png",
+      "welcome_image": "file_registry://realms/dominion/branding/welcome_image.png"
+    },
+    "codex": { "package": "dominion", "version": "latest" },
+    "extensions": ["all"]
+  },
+  "canister_artifacts": {
+    "realm": {
+      "backend": {
+        "did": {
+          "url": "https://github.com/smart-social-contracts/realms/releases/download/v0.3.1/realm_backend.did",
+          "checksum": "sha256:..."
+        },
+        "wasm": {
+          "url": "https://github.com/smart-social-contracts/realms/releases/download/v0.3.1/realm_backend.wasm.gz",
+          "checksum": "sha256:..."
+        }
+      },
+      "frontend": {
+        "url": "https://github.com/smart-social-contracts/realms/releases/download/v0.3.1/realm_frontend.tar.gz",
+        "checksum": "sha256:..."
+      }
+    },
+    "token": {
+      "backend": {
+        "did": {
+          "url": "https://github.com/smart-social-contracts/kybra-simple-token/releases/download/v0.5.1/token_backend.did",
+          "checksum": "sha256:..."
+        },
+        "wasm": {
+          "url": "https://github.com/smart-social-contracts/kybra-simple-token/releases/download/v0.5.1/token_backend.wasm.gz",
+          "checksum": "sha256:..."
+        }
+      },
+      "frontend": {
+        "url": "https://github.com/smart-social-contracts/kybra-simple-token/releases/download/v0.5.1/token_frontend.wasm.gz",
+        "checksum": "sha256:..."
+      }
+    },
+    "nft": {
+      "backend": {
+        "did": {
+          "url": "https://github.com/smart-social-contracts/kybra-simple-token/releases/download/v0.5.1/nft_backend.did",
+          "checksum": "sha256:..."
+        },
+        "wasm": {
+          "url": "https://github.com/smart-social-contracts/kybra-simple-token/releases/download/v0.5.1/nft_backend.wasm.gz",
+          "checksum": "sha256:..."
+        }
+      },
+      "frontend": {
+        "url": "https://github.com/smart-social-contracts/kybra-simple-token/releases/download/v0.5.1/nft_frontend.wasm.gz",
+        "checksum": "sha256:..."
+      }
+    }
+  },
+  "network": "staging"
+}

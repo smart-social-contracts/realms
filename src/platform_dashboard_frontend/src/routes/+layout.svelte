@@ -37,10 +37,10 @@
   };
 
   const navItems = [
-    { href: '/',          label: 'Dashboard',  icon: '⊞' },
-    { href: '/platform',  label: 'Platform',   icon: '⚙' },
-    { href: '/realms',    label: 'Realms',     icon: '◎' },
-    { href: '/installer', label: 'Installer',  icon: '⟐' },
+    { href: '/',          label: 'Dashboard',    icon: '⊞' },
+    { href: '/platform',  label: 'Platform',     icon: '⚙' },
+    { href: '/realms',    label: 'Realms',       icon: '◎' },
+    { href: '/installer', label: 'Deployments',  icon: '⟐' },
   ];
 </script>
 

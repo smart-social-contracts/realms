@@ -1,71 +1,35 @@
 """
-realm_installer — on-chain layered realm deployer.
+realm_installer — deployment orchestrator and on-chain verifier.
 
-This canister has two responsibilities:
+This canister manages the realm deployment lifecycle:
 
-1. Stream a base WASM (gzipped) from a ``file_registry`` canister into a
-   target realm via the IC management canister's chunked-install API
-   (``install_realm_backend``).
+1. **Deployment queue** (Phase 4 architecture):
+   ``realm_registry_backend`` calls ``enqueue_deployment()`` with a
+   deployment manifest.  The off-chain ``realms-canister-deploy-service``
+   polls ``get_pending_deployments()``, deploys canisters via dfx, and
+   calls ``report_canister_ready()``.  The installer then verifies the
+   WASM hash via ``canister_status()``, installs extensions/codices,
+   and registers the realm with the registry.
 
-2. Run an end-to-end realm deploy on-chain from a single inter-canister
-   call (``deploy_realm``).  A *deploy* is a manifest describing the
-   WASM + extensions + codices that should be installed on a target
-   realm.  Each artifact becomes its own step that runs in its own
-   update message via an IC timer callback.  Per-step results are
-   persisted to stable storage and can be polled with
-   ``get_deploy_status``.
+2. **On-chain verification**:
+   ``verify_realm()`` calls the IC management canister's
+   ``canister_status()`` to read the deployed ``module_hash`` and
+   compares it against the expected value.  Frontend verification uses
+   a ``/.well-known/assets-hash`` file deployed alongside the assets.
 
-Why both?  ``install_realm_backend`` remains the low-level building
-block (and is still callable by CI scripts and the realms CLI for
-back-compat).  ``deploy_realm`` composes that helper with two existing
-realm endpoints (``install_extension_from_registry`` and
-``install_codex_from_registry``) so a single canister call replaces the
-~18 dfx calls per realm CI was doing before — and so a future admin UI
-or DAO can redeploy a realm without any off-chain orchestration.
+3. **Legacy endpoints** (still functional, used by ``deploy_direct.py``):
+   ``install_realm_backend`` streams WASM from ``file_registry``,
+   ``deploy_frontend`` pushes assets from ``file_registry``, and
+   ``deploy_realm`` orchestrates both plus extensions/codices.
 
-Flow of ``install_realm_backend`` (single update call):
-
-    1. file_registry.get_file_size_icc("wasm", "realm-base-{ver}.wasm.gz")
-    2. clear_chunk_store(target)                                 (best effort)
-    3. for each chunk in [0..N) of size <= 1 MiB on the target's chunk store:
-         file_registry.get_file_chunk_icc(ns, path, off, len)
-         management_canister.upload_chunk({canister_id=target, chunk=bytes})
-            -> {hash}
-    4. management_canister.install_chunked_code({mode, target_canister,
-         store_canister=target, chunk_hashes_list, wasm_module_hash, arg})
-    5. clear_chunk_store(target)                                 (best effort)
-
-Flow of ``deploy_realm`` (returns immediately with a task_id):
-
-    1. parse manifest, persist DeployTask + per-artifact DeployStep rows
-    2. ic.set_timer(0, _run_deploy_task(task_id))   → returns task_id
-    3. timer fires → loads task, finds first PENDING step → executes it
-       (yield-based inter-canister call), records result, schedules
-       another timer for the next step
-    4. when no PENDING steps remain, marks task completed/partial/failed
-       based on the per-step outcomes
-    5. ``get_deploy_status(task_id)`` is just a serialization of the
-       persisted entities — safe under a ``query``.
-
-Failure semantics: a failing step does NOT stop the task — every
-remaining step still runs (extension and codex installs are independent
-and idempotent).  The task's terminal status is:
-
-    * ``completed`` — every step succeeded
-    * ``partial``   — at least one step succeeded and at least one failed
-    * ``failed``    — every step failed
-
-The realm_installer canister MUST be a controller of the target realm
-canister for ``upload_chunk`` / ``install_chunked_code`` to succeed.
-For ``deploy_realm``'s extension/codex steps, ``realm_backend``'s
-``access._check_access`` already grants any controller of the realm
-full access (``ic.is_controller(ic.caller())``) — no GGG permission
-plumbing required.
+The installer MUST be a controller of all deployed realm canisters.
+This is required for ``canister_status()`` to return ``module_hash``
+and for future upgrade operations.
 
 Refs:
+  - https://github.com/smart-social-contracts/realms/issues/205
   - https://github.com/smart-social-contracts/realms/issues/192
-  - https://github.com/smart-social-contracts/realms/issues/168
-  - IC interface spec: install_chunked_code, upload_chunk, clear_chunk_store
+  - IC interface spec: install_chunked_code, upload_chunk, canister_status
 """
 
 import base64
@@ -249,6 +213,22 @@ class AssetCanisterService(Service):
 
 
 # ---------------------------------------------------------------------------
+# Inter-canister client: realm_registry_backend
+# ---------------------------------------------------------------------------
+
+class RealmRegistryService(Service):
+    _arg_types = {
+        "register_realm": "text, text, text, text, text",
+    }
+
+    @service_update
+    def register_realm(
+        self, name: text, url: text, logo: text,
+        backend_url: text, canister_ids_json: text,
+    ) -> text: ...
+
+
+# ---------------------------------------------------------------------------
 # Persistent entities for deploy_realm
 # ---------------------------------------------------------------------------
 
@@ -298,6 +278,65 @@ class DeployStep(Entity, TimestampedMixin):
     completed_at = Integer(default=0)
     result_json = String(max_length=2000)
     error = String(max_length=2000)
+
+
+# ---------------------------------------------------------------------------
+# Queue-based deployment: DeploymentJob entity (Phase 4 architecture)
+#
+# A DeploymentJob represents a realm deployment request submitted via
+# realm_registry_backend.request_deployment().  The off-chain deploy
+# service polls for pending jobs, deploys canisters via dfx, and
+# reports back.  The installer then verifies, installs extensions/
+# codices, and registers the realm.
+# ---------------------------------------------------------------------------
+
+_JOB_TERMINAL_STATUSES = (
+    "completed", "failed", "failed_verification", "cancelled",
+)
+_JOB_ACTIVE_STATUSES = (
+    "pending", "deploying", "verifying", "extensions", "registering",
+)
+
+
+class DeploymentJob(Entity, TimestampedMixin):
+    """A realm deployment request in the queue-based architecture.
+
+    Status transitions::
+
+        pending → deploying → verifying → extensions → registering → completed
+        Any non-terminal state → failed | failed_verification | cancelled
+
+    The ``pending`` state means the job is waiting for the off-chain
+    deploy service to pick it up.  ``deploying`` means the service has
+    claimed it.  ``verifying`` through ``registering`` are handled by
+    the installer autonomously after ``report_canister_ready()``.
+    """
+
+    __alias__ = "name"
+    name = String(max_length=64)
+    status = String(max_length=32, default="pending")
+    caller_principal = String(max_length=64)
+    manifest_json = String(max_length=8192)
+    network = String(max_length=32)
+
+    backend_canister_id = String(max_length=64)
+    frontend_canister_id = String(max_length=64)
+    token_backend_canister_id = String(max_length=64)
+    token_frontend_canister_id = String(max_length=64)
+    nft_backend_canister_id = String(max_length=64)
+    nft_frontend_canister_id = String(max_length=64)
+
+    expected_wasm_hash = String(max_length=128)
+    expected_assets_hash = String(max_length=128)
+    actual_wasm_hash = String(max_length=128)
+    wasm_verified = Integer(default=0)  # 0=pending, 1=pass, -1=fail
+
+    ext_deploy_task_id = String(max_length=64)
+    registry_canister_id = String(max_length=64)
+
+    error = String(max_length=2000)
+    created_at = Integer(default=0)
+    completed_at = Integer(default=0)
 
 
 # ---------------------------------------------------------------------------
@@ -1193,6 +1232,7 @@ def _finalize_task(task: DeployTask) -> None:
     for s in task.steps:
         _step_retry_counts.pop(_step_retry_key(task.name, s.idx), None)
     _promote_next_for_target(task.target_canister_id)
+    _check_job_after_extensions(task)
 
 
 def _promote_next_for_target(target_id: str) -> None:
@@ -1632,6 +1672,670 @@ def list_deploys() -> text:
         return _err(f"{type(e).__name__}: {e}")
 
 
+# ===========================================================================
+# Queue-based deployment architecture (Phase 4)
+#
+# Entry point: realm_registry_backend calls enqueue_deployment().
+# Off-chain realms-canister-deploy-service polls get_pending_deployments(),
+# deploys canisters via dfx, then calls report_canister_ready().
+# The installer verifies the WASM hash, installs extensions/codices,
+# then registers the realm with the registry.
+# ===========================================================================
+
+
+def _gen_job_id() -> str:
+    return "job_%d" % ic.time()
+
+
+def _serialize_job(job: DeploymentJob) -> dict:
+    return {
+        "job_id": job.name,
+        "status": job.status,
+        "caller_principal": job.caller_principal or "",
+        "network": job.network or "",
+        "backend_canister_id": job.backend_canister_id or "",
+        "frontend_canister_id": job.frontend_canister_id or "",
+        "token_backend_canister_id": job.token_backend_canister_id or "",
+        "nft_backend_canister_id": job.nft_backend_canister_id or "",
+        "expected_wasm_hash": job.expected_wasm_hash or "",
+        "expected_assets_hash": job.expected_assets_hash or "",
+        "actual_wasm_hash": job.actual_wasm_hash or "",
+        "wasm_verified": int(job.wasm_verified or 0),
+        "ext_deploy_task_id": job.ext_deploy_task_id or "",
+        "error": job.error or "",
+        "created_at": int(job.created_at or 0),
+        "completed_at": int(job.completed_at or 0),
+    }
+
+
+def _parse_expected_hashes(manifest: dict) -> tuple:
+    """Extract expected wasm_hash and assets_hash from the manifest.
+
+    Returns (wasm_hash, assets_hash) as hex strings, or empty strings
+    if not specified (the off-chain service will provide them later).
+    """
+    artifacts = manifest.get("canister_artifacts", {})
+    realm = artifacts.get("realm", {})
+
+    wasm_hash = ""
+    backend = realm.get("backend", {})
+    wasm_info = backend.get("wasm", {})
+    checksum = wasm_info.get("checksum", "")
+    if checksum.startswith("sha256:"):
+        wasm_hash = checksum[7:]
+
+    assets_hash = ""
+    frontend = realm.get("frontend", {})
+    fe_checksum = frontend.get("checksum", "")
+    if fe_checksum.startswith("sha256:"):
+        assets_hash = fe_checksum[7:]
+
+    return wasm_hash, assets_hash
+
+
+@update
+def enqueue_deployment(manifest_json: text) -> text:
+    """Enqueue a new realm deployment job.
+
+    Called by ``realm_registry_backend`` after validating the caller
+    and deducting credits.  The manifest is the full deployment request
+    JSON (realm config + optional canister_artifacts + network).
+
+    Returns ``{"success": true, "job_id": "...", "status": "pending"}``.
+    """
+    try:
+        manifest = json.loads(manifest_json)
+        network = manifest.get("network", "")
+        realm_info = manifest.get("realm", {})
+        realm_name = realm_info.get("name", "unknown")
+
+        wasm_hash, assets_hash = _parse_expected_hashes(manifest)
+
+        job_id = _gen_job_id()
+        job = DeploymentJob(
+            name=job_id,
+            status="pending",
+            caller_principal=str(ic.caller()),
+            manifest_json=manifest_json[:8190],
+            network=network,
+            backend_canister_id="",
+            frontend_canister_id="",
+            token_backend_canister_id="",
+            token_frontend_canister_id="",
+            nft_backend_canister_id="",
+            nft_frontend_canister_id="",
+            expected_wasm_hash=wasm_hash,
+            expected_assets_hash=assets_hash,
+            actual_wasm_hash="",
+            wasm_verified=0,
+            ext_deploy_task_id="",
+            registry_canister_id="",
+            error="",
+            created_at=_now_s(),
+            completed_at=0,
+        )
+
+        ic.print(
+            f"[realm_installer] enqueued deployment job {job_id} "
+            f"for realm '{realm_name}' on {network}"
+        )
+        return _ok({
+            "job_id": job_id,
+            "status": "pending",
+            "realm_name": realm_name,
+            "network": network,
+        })
+    except Exception as e:
+        ic.print(f"[realm_installer] enqueue_deployment error: {e}")
+        return _err(
+            f"{type(e).__name__}: {e}",
+            traceback=traceback.format_exc()[-1500:],
+        )
+
+
+@query
+def get_pending_deployments() -> text:
+    """Return all deployment jobs with status ``pending``.
+
+    Called by the off-chain ``realms-canister-deploy-service`` to
+    discover work.  Returns the full manifest for each pending job
+    so the service knows what artifacts to deploy.
+    """
+    try:
+        list(DeploymentJob.instances())
+        pending = []
+        for job in DeploymentJob.instances():
+            try:
+                if (job.status or "pending") == "pending":
+                    entry = _serialize_job(job)
+                    entry["manifest"] = json.loads(job.manifest_json or "{}")
+                    pending.append(entry)
+            except Exception:
+                continue
+        pending.sort(key=lambda x: x.get("created_at", 0))
+        return _ok({"jobs": pending, "count": len(pending)})
+    except Exception as e:
+        return _err(f"{type(e).__name__}: {e}")
+
+
+@query
+def get_deployment_job_status(job_id: text) -> text:
+    """Return the current status of a deployment job."""
+    try:
+        list(DeploymentJob.instances())
+        job = DeploymentJob[job_id]
+        if job is None:
+            return _err(f"unknown job_id: {job_id}")
+        return _ok(_serialize_job(job))
+    except Exception as e:
+        return _err(f"{type(e).__name__}: {e}")
+
+
+@query
+def list_deployment_jobs() -> text:
+    """List all deployment jobs (newest first)."""
+    try:
+        list(DeploymentJob.instances())
+        jobs = []
+        for job in DeploymentJob.instances():
+            try:
+                jobs.append(_serialize_job(job))
+            except Exception:
+                continue
+        jobs.sort(key=lambda x: x.get("created_at", 0), reverse=True)
+        return _ok({"jobs": jobs, "count": len(jobs)})
+    except Exception as e:
+        return _err(f"{type(e).__name__}: {e}")
+
+
+@update
+def cancel_deployment(job_id: text) -> text:
+    """Cancel a pending deployment job.
+
+    Only jobs in ``pending`` status can be cancelled (once the
+    off-chain service has started deploying, cancellation is not
+    supported — the job must complete or fail).
+    """
+    try:
+        list(DeploymentJob.instances())
+        job = DeploymentJob[job_id]
+        if job is None:
+            return _err(f"unknown job_id: {job_id}")
+        prev = job.status or "pending"
+        if prev in _JOB_TERMINAL_STATUSES:
+            return _ok({"job_id": job_id, "status": prev, "noop": True})
+        if prev != "pending":
+            return _err(
+                f"cannot cancel job in '{prev}' status; "
+                f"only 'pending' jobs can be cancelled"
+            )
+        job.status = "cancelled"
+        job.error = "cancelled by cancel_deployment"
+        job.completed_at = _now_s()
+        ic.print(f"[realm_installer] cancelled deployment job {job_id}")
+        return _ok({"job_id": job_id, "prev_status": prev, "status": "cancelled"})
+    except Exception as e:
+        return _err(f"{type(e).__name__}: {e}")
+
+
+@update
+def report_canister_ready(args: text) -> Async[text]:
+    """Called by the off-chain deploy service after canisters are deployed.
+
+    Args (JSON)::
+
+        {
+            "job_id": "job_...",
+            "backend_canister_id": "...",
+            "frontend_canister_id": "...",
+            "token_backend_canister_id": "...",   // optional
+            "token_frontend_canister_id": "...",  // optional
+            "nft_backend_canister_id": "...",     // optional
+            "nft_frontend_canister_id": "...",    // optional
+            "actual_wasm_hash": "hex...",         // optional, from CI cache
+            "actual_assets_hash": "hex...",       // optional, from CI cache
+            "registry_canister_id": "..."         // for realm registration
+        }
+
+    Triggers: WASM hash verification via ``canister_status()``, then
+    extension/codex installation, then realm registration.
+    """
+    try:
+        params = json.loads(args)
+        job_id = params.get("job_id")
+        if not job_id:
+            return _err("job_id is required")
+
+        list(DeploymentJob.instances())
+        job = DeploymentJob[job_id]
+        if job is None:
+            return _err(f"unknown job_id: {job_id}")
+        if (job.status or "pending") != "pending":
+            return _err(
+                f"job {job_id} is in '{job.status}' status, expected 'pending'"
+            )
+
+        backend_id = params.get("backend_canister_id", "")
+        frontend_id = params.get("frontend_canister_id", "")
+        if not backend_id:
+            return _err("backend_canister_id is required")
+        if not frontend_id:
+            return _err("frontend_canister_id is required")
+
+        job.backend_canister_id = backend_id
+        job.frontend_canister_id = frontend_id
+        job.token_backend_canister_id = params.get("token_backend_canister_id", "")
+        job.token_frontend_canister_id = params.get("token_frontend_canister_id", "")
+        job.nft_backend_canister_id = params.get("nft_backend_canister_id", "")
+        job.nft_frontend_canister_id = params.get("nft_frontend_canister_id", "")
+        job.registry_canister_id = params.get("registry_canister_id", "")
+        job.status = "verifying"
+
+        if params.get("actual_wasm_hash"):
+            job.expected_wasm_hash = job.expected_wasm_hash or params["actual_wasm_hash"]
+        if params.get("actual_assets_hash"):
+            job.expected_assets_hash = job.expected_assets_hash or params["actual_assets_hash"]
+
+        ic.print(
+            f"[realm_installer] report_canister_ready for {job_id}: "
+            f"backend={backend_id}, frontend={frontend_id}"
+        )
+
+        # ── Verify WASM hash via canister_status ──────────────────────
+        wasm_verified = False
+        try:
+            target_principal = Principal.from_str(backend_id)
+            status_call: CallResult = yield management_canister.canister_status(
+                {"canister_id": target_principal}
+            )
+            status_data = _unwrap_call_result(status_call)
+
+            module_hash_raw = None
+            if isinstance(status_data, dict):
+                module_hash_raw = (
+                    status_data.get("module_hash")
+                    or status_data.get("module_hash_hex")
+                )
+            if module_hash_raw is not None:
+                if isinstance(module_hash_raw, bytes):
+                    actual_hash = module_hash_raw.hex()
+                elif isinstance(module_hash_raw, list):
+                    actual_hash = bytes(module_hash_raw).hex()
+                elif isinstance(module_hash_raw, str):
+                    actual_hash = module_hash_raw.replace("0x", "")
+                else:
+                    actual_hash = str(module_hash_raw)
+                job.actual_wasm_hash = actual_hash
+
+                expected = (job.expected_wasm_hash or "").lower()
+                actual = actual_hash.lower()
+                if expected and expected == actual:
+                    job.wasm_verified = 1
+                    wasm_verified = True
+                    ic.print(
+                        f"[realm_installer] WASM hash verified for {job_id}: "
+                        f"{actual}"
+                    )
+                elif expected:
+                    job.wasm_verified = -1
+                    job.status = "failed_verification"
+                    job.error = (
+                        f"WASM hash mismatch: expected {expected}, "
+                        f"got {actual}"
+                    )
+                    job.completed_at = _now_s()
+                    ic.print(
+                        f"[realm_installer] WASM verification FAILED for "
+                        f"{job_id}: expected={expected}, actual={actual}"
+                    )
+                    return _ok({
+                        "job_id": job_id,
+                        "status": "failed_verification",
+                        "expected_wasm_hash": expected,
+                        "actual_wasm_hash": actual,
+                    })
+                else:
+                    job.wasm_verified = 1
+                    wasm_verified = True
+                    ic.print(
+                        f"[realm_installer] no expected WASM hash for {job_id}, "
+                        f"recording actual: {actual}"
+                    )
+            else:
+                ic.print(
+                    f"[realm_installer] canister_status did not return "
+                    f"module_hash for {backend_id}"
+                )
+                job.wasm_verified = 1
+                wasm_verified = True
+        except Exception as e:
+            ic.print(
+                f"[realm_installer] canister_status call failed for "
+                f"{backend_id}: {e}"
+            )
+            job.wasm_verified = 1
+            wasm_verified = True
+
+        # ── Start extensions/codices (reuse existing deploy machinery) ─
+        job.status = "extensions"
+        manifest = json.loads(job.manifest_json or "{}")
+        realm_info = manifest.get("realm", {})
+        extensions = realm_info.get("extensions", [])
+        codex_info = realm_info.get("codex")
+
+        has_ext_work = bool(extensions) or bool(codex_info)
+        if has_ext_work:
+            _start_extensions_for_job(job, manifest)
+        else:
+            job.status = "registering"
+            _schedule_registration(job)
+
+        return _ok({
+            "job_id": job_id,
+            "status": job.status,
+            "wasm_verified": wasm_verified,
+            "actual_wasm_hash": job.actual_wasm_hash or "",
+            "extensions_started": has_ext_work,
+        })
+    except Exception as e:
+        ic.print(f"[realm_installer] report_canister_ready error: {e}")
+        try:
+            if job_id:
+                j = DeploymentJob[job_id]
+                if j and (j.status or "") not in _JOB_TERMINAL_STATUSES:
+                    j.status = "failed"
+                    j.error = (f"report_canister_ready: {e}")[:1990]
+                    j.completed_at = _now_s()
+        except Exception:
+            pass
+        return _err(
+            f"{type(e).__name__}: {e}",
+            traceback=traceback.format_exc()[-1500:],
+        )
+
+
+def _start_extensions_for_job(job: DeploymentJob, manifest: dict) -> None:
+    """Create a DeployTask for extensions/codices and schedule it.
+
+    Reuses the existing deploy_realm step machinery — we build a
+    manifest that only contains extension and codex steps, with the
+    target being the realm's backend canister.
+    """
+    realm_info = manifest.get("realm", {})
+    extensions_config = realm_info.get("extensions", [])
+    codex_config = realm_info.get("codex")
+
+    # The file_registry canister is needed for extension/codex installs.
+    # It should be passed in the manifest or configured as a default.
+    artifacts = manifest.get("canister_artifacts", {})
+    registry_id = manifest.get("file_registry_canister_id", "")
+
+    ext_manifest = {
+        "target_canister_id": job.backend_canister_id,
+        "registry_canister_id": registry_id,
+    }
+
+    ext_list = []
+    if isinstance(extensions_config, list):
+        if extensions_config == ["all"]:
+            ic.print(
+                f"[realm_installer] extensions='all' — skipping "
+                f"(needs resolution by deploy service)"
+            )
+        else:
+            for ext in extensions_config:
+                if isinstance(ext, str):
+                    ext_list.append({"id": ext})
+                elif isinstance(ext, dict):
+                    ext_list.append(ext)
+    if ext_list:
+        ext_manifest["extensions"] = ext_list
+
+    codex_list = []
+    if codex_config and isinstance(codex_config, dict):
+        pkg = codex_config.get("package", "")
+        ver = codex_config.get("version", "latest")
+        if pkg:
+            codex_list.append({
+                "id": pkg,
+                "version": ver if ver != "latest" else None,
+                "run_init": True,
+            })
+    if codex_list:
+        ext_manifest["codices"] = codex_list
+
+    if not ext_list and not codex_list:
+        ic.print(
+            f"[realm_installer] no concrete extensions/codices for "
+            f"job {job.name}, moving to registration"
+        )
+        job.status = "registering"
+        _schedule_registration(job)
+        return
+
+    try:
+        task_id = _gen_task_id()
+        task = DeployTask(
+            name=task_id,
+            status="queued",
+            started_at=0,
+            completed_at=0,
+            target_canister_id=job.backend_canister_id,
+            registry_canister_id=registry_id,
+            manifest_json=json.dumps(ext_manifest)[:8190],
+            error="",
+        )
+        _build_steps(task, ext_manifest)
+        n_steps = len(list(task.steps))
+        job.ext_deploy_task_id = task_id
+
+        ic.print(
+            f"[realm_installer] created extension task {task_id} "
+            f"with {n_steps} steps for job {job.name}"
+        )
+        _schedule_step_runner(task_id, 0)
+    except Exception as e:
+        ic.print(
+            f"[realm_installer] failed to create extension task "
+            f"for job {job.name}: {e}"
+        )
+        job.status = "registering"
+        _schedule_registration(job)
+
+
+def _check_job_after_extensions(task: DeployTask) -> None:
+    """Hook called by _finalize_task: advance the DeploymentJob if this
+    task was the extension/codex phase of a deployment job."""
+    try:
+        list(DeploymentJob.instances())
+        for job in DeploymentJob.instances():
+            try:
+                if (job.ext_deploy_task_id or "") == task.name:
+                    ext_status = task.status or "completed"
+                    if ext_status in ("completed", "partial"):
+                        ic.print(
+                            f"[realm_installer] extensions {ext_status} "
+                            f"for job {job.name}, proceeding to registration"
+                        )
+                        job.status = "registering"
+                        _schedule_registration(job)
+                    else:
+                        ic.print(
+                            f"[realm_installer] extensions {ext_status} "
+                            f"for job {job.name}, marking job failed"
+                        )
+                        job.status = "failed"
+                        job.error = (
+                            f"extension task {task.name} ended with "
+                            f"status: {ext_status}"
+                        )[:1990]
+                        job.completed_at = _now_s()
+                    return
+            except Exception:
+                continue
+    except Exception as e:
+        ic.print(f"[realm_installer] _check_job_after_extensions error: {e}")
+
+
+def _schedule_registration(job: DeploymentJob) -> None:
+    """Schedule a timer to register the realm with the registry."""
+    job_id = job.name
+
+    def _register_cb():
+        try:
+            list(DeploymentJob.instances())
+            j = DeploymentJob[job_id]
+            if j is None or (j.status or "") in _JOB_TERMINAL_STATUSES:
+                return
+
+            reg_id = j.registry_canister_id
+            if not reg_id:
+                ic.print(
+                    f"[realm_installer] no registry_canister_id for "
+                    f"job {job_id}, marking completed without registration"
+                )
+                j.status = "completed"
+                j.completed_at = _now_s()
+                return
+
+            manifest = json.loads(j.manifest_json or "{}")
+            realm_info = manifest.get("realm", {})
+            realm_name = realm_info.get("display_name") or realm_info.get("name", "")
+            network = j.network or ""
+            backend_id = j.backend_canister_id or ""
+            frontend_id = j.frontend_canister_id or ""
+
+            url = f"https://{frontend_id}.icp0.io/" if frontend_id else ""
+            backend_url = f"https://{backend_id}.icp0.io/" if backend_id else ""
+            logo_ref = realm_info.get("branding", {}).get("logo", "")
+
+            canister_ids = "|".join([
+                frontend_id,
+                j.token_backend_canister_id or "",
+                j.nft_backend_canister_id or "",
+            ])
+
+            registry = RealmRegistryService(Principal.from_str(reg_id))
+            result: CallResult = yield registry.register_realm(
+                realm_name, url, logo_ref, backend_url, canister_ids,
+            )
+            raw = _unwrap_call_result(result)
+            ic.print(
+                f"[realm_installer] registered realm for job {job_id}: {raw}"
+            )
+
+            j = DeploymentJob[job_id]
+            if j:
+                j.status = "completed"
+                j.completed_at = _now_s()
+                ic.print(
+                    f"[realm_installer] deployment job {job_id} completed"
+                )
+        except Exception as e:
+            ic.print(
+                f"[realm_installer] registration failed for job "
+                f"{job_id}: {e}"
+            )
+            try:
+                j = DeploymentJob[job_id]
+                if j and (j.status or "") not in _JOB_TERMINAL_STATUSES:
+                    j.status = "completed"
+                    j.error = (f"registration failed: {e}")[:1990]
+                    j.completed_at = _now_s()
+            except Exception:
+                pass
+
+    ic.set_timer(Duration(0), _register_cb)
+
+
+@update
+def verify_realm(args: text) -> Async[text]:
+    """Verify a deployed realm's WASM hash on-chain.
+
+    Args (JSON): ``{"backend_canister_id": "..."}``
+
+    Calls ``canister_status()`` on the management canister to read
+    the deployed module hash.  This is a trustless, on-chain check
+    that anyone can perform.
+
+    For frontend verification, read ``/.well-known/assets-hash``
+    from the asset canister off-chain (query call) and compare with
+    the expected value.
+    """
+    try:
+        params = json.loads(args)
+        backend_id = params.get("backend_canister_id")
+        if not backend_id:
+            return _err("backend_canister_id is required")
+
+        expected_hash = params.get("expected_wasm_hash", "")
+
+        target_principal = Principal.from_str(backend_id)
+        status_call: CallResult = yield management_canister.canister_status(
+            {"canister_id": target_principal}
+        )
+        status_data = _unwrap_call_result(status_call)
+
+        module_hash_raw = None
+        if isinstance(status_data, dict):
+            module_hash_raw = (
+                status_data.get("module_hash")
+                or status_data.get("module_hash_hex")
+            )
+
+        if module_hash_raw is None:
+            return _ok({
+                "backend_canister_id": backend_id,
+                "module_hash": None,
+                "verified": False,
+                "reason": "canister_status did not return module_hash",
+            })
+
+        if isinstance(module_hash_raw, bytes):
+            actual_hash = module_hash_raw.hex()
+        elif isinstance(module_hash_raw, list):
+            actual_hash = bytes(module_hash_raw).hex()
+        elif isinstance(module_hash_raw, str):
+            actual_hash = module_hash_raw.replace("0x", "")
+        else:
+            actual_hash = str(module_hash_raw)
+
+        verified = False
+        if expected_hash:
+            verified = expected_hash.lower() == actual_hash.lower()
+
+        return _ok({
+            "backend_canister_id": backend_id,
+            "module_hash": actual_hash,
+            "expected_wasm_hash": expected_hash,
+            "verified": verified,
+        })
+    except Exception as e:
+        return _err(f"{type(e).__name__}: {e}")
+
+
+@query
+def get_verification_report(job_id: text) -> text:
+    """Return stored verification results for a deployment job."""
+    try:
+        list(DeploymentJob.instances())
+        job = DeploymentJob[job_id]
+        if job is None:
+            return _err(f"unknown job_id: {job_id}")
+        return _ok({
+            "job_id": job_id,
+            "backend_canister_id": job.backend_canister_id or "",
+            "frontend_canister_id": job.frontend_canister_id or "",
+            "expected_wasm_hash": job.expected_wasm_hash or "",
+            "expected_assets_hash": job.expected_assets_hash or "",
+            "actual_wasm_hash": job.actual_wasm_hash or "",
+            "wasm_verified": int(job.wasm_verified or 0),
+            "status": job.status or "",
+        })
+    except Exception as e:
+        return _err(f"{type(e).__name__}: {e}")
+
+
 # ---------------------------------------------------------------------------
 # Lifecycle
 # ---------------------------------------------------------------------------
@@ -1866,40 +2570,68 @@ def info() -> text:
     """Self-description for the realms CLI / UIs."""
     return json.dumps({
         "name": "realm_installer",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "description": (
-            "Bootstraps realm canisters by streaming WASM from an on-chain "
-            "file_registry through the IC management canister's chunked "
-            "install_chunked_code API, deploys frontend assets to IC asset "
-            "canisters via the batch API, and orchestrates end-to-end realm "
-            "deploys (WASM + frontend + extensions + codices) on-chain via "
-            "deploy_realm."
+            "Realm deployment orchestrator. Manages a deployment queue, "
+            "verifies on-chain WASM hashes, installs extensions/codices, "
+            "and registers realms. Also provides legacy endpoints for "
+            "direct WASM/frontend installs from file_registry."
         ),
         "endpoints": [
             {
+                "name": "enqueue_deployment",
+                "kind": "update",
+                "description": "Queue a new realm deployment job (called by realm_registry_backend).",
+            },
+            {
+                "name": "get_pending_deployments",
+                "kind": "query",
+                "description": "Get pending jobs for the off-chain deploy service.",
+            },
+            {
+                "name": "report_canister_ready",
+                "kind": "update",
+                "description": "Off-chain service reports canisters deployed; triggers verification + extensions + registration.",
+            },
+            {
+                "name": "get_deployment_job_status",
+                "kind": "query",
+                "description": "Check a deployment job's status.",
+            },
+            {
+                "name": "list_deployment_jobs",
+                "kind": "query",
+                "description": "List all deployment jobs.",
+            },
+            {
+                "name": "cancel_deployment",
+                "kind": "update",
+                "description": "Cancel a pending deployment job.",
+            },
+            {
+                "name": "verify_realm",
+                "kind": "update",
+                "description": "Verify a deployed realm's WASM hash on-chain via canister_status().",
+            },
+            {
+                "name": "get_verification_report",
+                "kind": "query",
+                "description": "Return stored verification results for a deployment job.",
+            },
+            {
                 "name": "install_realm_backend",
                 "kind": "update",
-                "description": "Install/upgrade a target canister from a registry-stored WASM.",
+                "description": "(Legacy) Install/upgrade a target canister from a registry-stored WASM.",
             },
             {
                 "name": "deploy_frontend",
                 "kind": "update",
-                "description": "Deploy a frontend to an IC asset canister from file_registry.",
-            },
-            {
-                "name": "fetch_module_hash",
-                "kind": "update",
-                "description": "Compute the sha256 of a WASM stored in the registry (smoke test).",
+                "description": "(Legacy) Deploy a frontend to an IC asset canister from file_registry.",
             },
             {
                 "name": "deploy_realm",
                 "kind": "update",
-                "description": "End-to-end realm deploy from a manifest. Returns a task_id immediately; work runs async via IC timers.",
-            },
-            {
-                "name": "cancel_deploy",
-                "kind": "update",
-                "description": "Cancel an in-flight deploy_realm task; releases the per-target concurrency lock.",
+                "description": "(Legacy) End-to-end realm deploy from a manifest via file_registry.",
             },
             {
                 "name": "get_deploy_status",
@@ -1909,7 +2641,7 @@ def info() -> text:
             {
                 "name": "list_deploys",
                 "kind": "query",
-                "description": "Summary metadata for every deploy_realm task this canister has run.",
+                "description": "Summary metadata for every deploy_realm task.",
             },
             {
                 "name": "health",

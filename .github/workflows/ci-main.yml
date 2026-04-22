@@ -111,3 +111,17 @@ jobs:
           python3 scripts/deploy_direct.py \
               --file deployments/staging-mundus-layered.yml
 
+      - name: Upload build artifacts to deploy service cache
+        if: success()
+        run: |
+          python3 scripts/upload_ci_artifacts.py --network staging
+        continue-on-error: true
+
+      # ── Queue-based deployment (future) ─────────────────────────────
+      # Once the full queue pipeline is tested, replace the deploy_direct
+      # step above with:
+      #
+      #   python3 scripts/request_deployment.py \
+      #       --file deployments/staging-mundus-layered.yml \
+      #       --network staging
+

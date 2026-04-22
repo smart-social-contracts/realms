@@ -512,6 +512,13 @@ def _deploy_frontend_direct(
         local_dist = tmp / "dist"
         shutil.copytree(dist_dir, local_dist)
 
+        try:
+            from scripts.compute_assets_hash import compute_and_write_assets_hash
+            ah = compute_and_write_assets_hash(local_dist)
+            print(f"     assets_hash: {ah[:16]}...")
+        except Exception as e:
+            print(f"     ⚠ assets-hash computation failed: {e}")
+
         dfx_json = {
             "dfx": "0.29.0",
             "canisters": {
