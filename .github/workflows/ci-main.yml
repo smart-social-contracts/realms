@@ -1,13 +1,22 @@
 # ci-main.yml — main pipeline.
 #
-# Two phases:
+# Two phases that run in PARALLEL (they target different worlds):
 #   Phase A — local gating: run all four pipeline stages against an
 #             ephemeral local replica inside ONE runner (the local
-#             replica state can't survive a job boundary).
+#             replica state can't survive a job boundary). This is
+#             pure correctness gating — it doesn't touch staging.
 #   Phase B — staging deploy: re-run stages against the real staging
 #             subnet using the four reusable workflows (canisters are
 #             long-lived there so per-stage jobs are fine and give
 #             better observability).
+#
+# Phase B no longer waits on Phase A. The two test different things
+# (correctness vs. real-network deploy); making them sequential added
+# ~10 minutes of pure wall-clock overhead with no signal benefit. If
+# Phase A fails the commit is still bad, but the staging deploy will
+# either succeed (in which case the bug isn't deploy-time) or surface
+# its own failure independently. The `concurrency: ci-main` group
+# below still serializes pushes so two staging deploys never race.
 #
 # To push to mainnet (`ic`), use the manual workflow
 # `layered-deploy-dominion.yml`.
@@ -30,7 +39,7 @@ env:
   DFX_VERSION: "0.31.0"
 
 jobs:
-  # ── Phase A: local gating ──────────────────────────────────────────────────
+  # ── Phase A: local gating (parallel with Phase B) ─────────────────────────
   layered-e2e-local:
     runs-on: ubuntu-latest
     steps:
@@ -66,9 +75,8 @@ jobs:
         if: always()
         run: dfx stop || true
 
-  # ── Phase B: staging deploy (gated on Phase A) ─────────────────────────────
+  # ── Phase B: staging deploy (parallel with Phase A) ────────────────────────
   bootstrap-infra-staging:
-    needs: layered-e2e-local
     uses: ./.github/workflows/_bootstrap-infra.yml
     with:
       network: staging
