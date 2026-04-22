@@ -1,15 +1,10 @@
 # ci-main.yml — main pipeline.
 #
-# Two phases:
-#   Phase A — local gating: run all four pipeline stages against an
-#             ephemeral local replica inside ONE runner (the local
-#             replica state can't survive a job boundary).
-#   Phase B — staging deploy: deploy directly to staging via dfx
-#             (bypasses file_registry for WASMs/frontends; extensions
-#             and codices still go through file_registry + installer).
-#
-# To push to mainnet (`ic`), use the manual workflow
-# `layered-deploy-dominion.yml`.
+# Two modes:
+#   Default (push / dispatch): e2e tests run first, staging deploy is
+#                               gated on their success.
+#   Fast (manual dispatch):    e2e tests and staging deploy run in
+#                               parallel — saves ~12 minutes.
 
 name: CI (main)
 
@@ -17,9 +12,13 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      fast:
+        description: "Run e2e tests and staging deploy in parallel (skip gating)"
+        type: boolean
+        default: false
 
 concurrency:
-  # Serialize main pushes — never two staging deploys racing.
   group: ci-main
   cancel-in-progress: false
 
@@ -29,7 +28,7 @@ env:
   DFX_VERSION: "0.31.0"
 
 jobs:
-  # ── Phase A: local gating ──────────────────────────────────────────────────
+  # ── E2E tests on a local replica ────────────────────────────────────────────
   layered-e2e-local:
     runs-on: ubuntu-latest
     steps:
@@ -65,64 +64,17 @@ jobs:
         if: always()
         run: dfx stop || true
 
-  # ── Phase B: staging deploy (gated on Phase A) ─────────────────────────────
+  # ── Staging deploy (gated — waits for e2e) ─────────────────────────────────
   deploy-staging:
+    if: ${{ !inputs.fast }}
     needs: layered-e2e-local
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-      - name: Install dfx ${{ env.DFX_VERSION }}
-        run: |
-          DFXVM_INIT_YES=1 sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
-          echo "$HOME/.local/share/dfx/bin" >> "$GITHUB_PATH"
-      - name: Install npm workspace dependencies
-        run: npm ci --legacy-peer-deps
-      - name: Install realms CLI + Python deps
-        run: |
-          pip install -r requirements.txt
-          pip install -e cli/
-          pip install pyyaml
-      - name: Configure dfx identity
-        env:
-          IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
-        run: |
-          if [ -z "$IC_IDENTITY_PEM" ]; then
-            echo "::error::IC_IDENTITY_PEM secret is not set." >&2
-            exit 1
-          fi
-          printf '%s' "$IC_IDENTITY_PEM" > /tmp/identity.pem
-          chmod 600 /tmp/identity.pem
-          dfx identity import ci /tmp/identity.pem --storage-mode=plaintext --force
-          dfx identity use ci
-          rm -f /tmp/identity.pem
-          echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
-      - name: Deploy to staging via dfx
-        run: |
-          python3 scripts/deploy_direct.py \
-              --file deployments/staging-mundus-layered.yml
+    uses: ./.github/workflows/_deploy-staging.yml
+    secrets:
+      IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
 
-      - name: Upload build artifacts to deploy service cache
-        if: always()
-        run: |
-          pip install requests
-          python3 scripts/upload_ci_artifacts.py --network staging
-        continue-on-error: true
-
-      # ── Queue-based deployment (future) ─────────────────────────────
-      # Once the full queue pipeline is tested, replace the deploy_direct
-      # step above with:
-      #
-      #   python3 scripts/request_deployment.py \
-      #       --file deployments/staging-mundus-layered.yml \
-      #       --network staging
-
+  # ── Staging deploy (fast — runs in parallel with e2e) ──────────────────────
+  deploy-staging-fast:
+    if: ${{ inputs.fast }}
+    uses: ./.github/workflows/_deploy-staging.yml
+    secrets:
+      IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}

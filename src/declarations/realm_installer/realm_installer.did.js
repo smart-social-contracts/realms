@@ -4,6 +4,7 @@ export const idlFactory = ({ IDL }) => {
     'cancel_deploy' : IDL.Func([IDL.Text], [IDL.Text], []),
     'debug_resume_deploys' : IDL.Func([IDL.Text], [IDL.Text], []),
     'debug_run_one_step' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'deploy_frontend' : IDL.Func([IDL.Text], [IDL.Text], []),
     'deploy_realm' : IDL.Func([IDL.Text], [IDL.Text], []),
     'execute_code_shell' : IDL.Func([IDL.Text], [IDL.Text], []),
     'fetch_module_hash' : IDL.Func([IDL.Text], [IDL.Text], []),

@@ -375,7 +375,7 @@ try:
     MAINNET_CKBTC_LEDGER = "mxzaz-hqaaa-aaaar-qaada-cai"
     MAINNET_CKBTC_INDEXER = "n5wcd-faaaa-aaaar-qaaea-cai"
     
-    # Staging shared REALMS token (kybra-simple-token deployment)
+    # Staging shared REALMS token (ic-tokens deployment)
     STAGING_REALMS_TOKEN = "xbkkh-syaaa-aaaah-qq3ya-cai"
     
     # 1. ckBTC (shared)

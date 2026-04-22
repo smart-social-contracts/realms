@@ -245,16 +245,6 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'get_canister_id' : IDL.Func([], [IDL.Text], ['query']),
-    'get_canister_logs' : IDL.Func(
-        [
-          IDL.Opt(IDL.Int),
-          IDL.Opt(IDL.Int),
-          IDL.Opt(IDL.Text),
-          IDL.Opt(IDL.Text),
-        ],
-        [IDL.Vec(IDL.Text)],
-        ['query'],
-      ),
     'get_current_application_id' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'get_extension_frontend_info' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'get_extensions' : IDL.Func([], [RealmResponse], ['query']),

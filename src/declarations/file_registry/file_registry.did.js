@@ -46,6 +46,7 @@ export const idlFactory = ({ IDL }) => {
     'list_files' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'list_namespaces' : IDL.Func([], [IDL.Text], ['query']),
     'publish_namespace' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'purge_old_versions' : IDL.Func([IDL.Text], [IDL.Text], []),
     'revoke_publish' : IDL.Func([IDL.Text], [IDL.Text], []),
     'store_file' : IDL.Func([IDL.Text], [IDL.Text], []),
     'store_file_chunk' : IDL.Func([IDL.Text], [IDL.Text], []),

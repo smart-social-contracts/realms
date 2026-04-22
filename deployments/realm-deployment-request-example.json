@@ -31,33 +31,25 @@
     "token": {
       "backend": {
         "did": {
-          "url": "https://github.com/smart-social-contracts/kybra-simple-token/releases/download/v0.5.1/token_backend.did",
-          "checksum": "sha256:..."
+          "url": "https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/token_backend.did",
+          "checksum": "sha256:587b50fff3a54db8aab536154fe07e91aa21297e2e7ebfa482e0f06d1c2c475e"
         },
         "wasm": {
-          "url": "https://github.com/smart-social-contracts/kybra-simple-token/releases/download/v0.5.1/token_backend.wasm.gz",
-          "checksum": "sha256:..."
+          "url": "https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/token_backend.wasm.gz",
+          "checksum": "sha256:509f1355e72944dba879a858ab6aef0e9c8751d873e69b5257a5bb1fb475c628"
         }
-      },
-      "frontend": {
-        "url": "https://github.com/smart-social-contracts/kybra-simple-token/releases/download/v0.5.1/token_frontend.wasm.gz",
-        "checksum": "sha256:..."
       }
     },
     "nft": {
       "backend": {
         "did": {
-          "url": "https://github.com/smart-social-contracts/kybra-simple-token/releases/download/v0.5.1/nft_backend.did",
-          "checksum": "sha256:..."
+          "url": "https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/nft_backend.did",
+          "checksum": "sha256:8c1bd0854afee89fcf3eef81e19d31db524d642a3679041e5a78c3aaf3c730b0"
         },
         "wasm": {
-          "url": "https://github.com/smart-social-contracts/kybra-simple-token/releases/download/v0.5.1/nft_backend.wasm.gz",
-          "checksum": "sha256:..."
+          "url": "https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/nft_backend.wasm.gz",
+          "checksum": "sha256:4cc0821838baff7ee876a68de9c806cb0add6e0cc84eb2b6131d80bffc215365"
         }
-      },
-      "frontend": {
-        "url": "https://github.com/smart-social-contracts/kybra-simple-token/releases/download/v0.5.1/nft_frontend.wasm.gz",
-        "checksum": "sha256:..."
       }
     }
   },

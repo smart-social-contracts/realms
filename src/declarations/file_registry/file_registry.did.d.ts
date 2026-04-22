@@ -30,6 +30,11 @@ export interface Approve {
 export interface Archive { 'canister_id' : Principal }
 export interface Archives { 'archives' : Array<Archive> }
 export interface Asset { 'class' : AssetClass, 'symbol' : string }
+export interface AssetCanisterService {
+  'commit_batch' : ActorMethod<[string], undefined>,
+  'create_batch' : ActorMethod<[string], string>,
+  'create_chunk' : ActorMethod<[string], string>,
+}
 export type AssetClass = { 'Cryptocurrency' : null } |
   { 'FiatCurrency' : null };
 export interface AssistantInput {
@@ -940,6 +945,7 @@ export interface _SERVICE {
   'list_files' : ActorMethod<[string], string>,
   'list_namespaces' : ActorMethod<[], string>,
   'publish_namespace' : ActorMethod<[string], string>,
+  'purge_old_versions' : ActorMethod<[string], string>,
   'revoke_publish' : ActorMethod<[string], string>,
   'store_file' : ActorMethod<[string], string>,
   'store_file_chunk' : ActorMethod<[string], string>,

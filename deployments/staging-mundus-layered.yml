@@ -89,26 +89,26 @@ mundus:
   - name: token_backend
     type: token
     canister_id: 2rqin-xaaaa-aaaah-qunsq-cai
-    wasm_url: https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/token_backend.wasm
+    wasm_url: https://github.com/smart-social-contracts/ic-tokens/releases/latest/download/token_backend.wasm
     extensions: []
     codices: []
 
   - name: token_frontend
     type: token_frontend
     canister_id: 2ytdr-biaaa-aaaah-qunta-cai
-    wasm_url: https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/token_frontend.wasm
+    wasm_url: https://github.com/smart-social-contracts/ic-tokens/releases/latest/download/token_frontend.wasm
 
   - name: nft_backend
     type: nft
     canister_id: 27sff-mqaaa-aaaah-quntq-cai
-    wasm_url: https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/nft_backend.wasm
+    wasm_url: https://github.com/smart-social-contracts/ic-tokens/releases/latest/download/nft_backend.wasm
     extensions: []
     codices: []
 
   - name: nft_frontend
     type: nft_frontend
     canister_id: 3s4bl-dyaaa-aaaah-qunua-cai
-    wasm_url: https://github.com/smart-social-contracts/kybra-simple-token/releases/latest/download/nft_frontend.wasm
+    wasm_url: https://github.com/smart-social-contracts/ic-tokens/releases/latest/download/nft_frontend.wasm
 
 verify:
   e2e_specs:

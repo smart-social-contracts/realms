@@ -47,6 +47,7 @@ def find_repo_root() -> Path:
 
 def upload_realm_backend(repo: Path, network: str, base_url: str) -> bool:
     candidates = [
+        repo / ".basilisk" / "realm_backend" / "realm_backend.wasm.gz",
         repo / ".dfx" / network / "canisters" / "realm_backend" / "realm_backend.wasm.gz",
         repo / "build" / "realm_backend.wasm.gz",
     ]
