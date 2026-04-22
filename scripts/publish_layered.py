@@ -503,6 +503,75 @@ def _guess_content_type(path: Path) -> str:
     return guess or "application/octet-stream"
 
 
+def _registry_dfx_call(
+    registry: str,
+    network: str,
+    identity: Optional[str],
+    method: str,
+    payload: dict,
+    *,
+    quiet: bool = True,
+) -> int:
+    """Call a file_registry method via dfx. Returns subprocess exit code."""
+    import tempfile as _tempfile
+    cmd = ["dfx", "canister", "call"]
+    if identity:
+        cmd.extend(["--identity", identity])
+    if network:
+        cmd.extend(["--network", network])
+    candid = '("' + json.dumps(payload).replace("\\", "\\\\").replace('"', '\\"') + '")'
+    if len(candid.encode("utf-8")) >= 100 * 1024:
+        fd, arg_path = _tempfile.mkstemp(prefix="dfx-arg-", suffix=".did")
+        try:
+            with os.fdopen(fd, "w") as fh:
+                fh.write(candid)
+            cmd.extend([registry, method, "--argument-file", arg_path])
+            return _run(cmd, quiet=quiet)
+        finally:
+            try:
+                os.unlink(arg_path)
+            except OSError:
+                pass
+    cmd.extend([registry, method, candid])
+    return _run(cmd, quiet=quiet)
+
+
+def _check_remote_sha256(
+    registry: str,
+    network: str,
+    identity: Optional[str],
+    namespace: str,
+    path: str,
+) -> Optional[str]:
+    """Query file_registry for the SHA-256 of an already-stored file.
+
+    Returns the hex digest if the file exists, or None otherwise.
+    Uses a query call (~2M cycles) which is ~1000x cheaper than an upload.
+    """
+    cmd = ["dfx", "canister", "call", "--query"]
+    if identity:
+        cmd.extend(["--identity", identity])
+    if network:
+        cmd.extend(["--network", network])
+    payload = {"namespace": namespace, "path": path}
+    candid = '("' + json.dumps(payload).replace("\\", "\\\\").replace('"', '\\"') + '")'
+    cmd.extend([registry, "get_file_size", candid])
+    try:
+        cp = subprocess.run(cmd, capture_output=True, text=True)
+        if cp.returncode != 0:
+            return None
+        raw = cp.stdout
+        s = raw.index('"')
+        e = raw.rindex('"')
+        inner = raw[s + 1 : e].encode("utf-8").decode("unicode_escape")
+        resp = json.loads(inner)
+        if resp.get("error"):
+            return None
+        return resp.get("sha256") or None
+    except Exception:
+        return None
+
+
 def _upload_blob_to_registry(
     blob: bytes,
     *,
@@ -514,53 +583,24 @@ def _upload_blob_to_registry(
     content_type: str,
     chunk_size: int = 200 * 1024,
 ) -> int:
-    """Upload a single blob to file_registry, using chunked upload if needed.
+    """Upload a single blob to file_registry via the chunked path.
 
-    The chunk_size default (200 KiB) is tuned to stay within the IC's
-    40-billion-instruction-per-message limit when the file_registry is a
-    Python/WASI canister (base64 decode + SHA-256 + stable-memory write
-    are instruction-heavy in WASI).
+    Always uses store_file_chunk + finalize_chunked_file_step, which is
+    ~7x cheaper per KB than store_file (benchmarked: ~13M vs ~98M
+    cycles/KB) because chunks skip per-call SHA-256 in the WASI canister.
+
+    The chunk_size default (200 KiB) stays within the IC's 40B instruction
+    limit for a single message execution on a Python/WASI canister.
 
     Returns 0 on success, non-zero on failure.
     """
-
-    def _dfx_call(method: str, payload: dict) -> int:
-        import tempfile as _tempfile
-        cmd = ["dfx", "canister", "call"]
-        if identity:
-            cmd.extend(["--identity", identity])
-        if network:
-            cmd.extend(["--network", network])
-        candid = '("' + json.dumps(payload).replace("\\", "\\\\").replace('"', '\\"') + '")'
-        if len(candid.encode("utf-8")) >= 100 * 1024:
-            fd, arg_path = _tempfile.mkstemp(prefix="dfx-arg-", suffix=".did")
-            try:
-                with os.fdopen(fd, "w") as fh:
-                    fh.write(candid)
-                cmd.extend([registry, method, "--argument-file", arg_path])
-                return _run(cmd, quiet=True)
-            finally:
-                try:
-                    os.unlink(arg_path)
-                except OSError:
-                    pass
-        cmd.extend([registry, method, candid])
-        return _run(cmd, quiet=True)
-
     file_size = len(blob)
-    if file_size <= chunk_size:
-        return _dfx_call("store_file", {
-            "namespace": namespace,
-            "path": path,
-            "content_b64": base64.b64encode(blob).decode("ascii"),
-            "content_type": content_type,
-        })
+    total_chunks = max(1, (file_size + chunk_size - 1) // chunk_size)
 
-    total_chunks = (file_size + chunk_size - 1) // chunk_size
     for i in range(total_chunks):
         start = i * chunk_size
         end = min(start + chunk_size, file_size)
-        rc = _dfx_call("store_file_chunk", {
+        rc = _registry_dfx_call(registry, network, identity, "store_file_chunk", {
             "namespace": namespace,
             "path": path,
             "chunk_index": i,
@@ -575,7 +615,7 @@ def _upload_blob_to_registry(
     expected_sha = hashlib.sha256(blob).hexdigest()
     first = True
     while True:
-        payload = {"namespace": namespace, "path": path, "batch_size": 1}
+        payload: dict = {"namespace": namespace, "path": path, "batch_size": 1}
         if first:
             payload["expected_sha256"] = expected_sha
             first = False
@@ -646,29 +686,6 @@ def _step_publish_frontend(
         print(f"ERROR: dist dir is empty: {dist_dir}", file=sys.stderr)
         return 1
 
-    def _dfx_call(method: str, payload: dict) -> int:
-        import tempfile as _tempfile
-        cmd = ["dfx", "canister", "call"]
-        if identity:
-            cmd.extend(["--identity", identity])
-        if network:
-            cmd.extend(["--network", network])
-        candid = '("' + json.dumps(payload).replace("\\", "\\\\").replace('"', '\\"') + '")'
-        if len(candid.encode("utf-8")) >= 100 * 1024:
-            fd, arg_path = _tempfile.mkstemp(prefix="dfx-arg-", suffix=".did")
-            try:
-                with os.fdopen(fd, "w") as fh:
-                    fh.write(candid)
-                cmd.extend([registry, method, "--argument-file", arg_path])
-                return _run(cmd, quiet=True)
-            finally:
-                try:
-                    os.unlink(arg_path)
-                except OSError:
-                    pass
-        cmd.extend([registry, method, candid])
-        return _run(cmd, quiet=True)
-
     print(
         f"\nPublishing frontend ({len(all_files)} files) from {dist_dir} "
         f"→ {registry}:{namespace}"
@@ -714,44 +731,70 @@ def _step_publish_frontend(
     total_uploads = len(upload_tasks)
     print(f"  {total_uploads} upload tasks ({len(manifest_entries)} files + gzip variants)")
 
-    # Phase 2: upload in parallel
+    # Phase 2: upload in parallel, skipping unchanged files
     progress_lock = threading.Lock()
     completed_count = [0]
+    skipped_count = [0]
     first_error = [None]
 
     def _do_upload(task):
-        blob, path, ct = task
+        blob, upath, ct = task
+        local_sha = hashlib.sha256(blob).hexdigest()
+        remote_sha = _check_remote_sha256(
+            registry, network, identity, namespace, upath,
+        )
+        if remote_sha == local_sha:
+            with progress_lock:
+                skipped_count[0] += 1
+                completed_count[0] += 1
+                if completed_count[0] % 50 == 0 or completed_count[0] == total_uploads:
+                    print(
+                        f"  … {completed_count[0]}/{total_uploads} done "
+                        f"({skipped_count[0]} skipped)",
+                        flush=True,
+                    )
+            return (upath, 0)
+
         rc = _upload_blob_to_registry(
             blob,
             registry=registry,
             network=network,
             identity=identity,
             namespace=namespace,
-            path=path,
+            path=upath,
             content_type=ct,
         )
         with progress_lock:
             completed_count[0] += 1
             if completed_count[0] % 50 == 0 or completed_count[0] == total_uploads:
-                print(f"  … {completed_count[0]}/{total_uploads} uploads done",
-                      flush=True)
+                print(
+                    f"  … {completed_count[0]}/{total_uploads} done "
+                    f"({skipped_count[0]} skipped)",
+                    flush=True,
+                )
         if rc != 0:
             with progress_lock:
                 if first_error[0] is None:
-                    first_error[0] = path
-            return (path, rc)
-        return (path, 0)
+                    first_error[0] = upath
+            return (upath, rc)
+        return (upath, 0)
 
     with ThreadPoolExecutor(max_workers=_FRONTEND_UPLOAD_WORKERS) as pool:
         futures = {pool.submit(_do_upload, t): t for t in upload_tasks}
         for fut in as_completed(futures):
-            path, rc = fut.result()
+            upath, rc = fut.result()
             if rc != 0:
-                print(f"  FAILED to upload {path}", file=sys.stderr)
+                print(f"  FAILED to upload {upath}", file=sys.stderr)
                 pool.shutdown(wait=False, cancel_futures=True)
                 return rc
 
-    # Phase 3: upload manifest and publish
+    print(
+        f"  uploads complete: {total_uploads - skipped_count[0]} uploaded, "
+        f"{skipped_count[0]} skipped (unchanged)",
+        flush=True,
+    )
+
+    # Phase 3: upload manifest (always) and publish
     manifest = {
         "version": 2,
         "files": manifest_entries,
@@ -759,18 +802,23 @@ def _step_publish_frontend(
         "total_size": sum(e["size"] for e in manifest_entries),
     }
     manifest_json = json.dumps(manifest, indent=2)
-    rc = _dfx_call("store_file", {
-        "namespace": namespace,
-        "path": "_manifest.json",
-        "content_b64": base64.b64encode(manifest_json.encode()).decode("ascii"),
-        "content_type": "application/json",
-    })
+    rc = _upload_blob_to_registry(
+        manifest_json.encode(),
+        registry=registry,
+        network=network,
+        identity=identity,
+        namespace=namespace,
+        path="_manifest.json",
+        content_type="application/json",
+    )
     if rc != 0:
         print("  FAILED to upload _manifest.json", file=sys.stderr)
         return rc
     print(f"  ✓ _manifest.json ({len(manifest_entries)} files listed)")
 
-    rc = _dfx_call("publish_namespace", {"namespace": namespace})
+    rc = _registry_dfx_call(registry, network, identity, "publish_namespace", {
+        "namespace": namespace,
+    })
     if rc != 0:
         print(f"  FAILED to publish namespace {namespace}", file=sys.stderr)
         return rc
