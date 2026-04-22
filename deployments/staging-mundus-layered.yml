@@ -94,11 +94,6 @@ mundus:
     extensions: []
     codices: []
 
-  - name: token_frontend
-    type: token_frontend
-    canister_id: 2ytdr-biaaa-aaaah-qunta-cai
-    wasm_url: https://github.com/smart-social-contracts/ic-tokens/releases/latest/download/token_frontend.wasm
-
   - name: nft_backend
     type: nft
     canister_id: 27sff-mqaaa-aaaah-quntq-cai
@@ -106,11 +101,6 @@ mundus:
     init_arg: '(record { name = "Realms Land"; symbol = "RLAND"; description = opt "Land ownership NFT for Realms"; supply_cap = opt (10_000 : nat); test = opt true })'
     extensions: []
     codices: []
-
-  - name: nft_frontend
-    type: nft_frontend
-    canister_id: 3s4bl-dyaaa-aaaah-qunua-cai
-    wasm_url: https://github.com/smart-social-contracts/ic-tokens/releases/latest/download/nft_frontend.wasm
 
 verify:
   e2e_specs:
