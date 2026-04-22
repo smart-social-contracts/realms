@@ -512,9 +512,14 @@ def _upload_blob_to_registry(
     namespace: str,
     path: str,
     content_type: str,
-    chunk_size: int = 768 * 1024,
+    chunk_size: int = 200 * 1024,
 ) -> int:
     """Upload a single blob to file_registry, using chunked upload if needed.
+
+    The chunk_size default (200 KiB) is tuned to stay within the IC's
+    40-billion-instruction-per-message limit when the file_registry is a
+    Python/WASI canister (base64 decode + SHA-256 + stable-memory write
+    are instruction-heavy in WASI).
 
     Returns 0 on success, non-zero on failure.
     """
