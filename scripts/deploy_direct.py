@@ -457,30 +457,31 @@ def _install_wasm_direct(
     wasm_path: Path,
     network: str,
     mode: str = "upgrade",
+    init_arg: str = "",
 ) -> bool:
     """Install a WASM directly via `dfx canister install`. Returns True on success."""
     print(f"   • installing WASM on {canister_id} (mode={mode}) ...", flush=True)
-    try:
-        _dfx(
+
+    def _do_install(m: str) -> None:
+        cmd = [
             "canister", "install", canister_id,
             "--wasm", str(wasm_path),
-            "--mode", mode,
+            "--mode", m,
             "--yes",
-            network=network,
-        )
+        ]
+        if init_arg and m != "upgrade":
+            cmd += ["--argument", init_arg]
+        _dfx(*cmd, network=network)
+
+    try:
+        _do_install(mode)
         print(f"   ✅ WASM installed on {canister_id}")
         return True
     except subprocess.CalledProcessError:
         if mode == "upgrade":
             print(f"   ↻ upgrade failed, retrying with --mode install ...")
             try:
-                _dfx(
-                    "canister", "install", canister_id,
-                    "--wasm", str(wasm_path),
-                    "--mode", "install",
-                    "--yes",
-                    network=network,
-                )
+                _do_install("install")
                 print(f"   ✅ WASM installed on {canister_id} (fresh install)")
                 return True
             except subprocess.CalledProcessError:
@@ -1010,7 +1011,8 @@ def deploy_mundus(
             continue
 
         member_mode = (member.get("install_mode") or default_mode).strip()
-        if _install_wasm_direct(canister_id, wasm_path, network, member_mode):
+        member_init_arg = member.get("init_arg", "")
+        if _install_wasm_direct(canister_id, wasm_path, network, member_mode, member_init_arg):
             wasm_map[canister_id] = wasm_path
         else:
             failures.append(f"{name} (WASM)")
