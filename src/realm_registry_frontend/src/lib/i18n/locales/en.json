@@ -67,8 +67,6 @@
     "realms_tab": "My Realms",
     "loading": "Loading...",
     "current_balance": "Current Balance",
-    "current_balance_registry": "Current balance (registry)",
-    "billing_registry_sync_hint": "Billing account: {billing} — redeem a voucher or complete sync so this matches your on-chain balance for deployment.",
     "credits_unit": "credits",
     "purchase_history": "Purchase History",
     "no_purchases": "No purchases yet",

@@ -66,8 +66,6 @@
     "realms_tab": "I Miei Reami",
     "loading": "Caricamento...",
     "current_balance": "Saldo Attuale",
-    "current_balance_registry": "Saldo attuale (registro)",
-    "billing_registry_sync_hint": "Account di fatturazione: {billing} — riscatta un voucher o completa la sincronizzazione per allinearlo al saldo on-chain per il deploy.",
     "credits_unit": "crediti",
     "purchase_history": "Cronologia Acquisti",
     "no_purchases": "Nessun acquisto ancora",

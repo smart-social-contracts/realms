@@ -66,8 +66,6 @@
     "realms_tab": "Mes Royaumes",
     "loading": "Chargement...",
     "current_balance": "Solde Actuel",
-    "current_balance_registry": "Solde actuel (registre)",
-    "billing_registry_sync_hint": "Compte de facturation : {billing} — échangez un bon ou terminez la synchronisation pour l’aligner sur votre solde on-chain pour le déploiement.",
     "credits_unit": "crédits",
     "purchase_history": "Historique des Achats",
     "no_purchases": "Pas encore d'achats",

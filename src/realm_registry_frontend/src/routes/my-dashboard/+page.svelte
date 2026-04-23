@@ -18,9 +18,8 @@
     }
   }
   
-  // Credits data (balance = on-chain registry; billingBalance optional)
+  // Credits — registry balance (same source as deploy); billing /credits proxies chain
   let balance = 0;
-  let billingBalance = null;
   let purchases = [];
   let loadingCredits = true;
   
@@ -90,17 +89,12 @@
     if (!userPrincipal) return;
     loadingCredits = true;
     try {
-      const { fetchCreditBalances } = await import('$lib/user-credits.js');
-      const { registry, billing } = await fetchCreditBalances(
-        userPrincipal.toText()
-      );
-      balance = registry;
-      billingBalance = billing;
+      const { fetchUserCreditBalance } = await import('$lib/user-credits.js');
+      balance = await fetchUserCreditBalance(userPrincipal.toText());
       purchases = [];
     } catch (err) {
       console.error('Failed to load credits:', err);
       balance = 0;
-      billingBalance = null;
       purchases = [];
     } finally {
       loadingCredits = false;
@@ -355,20 +349,13 @@
           <div class="credits-section">
             <!-- Balance Card -->
             <div class="balance-card">
-              <div class="balance-label">{$_('dashboard.current_balance_registry')}</div>
+              <div class="balance-label">{$_('dashboard.current_balance')}</div>
               {#if loadingCredits}
                 <div class="balance-loading"></div>
               {:else}
                 <div class="balance-value">{balance}</div>
               {/if}
               <div class="balance-unit">{$_('dashboard.credits_unit')}</div>
-              {#if !loadingCredits && billingBalance != null && billingBalance !== balance}
-                <p class="balance-sync-hint">
-                  {$_('dashboard.billing_registry_sync_hint', {
-                    values: { billing: String(billingBalance) },
-                  })}
-                </p>
-              {/if}
             </div>
 
             <!-- Voucher Redemption Section -->
@@ -839,21 +826,6 @@
   .balance-unit {
     font-size: 0.875rem;
     opacity: 0.8;
-  }
-
-  .balance-sync-hint {
-    margin: 1rem 0 0;
-    padding: 0.75rem 1rem;
-    background: rgba(255, 255, 255, 0.12);
-    border-radius: 0.5rem;
-    font-size: 0.8125rem;
-    line-height: 1.45;
-    text-align: left;
-    opacity: 0.95;
-  }
-
-  .balance-sync-hint strong {
-    color: #fff;
   }
 
   .balance-loading {

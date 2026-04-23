@@ -66,8 +66,6 @@
     "realms_tab": "我的领域",
     "loading": "加载中...",
     "current_balance": "当前余额",
-    "current_balance_registry": "当前余额（链上注册）",
-    "billing_registry_sync_hint": "账单账户：{billing} — 请兑换代金券或完成同步，使其与用于部署的链上余额一致。",
     "credits_unit": "积分",
     "purchase_history": "购买记录",
     "no_purchases": "暂无购买记录",

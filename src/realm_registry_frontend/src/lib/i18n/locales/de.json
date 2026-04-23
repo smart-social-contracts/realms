@@ -66,8 +66,6 @@
     "realms_tab": "Meine Realms",
     "loading": "Laden...",
     "current_balance": "Aktuelles Guthaben",
-    "current_balance_registry": "Aktuelles Guthaben (Registry)",
-    "billing_registry_sync_hint": "Billing-Konto: {billing} — lösen Sie einen Gutschein ein oder vervollständigen Sie die Synchronisierung, damit dies Ihrem On-Chain-Guthaben für Deployments entspricht.",
     "credits_unit": "Credits",
     "purchase_history": "Kaufverlauf",
     "no_purchases": "Noch keine Käufe",
