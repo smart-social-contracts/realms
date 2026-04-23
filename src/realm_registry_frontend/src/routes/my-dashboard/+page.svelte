@@ -89,33 +89,9 @@
     if (!userPrincipal) return;
     loadingCredits = true;
     try {
-      // Same source as voucher top-ups: billing service (dfx + REALM_REGISTRY in .env).
-      // The bundled canister id can drift; direct get_credits then shows 0 incorrectly.
-      try {
-        const br = await fetch(
-          `${BILLING_SERVICE_URL}/credits/${encodeURIComponent(userPrincipal.toText())}`
-        );
-        if (br.ok) {
-          const j = await br.json();
-          if (j && j.credits != null) {
-            balance = Number(j.credits);
-            purchases = [];
-            return;
-          }
-        }
-      } catch (e) {
-        console.warn('loadCredits: billing request failed, using canister', e);
-      }
-      const { backend } = await import('$lib/canisters.js');
-      const result = await backend.get_credits(userPrincipal.toText());
-      if ('Ok' in result) {
-        balance = Number(result.Ok.balance);
-        purchases = [];
-      } else {
-        console.error('Failed to get credits:', result.Err);
-        balance = 0;
-        purchases = [];
-      }
+      const { fetchUserCreditBalance } = await import('$lib/user-credits.js');
+      balance = await fetchUserCreditBalance(userPrincipal.toText());
+      purchases = [];
     } catch (err) {
       console.error('Failed to load credits:', err);
       balance = 0;

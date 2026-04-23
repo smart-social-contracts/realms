@@ -59,11 +59,8 @@
   async function loadUserCredits() {
     if (!userPrincipal) return;
     try {
-      const { backend } = await import('$lib/canisters.js');
-      const result = await backend.get_credits(userPrincipal.toText());
-      if ('Ok' in result) {
-        userCredits = Number(result.Ok.balance);
-      }
+      const { fetchUserCreditBalance } = await import('$lib/user-credits.js');
+      userCredits = await fetchUserCreditBalance(userPrincipal.toText());
     } catch (e) {
       console.error('Failed to load credits:', e);
     }
