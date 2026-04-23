@@ -1,10 +1,6 @@
 # ci-main.yml — main pipeline.
 #
-# Two modes:
-#   Default (push / dispatch): e2e tests run first, staging deploy is
-#                               gated on their success.
-#   Fast (manual dispatch):    e2e tests and staging deploy run in
-#                               parallel — saves ~12 minutes.
+# E2E tests and staging deploy run in parallel.
 
 name: CI (main)
 
@@ -12,11 +8,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      fast:
-        description: "Run e2e tests and staging deploy in parallel (skip gating)"
-        type: boolean
-        default: true
 
 concurrency:
   group: ci-main
@@ -63,17 +54,8 @@ jobs:
         if: always()
         run: dfx stop || true
 
-  # ── Staging deploy (gated — waits for e2e) ─────────────────────────────────
+  # ── Staging deploy (runs in parallel with e2e) ──────────────────────────────
   deploy-staging:
-    if: ${{ !inputs.fast }}
-    needs: layered-e2e-local
-    uses: ./.github/workflows/_deploy-staging.yml
-    secrets:
-      IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
-
-  # ── Staging deploy (fast — runs in parallel with e2e) ──────────────────────
-  deploy-staging-fast:
-    if: ${{ inputs.fast }}
     uses: ./.github/workflows/_deploy-staging.yml
     secrets:
       IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
