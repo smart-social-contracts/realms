@@ -53,13 +53,7 @@ on:
           - install
 
       skip_base_wasm:
-        description: "Skip rebuilding+publishing realm_backend.wasm.gz. Tick this for frontend/extension-only iteration."
-        required: false
-        type: boolean
-        default: false
-
-      upgrade_installer:
-        description: "Run stage 0 (upgrade realm_installer) before stages 1+2. Required when new installer features are needed."
+        description: "Skip compiling and deploying the Rust backend WASM."
         required: false
         type: boolean
         default: false
@@ -95,7 +89,6 @@ jobs:
           echo "🧩 Extensions:    ${{ inputs.extensions || '(all from descriptor)' }}"
           echo "🔧 Install mode:  ${{ inputs.install_mode }}"
           echo "⏭  Skip base WASM: ${{ inputs.skip_base_wasm }}"
-          echo "🔄 Upgrade installer: ${{ inputs.upgrade_installer }}"
           echo "🔀 Ref:           ${{ inputs.ref || github.ref }}"
 
       - uses: actions/checkout@v4
