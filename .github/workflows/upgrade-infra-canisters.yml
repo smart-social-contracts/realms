@@ -40,7 +40,6 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.11"
-  DFX_VERSION: "0.31.0"
 
 jobs:
   upgrade:
@@ -62,7 +61,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install dfx ${{ env.DFX_VERSION }}
+      - name: Install dfx
         run: |
           DFXVM_INIT_YES=1 sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
           echo "$HOME/.local/share/dfx/bin" >> "$GITHUB_PATH"

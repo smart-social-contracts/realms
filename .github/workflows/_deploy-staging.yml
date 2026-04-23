@@ -12,9 +12,6 @@ on:
       node-version:
         type: string
         default: "20"
-      dfx-version:
-        type: string
-        default: "0.31.0"
     secrets:
       IC_IDENTITY_PEM:
         required: true
@@ -34,7 +31,7 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           cache: npm
-      - name: Install dfx ${{ inputs.dfx-version }}
+      - name: Install dfx
         run: |
           DFXVM_INIT_YES=1 sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
           echo "$HOME/.local/share/dfx/bin" >> "$GITHUB_PATH"
