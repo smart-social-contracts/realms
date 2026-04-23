@@ -13,7 +13,8 @@ Stages:
     2. Deploy  — `dfx canister install` for WASMs, `dfx deploy` for assets
     3. Ext/Cod — publish extensions/codices to file_registry, install via
                  realm_installer (only if member has extensions/codices)
-    4. Verify  — check on-chain module_hash and asset canister listings
+    4. Verify  — after install/reinstall only, check module_hash and asset
+                 listings (skipped when install_mode is upgrade)
 
 Usage:
     python scripts/deploy_direct.py \\
@@ -39,7 +40,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
@@ -476,8 +477,14 @@ def _install_wasm_direct(
     network: str,
     mode: str = "upgrade",
     init_arg: str = "",
-) -> bool:
-    """Install a WASM directly via `dfx canister install`. Returns True on success."""
+) -> Tuple[bool, Optional[str]]:
+    """Install a WASM directly via `dfx canister install`.
+
+    On success returns ``(True, effective_mode)`` where *effective_mode* is the
+    dfx mode that succeeded (``upgrade``, ``install``, or ``reinstall``).
+    After a successful upgrade we skip post-deploy hash verification; after
+    install/reinstall we run it.
+    """
     print(f"   • installing WASM on {canister_id} (mode={mode}) ...", flush=True)
 
     def _do_install(m: str) -> None:
@@ -494,18 +501,18 @@ def _install_wasm_direct(
     try:
         _do_install(mode)
         print(f"   ✅ WASM installed on {canister_id}")
-        return True
+        return True, mode
     except subprocess.CalledProcessError:
         if mode == "upgrade":
             print(f"   ↻ upgrade failed, retrying with --mode install ...")
             try:
                 _do_install("install")
                 print(f"   ✅ WASM installed on {canister_id} (fresh install)")
-                return True
+                return True, "install"
             except subprocess.CalledProcessError:
                 pass
         print(f"   ✗ failed to install WASM on {canister_id}")
-        return False
+        return False, None
 
 
 # ---------------------------------------------------------------------------
@@ -1136,7 +1143,8 @@ def deploy_mundus(
                     continue
                 sources_built[source] = _build_canister_wasm(source, network)
 
-    wasm_map: Dict[str, Path] = {}
+    # canister_id -> (local wasm path, whether phase-4 hash verify applies)
+    wasm_map: Dict[str, Tuple[Path, bool]] = {}
 
     for member in members:
         name = member["name"]
@@ -1162,8 +1170,15 @@ def deploy_mundus(
 
         member_mode = (member.get("install_mode") or default_mode).strip()
         member_init_arg = member.get("init_arg", "")
-        if _install_wasm_direct(canister_id, wasm_path, network, member_mode, member_init_arg):
-            wasm_map[canister_id] = wasm_path
+        ok, effective = _install_wasm_direct(
+            canister_id, wasm_path, network, member_mode, member_init_arg,
+        )
+        if ok:
+            # Hash verification is only meaningful after a full
+            # install/reinstall; preserve-mode upgrade can legitimately
+            # disagree with a plain file hash check.
+            verify_wasm = effective in ("install", "reinstall")
+            wasm_map[canister_id] = (wasm_path, verify_wasm)
         else:
             failures.append(f"{name} (WASM)")
 
@@ -1185,6 +1200,7 @@ def deploy_mundus(
             name = member.get("display_name") or member["name"]
             fe_id = member["frontend_canister_id"]
             cid = (member.get("canister_id") or "").strip()
+            member_mode = (member.get("install_mode") or default_mode).strip()
             print(f"\n   ▸ building realm_frontend for {name} ...")
             dist = _build_realm_frontend(member, network)
             branding_flags: Dict[str, bool] = {}
@@ -1192,33 +1208,45 @@ def deploy_mundus(
             if dist:
                 if not _deploy_frontend_direct(fe_id, dist, network):
                     failures.append(f"{name} (frontend)")
-                elif not _verify_frontend(fe_id, network):
-                    failures.append(f"{name} (frontend verify)")
-                    print("   ⚠ skipping branding — core bundle verification failed")
                 else:
-                    core_ok = True
-                    with tempfile.TemporaryDirectory(prefix="realm_branding_") as btmp:
-                        merged = Path(btmp) / "dist"
-                        shutil.copytree(dist, merged, symlinks=True)
-                        branding_flags = _overlay_branding_into_dist(merged, member)
-                        has_branding = bool(
-                            branding_flags.get("logo") or branding_flags.get("background"),
+                    if member_mode == "upgrade":
+                        print(
+                            "   ⏭ skip core asset canister check "
+                            "(install_mode=upgrade — same as backend deploy)"
                         )
-                        if has_branding:
-                            try:
-                                from scripts.compute_assets_hash import compute_and_write_assets_hash
-                                ah = compute_and_write_assets_hash(merged)
-                                print(
-                                    f"   • branding: composite assets_hash "
-                                    f"(core + images): {ah[:16]}..."
-                                )
-                            except Exception as e:
-                                print(f"   ⚠ branding assets-hash: {e}")
-                            if not _deploy_frontend_direct(
-                                fe_id, merged, network, no_asset_upgrade=True,
-                            ):
-                                failures.append(f"{name} (branding)")
-                                branding_flags = {}
+                    fe_list_ok = member_mode == "upgrade" or _verify_frontend(
+                        fe_id, network
+                    )
+                    if not fe_list_ok:
+                        failures.append(f"{name} (frontend verify)")
+                        print("   ⚠ skipping branding — core bundle verification failed")
+                    else:
+                        core_ok = True
+                        with tempfile.TemporaryDirectory(prefix="realm_branding_") as btmp:
+                            merged = Path(btmp) / "dist"
+                            shutil.copytree(dist, merged, symlinks=True)
+                            branding_flags = _overlay_branding_into_dist(merged, member)
+                            has_branding = bool(
+                                branding_flags.get("logo")
+                                or branding_flags.get("background"),
+                            )
+                            if has_branding:
+                                try:
+                                    from scripts.compute_assets_hash import (
+                                        compute_and_write_assets_hash,
+                                    )
+                                    ah = compute_and_write_assets_hash(merged)
+                                    print(
+                                        f"   • branding: composite assets_hash "
+                                        f"(core + images): {ah[:16]}..."
+                                    )
+                                except Exception as e:
+                                    print(f"   ⚠ branding assets-hash: {e}")
+                                if not _deploy_frontend_direct(
+                                    fe_id, merged, network, no_asset_upgrade=True,
+                                ):
+                                    failures.append(f"{name} (branding)")
+                                    branding_flags = {}
             if cid and core_ok:
                 _apply_realm_config_from_manifest(member, network, branding_flags)
                 branding_map[cid] = _registry_branding_urls(
@@ -1305,13 +1333,27 @@ def deploy_mundus(
     if verify:
         print("\n┌─ phase 4: verify " + "─" * 47)
 
-        for cid, wasm_path in wasm_map.items():
-            _verify_wasm_hash(cid, wasm_path, network)
+        for cid, (wasm_path, do_hash_verify) in wasm_map.items():
+            if do_hash_verify:
+                _verify_wasm_hash(cid, wasm_path, network)
+            else:
+                print(
+                    f"   ⏭ {cid}: skip WASM module hash check "
+                    f"(deploy used upgrade — not install/reinstall)"
+                )
 
         for member in members:
             fe_id = member.get("frontend_canister_id")
-            if fe_id and (member.get("type") or "realm").strip() not in _WASM_FRONTEND_TYPES:
-                _verify_frontend(fe_id, network)
+            if not fe_id or (member.get("type") or "realm").strip() in _WASM_FRONTEND_TYPES:
+                continue
+            member_mode = (member.get("install_mode") or default_mode).strip()
+            if member_mode == "upgrade":
+                print(
+                    f"   ⏭ {fe_id}: skip asset canister listing check "
+                    f"(install_mode=upgrade — same as backend)"
+                )
+                continue
+            _verify_frontend(fe_id, network)
 
     # ── Phase 5: Register realms ──────────────────────────────────────
 
