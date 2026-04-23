@@ -998,14 +998,14 @@
               {#if realm.url}
                 <div 
                   class="realm-card-bg" 
-                  style="background-image: url('{ensureProtocol(realm.url)}/{(realm.realm_welcome_image || 'images/welcome.png').replace(/^\//, '')}')"
+                  style="background-image: url('{realm.realm_welcome_image && realm.realm_welcome_image.startsWith('http') ? realm.realm_welcome_image : ensureProtocol(realm.url) + '/' + (realm.realm_welcome_image || 'images/welcome.png').replace(/^\//, '')}')"
                 ></div>
               {/if}
               <div class="card-accent"></div>
               <div class="realm-header">
                 <div class="realm-logo-container">
-                  {#if realm.logo}
-                    <img src={ensureProtocol(realm.logo)} alt="{realm.name} logo" class="realm-logo" />
+                  {#if realm.realm_logo || realm.logo}
+                    <img src={ensureProtocol(realm.realm_logo || realm.logo)} alt="{realm.name} logo" class="realm-logo" />
                   {:else}
                     <div class="realm-logo-fallback">
                       <span>{realm.name.charAt(0).toUpperCase()}</span>
