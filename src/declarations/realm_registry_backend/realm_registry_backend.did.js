@@ -34,6 +34,7 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Text,
     'created_at' : IDL.Float64,
     'backend_url' : IDL.Text,
+    'frontend_canister_id' : IDL.Text,
     'users_count' : IDL.Nat64,
   });
   const GetRealmResult = IDL.Variant({ 'Ok' : RealmRecord, 'Err' : IDL.Text });

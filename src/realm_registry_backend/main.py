@@ -326,6 +326,21 @@ class RealmRecord(Record):
     logo: text
     users_count: nat64
     created_at: float64
+    frontend_canister_id: text
+
+
+def _realm_record_from_dict(r: dict) -> RealmRecord:
+    """Map ORM to_candid record; includes frontend id for asset URL resolution."""
+    return RealmRecord(
+        id=r.get("id") or "",
+        name=r.get("name") or "",
+        url=r.get("url") or "",
+        backend_url=r.get("backend_url") or "",
+        logo=r.get("logo") or "",
+        users_count=int(r.get("users_count") or 0),
+        created_at=float(r.get("created_at") or 0.0),
+        frontend_canister_id=r.get("frontend_canister_id") or "",
+    )
 
 
 class AddRealmResult(Variant, total=False):
@@ -415,7 +430,7 @@ def list_realms() -> Vec[RealmRecord]:
     """List all registered realms"""
     try:
         realms_data = list_registered_realms()
-        return realms_data
+        return [_realm_record_from_dict(r) for r in realms_data]
     except Exception as e:
         logger.error(f"Error in list_realms: {str(e)}")
         return []
@@ -472,7 +487,7 @@ def get_realm(realm_id: text) -> GetRealmResult:
     try:
         result = get_registered_realm(realm_id)
         if result["success"]:
-            return {"Ok": result["realm"]}
+            return {"Ok": _realm_record_from_dict(result["realm"])}
         else:
             return {"Err": result["error"]}
     except Exception as e:
@@ -499,7 +514,7 @@ def search_realms(query: text) -> Vec[RealmRecord]:
     """Search realms by name or ID"""
     try:
         results = search_registered_realms(query)
-        return results
+        return [_realm_record_from_dict(r) for r in results]
     except Exception as e:
         logger.error(f"Error in search_realms: {str(e)}")
         return []

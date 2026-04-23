@@ -5,8 +5,8 @@
     "description": "A projection of where the world is likely heading: centralized, technocratic governance where algorithms, surveillance, and simulated consent replace genuine democratic agency.",
     "welcome_message": "Welcome to Dominion. Efficient governance through algorithmic oversight. Your compliance ensures collective prosperity.",
     "branding": {
-      "logo": "file_registry://realms/dominion/branding/logo.png",
-      "welcome_image": "file_registry://realms/dominion/branding/welcome_image.png"
+      "logo": "emblem.png",
+      "welcome_image": "background.png"
     },
     "codex": { "package": "dominion", "version": "latest" },
     "extensions": ["all"]

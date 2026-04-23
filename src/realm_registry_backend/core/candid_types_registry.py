@@ -50,6 +50,7 @@ class RealmRecord(Record):
     logo: text
     users_count: nat64
     created_at: float64
+    frontend_canister_id: text
 
 
 class AddRealmResult(Variant, total=False):

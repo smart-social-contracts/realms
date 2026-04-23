@@ -5,8 +5,8 @@
     "description": "A projection of where the world is likely heading...",
     "welcome_message": "Welcome to Dominion...",
     "branding": {
-      "logo": "file_registry://realms/dominion/branding/logo.png",
-      "welcome_image": "file_registry://realms/dominion/branding/welcome_image.png"
+      "logo": "emblem.png",
+      "welcome_image": "background.png"
     },
     "codex": { "package": "dominion", "version": "latest" },
     "extensions": ["all"]

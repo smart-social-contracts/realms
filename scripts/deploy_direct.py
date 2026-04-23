@@ -517,13 +517,22 @@ def _deploy_frontend_direct(
     canister_id: str,
     dist_dir: Path,
     network: str,
+    *,
+    no_asset_upgrade: bool = False,
 ) -> bool:
     """Deploy a frontend dist/ to an asset canister using dfx deploy.
 
     Creates a temporary workspace with a dfx.json + canister_ids.json
     so that `dfx deploy` pushes the assets directly to the IC.
+
+    When ``no_asset_upgrade`` is True, passes ``--no-asset-upgrade`` so only
+    asset files are synced (used after the core bundle is verified, to add
+    branding without reinstalling the asset canister WASM).
     """
-    print(f"   • deploying frontend assets to {canister_id} ...")
+    if no_asset_upgrade:
+        print(f"   • uploading extra frontend assets to {canister_id} (--no-asset-upgrade) ...")
+    else:
+        print(f"   • deploying frontend assets to {canister_id} ...")
 
     with tempfile.TemporaryDirectory(prefix="dfx_deploy_") as tmpdir:
         tmp = Path(tmpdir)
@@ -561,15 +570,18 @@ def _deploy_frontend_direct(
         if env.get("TERM", "dumb") == "dumb":
             env["TERM"] = "xterm-256color"
 
+        deploy_cmd = ["dfx", "deploy", "frontend", "--network", network, "--yes"]
+        if no_asset_upgrade:
+            deploy_cmd.append("--no-asset-upgrade")
+
         try:
-            _run(
-                ["dfx", "deploy", "frontend", "--network", network, "--yes"],
-                cwd=tmp,
-                env=env,
-            )
+            _run(deploy_cmd, cwd=tmp, env=env)
             print(f"   ✅ frontend deployed to {canister_id}")
             return True
         except subprocess.CalledProcessError:
+            if no_asset_upgrade:
+                print(f"   ✗ incremental asset deploy failed for {canister_id}")
+                return False
             print("   ⚠ upgrade failed, retrying with --mode reinstall ...")
             try:
                 _run(
@@ -586,131 +598,86 @@ def _deploy_frontend_direct(
 
 
 # ---------------------------------------------------------------------------
-# Branding assets — upload logo/welcome_image to file_registry
+# Branding assets — after core bundle deploy + verify, upload to asset canister
 # ---------------------------------------------------------------------------
 
 
-def _file_registry_http_url(file_registry_id: str, namespace: str, path: str) -> str:
-    return f"https://{file_registry_id}.icp0.io/{namespace}/{path}"
+def _overlay_branding_into_dist(dist_dir: Path, member: Dict[str, Any]) -> Dict[str, str]:
+    """Copy manifest logo/welcome_image into ``dist/images/`` (realm_logo.*, welcome.*).
 
+    Run only on a **copy** of dist/, after the core bundle is deployed and verified.
+    Paths match ``realm_backend`` status (``/images/realm_logo.*``, ``/images/welcome.*``).
 
-def _fr_list_files(file_registry_id: str, namespace: str, network: str) -> Dict[str, str]:
-    """Query list_files on file_registry (free query call). Returns {path: sha256}."""
-    try:
-        arg = json.dumps({"namespace": namespace})
-        escaped = arg.replace("\\", "\\\\").replace('"', '\\"')
-        cp = subprocess.run(
-            ["dfx", "canister", "call", "--query", "--network", network,
-             file_registry_id, "list_files", f'("{escaped}")'],
-            capture_output=True, text=True, timeout=30, env=_dfx_env(),
-        )
-        if cp.returncode != 0:
-            return {}
-        raw = _unwrap_candid_text(cp.stdout)
-        files = json.loads(raw)
-        if isinstance(files, list):
-            return {f["path"]: f.get("sha256", "") for f in files}
-    except Exception:
-        pass
-    return {}
-
-
-def _fr_store_file(
-    file_registry_id: str, namespace: str, reg_path: str,
-    local_path: str, network: str,
-) -> bool:
-    """Upload a single file to file_registry via store_file. Returns True on success."""
-    import base64
-    with open(local_path, "rb") as f:
-        blob = f.read()
-    ext = os.path.splitext(local_path)[1].lower()
-    ct_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
-              ".svg": "image/svg+xml", ".webp": "image/webp"}
-    content_type = ct_map.get(ext, "application/octet-stream")
-    payload = json.dumps({
-        "namespace": namespace,
-        "path": reg_path,
-        "content_b64": base64.b64encode(blob).decode("ascii"),
-        "content_type": content_type,
-    })
-    try:
-        raw = _unwrap_candid_text(
-            _dfx_call_text(file_registry_id, "store_file", payload, network=network, timeout=300)
-        )
-        res = json.loads(raw)
-        return isinstance(res, dict) and (res.get("ok") is True or res.get("success") is True)
-    except Exception as e:
-        print(f"     ✗ store_file error: {e}")
-        return False
-
-
-def _upload_branding_assets(
-    member: Dict[str, Any], file_registry_id: str, network: str,
-) -> Dict[str, str]:
-    """Upload logo and welcome_image from manifest to file_registry.
-
-    Checks on-chain SHA-256 first; skips if unchanged.
-    Returns a dict mapping field names to their file_registry HTTP URLs.
+    Returns ``{"logo_ext": ..., "welcome_ext": ...}`` for assets that were copied.
     """
+    out: Dict[str, str] = {}
     manifest_rel = member.get("manifest")
     if not manifest_rel:
-        return {}
+        return out
     manifest_path = REPO_ROOT / manifest_rel
     if not manifest_path.exists():
         print(f"   ⚠ manifest not found: {manifest_path}")
-        return {}
+        return out
     manifest = json.loads(manifest_path.read_text())
     manifest_dir = manifest_path.parent
+    images_dir = dist_dir / "images"
+    images_dir.mkdir(parents=True, exist_ok=True)
 
-    realm_name = (member.get("display_name") or member["name"]).lower().replace(" ", "_")
-    namespace = f"realms/{realm_name}/branding"
-
-    files_to_upload = []
-    for field, target_name in [("logo", "logo.png"), ("welcome_image", "welcome_image.png")]:
-        filename = manifest.get(field)
+    def _copy_one(manifest_key: str, dest_stem: str) -> None:
+        filename = manifest.get(manifest_key)
         if not filename:
-            continue
-        local_path = manifest_dir / filename
-        if not local_path.exists():
-            print(f"   ⚠ branding asset not found: {local_path}")
-            continue
-        files_to_upload.append((field, target_name, str(local_path)))
-
-    if not files_to_upload:
-        return {}
-
-    print(f"   • uploading branding for {realm_name} → {namespace}")
-    existing = _fr_list_files(file_registry_id, namespace, network)
-    urls = {}
-
-    for field, target_name, local_path in files_to_upload:
-        local_hash = hashlib.sha256(Path(local_path).read_bytes()).hexdigest()
-        if existing.get(target_name) == local_hash:
-            print(f"     ⊜ {target_name} unchanged")
-            urls[field] = _file_registry_http_url(file_registry_id, namespace, target_name)
-            continue
-
-        if _fr_store_file(file_registry_id, namespace, target_name, local_path, network):
-            print(f"     ✓ {target_name} uploaded")
-            urls[field] = _file_registry_http_url(file_registry_id, namespace, target_name)
-        else:
-            print(f"     ✗ failed to upload {target_name}")
-
-    # Publish namespace so files are accessible via HTTP
-    if urls:
+            return
+        src = manifest_dir / filename
+        if not src.is_file():
+            print(f"   ⚠ branding asset not found: {src}")
+            return
+        ext = (src.suffix.lstrip(".") or "png").lower()
+        dest = images_dir / f"{dest_stem}.{ext}"
         try:
-            pub_arg = json.dumps({"namespace": namespace})
-            _dfx_call_text(file_registry_id, "publish_namespace", pub_arg, network=network, timeout=120)
-        except SystemExit:
-            print(f"   ⚠ publish_namespace failed for {namespace}")
+            shutil.copy2(src, dest)
+            if dest_stem == "realm_logo":
+                out["logo_ext"] = ext
+            else:
+                out["welcome_ext"] = ext
+            print(f"   • branding: {filename} → dist/images/{dest.name}")
+        except OSError as exc:
+            print(f"   ⚠ could not copy branding {src}: {exc}")
 
+    _copy_one("logo", "realm_logo")
+    _copy_one("welcome_image", "welcome")
+    return out
+
+
+def _public_branding_asset_url(canister_id: str, network: str, path: str) -> str:
+    """HTTPS (or HTTP on local) URL for a file on a realm frontend asset canister."""
+    host = _frontend_url(canister_id, network)
+    if not host:
+        return ""
+    path = path.lstrip("/")
+    if network == "local":
+        return f"http://{host}/{path}"
+    return f"https://{host}/{path}"
+
+
+def _registry_branding_urls(member: Dict[str, Any], network: str, exts: Dict[str, str]) -> Dict[str, str]:
+    """Absolute URLs for registry ``logo`` / optional welcome (same asset canister as SPA)."""
+    fe = (member.get("frontend_canister_id") or "").strip()
+    if not fe:
+        return {}
+    urls: Dict[str, str] = {}
+    le = exts.get("logo_ext")
+    if le:
+        urls["logo"] = _public_branding_asset_url(fe, network, f"images/realm_logo.{le}")
+    we = exts.get("welcome_ext")
+    if we:
+        urls["welcome_image"] = _public_branding_asset_url(fe, network, f"images/welcome.{we}")
     return urls
 
 
-def _apply_realm_config(
-    member: Dict[str, Any], network: str, branding_urls: Dict[str, str],
+def _apply_realm_config_from_manifest(
+    member: Dict[str, Any], network: str, exts: Dict[str, str],
 ) -> None:
-    """Read manifest and call update_realm_config on the realm backend."""
+    """Push manifest text fields + asset-canister filenames to ``update_realm_config``."""
     manifest_rel = member.get("manifest")
     if not manifest_rel:
         return
@@ -718,22 +685,19 @@ def _apply_realm_config(
     if not manifest_path.exists():
         return
     manifest = json.loads(manifest_path.read_text())
-    canister_id = member["canister_id"]
+    canister_id = member.get("canister_id") or ""
+    if not canister_id:
+        return
 
     config: Dict[str, Any] = {}
     for key in ("name", "description", "welcome_message"):
         if key in manifest:
             config[key] = manifest[key]
 
-    if branding_urls.get("logo"):
-        config["logo"] = branding_urls["logo"]
-    elif manifest.get("logo"):
-        config["logo"] = manifest["logo"]
-
-    if branding_urls.get("welcome_image"):
-        config["welcome_image"] = branding_urls["welcome_image"]
-    elif manifest.get("welcome_image"):
-        config["welcome_image"] = manifest["welcome_image"]
+    if exts.get("logo_ext"):
+        config["logo"] = f"realm_logo.{exts['logo_ext']}"
+    if exts.get("welcome_ext"):
+        config["welcome_image"] = f"welcome.{exts['welcome_ext']}"
 
     if not config:
         return
@@ -1199,31 +1163,13 @@ def deploy_mundus(
         else:
             failures.append(f"{name} (WASM)")
 
-    # ── Phase 1.5: Upload branding assets & apply realm config ────────
-
-    branding_map: Dict[str, Dict[str, str]] = {}
-    realm_type_members = [
-        m for m in members
-        if (m.get("type") or "realm").strip() == "realm" and m.get("manifest")
-    ]
-    if realm_type_members and infra_ids.get("file_registry"):
-        print("\n┌─ phase 1.5: branding assets & realm config " + "─" * 21)
-        fr_id = infra_ids["file_registry"]
-        for member in realm_type_members:
-            name = member.get("display_name") or member["name"]
-            cid = member.get("canister_id")
-            urls = _upload_branding_assets(member, fr_id, network)
-            if cid:
-                branding_map[cid] = urls
-            if cid:
-                _apply_realm_config(member, network, urls)
-
-    # ── Phase 2: Build & deploy frontends ─────────────────────────────
+    # ── Phase 2: realm frontends — core bundle, verify, then branding ─
 
     print("\n┌─ phase 2: build & deploy frontends " + "─" * 29)
 
     ids_file = REPO_ROOT / "canister_ids.json"
     original_ids_text = ids_file.read_text() if ids_file.exists() else "{}"
+    branding_map: Dict[str, Dict[str, str]] = {}
 
     try:
         realm_members = [
@@ -1234,11 +1180,42 @@ def deploy_mundus(
         for member in realm_members:
             name = member.get("display_name") or member["name"]
             fe_id = member["frontend_canister_id"]
+            cid = (member.get("canister_id") or "").strip()
             print(f"\n   ▸ building realm_frontend for {name} ...")
             dist = _build_realm_frontend(member, network)
+            exts: Dict[str, str] = {}
+            core_ok = False
             if dist:
                 if not _deploy_frontend_direct(fe_id, dist, network):
                     failures.append(f"{name} (frontend)")
+                elif not _verify_frontend(fe_id, network):
+                    failures.append(f"{name} (frontend verify)")
+                    print("   ⚠ skipping branding — core bundle verification failed")
+                else:
+                    core_ok = True
+                    with tempfile.TemporaryDirectory(prefix="realm_branding_") as btmp:
+                        merged = Path(btmp) / "dist"
+                        shutil.copytree(dist, merged, symlinks=True)
+                        exts = _overlay_branding_into_dist(merged, member)
+                        has_branding = bool(exts.get("logo_ext") or exts.get("welcome_ext"))
+                        if has_branding:
+                            try:
+                                from scripts.compute_assets_hash import compute_and_write_assets_hash
+                                ah = compute_and_write_assets_hash(merged)
+                                print(
+                                    f"   • branding: composite assets_hash "
+                                    f"(core + images): {ah[:16]}..."
+                                )
+                            except Exception as e:
+                                print(f"   ⚠ branding assets-hash: {e}")
+                            if not _deploy_frontend_direct(
+                                fe_id, merged, network, no_asset_upgrade=True,
+                            ):
+                                failures.append(f"{name} (branding)")
+                                exts = {}
+            if cid and core_ok:
+                _apply_realm_config_from_manifest(member, network, exts)
+                branding_map[cid] = _registry_branding_urls(member, network, exts)
 
         if registry_member and registry_member.get("frontend_canister_id"):
             print("\n   ▸ building realm_registry_frontend ...")

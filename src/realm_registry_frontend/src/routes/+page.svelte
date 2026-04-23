@@ -351,12 +351,62 @@
     return `https://${url}`;
   }
 
+  /** Base URL for a realm's asset canister (static /images/..., etc.). */
+  function icAssetBaseUrlForCanister(canisterId) {
+    if (!canisterId || !String(canisterId).trim()) return '';
+    const id = String(canisterId).trim();
+    if (isLocalDevelopment()) {
+      const port = window.location.port || '4943';
+      return `http://${id}.localhost:${port}`;
+    }
+    const host = window.location.hostname || '';
+    if (host.endsWith('.ic0.app') && !host.includes('icp0')) {
+      return `https://${id}.ic0.app`;
+    }
+    return `https://${id}.icp0.io`;
+  }
+
+  /** True when registry `url` is the backend canister host (assets live on frontend). */
+  function registryUrlLooksLikeBackendOnly(realm) {
+    const bid = (realm.id || '').trim().toLowerCase();
+    if (!bid || !realm.url) return false;
+    const u = ensureProtocol(realm.url).replace(/\/$/, '').toLowerCase();
+    return [
+      `https://${bid}.icp0.io`,
+      `http://${bid}.icp0.io`,
+      `https://${bid}.ic0.app`,
+      `http://${bid}.ic0.app`,
+    ].includes(u);
+  }
+
+  function realmFrontendAssetBase(realm) {
+    const fe = realm.frontend_canister_id && String(realm.frontend_canister_id).trim();
+    if (fe) return icAssetBaseUrlForCanister(fe);
+    if (realm.url && !registryUrlLooksLikeBackendOnly(realm)) {
+      return ensureProtocol(realm.url).replace(/\/$/, '');
+    }
+    return '';
+  }
+
   function resolveRealmAssetUrl(realm, assetPath) {
     if (!assetPath) return '';
-    if (assetPath.startsWith('http://') || assetPath.startsWith('https://')) return assetPath;
-    if (!realm.url) return '';
-    const base = ensureProtocol(realm.url);
-    return base + '/' + assetPath.replace(/^\//, '');
+    const path = String(assetPath);
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    const base = realmFrontendAssetBase(realm);
+    if (!base) return '';
+    return `${base}/${path.replace(/^\//, '')}`;
+  }
+
+  function resolvedRealmLogoUrl(realm) {
+    if (realm.realm_logo) {
+      const u = resolveRealmAssetUrl(realm, realm.realm_logo);
+      return u || null;
+    }
+    if (realm.logo) {
+      const u = ensureProtocol(realm.logo);
+      return u || null;
+    }
+    return null;
   }
 
 
@@ -997,18 +1047,20 @@
       {#if viewMode === 'list'}
         <div class="realms-grid">
           {#each filteredRealms as realm}
+            {@const welcomeBg = resolveRealmAssetUrl(realm, realm.realm_welcome_image || '/images/welcome.png')}
+            {@const logoSrc = resolvedRealmLogoUrl(realm)}
             <div class="realm-card">
-              {#if realm.url}
+              {#if welcomeBg}
                 <div 
                   class="realm-card-bg" 
-                  style="background-image: url('{resolveRealmAssetUrl(realm, realm.realm_welcome_image || '/images/welcome.png')}')"
+                  style="background-image: url('{welcomeBg}')"
                 ></div>
               {/if}
               <div class="card-accent"></div>
               <div class="realm-header">
                 <div class="realm-logo-container">
-                  {#if realm.realm_logo || realm.logo}
-                    <img src={realm.realm_logo ? resolveRealmAssetUrl(realm, realm.realm_logo) : ensureProtocol(realm.logo)} alt="{realm.name} logo" class="realm-logo" />
+                  {#if logoSrc}
+                    <img src={logoSrc} alt="{realm.name} logo" class="realm-logo" />
                   {:else}
                     <div class="realm-logo-fallback">
                       <span>{realm.name.charAt(0).toUpperCase()}</span>
