@@ -330,10 +330,7 @@
 
   function ensureProtocol(url) {
     if (!url) return '';
-    // If URL already has a protocol, return as-is
     if (url.startsWith('http://') || url.startsWith('https://')) {
-      // For localhost URLs, normalize port to match current browser port
-      // (registry may store stale ports like 8000 when dfx runs on 4943)
       if (url.includes('localhost') || url.includes('127.0.0.1')) {
         const currentPort = window.location.port;
         if (currentPort) {
@@ -342,10 +339,8 @@
       }
       return url;
     }
-    // Use http for localhost, https for production
     const isLocal = url.includes('localhost') || url.includes('127.0.0.1');
     if (isLocal) {
-      // Normalize port to match current browser port
       const currentPort = window.location.port;
       if (currentPort) {
         const normalized = url.replace(/localhost:\d+/, `localhost:${currentPort}`);
@@ -354,6 +349,14 @@
       return `http://${url}`;
     }
     return `https://${url}`;
+  }
+
+  function resolveRealmAssetUrl(realm, assetPath) {
+    if (!assetPath) return '';
+    if (assetPath.startsWith('http://') || assetPath.startsWith('https://')) return assetPath;
+    if (!realm.url) return '';
+    const base = ensureProtocol(realm.url);
+    return base + '/' + assetPath.replace(/^\//, '');
   }
 
 
@@ -998,14 +1001,14 @@
               {#if realm.url}
                 <div 
                   class="realm-card-bg" 
-                  style="background-image: url('{realm.realm_welcome_image && realm.realm_welcome_image.startsWith('http') ? realm.realm_welcome_image : ensureProtocol(realm.url) + '/' + (realm.realm_welcome_image || 'images/welcome.png').replace(/^\//, '')}')"
+                  style="background-image: url('{resolveRealmAssetUrl(realm, realm.realm_welcome_image || '/images/welcome.png')}')"
                 ></div>
               {/if}
               <div class="card-accent"></div>
               <div class="realm-header">
                 <div class="realm-logo-container">
                   {#if realm.realm_logo || realm.logo}
-                    <img src={ensureProtocol(realm.realm_logo || realm.logo)} alt="{realm.name} logo" class="realm-logo" />
+                    <img src={realm.realm_logo ? resolveRealmAssetUrl(realm, realm.realm_logo) : ensureProtocol(realm.logo)} alt="{realm.name} logo" class="realm-logo" />
                   {:else}
                     <div class="realm-logo-fallback">
                       <span>{realm.name.charAt(0).toUpperCase()}</span>
