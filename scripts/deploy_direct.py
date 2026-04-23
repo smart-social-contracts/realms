@@ -602,15 +602,19 @@ def _deploy_frontend_direct(
 # ---------------------------------------------------------------------------
 
 
-def _overlay_branding_into_dist(dist_dir: Path, member: Dict[str, Any]) -> Dict[str, str]:
-    """Copy manifest logo/welcome_image into ``dist/images/`` (realm_logo.*, welcome.*).
+def _overlay_branding_into_dist(dist_dir: Path, member: Dict[str, Any]) -> Dict[str, bool]:
+    """Copy manifest branding into ``dist/images/logo.png`` and ``background.png``.
+
+    Convention: the realm frontend asset canister always serves
+    ``/images/logo.png`` and ``/images/background.png``. Manifest paths are
+    **source** filenames (any name); deploy copies bytes into those two names.
+    Prefer PNG sources; other formats may misbehave if browsers trust the extension.
 
     Run only on a **copy** of dist/, after the core bundle is deployed and verified.
-    Paths match ``realm_backend`` status (``/images/realm_logo.*``, ``/images/welcome.*``).
 
-    Returns ``{"logo_ext": ..., "welcome_ext": ...}`` for assets that were copied.
+    Returns flags ``{"logo": True, "background": True}`` for assets that were copied.
     """
-    out: Dict[str, str] = {}
+    out: Dict[str, bool] = {}
     manifest_rel = member.get("manifest")
     if not manifest_rel:
         return out
@@ -623,7 +627,7 @@ def _overlay_branding_into_dist(dist_dir: Path, member: Dict[str, Any]) -> Dict[
     images_dir = dist_dir / "images"
     images_dir.mkdir(parents=True, exist_ok=True)
 
-    def _copy_one(manifest_key: str, dest_stem: str) -> None:
+    def _copy_one(manifest_key: str, dest_name: str, flag_key: str) -> None:
         filename = manifest.get(manifest_key)
         if not filename:
             return
@@ -631,20 +635,18 @@ def _overlay_branding_into_dist(dist_dir: Path, member: Dict[str, Any]) -> Dict[
         if not src.is_file():
             print(f"   ⚠ branding asset not found: {src}")
             return
-        ext = (src.suffix.lstrip(".") or "png").lower()
-        dest = images_dir / f"{dest_stem}.{ext}"
+        if src.suffix.lower() not in (".png", ".jpg", ".jpeg", ".webp", ".svg"):
+            print(f"   ⚠ branding {src.name}: non-standard extension; use PNG when possible")
+        dest = images_dir / dest_name
         try:
             shutil.copy2(src, dest)
-            if dest_stem == "realm_logo":
-                out["logo_ext"] = ext
-            else:
-                out["welcome_ext"] = ext
-            print(f"   • branding: {filename} → dist/images/{dest.name}")
+            out[flag_key] = True
+            print(f"   • branding: {filename} → dist/images/{dest_name}")
         except OSError as exc:
             print(f"   ⚠ could not copy branding {src}: {exc}")
 
-    _copy_one("logo", "realm_logo")
-    _copy_one("welcome_image", "welcome")
+    _copy_one("logo", "logo.png", "logo")
+    _copy_one("welcome_image", "background.png", "background")
     return out
 
 
@@ -659,23 +661,25 @@ def _public_branding_asset_url(canister_id: str, network: str, path: str) -> str
     return f"https://{host}/{path}"
 
 
-def _registry_branding_urls(member: Dict[str, Any], network: str, exts: Dict[str, str]) -> Dict[str, str]:
-    """Absolute URLs for registry ``logo`` / optional welcome (same asset canister as SPA)."""
+def _registry_branding_urls(
+    member: Dict[str, Any], network: str, branding: Dict[str, bool],
+) -> Dict[str, str]:
+    """Absolute URLs for registry ``logo`` / welcome (canonical asset paths)."""
     fe = (member.get("frontend_canister_id") or "").strip()
     if not fe:
         return {}
     urls: Dict[str, str] = {}
-    le = exts.get("logo_ext")
-    if le:
-        urls["logo"] = _public_branding_asset_url(fe, network, f"images/realm_logo.{le}")
-    we = exts.get("welcome_ext")
-    if we:
-        urls["welcome_image"] = _public_branding_asset_url(fe, network, f"images/welcome.{we}")
+    if branding.get("logo"):
+        urls["logo"] = _public_branding_asset_url(fe, network, "images/logo.png")
+    if branding.get("background"):
+        urls["welcome_image"] = _public_branding_asset_url(
+            fe, network, "images/background.png",
+        )
     return urls
 
 
 def _apply_realm_config_from_manifest(
-    member: Dict[str, Any], network: str, exts: Dict[str, str],
+    member: Dict[str, Any], network: str, branding: Dict[str, bool],
 ) -> None:
     """Push manifest text fields + asset-canister filenames to ``update_realm_config``."""
     manifest_rel = member.get("manifest")
@@ -694,10 +698,10 @@ def _apply_realm_config_from_manifest(
         if key in manifest:
             config[key] = manifest[key]
 
-    if exts.get("logo_ext"):
-        config["logo"] = f"realm_logo.{exts['logo_ext']}"
-    if exts.get("welcome_ext"):
-        config["welcome_image"] = f"welcome.{exts['welcome_ext']}"
+    if branding.get("logo"):
+        config["logo"] = "logo.png"
+    if branding.get("background"):
+        config["welcome_image"] = "background.png"
 
     if not config:
         return
@@ -1183,7 +1187,7 @@ def deploy_mundus(
             cid = (member.get("canister_id") or "").strip()
             print(f"\n   ▸ building realm_frontend for {name} ...")
             dist = _build_realm_frontend(member, network)
-            exts: Dict[str, str] = {}
+            branding_flags: Dict[str, bool] = {}
             core_ok = False
             if dist:
                 if not _deploy_frontend_direct(fe_id, dist, network):
@@ -1196,8 +1200,10 @@ def deploy_mundus(
                     with tempfile.TemporaryDirectory(prefix="realm_branding_") as btmp:
                         merged = Path(btmp) / "dist"
                         shutil.copytree(dist, merged, symlinks=True)
-                        exts = _overlay_branding_into_dist(merged, member)
-                        has_branding = bool(exts.get("logo_ext") or exts.get("welcome_ext"))
+                        branding_flags = _overlay_branding_into_dist(merged, member)
+                        has_branding = bool(
+                            branding_flags.get("logo") or branding_flags.get("background"),
+                        )
                         if has_branding:
                             try:
                                 from scripts.compute_assets_hash import compute_and_write_assets_hash
@@ -1212,10 +1218,12 @@ def deploy_mundus(
                                 fe_id, merged, network, no_asset_upgrade=True,
                             ):
                                 failures.append(f"{name} (branding)")
-                                exts = {}
+                                branding_flags = {}
             if cid and core_ok:
-                _apply_realm_config_from_manifest(member, network, exts)
-                branding_map[cid] = _registry_branding_urls(member, network, exts)
+                _apply_realm_config_from_manifest(member, network, branding_flags)
+                branding_map[cid] = _registry_branding_urls(
+                    member, network, branding_flags,
+                )
 
         if registry_member and registry_member.get("frontend_canister_id"):
             print("\n   ▸ building realm_registry_frontend ...")

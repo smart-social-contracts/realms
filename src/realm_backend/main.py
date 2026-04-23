@@ -1561,8 +1561,13 @@ def create_foundational_objects() -> void:
                         manifest = json.load(f)
                     realm_name = manifest.get("name", realm_name)
                     realm_description = manifest.get("description", realm_description)
-                    realm_logo = manifest.get("logo", "")
-                    realm_welcome_image = manifest.get("welcome_image", "")
+                    # Filenames match asset canister /images/logo.png and /images/background.png
+                    realm_logo = (
+                        "logo.png" if manifest.get("logo") else ""
+                    )
+                    realm_welcome_image = (
+                        "background.png" if manifest.get("welcome_image") else ""
+                    )
                     realm_welcome_message = manifest.get("welcome_message", "")
                     calendar_config = manifest.get("calendar", {})
                     acct_currency_config = manifest.get("accounting_currency", {})

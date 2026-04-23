@@ -129,20 +129,19 @@ try:
             )
             if result.returncode == 0:
                 frontend_id = result.stdout.strip()
-                # Get logo extension from original filename
-                logo_ext = os.path.splitext(realm_logo)[1] if realm_logo else '.png'
+                # Canonical branding paths on the asset canister
                 if network == 'ic':
                     frontend_url = f"{frontend_id}.ic0.app"
                     if realm_logo:
-                        logo_url = f"https://{frontend_id}.ic0.app/images/realm_logo{logo_ext}"
+                        logo_url = f"https://{frontend_id}.ic0.app/images/logo.png"
                 elif network in ('staging', 'demo'):
                     frontend_url = f"{frontend_id}.icp0.io"
                     if realm_logo:
-                        logo_url = f"https://{frontend_id}.icp0.io/images/realm_logo{logo_ext}"
+                        logo_url = f"https://{frontend_id}.icp0.io/images/logo.png"
                 else:  # local
                     frontend_url = f"{frontend_id}.localhost:{local_port}"
                     if realm_logo:
-                        logo_url = f"http://{frontend_id}.localhost:{local_port}/images/realm_logo{logo_ext}"
+                        logo_url = f"http://{frontend_id}.localhost:{local_port}/images/logo.png"
                 print(f"   Frontend URL: {frontend_url}")
                 if logo_url:
                     print(f"   Logo URL: {logo_url}")
@@ -246,19 +245,14 @@ if os.path.exists(manifest_path):
         with open(manifest_path, 'r') as f:
             manifest = json.load(f)
         
-        # Extract realm config fields
-        # Logo is copied by deploy_canisters.sh as realm_logo.{ext} in static/images/
-        logo_filename = manifest.get("logo", "")
-        if logo_filename:
-            logo_ext = os.path.splitext(logo_filename)[1] or ".png"
-            logo_path = f"/images/realm_logo{logo_ext}"
-        else:
-            logo_path = ""
+        # Stored filenames match asset canister paths /images/logo.png and /images/background.png
+        has_logo = bool(manifest.get("logo"))
+        has_welcome = bool(manifest.get("welcome_image"))
         config = {
             "name": manifest.get("name", ""),
             "description": manifest.get("description", ""),
-            "logo": logo_path,
-            "welcome_image": "/images/welcome.png",  # Absolute path - copied by deploy_canisters.sh
+            "logo": "logo.png" if has_logo else "",
+            "welcome_image": "background.png" if has_welcome else "",
             "welcome_message": manifest.get("welcome_message", ""),
         }
         # Use ensure_ascii=False to keep UTF-8 characters instead of \uXXXX escapes

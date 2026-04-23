@@ -39,8 +39,8 @@
   // Only show admin profile when TEST_MODE_ADMIN_SELF_REGISTRATION is active
   $: profiles = allProfiles.filter(p => p.value !== 'admin' || TEST_MODE_ADMIN_SELF_REGISTRATION);
 
-  // Default fallback image if realm has no welcome image configured
-  const defaultWelcomeImage = '/images/default_welcome.jpg';
+  // Fallback when realm has no welcome image (canonical static path; may be overlaid at deploy)
+  const defaultWelcomeImage = '/images/background.png';
   
   // Reactive welcome image - use realm's image or fallback
   $: welcomeImageUrl = $realmWelcomeImage || defaultWelcomeImage;

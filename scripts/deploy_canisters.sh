@@ -439,11 +439,9 @@ if [ -f "manifest.json" ] && command -v jq &> /dev/null; then
         fi
         
         if [ -n "$LOGO_SOURCE" ]; then
-            # Find frontend directory and copy logo to static/images
-            # Preserve original extension
-            LOGO_EXT="${LOGO_SOURCE##*.}"
+            # Canonical path on asset canister: /images/logo.png
             mkdir -p src/realm_frontend/static/images
-            LOGO_DEST="src/realm_frontend/static/images/realm_logo.${LOGO_EXT}"
+            LOGO_DEST="src/realm_frontend/static/images/logo.png"
             cp "$LOGO_SOURCE" "$LOGO_DEST"
             echo "   ✅ Copied realm logo: $LOGO_SOURCE → $LOGO_DEST"
             # Also use logo as favicon
@@ -481,10 +479,9 @@ if [ -f "manifest.json" ] && command -v jq &> /dev/null; then
         fi
         
         if [ -n "$WELCOME_SOURCE" ]; then
-            # Copy to frontend static/images folder, preserving original extension
-            WELCOME_EXT="${WELCOME_SOURCE##*.}"
+            # Canonical path on asset canister: /images/background.png
             mkdir -p src/realm_frontend/static/images
-            WELCOME_DEST="src/realm_frontend/static/images/welcome.${WELCOME_EXT}"
+            WELCOME_DEST="src/realm_frontend/static/images/background.png"
             cp "$WELCOME_SOURCE" "$WELCOME_DEST"
             echo "   ✅ Copied realm welcome image: $WELCOME_SOURCE → $WELCOME_DEST"
         else
@@ -498,9 +495,7 @@ if [ -f "manifest.json" ] && command -v jq &> /dev/null; then
     LOGO_FILE=$(jq -r '.logo // empty' manifest.json)
     if [ -n "$LOGO_FILE" ] && [ -f "$LOGO_FILE" ]; then
         mkdir -p src/realm_frontend/static/images
-        # Get file extension
-        LOGO_EXT="${LOGO_FILE##*.}"
-        LOGO_DEST="src/realm_frontend/static/images/realm_logo.${LOGO_EXT}"
+        LOGO_DEST="src/realm_frontend/static/images/logo.png"
         cp "$LOGO_FILE" "$LOGO_DEST"
         echo "   ✅ Copied realm logo: $LOGO_FILE → $LOGO_DEST"
         # Also use logo as favicon
@@ -569,18 +564,16 @@ if [ -n "$FRONTENDS" ]; then
             if [ -f "manifest.json" ]; then
                 LOGO_FILE=$(python3 -c "import json; print(json.load(open('manifest.json')).get('logo',''))" 2>/dev/null)
                 if [ -n "$LOGO_FILE" ] && [ -f "$LOGO_FILE" ]; then
-                    LOGO_EXT="${LOGO_FILE##*.}"
-                    cp "$LOGO_FILE" "$STATIC_IMAGES/realm_logo.${LOGO_EXT}"
-                    echo "      🖼️  Copied logo: $LOGO_FILE → $STATIC_IMAGES/realm_logo.${LOGO_EXT}"
+                    cp "$LOGO_FILE" "$STATIC_IMAGES/logo.png"
+                    echo "      🖼️  Copied logo: $LOGO_FILE → $STATIC_IMAGES/logo.png"
                 fi
             fi
             
-            # Copy welcome/background image
+            # Copy welcome/background image → canonical background.png
             for img in welcome.png welcome.jpg welcome.webp background.png background.jpg; do
                 if [ -f "$img" ]; then
-                    IMG_EXT="${img##*.}"
-                    cp "$img" "$STATIC_IMAGES/welcome.${IMG_EXT}"
-                    echo "      🖼️  Copied welcome image: $img → $STATIC_IMAGES/welcome.${IMG_EXT}"
+                    cp "$img" "$STATIC_IMAGES/background.png"
+                    echo "      🖼️  Copied welcome image: $img → $STATIC_IMAGES/background.png"
                     break
                 fi
             done

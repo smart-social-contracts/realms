@@ -1047,7 +1047,7 @@
       {#if viewMode === 'list'}
         <div class="realms-grid">
           {#each filteredRealms as realm}
-            {@const welcomeBg = resolveRealmAssetUrl(realm, realm.realm_welcome_image || '/images/welcome.png')}
+            {@const welcomeBg = resolveRealmAssetUrl(realm, realm.realm_welcome_image || '/images/background.png')}
             {@const logoSrc = resolvedRealmLogoUrl(realm)}
             <div class="realm-card">
               {#if welcomeBg}
