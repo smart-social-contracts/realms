@@ -43,7 +43,8 @@
   "footer": {
     "built_on_ic": "Built on the Internet Computer",
     "local_deployment": "Local deployment",
-    "platform_dashboard": "Platform Dashboard"
+    "platform_dashboard": "Platform Dashboard",
+    "file_registry": "File Registry"
   },
   "time": {
     "just_now": "just now",

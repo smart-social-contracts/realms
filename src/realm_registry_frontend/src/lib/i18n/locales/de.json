@@ -42,7 +42,8 @@
   "footer": {
     "built_on_ic": "Aufgebaut auf dem Internet Computer",
     "local_deployment": "Lokale Bereitstellung",
-    "platform_dashboard": "Plattform-Dashboard"
+    "platform_dashboard": "Plattform-Dashboard",
+    "file_registry": "Dateiregister"
   },
   "time": {
     "just_now": "gerade eben",
