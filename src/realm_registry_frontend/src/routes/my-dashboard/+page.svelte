@@ -33,9 +33,6 @@
   let loadingDeployments = true;
   let deploymentPollInterval = null;
   
-  // Canister management service URL
-  const CANISTER_MGMT_URL = CONFIG.canister_management_url || 'https://canister-management.realmsgos.dev';
-
   // Top-up state
   let topUpAmount = 10;
   let topUpLoading = false;
@@ -89,11 +86,28 @@
   });
 
   async function loadCredits() {
+    if (!userPrincipal) return;
     loadingCredits = true;
     try {
+      // Same source as voucher top-ups: billing service (dfx + REALM_REGISTRY in .env).
+      // The bundled canister id can drift; direct get_credits then shows 0 incorrectly.
+      try {
+        const br = await fetch(
+          `${BILLING_SERVICE_URL}/credits/${encodeURIComponent(userPrincipal.toText())}`
+        );
+        if (br.ok) {
+          const j = await br.json();
+          if (j && j.credits != null) {
+            balance = Number(j.credits);
+            purchases = [];
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('loadCredits: billing request failed, using canister', e);
+      }
       const { backend } = await import('$lib/canisters.js');
       const result = await backend.get_credits(userPrincipal.toText());
-      
       if ('Ok' in result) {
         balance = Number(result.Ok.balance);
         purchases = [];
@@ -142,12 +156,14 @@
     if (!userPrincipal) return;
     loadingDeployments = true;
     try {
-      const response = await fetch(`${CANISTER_MGMT_URL}/api/deploy?principal_id=${userPrincipal.toText()}`);
-      if (response.ok) {
-        deployments = await response.json();
-        // Sort by created_at descending
-        deployments.sort((a, b) => b.created_at - a.created_at);
-      }
+      const { fetchDeploymentJobsFromInstaller, installerJobToDeploymentRow } = await import(
+        '$lib/installer-queue.js'
+      );
+      const jobs = await fetchDeploymentJobsFromInstaller();
+      const principalText = userPrincipal.toText();
+      const mine = jobs.filter((j) => (j.caller_principal || '') === principalText);
+      deployments = mine.map(installerJobToDeploymentRow);
+      deployments.sort((a, b) => b.created_at - a.created_at);
     } catch (err) {
       console.error('Failed to load deployments:', err);
       deployments = [];
@@ -243,8 +259,9 @@
       
       voucherSuccess = data.message;
       voucherCode = '';
-      
-      // Reload credits and vouchers
+      if (data.data && data.data.balance != null) {
+        balance = Number(data.data.balance);
+      }
       await Promise.all([loadCredits(), loadVouchers()]);
       
     } catch (err) {

@@ -812,6 +812,7 @@ export interface _SERVICE {
   >,
   'billing_status' : ActorMethod<[], GetBillingStatusResult>,
   'deduct_credits' : ActorMethod<[string, bigint, string], DeductCreditsResult>,
+  'deployment_failed' : ActorMethod<[string, string], string>,
   'get_credits' : ActorMethod<[string], GetCreditsResult>,
   'get_realm' : ActorMethod<[string], GetRealmResult>,
   'get_transactions' : ActorMethod<[string, bigint], TransactionHistoryResult>,
@@ -823,6 +824,7 @@ export interface _SERVICE {
     AddRealmResult
   >,
   'remove_realm' : ActorMethod<[string], AddRealmResult>,
+  'request_deployment' : ActorMethod<[string], string>,
   'search_realms' : ActorMethod<[string], Array<RealmRecord>>,
   'status' : ActorMethod<[], GetStatusResult>,
 }

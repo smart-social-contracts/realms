@@ -81,96 +81,80 @@
 
   async function handleAutomaticDeploy() {
     if (!userPrincipal || userCredits < REQUIRED_CREDITS) return;
-    
+
+    if (formData.codex_source !== 'package') {
+      deployError =
+        'One-click deploy supports a package codex only. Select a package, or use CLI manual deploy for URL/file codex.';
+      return;
+    }
+
     isDeploying = true;
     deployError = null;
     deploySuccess = null;
     deploymentId = null;
-    
+
     try {
-      // Prepare realm configuration from formData
-      const realmConfig = {
-        name: formData.name,
-        descriptions: formData.descriptions,
-        languages: formData.languages,
-        logo: formData.logoPreview,
-        welcome_image: formData.welcomeImagePreview,
-        welcome_messages: formData.welcome_messages,
-        token_enabled: formData.token_enabled,
-        token_name: formData.token_name,
-        token_symbol: formData.token_symbol,
-        ckbtc_enabled: formData.ckbtc_enabled,
-        land_token_enabled: formData.land_token_enabled,
-        land_token_name: formData.land_token_name,
-        land_token_symbol: formData.land_token_symbol,
-        codex_source: formData.codex_source,
-        codex_package_name: formData.codex_package_name,
-        codex_url: formData.codex_url,
-        extensions: formData.extensions,
-        assistant: formData.assistant,
-      };
-      
-      const CANISTER_MGMT_URL = CONFIG.canister_management_url || 'https://canister-management.realmsgos.dev';
-      
-      // Call canister-management service to deploy
-      const response = await fetch(`${CANISTER_MGMT_URL}/api/deploy`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          principal_id: userPrincipal.toText(),
-          realm_config: realmConfig,
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok || !data.success) {
-        deployError = data.message || data.detail || 'Deployment failed. Please try again.';
+      const { buildRealmDeploymentManifest } = await import('$lib/deployment-manifest.js');
+      const { getAuthenticatedRegistryActor } = await import('$lib/canisters.js');
+      const manifest = buildRealmDeploymentManifest(formData, CONFIG.default_deploy_queue_network);
+      const manifestJson = JSON.stringify(manifest);
+
+      const registry = await getAuthenticatedRegistryActor();
+      const raw = await registry.request_deployment(manifestJson);
+      const result = typeof raw === 'string' ? JSON.parse(raw) : raw;
+
+      if (!result?.success) {
+        deployError = result?.error || 'Deployment request failed';
+        isDeploying = false;
         return;
       }
-      
-      // Deployment started - it runs in the background
+
       deploySuccess = true;
-      deploymentId = data.deployment_id;
+      deploymentId = result.job_id;
       deploymentStatus = 'pending';
-      
-      // Start polling for deployment status
-      startDeploymentPolling(CANISTER_MGMT_URL, data.deployment_id);
-      
+      await loadUserCredits();
+      startDeploymentPolling(result.job_id);
     } catch (err) {
       console.error('Automatic deployment failed:', err);
-      deployError = 'Deployment failed. Please check your connection and try again.';
+      deployError =
+        err?.message || 'Deployment failed. Please check your connection and try again.';
       isDeploying = false;
     }
   }
 
-  function startDeploymentPolling(baseUrl, depId) {
+  function startDeploymentPolling(jobId) {
     if (pollTimer) clearInterval(pollTimer);
     pollTimer = setInterval(async () => {
       try {
-        const res = await fetch(`${baseUrl}/api/deploy/${depId}`);
-        if (!res.ok) return;
-        const info = await res.json();
+        const { fetchDeploymentJobStatus, installerJobToDeploymentRow } = await import(
+          '$lib/installer-queue.js'
+        );
+        const data = await fetchDeploymentJobStatus(jobId);
+        if (!data?.success) return;
+        const info = installerJobToDeploymentRow(data);
         deploymentStatus = info.status;
-        if (info.status === 'completed') {
+        if (info.raw_status === 'completed') {
           clearInterval(pollTimer);
           pollTimer = null;
           deploymentRealmUrl = info.realm_url;
           isDeploying = false;
           await loadUserCredits();
-        } else if (info.status === 'failed') {
+        } else if (
+          info.raw_status === 'failed' ||
+          info.raw_status === 'failed_verification' ||
+          info.raw_status === 'cancelled'
+        ) {
           clearInterval(pollTimer);
           pollTimer = null;
-          deployError = info.error || 'Deployment failed on the server.';
+          deployError = info.error || 'Deployment failed on the network.';
           deploySuccess = false;
           isDeploying = false;
+          await loadUserCredits();
         }
       } catch (e) {
         console.error('Poll error:', e);
       }
-    }, 10000); // Poll every 10 seconds
+    }, 10000);
   }
 
   // Wizard steps

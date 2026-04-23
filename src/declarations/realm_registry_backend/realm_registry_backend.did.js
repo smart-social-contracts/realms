@@ -78,6 +78,7 @@ export const idlFactory = ({ IDL }) => {
         [DeductCreditsResult],
         [],
       ),
+    'deployment_failed' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
     'get_credits' : IDL.Func([IDL.Text], [GetCreditsResult], ['query']),
     'get_realm' : IDL.Func([IDL.Text], [GetRealmResult], ['query']),
     'get_transactions' : IDL.Func(
@@ -94,6 +95,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'remove_realm' : IDL.Func([IDL.Text], [AddRealmResult], []),
+    'request_deployment' : IDL.Func([IDL.Text], [IDL.Text], []),
     'search_realms' : IDL.Func([IDL.Text], [IDL.Vec(RealmRecord)], ['query']),
     'status' : IDL.Func([], [GetStatusResult], ['query']),
   });

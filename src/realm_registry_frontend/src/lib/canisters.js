@@ -56,3 +56,32 @@ export const backend = new Proxy({}, {
         };
     }
 });
+
+/**
+ * Registry actor using the logged-in Internet Identity (required for
+ * request_deployment and other caller-scoped updates).
+ */
+export async function getAuthenticatedRegistryActor() {
+    if (buildingOrTesting) {
+        return dummyActor();
+    }
+    const { getIdentity } = await import('$lib/auth.js');
+    const identity = await getIdentity();
+    if (!identity) {
+        throw new Error('Not authenticated');
+    }
+    const { createActor, canisterId } = await import('declarations/realm_registry_backend');
+    const { HttpAgent } = await import('@dfinity/agent');
+    const agent = new HttpAgent({ identity });
+    if (isLocalDevelopment()) {
+        try {
+            await agent.fetchRootKey();
+        } catch (e) {
+            console.warn('fetchRootKey failed:', e);
+        }
+    }
+    if (!canisterId) {
+        throw new Error('CANISTER_ID_REALM_REGISTRY_BACKEND is not set');
+    }
+    return createActor(canisterId, { agent });
+}

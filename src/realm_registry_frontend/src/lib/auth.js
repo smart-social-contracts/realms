@@ -52,3 +52,12 @@ export async function getPrincipal() {
   }
   return null;
 }
+
+/** @returns {Promise<import('@dfinity/agent').Identity | null>} */
+export async function getIdentity() {
+  const client = await initializeAuthClient();
+  if (await client.isAuthenticated()) {
+    return client.getIdentity();
+  }
+  return null;
+}

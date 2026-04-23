@@ -1688,9 +1688,16 @@ def _gen_job_id() -> str:
 
 
 def _serialize_job(job: DeploymentJob) -> dict:
+    realm_name = ""
+    try:
+        m = json.loads(job.manifest_json or "{}")
+        realm_name = (m.get("realm") or {}).get("name") or ""
+    except Exception:
+        pass
     return {
         "job_id": job.name,
         "status": job.status,
+        "realm_name": realm_name,
         "caller_principal": job.caller_principal or "",
         "network": job.network or "",
         "backend_canister_id": job.backend_canister_id or "",
@@ -1751,11 +1758,15 @@ def enqueue_deployment(manifest_json: text) -> text:
 
         wasm_hash, assets_hash = _parse_expected_hashes(manifest)
 
+        requester = (manifest.get("requesting_principal") or "").strip()
+        if not requester:
+            requester = str(ic.caller())
+
         job_id = _gen_job_id()
         job = DeploymentJob(
             name=job_id,
             status="pending",
-            caller_principal=str(ic.caller()),
+            caller_principal=requester,
             manifest_json=manifest_json[:8190],
             network=network,
             backend_canister_id="",

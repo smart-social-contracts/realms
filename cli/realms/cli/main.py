@@ -1663,28 +1663,41 @@ def billing_redeem_voucher(
 
 @registry_realm_app.command("deploy-realm")
 def registry_deploy_realm(
-    principal_id: str = typer.Option(..., "--principal", "-p", help="User principal ID"),
     realm_name: str = typer.Option(..., "--name", "-n", help="Name for the new realm"),
-    management_url: str = typer.Option(
-        "https://management.realmsgos.dev", "--management-url", help="Management service URL"
+    network: str = typer.Option(
+        "staging",
+        "--network",
+        help="IC network (staging, demo, local, ic, …)",
+    ),
+    registry_canister: Optional[str] = typer.Option(
+        None,
+        "--registry-canister",
+        help="realm_registry_backend canister id (defaults per --network)",
     ),
 ) -> None:
-    """Deploy a new realm via the management service (appears in dashboard)."""
-    realm_deploy_realm_command(principal_id, realm_name, management_url)
+    """Enqueue a realm deploy via realm_registry_backend.request_deployment (uses dfx identity)."""
+    realm_deploy_realm_command(realm_name, network, registry_canister)
 
 
 @registry_realm_app.command("deploy-status")
 def registry_deploy_status(
-    deployment_id: str = typer.Option(..., "--deployment-id", "-d", help="Deployment ID to check"),
-    management_url: str = typer.Option(
-        "https://management.realmsgos.dev", "--management-url", help="Management service URL"
+    job_id: str = typer.Option(..., "--job-id", "-j", help="Queue job id from deploy-realm"),
+    network: str = typer.Option(
+        "staging",
+        "--network",
+        help="IC network",
     ),
-    wait: bool = typer.Option(False, "--wait", "-w", help="Wait for deployment to complete (polls periodically)"),
-    poll_interval: int = typer.Option(10, "--poll-interval", help="Seconds between status polls (with --wait)"),
+    installer_canister: Optional[str] = typer.Option(
+        None,
+        "--installer-canister",
+        help="realm_installer canister id (defaults per --network)",
+    ),
+    wait: bool = typer.Option(False, "--wait", "-w", help="Wait until job completes (polls periodically)"),
+    poll_interval: int = typer.Option(10, "--poll-interval", help="Seconds between polls (with --wait)"),
     max_wait: int = typer.Option(900, "--max-wait", help="Maximum seconds to wait (with --wait)"),
 ) -> None:
-    """Check deployment status, optionally waiting for completion."""
-    realm_deploy_status_command(deployment_id, management_url, wait, poll_interval, max_wait)
+    """Poll realm_installer for a deployment job status."""
+    realm_deploy_status_command(job_id, network, installer_canister, wait, poll_interval, max_wait)
 
 
 # Realm context management commands

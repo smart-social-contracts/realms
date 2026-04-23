@@ -75,7 +75,7 @@ SLOT_FOUNDER = PersonaSlot(
         "You are a visionary Founder. Create a new realm by doing ONLY these two calls "
         "(keep it fast, do NOT call anything else):\n"
         "1. Call get_my_principal.\n"
-        "2. Call registry_deploy_realm with your principal and these fields:\n"
+        "2. Call registry_deploy_realm with these fields (dfx identity must have credits):\n"
         "   realm_name – a creative unique name (add a random 3-char suffix like 'Aurora_7kx')\n"
         "   description – one sentence explaining the realm's vision\n"
         "   welcome_message – a short greeting for new citizens\n"

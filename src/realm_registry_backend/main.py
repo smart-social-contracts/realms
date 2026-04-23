@@ -745,9 +745,15 @@ def request_deployment(manifest_json: text) -> Async[text]:
             })
 
         # ── Forward to realm_installer ────────────────────────────────
+        # Inter-canister call: ic.caller() on the installer is the registry,
+        # not the user.  Stamp the human/CI principal into the manifest so
+        # the job record and UIs can attribute deployments correctly.
+        manifest["requesting_principal"] = caller
+        manifest_json_for_installer = json.dumps(manifest)
+
         installer = RealmInstallerService(Principal.from_str(installer_id))
         call_result: CallResult = yield installer.enqueue_deployment(
-            manifest_json
+            manifest_json_for_installer
         )
 
         raw = call_result

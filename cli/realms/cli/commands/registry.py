@@ -1,6 +1,7 @@
 """Registry commands for managing realm registrations."""
 
 import json
+import os
 import shutil
 import subprocess
 import time
@@ -793,113 +794,204 @@ def billing_redeem_voucher_command(
         raise typer.Exit(1)
 
 
-# ============== Realm Deployment via Management Service ==============
+# ============== Queue-based realm deployment (registry + installer) ==============
 
-def realm_deploy_realm_command(
-    principal_id: str,
-    realm_name: str,
-    management_url: str = "https://management.realmsgos.dev",
-) -> None:
-    """Deploy a new realm via the management service (appears in dashboard)."""
-    console.print("[bold blue]🚀 Deploying Realm via Management Service[/bold blue]\n")
-    console.print(f"[dim]Principal: {principal_id}[/dim]")
-    console.print(f"[dim]Realm name: {realm_name}[/dim]")
-    console.print(f"[dim]Management service: {management_url}[/dim]\n")
+_REGISTRY_QUEUE_IDS = {
+    "staging": "7wzxh-wyaaa-aaaau-aggyq-cai",
+    "demo": "rhw4p-gqaaa-aaaac-qbw7q-cai",
+}
+_INSTALLER_QUEUE_IDS = {
+    "staging": "lusjm-wqaaa-aaaau-ago7q-cai",
+    "demo": "2s4td-daaaa-aaaao-bazmq-cai",
+}
 
-    realm_config = {
-        "name": realm_name,
-        "descriptions": {"en": f"Realm created by agent: {realm_name}"},
-        "languages": ["en"],
-        "welcome_messages": {"en": f"Welcome to {realm_name}!"},
-        "token_enabled": True,
-        "token_name": realm_name,
-        "token_symbol": realm_name[:4].upper(),
-        "extensions": [],
-    }
 
-    result = _call_http_api(
-        f"{management_url}/api/deploy",
-        method="POST",
-        data={"principal_id": principal_id, "realm_config": realm_config},
-        timeout=60,
+def _dfx_canister_call_text(
+    canister_id: str,
+    method: str,
+    candid_arg: str,
+    network: str,
+    *,
+    timeout: int = 120,
+) -> subprocess.CompletedProcess:
+    env = os.environ.copy()
+    env["DFX_WARNING"] = "-mainnet_plaintext_identity"
+    env["NO_COLOR"] = "1"
+    env.setdefault("TERM", "dumb")
+    return subprocess.run(
+        [
+            "dfx",
+            "canister",
+            "call",
+            canister_id,
+            method,
+            candid_arg,
+            "--network",
+            network,
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=timeout,
     )
 
-    if not result["success"]:
-        console.print(f"[red]❌ Error: {result['error']}[/red]")
+
+def _parse_dfx_text_json(stdout: str) -> dict:
+    json_str = (stdout or "").strip()
+    if json_str.startswith("("):
+        json_str = json_str.strip("()").strip()
+    if json_str.startswith('"') and json_str.endswith('"'):
+        json_str = json_str[1:-1]
+        json_str = json_str.replace('\\"', '"').replace("\\n", "\n")
+    return json.loads(json_str)
+
+
+def realm_deploy_realm_command(
+    realm_name: str,
+    network: str = "staging",
+    registry_canister: Optional[str] = None,
+) -> None:
+    """Enqueue realm deployment via realm_registry_backend.request_deployment (dfx caller = payer)."""
+    registry_id = registry_canister or _REGISTRY_QUEUE_IDS.get(network)
+    if not registry_id:
+        console.print(
+            f"[red]❌ No default registry canister for network '{network}'. "
+            f"Use --registry-canister.[/red]"
+        )
         raise typer.Exit(1)
 
-    resp = result["data"]
-    if resp.get("success"):
-        deployment_id = resp.get("deployment_id", "unknown")
-        console.print(f"[green]✅ Deployment started![/green]")
-        console.print(f"[cyan]Deployment ID:[/cyan] {deployment_id}")
-        console.print(f"[dim]{resp.get('message', '')}[/dim]")
-        console.print(f"\n[yellow]📝 Check status with:[/yellow]")
-        console.print(f"   realms registry realm deploy-status --deployment-id {deployment_id}")
-    else:
-        console.print(f"[red]❌ {resp.get('message', 'Deployment failed')}[/red]")
-        if resp.get("error"):
-            console.print(f"[dim]Error code: {resp['error']}[/dim]")
+    manifest = {
+        "realm": {
+            "name": realm_name,
+            "display_name": realm_name,
+            "description": f"Realm created from CLI: {realm_name}",
+            "welcome_message": f"Welcome to {realm_name}!",
+            "branding": {"logo": "emblem.png", "welcome_image": "background.png"},
+            "codex": {"package": "syntropia", "version": "latest"},
+            "extensions": ["all"],
+        },
+        "network": network,
+    }
+    manifest_json = json.dumps(manifest)
+    candid_arg = f'("{manifest_json}")'
+
+    console.print("[bold blue]🚀 Queue realm deployment[/bold blue]\n")
+    console.print(f"[dim]Registry:[/dim] {registry_id}")
+    console.print(f"[dim]Network:[/dim] {network}")
+    console.print(f"[dim]Realm:[/dim] {realm_name}\n")
+
+    proc = _dfx_canister_call_text(registry_id, "request_deployment", candid_arg, network)
+    if proc.returncode != 0:
+        err = (proc.stderr or proc.stdout or "").strip()
+        console.print(f"[red]❌ dfx failed:[/red] {err}")
         raise typer.Exit(1)
+
+    try:
+        result = _parse_dfx_text_json(proc.stdout)
+    except Exception as e:
+        console.print(f"[red]❌ Could not parse response:[/red] {e}\n{proc.stdout}")
+        raise typer.Exit(1)
+
+    if not result.get("success"):
+        console.print(f"[red]❌ {result.get('error', 'request_deployment failed')}[/red]")
+        raise typer.Exit(1)
+
+    job_id = result.get("job_id", "?")
+    console.print(f"[green]✅ Queued job:[/green] {job_id}")
+    console.print(
+        f"\n[yellow]Poll:[/yellow] realms registry realm deploy-status "
+        f"--job-id {job_id} --network {network}"
+    )
 
 
 def realm_deploy_status_command(
-    deployment_id: str,
-    management_url: str = "https://management.realmsgos.dev",
+    job_id: str,
+    network: str = "staging",
+    installer_canister: Optional[str] = None,
     wait: bool = False,
     poll_interval: int = 10,
     max_wait: int = 900,
 ) -> None:
-    """Check deployment status, optionally waiting for completion."""
-    console.print("[bold blue]📋 Deployment Status[/bold blue]\n")
+    """Poll realm_installer.get_deployment_job_status for a queue job_id."""
+    installer_id = installer_canister or _INSTALLER_QUEUE_IDS.get(network)
+    if not installer_id:
+        console.print(
+            f"[red]❌ No default installer for network '{network}'. "
+            f"Use --installer-canister.[/red]"
+        )
+        raise typer.Exit(1)
+
+    console.print("[bold blue]📋 Deployment job status[/bold blue]\n")
 
     start_time = time.time()
 
-    while True:
-        result = _call_http_api(
-            f"{management_url}/api/deploy/{deployment_id}",
-            method="GET",
-        )
+    def _print_job_table(info: dict, status: str) -> None:
+        fe = info.get("frontend_canister_id") or ""
+        realm_url = f"https://{fe}.icp0.io" if fe else ""
 
-        if not result["success"]:
-            console.print(f"[red]❌ Error: {result['error']}[/red]")
+        table = Table(title=f"Job {job_id[:16]}…", show_header=False, box=None)
+        table.add_column("Field", style="cyan")
+        table.add_column("Value", style="white")
+
+        status_style = {
+            "completed": "[green]completed[/green]",
+            "failed": "[red]failed[/red]",
+            "failed_verification": "[red]failed_verification[/red]",
+            "cancelled": "[dim]cancelled[/dim]",
+            "deploying": "[yellow]deploying[/yellow]",
+            "verifying": "[yellow]verifying[/yellow]",
+            "extensions": "[yellow]extensions[/yellow]",
+            "registering": "[yellow]registering[/yellow]",
+            "pending": "[dim]pending[/dim]",
+        }.get(status, status)
+
+        table.add_row("Status", status_style)
+        table.add_row("Realm name", info.get("realm_name") or "—")
+        if realm_url:
+            table.add_row("Realm URL", f"[green]{realm_url}[/green]")
+        if info.get("error"):
+            table.add_row("Error", f"[red]{info['error']}[/red]")
+
+        console.print(table)
+
+    while True:
+        proc = _dfx_canister_call_text(
+            installer_id,
+            "get_deployment_job_status",
+            f'("{job_id}")',
+            network,
+            timeout=60,
+        )
+        if proc.returncode != 0:
+            console.print(f"[red]❌ dfx failed:[/red] {(proc.stderr or proc.stdout).strip()}")
             raise typer.Exit(1)
 
-        info = result["data"]
+        try:
+            info = _parse_dfx_text_json(proc.stdout)
+        except Exception as e:
+            console.print(f"[red]❌ Bad response:[/red] {e}\n{proc.stdout}")
+            raise typer.Exit(1)
+
+        if not info.get("success"):
+            console.print(f"[red]❌ {info.get('error', 'unknown')}[/red]")
+            raise typer.Exit(1)
+
         status = info.get("status", "unknown")
 
-        if not wait or status in ("completed", "failed"):
-            # Display final status
-            table = Table(title=f"Deployment {deployment_id[:12]}...", show_header=False, box=None)
-            table.add_column("Field", style="cyan")
-            table.add_column("Value", style="white")
-
-            status_style = {
-                "completed": "[green]completed[/green]",
-                "failed": "[red]failed[/red]",
-                "in_progress": "[yellow]in_progress[/yellow]",
-                "pending": "[dim]pending[/dim]",
-            }.get(status, status)
-
-            table.add_row("Status", status_style)
-            table.add_row("Realm Name", info.get("realm_name", "N/A"))
-            if info.get("realm_url"):
-                table.add_row("Realm URL", f"[green]{info['realm_url']}[/green]")
-            if info.get("realm_id"):
-                table.add_row("Realm ID", info["realm_id"])
-            if info.get("error"):
-                table.add_row("Error", f"[red]{info['error']}[/red]")
-            if info.get("credits_charged"):
-                table.add_row("Credits Charged", str(info["credits_charged"]))
-
-            console.print(table)
+        if not wait:
+            _print_job_table(info, status)
             break
 
-        # Waiting mode - show progress
+        if status in ("completed", "failed", "failed_verification", "cancelled"):
+            _print_job_table(info, status)
+            break
+
         elapsed = int(time.time() - start_time)
         if elapsed >= max_wait:
-            console.print(f"[red]❌ Timed out after {max_wait}s waiting for deployment[/red]")
+            console.print(f"[red]❌ Timed out after {max_wait}s[/red]")
             raise typer.Exit(1)
 
-        console.print(f"[dim]  Status: {status} (elapsed: {elapsed}s, polling every {poll_interval}s)...[/dim]")
+        console.print(
+            f"[dim]  Status: {status} ({elapsed}s / poll {poll_interval}s)…[/dim]"
+        )
         time.sleep(poll_interval)

@@ -161,8 +161,8 @@
     },
     "token_backend": {
       "type": "custom",
-      "candid": "https://github.com/smart-social-contracts/ic-tokens/releases/latest/download/token_backend.did",
-      "wasm": "https://github.com/smart-social-contracts/ic-tokens/releases/latest/download/token_backend.wasm",
+      "candid": "https://github.com/smart-social-contracts/kybra-simple-token/releases/download/v0.5.1/token_backend.did",
+      "wasm": "https://github.com/smart-social-contracts/kybra-simple-token/releases/download/v0.5.1/token_backend.wasm",
       "remote": {
         "id": {
           "demo": "xbkkh-syaaa-aaaah-qq3ya-cai"
@@ -172,8 +172,8 @@
     },
     "token_frontend": {
       "type": "custom",
-      "candid": "https://github.com/smart-social-contracts/ic-tokens/releases/latest/download/token_frontend.did",
-      "wasm": "https://github.com/smart-social-contracts/ic-tokens/releases/latest/download/token_frontend.wasm",
+      "candid": "https://github.com/smart-social-contracts/kybra-simple-token/releases/download/v0.5.1/token_frontend.did",
+      "wasm": "https://github.com/smart-social-contracts/kybra-simple-token/releases/download/v0.5.1/token_frontend.wasm",
       "frontend": {},
       "remote": {
         "id": {
@@ -183,8 +183,8 @@
     },
     "nft_backend": {
       "type": "custom",
-      "candid": "https://github.com/smart-social-contracts/ic-tokens/releases/latest/download/nft_backend.did",
-      "wasm": "https://github.com/smart-social-contracts/ic-tokens/releases/latest/download/nft_backend.wasm",
+      "candid": "https://github.com/smart-social-contracts/kybra-simple-token/releases/download/v0.5.1/nft_backend.did",
+      "wasm": "https://github.com/smart-social-contracts/kybra-simple-token/releases/download/v0.5.1/nft_backend.wasm",
       "remote": {
         "id": {
           "demo": "6hrip-iiaaa-aaaaf-qdoha-cai"
@@ -194,8 +194,8 @@
     },
     "nft_frontend": {
       "type": "custom",
-      "candid": "https://github.com/smart-social-contracts/ic-tokens/releases/latest/download/nft_frontend.did",
-      "wasm": "https://github.com/smart-social-contracts/ic-tokens/releases/latest/download/nft_frontend.wasm",
+      "candid": "https://github.com/smart-social-contracts/kybra-simple-token/releases/download/v0.5.1/nft_frontend.did",
+      "wasm": "https://github.com/smart-social-contracts/kybra-simple-token/releases/download/v0.5.1/nft_frontend.wasm",
       "frontend": {},
       "remote": {
         "id": {

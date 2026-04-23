@@ -228,5 +228,13 @@ service : {
   "debug_resume_deploys" : (text) -> (text);
   "health" : () -> (text) query;
   "info" : () -> (text) query;
+  "enqueue_deployment" : (text) -> (text);
+  "get_pending_deployments" : () -> (text) query;
+  "get_deployment_job_status" : (text) -> (text) query;
+  "list_deployment_jobs" : () -> (text) query;
+  "cancel_deployment" : (text) -> (text);
+  "report_canister_ready" : (text) -> (text);
+  "get_verification_report" : (text) -> (text) query;
+  "verify_realm" : (text) -> (text);
   "__get_candid_interface_tmp_hack" : () -> (text) query;
 }

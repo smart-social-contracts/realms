@@ -1,6 +1,6 @@
-import type { Principal } from '@icp-sdk/core/principal';
-import type { ActorMethod } from '@icp-sdk/core/agent';
-import type { IDL } from '@icp-sdk/core/candid';
+import type { Principal } from '@dfinity/principal';
+import type { ActorMethod } from '@dfinity/agent';
+import type { IDL } from '@dfinity/candid';
 
 export interface Account {
   'owner' : Principal,
@@ -129,7 +129,7 @@ export type Callback = ActorMethod<
 >;
 export interface CallbackStrategy {
   'token' : StreamingToken,
-  'callback' : [Principal, string],
+  'callback' : Callback,
 }
 export interface CanisterInfo {
   'canister_id' : string,
@@ -437,7 +437,7 @@ export interface HttpResponseIncoming {
   'status_code' : number,
 }
 export interface HttpTransform {
-  'function' : [Principal, string],
+  'function' : HttpTransformFunc,
   'context' : Uint8Array | number[],
 }
 export interface HttpTransformArgs {
@@ -676,7 +676,7 @@ export interface QueryBlocksResponse {
   'archived_blocks' : Array<QueryBlocksResponse_archived_blocks>,
 }
 export interface QueryBlocksResponse_archived_blocks {
-  'callback' : [Principal, string],
+  'callback' : QueryArchiveFn,
   'start' : bigint,
   'length' : bigint,
 }
@@ -923,17 +923,25 @@ export interface XRCCanister {
 export interface _SERVICE {
   '__get_candid_interface_tmp_hack' : ActorMethod<[], string>,
   'cancel_deploy' : ActorMethod<[string], string>,
+  'cancel_deployment' : ActorMethod<[string], string>,
   'debug_resume_deploys' : ActorMethod<[string], string>,
   'debug_run_one_step' : ActorMethod<[string], string>,
   'deploy_frontend' : ActorMethod<[string], string>,
   'deploy_realm' : ActorMethod<[string], string>,
+  'enqueue_deployment' : ActorMethod<[string], string>,
   'execute_code_shell' : ActorMethod<[string], string>,
   'fetch_module_hash' : ActorMethod<[string], string>,
   'get_deploy_status' : ActorMethod<[string], string>,
+  'get_deployment_job_status' : ActorMethod<[string], string>,
+  'get_pending_deployments' : ActorMethod<[], string>,
+  'get_verification_report' : ActorMethod<[string], string>,
   'health' : ActorMethod<[], string>,
   'info' : ActorMethod<[], string>,
   'install_realm_backend' : ActorMethod<[string], string>,
+  'list_deployment_jobs' : ActorMethod<[], string>,
   'list_deploys' : ActorMethod<[], string>,
+  'report_canister_ready' : ActorMethod<[string], string>,
+  'verify_realm' : ActorMethod<[string], string>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

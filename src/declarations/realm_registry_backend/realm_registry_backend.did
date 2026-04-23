@@ -215,5 +215,7 @@ service : {
   "deduct_credits" : (text, nat64, text) -> (DeductCreditsResult);
   "get_transactions" : (text, nat64) -> (TransactionHistoryResult) query;
   "billing_status" : () -> (GetBillingStatusResult) query;
+  "request_deployment" : (text) -> (text);
+  "deployment_failed" : (text, text) -> (text);
   "__get_candid_interface_tmp_hack" : () -> (text) query;
 }

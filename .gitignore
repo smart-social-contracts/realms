@@ -1,4 +1,5 @@
 .dfx
+.external-wasms/
 .basilisk
 venv
 .realms-venv

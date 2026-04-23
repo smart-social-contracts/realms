@@ -4,8 +4,6 @@
 Reads a mundus descriptor file and submits deployment requests for
 each realm via realm_registry_backend.request_deployment().
 
-This replaces deploy_direct.py once the queue-based architecture is
-fully operational.
 """
 
 import argparse
@@ -22,8 +20,8 @@ except ImportError:
 
 
 REGISTRY_CANISTER_IDS = {
-    "staging": "i4q3p-qyaaa-aaaau-agoza-cai",
-    "demo": "2a4qo-3aaaa-aaaao-bazma-cai",
+    "staging": "7wzxh-wyaaa-aaaau-aggyq-cai",
+    "demo": "rhw4p-gqaaa-aaaac-qbw7q-cai",
 }
 
 
