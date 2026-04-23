@@ -133,6 +133,50 @@ def _dfx_env() -> Dict[str, str]:
     return env
 
 
+def _canister_ids_json() -> Dict[str, Any]:
+    path = REPO_ROOT / "canister_ids.json"
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _pick_canister_id_from_json(data: Dict[str, Any], name: str, network: str) -> str:
+    entry = data.get(name)
+    if not isinstance(entry, dict):
+        return ""
+    for key in (network, "ic", "demo"):
+        v = entry.get(key)
+        if v and str(v).strip():
+            return str(v).strip()
+    return ""
+
+
+def _frontend_build_canister_env(network: str) -> Dict[str, str]:
+    """CANISTER_ID_* for Vite/npm builds when .env is missing (e.g. GitHub Actions)."""
+    data = _canister_ids_json()
+    pairs = [
+        ("CANISTER_ID_REALM_REGISTRY_BACKEND", "realm_registry_backend"),
+        ("CANISTER_ID_REALM_REGISTRY_FRONTEND", "realm_registry_frontend"),
+        ("CANISTER_ID_REALM_INSTALLER", "realm_installer"),
+        ("CANISTER_ID_FILE_REGISTRY", "file_registry"),
+        ("CANISTER_ID_FILE_REGISTRY_FRONTEND", "file_registry_frontend"),
+        ("CANISTER_ID_MARKETPLACE_BACKEND", "marketplace_backend"),
+        ("CANISTER_ID_MARKETPLACE_FRONTEND", "marketplace_frontend"),
+    ]
+    out: Dict[str, str] = {}
+    for env_key, json_name in pairs:
+        cid = _pick_canister_id_from_json(data, json_name, network)
+        if cid:
+            out[env_key] = cid
+    inst_fe = _pick_canister_id_from_json(data, "realm_installer_frontend", network)
+    if inst_fe:
+        out["CANISTER_ID_REALM_INSTALLER_FRONTEND"] = inst_fe
+    return out
+
+
 def _dfx(
     *args: str, network: str, check: bool = True
 ) -> subprocess.CompletedProcess:
@@ -458,6 +502,8 @@ def _build_dashboard_frontend(network: str) -> Optional[Path]:
 
     env = _dfx_env()
     env["DFX_NETWORK"] = network
+    env["IC_ASSET_BUILD_NETWORK"] = network
+    env.update(_frontend_build_canister_env(network))
     _run(["npm", "run", "build", "--workspace=platform_dashboard_frontend"], cwd=REPO_ROOT, env=env)
     dist = REPO_ROOT / "src" / "platform_dashboard_frontend" / "dist"
     if dist.is_dir() and any(dist.iterdir()):
