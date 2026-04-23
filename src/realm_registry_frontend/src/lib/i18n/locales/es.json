@@ -66,6 +66,8 @@
     "realms_tab": "Mis Reinos",
     "loading": "Cargando...",
     "current_balance": "Saldo Actual",
+    "current_balance_registry": "Saldo actual (registro)",
+    "billing_registry_sync_hint": "Cuenta de facturación: {billing} — canjea un cupón o completa la sincronización para que coincida con tu saldo on-chain para el despliegue.",
     "credits_unit": "créditos",
     "purchase_history": "Historial de Compras",
     "no_purchases": "Sin compras aún",

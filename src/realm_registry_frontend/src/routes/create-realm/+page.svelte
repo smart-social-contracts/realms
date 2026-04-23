@@ -12,6 +12,8 @@
   let userPrincipal = null;
   let authLoading = true;
   let userCredits = 0;
+  /** Billing balance when it differs from on-chain (informational). */
+  let billingCredits = null;
   const REQUIRED_CREDITS = 5;
 
   // Deploy mode
@@ -59,8 +61,12 @@
   async function loadUserCredits() {
     if (!userPrincipal) return;
     try {
-      const { fetchUserCreditBalance } = await import('$lib/user-credits.js');
-      userCredits = await fetchUserCreditBalance(userPrincipal.toText());
+      const { fetchCreditBalances } = await import('$lib/user-credits.js');
+      const { registry, billing } = await fetchCreditBalances(
+        userPrincipal.toText()
+      );
+      userCredits = registry;
+      billingCredits = billing;
     } catch (e) {
       console.error('Failed to load credits:', e);
     }
@@ -1424,7 +1430,7 @@
                   <circle cx="12" cy="12" r="10"></circle>
                   <path d="M12 6v6l4 2"></path>
                 </svg>
-                <span>You need at least {REQUIRED_CREDITS} credits (you have {userCredits})</span>
+                <span>You need at least {REQUIRED_CREDITS} registry credits (you have {userCredits} on-chain{#if billingCredits != null && billingCredits > userCredits}, {billingCredits} in billing{/if})</span>
                 <button type="button" class="btn btn-small btn-outline" on:click|stopPropagation={loadUserCredits}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
@@ -1481,7 +1487,15 @@
                 </div>
               {:else}
                 <div class="deploy-action">
-                  <p class="deploy-cost">Cost: <strong>{REQUIRED_CREDITS} credits</strong> (you have {userCredits})</p>
+                  <p class="deploy-cost">
+                    Cost: <strong>{REQUIRED_CREDITS} credits</strong> (registry balance: {userCredits})
+                  </p>
+                  {#if billingCredits != null && billingCredits !== userCredits}
+                    <p class="deploy-cost-hint">
+                      Billing shows {billingCredits} — only the registry balance is charged for deploy. Redeem a voucher on
+                      <a href="/my-dashboard">My Dashboard</a> if your purchase has not synced yet.
+                    </p>
+                  {/if}
                   <button 
                     type="button" 
                     class="btn btn-primary btn-deploy" 
@@ -3412,6 +3426,19 @@
     margin: 0 0 1rem;
     color: #166534;
     font-size: 0.875rem;
+  }
+
+  .deploy-cost-hint {
+    margin: 0 0 1rem;
+    color: #14532d;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    text-align: left;
+  }
+
+  .deploy-cost-hint a {
+    color: #15803d;
+    font-weight: 600;
   }
 
   .btn-deploy {
