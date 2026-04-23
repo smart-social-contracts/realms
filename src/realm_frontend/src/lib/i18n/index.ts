@@ -115,6 +115,25 @@ interface RuntimeExtensionsResponse {
   sources?: Record<string, RuntimeExtensionSource | null>;
 }
 
+/** Strip legacy `{ "extensions": { "<id>": { ... } } }` wrapper when present. */
+function normalizeExtensionTranslationObject(
+  extensionId: string,
+  raw: unknown,
+): Record<string, unknown> | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return null;
+  }
+  const o = raw as Record<string, unknown>;
+  const nested = o.extensions;
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    const inner = (nested as Record<string, unknown>)[extensionId];
+    if (inner && typeof inner === "object" && !Array.isArray(inner)) {
+      return inner as Record<string, unknown>;
+    }
+  }
+  return o as Record<string, unknown>;
+}
+
 /**
  * Fetch a single locale's translation file for one extension and merge it
  * into svelte-i18n. Resolves to `true` on success, `false` if the file is
@@ -127,22 +146,31 @@ async function fetchAndRegisterExtensionLocale(
   version: string,
   locale: string,
 ): Promise<boolean> {
-  const url = `${baseUrl}/ext/${extensionId}/${version}/frontend/i18n/${locale}.json`;
+  const prefix = `${baseUrl}/ext/${extensionId}/${version}/frontend/i18n`;
+  const urls = [
+    `${prefix}/${locale}.json`,
+    // Older publishes walked frontend/i18n/locales and stored nested paths.
+    `${prefix}/extensions/${extensionId}/${locale}.json`,
+  ];
   try {
-    const res = await fetch(url, { credentials: "omit" });
-    if (!res.ok) {
-      return false;
+    for (const url of urls) {
+      const res = await fetch(url, { credentials: "omit" });
+      if (!res.ok) {
+        continue;
+      }
+      const raw = await res.json();
+      const translations = normalizeExtensionTranslationObject(extensionId, raw);
+      if (!translations) {
+        continue;
+      }
+      addMessages(locale, {
+        extensions: {
+          [extensionId]: translations,
+        },
+      });
+      return true;
     }
-    const translations = await res.json();
-    if (!translations || typeof translations !== "object") {
-      return false;
-    }
-    addMessages(locale, {
-      extensions: {
-        [extensionId]: translations,
-      },
-    });
-    return true;
+    return false;
   } catch (err) {
     // Networking issues are not fatal — extension i18n is best-effort.
     console.warn(

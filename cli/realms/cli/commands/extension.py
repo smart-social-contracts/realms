@@ -1703,24 +1703,44 @@ def publish_extension_command(
             continue
         _upload("frontend/dist/index.js", b)
 
-    # Frontend i18n: prefer explicit per-extension folder, fall back to bundled
-    # frontend/i18n/locales/extensions/<ext>/ tree (in monorepo layout).
-    i18n_candidates = [
-        os.path.join(source_dir, "frontend", "i18n", "locales"),
-        os.path.join(source_dir, "frontend", "i18n", "locales", "extensions", ext_id),
-        os.path.join(source_dir, "i18n"),
-    ]
-    for i18n_root in i18n_candidates:
-        if not os.path.isdir(i18n_root):
-            continue
-        for root, _dirs, files in os.walk(i18n_root):
+    # Frontend i18n must land at ext/<id>/<ver>/frontend/i18n/<locale>.json
+    # (realm_frontend fetch URL). Monorepo layout stores files under
+    # frontend/i18n/locales/extensions/<ext_id>/ — upload those with paths
+    # relative to that folder only. If only a shared locales/ tree exists,
+    # rewrite extensions/<this_ext_id>/... → ... and skip other extensions.
+    i18n_ext_dir = os.path.join(
+        source_dir, "frontend", "i18n", "locales", "extensions", ext_id
+    )
+    locales_root = os.path.join(source_dir, "frontend", "i18n", "locales")
+    i18n_legacy_root = os.path.join(source_dir, "i18n")
+
+    def _publish_i18n_files(i18n_root: str, registry_rel_from_locale_rel) -> None:
+        for walk_root, _dirs, files in os.walk(i18n_root):
             for fname in sorted(files):
                 if not fname.endswith(".json"):
                     continue
-                local = os.path.join(root, fname)
+                local = os.path.join(walk_root, fname)
                 rel = os.path.relpath(local, i18n_root).replace(os.sep, "/")
-                _upload(f"frontend/i18n/{rel}", local)
-        break  # only use the first i18n root that exists
+                registry_rel = registry_rel_from_locale_rel(rel)
+                if registry_rel is None:
+                    continue
+                _upload(f"frontend/i18n/{registry_rel}", local)
+
+    if os.path.isdir(i18n_ext_dir):
+        _publish_i18n_files(i18n_ext_dir, lambda r: r)
+    elif os.path.isdir(locales_root):
+        ext_prefix = f"extensions/{ext_id}/"
+
+        def _map_shared_locales(rel: str):
+            if rel.startswith(ext_prefix):
+                return rel[len(ext_prefix) :]
+            if rel.startswith("extensions/"):
+                return None
+            return rel
+
+        _publish_i18n_files(locales_root, _map_shared_locales)
+    elif os.path.isdir(i18n_legacy_root):
+        _publish_i18n_files(i18n_legacy_root, lambda r: r)
 
     if uploaded == 0 and failed == 0:
         console.print(
