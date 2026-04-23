@@ -117,21 +117,29 @@ def _dfx(*args: str, network: str, check: bool = True) -> subprocess.CompletedPr
     return _run(["dfx", *args, "--network", network], check=check)
 
 
+def _strip_dfx_warnings(text: str) -> str:
+    """Strip deprecation/warning lines that newer dfx versions print to stdout."""
+    return "\n".join(
+        line for line in text.splitlines()
+        if not line.startswith("WARNING:")
+    ).strip()
+
+
 def _canister_id(name: str, network: str) -> Optional[str]:
     try:
-        out = subprocess.check_output(
+        out = _strip_dfx_warnings(subprocess.check_output(
             ["dfx", "canister", "id", name, "--network", network],
             text=True, stderr=subprocess.STDOUT,
-        ).strip()
+        ))
         return out or None
     except subprocess.CalledProcessError:
         return None
 
 
 def _dfx_identity_principal() -> str:
-    return subprocess.check_output(
+    return _strip_dfx_warnings(subprocess.check_output(
         ["dfx", "identity", "get-principal"], text=True
-    ).strip()
+    ))
 
 
 def _add_controller(canister: str, controller: str, network: str) -> None:
