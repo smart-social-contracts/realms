@@ -3,6 +3,7 @@ export const idlFactory = ({ IDL }) => {
     '__get_candid_interface_tmp_hack' : IDL.Func([], [IDL.Text], ['query']),
     'cancel_deploy' : IDL.Func([IDL.Text], [IDL.Text], []),
     'cancel_deployment' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'allocate_deployment_canisters' : IDL.Func([IDL.Text], [IDL.Text], []),
     'debug_resume_deploys' : IDL.Func([IDL.Text], [IDL.Text], []),
     'debug_run_one_step' : IDL.Func([IDL.Text], [IDL.Text], []),
     'deploy_frontend' : IDL.Func([IDL.Text], [IDL.Text], []),

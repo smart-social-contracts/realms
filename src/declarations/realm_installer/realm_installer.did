@@ -233,6 +233,7 @@ service : {
   "get_deployment_job_status" : (text) -> (text) query;
   "list_deployment_jobs" : () -> (text) query;
   "cancel_deployment" : (text) -> (text);
+  "allocate_deployment_canisters" : (text) -> (text);
   "report_canister_ready" : (text) -> (text);
   "get_verification_report" : (text) -> (text) query;
   "verify_realm" : (text) -> (text);

@@ -6,8 +6,9 @@ This canister manages the realm deployment lifecycle:
 1. **Deployment queue** (Phase 4 architecture):
    ``realm_registry_backend`` calls ``enqueue_deployment()`` with a
    deployment manifest.  The off-chain ``realms-canister-deploy-service``
-   polls ``get_pending_deployments()``, deploys canisters via dfx, and
-   calls ``report_canister_ready()``.  The installer then verifies the
+   polls ``get_pending_deployments()``, calls ``allocate_deployment_canisters()``
+   (on-chain create), installs via dfx, then calls ``report_canister_ready()``.
+   The installer then verifies the
    WASM hash via ``canister_status()``, installs extensions/codices,
    and registers the realm with the registry.
 
@@ -45,6 +46,8 @@ from basilisk import (
     Service,
     ic,
     init,
+    match,
+    Opt,
     post_upgrade,
     Principal,
     query,
@@ -303,13 +306,13 @@ class DeploymentJob(Entity, TimestampedMixin):
 
     Status transitions::
 
-        pending → deploying → verifying → extensions → registering → completed
+        pending → verifying → extensions → registering → completed
         Any non-terminal state → failed | failed_verification | cancelled
 
-    The ``pending`` state means the job is waiting for the off-chain
-    deploy service to pick it up.  ``deploying`` means the service has
-    claimed it.  ``verifying`` through ``registering`` are handled by
-    the installer autonomously after ``report_canister_ready()``.
+    While ``pending``, the off-chain worker calls ``allocate_deployment_canisters``
+    (empty canisters + ids on this job), installs WASM/assets via dfx, then
+    ``report_canister_ready()``.  ``verifying`` through ``registering`` are
+    handled by the installer autonomously after ``report_canister_ready()``.
     """
 
     __alias__ = "name"
@@ -333,6 +336,8 @@ class DeploymentJob(Entity, TimestampedMixin):
 
     ext_deploy_task_id = String(max_length=64)
     registry_canister_id = String(max_length=64)
+    # Set on first successful allocate_deployment_canisters (off-chain dfx identity).
+    offchain_deployer_principal = String(max_length=64)
 
     error = String(max_length=2000)
     created_at = Integer(default=0)
@@ -1676,11 +1681,16 @@ def list_deploys() -> text:
 # Queue-based deployment architecture (Phase 4)
 #
 # Entry point: realm_registry_backend calls enqueue_deployment().
-# Off-chain realms-canister-deploy-service polls get_pending_deployments(),
-# deploys canisters via dfx, then calls report_canister_ready().
+# Off-chain worker polls get_pending_deployments(), calls
+# allocate_deployment_canisters() so creation cycles are paid by this
+# canister, then installs WASM/assets via dfx and calls report_canister_ready().
 # The installer verifies the WASM hash, installs extensions/codices,
 # then registers the realm with the registry.
 # ===========================================================================
+
+# Initial cycles attached to each empty realm child canister at creation
+# (mainnet-style subnets; top-up before install remains the worker's job).
+_REALM_CHILD_CREATE_CYCLES = 600_000_000_000
 
 
 def _gen_job_id() -> str:
@@ -1709,6 +1719,7 @@ def _serialize_job(job: DeploymentJob) -> dict:
         "actual_wasm_hash": job.actual_wasm_hash or "",
         "wasm_verified": int(job.wasm_verified or 0),
         "ext_deploy_task_id": job.ext_deploy_task_id or "",
+        "offchain_deployer_principal": job.offchain_deployer_principal or "",
         "error": job.error or "",
         "created_at": int(job.created_at or 0),
         "completed_at": int(job.completed_at or 0),
@@ -1781,6 +1792,7 @@ def enqueue_deployment(manifest_json: text) -> text:
             wasm_verified=0,
             ext_deploy_task_id="",
             registry_canister_id="",
+            offchain_deployer_principal="",
             error="",
             created_at=_now_s(),
             completed_at=0,
@@ -1808,9 +1820,10 @@ def enqueue_deployment(manifest_json: text) -> text:
 def get_pending_deployments() -> text:
     """Return all deployment jobs with status ``pending``.
 
-    Called by the off-chain ``realms-canister-deploy-service`` to
-    discover work.  Returns the full manifest for each pending job
-    so the service knows what artifacts to deploy.
+    Called by the off-chain deploy worker to discover work.  Each job may
+    already include ``backend_canister_id`` / ``frontend_canister_id`` after
+    ``allocate_deployment_canisters()``; otherwise the worker must allocate
+    before ``dfx canister install``.  The manifest describes artifacts.
     """
     try:
         list(DeploymentJob.instances())
@@ -1890,6 +1903,175 @@ def cancel_deployment(job_id: text) -> text:
 
 
 @update
+def allocate_deployment_canisters(args: text) -> Async[text]:
+    """Create empty backend/frontend canisters for a pending job (paid from here).
+
+    Called by the off-chain worker with JSON::
+
+        {"job_id": "job_...", "deployer_controller": "principal-text"}
+
+    ``deployer_controller`` must match the dfx identity used for
+    ``dfx canister install`` / asset deploy (co-controller with this
+    canister).  If the manifest sets ``realm_deploy_controller`` or
+    ``offchain_deploy_controller``, the argument must match that value.
+    Otherwise the first successful call locks the principal on the job
+    for later retries.
+
+    Idempotent: if both canister ids are already set, returns them.
+    Supports partial progress (backend only) after a crash between creates.
+    """
+    job_id = ""
+    try:
+        params = json.loads(args)
+        job_id = (params.get("job_id") or "").strip()
+        dc = (params.get("deployer_controller") or "").strip()
+        if not job_id:
+            return _err("job_id is required")
+        if not dc:
+            return _err("deployer_controller is required")
+
+        list(DeploymentJob.instances())
+        job = DeploymentJob[job_id]
+        if job is None:
+            return _err(f"unknown job_id: {job_id}")
+        if (job.status or "pending") != "pending":
+            return _err(
+                f"job {job_id} is in '{job.status}' status, expected 'pending'"
+            )
+
+        be = (job.backend_canister_id or "").strip()
+        fe = (job.frontend_canister_id or "").strip()
+        had_both_at_start = bool(be and fe)
+        if had_both_at_start:
+            ic.print(
+                f"[realm_installer] allocate_deployment_canisters: "
+                f"{job_id} already has canisters"
+            )
+            return _ok({
+                "job_id": job_id,
+                "backend_canister_id": be,
+                "frontend_canister_id": fe,
+                "already_allocated": True,
+            })
+
+        manifest = json.loads(job.manifest_json or "{}")
+        manifest_dc = (
+            (manifest.get("realm_deploy_controller") or "")
+            or (manifest.get("offchain_deploy_controller") or "")
+        ).strip()
+        if manifest_dc and dc != manifest_dc:
+            return _err(
+                "deployer_controller does not match manifest "
+                "realm_deploy_controller / offchain_deploy_controller"
+            )
+        locked = (job.offchain_deployer_principal or "").strip()
+        if locked and dc != locked:
+            return _err(
+                "deployer_controller does not match locked value for this job"
+            )
+
+        try:
+            deployer = Principal.from_str(dc)
+        except Exception as e:
+            return _err(f"invalid deployer_controller principal: {e}")
+
+        if not locked and not manifest_dc:
+            job.offchain_deployer_principal = dc
+
+        installer_id = ic.id()
+        controllers = [installer_id, deployer]
+
+        def _mc_create_err(prefix: str, call_result: CallResult) -> str | None:
+            return match(call_result, {
+                "Ok": lambda _r: None,
+                "Err": lambda err: f"{prefix}: {err}",
+            })
+
+        if not be:
+            create_call: CallResult = (
+                yield management_canister.create_canister(
+                    {"settings": None}
+                ).with_cycles(_REALM_CHILD_CREATE_CYCLES)
+            )
+            err = _mc_create_err("create_canister (backend)", create_call)
+            if err:
+                return _err(err)
+            backend_principal = match(create_call, {
+                "Ok": lambda r: r["canister_id"],
+                "Err": lambda _e: None,
+            })
+            upd: CallResult = yield management_canister.update_settings({
+                "canister_id": backend_principal,
+                "settings": {
+                    "controllers": Opt(controllers),
+                    "compute_allocation": None,
+                    "memory_allocation": None,
+                    "freezing_threshold": None,
+                },
+            })
+            err = _mc_create_err("update_settings (backend)", upd)
+            if err:
+                return _err(err)
+            job.backend_canister_id = backend_principal.to_str()
+            ic.print(
+                f"[realm_installer] allocated backend {job.backend_canister_id} "
+                f"for {job_id}"
+            )
+
+        be2 = (job.backend_canister_id or "").strip()
+        if not be2:
+            return _err("internal error: backend canister id missing after create")
+
+        if not (job.frontend_canister_id or "").strip():
+            create_fe: CallResult = (
+                yield management_canister.create_canister(
+                    {"settings": None}
+                ).with_cycles(_REALM_CHILD_CREATE_CYCLES)
+            )
+            err = _mc_create_err("create_canister (frontend)", create_fe)
+            if err:
+                return _err(err)
+            frontend_principal = match(create_fe, {
+                "Ok": lambda r: r["canister_id"],
+                "Err": lambda _e: None,
+            })
+            upd2: CallResult = yield management_canister.update_settings({
+                "canister_id": frontend_principal,
+                "settings": {
+                    "controllers": Opt(controllers),
+                    "compute_allocation": None,
+                    "memory_allocation": None,
+                    "freezing_threshold": None,
+                },
+            })
+            err = _mc_create_err("update_settings (frontend)", upd2)
+            if err:
+                return _err(err)
+            job.frontend_canister_id = frontend_principal.to_str()
+            ic.print(
+                f"[realm_installer] allocated frontend {job.frontend_canister_id} "
+                f"for {job_id}"
+            )
+
+        fe2 = (job.frontend_canister_id or "").strip()
+        if not fe2:
+            return _err("internal error: frontend canister id missing after create")
+
+        return _ok({
+            "job_id": job_id,
+            "backend_canister_id": be2,
+            "frontend_canister_id": fe2,
+            "already_allocated": False,
+        })
+    except Exception as e:
+        ic.print(f"[realm_installer] allocate_deployment_canisters error: {e}")
+        return _err(
+            f"{type(e).__name__}: {e}",
+            traceback=traceback.format_exc()[-1500:],
+        )
+
+
+@update
 def report_canister_ready(args: text) -> Async[text]:
     """Called by the off-chain deploy service after canisters are deployed.
 
@@ -1933,8 +2115,22 @@ def report_canister_ready(args: text) -> Async[text]:
         if not frontend_id:
             return _err("frontend_canister_id is required")
 
-        job.backend_canister_id = backend_id
-        job.frontend_canister_id = frontend_id
+        existing_b = (job.backend_canister_id or "").strip()
+        existing_f = (job.frontend_canister_id or "").strip()
+        if existing_b and existing_f:
+            if backend_id != existing_b or frontend_id != existing_f:
+                return _err(
+                    "backend_canister_id / frontend_canister_id must match "
+                    "installer-allocated canisters for this job"
+                )
+        elif existing_b or existing_f:
+            return _err(
+                f"job {job_id} has partial canister allocation; "
+                f"call allocate_deployment_canisters and retry"
+            )
+        else:
+            job.backend_canister_id = backend_id
+            job.frontend_canister_id = frontend_id
         job.token_backend_canister_id = params.get("token_backend_canister_id", "")
         job.token_frontend_canister_id = params.get("token_frontend_canister_id", "")
         job.nft_backend_canister_id = params.get("nft_backend_canister_id", "")
@@ -2618,6 +2814,14 @@ def info() -> text:
                 "name": "cancel_deployment",
                 "kind": "update",
                 "description": "Cancel a pending deployment job.",
+            },
+            {
+                "name": "allocate_deployment_canisters",
+                "kind": "update",
+                "description": (
+                    "Create empty realm backend/frontend canisters for a pending job "
+                    "(installer pays cycles); worker passes deployer co-controller."
+                ),
             },
             {
                 "name": "verify_realm",

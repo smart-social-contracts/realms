@@ -924,6 +924,7 @@ export interface _SERVICE {
   '__get_candid_interface_tmp_hack' : ActorMethod<[], string>,
   'cancel_deploy' : ActorMethod<[string], string>,
   'cancel_deployment' : ActorMethod<[string], string>,
+  'allocate_deployment_canisters' : ActorMethod<[string], string>,
   'debug_resume_deploys' : ActorMethod<[string], string>,
   'debug_run_one_step' : ActorMethod<[string], string>,
   'deploy_frontend' : ActorMethod<[string], string>,
