@@ -788,52 +788,44 @@ def request_deployment(manifest_json: text) -> Async[text]:
             manifest_json_for_installer
         )
 
-        if hasattr(call_result, "Err") and getattr(call_result, "Err", None) is not None:
-            e = call_result.Err
-            msg = getattr(
-                e, "message", str(e),
-            ) if not isinstance(e, dict) else e.get("message", str(e))
-            result = {"success": False, "error": msg}
-        elif hasattr(call_result, "Ok") and getattr(call_result, "Ok", None) is not None:
-            okv = call_result.Ok
-            if isinstance(okv, dict):
-                result = {
+        def _unwrap_enqueue(raw):
+            """Unwrap CallResult{'Ok': RResultEnqueue{'Ok': REnqueueOk{...}}}"""
+            v = raw
+            if isinstance(v, dict):
+                if "Err" in v and v["Err"] is not None:
+                    e = v["Err"]
+                    if isinstance(e, dict) and "message" in e:
+                        return {"success": False, "error": e["message"]}
+                    return {"success": False, "error": str(e)}
+                if "Ok" in v:
+                    v = v["Ok"]
+            if hasattr(v, "Err") and getattr(v, "Err", None) is not None:
+                e = v.Err
+                msg = e.get("message", str(e)) if isinstance(e, dict) else getattr(e, "message", str(e))
+                return {"success": False, "error": msg}
+            if hasattr(v, "Ok") and getattr(v, "Ok", None) is not None:
+                v = v.Ok
+            if isinstance(v, dict):
+                if "Err" in v and v["Err"] is not None:
+                    e = v["Err"]
+                    if isinstance(e, dict) and "message" in e:
+                        return {"success": False, "error": e["message"]}
+                    return {"success": False, "error": str(e)}
+                if "Ok" in v:
+                    v = v["Ok"]
+                if "job_id" in v:
+                    return {"success": True, **v}
+            if hasattr(v, "job_id"):
+                return {
                     "success": True,
-                    "job_id": okv.get("job_id", ""),
-                    "status": okv.get("status", ""),
-                    "realm_name": okv.get("realm_name", ""),
-                    "network": okv.get("network", ""),
+                    "job_id": getattr(v, "job_id", ""),
+                    "status": getattr(v, "status", ""),
+                    "realm_name": getattr(v, "realm_name", ""),
+                    "network": getattr(v, "network", ""),
                 }
-            else:
-                result = {
-                    "success": True,
-                    "job_id": getattr(okv, "job_id", ""),
-                    "status": getattr(okv, "status", ""),
-                    "realm_name": getattr(okv, "realm_name", ""),
-                    "network": getattr(okv, "network", ""),
-                }
-        elif isinstance(call_result, dict):
-            if call_result.get("Err") is not None:
-                e = call_result["Err"]
-                if isinstance(e, dict):
-                    msg = e.get("message", str(e))
-                else:
-                    msg = str(e)
-                result = {"success": False, "error": msg}
-            elif call_result.get("Ok") is not None:
-                okv = call_result["Ok"]
-                result = {
-                    "success": True,
-                    "job_id": okv.get("job_id", "")
-                    if isinstance(okv, dict) else getattr(okv, "job_id", ""),
-                    "status": (okv.get("status", "") if isinstance(okv, dict) else getattr(okv, "status", "")),
-                    "realm_name": (okv.get("realm_name", "") if isinstance(okv, dict) else getattr(okv, "realm_name", "")),
-                    "network": (okv.get("network", "") if isinstance(okv, dict) else getattr(okv, "network", "")),
-                }
-            else:
-                result = {"success": False, "error": "unexpected installer response"}
-        else:
-            result = {"success": False, "error": "unexpected installer response"}
+            return {"success": False, "error": f"unexpected installer response: {str(raw)[:200]}"}
+
+        result = _unwrap_enqueue(call_result)
 
         if result.get("success"):
             job_id = (result.get("job_id") or "").strip()
