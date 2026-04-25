@@ -131,6 +131,8 @@ info "  Credits response: $CREDITS_RAW"
 info "\n Phase 2: Submit deployment request"
 
 REALM_NAME="e2e-test-$(date +%s)"
+RELEASE_TAG="v0.3.2"
+RELEASE_BASE="https://github.com/smart-social-contracts/realms/releases/download"
 MANIFEST=$(cat <<EOF
 {
   "realm": {
@@ -145,7 +147,21 @@ MANIFEST=$(cat <<EOF
     "codex": {"package": "syntropia", "version": "latest"},
     "extensions": ["all"]
   },
-  "network": "$NETWORK"
+  "network": "$NETWORK",
+  "canister_artifacts": {
+    "realm": {
+      "backend": {
+        "wasm": {
+          "url": "$RELEASE_BASE/$RELEASE_TAG/realm_backend.wasm.gz",
+          "checksum": ""
+        }
+      },
+      "frontend": {
+        "url": "$RELEASE_BASE/$RELEASE_TAG/realm_frontend.tar.gz",
+        "checksum": ""
+      }
+    }
+  }
 }
 EOF
 )
@@ -192,9 +208,7 @@ INTERVAL=10
 FINAL_STATUS=""
 
 while [[ $ELAPSED -lt $MAX_WAIT ]]; do
-  STATUS_QUERY='{"job_id":"'"$JOB_ID"'"}'
-  STATUS_ESCAPED=$(echo "$STATUS_QUERY" | sed 's/\\/\\\\/g; s/"/\\"/g')
-  STATUS_RAW=$(dfx_query "$INSTALLER_ID" "get_deployment_job_status" "(\"$STATUS_ESCAPED\")" 2>&1 || echo "{}")
+  STATUS_RAW=$(dfx_query "$INSTALLER_ID" "get_deployment_job_status" "(\"$JOB_ID\")" 2>&1 || echo "{}")
 
   CURRENT_STATUS=$(echo "$STATUS_RAW" | python3 -c "
 import sys, json
@@ -234,7 +248,7 @@ info "\n Phase 4: Verify deployed realm"
 
 if [[ "$FINAL_STATUS" == "completed" ]]; then
   # Get the full job status for canister IDs
-  FULL_STATUS=$(dfx_query "$INSTALLER_ID" "get_deployment_job_status" "(\"$STATUS_ESCAPED\")" 2>&1 || echo "{}")
+  FULL_STATUS=$(dfx_query "$INSTALLER_ID" "get_deployment_job_status" "(\"$JOB_ID\")" 2>&1 || echo "{}")
   info "  Full status: ${FULL_STATUS:0:300}"
 
   BACKEND_CID=$(echo "$FULL_STATUS" | python3 -c "
