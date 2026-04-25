@@ -1937,6 +1937,7 @@ def _schedule_registration(job: DeploymentJob) -> None:
                 frontend_id,
                 j.token_backend_canister_id or "",
                 j.nft_backend_canister_id or "",
+                backend_id,
             ])
 
             registry = RealmRegistryService(Principal.from_str(reg_id))

@@ -474,28 +474,32 @@ def register_realm(
     Note: Basilisk limits canister methods to 5 params, so canister IDs are passed as JSON.
     """
     try:
-        # Parse canister IDs — pipe-delimited format: frontend_id|token_id|nft_id
-        # (JSON format triggers basilisk Candid encoder bug, so we use pipe-delimited)
+        # Parse canister IDs — pipe-delimited: frontend_id|token_id|nft_id[|backend_id]
+        # When backend_id (4th element) is present, use it as realm ID instead of
+        # ic.caller(). This allows the installer to register on behalf of realms.
         frontend_canister_id = ""
         token_canister_id = ""
         nft_canister_id = ""
+        realm_id_override = ""
         if canister_ids_json and "|" in canister_ids_json:
             parts = canister_ids_json.split("|")
             frontend_canister_id = parts[0] if len(parts) > 0 else ""
             token_canister_id = parts[1] if len(parts) > 1 else ""
             nft_canister_id = parts[2] if len(parts) > 2 else ""
+            realm_id_override = parts[3].strip() if len(parts) > 3 else ""
         elif canister_ids_json and canister_ids_json.startswith("{"):
-            # Fallback: JSON format (for direct dfx calls)
             canister_ids = json.loads(canister_ids_json)
             frontend_canister_id = canister_ids.get("frontend_canister_id", "")
             token_canister_id = canister_ids.get("token_canister_id", "")
             nft_canister_id = canister_ids.get("nft_canister_id", "")
+            realm_id_override = canister_ids.get("backend_canister_id", "")
         
         result = register_realm_by_caller(
             name, url, logo, backend_url,
             frontend_canister_id=frontend_canister_id,
             token_canister_id=token_canister_id,
             nft_canister_id=nft_canister_id,
+            realm_id_override=realm_id_override,
         )
         if result["success"]:
             return {"Ok": result["message"]}

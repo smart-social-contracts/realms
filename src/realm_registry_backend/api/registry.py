@@ -38,9 +38,10 @@ def register_realm_by_caller(
     frontend_canister_id: str = "",
     token_canister_id: str = "",
     nft_canister_id: str = "",
+    realm_id_override: str = "",
 ) -> dict:
-    """Register a realm using the caller's principal as the unique ID (upsert logic)"""
-    caller_id = str(ic.caller())
+    """Register a realm using the caller's principal (or explicit override) as unique ID (upsert)"""
+    caller_id = realm_id_override.strip() if realm_id_override else str(ic.caller())
     logger.info(f"Registering realm by caller: {caller_id}")
 
     try:
