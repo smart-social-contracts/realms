@@ -110,6 +110,10 @@ def request_one(
         },
         "network": network,
     }
+    if realm_config.get("canister_id"):
+        manifest["backend_canister_id"] = realm_config["canister_id"]
+    if realm_config.get("frontend_canister_id"):
+        manifest["frontend_canister_id"] = realm_config["frontend_canister_id"]
     if release_tag:
         manifest["canister_artifacts"] = _build_artifact_refs(release_tag)
 

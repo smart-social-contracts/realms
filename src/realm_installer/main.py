@@ -41,6 +41,7 @@ from basilisk import (
     Async,
     CallResult,
     Duration,
+    Opt,
     Principal,
     Record,
     Service,
@@ -51,6 +52,7 @@ from basilisk import (
     init,
     int8,
     match,
+    nat,
     nat32,
     nat64,
     null,
@@ -73,6 +75,17 @@ from ic_python_db import (
     String,
     TimestampedMixin,
 )
+from ic_python_logging import (
+    get_canister_logs as _get_canister_logs,
+    get_logger as _get_logger,
+)
+
+_log = _get_logger("realm_installer")
+
+
+def _jlog(job_id: str):
+    """Return a per-job logger keyed by job_id for topic-based retrieval."""
+    return _get_logger(job_id)
 
 # ---------------------------------------------------------------------------
 # Monkey-patch: fix Basilisk's _ServiceCall to avoid trap on string encoding.
@@ -203,11 +216,10 @@ class RealmTargetService(Service):
 # ---------------------------------------------------------------------------
 
 class RealmRegistryService(Service):
-    _arg_types = {
-        "register_realm": "text, text, text, text, text",
-        "deployment_failed": "text, text, text",
-        "deployment_succeeded": "text, text",
-    }
+    # NOTE: do NOT set _arg_types here. Basilisk has a WASM/CPython bug where
+    # _ServiceCall.__init__ silently fails to candid_encode when _candid_arg_type
+    # is set (even though the candid text is correct), falling back to empty args.
+    # The text-based encoding works fine without _arg_types for plain text params.
 
     @service_update
     def register_realm(
@@ -580,6 +592,14 @@ class ResultDebugResume(Variant, total=False):
     Err: InstallerError
 
 
+class PublicLogEntry(Record, _CandidAttrAccess):
+    timestamp: nat
+    level: text
+    logger_name: text
+    message: text
+    id: nat
+
+
 class HealthView(Record, _CandidAttrAccess):
     ok: bool
     canister: text
@@ -671,25 +691,19 @@ def _schedule_registry_settlement(job_id: str, success: bool, reason: str = "") 
                     job_id, caller_principal
                 )
                 raw = _unwrap_call_result(result)
-                ic.print(
-                    f"[realm_installer] settlement success callback for {job_id}: {raw}"
-                )
+                _jlog(job_id).info(f"settlement success callback: {raw}")
             else:
                 msg = (reason or job.error or "deployment failed")[:1900]
                 result: CallResult = yield registry.deployment_failed(
                     job_id, msg, caller_principal
                 )
                 raw = _unwrap_call_result(result)
-                ic.print(
-                    f"[realm_installer] settlement failure callback for {job_id}: {raw}"
-                )
+                _jlog(job_id).info(f"settlement failure callback: {raw}")
             job = DeploymentJob[job_id]
             if job:
                 job.settlement_notified = 1
         except Exception as e:
-            ic.print(
-                f"[realm_installer] settlement callback failed for {job_id}: {e}"
-            )
+            _jlog(job_id).error(f"settlement callback failed: {e}")
 
     ic.set_timer(Duration(0), _cb)
 
@@ -867,8 +881,8 @@ def _finalize_task(task: DeployTask) -> None:
     else:
         task.status = "partial"
     task.completed_at = _now_s()
-    ic.print(
-        f"[realm_installer] deploy {task.name} → {task.status} "
+    _jlog(task.name).info(
+        f"deploy → {task.status} "
         f"(completed={n_completed}/{n_total}, failed={n_failed})"
     )
     for s in task.steps:
@@ -892,9 +906,8 @@ def _execute_step(task: DeployTask, step: DeployStep):
     """
     step.status = "running"
     step.started_at = _now_s()
-    ic.print(
-        f"[realm_installer] deploy {task.name} step {step.idx} "
-        f"({step.kind} {step.label}) starting"
+    _jlog(task.name).info(
+        f"step {step.idx} ({step.kind} {step.label}) starting"
     )
     try:
         args = json.loads(step.args_json or "{}")
@@ -938,9 +951,8 @@ def _execute_step(task: DeployTask, step: DeployStep):
             step.error = f"unknown step kind: {step.kind}"
             step.status = "failed"
     except Exception as e:
-        ic.print(
-            f"[realm_installer] deploy {task.name} step {step.idx} "
-            f"({step.kind} {step.label}) FAILED: {e}"
+        _jlog(task.name).error(
+            f"step {step.idx} ({step.kind} {step.label}) FAILED: {e}"
         )
         step.error = (f"{type(e).__name__}: {e}")[:1990]
         step.status = "failed"
@@ -963,13 +975,10 @@ def _schedule_step_runner(task_id: str, delay_s: int = 0) -> None:
             list(DeployTask.instances())
             task = DeployTask[task_id]
             if not task:
-                ic.print(f"[realm_installer] deploy {task_id}: task vanished")
+                _jlog(task_id).warning("task vanished")
                 return
             if (task.status or "queued") in _TERMINAL_TASK_STATUSES:
-                ic.print(
-                    f"[realm_installer] deploy {task_id}: already terminal "
-                    f"({task.status}), no-op"
-                )
+                _jlog(task_id).info(f"already terminal ({task.status}), no-op")
                 return
 
             if (task.status or "queued") == "queued":
@@ -986,10 +995,7 @@ def _schedule_step_runner(task_id: str, delay_s: int = 0) -> None:
                 list(DeployTask.instances())
                 task = DeployTask[task_id]
                 if not task or (task.status or "") in _TERMINAL_TASK_STATUSES:
-                    ic.print(
-                        f"[realm_installer] deploy {task_id}: "
-                        f"cancelled mid-run, stopping"
-                    )
+                    _jlog(task_id).info("cancelled mid-run, stopping")
                     return
 
                 yield from _execute_step(task, step)
@@ -1000,9 +1006,8 @@ def _schedule_step_runner(task_id: str, delay_s: int = 0) -> None:
                     if count < _MAX_STEP_RETRIES:
                         _step_retry_counts[rk] = count + 1
                         delay = _RETRY_BASE_DELAY_S * (2 ** count)
-                        ic.print(
-                            f"[realm_installer] deploy {task_id} step "
-                            f"{step.idx} transient error, retry "
+                        _jlog(task_id).warning(
+                            f"step {step.idx} transient error, retry "
                             f"{count + 1}/{_MAX_STEP_RETRIES} in {delay}s"
                         )
                         step.status = "pending"
@@ -1011,15 +1016,13 @@ def _schedule_step_runner(task_id: str, delay_s: int = 0) -> None:
                         step.completed_at = 0
                         _schedule_step_runner(task_id, delay_s=delay)
                         return
-                    ic.print(
-                        f"[realm_installer] deploy {task_id} step "
-                        f"{step.idx} transient error but retries "
+                    _jlog(task_id).error(
+                        f"step {step.idx} transient error, retries "
                         f"exhausted ({_MAX_STEP_RETRIES})"
                     )
         except Exception as e:
-            ic.print(
-                f"[realm_installer] timer callback fatal error for "
-                f"{task_id}: {e}\n{traceback.format_exc()[-1500:]}"
+            _jlog(task_id).error(
+                f"timer callback fatal: {e}\n{traceback.format_exc()[-1500:]}"
             )
             try:
                 t = DeployTask[task_id]
@@ -1047,6 +1050,12 @@ def _schedule_step_runner(task_id: str, delay_s: int = 0) -> None:
 # Initial cycles attached to each empty realm child canister at creation
 # (mainnet-style subnets; top-up before install remains the worker's job).
 _REALM_CHILD_CREATE_CYCLES = 600_000_000_000
+
+_FILE_REGISTRY_CANISTER_IDS = {
+    "staging": "iebdk-kqaaa-aaaau-agoxq-cai",
+    "demo": "vi64l-3aaaa-aaaae-qj4va-cai",
+    "test": "uq2mu-kaaaa-aaaah-avqcq-cai",
+}
 
 
 def _gen_job_id() -> str:
@@ -1142,12 +1151,12 @@ def enqueue_deployment(manifest_json: text) -> ResultEnqueue:
             caller_principal=requester,
             manifest_json=manifest_json[:8190],
             network=network,
-            backend_canister_id="",
-            frontend_canister_id="",
-            token_backend_canister_id="",
-            token_frontend_canister_id="",
-            nft_backend_canister_id="",
-            nft_frontend_canister_id="",
+            backend_canister_id=(manifest.get("backend_canister_id") or "").strip(),
+            frontend_canister_id=(manifest.get("frontend_canister_id") or "").strip(),
+            token_backend_canister_id=(manifest.get("token_backend_canister_id") or "").strip(),
+            token_frontend_canister_id=(manifest.get("token_frontend_canister_id") or "").strip(),
+            nft_backend_canister_id=(manifest.get("nft_backend_canister_id") or "").strip(),
+            nft_frontend_canister_id=(manifest.get("nft_frontend_canister_id") or "").strip(),
             expected_wasm_hash=wasm_hash,
             expected_assets_hash=assets_hash,
             actual_wasm_hash="",
@@ -1163,10 +1172,7 @@ def enqueue_deployment(manifest_json: text) -> ResultEnqueue:
             completed_at=0,
         )
 
-        ic.print(
-            f"[realm_installer] enqueued deployment job {job_id} "
-            f"for realm '{realm_name}' on {network}"
-        )
+        _jlog(job_id).info(f"enqueued for realm '{realm_name}' on {network}")
         return ResultEnqueue(Ok=EnqueueOk(
             job_id=job_id,
             status="pending",
@@ -1174,7 +1180,7 @@ def enqueue_deployment(manifest_json: text) -> ResultEnqueue:
             network=network,
         ))
     except Exception as e:
-        ic.print(f"[realm_installer] enqueue_deployment error: {e}")
+        _log.error(f"enqueue_deployment error: {e}")
         return ResultEnqueue(Err=_ie(
             f"{type(e).__name__}: {e}", traceback.format_exc()[-1500:],
         ))
@@ -1301,7 +1307,7 @@ def cancel_deployment(job_id: text) -> ResultJobCancel:
         job.error = "cancelled by cancel_deployment"
         job.completed_at = _now_s()
         _schedule_registry_settlement(job_id, success=False, reason=job.error)
-        ic.print(f"[realm_installer] cancelled deployment job {job_id}")
+        _jlog(job_id).info("cancelled")
         return ResultJobCancel(Ok=JobStatusAck(
             job_id=job_id,
             prev_status=prev,
@@ -1353,9 +1359,7 @@ def report_deployment_failure(args: text) -> ResultReportFailure:
             job.registry_canister_id = reg_id
         job.completed_at = _now_s()
         _schedule_registry_settlement(job_id, success=False, reason=err)
-        ic.print(
-            f"[realm_installer] report_deployment_failure {job_id}: {err[:240]}"
-        )
+        _jlog(job_id).error(f"report_deployment_failure: {err[:240]}")
         return ResultReportFailure(Ok=JobStatusAck(
             job_id=job_id,
             prev_status=prev,
@@ -1363,7 +1367,7 @@ def report_deployment_failure(args: text) -> ResultReportFailure:
             noop=False,
         ))
     except Exception as e:
-        ic.print(f"[realm_installer] report_deployment_failure error: {e}")
+        _log.error(f"report_deployment_failure error: {e}")
         return ResultReportFailure(Err=_ie(f"{type(e).__name__}: {e}"))
 
 
@@ -1408,10 +1412,7 @@ def allocate_deployment_canisters(args: text) -> Async[ResultAllocate]:
         fe = (job.frontend_canister_id or "").strip()
         had_both_at_start = bool(be and fe)
         if had_both_at_start:
-            ic.print(
-                f"[realm_installer] allocate_deployment_canisters: "
-                f"{job_id} already has canisters"
-            )
+            _jlog(job_id).info("allocate_deployment_canisters: already has canisters")
             return ResultAllocate(Ok=AllocateOk(
                 job_id=job_id,
                 backend_canister_id=be,
@@ -1478,10 +1479,7 @@ def allocate_deployment_canisters(args: text) -> Async[ResultAllocate]:
             if err:
                 return ResultAllocate(Err=_ie(err))
             job.backend_canister_id = backend_principal.to_str()
-            ic.print(
-                f"[realm_installer] allocated backend {job.backend_canister_id} "
-                f"for {job_id}"
-            )
+            _jlog(job_id).info(f"allocated backend {job.backend_canister_id}")
 
         be2 = (job.backend_canister_id or "").strip()
         if not be2:
@@ -1515,10 +1513,7 @@ def allocate_deployment_canisters(args: text) -> Async[ResultAllocate]:
             if err:
                 return ResultAllocate(Err=_ie(err))
             job.frontend_canister_id = frontend_principal.to_str()
-            ic.print(
-                f"[realm_installer] allocated frontend {job.frontend_canister_id} "
-                f"for {job_id}"
-            )
+            _jlog(job_id).info(f"allocated frontend {job.frontend_canister_id}")
 
         fe2 = (job.frontend_canister_id or "").strip()
         if not fe2:
@@ -1533,7 +1528,7 @@ def allocate_deployment_canisters(args: text) -> Async[ResultAllocate]:
             already_allocated=False,
         ))
     except Exception as e:
-        ic.print(f"[realm_installer] allocate_deployment_canisters error: {e}")
+        _log.error(f"allocate_deployment_canisters error: {e}")
         return ResultAllocate(Err=_ie(
             f"{type(e).__name__}: {e}", traceback.format_exc()[-1500:],
         ))
@@ -1611,9 +1606,8 @@ def report_canister_ready(args: text) -> Async[ResultReportReady]:
         if params.get("actual_assets_hash"):
             job.expected_assets_hash = job.expected_assets_hash or params["actual_assets_hash"]
 
-        ic.print(
-            f"[realm_installer] report_canister_ready for {job_id}: "
-            f"backend={backend_id}, frontend={frontend_id}"
+        _jlog(job_id).info(
+            f"report_canister_ready: backend={backend_id}, frontend={frontend_id}"
         )
 
         # ── Verify WASM hash via canister_status ──────────────────────
@@ -1647,10 +1641,7 @@ def report_canister_ready(args: text) -> Async[ResultReportReady]:
                 if expected and expected == actual:
                     job.wasm_verified = 1
                     wasm_verified = True
-                    ic.print(
-                        f"[realm_installer] WASM hash verified for {job_id}: "
-                        f"{actual}"
-                    )
+                    _jlog(job_id).info(f"WASM hash verified: {actual}")
                 elif expected:
                     job.wasm_verified = -1
                     job.status = "failed_verification"
@@ -1662,9 +1653,8 @@ def report_canister_ready(args: text) -> Async[ResultReportReady]:
                     _schedule_registry_settlement(
                         job_id, success=False, reason=job.error
                     )
-                    ic.print(
-                        f"[realm_installer] WASM verification FAILED for "
-                        f"{job_id}: expected={expected}, actual={actual}"
+                    _jlog(job_id).error(
+                        f"WASM verification FAILED: expected={expected}, actual={actual}"
                     )
                     return ResultReportReady(Ok=ReportReadyOk(
                         job_id=job_id,
@@ -1678,22 +1668,15 @@ def report_canister_ready(args: text) -> Async[ResultReportReady]:
                 else:
                     job.wasm_verified = 1
                     wasm_verified = True
-                    ic.print(
-                        f"[realm_installer] no expected WASM hash for {job_id}, "
-                        f"recording actual: {actual}"
-                    )
+                    _jlog(job_id).info(f"no expected WASM hash, recording actual: {actual}")
             else:
-                ic.print(
-                    f"[realm_installer] canister_status did not return "
-                    f"module_hash for {backend_id}"
+                _jlog(job_id).warning(
+                    f"canister_status did not return module_hash for {backend_id}"
                 )
                 job.wasm_verified = 1
                 wasm_verified = True
         except Exception as e:
-            ic.print(
-                f"[realm_installer] canister_status call failed for "
-                f"{backend_id}: {e}"
-            )
+            _jlog(job_id).warning(f"canister_status call failed for {backend_id}: {e}")
             job.wasm_verified = 1
             wasm_verified = True
 
@@ -1712,7 +1695,7 @@ def report_canister_ready(args: text) -> Async[ResultReportReady]:
             failed_verification=False,
         ))
     except Exception as e:
-        ic.print(f"[realm_installer] report_canister_ready error: {e}")
+        _log.error(f"report_canister_ready error: {e}")
         try:
             if job_id:
                 j = DeploymentJob[job_id]
@@ -1776,16 +1759,10 @@ def report_frontend_verified(args: text) -> ResultReportFrontend:
             job.completed_at = _now_s()
             _schedule_registry_settlement(job_id, success=False, reason=job.error)
             failed = True
-            ic.print(
-                f"[realm_installer] frontend assets verification FAILED "
-                f"for {job_id}"
-            )
+            _jlog(job_id).error("frontend assets verification FAILED")
         else:
             job.assets_verified = 1
-            ic.print(
-                f"[realm_installer] frontend assets verified for {job_id}: "
-                f"{assets_hash}"
-            )
+            _jlog(job_id).info(f"frontend assets verified: {assets_hash}")
             manifest = json.loads(job.manifest_json or "{}")
             realm_info = manifest.get("realm", {})
             extensions = realm_info.get("extensions", [])
@@ -1806,7 +1783,7 @@ def report_frontend_verified(args: text) -> ResultReportFrontend:
             failed_verification=failed,
         ))
     except Exception as e:
-        ic.print(f"[realm_installer] report_frontend_verified error: {e}")
+        _log.error(f"report_frontend_verified error: {e}")
         return ResultReportFrontend(Err=_ie(
             f"{type(e).__name__}: {e}", traceback.format_exc()[-1500:],
         ))
@@ -1822,10 +1799,11 @@ def _start_extensions_for_job(job: DeploymentJob, manifest: dict) -> None:
     extensions_config = realm_info.get("extensions", [])
     codex_config = realm_info.get("codex")
 
-    # The file_registry canister is needed for extension/codex installs.
-    # It should be passed in the manifest or configured as a default.
-    artifacts = manifest.get("canister_artifacts", {})
-    registry_id = manifest.get("file_registry_canister_id", "")
+    network = (manifest.get("network") or "").strip()
+    registry_id = (
+        manifest.get("file_registry_canister_id", "")
+        or _FILE_REGISTRY_CANISTER_IDS.get(network, "")
+    )
 
     ext_manifest = {
         "target_canister_id": job.backend_canister_id,
@@ -1835,9 +1813,8 @@ def _start_extensions_for_job(job: DeploymentJob, manifest: dict) -> None:
     ext_list = []
     if isinstance(extensions_config, list):
         if extensions_config == ["all"]:
-            ic.print(
-                f"[realm_installer] extensions='all' — skipping "
-                f"(needs resolution by deploy service)"
+            _jlog(job.name).info(
+                "extensions='all' — skipping (needs resolution by deploy service)"
             )
         else:
             for ext in extensions_config:
@@ -1862,10 +1839,7 @@ def _start_extensions_for_job(job: DeploymentJob, manifest: dict) -> None:
         ext_manifest["codices"] = codex_list
 
     if not ext_list and not codex_list:
-        ic.print(
-            f"[realm_installer] no concrete extensions/codices for "
-            f"job {job.name}, moving to registration"
-        )
+        _jlog(job.name).info("no concrete extensions/codices, moving to registration")
         job.status = "registering"
         _schedule_registration(job)
         return
@@ -1886,16 +1860,10 @@ def _start_extensions_for_job(job: DeploymentJob, manifest: dict) -> None:
         n_steps = len(list(task.steps))
         job.ext_deploy_task_id = task_id
 
-        ic.print(
-            f"[realm_installer] created extension task {task_id} "
-            f"with {n_steps} steps for job {job.name}"
-        )
+        _jlog(job.name).info(f"created extension task {task_id} with {n_steps} steps")
         _schedule_step_runner(task_id, 0)
     except Exception as e:
-        ic.print(
-            f"[realm_installer] failed to create extension task "
-            f"for job {job.name}: {e}"
-        )
+        _jlog(job.name).error(f"failed to create extension task: {e}")
         job.status = "registering"
         _schedule_registration(job)
 
@@ -1910,16 +1878,14 @@ def _check_job_after_extensions(task: DeployTask) -> None:
                 if (job.ext_deploy_task_id or "") == task.name:
                     ext_status = task.status or "completed"
                     if ext_status in ("completed", "partial"):
-                        ic.print(
-                            f"[realm_installer] extensions {ext_status} "
-                            f"for job {job.name}, proceeding to registration"
+                        _jlog(job.name).info(
+                            f"extensions {ext_status}, proceeding to registration"
                         )
                         job.status = "registering"
                         _schedule_registration(job)
                     else:
-                        ic.print(
-                            f"[realm_installer] extensions {ext_status} "
-                            f"for job {job.name}, marking job failed"
+                        _jlog(job.name).error(
+                            f"extensions {ext_status}, marking job failed"
                         )
                         job.status = "failed"
                         job.error = (
@@ -1934,7 +1900,7 @@ def _check_job_after_extensions(task: DeployTask) -> None:
             except Exception:
                 continue
     except Exception as e:
-        ic.print(f"[realm_installer] _check_job_after_extensions error: {e}")
+        _log.error(f"_check_job_after_extensions error: {e}")
 
 
 def _schedule_registration(job: DeploymentJob) -> None:
@@ -1950,10 +1916,7 @@ def _schedule_registration(job: DeploymentJob) -> None:
 
             reg_id = j.registry_canister_id
             if not reg_id:
-                ic.print(
-                    f"[realm_installer] no registry_canister_id for "
-                    f"job {job_id}, marking failed"
-                )
+                _jlog(job_id).error("no registry_canister_id, marking failed")
                 j.status = "failed"
                 j.error = "missing registry_canister_id"
                 j.completed_at = _now_s()
@@ -1981,23 +1944,16 @@ def _schedule_registration(job: DeploymentJob) -> None:
                 realm_name, url, logo_ref, backend_url, canister_ids,
             )
             raw = _unwrap_call_result(result)
-            ic.print(
-                f"[realm_installer] registered realm for job {job_id}: {raw}"
-            )
+            _jlog(job_id).info(f"registered realm: {raw}")
 
             j = DeploymentJob[job_id]
             if j:
                 j.status = "completed"
                 j.completed_at = _now_s()
                 _schedule_registry_settlement(job_id, success=True)
-                ic.print(
-                    f"[realm_installer] deployment job {job_id} completed"
-                )
+                _jlog(job_id).info("deployment completed")
         except Exception as e:
-            ic.print(
-                f"[realm_installer] registration failed for job "
-                f"{job_id}: {e}"
-            )
+            _jlog(job_id).error(f"registration failed: {e}")
             try:
                 j = DeploymentJob[job_id]
                 if j and (j.status or "") not in _JOB_TERMINAL_STATUSES:
@@ -2133,9 +2089,7 @@ def _resume_in_flight_deploys() -> None:
                     tid = t.target_canister_id
                     by_target.setdefault(tid, []).append(t)
             except Exception as e:
-                ic.print(
-                    f"[realm_installer] failed to inspect task {t}: {e}"
-                )
+                _log.error(f"failed to inspect task {t}: {e}")
 
         for target_id, tasks in by_target.items():
             # Sort: active (queued/running) first, then waiting, by started_at
@@ -2153,32 +2107,26 @@ def _resume_in_flight_deploys() -> None:
                     s.status = "pending"
                     s.started_at = 0
             head.status = "queued"
-            ic.print(
-                f"[realm_installer] resuming deploy {head.name} "
-                f"after upgrade (target {target_id})"
-            )
+            _jlog(head.name).info(f"resuming after upgrade (target {target_id})")
             _schedule_step_runner(head.name, 0)
 
             # Ensure remaining tasks for same target are waiting
             for t in tasks[1:]:
                 if (t.status or "queued") != "waiting":
                     t.status = "waiting"
-                    ic.print(
-                        f"[realm_installer] keeping {t.name} as waiting "
-                        f"(behind {head.name})"
-                    )
+                    _jlog(t.name).info(f"keeping as waiting (behind {head.name})")
     except Exception as e:
-        ic.print(f"[realm_installer] _resume_in_flight_deploys error: {e}")
+        _log.error(f"_resume_in_flight_deploys error: {e}")
 
 
 @init
 def _on_init() -> None:
-    ic.print("[realm_installer] init")
+    _log.info("init")
 
 
 @post_upgrade
 def _on_post_upgrade() -> None:
-    ic.print("[realm_installer] post_upgrade — resuming in-flight deploys")
+    _log.info("post_upgrade — resuming in-flight deploys")
     _resume_in_flight_deploys()
 
 
@@ -2251,9 +2199,8 @@ def debug_run_one_step(args: text) -> Async[ResultDebugRunStep]:
             task.status = "running"
             task.started_at = _now_s()
 
-        ic.print(
-            f"[debug_run_one_step] executing step {step.idx} "
-            f"({step.kind} {step.label}) for {task_id}"
+        _jlog(task_id).info(
+            f"debug_run_one_step: step {step.idx} ({step.kind} {step.label})"
         )
         yield from _execute_step(task, step)
 
@@ -2269,7 +2216,7 @@ def debug_run_one_step(args: text) -> Async[ResultDebugRunStep]:
             remaining_pending=nat32(int(remaining)),
         ))
     except Exception as e:
-        ic.print(f"[debug_run_one_step] error: {e}")
+        _log.error(f"debug_run_one_step error: {e}")
         return ResultDebugRunStep(Err=_ie(f"{type(e).__name__}: {e}"))
 
 
@@ -2321,8 +2268,8 @@ def debug_resume_deploys(args: text) -> ResultDebugResume:
                 status="",
                 note="",
             ))
-            ic.print(
-                f"[realm_installer] debug_resume: restarting {head.name} "
+            _jlog(head.name).info(
+                f"debug_resume: restarting "
                 f"({len(pending_steps)} pending, {len(running_steps)} running→pending)"
             )
             for t in tasks[1:]:
@@ -2353,6 +2300,32 @@ def health() -> HealthView:
         max_upload_chunk_bytes=nat32(int(MAX_UPLOAD_CHUNK_BYTES)),
         max_registry_read_bytes=nat32(int(MAX_REGISTRY_READ_BYTES)),
     )
+
+
+@query
+def get_canister_logs(
+    from_entry: Opt[nat] = None,
+    max_entries: Opt[nat] = None,
+    min_level: Opt[text] = None,
+    logger_name: Opt[text] = None,
+) -> Vec[PublicLogEntry]:
+    """Return in-memory log entries, optionally filtered by logger_name (job id)."""
+    logs = _get_canister_logs(
+        from_entry=from_entry,
+        max_entries=max_entries,
+        min_level=min_level,
+        logger_name=logger_name,
+    )
+    return [
+        PublicLogEntry(
+            timestamp=log["timestamp"],
+            level=log["level"],
+            logger_name=log["logger_name"],
+            message=log["message"],
+            id=log["id"],
+        )
+        for log in logs
+    ]
 
 
 @query
@@ -2435,6 +2408,11 @@ def info() -> InstallerInfoView:
                 name="health",
                 kind="query",
                 description="Liveness probe.",
+            ),
+            EndpointInfo(
+                name="get_canister_logs",
+                kind="query",
+                description="Retrieve in-memory logs, filterable by logger_name (job id).",
             ),
         ],
     )
