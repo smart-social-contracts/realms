@@ -114,7 +114,8 @@ def request_one(
         manifest["canister_artifacts"] = _build_artifact_refs(release_tag)
 
     manifest_json = json.dumps(manifest)
-    candid_arg = f'("{manifest_json}")'
+    escaped = manifest_json.replace('\\', '\\\\').replace('"', '\\"')
+    candid_arg = f'("{escaped}")'
 
     print(f"  Calling request_deployment for '{manifest['realm']['name']}'...")
     raw = dfx_call(registry_id, "request_deployment", candid_arg, network)
