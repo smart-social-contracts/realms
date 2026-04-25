@@ -50,17 +50,6 @@ export const idlFactory = ({ IDL }) => {
     'Ok' : DebugRunStepOk,
     'Err' : InstallerError,
   });
-  const DeployFrontendOk = IDL.Record({
-    'gzip_variants' : IDL.Nat32,
-    'files_deployed' : IDL.Nat32,
-    'operations_count' : IDL.Nat32,
-    'frontend_namespace' : IDL.Text,
-    'target_canister_id' : IDL.Text,
-  });
-  const ResultDeployFrontend = IDL.Variant({
-    'Ok' : DeployFrontendOk,
-    'Err' : InstallerError,
-  });
   const EnqueueOk = IDL.Record({
     'status' : IDL.Text,
     'network' : IDL.Text,
@@ -71,15 +60,12 @@ export const idlFactory = ({ IDL }) => {
     'Ok' : EnqueueOk,
     'Err' : InstallerError,
   });
-  const FetchModuleHashOk = IDL.Record({
-    'wasm_module_hash_hex' : IDL.Text,
-    'wasm_namespace' : IDL.Text,
-    'wasm_path' : IDL.Text,
-    'wasm_size' : IDL.Nat64,
-  });
-  const ResultFetchModuleHash = IDL.Variant({
-    'Ok' : FetchModuleHashOk,
-    'Err' : InstallerError,
+  const PublicLogEntry = IDL.Record({
+    'id' : IDL.Nat,
+    'level' : IDL.Text,
+    'logger_name' : IDL.Text,
+    'message' : IDL.Text,
+    'timestamp' : IDL.Nat,
   });
   const DeploymentJobView = IDL.Record({
     'status' : IDL.Text,
@@ -88,6 +74,7 @@ export const idlFactory = ({ IDL }) => {
     'backend_canister_id' : IDL.Text,
     'offchain_deployer_principal' : IDL.Text,
     'ext_deploy_task_id' : IDL.Text,
+    'assets_verified' : IDL.Int8,
     'network' : IDL.Text,
     'nft_frontend_canister_id' : IDL.Text,
     'created_at' : IDL.Nat64,
@@ -101,6 +88,7 @@ export const idlFactory = ({ IDL }) => {
     'expected_assets_hash' : IDL.Text,
     'completed_at' : IDL.Nat64,
     'token_backend_canister_id' : IDL.Text,
+    'actual_assets_hash' : IDL.Text,
     'frontend_canister_id' : IDL.Text,
     'nft_backend_canister_id' : IDL.Text,
   });
@@ -124,10 +112,12 @@ export const idlFactory = ({ IDL }) => {
     'status' : IDL.Text,
     'expected_wasm_hash' : IDL.Text,
     'backend_canister_id' : IDL.Text,
+    'assets_verified' : IDL.Int8,
     'wasm_verified' : IDL.Int8,
     'job_id' : IDL.Text,
     'actual_wasm_hash' : IDL.Text,
     'expected_assets_hash' : IDL.Text,
+    'actual_assets_hash' : IDL.Text,
     'frontend_canister_id' : IDL.Text,
   });
   const ResultVerificationReport = IDL.Variant({
@@ -150,19 +140,6 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Text,
     'description' : IDL.Text,
     'version' : IDL.Text,
-  });
-  const InstallBackendOk = IDL.Record({
-    'chunks_uploaded' : IDL.Nat32,
-    'wasm_module_hash_hex' : IDL.Text,
-    'mode' : IDL.Text,
-    'wasm_namespace' : IDL.Text,
-    'target_canister_id' : IDL.Text,
-    'wasm_path' : IDL.Text,
-    'wasm_size' : IDL.Nat64,
-  });
-  const ResultInstallBackend = IDL.Variant({
-    'Ok' : InstallBackendOk,
-    'Err' : InstallerError,
   });
   const ChildCanisterInstallStatus = IDL.Variant({
     'Empty' : IDL.Null,
@@ -211,6 +188,17 @@ export const idlFactory = ({ IDL }) => {
     'Ok' : JobStatusAck,
     'Err' : InstallerError,
   });
+  const ReportFrontendOk = IDL.Record({
+    'status' : IDL.Text,
+    'assets_verified' : IDL.Int8,
+    'failed_verification' : IDL.Bool,
+    'job_id' : IDL.Text,
+    'actual_assets_hash' : IDL.Text,
+  });
+  const ResultReportFrontend = IDL.Variant({
+    'Ok' : ReportFrontendOk,
+    'Err' : InstallerError,
+  });
   const VerifyOk = IDL.Record({
     'expected_wasm_hash' : IDL.Text,
     'verified' : IDL.Bool,
@@ -231,6 +219,16 @@ export const idlFactory = ({ IDL }) => {
     'debug_run_one_step' : IDL.Func([IDL.Text], [ResultDebugRunStep], []),
     'enqueue_deployment' : IDL.Func([IDL.Text], [ResultEnqueue], []),
     'execute_code_shell' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'get_canister_logs' : IDL.Func(
+        [
+          IDL.Opt(IDL.Nat),
+          IDL.Opt(IDL.Nat),
+          IDL.Opt(IDL.Text),
+          IDL.Opt(IDL.Text),
+        ],
+        [IDL.Vec(PublicLogEntry)],
+        ['query'],
+      ),
     'get_deployment_job_status' : IDL.Func(
         [IDL.Text],
         [ResultJobIdStatus],
@@ -254,6 +252,11 @@ export const idlFactory = ({ IDL }) => {
     'report_deployment_failure' : IDL.Func(
         [IDL.Text],
         [ResultReportFailure],
+        [],
+      ),
+    'report_frontend_verified' : IDL.Func(
+        [IDL.Text],
+        [ResultReportFrontend],
         [],
       ),
     'verify_realm' : IDL.Func([IDL.Text], [ResultVerify], []),

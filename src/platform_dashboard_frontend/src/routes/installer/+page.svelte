@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { installerActor, registryActor } from '$lib/canisters';
   import { isAuthenticated } from '$lib/auth';
+  import { CONFIG } from '$lib/config';
   import type { DeploymentJob, InstallerInfo } from '$lib/types';
 
   let loading = true;
@@ -10,7 +11,6 @@
   let info: InstallerInfo | null = null;
   let deploymentJobs: DeploymentJob[] = [];
 
-  // Deploy form state
   let showDeployForm = false;
   let deployRealmName = '';
   let deployDisplayName = '';
@@ -19,6 +19,12 @@
   let deploySubmitting = false;
   let deployError = '';
   let deploySuccess = '';
+
+  let expandedJobId: string | null = null;
+  let logsLoading = false;
+  let installerLogs: string = '';
+  let deployerLogs: string = '';
+  let activeLogTab: 'installer' | 'deployer' = 'installer';
 
   onMount(async () => {
     await loadData();
@@ -95,6 +101,64 @@
     }
   }
 
+  async function toggleLogs(jobId: string) {
+    if (expandedJobId === jobId) {
+      expandedJobId = null;
+      return;
+    }
+    expandedJobId = jobId;
+    installerLogs = '';
+    deployerLogs = '';
+    activeLogTab = 'installer';
+    logsLoading = true;
+
+    try {
+      const [instResult, deplResult] = await Promise.allSettled([
+        fetchInstallerLogs(jobId),
+        fetchDeployerLogs(jobId),
+      ]);
+      if (instResult.status === 'fulfilled') installerLogs = instResult.value;
+      else installerLogs = `Error: ${(instResult as any).reason}`;
+      if (deplResult.status === 'fulfilled') deployerLogs = deplResult.value;
+      else deployerLogs = `Error: ${(deplResult as any).reason}`;
+    } finally {
+      logsLoading = false;
+    }
+  }
+
+  async function fetchInstallerLogs(jobId: string): Promise<string> {
+    try {
+      const entries = await installerActor.get_canister_logs(
+        [],       // from_entry
+        [],       // max_entries
+        [],       // min_level
+        [jobId],  // logger_name = job_id
+      );
+      if (!entries || entries.length === 0) return '(no installer logs for this job)';
+      return entries
+        .map((e: any) => {
+          const ts = new Date(Number(e.timestamp) / 1_000_000).toISOString();
+          return `${ts} [${e.level}] ${e.message}`;
+        })
+        .join('\n');
+    } catch (e: any) {
+      return `Failed to fetch installer logs: ${e.message || e}`;
+    }
+  }
+
+  async function fetchDeployerLogs(jobId: string): Promise<string> {
+    const base = CONFIG.deploy_service_url;
+    if (!base) return '(deploy service URL not configured)';
+    try {
+      const resp = await fetch(`${base}/api/logs/${encodeURIComponent(jobId)}`);
+      if (resp.status === 404) return '(no deployer logs for this job)';
+      if (!resp.ok) return `HTTP ${resp.status}: ${await resp.text()}`;
+      return await resp.text();
+    } catch (e: any) {
+      return `Failed to fetch deployer logs: ${e.message || e}`;
+    }
+  }
+
   function statusBadgeClass(status: string): string {
     switch (status?.toLowerCase()) {
       case 'completed': return 'badge-success';
@@ -106,26 +170,29 @@
     }
   }
 
-  function verifiedBadge(v: number): string {
-    if (v === 1) return 'badge-success';
-    if (v === -1) return 'badge-danger';
+  function toNum(v: any): number {
+    if (typeof v === 'bigint') return Number(v);
+    return Number(v) || 0;
+  }
+
+  function verifiedBadge(v: any): string {
+    const n = toNum(v);
+    if (n === 1) return 'badge-success';
+    if (n === -1) return 'badge-danger';
     return 'badge-neutral';
   }
 
-  function verifiedLabel(v: number): string {
-    if (v === 1) return 'Verified';
-    if (v === -1) return 'Failed';
+  function verifiedLabel(v: any): string {
+    const n = toNum(v);
+    if (n === 1) return 'Verified';
+    if (n === -1) return 'Failed';
     return 'Pending';
   }
 
-  function formatTime(ts: number): string {
-    if (!ts) return '—';
-    return new Date(ts * 1000).toLocaleString();
-  }
-
-  function shortId(id: string): string {
-    if (!id || id.length <= 20) return id || '—';
-    return id.slice(0, 10) + '...';
+  function formatTime(ts: any): string {
+    const n = toNum(ts);
+    if (!n) return '—';
+    return new Date(n * 1000).toLocaleString();
   }
 </script>
 
@@ -224,22 +291,56 @@
             <th>Backend</th>
             <th>WASM</th>
             <th>Created</th>
+            <th>Logs</th>
           </tr>
         </thead>
         <tbody>
           {#each deploymentJobs as job}
             <tr>
-              <td><code>{shortId(job.job_id)}</code></td>
+              <td><code class="id-cell">{job.job_id || '—'}</code></td>
               <td><span class="badge {statusBadgeClass(job.status)}">{job.status}</span></td>
               <td>{job.network || '—'}</td>
-              <td><code>{shortId(job.backend_canister_id)}</code></td>
+              <td><code class="id-cell">{job.backend_canister_id || '—'}</code></td>
               <td>
                 <span class="badge {verifiedBadge(job.wasm_verified)}">
                   {verifiedLabel(job.wasm_verified)}
                 </span>
               </td>
               <td>{formatTime(job.created_at)}</td>
+              <td>
+                <button
+                  class="btn btn-sm btn-outline"
+                  on:click={() => toggleLogs(job.job_id)}
+                >
+                  {expandedJobId === job.job_id ? 'Hide' : 'Logs'}
+                </button>
+              </td>
             </tr>
+            {#if expandedJobId === job.job_id}
+              <tr class="logs-row">
+                <td colspan="7">
+                  <div class="logs-panel">
+                    <div class="log-tabs">
+                      <button
+                        class="log-tab"
+                        class:active={activeLogTab === 'installer'}
+                        on:click={() => activeLogTab = 'installer'}
+                      >Installer Canister</button>
+                      <button
+                        class="log-tab"
+                        class:active={activeLogTab === 'deployer'}
+                        on:click={() => activeLogTab = 'deployer'}
+                      >Deploy Service</button>
+                    </div>
+                    {#if logsLoading}
+                      <div class="log-content"><span class="spinner"></span> Loading logs...</div>
+                    {:else}
+                      <pre class="log-content">{activeLogTab === 'installer' ? installerLogs : deployerLogs}</pre>
+                    {/if}
+                  </div>
+                </td>
+              </tr>
+            {/if}
           {/each}
         </tbody>
       </table>
@@ -300,4 +401,57 @@
   }
   .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 0.5rem; }
   .table-wrap table { margin: 0; }
+  .id-cell {
+    font-size: 0.78rem;
+    word-break: break-all;
+    max-width: 18ch;
+    display: inline-block;
+  }
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    cursor: pointer;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.3rem;
+    font-size: 0.78rem;
+  }
+  .btn-outline:hover {
+    background: var(--surface);
+  }
+  .logs-row td {
+    padding: 0 !important;
+  }
+  .logs-panel {
+    border-top: 1px solid var(--border);
+    background: var(--surface, #1a1a2e);
+  }
+  .log-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+  }
+  .log-tab {
+    padding: 0.45rem 1rem;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.82rem;
+    border-bottom: 2px solid transparent;
+  }
+  .log-tab.active {
+    color: var(--text);
+    border-bottom-color: var(--primary, #6366f1);
+  }
+  .log-content {
+    padding: 0.75rem 1rem;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    max-height: 20rem;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin: 0;
+    font-family: 'Fira Code', 'JetBrains Mono', monospace;
+  }
 </style>

@@ -279,13 +279,6 @@ export interface DefiniteCanisterSettings {
   'compute_allocation' : bigint,
 }
 export interface DeleteCanisterArgs { 'canister_id' : Principal }
-export interface DeployFrontendOk {
-  'gzip_variants' : number,
-  'files_deployed' : number,
-  'operations_count' : number,
-  'frontend_namespace' : string,
-  'target_canister_id' : string,
-}
 export interface DeploymentJobView {
   'status' : string,
   'expected_wasm_hash' : string,
@@ -293,6 +286,7 @@ export interface DeploymentJobView {
   'backend_canister_id' : string,
   'offchain_deployer_principal' : string,
   'ext_deploy_task_id' : string,
+  'assets_verified' : number,
   'network' : string,
   'nft_frontend_canister_id' : string,
   'created_at' : bigint,
@@ -306,6 +300,7 @@ export interface DeploymentJobView {
   'expected_assets_hash' : string,
   'completed_at' : bigint,
   'token_backend_canister_id' : string,
+  'actual_assets_hash' : string,
   'frontend_canister_id' : string,
   'nft_backend_canister_id' : string,
 }
@@ -398,11 +393,9 @@ export interface ExtensionListing {
 export type ExtensionResult = { 'Ok' : ExtensionListing } |
   { 'Err' : string };
 export interface ExtensionsListRecord { 'extensions' : Array<string> }
-export interface FetchModuleHashOk {
-  'wasm_module_hash_hex' : string,
-  'wasm_namespace' : string,
-  'wasm_path' : string,
-  'wasm_size' : bigint,
+export interface FileRegistryService {
+  'get_backend_files_icc' : ActorMethod<[string, string, string], string>,
+  'get_extension_manifest' : ActorMethod<[string], string>,
 }
 export interface GenericError { 'message' : string, 'error_code' : bigint }
 export interface GenericErrorRecord {
@@ -516,15 +509,6 @@ export type InsertError = {
     'ValueTooLarge' : { 'max' : number, 'given' : number }
   } |
   { 'KeyTooLarge' : { 'max' : number, 'given' : number } };
-export interface InstallBackendOk {
-  'chunks_uploaded' : number,
-  'wasm_module_hash_hex' : string,
-  'mode' : string,
-  'wasm_namespace' : string,
-  'target_canister_id' : string,
-  'wasm_path' : string,
-  'wasm_size' : bigint,
-}
 export interface InstallCodeArgs {
   'arg' : Uint8Array | number[],
   'wasm_module' : Uint8Array | number[],
@@ -673,6 +657,13 @@ export interface ProvisionalTopUpCanisterArgs {
   'canister_id' : Principal,
   'amount' : bigint,
 }
+export interface PublicLogEntry {
+  'id' : bigint,
+  'level' : string,
+  'logger_name' : string,
+  'message' : string,
+  'timestamp' : bigint,
+}
 export interface PurchaseRecord {
   'purchased_at' : number,
   'item_kind' : string,
@@ -730,6 +721,7 @@ export interface RealmData {
   'principal_id' : string,
 }
 export interface RealmInstallerService {
+  'cancel_deployment' : ActorMethod<[string], string>,
   'enqueue_deployment' : ActorMethod<[string], RResultEnqueue>,
 }
 export interface RealmRecord {
@@ -743,6 +735,8 @@ export interface RealmRecord {
   'users_count' : bigint,
 }
 export interface RealmRegistryService {
+  'deployment_failed' : ActorMethod<[string, string, string], string>,
+  'deployment_succeeded' : ActorMethod<[string, string], string>,
   'register_realm' : ActorMethod<
     [string, string, string, string, string],
     string
@@ -773,6 +767,13 @@ export type RejectionCode = { 'NoError' : null } |
   { 'DestinationInvalid' : null } |
   { 'SysFatal' : null } |
   { 'CanisterReject' : null };
+export interface ReportFrontendOk {
+  'status' : string,
+  'assets_verified' : number,
+  'failed_verification' : boolean,
+  'job_id' : string,
+  'actual_assets_hash' : string,
+}
 export interface ReportReadyOk {
   'status' : string,
   'expected_wasm_hash' : string,
@@ -799,13 +800,7 @@ export type ResultDebugResume = { 'Ok' : DebugResumeOk } |
   { 'Err' : InstallerError };
 export type ResultDebugRunStep = { 'Ok' : DebugRunStepOk } |
   { 'Err' : InstallerError };
-export type ResultDeployFrontend = { 'Ok' : DeployFrontendOk } |
-  { 'Err' : InstallerError };
 export type ResultEnqueue = { 'Ok' : EnqueueOk } |
-  { 'Err' : InstallerError };
-export type ResultFetchModuleHash = { 'Ok' : FetchModuleHashOk } |
-  { 'Err' : InstallerError };
-export type ResultInstallBackend = { 'Ok' : InstallBackendOk } |
   { 'Err' : InstallerError };
 export type ResultJobCancel = { 'Ok' : JobStatusAck } |
   { 'Err' : InstallerError };
@@ -816,6 +811,8 @@ export type ResultJobsList = { 'Ok' : JobsListOk } |
 export type ResultPendingJobs = { 'Ok' : PendingJobsOk } |
   { 'Err' : InstallerError };
 export type ResultReportFailure = { 'Ok' : JobStatusAck } |
+  { 'Err' : InstallerError };
+export type ResultReportFrontend = { 'Ok' : ReportFrontendOk } |
   { 'Err' : InstallerError };
 export type ResultReportReady = { 'Ok' : ReportReadyOk } |
   { 'Err' : InstallerError };
@@ -1017,10 +1014,12 @@ export interface VerificationReport {
   'status' : string,
   'expected_wasm_hash' : string,
   'backend_canister_id' : string,
+  'assets_verified' : number,
   'wasm_verified' : number,
   'job_id' : string,
   'actual_wasm_hash' : string,
   'expected_assets_hash' : string,
+  'actual_assets_hash' : string,
   'frontend_canister_id' : string,
 }
 export interface VerifyOk {
@@ -1038,6 +1037,10 @@ export interface _SERVICE {
   'debug_run_one_step' : ActorMethod<[string], ResultDebugRunStep>,
   'enqueue_deployment' : ActorMethod<[string], ResultEnqueue>,
   'execute_code_shell' : ActorMethod<[string], string>,
+  'get_canister_logs' : ActorMethod<
+    [[] | [bigint], [] | [bigint], [] | [string], [] | [string]],
+    Array<PublicLogEntry>
+  >,
   'get_deployment_job_status' : ActorMethod<[string], ResultJobIdStatus>,
   'get_pending_deployments' : ActorMethod<[], ResultPendingJobs>,
   'get_verification_report' : ActorMethod<[string], ResultVerificationReport>,
@@ -1047,6 +1050,7 @@ export interface _SERVICE {
   'list_deployment_jobs' : ActorMethod<[], ResultJobsList>,
   'report_canister_ready' : ActorMethod<[string], ResultReportReady>,
   'report_deployment_failure' : ActorMethod<[string], ResultReportFailure>,
+  'report_frontend_verified' : ActorMethod<[string], ResultReportFrontend>,
   'verify_realm' : ActorMethod<[string], ResultVerify>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;

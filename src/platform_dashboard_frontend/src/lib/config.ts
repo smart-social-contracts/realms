@@ -24,6 +24,7 @@ export const CONFIG = {
   file_registry_frontend_id: pick('CANISTER_ID_FILE_REGISTRY_FRONTEND'),
   marketplace_backend_id: pick('CANISTER_ID_MARKETPLACE_BACKEND'),
   marketplace_frontend_id: pick('CANISTER_ID_MARKETPLACE_FRONTEND'),
+  deploy_service_url: pick('VITE_DEPLOY_SERVICE_URL') || '',
 };
 
 export function frontendUrl(canisterId: string): string {
