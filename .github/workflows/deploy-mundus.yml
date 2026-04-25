@@ -1,8 +1,10 @@
 # deploy-mundus.yml — deploy mundus members via the queue-based architecture.
 #
 # Uses realm_registry_backend.request_deployment + installer polling.
-# Requires infra canisters (file_registry, realm_installer, registry) to
-# already be running. For infra deploys, use deploy-infra.yml.
+# If the registry canister has no WASM yet, it is bootstrapped automatically
+# via direct dfx install before the queue deploy proceeds.
+# Requires infra canisters (file_registry, realm_installer) to already be
+# running — use deploy-infra.yml for those.
 #
 # Supports both manual dispatch (with realm/extension filters, install mode,
 # etc.) and reusable workflow_call (used by CI on main → staging).
@@ -137,6 +139,49 @@ jobs:
           dfx identity use ci
           rm -f /tmp/identity.pem
           echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
+
+      - name: Bootstrap registry if empty
+        env:
+          DESCRIPTOR: ${{ inputs.descriptor }}
+        run: |
+          python3 - <<'PYEOF'
+          import os, sys, yaml, subprocess
+
+          desc = yaml.safe_load(open(os.environ["DESCRIPTOR"]))
+          network = desc["network"]
+          registry = next(
+              (m for m in desc.get("mundus", []) if m.get("type") == "realm_registry"),
+              None,
+          )
+          if not registry:
+              print("No realm_registry member in descriptor, skipping bootstrap.")
+              sys.exit(0)
+
+          cid = registry["canister_id"]
+          print(f"Checking registry {cid} on {network}...")
+
+          result = subprocess.run(
+              ["dfx", "canister", "status", cid, "--network", network],
+              capture_output=True, text=True,
+          )
+          if "Module hash: None" in result.stdout or "no wasm module" in result.stderr.lower():
+              print(f"Registry {cid} has no WASM — bootstrapping via direct install...")
+              subprocess.run(
+                  ["python3", "-m", "basilisk", "realm_registry_backend",
+                   "src/realm_registry_backend/main.py"],
+                  check=True,
+                  env={**os.environ, "CANISTER_CANDID_PATH": "src/realm_registry_backend/realm_registry_backend.did"},
+              )
+              subprocess.run(
+                  ["dfx", "canister", "install", cid,
+                   "--wasm", ".basilisk/realm_registry_backend/realm_registry_backend.wasm",
+                   "--mode", "install", "--yes", "--network", network],
+                  check=True,
+              )
+              print(f"✅ Registry {cid} bootstrapped on {network}")
+          else:
+              print(f"Registry {cid} already has WASM, proceeding to queue deploy.")
+          PYEOF
 
       - name: Submit queue deployment
         env:
