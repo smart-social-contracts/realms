@@ -56,9 +56,9 @@ jobs:
 
   # ── Staging deploy (runs in parallel with e2e) ──────────────────────────────
   deploy-staging:
-    uses: ./.github/workflows/_deploy-ic-mundus.yml
+    uses: ./.github/workflows/deploy-mundus.yml
     with:
-      mundus_descriptor: deployments/staging-mundus-layered.yml
+      descriptor: deployments/staging-mundus-layered.yml
       artifact_network: staging
     secrets:
       IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}

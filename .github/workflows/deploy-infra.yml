@@ -1,0 +1,228 @@
+# deploy-infra.yml — deploy infrastructure canisters via direct dfx install.
+#
+# Infra canisters: file_registry, file_registry_frontend, realm_installer,
+# platform_dashboard_frontend.
+#
+# Use this when you've changed infra canister code and want to deploy
+# just those canisters (~2-10 minutes depending on scope).
+# For mundus members (registry, realms, marketplace, …) use deploy-mundus.yml.
+
+name: Deploy Infra
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        default: staging
+        options:
+          - test
+          - demo
+          - staging
+
+      install_mode:
+        description: "WASM install mode ('install' for empty canisters)"
+        required: true
+        type: choice
+        default: upgrade
+        options:
+          - upgrade
+          - reinstall
+          - install
+
+      canisters:
+        description: "Which infra canisters to deploy"
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - realm_installer
+          - file_registry
+          - file_registry_frontend
+          - platform_dashboard_frontend
+
+      ref:
+        description: "Branch/commit to build from (defaults to main)"
+        required: false
+        default: ""
+
+concurrency:
+  group: deploy-infra-${{ inputs.environment }}
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+
+jobs:
+  deploy-infra:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Parameters
+        run: |
+          echo "Environment:  ${{ inputs.environment }}"
+          echo "Install mode: ${{ inputs.install_mode }}"
+          echo "Canisters:    ${{ inputs.canisters }}"
+          echo "Ref:          ${{ inputs.ref || github.ref }}"
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ref: ${{ inputs.ref || github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dfx
+        run: |
+          DFXVM_INIT_YES=1 sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
+          echo "$HOME/.local/share/dfx/bin" >> "$GITHUB_PATH"
+
+      - name: Install npm workspace dependencies
+        if: >-
+          inputs.canisters == 'all' ||
+          inputs.canisters == 'file_registry_frontend' ||
+          inputs.canisters == 'platform_dashboard_frontend'
+        run: npm ci --legacy-peer-deps
+
+      - name: Install Python deps
+        run: |
+          pip install -r requirements.txt
+          pip install pyyaml
+
+      - name: Configure dfx identity
+        env:
+          IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
+        run: |
+          if [ -z "$IC_IDENTITY_PEM" ]; then
+            echo "::error::IC_IDENTITY_PEM secret is not set." >&2
+            exit 1
+          fi
+          printf '%s' "$IC_IDENTITY_PEM" > /tmp/identity.pem
+          chmod 600 /tmp/identity.pem
+          dfx identity import ci /tmp/identity.pem --storage-mode=plaintext --force
+          dfx identity use ci
+          rm -f /tmp/identity.pem
+          echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
+
+      # ── Resolve canister IDs from descriptor ────────────────────────────
+      - name: Resolve canister IDs
+        id: ids
+        run: |
+          python3 - <<'PY'
+          import os, yaml
+          env = "${{ inputs.environment }}"
+          desc = yaml.safe_load(open(f"deployments/{env}-mundus-layered.yml"))
+          infra = desc.get("infrastructure_overrides") or {}
+          mundus = desc.get("mundus") or []
+
+          def emit(key, val):
+              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                  f.write(f"{key}={val}\n")
+
+          emit("file_registry", infra.get("file_registry", {}).get("canister_id", ""))
+          emit("file_registry_frontend", infra.get("file_registry_frontend", {}).get("canister_id", ""))
+          emit("realm_installer", infra.get("realm_installer", {}).get("canister_id", ""))
+          for m in mundus:
+              if m.get("type") == "dashboard":
+                  emit("platform_dashboard_frontend", m.get("frontend_canister_id", ""))
+                  break
+          PY
+
+      # ── file_registry ──────────────────────────────────────────────────
+      - name: Build & deploy file_registry
+        if: inputs.canisters == 'all' || inputs.canisters == 'file_registry'
+        run: |
+          NETWORK="${{ inputs.environment }}"
+          CID="${{ steps.ids.outputs.file_registry }}"
+          MODE="${{ inputs.install_mode }}"
+          echo "Building file_registry WASM..."
+          CANISTER_CANDID_PATH=src/file_registry/file_registry.did \
+            python3 -m basilisk file_registry src/file_registry/main.py
+
+          echo "Installing file_registry ($CID) on $NETWORK (mode=$MODE)..."
+          dfx canister install "$CID" \
+              --wasm .basilisk/file_registry/file_registry.wasm \
+              --mode "$MODE" --yes \
+              --network "$NETWORK"
+          echo "✅ file_registry deployed on $NETWORK"
+
+      # ── file_registry_frontend ─────────────────────────────────────────
+      - name: Build & deploy file_registry_frontend
+        if: inputs.canisters == 'all' || inputs.canisters == 'file_registry_frontend'
+        run: |
+          NETWORK="${{ inputs.environment }}"
+          CID="${{ steps.ids.outputs.file_registry_frontend }}"
+          MODE="${{ inputs.install_mode }}"
+
+          dfx generate file_registry 2>/dev/null || true
+          npm run build --workspace=file_registry_frontend
+
+          echo "Installing file_registry_frontend ($CID) on $NETWORK (mode=$MODE)..."
+          dfx deploy file_registry_frontend \
+              --mode "$MODE" --yes \
+              --network "$NETWORK"
+          echo "✅ file_registry_frontend deployed on $NETWORK"
+
+      # ── realm_installer ────────────────────────────────────────────────
+      - name: Build & deploy realm_installer
+        if: inputs.canisters == 'all' || inputs.canisters == 'realm_installer'
+        run: |
+          NETWORK="${{ inputs.environment }}"
+          CID="${{ steps.ids.outputs.realm_installer }}"
+          MODE="${{ inputs.install_mode }}"
+          echo "Building realm_installer WASM..."
+          CANISTER_CANDID_PATH=src/realm_installer/realm_installer.did \
+            python3 -m basilisk realm_installer src/realm_installer/main.py
+
+          echo "Installing realm_installer ($CID) on $NETWORK (mode=$MODE)..."
+          dfx canister install "$CID" \
+              --wasm .basilisk/realm_installer/realm_installer.wasm \
+              --mode "$MODE" --yes \
+              --network "$NETWORK"
+
+          echo "Verifying..."
+          dfx canister call "$CID" health '()' --network "$NETWORK"
+          echo "✅ realm_installer deployed on $NETWORK"
+
+      # ── platform_dashboard_frontend ────────────────────────────────────
+      - name: Build & deploy platform_dashboard_frontend
+        if: inputs.canisters == 'all' || inputs.canisters == 'platform_dashboard_frontend'
+        run: |
+          NETWORK="${{ inputs.environment }}"
+          CID="${{ steps.ids.outputs.platform_dashboard_frontend }}"
+          MODE="${{ inputs.install_mode }}"
+
+          for canister in realm_registry_backend realm_installer marketplace_backend file_registry realm_backend; do
+            dfx generate "$canister" 2>/dev/null || true
+          done
+
+          echo "Building platform_dashboard_frontend..."
+          npm run build --workspace=platform_dashboard_frontend
+
+          echo "Installing platform_dashboard_frontend ($CID) on $NETWORK (mode=$MODE)..."
+          dfx deploy platform_dashboard_frontend \
+              --mode "$MODE" --yes \
+              --network "$NETWORK"
+          echo "✅ platform_dashboard_frontend deployed on $NETWORK"
+
+      # ── Summary ────────────────────────────────────────────────────────
+      - name: Summary
+        run: |
+          echo ""
+          echo "═══════════════════════════════════════"
+          echo " Infra deploy complete"
+          echo " Environment: ${{ inputs.environment }}"
+          echo " Canisters:   ${{ inputs.canisters }}"
+          echo " Mode:        ${{ inputs.install_mode }}"
+          echo "═══════════════════════════════════════"

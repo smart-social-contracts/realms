@@ -1,23 +1,16 @@
-# fast-deploy.yml — manual, fast deploy for prototyping.
+# deploy-mundus.yml — deploy mundus members via the queue-based architecture.
 #
-# Uses the queue-based deployment architecture via
-# realm_registry_backend.request_deployment and installer polling.
+# Uses realm_registry_backend.request_deployment + installer polling.
+# Requires infra canisters (file_registry, realm_installer, registry) to
+# already be running. For infra deploys, use deploy-infra.yml.
 #
-# Trade-offs vs ci-main.yml:
-#   * Skips Phase A (no local-replica e2e gating).
-#   * No Playwright / integration tests at the end.
-#   * Optional `realms` / `extensions` filters trim what gets built and
-#     deployed, so a frontend-only iteration on a single realm becomes
-#     ~3-5 minutes.
+# Supports both manual dispatch (with realm/extension filters, install mode,
+# etc.) and reusable workflow_call (used by CI on main → staging).
 #
-# Cost: ~$0.50 per full deploy (vs ~$47 with the old file_registry path).
-#
-# Use the regular `CI (main)` pipeline for anything that should be gated
-# by tests before reaching staging/demo/test. This workflow is a developer
-# tool — not a release pipeline. For a full-stack first install to empty
-# canisters, prefer workflow "Deploy IC environment" (test/demo/staging).
+# Optional `realms` / `extensions` filters trim what gets built and
+# deployed, so a single-realm iteration takes ~3-5 minutes.
 
-name: Deploy
+name: Deploy Mundus
 
 on:
   workflow_dispatch:
@@ -63,11 +56,22 @@ on:
         required: false
         default: ""
 
+  workflow_call:
+    inputs:
+      descriptor:
+        description: "Path to v2 mundus YAML (e.g. deployments/staging-mundus-layered.yml)"
+        type: string
+        required: true
+      artifact_network:
+        description: "Network name for upload_ci_artifacts.py (staging, demo, test)"
+        type: string
+        required: true
+    secrets:
+      IC_IDENTITY_PEM:
+        required: true
+
 concurrency:
-  # Different group from `ci-main` so this can run in parallel with the
-  # main pipeline. Self-serializing per-descriptor so two parallel fast-
-  # deploys against the same descriptor don't race.
-  group: fast-deploy-${{ inputs.descriptor }}
+  group: deploy-mundus-${{ inputs.descriptor }}
   cancel-in-progress: false
 
 env:
@@ -75,21 +79,21 @@ env:
   NODE_VERSION: "20"
 
 jobs:
-  fast-deploy:
+  deploy-mundus:
     runs-on: ubuntu-latest
     timeout-minutes: 240
     steps:
       - name: Deploy parameters
         run: |
           echo "╭────────────────────────────────────────╮"
-          echo "│ ⚡ Deploy                               │"
+          echo "│  Deploy Mundus                         │"
           echo "╰────────────────────────────────────────╯"
-          echo "📄 Descriptor:    ${{ inputs.descriptor }}"
-          echo "🏛️  Realms:        ${{ inputs.realms || '(all)' }}"
-          echo "🧩 Extensions:    ${{ inputs.extensions || '(all from descriptor)' }}"
-          echo "🔧 Install mode:  ${{ inputs.install_mode }}"
-          echo "⏭  Skip base WASM: ${{ inputs.skip_base_wasm }}"
-          echo "🔀 Ref:           ${{ inputs.ref || github.ref }}"
+          echo "Descriptor:    ${{ inputs.descriptor }}"
+          echo "Realms:        ${{ inputs.realms || '(all)' }}"
+          echo "Extensions:    ${{ inputs.extensions || '(all from descriptor)' }}"
+          echo "Install mode:  ${{ inputs.install_mode || 'upgrade' }}"
+          echo "Skip base WASM: ${{ inputs.skip_base_wasm || 'false' }}"
+          echo "Ref:           ${{ inputs.ref || github.ref }}"
 
       - uses: actions/checkout@v4
         with:
@@ -124,7 +128,7 @@ jobs:
           IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
         run: |
           if [ -z "$IC_IDENTITY_PEM" ]; then
-            echo "::error::IC_IDENTITY_PEM secret is not set on this repo." >&2
+            echo "::error::IC_IDENTITY_PEM secret is not set." >&2
             exit 1
           fi
           printf '%s' "$IC_IDENTITY_PEM" > /tmp/identity.pem
@@ -134,7 +138,7 @@ jobs:
           rm -f /tmp/identity.pem
           echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
 
-      - name: Submit queue deployment for ${{ inputs.descriptor }}
+      - name: Submit queue deployment
         env:
           DESCRIPTOR: ${{ inputs.descriptor }}
         run: |
@@ -149,7 +153,7 @@ jobs:
           elif echo "${{ inputs.descriptor }}" | grep -qE "test-mundus|/test-"; then NETWORK=test
           else NETWORK=staging
           fi
-          python3 scripts/upload_ci_artifacts.py --network "$NETWORK"
+          python3 scripts/upload_ci_artifacts.py --network "${NETWORK:-${{ inputs.artifact_network }}}"
         continue-on-error: true
 
       - name: Print frontend URLs
@@ -159,7 +163,7 @@ jobs:
           import os, yaml
           desc = yaml.safe_load(open(os.environ["DESC"]))
           print()
-          print("✅ Fast deploy complete. Live frontends:")
+          print("✅ Mundus deploy complete. Live frontends:")
           for m in desc.get("mundus", []):
               fe = m.get("frontend_canister_id")
               cid = m.get("canister_id")

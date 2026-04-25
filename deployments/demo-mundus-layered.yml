@@ -3,7 +3,7 @@
 # Same schema as staging-mundus-layered.yml but targeting the demo
 # canisters. The demo network is defined in dfx.json as "demo".
 #
-# Triggered manually via .github/workflows/fast-deploy.yml
+# Triggered manually via .github/workflows/deploy-mundus.yml
 # (select demo-mundus-layered.yml from the dropdown).
 
 version: 2

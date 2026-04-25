@@ -356,9 +356,9 @@ class TestCIInstallerPipeline:
         assert "deploy-dashboard-staging" not in text
         assert "_deploy-dashboard.yml" not in text
 
-    def test_fast_deploy_uses_queue_deployment(self):
-        fast = REPO_ROOT / ".github" / "workflows" / "fast-deploy.yml"
-        text = fast.read_text()
+    def test_deploy_mundus_uses_queue_deployment(self):
+        mundus = REPO_ROOT / ".github" / "workflows" / "deploy-mundus.yml"
+        text = mundus.read_text()
         assert "request_deployment.py" in text
         assert "upgrade_installer" not in text
 
