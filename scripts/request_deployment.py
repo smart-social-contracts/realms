@@ -8,6 +8,7 @@ each realm via realm_registry_backend.request_deployment().
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -38,7 +39,7 @@ def dfx_call(canister_id: str, method: str, arg: str, network: str) -> str:
 
     result = subprocess.run(
         ["dfx", "canister", "call", canister_id, method, arg,
-         "--network", network],
+         "--network", network, "--output", "json"],
         capture_output=True, text=True, env=run_env,
     )
     if result.returncode != 0:
@@ -47,7 +48,54 @@ def dfx_call(canister_id: str, method: str, arg: str, network: str) -> str:
     return result.stdout.strip()
 
 
-def request_one(realm_config: dict, network: str, registry_id: str) -> str | None:
+REALMS_RELEASE_BASE = (
+    "https://github.com/smart-social-contracts/realms/releases/download"
+)
+
+
+def _fetch_release_checksums(tag: str) -> dict[str, str]:
+    """Fetch checksums.txt from a GitHub release. Returns {filename: "sha256:hex"}."""
+    import urllib.request
+    url = f"{REALMS_RELEASE_BASE}/{tag}/checksums.txt"
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            text = resp.read().decode("utf-8", errors="replace")
+        result = {}
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split(None, 1)
+            if len(parts) == 2:
+                result[parts[1].strip()] = f"sha256:{parts[0]}"
+        return result
+    except Exception as e:
+        print(f"  (checksums.txt not available for {tag}: {e})")
+        return {}
+
+
+def _build_artifact_refs(tag: str) -> dict:
+    """Build canister_artifacts from a GitHub release tag with checksums."""
+    cs = _fetch_release_checksums(tag)
+    return {
+        "realm": {
+            "backend": {
+                "wasm": {
+                    "url": f"{REALMS_RELEASE_BASE}/{tag}/realm_backend.wasm.gz",
+                    "checksum": cs.get("realm_backend.wasm.gz", ""),
+                },
+            },
+            "frontend": {
+                "url": f"{REALMS_RELEASE_BASE}/{tag}/realm_frontend.tar.gz",
+                "checksum": cs.get("realm_frontend.tar.gz", ""),
+            },
+        },
+    }
+
+
+def request_one(
+    realm_config: dict, network: str, registry_id: str, *, release_tag: str = "",
+) -> str | None:
     """Submit a deployment request for one realm. Returns the job_id."""
     manifest = {
         "realm": {
@@ -61,6 +109,8 @@ def request_one(realm_config: dict, network: str, registry_id: str) -> str | Non
         },
         "network": network,
     }
+    if release_tag:
+        manifest["canister_artifacts"] = _build_artifact_refs(release_tag)
 
     manifest_json = json.dumps(manifest)
     candid_arg = f'("{manifest_json}")'
@@ -68,15 +118,20 @@ def request_one(realm_config: dict, network: str, registry_id: str) -> str | Non
     print(f"  Calling request_deployment for '{manifest['realm']['name']}'...")
     raw = dfx_call(registry_id, "request_deployment", candid_arg, network)
 
-    # Parse response
-    json_str = raw
-    if json_str.startswith("("):
-        json_str = json_str.strip("()")
-    if json_str.startswith('"') and json_str.endswith('"'):
-        json_str = json_str[1:-1]
-        json_str = json_str.replace('\\"', '"')
+    data = json.loads(raw)
+    if isinstance(data, dict) and data.get("Err") is not None:
+        err = data["Err"]
+        if isinstance(err, dict):
+            print(f"  FAILED: {err.get('message', str(err))}")
+        else:
+            print(f"  FAILED: {err}")
+        return None
+    payload = data.get("Ok", data) if isinstance(data, dict) else data
+    if isinstance(payload, str):
+        result = json.loads(payload)
+    else:
+        result = payload
 
-    result = json.loads(json_str)
     if result.get("success"):
         job_id = result.get("job_id", "?")
         print(f"  Enqueued: job_id={job_id}")
@@ -100,9 +155,12 @@ def poll_jobs(job_ids: list[str], network: str, installer_id: str,
                     installer_id, "get_deployment_job_status",
                     f'("{job_id}")', network,
                 )
-                json_str = raw.strip("()").strip('"').replace('\\"', '"')
-                result = json.loads(json_str)
-                status = result.get("status", "?")
+                data = json.loads(raw)
+                if isinstance(data, dict) and data.get("Err") is not None:
+                    print(f"  Job {job_id}: error {data['Err']}")
+                    continue
+                result = data.get("Ok", data) if isinstance(data, dict) else data
+                status = (result or {}).get("status", "?")
                 print(f"  Job {job_id}: {status}")
                 if status in ("completed", "failed", "failed_verification", "cancelled"):
                     pending.discard(job_id)
@@ -121,6 +179,11 @@ def main():
     parser.add_argument("--file", required=True, help="Mundus descriptor YAML")
     parser.add_argument("--network", help="Override network from descriptor")
     parser.add_argument("--no-poll", action="store_true", help="Don't wait for completion")
+    parser.add_argument(
+        "--release-tag",
+        default=os.environ.get("DEPLOY_RELEASE_TAG", ""),
+        help="GitHub release tag for WASM/frontend artifacts (e.g. v0.3.1)",
+    )
     args = parser.parse_args()
 
     if yaml is None:
@@ -141,14 +204,18 @@ def main():
         print(f"ERROR: no registry canister ID for network '{network}'", file=sys.stderr)
         sys.exit(1)
 
+    release_tag = (args.release_tag or "").strip()
+
     realms = desc.get("mundus", [])
     print(f"Submitting {len(realms)} realm deployment(s) to {network}")
+    if release_tag:
+        print(f"  release tag: {release_tag}")
 
     job_ids = []
     for realm in realms:
         if realm.get("type") in ("dashboard", "registry"):
             continue
-        job_id = request_one(realm, network, registry_id)
+        job_id = request_one(realm, network, registry_id, release_tag=release_tag)
         if job_id:
             job_ids.append(job_id)
 

@@ -564,6 +564,9 @@
                           <span class="deployment-error" title={deployment.error}>Error</span>
                         {/if}
                       </div>
+                      {#if deployment.deployment_id}
+                        <div class="deployment-id subtle">Job: {deployment.deployment_id}</div>
+                      {/if}
                       {#if deployment.credits_charged > 0}
                         <span class="credits-charged">-{deployment.credits_charged} credits</span>
                       {/if}
@@ -573,50 +576,21 @@
               </div>
             {/if}
 
-            <!-- Deployments in Progress -->
-            {#if deployments.length > 0}
-              <div class="realms-group deployments-section">
-                <h3>🚀 Deployments in Progress</h3>
-                <ul class="deployment-list">
-                  {#each deployments as deployment}
-                    <li class="deployment-item">
-                      <div class="deployment-header">
-                        <span class="deployment-name">{deployment.realm_name || 'Unnamed Realm'}</span>
-                        <span class="deployment-status status-{deployment.status}">
-                          {#if deployment.status === 'running'}
-                            <span class="status-spinner"></span>
-                          {/if}
-                          {deployment.status}
-                        </span>
-                      </div>
-                      <div class="deployment-id">ID: {deployment.deployment_id}</div>
-                      <div class="deployment-time">Started: {formatDate(deployment.created_at)}</div>
-                      {#if deployment.status === 'completed' && deployment.realm_url}
-                        <a href={deployment.realm_url} target="_blank" rel="noopener noreferrer" class="deployment-link">
-                          Visit Realm →
-                        </a>
-                      {/if}
-                      {#if deployment.status === 'failed' && deployment.error}
-                        <div class="deployment-error">{deployment.error}</div>
-                      {/if}
-                    </li>
-                  {/each}
-                </ul>
-              </div>
-            {/if}
-
-            <!-- Created Realms -->
+            <!-- Created Realms (on-chain registry — not the same as queued installer jobs) -->
             <div class="realms-group">
               <h3>{$_('dashboard.created_realms')}</h3>
-              {#if loadingDeployments}
+              {#if loadingRealms}
                 <div class="loading-placeholder"></div>
-              {:else if deployments.length === 0}
+              {:else if createdRealms.length === 0}
                 <div class="empty-state">
                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
                     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
                     <polyline points="9 22 9 12 15 12 15 22"></polyline>
                   </svg>
                   <p>{$_('dashboard.no_created_realms')}</p>
+                  {#if deployments.length > 0}
+                    <p class="empty-hint">Active deployments are listed above. This section updates when your realm is registered on-chain.</p>
+                  {/if}
                   <a href="/create-realm" class="create-realm-btn">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M12 5v14M5 12h14"/>
@@ -626,20 +600,17 @@
                 </div>
               {:else}
                 <ul class="realm-list">
-                  {#each deployments as deployment}
+                  {#each createdRealms as realm}
                     <li class="realm-item">
                       <div class="realm-info">
-                        <span class="realm-name">{deployment.realm_name || deployment.realm_id}</span>
-                        <span class="realm-id">{deployment.realm_id}</span>
+                        <span class="realm-name">{realm.name}</span>
+                        <span class="realm-id">{realm.id}</span>
                       </div>
-                      <div class="realm-status-row">
-                        <span class="deployment-status {deployment.status}">{deployment.status}</span>
-                        {#if deployment.status === 'completed' && deployment.realm_url}
-                          <a href={deployment.realm_url} target="_blank" rel="noopener noreferrer" class="realm-visit-link">
-                            Visit →
-                          </a>
-                        {/if}
-                      </div>
+                      {#if realm.url}
+                        <a href={realm.url} target="_blank" rel="noopener noreferrer" class="realm-visit-link">
+                          Visit →
+                        </a>
+                      {/if}
                     </li>
                   {/each}
                 </ul>
@@ -1367,67 +1338,23 @@
     color: #737373;
   }
 
-  /* Deployments in My Realms section */
-  .deployments-section {
-    background: #FEF3C7;
-    border: 1px solid #FCD34D;
-    border-radius: 0.75rem;
-    padding: 1rem;
-  }
-
-  .deployments-section h3 {
-    color: #92400E;
-  }
-
-  .deployment-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
   .deployment-id,
   .deployment-time {
     font-size: 0.75rem;
     color: #737373;
   }
 
-  .deployment-link {
+  .deployment-id.subtle {
+    margin-top: 0.35rem;
+    font-family: ui-monospace, monospace;
+  }
+
+  .empty-hint {
     font-size: 0.875rem;
-    color: #2563EB;
-    font-weight: 500;
-    text-decoration: none;
-  }
-
-  .deployment-link:hover {
-    text-decoration: underline;
-  }
-
-  .status-spinner {
-    width: 12px;
-    height: 12px;
-    border: 2px solid #F59E0B;
-    border-top-color: transparent;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    display: inline-block;
-  }
-
-  .status-running {
-    background: #FEF3C7;
-    border-color: #FCD34D;
-    color: #92400E;
-  }
-
-  .status-completed {
-    background: #D1FAE5;
-    border-color: #6EE7B7;
-    color: #065F46;
-  }
-
-  .status-failed {
-    background: #FEE2E2;
-    border-color: #FCA5A5;
-    color: #991B1B;
+    color: #737373;
+    margin: 0.75rem auto 0;
+    max-width: 22rem;
+    line-height: 1.4;
   }
 
   /* Responsive */

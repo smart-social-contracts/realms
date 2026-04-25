@@ -1,18 +1,12 @@
 // Browser-side client for the realm_installer canister.
 //
-// Provides deploy_realm (kick off) and get_deploy_status (polling).
-// Both methods exchange JSON-over-text with the canister.
+// The on-chain `deploy_realm` / `get_deploy_status` API was removed. Use
+// the registry `enqueue_deployment` flow and `get_deployment_job_status`
+// instead. These stubs remain only for backward compatibility in unused code.
 
 import { Actor, HttpAgent } from '@dfinity/agent';
-import { IDL } from '@dfinity/candid';
 import { Principal } from '@dfinity/principal';
 import { initializeAuthClient } from './auth';
-
-const realmInstallerIdlFactory = ({ IDL: idl }) =>
-  idl.Service({
-    deploy_realm: idl.Func([idl.Text], [idl.Text], []),
-    get_deploy_status: idl.Func([idl.Text], [idl.Text], ['query']),
-  });
 
 let _cachedActor = null;
 let _cachedCanisterId = null;
@@ -20,6 +14,7 @@ let _cachedCanisterId = null;
 async function getInstallerActor(canisterId) {
   if (_cachedActor && _cachedCanisterId === canisterId) return _cachedActor;
 
+  const { idlFactory } = await import('declarations/realm_installer');
   const client = await initializeAuthClient();
   const identity = client.getIdentity();
   const agent = new HttpAgent({ identity });
@@ -30,7 +25,7 @@ async function getInstallerActor(canisterId) {
   ) {
     try { await agent.fetchRootKey(); } catch (e) { /* local dev */ }
   }
-  _cachedActor = Actor.createActor(realmInstallerIdlFactory, {
+  _cachedActor = Actor.createActor(idlFactory, {
     agent,
     canisterId: Principal.fromText(canisterId),
   });
@@ -39,25 +34,21 @@ async function getInstallerActor(canisterId) {
 }
 
 /**
- * Submit a deploy_realm manifest and return the parsed response.
- * @param {string} installerCanisterId
- * @param {object} manifest
- * @returns {Promise<{success: boolean, task_id?: string, error?: string}>}
+ * @deprecated deploy_realm was removed. Use the registry queue + job status.
  */
-export async function deployRealm(installerCanisterId, manifest) {
-  const actor = await getInstallerActor(installerCanisterId);
-  const raw = await actor.deploy_realm(JSON.stringify(manifest));
-  return JSON.parse(String(raw));
+export async function deployRealm(_installerCanisterId, _manifest) {
+  return {
+    success: false,
+    error: 'deploy_realm was removed; use registry enqueue / deployment job status',
+  };
 }
 
 /**
- * Poll deploy status.
- * @param {string} installerCanisterId
- * @param {string} taskId
- * @returns {Promise<object>}
+ * @deprecated get_deploy_status was removed.
  */
-export async function getDeployStatus(installerCanisterId, taskId) {
-  const actor = await getInstallerActor(installerCanisterId);
-  const raw = await actor.get_deploy_status(taskId);
-  return JSON.parse(String(raw));
+export async function getDeployStatus(_installerCanisterId, _taskId) {
+  return {
+    success: false,
+    error: 'get_deploy_status was removed; use get_deployment_job_status',
+  };
 }

@@ -6,10 +6,13 @@
     "welcome_message": "Welcome to Dominion. Efficient governance through algorithmic oversight. Your compliance ensures collective prosperity.",
     "branding": {
       "logo": "emblem.png",
-      "welcome_image": "background.png"
+      "welcome_image": "background.png",
+      "logo_url": "https://deploy.realmsgos.dev/branding/files/abc123/emblem.png",
+      "welcome_image_url": "https://deploy.realmsgos.dev/branding/files/def456/background.png"
     },
     "codex": { "package": "dominion", "version": "latest" },
-    "extensions": ["all"]
+    "extensions": ["all"],
+    "realm_data_url": "https://deploy.realmsgos.dev/branding/files/aabb1122/realm_data.json"
   },
   "canister_artifacts": {
     "realm": {

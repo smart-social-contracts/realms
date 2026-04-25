@@ -15,12 +15,7 @@ from .commands.import_data import import_codex_command, import_data_command
 from .commands.export_data import export_data_command
 from .commands.extension import extension_command, codex_command
 from .commands.wasm_registry import wasm_command
-from .commands.installer import (
-    installer_cancel_command,
-    installer_deploy_command,
-    installer_list_command,
-    installer_status_command,
-)
+from .commands.installer import installer_health_command
 from .commands.marketplace import (
     marketplace_call_command,
     marketplace_deploy_command,
@@ -292,105 +287,22 @@ def wasm(
 
 
 # ---------------------------------------------------------------------------
-# `realms installer ...` — wraps realm_installer.deploy_realm /
-# get_deploy_status / list_deploys.  This is the operator-facing way to
-# drive an end-to-end realm deploy (WASM + extensions + codices) on-chain
-# from a single canister call.  See cli/commands/installer.py for the
-# actual implementation; the manifest schema mirrors the JSON accepted by
-# realm_installer.deploy_realm (see src/realm_installer/main.py docstring).
+# `realms installer health` — quick check against realm_installer
+# (end-to-end on-chain deploy_realm was removed; use the registry queue).
 # ---------------------------------------------------------------------------
 installer_app = typer.Typer(
     name="installer",
-    help="Drive on-chain realm_installer.deploy_realm.",
+    help="realm_installer utilities (e.g. health).",
 )
 app.add_typer(installer_app, name="installer", rich_help_panel="Lifecycle")
 
 
-@installer_app.command("deploy")
-def installer_deploy(
+@installer_app.command("health")
+def installer_health(
     installer: str = typer.Option(
         ..., "--installer", "-I",
         help="realm_installer canister ID",
     ),
-    manifest: str = typer.Option(
-        ..., "--manifest", "-m",
-        help="Path to a deploy_realm manifest JSON file (use '-' for stdin).",
-    ),
-    target: Optional[str] = typer.Option(
-        None, "--target", "-t",
-        help="Override target_canister_id from the manifest.",
-    ),
-    registry: Optional[str] = typer.Option(
-        None, "--registry", "-r",
-        help="Override registry_canister_id from the manifest.",
-    ),
-    network: str = typer.Option(
-        "ic", "--network", "-n", help="Network: local, staging, ic"
-    ),
-    identity: Optional[str] = typer.Option(
-        None, "--identity", help="dfx identity to use"
-    ),
-    wait: bool = typer.Option(
-        True, "--wait/--no-wait",
-        help="Block until the on-chain task is terminal (default: wait)",
-    ),
-    poll_interval: float = typer.Option(
-        5.0, "--poll-interval",
-        help="Seconds between get_deploy_status polls (default: 5).",
-    ),
-    max_wait: int = typer.Option(
-        1800, "--max-wait",
-        help="Max seconds to wait for the deploy (default: 1800).",
-    ),
-) -> None:
-    """End-to-end realm deploy from a JSON manifest.
-
-    Manifest schema (see src/realm_installer/main.py)::
-
-        {
-          "target_canister_id":   "ijdaw-…-cai",
-          "registry_canister_id": "iebdk-…-cai",
-          "wasm": {                                  // optional
-            "namespace": "wasm",
-            "path": "realm-base-1.2.3.wasm.gz",
-            "mode": "upgrade",                       // install|reinstall|upgrade
-            "init_arg_b64": ""
-          },
-          "extensions": [
-            {"id": "voting", "version": null},
-            {"id": "vault",  "version": "0.2.0"}
-          ],
-          "codices": [
-            {"id": "syntropia/membership", "version": null, "run_init": true}
-          ]
-        }
-
-    Examples::
-
-        realms installer deploy -I <installer> -m manifest.json --network staging
-        realms installer deploy -I <installer> -m - --no-wait < manifest.json
-    """
-    installer_deploy_command(
-        installer=installer,
-        manifest_path=manifest,
-        target=target,
-        registry=registry,
-        network=network,
-        identity=identity,
-        wait=wait,
-        poll_interval=poll_interval,
-        max_wait=max_wait,
-    )
-
-
-@installer_app.command("status")
-def installer_status(
-    installer: str = typer.Option(
-        ..., "--installer", "-I", help="realm_installer canister ID"
-    ),
-    task_id: str = typer.Option(
-        ..., "--task-id", help="task_id returned by `installer deploy`"
-    ),
     network: str = typer.Option(
         "ic", "--network", "-n", help="Network: local, staging, ic"
     ),
@@ -398,49 +310,8 @@ def installer_status(
         None, "--identity", help="dfx identity to use"
     ),
 ) -> None:
-    """Print the current status + per-step results for a deploy task."""
-    installer_status_command(
-        installer=installer, task_id=task_id,
-        network=network, identity=identity,
-    )
-
-
-@installer_app.command("cancel")
-def installer_cancel(
-    installer: str = typer.Option(
-        ..., "--installer", "-I", help="realm_installer canister ID"
-    ),
-    task_id: str = typer.Option(
-        ..., "--task-id", help="task_id of the deploy to cancel"
-    ),
-    network: str = typer.Option(
-        "ic", "--network", "-n", help="Network: local, staging, ic"
-    ),
-    identity: Optional[str] = typer.Option(
-        None, "--identity", help="dfx identity to use"
-    ),
-) -> None:
-    """Cancel an in-flight deploy_realm task (idempotent)."""
-    installer_cancel_command(
-        installer=installer, task_id=task_id,
-        network=network, identity=identity,
-    )
-
-
-@installer_app.command("list")
-def installer_list(
-    installer: str = typer.Option(
-        ..., "--installer", "-I", help="realm_installer canister ID"
-    ),
-    network: str = typer.Option(
-        "ic", "--network", "-n", help="Network: local, staging, ic"
-    ),
-    identity: Optional[str] = typer.Option(
-        None, "--identity", help="dfx identity to use"
-    ),
-) -> None:
-    """List every deploy_realm task this installer has run."""
-    installer_list_command(
+    """Call realm_installer.health (liveness + chunk limits)."""
+    installer_health_command(
         installer=installer, network=network, identity=identity,
     )
 

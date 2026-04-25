@@ -221,29 +221,31 @@ class TestInstallerManifestParsing:
         assert "gzip" not in entry["encodings"]
         assert "gzip_path" not in entry
 
-    def test_installer_did_has_asset_endpoints(self):
+    def test_installer_did_is_queue_only(self):
         did_path = REPO_ROOT / "src" / "realm_installer" / "realm_installer.did"
         did_text = did_path.read_text()
-        assert "deploy_frontend" in did_text
-        assert "create_batch" in did_text
-        assert "create_chunk" in did_text
-        assert "commit_batch" in did_text
+        assert "enqueue_deployment" in did_text
+        assert "get_deployment_job_status" in did_text
+        assert "report_frontend_verified" in did_text
+        assert "deploy_frontend" not in did_text
+        assert "install_realm_backend" not in did_text
+        assert "fetch_module_hash" not in did_text
 
-    def test_installer_main_has_frontend_core(self):
+    def test_installer_main_uses_worker_callbacks(self):
         main_path = REPO_ROOT / "src" / "realm_installer" / "main.py"
         main_text = main_path.read_text()
-        assert "_deploy_frontend_core" in main_text
-        assert "AssetCanisterService" in main_text
-        assert "deploy_frontend" in main_text
-        assert 'kind == "frontend"' in main_text or "kind == \"frontend\"" in main_text
+        assert "report_frontend_verified" in main_text
+        assert "_schedule_registry_settlement" in main_text
+        assert "_deploy_frontend_core" not in main_text
+        assert "AssetCanisterService" not in main_text
+        assert "def deploy_frontend(" not in main_text
 
-    def test_installer_main_handles_gzip_encoding(self):
+    def test_installer_main_has_no_frontend_deploy_internals(self):
         main_path = REPO_ROOT / "src" / "realm_installer" / "main.py"
         main_text = main_path.read_text()
-        assert "gzip" in main_text
-        assert "content_encoding" in main_text
-        assert "gzip_path" in main_text
-        assert "gzip_sha256" in main_text
+        assert "gzip_path" not in main_text
+        assert "gzip_sha256" not in main_text
+        assert "content_encoding" not in main_text
 
 
 class TestWasmSpecResolution:
@@ -312,15 +314,16 @@ class TestWasmSpecResolution:
 
 
 class TestCIInstallerPipeline:
-    """Verify the CI script uses installer for all frontends (no dfx deploy fallback)."""
+    """Verify the CI script deploys directly via dfx (no installer middleman)."""
 
-    def test_no_dfx_deploy_fallback(self):
+    def test_stage2_uses_direct_dfx(self):
         ci_path = REPO_ROOT / "scripts" / "ci_install_mundus.py"
         text = ci_path.read_text()
-        assert "_deploy_realm_frontends" not in text
-        assert "_deploy_registry_frontend" not in text
-        assert "_deploy_dashboard_frontend" not in text
-        assert "_deploy_infra_frontends_via_installer" not in text
+        assert "_find_or_build_wasm" in text
+        assert "_direct_deploy_frontend_assets" in text
+        assert "_build_member_frontend" in text
+        assert "install_realm_backend" not in text
+        assert '"deploy_frontend"' not in text
 
     def test_stage1_publishes_frontends(self):
         ci_path = REPO_ROOT / "scripts" / "ci_install_mundus.py"
@@ -353,11 +356,11 @@ class TestCIInstallerPipeline:
         assert "deploy-dashboard-staging" not in text
         assert "_deploy-dashboard.yml" not in text
 
-    def test_fast_deploy_has_upgrade_installer_option(self):
+    def test_fast_deploy_uses_queue_deployment(self):
         fast = REPO_ROOT / ".github" / "workflows" / "fast-deploy.yml"
         text = fast.read_text()
-        assert "upgrade_installer" in text
-        assert "UPGRADE_INSTALLER" in text
+        assert "request_deployment.py" in text
+        assert "upgrade_installer" not in text
 
 
 if __name__ == "__main__":

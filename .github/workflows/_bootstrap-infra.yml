@@ -86,9 +86,8 @@ jobs:
               --infra-ids-out infra-ids.json
 
       # realm_installer is pinned in the staging descriptor (so stage 0
-      # skips it), but we must upgrade it on every push so it has the
-      # latest endpoints (e.g. deploy_realm from #192).  Build with
-      # basilisk and install via dfx canister install --mode upgrade.
+      # skips it), but we must upgrade it on every push so queue/callback
+      # endpoints match the current worker + registry flow.
       - name: Upgrade realm_installer (non-local)
         if: ${{ inputs.network != 'local' }}
         run: |

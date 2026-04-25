@@ -29,8 +29,8 @@
 #     scripts/upload_data.sh <member.canister> <member.seed_data>
 #     Playwright e2e against each member's frontend
 #
-# This file is read by scripts/deploy.py via:
-#     python scripts/deploy.py --mundus-file deployments/local-mundus.yml
+# This file is consumed by:
+#     python scripts/ci_install_mundus.py --file deployments/local-mundus.yml --stages 0,1,2,3
 
 version: 2
 network: local

@@ -11,11 +11,10 @@ function isLocalDevelopment() {
   );
 }
 
-function parseJsonResponse(raw) {
+function resultOk(raw) {
   if (raw == null) return null;
-  if (typeof raw === 'object') return raw;
-  const s = String(raw);
-  return JSON.parse(s);
+  if (typeof raw === 'object' && 'Ok' in raw) return raw.Ok;
+  return null;
 }
 
 async function createInstallerActor() {
@@ -41,9 +40,10 @@ export async function fetchDeploymentJobsFromInstaller() {
   if (buildingOrTesting || !browser) return [];
   const actor = await createInstallerActor();
   const raw = await actor.list_deployment_jobs();
-  const data = parseJsonResponse(raw);
-  if (!data?.success) return [];
-  return data.jobs || [];
+  if (raw == null) return [];
+  if (typeof raw === 'object' && 'Err' in raw) return [];
+  const ok = resultOk(raw);
+  return (ok && ok.jobs) || [];
 }
 
 /** @returns {Promise<object|null>} */
@@ -51,7 +51,9 @@ export async function fetchDeploymentJobStatus(jobId) {
   if (buildingOrTesting || !browser || !jobId) return null;
   const actor = await createInstallerActor();
   const raw = await actor.get_deployment_job_status(jobId);
-  return parseJsonResponse(raw);
+  if (raw == null) return null;
+  if (typeof raw === 'object' && 'Err' in raw) return null;
+  return resultOk(raw);
 }
 
 /**

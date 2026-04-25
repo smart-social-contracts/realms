@@ -4,7 +4,7 @@ import time
 import uuid
 from typing import Dict, List, Optional
 
-from core.models import CreditTransaction, UserCredits
+from core.models import CreditTransaction, DeploymentCreditHold, UserCredits
 from ic_python_logging import get_logger
 
 logger = get_logger("credits")
@@ -206,4 +206,143 @@ def get_user_transactions(principal_id: str, limit: int = 50) -> Dict:
         return {"success": True, "transactions": transactions_data}
     except Exception as e:
         logger.error(f"Error getting transactions for {principal_id}: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+
+def create_deployment_hold(
+    principal_id: str,
+    job_id: str,
+    amount: int,
+    description: str = "Deployment hold",
+) -> Dict:
+    """Reserve credits for a deployment job (idempotent by job_id)."""
+    if amount <= 0:
+        return {"success": False, "error": "Amount must be positive"}
+    if not job_id:
+        return {"success": False, "error": "job_id is required"}
+    try:
+        existing = DeploymentCreditHold[job_id]
+        if existing:
+            return {
+                "success": existing.status in ("held", "captured"),
+                "hold": existing.to_dict(),
+                "idempotent": True,
+            }
+
+        user_credits = UserCredits[principal_id]
+        if not user_credits:
+            return {"success": False, "error": "User has no credits"}
+        balance = user_credits.balance or 0
+        if balance < amount:
+            return {
+                "success": False,
+                "error": f"Insufficient credits. Balance: {balance}, Required: {amount}",
+            }
+
+        user_credits.balance = balance - amount
+        hold = DeploymentCreditHold(
+            job_id=job_id,
+            principal_id=principal_id,
+            amount=amount,
+            status="held",
+            reason=description,
+            created_at=time.time(),
+            settled_at=0.0,
+        )
+        CreditTransaction(
+            id=f"tx_{uuid.uuid4().hex[:16]}",
+            principal_id=principal_id,
+            amount=-amount,
+            transaction_type="hold",
+            description=f"{description} (job={job_id})",
+            stripe_session_id="",
+            timestamp=time.time(),
+        )
+        return {"success": True, "hold": hold.to_dict(), "idempotent": False}
+    except Exception as e:
+        logger.error(f"Error creating deployment hold for {principal_id}: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+
+def capture_deployment_hold(job_id: str, description: str = "Deployment captured") -> Dict:
+    """Capture a held deployment amount into spent credits (idempotent)."""
+    if not job_id:
+        return {"success": False, "error": "job_id is required"}
+    try:
+        hold = DeploymentCreditHold[job_id]
+        if not hold:
+            return {"success": False, "error": f"Hold not found for job_id={job_id}"}
+        if hold.status == "captured":
+            return {"success": True, "hold": hold.to_dict(), "idempotent": True}
+        if hold.status == "released":
+            return {"success": False, "error": "Hold already released"}
+
+        principal_id = hold.principal_id
+        user_credits = UserCredits[principal_id]
+        if not user_credits:
+            user_credits = UserCredits(
+                principal_id=principal_id,
+                balance=0,
+                total_purchased=0,
+                total_spent=0,
+            )
+        user_credits.total_spent = (user_credits.total_spent or 0) + (hold.amount or 0)
+        hold.status = "captured"
+        hold.reason = description
+        hold.settled_at = time.time()
+        CreditTransaction(
+            id=f"tx_{uuid.uuid4().hex[:16]}",
+            principal_id=principal_id,
+            amount=0,
+            transaction_type="capture",
+            description=f"{description} (job={job_id})",
+            stripe_session_id="",
+            timestamp=time.time(),
+        )
+        return {"success": True, "hold": hold.to_dict(), "idempotent": False}
+    except Exception as e:
+        logger.error(f"Error capturing deployment hold {job_id}: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+
+def release_deployment_hold(job_id: str, description: str = "Deployment released") -> Dict:
+    """Release a held deployment amount back to user balance (idempotent)."""
+    if not job_id:
+        return {"success": False, "error": "job_id is required"}
+    try:
+        hold = DeploymentCreditHold[job_id]
+        if not hold:
+            return {"success": False, "error": f"Hold not found for job_id={job_id}"}
+        if hold.status == "released":
+            return {"success": True, "hold": hold.to_dict(), "idempotent": True}
+        if hold.status == "captured":
+            return {"success": False, "error": "Hold already captured"}
+
+        principal_id = hold.principal_id
+        amount = hold.amount or 0
+        user_credits = UserCredits[principal_id]
+        if user_credits:
+            user_credits.balance = (user_credits.balance or 0) + amount
+        else:
+            user_credits = UserCredits(
+                principal_id=principal_id,
+                balance=amount,
+                total_purchased=0,
+                total_spent=0,
+            )
+        hold.status = "released"
+        hold.reason = description
+        hold.settled_at = time.time()
+        CreditTransaction(
+            id=f"tx_{uuid.uuid4().hex[:16]}",
+            principal_id=principal_id,
+            amount=amount,
+            transaction_type="release",
+            description=f"{description} (job={job_id})",
+            stripe_session_id="",
+            timestamp=time.time(),
+        )
+        return {"success": True, "hold": hold.to_dict(), "idempotent": False}
+    except Exception as e:
+        logger.error(f"Error releasing deployment hold {job_id}: {str(e)}")
         return {"success": False, "error": str(e)}

@@ -64,7 +64,7 @@ flowchart LR
     RI -->|"install WASM +\nconfig"| BE
     RI -->|"stream chunks"| FR
     RI -->|"chunked install"| MGMT
-    RRF -->|"deploy_realm"| RI
+    RRF -->|"enqueue_deployment"| RI
     RI -->|"push assets"| FE
 
     %% File registry usage

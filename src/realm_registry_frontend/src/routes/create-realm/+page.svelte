@@ -93,7 +93,20 @@
     try {
       const { buildRealmDeploymentManifest } = await import('$lib/deployment-manifest.js');
       const { getAuthenticatedRegistryActor } = await import('$lib/canisters.js');
-      const manifest = buildRealmDeploymentManifest(formData, CONFIG.default_deploy_queue_network);
+      const { uploadBrandingFiles } = await import('$lib/branding-upload.js');
+
+      let brandingUrls = {};
+      if (formData.logo || formData.welcome_image || formData.realm_data_file) {
+        brandingUrls = await uploadBrandingFiles({
+          logo: formData.logo,
+          welcome_image: formData.welcome_image,
+          realm_data: formData.realm_data_file,
+        });
+      }
+
+      const manifest = await buildRealmDeploymentManifest(
+        formData, CONFIG.default_deploy_queue_network, brandingUrls,
+      );
       const manifestJson = JSON.stringify(manifest);
 
       const registry = await getAuthenticatedRegistryActor();

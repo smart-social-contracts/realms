@@ -1,9 +1,7 @@
 # fast-deploy.yml — manual, fast deploy for prototyping.
 #
-# Uses deploy_direct.py which deploys WASMs and frontends directly via
-# `dfx canister install` / `dfx deploy` (bypassing the expensive
-# file_registry canister). Extensions and codices still go through
-# file_registry + realm_installer (they are small and cheap).
+# Uses the queue-based deployment architecture via
+# realm_registry_backend.request_deployment and installer polling.
 #
 # Trade-offs vs ci-main.yml:
 #   * Skips Phase A (no local-replica e2e gating).
@@ -134,29 +132,12 @@ jobs:
           rm -f /tmp/identity.pem
           echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
 
-      - name: Run deploy against ${{ inputs.descriptor }}
+      - name: Submit queue deployment for ${{ inputs.descriptor }}
         env:
           DESCRIPTOR: ${{ inputs.descriptor }}
-          ONLY_REALMS: ${{ inputs.realms }}
-          ONLY_EXTENSIONS: ${{ inputs.extensions }}
-          SKIP_BASE_WASM: ${{ inputs.skip_base_wasm }}
-          INSTALL_MODE: ${{ inputs.install_mode }}
         run: |
-          set -- --file "$DESCRIPTOR"
-          if [ -n "$ONLY_REALMS" ]; then
-            set -- "$@" --only-realms "$ONLY_REALMS"
-          fi
-          if [ -n "$ONLY_EXTENSIONS" ]; then
-            set -- "$@" --only-extensions "$ONLY_EXTENSIONS"
-          fi
-          if [ "$SKIP_BASE_WASM" = "true" ]; then
-            set -- "$@" --skip-base-wasm
-          fi
-          if [ -n "$INSTALL_MODE" ] && [ "$INSTALL_MODE" != "upgrade" ]; then
-            set -- "$@" --install-mode "$INSTALL_MODE"
-          fi
-          echo "→ python3 scripts/deploy_direct.py $*"
-          python3 scripts/deploy_direct.py "$@"
+          echo "→ python3 scripts/request_deployment.py --file \"$DESCRIPTOR\""
+          python3 scripts/request_deployment.py --file "$DESCRIPTOR"
 
       - name: Upload build artifacts to deploy service cache
         if: always()

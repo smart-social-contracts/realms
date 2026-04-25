@@ -37,10 +37,9 @@
             installerActor.health().catch(() => null),
             installerActor.info().catch(() => null),
           ]);
-          subsystems[1].extra = { healthy: !!health };
+          subsystems[1].extra = { healthy: !!(health as any)?.ok };
           if (info) {
-            const parsed = typeof info === 'string' ? JSON.parse(info) : (info?.Ok ? JSON.parse(info.Ok) : info);
-            subsystems[1].status = parsed;
+            subsystems[1].status = info as any;
           }
         } catch (e: any) { subsystems[1].error = e.message; }
         subsystems[1].loading = false;

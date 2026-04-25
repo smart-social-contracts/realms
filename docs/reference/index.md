@@ -23,7 +23,7 @@ Complete reference documentation for the Realms GOS platform.
 
 ### Deployment & Operations
 - **[Deployment Guide](./DEPLOYMENT_GUIDE)** - Local → Staging → Production
-- **[On-chain `deploy_realm`](./ONCHAIN_REALM_DEPLOY)** - End-to-end realm install from a single canister call (#192)
+- **[On-chain `deploy_realm` (removed)](./ONCHAIN_REALM_DEPLOY)** - See queue + dfx path instead
 - **[Realm Registration](./REALM_REGISTRATION_GUIDE)** - Join the registry
 - **[Troubleshooting](./TROUBLESHOOTING)** - Common issues and solutions
 

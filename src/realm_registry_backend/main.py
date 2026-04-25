@@ -225,10 +225,13 @@ from typing import Optional
 
 from api.credits import (
     add_user_credits,
+    capture_deployment_hold,
+    create_deployment_hold,
     deduct_user_credits,
     get_billing_status,
     get_user_credits,
     get_user_transactions,
+    release_deployment_hold,
 )
 from api.registry import (
     count_registered_realms,
@@ -271,11 +274,33 @@ from ic_python_logging import get_logger
 
 # ---------------------------------------------------------------------------
 # Inter-canister client: realm_installer
+# (Types mirror src/realm_installer/main.py for typed inter-canister calls.)
 # ---------------------------------------------------------------------------
+
+
+class RInstallerError(Record):
+    message: text
+    traceback: text
+
+
+class REnqueueOk(Record):
+    job_id: text
+    status: text
+    realm_name: text
+    network: text
+
+
+class RResultEnqueue(Variant, total=False):
+    Ok: REnqueueOk
+    Err: RInstallerError
+
 
 class RealmInstallerService(Service):
     @service_update
-    def enqueue_deployment(self, manifest_json: text) -> text: ...
+    def enqueue_deployment(self, manifest_json: text) -> RResultEnqueue: ...
+
+    @service_update
+    def cancel_deployment(self, job_id: text) -> text: ...
 
 # NOTE: Record/Variant types MUST be defined in this file (not imported from
 # another module) because basilisk's Candid .did generator only parses main.py's
@@ -697,10 +722,10 @@ def request_deployment(manifest_json: text) -> Async[text]:
     user-triggered (via the platform dashboard).
 
     Flow:
-      1. Validate the caller
-      2. Deduct credits from the caller's balance
-      3. Forward the manifest to ``realm_installer.enqueue_deployment()``
-      4. Return the job_id
+      1. Validate caller and verify balance
+      2. Forward manifest to ``realm_installer.enqueue_deployment()``
+      3. Create credit hold (5 credits) keyed by job_id
+      4. Return job_id
 
     The caller's principal (from Internet Identity for users, or the
     deployer identity for CI) is used for authentication.
@@ -717,21 +742,26 @@ def request_deployment(manifest_json: text) -> Async[text]:
             f"network={network}"
         )
 
-        # ── Deduct credits ────────────────────────────────────────────
-        deduct_result = deduct_user_credits(
-            principal_id=caller,
-            amount=DEPLOYMENT_COST_CREDITS,
-            description=f"Realm deployment: {realm_name}",
-        )
-        if not deduct_result.get("success"):
-            error_msg = deduct_result.get("error", "insufficient credits")
+        # ── Check available balance before enqueue ────────────────────
+        credits_result = get_user_credits(caller)
+        if not credits_result.get("success"):
+            error_msg = credits_result.get("error", "could not load balance")
             logger.warning(
-                f"request_deployment: credit deduction failed for "
+                f"request_deployment: credit check failed for "
                 f"{caller}: {error_msg}"
             )
             return json.dumps({
                 "success": False,
-                "error": f"Credit deduction failed: {error_msg}",
+                "error": f"Credit check failed: {error_msg}",
+            })
+        balance = int((credits_result.get("credits") or {}).get("balance") or 0)
+        if balance < DEPLOYMENT_COST_CREDITS:
+            return json.dumps({
+                "success": False,
+                "error": (
+                    f"Insufficient credits. Balance: {balance}, "
+                    f"Required: {DEPLOYMENT_COST_CREDITS}"
+                ),
             })
 
         # ── Resolve installer canister ID ─────────────────────────────
@@ -749,6 +779,7 @@ def request_deployment(manifest_json: text) -> Async[text]:
         # not the user.  Stamp the human/CI principal into the manifest so
         # the job record and UIs can attribute deployments correctly.
         manifest["requesting_principal"] = caller
+        manifest["registry_canister_id"] = str(ic.id())
         manifest_json_for_installer = json.dumps(manifest)
 
         installer = RealmInstallerService(Principal.from_str(installer_id))
@@ -756,37 +787,98 @@ def request_deployment(manifest_json: text) -> Async[text]:
             manifest_json_for_installer
         )
 
-        raw = call_result
-        if hasattr(call_result, "Ok"):
-            raw = call_result.Ok
-        elif isinstance(call_result, dict) and "Ok" in call_result:
-            raw = call_result["Ok"]
-
-        if isinstance(raw, str):
-            result = json.loads(raw)
-        elif isinstance(raw, dict):
-            result = raw
+        if hasattr(call_result, "Err") and getattr(call_result, "Err", None) is not None:
+            e = call_result.Err
+            msg = getattr(
+                e, "message", str(e),
+            ) if not isinstance(e, dict) else e.get("message", str(e))
+            result = {"success": False, "error": msg}
+        elif hasattr(call_result, "Ok") and getattr(call_result, "Ok", None) is not None:
+            okv = call_result.Ok
+            if isinstance(okv, dict):
+                result = {
+                    "success": True,
+                    "job_id": okv.get("job_id", ""),
+                    "status": okv.get("status", ""),
+                    "realm_name": okv.get("realm_name", ""),
+                    "network": okv.get("network", ""),
+                }
+            else:
+                result = {
+                    "success": True,
+                    "job_id": getattr(okv, "job_id", ""),
+                    "status": getattr(okv, "status", ""),
+                    "realm_name": getattr(okv, "realm_name", ""),
+                    "network": getattr(okv, "network", ""),
+                }
+        elif isinstance(call_result, dict):
+            if call_result.get("Err") is not None:
+                e = call_result["Err"]
+                if isinstance(e, dict):
+                    msg = e.get("message", str(e))
+                else:
+                    msg = str(e)
+                result = {"success": False, "error": msg}
+            elif call_result.get("Ok") is not None:
+                okv = call_result["Ok"]
+                result = {
+                    "success": True,
+                    "job_id": okv.get("job_id", "")
+                    if isinstance(okv, dict) else getattr(okv, "job_id", ""),
+                    "status": (okv.get("status", "") if isinstance(okv, dict) else getattr(okv, "status", "")),
+                    "realm_name": (okv.get("realm_name", "") if isinstance(okv, dict) else getattr(okv, "realm_name", "")),
+                    "network": (okv.get("network", "") if isinstance(okv, dict) else getattr(okv, "network", "")),
+                }
+            else:
+                result = {"success": False, "error": "unexpected installer response"}
         else:
-            result = {"raw": str(raw)}
+            result = {"success": False, "error": "unexpected installer response"}
 
         if result.get("success"):
+            job_id = (result.get("job_id") or "").strip()
+            if not job_id:
+                return json.dumps({
+                    "success": False,
+                    "error": "installer response missing job_id",
+                })
+            hold_result = create_deployment_hold(
+                principal_id=caller,
+                job_id=job_id,
+                amount=DEPLOYMENT_COST_CREDITS,
+                description=f"Realm deployment hold: {realm_name}",
+            )
+            if not hold_result.get("success"):
+                err = hold_result.get("error", "could not hold credits")
+                logger.error(
+                    "request_deployment: hold creation failed for %s / %s: %s",
+                    caller, job_id, err,
+                )
+                try:
+                    cancel_raw: CallResult = yield installer.cancel_deployment(job_id)
+                    logger.warning(
+                        "request_deployment: cancelled job %s after hold failure: %s",
+                        job_id, cancel_raw,
+                    )
+                except Exception as ce:
+                    logger.error(
+                        "request_deployment: failed to cancel job %s after hold failure: %s",
+                        job_id, ce,
+                    )
+                return json.dumps({
+                    "success": False,
+                    "error": f"Could not reserve deployment credits: {err}",
+                })
             logger.info(
                 f"request_deployment: enqueued job "
                 f"{result.get('job_id', '?')} for {realm_name}"
             )
-            result["credits_deducted"] = DEPLOYMENT_COST_CREDITS
+            result["credits_held"] = DEPLOYMENT_COST_CREDITS
             result["caller"] = caller
             return json.dumps(result)
         else:
             logger.error(
                 f"request_deployment: installer rejected: "
                 f"{result.get('error', '?')}"
-            )
-            # Refund credits on failure
-            add_user_credits(
-                principal_id=caller,
-                amount=DEPLOYMENT_COST_CREDITS,
-                description=f"Refund: deployment of {realm_name} rejected",
             )
             return json.dumps(result)
 
@@ -805,13 +897,10 @@ def request_deployment(manifest_json: text) -> Async[text]:
 
 
 @update
-def deployment_failed(job_id: text, reason: text) -> text:
-    """Called by the installer when a deployment fails.
+def deployment_failed(job_id: text, reason: text, caller_principal: text = "") -> text:
+    """Called by the installer when a deployment reaches terminal failure.
 
-    Refunds the credits to the original requester. The ``job_id``
-    is used to look up which principal initiated the deployment
-    (this info is stored on the installer side; the caller must
-    include it).
+    Releases the held deployment credits by ``job_id``.
     """
     try:
         caller = str(ic.caller())
@@ -819,17 +908,58 @@ def deployment_failed(job_id: text, reason: text) -> text:
             f"deployment_failed: job_id={job_id}, caller={caller}, "
             f"reason={reason}"
         )
-        # The refund requires knowing the original caller's principal.
-        # For now, log the failure; the installer stores the caller info
-        # and can include it in a future version of this callback.
+        release_result = release_deployment_hold(
+            job_id=job_id,
+            description=f"Deployment failed: {reason}",
+        )
+        if not release_result.get("success"):
+            return json.dumps({
+                "success": False,
+                "job_id": job_id,
+                "error": release_result.get("error", "release failed"),
+            })
         return json.dumps({
             "success": True,
             "job_id": job_id,
             "reason": reason,
-            "note": "failure logged; credit refund pending caller lookup",
+            "caller_principal": caller_principal,
+            "settlement": "released",
         })
     except Exception as e:
         logger.error(f"deployment_failed error: {str(e)}")
+        return json.dumps({
+            "success": False,
+            "error": f"Internal error: {str(e)}",
+        })
+
+
+@update
+def deployment_succeeded(job_id: text, caller_principal: text = "") -> text:
+    """Called by installer when deployment completes; captures held credits."""
+    try:
+        caller = str(ic.caller())
+        logger.info(
+            f"deployment_succeeded: job_id={job_id}, caller={caller}, "
+            f"principal={caller_principal}"
+        )
+        capture_result = capture_deployment_hold(
+            job_id=job_id,
+            description="Deployment completed",
+        )
+        if not capture_result.get("success"):
+            return json.dumps({
+                "success": False,
+                "job_id": job_id,
+                "error": capture_result.get("error", "capture failed"),
+            })
+        return json.dumps({
+            "success": True,
+            "job_id": job_id,
+            "caller_principal": caller_principal,
+            "settlement": "captured",
+        })
+    except Exception as e:
+        logger.error(f"deployment_succeeded error: {str(e)}")
         return json.dumps({
             "success": False,
             "error": f"Internal error: {str(e)}",

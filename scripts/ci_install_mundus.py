@@ -949,23 +949,107 @@ def _register_realm_with_registry(
 
 
 # ---------------------------------------------------------------------------
-# Stage 2 — install mundus members via realm_installer.deploy_realm
+# Stage 2 — install mundus members directly via dfx.
 #
-# Each realm's WASM + extensions + codices are bundled into a single
-# manifest and handed to `realm_installer.deploy_realm` in one inter-
-# canister call. The installer drives every step on-chain via IC
-# timers (each step is its own update message). We poll
-# `get_deploy_status` until terminal and surface per-step failures.
-#
-# This replaces the previous per-realm sequence of:
-#     realms wasm install    (1×)
-#   + realms extension registry-install  (N×)
-#   + realms codex registry-install      (M×)
-# with a single dfx call per realm.  The on-chain installer is now the
-# source of truth for "what got installed where", which is the
-# prerequisite for blackholing realm_installer / removing the CI
-# principal as a controller of every realm in production.
+# For each member: install WASM via `dfx canister install --wasm`,
+# deploy frontend via `dfx deploy` (temp project), then run
+# extension/codex installs on the realm backend.
 # ---------------------------------------------------------------------------
+
+
+_DFX_NETWORKS: Dict[str, Dict[str, Any]] = {
+    "local": {"bind": "127.0.0.1:4943", "type": "ephemeral"},
+    "staging": {"providers": ["https://icp0.io"], "type": "persistent"},
+    "ic": {"providers": ["https://icp0.io"], "type": "persistent"},
+    "demo": {"providers": ["https://icp0.io"], "type": "persistent"},
+}
+
+
+def _find_or_build_wasm(
+    member: Dict[str, Any], base_version: str, network: str,
+) -> Optional[Path]:
+    """Locate a locally-built WASM artifact or build it on-the-fly.
+
+    Checks ``.basilisk/`` and ``.external-wasms/`` first (populated by
+    stage 1 if it ran in the same job), then falls back to building.
+    Returns ``None`` for frontend-only member types.
+    """
+    wasm_spec = _wasm_spec_for_member(member, base_version)
+    if wasm_spec is None:
+        return None
+
+    source = wasm_spec["source"]
+
+    if wasm_spec.get("external"):
+        url = wasm_spec.get("url") or member.get("wasm_url")
+        if not url:
+            return None
+        download_dir = REPO_ROOT / ".external-wasms"
+        filename = url.rsplit("/", 1)[-1]
+        dest = download_dir / filename
+        gz = dest.with_suffix(dest.suffix + ".gz") if not str(dest).endswith(".gz") else dest
+        if gz.exists():
+            return gz
+        if dest.exists():
+            return dest
+        return _download_external_wasm(url, download_dir, filename)
+
+    candidates = [
+        REPO_ROOT / ".basilisk" / source / f"{source}.wasm.gz",
+        REPO_ROOT / ".basilisk" / source / f"{source}.wasm",
+        REPO_ROOT / ".dfx" / network / "canisters" / source / f"{source}.wasm.gz",
+        REPO_ROOT / ".dfx" / network / "canisters" / source / f"{source}.wasm",
+    ]
+    for c in candidates:
+        if c.exists():
+            print(f"     reusing WASM artifact {c}")
+            return c
+
+    print(f"     WASM not cached — building {source}")
+    return _build_canister_wasm(source, network)
+
+
+def _build_member_frontend(
+    member: Dict[str, Any], network: str,
+) -> Optional[Path]:
+    """Build the correct frontend dist/ for a mundus member's type."""
+    mtype = (member.get("type") or "realm").strip()
+    if mtype in ("token", "token_frontend", "nft", "nft_frontend"):
+        return None
+    if mtype == "realm":
+        return _build_realm_frontend(member, network)
+    if mtype == "realm_registry":
+        return _build_registry_frontend(network)
+    if mtype == "marketplace":
+        return _build_marketplace_frontend(network)
+    if mtype == "dashboard":
+        return _build_dashboard_frontend(network)
+    return _build_realm_frontend(member, network)
+
+
+def _direct_deploy_frontend_assets(
+    canister_id: str, dist_dir: Path, network: str,
+) -> None:
+    """Deploy a frontend dist/ to an asset canister using a temp dfx project."""
+    tmp = Path(tempfile.mkdtemp(prefix="ci_fe_deploy_"))
+    try:
+        local_dist = tmp / "dist"
+        shutil.copytree(dist_dir, local_dist)
+        dfx_json: Dict[str, Any] = {
+            "version": 1,
+            "canisters": {"frontend": {"type": "assets", "source": ["dist"]}},
+            "networks": dict(_DFX_NETWORKS),
+        }
+        (tmp / "dfx.json").write_text(json.dumps(dfx_json, indent=2))
+        (tmp / "canister_ids.json").write_text(json.dumps(
+            {"frontend": {network: canister_id}}, indent=2,
+        ))
+        _run(
+            ["dfx", "deploy", "frontend", "--network", network, "--yes"],
+            cwd=tmp,
+        )
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def _build_deploy_manifest(
@@ -977,10 +1061,7 @@ def _build_deploy_manifest(
     install_mode: str,
     artifacts: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """Build the manifest that goes into ``deploy_realm``.
-
-    Mirrors the per-step work the old per-realm loop did, but as a
-    single declarative payload the on-chain installer can iterate over.
+    """Build a deploy manifest describing what to install for a member.
 
     For frontend-only members (type ``dashboard``), there is no WASM
     section — only a ``frontend`` section.
@@ -1102,116 +1183,153 @@ def _unwrap_candid_text(out: str) -> str:
     )
 
 
-def _format_deploy_failures(status: Dict[str, Any]) -> str:
-    """Pretty-print per-step failures in a deploy_realm status payload."""
-    lines: List[str] = []
-    wasm = status.get("wasm")
-    if wasm and wasm.get("status") == "failed":
-        lines.append(f"     ✗ wasm ({wasm.get('label')}): {wasm.get('error')}")
-    frontend = status.get("frontend")
-    if frontend and frontend.get("status") == "failed":
-        lines.append(
-            f"     ✗ frontend ({frontend.get('label')}): {frontend.get('error')}"
-        )
-    for ext in status.get("extensions") or []:
-        if ext.get("status") == "failed":
-            lines.append(
-                f"     ✗ extension {ext.get('label')}: {ext.get('error')}"
-            )
-    for cdx in status.get("codices") or []:
-        if cdx.get("status") == "failed":
-            lines.append(f"     ✗ codex {cdx.get('label')}: {cdx.get('error')}")
-    return "\n".join(lines) if lines else "     (no per-step failures recorded)"
-
-
-_TRANSIENT_DFX_PATTERNS = (
-    "Rejection code 2",
-    "Couldn't send message",
-    "Could not send message",
-    "transport error",
-    "connection reset",
-    "timed out",
-)
-
-_DFX_TRANSIENT_RETRIES = 3
-_DFX_TRANSIENT_BACKOFF_S = 15
-
-
-def _is_transient_dfx_error(exc: subprocess.CalledProcessError) -> bool:
-    stderr = (exc.stderr or "") + (exc.stdout or "")
-    return any(pat.lower() in stderr.lower() for pat in _TRANSIENT_DFX_PATTERNS)
-
-
-def _try_deploy_with_cancel_retry(
-    realm_installer: str,
-    manifest_json: str,
-    name: str,
+def _dfx_call_json(
+    canister: str,
+    method: str,
+    arg_text: str,
     network: str,
-) -> Dict[str, Any]:
-    """Call deploy_realm; if rejected for concurrency, cancel the stale task and retry.
-
-    Also retries on transient IC/dfx errors (e.g. subnet routing failures)
-    with exponential backoff.
-
-    Returns the parsed kickoff JSON dict on success, raises SystemExit on hard
-    errors.
-    """
-    for attempt in range(2):
-        for transient_try in range(_DFX_TRANSIENT_RETRIES):
-            try:
-                raw = _unwrap_candid_text(_dfx_call_text(
-                    realm_installer, "deploy_realm", manifest_json,
-                    network=network, timeout=120,
-                ))
-                break
-            except subprocess.CalledProcessError as e:
-                if _is_transient_dfx_error(e) and transient_try < _DFX_TRANSIENT_RETRIES - 1:
-                    delay = _DFX_TRANSIENT_BACKOFF_S * (2 ** transient_try)
-                    print(
-                        f"   ⚠ {name}: transient dfx error (attempt "
-                        f"{transient_try + 1}/{_DFX_TRANSIENT_RETRIES}), "
-                        f"retrying in {delay}s…"
-                    )
-                    time.sleep(delay)
-                    continue
-                print(
-                    f"   ✗ {name}: non-transient dfx error "
-                    f"(exit {e.returncode})"
-                )
-                if e.stderr:
-                    print(f"     stderr: {e.stderr.strip()[:500]}")
-                if e.stdout:
-                    print(f"     stdout: {e.stdout.strip()[:500]}")
-                raise
-        try:
-            data = json.loads(raw, strict=False)
-        except json.JSONDecodeError as e:
-            raise SystemExit(
-                f"ERROR: deploy_realm returned non-JSON for {name}: "
-                f"{raw[:300]} ({e})"
-            )
-        if data.get("success"):
-            return data
-
-        conflicting_id = data.get("conflicting_task_id")
-        if conflicting_id and attempt == 0:
-            print(
-                f"   ⚠ {name}: concurrency conflict with {conflicting_id}, "
-                f"cancelling stale deploy…"
-            )
-            cancel_raw = _unwrap_candid_text(_dfx_call_text(
-                realm_installer, "cancel_deploy", conflicting_id,
-                network=network, timeout=60,
-            ))
-            print(f"     cancel result: {cancel_raw[:200]}")
-            time.sleep(2)
-            continue
-
-        raise SystemExit(
-            f"ERROR: deploy_realm rejected for {name}: "
-            f"{data.get('error')}"
+    *,
+    query: bool = False,
+    timeout: int = 600,
+) -> Any:
+    """``dfx canister call`` with ``--output json`` (for realm_installer variants)."""
+    with tempfile.NamedTemporaryFile("w", suffix=".did", delete=False) as fh:
+        escaped = arg_text.replace("\\", "\\\\").replace("\"", "\\\"")
+        fh.write(f'("{escaped}")')
+        arg_path = fh.name
+    try:
+        cmd = ["dfx", "canister", "call", "--network", network, "--output", "json"]
+        if query:
+            cmd.append("--query")
+        cmd += [canister, method, "--argument-file", arg_path]
+        cp = subprocess.run(
+            cmd, capture_output=True, text=True, check=True, timeout=timeout,
         )
-    raise SystemExit(f"ERROR: deploy_realm still rejected for {name} after cancel")
+        return json.loads((cp.stdout or "").strip())
+    except subprocess.CalledProcessError as e:
+        print(
+            f"   ✗ dfx json call {canister}.{method} failed "
+            f"(exit {e.returncode})"
+        )
+        if e.stderr:
+            print(f"     stderr: {e.stderr.strip()[:500]}")
+        if e.stdout:
+            print(f"     stdout: {e.stdout.strip()[:500]}")
+        raise
+    finally:
+        try:
+            os.unlink(arg_path)
+        except OSError:
+            pass
+
+
+def _dfx_realm_text_to_backend(
+    canister_id: str, method: str, payload: Dict[str, Any], network: str,
+) -> Dict[str, Any]:
+    out = _unwrap_candid_text(
+        _dfx_call_text(
+            canister_id, method, json.dumps(payload, separators=(",", ":")),
+            network=network, timeout=1200,
+        )
+    )
+    return json.loads(out, strict=False)
+
+
+def _offchain_apply_mundus_manifest(
+    manifest: Dict[str, Any],
+    *,
+    network: str,
+    name: str,
+    ext_install_target: str | None,
+    member: Dict[str, Any],
+    base_version: str,
+) -> None:
+    """Install WASM + frontend + extensions/codices directly via dfx.
+
+    WASM is installed from local build artifacts (built in stage 1 or
+    on-the-fly).  Frontends are built and deployed via a temp dfx
+    project.  Extensions/codices are installed via inter-canister calls
+    on the realm backend.
+    """
+    reg = manifest.get("registry_canister_id", "")
+    if not reg:
+        raise SystemExit(f"ERROR: {name}: missing registry in manifest")
+
+    w = manifest.get("wasm")
+    if w and w.get("path"):
+        target = manifest.get("target_canister_id", "")
+        mode = w.get("mode", "upgrade")
+        wasm_file = _find_or_build_wasm(member, base_version, network)
+        if not wasm_file:
+            raise SystemExit(
+                f"ERROR: {name}: could not locate or build WASM artifact"
+            )
+        print(f"     installing WASM {wasm_file.name} → {target} (mode={mode})")
+        init_arg = (member.get("init_arg") or "").strip()
+        cmd = [
+            "dfx", "canister", "install", target,
+            "--wasm", str(wasm_file),
+            "--mode", mode,
+            "--network", network,
+            "--yes",
+        ]
+        if init_arg:
+            cmd += ["--argument", init_arg]
+        _run(cmd)
+
+    fe = manifest.get("frontend")
+    if fe and fe.get("target_canister_id"):
+        fe_canister_id = fe["target_canister_id"]
+        dist = _build_member_frontend(member, network)
+        if dist:
+            print(f"     deploying frontend → {fe_canister_id}")
+            _direct_deploy_frontend_assets(fe_canister_id, dist, network)
+        else:
+            print(f"   ⚠ no frontend dist built for {name} — skipping")
+
+    exts = manifest.get("extensions") or []
+    cdxs = manifest.get("codices") or []
+    if (exts or cdxs) and not ext_install_target:
+        raise SystemExit(
+            f"ERROR: {name} has extensions/codices but no backend canister to install on",
+        )
+    for e in exts:
+        eid = e.get("id") if isinstance(e, dict) else None
+        if not eid:
+            continue
+        res = _dfx_realm_text_to_backend(
+            ext_install_target,
+            "install_extension_from_registry",
+            {
+                "registry_canister_id": reg,
+                "ext_id": eid,
+                "version": (e or {}).get("version"),
+            },
+            network,
+        )
+        if isinstance(res, dict) and res.get("success") is False:
+            raise SystemExit(
+                f"ERROR: {name} extension {eid}: {res.get('error', res)}",
+            )
+    for c in cdxs:
+        cid = c.get("id") if isinstance(c, dict) else None
+        if not cid:
+            continue
+        res = _dfx_realm_text_to_backend(
+            ext_install_target,
+            "install_codex_from_registry",
+            {
+                "registry_canister_id": reg,
+                "codex_id": cid,
+                "version": (c or {}).get("version"),
+                "run_init": bool((c or {}).get("run_init", True)),
+            },
+            network,
+        )
+        if isinstance(res, dict) and res.get("success") is False:
+            raise SystemExit(
+                f"ERROR: {name} codex {cid}: {res.get('error', res)}",
+            )
 
 
 def _grant_frontend_permissions(
@@ -1261,15 +1379,10 @@ def _kickoff_deploy(
     artifacts: Dict[str, Any],
     network: str,
 ) -> Dict[str, Any]:
-    """Resolve canister id, add controller, fire deploy_realm.
+    """Resolve canister id, add controller, run off-chain dfx install.
 
-    Returns ``{"member", "canister_id", "task_id", "steps_count"}`` for
-    use by the polling phase.  Raises SystemExit on hard errors so a
-    bad realm aborts the whole CI run instead of silently scheduling a
-    no-op poll.
-
-    For frontend-only members (type ``dashboard``), the target canister
-    is the ``frontend_canister_id`` since there is no backend canister.
+    Raises SystemExit on hard errors. For frontend-only members the
+    manifest target is the asset canister (no extension install target).
     """
     name = member["name"]
     mtype = (member.get("type") or "realm").strip()
@@ -1333,125 +1446,24 @@ def _kickoff_deploy(
     manifest_json = json.dumps(manifest)
     print(f"     manifest: {manifest_json}")
 
-    kickoff_data = _try_deploy_with_cancel_retry(
-        realm_installer, manifest_json, name, network,
-    )
-    task_id = kickoff_data["task_id"]
-    print(
-        f"     queued deploy_realm task_id={task_id} "
-        f"(steps={kickoff_data.get('steps_count')})"
+    ext_install_target: str | None
+    if is_frontend_only:
+        ext_install_target = None
+    else:
+        ext_install_target = canister_id
+
+    _offchain_apply_mundus_manifest(
+        manifest,
+        network=network,
+        name=name,
+        ext_install_target=ext_install_target,
+        member=member,
+        base_version=base_version,
     )
     return {
         "member": member,
         "canister_id": canister_id,
-        "task_id": task_id,
-        "steps_count": int(kickoff_data.get("steps_count", 0)),
     }
-
-
-def _step_progress_summary(data: Dict[str, Any]) -> str:
-    """Build a compact 'completed/total' summary from a get_deploy_status response."""
-    total = done = failed = 0
-    for bucket in ("extensions", "codices"):
-        for s in (data.get(bucket) or []):
-            total += 1
-            if s.get("status") == "completed":
-                done += 1
-            elif s.get("status") == "failed":
-                failed += 1
-    for singular in ("wasm", "frontend"):
-        step = data.get(singular)
-        if step:
-            total += 1
-            if step.get("status") == "completed":
-                done += 1
-            elif step.get("status") == "failed":
-                failed += 1
-    if failed:
-        return f"{done}+{failed}err/{total}"
-    return f"{done}/{total}"
-
-
-def _poll_all_deploys(
-    realm_installer: str,
-    pending: List[Dict[str, Any]],
-    network: str,
-    *,
-    timeout: int = 3600,
-    interval: float = 10.0,
-) -> Dict[str, Dict[str, Any]]:
-    """Poll every queued deploy in ``pending`` until each reaches terminal.
-
-    All N tasks share one polling loop so we only sleep `interval`
-    seconds between rounds (instead of N × interval). Each round
-    fires a query per still-active task (queries are cheap and concurrent
-    on the IC).
-
-    Returns ``{task_id: final_status_dict}``.
-    """
-    deadline = time.time() + timeout
-    remaining = {p["task_id"]: p for p in pending}
-    finals: Dict[str, Dict[str, Any]] = {}
-    last_status: Dict[str, str] = {}
-    last_progress: Dict[str, str] = {}
-
-    while remaining and time.time() < deadline:
-        for task_id in list(remaining.keys()):
-            try:
-                out = _dfx_call_text(
-                    realm_installer, "get_deploy_status", task_id,
-                    network=network, query=True, timeout=60,
-                )
-            except subprocess.CalledProcessError as e:
-                if _is_transient_dfx_error(e):
-                    print(f"   ⚠ transient dfx error polling {task_id}, "
-                          f"will retry next round")
-                    continue
-                raise
-            body = _unwrap_candid_text(out)
-            try:
-                data = json.loads(body, strict=False)
-            except json.JSONDecodeError:
-                print(f"   ⚠️  unparseable get_deploy_status({task_id}): "
-                      f"{body[:200]}")
-                continue
-            if not data.get("success", True):
-                raise SystemExit(
-                    f"ERROR: get_deploy_status({task_id}) returned: "
-                    f"{data.get('error')}"
-                )
-            status = data.get("status", "")
-            name = remaining[task_id]["member"].get("name", "?")
-
-            step_summary = _step_progress_summary(data)
-            progress_key = f"{status}|{step_summary}"
-            if progress_key != last_progress.get(task_id, ""):
-                elapsed = int(time.time() - (deadline - timeout))
-                print(
-                    f"   • {name:<24s} {task_id}: {status}"
-                    f"  [{step_summary}]  ({elapsed}s)"
-                )
-                last_progress[task_id] = progress_key
-                last_status[task_id] = status
-
-            if status in ("completed", "partial", "failed", "cancelled"):
-                finals[task_id] = data
-                del remaining[task_id]
-        if remaining:
-            time.sleep(interval)
-
-    if remaining:
-        names = ", ".join(p["member"].get("name", "?") for p in remaining.values())
-        elapsed = int(time.time() - (deadline - timeout))
-        for task_id, p in remaining.items():
-            n = p["member"].get("name", "?")
-            prog = last_progress.get(task_id, "?")
-            print(f"   ⚠ {n:<24s} {task_id}: last progress = {prog}")
-        raise SystemExit(
-            f"ERROR: deploys did not reach terminal status within {timeout}s "
-            f"({elapsed}s elapsed): {names}"
-        )
-    return finals
 
 
 def stage2_install(
@@ -1466,8 +1478,8 @@ def stage2_install(
     registry_member = _find_registry_member(descriptor)
     default_mode = (descriptor.get("install_mode") or "upgrade").strip()
 
-    print("\n┌─ stage 2: install mundus members (via deploy_realm) "
-          + "─" * 14)
+    print("\n┌─ stage 2: install mundus members (dfx, off-chain manifest) "
+          + "─" * 2)
 
     members = descriptor.get("mundus") or []
     if not members:
@@ -1486,35 +1498,10 @@ def stage2_install(
             network=network,
         ))
 
-    # PHASE 2: poll every in-flight deploy in a single shared loop. The
-    # target realms are independent canisters → their installs run
-    # concurrently on different IC subnet replicas.  Each extension step
-    # involves inter-canister calls (~3-10s each on real subnets), and
-    # with 20+ extensions per realm the total can exceed 30 minutes.
-    deploy_timeout = 10800
-    print(f"\n   ⏳ awaiting {len(pending)} deploy(s) (timeout {deploy_timeout}s)…")
-    finals = _poll_all_deploys(
-        realm_installer, pending, network,
-        timeout=deploy_timeout, interval=10.0,
-    )
-
-    # PHASE 3: validate per-realm outcomes + register with registry.
-    failures: List[str] = []
     for p in pending:
         name = p["member"].get("name", "?")
-        final = finals.get(p["task_id"]) or {}
-        terminal = final.get("status")
-        if terminal != "completed":
-            print(f"\n   ✗ {name} deploy ended in status '{terminal}':")
-            print(_format_deploy_failures(final))
-            failures.append(name)
-            continue
-        print(f"   ✅ {name} deploy completed (task_id={p['task_id']})")
+        print(f"   ✅ {name} deploy completed")
 
-        # Register this realm with the central registry (best-effort,
-        # non-fatal). Only realm-type members that explicitly opt in
-        # via `register_with_registry: true` are registered, and only
-        # if the descriptor actually contains a registry member.
         member = p["member"]
         if (
             (member.get("type") or "realm").strip() == "realm"
@@ -1527,12 +1514,6 @@ def stage2_install(
                 or _canister_id(registry_member["name"], network) or "",
                 network,
             )
-
-    if failures:
-        raise SystemExit(
-            f"ERROR: {len(failures)} realm deploy(s) did not complete: "
-            f"{', '.join(failures)}"
-        )
 
     print("\n   ✅ mundus installed")
 

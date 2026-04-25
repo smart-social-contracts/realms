@@ -13,6 +13,10 @@ export const CONFIG = {
     viteEnv.VITE_REALM_INSTALLER_CANISTER_ID || 'lusjm-wqaaa-aaaau-ago7q-cai',
   /** Network field embedded in deployment manifests (registry → installer). */
   default_deploy_queue_network: viteEnv.VITE_DEPLOY_QUEUE_NETWORK || 'staging',
+  /** GitHub release tag for realm canister artifacts (WASM + frontend tarball). */
+  deploy_release_tag: viteEnv.VITE_DEPLOY_RELEASE_TAG || 'v0.3.1',
+  /** Base URL of the deploy service (branding upload, etc.). */
+  deploy_service_url: viteEnv.VITE_DEPLOY_SERVICE_URL || 'https://deploy.realmsgos.dev',
 };
 
 export const DEV_PORT = 8000;

@@ -205,12 +205,9 @@ def install_extensions_from_source(extensions_path: str, env: dict) -> None:
     src/realm_frontend/src/lib/extensions/... from a local extensions tree.
 
     Mirrors what the full `realms mundus/realm create` pipeline does, so
-    targeted backend/frontend redeploys (i.e. this script's
-    `deploy_backend` / `deploy_frontend` paths) still pick up every
-    build-time extension. Without this step the targeted paths produce
-    builds with an empty `extension_packages/` and no extension UI —
-    which is why Dominion's sidebar lost its extensions after the first
-    targeted redeploy (see issue #168).
+    targeted backend/frontend redeploys still pick up every build-time
+    extension. Without this step the targeted paths produce builds with
+    an empty `extension_packages/` and no extension UI.
 
     No-op when `extensions_codebase.path` is `none`, `bundled`, or empty:
       - `none`   → descriptor explicitly opts out of extensions

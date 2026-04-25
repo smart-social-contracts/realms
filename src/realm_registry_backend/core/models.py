@@ -52,6 +52,31 @@ class CreditTransaction(Entity, TimestampedMixin):
         }
 
 
+class DeploymentCreditHold(Entity, TimestampedMixin):
+    """Reserved credits for one deployment job."""
+
+    __alias__ = "job_id"
+
+    job_id = String()
+    principal_id = String()
+    amount = Integer()
+    status = String()  # held | captured | released
+    reason = String()
+    created_at = Float()
+    settled_at = Float()
+
+    def to_dict(self) -> dict:
+        return {
+            "job_id": self.job_id,
+            "principal_id": self.principal_id,
+            "amount": self.amount or 0,
+            "status": self.status or "",
+            "reason": self.reason or "",
+            "created_at": self.created_at or 0.0,
+            "settled_at": self.settled_at or 0.0,
+        }
+
+
 class RealmRecord(Entity, TimestampedMixin):
     """Entity representing a registered realm in the registry."""
 

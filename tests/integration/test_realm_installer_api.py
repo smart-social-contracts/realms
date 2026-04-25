@@ -1,30 +1,16 @@
 #!/usr/bin/env python3
-"""Integration tests for ``realm_installer`` candid surface (#192).
+"""Integration tests for ``realm_installer`` candid surface.
 
-These tests exercise the *API contract* of the new on-chain
-``deploy_realm`` / ``get_deploy_status`` / ``list_deploys`` endpoints
-on a live replica. They deliberately do *not* run a full end-to-end
-install — that requires a deployed ``file_registry`` plus a separate
-target canister, which is more setup than the standard CI
-container provides.
-
-Coverage:
-
-1. Candid surface includes the three new methods.
-2. ``list_deploys`` returns ``success: true`` (and an empty / list of
-   tasks).
-3. ``get_deploy_status`` on an unknown task returns a structured
-   error (not a candid trap).
-4. ``deploy_realm`` rejects malformed manifests with a structured
-   error response (not a trap).
+Exercises core query endpoints on a live replica.  The old on-chain
+``deploy_realm`` / ``get_deploy_status`` / ``list_deploys`` API has been
+removed; the queue + ``report_canister_ready`` flow is the supported
+path for full realm deploys.
 
 If ``realm_installer`` is not deployed, the suite skips cleanly with
-exit code 0 — this lets it live in the default integration-test set
-without breaking the existing realm_backend-only CI container.
+exit code 0.
 """
 
 import json
-import os
 import subprocess
 import sys
 import traceback
@@ -42,10 +28,14 @@ def _dfx_canister_id(canister: str) -> str:
     return (cp.stdout or "").strip() if cp.returncode == 0 else ""
 
 
-def _dfx_call(method: str, arg: str, *, query: bool = False, timeout: int = 60):
+def _dfx_call(
+    method: str, arg: str, *, query: bool = False, timeout: int = 60, output_json: bool = True,
+):
     cmd = ["dfx", "canister", "call", "realm_installer", method, arg]
     if query:
         cmd.append("--query")
+    if output_json:
+        cmd.extend(["--output", "json"])
     cp = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     return cp.stdout.strip(), cp.returncode, (cp.stderr or "").strip()
 
@@ -68,91 +58,47 @@ def _unwrap(out: str) -> str:
     )
 
 
-def _candid_text(payload: str) -> str:
-    return '("' + payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
-
-
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
 
 
-def test_candid_surface_has_new_methods():
-    """Sanity check: the .did exposes deploy_realm + status + list."""
-    print("  - test_candid_surface_has_new_methods...", end=" ")
+def test_candid_surface_has_core_methods():
+    """Sanity check: candid exposes queue + health (not removed deploy_realm)."""
+    print("  - test_candid_surface_has_core_methods...", end=" ")
     out, code, err = _dfx_call(
-        "__get_candid_interface_tmp_hack", "()", query=True
+        "__get_candid_interface_tmp_hack", "()", query=True, output_json=False,
     )
     assert code == 0, f"candid query failed: {err}"
     body = _unwrap(out)
-    for needed in ("deploy_realm", "get_deploy_status", "list_deploys"):
+    for needed in ("enqueue_deployment", "report_canister_ready", "health"):
         assert needed in body, f"missing endpoint in candid: {needed}"
+    assert "deploy_realm" not in body, "deploy_realm should be removed from candid"
     print("✓")
 
 
-def test_list_deploys_returns_structured_payload():
-    """``list_deploys`` must return ``{success, tasks: [...]}``."""
-    print("  - test_list_deploys_returns_structured_payload...", end=" ")
-    out, code, err = _dfx_call("list_deploys", "()", query=True)
-    assert code == 0, f"list_deploys failed: {err}"
-    body = json.loads(_unwrap(out))
-    assert body.get("success") is True, f"unexpected response: {body}"
-    assert "tasks" in body and isinstance(body["tasks"], list), (
-        f"tasks field missing/invalid: {body}"
-    )
-    print(f"✓ (tasks={len(body['tasks'])})")
-
-
-def test_get_deploy_status_unknown_task_id_returns_error():
-    """Bogus task_id → structured error, not a trap."""
-    print("  - test_get_deploy_status_unknown_task_id_returns_error...", end=" ")
-    out, code, err = _dfx_call(
-        "get_deploy_status",
-        _candid_text("does-not-exist-1729382938"),
-        query=True,
-    )
-    assert code == 0, f"get_deploy_status trapped: {err}"
-    body = json.loads(_unwrap(out))
-    # We want either {success: false, error: ...} or {success: true,
-    # status: "..."} with a defined status — anything but a trap.
-    assert "success" in body, f"missing success field: {body}"
-    if not body["success"]:
-        assert body.get("error"), f"error response missing 'error': {body}"
+def test_health_returns_ok():
+    """``health`` returns ok: true."""
+    print("  - test_health_returns_ok...", end=" ")
+    out, code, err = _dfx_call("health", "()", query=True)
+    assert code == 0, f"health failed: {err}"
+    body = json.loads(out)
+    assert body.get("ok") is True, body
     print("✓")
 
 
-def test_deploy_realm_rejects_malformed_manifest():
-    """Malformed manifest → ``success: false`` with descriptive error."""
-    print("  - test_deploy_realm_rejects_malformed_manifest...", end=" ")
-    # Missing both target_canister_id and registry_canister_id.
-    bad_manifest = json.dumps({"extensions": [{"id": "voting"}]})
-    out, code, err = _dfx_call(
-        "deploy_realm", _candid_text(bad_manifest), timeout=30,
+def test_list_deployment_jobs_returns_structured_payload():
+    """``list_deployment_jobs`` returns a Candid ``Ok`` payload with ``jobs``."""
+    print("  - test_list_deployment_jobs_returns_structured_payload...", end=" ")
+    out, code, err = _dfx_call("list_deployment_jobs", "()", query=True)
+    assert code == 0, f"list_deployment_jobs failed: {err}"
+    body = json.loads(out)
+    assert "Ok" in body, f"expected variant Ok, got: {body}"
+    ok = body["Ok"]
+    assert "jobs" in ok and isinstance(ok["jobs"], list), (
+        f"jobs field missing/invalid: {ok}"
     )
-    assert code == 0, f"deploy_realm trapped on bad input: {err}"
-    body = json.loads(_unwrap(out))
-    assert body.get("success") is False, (
-        f"expected rejection of malformed manifest, got: {body}"
-    )
-    assert body.get("error"), f"missing error message: {body}"
-    print(f"✓ (error: {body['error'][:60]})")
-
-
-def test_deploy_realm_rejects_invalid_json():
-    """Non-JSON payload → structured error, not a trap."""
-    print("  - test_deploy_realm_rejects_invalid_json...", end=" ")
-    out, code, err = _dfx_call(
-        "deploy_realm", _candid_text("not json at all {"), timeout=30,
-    )
-    assert code == 0, f"deploy_realm trapped on non-JSON: {err}"
-    raw = _unwrap(out)
-    # The canister error JSON may embed a Python traceback with literal
-    # newlines/tabs, which strict JSON rejects. Use strict=False so we
-    # tolerate the control characters.
-    body = json.loads(raw, strict=False)
-    assert body.get("success") is False, f"expected rejection: {body}"
-    assert body.get("error"), f"missing error message: {body}"
-    print(f"✓ (error: {body['error'][:60]})")
+    print(f"✓ (jobs={len(ok['jobs'])})")
 
 
 # ---------------------------------------------------------------------------
@@ -161,21 +107,17 @@ def test_deploy_realm_rejects_invalid_json():
 
 
 if __name__ == "__main__":
-    print("Testing realm_installer API surface (#192):")
+    print("Testing realm_installer API surface:")
 
     if not _dfx_canister_id("realm_installer"):
-        # Skipping cleanly is the right behavior — the standard
-        # integration container only deploys realm_backend.
         print("  ⚠️  realm_installer not deployed; skipping suite.")
         print("✅ Skipped (no realm_installer canister in this dfx project)")
         sys.exit(0)
 
     tests = [
-        test_candid_surface_has_new_methods,
-        test_list_deploys_returns_structured_payload,
-        test_get_deploy_status_unknown_task_id_returns_error,
-        test_deploy_realm_rejects_malformed_manifest,
-        test_deploy_realm_rejects_invalid_json,
+        test_candid_surface_has_core_methods,
+        test_health_returns_ok,
+        test_list_deployment_jobs_returns_structured_payload,
     ]
 
     failed = 0

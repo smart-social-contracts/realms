@@ -9,7 +9,6 @@
   let healthy = false;
   let info: InstallerInfo | null = null;
   let deploymentJobs: DeploymentJob[] = [];
-  let legacyDeploys: any[] = [];
 
   // Deploy form state
   let showDeployForm = false;
@@ -33,33 +32,30 @@
         installerActor.health(),
         installerActor.info(),
         installerActor.list_deployment_jobs(),
-        installerActor.list_deploys(),
       ]);
 
-      if (results[0].status === 'fulfilled') healthy = true;
+      if (results[0].status === 'fulfilled' && (results[0].value as any)?.ok) {
+        healthy = true;
+      }
 
       if (results[1].status === 'fulfilled') {
-        const raw = results[1].value;
-        try {
-          info = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        } catch { info = null; }
+        const raw = results[1].value as any;
+        if (raw && typeof raw === 'object' && 'version' in raw) {
+          info = raw as InstallerInfo;
+        } else {
+          info = null;
+        }
       }
 
       if (results[2].status === 'fulfilled') {
-        const raw = results[2].value;
-        try {
-          const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-          deploymentJobs = parsed?.jobs || [];
-        } catch { deploymentJobs = []; }
+        const raw = results[2].value as any;
+        const j =
+          raw?.Ok?.jobs ||
+          (raw && raw.jobs) ||
+          [];
+        deploymentJobs = j || [];
       }
 
-      if (results[3].status === 'fulfilled') {
-        const raw = results[3].value;
-        try {
-          const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-          legacyDeploys = parsed?.tasks || [];
-        } catch { legacyDeploys = []; }
-      }
     } catch (e: any) {
       error = e.message || 'Failed to load installer data';
     } finally {
@@ -160,10 +156,6 @@
       <div class="stat-value">{deploymentJobs.length}</div>
       <div class="stat-label">Deployment Jobs</div>
     </div>
-    <div class="stat-card">
-      <div class="stat-value">{legacyDeploys.length}</div>
-      <div class="stat-label">Legacy Deploys</div>
-    </div>
   </div>
 
   <!-- Deploy New Realm -->
@@ -253,34 +245,6 @@
     </div>
   {/if}
 
-  <!-- Legacy Deploys -->
-  {#if legacyDeploys.length > 0}
-    <h2 style="font-size: 1.1rem; margin: 1.5rem 0 0.75rem; opacity: 0.7;">Legacy Deploys</h2>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Task ID</th>
-            <th>Target</th>
-            <th>Status</th>
-            <th>Steps</th>
-            <th>Started</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each legacyDeploys as d}
-            <tr>
-              <td><code>{shortId(d.task_id)}</code></td>
-              <td><code>{shortId(d.target_canister_id)}</code></td>
-              <td><span class="badge {statusBadgeClass(d.status)}">{d.status}</span></td>
-              <td>{d.steps_count ?? '—'}</td>
-              <td>{formatTime(d.started_at)}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
-  {/if}
 {/if}
 
 <style>

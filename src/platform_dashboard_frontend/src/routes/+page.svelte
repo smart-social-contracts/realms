@@ -36,7 +36,7 @@
         } catch { fileStats = null; }
       }
 
-      if (results[3].status === 'fulfilled') {
+      if (results[3].status === 'fulfilled' && (results[3].value as any)?.ok) {
         installerHealthy = true;
       }
     } catch (e: any) {

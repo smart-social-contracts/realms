@@ -10,11 +10,45 @@
 
   $: deployId = $page.params.deployId;
 
+  function jobViewToDeployStatus(v: Record<string, unknown>): DeployStatusRecord {
+    const steps: DeployStepRecord[] = [];
+    const pushStep = (label: string, status: string, log = '') => {
+      steps.push({
+        step: steps.length + 1,
+        name: label,
+        status,
+        started_at: v.created_at != null ? String(v.created_at) : undefined,
+        completed_at: v.completed_at != null ? String(v.completed_at) : undefined,
+        log: log || undefined,
+      });
+    };
+    const wasmVerified = Number(v.wasm_verified ?? 0);
+    const assetsVerified = Number(v.assets_verified ?? 0);
+    pushStep('backend_wasm_verification', wasmVerified === 1 ? 'completed' : wasmVerified === -1 ? 'failed' : 'pending');
+    pushStep('frontend_assets_verification', assetsVerified === 1 ? 'completed' : assetsVerified === -1 ? 'failed' : 'pending');
+    return {
+      deploy_id: String(v.job_id || deployId),
+      realm_name: String(v.realm_name || ''),
+      status: String(v.status || 'pending'),
+      steps,
+      error: v.error ? String(v.error) : undefined,
+    };
+  }
+
   onMount(async () => {
     try {
-      const raw = await installerActor.get_deploy_status(deployId);
-      const parsed = typeof raw === 'string' ? JSON.parse(raw) : (raw?.Ok ? JSON.parse(raw.Ok) : raw);
-      deployStatus = parsed;
+      const raw = await installerActor.get_deployment_job_status(deployId) as Record<string, unknown>;
+      if (raw && 'Err' in raw && (raw as any).Err) {
+        error = String((raw as any).Err.message || 'Error');
+        deployStatus = null;
+        return;
+      }
+      const ok = (raw as any)?.Ok || raw;
+      if (ok && typeof ok === 'object' && 'job_id' in ok) {
+        deployStatus = jobViewToDeployStatus(ok as Record<string, unknown>);
+      } else {
+        deployStatus = null;
+      }
     } catch (e: any) {
       error = e.message || 'Failed to load deployment status';
     } finally {
