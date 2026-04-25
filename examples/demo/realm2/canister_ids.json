@@ -1,11 +1,13 @@
 {
   "realm_backend": {
     "demo": "3bohd-2yaaa-aaaac-qcyla-cai",
-    "staging": "ihbn6-yiaaa-aaaac-beh3a-cai"
+    "staging": "ihbn6-yiaaa-aaaac-beh3a-cai",
+    "test": "rnghe-haaaa-aaaak-qyxyq-cai"
   },
   "realm_frontend": {
     "demo": "3gpbx-xaaaa-aaaac-qcylq-cai",
-    "staging": "iaalk-vqaaa-aaaac-beh3q-cai"
+    "staging": "iaalk-vqaaa-aaaac-beh3q-cai",
+    "test": "pqwsi-vyaaa-aaaau-agrbq-cai"
   },
   "quarter_1_backend": {
     "demo": "rhszc-gyaaa-aaaac-qfnra-cai",

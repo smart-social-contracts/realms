@@ -799,10 +799,12 @@ def billing_redeem_voucher_command(
 _REGISTRY_QUEUE_IDS = {
     "staging": "7wzxh-wyaaa-aaaau-aggyq-cai",
     "demo": "rhw4p-gqaaa-aaaac-qbw7q-cai",
+    "test": "yhw3g-fyaaa-aaaas-qgorq-cai",
 }
 _INSTALLER_QUEUE_IDS = {
     "staging": "lusjm-wqaaa-aaaau-ago7q-cai",
     "demo": "2s4td-daaaa-aaaao-bazmq-cai",
+    "test": "fltjm-tyaaa-aaaap-qunhq-cai",
 }
 
 

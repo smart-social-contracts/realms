@@ -119,7 +119,7 @@ def upload_realm_frontend(repo: Path, network: str, base_url: str) -> bool:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--network", required=True, help="Target network (staging, demo)")
+    parser.add_argument("--network", required=True, help="Target network (staging, demo, test)")
     parser.add_argument(
         "--deploy-service-url", default=DEFAULT_DEPLOY_SERVICE_URL,
         help=f"Deploy service URL (default: {DEFAULT_DEPLOY_SERVICE_URL})",

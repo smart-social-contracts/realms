@@ -35,7 +35,7 @@ except ImportError:
 VALID_TYPES = ("realm", "registry", "mundus")
 VALID_SUBTYPES = ("backend", "frontend", "token", "nft", "marketplace", "all")
 VALID_MODES = ("upgrade", "reinstall", "install", "auto")
-VALID_NETWORKS = ("local", "staging", "demo", "ic")
+VALID_NETWORKS = ("local", "staging", "demo", "test", "ic")
 
 VITE_PARAM_MAP = {
     "TEST_MODE": "VITE_TEST_MODE",

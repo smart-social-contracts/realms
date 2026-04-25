@@ -134,7 +134,7 @@ try:
                     frontend_url = f"{frontend_id}.ic0.app"
                     if realm_logo:
                         logo_url = f"https://{frontend_id}.ic0.app/images/logo.png"
-                elif network in ('staging', 'demo'):
+                elif network in ('staging', 'demo', 'test'):
                     frontend_url = f"{frontend_id}.icp0.io"
                     if realm_logo:
                         logo_url = f"https://{frontend_id}.icp0.io/images/logo.png"
@@ -155,7 +155,7 @@ try:
                 backend_id = result.stdout.strip()
                 if network == 'ic':
                     backend_url = f"{backend_id}.ic0.app"
-                elif network in ('staging', 'demo'):
+                elif network in ('staging', 'demo', 'test'):
                     backend_url = f"{backend_id}.icp0.io"
                 else:  # local
                     backend_url = f"{backend_id}.localhost:{local_port}"
@@ -391,7 +391,7 @@ try:
         pass
     
     # Fallback to mainnet IDs for staging/ic networks
-    if not ckbtc_ledger_id and network in ('staging', 'ic'):
+    if not ckbtc_ledger_id and network in ('staging', 'test', 'ic'):
         ckbtc_ledger_id = MAINNET_CKBTC_LEDGER
         ckbtc_indexer_id = MAINNET_CKBTC_INDEXER
         print(f"   ℹ️  Using mainnet ckBTC canister IDs")
