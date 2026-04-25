@@ -1,11 +1,13 @@
 {
   "realm_backend": {
     "demo": "2lbfz-yiaaa-aaaac-qcyma-cai",
-    "staging": "jnope-2yaaa-aaaac-beh4a-cai"
+    "staging": "jnope-2yaaa-aaaac-beh4a-cai",
+    "test": "m2wv3-uaaaa-aaaah-quoiq-cai"
   },
   "realm_frontend": {
     "demo": "2madn-vqaaa-aaaac-qcymq-cai",
-    "staging": "jkpjq-xaaaa-aaaac-beh4q-cai"
+    "staging": "jkpjq-xaaaa-aaaac-beh4q-cai",
+    "test": "2dmsp-maaaa-aaaad-qlxfq-cai"
   },
   "token_backend": {
     "demo": "tgp4d-piaaa-aaaah-qq46q-cai"

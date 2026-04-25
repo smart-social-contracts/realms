@@ -325,7 +325,7 @@ def installer_deploy(
         help="Override registry_canister_id from the manifest.",
     ),
     network: str = typer.Option(
-        "ic", "--network", "-n", help="Network: local, staging, ic"
+        "ic", "--network", "-n", help="Network: local, staging, demo, test, ic"
     ),
     identity: Optional[str] = typer.Option(
         None, "--identity", help="dfx identity to use"
@@ -392,7 +392,7 @@ def installer_status(
         ..., "--task-id", help="task_id returned by `installer deploy`"
     ),
     network: str = typer.Option(
-        "ic", "--network", "-n", help="Network: local, staging, ic"
+        "ic", "--network", "-n", help="Network: local, staging, demo, test, ic"
     ),
     identity: Optional[str] = typer.Option(
         None, "--identity", help="dfx identity to use"
@@ -414,7 +414,7 @@ def installer_cancel(
         ..., "--task-id", help="task_id of the deploy to cancel"
     ),
     network: str = typer.Option(
-        "ic", "--network", "-n", help="Network: local, staging, ic"
+        "ic", "--network", "-n", help="Network: local, staging, demo, test, ic"
     ),
     identity: Optional[str] = typer.Option(
         None, "--identity", help="dfx identity to use"
@@ -433,7 +433,7 @@ def installer_list(
         ..., "--installer", "-I", help="realm_installer canister ID"
     ),
     network: str = typer.Option(
-        "ic", "--network", "-n", help="Network: local, staging, ic"
+        "ic", "--network", "-n", help="Network: local, staging, demo, test, ic"
     ),
     identity: Optional[str] = typer.Option(
         None, "--identity", help="dfx identity to use"
@@ -481,7 +481,7 @@ def deploy(
     ),
     network: Optional[str] = typer.Option(
         None, "--network", "-n",
-        help="Override target network: local, staging, demo, ic",
+        help="Override target network: local, staging, demo, test, ic",
     ),
     identity: Optional[str] = typer.Option(
         None, "--identity", "-i",
@@ -1279,7 +1279,7 @@ def registry_add(
             # Format URL based on network
             if network == "ic":
                 frontend_url = f"{frontend_canister_id}.ic0.app"
-            elif network == "staging":
+            elif network in ("staging", "demo", "test"):
                 frontend_url = f"{frontend_canister_id}.icp0.io"
             else:  # local
                 frontend_url = f"{frontend_canister_id}.localhost:8000"
@@ -1667,7 +1667,7 @@ def registry_deploy_realm(
     network: str = typer.Option(
         "staging",
         "--network",
-        help="IC network (staging, demo, local, ic, …)",
+        help="IC network (staging, demo, test, local, ic, …)",
     ),
     registry_canister: Optional[str] = typer.Option(
         None,
@@ -1685,7 +1685,7 @@ def registry_deploy_status(
     network: str = typer.Option(
         "staging",
         "--network",
-        help="IC network",
+        help="IC network (staging, demo, test, …)",
     ),
     installer_canister: Optional[str] = typer.Option(
         None,
@@ -2053,7 +2053,7 @@ def realm_status(
                     if effective_network == "ic":
                         candid_ui = "a4gq6-oaaaa-aaaab-qaa4q-cai"
                         url = f"https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.ic0.app/?id={canister_id}"
-                    elif effective_network == "staging":
+                    elif effective_network in ("staging", "demo", "test"):
                         candid_ui = "a4gq6-oaaaa-aaaab-qaa4q-cai"
                         url = f"https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id={canister_id}"
                     elif effective_network == "local":
@@ -2070,7 +2070,7 @@ def realm_status(
                     # Frontend canisters use direct URLs
                     if effective_network == "ic":
                         url = f"https://{canister_id}.ic0.app"
-                    elif effective_network == "staging":
+                    elif effective_network in ("staging", "demo", "test"):
                         url = f"https://{canister_id}.icp0.io"
                     elif effective_network == "local":
                         # Use recommended format for local
@@ -2103,7 +2103,7 @@ def _show_remote_realm_status(backend_canister_id: str, realm_name: str, network
     if network == "ic":
         frontend_url = f"https://{backend_canister_id}.ic0.app"  # Actually need frontend ID
         backend_url = f"https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.ic0.app/?id={backend_canister_id}"
-    elif network == "staging":
+    elif network in ("staging", "demo", "test"):
         frontend_url = f"https://{backend_canister_id}.icp0.io"  # Actually need frontend ID
         backend_url = f"https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id={backend_canister_id}"
     else:

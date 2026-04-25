@@ -18,6 +18,7 @@ on:
         options:
           - staging
           - demo
+          - test
 
       canisters:
         description: "Which canisters to upgrade"

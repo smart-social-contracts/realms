@@ -1,11 +1,13 @@
 {
   "realm_backend": {
     "demo": "h5vpp-qyaaa-aaaac-qai3a-cai",
-    "staging": "ijdaw-dyaaa-aaaac-beh2a-cai"
+    "staging": "ijdaw-dyaaa-aaaac-beh2a-cai",
+    "test": "ku6cv-2iaaa-aaaab-agrpa-cai"
   },
   "realm_frontend": {
     "demo": "gzya5-jyaaa-aaaac-qai5a-cai",
-    "staging": "iocgc-oaaaa-aaaac-beh2q-cai"
+    "staging": "iocgc-oaaaa-aaaac-beh2q-cai",
+    "test": "2enu3-byaaa-aaaad-qlxfa-cai"
   },
   "ckbtc_ledger": {
     "demo": "mxzaz-hqaaa-aaaar-qaada-cai"

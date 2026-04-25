@@ -15,8 +15,9 @@
 # Cost: ~$0.50 per full deploy (vs ~$47 with the old file_registry path).
 #
 # Use the regular `CI (main)` pipeline for anything that should be gated
-# by tests before reaching staging/demo. This workflow is a developer
-# tool — not a release pipeline.
+# by tests before reaching staging/demo/test. This workflow is a developer
+# tool — not a release pipeline. For a full-stack first install to empty
+# canisters, prefer workflow "Deploy IC environment" (test/demo/staging).
 
 name: Deploy
 
@@ -31,6 +32,7 @@ on:
         options:
           - deployments/staging-mundus-layered.yml
           - deployments/demo-mundus-layered.yml
+          - deployments/test-mundus-layered.yml
 
       realms:
         description: "Comma-separated mundus member names to (re)deploy. Leave empty for all (e.g. 'dominion' or 'dominion,agora')."
@@ -162,7 +164,10 @@ jobs:
         if: always()
         run: |
           pip install requests
-          NETWORK=$(echo "${{ inputs.descriptor }}" | grep -q "demo" && echo "demo" || echo "staging")
+          if echo "${{ inputs.descriptor }}" | grep -qE "demo-mundus|/demo-"; then NETWORK=demo
+          elif echo "${{ inputs.descriptor }}" | grep -qE "test-mundus|/test-"; then NETWORK=test
+          else NETWORK=staging
+          fi
           python3 scripts/upload_ci_artifacts.py --network "$NETWORK"
         continue-on-error: true
 

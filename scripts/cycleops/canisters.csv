@@ -40,3 +40,21 @@
 39,vault (2),guja4-2aaaa-aaaam-qdhjq-cai,ic,unknown,CycleOps only (billing CSV)
 40,canister_main,wxfhb-tqaaa-aaaah-aq2qq-cai,ic,unknown,CycleOps only (billing CSV)
 41,canister_frontend,ctydg-unknown,ic,unknown,Not found in any repo
+43,test-file_registry,uq2mu-kaaaa-aaaah-avqcq-cai,test,realms,canister_ids.json
+44,test-realm_installer,fltjm-tyaaa-aaaap-qunhq-cai,test,realms,canister_ids.json
+45,test-file_registry_frontend,2no7h-xqaaa-aaaad-qlxeq-cai,test,realms,canister_ids.json
+46,test-registry_backend,yhw3g-fyaaa-aaaas-qgorq-cai,test,realms,canister_ids.json
+47,test-registry_frontend,qtank-3qaaa-aaaaa-qhb6q-cai,test,realms,canister_ids.json
+48,test-dominion_backend,ku6cv-2iaaa-aaaab-agrpa-cai,test,realms,examples/demo/realm1/canister_ids.json
+49,test-dominion_frontend,2enu3-byaaa-aaaad-qlxfa-cai,test,realms,examples/demo/realm1/canister_ids.json
+50,test-agora_backend,rnghe-haaaa-aaaak-qyxyq-cai,test,realms,examples/demo/realm2/canister_ids.json
+51,test-agora_frontend,pqwsi-vyaaa-aaaau-agrbq-cai,test,realms,examples/demo/realm2/canister_ids.json
+52,test-syntropia_backend,m2wv3-uaaaa-aaaah-quoiq-cai,test,realms,examples/demo/realm3/canister_ids.json
+53,test-syntropia_frontend,2dmsp-maaaa-aaaad-qlxfq-cai,test,realms,examples/demo/realm3/canister_ids.json
+54,test-marketplace_backend,2wldc-niaaa-aaaad-qlxga-cai,test,realms,canister_ids.json
+55,test-marketplace_frontend,mxyd5-3qaaa-aaaao-ba2xq-cai,test,realms,canister_ids.json
+56,test-platform_dashboard_frontend,em2mz-rqaaa-aaaag-ayt7q-cai,test,realms,canister_ids.json
+57,test-token_backend,nusyl-jiaaa-aaaae-qj6mq-cai,test,realms,canister_ids.json
+58,test-token_frontend,33mmr-pyaaa-aaaam-ai47q-cai,test,realms,canister_ids.json
+59,test-nft_backend,eelas-yyaaa-aaaao-qps7a-cai,test,realms,canister_ids.json
+60,test-nft_frontend,ysrkl-eqaaa-aaaas-qgosa-cai,test,realms,canister_ids.json

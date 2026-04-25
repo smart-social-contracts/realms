@@ -686,6 +686,7 @@ DEPLOYMENT_COST_CREDITS = 5
 _INSTALLER_CANISTER_IDS = {
     "staging": "lusjm-wqaaa-aaaau-ago7q-cai",
     "demo": "2s4td-daaaa-aaaao-bazmq-cai",
+    "test": "fltjm-tyaaa-aaaap-qunhq-cai",
 }
 
 

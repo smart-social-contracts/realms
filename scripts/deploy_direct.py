@@ -610,6 +610,7 @@ def _deploy_frontend_direct(
             "networks": {
                 "staging": {"providers": ["https://icp0.io"], "type": "persistent"},
                 "demo": {"providers": ["https://icp0.io"], "type": "persistent"},
+                "test": {"providers": ["https://icp0.io"], "type": "persistent"},
                 "ic": {"providers": ["https://icp0.io"], "type": "persistent"},
             },
         }
@@ -1084,7 +1085,7 @@ def _frontend_url(canister_id: str, network: str) -> str:
         return ""
     if network == "ic":
         return f"{canister_id}.ic0.app"
-    if network in ("staging", "demo"):
+    if network in ("staging", "demo", "test"):
         return f"{canister_id}.icp0.io"
     return f"{canister_id}.localhost:8000"
 

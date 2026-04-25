@@ -34,6 +34,8 @@ declare -A HIGH_BURN_CANISTERS=(
   ["2s4td-daaaa-aaaao-bazmq-cai"]="demo-realm_installer"
   ["iebdk-kqaaa-aaaau-agoxq-cai"]="staging-file_registry"
   ["vi64l-3aaaa-aaaae-qj4va-cai"]="demo-file_registry"
+  ["uq2mu-kaaaa-aaaah-avqcq-cai"]="test-file_registry"
+  ["fltjm-tyaaa-aaaap-qunhq-cai"]="test-realm_installer"
 )
 
 # Standard canisters: 4 TC @ 2 TC
@@ -78,6 +80,23 @@ declare -A ALL_CANISTERS=(
   ["4tpn3-niaaa-aaaaf-qdoja-cai"]="nft_realm1"
   ["4uolp-aqaaa-aaaaf-qdojq-cai"]="nft_realm2"
   ["4bj2c-byaaa-aaaaf-qdoka-cai"]="nft_realm3"
+  # --- Test (IC) ---
+  ["2no7h-xqaaa-aaaad-qlxeq-cai"]="test-file_registry_frontend"
+  ["yhw3g-fyaaa-aaaas-qgorq-cai"]="test-registry_backend"
+  ["qtank-3qaaa-aaaaa-qhb6q-cai"]="test-registry_frontend"
+  ["ku6cv-2iaaa-aaaab-agrpa-cai"]="test-dominion_backend"
+  ["2enu3-byaaa-aaaad-qlxfa-cai"]="test-dominion_frontend"
+  ["rnghe-haaaa-aaaak-qyxyq-cai"]="test-agora_backend"
+  ["pqwsi-vyaaa-aaaau-agrbq-cai"]="test-agora_frontend"
+  ["m2wv3-uaaaa-aaaah-quoiq-cai"]="test-syntropia_backend"
+  ["2dmsp-maaaa-aaaad-qlxfq-cai"]="test-syntropia_frontend"
+  ["2wldc-niaaa-aaaad-qlxga-cai"]="test-marketplace_backend"
+  ["mxyd5-3qaaa-aaaao-ba2xq-cai"]="test-marketplace_frontend"
+  ["em2mz-rqaaa-aaaag-ayt7q-cai"]="test-platform_dashboard_frontend"
+  ["nusyl-jiaaa-aaaae-qj6mq-cai"]="test-token_backend"
+  ["33mmr-pyaaa-aaaam-ai47q-cai"]="test-token_frontend"
+  ["eelas-yyaaa-aaaao-qps7a-cai"]="test-nft_backend"
+  ["ysrkl-eqaaa-aaaas-qgosa-cai"]="test-nft_frontend"
 )
 
 HIGH_TOPUP_RULE="opt record { threshold = $HIGH_THRESHOLD : nat; method = variant { to_balance = $HIGH_TOPUP : nat } }"

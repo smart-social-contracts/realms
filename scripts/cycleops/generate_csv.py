@@ -201,7 +201,11 @@ def generate_csv(
 
 def main():
     parser = argparse.ArgumentParser(description="Generate CycleOps CSV for RealmGOS canisters")
-    parser.add_argument("--network", default="staging", help="IC network (staging, ic)")
+    parser.add_argument(
+        "--network",
+        default="staging",
+        help="Network key in canister_ids.json (e.g. staging, demo, test, ic)",
+    )
     parser.add_argument("--output", default=None, help="Output CSV file path")
     parser.add_argument("--threshold", type=float, default=DEFAULT_THRESHOLD_TC,
                         help=f"Top-up threshold in T cycles (default: {DEFAULT_THRESHOLD_TC})")

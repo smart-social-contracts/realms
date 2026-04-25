@@ -195,6 +195,7 @@
         <select id="network" bind:value={deployNetwork}>
           <option value="staging">Staging</option>
           <option value="demo">Demo</option>
+          <option value="test">Test</option>
         </select>
       </div>
 

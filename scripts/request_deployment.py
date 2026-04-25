@@ -22,6 +22,7 @@ except ImportError:
 REGISTRY_CANISTER_IDS = {
     "staging": "7wzxh-wyaaa-aaaau-aggyq-cai",
     "demo": "rhw4p-gqaaa-aaaac-qbw7q-cai",
+    "test": "yhw3g-fyaaa-aaaas-qgorq-cai",
 }
 
 
@@ -165,6 +166,7 @@ def main():
     installer_ids = {
         "staging": "lusjm-wqaaa-aaaau-ago7q-cai",
         "demo": "2s4td-daaaa-aaaao-bazmq-cai",
+        "test": "fltjm-tyaaa-aaaap-qunhq-cai",
     }
     installer_id = installer_ids.get(network)
     if not installer_id:

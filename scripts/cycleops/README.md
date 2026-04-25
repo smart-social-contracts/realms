@@ -66,11 +66,23 @@ Generates a CSV file for CycleOps bulk canister import. Queries the realm regist
 python3 scripts/cycleops/generate_csv.py --network staging
 ```
 
+### `provision_test_env_cycleops.sh` — Provision the `test` IC environment via CycleOps
+
+Prints (or runs) `createCanister` calls for the 18 RealmGOS canisters that mirror staging. Names and follow-up steps are documented in `CANISTER_CREATION.md` (section *Test environment (RealmGOS)*).
+
+```bash
+bash scripts/cycleops/provision_test_env_cycleops.sh
+EXECUTE=1 bash scripts/cycleops/provision_test_env_cycleops.sh
+```
+
+Re-running with `EXECUTE=1` is safe: names already recorded in `scripts/cycleops/test_env_cycleops_ids.tsv` are skipped so you do not duplicate the fleet.
+
 ## Reference Files
 
 | File | Description |
 |---|---|
-| `CANISTER_CREATION.md` | How to create canisters programmatically via CycleOps API |
+| `CANISTER_CREATION.md` | How to create canisters programmatically via CycleOps API; **test** fleet list and registration steps |
+| `provision_test_env_cycleops.sh` | Dry-run or execute `createCanister` for all **test** RealmGOS canisters |
 | `canisters.csv` | Master list of all canister IDs, networks, and repo locations |
 | `expenses/` | Billing history and account exports from CycleOps |
 
