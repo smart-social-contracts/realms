@@ -1,5 +1,5 @@
-# Manual full IC deploy for staging, demo, or test (empty canisters → installed WASM).
-# Same path as CI staging deploy: deploy_direct.py on *-mundus-layered.yml.
+# Manual full IC deploy for staging, demo, or test.
+# Uses ci_install_mundus.py (stages 0-3) so it works on empty canisters.
 #
 # Requires repo secret: IC_IDENTITY_PEM (controller on the target canisters).
 
@@ -18,15 +18,92 @@ on:
           - demo
           - staging
 
+      install_mode:
+        description: "WASM install mode (use 'install' for empty canisters)"
+        type: choice
+        required: true
+        default: install
+        options:
+          - install
+          - upgrade
+          - reinstall
+
+      stages:
+        description: "Stages to run (comma-separated: 0=infra, 1=publish, 2=install, 3=verify)"
+        required: false
+        default: "0,1,2,3"
+
 concurrency:
   group: deploy-ic-${{ inputs.environment }}
   cancel-in-progress: false
 
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+
 jobs:
   deploy:
-    uses: ./.github/workflows/_deploy-ic-mundus.yml
-    with:
-      mundus_descriptor: deployments/${{ inputs.environment }}-mundus-layered.yml
-      artifact_network: ${{ inputs.environment }}
-    secrets:
-      IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Deploy parameters
+        run: |
+          echo "Environment:  ${{ inputs.environment }}"
+          echo "Install mode: ${{ inputs.install_mode }}"
+          echo "Stages:       ${{ inputs.stages }}"
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dfx
+        run: |
+          DFXVM_INIT_YES=1 sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
+          echo "$HOME/.local/share/dfx/bin" >> "$GITHUB_PATH"
+
+      - name: Install npm workspace dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Install realms CLI + Python deps
+        run: |
+          pip install -r requirements.txt
+          pip install -e cli/
+          pip install pyyaml
+
+      - name: Configure dfx identity
+        env:
+          IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
+        run: |
+          if [ -z "$IC_IDENTITY_PEM" ]; then
+            echo "::error::IC_IDENTITY_PEM secret is not set." >&2
+            exit 1
+          fi
+          printf '%s' "$IC_IDENTITY_PEM" > /tmp/identity.pem
+          chmod 600 /tmp/identity.pem
+          dfx identity import ci /tmp/identity.pem --storage-mode=plaintext --force
+          dfx identity use ci
+          rm -f /tmp/identity.pem
+          echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
+
+      - name: Deploy via ci_install_mundus.py
+        run: |
+          python3 scripts/ci_install_mundus.py \
+              --file "deployments/${{ inputs.environment }}-mundus-layered.yml" \
+              --stages "${{ inputs.stages }}" \
+              --install-mode "${{ inputs.install_mode }}"
+
+      - name: Upload build artifacts to deploy service cache
+        if: always()
+        run: |
+          pip install requests
+          python3 scripts/upload_ci_artifacts.py --network "${{ inputs.environment }}"
+        continue-on-error: true

@@ -962,6 +962,7 @@ _DFX_NETWORKS: Dict[str, Dict[str, Any]] = {
     "staging": {"providers": ["https://icp0.io"], "type": "persistent"},
     "ic": {"providers": ["https://icp0.io"], "type": "persistent"},
     "demo": {"providers": ["https://icp0.io"], "type": "persistent"},
+    "test": {"providers": ["https://icp0.io"], "type": "persistent"},
 }
 
 
