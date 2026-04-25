@@ -219,7 +219,7 @@ def main():
 
     job_ids = []
     for realm in realms:
-        if realm.get("type") in ("dashboard", "registry", "realm_registry", "token", "nft"):
+        if realm.get("type") in ("dashboard", "registry", "realm_registry", "marketplace", "token", "nft"):
             continue
         job_id = request_one(realm, network, registry_id, release_tag=release_tag)
         if job_id:
