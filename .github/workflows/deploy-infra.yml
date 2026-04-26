@@ -259,7 +259,7 @@ jobs:
           for pair in \
             "realm_registry_backend:${{ steps.ids.outputs.realm_registry_backend }}:status" \
             "realm_installer:${{ steps.ids.outputs.realm_installer }}:health" \
-            "file_registry:${{ steps.ids.outputs.file_registry }}:status" \
+            "file_registry:${{ steps.ids.outputs.file_registry }}:get_stats" \
             "marketplace_backend:${{ steps.ids.outputs.marketplace_backend }}:status"; do
             name="${pair%%:*}"; rest="${pair#*:}"; cid="${rest%%:*}"; method="${rest#*:}"
             if [ "$CANISTERS" = "all" ] || [ "$CANISTERS" = "$name" ]; then
