@@ -17,11 +17,11 @@ on:
         description: "Mundus descriptor to deploy"
         required: true
         type: choice
-        default: deployments/staging-mundus-layered.yml
+        default: deployment-descriptors/staging-mundus-layered.yml
         options:
-          - deployments/staging-mundus-layered.yml
-          - deployments/demo-mundus-layered.yml
-          - deployments/test-mundus-layered.yml
+          - deployment-descriptors/staging-mundus-layered.yml
+          - deployment-descriptors/demo-mundus-layered.yml
+          - deployment-descriptors/test-mundus-layered.yml
 
       realms:
         description: "Comma-separated mundus member names to (re)deploy. Leave empty for all (e.g. 'dominion' or 'dominion,agora')."
@@ -57,7 +57,7 @@ on:
   workflow_call:
     inputs:
       descriptor:
-        description: "Path to v2 mundus YAML (e.g. deployments/staging-mundus-layered.yml)"
+        description: "Path to mundus YAML (e.g. deployment-descriptors/staging-mundus-layered.yml)"
         type: string
         required: true
       artifact_network:

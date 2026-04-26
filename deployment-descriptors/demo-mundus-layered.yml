@@ -1,0 +1,24 @@
+version: 2
+network: demo
+
+mundus:
+  - name: dominion
+    type: realm
+    display_name: Dominion
+    canister_id: h5vpp-qyaaa-aaaac-qai3a-cai
+    frontend_canister_id: gzya5-jyaaa-aaaac-qai5a-cai
+    manifest: examples/demo/realm1/manifest.json
+
+  - name: agora
+    type: realm
+    display_name: Agora
+    canister_id: 3bohd-2yaaa-aaaac-qcyla-cai
+    frontend_canister_id: 3gpbx-xaaaa-aaaac-qcylq-cai
+    manifest: examples/demo/realm2/manifest.json
+
+  - name: syntropia
+    type: realm
+    display_name: Syntropia
+    canister_id: 2lbfz-yiaaa-aaaac-qcyma-cai
+    frontend_canister_id: 2madn-vqaaa-aaaac-qcymq-cai
+    manifest: examples/demo/realm3/manifest.json

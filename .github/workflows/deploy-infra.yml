@@ -127,7 +127,7 @@ jobs:
           python3 - <<'PY'
           import os, yaml
           env = "${{ inputs.environment }}"
-          desc = yaml.safe_load(open(f"deployments/{env}-mundus-layered.yml"))
+          desc = yaml.safe_load(open(f"deployment-descriptors/{env}-mundus-layered.yml"))
           infra = desc.get("infrastructure_overrides") or {}
           mundus = desc.get("mundus") or []
 
