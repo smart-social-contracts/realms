@@ -1,1013 +1,255 @@
-"""Mundus creation and management commands."""
+"""Mundus deployment commands.
+
+Implements the deployment pipeline described in REWRITE.md:
+1. Parse descriptor YAML (deployment-descriptors/*.yml)
+2. For each realm: resolve artifacts, upload to deployer, submit manifest, poll
+"""
 
 import json
 import os
-import shutil
 import subprocess
+import sys
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
 import typer
+import yaml
 from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
 
-from .create import create_command
-from .registry import registry_create_command
-from ..utils import console, generate_output_dir_name, get_project_root, display_canister_urls_json, get_canister_urls, ensure_dfx_running
+from ..utils import console, get_project_root
+
+DEPLOYER_URL = os.environ.get("DEPLOYER_URL", "https://deploy.realmsgos.dev")
+POLL_INTERVAL_S = 10
+POLL_TIMEOUT_S = 300
+
+_REGISTRY_IDS = {
+    "staging": "7wzxh-wyaaa-aaaau-aggyq-cai",
+    "demo": "rhw4p-gqaaa-aaaac-qbw7q-cai",
+    "test": "yhw3g-fyaaa-aaaas-qgorq-cai",
+}
+
+_INSTALLER_IDS = {
+    "staging": "lusjm-wqaaa-aaaau-ago7q-cai",
+    "demo": "2s4td-daaaa-aaaao-bazmq-cai",
+    "test": "fltjm-tyaaa-aaaap-qunhq-cai",
+}
 
 
-def mundus_create_command(
-    output_dir: str,
-    mundus_name: str,
-    manifest: Optional[str],
-    network: str,
-    deploy: bool,
-    identity: Optional[str],
-    mode: str,
-    no_demo_data: bool = False,
-) -> None:
-    """Create a new multi-realm mundus by calling realm and registry commands."""
-    
-    console.print(Panel.fit(
-        "[bold cyan]🌍 Creating Mundus (Multi-Realm Universe)[/bold cyan]",
-        border_style="cyan"
-    ))
-    
+def _dfx_call(canister_id: str, method: str, arg: str, network: str, *, query: bool = False) -> str:
+    cmd = ["dfx", "canister", "call", canister_id, method, arg, "--network", network, "--output", "json"]
+    if query:
+        cmd.append("--query")
     project_root = get_project_root()
-    
-    # Load manifest
-    if manifest:
-        manifest_path = Path(manifest)
-    else:
-        # Use default demo mundus manifest
-        manifest_path = project_root / "examples" / "demo" / "manifest.json"
-    
-    if not manifest_path.exists():
-        console.print(f"[red]❌ Manifest not found: {manifest_path}[/red]")
-        raise typer.Exit(1)
-    
-    with open(manifest_path, 'r') as f:
-        mundus_config = json.load(f)
-    
-    # Generate mundus directory with timestamp
-    dir_name = generate_output_dir_name("mundus", mundus_name)
-    base_dir = Path(output_dir)
-    mundus_dir = base_dir / dir_name
-    
-    mundus_dir.mkdir(parents=True, exist_ok=True)
-    console.print(f"📁 Mundus directory: {mundus_dir}\n")
-    
-    # Save mundus manifest
-    mundus_manifest_path = mundus_dir / "manifest.json"
-    with open(mundus_manifest_path, 'w') as f:
-        json.dump(mundus_config, f, indent=2)
-    console.print(f"📄 Saved mundus manifest\n")
-    
-    # Get realms from manifest
-    realms = mundus_config.get("realms", [])
-    console.print(f"🌍 Creating {len(realms)} realm(s) + 1 registry...\n")
-    
-    created_realms = []
-    
-    # Create each realm
-    for i, realm_entry in enumerate(realms, 1):
-        # Handle both formats:
-        # - String: path to realm folder (relative to mundus manifest)
-        # - Dict: inline realm config
-        if isinstance(realm_entry, str):
-            # String is a path to realm folder containing manifest.json
-            realm_manifest_path = manifest_path.parent / realm_entry / "manifest.json"
-            if not realm_manifest_path.exists():
-                console.print(f"[red]❌ Realm manifest not found: {realm_manifest_path}[/red]")
-                raise typer.Exit(1)
-            with open(realm_manifest_path, 'r') as f:
-                realm_config = json.load(f)
-            use_manifest = str(realm_manifest_path)
-        else:
-            # Dict is inline config
-            realm_config = realm_entry
-            use_manifest = None
-        
-        realm_name = realm_config.get("name", f"Realm{i}")
-        console.print(f"  📦 Creating realm: {realm_name}...")
-        
-        # Call create_command for each realm (it will create timestamped directory)
-        # We pass the mundus directory as the base output_dir
-        try:
-            # Temporarily change to project root for realm creation
-            orig_dir = os.getcwd()
-            os.chdir(project_root)
-            
-            create_command(
-                output_dir=str(mundus_dir),
-                realm_name=realm_name,
-                manifest=use_manifest,  # Pass realm manifest if it exists
-                random=realm_config.get("random", False),
-                members=realm_config.get("members"),
-                organizations=realm_config.get("organizations"),
-                transactions=realm_config.get("transactions"),
-                disputes=realm_config.get("disputes"),
-                seed=realm_config.get("seed"),
-                network=network,
-                deploy=False,  # Don't deploy individual realms yet
-                no_demo_data=no_demo_data,
-            )
-            
-            # Find the created realm directory (most recent realm_* directory)
-            realm_dirs = sorted(mundus_dir.glob("realm_*"), key=lambda p: p.stat().st_mtime)
-            if realm_dirs:
-                created_realms.append(realm_dirs[-1])
-                console.print(f"     ✅ {realm_name} created\n")
-            
-        finally:
-            os.chdir(orig_dir)
-    
-    # Create registry
-    console.print(f"  📋 Creating registry...")
-    try:
-        orig_dir = os.getcwd()
-        os.chdir(project_root)
-        
-        registry_dir = registry_create_command(
-            registry_name=mundus_config.get("registry", {}).get("name", "MainRegistry"),
-            output_dir=str(mundus_dir),
-            network=network,
-        )
-        
-        # Copy canister_ids.json for registry if it exists in manifest directory
-        registry_canister_ids = manifest_path.parent / "registry" / "canister_ids.json"
-        if registry_canister_ids.exists():
-            registry_ids_dest = registry_dir / "canister_ids.json"
-            shutil.copy2(registry_canister_ids, registry_ids_dest)
-            console.print(f"     ✅ Copied canister_ids.json for existing staging canisters")
-        
-        # Copy registry manifest if it exists (includes logo reference)
-        registry_manifest_path = manifest_path.parent / "registry" / "manifest.json"
-        if registry_manifest_path.exists():
-            registry_manifest_dest = registry_dir / "manifest.json"
-            shutil.copy2(registry_manifest_path, registry_manifest_dest)
-            console.print(f"     ✅ Copied registry manifest.json")
-            
-            # Load manifest to check for logo
-            with open(registry_manifest_path, 'r') as f:
-                registry_manifest = json.load(f)
-            
-            # Copy logo file if specified in manifest
-            logo_filename = registry_manifest.get("logo", "")
-            if logo_filename:
-                logo_source = manifest_path.parent / "registry" / logo_filename
-                if logo_source.exists():
-                    logo_dest = registry_dir / logo_filename
-                    shutil.copy2(logo_source, logo_dest)
-                    console.print(f"     ✅ Copied registry logo: {logo_filename}")
-                else:
-                    console.print(f"     ⚠️  Registry logo file not found: {logo_source}")
-        
-        console.print(f"     ✅ Registry created\n")
-        
-    finally:
-        os.chdir(orig_dir)
-    
-    # Marketplace canisters now live in the realms repo proper
-    # (src/marketplace_backend, src/marketplace_frontend) and are deployed
-    # directly via `realms marketplace deploy` during mundus deployment —
-    # no per-mundus folder is needed. Honour mundus_config["marketplace"]
-    # only as a flag to enable the post-realm marketplace deploy step.
-    marketplace_dir = None
-    if mundus_config.get("marketplace"):
-        console.print(f"  🛒 Marketplace will be deployed from src/marketplace_* during 'mundus deploy'\n")
-    
-    # Create mundus deployment orchestration script
-    _create_mundus_deploy_script(mundus_dir, created_realms, registry_dir, network)
-    
-    console.print(f"\n[green]✅ Mundus '{mundus_name}' created successfully at:[/green] [cyan]{mundus_dir}[/cyan]\n")
-    console.print(f"[yellow]📝 Next steps:[/yellow]")
-    console.print(f"   1. Deploy: realms mundus deploy --mundus-dir {mundus_dir}")
-    console.print(f"   2. Or run: cd {mundus_dir} && bash scripts/deploy-all.sh\n")
-    
-    if deploy:
-        console.print("\n[bold yellow]🚀 Starting deployment...[/bold yellow]\n")
-        mundus_deploy_command(str(mundus_dir), network, identity, mode, no_demo_data=no_demo_data)
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=project_root)
+    if result.returncode != 0:
+        raise RuntimeError(f"dfx call failed: {result.stderr}")
+    return result.stdout.strip()
 
 
-def _create_mundus_deploy_script(
-    mundus_dir: Path,
-    realm_dirs: list,
-    registry_dir: Path,
-    network: str
-) -> None:
-    """Create orchestration script to deploy all realms and registry."""
-    
-    scripts_dir = mundus_dir / "scripts"
-    scripts_dir.mkdir(exist_ok=True)
-    
-    script_content = f"""#!/bin/bash
-# Mundus deployment orchestration script
-# Deploys all realms and registry in sequence
+def _upload_file(filepath: Path) -> str:
+    """Upload a file to the deployer and return its URL."""
+    import urllib.request
+    import urllib.parse
 
-set -e
+    url = f"{DEPLOYER_URL}/upload-file"
+    boundary = "----RealmsUploadBoundary"
+    filename = filepath.name
+    data = filepath.read_bytes()
 
-NETWORK="${{1:-{network}}}"
-MODE="${{2:-upgrade}}"
+    body = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+        f"Content-Type: application/octet-stream\r\n\r\n"
+    ).encode() + data + f"\r\n--{boundary}--\r\n".encode()
 
-echo "╭────────────────────────────────────────╮"
-echo "│ 🌍 Deploying Mundus                    │"
-echo "╰────────────────────────────────────────╯"
-echo "📡 Network: $NETWORK"
-echo "🔄 Mode: $MODE"
-echo ""
-
-# Get the mundus directory
-MUNDUS_DIR="$( cd "$( dirname "${{BASH_SOURCE[0]}}" )/.." && pwd )"
-
-# Deploy registry first
-echo "📋 Deploying registry..."
-REGISTRY_DIR=$(find "$MUNDUS_DIR" -maxdepth 1 -type d -name "registry_*" | head -1)
-if [ -n "$REGISTRY_DIR" ]; then
-    echo "   Directory: $REGISTRY_DIR"
-    if [ -f "$REGISTRY_DIR/scripts/2-deploy-canisters.sh" ]; then
-        bash "$REGISTRY_DIR/scripts/2-deploy-canisters.sh" "$REGISTRY_DIR" "$NETWORK" "$MODE"
-        echo "   ✅ Registry deployed"
-    else
-        echo "   ⚠️  Registry deployment script not found"
-    fi
-else
-    echo "   ⚠️  No registry directory found"
-fi
-
-echo ""
-
-# Deploy all realms
-echo "🏛️  Deploying realms..."
-REALM_COUNT=0
-for REALM_DIR in "$MUNDUS_DIR"/realm_*/; do
-    if [ -d "$REALM_DIR" ]; then
-        REALM_NAME=$(basename "$REALM_DIR")
-        echo "   📦 Deploying $REALM_NAME..."
-        
-        # Run realm deployment scripts
-        if [ -f "$REALM_DIR/scripts/1-install-extensions.sh" ]; then
-            bash "$REALM_DIR/scripts/1-install-extensions.sh" || echo "      ⚠️  Extension installation failed"
-        fi
-        
-        if [ -f "$REALM_DIR/scripts/2-deploy-canisters.sh" ]; then
-            bash "$REALM_DIR/scripts/2-deploy-canisters.sh" "$REALM_DIR" "$NETWORK" "$MODE"
-            echo "      ✅ $REALM_NAME deployed"
-            REALM_COUNT=$((REALM_COUNT + 1))
-        else
-            echo "      ⚠️  Deployment script not found"
-        fi
-        
-        echo ""
-    fi
-done
-
-echo "╭────────────────────────────────────────╮"
-echo "│ ✅ Mundus Deployment Complete          │"
-echo "╰────────────────────────────────────────╯"
-echo "📊 Deployed: $REALM_COUNT realm(s) + 1 registry"
-echo ""
-"""
-    
-    deploy_script = scripts_dir / "deploy-all.sh"
-    deploy_script.write_text(script_content)
-    deploy_script.chmod(0o755)
-    console.print(f"   ✅ Created orchestration script: scripts/deploy-all.sh")
+    req = urllib.request.Request(url, data=body, method="POST")
+    req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        result = json.loads(resp.read())
+    return f"{DEPLOYER_URL}{result['url']}"
 
 
-def _deploy_single_realm(
-    folder: str,
-    network: str,
-    mode: str,
-    identity: Optional[str],
-    env_vars: Optional[dict] = None,
-) -> Tuple[bool, str]:
-    """Deploy a single realm - designed to run in a subprocess.
-    
-    Args:
-        folder: Path to realm directory
-        network: Network to deploy to
-        mode: Deployment mode (upgrade, reinstall, install)
-        identity: Identity file path
-        env_vars: Environment variables to set in the subprocess (for ProcessPoolExecutor)
-    
-    Returns:
-        Tuple of (success: bool, error_message: str)
+def _resolve_artifact(ref: str, artifact_type: str, network: str) -> str:
+    """Resolve an artifact reference to a URL.
+
+    Supported formats:
+      - URL (https://...) -> returned as-is
+      - version (e.g. "0.3.2") -> GitHub release URL
+      - "latest" -> latest GitHub release
+      - local path -> upload to deployer
     """
-    try:
-        # Set environment variables passed from parent process
-        # This is needed because ProcessPoolExecutor doesn't inherit env vars
-        if env_vars:
-            for key, value in env_vars.items():
-                if value:  # Only set if value is not None/empty
-                    os.environ[key] = value
-        
-        # Import here to avoid circular imports and ensure fresh import in subprocess
-        from .deploy import deploy_command as realm_deploy_command
-        
-        realm_deploy_command(
-            folder=folder,
-            network=network,
-            mode=mode,
-            identity=identity,
-        )
-        return (True, "")
-    except SystemExit as e:
-        # typer.Exit raises SystemExit
-        if e.code != 0:
-            return (False, f"Deployment exited with code {e.code}")
-        return (True, "")
-    except Exception as e:
-        return (False, str(e))
+    if ref.startswith("http://") or ref.startswith("https://"):
+        return ref
 
-
-def _inject_shared_canister_ids(shared_ids: dict, deploy_dir: Path, network: str) -> None:
-    """Inject shared canister IDs into a realm/registry's canister_ids.json.
-    
-    This allows each realm to have its own backend/frontend canisters while
-    sharing internet_identity, ckbtc_ledger, etc.
-    
-    Args:
-        shared_ids: Dict of {canister_name: {network: canister_id}}
-        deploy_dir: Path to the realm or registry directory
-        network: Network name (e.g., 'local')
-    """
-    ids_file = deploy_dir / ".dfx" / network / "canister_ids.json"
-    ids_file.parent.mkdir(parents=True, exist_ok=True)
-    
-    # Load existing IDs if any
-    existing = {}
-    if ids_file.exists():
-        try:
-            existing = json.loads(ids_file.read_text())
-        except json.JSONDecodeError:
-            pass
-    
-    # Merge shared canister IDs (don't overwrite realm-specific canisters)
-    for canister_name, network_ids in shared_ids.items():
-        if canister_name not in existing:
-            existing[canister_name] = {}
-        existing[canister_name].update(network_ids)
-    
-    ids_file.write_text(json.dumps(existing, indent=2))
-    console.print(f"   ✅ Injected shared IDs into {deploy_dir.name}")
-
-
-def mundus_deploy_command(
-    mundus_dir: str,
-    network: str,
-    identity: Optional[str],
-    mode: str,
-    no_demo_data: bool = False,
-) -> None:
-    """Deploy all realms and registry in a mundus by calling individual deploy commands."""
-    
-    console.print(Panel.fit(
-        f"[bold cyan]🚀 Deploying Mundus to {network}[/bold cyan]",
-        border_style="cyan"
-    ))
-    
-    mundus_path = Path(mundus_dir).absolute()
-    if not mundus_path.exists():
-        console.print(f"[red]❌ Mundus directory not found: {mundus_dir}[/red]")
-        raise typer.Exit(1)
-    
-    console.print(f"📁 Mundus: {mundus_path}")
-    console.print(f"📡 Network: {network}")
-    console.print(f"🔄 Mode: {mode}\n")
-    
-    # For local network, manage shared dfx instance
-    if network == "local":
-        # Ensure dfx is running (creates dfx.log in mundus dir)
-        ensure_dfx_running(log_dir=mundus_path, network=network)
-    
-    # Import deploy commands
-    from .deploy import deploy_command as realm_deploy_command
-    from .registry import registry_deploy_command
-    
-    # Get all directories
-    registry_dirs = sorted(mundus_path.glob("registry_*"))
-    realm_dirs = sorted(mundus_path.glob("realm_*"))
-    
-    # Load mundus manifest early so we can decide what to deploy even
-    # when there are no realms in the mundus subtree (e.g. a
-    # marketplace-only deploy).
-    mundus_manifest_path = mundus_path / "manifest.json"
-    mundus_config = {}
-    if mundus_manifest_path.exists():
-        with open(mundus_manifest_path, 'r') as f:
-            mundus_config = json.load(f)
-    
-    if not realm_dirs:
-        # Marketplace v2 lives in src/marketplace_* (not in the mundus
-        # subtree), so it's worth deploying even when no realms or
-        # registries are present in this mundus.
-        if mundus_config.get("marketplace"):
-            console.print("[yellow]⚠️  No realms found in mundus directory — proceeding to marketplace deploy only.[/yellow]\n")
-            try:
-                from .marketplace import marketplace_deploy_command
-                marketplace_deploy_command(
-                    network=network,
-                    mode=mode,
-                    identity=identity,
-                    with_registry=None,
-                )
-                console.print("\n[green]✅ Marketplace deployed (no realms in this mundus).[/green]")
-            except SystemExit:
-                pass
-            return
-        console.print("[yellow]⚠️  No realms found in mundus directory[/yellow]")
-        return
-    
-    # Track shared canister IDs to inject into each realm
-    shared_canister_ids = {}
-    
-    # 1. Deploy shared canisters (local only - on IC, production canisters are used)
-    if network == "local":
-        first_realm = realm_dirs[0]
-        dfx_json_path = first_realm / "dfx.json"
-        if dfx_json_path.exists():
-            with open(dfx_json_path, 'r') as f:
-                dfx_config = json.load(f)
-            
-            shared_canister_names = [
-                name for name in dfx_config.get("canisters", {}).keys()
-                if name in ["internet_identity", "ckbtc_ledger", "ckbtc_indexer"]
-            ]
-            
-            if shared_canister_names:
-                console.print("🔐 Deploying shared canisters (local)...")
-                for canister in shared_canister_names:
-                    try:
-                        result = subprocess.run(
-                            ["dfx", "deploy", canister, "--network", network],
-                            cwd=first_realm, capture_output=True, text=True
-                        )
-                        if result.returncode == 0:
-                            console.print(f"   ✅ {canister} deployed")
-                            # Get the canister ID
-                            id_result = subprocess.run(
-                                ["dfx", "canister", "id", canister, "--network", network],
-                                cwd=first_realm, capture_output=True, text=True
-                            )
-                            if id_result.returncode == 0:
-                                shared_canister_ids[canister] = {network: id_result.stdout.strip()}
-                        else:
-                            console.print(f"[yellow]   ⚠️  {canister} skipped[/yellow]")
-                    except Exception as e:
-                        console.print(f"[yellow]   ⚠️  {canister} skipped: {e}[/yellow]")
-                console.print("")
-                
-                # Inject shared canister IDs into all realms and registry
-                if shared_canister_ids:
-                    console.print("📋 Injecting shared canister IDs into realms...")
-                    for deploy_dir in list(registry_dirs) + list(realm_dirs):
-                        _inject_shared_canister_ids(shared_canister_ids, deploy_dir, network)
-                    console.print("")
-        
-        # 1b. Deploy shared REALMS token at mundus level
-        mundus_token_config = mundus_config.get("token", {})
-        if mundus_token_config:
-            console.print("🪙 Deploying shared REALMS token...")
-            
-            # Create a temporary dfx.json for the REALMS token in mundus directory
-            token_name = mundus_token_config.get("name", "REALMS Token")
-            token_symbol = mundus_token_config.get("symbol", "REALMS")
-            token_decimals = mundus_token_config.get("decimals", 8)
-            token_supply = mundus_token_config.get("total_supply", 100000000000000000)
-            
-            # Get token_backend config from first realm's dfx.json
-            if dfx_json_path.exists():
-                token_backend_config = dfx_config.get("canisters", {}).get("token_backend", {})
-                if token_backend_config:
-                    import copy
-                    realms_token_config = copy.deepcopy(token_backend_config)
-                    
-                    # Update init_arg with REALMS token config
-                    init_arg = f'(record {{ name = "{token_name}"; symbol = "{token_symbol}"; decimals = {token_decimals} : nat8; total_supply = {token_supply} : nat; fee = 10_000 : nat }})'
-                    realms_token_config["init_arg"] = init_arg
-                    
-                    # Create mundus-level dfx.json for REALMS token
-                    mundus_dfx = {
-                        "canisters": {
-                            "realms_token": realms_token_config
-                        },
-                        "defaults": dfx_config.get("defaults", {}),
-                        "networks": dfx_config.get("networks", {}),
-                        "output_env_file": ".env",
-                        "version": dfx_config.get("version", 1)
-                    }
-                    
-                    mundus_dfx_path = mundus_path / "dfx.json"
-                    with open(mundus_dfx_path, 'w') as f:
-                        json.dump(mundus_dfx, f, indent=2)
-                    
-                    # Deploy REALMS token from mundus directory
-                    try:
-                        result = subprocess.run(
-                            ["dfx", "deploy", "realms_token", "--network", network, "--yes"],
-                            cwd=mundus_path, capture_output=True, text=True
-                        )
-                        if result.returncode == 0:
-                            console.print(f"   ✅ realms_token deployed as '{token_name}' ({token_symbol})")
-                            # Get the canister ID
-                            id_result = subprocess.run(
-                                ["dfx", "canister", "id", "realms_token", "--network", network],
-                                cwd=mundus_path, capture_output=True, text=True
-                            )
-                            if id_result.returncode == 0:
-                                shared_canister_ids["realms_token"] = {network: id_result.stdout.strip()}
-                                console.print(f"   📍 Canister ID: {id_result.stdout.strip()}")
-                        else:
-                            console.print(f"[yellow]   ⚠️  realms_token deployment failed: {result.stderr}[/yellow]")
-                    except Exception as e:
-                        console.print(f"[yellow]   ⚠️  realms_token deployment failed: {e}[/yellow]")
-                    
-                    console.print("")
-                    
-                    # Re-inject shared canister IDs (now including realms_token)
-                    if "realms_token" in shared_canister_ids:
-                        console.print("📋 Injecting REALMS token ID into realms...")
-                        for deploy_dir in list(registry_dirs) + list(realm_dirs):
-                            _inject_shared_canister_ids({"realms_token": shared_canister_ids["realms_token"]}, deploy_dir, network)
-                        console.print("")
-    
-    # 2. Deploy registry
-    registry_canister_ids = {}
-    if registry_dirs:
-        console.print("📋 Deploying registry...")
-        for registry_dir in registry_dirs:
-            try:
-                registry_deploy_command(
-                    folder=str(registry_dir),
-                    network=network,
-                    mode=mode,
-                    identity=identity
-                )
-                console.print(f"   ✅ {registry_dir.name} deployed\n")
-                
-                # Capture registry canister IDs for injection into realms
-                for canister in ["realm_registry_backend", "realm_registry_frontend"]:
-                    try:
-                        id_result = subprocess.run(
-                            ["dfx", "canister", "id", canister, "--network", network],
-                            cwd=registry_dir, capture_output=True, text=True
-                        )
-                        if id_result.returncode == 0:
-                            registry_canister_ids[canister] = {network: id_result.stdout.strip()}
-                    except:
-                        pass
-            except Exception as e:
-                console.print(f"[red]   ❌ Failed to deploy {registry_dir.name}: {e}[/red]")
-                raise typer.Exit(1)
-        
-        # Inject registry canister IDs into all realms so they can register themselves
-        if registry_canister_ids and realm_dirs:
-            console.print("📋 Injecting registry canister IDs into realms...")
-            for realm_dir in realm_dirs:
-                _inject_shared_canister_ids(registry_canister_ids, realm_dir, network)
-            console.print("")
-        
-        # Inject registry canister ID into each realm's manifest.json services section
-        # This allows post_deploy.py to read it from the manifest instead of env var
-        if "realm_registry_backend" in registry_canister_ids:
-            backend_id = registry_canister_ids["realm_registry_backend"].get(network)
-            if backend_id and realm_dirs:
-                console.print("📋 Injecting registry canister ID into realm manifests...")
-                for realm_dir in realm_dirs:
-                    realm_manifest_path = realm_dir / "manifest.json"
-                    if realm_manifest_path.exists():
-                        with open(realm_manifest_path, 'r') as f:
-                            realm_manifest = json.load(f)
-                        services = realm_manifest.setdefault("services", {})
-                        services["registry"] = {"canister_id": backend_id}
-                        with open(realm_manifest_path, 'w') as f:
-                            json.dump(realm_manifest, f, indent=2)
-                            f.write("\n")
-                        console.print(f"   ✅ {realm_dir.name}/manifest.json updated")
-                console.print("")
-                
-                # Also set env var as fallback for post_deploy.py
-                os.environ["REGISTRY_CANISTER_ID"] = backend_id
-                console.print(f"   Set REGISTRY_CANISTER_ID={backend_id}")
-    
-    # Set REALMS_TOKEN_CANISTER_ID env var for token seeding
-    if "realms_token" in shared_canister_ids:
-        realms_token_id = shared_canister_ids["realms_token"].get(network)
-        if realms_token_id:
-            os.environ["REALMS_TOKEN_CANISTER_ID"] = realms_token_id
-            console.print(f"   Set REALMS_TOKEN_CANISTER_ID={realms_token_id}")
-    
-    # 2.5. Deploy marketplace (always, so realms can link to it)
-    # The marketplace lives in the realms repo (src/marketplace_*); we
-    # invoke the new deploy command which also brings up file_registry
-    # locally. After deploy, expose the canister ids to subsequent steps.
-    marketplace_was_deployed = False
-    try:
-        from .marketplace import marketplace_deploy_command
-        
-        console.print("🛒 Deploying marketplace...")
-        try:
-            marketplace_deploy_command(
-                network=network,
-                mode=mode,
-                identity=identity,
-                with_registry=None,  # default: True for local, False elsewhere
-            )
-            marketplace_was_deployed = True
-        except SystemExit as e:
-            console.print(f"[yellow]   ⚠️  Marketplace deploy returned non-zero ({e})[/yellow]")
-            console.print(f"[yellow]   Continuing with realm deployment...[/yellow]")
-        
-        # Capture marketplace backend canister ID for realm frontend builds.
-        if marketplace_was_deployed:
-            try:
-                id_result = subprocess.run(
-                    ["dfx", "canister", "id", "marketplace_backend", "--network", network],
-                    cwd=project_root, capture_output=True, text=True
-                )
-                if id_result.returncode == 0:
-                    marketplace_backend_id = id_result.stdout.strip()
-                    os.environ["CANISTER_MARKETPLACE_BACKEND_ID"] = marketplace_backend_id
-                    console.print(f"   Set CANISTER_MARKETPLACE_BACKEND_ID={marketplace_backend_id}")
-            except Exception:
-                pass
-    except Exception as e:
-        console.print(f"[yellow]   ⚠️  Failed to deploy marketplace: {e}[/yellow]")
-        console.print(f"[yellow]   Continuing with realm deployment...[/yellow]")
-    console.print("")
-    
-    # 3. Deploy all realms (last) - in parallel for speed
-    console.print(f"🏛️  Deploying {len(realm_dirs)} realm(s) in parallel...\n")
-    
-    failed_realms = []
-    successful_realms = []
-    
-    # Collect environment variables to pass to child processes
-    # ProcessPoolExecutor spawns separate processes that don't inherit os.environ
-    deploy_env_vars = {
-        'REGISTRY_CANISTER_ID': os.environ.get('REGISTRY_CANISTER_ID'),
-        'REALMS_TOKEN_CANISTER_ID': os.environ.get('REALMS_TOKEN_CANISTER_ID'),
-        'CANISTER_MARKETPLACE_BACKEND_ID': os.environ.get('CANISTER_MARKETPLACE_BACKEND_ID'),
-        'NO_DEMO_DATA': '1' if no_demo_data else '',
-    }
-    
-    # Use ProcessPoolExecutor for parallel deployment
-    with ProcessPoolExecutor(max_workers=len(realm_dirs)) as executor:
-        # Submit all realm deployments
-        future_to_realm = {
-            executor.submit(
-                _deploy_single_realm,
-                str(realm_dir),
-                network,
-                mode,
-                identity,
-                deploy_env_vars,  # Pass env vars to child processes
-            ): realm_dir for realm_dir in realm_dirs
-        }
-        
-        # Collect results as they complete
-        for future in as_completed(future_to_realm):
-            realm_dir = future_to_realm[future]
-            try:
-                success, error_msg = future.result()
-                if success:
-                    console.print(f"   ✅ {realm_dir.name} deployed")
-                    successful_realms.append(realm_dir)
-                else:
-                    console.print(f"[red]   ❌ {realm_dir.name} failed: {error_msg}[/red]")
-                    failed_realms.append((realm_dir, error_msg))
-            except Exception as e:
-                console.print(f"[red]   ❌ {realm_dir.name} failed: {e}[/red]")
-                failed_realms.append((realm_dir, str(e)))
-    
-    console.print("")  # Blank line after parallel deployments
-    
-    if failed_realms:
-        console.print(f"[red]❌ {len(failed_realms)} realm(s) failed to deploy:[/red]")
-        for realm_dir, error in failed_realms:
-            console.print(f"[red]   • {realm_dir.name}: {error}[/red]")
-        raise typer.Exit(1)
-    
-    console.print(Panel.fit(
-        "[bold green]✅ Mundus Deployment Complete[/bold green]",
-        border_style="green"
-    ))
-    console.print(f"📊 Deployed: {len(realm_dirs)} realm(s) + {len(registry_dirs)} registry\n")
-    
-    # Display all canister URLs from all deployments
-    console.print("[bold cyan]📋 Mundus Deployment Summary[/bold cyan]\n")
-    all_canisters = {}
-    
-    # Collect registry canisters
-    for registry_dir in registry_dirs:
-        registry_canisters = get_canister_urls(registry_dir, network)
-        for name, info in registry_canisters.items():
-            all_canisters[f"{registry_dir.name}/{name}"] = info
-    
-    # Collect realm canisters
-    for realm_dir in realm_dirs:
-        realm_canisters = get_canister_urls(realm_dir, network)
-        for name, info in realm_canisters.items():
-            all_canisters[f"{realm_dir.name}/{name}"] = info
-    
-    if all_canisters:
-        console.print(json.dumps(all_canisters, indent=2))
-        console.print("")
-
-
-def mundus_status_command(
-    mundus_dir: Optional[str],
-    network: str,
-) -> None:
-    """Show status of mundus deployments including realms and registries."""
-    
-    console.print(Panel.fit(
-        "[bold cyan]📊 Mundus Status[/bold cyan]",
-        border_style="cyan"
-    ))
-    
-    # Determine which mundus directories to check
-    if mundus_dir:
-        mundus_dirs = [Path(mundus_dir).absolute()]
+    repo = "smart-social-contracts/realms"
+    if ref == "latest":
+        gh_url = f"https://api.github.com/repos/{repo}/releases/latest"
+        import urllib.request
+        with urllib.request.urlopen(gh_url, timeout=30) as resp:
+            release = json.loads(resp.read())
+        version = release["tag_name"].lstrip("v")
+    elif ref.replace(".", "").isdigit():
+        version = ref
     else:
-        # Find all mundus directories in default location
-        default_mundus_base = Path(".realms/mundus")
-        if default_mundus_base.exists():
-            mundus_dirs = sorted(default_mundus_base.glob("mundus_*"))
-        else:
-            mundus_dirs = []
-    
-    if not mundus_dirs:
-        console.print("[yellow]No mundus directories found.[/yellow]")
-        console.print(f"[dim]Create one with: realms mundus create[/dim]")
-        return
-    
-    console.print(f"[dim]Network: {network}[/dim]\n")
-    
-    for mundus_path in mundus_dirs:
-        if not mundus_path.is_dir():
-            continue
-            
-        console.print(f"[bold cyan]📂 {mundus_path.name}[/bold cyan]")
-        console.print(f"   [dim]{mundus_path}[/dim]\n")
-        
-        # Load manifest if exists
-        manifest_path = mundus_path / "manifest.json"
-        if manifest_path.exists():
-            try:
-                with open(manifest_path, 'r') as f:
-                    manifest = json.load(f)
-                console.print(f"   [dim]Manifest: {manifest.get('name', 'unnamed')}[/dim]\n")
-            except:
-                pass
-        
-        # Find registries
-        registry_dirs = sorted(mundus_path.glob("registry_*"))
-        if registry_dirs:
-            console.print("   [bold]📋 Registries:[/bold]")
-            for registry_dir in registry_dirs:
-                _print_deployment_status(registry_dir, network)
-        
-        # Check for shared REALMS token at mundus level
-        mundus_dfx_path = mundus_path / "dfx.json"
-        if mundus_dfx_path.exists():
-            try:
-                with open(mundus_dfx_path, 'r') as f:
-                    mundus_dfx = json.load(f)
-                if "realms_token" in mundus_dfx.get("canisters", {}):
-                    console.print("   [bold]🪙 Shared Token:[/bold]")
-                    # Check deployment status
-                    try:
-                        id_result = subprocess.run(
-                            ["dfx", "canister", "id", "realms_token", "--network", network],
-                            capture_output=True, text=True, timeout=5, cwd=mundus_path
-                        )
-                        if id_result.returncode == 0:
-                            cid = id_result.stdout.strip()
-                            if network == "local":
-                                url = f"http://{cid}.localhost:4943/"
-                            elif network in ["staging", "ic"]:
-                                url = f"https://{cid}.icp0.io/"
-                            else:
-                                url = ""
-                            # Get token info from manifest
-                            token_info = manifest.get("token", {}) if manifest_path.exists() else {}
-                            token_name = token_info.get("name", "REALMS Token")
-                            token_symbol = token_info.get("symbol", "REALMS")
-                            console.print(f"      [green]✅ realms_token[/green]: {token_name} ({token_symbol})")
-                            console.print(f"         [dim]{url}[/dim]")
-                        else:
-                            console.print(f"      [yellow]⚠️  realms_token not deployed[/yellow]")
-                    except:
-                        console.print(f"      [yellow]⚠️  Could not check realms_token status[/yellow]")
-            except:
-                pass
-        
-        # Check for ckBTC canisters (may be in realm dfx.json, not mundus)
-        # First try mundus dfx.json, then fall back to first realm's dfx.json
-        ckbtc_dfx_path = mundus_dfx_path
-        ckbtc_cwd = mundus_path
-        realm_dirs = sorted(mundus_path.glob("realm_*"))
-        if realm_dirs:
-            first_realm_dfx = realm_dirs[0] / "dfx.json"
-            if first_realm_dfx.exists():
-                ckbtc_dfx_path = first_realm_dfx
-                ckbtc_cwd = realm_dirs[0]
-        
-        if ckbtc_dfx_path.exists():
-            try:
-                with open(ckbtc_dfx_path, 'r') as f:
-                    ckbtc_dfx = json.load(f)
-                ckbtc_canisters = [c for c in ckbtc_dfx.get("canisters", {}).keys() 
-                                   if c.startswith("ckbtc_")]
-                if ckbtc_canisters:
-                    console.print("   [bold]₿ ckBTC:[/bold]")
-                    for canister_name in sorted(ckbtc_canisters):
-                        try:
-                            id_result = subprocess.run(
-                                ["dfx", "canister", "id", canister_name, "--network", network],
-                                capture_output=True, text=True, timeout=5, cwd=ckbtc_cwd
-                            )
-                            if id_result.returncode == 0:
-                                cid = id_result.stdout.strip()
-                                if network == "local":
-                                    url = f"http://{cid}.localhost:4943/"
-                                elif network in ["staging", "ic"]:
-                                    url = f"https://{cid}.icp0.io/"
-                                else:
-                                    url = ""
-                                console.print(f"      [green]✅ {canister_name}[/green]")
-                                console.print(f"         [dim]{url}[/dim]")
-                            else:
-                                console.print(f"      [yellow]⚠️  {canister_name} not deployed[/yellow]")
-                        except:
-                            console.print(f"      [yellow]⚠️  Could not check {canister_name} status[/yellow]")
-            except:
-                pass
-        
-        # Check for Internet Identity canister (may be in realm dfx.json, not mundus)
-        # Use the same path as ckbtc (first realm's dfx.json)
-        ii_dfx_path = ckbtc_dfx_path
-        ii_cwd = ckbtc_cwd
-        
-        if ii_dfx_path.exists():
-            try:
-                with open(ii_dfx_path, 'r') as f:
-                    ii_dfx = json.load(f)
-                if "internet_identity" in ii_dfx.get("canisters", {}):
-                    console.print("   [bold]🔐 Identity:[/bold]")
-                    try:
-                        id_result = subprocess.run(
-                            ["dfx", "canister", "id", "internet_identity", "--network", network],
-                            capture_output=True, text=True, timeout=5, cwd=ii_cwd
-                        )
-                        if id_result.returncode == 0:
-                            cid = id_result.stdout.strip()
-                            if network == "local":
-                                url = f"http://{cid}.localhost:4943/"
-                            elif network in ["staging", "ic"]:
-                                url = f"https://{cid}.icp0.io/"
-                            else:
-                                url = ""
-                            console.print(f"      [green]✅ internet_identity[/green]")
-                            console.print(f"         [dim]{url}[/dim]")
-                        else:
-                            console.print(f"      [yellow]⚠️  internet_identity not deployed[/yellow]")
-                    except:
-                        console.print(f"      [yellow]⚠️  Could not check internet_identity status[/yellow]")
-            except:
-                pass
-        
-        # Find marketplaces
-        marketplace_dirs = sorted(mundus_path.glob("marketplace_*"))
-        if marketplace_dirs:
-            console.print("   [bold]🛒 Marketplaces:[/bold]")
-            for marketplace_dir in marketplace_dirs:
-                _print_deployment_status(marketplace_dir, network)
-        
-        # Find realms
-        realm_dirs = sorted(mundus_path.glob("realm_*"))
-        if realm_dirs:
-            console.print("   [bold]🏛️  Realms:[/bold]")
-            for realm_dir in realm_dirs:
-                _print_deployment_status(realm_dir, network)
-        
-        if not registry_dirs and not realm_dirs and not marketplace_dirs:
-            console.print("   [yellow]No realms or registries found[/yellow]")
-        
-        console.print("")
+        local_path = Path(ref)
+        if local_path.exists():
+            console.print(f"  Uploading local artifact: {local_path.name}")
+            return _upload_file(local_path)
+        raise ValueError(f"Unknown artifact reference: {ref}")
 
-
-def _print_deployment_status(deploy_dir: Path, network: str) -> None:
-    """Print deployment status for a realm or registry directory."""
-    
-    dir_name = deploy_dir.name
-    console.print(f"      [cyan]{dir_name}[/cyan]")
-    
-    # Check for dfx.json
-    dfx_json = deploy_dir / "dfx.json"
-    if not dfx_json.exists():
-        console.print(f"         [yellow]⚠️  No dfx.json found[/yellow]")
-        return
-    
-    try:
-        with open(dfx_json, 'r') as f:
-            dfx_config = json.load(f)
-        all_canister_names = list(dfx_config.get("canisters", {}).keys())
-    except:
-        console.print(f"         [yellow]⚠️  Could not read dfx.json[/yellow]")
-        return
-    
-    # Filter to only deployment-specific canisters (not shared infrastructure)
-    # Shared canisters like internet_identity, ckbtc_*, __Candid_UI are managed separately
-    shared_canisters = {
-        "internet_identity", "ckbtc_ledger", "ckbtc_indexer", 
-        "__Candid_UI", "icrc1_ledger"
-    }
-    
-    # Determine which canisters are specific to this deployment
-    is_registry = dir_name.startswith("registry_")
-    if is_registry:
-        # Registry should only count realm_registry_backend and realm_registry_frontend
-        canister_names = [n for n in all_canister_names 
-                         if n.startswith("realm_registry_")]
+    if artifact_type == "realm_backend":
+        return f"https://github.com/{repo}/releases/download/v{version}/realm_backend.wasm.gz"
+    elif artifact_type == "realm_frontend":
+        return f"https://github.com/{repo}/releases/download/v{version}/realm_frontend.tar.gz"
     else:
-        # Realm should count realm_backend, realm_frontend, token_backend, and nft_backend
-        canister_names = [n for n in all_canister_names 
-                         if n in ("realm_backend", "realm_frontend", "token_backend", "nft_backend") or 
-                         (n.endswith("_backend") and not n.startswith("realm_registry_")) or
-                         (n.endswith("_frontend") and not n.startswith("realm_registry_")) or
-                         n.endswith("_token_backend") or n.endswith("_nft_backend")]
-        # Exclude shared canisters
-        canister_names = [n for n in canister_names if n not in shared_canisters]
-    
-    if not canister_names:
-        console.print(f"         [yellow]⚠️  No deployment canisters found[/yellow]")
-        return
-    
-    # Verify actual deployment status using dfx canister status
-    deployed_canisters = []
-    created_only_canisters = []
-    not_created_canisters = []
-    
-    for canister_name in canister_names:
+        raise ValueError(f"Unknown artifact type: {artifact_type}")
+
+
+def _build_manifest(realm_entry: dict, network: str, deploy_mode: str,
+                    backend_url: str, frontend_url: str) -> dict:
+    """Build a deployment manifest for a single realm."""
+    project_root = get_project_root()
+    manifest_path = realm_entry.get("manifest", "")
+    realm_manifest = {}
+    if manifest_path:
+        full_path = project_root / manifest_path
+        if full_path.exists():
+            realm_manifest = json.loads(full_path.read_text())
+
+    return {
+        "name": realm_entry.get("display_name", realm_entry.get("name", "unknown")),
+        "network": network,
+        "deploy_mode": deploy_mode,
+        "artifacts": {
+            "realm_backend": backend_url,
+            "realm_frontend": frontend_url,
+        },
+        "canister_ids": {
+            "backend": realm_entry.get("canister_id", ""),
+            "frontend": realm_entry.get("frontend_canister_id", ""),
+        },
+        "realm": {
+            "name": realm_entry.get("display_name", realm_entry.get("name", "")),
+            **{k: v for k, v in realm_manifest.items() if k not in ("name",)},
+        },
+        "registry_canister_id": _REGISTRY_IDS.get(network, ""),
+        "installer_canister_id": _INSTALLER_IDS.get(network, ""),
+    }
+
+
+def _submit_and_poll(manifest: dict, network: str) -> bool:
+    """Submit deployment request and poll for completion."""
+    realm_name = manifest.get("name", "unknown")
+    registry_id = _REGISTRY_IDS.get(network, "")
+    if not registry_id:
+        console.print(f"[red]  No registry ID for network '{network}'[/red]")
+        return False
+
+    manifest_json = json.dumps(manifest)
+    candid_arg = '("' + manifest_json.replace("\\", "\\\\").replace('"', '\\"') + '")'
+
+    console.print(f"  Submitting to registry...")
+    try:
+        raw = _dfx_call(registry_id, "request_deployment", candid_arg, network)
+        result = json.loads(json.loads(raw) if raw.startswith('"') else raw)
+    except Exception as e:
+        console.print(f"[red]  request_deployment failed: {e}[/red]")
+        return False
+
+    if not result.get("success"):
+        console.print(f"[red]  Rejected: {result.get('error', 'unknown')}[/red]")
+        return False
+
+    job_id = result.get("job_id", "")
+    console.print(f"  Job enqueued: {job_id}")
+
+    installer_id = _INSTALLER_IDS.get(network, "")
+    if not installer_id:
+        console.print(f"[yellow]  No installer ID — cannot poll[/yellow]")
+        return True
+
+    start = time.time()
+    while time.time() - start < POLL_TIMEOUT_S:
+        time.sleep(POLL_INTERVAL_S)
+        elapsed = int(time.time() - start)
         try:
-            # First check if canister ID exists
-            id_result = subprocess.run(
-                ["dfx", "canister", "id", canister_name, "--network", network],
-                capture_output=True, text=True, timeout=5, cwd=deploy_dir
-            )
-            if id_result.returncode != 0:
-                not_created_canisters.append(canister_name)
-                continue
-                
-            canister_id = id_result.stdout.strip()
-            
-            # Now verify it's actually deployed by checking status
-            status_result = subprocess.run(
-                ["dfx", "canister", "status", canister_name, "--network", network],
-                capture_output=True, text=True, timeout=10, cwd=deploy_dir
-            )
-            
-            if status_result.returncode == 0 and "Status: Running" in status_result.stdout:
-                deployed_canisters.append((canister_name, canister_id))
+            raw = _dfx_call(installer_id, "get_deployment_job_status", f'("{job_id}")', network, query=True)
+            data = json.loads(raw)
+            ok = data.get("Ok") or (data if "job_id" in data else None)
+            if ok:
+                status = ok.get("status", "unknown")
+                console.print(f"  [{elapsed}s] Status: {status}")
+                if status == "completed":
+                    console.print(f"  [green]Deployment succeeded[/green]")
+                    return True
+                elif status in ("failed", "failed_verification", "cancelled"):
+                    error = ok.get("error", "")
+                    console.print(f"  [red]Deployment failed: {error}[/red]")
+                    return False
             else:
-                # Canister ID exists but not running (created but not deployed)
-                created_only_canisters.append((canister_name, canister_id))
-        except:
-            not_created_canisters.append(canister_name)
-    
-    # Display status based on actual deployment state
-    total_expected = len(canister_names)
-    
-    if len(deployed_canisters) == total_expected:
-        console.print(f"         [green]✅ Deployed ({len(deployed_canisters)}/{total_expected} canisters)[/green]")
-    elif deployed_canisters:
-        console.print(f"         [yellow]⚠️  Partial ({len(deployed_canisters)}/{total_expected} canisters)[/yellow]")
-    else:
-        console.print(f"         [red]❌ Not deployed (0/{total_expected} canisters)[/red]")
-    
-    # Show deployed canisters with URLs
-    for name, cid in deployed_canisters:
-        if network == "local":
-            url = f"http://{cid}.localhost:4943/"
-        elif network in ["staging", "ic"]:
-            url = f"https://{cid}.icp0.io/"
-        else:
-            url = ""
-        console.print(f"            • {name}: [dim]{url}[/dim]")
-    
-    # Show created but not running
-    if created_only_canisters:
-        console.print(f"         [yellow]   Created but not running:[/yellow]")
-        for name, cid in created_only_canisters:
-            console.print(f"            • {name}: {cid}")
-    
-    # Show not created
-    if not_created_canisters:
-        console.print(f"         [dim]   Not created: {', '.join(not_created_canisters)}[/dim]")
+                err = data.get("Err", {})
+                console.print(f"  [{elapsed}s] Poll error: {err}")
+        except Exception as e:
+            console.print(f"  [{elapsed}s] Poll error: {e}")
 
+    console.print(f"[red]  Timeout after {POLL_TIMEOUT_S}s[/red]")
+    return False
+
+
+def mundus_deploy_descriptor_command(
+    descriptor: str,
+    network: str,
+    deploy_mode: str = "upgrade",
+    artifact_version: str = "latest",
+) -> None:
+    """Deploy realms from a mundus descriptor YAML file."""
+    descriptor_path = Path(descriptor)
+    if not descriptor_path.is_absolute():
+        descriptor_path = get_project_root() / descriptor_path
+
+    if not descriptor_path.exists():
+        console.print(f"[red]Descriptor not found: {descriptor_path}[/red]")
+        raise typer.Exit(1)
+
+    with open(descriptor_path) as f:
+        desc = yaml.safe_load(f)
+
+    desc_network = desc.get("network", network)
+    if network and network != desc_network:
+        console.print(f"[yellow]Warning: overriding descriptor network '{desc_network}' with '{network}'[/yellow]")
+    else:
+        network = desc_network
+
+    realms = [e for e in desc.get("mundus", []) if e.get("type", "realm") == "realm"]
+    if not realms:
+        console.print("[yellow]No realm entries in descriptor[/yellow]")
+        return
+
+    console.print(f"Deploying {len(realms)} realm(s) to {network} (mode={deploy_mode})\n")
+
+    backend_url = _resolve_artifact(artifact_version, "realm_backend", network)
+    frontend_url = _resolve_artifact(artifact_version, "realm_frontend", network)
+    console.print(f"Artifacts resolved:")
+    console.print(f"  backend:  {backend_url}")
+    console.print(f"  frontend: {frontend_url}\n")
+
+    results = []
+    for realm in realms:
+        name = realm.get("display_name", realm.get("name", "?"))
+        console.print(f"--- {name} ---")
+        manifest = _build_manifest(realm, network, deploy_mode, backend_url, frontend_url)
+        ok = _submit_and_poll(manifest, network)
+        results.append((name, ok))
+        console.print()
+
+    console.print("Summary:")
+    all_ok = True
+    for name, ok in results:
+        symbol = "[green]OK[/green]" if ok else "[red]FAIL[/red]"
+        console.print(f"  {name}: {symbol}")
+        if not ok:
+            all_ok = False
+
+    if not all_ok:
+        raise typer.Exit(1)

@@ -21,7 +21,7 @@ from .commands.marketplace import (
     marketplace_deploy_command,
     marketplace_status_command,
 )
-from .commands.mundus import mundus_create_command, mundus_deploy_command, mundus_status_command
+from .commands.mundus import mundus_deploy_descriptor_command
 from .commands.quarter import (
     quarter_create_command,
     quarter_list_command,
@@ -539,83 +539,27 @@ def status(
 
 
 # Create mundus subcommand group
-mundus_app = typer.Typer(name="mundus", help="Multi-realm mundus operations")
+mundus_app = typer.Typer(name="mundus", help="Mundus deployment operations")
 app.add_typer(mundus_app, name="mundus", rich_help_panel="Lifecycle")
-
-
-@mundus_app.command("create")
-def mundus_create(
-    output_dir: str = typer.Option(
-        ".realms/mundus", "--output-dir", help="Output directory for mundus"
-    ),
-    mundus_name: str = typer.Option(
-        "Demo Mundus", "--mundus-name", help="Name of the mundus"
-    ),
-    manifest: Optional[str] = typer.Option(
-        None, "--manifest", help="Path to mundus manifest.json (default: examples/demo/manifest.json)"
-    ),
-    network: str = typer.Option(
-        "local", "--network", help="Target network for deployment"
-    ),
-    deploy: bool = typer.Option(
-        False, "--deploy", help="Deploy the mundus after creation"
-    ),
-    identity: Optional[str] = typer.Option(
-        None, "--identity", help="Path to identity PEM file or identity name for dfx"
-    ),
-    mode: str = typer.Option(
-        "auto", "--mode", "-m", help="Deploy mode: 'auto', 'upgrade' or 'reinstall' (auto picks install/upgrade)"
-    ),
-    no_demo_data: bool = typer.Option(
-        False, "--no-demo-data", help="Skip generating demo/fake data (users, orgs, accounting). Extensions and codex files are still included."
-    ),
-) -> None:
-    """Create a new multi-realm mundus from a manifest."""
-    mundus_create_command(
-        output_dir,
-        mundus_name,
-        manifest,
-        network,
-        deploy,
-        identity,
-        mode,
-        no_demo_data=no_demo_data,
-    )
 
 
 @mundus_app.command("deploy")
 def mundus_deploy(
-    mundus_dir: str = typer.Option(
-        ".realms/mundus", "--mundus-dir", help="Path to mundus directory"
+    descriptor: str = typer.Argument(
+        ..., help="Path to mundus descriptor YAML (e.g. deployment-descriptors/staging-mundus-layered.yml)"
     ),
     network: str = typer.Option(
-        "local", "--network", help="Target network for deployment"
+        "", "--network", "-n", help="Override network from descriptor"
     ),
-    identity: Optional[str] = typer.Option(
-        None, "--identity", help="Path to identity PEM file or identity name for dfx"
+    deploy_mode: str = typer.Option(
+        "upgrade", "--mode", "-m", help="Deploy mode: upgrade, reinstall, install"
     ),
-    mode: str = typer.Option(
-        "auto", "--mode", "-m", help="Deploy mode: 'auto', 'upgrade' or 'reinstall'"
-    ),
-    no_demo_data: bool = typer.Option(
-        False, "--no-demo-data", help="Skip generating demo/fake data (users, orgs, accounting). Extensions and codex files are still included."
+    artifact_version: str = typer.Option(
+        "latest", "--version", "-v", help="Artifact version: 'latest', semver (e.g. 0.3.2), or local path"
     ),
 ) -> None:
-    """Deploy all realms and registry in an existing mundus."""
-    mundus_deploy_command(mundus_dir, network, identity, mode, no_demo_data=no_demo_data)
-
-
-@mundus_app.command("status")
-def mundus_status(
-    mundus_dir: Optional[str] = typer.Option(
-        None, "--mundus-dir", help="Path to specific mundus directory (default: scan .realms/mundus)"
-    ),
-    network: str = typer.Option(
-        "local", "--network", "-n", help="Network to check status for"
-    ),
-) -> None:
-    """Show status of mundus deployments including realms and registries."""
-    mundus_status_command(mundus_dir, network)
+    """Deploy realm canisters from a mundus descriptor."""
+    mundus_deploy_descriptor_command(descriptor, network, deploy_mode, artifact_version)
 
 
 # Create realm subcommand group
