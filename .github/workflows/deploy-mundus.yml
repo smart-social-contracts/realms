@@ -140,6 +140,25 @@ jobs:
           rm -f /tmp/identity.pem
           echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
 
+      - name: Build WASM and frontend artifacts
+        env:
+          DESCRIPTOR: ${{ inputs.descriptor }}
+        run: |
+          SKIP_FLAG=""
+          if [ "${{ inputs.skip_base_wasm }}" = "true" ]; then
+            SKIP_FLAG="--skip-base-wasm"
+          fi
+          python3 scripts/build_mundus_artifacts.py --file "$DESCRIPTOR" $SKIP_FLAG
+
+      - name: Upload artifacts to deploy service cache
+        run: |
+          pip install requests
+          if echo "${{ inputs.descriptor }}" | grep -qE "demo-mundus|/demo-"; then NETWORK=demo
+          elif echo "${{ inputs.descriptor }}" | grep -qE "test-mundus|/test-"; then NETWORK=test
+          else NETWORK=staging
+          fi
+          python3 scripts/upload_ci_artifacts.py --network "${NETWORK:-${{ inputs.artifact_network }}}"
+
       - name: Bootstrap registry if empty
         env:
           DESCRIPTOR: ${{ inputs.descriptor }}
@@ -190,17 +209,6 @@ jobs:
         run: |
           echo "→ python3 scripts/request_deployment.py --file \"$DESCRIPTOR\" --install-mode \"$INSTALL_MODE\""
           python3 scripts/request_deployment.py --file "$DESCRIPTOR" --install-mode "$INSTALL_MODE"
-
-      - name: Upload build artifacts to deploy service cache
-        if: always()
-        run: |
-          pip install requests
-          if echo "${{ inputs.descriptor }}" | grep -qE "demo-mundus|/demo-"; then NETWORK=demo
-          elif echo "${{ inputs.descriptor }}" | grep -qE "test-mundus|/test-"; then NETWORK=test
-          else NETWORK=staging
-          fi
-          python3 scripts/upload_ci_artifacts.py --network "${NETWORK:-${{ inputs.artifact_network }}}"
-        continue-on-error: true
 
       - name: Print frontend URLs
         if: success()
