@@ -168,6 +168,11 @@ jobs:
           dfx generate file_registry 2>/dev/null || true
           npm run build --workspace=file_registry_frontend
 
+          if [ "$MODE" = "reinstall" ]; then
+            echo "Uninstalling $CID before fresh install (asset canister)..."
+            dfx canister uninstall-code "$CID" --network "$NETWORK"
+            MODE="install"
+          fi
           echo "Installing file_registry_frontend ($CID) on $NETWORK (mode=$MODE)..."
           dfx deploy file_registry_frontend \
               --mode "$MODE" --yes \
@@ -210,6 +215,11 @@ jobs:
           echo "Building platform_dashboard_frontend..."
           npm run build --workspace=platform_dashboard_frontend
 
+          if [ "$MODE" = "reinstall" ]; then
+            echo "Uninstalling $CID before fresh install (asset canister)..."
+            dfx canister uninstall-code "$CID" --network "$NETWORK"
+            MODE="install"
+          fi
           echo "Installing platform_dashboard_frontend ($CID) on $NETWORK (mode=$MODE)..."
           dfx deploy platform_dashboard_frontend \
               --mode "$MODE" --yes \
