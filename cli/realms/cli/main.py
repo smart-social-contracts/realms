@@ -21,7 +21,7 @@ from .commands.marketplace import (
     marketplace_deploy_command,
     marketplace_status_command,
 )
-from .commands.mundus import mundus_deploy_descriptor_command
+from .commands.mundus import mundus_deploy_descriptor_command, mundus_deploy_new_command
 from .commands.quarter import (
     quarter_create_command,
     quarter_list_command,
@@ -560,6 +560,29 @@ def mundus_deploy(
 ) -> None:
     """Deploy realm canisters from a mundus descriptor."""
     mundus_deploy_descriptor_command(descriptor, network, deploy_mode, artifact_version)
+
+
+@mundus_app.command("deploy-new")
+def mundus_deploy_new(
+    name: str = typer.Argument(..., help="Realm name identifier"),
+    network: str = typer.Option(
+        "test", "--network", "-n", help="Target network"
+    ),
+    artifact_version: str = typer.Option(
+        "latest", "--version", "-v", help="Artifact version: 'latest' or semver"
+    ),
+    display_name: str = typer.Option(
+        "", "--display-name", help="Display name (defaults to name)"
+    ),
+    description: str = typer.Option(
+        "", "--description", "-d", help="Realm description"
+    ),
+    cleanup: bool = typer.Option(
+        False, "--cleanup", help="Delete test canisters after deployment"
+    ),
+) -> None:
+    """Deploy a new realm with no existing canister IDs."""
+    mundus_deploy_new_command(name, network, artifact_version, display_name, description, cleanup)
 
 
 # Create realm subcommand group

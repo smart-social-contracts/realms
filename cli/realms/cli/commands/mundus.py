@@ -197,6 +197,47 @@ def _submit_and_poll(manifest: dict, network: str) -> bool:
     return False
 
 
+def mundus_deploy_new_command(
+    name: str,
+    network: str,
+    artifact_version: str = "latest",
+    display_name: str = "",
+    description: str = "",
+    cleanup: bool = False,
+) -> None:
+    """Deploy a new realm (no existing canister IDs -- creates new ones)."""
+    backend_url = _resolve_artifact(artifact_version, "realm_backend", network)
+    frontend_url = _resolve_artifact(artifact_version, "realm_frontend", network)
+    console.print(f"Artifacts resolved:")
+    console.print(f"  backend:  {backend_url}")
+    console.print(f"  frontend: {frontend_url}\n")
+
+    manifest = {
+        "name": display_name or name,
+        "network": network,
+        "deploy_mode": "install",
+        "artifacts": {"realm_backend": backend_url, "realm_frontend": frontend_url},
+        "realm": {
+            "name": display_name or name,
+            "display_name": display_name or name,
+            "description": description or f"Realm {name}",
+        },
+        "registry_canister_id": _REGISTRY_IDS.get(network, ""),
+        "installer_canister_id": _INSTALLER_IDS.get(network, ""),
+    }
+
+    console.print(f"--- {display_name or name} (new realm) ---")
+    ok = _submit_and_poll(manifest, network)
+
+    if ok and cleanup:
+        installer_id = _INSTALLER_IDS.get(network, "")
+        job_id = manifest.get("_job_id", "")
+        console.print("[yellow]Cleanup requested but not yet implemented[/yellow]")
+
+    if not ok:
+        raise typer.Exit(1)
+
+
 def mundus_deploy_descriptor_command(
     descriptor: str,
     network: str,
