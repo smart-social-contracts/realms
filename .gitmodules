@@ -1,7 +1,7 @@
 [submodule "extensions"]
 	path = extensions
-	url = git@github.com:smart-social-contracts/realms-extensions.git
+	url = https://github.com/smart-social-contracts/realms-extensions.git
 	branch = main
 [submodule "codices"]
 	path = codices
-	url = git@github.com:smart-social-contracts/realms-codices.git
+	url = https://github.com/smart-social-contracts/realms-codices.git
