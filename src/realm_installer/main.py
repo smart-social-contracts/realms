@@ -276,63 +276,6 @@ def unwrap_call_result(result):
     return result
 
 
-def _candid_store(key, ctype, cenc, content):
-    """Encode asset canister store() argument as raw Candid bytes."""
-    def _u(n):
-        r = bytearray()
-        while True:
-            b = n & 0x7f; n >>= 7
-            r.append(b | 0x80 if n else b)
-            if not n: break
-        return bytes(r)
-    def _s(n):
-        r = bytearray()
-        while True:
-            b = n & 0x7f; n >>= 7
-            if (n == 0 and not (b & 0x40)) or (n == -1 and (b & 0x40)):
-                r.append(b); break
-            r.append(b | 0x80)
-        return bytes(r)
-    def _t(s):
-        b = s.encode(); return _u(len(b)) + b
-    def _bl(b):
-        return _u(len(b)) + b
-    def _fh(nm):
-        h = 0
-        for c in nm: h = (h * 223 + ord(c)) & 0xFFFFFFFF
-        return h
-    flds = sorted([
-        (_fh("content"), _s(0)), (_fh("content_encoding"), _s(-15)),
-        (_fh("content_type"), _s(-15)), (_fh("key"), _s(-15)), (_fh("sha256"), _s(1)),
-    ])
-    rec = _s(-20) + _u(5)
-    for h, t in flds: rec += _u(h) + t
-    tt = _u(3) + _s(-19) + _s(-5) + _s(-18) + _s(0) + rec
-    vals = b""
-    fh_map = {_fh("key"): lambda: _t(key), _fh("content_type"): lambda: _t(ctype),
-              _fh("content_encoding"): lambda: _t(cenc), _fh("content"): lambda: _bl(content),
-              _fh("sha256"): lambda: b'\x00'}
-    for h, _ in flds: vals += fh_map[h]()
-    return b'DIDL' + tt + _u(1) + _s(2) + vals
-
-
-def _schedule_canister_ids_upload(frontend_id, backend_id, job_id_val):
-    """Upload /canister_ids.js to the frontend asset canister."""
-    def _cb():
-        try:
-            js = f'globalThis.__CANISTER_IDS={{realm_backend:"{backend_id}",internet_identity:"https://identity.ic0.app"}};'
-            raw = _candid_store("/canister_ids.js", "application/javascript", "identity", js.encode("utf-8"))
-            import basilisk as _bsk
-            sc = _bsk._ServiceCall(Principal.from_str(frontend_id), "store", payment=0, arg_type="raw")
-            sc._raw_args = raw
-            sc.args[2] = raw
-            result: CallResult = yield sc
-            jlog(job_id_val).info(f"canister_ids.js uploaded to {frontend_id}")
-        except Exception as e:
-            jlog(job_id_val).error(f"canister_ids.js upload failed: {e}")
-    ic.set_timer(Duration(0), _cb)
-
-
 def schedule_registry_settlement(job_id: str, success: bool, reason: str = ""):
     def _cb():
         try:
@@ -866,11 +809,6 @@ def report_frontend_verified(args: text) -> ResultReportFrontend:
             failed = True
         else:
             job.assets_verified = 1
-            fe = (job.frontend_canister_id or "").strip()
-            be = (job.backend_canister_id or "").strip()
-            if fe and be:
-                _schedule_canister_ids_upload(fe, be, job_id)
-
             manifest = json.loads(job.manifest_json or "{}")
             realm_info = manifest.get("realm", {})
             has_work = bool(realm_info.get("extensions")) or bool(realm_info.get("codex"))
