@@ -186,9 +186,10 @@ jobs:
       - name: Submit queue deployment
         env:
           DESCRIPTOR: ${{ inputs.descriptor }}
+          INSTALL_MODE: ${{ inputs.install_mode || 'upgrade' }}
         run: |
-          echo "→ python3 scripts/request_deployment.py --file \"$DESCRIPTOR\""
-          python3 scripts/request_deployment.py --file "$DESCRIPTOR"
+          echo "→ python3 scripts/request_deployment.py --file \"$DESCRIPTOR\" --install-mode \"$INSTALL_MODE\""
+          python3 scripts/request_deployment.py --file "$DESCRIPTOR" --install-mode "$INSTALL_MODE"
 
       - name: Upload build artifacts to deploy service cache
         if: always()

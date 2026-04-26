@@ -95,7 +95,8 @@ def _build_artifact_refs(tag: str) -> dict:
 
 
 def request_one(
-    realm_config: dict, network: str, registry_id: str, *, release_tag: str = "",
+    realm_config: dict, network: str, registry_id: str, *,
+    release_tag: str = "", install_mode: str = "upgrade",
 ) -> str | None:
     """Submit a deployment request for one realm. Returns the job_id."""
     manifest = {
@@ -109,6 +110,7 @@ def request_one(
             "extensions": realm_config.get("extensions", ["all"]),
         },
         "network": network,
+        "install_mode": install_mode,
     }
     if realm_config.get("canister_id"):
         manifest["backend_canister_id"] = realm_config["canister_id"]
@@ -190,6 +192,12 @@ def main():
         default=os.environ.get("DEPLOY_RELEASE_TAG", ""),
         help="GitHub release tag for WASM/frontend artifacts (e.g. v0.3.1)",
     )
+    parser.add_argument(
+        "--install-mode",
+        default=os.environ.get("INSTALL_MODE", "upgrade"),
+        choices=["upgrade", "reinstall", "install"],
+        help="Install mode for realm canisters (default: upgrade)",
+    )
     args = parser.parse_args()
 
     if yaml is None:
@@ -211,17 +219,20 @@ def main():
         sys.exit(1)
 
     release_tag = (args.release_tag or "").strip()
+    install_mode = args.install_mode
 
     realms = desc.get("mundus", [])
     print(f"Submitting {len(realms)} realm deployment(s) to {network}")
     if release_tag:
         print(f"  release tag: {release_tag}")
+    if install_mode != "upgrade":
+        print(f"  install mode: {install_mode}")
 
     job_ids = []
     for realm in realms:
         if realm.get("type") in ("dashboard", "registry", "realm_registry", "marketplace", "token", "nft"):
             continue
-        job_id = request_one(realm, network, registry_id, release_tag=release_tag)
+        job_id = request_one(realm, network, registry_id, release_tag=release_tag, install_mode=install_mode)
         if job_id:
             job_ids.append(job_id)
 
