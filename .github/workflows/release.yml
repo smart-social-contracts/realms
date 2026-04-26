@@ -75,7 +75,7 @@ jobs:
           sed -i "s|DEFAULT_DOCKER_IMAGE = \"ghcr.io/smart-social-contracts/realms:v.*\"|DEFAULT_DOCKER_IMAGE = \"ghcr.io/smart-social-contracts/realms:v${NEW_VERSION}\"|" cli/realms/cli/constants.py
           
           # Update frontend deploy release tag default
-          sed -i "s|deploy_release_tag: viteEnv.VITE_DEPLOY_RELEASE_TAG || 'v[^']*'|deploy_release_tag: viteEnv.VITE_DEPLOY_RELEASE_TAG || 'v${NEW_VERSION}'|" \
+          sed -i "s#deploy_release_tag: viteEnv.VITE_DEPLOY_RELEASE_TAG || 'v[^']*'#deploy_release_tag: viteEnv.VITE_DEPLOY_RELEASE_TAG || 'v${NEW_VERSION}'#" \
             src/realm_registry_frontend/src/lib/config.js
           
           # Store new version for later use
