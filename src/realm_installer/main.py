@@ -22,29 +22,6 @@ from ic_python_logging import get_canister_logs as _get_canister_logs, get_logge
 
 _log = _get_logger("realm_installer")
 
-# ── Monkey-patch basilisk _ServiceCall for safe JSON encoding ──────────
-try:
-    import basilisk as _bsk
-    _SC = _bsk._ServiceCall
-    _orig = _SC.__init__
-    def _safe_init(self, cp, mn, ca=None, payment=0, arg_type=None):
-        if arg_type is not None:
-            self._python_call_args = ca if ca else ()
-            self._candid_arg_type = arg_type
-            self._raw_args = b'DIDL\x00\x00'
-            self.canister_principal = cp
-            self.method_name = mn
-            self.payment = payment
-            pt = str(cp) if not isinstance(cp, str) else cp
-            self.name = "call_raw"
-            self.args = [pt, mn, self._raw_args, payment]
-            self._payment = payment
-        else:
-            _orig(self, cp, mn, ca, payment, arg_type)
-    _SC.__init__ = _safe_init
-except Exception:
-    pass
-
 # ── Storage ────────────────────────────────────────────────────────────
 
 _db_storage = StableBTreeMap[str, str](memory_id=1, max_key_size=200, max_value_size=10000)
@@ -325,6 +302,19 @@ def schedule_registration(job_id_val: str):
             backend_url = f"https://{backend_id}.icp0.io" if backend_id else ""
             logo = realm_info.get("branding", {}).get("logo", "") or realm_info.get("logo", "")
             canister_ids = f"{frontend_id}|||{backend_id}"
+
+            if frontend_id and backend_id:
+                js = 'globalThis.__CANISTER_IDS={realm_backend:"' + backend_id + '",internet_identity:"https://identity.ic0.app"};'
+                escaped = js.replace('\\', '\\\\').replace('"', '\\"')
+                candid_arg = '(record { key = "/canister_ids.js"; content_type = "application/javascript"; content_encoding = "identity"; content = blob "' + escaped + '"; sha256 = null })'
+                store_result: CallResult = yield ic.call_raw(
+                    Principal.from_str(frontend_id), "store",
+                    ic.candid_encode(candid_arg), 0,
+                )
+                if isinstance(store_result, dict) and "Err" in store_result:
+                    jlog(job_id_val).error(f"canister_ids.js upload failed: {store_result['Err']}")
+                else:
+                    jlog(job_id_val).info("canister_ids.js uploaded to frontend")
 
             registry = RealmRegistryService(Principal.from_str(reg_id))
             result: CallResult = yield registry.register_realm(
