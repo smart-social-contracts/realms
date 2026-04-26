@@ -111,6 +111,19 @@ jobs:
           rm -f /tmp/identity.pem
           echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
 
+      - name: Top up credits
+        run: |
+          NETWORK=$(python3 -c "import yaml; print(yaml.safe_load(open('${{ inputs.descriptor }}'))['network'])")
+          REGISTRY=$(python3 -c "import json; print(json.load(open('canister_ids.json'))['realm_registry_backend']['$NETWORK'])" 2>/dev/null || echo "")
+          if [ -z "$REGISTRY" ]; then
+            echo "::warning::Could not resolve registry canister for network '$NETWORK', skipping credit top-up"
+          else
+            PRINCIPAL=$(dfx identity get-principal)
+            dfx canister call --network ic "$REGISTRY" add_credits \
+              "(\"$PRINCIPAL\", 50 : nat64, \"\", \"CI credit top-up\")" || true
+            echo "Credits topped up for $PRINCIPAL on $NETWORK (registry: $REGISTRY)"
+          fi
+
       - name: Deploy realms
         run: |
           realms mundus deploy \
