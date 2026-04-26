@@ -689,7 +689,7 @@ def get_pending_deployments() -> ResultPendingJobs:
         list(DeploymentJob.instances())
         pending = []
         for job in DeploymentJob.instances():
-                if (job.status or "pending") == "pending":
+            if (job.status or "pending") == "pending":
                 pending.append(PendingJobEntry(job=_job_to_view(job), manifest=job.manifest_json or "{}"))
         pending.sort(key=lambda e: int(e.job.created_at))
         return ResultPendingJobs(Ok=PendingJobsOk(jobs=pending, count=nat32(len(pending))))
@@ -827,7 +827,7 @@ def report_canister_ready(args: text) -> Async[ResultReportReady]:
             failed_verification=False,
         ))
     except Exception as e:
-            if job_id:
+        if job_id:
             try:
                 j = DeploymentJob[job_id]
                 if j and (j.status or "") not in _JOB_TERMINAL_STATUSES:
@@ -835,8 +835,8 @@ def report_canister_ready(args: text) -> Async[ResultReportReady]:
                     j.error = str(e)[:1990]
                     j.completed_at = now_s()
                     schedule_registry_settlement(job_id, success=False, reason=j.error)
-        except Exception:
-            pass
+            except Exception:
+                pass
         return ResultReportReady(Err=ie(str(e), traceback.format_exc()[-1500:]))
 
 @update
