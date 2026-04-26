@@ -1,17 +1,3 @@
-# deploy-infra.yml — deploy infrastructure canisters via direct dfx
-#
-# Infra canisters - backend and frontend (if any):
-#
-# realm_registry
-# realm_installer
-# file_registry
-# dashboard
-# marketplace
-# token
-# nft
-#
-# Use this when you've changed infra canister code and want to deploy
-
 name: Deploy Infra
 
 on:
@@ -27,8 +13,8 @@ on:
           - demo
           - staging
 
-      install_mode:
-        description: "WASM install mode ('install' for empty canisters)"
+      deploy_mode:
+        description: "WASM deploy mode"
         required: true
         type: choice
         default: upgrade
@@ -44,9 +30,13 @@ on:
         default: all
         options:
           - all
+          - realm_registry_backend
+          - realm_registry_frontend
           - realm_installer
           - file_registry
           - file_registry_frontend
+          - marketplace_backend
+          - marketplace_frontend
           - platform_dashboard_frontend
 
       ref:
@@ -70,7 +60,7 @@ jobs:
       - name: Parameters
         run: |
           echo "Environment:  ${{ inputs.environment }}"
-          echo "Install mode: ${{ inputs.install_mode }}"
+          echo "Deploy mode:  ${{ inputs.deploy_mode }}"
           echo "Canisters:    ${{ inputs.canisters }}"
           echo "Ref:          ${{ inputs.ref || github.ref }}"
 
@@ -94,16 +84,11 @@ jobs:
           echo "$HOME/.local/share/dfx/bin" >> "$GITHUB_PATH"
 
       - name: Install npm workspace dependencies
-        if: >-
-          inputs.canisters == 'all' ||
-          inputs.canisters == 'file_registry_frontend' ||
-          inputs.canisters == 'platform_dashboard_frontend'
         run: npm ci --legacy-peer-deps
 
       - name: Install Python deps
         run: |
           pip install -r requirements.txt
-          pip install pyyaml
 
       - name: Configure dfx identity
         env:
@@ -120,118 +105,197 @@ jobs:
           rm -f /tmp/identity.pem
           echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
 
-      # ── Resolve canister IDs from descriptor ────────────────────────────
       - name: Resolve canister IDs
         id: ids
         run: |
           python3 - <<'PY'
-          import os, yaml
+          import json, os
           env = "${{ inputs.environment }}"
-          desc = yaml.safe_load(open(f"deployment-descriptors/{env}-mundus-layered.yml"))
-          infra = desc.get("infrastructure_overrides") or {}
-          mundus = desc.get("mundus") or []
-
-          def emit(key, val):
+          ids = json.load(open("canister_ids.json"))
+          def emit(key, canister):
+              cid = ids.get(canister, {}).get(env, "")
               with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-                  f.write(f"{key}={val}\n")
-
-          emit("file_registry", infra.get("file_registry", {}).get("canister_id", ""))
-          emit("file_registry_frontend", infra.get("file_registry_frontend", {}).get("canister_id", ""))
-          emit("realm_installer", infra.get("realm_installer", {}).get("canister_id", ""))
-          for m in mundus:
-              if m.get("type") == "dashboard":
-                  emit("platform_dashboard_frontend", m.get("frontend_canister_id", ""))
-                  break
+                  f.write(f"{key}={cid}\n")
+              if not cid:
+                  print(f"::warning::No canister ID for {canister} on {env}")
+          emit("realm_registry_backend", "realm_registry_backend")
+          emit("realm_registry_frontend", "realm_registry_frontend")
+          emit("realm_installer", "realm_installer")
+          emit("file_registry", "file_registry")
+          emit("file_registry_frontend", "file_registry_frontend")
+          emit("marketplace_backend", "marketplace_backend")
+          emit("marketplace_frontend", "marketplace_frontend")
+          emit("platform_dashboard_frontend", "platform_dashboard_frontend")
           PY
 
-      # ── file_registry ──────────────────────────────────────────────────
-      - name: Build & deploy file_registry
-        if: inputs.canisters == 'all' || inputs.canisters == 'file_registry'
+      # ── Backend canisters (basilisk WASM) ─────────────────────────────
+
+      - name: Build & deploy realm_registry_backend
+        if: inputs.canisters == 'all' || inputs.canisters == 'realm_registry_backend'
         run: |
           NETWORK="${{ inputs.environment }}"
-          CID="${{ steps.ids.outputs.file_registry }}"
-          MODE="${{ inputs.install_mode }}"
-          echo "Building file_registry WASM..."
-          CANISTER_CANDID_PATH=src/file_registry/file_registry.did \
-            python3 -m basilisk file_registry src/file_registry/main.py
-
-          echo "Installing file_registry ($CID) on $NETWORK (mode=$MODE)..."
+          CID="${{ steps.ids.outputs.realm_registry_backend }}"
+          MODE="${{ inputs.deploy_mode }}"
+          CANISTER_CANDID_PATH=src/realm_registry_backend/realm_registry_backend.did \
+            python3 -m basilisk realm_registry_backend src/realm_registry_backend/main.py
           dfx canister install "$CID" \
-              --wasm .basilisk/file_registry/file_registry.wasm \
-              --mode "$MODE" --yes \
-              --network "$NETWORK"
-          echo "✅ file_registry deployed on $NETWORK"
+              --wasm .basilisk/realm_registry_backend/realm_registry_backend.wasm \
+              --mode "$MODE" --yes --network "$NETWORK"
+          dfx canister call "$CID" status '()' --network "$NETWORK"
+          echo "✅ realm_registry_backend deployed"
 
-      # ── file_registry_frontend ─────────────────────────────────────────
-      - name: Build & deploy file_registry_frontend
-        if: inputs.canisters == 'all' || inputs.canisters == 'file_registry_frontend'
-        run: |
-          NETWORK="${{ inputs.environment }}"
-          CID="${{ steps.ids.outputs.file_registry_frontend }}"
-          MODE="${{ inputs.install_mode }}"
-
-          dfx generate file_registry 2>/dev/null || true
-          npm run build --workspace=file_registry_frontend
-
-          if [ "$MODE" = "reinstall" ]; then
-            echo "Uninstalling $CID before fresh install (asset canister)..."
-            dfx canister uninstall-code "$CID" --network "$NETWORK"
-            MODE="install"
-          fi
-          echo "Installing file_registry_frontend ($CID) on $NETWORK (mode=$MODE)..."
-          dfx deploy file_registry_frontend \
-              --mode "$MODE" --yes \
-              --network "$NETWORK"
-          echo "✅ file_registry_frontend deployed on $NETWORK"
-
-      # ── realm_installer ────────────────────────────────────────────────
       - name: Build & deploy realm_installer
         if: inputs.canisters == 'all' || inputs.canisters == 'realm_installer'
         run: |
           NETWORK="${{ inputs.environment }}"
           CID="${{ steps.ids.outputs.realm_installer }}"
-          MODE="${{ inputs.install_mode }}"
-          echo "Building realm_installer WASM..."
+          MODE="${{ inputs.deploy_mode }}"
           CANISTER_CANDID_PATH=src/realm_installer/realm_installer.did \
             python3 -m basilisk realm_installer src/realm_installer/main.py
-
-          echo "Installing realm_installer ($CID) on $NETWORK (mode=$MODE)..."
           dfx canister install "$CID" \
               --wasm .basilisk/realm_installer/realm_installer.wasm \
-              --mode "$MODE" --yes \
-              --network "$NETWORK"
-
-          echo "Verifying..."
+              --mode "$MODE" --yes --network "$NETWORK"
           dfx canister call "$CID" health '()' --network "$NETWORK"
-          echo "✅ realm_installer deployed on $NETWORK"
+          echo "✅ realm_installer deployed"
 
-      # ── platform_dashboard_frontend ────────────────────────────────────
+      - name: Build & deploy file_registry
+        if: inputs.canisters == 'all' || inputs.canisters == 'file_registry'
+        run: |
+          NETWORK="${{ inputs.environment }}"
+          CID="${{ steps.ids.outputs.file_registry }}"
+          MODE="${{ inputs.deploy_mode }}"
+          CANISTER_CANDID_PATH=src/file_registry/file_registry.did \
+            python3 -m basilisk file_registry src/file_registry/main.py
+          dfx canister install "$CID" \
+              --wasm .basilisk/file_registry/file_registry.wasm \
+              --mode "$MODE" --yes --network "$NETWORK"
+          echo "✅ file_registry deployed"
+
+      - name: Build & deploy marketplace_backend
+        if: inputs.canisters == 'all' || inputs.canisters == 'marketplace_backend'
+        run: |
+          NETWORK="${{ inputs.environment }}"
+          CID="${{ steps.ids.outputs.marketplace_backend }}"
+          MODE="${{ inputs.deploy_mode }}"
+          CANISTER_CANDID_PATH=src/marketplace_backend/marketplace_backend.did \
+            python3 -m basilisk marketplace_backend src/marketplace_backend/main.py
+          dfx canister install "$CID" \
+              --wasm .basilisk/marketplace_backend/marketplace_backend.wasm \
+              --mode "$MODE" --yes --network "$NETWORK"
+          echo "✅ marketplace_backend deployed"
+
+      # ── Frontend canisters (asset canisters) ──────────────────────────
+
+      - name: Generate Candid declarations for frontends
+        if: inputs.canisters == 'all' || contains(fromJSON('["realm_registry_frontend","file_registry_frontend","marketplace_frontend","platform_dashboard_frontend"]'), inputs.canisters)
+        run: |
+          for canister in realm_registry_backend realm_installer marketplace_backend file_registry realm_backend; do
+            dfx generate "$canister" 2>/dev/null || true
+          done
+
+      - name: Build & deploy realm_registry_frontend
+        if: inputs.canisters == 'all' || inputs.canisters == 'realm_registry_frontend'
+        run: |
+          NETWORK="${{ inputs.environment }}"
+          CID="${{ steps.ids.outputs.realm_registry_frontend }}"
+          MODE="${{ inputs.deploy_mode }}"
+          npm run build --workspace=realm_registry_frontend
+          if [ "$MODE" = "reinstall" ]; then
+            dfx canister uninstall-code "$CID" --network "$NETWORK"
+            MODE="install"
+          fi
+          dfx deploy realm_registry_frontend --mode "$MODE" --yes --network "$NETWORK"
+          echo "✅ realm_registry_frontend deployed"
+
+      - name: Build & deploy file_registry_frontend
+        if: inputs.canisters == 'all' || inputs.canisters == 'file_registry_frontend'
+        run: |
+          NETWORK="${{ inputs.environment }}"
+          CID="${{ steps.ids.outputs.file_registry_frontend }}"
+          MODE="${{ inputs.deploy_mode }}"
+          npm run build --workspace=file_registry_frontend
+          if [ "$MODE" = "reinstall" ]; then
+            dfx canister uninstall-code "$CID" --network "$NETWORK"
+            MODE="install"
+          fi
+          dfx deploy file_registry_frontend --mode "$MODE" --yes --network "$NETWORK"
+          echo "✅ file_registry_frontend deployed"
+
+      - name: Build & deploy marketplace_frontend
+        if: inputs.canisters == 'all' || inputs.canisters == 'marketplace_frontend'
+        run: |
+          NETWORK="${{ inputs.environment }}"
+          CID="${{ steps.ids.outputs.marketplace_frontend }}"
+          MODE="${{ inputs.deploy_mode }}"
+          npm run build --workspace=marketplace_frontend
+          if [ "$MODE" = "reinstall" ]; then
+            dfx canister uninstall-code "$CID" --network "$NETWORK"
+            MODE="install"
+          fi
+          dfx deploy marketplace_frontend --mode "$MODE" --yes --network "$NETWORK"
+          echo "✅ marketplace_frontend deployed"
+
       - name: Build & deploy platform_dashboard_frontend
         if: inputs.canisters == 'all' || inputs.canisters == 'platform_dashboard_frontend'
         run: |
           NETWORK="${{ inputs.environment }}"
           CID="${{ steps.ids.outputs.platform_dashboard_frontend }}"
-          MODE="${{ inputs.install_mode }}"
-
-          for canister in realm_registry_backend realm_installer marketplace_backend file_registry realm_backend; do
-            dfx generate "$canister" 2>/dev/null || true
-          done
-
-          echo "Building platform_dashboard_frontend..."
+          MODE="${{ inputs.deploy_mode }}"
           npm run build --workspace=platform_dashboard_frontend
-
           if [ "$MODE" = "reinstall" ]; then
-            echo "Uninstalling $CID before fresh install (asset canister)..."
             dfx canister uninstall-code "$CID" --network "$NETWORK"
             MODE="install"
           fi
-          echo "Installing platform_dashboard_frontend ($CID) on $NETWORK (mode=$MODE)..."
-          dfx deploy platform_dashboard_frontend \
-              --mode "$MODE" --yes \
-              --network "$NETWORK"
-          echo "✅ platform_dashboard_frontend deployed on $NETWORK"
+          dfx deploy platform_dashboard_frontend --mode "$MODE" --yes --network "$NETWORK"
+          echo "✅ platform_dashboard_frontend deployed"
 
-      # ── Summary ────────────────────────────────────────────────────────
+      # ── Smoke tests ───────────────────────────────────────────────────
+
+      - name: Smoke test backends
+        run: |
+          NETWORK="${{ inputs.environment }}"
+          CANISTERS="${{ inputs.canisters }}"
+          fail=0
+          for pair in \
+            "realm_registry_backend:${{ steps.ids.outputs.realm_registry_backend }}:status" \
+            "realm_installer:${{ steps.ids.outputs.realm_installer }}:health" \
+            "file_registry:${{ steps.ids.outputs.file_registry }}:status" \
+            "marketplace_backend:${{ steps.ids.outputs.marketplace_backend }}:status"; do
+            name="${pair%%:*}"; rest="${pair#*:}"; cid="${rest%%:*}"; method="${rest#*:}"
+            if [ "$CANISTERS" = "all" ] || [ "$CANISTERS" = "$name" ]; then
+              echo "Checking $name ($cid)..."
+              if dfx canister call "$cid" "$method" '()' --network "$NETWORK"; then
+                echo "  ✅ $name OK"
+              else
+                echo "  ❌ $name FAILED"
+                fail=1
+              fi
+            fi
+          done
+          [ $fail -eq 0 ] || exit 1
+
+      - name: Smoke test frontends
+        run: |
+          CANISTERS="${{ inputs.canisters }}"
+          fail=0
+          for pair in \
+            "realm_registry_frontend:${{ steps.ids.outputs.realm_registry_frontend }}" \
+            "file_registry_frontend:${{ steps.ids.outputs.file_registry_frontend }}" \
+            "marketplace_frontend:${{ steps.ids.outputs.marketplace_frontend }}" \
+            "platform_dashboard_frontend:${{ steps.ids.outputs.platform_dashboard_frontend }}"; do
+            name="${pair%%:*}"; cid="${pair#*:}"
+            if [ "$CANISTERS" = "all" ] || [ "$CANISTERS" = "$name" ]; then
+              echo "Checking $name ($cid)..."
+              if curl -sf "https://${cid}.icp0.io/" -o /dev/null; then
+                echo "  ✅ $name OK"
+              else
+                echo "  ❌ $name FAILED"
+                fail=1
+              fi
+            fi
+          done
+          [ $fail -eq 0 ] || exit 1
+
       - name: Summary
         run: |
           echo ""
@@ -239,5 +303,5 @@ jobs:
           echo " Infra deploy complete"
           echo " Environment: ${{ inputs.environment }}"
           echo " Canisters:   ${{ inputs.canisters }}"
-          echo " Mode:        ${{ inputs.install_mode }}"
+          echo " Mode:        ${{ inputs.deploy_mode }}"
           echo "═══════════════════════════════════════"
