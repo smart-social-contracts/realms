@@ -133,6 +133,12 @@ info "\n Phase 2: Submit deployment request"
 REALM_NAME="e2e-test-$(date +%s)"
 RELEASE_TAG="v0.3.2"
 RELEASE_BASE="https://github.com/smart-social-contracts/realms/releases/download"
+declare -A FILE_REGISTRY_IDS=(
+  [staging]="iebdk-kqaaa-aaaau-agoxq-cai"
+  [demo]="vi64l-3aaaa-aaaae-qj4va-cai"
+)
+FILE_REGISTRY_ID="${FILE_REGISTRY_IDS[$NETWORK]:-}"
+
 MANIFEST=$(cat <<EOF
 {
   "realm": {
@@ -148,6 +154,7 @@ MANIFEST=$(cat <<EOF
     "extensions": ["all"]
   },
   "network": "$NETWORK",
+  "file_registry_canister_id": "$FILE_REGISTRY_ID",
   "canister_artifacts": {
     "realm": {
       "backend": {

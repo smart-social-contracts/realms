@@ -1,0 +1,10 @@
+date_utc,team,type,canister_id,canister_name,cycles,icp,icp_e8s,locked_icp,notes,team_principal
+2026-04-25 16:54:09,realms-staging-deployments,topup,qjliw-6aaaa-aaaak-qyx6q-cai,e2e-test-1777136033-backend,2000000000000,1.17509730,117509730,,2.000 TC,aeexw-gtdpf-rwyzl-pobzx-izlbn-vieqt-db4nu-6mvgb-mjt6s-pljrx-ax6
+2026-04-25 16:54:15,realms-staging-deployments,topup,dh3zp-eqaaa-aaaap-qunqa-cai,e2e-test-1777136033-backend,2000000000000,1.17509730,117509730,,2.000 TC,aeexw-gtdpf-rwyzl-pobzx-izlbn-vieqt-db4nu-6mvgb-mjt6s-pljrx-ax6
+2026-04-25 17:00:15,realms-staging-deployments,topup,qjliw-6aaaa-aaaak-qyx6q-cai,e2e-test-1777136033-backend,1105960165531,0.64980540,64980540,,1.106 TC,aeexw-gtdpf-rwyzl-pobzx-izlbn-vieqt-db4nu-6mvgb-mjt6s-pljrx-ax6
+2026-04-25 17:22:46,my-team-1 (legacy),balance_snapshot,,,,0.00000000,0,0.00000000,available=0.00000000 ICP,xee7m-jddpf-rwyzl-pobzx-izlbn-vhsbt-ublzn-lf4vo-kbvz2-buwfk-xh6
+2026-04-25 17:22:53,realms-staging-core,balance_snapshot,,,,2.00000000,200000000,0.00000000,available=2.00000000 ICP,g7ypv-etdpf-rwyzl-pobzx-izlbn-vieqq-ykcip-stfra-f5y6w-n244p-fx6
+2026-04-25 17:22:58,realms-staging-deployments,balance_snapshot,,,,7.99990000,799990000,7.99990000,available=0.00000000 ICP,aeexw-gtdpf-rwyzl-pobzx-izlbn-vieqt-db4nu-6mvgb-mjt6s-pljrx-ax6
+2026-04-25 17:23:04,realms-demo-core,balance_snapshot,,,,0.00000000,0,0.00000000,available=0.00000000 ICP,p3ad5-2ddpf-rwyzl-pobzx-izlbn-vieu3-ez6xe-c5irq-x2lts-otiil-zx6
+2026-04-25 17:23:10,realms-demo-deployments,balance_snapshot,,,,0.00000000,0,0.00000000,available=0.00000000 ICP,4n2de-4ldpf-rwyzl-pobzx-izlbn-vieuz-4ya5j-z6crn-7etyk-rey4j-jh6
+2026-04-25 17:23:16,realms-test-deployments,balance_snapshot,,,,0.00000000,0,0.00000000,available=0.00000000 ICP,mh4xc-v3dpf-rwyzl-pobzx-izlbn-vieu2-cy37m-6py25-u2ahi-44mqf-5x6

@@ -245,6 +245,12 @@
       ],
       "type": "assets",
       "workspace": "platform_dashboard_frontend"
+    },
+    "mock_cycleops": {
+      "candid": "scripts/cycleops/mock_cycleops/mock_cycleops.did",
+      "type": "custom",
+      "wasm": "scripts/cycleops/mock_cycleops/mock_cycleops.wasm",
+      "build": ""
     }
   },
   "defaults": { 

@@ -275,9 +275,36 @@ After every principal exists:
 | `Created canisters must start with at least 100 billion spare cycles` | `withStartingCyclesBalance` below IC minimum | Use at least `100_000_000_000` (100B) cycles; the script default is 500B |
 | `variant field by_amount not found` | Wrong type for `topupAmount` | Use `variant { cycles = ... }` not `variant { by_amount = ... }` |
 
+## Cost Reference
+
+### Per-Canister Creation Cost (CycleOps `createCanister`)
+
+CycleOps converts team ICP to cycles at the current XDR rate. Costs measured
+on 2026-04-25:
+
+| Canister Role | Starting Cycles | Approx. ICP Cost |
+|---|---|---|
+| Realm backend | 1.5 TC | ~1.2 ICP |
+| Realm frontend | 800 B | ~0.74 ICP |
+| **Total per realm deployment** | **2.3 TC** | **~1.94 ICP** |
+
+> A single realm deployment (1 backend + 1 frontend) costs **~2 ICP** from the
+> CycleOps team balance. At $12/ICP this is ~$24 per deployment.
+>
+> The `realms-staging-deployments` team was funded with 5 ICP for the first
+> staging E2E test. After one deployment, ~3.06 ICP remained.
+
+### Ongoing Costs
+
+After creation, canisters consume cycles proportional to storage + compute:
+- A typical realm backend uses ~10–50 MB → ~0.01–0.05 TC/day idle
+- CycleOps auto-tops at the Standard tier (2 TC threshold → 4 TC)
+- Monthly cost per realm: ~0.5–2 ICP depending on usage
+
 ## Notes
 
-- **No local testing**: CycleOps has no local replica. All testing must be on IC mainnet.
 - **Not a public API**: Byron confirmed this is not officially supported yet. API may change.
 - **Cost**: Creating a canister with 0.5T cycles costs ~$0.65 in ICP at current rates ($1.57/TC).
+  For realm deployments (1.5T backend + 800B frontend) the total is ~1.94 ICP per realm.
 - **dfx version**: Must run from a directory without `dfx.json` version pinning, or use a compatible version. We ran from `/tmp` to avoid the realms repo's `dfx.json` pinning to 0.29.0.
+- **Local testing**: Use the mock CycleOps canister (`scripts/cycleops/mock_cycleops/`) on a local dfx replica. See `scripts/test_local_e2e.sh`.

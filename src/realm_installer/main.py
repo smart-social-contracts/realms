@@ -1,5 +1,5 @@
 """
-realm_installer — deployment orchestrator and on-chain verifier.
+realm_installer — realm deployment orchestrator and on-chain verifier.
 
 This canister manages the realm deployment lifecycle:
 

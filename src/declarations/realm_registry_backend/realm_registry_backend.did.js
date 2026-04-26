@@ -78,7 +78,12 @@ export const idlFactory = ({ IDL }) => {
         [DeductCreditsResult],
         [],
       ),
-    'deployment_failed' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
+    'deployment_failed' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text],
+        [IDL.Text],
+        [],
+      ),
+    'deployment_succeeded' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
     'get_credits' : IDL.Func([IDL.Text], [GetCreditsResult], ['query']),
     'get_realm' : IDL.Func([IDL.Text], [GetRealmResult], ['query']),
     'get_transactions' : IDL.Func(

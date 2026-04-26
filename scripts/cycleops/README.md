@@ -2,18 +2,44 @@
 
 Scripts and documentation for managing IC canister cycles via [CycleOps](https://cycleops.dev).
 
-Dashboard: https://cycleops.dev/app/team/my-team-1/canisters/
+## Teams
+
+| Team | Purpose | Dashboard |
+|---|---|---|
+| `realms-staging-core` | Infrastructure canisters (registry, installer, file_registry, marketplace, etc.) | [Dashboard](https://cycleops.dev/app/team/realms-staging-core/canisters/) |
+| `realms-staging-deployments` | Dynamically deployed realm canisters (created by the deploy worker) | [Dashboard](https://cycleops.dev/app/team/realms-staging-deployments/canisters/) |
+| `my-team-1` (legacy) | Original team — migrate canisters to the above teams | [Dashboard](https://cycleops.dev/app/team/my-team-1/canisters/) |
+
+| Team | Principal | ICP Deposit Address |
+|---|---|---|
+| `realms-staging-core` | `g7ypv-etdpf-rwyzl-pobzx-izlbn-vieqq-ykcip-stfra-f5y6w-n244p-fx6` | `1dea4104a85d1176d2e5e55132f8a75d32bb7d48b5e7a03385f86a26a01967d0` |
+| `realms-staging-deployments` | `aeexw-gtdpf-rwyzl-pobzx-izlbn-vieqt-db4nu-6mvgb-mjt6s-pljrx-ax6` | `616bfe71d2bf09c8301e1d168c4bff0ef1cada42f607d7a262d9ccd942efbc2f` |
+| `my-team-1` (legacy) | `xee7m-jddpf-rwyzl-pobzx-izlbn-vhsbt-ublzn-lf4vo-kbvz2-buwfk-xh6` | `d9813cedffb1e4ea6ab206d82a86fe8f5b675bc685ece951720260a828ff3def` |
+
+### Deployment Worker Integration
+
+The `realms-management-service` deploy worker creates realm canisters via the CycleOps
+`createCanister` API (team: `realms-staging-deployments`). Each canister is:
+- Created on IC mainnet with starting cycles
+- Auto-registered for CycleOps monitoring with a standard top-up rule
+- Named `{realm-slug}-backend` / `{realm-slug}-frontend`
+
+Config env vars for the deploy worker:
+- `CYCLEOPS_CANISTER_ID` — CycleOps canister (`qc4nb-ciaaa-aaaap-aawqa-cai`)
+- `CYCLEOPS_NETWORK` — network where CycleOps lives (`ic` for mainnet, `local` for testing)
+- `CYCLEOPS_TEAM_PRINCIPAL` — team that pays for canister creation
+- `CYCLEOPS_BLACKHOLE` — v3 blackhole for monitoring (`cpbhu-5iaaa-aaaad-aalta-cai`)
 
 ## Top-Up Rules
 
-### Current Configuration (as of 2026-04-21)
+### Current Configuration (as of 2026-04-25)
 
 Canisters are split into two tiers based on cycle burn rate:
 
 | Tier | Threshold | Top-Up To | Canisters |
 |------|-----------|-----------|-----------|
 | **HIGH_BURN** | 4 TC | 8 TC | `realm_installer` (staging + demo), `file_registry` (staging + demo) |
-| **Standard** | 2 TC | 4 TC | All other canisters (~30) |
+| **Standard** | 2 TC | 4 TC | All other canisters (~30), including dynamically deployed realms |
 
 ### Why Two Tiers?
 
@@ -77,12 +103,29 @@ EXECUTE=1 bash scripts/cycleops/provision_test_env_cycleops.sh
 
 Re-running with `EXECUTE=1` is safe: names already recorded in `scripts/cycleops/test_env_cycleops_ids.tsv` are skipped so you do not duplicate the fleet.
 
+## Mock CycleOps (Local Testing)
+
+`mock_cycleops/` contains a Motoko canister that implements the same Candid
+interface as the real CycleOps (`createCanister`, `manualTopup`).  It is
+deployed to the local dfx replica by `scripts/test_local_e2e.sh` so the
+deployment worker exercises the same code path regardless of network.
+
+The mock WASM is pre-compiled and committed. To recompile after editing:
+
+```bash
+MOC="$(dfx cache show)/moc"
+BASE="$(dfx cache show)/base"
+$MOC --package base "$BASE" scripts/cycleops/mock_cycleops/mock_cycleops.mo -o scripts/cycleops/mock_cycleops/mock_cycleops.wasm
+$MOC --package base "$BASE" --idl scripts/cycleops/mock_cycleops/mock_cycleops.mo -o scripts/cycleops/mock_cycleops/mock_cycleops.did
+```
+
 ## Reference Files
 
 | File | Description |
 |---|---|
 | `CANISTER_CREATION.md` | How to create canisters programmatically via CycleOps API; **test** fleet list and registration steps |
 | `provision_test_env_cycleops.sh` | Dry-run or execute `createCanister` for all **test** RealmGOS canisters |
+| `mock_cycleops/` | Motoko mock for local E2E testing (same Candid interface as real CycleOps) |
 | `canisters.csv` | Master list of all canister IDs, networks, and repo locations |
 | `expenses/` | Billing history and account exports from CycleOps |
 
@@ -96,8 +139,9 @@ Private email threads with Byron Becker (CycleOps) are in `realms-strategy/` (pr
 | V3 Blackhole | `cpbhu-5iaaa-aaaad-aalta-cai` |
 | dfx identity | `my_dev_identity_1` |
 | dfx principal | `ah6ac-cc73l-bb2zc-ni7bh-jov4q-roeyj-6k2ob-mkg5j-pequi-vuaa6-2ae` |
-| Team principal | `xee7m-jddpf-rwyzl-pobzx-izlbn-vhsbt-ublzn-lf4vo-kbvz2-buwfk-xh6` |
-| Team ICP deposit | `d9813cedffb1e4ea6ab206d82a86fe8f5b675bc685ece951720260a828ff3def` |
+| Team: `realms-staging-core` | `g7ypv-etdpf-rwyzl-pobzx-izlbn-vieqq-ykcip-stfra-f5y6w-n244p-fx6` |
+| Team: `realms-staging-deployments` | `aeexw-gtdpf-rwyzl-pobzx-izlbn-vieqt-db4nu-6mvgb-mjt6s-pljrx-ax6` |
+| Team: `my-team-1` (legacy) | `xee7m-jddpf-rwyzl-pobzx-izlbn-vhsbt-ublzn-lf4vo-kbvz2-buwfk-xh6` |
 
 ## Preventing Canister Freeze
 
