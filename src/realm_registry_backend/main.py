@@ -1,20 +1,15 @@
 # ============================================================================
-# WASI stdlib compatibility patches
-# Must run BEFORE any imports that trigger lazy module loads.
-# These fix stub modules created by basilisk's _wasi_safe_import hook.
-# TODO: move these into basilisk frozen_stdlib_preamble.py in a future release.
+# WASI stdlib compatibility patches — must run BEFORE any imports.
 # ============================================================================
 import sys as _wsys
 
-# -- 0a. builtins.open: not available in WASI (no filesystem) --
 import builtins as _bi
 if not hasattr(_bi, 'open'):
     def _stub_open(*a, **kw):
-        raise OSError("open() not available in WASI (no filesystem)")
+        raise OSError("open() not available in WASI")
     _bi.open = _stub_open
 del _bi
 
-# -- 0b. os / os.path: create stub BEFORE real os.py loads (it crashes in WASI) --
 _os = _wsys.modules.get('os')
 if _os is None or not hasattr(_os, 'path') or not hasattr(getattr(_os, 'path', None) or _os, 'exists'):
     if _os is None:
@@ -39,25 +34,18 @@ if _os is None or not hasattr(_os, 'path') or not hasattr(getattr(_os, 'path', N
             i = p.rfind('.')
             return (p[:i], p[i:]) if i > 0 else (p, '')
     _os.path = _FakePath()
-    if not hasattr(_os, 'sep'):
-        _os.sep = '/'
-    if not hasattr(_os, 'getcwd'):
-        _os.getcwd = lambda: '/'
-    if not hasattr(_os, 'environ'):
-        _os.environ = {}
-    if not hasattr(_os, 'listdir'):
-        _os.listdir = lambda p='/': []
-    if not hasattr(_os, 'makedirs'):
-        _os.makedirs = lambda p, exist_ok=False: None
-    if not hasattr(_os, 'remove'):
-        _os.remove = lambda p: None
+    if not hasattr(_os, 'sep'): _os.sep = '/'
+    if not hasattr(_os, 'getcwd'): _os.getcwd = lambda: '/'
+    if not hasattr(_os, 'environ'): _os.environ = {}
+    if not hasattr(_os, 'listdir'): _os.listdir = lambda p='/': []
+    if not hasattr(_os, 'makedirs'): _os.makedirs = lambda p, exist_ok=False: None
+    if not hasattr(_os, 'remove'): _os.remove = lambda p: None
     if not hasattr(_os, 'urandom'):
         import random as _osrnd
         _os.urandom = lambda n: bytes(_osrnd.getrandbits(8) for _ in range(n))
         del _osrnd
 del _os
 
-# -- 1. dataclasses: stub is a no-op, must generate __init__/__repr__ --
 _dc = _wsys.modules.get('dataclasses')
 if _dc and getattr(_dc, '__file__', '') == '<frozen dataclasses>':
     def _real_dataclass(cls=None, **kw):
@@ -71,15 +59,12 @@ if _dc and getattr(_dc, '__file__', '') == '<frozen dataclasses>':
                 def _mkinit(fs, ds):
                     def __init__(self, *args, **kwargs):
                         for i, f in enumerate(fs):
-                            if i < len(args):
-                                object.__setattr__(self, f, args[i])
-                            elif f in kwargs:
-                                object.__setattr__(self, f, kwargs[f])
+                            if i < len(args): object.__setattr__(self, f, args[i])
+                            elif f in kwargs: object.__setattr__(self, f, kwargs[f])
                             elif f in ds:
                                 v = ds[f]
                                 object.__setattr__(self, f, v() if callable(v) else v)
-                            else:
-                                raise TypeError(f"{c.__name__}() missing required argument: '{f}'")
+                            else: raise TypeError(f"{c.__name__}() missing: '{f}'")
                     return __init__
                 c.__init__ = _mkinit(_fs, _ds)
             if '__repr__' not in c.__dict__ and ann:
@@ -94,13 +79,11 @@ if _dc and getattr(_dc, '__file__', '') == '<frozen dataclasses>':
     _dc.dataclass = _real_dataclass
 del _dc
 
-# -- 2. traceback: stub has no format_exc/format_exception/print_exc --
 import traceback as _tb
 if not hasattr(_tb, 'format_exc'):
     def _format_exc(limit=None, chain=True, _s=_wsys):
         ei = _s.exc_info()
-        if ei[1] is None:
-            return ''
+        if ei[1] is None: return ''
         parts = [f'{type(ei[1]).__name__}: {ei[1]}']
         tb = ei[2]
         frames = []
@@ -110,110 +93,86 @@ if not hasattr(_tb, 'format_exc'):
             tb = tb.tb_next
         if frames:
             parts.insert(0, 'Traceback (most recent call last):')
-            for fr in frames:
-                parts.insert(-1, fr)
+            for fr in frames: parts.insert(-1, fr)
         return '\n'.join(parts)
     _tb.format_exc = _format_exc
     _tb.format_exception = lambda tp, val, tb, **kw: [_format_exc()]
     _tb.print_exc = lambda **kw: print(_format_exc())
 del _tb
 
-# -- 3. random: frozen module may lack getrandbits (C ext _random missing) --
 import random as _rnd
 if not hasattr(_rnd, 'getrandbits'):
-    _rnd_counter = [0]
-    def _getrandbits(k, _c=_rnd_counter):
+    _c = [0]
+    def _getrandbits(k, _c=_c):
         _c[0] += 1
-        v = hash((_c[0], id(_c))) & ((1 << k) - 1)
-        return v
+        return hash((_c[0], id(_c))) & ((1 << k) - 1)
     _rnd.getrandbits = _getrandbits
     if not hasattr(_rnd, 'randint'):
         _rnd.randint = lambda a, b: a + (_getrandbits(32) % (b - a + 1))
 del _rnd
 
-# -- 4. hashlib: stub has no sha256 -- pure Python SHA-256 --
 import hashlib as _hl
 if not hasattr(_hl, 'sha256'):
-    _K256 = [
-        0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
-        0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
-        0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
-        0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
-        0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
-        0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
-        0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
-        0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2,
-    ]
+    _K = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+          0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+          0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+          0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+          0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+          0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+          0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+          0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]
     class _Sha256:
         def __init__(self, data=b''):
             self._h = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]
-            self._buf = b''
-            self._count = 0
-            if data:
-                self.update(data)
-        def _rr(self, x, n):
-            return ((x >> n) | (x << (32 - n))) & 0xffffffff
+            self._buf, self._count = b'', 0
+            if data: self.update(data)
+        def _rr(self, x, n): return ((x >> n) | (x << (32 - n))) & 0xffffffff
         def _compress(self, block):
             w = [int.from_bytes(block[i:i+4], 'big') for i in range(0, 64, 4)]
             for i in range(16, 64):
-                s0 = self._rr(w[i-15], 7) ^ self._rr(w[i-15], 18) ^ (w[i-15] >> 3)
-                s1 = self._rr(w[i-2], 17) ^ self._rr(w[i-2], 19) ^ (w[i-2] >> 10)
-                w.append((w[i-16] + s0 + w[i-7] + s1) & 0xffffffff)
+                s0 = self._rr(w[i-15],7) ^ self._rr(w[i-15],18) ^ (w[i-15]>>3)
+                s1 = self._rr(w[i-2],17) ^ self._rr(w[i-2],19) ^ (w[i-2]>>10)
+                w.append((w[i-16]+s0+w[i-7]+s1) & 0xffffffff)
             a,b,c,d,e,f,g,h = self._h
             for i in range(64):
-                S1 = self._rr(e,6) ^ self._rr(e,11) ^ self._rr(e,25)
-                ch = (e & f) ^ ((~e) & g)
-                t1 = (h + S1 + ch + _K256[i] + w[i]) & 0xffffffff
-                S0 = self._rr(a,2) ^ self._rr(a,13) ^ self._rr(a,22)
-                mj = (a & b) ^ (a & c) ^ (b & c)
-                t2 = (S0 + mj) & 0xffffffff
+                S1 = self._rr(e,6)^self._rr(e,11)^self._rr(e,25)
+                t1 = (h+S1+(e&f^(~e)&g)+_K[i]+w[i]) & 0xffffffff
+                S0 = self._rr(a,2)^self._rr(a,13)^self._rr(a,22)
+                t2 = (S0+(a&b^a&c^b&c)) & 0xffffffff
                 h,g,f,e,d,c,b,a = g,f,e,(d+t1)&0xffffffff,c,b,a,(t1+t2)&0xffffffff
             for i,v in enumerate([a,b,c,d,e,f,g,h]):
-                self._h[i] = (self._h[i] + v) & 0xffffffff
+                self._h[i] = (self._h[i]+v) & 0xffffffff
         def update(self, data):
-            if isinstance(data, str):
-                data = data.encode('utf-8')
-            self._buf += data
-            self._count += len(data)
+            if isinstance(data, str): data = data.encode('utf-8')
+            self._buf += data; self._count += len(data)
             while len(self._buf) >= 64:
-                self._compress(self._buf[:64])
-                self._buf = self._buf[64:]
+                self._compress(self._buf[:64]); self._buf = self._buf[64:]
         def digest(self):
             buf = self._buf + b'\x80'
             buf += b'\x00' * ((55 - len(self._buf)) % 64)
             buf += (self._count * 8).to_bytes(8, 'big')
-            h = list(self._h)
-            _tmp = _Sha256.__new__(_Sha256)
-            _tmp._h = h; _tmp._buf = b''; _tmp._count = 0
-            for i in range(0, len(buf), 64):
-                _tmp._compress(buf[i:i+64])
-            return b''.join(v.to_bytes(4, 'big') for v in _tmp._h)
-        def hexdigest(self):
-            return self.digest().hex()
+            h = list(self._h); tmp = _Sha256.__new__(_Sha256)
+            tmp._h, tmp._buf, tmp._count = h, b'', 0
+            for i in range(0, len(buf), 64): tmp._compress(buf[i:i+64])
+            return b''.join(v.to_bytes(4, 'big') for v in tmp._h)
+        def hexdigest(self): return self.digest().hex()
         def copy(self):
             c = _Sha256.__new__(_Sha256)
-            c._h = list(self._h); c._buf = self._buf; c._count = self._count
+            c._h, c._buf, c._count = list(self._h), self._buf, self._count
             return c
-    def _sha256(data=b''):
-        return _Sha256(data)
-    _hl.sha256 = _sha256
-    _hl.new = lambda name, data=b'': _sha256(data) if name == 'sha256' else None
+    _hl.sha256 = lambda data=b'': _Sha256(data)
+    _hl.new = lambda name, data=b'': _Sha256(data) if name == 'sha256' else None
 del _hl
 
-# -- 4. math: stub has no ceil/floor/log/sqrt --
 import math as _ma
 if not hasattr(_ma, 'ceil'):
     _ma.ceil = lambda x: int(x) if x == int(x) else int(x) + (1 if x > 0 else 0)
     _ma.floor = lambda x: int(x) if x >= 0 or x == int(x) else int(x) - 1
     _ma.fabs = lambda x: x if x >= 0 else -x
     _ma.sqrt = lambda x: x ** 0.5
-    _ma.pow = lambda x, y: x ** y
-    _ma.pi = 3.141592653589793
-    _ma.e = 2.718281828459045
-    _ma.inf = float('inf')
-    _ma.nan = float('nan')
+    _ma.pi, _ma.e = 3.141592653589793, 2.718281828459045
+    _ma.inf, _ma.nan = float('inf'), float('nan')
 del _ma
-
 del _wsys
 # ============================================================================
 # End WASI stdlib compatibility patches
@@ -221,67 +180,30 @@ del _wsys
 
 import json
 import traceback
-from typing import Optional
 
 from api.credits import (
-    add_user_credits,
-    capture_deployment_hold,
-    create_deployment_hold,
-    deduct_user_credits,
-    get_billing_status,
-    get_user_credits,
-    get_user_transactions,
-    release_deployment_hold,
+    add_user_credits, capture_deployment_hold, create_deployment_hold,
+    deduct_user_credits, get_billing_status, get_user_credits,
+    get_user_transactions, release_deployment_hold,
 )
 from api.registry import (
-    count_registered_realms,
-    get_registered_realm,
-    list_registered_realms,
-    register_realm_by_caller,
-    remove_registered_realm,
-    search_registered_realms,
+    count_registered_realms, get_registered_realm,
+    list_registered_realms, register_realm_by_caller, remove_registered_realm,
 )
 from api.status import get_status
 from _cdk import (
-    Async,
-    CallResult,
-    Func,
-    Opt,
-    Principal,
-    Query,
-    Record,
-    Service,
-    StableBTreeMap,
-    Variant,
-    Vec,
-    blob,
-    float64,
-    ic,
-    init,
-    match,
-    nat,
-    nat64,
-    post_upgrade,
-    query,
-    service_update,
-    text,
-    update,
-    void,
+    Async, CallResult, Func, Opt, Principal, Query, Record, Service,
+    StableBTreeMap, Variant, Vec, blob, float64, ic, init, match, nat,
+    nat64, post_upgrade, query, service_update, text, update, void,
 )
 from ic_python_db import Database
 from ic_python_logging import get_logger
 
-
-# ---------------------------------------------------------------------------
-# Inter-canister client: realm_installer
-# (Types mirror src/realm_installer/main.py for typed inter-canister calls.)
-# ---------------------------------------------------------------------------
-
+# ── Inter-canister: realm_installer ────────────────────────────────────
 
 class RInstallerError(Record):
     message: text
     traceback: text
-
 
 class REnqueueOk(Record):
     job_id: text
@@ -289,29 +211,23 @@ class REnqueueOk(Record):
     realm_name: text
     network: text
 
-
 class RResultEnqueue(Variant, total=False):
     Ok: REnqueueOk
     Err: RInstallerError
 
-
 class RealmInstallerService(Service):
     @service_update
     def enqueue_deployment(self, manifest_json: text) -> RResultEnqueue: ...
-
     @service_update
     def cancel_deployment(self, job_id: text) -> text: ...
 
-# NOTE: Record/Variant types MUST be defined in this file (not imported from
-# another module) because basilisk's Candid .did generator only parses main.py's
-# AST for type definitions.  Duplicated from core/candid_types_registry.py.
+# ── Candid types (must be in main.py for basilisk .did generator) ──────
 
 class UserCreditsRecord(Record):
     principal_id: text
     balance: nat64
     total_purchased: nat64
     total_spent: nat64
-
 
 class CreditTransactionRecord(Record):
     id: text
@@ -322,26 +238,21 @@ class CreditTransactionRecord(Record):
     stripe_session_id: text
     timestamp: float64
 
-
 class GetCreditsResult(Variant, total=False):
     Ok: UserCreditsRecord
     Err: text
-
 
 class AddCreditsResult(Variant, total=False):
     Ok: UserCreditsRecord
     Err: text
 
-
 class DeductCreditsResult(Variant, total=False):
     Ok: UserCreditsRecord
     Err: text
 
-
 class TransactionHistoryResult(Variant, total=False):
     Ok: Vec[CreditTransactionRecord]
     Err: text
-
 
 class RealmRecord(Record):
     id: text
@@ -353,41 +264,13 @@ class RealmRecord(Record):
     created_at: float64
     frontend_canister_id: text
 
-
-def _realm_record_from_dict(r: dict) -> RealmRecord:
-    """Map ORM to_candid record; includes frontend id for asset URL resolution."""
-    return RealmRecord(
-        id=r.get("id") or "",
-        name=r.get("name") or "",
-        url=r.get("url") or "",
-        backend_url=r.get("backend_url") or "",
-        logo=r.get("logo") or "",
-        users_count=int(r.get("users_count") or 0),
-        created_at=float(r.get("created_at") or 0.0),
-        frontend_canister_id=r.get("frontend_canister_id") or "",
-    )
-
-
 class AddRealmResult(Variant, total=False):
     Ok: text
     Err: text
 
-
 class GetRealmResult(Variant, total=False):
     Ok: RealmRecord
     Err: text
-
-
-class RealmsListRecord(Record):
-    realms: Vec[RealmRecord]
-    total_count: nat64
-
-
-class SearchRealmsResult(Record):
-    realms: Vec[RealmRecord]
-    query: text
-    count: nat64
-
 
 class StatusRecord(Record):
     version: text
@@ -398,11 +281,9 @@ class StatusRecord(Record):
     dependencies: Vec[text]
     python_version: text
 
-
 class GetStatusResult(Variant, total=False):
     Ok: StatusRecord
     Err: text
-
 
 class BillingStatusRecord(Record):
     users_count: nat64
@@ -410,554 +291,260 @@ class BillingStatusRecord(Record):
     total_purchased: nat64
     total_spent: nat64
 
-
 class GetBillingStatusResult(Variant, total=False):
     Ok: BillingStatusRecord
     Err: text
 
-# Storage for the ORM (used internally by Database class)
-# Direct storage access is not needed - use Entity classes instead
+# ── Storage ────────────────────────────────────────────────────────────
+
 storage = StableBTreeMap[str, str](memory_id=1, max_key_size=200, max_value_size=2000)
 Database.init(db_storage=storage, audit_enabled=True)
-
 logger = get_logger("main")
 
-
-@init
-def init_canister() -> void:
-    """Initialize the realm registry canister"""
-    logger.info("Realm Registry canister initialized")
-
-
-@query
-def status() -> GetStatusResult:
-    """Get the status of the registry backend canister"""
-    try:
-        status_data = get_status()
-        return {
-            "Ok": StatusRecord(
-                version=status_data["version"],
-                commit=status_data["commit"],
-                commit_datetime=status_data["commit_datetime"],
-                status=status_data["status"],
-                realms_count=status_data["realms_count"],
-                dependencies=status_data["dependencies"],
-                python_version=status_data["python_version"],
-            )
-        }
-    except Exception as e:
-        logger.error(f"Error getting status: {str(e)}")
-        return {"Err": f"Internal error: {str(e)}"}
-
-
-@query
-def list_realms() -> Vec[RealmRecord]:
-    """List all registered realms"""
-    try:
-        realms_data = list_registered_realms()
-        return [_realm_record_from_dict(r) for r in realms_data]
-    except Exception as e:
-        logger.error(f"Error in list_realms: {str(e)}")
-        return []
-
-
-@update
-def register_realm(
-    name: text,
-    url: text,
-    logo: text,
-    backend_url: text = "",
-    canister_ids_json: text = "{}",
-) -> AddRealmResult:
-    """Register calling realm (uses caller principal as ID, upsert logic)
-    
-    Note: Basilisk limits canister methods to 5 params, so canister IDs are passed as JSON.
-    """
-    try:
-        # Parse canister IDs — pipe-delimited: frontend_id|token_id|nft_id[|backend_id]
-        # When backend_id (4th element) is present, use it as realm ID instead of
-        # ic.caller(). This allows the installer to register on behalf of realms.
-        frontend_canister_id = ""
-        token_canister_id = ""
-        nft_canister_id = ""
-        realm_id_override = ""
-        if canister_ids_json and "|" in canister_ids_json:
-            parts = canister_ids_json.split("|")
-            frontend_canister_id = parts[0] if len(parts) > 0 else ""
-            token_canister_id = parts[1] if len(parts) > 1 else ""
-            nft_canister_id = parts[2] if len(parts) > 2 else ""
-            realm_id_override = parts[3].strip() if len(parts) > 3 else ""
-        elif canister_ids_json and canister_ids_json.startswith("{"):
-            canister_ids = json.loads(canister_ids_json)
-            frontend_canister_id = canister_ids.get("frontend_canister_id", "")
-            token_canister_id = canister_ids.get("token_canister_id", "")
-            nft_canister_id = canister_ids.get("nft_canister_id", "")
-            realm_id_override = canister_ids.get("backend_canister_id", "")
-        
-        result = register_realm_by_caller(
-            name, url, logo, backend_url,
-            frontend_canister_id=frontend_canister_id,
-            token_canister_id=token_canister_id,
-            nft_canister_id=nft_canister_id,
-            realm_id_override=realm_id_override,
-        )
-        if result["success"]:
-            return {"Ok": result["message"]}
-        else:
-            return {"Err": result["error"]}
-    except Exception as e:
-        logger.error(f"Error in register_realm: {str(e)}")
-        return {"Err": f"Internal error: {str(e)}"}
-
-
-@query
-def get_realm(realm_id: text) -> GetRealmResult:
-    """Get a specific realm by ID"""
-    try:
-        result = get_registered_realm(realm_id)
-        if result["success"]:
-            return {"Ok": _realm_record_from_dict(result["realm"])}
-        else:
-            return {"Err": result["error"]}
-    except Exception as e:
-        logger.error(f"Error in get_realm: {str(e)}")
-        return {"Err": f"Internal error: {str(e)}"}
-
-
-@update
-def remove_realm(realm_id: text) -> AddRealmResult:
-    """Remove a realm from the registry"""
-    try:
-        result = remove_registered_realm(realm_id)
-        if result["success"]:
-            return {"Ok": result["message"]}
-        else:
-            return {"Err": result["error"]}
-    except Exception as e:
-        logger.error(f"Error in remove_realm: {str(e)}")
-        return {"Err": f"Internal error: {str(e)}"}
-
-
-@query
-def search_realms(query: text) -> Vec[RealmRecord]:
-    """Search realms by name or ID"""
-    try:
-        results = search_registered_realms(query)
-        return [_realm_record_from_dict(r) for r in results]
-    except Exception as e:
-        logger.error(f"Error in search_realms: {str(e)}")
-        return []
-
-
-@query
-def realm_count() -> nat64:
-    """Get the total number of registered realms"""
-    try:
-        count = count_registered_realms()
-        return count
-    except Exception as e:
-        logger.error(f"Error in realm_count: {str(e)}")
-        return 0
-
-
-@query
-def greet(name: str) -> str:
-    """Simple greeting function for testing"""
-    return f"Hello, {name}!"
-
-
-# ============== Credits Endpoints ==============
-
-@query
-def get_credits(principal_id: text) -> GetCreditsResult:
-    """Get a user's credit balance"""
-    try:
-        result = get_user_credits(principal_id)
-        if result["success"]:
-            credits = result["credits"]
-            return {
-                "Ok": {
-                    "principal_id": credits["principal_id"],
-                    "balance": credits["balance"],
-                    "total_purchased": credits["total_purchased"],
-                    "total_spent": credits["total_spent"],
-                }
-            }
-        else:
-            return {"Err": result["error"]}
-    except Exception as e:
-        logger.error(f"Error in get_credits: {str(e)}")
-        return {"Err": f"Internal error: {str(e)}"}
-
-
-@update
-def add_credits(principal_id: text, amount: nat64, stripe_session_id: text = "", description: text = "Credit top-up") -> AddCreditsResult:
-    """
-    Add credits to a user's balance.
-    Called by the billing service after successful payment.
-    
-    - **principal_id**: User's Internet Identity principal
-    - **amount**: Number of credits to add (1 credit = $1)
-    - **stripe_session_id**: Stripe checkout session ID (for tracking)
-    - **description**: Transaction description
-    """
-    try:
-        result = add_user_credits(
-            principal_id=principal_id,
-            amount=int(amount),
-            stripe_session_id=stripe_session_id,
-            description=description,
-        )
-        if result["success"]:
-            credits = result["credits"]
-            return {
-                "Ok": {
-                    "principal_id": credits["principal_id"],
-                    "balance": credits["balance"],
-                    "total_purchased": credits["total_purchased"],
-                    "total_spent": credits["total_spent"],
-                }
-            }
-        else:
-            return {"Err": result["error"]}
-    except Exception as e:
-        logger.error(f"Error in add_credits: {str(e)}")
-        return {"Err": f"Internal error: {str(e)}"}
-
-
-@update
-def deduct_credits(principal_id: text, amount: nat64, description: text = "Credit spend") -> DeductCreditsResult:
-    """
-    Deduct credits from a user's balance.
-    Used when user deploys a realm or uses credits for other services.
-    
-    - **principal_id**: User's Internet Identity principal
-    - **amount**: Number of credits to deduct
-    - **description**: Transaction description
-    """
-    try:
-        result = deduct_user_credits(
-            principal_id=principal_id,
-            amount=int(amount),
-            description=description,
-        )
-        if result["success"]:
-            credits = result["credits"]
-            return {
-                "Ok": {
-                    "principal_id": credits["principal_id"],
-                    "balance": credits["balance"],
-                    "total_purchased": credits["total_purchased"],
-                    "total_spent": credits["total_spent"],
-                }
-            }
-        else:
-            return {"Err": result["error"]}
-    except Exception as e:
-        logger.error(f"Error in deduct_credits: {str(e)}")
-        return {"Err": f"Internal error: {str(e)}"}
-
-
-@query
-def get_transactions(principal_id: text, limit: nat64 = 50) -> TransactionHistoryResult:
-    """Get a user's transaction history"""
-    try:
-        result = get_user_transactions(principal_id, int(limit))
-        if result["success"]:
-            transactions = [
-                {
-                    "id": tx["id"],
-                    "principal_id": tx["principal_id"],
-                    "amount": abs(tx["amount"]),
-                    "transaction_type": tx["transaction_type"],
-                    "description": tx["description"],
-                    "stripe_session_id": tx["stripe_session_id"],
-                    "timestamp": float(tx["timestamp"]),
-                }
-                for tx in result["transactions"]
-            ]
-            return {"Ok": transactions}
-        else:
-            return {"Err": result["error"]}
-    except Exception as e:
-        logger.error(f"Error in get_transactions: {str(e)}")
-        return {"Err": f"Internal error: {str(e)}"}
-
-
-@query
-def billing_status() -> GetBillingStatusResult:
-    """Get overall billing status across all users"""
-    try:
-        result = get_billing_status()
-        if result["success"]:
-            billing = result["billing"]
-            return {
-                "Ok": BillingStatusRecord(
-                    users_count=billing["users_count"],
-                    total_balance=billing["total_balance"],
-                    total_purchased=billing["total_purchased"],
-                    total_spent=billing["total_spent"],
-                )
-            }
-        else:
-            return {"Err": result["error"]}
-    except Exception as e:
-        logger.error(f"Error in billing_status: {str(e)}")
-        return {"Err": f"Internal error: {str(e)}"}
-
-
-# ============== Deployment Queue Endpoints ==============
-
-# Deployment cost in credits (1 credit = $1).
 DEPLOYMENT_COST_CREDITS = 5
-
-# Known realm_installer canister IDs per network.
-_INSTALLER_CANISTER_IDS = {
+_INSTALLER_IDS = {
     "staging": "lusjm-wqaaa-aaaau-ago7q-cai",
     "demo": "2s4td-daaaa-aaaao-bazmq-cai",
     "test": "fltjm-tyaaa-aaaap-qunhq-cai",
 }
 
 
+def _realm_record(r: dict) -> RealmRecord:
+    return RealmRecord(
+        id=r.get("id", ""), name=r.get("name", ""),
+        url=r.get("url", ""), backend_url=r.get("backend_url", ""),
+        logo=r.get("logo", ""), users_count=int(r.get("users_count", 0)),
+        created_at=float(r.get("created_at", 0.0)),
+        frontend_canister_id=r.get("frontend_canister_id", ""),
+    )
+
+
+def _credits_record(c: dict) -> UserCreditsRecord:
+    return UserCreditsRecord(
+        principal_id=c["principal_id"], balance=c["balance"],
+        total_purchased=c["total_purchased"], total_spent=c["total_spent"],
+    )
+
+
+@init
+def init_canister() -> void:
+    logger.info("Realm Registry canister initialized")
+
+# ── Registry endpoints ─────────────────────────────────────────────────
+
+@query
+def status() -> GetStatusResult:
+    try:
+        s = get_status()
+        return {"Ok": StatusRecord(
+            version=s["version"], commit=s["commit"],
+            commit_datetime=s["commit_datetime"], status=s["status"],
+            realms_count=s["realms_count"], dependencies=s["dependencies"],
+            python_version=s["python_version"],
+        )}
+    except Exception as e:
+        return {"Err": str(e)}
+
+@query
+def list_realms() -> Vec[RealmRecord]:
+    try:
+        return [_realm_record(r) for r in list_registered_realms()]
+    except Exception:
+        return []
+
+@update
+def register_realm(name: text, url: text, logo: text,
+                   backend_url: text = "", canister_ids_json: text = "{}") -> AddRealmResult:
+    try:
+        frontend_id = ""
+        realm_id_override = ""
+        if canister_ids_json and "|" in canister_ids_json:
+            parts = canister_ids_json.split("|")
+            frontend_id = parts[0] if len(parts) > 0 else ""
+            realm_id_override = parts[3].strip() if len(parts) > 3 else ""
+        elif canister_ids_json and canister_ids_json.startswith("{"):
+            ids = json.loads(canister_ids_json)
+            frontend_id = ids.get("frontend_canister_id", "")
+            realm_id_override = ids.get("backend_canister_id", "")
+        result = register_realm_by_caller(
+            name, url, logo, backend_url,
+            frontend_canister_id=frontend_id, realm_id_override=realm_id_override,
+        )
+        return {"Ok": result["message"]} if result["success"] else {"Err": result["error"]}
+    except Exception as e:
+        return {"Err": str(e)}
+
+@query
+def get_realm(realm_id: text) -> GetRealmResult:
+    try:
+        result = get_registered_realm(realm_id)
+        if result["success"]:
+            return {"Ok": _realm_record(result["realm"])}
+        return {"Err": result["error"]}
+    except Exception as e:
+        return {"Err": str(e)}
+
+@update
+def remove_realm(realm_id: text) -> AddRealmResult:
+    try:
+        result = remove_registered_realm(realm_id)
+        return {"Ok": result["message"]} if result["success"] else {"Err": result["error"]}
+    except Exception as e:
+        return {"Err": str(e)}
+
+@query
+def realm_count() -> nat64:
+    return count_registered_realms()
+
+# ── Credits endpoints ──────────────────────────────────────────────────
+
+@query
+def get_credits(principal_id: text) -> GetCreditsResult:
+    try:
+        r = get_user_credits(principal_id)
+        return {"Ok": _credits_record(r["credits"])} if r["success"] else {"Err": r["error"]}
+    except Exception as e:
+        return {"Err": str(e)}
+
+@update
+def add_credits(principal_id: text, amount: nat64,
+                stripe_session_id: text = "", description: text = "Credit top-up") -> AddCreditsResult:
+    try:
+        r = add_user_credits(principal_id, int(amount), stripe_session_id, description)
+        return {"Ok": _credits_record(r["credits"])} if r["success"] else {"Err": r["error"]}
+    except Exception as e:
+        return {"Err": str(e)}
+
+@update
+def deduct_credits(principal_id: text, amount: nat64,
+                   description: text = "Credit spend") -> DeductCreditsResult:
+    try:
+        r = deduct_user_credits(principal_id, int(amount), description)
+        return {"Ok": _credits_record(r["credits"])} if r["success"] else {"Err": r["error"]}
+    except Exception as e:
+        return {"Err": str(e)}
+
+@query
+def get_transactions(principal_id: text, limit: nat64 = 50) -> TransactionHistoryResult:
+    try:
+        r = get_user_transactions(principal_id, int(limit))
+        if not r["success"]:
+            return {"Err": r["error"]}
+        return {"Ok": [{
+            "id": t["id"], "principal_id": t["principal_id"],
+            "amount": abs(t["amount"]), "transaction_type": t["transaction_type"],
+            "description": t["description"], "stripe_session_id": t["stripe_session_id"],
+            "timestamp": float(t["timestamp"]),
+        } for t in r["transactions"]]}
+    except Exception as e:
+        return {"Err": str(e)}
+
+@query
+def billing_status() -> GetBillingStatusResult:
+    try:
+        r = get_billing_status()
+        if not r["success"]:
+            return {"Err": r["error"]}
+        b = r["billing"]
+        return {"Ok": BillingStatusRecord(
+            users_count=b["users_count"], total_balance=b["total_balance"],
+            total_purchased=b["total_purchased"], total_spent=b["total_spent"],
+        )}
+    except Exception as e:
+        return {"Err": str(e)}
+
+# ── Deployment queue endpoints ─────────────────────────────────────────
+
 @update
 def request_deployment(manifest_json: text) -> Async[text]:
-    """Submit a realm deployment request.
-
-    This is the single entry point for all deployments — both CI and
-    user-triggered (via the platform dashboard).
-
-    Flow:
-      1. Validate caller and verify balance
-      2. Forward manifest to ``realm_installer.enqueue_deployment()``
-      3. Create credit hold (5 credits) keyed by job_id
-      4. Return job_id
-
-    The caller's principal (from Internet Identity for users, or the
-    deployer identity for CI) is used for authentication.
-    """
     try:
         caller = str(ic.caller())
         manifest = json.loads(manifest_json)
         network = manifest.get("network", "")
-        realm_info = manifest.get("realm", {})
-        realm_name = realm_info.get("name", "unknown")
+        realm_name = manifest.get("name", "unknown")
 
-        logger.info(
-            f"request_deployment: caller={caller}, realm={realm_name}, "
-            f"network={network}"
-        )
-
-        # ── Check available balance before enqueue ────────────────────
-        credits_result = get_user_credits(caller)
-        if not credits_result.get("success"):
-            error_msg = credits_result.get("error", "could not load balance")
-            logger.warning(
-                f"request_deployment: credit check failed for "
-                f"{caller}: {error_msg}"
-            )
-            return json.dumps({
-                "success": False,
-                "error": f"Credit check failed: {error_msg}",
-            })
-        balance = int((credits_result.get("credits") or {}).get("balance") or 0)
+        cr = get_user_credits(caller)
+        if not cr.get("success"):
+            return json.dumps({"success": False, "error": cr.get("error", "credit check failed")})
+        balance = int((cr.get("credits") or {}).get("balance", 0))
         if balance < DEPLOYMENT_COST_CREDITS:
-            return json.dumps({
-                "success": False,
-                "error": (
-                    f"Insufficient credits. Balance: {balance}, "
-                    f"Required: {DEPLOYMENT_COST_CREDITS}"
-                ),
-            })
+            return json.dumps({"success": False,
+                "error": f"Insufficient credits: {balance} < {DEPLOYMENT_COST_CREDITS}"})
 
-        # ── Resolve installer canister ID ─────────────────────────────
-        installer_id = _INSTALLER_CANISTER_IDS.get(network)
+        installer_id = _INSTALLER_IDS.get(network) or manifest.get("installer_canister_id", "")
         if not installer_id:
-            installer_id = manifest.get("installer_canister_id", "")
-        if not installer_id:
-            return json.dumps({
-                "success": False,
-                "error": f"No installer canister configured for network '{network}'",
-            })
+            return json.dumps({"success": False, "error": f"No installer for network '{network}'"})
 
-        # ── Forward to realm_installer ────────────────────────────────
-        # Inter-canister call: ic.caller() on the installer is the registry,
-        # not the user.  Stamp the human/CI principal into the manifest so
-        # the job record and UIs can attribute deployments correctly.
         manifest["requesting_principal"] = caller
         manifest["registry_canister_id"] = str(ic.id())
-        manifest_json_for_installer = json.dumps(manifest)
 
         installer = RealmInstallerService(Principal.from_str(installer_id))
-        call_result: CallResult = yield installer.enqueue_deployment(
-            manifest_json_for_installer
-        )
-
-        def _unwrap_enqueue(raw):
-            """Unwrap CallResult{'Ok': RResultEnqueue{'Ok': REnqueueOk{...}}}"""
-            v = raw
-            if isinstance(v, dict):
-                if "Err" in v and v["Err"] is not None:
-                    e = v["Err"]
-                    if isinstance(e, dict) and "message" in e:
-                        return {"success": False, "error": e["message"]}
-                    return {"success": False, "error": str(e)}
-                if "Ok" in v:
-                    v = v["Ok"]
-            if hasattr(v, "Err") and getattr(v, "Err", None) is not None:
-                e = v.Err
-                msg = e.get("message", str(e)) if isinstance(e, dict) else getattr(e, "message", str(e))
-                return {"success": False, "error": msg}
-            if hasattr(v, "Ok") and getattr(v, "Ok", None) is not None:
-                v = v.Ok
-            if isinstance(v, dict):
-                if "Err" in v and v["Err"] is not None:
-                    e = v["Err"]
-                    if isinstance(e, dict) and "message" in e:
-                        return {"success": False, "error": e["message"]}
-                    return {"success": False, "error": str(e)}
-                if "Ok" in v:
-                    v = v["Ok"]
-                if "job_id" in v:
-                    return {"success": True, **v}
-            if hasattr(v, "job_id"):
-                return {
-                    "success": True,
-                    "job_id": getattr(v, "job_id", ""),
-                    "status": getattr(v, "status", ""),
-                    "realm_name": getattr(v, "realm_name", ""),
-                    "network": getattr(v, "network", ""),
-                }
-            return {"success": False, "error": f"unexpected installer response: {str(raw)[:200]}"}
+        call_result: CallResult = yield installer.enqueue_deployment(json.dumps(manifest))
 
         result = _unwrap_enqueue(call_result)
-
-        if result.get("success"):
-            job_id = (result.get("job_id") or "").strip()
-            if not job_id:
-                return json.dumps({
-                    "success": False,
-                    "error": "installer response missing job_id",
-                })
-            hold_result = create_deployment_hold(
-                principal_id=caller,
-                job_id=job_id,
-                amount=DEPLOYMENT_COST_CREDITS,
-                description=f"Realm deployment hold: {realm_name}",
-            )
-            if not hold_result.get("success"):
-                err = hold_result.get("error", "could not hold credits")
-                logger.error(
-                    "request_deployment: hold creation failed for %s / %s: %s",
-                    caller, job_id, err,
-                )
-                try:
-                    cancel_raw: CallResult = yield installer.cancel_deployment(job_id)
-                    logger.warning(
-                        "request_deployment: cancelled job %s after hold failure: %s",
-                        job_id, cancel_raw,
-                    )
-                except Exception as ce:
-                    logger.error(
-                        "request_deployment: failed to cancel job %s after hold failure: %s",
-                        job_id, ce,
-                    )
-                return json.dumps({
-                    "success": False,
-                    "error": f"Could not reserve deployment credits: {err}",
-                })
-            logger.info(
-                f"request_deployment: enqueued job "
-                f"{result.get('job_id', '?')} for {realm_name}"
-            )
-            result["credits_held"] = DEPLOYMENT_COST_CREDITS
-            result["caller"] = caller
-            return json.dumps(result)
-        else:
-            logger.error(
-                f"request_deployment: installer rejected: "
-                f"{result.get('error', '?')}"
-            )
+        if not result.get("success"):
             return json.dumps(result)
 
+        job_id = (result.get("job_id") or "").strip()
+        if not job_id:
+            return json.dumps({"success": False, "error": "installer missing job_id"})
+
+        hold = create_deployment_hold(caller, job_id, DEPLOYMENT_COST_CREDITS,
+                                      f"Realm deployment: {realm_name}")
+        if not hold.get("success"):
+            try:
+                yield installer.cancel_deployment(job_id)
+            except Exception:
+                pass
+            return json.dumps({"success": False, "error": hold.get("error", "hold failed")})
+
+        result["credits_held"] = DEPLOYMENT_COST_CREDITS
+        result["caller"] = caller
+        return json.dumps(result)
     except Exception as e:
-        logger.error(f"request_deployment error: {str(e)}")
-        tb = ""
-        try:
-            tb = traceback.format_exc()[-1000:]
-        except Exception:
-            pass
-        return json.dumps({
-            "success": False,
-            "error": f"Internal error: {str(e)}",
-            "traceback": tb,
-        })
+        return json.dumps({"success": False, "error": str(e)})
+
+
+def _unwrap_enqueue(raw):
+    v = raw
+    if isinstance(v, dict):
+        if v.get("Err") is not None:
+            e = v["Err"]
+            return {"success": False, "error": e.get("message", str(e)) if isinstance(e, dict) else str(e)}
+        if "Ok" in v:
+            v = v["Ok"]
+    if hasattr(v, "Err") and getattr(v, "Err", None) is not None:
+        e = v.Err
+        return {"success": False, "error": getattr(e, "message", str(e))}
+    if hasattr(v, "Ok"):
+        v = v.Ok
+    if isinstance(v, dict):
+        if v.get("Err") is not None:
+            e = v["Err"]
+            return {"success": False, "error": e.get("message", str(e)) if isinstance(e, dict) else str(e)}
+        if "Ok" in v:
+            v = v["Ok"]
+        if "job_id" in v:
+            return {"success": True, **v}
+    if hasattr(v, "job_id"):
+        return {"success": True, "job_id": v.job_id, "status": getattr(v, "status", ""),
+                "realm_name": getattr(v, "realm_name", ""), "network": getattr(v, "network", "")}
+    return {"success": False, "error": f"unexpected response: {str(raw)[:200]}"}
 
 
 @update
 def deployment_failed(job_id: text, reason: text, caller_principal: text = "") -> text:
-    """Called by the installer when a deployment reaches terminal failure.
-
-    Releases the held deployment credits by ``job_id``.
-    """
     try:
-        caller = str(ic.caller())
-        logger.info(
-            f"deployment_failed: job_id={job_id}, caller={caller}, "
-            f"reason={reason}"
-        )
-        release_result = release_deployment_hold(
-            job_id=job_id,
-            description=f"Deployment failed: {reason}",
-        )
-        if not release_result.get("success"):
-            return json.dumps({
-                "success": False,
-                "job_id": job_id,
-                "error": release_result.get("error", "release failed"),
-            })
-        return json.dumps({
-            "success": True,
-            "job_id": job_id,
-            "reason": reason,
-            "caller_principal": caller_principal,
-            "settlement": "released",
-        })
+        release_deployment_hold(job_id, f"Failed: {reason}")
+        return json.dumps({"success": True, "job_id": job_id, "settlement": "released"})
     except Exception as e:
-        logger.error(f"deployment_failed error: {str(e)}")
-        return json.dumps({
-            "success": False,
-            "error": f"Internal error: {str(e)}",
-        })
+        return json.dumps({"success": False, "error": str(e)})
 
 
 @update
 def deployment_succeeded(job_id: text, caller_principal: text = "") -> text:
-    """Called by installer when deployment completes; captures held credits."""
     try:
-        caller = str(ic.caller())
-        logger.info(
-            f"deployment_succeeded: job_id={job_id}, caller={caller}, "
-            f"principal={caller_principal}"
-        )
-        capture_result = capture_deployment_hold(
-            job_id=job_id,
-            description="Deployment completed",
-        )
-        if not capture_result.get("success"):
-            return json.dumps({
-                "success": False,
-                "job_id": job_id,
-                "error": capture_result.get("error", "capture failed"),
-            })
-        return json.dumps({
-            "success": True,
-            "job_id": job_id,
-            "caller_principal": caller_principal,
-            "settlement": "captured",
-        })
+        capture_deployment_hold(job_id, "Deployment completed")
+        return json.dumps({"success": True, "job_id": job_id, "settlement": "captured"})
     except Exception as e:
-        logger.error(f"deployment_succeeded error: {str(e)}")
-        return json.dumps({
-            "success": False,
-            "error": f"Internal error: {str(e)}",
-        })
+        return json.dumps({"success": False, "error": str(e)})

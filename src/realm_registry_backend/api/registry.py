@@ -1,7 +1,3 @@
-"""Registry API functions for managing realm registrations."""
-
-from typing import List, Optional
-
 from core.models import RealmRecord
 from _cdk import ic
 from ic_python_logging import get_logger
@@ -9,168 +5,73 @@ from ic_python_logging import get_logger
 logger = get_logger("registry")
 
 
-def list_registered_realms() -> List[dict]:
-    """List all registered realms"""
-    logger.info("Listing all registered realms")
-
+def list_registered_realms() -> list:
     try:
-        # Load all realm records using ORM
-        realms = RealmRecord.instances()
-        realms_list = [realm.to_dict() for realm in realms]
-
-        # Sort by created_at timestamp (newest first)
-        realms_list.sort(key=lambda r: r.get("created_at", 0), reverse=True)
-
-        logger.info(f"Found {len(realms_list)} registered realms")
-        return realms_list
+        realms = [r.to_dict() for r in RealmRecord.instances()]
+        realms.sort(key=lambda r: r.get("created_at", 0), reverse=True)
+        return realms
     except Exception as e:
-        logger.error(f"Error listing realms: {str(e)}")
+        logger.error(f"Error listing realms: {e}")
         return []
 
 
 def register_realm_by_caller(
-    name: str,
-    url: str = "",
-    logo: str = "",
-    backend_url: str = "",
-    latitude: Optional[float] = None,
-    longitude: Optional[float] = None,
-    frontend_canister_id: str = "",
-    token_canister_id: str = "",
-    nft_canister_id: str = "",
-    realm_id_override: str = "",
+    name: str, url: str = "", logo: str = "", backend_url: str = "",
+    frontend_canister_id: str = "", realm_id_override: str = "",
 ) -> dict:
-    """Register a realm using the caller's principal (or explicit override) as unique ID (upsert)"""
-    caller_id = realm_id_override.strip() if realm_id_override else str(ic.caller())
-    logger.info(f"Registering realm by caller: {caller_id}")
-
+    realm_id = realm_id_override.strip() if realm_id_override else str(ic.caller())
+    if not name or not name.strip():
+        return {"success": False, "error": "Realm name cannot be empty"}
     try:
-        # Validate input
-        if not name or not name.strip():
-            return {"success": False, "error": "Realm name cannot be empty"}
-
-        # Check if realm already exists (upsert)
-        existing_realm = RealmRecord[caller_id]
-        if existing_realm is not None:
-            # Update existing realm
-            existing_realm.name = name.strip()
-            existing_realm.url = url.strip() if url else existing_realm.url
-            existing_realm.backend_url = backend_url.strip() if backend_url else existing_realm.backend_url
-            existing_realm.logo = logo.strip() if logo else existing_realm.logo
-            if latitude is not None:
-                existing_realm.latitude = latitude
-            if longitude is not None:
-                existing_realm.longitude = longitude
-            # Update canister IDs if provided
+        existing = RealmRecord[realm_id]
+        if existing:
+            existing.name = name.strip()
+            if url:
+                existing.url = url.strip()
+            if backend_url:
+                existing.backend_url = backend_url.strip()
+            if logo:
+                existing.logo = logo.strip()
             if frontend_canister_id:
-                existing_realm.frontend_canister_id = frontend_canister_id.strip()
-            if token_canister_id:
-                existing_realm.token_canister_id = token_canister_id.strip()
-            if nft_canister_id:
-                existing_realm.nft_canister_id = nft_canister_id.strip()
-            logger.info(f"Updated existing realm: {caller_id} - {name}")
-            return {"success": True, "message": f"Realm '{caller_id}' updated successfully", "action": "updated"}
+                existing.frontend_canister_id = frontend_canister_id.strip()
+            return {"success": True, "message": f"Realm '{realm_id}' updated"}
 
-        # Create new realm record
-        realm = RealmRecord(
-            id=caller_id,
-            name=name.strip(),
-            url=url.strip() if url else "",
-            backend_url=backend_url.strip() if backend_url else "",
-            logo=logo.strip() if logo else "",
-            latitude=latitude,
-            longitude=longitude,
-            created_at=float(
-                ic.time() / 1_000_000_000
-            ),  # Convert nanoseconds to seconds
-            frontend_canister_id=frontend_canister_id.strip() if frontend_canister_id else "",
-            token_canister_id=token_canister_id.strip() if token_canister_id else "",
-            nft_canister_id=nft_canister_id.strip() if nft_canister_id else "",
+        RealmRecord(
+            id=realm_id, name=name.strip(),
+            url=url.strip(), backend_url=backend_url.strip(),
+            logo=logo.strip(),
+            created_at=float(ic.time() / 1_000_000_000),
+            frontend_canister_id=frontend_canister_id.strip(),
         )
-
-        logger.info(f"Successfully registered realm: {caller_id} - {name}")
-        return {"success": True, "message": f"Realm '{caller_id}' registered successfully", "action": "created"}
-
+        return {"success": True, "message": f"Realm '{realm_id}' registered"}
     except Exception as e:
-        logger.error(f"Error registering realm {caller_id}: {str(e)}")
-        return {"success": False, "error": f"Failed to register realm: {str(e)}"}
+        logger.error(f"Error registering realm {realm_id}: {e}")
+        return {"success": False, "error": str(e)}
 
 
 def get_registered_realm(realm_id: str) -> dict:
-    """Get a specific realm by ID"""
-    logger.info(f"Getting realm: {realm_id}")
-
     try:
-        # Load realm using ORM
         realm = RealmRecord[realm_id]
         if realm is None:
-            return {"success": False, "error": f"Realm with ID '{realm_id}' not found"}
-
+            return {"success": False, "error": f"Realm '{realm_id}' not found"}
         return {"success": True, "realm": realm.to_dict()}
-
     except Exception as e:
-        logger.error(f"Error getting realm {realm_id}: {str(e)}")
-        return {"success": False, "error": f"Failed to get realm: {str(e)}"}
+        return {"success": False, "error": str(e)}
 
 
 def remove_registered_realm(realm_id: str) -> dict:
-    """Remove a realm from the registry"""
-    logger.info(f"Removing realm: {realm_id}")
-
     try:
-        # Load realm using ORM
-        existing_realm = RealmRecord[realm_id]
-        if existing_realm is None:
-            return {"success": False, "error": f"Realm with ID '{realm_id}' not found"}
-
-        # Delete using ORM
-        existing_realm.delete()
-        logger.info(f"Successfully removed realm: {realm_id}")
-        return {"success": True, "message": f"Realm '{realm_id}' removed successfully"}
-
+        realm = RealmRecord[realm_id]
+        if realm is None:
+            return {"success": False, "error": f"Realm '{realm_id}' not found"}
+        realm.delete()
+        return {"success": True, "message": f"Realm '{realm_id}' removed"}
     except Exception as e:
-        logger.error(f"Error removing realm {realm_id}: {str(e)}")
-        return {"success": False, "error": f"Failed to remove realm: {str(e)}"}
-
-
-def search_registered_realms(query: str) -> List[dict]:
-    """Search realms by name or ID (case-insensitive)"""
-    logger.info(f"Searching realms with query: {query}")
-
-    try:
-        if not query or not query.strip():
-            return list_registered_realms()
-
-        query_lower = query.lower().strip()
-        matching_realms = []
-
-        # Load all realms using ORM
-        all_realms = RealmRecord.instances()
-        for realm in all_realms:
-            if query_lower in realm.id.lower() or query_lower in realm.name.lower():
-                matching_realms.append(realm.to_dict())
-
-        # Sort by created_at timestamp (newest first)
-        matching_realms.sort(key=lambda r: r.get("created_at", 0), reverse=True)
-
-        logger.info(f"Found {len(matching_realms)} realms matching query: {query}")
-        return matching_realms
-
-    except Exception as e:
-        logger.error(f"Error searching realms with query '{query}': {str(e)}")
-        return []
+        return {"success": False, "error": str(e)}
 
 
 def count_registered_realms() -> int:
-    """Get the total number of registered realms"""
-    logger.info("Getting realm count")
-
     try:
-        # Count all realms using ORM
-        count = len(list(RealmRecord.instances()))
-        logger.info(f"Total registered realms: {count}")
-        return count
-
-    except Exception as e:
-        logger.error(f"Error counting realms: {str(e)}")
+        return len(list(RealmRecord.instances()))
+    except Exception:
         return 0

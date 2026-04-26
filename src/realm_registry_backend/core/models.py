@@ -1,23 +1,14 @@
-"""Entity models for the realm registry."""
-
 from ic_python_db import Entity, Float, Integer, String, TimestampedMixin
-from ic_python_logging import get_logger
-
-logger = get_logger("models")
 
 
 class UserCredits(Entity, TimestampedMixin):
-    """Entity representing a user's credit balance."""
-
     __alias__ = "principal_id"
-
-    principal_id = String()  # User's Internet Identity principal
-    balance = Integer()  # Current credit balance
-    total_purchased = Integer()  # Total credits ever purchased
-    total_spent = Integer()  # Total credits ever spent
+    principal_id = String()
+    balance = Integer()
+    total_purchased = Integer()
+    total_spent = Integer()
 
     def to_dict(self) -> dict:
-        """Convert user credits to dictionary format."""
         return {
             "principal_id": self.principal_id,
             "balance": self.balance or 0,
@@ -27,20 +18,16 @@ class UserCredits(Entity, TimestampedMixin):
 
 
 class CreditTransaction(Entity, TimestampedMixin):
-    """Entity representing a credit transaction (top-up or spend)."""
-
     __alias__ = "id"
-
-    id = String()  # Unique transaction ID
-    principal_id = String()  # User's principal
-    amount = Integer()  # Amount (positive for top-up, negative for spend)
-    transaction_type = String()  # "topup" or "spend"
-    description = String()  # Description of the transaction
-    stripe_session_id = String()  # Stripe session ID (for top-ups)
-    timestamp = Float()  # Transaction timestamp
+    id = String()
+    principal_id = String()
+    amount = Integer()
+    transaction_type = String()
+    description = String()
+    stripe_session_id = String()
+    timestamp = Float()
 
     def to_dict(self) -> dict:
-        """Convert transaction to dictionary format."""
         return {
             "id": self.id,
             "principal_id": self.principal_id,
@@ -53,14 +40,11 @@ class CreditTransaction(Entity, TimestampedMixin):
 
 
 class DeploymentCreditHold(Entity, TimestampedMixin):
-    """Reserved credits for one deployment job."""
-
     __alias__ = "job_id"
-
     job_id = String()
     principal_id = String()
     amount = Integer()
-    status = String()  # held | captured | released
+    status = String()
     reason = String()
     created_at = Float()
     settled_at = Float()
@@ -78,37 +62,24 @@ class DeploymentCreditHold(Entity, TimestampedMixin):
 
 
 class RealmRecord(Entity, TimestampedMixin):
-    """Entity representing a registered realm in the registry."""
-
     __alias__ = "id"
-
-    id = String()  # realm_backend canister ID (primary identifier)
+    id = String()
     name = String()
     url = String(max_length=512)
     backend_url = String(max_length=512)
     logo = String(max_length=512)
     users_count = Integer()
-    latitude = Float()
-    longitude = Float()
     created_at = Float()
-    # Associated canister IDs
     frontend_canister_id = String(max_length=64)
-    token_canister_id = String(max_length=64)
-    nft_canister_id = String(max_length=64)
 
     def to_dict(self) -> dict:
-        """Convert realm record to dictionary format."""
         return {
             "id": self.id,
-            "name": self.name,
-            "url": self.url,
-            "backend_url": getattr(self, 'backend_url', ''),
-            "logo": getattr(self, 'logo', ''),
-            "users_count": getattr(self, 'users_count', 0) or 0,
-            "latitude": getattr(self, 'latitude', None),
-            "longitude": getattr(self, 'longitude', None),
-            "created_at": self.created_at,
-            "frontend_canister_id": getattr(self, 'frontend_canister_id', '') or '',
-            "token_canister_id": getattr(self, 'token_canister_id', '') or '',
-            "nft_canister_id": getattr(self, 'nft_canister_id', '') or '',
+            "name": self.name or "",
+            "url": self.url or "",
+            "backend_url": self.backend_url or "",
+            "logo": self.logo or "",
+            "users_count": self.users_count or 0,
+            "created_at": self.created_at or 0.0,
+            "frontend_canister_id": self.frontend_canister_id or "",
         }
