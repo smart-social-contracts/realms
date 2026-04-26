@@ -1,10 +1,9 @@
 // src/lib/auth.js
 import { AuthClient } from '@dfinity/auth-client';
 import { Principal } from '@dfinity/principal';
-import { CONFIG, TEST_MODE_II_BYPASS } from '$lib/config.js';
+import { TEST_MODE_II_BYPASS } from '$lib/config.js';
 
-// Use the Internet Identity URL from config (set during deployment)
-const II_URL = CONFIG.internet_identity_url;
+const II_URL = globalThis.__CANISTER_IDS?.internet_identity || 'https://identity.ic0.app';
 console.log(`Using Identity Provider: ${II_URL}`);
 
 let authClient;

@@ -3,7 +3,7 @@
   import { onMount } from 'svelte';
   import { principal, isAuthenticated } from '$lib/stores/auth';
   import { login, initializeAuthClient } from '$lib/auth';
-  import { CONFIG, TEST_MODE, TEST_MODE_II_BYPASS, TEST_MODE_ADMIN_SELF_REGISTRATION, TEST_MODE_SKIP_TERMS } from '$lib/config.js';
+  import { TEST_MODE, TEST_MODE_II_BYPASS, TEST_MODE_ADMIN_SELF_REGISTRATION, TEST_MODE_SKIP_TERMS } from '$lib/config.js';
   import { backend, initBackendWithIdentity, setActiveQuarter } from '$lib/canisters.js';
   import { loadUserProfiles, hasJoined, profilesLoading } from '$lib/stores/profiles';
   import { activeQuarterId } from '$lib/stores/quarters';
@@ -301,7 +301,7 @@
           
           <p class="mt-6 text-center text-sm text-gray-500">
             Don't have an Internet Identity? 
-            <a href={CONFIG.internet_identity_url} target="_blank" rel="noopener noreferrer" class="text-gray-700 hover:text-gray-900 hover:underline font-medium">
+            <a href={globalThis.__CANISTER_IDS?.internet_identity || 'https://identity.ic0.app'} target="_blank" rel="noopener noreferrer" class="text-gray-700 hover:text-gray-900 hover:underline font-medium">
               Create one →
             </a>
           </p>

@@ -10,32 +10,32 @@ async function initializeImports() {
 	if (importsInitialized) return;
 
 	console.log('🏭 Loading IC backend implementations');
-	
-	// Import realm_backend declarations directly
-	// This will be bundled by Vite at build time
-	let declarationsModule = null;
+
+	// Canister ID comes from /canister_ids.js (uploaded by the installer at deploy time).
+	// Falls back to build-time declarations for local dev.
+	const runtimeIds = globalThis.__CANISTER_IDS;
+	if (runtimeIds?.realm_backend) {
+		canisterId = runtimeIds.realm_backend;
+		console.log(`✅ realm_backend from canister_ids.js: ${canisterId}`);
+	}
+
 	try {
-		// Use static import path that Vite can analyze at build time
 		const { createActor: ca, canisterId: cid } = await import('$lib/declarations/realm_backend');
-		declarationsModule = { createActor: ca, canisterId: cid };
-		console.log(`✅ Loaded declarations for realm_backend`);
+		createActor = ca;
+		if (!canisterId) {
+			canisterId = cid;
+			console.log(`✅ realm_backend from declarations: ${canisterId}`);
+		}
 	} catch (e) {
 		console.error('Failed to load backend declarations:', e);
 		throw new Error('Could not load backend declarations. Please run: dfx generate');
 	}
-	
-	if (declarationsModule) {
-		createActor = declarationsModule.createActor;
-		canisterId = declarationsModule.canisterId;
-	} else {
-		throw new Error('Could not load backend declarations. Please run: dfx generate');
-	}
-	
+
 	const agentModule = await import('@dfinity/agent');
 	HttpAgent = agentModule.HttpAgent;
 
 	if (!canisterId) {
-		throw new Error('Canister ID not found in declarations');
+		throw new Error('Canister ID not found. Ensure /canister_ids.js is deployed.');
 	}
 
 	importsInitialized = true;

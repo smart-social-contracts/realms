@@ -276,6 +276,63 @@ def unwrap_call_result(result):
     return result
 
 
+def _candid_store(key, ctype, cenc, content):
+    """Encode asset canister store() argument as raw Candid bytes."""
+    def _u(n):
+        r = bytearray()
+        while True:
+            b = n & 0x7f; n >>= 7
+            r.append(b | 0x80 if n else b)
+            if not n: break
+        return bytes(r)
+    def _s(n):
+        r = bytearray()
+        while True:
+            b = n & 0x7f; n >>= 7
+            if (n == 0 and not (b & 0x40)) or (n == -1 and (b & 0x40)):
+                r.append(b); break
+            r.append(b | 0x80)
+        return bytes(r)
+    def _t(s):
+        b = s.encode(); return _u(len(b)) + b
+    def _bl(b):
+        return _u(len(b)) + b
+    def _fh(nm):
+        h = 0
+        for c in nm: h = (h * 223 + ord(c)) & 0xFFFFFFFF
+        return h
+    flds = sorted([
+        (_fh("content"), _s(0)), (_fh("content_encoding"), _s(-15)),
+        (_fh("content_type"), _s(-15)), (_fh("key"), _s(-15)), (_fh("sha256"), _s(1)),
+    ])
+    rec = _s(-20) + _u(5)
+    for h, t in flds: rec += _u(h) + t
+    tt = _u(3) + _s(-19) + _s(-5) + _s(-18) + _s(0) + rec
+    vals = b""
+    fh_map = {_fh("key"): lambda: _t(key), _fh("content_type"): lambda: _t(ctype),
+              _fh("content_encoding"): lambda: _t(cenc), _fh("content"): lambda: _bl(content),
+              _fh("sha256"): lambda: b'\x00'}
+    for h, _ in flds: vals += fh_map[h]()
+    return b'DIDL' + tt + _u(1) + _s(2) + vals
+
+
+def _schedule_canister_ids_upload(frontend_id, backend_id, job_id_val):
+    """Upload /canister_ids.js to the frontend asset canister."""
+    def _cb():
+        try:
+            js = f'globalThis.__CANISTER_IDS={{realm_backend:"{backend_id}",internet_identity:"https://identity.ic0.app"}};'
+            raw = _candid_store("/canister_ids.js", "application/javascript", "identity", js.encode("utf-8"))
+            import basilisk as _bsk
+            sc = _bsk._ServiceCall(Principal.from_str(frontend_id), "store", payment=0, arg_type="raw")
+            sc._raw_args = raw
+            sc.args[2] = raw
+            result: CallResult = yield sc
+            jlog(job_id_val).info(f"canister_ids.js uploaded to {frontend_id}")
+        except Exception as e:
+            jlog(job_id_val).error(f"canister_ids.js upload failed: {e}")
+    ic.set_timer(Duration(0), _cb)
+
+
 def schedule_registry_settlement(job_id: str, success: bool, reason: str = ""):
     def _cb():
         try:
@@ -413,16 +470,16 @@ def _execute_step(task, step):
             step.completed_at = now_s()
             return
         raw = unwrap_call_result(call_result)
-        step.result_json = (raw if isinstance(raw, str) else json.dumps(raw))[:1990]
-        try:
-            parsed = json.loads(raw) if isinstance(raw, str) else raw
-        except Exception:
-            parsed = None
-        if isinstance(parsed, dict) and parsed.get("success") is False:
+            step.result_json = (raw if isinstance(raw, str) else json.dumps(raw))[:1990]
+            try:
+                parsed = json.loads(raw) if isinstance(raw, str) else raw
+            except Exception:
+                parsed = None
+            if isinstance(parsed, dict) and parsed.get("success") is False:
             step.error = (parsed.get("error") or "install failed")[:1990]
-            step.status = "failed"
-        else:
-            step.status = "completed"
+                step.status = "failed"
+            else:
+                step.status = "completed"
     except Exception as e:
         step.error = f"{type(e).__name__}: {e}"[:1990]
         step.status = "failed"
@@ -502,10 +559,10 @@ def _start_extensions_for_job(job, manifest: dict):
     realm_info = manifest.get("realm", {})
     network = (manifest.get("network") or "").strip()
     _FILE_REGISTRY_IDS = {
-        "staging": "iebdk-kqaaa-aaaau-agoxq-cai",
-        "demo": "vi64l-3aaaa-aaaae-qj4va-cai",
-        "test": "uq2mu-kaaaa-aaaah-avqcq-cai",
-    }
+    "staging": "iebdk-kqaaa-aaaau-agoxq-cai",
+    "demo": "vi64l-3aaaa-aaaae-qj4va-cai",
+    "test": "uq2mu-kaaaa-aaaah-avqcq-cai",
+}
     registry_id = manifest.get("file_registry_canister_id", "") or _FILE_REGISTRY_IDS.get(network, "")
 
     ext_manifest = {"target_canister_id": job.backend_canister_id, "registry_canister_id": registry_id}
@@ -632,7 +689,7 @@ def get_pending_deployments() -> ResultPendingJobs:
         list(DeploymentJob.instances())
         pending = []
         for job in DeploymentJob.instances():
-            if (job.status or "pending") == "pending":
+                if (job.status or "pending") == "pending":
                 pending.append(PendingJobEntry(job=_job_to_view(job), manifest=job.manifest_json or "{}"))
         pending.sort(key=lambda e: int(e.job.created_at))
         return ResultPendingJobs(Ok=PendingJobsOk(jobs=pending, count=nat32(len(pending))))
@@ -725,8 +782,8 @@ def report_canister_ready(args: text) -> Async[ResultReportReady]:
         frontend_id = params.get("frontend_canister_id", "")
         if not backend_id or not frontend_id:
             return ResultReportReady(Err=ie("canister IDs required"))
-        job.backend_canister_id = backend_id
-        job.frontend_canister_id = frontend_id
+            job.backend_canister_id = backend_id
+            job.frontend_canister_id = frontend_id
         job.registry_canister_id = params.get("registry_canister_id", job.registry_canister_id or "")
         job.status = "verifying"
 
@@ -754,8 +811,8 @@ def report_canister_ready(args: text) -> Async[ResultReportReady]:
                         actual_wasm_hash=actual, extensions_started=False,
                         expected_wasm_hash=expected, failed_verification=True,
                     ))
-                job.wasm_verified = 1
-                wasm_verified = True
+                    job.wasm_verified = 1
+                    wasm_verified = True
             else:
                 job.wasm_verified = 1
                 wasm_verified = True
@@ -770,7 +827,7 @@ def report_canister_ready(args: text) -> Async[ResultReportReady]:
             failed_verification=False,
         ))
     except Exception as e:
-        if job_id:
+            if job_id:
             try:
                 j = DeploymentJob[job_id]
                 if j and (j.status or "") not in _JOB_TERMINAL_STATUSES:
@@ -778,8 +835,8 @@ def report_canister_ready(args: text) -> Async[ResultReportReady]:
                     j.error = str(e)[:1990]
                     j.completed_at = now_s()
                     schedule_registry_settlement(job_id, success=False, reason=j.error)
-            except Exception:
-                pass
+        except Exception:
+            pass
         return ResultReportReady(Err=ie(str(e), traceback.format_exc()[-1500:]))
 
 @update
@@ -809,6 +866,11 @@ def report_frontend_verified(args: text) -> ResultReportFrontend:
             failed = True
         else:
             job.assets_verified = 1
+            fe = (job.frontend_canister_id or "").strip()
+            be = (job.backend_canister_id or "").strip()
+            if fe and be:
+                _schedule_canister_ids_upload(fe, be, job_id)
+
             manifest = json.loads(job.manifest_json or "{}")
             realm_info = manifest.get("realm", {})
             has_work = bool(realm_info.get("extensions")) or bool(realm_info.get("codex"))
@@ -854,6 +916,6 @@ def _resume_in_flight():
             head.status = "queued"
             _schedule_step_runner(head.name, 0)
             for t in tasks[1:]:
-                t.status = "waiting"
+                    t.status = "waiting"
     except Exception as e:
         _log.error(f"_resume_in_flight: {e}")
