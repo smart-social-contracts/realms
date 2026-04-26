@@ -321,8 +321,8 @@ def schedule_registration(job_id_val: str):
             realm_name = realm_info.get("display_name") or realm_info.get("name", "")
             backend_id = j.backend_canister_id or ""
             frontend_id = j.frontend_canister_id or ""
-            url = f"https://{frontend_id}.icp0.io/" if frontend_id else ""
-            backend_url = f"https://{backend_id}.icp0.io/" if backend_id else ""
+            url = f"https://{frontend_id}.icp0.io" if frontend_id else ""
+            backend_url = f"https://{backend_id}.icp0.io" if backend_id else ""
             logo = realm_info.get("branding", {}).get("logo", "") or realm_info.get("logo", "")
             canister_ids = f"{frontend_id}|||{backend_id}"
 
