@@ -246,8 +246,306 @@ class GetStatusResult(Variant, total=False):
 
 # ── Helpers ────────────────────────────────────────────────────────────
 
-from helpers import ie, jlog, now_s, unwrap_call_result, schedule_registry_settlement, schedule_registration
+def jlog(job_id: str):
+    return _get_logger(job_id)
 
+
+def now_s() -> int:
+    return int(round(ic.time() / 1e9))
+
+
+def ie(message: str, tb: str = ""):
+    return InstallerError(message=message, traceback=tb or "")
+
+
+def unwrap_call_result(result):
+    if result is None:
+        return None
+    if isinstance(result, (str, bytes)):
+        return result
+    if isinstance(result, dict):
+        if "Err" in result and result["Err"] is not None:
+            raise RuntimeError(f"inter-canister Err: {result['Err']}")
+        if "Ok" in result:
+            return result["Ok"]
+        return result
+    if hasattr(result, "Err") and getattr(result, "Err", None):
+        raise RuntimeError(f"inter-canister Err: {result.Err}")
+    if hasattr(result, "Ok"):
+        return result.Ok
+    return result
+
+
+def schedule_registry_settlement(job_id: str, success: bool, reason: str = ""):
+    def _cb():
+        try:
+            list(DeploymentJob.instances())
+            job = DeploymentJob[job_id]
+            if job is None or int(job.settlement_notified or 0) == 1:
+                return
+            reg_id = (job.registry_canister_id or "").strip()
+            if not reg_id:
+                return
+            caller = (job.caller_principal or "").strip()
+            registry = RealmRegistryService(Principal.from_str(reg_id))
+            if success:
+                result: CallResult = yield registry.deployment_succeeded(job_id, caller)
+            else:
+                msg = (reason or job.error or "deployment failed")[:1900]
+                result: CallResult = yield registry.deployment_failed(job_id, msg, caller)
+            jlog(job_id).info(f"settlement {'success' if success else 'failure'} callback done")
+            job = DeploymentJob[job_id]
+            if job:
+                job.settlement_notified = 1
+        except Exception as e:
+            jlog(job_id).error(f"settlement callback failed: {e}")
+
+    ic.set_timer(Duration(0), _cb)
+
+
+def schedule_registration(job_id_val: str):
+    def _register_cb():
+        try:
+            list(DeploymentJob.instances())
+            j = DeploymentJob[job_id_val]
+            if j is None or (j.status or "") in _JOB_TERMINAL_STATUSES:
+                return
+            reg_id = j.registry_canister_id
+            if not reg_id:
+                j.status = "failed"
+                j.error = "missing registry_canister_id"
+                j.completed_at = now_s()
+                return
+            manifest = json.loads(j.manifest_json or "{}")
+            realm_info = manifest.get("realm", {})
+            realm_name = realm_info.get("display_name") or realm_info.get("name", "")
+            backend_id = j.backend_canister_id or ""
+            frontend_id = j.frontend_canister_id or ""
+            url = f"https://{frontend_id}.icp0.io/" if frontend_id else ""
+            backend_url = f"https://{backend_id}.icp0.io/" if backend_id else ""
+            logo = realm_info.get("branding", {}).get("logo", "")
+            canister_ids = f"{frontend_id}|||{backend_id}"
+
+            registry = RealmRegistryService(Principal.from_str(reg_id))
+            result: CallResult = yield registry.register_realm(
+                realm_name, url, logo, backend_url, canister_ids,
+            )
+            raw = unwrap_call_result(result)
+            jlog(job_id_val).info(f"registered realm: {raw}")
+
+            j = DeploymentJob[job_id_val]
+            if j:
+                j.status = "completed"
+                j.completed_at = now_s()
+                schedule_registry_settlement(job_id_val, success=True)
+        except Exception as e:
+            jlog(job_id_val).error(f"registration failed: {e}")
+            try:
+                j = DeploymentJob[job_id_val]
+                if j and (j.status or "") not in _JOB_TERMINAL_STATUSES:
+                    j.status = "failed"
+                    j.error = str(e)[:1990]
+                    j.completed_at = now_s()
+                    schedule_registry_settlement(job_id_val, success=False, reason=j.error)
+            except Exception:
+                pass
+
+    ic.set_timer(Duration(0), _register_cb)
+
+
+# ── Task runner ───────────────────────────────────────────────────────
+
+_TERMINAL_TASK_STATUSES = ("completed", "partial", "failed", "cancelled")
+_RETRYABLE_PATTERNS = ("Rejection code 2", "Couldn't send message", "IC0515", "IC0504")
+_MAX_RETRIES = 5
+_RETRY_BASE_S = 10
+_retry_counts: dict = {}
+
+
+def _build_steps(task, manifest: dict) -> list:
+    steps = []
+    idx = 0
+    for ext in (manifest.get("extensions") or []):
+        ext_id = ext.get("id")
+        if not ext_id:
+            continue
+        steps.append(DeployStep(
+            task=task, idx=idx, kind="extension", label=ext_id,
+            args_json=json.dumps({"registry_canister_id": task.registry_canister_id,
+                                   "ext_id": ext_id, "version": ext.get("version")}),
+            status="pending",
+        ))
+        idx += 1
+    for cdx in (manifest.get("codices") or []):
+        cdx_id = cdx.get("id")
+        if not cdx_id:
+            continue
+        steps.append(DeployStep(
+            task=task, idx=idx, kind="codex", label=cdx_id,
+            args_json=json.dumps({"registry_canister_id": task.registry_canister_id,
+                                   "codex_id": cdx_id, "version": cdx.get("version"),
+                                   "run_init": bool(cdx.get("run_init", True))}),
+            status="pending",
+        ))
+        idx += 1
+    return steps
+
+
+def _next_pending(task):
+    pending = [s for s in task.steps if s.status == "pending"]
+    return sorted(pending, key=lambda s: int(s.idx or 0))[0] if pending else None
+
+
+def _execute_step(task, step):
+    step.status = "running"
+    step.started_at = now_s()
+    jlog(task.name).info(f"step {step.idx} ({step.kind} {step.label}) starting")
+    try:
+        args = json.loads(step.args_json or "{}")
+        target = RealmTargetService(Principal.from_str(task.target_canister_id))
+        if step.kind == "extension":
+            call_result: CallResult = yield target.install_extension_from_registry(json.dumps(args))
+        elif step.kind == "codex":
+            call_result: CallResult = yield target.install_codex_from_registry(json.dumps(args))
+        else:
+            step.error = f"unknown kind: {step.kind}"
+            step.status = "failed"
+            step.completed_at = now_s()
+            return
+        raw = unwrap_call_result(call_result)
+        step.result_json = (raw if isinstance(raw, str) else json.dumps(raw))[:1990]
+        try:
+            parsed = json.loads(raw) if isinstance(raw, str) else raw
+        except Exception:
+            parsed = None
+        if isinstance(parsed, dict) and parsed.get("success") is False:
+            step.error = (parsed.get("error") or "install failed")[:1990]
+            step.status = "failed"
+        else:
+            step.status = "completed"
+    except Exception as e:
+        step.error = f"{type(e).__name__}: {e}"[:1990]
+        step.status = "failed"
+    step.completed_at = now_s()
+
+
+def _finalize_task(task):
+    statuses = [s.status for s in task.steps]
+    n_ok = sum(1 for s in statuses if s == "completed")
+    n_fail = sum(1 for s in statuses if s == "failed")
+    n = len(statuses)
+    task.status = "completed" if n == 0 or n_ok == n else ("failed" if n_fail == n else "partial")
+    task.completed_at = now_s()
+    jlog(task.name).info(f"task → {task.status} ({n_ok}/{n} ok, {n_fail} failed)")
+    _check_job_after_extensions(task)
+
+
+def _check_job_after_extensions(task):
+    try:
+        list(DeploymentJob.instances())
+        for job in DeploymentJob.instances():
+            if (job.ext_deploy_task_id or "") == task.name:
+                if task.status in ("completed", "partial"):
+                    job.status = "registering"
+                    schedule_registration(job.name)
+                else:
+                    job.status = "failed"
+                    job.error = f"extension task {task.name}: {task.status}"[:1990]
+                    job.completed_at = now_s()
+                    schedule_registry_settlement(job.name, success=False, reason=job.error)
+                return
+    except Exception as e:
+        jlog(task.name).error(f"_check_job_after_extensions: {e}")
+
+
+def _schedule_step_runner(task_id: str, delay_s: int = 0):
+    def _cb():
+        try:
+            list(DeployStep.instances())
+            list(DeployTask.instances())
+            task = DeployTask[task_id]
+            if not task or (task.status or "queued") in _TERMINAL_TASK_STATUSES:
+                return
+            if (task.status or "queued") == "queued":
+                task.status = "running"
+                task.started_at = now_s()
+            while True:
+                step = _next_pending(task)
+                if step is None:
+                    _finalize_task(task)
+                    return
+                yield from _execute_step(task, step)
+                if step.status == "failed" and any(p in (step.error or "") for p in _RETRYABLE_PATTERNS):
+                    rk = f"{task_id}_{step.idx}"
+                    count = _retry_counts.get(rk, 0)
+                    if count < _MAX_RETRIES:
+                        _retry_counts[rk] = count + 1
+                        step.status = "pending"
+                        step.error = ""
+                        _schedule_step_runner(task_id, delay_s=_RETRY_BASE_S * (2 ** count))
+                        return
+        except Exception as e:
+            jlog(task_id).error(f"runner fatal: {e}")
+            try:
+                t = DeployTask[task_id]
+                if t and (t.status or "queued") not in _TERMINAL_TASK_STATUSES:
+                    t.status = "failed"
+                    t.error = str(e)[:1990]
+                    t.completed_at = now_s()
+            except Exception:
+                pass
+
+    ic.set_timer(Duration(int(delay_s)), _cb)
+
+
+def _start_extensions_for_job(job, manifest: dict):
+    realm_info = manifest.get("realm", {})
+    network = (manifest.get("network") or "").strip()
+    _FILE_REGISTRY_IDS = {
+        "staging": "iebdk-kqaaa-aaaau-agoxq-cai",
+        "demo": "vi64l-3aaaa-aaaae-qj4va-cai",
+        "test": "uq2mu-kaaaa-aaaah-avqcq-cai",
+    }
+    registry_id = manifest.get("file_registry_canister_id", "") or _FILE_REGISTRY_IDS.get(network, "")
+
+    ext_manifest = {"target_canister_id": job.backend_canister_id, "registry_canister_id": registry_id}
+    ext_list = []
+    for ext in (realm_info.get("extensions") or []):
+        if isinstance(ext, str):
+            ext_list.append({"id": ext})
+        elif isinstance(ext, dict):
+            ext_list.append(ext)
+    if ext_list:
+        ext_manifest["extensions"] = ext_list
+
+    codex_list = []
+    codex = realm_info.get("codex")
+    if codex and isinstance(codex, dict) and codex.get("package"):
+        codex_list.append({"id": codex["package"], "version": codex.get("version"), "run_init": True})
+    if codex_list:
+        ext_manifest["codices"] = codex_list
+
+    if not ext_list and not codex_list:
+        job.status = "registering"
+        schedule_registration(job.name)
+        return
+
+    try:
+        task_id = "deploy_%d" % ic.time()
+        task = DeployTask(
+            name=task_id, status="queued", target_canister_id=job.backend_canister_id,
+            registry_canister_id=registry_id, manifest_json=json.dumps(ext_manifest)[:8190], error="",
+        )
+        _build_steps(task, ext_manifest)
+        job.ext_deploy_task_id = task_id
+        _schedule_step_runner(task_id, 0)
+    except Exception as e:
+        jlog(job.name).error(f"failed to create extension task: {e}")
+        job.status = "registering"
+        schedule_registration(job.name)
+
+
+# ── Serialization ─────────────────────────────────────────────────────
 
 def _serialize_job(job: DeploymentJob) -> dict:
     realm_name = ""
@@ -516,8 +814,7 @@ def report_frontend_verified(args: text) -> ResultReportFrontend:
             has_work = bool(realm_info.get("extensions")) or bool(realm_info.get("codex"))
             if has_work:
                 job.status = "extensions"
-                from task_runner import start_extensions_for_job
-                start_extensions_for_job(job, manifest)
+                _start_extensions_for_job(job, manifest)
             else:
                 job.status = "registering"
                 schedule_registration(job.name)
@@ -542,7 +839,6 @@ def get_canister_logs(from_entry: Opt[nat] = None, max_entries: Opt[nat] = None,
 
 def _resume_in_flight():
     try:
-        from task_runner import schedule_step_runner
         list(DeployStep.instances())
         by_target = {}
         for t in DeployTask.instances():
@@ -556,7 +852,7 @@ def _resume_in_flight():
                     s.status = "pending"
                     s.started_at = 0
             head.status = "queued"
-            schedule_step_runner(head.name, 0)
+            _schedule_step_runner(head.name, 0)
             for t in tasks[1:]:
                 t.status = "waiting"
     except Exception as e:
