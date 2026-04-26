@@ -1,11 +1,16 @@
-# deploy-infra.yml — deploy infrastructure canisters via direct dfx install.
+# deploy-infra.yml — deploy infrastructure canisters via direct dfx
 #
-# Infra canisters: file_registry, file_registry_frontend, realm_installer,
-# platform_dashboard_frontend.
+# Infra canisters - backend and frontend (if any):
+#
+# realm_registry
+# realm_installer
+# file_registry
+# dashboard
+# marketplace
+# token
+# nft
 #
 # Use this when you've changed infra canister code and want to deploy
-# just those canisters (~2-10 minutes depending on scope).
-# For mundus members (registry, realms, marketplace, …) use deploy-mundus.yml.
 
 name: Deploy Infra
 

@@ -1,13 +1,9 @@
-# deploy-mundus.yml — deploy mundus members via the queue-based architecture.
+# deploy-mundus.yml — deploy realm canisters via the decentralized deployment mechanism.
 #
-# Uses realm_registry_backend.request_deployment + installer polling.
-# If the registry canister has no WASM yet, it is bootstrapped automatically
-# via direct dfx install before the queue deploy proceeds.
-# Requires infra canisters (file_registry, realm_installer) to already be
-# running — use deploy-infra.yml for those.
-#
-# Supports both manual dispatch (with realm/extension filters, install mode,
-# etc.) and reusable workflow_call (used by CI on main → staging).
+# Mundus canisters - backend and frontend (if any):
+# realms (dominion, agora, syntropia)
+# token
+# nft
 #
 # Optional `realms` / `extensions` filters trim what gets built and
 # deployed, so a single-realm iteration takes ~3-5 minutes.

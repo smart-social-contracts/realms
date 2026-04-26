@@ -1,9 +1,0 @@
-[
-  {
-    "match": "**/*",
-    "security_policy": "standard",
-    "headers": {
-      "Content-Security-Policy": "default-src 'self'; script-src 'self' https: 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob:; connect-src 'self' https: wss:; font-src 'self' data: https:; frame-src https:;"
-    }
-  }
-]
