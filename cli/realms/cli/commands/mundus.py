@@ -41,7 +41,8 @@ def _dfx_call(canister_id: str, method: str, arg: str, network: str, *, query: b
     if query:
         cmd.append("--query")
     project_root = get_project_root()
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=project_root)
+    env = {**os.environ, "TERM": "xterm", "DFX_WARNING": "-mainnet_plaintext_identity"}
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=project_root, env=env)
     if result.returncode != 0:
         raise RuntimeError(f"dfx call failed: {result.stderr}")
     return result.stdout.strip()
@@ -70,6 +71,59 @@ def _upload_file(filepath: Path) -> str:
     return f"{DEPLOYER_URL}{result['url']}"
 
 
+_build_cache: dict[str, str] = {}
+
+
+def _build_artifacts() -> dict[str, Path]:
+    """Build backend WASM and frontend tarball from source. Returns artifact paths."""
+    import gzip
+    import tarfile
+    import tempfile
+
+    project_root = get_project_root()
+
+    console.print("  Building backend WASM...")
+    build_env = {**os.environ, "CANISTER_CANDID_PATH": str(project_root / "src" / "realm_backend" / "realm_backend.did")}
+    result = subprocess.run(
+        ["python", "-m", "basilisk", "realm_backend", "src/realm_backend/main.py"],
+        cwd=project_root, capture_output=True, text=True, env=build_env,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"Backend build failed:\n{result.stderr}")
+
+    wasm_path = project_root / ".basilisk" / "realm_backend" / "realm_backend.wasm"
+    if not wasm_path.exists():
+        raise FileNotFoundError(f"WASM not found at {wasm_path}")
+
+    wasm_gz = Path(tempfile.mktemp(suffix=".wasm.gz", prefix="realm_backend_"))
+    with open(wasm_path, "rb") as f_in, gzip.open(wasm_gz, "wb") as f_out:
+        f_out.write(f_in.read())
+    console.print(f"  Backend WASM built ({wasm_gz.stat().st_size // 1024} KB)")
+
+    console.print("  Building frontend...")
+    fe_dir = project_root / "src" / "realm_frontend"
+    result = subprocess.run(["npm", "install", "--legacy-peer-deps"], cwd=fe_dir, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"npm install failed:\n{result.stderr}")
+    result = subprocess.run(["npm", "run", "build"], cwd=fe_dir, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"Frontend build failed:\n{result.stderr}")
+
+    dist_dir = fe_dir / "dist"
+    if not dist_dir.exists():
+        dist_dir = fe_dir / "build"
+    if not dist_dir.exists():
+        raise FileNotFoundError("Frontend dist/build directory not found")
+
+    tarball = Path(tempfile.mktemp(suffix=".tar.gz", prefix="realm_frontend_"))
+    with tarfile.open(tarball, "w:gz") as tar:
+        for item in dist_dir.iterdir():
+            tar.add(item, arcname=item.name)
+    console.print(f"  Frontend tarball built ({tarball.stat().st_size // 1024} KB)")
+
+    return {"realm_backend": wasm_gz, "realm_frontend": tarball}
+
+
 def _resolve_artifact(ref: str, artifact_type: str, network: str) -> str:
     """Resolve an artifact reference to a URL.
 
@@ -77,10 +131,23 @@ def _resolve_artifact(ref: str, artifact_type: str, network: str) -> str:
       - URL (https://...) -> returned as-is
       - version (e.g. "0.3.2") -> GitHub release URL
       - "latest" -> latest GitHub release
+      - "build" -> compile from source, upload to deployer
       - local path -> upload to deployer
     """
     if ref.startswith("http://") or ref.startswith("https://"):
         return ref
+
+    if ref == "build":
+        cache_key = f"build:{artifact_type}"
+        if cache_key in _build_cache:
+            return _build_cache[cache_key]
+        artifacts = _build_artifacts()
+        for atype, path in artifacts.items():
+            console.print(f"  Uploading {atype}: {path.name}")
+            url = _upload_file(path)
+            _build_cache[f"build:{atype}"] = url
+            path.unlink(missing_ok=True)
+        return _build_cache[cache_key]
 
     repo = "smart-social-contracts/realms"
     if ref == "latest":
