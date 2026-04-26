@@ -470,16 +470,16 @@ def _execute_step(task, step):
             step.completed_at = now_s()
             return
         raw = unwrap_call_result(call_result)
-            step.result_json = (raw if isinstance(raw, str) else json.dumps(raw))[:1990]
-            try:
-                parsed = json.loads(raw) if isinstance(raw, str) else raw
-            except Exception:
-                parsed = None
-            if isinstance(parsed, dict) and parsed.get("success") is False:
+        step.result_json = (raw if isinstance(raw, str) else json.dumps(raw))[:1990]
+        try:
+            parsed = json.loads(raw) if isinstance(raw, str) else raw
+        except Exception:
+            parsed = None
+        if isinstance(parsed, dict) and parsed.get("success") is False:
             step.error = (parsed.get("error") or "install failed")[:1990]
-                step.status = "failed"
-            else:
-                step.status = "completed"
+            step.status = "failed"
+        else:
+            step.status = "completed"
     except Exception as e:
         step.error = f"{type(e).__name__}: {e}"[:1990]
         step.status = "failed"
