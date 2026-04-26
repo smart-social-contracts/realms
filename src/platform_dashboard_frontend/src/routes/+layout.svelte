@@ -10,6 +10,13 @@
   let booted = false;
   let sidebarOpen = false;
 
+  // @ts-ignore – Vite injects at build time
+  let version = typeof __BUILD_VERSION__ !== 'undefined' ? __BUILD_VERSION__ : 'dev';
+  // @ts-ignore
+  let commitHash = typeof __BUILD_COMMIT__ !== 'undefined' ? __BUILD_COMMIT__ : 'local';
+  // @ts-ignore
+  let buildTime = typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : '';
+
   onMount(async () => {
     if (!browser) return;
     await bootstrapAuth();
@@ -78,6 +85,9 @@
           Sign in
         </button>
       {/if}
+      <div class="build-info">
+        Platform Dashboard {version}{commitHash && commitHash !== 'local' ? ` (${commitHash})` : ''}{buildTime ? ` - ${buildTime}` : ''}
+      </div>
     </div>
   </aside>
 
@@ -167,6 +177,13 @@
   .sidebar-footer {
     padding: 1rem 1.25rem;
     border-top: 1px solid var(--border);
+  }
+  .build-info {
+    margin-top: 0.75rem;
+    font-size: 0.68rem;
+    color: var(--text-faint, #999);
+    text-align: center;
+    line-height: 1.3;
   }
   .auth-info {
     display: flex;

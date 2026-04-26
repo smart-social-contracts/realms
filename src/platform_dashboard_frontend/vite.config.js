@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath, URL } from 'url';
 import { join, dirname } from 'path';
+import { execSync } from 'child_process';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import environment from 'vite-plugin-environment';
@@ -10,6 +11,17 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, '..', '..');
 
 dotenv.config({ path: join(repoRoot, '.env') });
+
+function getBuildTimeValues() {
+  let version = 'dev';
+  let commitHash = 'local';
+  const buildTime = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  try { version = readFileSync(join(repoRoot, 'version.txt'), 'utf-8').trim(); } catch {}
+  try { commitHash = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim(); } catch {}
+  return { version, commitHash, buildTime };
+}
+
+const buildValues = getBuildTimeValues();
 
 /**
  * CI and `dfx deploy` often run without a populated .env. Declarations expect
@@ -68,6 +80,11 @@ process.env.DFX_NETWORK = 'ic';
 
 export default defineConfig({
   build: { emptyOutDir: true },
+  define: {
+    '__BUILD_VERSION__': JSON.stringify(buildValues.version),
+    '__BUILD_COMMIT__': JSON.stringify(buildValues.commitHash),
+    '__BUILD_TIME__': JSON.stringify(buildValues.buildTime),
+  },
   optimizeDeps: {
     esbuildOptions: { define: { global: 'globalThis' } },
   },
