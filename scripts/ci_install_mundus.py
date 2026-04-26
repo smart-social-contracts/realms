@@ -578,7 +578,13 @@ def _build_realm_frontend(
     return None
 
 
-def _build_registry_frontend(network: str) -> Optional[Path]:
+def _build_registry_frontend(
+    network: str,
+    *,
+    installer_canister_id: str = "",
+    deploy_queue_network: str = "",
+    deploy_service_url: str = "",
+) -> Optional[Path]:
     """Build the realm_registry_frontend. Returns dist/ path or None."""
     did_path = REPO_ROOT / "src" / "realm_registry_backend" / "realm_registry_backend.did"
     if not did_path.exists():
@@ -606,14 +612,23 @@ def _build_registry_frontend(network: str) -> Optional[Path]:
     fe_pkg = REPO_ROOT / "src" / "realm_registry_frontend" / "package.json"
     pkg_text = fe_pkg.read_text()
     if '"prebuild"' in pkg_text:
-        fe_pkg.write_text(pkg_text.replace(
-            '"prebuild": "dfx generate realm_registry_backend",\n    ', ''
-        ).replace(
-            '"prebuild": "dfx generate realm_registry_backend",', ''
-        ))
+        pkg_data = json.loads(pkg_text)
+        pkg_data.get("scripts", {}).pop("prebuild", None)
+        fe_pkg.write_text(json.dumps(pkg_data, indent=2) + "\n")
+
+    build_env = os.environ.copy()
+    if deploy_queue_network:
+        build_env["VITE_DEPLOY_QUEUE_NETWORK"] = deploy_queue_network
+        print(f"   • VITE_DEPLOY_QUEUE_NETWORK={deploy_queue_network}")
+    if installer_canister_id:
+        build_env["VITE_REALM_INSTALLER_CANISTER_ID"] = installer_canister_id
+        print(f"   • VITE_REALM_INSTALLER_CANISTER_ID={installer_canister_id}")
+    if deploy_service_url:
+        build_env["VITE_DEPLOY_SERVICE_URL"] = deploy_service_url
+        print(f"   • VITE_DEPLOY_SERVICE_URL={deploy_service_url}")
 
     _run(["npm", "run", "build", "--workspace=realm_registry_frontend"],
-         cwd=REPO_ROOT)
+         cwd=REPO_ROOT, env=build_env)
 
     fe_pkg.write_text(pkg_text)
 
@@ -805,7 +820,17 @@ def stage1_publish(
     registry_member = _find_registry_member(descriptor)
     if registry_member and registry_member.get("frontend_canister_id"):
         print("\n   ▸ building realm_registry_frontend …")
-        dist = _build_registry_frontend(network)
+        _mgmt_url_map = {
+            "staging": "https://management.realmsgos.dev",
+            "demo": "https://management-demo.realmsgos.dev",
+            "test": "https://management-test.realmsgos.dev",
+        }
+        dist = _build_registry_frontend(
+            network,
+            installer_canister_id=infra_ids.get("realm_installer", ""),
+            deploy_queue_network=network,
+            deploy_service_url=_mgmt_url_map.get(network, ""),
+        )
         if dist:
             namespace = f"frontend/{registry_member['name']}"
             rc = _publish_frontend_dist(dist, namespace, file_registry, network)
@@ -1012,6 +1037,7 @@ def _find_or_build_wasm(
 
 def _build_member_frontend(
     member: Dict[str, Any], network: str,
+    **registry_kwargs,
 ) -> Optional[Path]:
     """Build the correct frontend dist/ for a mundus member's type."""
     mtype = (member.get("type") or "realm").strip()
@@ -1020,7 +1046,7 @@ def _build_member_frontend(
     if mtype == "realm":
         return _build_realm_frontend(member, network)
     if mtype == "realm_registry":
-        return _build_registry_frontend(network)
+        return _build_registry_frontend(network, **registry_kwargs)
     if mtype == "marketplace":
         return _build_marketplace_frontend(network)
     if mtype == "dashboard":
