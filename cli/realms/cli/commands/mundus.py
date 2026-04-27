@@ -86,10 +86,14 @@ def _build_artifacts() -> dict[str, Path]:
 
     console.print("  Installing extensions from source...")
     try:
+        import os as _os
+        old_cwd = _os.getcwd()
+        _os.chdir(str(project_root))
         from .extension import install_from_source_command, generate_extension_manifests, generate_extension_registry
-        install_from_source_command(source_dir="extensions")
+        install_from_source_command(source_dir="extensions/extensions")
         generate_extension_manifests()
         generate_extension_registry()
+        _os.chdir(old_cwd)
     except Exception as e:
         console.print(f"  [yellow]Extension install warning: {e}[/yellow]")
 
