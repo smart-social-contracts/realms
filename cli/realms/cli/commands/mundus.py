@@ -100,12 +100,20 @@ def _build_artifacts() -> dict[str, Path]:
         f_out.write(f_in.read())
     console.print(f"  Backend WASM built ({wasm_gz.stat().st_size // 1024} KB)")
 
+    console.print("  Generating Candid declarations...")
+    result = subprocess.run(
+        ["dfx", "generate", "realm_backend"],
+        cwd=project_root, capture_output=True, text=True, env=build_env,
+    )
+    if result.returncode != 0:
+        console.print(f"  [yellow]dfx generate warning: {result.stderr[:200]}[/yellow]")
+
     console.print("  Building frontend...")
     fe_dir = project_root / "src" / "realm_frontend"
     result = subprocess.run(["npm", "install", "--legacy-peer-deps"], cwd=fe_dir, capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"npm install failed:\n{result.stderr}")
-    result = subprocess.run(["npm", "run", "build"], cwd=fe_dir, capture_output=True, text=True)
+    result = subprocess.run(["npm", "run", "build"], cwd=fe_dir, capture_output=True, text=True, env=build_env)
     if result.returncode != 0:
         raise RuntimeError(f"Frontend build failed:\n{result.stderr}")
 

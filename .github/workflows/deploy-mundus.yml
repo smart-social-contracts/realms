@@ -30,9 +30,9 @@ on:
           - install
 
       artifact_version:
-        description: "Artifact version: 'latest', semver (e.g. 0.3.2), or 'build' to compile from source"
+        description: "Artifact version: 'build' (from source), 'latest', or semver (e.g. 0.3.2)"
         required: false
-        default: "latest"
+        default: "build"
 
       ref:
         description: "Commit/branch to deploy from (defaults to workflow ref)"
@@ -54,7 +54,7 @@ on:
         description: "Artifact version"
         type: string
         required: false
-        default: "latest"
+        default: "build"
     secrets:
       IC_IDENTITY_PEM:
         required: true

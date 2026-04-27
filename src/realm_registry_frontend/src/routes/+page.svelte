@@ -405,13 +405,9 @@
   function resolvedRealmLogoUrl(realm) {
     if (realm.realm_logo) {
       const u = resolveRealmAssetUrl(realm, realm.realm_logo);
-      return u || null;
+      if (u) return u;
     }
-    if (realm.logo) {
-      const u = ensureProtocol(realm.logo);
-      return u || null;
-    }
-    return null;
+    return resolveRealmAssetUrl(realm, '/images/logo.png') || null;
   }
 
 
@@ -1081,13 +1077,13 @@
               </div>
               
               <div class="realm-content">
-                <h3 class="realm-name">{realm.realm_name || realm.name}</h3>
+                <h3 class="realm-name">{realm.name || realm.realm_name}</h3>
                 
                 {#if realm.description}
                   <p 
                     class="realm-description" 
                     title={realm.description}
-                    on:click={() => activeDescriptionRealm = { id: realm.id, name: realm.realm_name || realm.name, description: realm.description }}
+                    on:click={() => activeDescriptionRealm = { id: realm.id, name: realm.name || realm.realm_name, description: realm.description }}
                     role="button"
                     tabindex="0"
                   >
