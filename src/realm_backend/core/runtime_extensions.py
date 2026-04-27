@@ -1,16 +1,13 @@
 """
-Runtime Extension Loader — Layer 2 of the Realm architecture.
+Runtime Extension Loader for the Realm architecture.
 
-Loads extensions dynamically from the persistent filesystem instead of
-requiring them to be baked into the WASM at build time.
+Extensions are loaded dynamically from the persistent filesystem.
+They are installed via the installer canister which pulls extension
+files from the on-chain File Registry.
 
 Extensions are stored at: /extensions/{ext_id}/
   - manifest.json   — extension metadata
   - entry.py        — backend entry point (defines functions callable via the registry)
-
-This module replaces the build-time-generated:
-  - extension_packages/registry.py
-  - extension_packages/extension_manifests.py
 
 See: https://github.com/smart-social-contracts/realms/issues/168
 """
@@ -156,26 +153,16 @@ def _load_manifest(ext_id: str, force=False) -> Optional[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Public API — drop-in replacement for extension_packages.registry
+# Public API
 # ---------------------------------------------------------------------------
 
 
 def get_func(extension_name: str, function_name: str) -> Optional[Callable]:
-    """Get a function from a runtime-loaded extension.
-
-    Drop-in replacement for extension_packages.registry.get_func().
-    """
-    # Try runtime-loaded extensions first
+    """Get a function from a runtime-loaded extension."""
     module = _load_module(extension_name)
 
     if module is None:
-        # Fall back to build-time baked-in extensions (backward compat)
-        try:
-            from extension_packages.registry import get_func as _baked_get_func
-            return _baked_get_func(extension_name, function_name)
-        except (ImportError, ValueError):
-            pass
-        raise ValueError(f"Extension '{extension_name}' not found (runtime or baked-in)")
+        raise ValueError(f"Extension '{extension_name}' not found")
 
     func = getattr(module, function_name, None)
     if func is None:
@@ -186,13 +173,9 @@ def get_func(extension_name: str, function_name: str) -> Optional[Callable]:
 
 
 def get_all_extension_manifests() -> dict:
-    """Get all extension manifests (runtime + baked-in).
-
-    Drop-in replacement for extension_packages.extension_manifests.get_all_extension_manifests().
-    """
+    """Get all extension manifests from runtime-installed extensions."""
     manifests = {}
 
-    # Load runtime-installed extension manifests
     _ensure_extensions_dir()
     if os.path.exists(EXTENSIONS_DIR):
         for item in os.listdir(EXTENSIONS_DIR):
@@ -201,18 +184,6 @@ def get_all_extension_manifests() -> dict:
                 manifest = _load_manifest(item)
                 if manifest:
                     manifests[item] = manifest
-
-    # Merge baked-in manifests (runtime takes precedence)
-    try:
-        from extension_packages.extension_manifests import (
-            get_all_extension_manifests as _baked_manifests,
-        )
-        baked = _baked_manifests()
-        for ext_id, manifest in baked.items():
-            if ext_id not in manifests:
-                manifests[ext_id] = manifest
-    except ImportError:
-        pass
 
     return manifests
 

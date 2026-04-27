@@ -16,14 +16,9 @@ logger = get_logger("api.extensions")
 
 
 def get_all_extension_manifests():
-    """Get all extension manifests from runtime loader (+ baked-in fallback)."""
-    try:
-        from core.runtime_extensions import get_all_extension_manifests as _get_manifests
-
-        return _get_manifests()
-    except ImportError:
-        logger.error("runtime_extensions not available")
-        return {}
+    """Get all extension manifests from runtime-installed extensions."""
+    from core.runtime_extensions import get_all_extension_manifests as _get_manifests
+    return _get_manifests()
 
 
 @query

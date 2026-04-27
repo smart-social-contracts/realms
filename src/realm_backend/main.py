@@ -1744,14 +1744,14 @@ def initialize() -> void:
                             )
                             continue
 
-                        # Import implementation
                         parts = impl_path.split(".")
-                        module_path = (
-                            f"extension_packages.{extension_id}.{'.'.join(parts[:-1])}"
-                        )
                         func_name = parts[-1]
 
-                        impl_module = __import__(module_path, fromlist=[func_name])
+                        from core.runtime_extensions import _load_module
+                        impl_module = _load_module(extension_id)
+                        if impl_module is None:
+                            logger.warning(f"Extension '{extension_id}' not installed (runtime)")
+                            continue
                         impl_func = getattr(impl_module, func_name, None)
 
                         if not impl_func:
@@ -1792,17 +1792,12 @@ def initialize() -> void:
 
             # Step 1: Try to register extension entity types
             try:
-                extension_module = __import__(
-                    f"extension_packages.{extension_id}.entry",
-                    fromlist=["register_entities"],
-                )
+                from core.runtime_extensions import _load_module
+                extension_module = _load_module(extension_id)
 
-                if hasattr(extension_module, "register_entities"):
+                if extension_module and hasattr(extension_module, "register_entities"):
                     extension_module.register_entities()
                     status["has_entities"] = True
-            except ImportError:
-                # No entry module - that's fine
-                pass
             except Exception as e:
                 logger.warning(
                     f"Error registering entity types for {extension_id}: {str(e)}"

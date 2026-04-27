@@ -64,15 +64,17 @@ def search_objects(class_name: str, params: List[tuple[str, str]]) -> List[Any]:
         # Handle namespaced extension entities (e.g., "vault::KnownSubaccount")
         if "::" in class_name:
             ext_name, entity_name = class_name.split("::", 1)
-            try:
-                entities_module = importlib.import_module(
-                    f"extension_packages.{ext_name}.{ext_name}_lib.entities"
-                )
-            except ImportError:
-                entities_module = importlib.import_module(
-                    f"extension_packages.{ext_name}.vault_lib.entities"
-                )
-            class_object = getattr(entities_module, entity_name)
+            from core.runtime_extensions import _load_module
+            ext_module = _load_module(ext_name)
+            if ext_module is None:
+                raise KeyError(f"Extension '{ext_name}' not installed")
+            class_object = getattr(ext_module, entity_name, None)
+            if class_object is None:
+                entities_attr = getattr(ext_module, "entities", None)
+                if entities_attr:
+                    class_object = getattr(entities_attr, entity_name)
+                else:
+                    raise KeyError(f"Entity '{entity_name}' not found in extension '{ext_name}'")
         else:
             class_object = globals()[class_name]
 
@@ -110,17 +112,17 @@ def list_objects_paginated(
         # Handle namespaced extension entities (e.g., "vault::KnownSubaccount")
         if "::" in class_name:
             ext_name, entity_name = class_name.split("::", 1)
-            try:
-                # Try extension_packages.{ext}.{ext}_lib.entities first
-                entities_module = importlib.import_module(
-                    f"extension_packages.{ext_name}.{ext_name}_lib.entities"
-                )
-            except ImportError:
-                # Fallback to extension_packages.{ext}.vault_lib.entities (legacy)
-                entities_module = importlib.import_module(
-                    f"extension_packages.{ext_name}.vault_lib.entities"
-                )
-            class_object = getattr(entities_module, entity_name)
+            from core.runtime_extensions import _load_module
+            ext_module = _load_module(ext_name)
+            if ext_module is None:
+                raise KeyError(f"Extension '{ext_name}' not installed")
+            class_object = getattr(ext_module, entity_name, None)
+            if class_object is None:
+                entities_attr = getattr(ext_module, "entities", None)
+                if entities_attr:
+                    class_object = getattr(entities_attr, entity_name)
+                else:
+                    raise KeyError(f"Entity '{entity_name}' not found in extension '{ext_name}'")
         else:
             class_object = globals()[class_name]
         count = class_object.count()

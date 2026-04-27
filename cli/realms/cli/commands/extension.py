@@ -955,6 +955,12 @@ def install_from_source_command(source_dir: str = "extensions"):
                 shutil.copy2(root_manifest, backend_manifest)  # Always copy to get updates
                 console.print("  [green]✓[/green] Manifest copied to backend")
 
+            # Ensure __init__.py exists so Python treats the directory as a package
+            init_path = os.path.join(paths["backend"], "__init__.py")
+            if os.path.isdir(paths["backend"]) and not os.path.exists(init_path):
+                with open(init_path, "w") as f:
+                    f.write("")
+
             # Copy frontend files if they exist
             frontend_source = os.path.join(source_path, "frontend")
             if os.path.exists(frontend_source):
