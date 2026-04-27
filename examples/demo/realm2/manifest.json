@@ -32,6 +32,29 @@
     "license_review_cycle": 600
   },
   "quarters": 2,
+  "extensions": [
+    "public_dashboard",
+    "member_dashboard",
+    "admin_dashboard",
+    "welcome",
+    "voting",
+    "vault",
+    "codex_viewer",
+    "passport_verification",
+    "notifications",
+    "metrics",
+    "package_manager",
+    "system_info",
+    "task_monitor",
+    "justice_litigation",
+    "land_registry",
+    "market_place",
+    "erd_explorer",
+    "zone_selector",
+    "llm_chat",
+    "hello_world",
+    "test_bench"
+  ],
   "options": {
     "random": {
       "members": 30,
