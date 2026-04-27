@@ -375,7 +375,10 @@ def _build_steps(task, manifest: dict) -> list:
     for ext in (manifest.get("extensions") or []):
         ext_id = ext.get("id")
         if not ext_id:
+            _log.warning(f"skipping extension with no id: {ext}")
             continue
+        ext_id = str(ext_id)
+        _log.info(f"[{task.name}] step {idx}: extension '{ext_id}'")
         steps.append(DeployStep(
             task=task, idx=idx, kind="extension", label=ext_id,
             args_json=json.dumps({"registry_canister_id": task.registry_canister_id,
@@ -386,7 +389,10 @@ def _build_steps(task, manifest: dict) -> list:
     for cdx in (manifest.get("codices") or []):
         cdx_id = cdx.get("id")
         if not cdx_id:
+            _log.warning(f"skipping codex with no id: {cdx}")
             continue
+        cdx_id = str(cdx_id)
+        _log.info(f"[{task.name}] step {idx}: codex '{cdx_id}'")
         steps.append(DeployStep(
             task=task, idx=idx, kind="codex", label=cdx_id,
             args_json=json.dumps({"registry_canister_id": task.registry_canister_id,
@@ -395,6 +401,7 @@ def _build_steps(task, manifest: dict) -> list:
             status="pending",
         ))
         idx += 1
+    _log.info(f"[{task.name}] built {len(steps)} total steps")
     return steps
 
 
@@ -406,13 +413,16 @@ def _next_pending(task):
 def _execute_step(task, step):
     step.status = "running"
     step.started_at = now_s()
-    jlog(task.name).info(f"step {step.idx} ({step.kind} {step.label}) starting")
+    jlog(task.name).info(f"step {step.idx} ({step.kind} '{step.label}') starting → target={task.target_canister_id}")
     try:
         args = json.loads(step.args_json or "{}")
+        jlog(task.name).info(f"step {step.idx} args: {step.args_json[:200]}")
         target = RealmTargetService(Principal.from_str(task.target_canister_id))
         if step.kind == "extension":
+            jlog(task.name).info(f"step {step.idx} calling install_extension_from_registry")
             call_result: CallResult = yield target.install_extension_from_registry(json.dumps(args))
         elif step.kind == "codex":
+            jlog(task.name).info(f"step {step.idx} calling install_codex_from_registry")
             call_result: CallResult = yield target.install_codex_from_registry(json.dumps(args))
         else:
             step.error = f"unknown kind: {step.kind}"
@@ -420,6 +430,7 @@ def _execute_step(task, step):
             step.completed_at = now_s()
             return
         raw = unwrap_call_result(call_result)
+        jlog(task.name).info(f"step {step.idx} raw result: {str(raw)[:300]}")
         step.result_json = (raw if isinstance(raw, str) else json.dumps(raw))[:1990]
         try:
             parsed = json.loads(raw) if isinstance(raw, str) else raw
@@ -428,11 +439,14 @@ def _execute_step(task, step):
         if isinstance(parsed, dict) and parsed.get("success") is False:
             step.error = (parsed.get("error") or "install failed")[:1990]
             step.status = "failed"
+            jlog(task.name).error(f"step {step.idx} ({step.label}) failed: {step.error[:200]}")
         else:
             step.status = "completed"
+            jlog(task.name).info(f"step {step.idx} ({step.label}) completed OK")
     except Exception as e:
         step.error = f"{type(e).__name__}: {e}"[:1990]
         step.status = "failed"
+        jlog(task.name).error(f"step {step.idx} ({step.label}) exception: {step.error[:300]}")
     step.completed_at = now_s()
 
 
@@ -509,45 +523,64 @@ def _start_extensions_for_job(job, manifest: dict):
     realm_info = manifest.get("realm", {})
     network = (manifest.get("network") or "").strip()
     _FILE_REGISTRY_IDS = {
-    "staging": "iebdk-kqaaa-aaaau-agoxq-cai",
-    "demo": "vi64l-3aaaa-aaaae-qj4va-cai",
-    "test": "uq2mu-kaaaa-aaaah-avqcq-cai",
-}
+        "staging": "iebdk-kqaaa-aaaau-agoxq-cai",
+        "demo": "vi64l-3aaaa-aaaae-qj4va-cai",
+        "test": "uq2mu-kaaaa-aaaah-avqcq-cai",
+    }
     registry_id = manifest.get("file_registry_canister_id", "") or _FILE_REGISTRY_IDS.get(network, "")
+
+    jlog(job.name).info(f"starting extension install: network={network}, file_registry={registry_id}")
+    jlog(job.name).info(f"realm_info keys: {list(realm_info.keys())}")
+    raw_exts = realm_info.get("extensions") or []
+    raw_codex = realm_info.get("codex")
+    jlog(job.name).info(f"raw extensions: {len(raw_exts)} items, codex: {type(raw_codex).__name__}={raw_codex}")
 
     ext_manifest = {"target_canister_id": job.backend_canister_id, "registry_canister_id": registry_id}
     ext_list = []
-    for ext in (realm_info.get("extensions") or []):
+    for ext in raw_exts:
         if isinstance(ext, str):
             ext_list.append({"id": ext})
         elif isinstance(ext, dict):
             ext_list.append(ext)
     if ext_list:
         ext_manifest["extensions"] = ext_list
+    jlog(job.name).info(f"resolved {len(ext_list)} extensions")
 
     codex_list = []
     codex = realm_info.get("codex")
-    if codex and isinstance(codex, dict) and codex.get("package"):
-        codex_list.append({"id": codex["package"], "version": codex.get("version"), "run_init": True})
+    if codex and isinstance(codex, dict):
+        pkg = codex.get("package")
+        if isinstance(pkg, str):
+            codex_list.append({"id": pkg, "version": codex.get("version"), "run_init": True})
+        elif isinstance(pkg, dict):
+            codex_list.append({"id": pkg.get("name", ""), "version": pkg.get("version"), "run_init": True})
     if codex_list:
         ext_manifest["codices"] = codex_list
 
+    jlog(job.name).info(f"resolved {len(codex_list)} codices")
+
     if not ext_list and not codex_list:
+        jlog(job.name).info("no extensions or codices to install, skipping to registration")
         job.status = "registering"
         schedule_registration(job.name)
         return
 
     try:
         task_id = "deploy_%d" % ic.time()
+        jlog(job.name).info(f"creating deploy task {task_id} with {len(ext_list)} ext + {len(codex_list)} codex")
         task = DeployTask(
             name=task_id, status="queued", target_canister_id=job.backend_canister_id,
             registry_canister_id=registry_id, manifest_json=json.dumps(ext_manifest)[:8190], error="",
         )
         _build_steps(task, ext_manifest)
+        steps = list(task.steps)
+        jlog(job.name).info(f"built {len(steps)} steps for task {task_id}")
         job.ext_deploy_task_id = task_id
         _schedule_step_runner(task_id, 0)
+        jlog(job.name).info(f"extension task {task_id} scheduled")
     except Exception as e:
-        jlog(job.name).error(f"failed to create extension task: {e}")
+        jlog(job.name).error(f"failed to create extension task: {type(e).__name__}: {e}")
+        jlog(job.name).error(f"ext_manifest keys: {list(ext_manifest.keys())}, ext_list sample: {ext_list[:3]}")
         job.status = "registering"
         schedule_registration(job.name)
 
@@ -617,6 +650,12 @@ def enqueue_deployment(manifest_json: text) -> ResultEnqueue:
         requester = (manifest.get("requesting_principal") or str(ic.caller())).strip()
         canister_ids = manifest.get("canister_ids", {})
 
+        realm_info = manifest.get("realm", {})
+        ext_count = len(realm_info.get("extensions") or [])
+        codex_info = realm_info.get("codex")
+        _log.info(f"enqueue: realm='{realm_name}' network={network} manifest_len={len(manifest_json)} extensions={ext_count} codex={bool(codex_info)}")
+        _log.info(f"enqueue: realm_info keys={list(realm_info.keys())}")
+
         job_id = "job_%d" % ic.time()
         DeploymentJob(
             name=job_id, status="pending", caller_principal=requester,
@@ -626,7 +665,7 @@ def enqueue_deployment(manifest_json: text) -> ResultEnqueue:
             registry_canister_id=registry_id,
             created_at=now_s(),
         )
-        jlog(job_id).info(f"enqueued for '{realm_name}' on {network}")
+        jlog(job_id).info(f"enqueued for '{realm_name}' on {network} (extensions={ext_count}, codex={bool(codex_info)})")
         return ResultEnqueue(Ok=EnqueueOk(
             job_id=job_id, status="pending", realm_name=realm_name, network=network,
         ))
@@ -818,12 +857,18 @@ def report_frontend_verified(args: text) -> ResultReportFrontend:
             job.assets_verified = 1
             manifest = json.loads(job.manifest_json or "{}")
             realm_info = manifest.get("realm", {})
-            has_work = bool(realm_info.get("extensions")) or bool(realm_info.get("codex"))
+            exts = realm_info.get("extensions")
+            cdx = realm_info.get("codex")
+            has_work = bool(exts) or bool(cdx)
+            jlog(job_id).info(f"frontend verified: has_work={has_work}, extensions={type(exts).__name__}({len(exts) if isinstance(exts, list) else exts}), codex={type(cdx).__name__}")
+            jlog(job_id).info(f"manifest_json length={len(job.manifest_json or '')}, realm_info keys={list(realm_info.keys())}")
             if has_work:
                 job.status = "extensions"
+                jlog(job_id).info("entering extensions phase")
                 _start_extensions_for_job(job, manifest)
             else:
                 job.status = "registering"
+                jlog(job_id).info("no work, skipping to registration")
                 schedule_registration(job.name)
 
         return ResultReportFrontend(Ok=ReportFrontendOk(
