@@ -300,7 +300,7 @@ def schedule_registration(job_id_val: str):
             frontend_id = j.frontend_canister_id or ""
             url = f"https://{frontend_id}.icp0.io" if frontend_id else ""
             backend_url = f"https://{backend_id}.icp0.io" if backend_id else ""
-            logo = realm_info.get("branding", {}).get("logo", "") or realm_info.get("logo", "")
+            logo = "logo.png"
             canister_ids = f"{frontend_id}|||{backend_id}"
 
             if frontend_id and backend_id:
@@ -315,6 +315,23 @@ def schedule_registration(job_id_val: str):
                     jlog(job_id_val).error(f"canister_ids.js upload failed: {store_result['Err']}")
                 else:
                     jlog(job_id_val).info("canister_ids.js uploaded to frontend")
+
+            if backend_id and realm_info:
+                config = {
+                    "name": realm_name,
+                    "description": realm_info.get("description", ""),
+                    "welcome_message": realm_info.get("welcome_message", ""),
+                }
+                config_json = json.dumps(config).replace('\\', '\\\\').replace('"', '\\"')
+                config_arg = '("' + config_json + '")'
+                config_result: CallResult = yield ic.call_raw(
+                    Principal.from_str(backend_id), "update_realm_config",
+                    ic.candid_encode(config_arg), 0,
+                )
+                if isinstance(config_result, dict) and "Err" in config_result:
+                    jlog(job_id_val).error(f"update_realm_config failed: {config_result['Err']}")
+                else:
+                    jlog(job_id_val).info(f"realm config updated: name={realm_name}")
 
             registry = RealmRegistryService(Principal.from_str(reg_id))
             result: CallResult = yield registry.register_realm(

@@ -2,8 +2,6 @@
   "type": "realm",
   "name": "Syntropia",
   "description": "A full-featured representative democracy with separation of powers, progressive taxation, welfare benefits, land treaties, licensed private service providers, zones of action, and ZK passport-based citizenship.",
-  "logo": "emblem.png",
-  "welcome_image": "background.png",
   "welcome_message": "Welcome to Syntropia. A self-governing community built on transparency, fair taxation, and universal welfare. Verify your passport to join.",
   "codex": {
     "package": {

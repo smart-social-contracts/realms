@@ -2,8 +2,6 @@
   "type": "realm",
   "name": "NewRealm",
   "description": "A new realm",
-  "logo": "emblem.png",
-  "welcome_image": "background.png",
   "welcome_message": "Welcome to NewRealm",
   "codex": {
     "package": {

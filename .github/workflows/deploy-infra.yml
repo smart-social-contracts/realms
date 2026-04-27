@@ -195,6 +195,8 @@ jobs:
 
       - name: Build & deploy realm_registry_frontend
         if: inputs.canisters == 'all' || inputs.canisters == 'realm_registry_frontend'
+        env:
+          DFX_NETWORK: ${{ inputs.environment }}
         run: |
           NETWORK="${{ inputs.environment }}"
           CID="${{ steps.ids.outputs.realm_registry_frontend }}"
@@ -209,6 +211,8 @@ jobs:
 
       - name: Build & deploy file_registry_frontend
         if: inputs.canisters == 'all' || inputs.canisters == 'file_registry_frontend'
+        env:
+          DFX_NETWORK: ${{ inputs.environment }}
         run: |
           NETWORK="${{ inputs.environment }}"
           CID="${{ steps.ids.outputs.file_registry_frontend }}"
@@ -223,6 +227,8 @@ jobs:
 
       - name: Build & deploy marketplace_frontend
         if: inputs.canisters == 'all' || inputs.canisters == 'marketplace_frontend'
+        env:
+          DFX_NETWORK: ${{ inputs.environment }}
         run: |
           NETWORK="${{ inputs.environment }}"
           CID="${{ steps.ids.outputs.marketplace_frontend }}"
@@ -237,6 +243,8 @@ jobs:
 
       - name: Build & deploy platform_dashboard_frontend
         if: inputs.canisters == 'all' || inputs.canisters == 'platform_dashboard_frontend'
+        env:
+          DFX_NETWORK: ${{ inputs.environment }}
         run: |
           NETWORK="${{ inputs.environment }}"
           CID="${{ steps.ids.outputs.platform_dashboard_frontend }}"

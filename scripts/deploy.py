@@ -576,19 +576,11 @@ def deploy_frontend(
         static_images = frontend_dir / "static" / "images"
         static_images.mkdir(parents=True, exist_ok=True)
 
-        for img_name in ("emblem.png", "logo.svg", "logo.png"):
-            src = manifest_dir / img_name
+        for name in ("logo.png", "background.png"):
+            src = manifest_dir / name
             if src.exists():
-                dest = static_images / "logo.png"
-                shutil.copy2(src, dest)
-                print(f"   🖼️  Copied {img_name} → {dest}")
-
-        for img_name in ("background.png", "welcome.png", "background.jpg"):
-            src = manifest_dir / img_name
-            if src.exists():
-                dest = static_images / "background.png"
-                shutil.copy2(src, dest)
-                print(f"   🖼️  Copied {img_name} → {dest}")
+                shutil.copy2(src, static_images / name)
+                print(f"   🖼️  Copied {name} → {static_images / name}")
 
     # Generate realm_backend declarations for the frontend bundle.
     # The candid file is git-ignored (Basilisk generates it on backend

@@ -1540,8 +1540,6 @@ def create_foundational_objects() -> void:
         # 4. Create realm - try to load data from manifest.json if available
         realm_name = "Default Realm"
         realm_description = "A realm for digital governance and coordination"
-        realm_logo = ""
-        realm_welcome_image = ""
         realm_welcome_message = ""
 
         import json
@@ -1549,7 +1547,6 @@ def create_foundational_objects() -> void:
 
         manifest_json_str = "{}"  # default if no manifest.json found
         try:
-            # Look for manifest.json in common locations
             manifest_paths = [
                 "manifest.json",
                 "../manifest.json",
@@ -1561,13 +1558,6 @@ def create_foundational_objects() -> void:
                         manifest = json.load(f)
                     realm_name = manifest.get("name", realm_name)
                     realm_description = manifest.get("description", realm_description)
-                    # Filenames match asset canister /images/logo.png and /images/background.png
-                    realm_logo = (
-                        "logo.png" if manifest.get("logo") else ""
-                    )
-                    realm_welcome_image = (
-                        "background.png" if manifest.get("welcome_image") else ""
-                    )
                     realm_welcome_message = manifest.get("welcome_message", "")
                     calendar_config = manifest.get("calendar", {})
                     acct_currency_config = manifest.get("accounting_currency", {})
@@ -1586,8 +1576,8 @@ def create_foundational_objects() -> void:
         realm = Realm(
             name=realm_name,
             description=realm_description,
-            logo=realm_logo,
-            welcome_image=realm_welcome_image,
+            logo="logo.png",
+            welcome_image="background.png",
             welcome_message=realm_welcome_message,
             accounting_currency=acct_currency_config.get("symbol", "ckBTC"),
             accounting_currency_decimals=acct_currency_config.get("decimals", 8),
@@ -2628,14 +2618,6 @@ def update_realm_config(config_json: str) -> str:
         if "description" in config and config["description"]:
             realm.description = config["description"]
             updated_fields.append(f"description={config['description'][:50]}...")
-
-        if "logo" in config:
-            realm.logo = config["logo"] or ""
-            updated_fields.append(f"logo={config['logo']}")
-
-        if "welcome_image" in config:
-            realm.welcome_image = config["welcome_image"] or ""
-            updated_fields.append(f"welcome_image={config['welcome_image']}")
 
         if "welcome_message" in config:
             realm.welcome_message = config["welcome_message"] or ""

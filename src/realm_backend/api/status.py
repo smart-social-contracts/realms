@@ -60,28 +60,18 @@ def get_status() -> "dict[str, Any]":
     votes_count = Vote.count()
     user_profiles_count = UserProfile.count()
 
-    # Get realm info efficiently - only load first realm, not all realms
     realm_name = ""
-    realm_logo = ""
-    realm_welcome_image = ""
+    realm_logo = "/images/logo.png"
+    realm_welcome_image = "/images/background.png"
     realm_welcome_message = ""
     realm_description = ""
     try:
-        # Load only the first realm (ID 1) instead of all realms
         first_realm = Realm.load("1")
         if first_realm:
             realm_name = first_realm.name or ""
-            # Canonical asset-canister paths for branding files
-            logo_filename = getattr(first_realm, "logo", None) or ""
-            if logo_filename:
-                realm_logo = "/images/logo.png"
-            welcome_image_filename = getattr(first_realm, "welcome_image", None) or ""
-            if welcome_image_filename:
-                realm_welcome_image = "/images/background.png"
             realm_welcome_message = getattr(first_realm, "welcome_message", None) or ""
             realm_description = getattr(first_realm, "description", None) or ""
     except Exception:
-        # Realm might not exist yet
         pass
 
     # Extension discovery with version, commit, and datetime from manifests

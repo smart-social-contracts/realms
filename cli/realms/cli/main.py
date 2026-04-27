@@ -22,6 +22,7 @@ from .commands.marketplace import (
     marketplace_status_command,
 )
 from .commands.mundus import mundus_deploy_descriptor_command, mundus_deploy_new_command
+from .commands.files import files_publish_command, files_reset_command
 from .commands.quarter import (
     quarter_create_command,
     quarter_list_command,
@@ -583,6 +584,49 @@ def mundus_deploy_new(
 ) -> None:
     """Deploy a new realm with no existing canister IDs."""
     mundus_deploy_new_command(name, network, artifact_version, display_name, description, cleanup)
+
+
+# Create files subcommand group
+files_app = typer.Typer(name="files", help="File registry operations")
+app.add_typer(files_app, name="files", rich_help_panel="Lifecycle")
+
+
+@files_app.command("publish")
+def files_publish(
+    network: str = typer.Option(
+        "staging", "--network", "-n", help="Target network: staging, demo, test"
+    ),
+    registry: Optional[str] = typer.Option(
+        None, "--registry", "-r", help="File registry canister ID (auto-resolved from network)"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="dfx identity to use"
+    ),
+    extensions_only: bool = typer.Option(
+        False, "--extensions-only", help="Only publish extensions"
+    ),
+    codices_only: bool = typer.Option(
+        False, "--codices-only", help="Only publish codices"
+    ),
+) -> None:
+    """Publish all extensions and codices to the file registry."""
+    files_publish_command(network, registry, identity, extensions_only, codices_only)
+
+
+@files_app.command("reset")
+def files_reset(
+    network: str = typer.Option(
+        "staging", "--network", "-n", help="Target network: staging, demo, test"
+    ),
+    registry: Optional[str] = typer.Option(
+        None, "--registry", "-r", help="File registry canister ID (auto-resolved from network)"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="dfx identity to use"
+    ),
+) -> None:
+    """Wipe and reinstall the file registry canister."""
+    files_reset_command(network, registry, identity)
 
 
 # Create realm subcommand group

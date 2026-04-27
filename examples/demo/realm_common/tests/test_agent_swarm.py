@@ -79,7 +79,7 @@ SLOT_FOUNDER = PersonaSlot(
         "   realm_name – a creative unique name (add a random 3-char suffix like 'Aurora_7kx')\n"
         "   description – one sentence explaining the realm's vision\n"
         "   welcome_message – a short greeting for new citizens\n"
-        "   logo_url – https://raw.githubusercontent.com/smart-social-contracts/realms/main/examples/demo/realm_new/emblem.png\n"
+        "   logo_url – https://raw.githubusercontent.com/smart-social-contracts/realms/main/examples/demo/realm_new/logo.png\n"
         "   welcome_image_url – https://raw.githubusercontent.com/smart-social-contracts/realms/main/examples/demo/realm_new/background.png\n"
         "If deploy fails with 'insufficient credits', call registry_redeem_voucher "
         "with your principal and code 'BETA50', then retry the deploy.\n"

@@ -868,7 +868,6 @@ def realm_deploy_realm_command(
             "display_name": realm_name,
             "description": f"Realm created from CLI: {realm_name}",
             "welcome_message": f"Welcome to {realm_name}!",
-            "branding": {"logo": "emblem.png", "welcome_image": "background.png"},
             "codex": {"package": "syntropia", "version": "latest"},
             "extensions": ["all"],
         },

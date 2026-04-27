@@ -89,7 +89,7 @@ export async function buildRealmDeploymentManifest(formData, network, brandingUr
     String(welcome_message).trim() || `Welcome to ${name}!`;
 
   const branding = {
-    logo: 'emblem.png',
+    logo: 'logo.png',
     welcome_image: 'background.png',
   };
   if (brandingUrls?.logo_url) branding.logo_url = brandingUrls.logo_url;

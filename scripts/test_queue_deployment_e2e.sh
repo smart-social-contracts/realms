@@ -146,10 +146,6 @@ MANIFEST=$(cat <<EOF
     "display_name": "E2E Test Realm",
     "description": "Automated test realm for queue deployment pipeline",
     "welcome_message": "Welcome to the E2E test realm!",
-    "branding": {
-      "logo": "emblem.png",
-      "welcome_image": "background.png"
-    },
     "codex": {"package": "syntropia", "version": "latest"},
     "extensions": ["all"]
   },
