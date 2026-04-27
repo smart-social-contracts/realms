@@ -66,7 +66,7 @@ async function buildArtifactRefs(tag) {
  *
  * @param {object} formData - create-realm wizard state
  * @param {string} network - e.g. staging, demo
- * @param {{ logo_url?: string, welcome_image_url?: string }} [brandingUrls]
+ * @param {{ logo?: string, background?: string }} [brandingUrls]
  *   URLs returned by uploadBrandingFiles (deploy service).
  */
 export async function buildRealmDeploymentManifest(formData, network, brandingUrls) {
@@ -88,19 +88,11 @@ export async function buildRealmDeploymentManifest(formData, network, brandingUr
   welcome_message =
     String(welcome_message).trim() || `Welcome to ${name}!`;
 
-  const branding = {
-    logo: 'logo.png',
-    welcome_image: 'background.png',
-  };
-  if (brandingUrls?.logo_url) branding.logo_url = brandingUrls.logo_url;
-  if (brandingUrls?.welcome_image_url) branding.welcome_image_url = brandingUrls.welcome_image_url;
-
   const realm = {
     name,
     display_name: name,
     description,
     welcome_message,
-    branding,
     extensions: Array.isArray(formData.extensions) ? [...formData.extensions] : ['all'],
   };
 
@@ -117,16 +109,20 @@ export async function buildRealmDeploymentManifest(formData, network, brandingUr
     realm.assistant = formData.assistant;
   }
 
-  if (brandingUrls?.realm_data_url) {
-    realm.realm_data_url = brandingUrls.realm_data_url;
-  }
-
   const tag = CONFIG.deploy_release_tag;
   const canister_artifacts = tag ? await buildArtifactRefs(tag) : undefined;
 
-  return {
-    realm,
+  const manifest = {
+    name,
     network: network || 'staging',
+    realm,
     ...(canister_artifacts && { canister_artifacts }),
   };
+
+  const branding = {};
+  if (brandingUrls?.logo) branding.logo = brandingUrls.logo;
+  if (brandingUrls?.background) branding.background = brandingUrls.background;
+  if (Object.keys(branding).length > 0) manifest.branding = branding;
+
+  return manifest;
 }

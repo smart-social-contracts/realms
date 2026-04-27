@@ -179,12 +179,22 @@ def _build_manifest(realm_entry: dict, network: str, deploy_mode: str,
     project_root = get_project_root()
     manifest_path = realm_entry.get("manifest", "")
     realm_manifest = {}
+    manifest_dir = None
     if manifest_path:
         full_path = project_root / manifest_path
         if full_path.exists():
             realm_manifest = json.loads(full_path.read_text())
+            manifest_dir = full_path.parent
 
-    return {
+    branding = {}
+    if manifest_dir:
+        for name, key in [("logo.png", "logo"), ("background.png", "background")]:
+            img = manifest_dir / name
+            if img.exists():
+                console.print(f"  Uploading branding: {name}")
+                branding[key] = _upload_file(img)
+
+    result = {
         "name": realm_entry.get("display_name", realm_entry.get("name", "unknown")),
         "network": network,
         "deploy_mode": deploy_mode,
@@ -203,6 +213,9 @@ def _build_manifest(realm_entry: dict, network: str, deploy_mode: str,
         "registry_canister_id": _REGISTRY_IDS.get(network, ""),
         "installer_canister_id": _INSTALLER_IDS.get(network, ""),
     }
+    if branding:
+        result["branding"] = branding
+    return result
 
 
 def _submit_and_poll(manifest: dict, network: str) -> bool:

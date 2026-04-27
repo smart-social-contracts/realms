@@ -96,11 +96,10 @@
       const { uploadBrandingFiles } = await import('$lib/branding-upload.js');
 
       let brandingUrls = {};
-      if (formData.logo || formData.welcome_image || formData.realm_data_file) {
+      if (formData.logo || formData.welcome_image) {
         brandingUrls = await uploadBrandingFiles({
           logo: formData.logo,
-          welcome_image: formData.welcome_image,
-          realm_data: formData.realm_data_file,
+          background: formData.welcome_image,
         });
       }
 
@@ -475,8 +474,6 @@
       name: formData.name,
       languages: formData.languages,
       descriptions: formData.descriptions,
-      logo: formData.logo ? formData.logo.name : 'logo.png',
-      welcome_image: formData.welcome_image ? formData.welcome_image.name : 'welcome.png',
       welcome_messages: formData.welcome_messages
     };
 

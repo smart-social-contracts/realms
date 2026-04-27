@@ -1,47 +1,46 @@
 /**
- * Upload deployment files (branding images + realm data) to the deploy service.
+ * Upload branding images to the deploy service via /upload-file.
  *
- * Returns an object like:
- *   { logo_url: "https://deploy.../branding/files/abc/logo.png",
- *     welcome_image_url: "https://deploy.../branding/files/def/bg.png",
- *     realm_data_url: "https://deploy.../branding/files/ghi/realm_data.json" }
+ * Returns { logo?: "https://deploy.../...", background?: "https://deploy.../..." }
+ * matching the manifest branding schema.
  */
 import { CONFIG } from './config.js';
 
-/**
- * @param {{ logo?: File|null, welcome_image?: File|null, realm_data?: File|null }} files
- * @returns {Promise<{ logo_url?: string, welcome_image_url?: string, realm_data_url?: string }>}
- */
-export async function uploadBrandingFiles(files) {
-  const { logo, welcome_image, realm_data } = files;
-  if (!logo && !welcome_image && !realm_data) return {};
-
+async function _uploadSingleFile(file, base) {
   const form = new FormData();
-  if (logo) form.append('logo', logo);
-  if (welcome_image) form.append('welcome_image', welcome_image);
-  if (realm_data) form.append('realm_data', realm_data);
+  form.append('file', file);
 
-  const base = CONFIG.deploy_service_url.replace(/\/+$/, '');
-  const resp = await fetch(`${base}/branding/upload`, {
+  const resp = await fetch(`${base}/upload-file`, {
     method: 'POST',
     body: form,
   });
 
   if (!resp.ok) {
     const body = await resp.text();
-    throw new Error(`Deploy file upload failed (${resp.status}): ${body}`);
+    throw new Error(`File upload failed (${resp.status}): ${body}`);
   }
 
-  const { uploaded } = await resp.json();
+  const result = await resp.json();
+  return `${base}${result.url}`;
+}
+
+/**
+ * @param {{ logo?: File|null, background?: File|null }} files
+ * @returns {Promise<{ logo?: string, background?: string }>}
+ */
+export async function uploadBrandingFiles(files) {
+  const { logo, background } = files;
+  if (!logo && !background) return {};
+
+  const base = CONFIG.deploy_service_url.replace(/\/+$/, '');
   const result = {};
-  if (uploaded?.logo?.download_path) {
-    result.logo_url = `${base}${uploaded.logo.download_path}`;
+
+  if (logo) {
+    result.logo = await _uploadSingleFile(logo, base);
   }
-  if (uploaded?.welcome_image?.download_path) {
-    result.welcome_image_url = `${base}${uploaded.welcome_image.download_path}`;
+  if (background) {
+    result.background = await _uploadSingleFile(background, base);
   }
-  if (uploaded?.realm_data?.download_path) {
-    result.realm_data_url = `${base}${uploaded.realm_data.download_path}`;
-  }
+
   return result;
 }
