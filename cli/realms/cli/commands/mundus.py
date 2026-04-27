@@ -108,6 +108,16 @@ def _build_artifacts() -> dict[str, Path]:
     if result.returncode != 0:
         console.print(f"  [yellow]dfx generate warning: {result.stderr[:200]}[/yellow]")
 
+    decl_src = project_root / "src" / "declarations" / "realm_backend"
+    decl_dst = project_root / "src" / "realm_frontend" / "src" / "lib" / "declarations" / "realm_backend"
+    if decl_src.exists():
+        import shutil
+        decl_dst.parent.mkdir(parents=True, exist_ok=True)
+        if decl_dst.exists():
+            shutil.rmtree(decl_dst)
+        shutil.copytree(decl_src, decl_dst)
+        console.print("  Declarations copied to frontend")
+
     console.print("  Building frontend...")
     fe_dir = project_root / "src" / "realm_frontend"
     result = subprocess.run(["npm", "install", "--legacy-peer-deps"], cwd=fe_dir, capture_output=True, text=True)
