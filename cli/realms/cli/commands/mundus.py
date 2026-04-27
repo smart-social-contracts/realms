@@ -82,8 +82,17 @@ def _build_artifacts() -> dict[str, Path]:
 
     project_root = get_project_root()
 
-    console.print("  Building backend WASM...")
     build_env = {**os.environ, "CANISTER_CANDID_PATH": str(project_root / "src" / "realm_backend" / "realm_backend.did")}
+
+    console.print("  Installing extensions from source...")
+    result = subprocess.run(
+        ["realms", "extension", "install-from-source"],
+        cwd=project_root, capture_output=True, text=True, env=build_env,
+    )
+    if result.returncode != 0:
+        console.print(f"  [yellow]Extension install warning: {result.stderr[:300]}[/yellow]")
+
+    console.print("  Building backend WASM...")
     result = subprocess.run(
         ["python", "-m", "basilisk", "realm_backend", "src/realm_backend/main.py"],
         cwd=project_root, capture_output=True, text=True, env=build_env,
