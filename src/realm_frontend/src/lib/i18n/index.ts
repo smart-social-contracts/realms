@@ -330,16 +330,18 @@ export async function initI18n(options: InitI18nOptions = {}) {
   //    the realm_frontend WASM).
   await loadExtensionTranslations();
 
-  // 2) Runtime extension translations from file_registry (Layered Realm).
-  //    This is best-effort and never throws — a failure here just means some
-  //    extension labels fall back to manifest sidebar_label / raw keys.
-  if (options.backend) {
-    try {
-      await loadExtensionTranslationsFromRegistry(options.backend);
-    } catch (err) {
-      console.warn('[i18n] runtime extension translations failed (non-fatal):', err);
-    }
-  }
+  // 2) Runtime extension translations from file_registry.
+  //    Disabled: runtime ESM bundles are self-contained and handle their own
+  //    UI text. Fetching per-locale JSON from file_registry produces dozens of
+  //    browser-visible 404s for no benefit. Re-enable when extensions start
+  //    shipping dedicated i18n JSON files.
+  // if (options.backend) {
+  //   try {
+  //     await loadExtensionTranslationsFromRegistry(options.backend);
+  //   } catch (err) {
+  //     console.warn('[i18n] runtime extension translations failed (non-fatal):', err);
+  //   }
+  // }
 
   console.log('All translations (core + extensions) loaded');
 }
