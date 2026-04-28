@@ -76,12 +76,10 @@
 </script>
 
 <div class="p-4">
-	<h1 class="text-2xl font-bold mb-4">Extension: {id}</h1>
-
 	{#if status === 'loading'}
 		<div class="flex items-center gap-2 text-gray-600">
 			<Spinner size="5" />
-			<span>{debugInfo || 'Resolving extension...'}</span>
+			<span>{debugInfo || 'Loading extension...'}</span>
 		</div>
 	{:else if status === 'error'}
 		<Alert color="red" class="mb-4">
