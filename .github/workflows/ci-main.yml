@@ -32,13 +32,13 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-      - name: Install IC CLI
+      - name: Install dfx
         run: |
-          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/dfinity/icp-cli/releases/latest/download/icp-cli-installer.sh | sh
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-          if command -v icp &>/dev/null && ! command -v dfx &>/dev/null; then
-            ln -sf "$(which icp)" "$HOME/.cargo/bin/dfx" 2>/dev/null || true
-          fi
+          DFX_VERSION=0.32.0
+          curl -fsSL "https://github.com/dfinity/sdk/releases/download/${DFX_VERSION}/dfx-${DFX_VERSION}-x86_64-linux.tar.gz" -o /tmp/dfx.tar.gz
+          tar -xzf /tmp/dfx.tar.gz -C /usr/local/bin
+          rm /tmp/dfx.tar.gz
+          dfx --version
       - name: Install realms CLI + Python deps
         run: |
           pip install -r requirements.txt
