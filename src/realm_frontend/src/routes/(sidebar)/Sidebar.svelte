@@ -435,9 +435,13 @@
 						}
 					}
 
+					const displayName = inlineLabel
+						?? ext.name?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+						?? ext.id.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+
 					return {
 						translationKey: inlineLabel ? undefined : `extensions.${ext.id}.sidebar`,
-						name: inlineLabel ?? ext.name ?? ext.id,
+						name: displayName,
 						icon: iconComponent,
 						href,
 					};
@@ -446,6 +450,15 @@
 
 		return result;
 	})();
+
+	function resolveLabel(translationKey: string | undefined, name: string | undefined): string {
+		if (!translationKey) return name ?? '';
+		const translated = $_?.(translationKey) ?? translationKey;
+		if (translated === translationKey || translated.startsWith('extensions.')) {
+			return name ?? translationKey;
+		}
+		return translated;
+	}
 
 	function formatCategoryName(category: string): string {
 		return category
@@ -492,11 +505,11 @@
 									class={itemClass}
 								>
 									<svelte:component this={icon} class={iconClass} />
-									<span class="ml-3">{translationKey ? $_(translationKey) : name}</span>
+									<span class="ml-3">{resolveLabel(translationKey, name)}</span>
 								</a>
 							</li>
 						{:else}
-							<SidebarItem label={name} {href} spanClass="ml-3" class={itemClass}>
+							<SidebarItem label={resolveLabel(translationKey, name)} {href} spanClass="ml-3" class={itemClass}>
 								<svelte:component this={icon} slot="icon" class={iconClass} />
 							</SidebarItem>
 						{/if}
@@ -535,11 +548,11 @@
 											class={itemClass}
 										>
 											<svelte:component this={icon} class={iconClass} />
-											<span class="ml-3">{translationKey ? $_(translationKey) : name}</span>
+											<span class="ml-3">{resolveLabel(translationKey, name)}</span>
 										</a>
 									</li>
 								{:else}
-									<SidebarItem label={name} {href} spanClass="ml-3" class={itemClass}>
+									<SidebarItem label={resolveLabel(translationKey, name)} {href} spanClass="ml-3" class={itemClass}>
 										<svelte:component this={icon} slot="icon" class={iconClass} />
 									</SidebarItem>
 								{/if}
