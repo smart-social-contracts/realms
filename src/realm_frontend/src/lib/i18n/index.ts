@@ -135,48 +135,57 @@ function normalizeExtensionTranslationObject(
 }
 
 /**
- * Fetch a single locale's translation file for one extension and merge it
- * into svelte-i18n. Resolves to `true` on success, `false` if the file is
- * missing or invalid (which is *not* an error — many extensions don't have
- * translations for every locale).
+ * Probe whether an extension ships i18n files by trying en.json.
+ * Returns `{ prefix, enTranslations }` on success or null when no i18n
+ * exists. This keeps the 404 noise to at most 2 requests per extension
+ * (one per URL pattern) instead of 2*L (L = number of locales).
  */
-async function fetchAndRegisterExtensionLocale(
+async function probeExtensionI18n(
   baseUrl: string,
   extensionId: string,
   version: string,
-  locale: string,
-): Promise<boolean> {
+): Promise<{ prefix: string; enTranslations: Record<string, unknown> } | null> {
   const prefix = `${baseUrl}/ext/${extensionId}/${version}/frontend/i18n`;
-  const urls = [
-    `${prefix}/${locale}.json`,
-    // Older publishes walked frontend/i18n/locales and stored nested paths.
-    `${prefix}/extensions/${extensionId}/${locale}.json`,
+  const candidates = [
+    prefix,
+    `${prefix}/extensions/${extensionId}`,
   ];
-  try {
-    for (const url of urls) {
-      const res = await fetch(url, { credentials: "omit" });
-      if (!res.ok) {
-        continue;
-      }
+  for (const candidate of candidates) {
+    try {
+      const res = await fetch(`${candidate}/en.json`, { credentials: "omit" });
+      if (!res.ok) continue;
       const raw = await res.json();
       const translations = normalizeExtensionTranslationObject(extensionId, raw);
-      if (!translations) {
-        continue;
-      }
-      addMessages(locale, {
-        extensions: {
-          [extensionId]: translations,
-        },
-      });
-      return true;
+      if (translations) return { prefix: candidate, enTranslations: translations };
+    } catch {
+      // ignore
     }
-    return false;
-  } catch (err) {
-    // Networking issues are not fatal — extension i18n is best-effort.
-    console.warn(
-      `[i18n] Failed to fetch ${locale}.json for runtime extension '${extensionId}@${version}':`,
-      err,
-    );
+  }
+  return null;
+}
+
+/**
+ * Fetch one locale's translation file and merge it into svelte-i18n.
+ * `i18nPrefix` must be the working URL prefix discovered by `probeExtensionI18n`.
+ */
+async function fetchAndRegisterExtensionLocale(
+  i18nPrefix: string,
+  extensionId: string,
+  locale: string,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${i18nPrefix}/${locale}.json`, { credentials: "omit" });
+    if (!res.ok) return false;
+    const raw = await res.json();
+    const translations = normalizeExtensionTranslationObject(extensionId, raw);
+    if (!translations) return false;
+    addMessages(locale, {
+      extensions: {
+        [extensionId]: translations,
+      },
+    });
+    return true;
+  } catch {
     return false;
   }
 }
@@ -215,33 +224,42 @@ export async function loadExtensionTranslationsFromRegistry(
   }
 
   const sources = parsed.sources ?? {};
-  const tasks: Array<Promise<boolean>> = [];
   let registeredCount = 0;
   let extensionCount = 0;
+  let skippedCount = 0;
 
   for (const extId of parsed.runtime_extensions) {
     const src = sources[extId];
     if (!src?.registry_canister_id || !src?.version) {
-      // Bundled or manually-installed extensions don't have registry coords.
       continue;
     }
     extensionCount++;
     const baseUrl = fileRegistryBaseUrlFor(src.registry_canister_id);
-    for (const locale of locales) {
-      const t = fetchAndRegisterExtensionLocale(baseUrl, extId, src.version, locale).then(
-        (ok) => {
-          if (ok) registeredCount++;
-          return ok;
-        },
+
+    // Probe en.json first; if it 404s the extension ships no i18n at all
+    // and we skip the remaining locales (avoids N*L useless 404s).
+    const probe = await probeExtensionI18n(baseUrl, extId, src.version);
+    if (probe) {
+      // en.json already fetched and parsed by the probe — register it directly
+      addMessages("en", { extensions: { [extId]: probe.enTranslations } });
+      registeredCount++;
+      const remaining = locales.filter((l) => l !== "en");
+      const results = await Promise.all(
+        remaining.map((locale) =>
+          fetchAndRegisterExtensionLocale(probe.prefix, extId, locale),
+        ),
       );
-      tasks.push(t);
+      registeredCount += results.filter(Boolean).length;
+    } else {
+      skippedCount++;
     }
   }
 
-  await Promise.all(tasks);
   console.log(
     `[i18n] Runtime extension translations loaded: ${registeredCount} file(s) ` +
-      `across ${extensionCount} extension(s) and ${locales.length} locale(s).`,
+      `across ${extensionCount} extension(s) and ${locales.length} locale(s)` +
+      (skippedCount ? ` (${skippedCount} without i18n)` : "") +
+      `.`,
   );
 }
 
