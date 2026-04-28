@@ -327,64 +327,25 @@
 	});
 	
 	/**
-	 * SIDEBAR EXTENSION FILTERING RULES
-	 * 
-	 * This function implements the following filtering logic for sidebar extension visibility:
-	 * 
-	 * 1. SHOW_IN_SIDEBAR CHECK:
-	 *    - If show_in_sidebar is false, do not show the extension icon in the sidebar
-	 * 
-	 * 2. UNAUTHENTICATED USERS (neither admin nor member):
-	 *    - Only show llm_chat extension (AI Assistant) and Public Dashboard
-	 * 
-	 * 3. MEMBER USERS:
-	 *    - Show extensions that contain "member" among the list of values of the "profiles" attribute in manifest
-	 * 
-	 * 4. ADMIN USERS:
-	 *    - Show extensions that contain "admin" among the list of values of the "profiles" attribute in manifest
-	 * 
-	 * 5. ADDITIONAL FILTERS:
-	 *    - Skip if extension is explicitly disabled (enabled: false)
-	 *    - Skip if path is explicitly set to null (hide from sidebar)
+	 * Sidebar visibility is driven entirely by the manifest's `profiles` field:
+	 *   - profiles is empty/absent → visible to everyone (including guests)
+	 *   - profiles is non-empty     → user must hold at least one listed profile
 	 */
 	function filterExtensionsForSidebar(extensions: ExtensionMetadataWithPath[], userProfiles: string[]): ExtensionMetadataWithPath[] {
-		if (!extensionsLoaded) {
-			console.log('Extensions not loaded yet, returning empty array');
-			return [];
-		}
-		console.log('Filtering extensions:', extensions.length, 'User profiles:', userProfiles);
-		
+		if (!extensionsLoaded) return [];
+
 		return extensions.filter(ext => {
-			console.log('Checking extension:', ext.name, 'enabled:', ext.enabled, 'show_in_sidebar:', ext.show_in_sidebar, 'profiles:', ext.profiles);
-			
-			// Skip if extension is not enabled
 			if (ext.enabled === false) return false;
-			
-			// RULE 1: Skip if show_in_sidebar is explicitly set to false
 			if (ext.show_in_sidebar === false) return false;
-			
-			// Note: url_path can be null (which means use default /extensions/{name} route)
-			// We don't filter based on url_path being null
-			
-			// RULE 2: If user is neither admin nor member, only show llm_chat and public_dashboard
-			if (!userProfiles || userProfiles.length === 0 || 
-				(!userProfiles.includes('admin') && !userProfiles.includes('member'))) {
-				const allowedForUnauthenticated = ['llm_chat', 'public_dashboard'];
-				const isAllowed = allowedForUnauthenticated.includes(ext.name);
-				console.log('Unauthenticated user - extension allowed:', isAllowed);
-				return isAllowed;
-			}
-			
-			// If no profiles specified in extension manifest, show to all authenticated users
-			if (!ext.profiles || !Array.isArray(ext.profiles) || ext.profiles.length === 0) {
-				console.log('Extension has no profile restrictions, showing to authenticated users');
+
+			const required = ext.profiles;
+			if (!required || !Array.isArray(required) || required.length === 0) {
 				return true;
 			}
-			
-			// RULE 3 & 4: Check if current user has any of the profiles required by the extension
-			const hasProfile = ext.profiles.some((profile: string) => userProfiles.includes(profile));
-			console.log('Profile check result:', hasProfile);
-			return hasProfile;
+
+			if (!userProfiles || userProfiles.length === 0) return false;
+
+			return required.some((p: string) => userProfiles.includes(p));
 		});
 	}
 
@@ -411,21 +372,15 @@
 	// Filter extensions based on user profiles and create menu items
 	let filteredExtensions: ExtensionMetadataWithPath[] = [];
 	
-	// Reactive statement with explicit dependency tracking
+	// Re-filter whenever extensions, profiles, or loading state change.
+	// We no longer gate on profilesLoading — if profiles haven't loaded yet
+	// we pass an empty array so the filter treats the user as a guest and
+	// still shows the public subset (llm_chat, public_dashboard).
 	$: {
-		console.log('=== SIDEBAR REACTIVE UPDATE ===');
-		console.log('extensionsLoaded:', extensionsLoaded);
-		console.log('profilesLoading:', $profilesLoading);
-		console.log('userProfiles:', $userProfiles);
-		console.log('extensions count:', extensions.length);
-		console.log('raw extensions:', extensions);
-		
-		if (extensionsLoaded && !$profilesLoading) {
-			console.log('Both extensions and profiles are ready, filtering...');
-			filteredExtensions = filterExtensionsForSidebar(extensions, $userProfiles);
-			console.log('Filtered extensions result:', filteredExtensions);
+		const effectiveProfiles = $profilesLoading ? [] : $userProfiles;
+		if (extensionsLoaded) {
+			filteredExtensions = filterExtensionsForSidebar(extensions, effectiveProfiles);
 		} else {
-			console.log('Waiting for data - extensionsLoaded:', extensionsLoaded, 'profilesLoading:', $profilesLoading);
 			filteredExtensions = [];
 		}
 	}
@@ -451,46 +406,20 @@
 
 	// Create navigation items for each category
 	$: categorizedNavItems = (() => {
-		console.log('=== CREATING CATEGORIZED NAV ITEMS ===');
-		console.log('extensionsByCategory:', extensionsByCategory);
-		
+		const excluded = new Set(['demo_loader', 'test_bench']);
 		const result: Record<string, NavItemWithHref[]> = {};
-		
+
 		Object.entries(extensionsByCategory).forEach(([category, exts]) => {
-			console.log(`Processing category: ${category}, extensions:`, exts);
 			result[category] = exts
-				.filter(ext => {
-					// Exclude extensions that are handled separately or have special logic
-					const excluded = [
-						'demo_loader',
-						'test_bench'
-					];
-					const isExcluded = excluded.includes(ext.id);
-					console.log(`Extension ${ext.id} excluded:`, isExcluded);
-					return !isExcluded;
-				})
+				.filter(ext => !excluded.has(ext.id as string))
 				.map(ext => {
-					console.log(`Mapping extension ${ext.id}:`, ext);
-					// Determine href based on url_path field (new manifest schema)
-					let href: string;
-					if (ext.url_path === undefined || ext.url_path === null) {
-						// Default behavior: use extensions/<extension_id> route
-						href = `/extensions/${ext.id}`;
-					} else {
-						// Use custom path from url_path field
-						href = `/${ext.url_path}`;
-					}
+					const href = (ext.url_path === undefined || ext.url_path === null)
+						? `/extensions/${ext.id}`
+						: `/${ext.url_path}`;
 
-					// Consistent handling for all extensions
 					const iconComponent = getIcon(ext.icon) || LayersSolid;
-					console.log(`Extension ${ext.id}: icon="${ext.icon}", resolved to:`, iconComponent);
-					console.log(`Extension ${ext.id}: href="${href}"`);
 
-					// Resolve a display label, in this order:
-					//   1) manifest.sidebar_label[currentLocale] (or "en" or first key)
-					//   2) i18n key extensions.<id>.sidebar (legacy bundled-style)
-					//   3) manifest.name
-					//   4) ext.id
+					// Resolve display label: sidebar_label[locale] → i18n key → name → id
 					let inlineLabel: string | undefined;
 					const sl = ext.sidebar_label as any;
 					if (sl) {
@@ -506,18 +435,15 @@
 						}
 					}
 
-					const navItem = {
+					return {
 						translationKey: inlineLabel ? undefined : `extensions.${ext.id}.sidebar`,
 						name: inlineLabel ?? ext.name ?? ext.id,
 						icon: iconComponent,
 						href,
 					};
-					console.log(`Created nav item for ${ext.id}:`, navItem);
-					return navItem;
 				});
 		});
-		
-		console.log('Final categorized nav items:', result);
+
 		return result;
 	})();
 
