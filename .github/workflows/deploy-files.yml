@@ -62,10 +62,14 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install dfx
+      - name: Install IC CLI
         run: |
-          DFXVM_INIT_YES=1 sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
-          echo "$HOME/.local/share/dfx/bin" >> "$GITHUB_PATH"
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/dfinity/icp-cli/releases/latest/download/icp-cli-installer.sh | sh
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          # Create dfx shim for backward compatibility
+          if command -v icp &>/dev/null && ! command -v dfx &>/dev/null; then
+            ln -sf "$(which icp)" "$HOME/.cargo/bin/dfx" 2>/dev/null || true
+          fi
 
       - name: Install realms CLI
         run: |
