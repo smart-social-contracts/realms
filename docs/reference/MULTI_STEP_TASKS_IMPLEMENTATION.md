@@ -130,7 +130,7 @@ def run(...,
 
 ### Command
 ```bash
-realms run --config examples/multi_step_task_config.json
+basilisk-toolkit exec -f examples/multi_step_task_config.json
 ```
 
 ## Key Features
@@ -171,7 +171,7 @@ Calling backend to create multi-step task...
    First run at: 1762860706
    Repeat every: 3600s
 
-Use 'realms ps ls' to view scheduled tasks
+Task scheduled successfully.
 ```
 
 ### ✅ Error Handling
@@ -202,8 +202,8 @@ Use 'realms ps ls' to view scheduled tasks
 
 ### Integration
 - [ ] Create simple 2-step task
-- [ ] Verify execution in `realms ps ls`
-- [ ] Check logs with `realms ps logs`
+- [ ] Verify execution via basilisk-toolkit task management
+- [ ] Check logs via basilisk-toolkit
 - [ ] Test recurring task
 - [ ] Test one-time task
 - [ ] Test async + sync combination
@@ -217,14 +217,10 @@ Use 'realms ps ls' to view scheduled tasks
 
 2. **Test with example config**:
    ```bash
-   realms run --config examples/multi_step_task_config.json
+   basilisk-toolkit exec -f examples/multi_step_task_config.json
    ```
 
-3. **Monitor execution**:
-   ```bash
-   realms ps ls
-   realms ps logs <task_id>
-   ```
+3. **Monitor execution** via basilisk-toolkit task management.
 
 4. **Check canister logs**:
    ```bash

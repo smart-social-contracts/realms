@@ -1,5 +1,5 @@
-# Example sync code for realms shell
-# Usage: realms shell --file examples/sync_example.py
+# Example sync code for basilisk canister execution
+# Usage: basilisk-toolkit exec -f examples/sync_example.py
 
 from _cdk import ic
 from ggg import Member, Treasury

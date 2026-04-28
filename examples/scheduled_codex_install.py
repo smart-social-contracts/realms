@@ -8,7 +8,7 @@ This demonstrates:
 - TaskManager and TaskSchedule usage
 
 Run with:
-    realms shell --file examples/scheduled_codex_install.py
+    basilisk-toolkit exec -f examples/scheduled_codex_install.py
 """
 
 from ggg import Codex

@@ -79,12 +79,12 @@ See [Core Entities](./CORE_ENTITIES) for complete details.
 # Realm Management
 realms realm create          # Create new realm
 realms realm deploy          # Deploy canisters
-realms import                # Import data
+realms db import             # Import data
+realms db export             # Export data
 
-# Task Management
-realms run                   # Execute code
-realms ps ls                 # List tasks
-realms ps logs               # View logs
+# Code Execution (via basilisk-toolkit)
+basilisk-toolkit exec        # Execute code in canister
+basilisk shell               # Interactive canister shell
 
 # Extensions
 realms extension list        # List extensions

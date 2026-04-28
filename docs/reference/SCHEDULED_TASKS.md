@@ -73,7 +73,7 @@ sequenceDiagram
     participant Scheduler as Task Scheduler
     participant Executor as Code Executor
     
-    CLI->>Backend: realms run --file task.py --every 10
+    CLI->>Backend: basilisk-toolkit exec -f task.py
     Backend->>Backend: Create Codex (store code)
     Backend->>Backend: Create Task
     Backend->>Backend: Create TaskStep with Call
@@ -87,83 +87,26 @@ sequenceDiagram
         Backend->>Backend: Update TaskExecution status
     end
     
-    CLI->>Backend: realms ps logs <task_id>
+    CLI->>Backend: basilisk-toolkit (task management)
     Backend->>CLI: Return execution history
 ```
 
 ## CLI Reference
 
-### Running Tasks
+Code execution and task management are handled by `basilisk-toolkit`:
 
 ```bash
-# Run a Python file once (immediate execution)
-realms run --file examples/my_task.py
+# Execute a Python file on the canister
+basilisk-toolkit exec -f examples/my_task.py
 
-# Run every 10 seconds (scheduled task)
-realms run --file examples/my_task.py --every 10
+# Interactive shell
+basilisk shell
 
-# Run after a 30-second delay
-realms run --file examples/my_task.py --after 30
-
-# Run with a multi-step config file
-realms run --config task_config.json
-
-# Specify network and canister
-realms run --file task.py --network staging --canister realm_backend
+# Specify canister and network
+basilisk-toolkit exec --canister my_app --network ic -f task.py
 ```
 
-### Managing Tasks (`realms ps`)
-
-#### List Tasks
-
-```bash
-# List all scheduled and running tasks
-realms ps ls
-
-# Show detailed metadata
-realms ps ls --verbose
-
-# Output as JSON (for scripting)
-realms ps ls --output json
-
-# Specify realm folder
-realms ps ls --folder .realms/my_realm
-```
-
-#### Start/Stop Tasks
-
-```bash
-# Start a stopped task
-realms ps start <task_id>
-
-# Stop a running task
-realms ps kill <task_id>
-
-# Task IDs can be partial (first 8 characters)
-realms ps kill abc12345
-```
-
-#### View Logs
-
-```bash
-# View execution history (last 20 executions)
-realms ps logs <task_id>
-
-# Show last 50 executions
-realms ps logs <task_id> --tail 50
-
-# Follow logs in real-time (like tail -f)
-realms ps logs <task_id> --follow
-
-# Save logs to a file
-realms ps logs <task_id> --output-file task.log
-
-# Pagination for large log sets
-realms ps logs <task_id> --limit 100 --from 0
-
-# Output as JSON
-realms ps logs <task_id> --output json
-```
+Task scheduling and management (creating recurring tasks, listing, starting, stopping, viewing logs) are provided by the `ic-basilisk-toolkit` package. See the basilisk-toolkit documentation for details.
 
 ## Task Code Requirements
 

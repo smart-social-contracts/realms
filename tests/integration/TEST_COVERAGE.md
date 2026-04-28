@@ -16,21 +16,8 @@ Tests the `realms db` interactive database explorer command.
 
 **Coverage:** 4/4 tests passing
 
-### ✅ test_shell_command.py
-Tests the `realms shell` and `realms run` commands for Python code execution.
-
-**Tests:**
-- `test_shell_command_help()` - Shell help output
-- `test_run_command_help()` - Run help output
-- `test_run_command_with_simple_code()` - Basic code execution
-- `test_run_command_with_ggg_imports()` - GGG entity imports in canister
-- `test_run_command_with_entity_query()` - Database queries from code
-- `test_run_command_with_network_option()` - Network parameter support
-- `test_shell_interactive_mode_exits()` - Interactive shell startup/exit
-
-**Coverage:** 7/7 tests passing
-
-**Note:** `realms run --file` executes Python code **remotely in the canister**, not locally. Tests verify successful execution via JSON response, not direct print output.
+### ~~test_shell_command.py~~ (removed)
+The `realms shell` and `realms run` commands have been removed. Code execution is now handled by `basilisk-toolkit exec` and `basilisk shell`.
 
 ### ✅ test_status_api.py
 Tests backend canister status endpoints.
@@ -120,9 +107,8 @@ See `.github/workflows/ci-main.yml` for the full CI configuration.
 
 ## Total Coverage
 
-**Integration Tests:** 41/41 passing ✅
+**Integration Tests:** 34/34 passing ✅
 - DB command: 4 tests
-- Shell/Run command: 7 tests  
 - Status API: 3 tests
 - Extensions API: 3 tests
 - GGG Entities API: 5 tests
@@ -135,13 +121,13 @@ The following CLI commands are tested through CI workflows:
 - ✅ `realms realm create` - Used in integration test setup
 - ✅ `realms realm deploy` - Used in integration test setup
 - ✅ `realms extension install-from-source` - Used in Docker builds
-- ✅ `realms import` - Used in generated upload scripts
+- ✅ `realms db import` - Used in generated upload scripts
 
 ## Remaining Test Gaps
 
 Commands without dedicated integration tests:
 - ❌ `realms registry` (add/list/get/remove/search/count)
 - ❌ `realms network` (set/current/unset)
-- ❌ `realms import` (direct testing - only indirect via create)
+- ❌ `realms db import` (direct testing - only indirect via create)
 
 These commands are lower priority as they're less frequently used in production workflows.

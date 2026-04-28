@@ -1,7 +1,7 @@
 #!/bin/bash
 # Upload realm data and codex files
 # NOTE: This script requires the admin_dashboard extension to be installed
-# The 'realms import' command uses the admin_dashboard extension backend
+# The 'realms db import' command uses the admin_dashboard extension backend
 
 set -e
 
@@ -30,9 +30,9 @@ echo "🎯 Target canister: $BACKEND_NAME (auto-detected from dfx.json)"
 UPLOAD_SUCCESS=false
 
 # Build realms command with network parameter and canister name
-REALMS_CMD="realms import --canister $BACKEND_NAME"
+REALMS_CMD="realms db import --canister $BACKEND_NAME"
 if [ "$NETWORK" != "local" ]; then
-    REALMS_CMD="realms import --network $NETWORK --canister $BACKEND_NAME"
+    REALMS_CMD="realms db import --network $NETWORK --canister $BACKEND_NAME"
 fi
 
 # Check if realm_data.json exists and has content

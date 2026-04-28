@@ -157,12 +157,11 @@ Extensions can override entity methods, add UI routes, and call backend function
 # Realm lifecycle
 realms realm create --citizens 100 --organizations 10
 realms realm deploy --network ic
-realms import realm_data.json
+realms db import realm_data.json
 
-# Task management
-realms run codex.py
-realms ps ls
-realms ps logs <task_id>
+# Code execution (via basilisk-toolkit)
+basilisk-toolkit exec -f codex.py
+basilisk shell
 
 # Extensions
 realms extension install my_extension.zip
@@ -257,7 +256,7 @@ cd generated_realm
 dfx deploy --network ic
 
 # 3. Upload data
-realms import realm_data.json --network ic
+realms db import realm_data.json --network ic
 
 # 4. Register (optional)
 realms registry add --network ic

@@ -545,13 +545,13 @@ ic.print("✅ Tax rate updated to 10%")
 
 ```bash
 # Submit proposal from file
-realms run --file submit_proposal.py
+basilisk-toolkit exec -f submit_proposal.py
 
-# Schedule vote tallying
-realms run --file tally_votes.py --every 86400
+# Execute vote tallying
+basilisk-toolkit exec -f tally_votes.py
 
 # Monitor proposals
-realms shell --file list_proposals.py
+basilisk-toolkit exec -f list_proposals.py
 ```
 
 ---

@@ -299,16 +299,19 @@ Extensions can access:
 
 ## Running Python Code in Realms
 
-The `realms shell` command executes Python code inside the realm canister using the unified `execute_code()` function, which automatically detects and handles both synchronous and asynchronous code via the TaskManager.
+Python code can be executed inside the realm canister using `basilisk shell` (interactive) or `basilisk-toolkit exec` (file-based). These commands use the unified `execute_code()` function, which automatically detects and handles both synchronous and asynchronous code via the TaskManager.
 
 ### Basic Usage
 
 ```bash
 # Sync code - executes immediately, returns result
-realms shell --file examples/sync_example.py
+basilisk-toolkit exec -f examples/sync_example.py
 
 # Async code - schedules task, returns task ID
-realms shell --file examples/async_example.py
+basilisk-toolkit exec -f examples/async_example.py
+
+# Interactive shell
+basilisk shell
 ```
 
 ### Response Format
@@ -368,22 +371,7 @@ See `examples/sync_example.py` and `examples/async_example.py` for working examp
 
 ## Scheduled Tasks
 
-Schedule Python code to run automatically at regular intervals.
-
-```bash
-# Run a file once
-realms run --file examples/my_task.py
-
-# Run every 10 seconds
-realms run --file examples/my_task.py --every 10
-
-# Manage tasks
-realms ps ls                    # List all tasks
-realms ps start <task_id>       # Start a task
-realms ps kill <task_id>        # Stop a task
-realms ps logs <task_id>        # View execution logs
-realms ps logs <task_id> -f     # Follow logs in real-time
-```
+Task scheduling and management is handled via `basilisk-toolkit`. See the basilisk-toolkit documentation for details on creating, monitoring, and managing scheduled tasks.
 
 📖 **Full documentation**: [Scheduled Tasks Reference](./docs/reference/SCHEDULED_TASKS.md)
 
@@ -418,7 +406,7 @@ realms realm create --realm-name "My Realm"
 
 # Import data
 cd generated_realm
-realms import ../my_realm_data.json
+realms db import ../my_realm_data.json
 
 # Deploy
 realms realm deploy
@@ -427,7 +415,7 @@ realms realm deploy
 ### Administration
 
 Manage realm data:
-- **Via CLI**: `realms import <data.json>` or `realms import <codex.py> --type codex`
+- **Via CLI**: `realms db import <data.json>` or `realms db import <codex.py> --type codex`
 - **Via UI**: Use the Admin Dashboard extension (admin-only access)
 - **Via Extensions**: Extensions can provide custom data management interfaces
 

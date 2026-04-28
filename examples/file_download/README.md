@@ -13,13 +13,10 @@ This folder contains examples of downloading files from the internet within ICP 
 
 ```bash
 # Run once (simple example)
-realms run --file examples/file_download/simple_download.py
+basilisk-toolkit exec -f examples/file_download/simple_download.py
 
-# Run word counter every 5 minutes
-realms run --file examples/file_download/word_counter.py --every 300
-
-# Check task status
-realms ps ls
+# Run word counter
+basilisk-toolkit exec -f examples/file_download/word_counter.py
 ```
 
 ## Documentation

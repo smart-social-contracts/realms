@@ -100,10 +100,7 @@ realms extension install <extension_name>
 
 ### View Running Tasks
 
-```bash
-realms ps ls
-realms ps logs <task_id>
-```
+Task management is handled via `basilisk-toolkit`. See the basilisk-toolkit documentation for listing and monitoring tasks.
 
 ## Getting Help
 

@@ -1,6 +1,5 @@
-# Example async code for realms shell
-# Usage: realms shell --file examples/async_example.py
-# Usage with wait: realms shell --file examples/async_example.py --wait
+# Example async code for basilisk canister execution
+# Usage: basilisk-toolkit exec -f examples/async_example.py
 
 from _cdk import ic
 from ggg import Treasury

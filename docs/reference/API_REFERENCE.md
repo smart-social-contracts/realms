@@ -432,25 +432,25 @@ get_registry_info: () -> (text)
 
 ## Data Import/Export
 
-### Import via Extension
+### Import via CLI
 Bulk data import through admin_dashboard extension.
 
 **Example:**
 ```bash
 # Import JSON entities
-realms import realm_data.json
+realms db import realm_data.json
 
 # Import codex
-realms import tax_collection.py --type codex
+realms db import tax_collection.py --type codex
 ```
 
 ### Export via CLI
 ```bash
 # Export all data
-realms export --output-dir exported_realm
+realms db export --output-dir exported_realm
 
 # Export specific entities
-realms export --entity-types User,Proposal,Vote
+realms db export --entity-types User,Proposal,Vote
 ```
 
 ---
@@ -531,10 +531,12 @@ const result = await callBackend('extension_sync_call', [{
 # Using dfx directly
 dfx canister call realm_backend status
 
-# Using realms CLI
-realms shell --file my_code.py
-realms ps ls
-realms import data.json
+# Using basilisk-toolkit for code execution
+basilisk-toolkit exec -f my_code.py
+basilisk shell
+
+# Using realms CLI for data operations
+realms db import data.json
 ```
 
 ### Extension Backend

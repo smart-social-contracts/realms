@@ -18,14 +18,10 @@ ICP canisters can make HTTP requests to external services using the management c
 
 ```bash
 # Run the simple download example once
-realms run --file examples/file_download/simple_download.py
+basilisk-toolkit exec -f examples/file_download/simple_download.py
 
-# Run the word counter every 5 minutes
-realms run --file examples/file_download/word_counter.py --every 300
-
-# Monitor the task
-realms ps ls
-realms ps logs <task_id>
+# Task scheduling (e.g., running the word counter every 5 minutes)
+# is managed via basilisk-toolkit. See basilisk-toolkit documentation.
 ```
 
 ---
@@ -186,22 +182,7 @@ For consensus, all replicas must agree on the response. Use a transform function
 
 ## Scheduling as Recurring Task
 
-```bash
-# Run every 60 seconds
-realms run --file examples/file_download/word_counter.py --every 60
-
-# Run every 5 minutes, starting after 10 seconds
-realms run --file examples/file_download/word_counter.py --every 300 --after 10
-
-# List all scheduled tasks
-realms ps ls
-
-# View logs
-realms ps logs <task_id>
-
-# Stop task
-realms ps kill <schedule_id>
-```
+Task scheduling is managed via `basilisk-toolkit`. See the basilisk-toolkit documentation for details on creating recurring tasks, viewing logs, and managing task lifecycles.
 
 ---
 

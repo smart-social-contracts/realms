@@ -217,17 +217,13 @@ dfx canister call realm_backend my_method --timeout 120
 
 **Solution:**
 ```bash
-# List tasks
-realms ps ls
-
-# Check logs
-realms ps logs <task_id> --tail 50
-
 # Verify schedule
 dfx canister call realm_backend list_scheduled_tasks
 
-# Manual run
-realms run --file my_task.py
+# Manual run via basilisk-toolkit
+basilisk-toolkit exec -f my_task.py
+
+# Task management is handled via basilisk-toolkit
 ```
 
 ---
@@ -236,7 +232,7 @@ realms run --file my_task.py
 
 ### Import Fails
 
-**Problem:** `realms import` fails with errors.
+**Problem:** `realms db import` fails with errors.
 
 **Solution:**
 ```bash
@@ -244,10 +240,10 @@ realms run --file my_task.py
 python -m json.tool realm_data.json
 
 # Use smaller batches
-realms import data.json --batch-size 10
+realms db import data.json --batch-size 10
 
 # Dry run first
-realms import data.json --dry-run
+realms db import data.json --dry-run
 
 # Check backend logs
 dfx canister logs realm_backend
@@ -286,7 +282,7 @@ user = User.load_by_id(5)  # By internal ID
 **Solution:**
 ```bash
 # Export data
-realms export --output-dir backup
+realms db export --output-dir backup
 
 # Reinstall canister (wipes data!)
 dfx deploy realm_backend --mode reinstall
@@ -295,7 +291,7 @@ dfx deploy realm_backend --mode reinstall
 dfx canister call realm_backend initialize
 
 # Re-import essential data only
-realms import critical_data.json
+realms db import critical_data.json
 ```
 
 ---
@@ -552,7 +548,7 @@ dfx canister deposit-cycles 1000000000000 realm_backend
 ### "Storage full"
 ```bash
 # Solution: Export and reinstall
-realms export
+realms db export
 dfx deploy --mode reinstall
 ```
 
@@ -578,16 +574,16 @@ dfx canister logs realm_backend
 
 # Frontend dev logs
 npm run dev  # Watch console
-
-# Task logs
-realms ps logs <task_id>
 ```
 
 ### Test in Shell
 
 ```bash
 # Interactive testing
-realms shell --file test.py
+basilisk shell
+
+# Execute a file
+basilisk-toolkit exec -f test.py
 
 # Or direct call
 dfx canister call realm_backend execute_code '("print(User.count())")'
@@ -621,7 +617,6 @@ ls examples/
 ### 3. Check Logs
 ```bash
 dfx canister logs realm_backend
-realms ps logs <task_id>
 ```
 
 ### 4. Community Support
@@ -636,7 +631,7 @@ realms ps logs <task_id>
 ### Development Best Practices
 - Test locally before IC deployment
 - Use version control
-- Regular backups (`realms export`)
+- Regular backups (`realms db export`)
 - Monitor cycles balance
 - Keep dependencies updated
 

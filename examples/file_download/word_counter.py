@@ -7,7 +7,7 @@ This codex demonstrates:
 3. Async task pattern with yield
 
 Usage:
-    realms run --file examples/file_download/word_counter.py --every 300
+    basilisk-toolkit exec -f examples/file_download/word_counter.py
 """
 
 from _cdk import ic, Async, CallResult, match

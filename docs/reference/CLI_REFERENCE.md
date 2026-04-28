@@ -161,24 +161,24 @@ realms mundus deploy --mundus-dir .realms/mundus/... --mode reinstall
 
 ## Data Operations
 
-### `realms import`
+### `realms db import`
 Import data into realm.
 
 ```bash
 # Import JSON data (auto-detected)
-realms import realm_data.json
+realms db import realm_data.json
 
 # Import codex
-realms import tax_collection.py --type codex
+realms db import tax_collection.py --type codex
 
 # Batch import
-realms import large_dataset.json --batch-size 50
+realms db import large_dataset.json --batch-size 50
 
 # Dry run
-realms import data.json --dry-run
+realms db import data.json --dry-run
 
 # Specific network
-realms import data.json --network staging --identity prod
+realms db import data.json --network staging --identity prod
 ```
 
 **Options:**
@@ -191,24 +191,24 @@ realms import data.json --network staging --identity prod
 
 ---
 
-### `realms export`
+### `realms db export`
 Export realm data.
 
 ```bash
 # Export everything
-realms export
+realms db export
 
 # Export to specific directory
-realms export --output-dir my_backup
+realms db export --output-dir my_backup
 
 # Export specific entities
-realms export --entity-types User,Proposal,Vote
+realms db export --entity-types User,Proposal,Vote
 
 # Without codexes
-realms export --no-codexes
+realms db export --no-codexes
 
 # From specific network
-realms export --network staging --identity prod
+realms db export --network staging --identity prod
 ```
 
 **Options:**
@@ -220,77 +220,22 @@ realms export --network staging --identity prod
 
 ---
 
-## Task Management
+## Code Execution & Task Management
 
-### `realms run`
-Execute Python code or schedule task.
-
-```bash
-# Run once
-realms run --file my_script.py
-
-# Schedule recurring task
-realms run --file daily_task.py --every 3600
-
-# With delay
-realms run --file task.py --every 3600 --after 60
-
-# Multi-step task
-realms run --config multi_step_config.json
-```
-
-**Options:**
-- `--file PATH` - Python file to execute
-- `--config PATH` - Multi-step task config (JSON)
-- `--every N` - Repeat every N seconds
-- `--after N` - Initial delay in seconds (default: 5)
-- `--network TEXT` - Network
-- `--identity PATH` - Identity
-
----
-
-### `realms shell`
-Execute Python in realm (alternative to `run`).
+Code execution and task management have moved to `basilisk-toolkit`:
 
 ```bash
-realms shell --file script.py
+# Execute a Python file in the canister
+basilisk-toolkit exec -f my_script.py
+
+# Interactive shell
+basilisk shell
+
+# Task scheduling and management
+# See basilisk-toolkit documentation for details
 ```
 
----
-
-### `realms ps ls`
-List scheduled tasks.
-
-```bash
-# List all tasks
-realms ps ls
-
-# Verbose output
-realms ps ls --verbose
-```
-
----
-
-### `realms ps logs`
-View task execution logs.
-
-```bash
-# Last 20 executions
-realms ps logs <task_id>
-
-# Last 50 executions
-realms ps logs <task_id> --tail 50
-```
-
----
-
-### `realms ps kill`
-Stop a scheduled task.
-
-```bash
-# Stop by task ID (full or partial)
-realms ps kill abc123
-```
+> **Note:** The `realms run`, `realms shell`, and `realms ps` commands have been replaced by `basilisk-toolkit exec`, `basilisk shell`, and basilisk-toolkit task management respectively.
 
 ---
 
@@ -467,45 +412,13 @@ realms context clear-realm
 
 ## Advanced Usage
 
-### Multi-Step Task Configuration
-
-Create `task_config.json`:
-```json
-{
-  "name": "Data Pipeline",
-  "every": 3600,
-  "after": 10,
-  "steps": [
-    {
-      "file": "step1_fetch.py",
-      "run_next_after": 0
-    },
-    {
-      "file": "step2_process.py",
-      "run_next_after": 5
-    },
-    {
-      "file": "step3_save.py",
-      "run_next_after": 2
-    }
-  ]
-}
-```
-
-Run:
-```bash
-realms run --config task_config.json
-```
-
----
-
 ### Batch Data Import
 
 Large dataset import with batching:
 
 ```bash
 # Import 10,000 users in batches of 100
-realms import large_users.json --batch-size 100
+realms db import large_users.json --batch-size 100
 ```
 
 ---
@@ -552,11 +465,9 @@ cd generated_realm
 realms extension install-from-source
 
 # 3. Run test scripts
-realms run --file test_proposal.py
+basilisk-toolkit exec -f test_proposal.py
 
-# 4. Monitor tasks
-realms ps ls
-realms ps logs <task_id>
+# 4. Monitor tasks via basilisk-toolkit
 ```
 
 ### Multi-Realm Development (Mundus)
@@ -585,7 +496,7 @@ cd generated_realm
 realms realm deploy --network ic --identity prod --mode reinstall
 
 # 3. Import production data
-realms import prod_data.json --network ic --identity prod
+realms db import prod_data.json --network ic --identity prod
 
 # 4. Register with registry
 realms registry add \
@@ -597,13 +508,13 @@ realms registry add \
 ### Data Migration
 ```bash
 # 1. Export from old realm
-realms export --output-dir backup --network staging
+realms db export --output-dir backup --network staging
 
 # 2. Deploy new realm
 realms realm deploy --network ic
 
 # 3. Import to new realm
-realms import backup/realm_data.json --network ic
+realms db import backup/realm_data.json --network ic
 ```
 
 ---
@@ -614,9 +525,6 @@ realms import backup/realm_data.json --network ic
 ```bash
 # Backend logs
 dfx canister logs realm_backend
-
-# Task logs
-realms ps logs <task_id> --tail 100
 ```
 
 ### Verify Deployment

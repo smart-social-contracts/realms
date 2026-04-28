@@ -124,7 +124,7 @@ cd .realms/realm_YourRealm_*/
 **What it does:**
 1. **Realm Data Import:**
    - Imports `realm_data.json` containing entities (Users, Organizations, Transfers, etc.)
-   - Uses `realms import` command with admin_dashboard extension
+   - Uses `realms db import` command with admin_dashboard extension
 
 2. **Codex Import:**
    - Discovers all codex `.py` files in realm directory
@@ -161,7 +161,7 @@ python scripts/4-post-deploy.py [NETWORK]
 
 2. **Canister Initialization:**
    - Looks for optional `canister_init.py` in `scripts/` directory
-   - Executes initialization script via `realms shell` if present
+   - Executes initialization script via `basilisk shell` if present
    - Used for custom realm-specific setup (e.g., setting `manifest_data`)
 
 3. **Entity Method Overrides:**
@@ -250,7 +250,7 @@ dfx deploy realm_frontend
 dfx canister call realm_backend initialize
 
 # Import data
-realms import realm_data.json
+realms db import realm_data.json
 ```
 
 ### Local Token Testing (ckBTC)
@@ -602,13 +602,13 @@ echo "export const INTERNET_IDENTITY_CANISTER_ID = '$II_CANISTER';" > src/realm_
 
 ```bash
 # Import users
-realms import prod_users.json --network ic --identity production
+realms db import prod_users.json --network ic --identity production
 
 # Import governance data
-realms import governance.json --network ic --identity production
+realms db import governance.json --network ic --identity production
 
 # Import codexes
-realms import tax_collection.py --type codex --network ic --identity production
+realms db import tax_collection.py --type codex --network ic --identity production
 ```
 
 ---
@@ -649,7 +649,7 @@ dfx deploy realm_backend --network ic --mode reinstall
 dfx canister call realm_backend initialize --network ic
 
 # Re-import data
-realms import backup.json --network ic
+realms db import backup.json --network ic
 ```
 
 ---
@@ -683,10 +683,10 @@ dfx canister call realm_backend status --network ic
 
 ```bash
 # Export all data
-realms export --output-dir backup_$(date +%Y%m%d) --network ic
+realms db export --output-dir backup_$(date +%Y%m%d) --network ic
 
 # Export specific entities
-realms export --entity-types User,Proposal,Vote --network ic
+realms db export --entity-types User,Proposal,Vote --network ic
 ```
 
 ---
@@ -705,7 +705,7 @@ dfx deploy --mode reinstall
 # Production-like setup
 realms realm create --realm-name "Staging" --no-extensions
 dfx deploy --network staging --mode upgrade
-realms import staging_data.json --network staging
+realms db import staging_data.json --network staging
 ```
 
 ### Production
@@ -713,7 +713,7 @@ realms import staging_data.json --network staging
 # Full production deployment
 realms realm create --realm-name "Production"
 dfx deploy --network ic --mode upgrade --with-cycles 10000000000000
-realms import prod_data.json --network ic
+realms db import prod_data.json --network ic
 ```
 
 ---
@@ -784,7 +784,7 @@ jobs:
 
 ### 1. Export Current State
 ```bash
-realms export --output-dir rollback_backup --network ic
+realms db export --output-dir rollback_backup --network ic
 ```
 
 ### 2. Note Current Version
@@ -874,13 +874,13 @@ dfx canister deposit-cycles 5000000000000 realm_backend --network ic
 ### Canister Full
 ```bash
 # Export data
-realms export --network ic
+realms db export --network ic
 
 # Reinstall with more memory
 dfx deploy --mode reinstall --network ic
 
 # Re-import
-realms import backup.json --network ic
+realms db import backup.json --network ic
 ```
 
 ---

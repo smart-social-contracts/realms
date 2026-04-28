@@ -128,7 +128,7 @@ realms extension create my_extension
 realms extension install-from-source
 
 # Test your extension
-realms run test_my_extension.py
+basilisk-toolkit exec -f test_my_extension.py
 
 # Deploy with your realm
 realms realm deploy

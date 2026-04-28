@@ -49,7 +49,7 @@ Complete documentation for building and deploying governance systems on the Inte
 - **[Troubleshooting](./reference/TROUBLESHOOTING.md)** - Common issues
 
 ### Advanced Features
-- **[Scheduled Tasks](./reference/SCHEDULED_TASKS.md)** - Task scheduling and `realms ps` commands
+- **[Scheduled Tasks](./reference/SCHEDULED_TASKS.md)** - Task scheduling (via basilisk-toolkit)
 - **[Task System](./reference/TASK_ENTITY.md)** - Batch processing with TaskEntity
 - **[Multi-Step Tasks](./reference/MULTI_STEP_TASKS_IMPLEMENTATION.md)** - Complex workflows
 - **[Method Override System](./reference/METHOD_OVERRIDE_SYSTEM.md)** - Extension method injection
@@ -95,20 +95,20 @@ Tasks & Automation        Services                Registry
 # Realm Management
 realms realm create          # Create new realm
 realms realm deploy          # Deploy canisters
-realms import          # Import data
+realms db import             # Import data
+realms db export             # Export data
 
-# Task Management  
-realms run             # Execute code
-realms ps ls           # List tasks
-realms ps logs         # View logs
+# Code Execution (via basilisk-toolkit)
+basilisk-toolkit exec        # Execute code in canister
+basilisk shell               # Interactive canister shell
 
 # Extensions
-realms extension list      # List extensions
-realms extension install   # Install extension
+realms extension list        # List extensions
+realms extension install     # Install extension
 
 # Registry
-realms registry add    # Register realm
-realms registry list   # List realms
+realms registry add          # Register realm
+realms registry list         # List realms
 ```
 → [Full CLI Reference](./reference/CLI_REFERENCE.md)
 
