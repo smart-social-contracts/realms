@@ -23,10 +23,25 @@
 	let mounted: MountResult | void;
 
 	function buildContext(id: string, version: string): RealmExtensionContext {
+		async function callSync(fn: string, args: Record<string, unknown> = {}): Promise<unknown> {
+			const raw = await backend.extension_sync_call(id, fn, JSON.stringify(args));
+			const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+			if (res?.success === false) throw new Error(res.response ?? 'extension_sync_call failed');
+			return res?.response ? JSON.parse(res.response) : res;
+		}
+		async function callAsync(fn: string, args: Record<string, unknown> = {}): Promise<unknown> {
+			const raw = await backend.extension_async_call(id, fn, JSON.stringify(args));
+			const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+			if (res?.success === false) throw new Error(res.response ?? 'extension_async_call failed');
+			return res?.response ? JSON.parse(res.response) : res;
+		}
+
 		return {
 			extensionId: id,
 			version,
 			backend,
+			callSync,
+			callAsync,
 			principal,
 			isAuthenticated,
 			userProfiles,

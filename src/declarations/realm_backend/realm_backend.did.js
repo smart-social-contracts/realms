@@ -113,11 +113,6 @@ export const idlFactory = ({ IDL }) => {
     'data' : CryptoResponseData,
     'success' : IDL.Bool,
   });
-  const ExtensionCallArgs = IDL.Record({
-    'args' : IDL.Text,
-    'function_name' : IDL.Text,
-    'extension_name' : IDL.Text,
-  });
   const ExtensionCallResponse = IDL.Record({
     'response' : IDL.Text,
     'success' : IDL.Bool,
@@ -225,17 +220,17 @@ export const idlFactory = ({ IDL }) => {
     'derive_my_vetkey' : IDL.Func([IDL.Text], [RealmResponse], []),
     'execute_code_shell' : IDL.Func([IDL.Text], [IDL.Text], []),
     'extension_async_call' : IDL.Func(
-        [ExtensionCallArgs],
+        [IDL.Text, IDL.Text, IDL.Text],
         [ExtensionCallResponse],
         [],
       ),
     'extension_call' : IDL.Func(
-        [ExtensionCallArgs],
+        [IDL.Text, IDL.Text, IDL.Text],
         [ExtensionCallResponse],
         ['query'],
       ),
     'extension_sync_call' : IDL.Func(
-        [ExtensionCallArgs],
+        [IDL.Text, IDL.Text, IDL.Text],
         [ExtensionCallResponse],
         [],
       ),

@@ -335,7 +335,7 @@ def mundus_deploy_new_command(
 
     if not ok:
         raise typer.Exit(1)
-
+    
 
 def mundus_deploy_descriptor_command(
     descriptor: str,
@@ -365,7 +365,7 @@ def mundus_deploy_descriptor_command(
     if not realms:
         console.print("[yellow]No realm entries in descriptor[/yellow]")
         return
-
+    
     console.print(f"Deploying {len(realms)} realm(s) to {network} (mode={deploy_mode})\n")
 
     backend_url = _resolve_artifact(artifact_version, "realm_backend", network)

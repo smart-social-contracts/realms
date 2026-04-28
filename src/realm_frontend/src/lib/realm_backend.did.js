@@ -1,8 +1,3 @@
-type ExtensionCallArgs = record {
-  args : text;
-  function_name : text;
-  extension_name : text;
-};
 type ExtensionCallResponse = record { response : text; success : bool };
 type ExtensionsListRecord = record { extensions : vec text };
 type HttpHeader = record { value : text; name : text };
@@ -95,8 +90,8 @@ service : () -> {
   download_file_from_url : (text) -> (record { bool; text });
   execute_code : (text) -> (text);
   execute_code_shell : (text) -> (text);
-  extension_async_call : (ExtensionCallArgs) -> (ExtensionCallResponse);
-  extension_sync_call : (ExtensionCallArgs) -> (ExtensionCallResponse);
+  extension_async_call : (text, text, text) -> (ExtensionCallResponse);
+  extension_sync_call : (text, text, text) -> (ExtensionCallResponse);
   get_canister_id : () -> (text) query;
   get_current_application_id : (text) -> (text) query;
   get_extensions : () -> (RealmResponse) query;

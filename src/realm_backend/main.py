@@ -2088,19 +2088,19 @@ def start_task_manager() -> text:
 
 
 @query
-def extension_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
+def extension_call(extension_name: text, function_name: text, args: text) -> ExtensionCallResponse:
     """Query version of extension call for read-only operations like get_entity_types."""
     try:
         logger.debug(
-            f"Query calling extension '{args['extension_name']}' function '{args['function_name']}' with args {args['args']}"
+            f"Query calling extension '{extension_name}' function '{function_name}' with args {args}"
         )
 
         extension_result = api.extensions.extension_sync_call(
-            args["extension_name"], args["function_name"], args["args"]
+            extension_name, function_name, args
         )
 
         logger.debug(
-            f"Got extension result from {args['extension_name']} function {args['function_name']}: {extension_result}"
+            f"Got extension result from {extension_name} function {function_name}: {extension_result}"
         )
 
         response = (
@@ -2116,7 +2116,7 @@ def extension_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
 
 
 @update
-def extension_sync_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
+def extension_sync_call(extension_name: text, function_name: text, args: text) -> ExtensionCallResponse:
     try:
         caller = ic.caller().to_str()
         if not _check_access(caller, Operations.EXTENSION_SYNC_CALL):
@@ -2125,15 +2125,15 @@ def extension_sync_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
                 response=f"Access denied: user {caller} lacks permission '{Operations.EXTENSION_SYNC_CALL}'",
             )
         logger.debug(
-            f"Sync calling extension '{args['extension_name']}' entry point '{args['function_name']}' with args {args['args']}"
+            f"Sync calling extension '{extension_name}' entry point '{function_name}' with args {args}"
         )
 
         extension_result = api.extensions.extension_sync_call(
-            args["extension_name"], args["function_name"], args["args"]
+            extension_name, function_name, args
         )
 
         logger.debug(
-            f"Got extension result from {args['extension_name']} function {args['function_name']}: {extension_result}, type: {type(extension_result)}"
+            f"Got extension result from {extension_name} function {function_name}: {extension_result}, type: {type(extension_result)}"
         )
 
         response = (
@@ -2149,7 +2149,7 @@ def extension_sync_call(args: ExtensionCallArgs) -> ExtensionCallResponse:
 
 
 @update
-def extension_async_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse]:
+def extension_async_call(extension_name: text, function_name: text, args: text) -> Async[ExtensionCallResponse]:
     try:
         caller = ic.caller().to_str()
         if not _check_access(caller, Operations.EXTENSION_ASYNC_CALL):
@@ -2158,16 +2158,16 @@ def extension_async_call(args: ExtensionCallArgs) -> Async[ExtensionCallResponse
                 response=f"Access denied: user {caller} lacks permission '{Operations.EXTENSION_ASYNC_CALL}'",
             )
         logger.debug(
-            f"Async calling extension '{args['extension_name']}' entry point '{args['function_name']}' with args {args['args']}"
+            f"Async calling extension '{extension_name}' entry point '{function_name}' with args {args}"
         )
 
         extension_coroutine = api.extensions.extension_async_call(
-            args["extension_name"], args["function_name"], args["args"]
+            extension_name, function_name, args
         )
         extension_result = yield extension_coroutine
 
         logger.debug(
-            f"Got extension result from {args['extension_name']} function {args['function_name']}: {extension_result}, type: {type(extension_result)}"
+            f"Got extension result from {extension_name} function {function_name}: {extension_result}, type: {type(extension_result)}"
         )
 
         response = (

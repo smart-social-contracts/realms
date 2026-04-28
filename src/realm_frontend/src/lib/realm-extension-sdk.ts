@@ -55,6 +55,22 @@ export interface RealmExtensionContext {
 	 */
 	backend: any;
 
+	/**
+	 * Call a sync extension function on the backend.
+	 * Automatically handles positional Candid args and JSON serialization.
+	 *
+	 * @param fn    The function name exposed by the backend extension.
+	 * @param args  A plain JS object that will be JSON-stringified as the `args` parameter.
+	 * @returns     The parsed JSON response, or throws on failure.
+	 */
+	callSync: (fn: string, args?: Record<string, unknown>) => Promise<unknown>;
+
+	/**
+	 * Call an async (inter-canister) extension function on the backend.
+	 * Same ergonomics as callSync.
+	 */
+	callAsync: (fn: string, args?: Record<string, unknown>) => Promise<unknown>;
+
 	/** The logged-in user's principal as a reactive store. Empty string when anonymous. */
 	principal: Readable<string>;
 	/** Whether the user has authenticated via Internet Identity. */

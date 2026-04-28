@@ -27,12 +27,6 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'get_extension_manifest' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
-    'get_frontend_files' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
-    'get_frontend_files_icc' : IDL.Func(
-        [IDL.Text, IDL.Text],
-        [IDL.Text],
-        ['query'],
-      ),
     'get_file' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'get_file_chunk' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'get_file_chunk_icc' : IDL.Func(
@@ -42,6 +36,12 @@ export const idlFactory = ({ IDL }) => {
       ),
     'get_file_size' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'get_file_size_icc' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], ['query']),
+    'get_frontend_files' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
+    'get_frontend_files_icc' : IDL.Func(
+        [IDL.Text, IDL.Text],
+        [IDL.Text],
+        ['query'],
+      ),
     'get_stats' : IDL.Func([], [IDL.Text], ['query']),
     'grant_publish' : IDL.Func([IDL.Text], [IDL.Text], []),
     'http_request' : IDL.Func([HttpRequest], [HttpResponseIncoming], ['query']),
