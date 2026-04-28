@@ -27,6 +27,12 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'get_extension_manifest' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
+    'get_frontend_files' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
+    'get_frontend_files_icc' : IDL.Func(
+        [IDL.Text, IDL.Text],
+        [IDL.Text],
+        ['query'],
+      ),
     'get_file' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'get_file_chunk' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'get_file_chunk_icc' : IDL.Func(

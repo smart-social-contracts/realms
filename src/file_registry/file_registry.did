@@ -255,6 +255,8 @@ service : {
   "get_extension_manifest" : (text) -> (text) query;
   "get_backend_files" : (text) -> (text) query;
   "get_backend_files_icc" : (text, text, text) -> (text) query;
+  "get_frontend_files" : (text) -> (text) query;
+  "get_frontend_files_icc" : (text, text) -> (text) query;
   "store_file" : (text) -> (text);
   "delete_file" : (text) -> (text);
   "update_namespace" : (text) -> (text);

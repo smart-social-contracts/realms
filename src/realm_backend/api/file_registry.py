@@ -1,8 +1,8 @@
 """
 File Registry client — inter-canister interface to the file registry.
 
-Provides async functions for realm canisters to pull extension backend files
-and codex packages from a file registry canister.
+Provides async functions for realm canisters to pull extension backend files,
+frontend bundles, and codex packages from a file registry canister.
 
 Usage from main.py (async/generator pattern):
     result = yield from install_extension_from_registry(registry_id, ext_id, version)
@@ -12,7 +12,7 @@ Refs: https://github.com/smart-social-contracts/realms/issues/168
 
 import json
 
-from _cdk import Async, CallResult, Principal, Service, service_query, text
+from _cdk import Async, CallResult, Principal, Service, ic, service_query, text
 from ic_python_logging import get_logger
 
 logger = get_logger("api.file_registry")
@@ -23,18 +23,25 @@ class FileRegistryService(Service):
     def get_backend_files_icc(self, category: text, item_id: text, version: text) -> text: ...
 
     @service_query
+    def get_frontend_files_icc(self, item_id: text, version: text) -> text: ...
+
+    @service_query
     def get_extension_manifest(self, args: text) -> text: ...
 
 
 def install_extension_from_registry(
-    registry_canister_id: str, ext_id: str, version: str = None
+    registry_canister_id: str, ext_id: str, version: str = None,
+    frontend_canister_id: str = None,
 ) -> Async[str]:
     """Pull extension backend files from the file registry and install them.
+    If frontend_canister_id is provided, also copies frontend bundles to
+    the realm's frontend asset canister for same-origin loading.
 
     Args:
         registry_canister_id: Canister ID of the file registry
         ext_id: Extension identifier (e.g. "voting")
         version: Specific version or None for latest
+        frontend_canister_id: Optional - frontend asset canister to copy bundles to
 
     Returns (via yield):
         JSON string with result
@@ -89,20 +96,27 @@ def install_extension_from_registry(
         source_registry_id=registry_canister_id,
         source_version=resolved_version,
     )
-    if ok:
-        return json.dumps({
-            "success": True,
-            "extension_id": ext_id,
-            "version": resolved_version,
-            "files_count": len(files),
-            "source": "registry",
-            "registry_canister_id": registry_canister_id,
-        })
-    else:
+    if not ok:
         return json.dumps({
             "success": False,
             "error": f"Failed to load extension '{ext_id}' after install",
         })
+
+    frontend_copied = 0
+    if frontend_canister_id:
+        frontend_copied = yield from _copy_frontend_to_asset_canister(
+            registry_canister_id, ext_id, resolved_version, frontend_canister_id,
+        )
+
+    return json.dumps({
+        "success": True,
+        "extension_id": ext_id,
+        "version": resolved_version,
+        "files_count": len(files),
+        "frontend_files_copied": frontend_copied,
+        "source": "registry",
+        "registry_canister_id": registry_canister_id,
+    })
 
 
 def install_codex_from_registry(
@@ -181,3 +195,91 @@ def install_codex_from_registry(
     if init_error:
         result["init_warning"] = init_error
     return json.dumps(result)
+
+
+_CONTENT_TYPES = {
+    ".js": "application/javascript",
+    ".json": "application/json",
+    ".css": "text/css",
+    ".html": "text/html",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".woff2": "font/woff2",
+}
+
+
+def _guess_content_type(path: str) -> str:
+    for ext, ct in _CONTENT_TYPES.items():
+        if path.endswith(ext):
+            return ct
+    return "application/octet-stream"
+
+
+def _copy_frontend_to_asset_canister(
+    registry_canister_id: str, ext_id: str, version: str, frontend_canister_id: str,
+) -> Async[int]:
+    """Fetch frontend files from the file registry and upload them to the
+    realm's frontend asset canister under /ext/{ext_id}/{version}/...
+
+    Returns the number of files successfully copied.
+    """
+    logger.info(
+        f"Copying frontend files for {ext_id}@{version} "
+        f"from registry {registry_canister_id} to frontend {frontend_canister_id}"
+    )
+
+    registry = FileRegistryService(Principal.from_str(registry_canister_id))
+    result: CallResult = yield registry.get_frontend_files_icc(ext_id, version or "")
+
+    raw = result if isinstance(result, str) else str(result)
+    if isinstance(result, dict):
+        raw = result.get("Ok", result.get("ok", raw))
+    elif hasattr(result, "Ok"):
+        raw = result.Ok
+
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError) as e:
+        logger.warning(f"Failed to parse frontend files response: {e}")
+        return 0
+
+    if "error" in data:
+        logger.warning(f"Frontend files fetch error: {data['error']}")
+        return 0
+
+    files = data.get("files", {})
+    if not files:
+        logger.info(f"No frontend files found for {ext_id}@{version}")
+        return 0
+
+    resolved_version = data.get("version", version)
+    copied = 0
+    frontend_principal = Principal.from_str(frontend_canister_id)
+
+    for path, content in files.items():
+        asset_key = f"/ext/{ext_id}/{resolved_version}/{path}"
+        content_type = _guess_content_type(path)
+
+        escaped = content.replace('\\', '\\\\').replace('"', '\\"')
+        candid_arg = (
+            f'(record {{ key = "{asset_key}"; '
+            f'content_type = "{content_type}"; '
+            f'content_encoding = "identity"; '
+            f'content = blob "{escaped}"; '
+            f'sha256 = null }})'
+        )
+
+        try:
+            store_result: CallResult = yield ic.call_raw(
+                frontend_principal, "store",
+                ic.candid_encode(candid_arg), 0,
+            )
+            if isinstance(store_result, dict) and "Err" in store_result:
+                logger.warning(f"store failed for {asset_key}: {store_result['Err']}")
+            else:
+                copied += 1
+        except Exception as e:
+            logger.warning(f"store exception for {asset_key}: {e}")
+
+    logger.info(f"Copied {copied}/{len(files)} frontend files for {ext_id}@{resolved_version}")
+    return copied

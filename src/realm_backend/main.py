@@ -225,6 +225,15 @@ class ExtensionCallResponse(Record):
 storage = StableBTreeMap[str, str](memory_id=1, max_key_size=100, max_value_size=10000)
 Database.init(db_storage=storage, audit_enabled=True)
 
+def _get_frontend_canister_id() -> str:
+    """Read the frontend canister ID from the Realm entity."""
+    try:
+        from ggg import Realm
+        realm = list(Realm.instances())[0] if Realm.instances() else None
+        return str(realm.frontend_canister_id or "") if realm else ""
+    except Exception:
+        return ""
+
 logger = get_logger("main")
 
 
@@ -3062,11 +3071,14 @@ def list_codex_packages() -> text:
 @require(Operations.EXTENSION_INSTALL)
 def install_extension_from_registry(args: text) -> Async[text]:
     """Install an extension by pulling backend files from the file registry.
+    Also copies frontend bundles to the realm's frontend asset canister
+    for same-origin loading.
 
     Args (JSON): {
         "registry_canister_id": str,
         "ext_id": str,
-        "version": str|null  (null = latest)
+        "version": str|null  (null = latest),
+        "frontend_canister_id": str|null  (overrides Realm entity value)
     }
     """
     try:
@@ -3080,9 +3092,11 @@ def install_extension_from_registry(args: text) -> Async[text]:
         if not ext_id:
             return json.dumps({"success": False, "error": "ext_id is required"})
 
+        frontend_id = params.get("frontend_canister_id") or _get_frontend_canister_id()
+
         from api.file_registry import install_extension_from_registry as _install
 
-        result = yield from _install(registry_id, ext_id, version)
+        result = yield from _install(registry_id, ext_id, version, frontend_canister_id=frontend_id)
         return result
     except Exception as e:
         logger.error(f"install_extension_from_registry error: {e}\n{traceback.format_exc()}")

@@ -736,6 +736,56 @@ def get_backend_files_icc(category: text, item_id: text, version: text) -> text:
     return _get_backend_files_impl(category, item_id, version or None)
 
 
+def _get_frontend_files_impl(item_id: str, version: str) -> str:
+    """Return all frontend/ files for an extension as {path: content}."""
+    namespaces = _load_namespaces()
+    prefix = f"{NS_PREFIX_EXT}{item_id}/"
+
+    if not version:
+        version = _find_latest_version(namespaces, prefix)
+        if not version:
+            return json.dumps({"error": f"No versions found for ext/{item_id}"})
+
+    ns = f"{prefix}{version}".rstrip("/")
+    if ns not in namespaces:
+        return json.dumps({"error": f"Namespace '{ns}' not found"})
+    if not _is_published(namespaces[ns]):
+        return json.dumps({"error": f"Namespace '{ns}' is not yet published"})
+
+    meta = _load_meta(ns)
+    all_files = meta.get("files", {})
+
+    files = {}
+    for path in all_files:
+        if path.startswith("frontend/"):
+            fp = _file_path(ns, path)
+            try:
+                with open(fp, "r") as f:
+                    files[path] = f.read()
+            except FileNotFoundError:
+                pass
+
+    return json.dumps({
+        "files": files,
+        "version": version,
+        "namespace": ns,
+        "file_count": len(files),
+    })
+
+
+@query
+def get_frontend_files(args: text) -> text:
+    """Return all frontend files for an extension as {filename: content}."""
+    params = json.loads(args)
+    return _get_frontend_files_impl(params["item_id"], params.get("version"))
+
+
+@query
+def get_frontend_files_icc(item_id: text, version: text) -> text:
+    """Inter-canister variant: return all frontend/ files for an extension."""
+    return _get_frontend_files_impl(item_id, version or None)
+
+
 # ---------------------------------------------------------------------------
 # Authenticated update endpoints
 # ---------------------------------------------------------------------------

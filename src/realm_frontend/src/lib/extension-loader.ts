@@ -1,22 +1,18 @@
 /**
  * Runtime extension frontend loader.
  *
- * Loads an extension's compiled JS bundle from the file_registry canister
- * over HTTP and mounts it into a DOM target — without rebuilding realm_frontend.
+ * Loads an extension's compiled JS bundle and mounts it into a DOM target,
+ * without rebuilding realm_frontend.
  *
- * See Issue #168 Layer 2 (runtime extensions). The corresponding backend
- * code is loaded by realm_backend from the same file_registry namespace
- * (`ext/<id>/<version>/backend/`). This module loads the frontend half
- * (`ext/<id>/<version>/frontend/dist/index.js`).
+ * Loading strategy (same-origin first):
+ *   1. Try loading from the realm's own frontend asset canister at
+ *      /ext/{id}/{version}/frontend/dist/index.js (same origin, certified).
+ *   2. Fall back to the file_registry canister via cross-origin import.
  *
  * Extension bundle contract:
  *   The file at `frontend/dist/index.js` MUST be a valid ES module that
  *   exports a default `mount(target: HTMLElement, props: object)` function
  *   returning an optional `unmount()` function.
- *
- * In production this bundle would typically be produced by a per-extension
- * `vite build --lib` step; any framework (Svelte/React/vanilla) is fine
- * as long as it compiles to a self-contained ESM.
  */
 
 export interface ExtensionManifest {
@@ -39,16 +35,13 @@ export type MountFn = (
 export interface ExtensionFrontendInfo {
   registryCanisterId: string;
   version: string;
-  namespace: string; // e.g. "ext/test_bench/0.1.3"
-  frontendPath: string; // e.g. "frontend/dist/index.js"
+  namespace: string;
+  frontendPath: string;
 }
 
 /**
  * Build the HTTP base URL for a file_registry canister, valid for both
  * local `dfx` (subdomain on localhost) and production ICP gateways.
- *
- * Exported because the i18n loader (`$lib/i18n`) needs to fetch translation
- * JSON from the same canister using the same URL convention.
  */
 export function fileRegistryBaseUrlFor(canisterId: string): string {
   const host = typeof window !== 'undefined' ? window.location.host : '';
@@ -61,18 +54,6 @@ export function fileRegistryBaseUrlFor(canisterId: string): string {
   return `https://${canisterId}.icp0.io`;
 }
 
-/**
- * Resolve the file_registry canister id to use for a given extension.
- *
- * Preferred source: realm_backend's `get_extension_frontend_info`, which
- * returns the registry the extension was actually installed from. This
- * means realm_frontend does NOT need the registry id baked in at build
- * time, and can correctly load extensions installed from any registry.
- *
- * Fallback: build-time `CANISTER_ID_FILE_REGISTRY` (set by `dfx deploy`),
- * used during the bootstrap window before the realm has any extensions
- * installed and during local development.
- */
 async function resolveFrontendInfo(
   backend: { get_extension_frontend_info?: (args: string) => Promise<string> },
   extId: string,
@@ -92,7 +73,6 @@ async function resolveFrontendInfo(
         };
       }
     } catch (e) {
-      // Backend may be older than this method — fall through to env fallback.
       console.warn('[extension-loader] get_extension_frontend_info failed, using env fallback:', e);
     }
   }
@@ -116,7 +96,6 @@ async function resolveFrontendInfo(
 
 /**
  * Resolve an extension's installed version by querying the realm_backend.
- * Returns undefined if the extension is not installed.
  */
 export async function resolveExtensionVersion(
   backend: {
@@ -134,12 +113,12 @@ export async function resolveExtensionVersion(
  * Fetch and dynamically import an extension's compiled frontend bundle,
  * then call its default export to mount it into `target`.
  *
- * Bundle URL is built from realm_backend's `get_extension_frontend_info`:
- *   {fileRegistryBase}/{namespace}/{frontendPath}
- *   = {fileRegistryBase}/ext/{extId}/{version}/frontend/dist/index.js
+ * Same-origin loading (preferred):
+ *   The realm backend copies extension frontend bundles into the realm's
+ *   own frontend asset canister during installation. This loader tries
+ *   /ext/{id}/{version}/frontend/dist/index.js on the current origin first.
  *
- * `version` is used to override what the backend returns when set (e.g.
- * for development pinning); otherwise the backend-resolved version wins.
+ * Fallback: cross-origin load from the file_registry canister.
  */
 export async function mountExtension(
   extId: string,
@@ -149,15 +128,24 @@ export async function mountExtension(
 ): Promise<MountResult | void> {
   const backend: any = (props as any)?.backend;
   const info = await resolveFrontendInfo(backend, extId);
-
   const ver = info.version || version;
-  const namespace = info.version ? info.namespace : `ext/${extId}/${ver}`;
-  const base = fileRegistryBaseUrlFor(info.registryCanisterId);
-  const bundleUrl = `${base}/${namespace}/${info.frontendPath}`;
 
-  // Browsers require explicit module specifier for dynamic import.
-  // The /* @vite-ignore */ prevents Vite from trying to statically analyse/bundle this URL.
-  const mod = await import(/* @vite-ignore */ bundleUrl);
+  let mod: any;
+
+  const sameOriginPath = `/ext/${extId}/${ver}/frontend/dist/index.js`;
+  try {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const sameOriginUrl = `${origin}${sameOriginPath}`;
+    mod = await import(/* @vite-ignore */ sameOriginUrl);
+  } catch {
+    const namespace = info.version ? info.namespace : `ext/${extId}/${ver}`;
+    const base = fileRegistryBaseUrlFor(info.registryCanisterId);
+    const fallbackUrl = `${base}/${namespace}/${info.frontendPath}`;
+    console.warn(
+      `[extension-loader] Same-origin load failed for '${extId}', falling back to registry: ${fallbackUrl}`,
+    );
+    mod = await import(/* @vite-ignore */ fallbackUrl);
+  }
 
   const mount: MountFn | undefined = mod?.default ?? mod?.mount;
   if (typeof mount !== 'function') {

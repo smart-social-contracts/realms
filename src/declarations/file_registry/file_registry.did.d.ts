@@ -395,6 +395,7 @@ export type ExtensionResult = { 'Ok' : ExtensionListing } |
 export interface ExtensionsListRecord { 'extensions' : Array<string> }
 export interface FileRegistryService {
   'get_backend_files_icc' : ActorMethod<[string, string, string], string>,
+  'get_frontend_files_icc' : ActorMethod<[string, string], string>,
   'get_extension_manifest' : ActorMethod<[string], string>,
 }
 export interface GenericError { 'message' : string, 'error_code' : bigint }
@@ -1032,6 +1033,8 @@ export interface _SERVICE {
   'get_backend_files' : ActorMethod<[string], string>,
   'get_backend_files_icc' : ActorMethod<[string, string, string], string>,
   'get_extension_manifest' : ActorMethod<[string], string>,
+  'get_frontend_files' : ActorMethod<[string], string>,
+  'get_frontend_files_icc' : ActorMethod<[string, string], string>,
   'get_file' : ActorMethod<[string], string>,
   'get_file_chunk' : ActorMethod<[string], string>,
   'get_file_chunk_icc' : ActorMethod<[string, string, string, string], string>,

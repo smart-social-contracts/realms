@@ -372,6 +372,18 @@ _retry_counts: dict = {}
 def _build_steps(task, manifest: dict) -> list:
     steps = []
     idx = 0
+
+    frontend_id = manifest.get("frontend_canister_id", "")
+    backend_id = manifest.get("target_canister_id", "")
+    if frontend_id and backend_id:
+        _log.info(f"[{task.name}] step {idx}: grant_frontend_access backend={backend_id} frontend={frontend_id}")
+        steps.append(DeployStep(
+            task=task, idx=idx, kind="grant_frontend_access", label="grant_frontend_access",
+            args_json=json.dumps({"backend_canister_id": backend_id, "frontend_canister_id": frontend_id}),
+            status="pending",
+        ))
+        idx += 1
+
     for ext in (manifest.get("extensions") or []):
         ext_id = ext.get("id")
         if not ext_id:
@@ -382,7 +394,8 @@ def _build_steps(task, manifest: dict) -> list:
         steps.append(DeployStep(
             task=task, idx=idx, kind="extension", label=ext_id,
             args_json=json.dumps({"registry_canister_id": task.registry_canister_id,
-                                   "ext_id": ext_id, "version": ext.get("version")}),
+                                   "ext_id": ext_id, "version": ext.get("version"),
+                                   "frontend_canister_id": frontend_id}),
             status="pending",
         ))
         idx += 1
@@ -417,6 +430,11 @@ def _execute_step(task, step):
     try:
         args = json.loads(step.args_json or "{}")
         jlog(task.name).info(f"step {step.idx} args: {step.args_json[:200]}")
+
+        if step.kind == "grant_frontend_access":
+            yield from _execute_grant_frontend_access(task, step, args)
+            return
+
         target = RealmTargetService(Principal.from_str(task.target_canister_id))
         if step.kind == "extension":
             jlog(task.name).info(f"step {step.idx} calling install_extension_from_registry")
@@ -447,6 +465,35 @@ def _execute_step(task, step):
         step.error = f"{type(e).__name__}: {e}"[:1990]
         step.status = "failed"
         jlog(task.name).error(f"step {step.idx} ({step.label}) exception: {step.error[:300]}")
+    step.completed_at = now_s()
+
+
+def _execute_grant_frontend_access(task, step, args):
+    """Grant the realm backend Commit permission on the frontend asset canister."""
+    backend_id = args.get("backend_canister_id", "")
+    frontend_id = args.get("frontend_canister_id", "")
+    if not backend_id or not frontend_id:
+        step.error = "missing backend_canister_id or frontend_canister_id"
+        step.status = "failed"
+        step.completed_at = now_s()
+        return
+
+    jlog(task.name).info(f"granting Commit on frontend {frontend_id} to backend {backend_id}")
+    candid_arg = f'(record {{ to_principal = principal "{backend_id}"; permission = variant {{ Commit }} }})'
+    grant_result: CallResult = yield ic.call_raw(
+        Principal.from_str(frontend_id), "grant_permission",
+        ic.candid_encode(candid_arg), 0,
+    )
+    if isinstance(grant_result, dict) and "Err" in grant_result:
+        step.error = f"grant_permission failed: {grant_result['Err']}"[:1990]
+        step.status = "failed"
+        jlog(task.name).error(f"step {step.idx} grant_permission failed: {step.error}")
+        step.completed_at = now_s()
+        return
+
+    step.status = "completed"
+    step.result_json = json.dumps({"granted": True, "backend": backend_id, "frontend": frontend_id})
+    jlog(task.name).info(f"step {step.idx} Commit permission granted to backend on frontend asset canister")
     step.completed_at = now_s()
 
 
@@ -535,7 +582,11 @@ def _start_extensions_for_job(job, manifest: dict):
     raw_codex = realm_info.get("codex")
     jlog(job.name).info(f"raw extensions: {len(raw_exts)} items, codex: {type(raw_codex).__name__}={raw_codex}")
 
-    ext_manifest = {"target_canister_id": job.backend_canister_id, "registry_canister_id": registry_id}
+    ext_manifest = {
+        "target_canister_id": job.backend_canister_id,
+        "frontend_canister_id": job.frontend_canister_id or "",
+        "registry_canister_id": registry_id,
+    }
     ext_list = []
     for ext in raw_exts:
         if isinstance(ext, str):
