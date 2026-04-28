@@ -21,7 +21,7 @@ from ..utils import console, get_project_root
 
 DEPLOYER_URL = os.environ.get("DEPLOYER_URL", "https://deploy.realmsgos.dev")
 POLL_INTERVAL_S = 10
-POLL_TIMEOUT_S = 300
+POLL_TIMEOUT_S = 3600
 
 _REGISTRY_IDS = {
     "staging": "7wzxh-wyaaa-aaaau-aggyq-cai",
