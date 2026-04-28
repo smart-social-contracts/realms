@@ -15,6 +15,14 @@
  *   returning an optional `unmount()` function.
  */
 
+import type {
+  RealmExtensionContext,
+  MountResult,
+  ExtensionMountFn,
+} from './realm-extension-sdk';
+
+export type { MountResult, ExtensionMountFn as MountFn };
+
 export interface ExtensionManifest {
   id?: string;
   name: string;
@@ -22,15 +30,6 @@ export interface ExtensionManifest {
   description?: string;
   [key: string]: unknown;
 }
-
-export interface MountResult {
-  unmount?: () => void;
-}
-
-export type MountFn = (
-  target: HTMLElement,
-  props?: Record<string, unknown>,
-) => MountResult | void | Promise<MountResult | void>;
 
 export interface ExtensionFrontendInfo {
   registryCanisterId: string;
@@ -124,9 +123,9 @@ export async function mountExtension(
   extId: string,
   version: string,
   target: HTMLElement,
-  props: Record<string, unknown> = {},
+  ctx: RealmExtensionContext,
 ): Promise<MountResult | void> {
-  const backend: any = (props as any)?.backend;
+  const backend: any = ctx?.backend;
   const info = await resolveFrontendInfo(backend, extId);
   const ver = info.version || version;
 
@@ -147,14 +146,14 @@ export async function mountExtension(
     mod = await import(/* @vite-ignore */ fallbackUrl);
   }
 
-  const mount: MountFn | undefined = mod?.default ?? mod?.mount;
+  const mount: ExtensionMountFn | undefined = mod?.default ?? mod?.mount;
   if (typeof mount !== 'function') {
     throw new Error(
       `Extension '${extId}@${ver}' bundle does not export a default mount() function`,
     );
   }
 
-  return await mount(target, props);
+  return await mount(target, ctx);
 }
 
 export const _internal = { fileRegistryBaseUrlFor, resolveFrontendInfo };

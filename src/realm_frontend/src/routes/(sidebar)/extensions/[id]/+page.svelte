@@ -1,17 +1,52 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { Spinner, Alert } from 'flowbite-svelte';
 	import { backend } from '$lib/canisters';
+	import { canisterId as backendCanisterId } from '$lib/declarations/realm_backend';
 	import { principal, isAuthenticated } from '$lib/stores/auth';
+	import { userProfiles } from '$lib/stores/profiles';
+	import { realmInfo } from '$lib/stores/realmInfo';
+	import { notifications, unreadCount, loadNotifications, markAsRead } from '$lib/stores/notifications';
+	import { _, locale } from 'svelte-i18n';
+	import { CONFIG } from '$lib/config.js';
+	import { cn } from '$lib/theme/utilities';
 	import { mountExtension, resolveExtensionVersion, type MountResult } from '$lib/extension-loader';
+	import type { RealmExtensionContext } from '$lib/realm-extension-sdk';
 
 	let mountPoint: HTMLDivElement | undefined;
 	let status: 'loading' | 'ready' | 'error' = 'loading';
 	let errorMsg = '';
 	let debugInfo = '';
 	let mounted: MountResult | void;
+
+	function buildContext(id: string, version: string): RealmExtensionContext {
+		return {
+			extensionId: id,
+			version,
+			backend,
+			principal,
+			isAuthenticated,
+			userProfiles,
+			realmInfo,
+			config: {
+				...CONFIG,
+				canisterId: backendCanisterId?.toString?.() ?? '',
+			},
+			navigate: goto,
+			t: _,
+			locale,
+			notifications: {
+				items: notifications,
+				unreadCount,
+				load: loadNotifications,
+				markAsRead,
+			},
+			theme: { cn },
+		};
+	}
 
 	async function loadRuntimeExtension(id: string) {
 		status = 'loading';
@@ -25,21 +60,14 @@
 				errorMsg = `Extension '${id}' is not installed on this realm_backend.`;
 				return;
 			}
-			debugInfo = `Loading ${id}@${version} from file_registry...`;
+			debugInfo = `Loading ${id}@${version}...`;
 
 			if (!mountPoint) {
 				throw new Error('mount point not ready');
 			}
-			mounted = await mountExtension(id, version, mountPoint, {
-				backend,
-				extensionId: id,
-				version,
-				// Extensions that need to identify the current user (e.g.
-				// member_dashboard) receive principal + auth state as props.
-				// Bundle MUST read these as props, not reach into host stores.
-				principal: $principal || '',
-				isAuthenticated: $isAuthenticated,
-			});
+
+			const ctx = buildContext(id, version);
+			mounted = await mountExtension(id, version, mountPoint, ctx);
 			debugInfo = `Mounted ${id}@${version}`;
 			status = 'ready';
 		} catch (e: any) {
