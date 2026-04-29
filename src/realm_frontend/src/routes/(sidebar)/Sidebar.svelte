@@ -349,10 +349,21 @@
 		});
 	}
 
-	// Core navigation items with translation keys
+	// Core navigation: use translationKey + fallback name so labels stay reactive after i18n loads
+	// (do not call $_() in a const initializer — it runs once before locale is ready).
 	const coreNavItems: NavItemWithHref[] = [
-		{ name: $_('common.identities') || 'My Identities', icon: FingerprintOutline, href: '/identities' }, // For all users
-		{ name: $_('common.settings'), icon: CogOutline, href: '/settings' }, // For all users
+		{
+			translationKey: 'common.identities',
+			name: 'My Identities',
+			icon: FingerprintOutline,
+			href: '/identities',
+		},
+		{
+			translationKey: 'common.settings',
+			name: 'Settings',
+			icon: CogOutline,
+			href: '/settings',
+		},
 	];
 
 	// Filter core navigation items based on user profiles
