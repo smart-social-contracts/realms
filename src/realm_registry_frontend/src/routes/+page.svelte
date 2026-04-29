@@ -23,20 +23,22 @@
   const H3_RESOLUTION = 6; // Resolution 6 = ~3.2km hex edge (good for city level)
   const MARKER_HIDE_ZOOM = 8; // Hide markers when zoom >= this level (hexes become visible)
 
-  // Marketplace frontend URL (resolved per environment via dfx canister IDs)
+  // Canister IDs injected at build time from canister_ids.json via vite.config.js
+  const marketplaceCanisterId = import.meta.env.CANISTER_ID_MARKETPLACE_FRONTEND || '';
+  const dashboardCanisterId = import.meta.env.CANISTER_ID_PLATFORM_DASHBOARD_FRONTEND || '';
+  const fileRegistryCanisterId = import.meta.env.CANISTER_ID_FILE_REGISTRY_FRONTEND || '';
+
   $: marketplaceUrl = isLocalDevelopment()
     ? `http://localhost:${(typeof window !== 'undefined' && window.location.port) || '4943'}/?canisterId=marketplace_frontend`
-    : `https://${import.meta.env.CANISTER_ID_MARKETPLACE_FRONTEND}.icp0.io`;
+    : marketplaceCanisterId ? `https://${marketplaceCanisterId}.icp0.io` : '';
 
-  // Platform Dashboard URL (resolved per environment via dfx canister IDs)
   $: dashboardUrl = isLocalDevelopment()
     ? `http://localhost:${(typeof window !== 'undefined' && window.location.port) || '4943'}/?canisterId=platform_dashboard_frontend`
-    : `https://${import.meta.env.CANISTER_ID_PLATFORM_DASHBOARD_FRONTEND}.icp0.io`;
+    : dashboardCanisterId ? `https://${dashboardCanisterId}.icp0.io` : '';
 
-  // File Registry URL (resolved per environment via dfx canister IDs)
   $: fileRegistryUrl = isLocalDevelopment()
     ? `http://localhost:${(typeof window !== 'undefined' && window.location.port) || '4943'}/?canisterId=file_registry_frontend`
-    : `https://${import.meta.env.CANISTER_ID_FILE_REGISTRY_FRONTEND}.icp0.io`;
+    : fileRegistryCanisterId ? `https://${fileRegistryCanisterId}.icp0.io` : '';
 
   // Get commit hash from meta tag
   let commitHash = '';

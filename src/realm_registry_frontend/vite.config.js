@@ -4,30 +4,10 @@ import { defineConfig } from 'vite';
 import environment from 'vite-plugin-environment';
 import dotenv from 'dotenv';
 import { execSync } from 'child_process';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 
 dotenv.config({ path: '../../.env' });
 
-// Inject canister IDs from canister_ids.json for the active DFX_NETWORK so
-// the frontend can resolve per-environment URLs without hardcoding.
-function injectCanisterIds() {
-  const network = process.env.DFX_NETWORK || 'staging';
-  try {
-    const ids = JSON.parse(readFileSync('../../canister_ids.json', 'utf-8'));
-    for (const [canister, envs] of Object.entries(ids)) {
-      const id = envs[network] || envs['ic'] || '';
-      if (id) {
-        const key = `CANISTER_ID_${canister.toUpperCase().replace(/-/g, '_')}`;
-        process.env[key] = process.env[key] || id;
-      }
-    }
-  } catch (e) {
-    // canister_ids.json not present (e.g. CI without checkout), skip
-  }
-}
-injectCanisterIds();
-
-// Get build-time values for local development
 function getBuildTimeValues() {
   let version = 'dev';
   let commitHash = 'local';
@@ -48,7 +28,41 @@ function getBuildTimeValues() {
   return { version, commitHash, buildTime };
 }
 
+// Resolve canister IDs from canister_ids.json for the active DFX_NETWORK.
+// Injects IDs directly into Vite's define block (build-time constants) AND
+// into process.env so vite-plugin-environment can also pick them up.
+// This bypasses plugin ordering/timing issues and works in both local dev and CI.
+function getCanisterIdDefines() {
+  const network = process.env.DFX_NETWORK;
+  if (!network) {
+    console.warn('DFX_NETWORK is not set — canister IDs will not be injected at build time.');
+    return {};
+  }
+
+  const idsPath = '../../canister_ids.json';
+  const defines = {};
+
+  if (!existsSync(idsPath)) return defines;
+
+  try {
+    const allIds = JSON.parse(readFileSync(idsPath, 'utf-8'));
+    for (const [canister, networks] of Object.entries(allIds)) {
+      const id = networks[network] || '';
+      if (id) {
+        const envKey = `CANISTER_ID_${canister.toUpperCase()}`;
+        defines[`import.meta.env.${envKey}`] = JSON.stringify(id);
+        process.env[envKey] = id;
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to read canister_ids.json:', e.message);
+  }
+
+  return defines;
+}
+
 const buildValues = getBuildTimeValues();
+const canisterDefines = getCanisterIdDefines();
 
 export default defineConfig({
   build: {
@@ -67,6 +81,7 @@ export default defineConfig({
     '__BUILD_VERSION__': JSON.stringify(buildValues.version),
     '__BUILD_COMMIT__': JSON.stringify(buildValues.commitHash),
     '__BUILD_TIME__': JSON.stringify(buildValues.buildTime),
+    ...canisterDefines,
   },
   optimizeDeps: {
     esbuildOptions: {
