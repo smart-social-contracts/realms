@@ -342,8 +342,12 @@ def mundus_deploy_descriptor_command(
     network: str,
     deploy_mode: str = "upgrade",
     artifact_version: str = "latest",
+    realm_filter: str = "",
 ) -> None:
-    """Deploy realms from a mundus descriptor YAML file."""
+    """Deploy realms from a mundus descriptor YAML file.
+
+    When *realm_filter* is set only the matching realm entry is deployed.
+    """
     descriptor_path = Path(descriptor)
     if not descriptor_path.is_absolute():
         descriptor_path = get_project_root() / descriptor_path
@@ -362,10 +366,20 @@ def mundus_deploy_descriptor_command(
         network = desc_network
 
     realms = [e for e in desc.get("mundus", []) if e.get("type", "realm") == "realm"]
+
+    if realm_filter:
+        realms = [
+            r for r in realms
+            if r.get("name") == realm_filter or r.get("display_name") == realm_filter
+        ]
+        if not realms:
+            console.print(f"[red]No realm matching '{realm_filter}' found in descriptor[/red]")
+            raise typer.Exit(1)
+
     if not realms:
         console.print("[yellow]No realm entries in descriptor[/yellow]")
         return
-    
+
     console.print(f"Deploying {len(realms)} realm(s) to {network} (mode={deploy_mode})\n")
 
     backend_url = _resolve_artifact(artifact_version, "realm_backend", network)

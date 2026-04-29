@@ -506,9 +506,21 @@ def mundus_deploy(
     artifact_version: str = typer.Option(
         "latest", "--version", "-v", help="Artifact version: 'latest', semver (e.g. 0.3.2), or local path"
     ),
+    realm: str = typer.Option(
+        "", "--realm", "-r", help="Deploy only this realm (matched by name or display_name)"
+    ),
+    backend_url: str = typer.Option(
+        "", "--backend-url", help="Pre-resolved backend WASM URL (skips artifact resolution)"
+    ),
+    frontend_url: str = typer.Option(
+        "", "--frontend-url", help="Pre-resolved frontend tarball URL (skips artifact resolution)"
+    ),
 ) -> None:
     """Deploy realm canisters from a mundus descriptor."""
-    mundus_deploy_descriptor_command(descriptor, network, deploy_mode, artifact_version)
+    mundus_deploy_descriptor_command(
+        descriptor, network, deploy_mode, artifact_version,
+        realm, backend_url, frontend_url,
+    )
 
 
 @mundus_app.command("deploy-new")

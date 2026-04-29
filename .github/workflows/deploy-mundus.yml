@@ -1,8 +1,9 @@
 # deploy-mundus.yml — deploy realm canisters via the realms CLI.
 #
-# Iterates over a mundus descriptor and submits one deployment request
-# per realm to the registry. The deployer picks up each job, installs
-# WASM, deploys frontend assets, and reports back.
+# Splits work into three stages:
+#   1. prepare   — parse the descriptor, resolve/build artifacts once, top up credits
+#   2. deploy-realm (matrix) — one parallel runner per realm: submit + poll
+#   3. smoke-test — verify all realms are live after the matrix completes
 
 name: Deploy Mundus
 
@@ -65,11 +66,21 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.13"
+  DFX_VERSION: "0.32.0"
 
+# ---------------------------------------------------------------------------
+# Job 1 — prepare
+# Resolve artifact URLs (building from source when requested), parse the
+# descriptor to emit the realm list, and top up deployer credits once.
+# ---------------------------------------------------------------------------
 jobs:
-  deploy-mundus:
+  prepare:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
+    outputs:
+      realms:      ${{ steps.parse.outputs.realms }}
+      backend_url: ${{ steps.artifacts.outputs.backend_url }}
+      frontend_url: ${{ steps.artifacts.outputs.frontend_url }}
     steps:
       - name: Deploy parameters
         run: |
@@ -89,7 +100,6 @@ jobs:
 
       - name: Install dfx
         run: |
-          DFX_VERSION=0.32.0
           curl -fsSL "https://github.com/dfinity/sdk/releases/download/${DFX_VERSION}/dfx-${DFX_VERSION}-x86_64-linux.tar.gz" -o /tmp/dfx.tar.gz
           tar -xzf /tmp/dfx.tar.gz -C /usr/local/bin
           rm /tmp/dfx.tar.gz
@@ -115,6 +125,23 @@ jobs:
           rm -f /tmp/identity.pem
           echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
 
+      - name: Parse descriptor → realm matrix
+        id: parse
+        run: |
+          python3 - <<'PY'
+          import yaml, json, os
+
+          desc = yaml.safe_load(open("${{ inputs.descriptor }}"))
+          realms = [
+              r["name"]
+              for r in desc.get("mundus", [])
+              if r.get("type", "realm") == "realm"
+          ]
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"realms={json.dumps(realms)}\n")
+          print(f"Realm matrix: {realms}")
+          PY
+
       - name: Top up credits
         run: |
           NETWORK=$(python3 -c "import yaml; print(yaml.safe_load(open('${{ inputs.descriptor }}'))['network'])")
@@ -128,26 +155,157 @@ jobs:
             echo "Credits topped up for $PRINCIPAL on $NETWORK (registry: $REGISTRY)"
           fi
 
-      - name: Deploy realms
+      - name: Resolve artifact URLs
+        id: artifacts
+        run: |
+          python3 - <<'PY'
+          import json, os, yaml
+
+          version = "${{ inputs.artifact_version || 'latest' }}"
+          repo    = "smart-social-contracts/realms"
+
+          if version == "build":
+              # Build WASM + frontend tarball from source, upload to deployer,
+              # and return the resulting URLs. The build cache means backend and
+              # frontend are compiled only once despite two _resolve_artifact calls.
+              from realms.cli.commands.mundus import _resolve_artifact
+              desc    = yaml.safe_load(open("${{ inputs.descriptor }}"))
+              network = desc.get("network", "")
+              backend_url  = _resolve_artifact("build", "realm_backend",  network)
+              frontend_url = _resolve_artifact("build", "realm_frontend", network)
+
+          elif version == "latest":
+              import urllib.request
+              with urllib.request.urlopen(
+                  f"https://api.github.com/repos/{repo}/releases/latest", timeout=30
+              ) as resp:
+                  ver = json.loads(resp.read())["tag_name"].lstrip("v")
+              backend_url  = f"https://github.com/{repo}/releases/download/v{ver}/realm_backend.wasm.gz"
+              frontend_url = f"https://github.com/{repo}/releases/download/v{ver}/realm_frontend.tar.gz"
+
+          else:
+              # Treat as explicit semver
+              backend_url  = f"https://github.com/{repo}/releases/download/v{version}/realm_backend.wasm.gz"
+              frontend_url = f"https://github.com/{repo}/releases/download/v{version}/realm_frontend.tar.gz"
+
+          print(f"backend_url:  {backend_url}")
+          print(f"frontend_url: {frontend_url}")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"backend_url={backend_url}\n")
+              f.write(f"frontend_url={frontend_url}\n")
+          PY
+
+  # ---------------------------------------------------------------------------
+  # Job 2 — deploy-realm (matrix)
+  # One runner per realm, all running in parallel.  Each runner deploys only
+  # its assigned realm using the artifact URLs resolved in the prepare job.
+  # ---------------------------------------------------------------------------
+  deploy-realm:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false   # let other realms finish even if one fails
+      matrix:
+        realm: ${{ fromJson(needs.prepare.outputs.realms) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dfx
+        run: |
+          curl -fsSL "https://github.com/dfinity/sdk/releases/download/${DFX_VERSION}/dfx-${DFX_VERSION}-x86_64-linux.tar.gz" -o /tmp/dfx.tar.gz
+          tar -xzf /tmp/dfx.tar.gz -C /usr/local/bin
+          rm /tmp/dfx.tar.gz
+
+      - name: Install realms CLI
+        run: |
+          pip install -r requirements.txt
+          pip install -e cli/
+
+      - name: Configure dfx identity
+        env:
+          IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
+        run: |
+          if [ -z "$IC_IDENTITY_PEM" ]; then
+            echo "::error::IC_IDENTITY_PEM secret is not set." >&2
+            exit 1
+          fi
+          printf '%s' "$IC_IDENTITY_PEM" > /tmp/identity.pem
+          chmod 600 /tmp/identity.pem
+          dfx identity import ci /tmp/identity.pem --storage-mode=plaintext --force
+          dfx identity use ci
+          rm -f /tmp/identity.pem
+          echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
+
+      - name: Deploy realm ${{ matrix.realm }}
         run: |
           realms mundus deploy \
             "${{ inputs.descriptor }}" \
-            --mode "${{ inputs.deploy_mode || 'upgrade' }}" \
-            --version "${{ inputs.artifact_version || 'latest' }}"
+            --mode    "${{ inputs.deploy_mode || 'upgrade' }}" \
+            --realm   "${{ matrix.realm }}" \
+            --backend-url  "${{ needs.prepare.outputs.backend_url }}" \
+            --frontend-url "${{ needs.prepare.outputs.frontend_url }}"
+
+  # ---------------------------------------------------------------------------
+  # Job 3 — smoke-test
+  # Runs after all realm deployments succeed.  Pings each realm's backend
+  # canister and frontend URL to confirm liveness.
+  # ---------------------------------------------------------------------------
+  smoke-test:
+    needs: deploy-realm
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: success()
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dfx
+        run: |
+          curl -fsSL "https://github.com/dfinity/sdk/releases/download/${DFX_VERSION}/dfx-${DFX_VERSION}-x86_64-linux.tar.gz" -o /tmp/dfx.tar.gz
+          tar -xzf /tmp/dfx.tar.gz -C /usr/local/bin
+          rm /tmp/dfx.tar.gz
+
+      - name: Configure dfx identity
+        env:
+          IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
+        run: |
+          if [ -z "$IC_IDENTITY_PEM" ]; then
+            echo "::error::IC_IDENTITY_PEM secret is not set." >&2
+            exit 1
+          fi
+          printf '%s' "$IC_IDENTITY_PEM" > /tmp/identity.pem
+          chmod 600 /tmp/identity.pem
+          dfx identity import ci /tmp/identity.pem --storage-mode=plaintext --force
+          dfx identity use ci
+          rm -f /tmp/identity.pem
+          echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
 
       - name: Smoke test
-        if: success()
         run: |
           python3 - <<'PY'
           import yaml, subprocess, sys, urllib.request
 
-          desc = yaml.safe_load(open("${{ inputs.descriptor }}"))
+          desc    = yaml.safe_load(open("${{ inputs.descriptor }}"))
           network = desc["network"]
-          ok = True
+          ok      = True
 
           for m in desc.get("mundus", []):
-              name = m.get("display_name") or m["name"]
-              backend = m.get("canister_id", "")
+              name     = m.get("display_name") or m["name"]
+              backend  = m.get("canister_id", "")
               frontend = m.get("frontend_canister_id", "")
 
               if backend:
