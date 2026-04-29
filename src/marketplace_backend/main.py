@@ -712,7 +712,7 @@ def _license_record(d: dict) -> "DeveloperLicense":
 
 
 @init
-def init_canister(arg: Opt[MarketplaceInitArg]) -> void:
+def init_canister(arg: Opt[MarketplaceInitArg] = None) -> void:
     """Initialise marketplace.
 
     The init arg is optional. When provided, sets the file_registry
