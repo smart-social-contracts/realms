@@ -514,11 +514,22 @@ def _check_job_after_extensions(task):
         for job in DeploymentJob.instances():
             if (job.ext_deploy_task_id or "") == task.name:
                 if task.status in ("completed", "partial"):
+                    if task.status == "partial":
+                        failed_steps = [s for s in task.steps if s.status == "failed"]
+                        warnings = "; ".join(
+                            f"{s.label}: {s.error}" for s in failed_steps[:10]
+                        )
+                        job.error = f"partial extension install ({len(failed_steps)} failed): {warnings}"[:1990]
+                        jlog(job.name).warning(job.error)
                     job.status = "registering"
                     schedule_registration(job.name)
                 else:
                     job.status = "failed"
-                    job.error = f"extension task {task.name}: {task.status}"[:1990]
+                    failed_steps = [s for s in task.steps if s.status == "failed"]
+                    errors = "; ".join(
+                        f"{s.label}: {s.error}" for s in failed_steps[:10]
+                    )
+                    job.error = f"extension install failed ({len(failed_steps)} failed): {errors}"[:1990]
                     job.completed_at = now_s()
                     schedule_registry_settlement(job.name, success=False, reason=job.error)
                 return

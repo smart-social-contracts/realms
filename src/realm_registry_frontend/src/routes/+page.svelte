@@ -23,20 +23,20 @@
   const H3_RESOLUTION = 6; // Resolution 6 = ~3.2km hex edge (good for city level)
   const MARKER_HIDE_ZOOM = 8; // Hide markers when zoom >= this level (hexes become visible)
 
-  // Marketplace frontend URL (resolved per environment)
+  // Marketplace frontend URL (resolved per environment via dfx canister IDs)
   $: marketplaceUrl = isLocalDevelopment()
     ? `http://localhost:${(typeof window !== 'undefined' && window.location.port) || '4943'}/?canisterId=marketplace_frontend`
-    : 'https://joj52-zaaaa-aaaah-qrejq-cai.icp0.io';
+    : `https://${import.meta.env.CANISTER_ID_MARKETPLACE_FRONTEND || 'joj52-zaaaa-aaaah-qrejq-cai'}.icp0.io`;
 
-  // Platform Dashboard URL (resolved per environment)
+  // Platform Dashboard URL (resolved per environment via dfx canister IDs)
   $: dashboardUrl = isLocalDevelopment()
     ? `http://localhost:${(typeof window !== 'undefined' && window.location.port) || '4943'}/?canisterId=platform_dashboard_frontend`
-    : 'https://dpgu3-wqaaa-aaaau-agqoa-cai.icp0.io';
+    : `https://${import.meta.env.CANISTER_ID_PLATFORM_DASHBOARD_FRONTEND || 'dpgu3-wqaaa-aaaau-agqoa-cai'}.icp0.io`;
 
-  // File Registry URL (resolved per environment)
+  // File Registry URL (resolved per environment via dfx canister IDs)
   $: fileRegistryUrl = isLocalDevelopment()
     ? `http://localhost:${(typeof window !== 'undefined' && window.location.port) || '4943'}/?canisterId=file_registry_frontend`
-    : 'https://rbex3-xyaaa-aaaah-qumma-cai.icp0.io';
+    : `https://${import.meta.env.CANISTER_ID_FILE_REGISTRY_FRONTEND || 'rbex3-xyaaa-aaaah-qumma-cai'}.icp0.io`;
 
   // Get commit hash from meta tag
   let commitHash = '';

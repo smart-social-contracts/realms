@@ -280,6 +280,9 @@ def _submit_and_poll(manifest: dict, network: str) -> bool:
                 status = ok.get("status", "unknown")
                 console.print(f"  [{elapsed}s] Status: {status}")
                 if status == "completed":
+                    error = ok.get("error", "")
+                    if error:
+                        console.print(f"  [yellow]⚠ {error}[/yellow]")
                     console.print(f"  [green]Deployment succeeded[/green]")
                     return True
                 elif status in ("failed", "failed_verification", "cancelled"):
