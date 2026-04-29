@@ -236,8 +236,7 @@
         "src/marketplace_frontend/dist"
       ],
       "type": "assets",
-      "workspace": "marketplace_frontend",
-      "dependencies": ["marketplace_backend"]
+      "workspace": "marketplace_frontend"
     },
     "platform_dashboard_frontend": {
       "source": [
