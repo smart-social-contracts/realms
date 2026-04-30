@@ -64,12 +64,9 @@ def _check_access(caller_principal: str, operation: str) -> bool:
     # ...) and the deploying CI principal needs admin to bootstrap even
     # though no explicit User record exists for it after a reinstall.
     try:
-        if ic.is_controller(ic.caller()):
+        if ic.is_controller(caller_principal):
             return True
     except Exception:
-        # Older basilisk runtimes may not expose is_controller; the
-        # init-time _controller_principal fallback below still handles
-        # the original deployer in those cases.
         pass
 
     # 0b. First-deploy controller fallback (principal captured at init).

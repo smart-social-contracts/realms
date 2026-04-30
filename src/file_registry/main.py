@@ -636,6 +636,9 @@ def get_extension_manifest(args: text) -> text:
 
     namespaces = _load_namespaces()
 
+    if version and str(version).strip().lower() == "latest":
+        version = ""
+
     if not version:
         prefix = f"{NS_PREFIX_EXT}{ext_id}/"
         version = _find_latest_version(namespaces, prefix)
@@ -666,6 +669,10 @@ def _get_backend_files_impl(category: str, item_id: str, version: str) -> str:
         prefix = f"{NS_PREFIX_CODEX}{item_id}/"
     else:
         return json.dumps({"error": f"Unknown category: {category}"})
+
+    # Realm manifests often use version "latest"; treat like empty → resolve semver.
+    if version and str(version).strip().lower() == "latest":
+        version = ""
 
     if not version:
         version = _find_latest_version(namespaces, prefix)
@@ -740,6 +747,9 @@ def _get_frontend_files_impl(item_id: str, version: str) -> str:
     """Return all frontend/ files for an extension as {path: content}."""
     namespaces = _load_namespaces()
     prefix = f"{NS_PREFIX_EXT}{item_id}/"
+
+    if version and str(version).strip().lower() == "latest":
+        version = ""
 
     if not version:
         version = _find_latest_version(namespaces, prefix)

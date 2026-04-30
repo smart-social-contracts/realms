@@ -73,7 +73,7 @@ jobs:
       - name: Install realms CLI
         run: |
           pip install -r requirements.txt
-          pip install -e cli/
+          pip install cli/
 
       - name: Configure dfx identity
         env:
