@@ -323,6 +323,13 @@ export async function initI18n(options: InitI18nOptions = {}) {
     initialLocale: browser ? getPreferredLocale() : "en"
   });
 
+  // Wait for the initial locale's messages to finish loading before
+  // allowing any component to render. Without this, the locale store
+  // is still null while en.json is being fetched asynchronously, and
+  // any `$_()` call would throw "Cannot format a message without first
+  // setting the initial locale".
+  await waitLocale();
+
   console.log('i18n initialized in realm_frontend');
 
   // 1) Build-time bundled extension translations (legacy path; will be empty
