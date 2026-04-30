@@ -5,6 +5,7 @@ and realm registration. The off-chain realms-deployer polls for pending jobs,
 deploys via dfx, and reports back.
 """
 
+import hashlib
 import json
 import traceback
 
@@ -718,7 +719,31 @@ def enqueue_deployment(manifest_json: text) -> ResultEnqueue:
         _log.info(f"enqueue: realm='{realm_name}' network={network} manifest_len={len(manifest_json)} extensions={ext_count} codex={bool(codex_info)}")
         _log.info(f"enqueue: realm_info keys={list(realm_info.keys())}")
 
-        job_id = "job_%d" % ic.time()
+        epoch_s = ic.time() // 1_000_000_000
+        # Manual UTC datetime from epoch — no stdlib time/datetime needed
+        s = epoch_s
+        DAYS_PER_400Y = 146097
+        DAYS_PER_100Y = 36524
+        DAYS_PER_4Y = 1461
+        days = s // 86400
+        rem = s % 86400
+        hh = rem // 3600
+        mm = (rem % 3600) // 60
+        ss = rem % 60
+        days += 719468  # shift epoch from 1970 to 0000-03-01
+        era = days // DAYS_PER_400Y
+        doe = days - era * DAYS_PER_400Y
+        yoe = (doe - doe // 1460 + doe // 36524 - doe // 146096) // 365
+        y = yoe + era * 400
+        doy = doe - (365 * yoe + yoe // 4 - yoe // 100)
+        mp = (5 * doy + 2) // 153
+        d = doy - (153 * mp + 2) // 5 + 1
+        m = mp + (3 if mp < 10 else -9)
+        if m <= 2:
+            y += 1
+        ts = "%04d%02d%02d%02d%02d%02d" % (y, m, d, hh, mm, ss)
+        suffix = hashlib.sha256(realm_name.encode()).hexdigest()[:4]
+        job_id = "job_%s_%s" % (ts, suffix)
         DeploymentJob(
             name=job_id, status="pending", caller_principal=requester,
             manifest_json=manifest_json[:8190], network=network,
