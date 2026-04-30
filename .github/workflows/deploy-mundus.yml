@@ -1,8 +1,9 @@
 # deploy-mundus.yml — deploy realm canisters via the realms CLI.
 #
-# Iterates over a mundus descriptor and submits one deployment request
-# per realm to the registry. The deployer picks up each job, installs
-# WASM, deploys frontend assets, and reports back.
+# Three-job pipeline:
+#   1. prepare  — checkout, resolve artifacts, emit realm matrix
+#   2. deploy-realm (matrix) — one parallel runner per realm
+#   3. smoke-test — verify all deployments succeeded
 
 name: Deploy Mundus
 
@@ -34,6 +35,21 @@ on:
         required: false
         default: "build"
 
+      realm:
+        description: "Deploy only this realm (leave blank for all)"
+        required: false
+        default: ""
+
+      canister:
+        description: "Deploy only 'backend' or 'frontend' (leave blank for both)"
+        required: false
+        type: choice
+        default: ""
+        options:
+          - ""
+          - backend
+          - frontend
+
       ref:
         description: "Commit/branch to deploy from (defaults to workflow ref)"
         required: false
@@ -55,6 +71,16 @@ on:
         type: string
         required: false
         default: "build"
+      realm:
+        description: "Filter to a single realm name (empty = all)"
+        type: string
+        required: false
+        default: ""
+      canister:
+        description: "Filter to backend/frontend (empty = both)"
+        type: string
+        required: false
+        default: ""
     secrets:
       IC_IDENTITY_PEM:
         required: true
@@ -67,17 +93,108 @@ env:
   PYTHON_VERSION: "3.13"
 
 jobs:
-  deploy-mundus:
+  # ─── Job 1: Prepare ───────────────────────────────────────────────────────────
+  prepare:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
+    outputs:
+      realm_matrix: ${{ steps.matrix.outputs.realms }}
+      network: ${{ steps.matrix.outputs.network }}
     steps:
       - name: Deploy parameters
         run: |
           echo "Descriptor:       ${{ inputs.descriptor }}"
           echo "Deploy mode:      ${{ inputs.deploy_mode || 'upgrade' }}"
           echo "Artifact version: ${{ inputs.artifact_version || 'latest' }}"
+          echo "Realm filter:     ${{ inputs.realm || '(all)' }}"
+          echo "Canister filter:  ${{ inputs.canister || '(both)' }}"
           echo "Ref:              ${{ inputs.ref || github.ref }}"
 
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Build realm matrix
+        id: matrix
+        run: |
+          python3 - <<'PY'
+          import json, os, yaml
+
+          desc = yaml.safe_load(open("${{ inputs.descriptor }}"))
+          network = desc.get("network", "staging")
+          realm_filter = "${{ inputs.realm }}".strip().lower()
+
+          realms = [e for e in desc.get("mundus", []) if e.get("type", "realm") == "realm"]
+
+          if realm_filter:
+              realms = [
+                  e for e in realms
+                  if realm_filter in (e.get("name", "").lower(), e.get("display_name", "").lower())
+              ]
+
+          names = [e.get("name", e.get("display_name", "unknown")) for e in realms]
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"realms={json.dumps(names)}\n")
+              f.write(f"network={network}\n")
+
+          print(f"Matrix: {names}")
+          PY
+
+      - name: Install dfx
+        run: |
+          DFX_VERSION=0.32.0
+          curl -fsSL "https://github.com/dfinity/sdk/releases/download/${DFX_VERSION}/dfx-${DFX_VERSION}-x86_64-linux.tar.gz" -o /tmp/dfx.tar.gz
+          tar -xzf /tmp/dfx.tar.gz -C /usr/local/bin
+          rm /tmp/dfx.tar.gz
+          dfx --version
+
+      - name: Configure dfx identity
+        env:
+          IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
+        run: |
+          if [ -z "$IC_IDENTITY_PEM" ]; then
+            echo "::error::IC_IDENTITY_PEM secret is not set." >&2
+            exit 1
+          fi
+          printf '%s' "$IC_IDENTITY_PEM" > /tmp/identity.pem
+          chmod 600 /tmp/identity.pem
+          dfx identity import ci /tmp/identity.pem --storage-mode=plaintext --force
+          dfx identity use ci
+          rm -f /tmp/identity.pem
+          echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
+
+      - name: Top up credits
+        run: |
+          NETWORK="${{ needs.prepare.outputs.network || steps.matrix.outputs.network }}"
+          REGISTRY=$(python3 -c "import json; print(json.load(open('canister_ids.json'))['realm_registry_backend']['$NETWORK'])" 2>/dev/null || echo "")
+          if [ -z "$REGISTRY" ]; then
+            echo "::warning::Could not resolve registry canister for network '$NETWORK', skipping credit top-up"
+          else
+            PRINCIPAL=$(dfx identity get-principal)
+            dfx canister call --network ic "$REGISTRY" add_credits \
+              "(\"$PRINCIPAL\", 50 : nat64, \"\", \"CI credit top-up\")" || true
+            echo "Credits topped up for $PRINCIPAL on $NETWORK (registry: $REGISTRY)"
+          fi
+
+  # ─── Job 2: Deploy each realm in parallel ─────────────────────────────────────
+  deploy-realm:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        realm: ${{ fromJson(needs.prepare.outputs.realm_matrix) }}
+    steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref || github.ref }}
@@ -104,10 +221,6 @@ jobs:
         env:
           IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
         run: |
-          if [ -z "$IC_IDENTITY_PEM" ]; then
-            echo "::error::IC_IDENTITY_PEM secret is not set." >&2
-            exit 1
-          fi
           printf '%s' "$IC_IDENTITY_PEM" > /tmp/identity.pem
           chmod 600 /tmp/identity.pem
           dfx identity import ci /tmp/identity.pem --storage-mode=plaintext --force
@@ -115,42 +228,76 @@ jobs:
           rm -f /tmp/identity.pem
           echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
 
-      - name: Top up credits
+      - name: Deploy ${{ matrix.realm }}
         run: |
-          NETWORK=$(python3 -c "import yaml; print(yaml.safe_load(open('${{ inputs.descriptor }}'))['network'])")
-          REGISTRY=$(python3 -c "import json; print(json.load(open('canister_ids.json'))['realm_registry_backend']['$NETWORK'])" 2>/dev/null || echo "")
-          if [ -z "$REGISTRY" ]; then
-            echo "::warning::Could not resolve registry canister for network '$NETWORK', skipping credit top-up"
-          else
-            PRINCIPAL=$(dfx identity get-principal)
-            dfx canister call --network ic "$REGISTRY" add_credits \
-              "(\"$PRINCIPAL\", 50 : nat64, \"\", \"CI credit top-up\")" || true
-            echo "Credits topped up for $PRINCIPAL on $NETWORK (registry: $REGISTRY)"
+          CANISTER_FLAG=""
+          if [ -n "${{ inputs.canister }}" ]; then
+            CANISTER_FLAG="--canister ${{ inputs.canister }}"
           fi
 
-      - name: Deploy realms
-        run: |
           realms mundus deploy \
             "${{ inputs.descriptor }}" \
             --mode "${{ inputs.deploy_mode || 'upgrade' }}" \
-            --version "${{ inputs.artifact_version || 'latest' }}"
+            --version "${{ inputs.artifact_version || 'latest' }}" \
+            --realm "${{ matrix.realm }}" \
+            $CANISTER_FLAG
+
+  # ─── Job 3: Smoke test ─────────────────────────────────────────────────────────
+  smoke-test:
+    needs: [prepare, deploy-realm]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dfx
+        run: |
+          DFX_VERSION=0.32.0
+          curl -fsSL "https://github.com/dfinity/sdk/releases/download/${DFX_VERSION}/dfx-${DFX_VERSION}-x86_64-linux.tar.gz" -o /tmp/dfx.tar.gz
+          tar -xzf /tmp/dfx.tar.gz -C /usr/local/bin
+          rm /tmp/dfx.tar.gz
+
+      - name: Configure dfx identity
+        env:
+          IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
+        run: |
+          printf '%s' "$IC_IDENTITY_PEM" > /tmp/identity.pem
+          chmod 600 /tmp/identity.pem
+          dfx identity import ci /tmp/identity.pem --storage-mode=plaintext --force
+          dfx identity use ci
+          rm -f /tmp/identity.pem
+          echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: pip install pyyaml
 
       - name: Smoke test
-        if: success()
         run: |
           python3 - <<'PY'
           import yaml, subprocess, sys, urllib.request
 
           desc = yaml.safe_load(open("${{ inputs.descriptor }}"))
           network = desc["network"]
+          realm_filter = "${{ inputs.realm }}".strip().lower()
+          canister_filter = "${{ inputs.canister }}".strip().lower()
           ok = True
 
           for m in desc.get("mundus", []):
               name = m.get("display_name") or m["name"]
+
+              if realm_filter and realm_filter not in (m.get("name", "").lower(), name.lower()):
+                  continue
+
               backend = m.get("canister_id", "")
               frontend = m.get("frontend_canister_id", "")
 
-              if backend:
+              if backend and canister_filter != "frontend":
                   try:
                       subprocess.run(
                           ["dfx", "canister", "call", backend, "status", "()",
@@ -162,7 +309,7 @@ jobs:
                       print(f"  backend  {name}: FAIL - {e.stderr[:200]}")
                       ok = False
 
-              if frontend:
+              if frontend and canister_filter != "backend":
                   url = f"https://{frontend}.icp0.io/"
                   try:
                       urllib.request.urlopen(url, timeout=15)

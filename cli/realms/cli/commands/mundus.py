@@ -193,8 +193,12 @@ def _resolve_artifact(ref: str, artifact_type: str, network: str) -> str:
 
 
 def _build_manifest(realm_entry: dict, network: str, deploy_mode: str,
-                    backend_url: str, frontend_url: str) -> dict:
-    """Build a deployment manifest for a single realm."""
+                    backend_url: str, frontend_url: str,
+                    canister_filter: str = "") -> dict:
+    """Build a deployment manifest for a single realm.
+
+    canister_filter: "" = both, "backend" = backend only, "frontend" = frontend only.
+    """
     project_root = get_project_root()
     manifest_path = realm_entry.get("manifest", "")
     realm_manifest = {}
@@ -213,18 +217,22 @@ def _build_manifest(realm_entry: dict, network: str, deploy_mode: str,
                 console.print(f"  Uploading branding: {name}")
                 branding[key] = _upload_file(img)
 
+    artifacts = {}
+    canister_ids = {}
+
+    if canister_filter != "frontend":
+        artifacts["realm_backend"] = backend_url
+        canister_ids["backend"] = realm_entry.get("canister_id", "")
+    if canister_filter != "backend":
+        artifacts["realm_frontend"] = frontend_url
+        canister_ids["frontend"] = realm_entry.get("frontend_canister_id", "")
+
     result = {
         "name": realm_entry.get("display_name", realm_entry.get("name", "unknown")),
         "network": network,
         "deploy_mode": deploy_mode,
-        "artifacts": {
-            "realm_backend": backend_url,
-            "realm_frontend": frontend_url,
-        },
-        "canister_ids": {
-            "backend": realm_entry.get("canister_id", ""),
-            "frontend": realm_entry.get("frontend_canister_id", ""),
-        },
+        "artifacts": artifacts,
+        "canister_ids": canister_ids,
         "realm": {
             "name": realm_entry.get("display_name", realm_entry.get("name", "")),
             **{k: v for k, v in realm_manifest.items() if k not in ("name",)},
@@ -235,6 +243,23 @@ def _build_manifest(realm_entry: dict, network: str, deploy_mode: str,
     if branding:
         result["branding"] = branding
     return result
+
+
+def _format_elapsed(seconds: int) -> str:
+    """Format seconds as human-readable duration."""
+    if seconds < 60:
+        return f"{seconds}s"
+    minutes, secs = divmod(seconds, 60)
+    return f"{minutes}m{secs:02d}s"
+
+
+def _poll_status_line(elapsed: int, status: str, detail: str = "") -> str:
+    """Build a formatted poll status line."""
+    ts = _format_elapsed(elapsed)
+    line = f"  [{ts}] {status}"
+    if detail:
+        line += f" — {detail}"
+    return line
 
 
 def _submit_and_poll(manifest: dict, network: str) -> bool:
@@ -248,7 +273,7 @@ def _submit_and_poll(manifest: dict, network: str) -> bool:
     manifest_json = json.dumps(manifest)
     candid_arg = '("' + manifest_json.replace("\\", "\\\\").replace('"', '\\"') + '")'
 
-    console.print(f"  Submitting to registry...")
+    console.print(f"  Submitting to registry ({registry_id})...")
     try:
         raw = _dfx_call(registry_id, "request_deployment", candid_arg, network)
         result = json.loads(json.loads(raw) if raw.startswith('"') else raw)
@@ -261,14 +286,20 @@ def _submit_and_poll(manifest: dict, network: str) -> bool:
         return False
 
     job_id = result.get("job_id", "")
-    console.print(f"  Job enqueued: {job_id}")
+    console.print(f"  Job enqueued: [bold]{job_id}[/bold]")
 
     installer_id = _INSTALLER_IDS.get(network, "")
     if not installer_id:
         console.print(f"[yellow]  No installer ID — cannot poll[/yellow]")
         return True
 
+    console.print(f"  Polling installer ({installer_id})...\n")
+
     start = time.time()
+    prev_status = ""
+    prev_detail = ""
+    same_status_count = 0
+
     while time.time() - start < POLL_TIMEOUT_S:
         time.sleep(POLL_INTERVAL_S)
         elapsed = int(time.time() - start)
@@ -278,24 +309,113 @@ def _submit_and_poll(manifest: dict, network: str) -> bool:
             ok = data.get("Ok") or (data if "job_id" in data else None)
             if ok:
                 status = ok.get("status", "unknown")
-                console.print(f"  [{elapsed}s] Status: {status}")
-                if status == "completed":
+                detail = ""
+
+                # Build contextual detail per phase
+                if status == "pending":
+                    detail = "waiting for installer to pick up job"
+                elif status == "allocating":
+                    be = ok.get("backend_canister_id", "")
+                    fe = ok.get("frontend_canister_id", "")
+                    if be or fe:
+                        detail = f"backend={be or '...'} frontend={fe or '...'}"
+                    else:
+                        detail = "allocating canisters"
+                elif status == "installing_wasm":
+                    be = ok.get("backend_canister_id", "")
+                    detail = f"uploading WASM to {be}" if be else "installing WASM"
+                elif status == "verifying":
+                    wasm_ok = ok.get("wasm_verified", 0)
+                    assets_ok = ok.get("assets_verified", 0)
+                    parts = []
+                    if wasm_ok:
+                        parts.append("wasm [green]✓[/green]")
+                    else:
+                        expected = ok.get("expected_wasm_hash", "")[:12]
+                        actual = ok.get("actual_wasm_hash", "")[:12]
+                        if actual:
+                            parts.append(f"wasm hash {actual}{'==' if actual == expected[:12] else '≠'}{expected}")
+                        else:
+                            parts.append("verifying wasm hash")
+                    if assets_ok:
+                        parts.append("assets [green]✓[/green]")
+                    else:
+                        parts.append("verifying assets")
+                    detail = " | ".join(parts)
+                elif status == "deploying_frontend":
+                    fe = ok.get("frontend_canister_id", "")
+                    assets_ok = ok.get("assets_verified", 0)
+                    detail = f"uploading assets to {fe}" if fe else "deploying frontend"
+                    if assets_ok:
+                        detail += " (verified)"
+                elif status == "extensions":
+                    task_id = ok.get("ext_deploy_task_id", "")
+                    if task_id:
+                        detail = f"installing extensions (task: {task_id[:16]}…)"
+                    else:
+                        detail = "installing extensions & codices"
+                elif status == "registering":
+                    detail = "registering realm in registry"
+                elif status == "completed":
+                    completed_at = ok.get("completed_at", 0)
+                    be = ok.get("backend_canister_id", "")
+                    fe = ok.get("frontend_canister_id", "")
                     error = ok.get("error", "")
+                    duration = _format_elapsed(elapsed)
+                    console.print(f"  [{duration}] [green bold]completed[/green bold]")
+                    if be:
+                        console.print(f"         backend:  {be}")
+                    if fe:
+                        console.print(f"         frontend: {fe}")
                     if error:
                         console.print(f"  [yellow]⚠ {error}[/yellow]")
-                    console.print(f"  [green]Deployment succeeded[/green]")
+                    console.print(f"  [green]Deployment succeeded ({duration} total)[/green]")
                     return True
                 elif status in ("failed", "failed_verification", "cancelled"):
                     error = ok.get("error", "")
-                    console.print(f"  [red]Deployment failed: {error}[/red]")
+                    be = ok.get("backend_canister_id", "")
+                    wasm_ok = ok.get("wasm_verified", 0)
+                    assets_ok = ok.get("assets_verified", 0)
+                    console.print(f"  [{_format_elapsed(elapsed)}] [red bold]{status}[/red bold]")
+                    if error:
+                        console.print(f"  [red]  Error: {error}[/red]")
+                    if be:
+                        console.print(f"         backend:  {be}")
+                    if status == "failed_verification":
+                        console.print(f"         wasm_verified={wasm_ok} assets_verified={assets_ok}")
+                        expected_w = ok.get("expected_wasm_hash", "")
+                        actual_w = ok.get("actual_wasm_hash", "")
+                        if expected_w or actual_w:
+                            console.print(f"         wasm expected: {expected_w}")
+                            console.print(f"         wasm actual:   {actual_w}")
                     return False
+
+                # Suppress repeated identical lines; show phase transitions prominently
+                if status != prev_status:
+                    same_status_count = 0
+                    color = {"pending": "dim", "extensions": "cyan", "verifying": "yellow",
+                             "registering": "magenta", "allocating": "blue",
+                             "installing_wasm": "blue", "deploying_frontend": "blue"}.get(status, "white")
+                    console.print(f"  [{_format_elapsed(elapsed)}] [{color}]{status}[/{color}] — {detail}")
+                    prev_status = status
+                    prev_detail = detail
+                elif detail != prev_detail:
+                    same_status_count = 0
+                    console.print(_poll_status_line(elapsed, status, detail))
+                    prev_detail = detail
+                else:
+                    same_status_count += 1
+                    if same_status_count % 6 == 0:
+                        console.print(f"  [{_format_elapsed(elapsed)}] still {status} ({_format_elapsed(elapsed)} elapsed)")
             else:
                 err = data.get("Err", {})
-                console.print(f"  [{elapsed}s] Poll error: {err}")
+                msg = err.get("message", str(err)) if isinstance(err, dict) else str(err)
+                console.print(f"  [{_format_elapsed(elapsed)}] [yellow]poll error: {msg}[/yellow]")
         except Exception as e:
-            console.print(f"  [{elapsed}s] Poll error: {e}")
+            console.print(f"  [{_format_elapsed(elapsed)}] [yellow]poll error: {e}[/yellow]")
 
-    console.print(f"[red]  Timeout after {POLL_TIMEOUT_S}s[/red]")
+    console.print(f"[red]  Timeout after {_format_elapsed(POLL_TIMEOUT_S)} — job may still be running[/red]")
+    console.print(f"[red]  Job ID: {job_id}[/red]")
     return False
 
 
@@ -345,14 +465,25 @@ def mundus_deploy_descriptor_command(
     network: str,
     deploy_mode: str = "upgrade",
     artifact_version: str = "latest",
+    realm_filter: str = "",
+    canister_filter: str = "",
 ) -> None:
-    """Deploy realms from a mundus descriptor YAML file."""
+    """Deploy realms from a mundus descriptor YAML file.
+
+    Optional filters:
+      realm_filter   — deploy only the realm matching this name/display_name
+      canister_filter — "backend", "frontend", or "" (both)
+    """
     descriptor_path = Path(descriptor)
     if not descriptor_path.is_absolute():
         descriptor_path = get_project_root() / descriptor_path
 
     if not descriptor_path.exists():
         console.print(f"[red]Descriptor not found: {descriptor_path}[/red]")
+        raise typer.Exit(1)
+
+    if canister_filter and canister_filter not in ("backend", "frontend"):
+        console.print(f"[red]Invalid canister filter '{canister_filter}'. Use 'backend' or 'frontend'.[/red]")
         raise typer.Exit(1)
 
     with open(descriptor_path) as f:
@@ -365,23 +496,46 @@ def mundus_deploy_descriptor_command(
         network = desc_network
 
     realms = [e for e in desc.get("mundus", []) if e.get("type", "realm") == "realm"]
+
+    if realm_filter:
+        realms = [
+            e for e in realms
+            if realm_filter.lower() in (
+                e.get("name", "").lower(),
+                e.get("display_name", "").lower(),
+            )
+        ]
+        if not realms:
+            console.print(f"[red]No realm matching '{realm_filter}' in descriptor[/red]")
+            raise typer.Exit(1)
+
     if not realms:
         console.print("[yellow]No realm entries in descriptor[/yellow]")
         return
-    
-    console.print(f"Deploying {len(realms)} realm(s) to {network} (mode={deploy_mode})\n")
 
-    backend_url = _resolve_artifact(artifact_version, "realm_backend", network)
-    frontend_url = _resolve_artifact(artifact_version, "realm_frontend", network)
-    console.print(f"Artifacts resolved:")
-    console.print(f"  backend:  {backend_url}")
-    console.print(f"  frontend: {frontend_url}\n")
+    scope = f"{len(realms)} realm(s)"
+    if canister_filter:
+        scope += f" ({canister_filter} only)"
+    console.print(f"Deploying {scope} to {network} (mode={deploy_mode})\n")
+
+    backend_url = ""
+    frontend_url = ""
+    if canister_filter != "frontend":
+        backend_url = _resolve_artifact(artifact_version, "realm_backend", network)
+        console.print(f"Artifacts resolved:")
+        console.print(f"  backend:  {backend_url}")
+    if canister_filter != "backend":
+        frontend_url = _resolve_artifact(artifact_version, "realm_frontend", network)
+        if not backend_url:
+            console.print(f"Artifacts resolved:")
+        console.print(f"  frontend: {frontend_url}")
+    console.print()
 
     results = []
     for realm in realms:
         name = realm.get("display_name", realm.get("name", "?"))
         console.print(f"--- {name} ---")
-        manifest = _build_manifest(realm, network, deploy_mode, backend_url, frontend_url)
+        manifest = _build_manifest(realm, network, deploy_mode, backend_url, frontend_url, canister_filter)
         ok = _submit_and_poll(manifest, network)
         results.append((name, ok))
         console.print()

@@ -506,9 +506,30 @@ def mundus_deploy(
     artifact_version: str = typer.Option(
         "latest", "--version", "-v", help="Artifact version: 'latest', semver (e.g. 0.3.2), or local path"
     ),
+    realm_filter: str = typer.Option(
+        "", "--realm", "-r", help="Deploy only this realm (by name or display_name)"
+    ),
+    canister_filter: str = typer.Option(
+        "", "--canister", "-c", help="Deploy only 'backend' or 'frontend' (default: both)"
+    ),
 ) -> None:
-    """Deploy realm canisters from a mundus descriptor."""
-    mundus_deploy_descriptor_command(descriptor, network, deploy_mode, artifact_version)
+    """Deploy realm canisters from a mundus descriptor.
+
+    \b
+    Examples:
+      # Deploy all realms (full mundus)
+      realms mundus deploy deployment-descriptors/staging-mundus-layered.yml
+
+      # Deploy only the Dominion realm
+      realms mundus deploy deployment-descriptors/staging-mundus-layered.yml --realm dominion
+
+      # Deploy only the backend canister of Agora
+      realms mundus deploy deployment-descriptors/staging-mundus-layered.yml --realm agora --canister backend
+    """
+    mundus_deploy_descriptor_command(
+        descriptor, network, deploy_mode, artifact_version,
+        realm_filter=realm_filter, canister_filter=canister_filter,
+    )
 
 
 @mundus_app.command("deploy-new")
