@@ -60,13 +60,12 @@ print(f"🎯 Target canister: {backend_name}")
 try:
     print(f"\n🌐 Checking realm registration...")
     
-    # Load manifest to get realm name and logo
+    # Load manifest to get realm name
     manifest_path = os.path.join(realm_dir, 'manifest.json')
     if os.path.exists(manifest_path):
         with open(manifest_path, 'r') as f:
             manifest = json.load(f)
         realm_name = manifest.get('name', 'Generated Realm')
-        realm_logo = manifest.get('logo', '')
         
         # Generate a unique realm ID based on name and timestamp
         realm_id = f"{realm_name.lower().replace(' ', '_')}_{int(time.time())}"
@@ -74,8 +73,6 @@ try:
         print(f"   Realm Name: {realm_name}")
         print(f"   Realm ID: {realm_id}")
         print(f"   Network: {network}")
-        if realm_logo:
-            print(f"   Logo: {realm_logo}")
         
         # Get frontend and backend canister IDs
         logo_url = ""
@@ -129,19 +126,15 @@ try:
             )
             if result.returncode == 0:
                 frontend_id = result.stdout.strip()
-                # Canonical branding paths on the asset canister
                 if network == 'ic':
                     frontend_url = f"{frontend_id}.ic0.app"
-                    if realm_logo:
-                        logo_url = f"https://{frontend_id}.ic0.app/images/logo.png"
+                    logo_url = f"https://{frontend_id}.ic0.app/images/logo.png"
                 elif network in ('staging', 'demo', 'test'):
                     frontend_url = f"{frontend_id}.icp0.io"
-                    if realm_logo:
-                        logo_url = f"https://{frontend_id}.icp0.io/images/logo.png"
+                    logo_url = f"https://{frontend_id}.icp0.io/images/logo.png"
                 else:  # local
                     frontend_url = f"{frontend_id}.localhost:{local_port}"
-                    if realm_logo:
-                        logo_url = f"http://{frontend_id}.localhost:{local_port}/images/logo.png"
+                    logo_url = f"http://{frontend_id}.localhost:{local_port}/images/logo.png"
                 print(f"   Frontend URL: {frontend_url}")
                 if logo_url:
                     print(f"   Logo URL: {logo_url}")
@@ -245,14 +238,11 @@ if os.path.exists(manifest_path):
         with open(manifest_path, 'r') as f:
             manifest = json.load(f)
         
-        # Stored filenames match asset canister paths /images/logo.png and /images/background.png
-        has_logo = bool(manifest.get("logo"))
-        has_welcome = bool(manifest.get("welcome_image"))
         config = {
             "name": manifest.get("name", ""),
             "description": manifest.get("description", ""),
-            "logo": "logo.png" if has_logo else "",
-            "welcome_image": "background.png" if has_welcome else "",
+            "logo": "logo.png",
+            "welcome_image": "background.png",
             "welcome_message": manifest.get("welcome_message", ""),
         }
         # Use ensure_ascii=False to keep UTF-8 characters instead of \uXXXX escapes

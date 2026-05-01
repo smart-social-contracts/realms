@@ -426,35 +426,14 @@ fi
 # Copy realm logo to frontend static folder if it exists
 echo ""
 echo "🖼️  Checking for realm logo..."
-if [ -f "manifest.json" ] && command -v jq &> /dev/null; then
-    LOGO_FILE=$(jq -r '.logo // empty' manifest.json)
-    if [ -n "$LOGO_FILE" ]; then
-        # Check if logo file exists in realm directory (could be realm1_logo.svg or logo.svg)
-        if [ -f "$LOGO_FILE" ]; then
-            LOGO_SOURCE="$LOGO_FILE"
-        elif [ -f "logo.svg" ]; then
-            LOGO_SOURCE="logo.svg"
-        else
-            LOGO_SOURCE=""
-        fi
-        
-        if [ -n "$LOGO_SOURCE" ]; then
-            # Canonical path on asset canister: /images/logo.png
-            mkdir -p src/realm_frontend/static/images
-            LOGO_DEST="src/realm_frontend/static/images/logo.png"
-            cp "$LOGO_SOURCE" "$LOGO_DEST"
-            echo "   ✅ Copied realm logo: $LOGO_SOURCE → $LOGO_DEST"
-            # Also use logo as favicon
-            cp "$LOGO_SOURCE" "src/realm_frontend/static/favicon.png"
-            echo "   ✅ Set realm logo as favicon: $LOGO_SOURCE → src/realm_frontend/static/favicon.png"
-        else
-            echo "   ⚠️  Logo file not found: $LOGO_FILE"
-        fi
-    else
-        echo "   ℹ️  No logo defined in manifest.json"
-    fi
+if [ -f "logo.png" ]; then
+    mkdir -p src/realm_frontend/static/images
+    cp "logo.png" "src/realm_frontend/static/images/logo.png"
+    echo "   ✅ Copied realm logo: logo.png → src/realm_frontend/static/images/logo.png"
+    cp "logo.png" "src/realm_frontend/static/favicon.png"
+    echo "   ✅ Set realm logo as favicon: logo.png → src/realm_frontend/static/favicon.png"
 else
-    echo "   ℹ️  No manifest.json found or jq not available"
+    echo "   ℹ️  No logo.png found in realm directory"
 fi
 
 # Copy realm welcome image to frontend static folder if it exists
@@ -492,49 +471,24 @@ if [ -f "manifest.json" ] && command -v jq &> /dev/null; then
     fi
     
     # Also copy realm logo to frontend static/images folder
-    LOGO_FILE=$(jq -r '.logo // empty' manifest.json)
-    if [ -n "$LOGO_FILE" ] && [ -f "$LOGO_FILE" ]; then
+    if [ -f "logo.png" ]; then
         mkdir -p src/realm_frontend/static/images
-        LOGO_DEST="src/realm_frontend/static/images/logo.png"
-        cp "$LOGO_FILE" "$LOGO_DEST"
-        echo "   ✅ Copied realm logo: $LOGO_FILE → $LOGO_DEST"
-        # Also use logo as favicon
-        cp "$LOGO_FILE" "src/realm_frontend/static/favicon.png"
-        echo "   ✅ Set realm logo as favicon: $LOGO_FILE → src/realm_frontend/static/favicon.png"
+        cp "logo.png" "src/realm_frontend/static/images/logo.png"
+        echo "   ✅ Copied realm logo: logo.png → src/realm_frontend/static/images/logo.png"
+        cp "logo.png" "src/realm_frontend/static/favicon.png"
+        echo "   ✅ Set realm logo as favicon: logo.png → src/realm_frontend/static/favicon.png"
     fi
 else
     echo "   ℹ️  No manifest.json found or jq not available"
 fi
 
 # Copy logo to registry frontend static folder if this is a registry deployment
-if [ -d "src/realm_registry_frontend/static/images" ] && [ -f "manifest.json" ] && command -v jq &> /dev/null; then
-    MANIFEST_TYPE=$(jq -r '.type // empty' manifest.json)
-    if [ "$MANIFEST_TYPE" = "registry" ]; then
-        echo ""
-        echo "🖼️  Checking for registry logo..."
-        LOGO_FILE=$(jq -r '.logo // empty' manifest.json)
-        if [ -n "$LOGO_FILE" ]; then
-            # Check if logo file exists
-            if [ -f "$LOGO_FILE" ]; then
-                LOGO_SOURCE="$LOGO_FILE"
-            elif [ -f "logo.svg" ]; then
-                LOGO_SOURCE="logo.svg"
-            else
-                LOGO_SOURCE=""
-            fi
-            
-            if [ -n "$LOGO_SOURCE" ]; then
-                # Copy to registry frontend static folder (overwrite default logo_horizontal.svg)
-                LOGO_DEST="src/realm_registry_frontend/static/images/logo_horizontal.svg"
-                cp "$LOGO_SOURCE" "$LOGO_DEST"
-                echo "   ✅ Copied registry logo: $LOGO_SOURCE → $LOGO_DEST"
-            else
-                echo "   ⚠️  Registry logo file not found: $LOGO_FILE"
-            fi
-        else
-            echo "   ℹ️  No logo defined in registry manifest.json"
-        fi
-    fi
+if [ -d "src/realm_registry_frontend/static/images" ] && [ -f "logo.png" ]; then
+    echo ""
+    echo "🖼️  Checking for registry logo..."
+    LOGO_DEST="src/realm_registry_frontend/static/images/logo_horizontal.svg"
+    cp "logo.png" "$LOGO_DEST"
+    echo "   ✅ Copied registry logo: logo.png → $LOGO_DEST"
 fi
 
 # Build and deploy frontends
@@ -560,13 +514,10 @@ if [ -n "$FRONTENDS" ]; then
             STATIC_IMAGES="$frontend_dir/static/images"
             mkdir -p "$STATIC_IMAGES"
             
-            # Copy logo file (referenced as "logo" in manifest.json)
-            if [ -f "manifest.json" ]; then
-                LOGO_FILE=$(python3 -c "import json; print(json.load(open('manifest.json')).get('logo',''))" 2>/dev/null)
-                if [ -n "$LOGO_FILE" ] && [ -f "$LOGO_FILE" ]; then
-                    cp "$LOGO_FILE" "$STATIC_IMAGES/logo.png"
-                    echo "      🖼️  Copied logo: $LOGO_FILE → $STATIC_IMAGES/logo.png"
-                fi
+            # Copy logo.png if present beside manifest
+            if [ -f "logo.png" ]; then
+                cp "logo.png" "$STATIC_IMAGES/logo.png"
+                echo "      🖼️  Copied logo: logo.png → $STATIC_IMAGES/logo.png"
             fi
             
             # Copy welcome/background image → canonical background.png
