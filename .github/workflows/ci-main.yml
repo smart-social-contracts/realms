@@ -51,7 +51,7 @@ jobs:
       - name: Run all four stages on the local mundus
         run: |
           python3 scripts/ci_install_mundus.py \
-              --file deployments/local-mundus.yml \
+              --file deployment-descriptors/local-mundus.yml \
               --stages 0,1,2,3
       - name: Stop local replica
         if: always()
