@@ -61,7 +61,6 @@ jobs:
   deploy-staging:
     uses: ./.github/workflows/deploy-mundus.yml
     with:
-      descriptor: deployments/staging-mundus-layered.yml
-      artifact_network: staging
+      descriptor: deployment-descriptors/staging-mundus-layered.yml
     secrets:
       IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}

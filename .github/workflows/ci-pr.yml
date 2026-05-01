@@ -60,7 +60,7 @@ jobs:
         run: pytest -v cli/tests/ || true
       - name: Validate descriptors
         run: |
-          for f in deployments/*-mundus*.yml; do
+          for f in deployment-descriptors/*-mundus*.yml; do
             echo "::group::$f"
             python3 -c "import yaml,sys; yaml.safe_load(open('$f'))"
             echo "::endgroup::"

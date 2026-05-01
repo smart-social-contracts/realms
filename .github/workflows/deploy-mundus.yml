@@ -44,9 +44,9 @@ on:
         description: "Deploy only 'backend' or 'frontend' (leave blank for both)"
         required: false
         type: choice
-        default: ""
+        default: "both"
         options:
-          - ""
+          - "both"
           - backend
           - frontend
 
@@ -174,7 +174,7 @@ jobs:
 
       - name: Top up credits
         run: |
-          NETWORK="${{ needs.prepare.outputs.network || steps.matrix.outputs.network }}"
+          NETWORK="${{ needs.prepare.outputs.network }}"
           REGISTRY=$(python3 -c "import json; print(json.load(open('canister_ids.json'))['realm_registry_backend']['$NETWORK'])" 2>/dev/null || echo "")
           if [ -z "$REGISTRY" ]; then
             echo "::warning::Could not resolve registry canister for network '$NETWORK', skipping credit top-up"
@@ -231,7 +231,7 @@ jobs:
       - name: Deploy ${{ matrix.realm }}
         run: |
           CANISTER_FLAG=""
-          if [ -n "${{ inputs.canister }}" ]; then
+          if [ "${{ inputs.canister }}" != "both" ] && [ -n "${{ inputs.canister }}" ]; then
             CANISTER_FLAG="--canister ${{ inputs.canister }}"
           fi
 
@@ -240,7 +240,7 @@ jobs:
             --mode "${{ inputs.deploy_mode || 'upgrade' }}" \
             --version "${{ inputs.artifact_version || 'latest' }}" \
             --realm "${{ matrix.realm }}" \
-            $CANISTER_FLAG
+            ${CANISTER_FLAG}
 
   # ─── Job 3: Smoke test ─────────────────────────────────────────────────────────
   smoke-test:
