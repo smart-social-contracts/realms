@@ -230,17 +230,17 @@ jobs:
 
       - name: Deploy ${{ matrix.realm }}
         run: |
-          CANISTER_FLAG=""
+          ARGS=(
+            "${{ inputs.descriptor }}"
+            --mode "${{ inputs.deploy_mode || 'upgrade' }}"
+            --version "${{ inputs.artifact_version || 'latest' }}"
+            --realm "${{ matrix.realm }}"
+          )
           if [ "${{ inputs.canister }}" != "both" ] && [ -n "${{ inputs.canister }}" ]; then
-            CANISTER_FLAG="--canister ${{ inputs.canister }}"
+            ARGS+=(--canister "${{ inputs.canister }}")
           fi
 
-          realms mundus deploy \
-            "${{ inputs.descriptor }}" \
-            --mode "${{ inputs.deploy_mode || 'upgrade' }}" \
-            --version "${{ inputs.artifact_version || 'latest' }}" \
-            --realm "${{ matrix.realm }}" \
-            ${CANISTER_FLAG}
+          realms mundus deploy "${ARGS[@]}"
 
   # ─── Job 3: Smoke test ─────────────────────────────────────────────────────────
   smoke-test:
