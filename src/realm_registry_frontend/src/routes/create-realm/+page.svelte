@@ -96,10 +96,10 @@
       const { uploadBrandingFiles } = await import('$lib/branding-upload.js');
 
       let brandingUrls = {};
-      if (formData.logo || formData.welcome_image) {
+      if (formData.logo || formData.background) {
         brandingUrls = await uploadBrandingFiles({
           logo: formData.logo,
-          background: formData.welcome_image,
+          background: formData.background,
         });
       }
 
@@ -237,8 +237,8 @@
     languages: ['en'], // Default to English
     logo: null,
     logoPreview: '',
-    welcome_image: null,
-    welcomeImagePreview: '',
+    background: null,
+    backgroundPreview: '',
     welcome_messages: { en: '' }, // Language-keyed welcome messages
     token_enabled: true,
     token_name: '',
@@ -386,10 +386,10 @@
   function handleWelcomeImageUpload(event) {
     const file = event.target.files[0];
     if (file) {
-      formData.welcome_image = file;
+      formData.background = file;
       const reader = new FileReader();
       reader.onload = (e) => {
-        formData.welcomeImagePreview = e.target.result;
+        formData.backgroundPreview = e.target.result;
       };
       reader.readAsDataURL(file);
     }
@@ -778,10 +778,10 @@
 
           <div class="form-group">
             <label>Welcome Image</label>
-            <div class="upload-area welcome-upload" class:has-preview={formData.welcomeImagePreview}>
-              {#if formData.welcomeImagePreview}
-                <img src={formData.welcomeImagePreview} alt="Welcome image preview" class="preview-image" />
-                <button class="remove-btn" on:click={() => { formData.welcome_image = null; formData.welcomeImagePreview = ''; }}>
+            <div class="upload-area welcome-upload" class:has-preview={formData.backgroundPreview}>
+              {#if formData.backgroundPreview}
+                <img src={formData.backgroundPreview} alt="Background image preview" class="preview-image" />
+                <button class="remove-btn" on:click={() => { formData.background = null; formData.backgroundPreview = ''; }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M18 6L6 18M6 6l12 12"/>
                   </svg>

@@ -67,9 +67,7 @@ type StatusRecord = record {
   is_quarter : bool;
   parent_realm_canister_id : text;
   realm_name : text;
-  realm_logo : text;
   realm_description : text;
-  realm_welcome_image : text;
   realm_welcome_message : text;
   accounting_currency : text;
   accounting_currency_decimals : nat;

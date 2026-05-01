@@ -945,7 +945,6 @@ def _register_realm_with_registry(
         frontend_canister_id, network
     )
     backend_url = member.get("backend_url") or _frontend_url(canister_id, network)
-    logo_url = member.get("logo_url", "")
     canister_ids_packed = "|".join([
         frontend_canister_id or "",
         member.get("token_canister_id", ""),
@@ -953,7 +952,7 @@ def _register_realm_with_registry(
     ])
     args = (
         f'("{registry_canister_id}", "{realm_name}", "{frontend_url}", '
-        f'"{logo_url}", "{canister_ids_packed}")'
+        f'"{canister_ids_packed}")'
     )
     print(f"   • registering {name} with registry {registry_canister_id}")
     try:

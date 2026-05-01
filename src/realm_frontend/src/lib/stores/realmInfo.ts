@@ -15,8 +15,6 @@ interface QuarterInfo {
 
 interface RealmInfo {
 	name: string;
-	logo: string;
-	welcomeImage: string;
 	welcomeMessage: string;
 	description: string;
 	registries: CanisterInfo[];
@@ -30,8 +28,6 @@ interface RealmInfo {
 const createRealmInfoStore = () => {
 	const { subscribe, set, update } = writable<RealmInfo>({
 		name: '',
-		logo: '',
-		welcomeImage: '',
 		welcomeMessage: '',
 		description: '',
 		registries: [],
@@ -60,8 +56,6 @@ const createRealmInfoStore = () => {
 					update(state => ({
 						...state,
 						name: status.realm_name || '',
-						logo: status.realm_logo || '',
-						welcomeImage: status.realm_welcome_image || '',
 						welcomeMessage: status.realm_welcome_message || '',
 						description: status.realm_description || '',
 						registries: status.registries || [],
@@ -87,14 +81,8 @@ const createRealmInfoStore = () => {
 
 export const realmInfo = createRealmInfoStore();
 
-// Derived store for just the logo URL
-export const realmLogo = derived(realmInfo, $realmInfo => $realmInfo.logo);
-
 // Derived store for just the realm name
 export const realmName = derived(realmInfo, $realmInfo => $realmInfo.name);
-
-// Derived store for welcome image
-export const realmWelcomeImage = derived(realmInfo, $realmInfo => $realmInfo.welcomeImage);
 
 // Derived store for welcome message
 export const realmWelcomeMessage = derived(realmInfo, $realmInfo => $realmInfo.welcomeMessage);

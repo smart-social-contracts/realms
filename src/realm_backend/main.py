@@ -110,9 +110,7 @@ class StatusRecord(Record):
     extensions: Vec[text]
     test_mode: bool
     realm_name: text
-    realm_logo: text
     realm_description: text
-    realm_welcome_image: text
     realm_welcome_message: text
     user_profiles_count: nat
     canisters: Vec[CanisterInfo]
@@ -1585,8 +1583,6 @@ def create_foundational_objects() -> void:
         realm = Realm(
             name=realm_name,
             description=realm_description,
-            logo="logo.png",
-            welcome_image="background.png",
             welcome_message=realm_welcome_message,
             accounting_currency=acct_currency_config.get("symbol", "ckBTC"),
             accounting_currency_decimals=acct_currency_config.get("decimals", 8),
@@ -2443,7 +2439,6 @@ def register_realm_with_registry(
     registry_canister_id: text,
     realm_name: text,
     frontend_url: text = "",
-    logo_url: text = "",
     canister_ids_json: text = "{}",
 ) -> Async[text]:
     """
@@ -2457,15 +2452,12 @@ def register_realm_with_registry(
         registry_canister_id: Canister ID of the realm registry backend
         realm_name: Display name for this realm
         frontend_url: Frontend canister URL (optional)
-        logo_url: Logo URL (optional)
-        canister_ids_json: JSON string with frontend_canister_id, token_canister_id, nft_canister_id
+        canister_ids_json: Pipe-delimited string: frontend_id|token_id|nft_id
 
     Returns:
         JSON string with success status and message
     """
     try:
-        # canister_ids_json is pipe-delimited: frontend_id|token_id|nft_id
-        # (JSON triggers basilisk Candid encoder bug)
         canister_ids = {}
         if canister_ids_json and "|" in canister_ids_json:
             parts = canister_ids_json.split("|")
@@ -2476,7 +2468,7 @@ def register_realm_with_registry(
             }
 
         result = yield register_realm(
-            registry_canister_id, realm_name, frontend_url, logo_url, "", canister_ids
+            registry_canister_id, realm_name, frontend_url, "", canister_ids
         )
         return json.dumps(result, indent=2)
     except Exception as e:
@@ -2591,7 +2583,7 @@ def get_nft_config() -> text:
 @require(Operations.REALM_CONFIGURE)
 def update_realm_config(config_json: str) -> str:
     """
-    Update the realm configuration (name, description, logo, welcome_image, welcome_message).
+    Update the realm configuration (name, description, welcome_message).
     This should be called after deployment with the manifest.json data.
 
     Args:

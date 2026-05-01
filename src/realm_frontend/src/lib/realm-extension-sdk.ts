@@ -28,8 +28,6 @@ export interface NotificationItem {
 
 export interface RealmInfo {
 	name: string;
-	logo: string;
-	welcomeImage: string;
 	welcomeMessage: string;
 	description: string;
 	registries: { canister_id: string; canister_type: string }[];

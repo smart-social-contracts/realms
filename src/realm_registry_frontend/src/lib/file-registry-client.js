@@ -1,7 +1,7 @@
 // Browser-side client for the file_registry canister — adapted for the
 // realm_registry_frontend auth module.
 //
-// Handles uploading images (logo, welcome_image) in chunks and publishing
+// Handles uploading images (logo, background) in chunks and publishing
 // the namespace so the realm_installer can later read them on-chain.
 
 import { Actor, HttpAgent } from '@dfinity/agent';

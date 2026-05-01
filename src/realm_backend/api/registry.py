@@ -36,7 +36,6 @@ def register_realm(
     registry_canister_id: str,
     realm_name: str,
     realm_url: str = "",
-    realm_logo: str = "",
     backend_url: str = "",
     canister_ids: dict = None,  # {frontend_canister_id, token_canister_id, nft_canister_id}
 ) -> Async[Dict]:
@@ -51,7 +50,6 @@ def register_realm(
         registry_canister_id: Canister ID of the realm registry backend
         realm_name: Human-readable name for this realm
         realm_url: Frontend canister URL (optional)
-        realm_logo: URL or path to realm logo (optional)
         backend_url: Backend canister URL (optional)
         canister_ids: Dict with frontend_canister_id, token_canister_id, nft_canister_id (optional)
 
@@ -62,17 +60,6 @@ def register_realm(
     logger.info(f"Registering realm {realm_name} (canister {realm_id}) with registry {registry_canister_id}")
 
     try:
-        # Construct full logo URL if it's just a filename
-        if realm_logo and not realm_logo.startswith("http"):
-            if realm_url:
-                base_url = realm_url if realm_url.startswith("http") else f"https://{realm_url}"
-                realm_logo = f"{base_url}/{realm_logo}"
-            logger.info(f"Constructed full logo URL: {realm_logo}")
-
-        # Create registry canister reference and make inter-canister call
-        # Pack canister IDs into pipe-delimited string (Basilisk limits params to 6 including self)
-        # Format: frontend_id|token_id|nft_id
-        # NOTE: Cannot use JSON here — basilisk's Candid encoder parses {} as record syntax
         canister_ids = canister_ids or {}
         canister_ids_packed = "|".join([
             canister_ids.get("frontend_canister_id", ""),
@@ -80,12 +67,14 @@ def register_realm(
             canister_ids.get("nft_canister_id", ""),
         ])
         logger.info(
-            f"Calling registry register_realm with args: ({realm_name}, {realm_url}, {realm_logo}, {backend_url}, {canister_ids_packed})"
+            f"Calling registry register_realm with args: ({realm_name}, {realm_url}, {backend_url}, {canister_ids_packed})"
         )
 
+        # Logo is always at /images/logo.png by convention; the registry frontend
+        # constructs the full URL client-side, so we pass "" here.
         registry = RealmRegistryService(Principal.from_str(registry_canister_id))
         result: CallResult[AddRealmResult] = yield registry.register_realm(
-            realm_name, realm_url, realm_logo, backend_url, canister_ids_packed
+            realm_name, realm_url, "", backend_url, canister_ids_packed
         )
 
         logger.info(f"Registry call result: {result}")

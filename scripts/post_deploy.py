@@ -75,7 +75,6 @@ try:
         print(f"   Network: {network}")
         
         # Get frontend and backend canister IDs
-        logo_url = ""
         frontend_url = ""
         backend_url = ""
         backend_id = ""
@@ -128,16 +127,11 @@ try:
                 frontend_id = result.stdout.strip()
                 if network == 'ic':
                     frontend_url = f"{frontend_id}.ic0.app"
-                    logo_url = f"https://{frontend_id}.ic0.app/images/logo.png"
                 elif network in ('staging', 'demo', 'test'):
                     frontend_url = f"{frontend_id}.icp0.io"
-                    logo_url = f"https://{frontend_id}.icp0.io/images/logo.png"
                 else:  # local
                     frontend_url = f"{frontend_id}.localhost:{local_port}"
-                    logo_url = f"http://{frontend_id}.localhost:{local_port}/images/logo.png"
                 print(f"   Frontend URL: {frontend_url}")
-                if logo_url:
-                    print(f"   Logo URL: {logo_url}")
             
             # Get backend canister ID
             result = subprocess.run(
@@ -168,10 +162,10 @@ try:
             print(f"   Registering realm with central registry...")
             
             # Call realm_backend's register_realm function which makes inter-canister call
-            # Signature: register_realm_with_registry(registry_canister_id, realm_name, frontend_url, logo_url, canister_ids_packed)
+            # Signature: register_realm_with_registry(registry_canister_id, realm_name, frontend_url, canister_ids_packed)
             # canister_ids_packed is pipe-delimited: frontend_id|token_id|nft_id (JSON triggers basilisk Candid bug)
             canister_ids_packed = "||"  # frontend|token|nft - empty for now
-            register_args = f'("{registry_canister_id}", "{realm_name}", "{frontend_url}", "{logo_url}", "{canister_ids_packed}")'
+            register_args = f'("{registry_canister_id}", "{realm_name}", "{frontend_url}", "{canister_ids_packed}")'
             register_cmd = [
                 'dfx', 'canister', 'call', backend_name_local, 'register_realm_with_registry',
                 register_args,
@@ -200,8 +194,6 @@ try:
                     register_cmd.extend(['--frontend-url', frontend_url])
                 if backend_url:
                     register_cmd.extend(['--backend-url', backend_url])
-                if logo_url:
-                    register_cmd.extend(['--logo-url', logo_url])
                 register_result = subprocess.run(register_cmd, cwd=realm_dir)
                 if register_result.returncode == 0:
                     print(f"   ✅ Realm registered successfully (direct)!")
@@ -241,8 +233,6 @@ if os.path.exists(manifest_path):
         config = {
             "name": manifest.get("name", ""),
             "description": manifest.get("description", ""),
-            "logo": "logo.png",
-            "welcome_image": "background.png",
             "welcome_message": manifest.get("welcome_message", ""),
         }
         # Use ensure_ascii=False to keep UTF-8 characters instead of \uXXXX escapes

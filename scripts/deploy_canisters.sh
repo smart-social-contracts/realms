@@ -436,50 +436,15 @@ else
     echo "   ℹ️  No logo.png found in realm directory"
 fi
 
-# Copy realm welcome image to frontend static folder if it exists
+# Copy realm background image to frontend static folder if it exists
 echo ""
-echo "🖼️  Checking for realm welcome image..."
-if [ -f "manifest.json" ] && command -v jq &> /dev/null; then
-    WELCOME_IMAGE=$(jq -r '.welcome_image // empty' manifest.json)
-    if [ -n "$WELCOME_IMAGE" ]; then
-        # Check if welcome image file exists - first try the manifest value, then fallback to welcome.*
-        if [ -f "$WELCOME_IMAGE" ]; then
-            WELCOME_SOURCE="$WELCOME_IMAGE"
-        elif [ -f "welcome.png" ]; then
-            WELCOME_SOURCE="welcome.png"
-        elif [ -f "welcome.jpg" ]; then
-            WELCOME_SOURCE="welcome.jpg"
-        elif [ -f "welcome.jpeg" ]; then
-            WELCOME_SOURCE="welcome.jpeg"
-        elif [ -f "welcome.webp" ]; then
-            WELCOME_SOURCE="welcome.webp"
-        else
-            WELCOME_SOURCE=""
-        fi
-        
-        if [ -n "$WELCOME_SOURCE" ]; then
-            # Canonical path on asset canister: /images/background.png
-            mkdir -p src/realm_frontend/static/images
-            WELCOME_DEST="src/realm_frontend/static/images/background.png"
-            cp "$WELCOME_SOURCE" "$WELCOME_DEST"
-            echo "   ✅ Copied realm welcome image: $WELCOME_SOURCE → $WELCOME_DEST"
-        else
-            echo "   ⚠️  Welcome image file not found: $WELCOME_IMAGE (or welcome.*)"
-        fi
-    else
-        echo "   ℹ️  No welcome_image defined in manifest.json"
-    fi
-    
-    # Also copy realm logo to frontend static/images folder
-    if [ -f "logo.png" ]; then
-        mkdir -p src/realm_frontend/static/images
-        cp "logo.png" "src/realm_frontend/static/images/logo.png"
-        echo "   ✅ Copied realm logo: logo.png → src/realm_frontend/static/images/logo.png"
-        cp "logo.png" "src/realm_frontend/static/favicon.png"
-        echo "   ✅ Set realm logo as favicon: logo.png → src/realm_frontend/static/favicon.png"
-    fi
+echo "🖼️  Checking for realm background image..."
+if [ -f "background.png" ]; then
+    mkdir -p src/realm_frontend/static/images
+    cp "background.png" "src/realm_frontend/static/images/background.png"
+    echo "   ✅ Copied realm background: background.png → src/realm_frontend/static/images/background.png"
 else
-    echo "   ℹ️  No manifest.json found or jq not available"
+    echo "   ℹ️  No background.png found in realm directory"
 fi
 
 # Copy logo to registry frontend static folder if this is a registry deployment
@@ -520,14 +485,11 @@ if [ -n "$FRONTENDS" ]; then
                 echo "      🖼️  Copied logo: logo.png → $STATIC_IMAGES/logo.png"
             fi
             
-            # Copy welcome/background image → canonical background.png
-            for img in welcome.png welcome.jpg welcome.webp background.png background.jpg; do
-                if [ -f "$img" ]; then
-                    cp "$img" "$STATIC_IMAGES/background.png"
-                    echo "      🖼️  Copied welcome image: $img → $STATIC_IMAGES/background.png"
-                    break
-                fi
-            done
+            # Copy background.png → canonical /images/background.png
+            if [ -f "background.png" ]; then
+                cp "background.png" "$STATIC_IMAGES/background.png"
+                echo "      🖼️  Copied background: background.png → $STATIC_IMAGES/background.png"
+            fi
             
             # Always install dependencies (npm is fast if already up to date)
             echo "      📥 Installing npm dependencies..."

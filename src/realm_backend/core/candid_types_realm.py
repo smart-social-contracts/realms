@@ -41,9 +41,7 @@ class StatusRecord(Record):
     extensions: Vec[text]
     test_mode: bool
     realm_name: text
-    realm_logo: text
     realm_description: text
-    realm_welcome_image: text
     realm_welcome_message: text
     user_profiles_count: nat
     canisters: Vec[CanisterInfo]
