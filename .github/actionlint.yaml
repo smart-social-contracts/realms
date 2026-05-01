@@ -1,0 +1,4 @@
+paths:
+  '**/*':
+    ignore:
+      - 'property "prepare" is not defined in object type'

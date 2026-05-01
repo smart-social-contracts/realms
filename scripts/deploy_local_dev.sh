@@ -183,50 +183,14 @@ deploy_single_realm() {
         echo -e "${GREEN}📦 Copying frontend...${NC}"
         cp -r "$REPO_ROOT/src/realm_frontend/"* "$SINGLE_REALM_PATH/src/realm_frontend/"
         
-        # Copy extension frontends
-        echo -e "${GREEN}📦 Copying extension frontends...${NC}"
-        for ext_dir in "$REPO_ROOT/extensions/extensions/"*/frontend; do
-            if [ -d "$ext_dir" ]; then
-                ext_name=$(basename "$(dirname "$ext_dir")")
-                if [ -d "$ext_dir/lib/extensions/$ext_name" ]; then
-                    mkdir -p "$SINGLE_REALM_PATH/src/realm_frontend/src/lib/extensions/$ext_name"
-                    cp -r "$ext_dir/lib/extensions/$ext_name/"* "$SINGLE_REALM_PATH/src/realm_frontend/src/lib/extensions/$ext_name/"
-                fi
-                # Copy routes if exists
-                if [ -d "$ext_dir/routes" ]; then
-                    cp -r "$ext_dir/routes/"* "$SINGLE_REALM_PATH/src/realm_frontend/src/routes/"
-                fi
-                # Copy i18n if exists
-                if [ -d "$ext_dir/i18n" ]; then
-                    mkdir -p "$SINGLE_REALM_PATH/src/realm_frontend/src/i18n"
-                    cp -r "$ext_dir/i18n/"* "$SINGLE_REALM_PATH/src/realm_frontend/src/i18n/"
-                fi
-            fi
-        done
+        # Extension frontends are loaded dynamically via frontend-rt at runtime.
     fi
     
     if [ "$DEPLOY_BACKEND" = true ]; then
         echo -e "${GREEN}📦 Copying backend...${NC}"
         cp -r "$REPO_ROOT/src/realm_backend/"* "$SINGLE_REALM_PATH/src/realm_backend/"
         
-        # Copy extension backends
-        echo -e "${GREEN}📦 Copying extension backends...${NC}"
-        if [ -d "$REPO_ROOT/extensions/extensions" ]; then
-            cp -r "$REPO_ROOT/extensions/extensions" "$SINGLE_REALM_PATH/extensions/"
-        fi
-        
-        # Also copy into extension_packages (what basilisk build actually uses)
-        if [ -d "$SINGLE_REALM_PATH/src/realm_backend/extension_packages" ]; then
-            echo -e "${GREEN}📦 Updating extension_packages...${NC}"
-            for ext_dir in "$REPO_ROOT/extensions/extensions/"*/backend; do
-                if [ -d "$ext_dir" ]; then
-                    ext_name=$(basename "$(dirname "$ext_dir")")
-                    if [ -d "$SINGLE_REALM_PATH/src/realm_backend/extension_packages/$ext_name" ]; then
-                        cp -r "$ext_dir/"* "$SINGLE_REALM_PATH/src/realm_backend/extension_packages/$ext_name/"
-                    fi
-                fi
-            done
-        fi
+        # Extension backends are installed dynamically via the file registry at runtime.
     fi
     
     if [ "$DEPLOY_FRONTEND" = true ]; then
@@ -332,50 +296,14 @@ deploy_mundus_realm() {
         echo -e "${GREEN}📦 Copying realm $realm_num frontend...${NC}"
         cp -r "$REPO_ROOT/src/realm_frontend/"* "$realm_dir/src/realm_frontend/"
         
-        # Copy extension frontends
-        echo -e "${GREEN}📦 Copying extension frontends...${NC}"
-        for ext_dir in "$REPO_ROOT/extensions/extensions/"*/frontend; do
-            if [ -d "$ext_dir" ]; then
-                ext_name=$(basename "$(dirname "$ext_dir")")
-                if [ -d "$ext_dir/lib/extensions/$ext_name" ]; then
-                    mkdir -p "$realm_dir/src/realm_frontend/src/lib/extensions/$ext_name"
-                    cp -r "$ext_dir/lib/extensions/$ext_name/"* "$realm_dir/src/realm_frontend/src/lib/extensions/$ext_name/"
-                fi
-                # Copy routes if exists
-                if [ -d "$ext_dir/routes" ]; then
-                    cp -r "$ext_dir/routes/"* "$realm_dir/src/realm_frontend/src/routes/"
-                fi
-                # Copy i18n if exists
-                if [ -d "$ext_dir/i18n" ]; then
-                    mkdir -p "$realm_dir/src/realm_frontend/src/i18n"
-                    cp -r "$ext_dir/i18n/"* "$realm_dir/src/realm_frontend/src/i18n/"
-                fi
-            fi
-        done
+        # Extension frontends are loaded dynamically via frontend-rt at runtime.
     fi
     
     if [ "$DEPLOY_BACKEND" = true ]; then
         echo -e "${GREEN}📦 Copying realm $realm_num backend...${NC}"
         cp -r "$REPO_ROOT/src/realm_backend/"* "$realm_dir/src/realm_backend/"
         
-        # Copy extension backends
-        echo -e "${GREEN}📦 Copying extension backends...${NC}"
-        if [ -d "$REPO_ROOT/extensions/extensions" ]; then
-            cp -r "$REPO_ROOT/extensions/extensions" "$realm_dir/extensions/"
-        fi
-        
-        # Also copy into extension_packages (what basilisk build actually uses)
-        if [ -d "$realm_dir/src/realm_backend/extension_packages" ]; then
-            echo -e "${GREEN}📦 Updating extension_packages...${NC}"
-            for ext_dir in "$REPO_ROOT/extensions/extensions/"*/backend; do
-                if [ -d "$ext_dir" ]; then
-                    ext_name=$(basename "$(dirname "$ext_dir")")
-                    if [ -d "$realm_dir/src/realm_backend/extension_packages/$ext_name" ]; then
-                        cp -r "$ext_dir/"* "$realm_dir/src/realm_backend/extension_packages/$ext_name/"
-                    fi
-                fi
-            done
-        fi
+        # Extension backends are installed dynamically via the file registry at runtime.
     fi
     
     if [ "$CLEAN_BUILD" = true ] && [ "$DEPLOY_FRONTEND" = true ]; then

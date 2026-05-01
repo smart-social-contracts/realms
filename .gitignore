@@ -27,8 +27,8 @@ integration-test-logs/
 playwright-report
 test-results
 
-# Extension deployment artifacts (source code is in extensions/)
-# These folders contain deployed extensions and should not be version controlled
+# Legacy extension artifacts (no longer generated; extensions load dynamically)
+# Kept in case local trees still have these from prior builds.
 src/realm_backend/extension_packages/
 src/realm_frontend/src/lib/extensions/
 src/realm_frontend/src/routes/(sidebar)/extensions/

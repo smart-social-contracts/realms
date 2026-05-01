@@ -150,7 +150,7 @@ jobs:
               sha256sum "$f" >> checksums.txt
             fi
           done
-          cat checksums.txt | tee -a release-logs/checksums.log
+          tee -a release-logs/checksums.log < checksums.txt
       
       - name: Build and publish CLI to PyPI
         env:

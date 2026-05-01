@@ -51,7 +51,7 @@ jobs:
       - name: Run all four stages on the local mundus
         run: |
           python3 scripts/ci_install_mundus.py \
-              --file deployments/local-mundus.yml \
+              --file deployment-descriptors/local-mundus.yml \
               --stages 0,1,2,3
       - name: Stop local replica
         if: always()
@@ -61,7 +61,6 @@ jobs:
   deploy-staging:
     uses: ./.github/workflows/deploy-mundus.yml
     with:
-      descriptor: deployments/staging-mundus-layered.yml
-      artifact_network: staging
+      descriptor: deployment-descriptors/staging-mundus-layered.yml
     secrets:
       IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
