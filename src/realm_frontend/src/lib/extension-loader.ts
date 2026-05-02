@@ -52,6 +52,8 @@ export function fileRegistryBaseUrlFor(canisterId: string): string {
 async function resolveFrontendInfo(
   backend: { get_extension_frontend_info?: (args: string) => Promise<string> },
   extId: string,
+  /** From status().canisters (set on ctx.config by the host page) */
+  fileRegistryFromRealmConfig?: string,
 ): Promise<ExtensionFrontendInfo> {
   if (typeof backend?.get_extension_frontend_info === 'function') {
     try {
@@ -72,13 +74,19 @@ async function resolveFrontendInfo(
     }
   }
 
+  const cfg = (fileRegistryFromRealmConfig ?? '').trim();
+  const ids = (globalThis as unknown as { __CANISTER_IDS?: { file_registry?: string } })
+    .__CANISTER_IDS;
+  const fromGlobals = (ids?.file_registry ?? '').trim();
   const fallbackId: string | undefined =
+    cfg ||
+    fromGlobals ||
     process.env.CANISTER_ID_FILE_REGISTRY ||
     (import.meta as any).env?.VITE_FILE_REGISTRY_CANISTER_ID;
   if (!fallbackId) {
     throw new Error(
       `Could not resolve file_registry for extension '${extId}': backend ` +
-        `did not return source info and CANISTER_ID_FILE_REGISTRY is unset.`,
+        `did not return source info, realm config has no fileRegistryCanisterId, and CANISTER_ID_FILE_REGISTRY is unset.`,
     );
   }
   return {
@@ -118,13 +126,32 @@ export async function mountExtension(
   ctx: RealmExtensionContext,
 ): Promise<MountResult | void> {
   const backend: any = ctx?.backend;
-  const info = await resolveFrontendInfo(backend, extId);
+  const info = await resolveFrontendInfo(
+    backend,
+    extId,
+    ctx?.config?.fileRegistryCanisterId,
+  );
   const ver = info.version || version;
 
   const sameOriginPath = `/ext/${extId}/${ver}/frontend/dist/index.js`;
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const url = `${origin}${sameOriginPath}`;
-  const mod = await import(/* @vite-ignore */ url);
+  const sameOriginUrl = `${origin}${sameOriginPath}`;
+
+  let mod: any;
+  try {
+    mod = await import(/* @vite-ignore */ sameOriginUrl);
+  } catch (e) {
+    const ns = info.version
+      ? info.namespace
+      : `ext/${extId}/${ver}`;
+    const base = fileRegistryBaseUrlFor(info.registryCanisterId);
+    const fallbackUrl = `${base}/${ns}/${info.frontendPath}`;
+    console.warn(
+      `[extension-loader] Same-origin load failed for '${extId}', falling back to registry: ${fallbackUrl}`,
+      e,
+    );
+    mod = await import(/* @vite-ignore */ fallbackUrl);
+  }
 
   const mount: ExtensionMountFn | undefined = mod?.default ?? mod?.mount;
   if (typeof mount !== 'function') {

@@ -305,7 +305,16 @@ def schedule_registration(job_id_val: str):
             canister_ids = f"{frontend_id}|||{backend_id}"
 
             if frontend_id and backend_id:
-                js = 'globalThis.__CANISTER_IDS={realm_backend:"' + backend_id + '",internet_identity:"https://identity.ic0.app"};'
+                infra_early = manifest.get("infra") or {}
+                fr_js = infra_early.get("file_registry_canister_id", "") or ""
+                if fr_js:
+                    js = (
+                        'globalThis.__CANISTER_IDS={realm_backend:"' + backend_id
+                        + '",internet_identity:"https://identity.ic0.app",file_registry:"'
+                        + fr_js + '"};'
+                    )
+                else:
+                    js = 'globalThis.__CANISTER_IDS={realm_backend:"' + backend_id + '",internet_identity:"https://identity.ic0.app"};'
                 escaped = js.replace('\\', '\\\\').replace('"', '\\"')
                 candid_arg = '(record { key = "/canister_ids.js"; content_type = "application/javascript"; content_encoding = "identity"; content = blob "' + escaped + '"; sha256 = null })'
                 store_result: CallResult = yield ic.call_raw(
