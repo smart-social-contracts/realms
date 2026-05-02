@@ -53,7 +53,6 @@ interface ExtensionUnderTest {
 	id: string;
 	name: string;
 	sidebar_label: Record<string, string>;
-	url_path: string | null;
 	show_in_sidebar: boolean;
 }
 
@@ -101,7 +100,6 @@ function loadExtensions(): ExtensionUnderTest[] {
 					typeof m.sidebar_label === 'object' && m.sidebar_label
 						? m.sidebar_label
 						: { en: m.name ?? entry },
-				url_path: m.url_path ?? null,
 				show_in_sidebar: m.show_in_sidebar !== false,
 			});
 		} catch {
@@ -115,32 +113,32 @@ function loadExtensions(): ExtensionUnderTest[] {
  * realms-extensions/ tree is not co-located. Order matches `ls` of the
  * extensions directory. Sidebar labels match scripts/add_sidebar_labels.py. */
 const FALLBACK_EXTENSIONS: ExtensionUnderTest[] = [
-	{ id: 'admin_dashboard',     name: 'admin_dashboard',     url_path: 'admin', show_in_sidebar: true,  sidebar_label: { en: 'Admin Dashboard' } },
-	{ id: 'codex_viewer',        name: 'codex_viewer',        url_path: null,    show_in_sidebar: true,  sidebar_label: { en: 'Codex Viewer' } },
-	{ id: 'erd_explorer',        name: 'erd_explorer',        url_path: null,    show_in_sidebar: true,  sidebar_label: { en: 'ERD Explorer' } },
-	{ id: 'hello_world',         name: 'hello_world',         url_path: null,    show_in_sidebar: true,  sidebar_label: { en: 'Hello World' } },
-	{ id: 'justice_litigation',  name: 'justice_litigation',  url_path: null,    show_in_sidebar: true,  sidebar_label: { en: 'Justice & Litigation' } },
-	{ id: 'land_registry',       name: 'land_registry',       url_path: null,    show_in_sidebar: true,  sidebar_label: { en: 'Land Registry' } },
-	{ id: 'llm_chat',            name: 'llm_chat',            url_path: null,    show_in_sidebar: true,  sidebar_label: { en: 'AI Assistant' } },
-	{ id: 'market_place',        name: 'market_place',        url_path: null,    show_in_sidebar: true,  sidebar_label: { en: 'Extensions Marketplace' } },
-	{ id: 'member_dashboard',    name: 'member_dashboard',    url_path: null,    show_in_sidebar: true,  sidebar_label: { en: 'My Dashboard' } },
-	{ id: 'metrics',             name: 'metrics',             url_path: null,    show_in_sidebar: true,  sidebar_label: { en: 'Metrics' } },
-	{ id: 'notifications',       name: 'notifications',       url_path: null,    show_in_sidebar: true,  sidebar_label: { en: 'Notifications' } },
-	{ id: 'passport_verification', name: 'passport_verification', url_path: null, show_in_sidebar: true, sidebar_label: { en: 'Passport Verification' } },
-	{ id: 'public_dashboard',    name: 'public_dashboard',    url_path: null,    show_in_sidebar: true,  sidebar_label: { en: 'Public Dashboard' } },
-	{ id: 'system_info',         name: 'system_info',         url_path: null,    show_in_sidebar: true,  sidebar_label: { en: 'System Info' } },
-	{ id: 'task_monitor',        name: 'task_monitor',        url_path: 'monitor', show_in_sidebar: true, sidebar_label: { en: 'Task Monitor' } },
-	{ id: 'test_bench',          name: 'test_bench',          url_path: null,    show_in_sidebar: false, sidebar_label: { en: 'Test Bench' } },
-	{ id: 'vault',               name: 'vault',               url_path: null,    show_in_sidebar: true,  sidebar_label: { en: 'Treasury Vault' } },
-	{ id: 'voting',              name: 'voting',              url_path: null,    show_in_sidebar: true,  sidebar_label: { en: 'Voting' } },
-	{ id: 'welcome',             name: 'welcome',             url_path: null,    show_in_sidebar: false, sidebar_label: { en: 'Welcome' } },
-	{ id: 'zone_selector',       name: 'zone_selector',       url_path: null,    show_in_sidebar: true,  sidebar_label: { en: 'Zone Selector' } },
+	{ id: 'admin_dashboard',       name: 'admin_dashboard',       show_in_sidebar: true,  sidebar_label: { en: 'Admin Dashboard' } },
+	{ id: 'codex_viewer',          name: 'codex_viewer',          show_in_sidebar: true,  sidebar_label: { en: 'Codex Viewer' } },
+	{ id: 'erd_explorer',          name: 'erd_explorer',          show_in_sidebar: true,  sidebar_label: { en: 'ERD Explorer' } },
+	{ id: 'hello_world',           name: 'hello_world',           show_in_sidebar: true,  sidebar_label: { en: 'Hello World' } },
+	{ id: 'justice_litigation',    name: 'justice_litigation',    show_in_sidebar: true,  sidebar_label: { en: 'Justice & Litigation' } },
+	{ id: 'land_registry',         name: 'land_registry',         show_in_sidebar: true,  sidebar_label: { en: 'Land Registry' } },
+	{ id: 'llm_chat',              name: 'llm_chat',              show_in_sidebar: true,  sidebar_label: { en: 'AI Assistant' } },
+	{ id: 'market_place',          name: 'market_place',          show_in_sidebar: true,  sidebar_label: { en: 'Extensions Marketplace' } },
+	{ id: 'member_dashboard',      name: 'member_dashboard',      show_in_sidebar: true,  sidebar_label: { en: 'My Dashboard' } },
+	{ id: 'metrics',               name: 'metrics',               show_in_sidebar: true,  sidebar_label: { en: 'Metrics' } },
+	{ id: 'notifications',         name: 'notifications',         show_in_sidebar: true,  sidebar_label: { en: 'Notifications' } },
+	{ id: 'passport_verification', name: 'passport_verification', show_in_sidebar: true,  sidebar_label: { en: 'Passport Verification' } },
+	{ id: 'public_dashboard',      name: 'public_dashboard',      show_in_sidebar: true,  sidebar_label: { en: 'Public Dashboard' } },
+	{ id: 'system_info',           name: 'system_info',           show_in_sidebar: true,  sidebar_label: { en: 'System Info' } },
+	{ id: 'task_monitor',          name: 'task_monitor',          show_in_sidebar: true,  sidebar_label: { en: 'Task Monitor' } },
+	{ id: 'test_bench',            name: 'test_bench',            show_in_sidebar: false, sidebar_label: { en: 'Test Bench' } },
+	{ id: 'vault',                 name: 'vault',                 show_in_sidebar: true,  sidebar_label: { en: 'Treasury Vault' } },
+	{ id: 'voting',                name: 'voting',                show_in_sidebar: true,  sidebar_label: { en: 'Voting' } },
+	{ id: 'welcome',               name: 'welcome',               show_in_sidebar: false, sidebar_label: { en: 'Welcome' } },
+	{ id: 'zone_selector',         name: 'zone_selector',         show_in_sidebar: true,  sidebar_label: { en: 'Zone Selector' } },
 ];
 
 const EXTENSIONS = loadExtensions();
 
 function urlForExtension(ext: ExtensionUnderTest): string {
-	return ext.url_path ? `/${ext.url_path}` : `/extensions/${ext.id}`;
+	return `/extensions/${ext.id}`;
 }
 
 async function setLocale(page: Page, locale: string): Promise<void> {

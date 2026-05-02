@@ -2835,7 +2835,6 @@ def get_sidebar_manifests() -> text:
             "name":             "voting",
             "version":          "1.0.3",
             "icon":             "ClipboardListSolid",   # name in iconMap
-            "url_path":         null,                    # use /extensions/<id> by default
             "categories":       ["public_services"],
             "profiles":         ["admin", "member"],
             "show_in_sidebar":  true,
@@ -2867,7 +2866,6 @@ def get_sidebar_manifests() -> text:
                 "name": m.get("name") or ext_id,
                 "version": m.get("version"),
                 "icon": m.get("icon"),
-                "url_path": m.get("url_path"),
                 "categories": m.get("categories") or ["other"],
                 "profiles": m.get("profiles") or [],
                 "show_in_sidebar": m.get("show_in_sidebar", True) is not False,

@@ -39,7 +39,6 @@
 	// Extend ExtensionMetadata to include path field and other properties
 	interface ExtensionMetadataWithPath extends ExtensionMetadata {
 		path?: string | null;
-		url_path?: string | null;
 		categories?: string[];
 		profiles?: string[];
 		doc_url?: string;
@@ -185,7 +184,6 @@
 			id: entry.id,
 			name: entry.name ?? entry.id,
 			icon: entry.icon,
-			url_path: entry.url_path ?? null,
 			categories: Array.isArray(entry.categories) && entry.categories.length > 0
 				? entry.categories
 				: ['other'],
@@ -239,7 +237,6 @@
 						id: ext.name,
 						name: ext.name,
 						icon: ext.icon,
-						url_path: ext.url_path,
 						categories: ext.categories || ['other'],
 						profiles: ext.profiles || [],
 						show_in_sidebar: ext.show_in_sidebar !== false,
@@ -267,7 +264,6 @@
 							name: m.name ?? id,
 							version: m.version,
 							icon: m.icon,
-							url_path: m.url_path,
 							categories: m.categories,
 							profiles: m.profiles,
 							show_in_sidebar: m.show_in_sidebar,
@@ -424,9 +420,7 @@
 			result[category] = exts
 				.filter(ext => !excluded.has(ext.id as string))
 				.map(ext => {
-					const href = (ext.url_path === undefined || ext.url_path === null)
-						? `/extensions/${ext.id}`
-						: `/${ext.url_path}`;
+					const href = `/extensions/${ext.id}`;
 
 					const iconComponent = getIcon(ext.icon) || LayersSolid;
 
