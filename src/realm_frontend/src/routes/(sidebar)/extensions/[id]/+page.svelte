@@ -22,6 +22,25 @@
 	let debugInfo = '';
 	let mounted: MountResult | void;
 
+	let infraConfig: { fileRegistryCanisterId?: string; marketplaceCanisterId?: string } = {};
+
+	async function resolveInfraConfig() {
+		try {
+			const raw = await backend.status();
+			const resp = typeof raw === 'string' ? JSON.parse(raw) : raw;
+			const canisters: { canister_id: string; canister_type: string }[] =
+				resp?.data?.status?.canisters ?? [];
+			const fr = canisters.find((c) => c.canister_type === 'file_registry');
+			const mp = canisters.find((c) => c.canister_type === 'marketplace');
+			infraConfig = {
+				fileRegistryCanisterId: fr?.canister_id ?? '',
+				marketplaceCanisterId: mp?.canister_id ?? '',
+			};
+		} catch {
+			infraConfig = {};
+		}
+	}
+
 	function buildContext(id: string, version: string): RealmExtensionContext {
 		async function callSync(fn: string, args: Record<string, unknown> = {}): Promise<unknown> {
 			const raw = await backend.extension_sync_call(id, fn, JSON.stringify(args));
@@ -51,6 +70,7 @@
 			config: {
 				...CONFIG,
 				canisterId: backendCanisterId?.toString?.() ?? '',
+				...infraConfig,
 			},
 			navigate: goto,
 			t: _,
@@ -71,7 +91,10 @@
 		debugInfo = '';
 
 		try {
-			const version = await resolveExtensionVersion(backend as any, id);
+			const [version] = await Promise.all([
+				resolveExtensionVersion(backend as any, id),
+				resolveInfraConfig(),
+			]);
 			if (!version) {
 				status = 'error';
 				errorMsg = `Extension '${id}' is not installed on this realm_backend.`;

@@ -139,6 +139,20 @@ def get_status() -> "dict[str, Any]":
                         "canister_type": "nft_backend",
                     }
                 )
+            if getattr(first_realm, "file_registry_canister_id", None):
+                canisters.append(
+                    {
+                        "canister_id": first_realm.file_registry_canister_id,
+                        "canister_type": "file_registry",
+                    }
+                )
+            if getattr(first_realm, "marketplace_canister_id", None):
+                canisters.append(
+                    {
+                        "canister_id": first_realm.marketplace_canister_id,
+                        "canister_type": "marketplace",
+                    }
+                )
     except Exception as e:
         logger.warning(f"Could not load canister IDs from Realm entity: {e}")
 

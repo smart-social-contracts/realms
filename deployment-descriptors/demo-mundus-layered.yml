@@ -1,6 +1,11 @@
 version: 2
 network: demo
 
+infra:
+  # Shared infrastructure canister IDs — set_canister_config passes these to every realm
+  file_registry_canister_id: ""   # TODO: fill in after deploying file_registry on demo
+  marketplace_canister_id: ""     # TODO: fill in after deploying marketplace on demo
+
 mundus:
   - name: dominion
     type: realm

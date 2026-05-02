@@ -557,6 +557,8 @@ def set_canister_config(
     frontend_canister_id: Opt[text],
     token_canister_id: Opt[text],
     nft_canister_id: Opt[text],
+    file_registry_canister_id: Opt[text],
+    marketplace_canister_id: Opt[text],
 ) -> RealmResponse:
     """
     Set canister IDs for this realm (admin only).
@@ -566,6 +568,8 @@ def set_canister_config(
         frontend_canister_id: The realm_frontend canister ID
         token_canister_id: Optional token_backend canister ID
         nft_canister_id: Optional nft_backend canister ID
+        file_registry_canister_id: Optional file_registry canister ID (shared infra)
+        marketplace_canister_id: Optional marketplace_backend canister ID (shared infra)
     """
     try:
         from ggg import Realm
@@ -582,10 +586,16 @@ def set_canister_config(
             realm.token_canister_id = token_canister_id
         if nft_canister_id:
             realm.nft_canister_id = nft_canister_id
+        if file_registry_canister_id:
+            realm.file_registry_canister_id = file_registry_canister_id
+        if marketplace_canister_id:
+            realm.marketplace_canister_id = marketplace_canister_id
 
         realm.save()
         logger.info(
-            f"Updated canister config: frontend={frontend_canister_id}, token={token_canister_id}, nft={nft_canister_id}"
+            f"Updated canister config: frontend={frontend_canister_id}, "
+            f"token={token_canister_id}, nft={nft_canister_id}, "
+            f"file_registry={file_registry_canister_id}, marketplace={marketplace_canister_id}"
         )
 
         return RealmResponse(

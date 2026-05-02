@@ -199,7 +199,7 @@ service : {
   "change_quarter" : (text) -> (RealmResponse);
   "get_my_principal" : () -> (text) query;
   "get_canister_id" : () -> (text) query;
-  "set_canister_config" : (opt text, opt text, opt text) -> (RealmResponse);
+  "set_canister_config" : (opt text, opt text, opt text, opt text, opt text) -> (RealmResponse);
   "register_quarter" : (text, text) -> (RealmResponse);
   "deregister_quarter" : (text) -> (RealmResponse);
   "set_quarter_config" : (text) -> (RealmResponse);

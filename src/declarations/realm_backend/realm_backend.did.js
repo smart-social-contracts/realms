@@ -288,7 +288,7 @@ export const idlFactory = ({ IDL }) => {
     'reload_entity_method_overrides' : IDL.Func([], [IDL.Text], []),
     'set_application_id' : IDL.Func([IDL.Text], [IDL.Text], []),
     'set_canister_config' : IDL.Func(
-        [IDL.Opt(IDL.Text), IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
+        [IDL.Opt(IDL.Text), IDL.Opt(IDL.Text), IDL.Opt(IDL.Text), IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
         [RealmResponse],
         [],
       ),

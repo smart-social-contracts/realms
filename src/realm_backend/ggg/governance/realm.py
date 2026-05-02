@@ -31,6 +31,9 @@ class Realm(Entity, TimestampedMixin):
     frontend_canister_id = String(max_length=64)
     token_canister_id = String(max_length=64)
     nft_canister_id = String(max_length=64)
+    # Shared infrastructure canister IDs (typically set from deploy descriptor infra section)
+    file_registry_canister_id = String(max_length=64)
+    marketplace_canister_id = String(max_length=64)
     # Quarter/Federation fields (dormant for single-quarter realms)
     is_quarter = Boolean(default=False)
     is_capital = Boolean(default=False)  # This quarter coordinates federation governance

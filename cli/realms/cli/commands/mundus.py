@@ -212,10 +212,11 @@ def _resolve_artifact(ref: str, artifact_type: str, network: str,
 
 def _build_manifest(realm_entry: dict, network: str, deploy_mode: str,
                     backend_url: str, frontend_url: str,
-                    canister_filter: str = "") -> dict:
+                    canister_filter: str = "", infra: dict | None = None) -> dict:
     """Build a deployment manifest for a single realm.
 
     canister_filter: "" = both, "backend" = backend only, "frontend" = frontend only.
+    infra: shared infrastructure canister IDs from the descriptor's ``infra`` section.
     """
     project_root = get_project_root()
     manifest_path = realm_entry.get("manifest", "")
@@ -260,6 +261,8 @@ def _build_manifest(realm_entry: dict, network: str, deploy_mode: str,
     }
     if branding:
         result["branding"] = branding
+    if infra:
+        result["infra"] = infra
     return result
 
 
@@ -514,6 +517,7 @@ def mundus_deploy_descriptor_command(
         network = desc_network
 
     parameters = desc.get("parameters") or {}
+    infra = desc.get("infra") or {}
 
     realms = [e for e in desc.get("mundus", []) if e.get("type", "realm") == "realm"]
 
@@ -558,7 +562,7 @@ def mundus_deploy_descriptor_command(
     for realm in realms:
         name = realm.get("display_name", realm.get("name", "?"))
         console.print(f"--- {name} ---")
-        manifest = _build_manifest(realm, network, deploy_mode, backend_url, frontend_url, canister_filter)
+        manifest = _build_manifest(realm, network, deploy_mode, backend_url, frontend_url, canister_filter, infra=infra)
         ok = _submit_and_poll(manifest, network)
         results.append((name, ok))
         console.print()

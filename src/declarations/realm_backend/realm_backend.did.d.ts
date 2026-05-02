@@ -862,7 +862,7 @@ export interface _SERVICE {
   'reload_entity_method_overrides' : ActorMethod<[], string>,
   'set_application_id' : ActorMethod<[string], string>,
   'set_canister_config' : ActorMethod<
-    [[] | [string], [] | [string], [] | [string]],
+    [[] | [string], [] | [string], [] | [string], [] | [string], [] | [string]],
     RealmResponse
   >,
   'set_quarter_config' : ActorMethod<[string], RealmResponse>,

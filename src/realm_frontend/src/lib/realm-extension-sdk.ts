@@ -85,6 +85,10 @@ export interface RealmExtensionContext {
 		token_backend_canister_id: string;
 		/** The realm_backend canister ID itself. */
 		canisterId: string;
+		/** File registry canister ID (shared infra, set via set_canister_config). */
+		fileRegistryCanisterId?: string;
+		/** Marketplace canister ID (shared infra, set via set_canister_config). */
+		marketplaceCanisterId?: string;
 	};
 
 	/** Navigate to a path within the realm SPA (wraps SvelteKit's goto). */
