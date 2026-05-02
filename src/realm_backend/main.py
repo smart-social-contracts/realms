@@ -591,7 +591,6 @@ def set_canister_config(
         if marketplace_canister_id:
             realm.marketplace_canister_id = marketplace_canister_id
 
-        realm.save()
         logger.info(
             f"Updated canister config: frontend={frontend_canister_id}, "
             f"token={token_canister_id}, nft={nft_canister_id}, "
@@ -714,7 +713,6 @@ def set_quarter_config(parent_realm_canister_id: text) -> RealmResponse:
 
         realm.is_quarter = True
         realm.federation_realm_id = parent_realm_canister_id
-        realm.save()
 
         logger.info(f"Configured realm as quarter of parent {parent_realm_canister_id}")
 
@@ -758,7 +756,6 @@ def declare_independence() -> RealmResponse:
         realm.is_quarter = False
         realm.is_capital = False
         realm.federation_realm_id = ""
-        realm.save()
 
         logger.info(f"Declared independence from federation {old_federation}")
 
@@ -805,7 +802,6 @@ def join_federation(capital_canister_id: text, as_capital: bool = False) -> Real
         realm.is_quarter = True
         realm.is_capital = as_capital
         realm.federation_realm_id = capital_canister_id
-        realm.save()
 
         role = "capital" if as_capital else "quarter"
         logger.info(f"Joined federation {capital_canister_id} as {role}")
