@@ -334,6 +334,22 @@ def schedule_registration(job_id_val: str):
                 else:
                     jlog(job_id_val).info(f"realm config updated: name={realm_name}")
 
+            infra = manifest.get("infra") or {}
+            fr_id = infra.get("file_registry_canister_id", "")
+            mp_id = infra.get("marketplace_canister_id", "")
+            if backend_id and (fr_id or mp_id):
+                def _opt(v):
+                    return f'opt "{v}"' if v else "null"
+                canister_config_arg = f"(null, null, null, {_opt(fr_id)}, {_opt(mp_id)})"
+                cc_result: CallResult = yield ic.call_raw(
+                    Principal.from_str(backend_id), "set_canister_config",
+                    ic.candid_encode(canister_config_arg), 0,
+                )
+                if isinstance(cc_result, dict) and "Err" in cc_result:
+                    jlog(job_id_val).error(f"set_canister_config failed: {cc_result['Err']}")
+                else:
+                    jlog(job_id_val).info(f"set_canister_config: file_registry={fr_id}, marketplace={mp_id}")
+
             registry = RealmRegistryService(Principal.from_str(reg_id))
             result: CallResult = yield registry.register_realm(
                 realm_name, url, logo, backend_url, canister_ids,
