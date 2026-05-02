@@ -1,6 +1,10 @@
 version: 2
 network: test
 
+infra:
+  file_registry_canister_id: uq2mu-kaaaa-aaaah-avqcq-cai
+  marketplace_canister_id: 2wldc-niaaa-aaaad-qlxga-cai
+
 mundus:
   - name: dominion
     type: realm

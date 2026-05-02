@@ -1,6 +1,10 @@
 version: 2
 network: staging
 
+infra:
+  file_registry_canister_id: iebdk-kqaaa-aaaau-agoxq-cai
+  marketplace_canister_id: jji3o-uyaaa-aaaah-qreja-cai
+
 mundus:
   - name: dominion
     type: realm
