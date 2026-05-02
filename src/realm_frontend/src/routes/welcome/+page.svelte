@@ -3,19 +3,13 @@
   import { browser } from '$app/environment';
   import Footer from '$lib/../routes/(sidebar)/Footer.svelte';
   import { _ } from 'svelte-i18n';
-  import { realmInfo, realmName, realmLogo, realmWelcomeImage, realmWelcomeMessage, realmDescription } from '$lib/stores/realmInfo';
+  import { realmInfo, realmName, realmWelcomeMessage, realmDescription } from '$lib/stores/realmInfo';
   import { isAuthenticated } from '$lib/stores/auth';
-  
-  // Fallback when realm has no welcome image (canonical static path; may be overlaid at deploy)
-  const defaultWelcomeImage = '/images/background.png';
   
   // Fetch realm info on mount
   onMount(() => {
     realmInfo.fetch();
   });
-  
-  // Reactive welcome image - use realm's image or fallback
-  $: welcomeImageUrl = $realmWelcomeImage || defaultWelcomeImage;
 </script>
 
 <svelte:head>
@@ -26,7 +20,7 @@
   {#if browser}
     <div class="background-photo-container">
       <img
-        src={welcomeImageUrl}
+        src="/images/background.png"
         alt="{$realmName || 'Realm'} - {$_('extensions.welcome.alt_text.background')}"
         class="background-photo active"
       />
@@ -44,11 +38,7 @@
   <!-- Top bar with logo -->
   <div class="top-bar">
     <div class="realms-logo">
-      {#if $realmLogo}
-        <img src={$realmLogo} alt="{$realmName}" class="logo-img" />
-      {:else}
-        <img src="/images/logo_horizontal_white.svg" alt="{$_('extensions.welcome.alt_text.realms_logo')}" class="logo-img" width="200" />
-      {/if}
+      <img src="/images/logo.png" alt="{$realmName}" class="logo-img" onerror={(e) => { e.currentTarget.src = '/images/logo_horizontal_white.svg'; }} />
     </div>
   </div>
 
