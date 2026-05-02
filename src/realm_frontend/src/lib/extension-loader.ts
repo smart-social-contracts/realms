@@ -1,13 +1,9 @@
 /**
  * Runtime extension frontend loader.
  *
- * Loads an extension's compiled JS bundle and mounts it into a DOM target,
- * without rebuilding realm_frontend.
- *
- * Loading strategy (same-origin first):
- *   1. Try loading from the realm's own frontend asset canister at
- *      /ext/{id}/{version}/frontend/dist/index.js (same origin, certified).
- *   2. Fall back to the file_registry canister via cross-origin import.
+ * Loads an extension's compiled JS bundle from the realm's own frontend
+ * asset canister at /ext/{id}/{version}/frontend/dist/index.js and mounts
+ * it into a DOM target, without rebuilding realm_frontend.
  *
  * Extension bundle contract:
  *   The file at `frontend/dist/index.js` MUST be a valid ES module that
@@ -112,12 +108,8 @@ export async function resolveExtensionVersion(
  * Fetch and dynamically import an extension's compiled frontend bundle,
  * then call its default export to mount it into `target`.
  *
- * Same-origin loading (preferred):
- *   The realm backend copies extension frontend bundles into the realm's
- *   own frontend asset canister during installation. This loader tries
- *   /ext/{id}/{version}/frontend/dist/index.js on the current origin first.
- *
- * Fallback: cross-origin load from the file_registry canister.
+ * The bundle is loaded from the realm's own frontend asset canister at
+ * /ext/{id}/{version}/frontend/dist/index.js (same origin, certified).
  */
 export async function mountExtension(
   extId: string,
@@ -129,22 +121,10 @@ export async function mountExtension(
   const info = await resolveFrontendInfo(backend, extId);
   const ver = info.version || version;
 
-  let mod: any;
-
   const sameOriginPath = `/ext/${extId}/${ver}/frontend/dist/index.js`;
-  try {
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const sameOriginUrl = `${origin}${sameOriginPath}`;
-    mod = await import(/* @vite-ignore */ sameOriginUrl);
-  } catch {
-    const namespace = info.version ? info.namespace : `ext/${extId}/${ver}`;
-    const base = fileRegistryBaseUrlFor(info.registryCanisterId);
-    const fallbackUrl = `${base}/${namespace}/${info.frontendPath}`;
-    console.warn(
-      `[extension-loader] Same-origin load failed for '${extId}', falling back to registry: ${fallbackUrl}`,
-    );
-    mod = await import(/* @vite-ignore */ fallbackUrl);
-  }
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const url = `${origin}${sameOriginPath}`;
+  const mod = await import(/* @vite-ignore */ url);
 
   const mount: ExtensionMountFn | undefined = mod?.default ?? mod?.mount;
   if (typeof mount !== 'function') {
