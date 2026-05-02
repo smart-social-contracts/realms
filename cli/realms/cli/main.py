@@ -993,7 +993,6 @@ def registry_add(
     realm_name: str = typer.Option(..., "--realm-name", help="Human-readable realm name"),
     frontend_url: str = typer.Option("", "--frontend-url", help="Frontend canister URL (optional, will auto-derive)"),
     backend_url: str = typer.Option("", "--backend-url", help="Backend canister URL for status fetching"),
-    logo_url: str = typer.Option("", "--logo-url", help="Realm logo URL (served from frontend static folder)"),
     network: str = typer.Option("local", "--network", "-n", help="Network to use"),
     registry_canister_id: str = typer.Option(
         "realm_registry_backend",
@@ -1079,8 +1078,6 @@ def registry_add(
         console.print(f"[cyan]Frontend Canister:[/cyan] {frontend_canister_id}")
     if backend_url:
         console.print(f"[cyan]Backend URL:[/cyan] {backend_url}")
-    if logo_url:
-        console.print(f"[cyan]Logo URL:[/cyan] {logo_url}")
     console.print(f"[dim]Network:[/dim] {network}\n")
     
     # Call realm backend's register_realm_with_registry (secure inter-canister call)
@@ -1088,7 +1085,7 @@ def registry_add(
     # NOTE: Cannot use JSON — basilisk's Candid encoder parses {} as record syntax
     canister_ids_packed = f"{frontend_canister_id}|{token_canister_id}|{nft_canister_id}"
     
-    args = f'("{registry_canister_id}", "{realm_name}", "{frontend_url}", "{logo_url}", "{canister_ids_packed}")'
+    args = f'("{registry_canister_id}", "{realm_name}", "{frontend_url}", "{canister_ids_packed}")'
     cmd = ["dfx", "canister", "call", "--network", network, realm_backend_canister, "register_realm_with_registry", args]
     
     try:

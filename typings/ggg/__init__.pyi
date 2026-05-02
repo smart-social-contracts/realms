@@ -910,10 +910,6 @@ class Realm(Entity):
     """Realm name (min 2, max 256 chars)"""
     description: Optional[str]
     """Realm description (max 256 chars)"""
-    logo: Optional[str]
-    """Logo URL (max 512 chars)"""
-    welcome_image: Optional[str]
-    """Welcome page background image URL (max 512 chars)"""
     welcome_message: Optional[str]
     """Welcome message (max 1024 chars)"""
     calendar: Optional["Calendar"]
@@ -927,7 +923,7 @@ class Realm(Entity):
     principal_id: Optional[str]
     """Canister principal ID (max 64 chars)"""
 
-    def __init__(self, *, name: Optional[str] = ..., description: Optional[str] = ..., logo: Optional[str] = ..., welcome_image: Optional[str] = ..., welcome_message: Optional[str] = ..., accounting_currency: Optional[str] = ..., accounting_currency_decimals: Optional[int] = ..., principal_id: Optional[str] = ..., **kwargs) -> None: ...
+    def __init__(self, *, name: Optional[str] = ..., description: Optional[str] = ..., welcome_message: Optional[str] = ..., accounting_currency: Optional[str] = ..., accounting_currency_decimals: Optional[int] = ..., principal_id: Optional[str] = ..., **kwargs) -> None: ...
     @classmethod
     def instances(cls) -> List["Realm"]: ...
     @classmethod

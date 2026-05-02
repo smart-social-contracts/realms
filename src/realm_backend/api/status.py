@@ -61,8 +61,6 @@ def get_status() -> "dict[str, Any]":
     user_profiles_count = UserProfile.count()
 
     realm_name = ""
-    realm_logo = "/images/logo.png"
-    realm_welcome_image = "/images/background.png"
     realm_welcome_message = ""
     realm_description = ""
     try:
@@ -233,8 +231,6 @@ def get_status() -> "dict[str, Any]":
         "version": version,
         "status": "ok",
         "realm_name": realm_name,
-        "realm_logo": realm_logo,
-        "realm_welcome_image": realm_welcome_image,
         "realm_welcome_message": realm_welcome_message,
         "realm_description": realm_description,
         "users_count": users_count,

@@ -4,7 +4,7 @@
 	import UserMenu from '../utils/widgets/UserMenu.svelte';
 		import { _ } from 'svelte-i18n';
 	import { isAuthenticated } from '$lib/stores/auth';
-		import { realmInfo, realmLogo, realmName } from '$lib/stores/realmInfo';
+		import { realmInfo, realmName } from '$lib/stores/realmInfo';
 	import QuarterSelector from '$lib/components/QuarterSelector.svelte';
 	import { onMount } from 'svelte';
 	import {
@@ -43,7 +43,7 @@
 	<div class="absolute left-1/2 transform -translate-x-1/2">
 		<a href="/" class="flex items-center cursor-pointer">
 			<img
-				src={$realmLogo || "/images/logo_sphere_only.svg"}
+				src="/images/logo.png"
 				class="h-8 sm:h-10 pointer-events-none"
 				alt={$realmName || "Realms Logo"}
 			/>

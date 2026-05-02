@@ -135,7 +135,7 @@ class RealmGenerator:
         random.seed(self.seed)
         self.generated_data = {}
         self.realm_id = "0"
-        self.logo = ""  # Logo path/URL for the realm
+        self.has_logo = False  # Whether a logo.png exists for the realm
         
     def generate_id(self, prefix: str = "") -> str:
         """Generate a unique ID with optional prefix"""
@@ -803,14 +803,10 @@ class RealmGenerator:
         # The manifest can be uploaded separately after deployment if needed
         manifest = self.get_codex_overrides_manifest()
         
-        # Logo path - if set, points to /images/{logo_filename} served from frontend static folder
-        logo_path = f"/images/{self.logo}" if self.logo else ""
-        
         realm = Realm(
             id=self.realm_id,
             name=realm_name,
             description=f"Generated demo realm with {members} members and {organizations} organizations",
-            logo=logo_path,
             created_at=datetime.now().isoformat(),
             status="active",
             governance_type="democratic",
@@ -1039,15 +1035,10 @@ def main():
             manifest_data = json.load(f)
         print(f"Using existing manifest from output directory")
         
-        # Set logo on generator if specified in manifest
-        logo_filename = manifest_data.get("logo", "")
-        if logo_filename:
-            logo_file = output_dir / logo_filename
-            if logo_file.exists():
-                generator.logo = logo_filename
-                print(f"Using logo: {logo_filename}")
-            else:
-                print(f"Warning: Logo file {logo_filename} not found in output directory")
+        # Check for logo.png by convention
+        if (output_dir / "logo.png").exists():
+            generator.has_logo = True
+            print(f"Using logo: logo.png")
     else:
         # Fallback: Copy manifest from examples/demo (for backwards compatibility)
         if args.demo_folder:
@@ -1067,14 +1058,12 @@ def main():
                 json.dump(manifest_data, f, indent=2)
             print(f"Copied manifest from {demo_base_dir}")
             
-            # Copy logo if it exists
-            logo_filename = manifest_data.get("logo", "")
-            if logo_filename:
-                logo_source = demo_base_dir / logo_filename
-                if logo_source.exists():
-                    shutil.copy2(logo_source, output_dir / logo_filename)
-                    generator.logo = logo_filename
-                    print(f"Copied logo: {logo_filename}")
+            # Copy logo.png if it exists
+            logo_source = demo_base_dir / "logo.png"
+            if logo_source.exists():
+                shutil.copy2(logo_source, output_dir / "logo.png")
+                generator.has_logo = True
+                print(f"Copied logo: logo.png")
         else:
             # Generate minimal manifest
             manifest_data = generator.get_codex_overrides_manifest()

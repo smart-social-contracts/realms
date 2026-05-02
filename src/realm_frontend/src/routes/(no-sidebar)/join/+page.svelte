@@ -7,7 +7,7 @@
   import { backend, initBackendWithIdentity, setActiveQuarter } from '$lib/canisters.js';
   import { loadUserProfiles, hasJoined, profilesLoading } from '$lib/stores/profiles';
   import { activeQuarterId } from '$lib/stores/quarters';
-  import { realmInfo, realmLogo, realmName as realmNameStore, realmWelcomeImage, realmWelcomeMessage, realmDescription } from '$lib/stores/realmInfo';
+  import { realmInfo, realmName as realmNameStore, realmWelcomeMessage, realmDescription } from '$lib/stores/realmInfo';
   import { cn } from '$lib/theme/utilities';
   import { _ } from 'svelte-i18n';
   
@@ -39,11 +39,7 @@
   // Only show admin profile when TEST_MODE_ADMIN_SELF_REGISTRATION is active
   $: profiles = allProfiles.filter(p => p.value !== 'admin' || TEST_MODE_ADMIN_SELF_REGISTRATION);
 
-  // Fallback when realm has no welcome image (canonical static path; may be overlaid at deploy)
-  const defaultWelcomeImage = '/images/background.png';
-  
-  // Reactive welcome image - use realm's image or fallback
-  $: welcomeImageUrl = $realmWelcomeImage || defaultWelcomeImage;
+  const welcomeImageUrl = '/images/background.png';
   
   // Determine initial step based on auth status and join status
   $: {

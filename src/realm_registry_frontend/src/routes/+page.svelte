@@ -156,9 +156,7 @@
         'users_count': IDL.Nat,
         'trades_count': IDL.Nat,
         'realm_name': IDL.Text,
-        'realm_logo': IDL.Text,
         'realm_description': IDL.Text,
-        'realm_welcome_image': IDL.Text,
         'realm_welcome_message': IDL.Text,
         'user_profiles_count': IDL.Nat,
       });
@@ -199,15 +197,12 @@
             console.log(`Realm details for ${realm.id}:`, {
               realm_name: statusData.realm_name,
               realm_description: statusData.realm_description,
-              realm_logo: statusData.realm_logo,
             });
             return { 
               id: realm.id, 
               users_count: Number(statusData.users_count),
               description: statusData.realm_description || '',
-              realm_logo: statusData.realm_logo || '',
               realm_name: statusData.realm_name || '',
-              realm_welcome_image: statusData.realm_welcome_image || '',
             };
           } else {
             console.warn(`Status call failed or no status data for ${realm.id}:`, response);
@@ -222,9 +217,9 @@
     // Update realms with fetched details
     updates.forEach(result => {
       if (result.status === 'fulfilled' && result.value) {
-        const { id, users_count, description, realm_logo, realm_name, realm_welcome_image } = result.value;
-        realms = realms.map(r => r.id === id ? { ...r, users_count, description, realm_logo, realm_name, realm_welcome_image } : r);
-        filteredRealms = filteredRealms.map(r => r.id === id ? { ...r, users_count, description, realm_logo, realm_name, realm_welcome_image } : r);
+        const { id, users_count, description, realm_name } = result.value;
+        realms = realms.map(r => r.id === id ? { ...r, users_count, description, realm_name } : r);
+        filteredRealms = filteredRealms.map(r => r.id === id ? { ...r, users_count, description, realm_name } : r);
       }
     });
   }
@@ -405,10 +400,6 @@
   }
 
   function resolvedRealmLogoUrl(realm) {
-    if (realm.realm_logo) {
-      const u = resolveRealmAssetUrl(realm, realm.realm_logo);
-      if (u) return u;
-    }
     return resolveRealmAssetUrl(realm, '/images/logo.png') || null;
   }
 
@@ -1050,7 +1041,7 @@
       {#if viewMode === 'list'}
         <div class="realms-grid">
           {#each filteredRealms as realm}
-            {@const welcomeBg = resolveRealmAssetUrl(realm, realm.realm_welcome_image || '/images/background.png')}
+            {@const welcomeBg = resolveRealmAssetUrl(realm, '/images/background.png')}
             {@const logoSrc = resolvedRealmLogoUrl(realm)}
             <div class="realm-card">
               {#if welcomeBg}
