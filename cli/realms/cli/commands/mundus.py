@@ -73,8 +73,16 @@ def _upload_file(filepath: Path) -> str:
 
 _build_cache: dict[str, str] = {}
 
+_VITE_PARAM_MAP = {
+    "TEST_MODE": "VITE_TEST_MODE",
+    "TEST_MODE_II_BYPASS": "VITE_TEST_MODE_II_BYPASS",
+    "TEST_MODE_ADMIN_SELF_REGISTRATION": "VITE_TEST_MODE_ADMIN_SELF_REGISTRATION",
+    "TEST_MODE_DEMO_DATA": "VITE_TEST_MODE_DEMO_DATA",
+    "TEST_MODE_SKIP_TERMS": "VITE_TEST_MODE_SKIP_TERMS",
+}
 
-def _build_artifacts() -> dict[str, Path]:
+
+def _build_artifacts(parameters: dict | None = None) -> dict[str, Path]:
     """Build backend WASM and frontend tarball from source. Returns artifact paths."""
     import gzip
     import tarfile
@@ -83,6 +91,15 @@ def _build_artifacts() -> dict[str, Path]:
     project_root = get_project_root()
 
     build_env = {**os.environ, "CANISTER_CANDID_PATH": str(project_root / "src" / "realm_backend" / "realm_backend.did")}
+
+    if parameters:
+        for param_name, value in parameters.items():
+            vite_key = _VITE_PARAM_MAP.get(param_name)
+            if vite_key:
+                build_env[vite_key] = str(value).lower()
+        applied = {k: v for k, v in parameters.items() if k in _VITE_PARAM_MAP}
+        if applied:
+            console.print(f"  Build parameters: {applied}")
 
     console.print("  Building backend WASM...")
     result = subprocess.run(
@@ -143,7 +160,8 @@ def _build_artifacts() -> dict[str, Path]:
     return {"realm_backend": wasm_gz, "realm_frontend": tarball}
 
 
-def _resolve_artifact(ref: str, artifact_type: str, network: str) -> str:
+def _resolve_artifact(ref: str, artifact_type: str, network: str,
+                      parameters: dict | None = None) -> str:
     """Resolve an artifact reference to a URL.
 
     Supported formats:
@@ -160,7 +178,7 @@ def _resolve_artifact(ref: str, artifact_type: str, network: str) -> str:
         cache_key = f"build:{artifact_type}"
         if cache_key in _build_cache:
             return _build_cache[cache_key]
-        artifacts = _build_artifacts()
+        artifacts = _build_artifacts(parameters=parameters)
         for atype, path in artifacts.items():
             console.print(f"  Uploading {atype}: {path.name}")
             url = _upload_file(path)
@@ -495,6 +513,8 @@ def mundus_deploy_descriptor_command(
     else:
         network = desc_network
 
+    parameters = desc.get("parameters") or {}
+
     realms = [e for e in desc.get("mundus", []) if e.get("type", "realm") == "realm"]
 
     if realm_filter:
@@ -516,16 +536,19 @@ def mundus_deploy_descriptor_command(
     scope = f"{len(realms)} realm(s)"
     if canister_filter:
         scope += f" ({canister_filter} only)"
-    console.print(f"Deploying {scope} to {network} (mode={deploy_mode})\n")
+    console.print(f"Deploying {scope} to {network} (mode={deploy_mode})")
+    if parameters:
+        console.print(f"Parameters: {parameters}")
+    console.print()
 
     backend_url = ""
     frontend_url = ""
     if canister_filter != "frontend":
-        backend_url = _resolve_artifact(artifact_version, "realm_backend", network)
+        backend_url = _resolve_artifact(artifact_version, "realm_backend", network, parameters=parameters)
         console.print(f"Artifacts resolved:")
         console.print(f"  backend:  {backend_url}")
     if canister_filter != "backend":
-        frontend_url = _resolve_artifact(artifact_version, "realm_frontend", network)
+        frontend_url = _resolve_artifact(artifact_version, "realm_frontend", network, parameters=parameters)
         if not backend_url:
             console.print(f"Artifacts resolved:")
         console.print(f"  frontend: {frontend_url}")

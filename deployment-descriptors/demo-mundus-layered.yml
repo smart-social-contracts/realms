@@ -22,3 +22,10 @@ mundus:
     canister_id: 2lbfz-yiaaa-aaaac-qcyma-cai
     frontend_canister_id: 2madn-vqaaa-aaaac-qcymq-cai
     manifest: examples/demo/realm3/manifest.json
+
+parameters:
+  TEST_MODE: true
+  TEST_MODE_II_BYPASS: false
+  TEST_MODE_ADMIN_SELF_REGISTRATION: true
+  TEST_MODE_DEMO_DATA: true
+  TEST_MODE_SKIP_TERMS: false
