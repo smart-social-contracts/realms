@@ -178,15 +178,20 @@ jobs:
           # Using needs.prepare.outputs here is wrong — needs.* is for other jobs only,
           # so NETWORK was always empty and credit top-up was skipped.
           NETWORK="${{ steps.matrix.outputs.network }}"
+          if [ -z "$NETWORK" ]; then
+            echo "::error::steps.matrix.outputs.network is empty — cannot resolve registry." >&2
+            exit 1
+          fi
           REGISTRY=$(python3 -c "import json; print(json.load(open('canister_ids.json'))['realm_registry_backend']['$NETWORK'])" 2>/dev/null || echo "")
           if [ -z "$REGISTRY" ]; then
-            echo "::warning::Could not resolve registry canister for network '$NETWORK', skipping credit top-up"
-          else
-            PRINCIPAL=$(dfx identity get-principal)
-            dfx canister call --network ic "$REGISTRY" add_credits \
-              "(\"$PRINCIPAL\", 50 : nat64, \"\", \"CI credit top-up\")" || true
-            echo "Credits topped up for $PRINCIPAL on $NETWORK (registry: $REGISTRY)"
+            echo "::error::No realm_registry_backend entry for network '$NETWORK' in canister_ids.json; cannot top up CI credits." >&2
+            exit 1
           fi
+          PRINCIPAL=$(dfx identity get-principal)
+          echo "Topping up 50 credits for $PRINCIPAL (registry=$REGISTRY, network=$NETWORK)..."
+          dfx canister call --network ic "$REGISTRY" add_credits \
+            "(\"$PRINCIPAL\", 50 : nat64, \"\", \"CI credit top-up\")"
+          echo "Credits topped up successfully."
 
   # ─── Job 2: Deploy each realm in parallel ─────────────────────────────────────
   deploy-realm:
