@@ -174,7 +174,10 @@ jobs:
 
       - name: Top up credits
         run: |
-          NETWORK="${{ needs.prepare.outputs.network }}"
+          # Same job: network comes from the "Build realm matrix" step outputs.
+          # Using needs.prepare.outputs here is wrong — needs.* is for other jobs only,
+          # so NETWORK was always empty and credit top-up was skipped.
+          NETWORK="${{ steps.matrix.outputs.network }}"
           REGISTRY=$(python3 -c "import json; print(json.load(open('canister_ids.json'))['realm_registry_backend']['$NETWORK'])" 2>/dev/null || echo "")
           if [ -z "$REGISTRY" ]; then
             echo "::warning::Could not resolve registry canister for network '$NETWORK', skipping credit top-up"
