@@ -2,7 +2,6 @@
 	import modeobserver from './utils/modeobserver';
 	import { onMount } from 'svelte';
 	import { initI18n } from '$lib/i18n';
-	import { backend } from '$lib/canisters';
 	import { browser } from '$app/environment';
 	import { locale, _ } from 'svelte-i18n';
 	import '../app.pcss';
@@ -29,13 +28,7 @@
 		// Initialize theme system
 		initializeTheme();
 		
-		// Initialize i18n and wait for all translations to load.
-		// This includes core translations, build-time bundled extension
-		// translations, AND runtime extension translations fetched from
-		// file_registry (Layered Realm — Issue #168). Passing `backend`
-		// is what enables that runtime fetch; if it is null/undefined the
-		// init falls back to bundled-only behavior.
-		await initI18n({ backend });
+		await initI18n();
 		
 		i18nReady = true;
 		

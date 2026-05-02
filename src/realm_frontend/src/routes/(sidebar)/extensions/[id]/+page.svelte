@@ -11,9 +11,11 @@
 	import { realmInfo } from '$lib/stores/realmInfo';
 	import { notifications, unreadCount, loadNotifications, markAsRead } from '$lib/stores/notifications';
 	import { _, locale } from 'svelte-i18n';
+	import { get } from 'svelte/store';
 	import { CONFIG } from '$lib/config.js';
 	import { cn } from '$lib/theme/utilities';
 	import { mountExtension, resolveExtensionVersion, type MountResult } from '$lib/extension-loader';
+	import { loadExtensionTranslation } from '$lib/i18n';
 	import type { RealmExtensionContext } from '$lib/realm-extension-sdk';
 
 	let mountPoint: HTMLDivElement | undefined;
@@ -105,6 +107,8 @@
 			if (!mountPoint) {
 				throw new Error('mount point not ready');
 			}
+
+			await loadExtensionTranslation(id, version, get(locale) || 'en');
 
 			const ctx = buildContext(id, version);
 			mounted = await mountExtension(id, version, mountPoint, ctx);

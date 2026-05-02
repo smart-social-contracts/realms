@@ -1,5 +1,5 @@
 import { browser } from "$app/environment";
-import { init, register, getLocaleFromNavigator, isLoading, addMessages } from "svelte-i18n";
+import { init, register, isLoading, addMessages } from "svelte-i18n";
 
 export const supportedLocales = [
   { id: "en", name: "English" },
@@ -77,43 +77,16 @@ function getPreferredLocale(): string {
 }
 
 // ---------------------------------------------------------------------------
-// Runtime extension translations (Issue #168, Layered Realm)
+// Runtime extension translations — lazy, same-origin loading
 // ---------------------------------------------------------------------------
-// `loadExtensionTranslations()` below is the legacy, build-time path: it uses
-// `import.meta.glob` to register every JSON file shipped under
-// `./locales/extensions/*/<lang>.json` at the moment realm_frontend was
-// compiled. With the Layered Realm transition, extensions are no longer baked
-// into the WASM and their i18n JSON lives in `file_registry`. The
-// `loadExtensionTranslationsFromRegistry(...)` function below fetches them
-// over HTTP at runtime and feeds them to the same `addMessages(...)` API, so
-// the rest of the app does not need to know whether a given extension is
-// "bundled" or "runtime".
-//
-// The contract for an extension's i18n in `file_registry` is:
-//
-//     ext/<extension_id>/<version>/frontend/i18n/<locale>.json
-//
-// (this matches what `realms extension publish` uploads, see
-// `cli/realms/cli/commands/extension.py::_publish_extension_command`).
-//
-// 404s are silent — an extension is allowed to omit a locale; we will fall
-// back to the manifest's `sidebar_label` (rendered by Sidebar.svelte) and to
-// raw key strings for missing translations, exactly like svelte-i18n does for
-// any missing key.
+// Each extension's i18n files live at:
+//   /ext/{ext_id}/{version}/frontend/i18n/{locale}.json
+// on the realm's own frontend asset canister (copied there during install).
+// Translations are loaded lazily — one extension, one locale, on demand —
+// when the extension page is mounted, not at app startup.
 // ---------------------------------------------------------------------------
 
-import { fileRegistryBaseUrlFor } from "$lib/extension-loader";
-
-interface RuntimeExtensionSource {
-  registry_canister_id: string;
-  version: string;
-}
-
-interface RuntimeExtensionsResponse {
-  success: boolean;
-  runtime_extensions?: string[];
-  sources?: Record<string, RuntimeExtensionSource | null>;
-}
+const _loadedExtLocales = new Set<string>();
 
 /** Strip legacy `{ "extensions": { "<id>": { ... } } }` wrapper when present. */
 function normalizeExtensionTranslationObject(
@@ -135,132 +108,36 @@ function normalizeExtensionTranslationObject(
 }
 
 /**
- * Probe whether an extension ships i18n files by trying en.json.
- * Returns `{ prefix, enTranslations }` on success or null when no i18n
- * exists. This keeps the 404 noise to at most 2 requests per extension
- * (one per URL pattern) instead of 2*L (L = number of locales).
+ * Load translations for a single extension and locale from the realm's own
+ * frontend asset canister (same-origin). Safe to call multiple times — skips
+ * if the same extension+locale was already loaded.
  */
-async function probeExtensionI18n(
-  baseUrl: string,
-  extensionId: string,
+export async function loadExtensionTranslation(
+  extId: string,
   version: string,
-): Promise<{ prefix: string; enTranslations: Record<string, unknown> } | null> {
-  const prefix = `${baseUrl}/ext/${extensionId}/${version}/frontend/i18n`;
-  const candidates = [
-    prefix,
-    `${prefix}/extensions/${extensionId}`,
-  ];
-  for (const candidate of candidates) {
+  currentLocale: string,
+): Promise<void> {
+  const localesToLoad = [currentLocale];
+  if (currentLocale !== "en") localesToLoad.push("en");
+
+  for (const loc of localesToLoad) {
+    const key = `${extId}@${version}:${loc}`;
+    if (_loadedExtLocales.has(key)) continue;
+    _loadedExtLocales.add(key);
+
+    const url = `/ext/${extId}/${version}/frontend/i18n/${loc}.json`;
     try {
-      const res = await fetch(`${candidate}/en.json`, { credentials: "omit" });
+      const res = await fetch(url);
       if (!res.ok) continue;
       const raw = await res.json();
-      const translations = normalizeExtensionTranslationObject(extensionId, raw);
-      if (translations) return { prefix: candidate, enTranslations: translations };
+      const translations = normalizeExtensionTranslationObject(extId, raw);
+      if (translations) {
+        addMessages(loc, { extensions: { [extId]: translations } });
+      }
     } catch {
-      // ignore
+      // Extension doesn't ship i18n for this locale — that's fine.
     }
   }
-  return null;
-}
-
-/**
- * Fetch one locale's translation file and merge it into svelte-i18n.
- * `i18nPrefix` must be the working URL prefix discovered by `probeExtensionI18n`.
- */
-async function fetchAndRegisterExtensionLocale(
-  i18nPrefix: string,
-  extensionId: string,
-  locale: string,
-): Promise<boolean> {
-  try {
-    const res = await fetch(`${i18nPrefix}/${locale}.json`, { credentials: "omit" });
-    if (!res.ok) return false;
-    const raw = await res.json();
-    const translations = normalizeExtensionTranslationObject(extensionId, raw);
-    if (!translations) return false;
-    addMessages(locale, {
-      extensions: {
-        [extensionId]: translations,
-      },
-    });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Discover every runtime-installed extension via realm_backend and load its
- * locales from file_registry. Safe to call multiple times: addMessages merges
- * by key and svelte-i18n re-evaluates when the locale changes.
- *
- * @param backend  An actor with `list_runtime_extensions(): Promise<string>`
- *                 (i.e. a realm_backend agent).
- * @param locales  Locale codes to fetch. Defaults to `supportedLocales`.
- */
-export async function loadExtensionTranslationsFromRegistry(
-  backend: { list_runtime_extensions: () => Promise<string> } | null | undefined,
-  locales: readonly string[] = supportedLocales.map((l) => l.id),
-): Promise<void> {
-  if (!backend || typeof backend.list_runtime_extensions !== "function") {
-    console.warn(
-      "[i18n] loadExtensionTranslationsFromRegistry: no backend with list_runtime_extensions; skipping.",
-    );
-    return;
-  }
-
-  let parsed: RuntimeExtensionsResponse;
-  try {
-    const raw = await backend.list_runtime_extensions();
-    parsed = JSON.parse(raw) as RuntimeExtensionsResponse;
-  } catch (err) {
-    console.warn("[i18n] list_runtime_extensions failed; skipping registry i18n load:", err);
-    return;
-  }
-
-  if (!parsed?.success || !Array.isArray(parsed.runtime_extensions)) {
-    return;
-  }
-
-  const sources = parsed.sources ?? {};
-  let registeredCount = 0;
-  let extensionCount = 0;
-  let skippedCount = 0;
-
-  for (const extId of parsed.runtime_extensions) {
-    const src = sources[extId];
-    if (!src?.registry_canister_id || !src?.version) {
-      continue;
-    }
-    extensionCount++;
-    const baseUrl = fileRegistryBaseUrlFor(src.registry_canister_id);
-
-    // Probe en.json first; if it 404s the extension ships no i18n at all
-    // and we skip the remaining locales (avoids N*L useless 404s).
-    const probe = await probeExtensionI18n(baseUrl, extId, src.version);
-    if (probe) {
-      // en.json already fetched and parsed by the probe — register it directly
-      addMessages("en", { extensions: { [extId]: probe.enTranslations } });
-      registeredCount++;
-      const remaining = locales.filter((l) => l !== "en");
-      const results = await Promise.all(
-        remaining.map((locale) =>
-          fetchAndRegisterExtensionLocale(probe.prefix, extId, locale),
-        ),
-      );
-      registeredCount += results.filter(Boolean).length;
-    } else {
-      skippedCount++;
-    }
-  }
-
-  console.log(
-    `[i18n] Runtime extension translations loaded: ${registeredCount} file(s) ` +
-      `across ${extensionCount} extension(s) and ${locales.length} locale(s)` +
-      (skippedCount ? ` (${skippedCount} without i18n)` : "") +
-      `.`,
-  );
 }
 
 // Find and register all extension translations
@@ -307,48 +184,21 @@ export async function loadExtensionTranslations() {
   }
 }
 
-export interface InitI18nOptions {
-  /**
-   * Optional realm_backend agent. When provided, runtime extension
-   * translations will be loaded from `file_registry` (Layered Realm /
-   * Issue #168) in addition to any build-time bundled translations.
-   * If omitted, only build-time translations are loaded.
-   */
-  backend?: { list_runtime_extensions: () => Promise<string> } | null;
-}
-
-export async function initI18n(options: InitI18nOptions = {}) {
+export async function initI18n() {
   init({
     fallbackLocale: "en",
     initialLocale: browser ? getPreferredLocale() : "en"
   });
 
-  // Wait for the initial locale's messages to finish loading before
-  // allowing any component to render. Without this, the locale store
-  // is still null while en.json is being fetched asynchronously, and
-  // any `$_()` call would throw "Cannot format a message without first
-  // setting the initial locale".
   await waitLocale();
 
   console.log('i18n initialized in realm_frontend');
 
-  // 1) Build-time bundled extension translations (legacy path; will be empty
-  //    in fully layered deployments because no extension code is shipped in
-  //    the realm_frontend WASM).
+  // Build-time bundled extension translations (legacy path; will be empty
+  // in fully layered deployments because no extension code is shipped in
+  // the realm_frontend WASM). Runtime extension translations are loaded
+  // lazily per-extension via loadExtensionTranslation().
   await loadExtensionTranslations();
-
-  // 2) Runtime extension translations from file_registry.
-  //    Disabled: runtime ESM bundles are self-contained and handle their own
-  //    UI text. Fetching per-locale JSON from file_registry produces dozens of
-  //    browser-visible 404s for no benefit. Re-enable when extensions start
-  //    shipping dedicated i18n JSON files.
-  // if (options.backend) {
-  //   try {
-  //     await loadExtensionTranslationsFromRegistry(options.backend);
-  //   } catch (err) {
-  //     console.warn('[i18n] runtime extension translations failed (non-fatal):', err);
-  //   }
-  // }
 
   console.log('All translations (core + extensions) loaded');
 }
