@@ -32,9 +32,6 @@
       key !== 'relations'
     ) : [];
   
-  // Import transfer table for specialized display
-  import TransfersTable from './TransfersTable.svelte';
-  
   function formatValue(value, key) {
     if (value === null || value === undefined) return 'N/A';
     
