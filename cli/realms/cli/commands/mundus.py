@@ -107,7 +107,14 @@ def _build_artifacts(parameters: dict | None = None) -> dict[str, Path]:
         cwd=project_root, capture_output=True, text=True, env=build_env,
     )
     if result.returncode != 0:
-        raise RuntimeError(f"Backend build failed:\n{result.stderr}")
+        console.print(f"[red]  Backend build failed (exit code {result.returncode})[/red]")
+        console.print(f"[red]  stdout:[/red]\n{result.stdout or '(empty)'}")
+        console.print(f"[red]  stderr:[/red]\n{result.stderr or '(empty)'}")
+        raise RuntimeError(
+            f"Backend build failed (exit code {result.returncode}):\n"
+            f"--- stdout ---\n{result.stdout or '(empty)'}\n"
+            f"--- stderr ---\n{result.stderr or '(empty)'}"
+        )
 
     wasm_path = project_root / ".basilisk" / "realm_backend" / "realm_backend.wasm"
     if not wasm_path.exists():
