@@ -109,9 +109,11 @@ jobs:
 
       - name: Generate Candid declarations
         run: |
-          dfx generate realm_backend 2>/dev/null || true
+          # Copy declarations to where the frontend expects them ($lib/declarations/realm_backend)
+          mkdir -p src/realm_frontend/src/lib/declarations
+          cp -r src/declarations/realm_backend src/realm_frontend/src/lib/declarations/realm_backend
           cp src/realm_backend/realm_backend.did ./realm_backend.did
-          echo "✅ Candid DID file copied"
+          echo "✅ Candid declarations copied to frontend lib, DID file ready"
 
       - name: Build frontend
         run: |
