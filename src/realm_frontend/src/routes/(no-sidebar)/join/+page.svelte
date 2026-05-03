@@ -135,6 +135,7 @@
     if (!inviteCode) return;
     inviteChecking = true;
     inviteError = '';
+    error = '';
     try {
       const result = await backend.extension_sync_call(
         'admin_dashboard',
@@ -320,18 +321,7 @@
         </div>
       {/if}
 
-      {#if inviteCode && !inviteChecking && !inviteValid && inviteError}
-        <div class="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-yellow-800 text-sm flex items-start gap-2">
-          <svg class="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.072 16.5c-.77.833.192 2.5 1.732 2.5z" />
-          </svg>
-          <div>
-            <span class="font-medium">Invalid invitation:</span> {inviteError}. You can still join as a member.
-          </div>
-        </div>
-      {/if}
-
-      {#if inviteCode && inviteChecking}
+      {#if inviteChecking}
         <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-sm flex items-center gap-2">
           <Spinner size="4" color="blue" />
           <span>Validating invitation code...</span>
@@ -506,6 +496,58 @@
                 </div>
               </button>
             {/each}
+          </div>
+
+          <!-- Invite code input -->
+          <div class="mb-6 p-4 border border-gray-200 rounded-xl">
+            <label for="invite-code" class="block text-sm font-medium text-gray-700 mb-2">
+              {inviteValid ? 'Invitation code' : 'Have an invitation code?'}
+            </label>
+            <div class="flex gap-2">
+              <input
+                id="invite-code"
+                type="text"
+                bind:value={inviteCode}
+                on:keydown={(e) => { if (e.key === 'Enter' && inviteCode && !inviteChecking) validateInvite(); }}
+                placeholder="Paste your invite code"
+                disabled={inviteValid}
+                class={cn(
+                  "flex-1 px-3 py-2 border rounded-lg text-sm focus:ring-gray-900 focus:border-gray-900",
+                  inviteValid ? "border-green-300 bg-green-50 text-green-800" : "border-gray-300"
+                )}
+              />
+              {#if inviteValid}
+                <button
+                  on:click={() => { inviteCode = ''; inviteValid = false; inviteProfile = ''; inviteError = ''; selectedProfile = ''; }}
+                  class="px-4 py-2 text-sm font-medium border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Clear
+                </button>
+              {:else}
+                <button
+                  on:click={validateInvite}
+                  disabled={!inviteCode || inviteChecking}
+                  class="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {#if inviteChecking}
+                    <Spinner size="4" color="white" />
+                  {:else}
+                    Validate
+                  {/if}
+                </button>
+              {/if}
+            </div>
+            {#if inviteValid}
+              <p class="mt-2 text-sm text-green-600 flex items-center gap-1">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+                Valid — grants <strong class="ml-1">{inviteProfile}</strong> access
+              </p>
+            {/if}
+            {#if inviteError && !inviteChecking && !inviteValid}
+              <p class="mt-2 text-sm text-red-600">{inviteError}</p>
+            {/if}
           </div>
           
 {#if TEST_MODE}
