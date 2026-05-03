@@ -129,6 +129,8 @@ jobs:
                       cd \$FRONTEND_DIR/assets && tar czf /artifacts/realm_frontend.tar.gz . ; \
                     elif [ -d \"\$FRONTEND_DIR/dist\" ]; then \
                       cd \$FRONTEND_DIR/dist && tar czf /artifacts/realm_frontend.tar.gz . ; \
+                    elif [ -d \"\$REALM_DIR/src/realm_frontend/dist\" ]; then \
+                      cd \$REALM_DIR/src/realm_frontend/dist && tar czf /artifacts/realm_frontend.tar.gz . ; \
                     else \
                       echo 'No frontend dist found' && exit 1 ; \
                     fi && \
