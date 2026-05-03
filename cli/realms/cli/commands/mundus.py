@@ -92,6 +92,9 @@ def _build_artifacts(parameters: dict | None = None) -> dict[str, Path]:
 
     build_env = {**os.environ, "CANISTER_CANDID_PATH": str(project_root / "src" / "realm_backend" / "realm_backend.did")}
 
+    backend_config_path = project_root / "src" / "realm_backend" / "config.py"
+    backend_config_backup = None
+
     if parameters:
         for param_name, value in parameters.items():
             vite_key = _VITE_PARAM_MAP.get(param_name)
@@ -101,12 +104,31 @@ def _build_artifacts(parameters: dict | None = None) -> dict[str, Path]:
         if applied:
             console.print(f"  Build parameters: {applied}")
 
+        # Patch backend config.py with matching parameters
+        if backend_config_path.exists():
+            backend_config_backup = backend_config_path.read_text()
+            patched = backend_config_backup
+            for param_name, value in parameters.items():
+                py_value = "True" if value is True else "False" if value is False else repr(value)
+                old = f"{param_name} = False"
+                new = f"{param_name} = {py_value}"
+                if old in patched:
+                    patched = patched.replace(old, new)
+                else:
+                    old_true = f"{param_name} = True"
+                    if old_true in patched:
+                        patched = patched.replace(old_true, new)
+            if patched != backend_config_backup:
+                backend_config_path.write_text(patched)
+
     console.print("  Building backend WASM...")
     result = subprocess.run(
         ["python", "-m", "basilisk", "realm_backend", "src/realm_backend/main.py"],
         cwd=project_root, capture_output=True, text=True, env=build_env,
     )
     if result.returncode != 0:
+        if backend_config_backup is not None:
+            backend_config_path.write_text(backend_config_backup)
         console.print(f"[red]  Backend build failed (exit code {result.returncode})[/red]")
         console.print(f"[red]  stdout:[/red]\n{result.stdout or '(empty)'}")
         console.print(f"[red]  stderr:[/red]\n{result.stderr or '(empty)'}")
@@ -115,6 +137,10 @@ def _build_artifacts(parameters: dict | None = None) -> dict[str, Path]:
             f"--- stdout ---\n{result.stdout or '(empty)'}\n"
             f"--- stderr ---\n{result.stderr or '(empty)'}"
         )
+
+    # Restore original config.py after backend build
+    if backend_config_backup is not None:
+        backend_config_path.write_text(backend_config_backup)
 
     wasm_path = project_root / ".basilisk" / "realm_backend" / "realm_backend.wasm"
     if not wasm_path.exists():
