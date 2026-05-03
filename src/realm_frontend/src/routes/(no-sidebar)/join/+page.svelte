@@ -137,7 +137,7 @@
     inviteError = '';
     error = '';
     try {
-      const result = await backend.extension_sync_call(
+      const result = await backend.extension_call(
         'admin_dashboard',
         'validate_registration_code',
         JSON.stringify({ code: inviteCode })
