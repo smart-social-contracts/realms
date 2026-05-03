@@ -58,4 +58,4 @@ Introduction of Quarters — federated autonomous realm backends within a Realm 
 📋 [Full details — GitHub Epic #143](https://github.com/smart-social-contracts/realms/issues/143)
 
 ### Enhanced Python Interpreter
-Transition from the Kybra Python-to-Wasm toolchain to Basilisk, delivering improved performance, broader Python compatibility, and a more streamlined developer experience for canister development.
+Basilisk — our Python-to-Wasm toolchain — delivers improved performance, broad Python compatibility, and a streamlined developer experience for canister development. (Completed: replaces deprecated Kybra toolchain.)

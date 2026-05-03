@@ -191,9 +191,8 @@ def resolve_codebase(path: str, label: str, temp_dir: str) -> str:
         return clone_dir
 
     if is_version_tag(path):
-        print(f"   📦 {label}: version {path} (will use Docker image or pip package)")
-        # For version tags, we'd pull the Docker image or install via pip
-        # For now, return the version string; the deploy functions handle it
+        print(f"   📦 {label}: version {path}")
+        # For version tags, return the version string; the deploy functions handle it
         return f"version:{path}"
 
     print(f"❌ {label}: unrecognized codebase format: {path}")

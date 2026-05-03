@@ -296,7 +296,6 @@ def get_scripts_path() -> Path:
     2. ../scripts (repo mode - running from cli subfolder)
     3. Package bundled scripts (pip-installed mode)
     4. /srv/realms/scripts (server deployment)
-    5. /app/scripts (legacy Docker image mode)
     
     Returns:
         Path to scripts directory
@@ -321,8 +320,7 @@ def get_scripts_path() -> Path:
     if server_scripts.exists() and (server_scripts / "deploy_canisters.sh").exists():
         return server_scripts
     
-    # 5. Fallback to Docker image path
-    return Path("/app/scripts")
+    raise FileNotFoundError("Could not find scripts directory")
 
 
 def is_repo_mode() -> bool:
@@ -830,7 +828,6 @@ def ensure_dfx_running(
     
     # Run dfx WITHOUT --background to capture canister logs from stderr
     # Redirect all file descriptors to fully detach process
-    # (required for docker exec to return properly when running in containers)
     cmd = f"dfx start {'--clean ' if clean else ''}--log file --logfile {dfx_log_path} --host 127.0.0.1:{port} </dev/null >/dev/null 2>{dfx2_log_path} &"
     
     subprocess.Popen(
