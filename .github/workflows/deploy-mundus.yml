@@ -24,10 +24,10 @@ on:
         description: "Deploy mode for realm canisters"
         required: false
         type: choice
-        default: upgrade
+        default: reinstall
         options:
-          - upgrade
           - reinstall
+          - upgrade
           - install
 
       artifact_version:

@@ -137,6 +137,14 @@
     inviteError = '';
     error = '';
     try {
+      // Test mode shortcut: "admin" is accepted client-side
+      if (TEST_MODE_ADMIN_SELF_REGISTRATION && inviteCode.trim() === 'admin') {
+        inviteValid = true;
+        inviteProfile = 'admin';
+        selectedProfile = 'admin';
+        return;
+      }
+
       const result = await backend.extension_call(
         'admin_dashboard',
         'validate_registration_code',
