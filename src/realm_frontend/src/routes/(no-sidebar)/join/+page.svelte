@@ -19,6 +19,11 @@
   let loading = false;
   let realmName = 'Realm';
   let selectedProfile = ''; // No default - user must choose
+  let inviteCode = '';
+  let inviteProfile = '';
+  let inviteValid = false;
+  let inviteError = '';
+  let inviteChecking = false;
   
   // Available profiles with icon names (rendered as SVGs)
   const allProfiles = [
@@ -37,7 +42,13 @@
   ];
 
   // Only show admin profile when TEST_MODE_ADMIN_SELF_REGISTRATION is active
-  $: profiles = allProfiles.filter(p => p.value !== 'admin' || TEST_MODE_ADMIN_SELF_REGISTRATION);
+  $: profiles = inviteValid && inviteProfile
+    ? allProfiles.filter(p => p.value === inviteProfile)
+    : allProfiles.filter(p => p.value !== 'admin' || TEST_MODE_ADMIN_SELF_REGISTRATION);
+
+  $: if (profiles.length === 1 && !selectedProfile) {
+    selectedProfile = profiles[0].value;
+  }
 
   const welcomeImageUrl = '/images/background.png';
   
@@ -64,6 +75,10 @@
       realmName = $realmNameStore;
     }
     
+    // Read invite code from URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    inviteCode = urlParams.get('invite') || urlParams.get('code') || '';
+
     // In test mode with II bypass, auto-login if not already authenticated
     if (TEST_MODE_II_BYPASS && !$isAuthenticated) {
       console.log('[JOIN PAGE] [TEST MODE] Auto-login triggered');
@@ -76,6 +91,9 @@
       console.log('[JOIN PAGE v2] Loading profiles for authenticated user...');
       await initBackendWithIdentity();
       await loadUserProfiles();
+      if (inviteCode) {
+        await validateInvite();
+      }
       console.log('[JOIN PAGE v2] Profiles loaded, hasJoined:', hasJoined());
     }
   });
@@ -90,6 +108,9 @@
         principal.set(userPrincipal.toText());
         await initBackendWithIdentity();
         await loadUserProfiles();
+        if (inviteCode) {
+          await validateInvite();
+        }
         // Check if user has already joined
         userHasJoined = hasJoined();
         currentStep = userHasJoined ? 'already_joined' : 'terms';
@@ -101,6 +122,40 @@
       error = 'Failed to authenticate. Please try again.';
     } finally {
       loading = false;
+    }
+  }
+
+  async function sha256Hex(plaintext) {
+    const data = new TextEncoder().encode(plaintext);
+    const buf = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function validateInvite() {
+    if (!inviteCode) return;
+    inviteChecking = true;
+    inviteError = '';
+    try {
+      const result = await backend.extension_sync_call(
+        'admin_dashboard',
+        'validate_registration_code',
+        JSON.stringify({ code: inviteCode })
+      );
+      const parsed = typeof result.response === 'string' ? JSON.parse(result.response) : result.response;
+      if (parsed.success && parsed.data) {
+        inviteValid = true;
+        inviteProfile = parsed.data.profile || 'member';
+        selectedProfile = inviteProfile;
+      } else {
+        inviteError = parsed.error || 'Invalid invitation code';
+        inviteValid = false;
+      }
+    } catch (e) {
+      console.error('Invite validation error:', e);
+      inviteError = 'Could not validate invitation code';
+      inviteValid = false;
+    } finally {
+      inviteChecking = false;
     }
   }
 
@@ -132,7 +187,8 @@
       loading = true;
       console.log(`Joining realm with profile: ${selectedProfile}`);
       // Step 1: Register on the capital (current backend) — gets quarter assignment
-      const response = await backend.join_realm(selectedProfile, '');
+      const inviteChecksum = inviteCode ? await sha256Hex(inviteCode) : '';
+      const response = await backend.join_realm(selectedProfile, '', inviteChecksum);
       if (response.success) {
         // Step 2: If assigned to a quarter, switch to it and register there too
         const assignedQuarter = response.data?.userGet?.assigned_quarter;
@@ -143,7 +199,7 @@
 
           // Register on the assigned quarter backend
           try {
-            await backend.join_realm(selectedProfile, '');
+            await backend.join_realm(selectedProfile, '', inviteChecksum);
             console.log('Registered on assigned quarter');
           } catch (qErr) {
             console.warn('Quarter registration deferred:', qErr);
@@ -261,6 +317,24 @@
       {#if error}
         <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
           {error}
+        </div>
+      {/if}
+
+      {#if inviteCode && !inviteChecking && !inviteValid && inviteError}
+        <div class="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-yellow-800 text-sm flex items-start gap-2">
+          <svg class="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.072 16.5c-.77.833.192 2.5 1.732 2.5z" />
+          </svg>
+          <div>
+            <span class="font-medium">Invalid invitation:</span> {inviteError}. You can still join as a member.
+          </div>
+        </div>
+      {/if}
+
+      {#if inviteCode && inviteChecking}
+        <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-sm flex items-center gap-2">
+          <Spinner size="4" color="blue" />
+          <span>Validating invitation code...</span>
         </div>
       {/if}
 
@@ -385,7 +459,11 @@
         <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
           <div class="flex items-center justify-between mb-2">
             <h2 class="text-2xl font-bold text-gray-900">Select Profile</h2>
-{#if TEST_MODE}<span class="px-3 py-1 bg-gray-200 text-gray-600 text-xs font-medium rounded-full">Test Mode</span>{/if}
+{#if inviteValid}
+              <span class="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">Invited as {inviteProfile}</span>
+            {:else if TEST_MODE}
+              <span class="px-3 py-1 bg-gray-200 text-gray-600 text-xs font-medium rounded-full">Test Mode</span>
+            {/if}
           </div>
           <p class="text-gray-500 mb-6">Choose how you want to participate</p>
           

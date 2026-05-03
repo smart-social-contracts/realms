@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import importlib
 import json
 import sys
@@ -58,7 +59,8 @@ from api.user import (
 )
 from api.vetkeys import derive_vetkey, get_vetkey_public_key
 from api.zones import get_zone_aggregation
-from core.access import _check_access, require, set_controller
+import config as Config
+from core.access import _check_access, require, require_controller, set_controller
 from core.task_manager import TaskManager
 from ggg import Call, Codex, Task, TaskSchedule, TaskStep
 from ggg.system.user_profile import Operations
@@ -233,7 +235,6 @@ def _get_frontend_canister_id() -> str:
         return ""
 
 logger = get_logger("main")
-
 
 def _make_codex_proxy(codex_name: str, func_name: str, method_type: str = "method"):
     """Create a dynamic proxy that always exec()s the latest Codex code.
@@ -437,26 +438,101 @@ def _assign_quarter(principal: str, realm, quarters, preferred_quarter: str) -> 
 
 
 @update
-def join_realm(profile: str, preferred_quarter: text) -> RealmResponse:
+def join_realm(profile: str, preferred_quarter: text, invite_code_checksum_hex: text) -> RealmResponse:
+    """Register the caller in the realm.
+
+    Registration modes:
+    - Code-based (default): caller must provide a valid invite_code.
+      The code's profile determines the granted role.
+    - Open registration: if Realm.open_registration is True, members
+      may join without a code. Admin always requires a code.
+    - Controller bypass: IC controllers can join with any profile
+      without a code (for manual dfx deploys).
+    - Test mode: when TEST_MODE_ADMIN_SELF_REGISTRATION is True,
+      the code "admin" (sha256-matched) grants admin access.
+    """
     try:
-        user = user_register(ic.caller().to_str(), profile)
+        caller = ic.caller().to_str()
+        from ggg import Quarter, Realm, User
+
+        realm = Realm.load("1")
+        has_invite = bool(invite_code_checksum_hex and invite_code_checksum_hex.strip())
+        granted_profile = profile
+
+        # --- Determine access ---
+
+        is_controller = False
+        try:
+            is_controller = ic.is_controller(caller)
+        except Exception:
+            pass
+
+        if has_invite:
+            # Test mode shortcut: code sha256(b"admin").hexdigest() grants admin without extension call
+            _ADMIN_TEST_CODE_CHECKSUM_HEX = "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"
+            if Config.TEST_MODE_ADMIN_SELF_REGISTRATION and invite_code_checksum_hex == _ADMIN_TEST_CODE_CHECKSUM_HEX:
+                granted_profile = "admin"
+            else:
+                # Code-based path: validate and consume the invite code
+                from ggg.system.registration_code import consume_registration_code
+                consume_result = consume_registration_code(invite_code_checksum_hex, caller)
+
+                if not consume_result.get("success"):
+                    error_msg = consume_result.get("error", "Invalid or expired invitation code")
+                    return RealmResponse(
+                        success=False,
+                        data=RealmResponseData(error=error_msg),
+                    )
+
+                consume_data = consume_result.get("data", {})
+                invite_profile = (consume_data if isinstance(consume_data, dict) else consume_result).get("profile", "member")
+                if profile and profile != invite_profile:
+                    return RealmResponse(
+                        success=False,
+                        data=RealmResponseData(
+                            error=f"Invitation grants '{invite_profile}' profile, but '{profile}' was requested"
+                        ),
+                    )
+                granted_profile = invite_profile
+
+        elif is_controller:
+            # Controllers can join with any profile without a code
+            pass
+
+        elif profile == "admin":
+            return RealmResponse(
+                success=False,
+                data=RealmResponseData(
+                    error="Admin registration requires an invitation code. Use /join?invite=CODE"
+                ),
+            )
+
+        else:
+            # Member join without code: allowed only if open_registration is on
+            open_reg = realm and realm.open_registration
+            if not open_reg:
+                return RealmResponse(
+                    success=False,
+                    data=RealmResponseData(
+                        error="Registration requires an invitation code. Use /join?invite=CODE"
+                    ),
+                )
+
+        # --- Register user and assign quarter ---
+
+        user = user_register(caller, granted_profile)
         profiles = Vec[text]()
         if "profiles" in user and user["profiles"]:
             for p in user["profiles"]:
                 profiles.append(p)
 
-        # Quarter assignment (no-op for single-quarter realms)
         assigned_quarter_canister_id = ""
-        from ggg import Quarter, Realm, User
-
-        realm = Realm.load("1")
         quarters = list(Quarter.instances()) if realm else []
         if realm and quarters:
             assigned_quarter_canister_id = _assign_quarter(
-                ic.caller().to_str(), realm, quarters, preferred_quarter
+                caller, realm, quarters, preferred_quarter
             )
-            # Persist the assignment on the User entity
-            u = User[ic.caller().to_str()]
+            u = User[caller]
             if u and assigned_quarter_canister_id:
                 u.home_quarter = assigned_quarter_canister_id
 
@@ -475,6 +551,47 @@ def join_realm(profile: str, preferred_quarter: text) -> RealmResponse:
         )
     except Exception as e:
         logger.error(f"Error registering user: {str(e)}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@update
+@require_controller
+def store_admin_invite_hash(args_json: text) -> RealmResponse:
+    """Controller-only endpoint to store a pre-computed admin invite hash."""
+    try:
+        args = json.loads(args_json)
+        code_hash = args.get("code_hash", "").strip()
+        expires_in_hours = args.get("expires_in_hours", 24)
+        if not code_hash:
+            return RealmResponse(
+                success=False,
+                data=RealmResponseData(error="code_hash is required"),
+            )
+
+        from ggg.system.registration_code import create_registration_code
+        reg_code = create_registration_code(
+            code_hash=code_hash,
+            profile="admin",
+            max_uses=1,
+            expires_in_hours=expires_in_hours,
+            created_by=ic.caller().to_str(),
+            user_id="installer",
+        )
+        result = {
+            "success": True,
+            "data": {
+                "code_hash": code_hash[:8],
+                "expires_at": reg_code.expires_at,
+                "profile": "admin",
+            },
+        }
+        result_str = json.dumps(result)
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(message=result_str),
+        )
+    except Exception as e:
+        logger.error(f"Error storing admin invite hash: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 

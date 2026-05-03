@@ -8,6 +8,8 @@ For local development, these default to IC mainnet values.
 During deployment, the deploy script updates these with actual canister IDs.
 """
 
+TEST_MODE_ADMIN_SELF_REGISTRATION = False
+
 # Shared canister IDs - updated during deployment
 CANISTER_IDS = {
     # ckBTC ledger canister for token operations

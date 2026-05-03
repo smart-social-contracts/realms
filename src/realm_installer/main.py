@@ -359,6 +359,24 @@ def schedule_registration(job_id_val: str):
                 else:
                     jlog(job_id_val).info(f"set_canister_config: file_registry={fr_id}, marketplace={mp_id}")
 
+            # Store admin invite hash if present in manifest
+            admin_invite_hash = realm_info.get("admin_invite_hash", "")
+            if admin_invite_hash and backend_id:
+                try:
+                    invite_json = json.dumps({"code_hash": admin_invite_hash, "expires_in_hours": 24})
+                    invite_escaped = invite_json.replace('\\', '\\\\').replace('"', '\\"')
+                    invite_arg = '("' + invite_escaped + '")'
+                    invite_result: CallResult = yield ic.call_raw(
+                        Principal.from_str(backend_id), "store_admin_invite_hash",
+                        ic.candid_encode(invite_arg), 0,
+                    )
+                    if isinstance(invite_result, dict) and "Err" in invite_result:
+                        jlog(job_id_val).error(f"store_admin_invite_hash failed: {invite_result['Err']}")
+                    else:
+                        jlog(job_id_val).info(f"admin invite hash stored on backend")
+                except Exception as invite_err:
+                    jlog(job_id_val).error(f"store_admin_invite_hash error: {invite_err}")
+
             registry = RealmRegistryService(Principal.from_str(reg_id))
             result: CallResult = yield registry.register_realm(
                 realm_name, url, logo, backend_url, canister_ids,

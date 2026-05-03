@@ -22,6 +22,7 @@ from .task import Task
 from .task_execution import TaskExecution
 from .task_schedule import TaskSchedule
 from .task_step import TaskStep
+from .registration_code import RegistrationCode
 from .user import User
 from .user_profile import Operations, Profiles, UserProfile
 
@@ -37,6 +38,7 @@ __all__ = [
     "Permission",
     "Profiles",
     "ProposalStatus",
+    "RegistrationCode",
     "Service",
     "Task",
     "TaskExecution",

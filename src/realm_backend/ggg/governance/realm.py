@@ -43,3 +43,6 @@ class Realm(Entity, TimestampedMixin):
     # Comma-separated canister principal IDs trusted for inter-canister calls
     # (DAO controllers, AI agents, parent realms). These bypass User-based access checks.
     trusted_principals = String(max_length=2048, default="")
+    # When False (default), all users must present an invite code to join.
+    # When True, anyone can join as member without a code. Admin always requires a code.
+    open_registration = Boolean(default=False)

@@ -195,7 +195,8 @@ service : {
   "status" : () -> (RealmResponse) query;
   "get_quarter_info" : () -> (RealmResponse) query;
   "get_extensions" : () -> (RealmResponse) query;
-  "join_realm" : (text, text) -> (RealmResponse);
+  "join_realm" : (text, text, text) -> (RealmResponse);
+  "store_admin_invite_hash" : (text) -> (RealmResponse);
   "change_quarter" : (text) -> (RealmResponse);
   "get_my_principal" : () -> (text) query;
   "get_canister_id" : () -> (text) query;

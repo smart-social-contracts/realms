@@ -151,3 +151,57 @@ def require(operation: str):
             return wrapper
 
     return decorator
+
+
+def _is_controller_or_trusted(caller_principal: str) -> bool:
+    """Check if caller is an IC controller, init-time controller, or trusted principal."""
+    try:
+        if ic.is_controller(caller_principal):
+            return True
+    except Exception:
+        pass
+
+    if _controller_principal and caller_principal == _controller_principal:
+        return True
+
+    from ggg import Realm
+    try:
+        realm = Realm.load("1")
+        if realm and realm.trusted_principals:
+            trusted = [p.strip() for p in str(realm.trusted_principals).split(",") if p.strip()]
+            if caller_principal in trusted:
+                return True
+    except Exception:
+        pass
+
+    return False
+
+
+def require_controller(fn):
+    """Decorator that restricts an endpoint to IC controllers and trusted principals.
+
+    Raises AccessDenied if the caller is not a controller (IC-level or
+    init-time) and not in the realm's trusted_principals list.
+    """
+    _is_gen = getattr(fn, '__code__', None) is not None and (fn.__code__.co_flags & 0x20)
+
+    if _is_gen:
+        @wraps(fn)
+        def async_wrapper(*args, **kwargs):
+            caller = ic.caller().to_str()
+            if not _is_controller_or_trusted(caller):
+                raise AccessDenied(
+                    f"Access denied: {caller} is not a controller or trusted principal"
+                )
+            return (yield from fn(*args, **kwargs))
+        return async_wrapper
+    else:
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            caller = ic.caller().to_str()
+            if not _is_controller_or_trusted(caller):
+                raise AccessDenied(
+                    f"Access denied: {caller} is not a controller or trusted principal"
+                )
+            return fn(*args, **kwargs)
+        return wrapper
