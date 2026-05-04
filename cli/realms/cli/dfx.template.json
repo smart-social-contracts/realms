@@ -136,10 +136,8 @@
       "init_arg": "(record { name = \"Land NFT\"; symbol = \"LAND\"; description = opt \"Land ownership NFT for realm\"; supply_cap = opt 10000 : opt nat; test = opt true })"
     },
     "nft_frontend": {
-      "type": "custom",
-      "candid": "https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/nft_frontend.did",
-      "wasm": "https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/nft_frontend.wasm",
-      "frontend": {},
+      "type": "assets",
+      "source": [],
       "remote": {
         "id": {
           "demo": "6aqo3-fqaaa-aaaaf-qdohq-cai",
