@@ -42,5 +42,7 @@ export const TEST_MODE_ADMIN_SELF_REGISTRATION = _testFlag('VITE_TEST_MODE_ADMIN
 export const TEST_MODE_DEMO_DATA = _testFlag('VITE_TEST_MODE_DEMO_DATA', 'demo_data');
 // Skip terms acceptance step on the join page.
 export const TEST_MODE_SKIP_TERMS = _testFlag('VITE_TEST_MODE_SKIP_TERMS', 'skip_terms');
+// Skip real ZK passport proof — treat passport verification as always verified.
+export const TEST_MODE_SKIP_PASSPORT_ZKPROOF = _testFlag('VITE_TEST_MODE_SKIP_PASSPORT_ZKPROOF', 'skip_passport');
 
 export const DEV_PORT = 8000;

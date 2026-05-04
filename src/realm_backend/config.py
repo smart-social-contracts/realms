@@ -9,6 +9,7 @@ During deployment, the deploy script updates these with actual canister IDs.
 """
 
 TEST_MODE_ADMIN_SELF_REGISTRATION = False
+TEST_MODE_SKIP_PASSPORT_ZKPROOF = False
 
 # Shared canister IDs - updated during deployment
 CANISTER_IDS = {

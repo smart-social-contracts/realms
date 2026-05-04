@@ -13,12 +13,36 @@ mundus:
     frontend_canister_id: iocgc-oaaaa-aaaac-beh2q-cai
     manifest: examples/demo/realm1/manifest.json
 
+  - name: dominion-token
+    type: token
+    display_name: Dominion Token
+    wasm_url: https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/token_backend.wasm
+    init_arg: '(record { name = "Dominion Token"; symbol = "DOM"; decimals = 8 : nat8; total_supply = 100_000_000_000_000_000 : nat; fee = 10_000 : nat; test = opt true })'
+
+  - name: dominion-nft
+    type: nft
+    display_name: Dominion Land NFT
+    wasm_url: https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/nft_backend.wasm
+    init_arg: '(record { name = "Dominion Land"; symbol = "DLAND"; description = opt "Land ownership NFT for Dominion realm"; supply_cap = opt 10000 : opt nat; test = opt true })'
+
   - name: agora
     type: realm
     display_name: Agora
     canister_id: ihbn6-yiaaa-aaaac-beh3a-cai
     frontend_canister_id: iaalk-vqaaa-aaaac-beh3q-cai
     manifest: examples/demo/realm2/manifest.json
+
+  - name: agora-token
+    type: token
+    display_name: Agora Token
+    wasm_url: https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/token_backend.wasm
+    init_arg: '(record { name = "Agora Token"; symbol = "AGO"; decimals = 8 : nat8; total_supply = 100_000_000_000_000_000 : nat; fee = 10_000 : nat; test = opt true })'
+
+  - name: agora-nft
+    type: nft
+    display_name: Agora Land NFT
+    wasm_url: https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/nft_backend.wasm
+    init_arg: '(record { name = "Agora Land"; symbol = "ALAND"; description = opt "Land ownership NFT for Agora realm"; supply_cap = opt 10000 : opt nat; test = opt true })'
 
   - name: syntropia
     type: realm
@@ -27,9 +51,22 @@ mundus:
     frontend_canister_id: jkpjq-xaaaa-aaaac-beh4q-cai
     manifest: examples/demo/realm3/manifest.json
 
+  - name: syntropia-token
+    type: token
+    display_name: Syntropia Token
+    wasm_url: https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/token_backend.wasm
+    init_arg: '(record { name = "Syntropia Token"; symbol = "SYN"; decimals = 8 : nat8; total_supply = 100_000_000_000_000_000 : nat; fee = 10_000 : nat; test = opt true })'
+
+  - name: syntropia-nft
+    type: nft
+    display_name: Syntropia Land NFT
+    wasm_url: https://github.com/smart-social-contracts/ic-tokens/releases/download/v0.1.0/nft_backend.wasm
+    init_arg: '(record { name = "Syntropia Land"; symbol = "SLAND"; description = opt "Land ownership NFT for Syntropia realm"; supply_cap = opt 10000 : opt nat; test = opt true })'
+
 parameters:
   TEST_MODE: true
   TEST_MODE_II_BYPASS: false
   TEST_MODE_ADMIN_SELF_REGISTRATION: true
   TEST_MODE_DEMO_DATA: false
   TEST_MODE_SKIP_TERMS: false
+  TEST_MODE_SKIP_PASSPORT_ZKPROOF: false

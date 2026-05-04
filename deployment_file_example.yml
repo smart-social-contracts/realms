@@ -14,7 +14,8 @@ object:
 
   # Which canister types to deploy (comma-separated)
   # Valid: backend, frontend, token, nft, marketplace, all
-  subtypes: backend, frontend
+  # Include token and nft to deploy per-realm token/NFT canisters
+  subtypes: backend, frontend, token, nft
 
   # Number of backend quarters
   # 1 = main realm_backend only
@@ -61,3 +62,4 @@ object:
     TEST_MODE_ADMIN_SELF_REGISTRATION: true
     TEST_MODE_DEMO_DATA: true
     TEST_MODE_SKIP_TERMS: true
+    TEST_MODE_SKIP_PASSPORT_ZKPROOF: true

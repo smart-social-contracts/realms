@@ -503,7 +503,7 @@ def join_realm(profile: str, preferred_quarter: text, invite_code_checksum_hex: 
             return RealmResponse(
                 success=False,
                 data=RealmResponseData(
-                    error="Admin registration requires an invitation code. Use /join?invite=CODE"
+                    error="Admin registration requires an invitation code."
                 ),
             )
 
@@ -514,7 +514,7 @@ def join_realm(profile: str, preferred_quarter: text, invite_code_checksum_hex: 
                 return RealmResponse(
                     success=False,
                     data=RealmResponseData(
-                        error="Registration requires an invitation code. Use /join?invite=CODE"
+                        error="Registration requires an invitation code."
                     ),
                 )
 

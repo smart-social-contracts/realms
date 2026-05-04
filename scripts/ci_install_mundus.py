@@ -1492,6 +1492,49 @@ def _kickoff_deploy(
     }
 
 
+def _link_token_nft_canisters(
+    members: List[Dict[str, Any]], network: str,
+) -> None:
+    """Link per-realm token/nft canisters to their realm backends via set_canister_config.
+
+    Convention: a member named ``<realm>-token`` (type ``token``) is linked
+    to the realm member named ``<realm>``, and similarly for ``<realm>-nft``.
+    """
+    realm_members = {
+        m["name"]: m for m in members
+        if (m.get("type") or "realm").strip() == "realm"
+    }
+    if not realm_members:
+        return
+
+    for realm_name, realm_m in realm_members.items():
+        token_name = f"{realm_name}-token"
+        nft_name = f"{realm_name}-nft"
+
+        token_id = ""
+        nft_id = ""
+        for m in members:
+            if m["name"] == token_name:
+                token_id = m.get("canister_id") or _canister_id(token_name, network) or ""
+            if m["name"] == nft_name:
+                nft_id = m.get("canister_id") or _canister_id(nft_name, network) or ""
+
+        if not token_id and not nft_id:
+            continue
+
+        realm_cid = realm_m.get("canister_id") or _canister_id(realm_name, network)
+        if not realm_cid:
+            continue
+
+        opt = lambda v: f'opt "{v}"' if v else "null"
+        arg = f'({opt("")}, {opt(token_id)}, {opt(nft_id)}, null, null)'
+        print(f"   🔗 linking {realm_name}: token={token_id or '–'}, nft={nft_id or '–'}")
+        try:
+            _dfx("canister", "call", realm_cid, "set_canister_config", arg, network=network)
+        except Exception as e:
+            print(f"   ⚠ set_canister_config on {realm_name} failed: {e}")
+
+
 def stage2_install(
     descriptor: Dict[str, Any],
     infra_ids: Dict[str, str],
@@ -1540,6 +1583,8 @@ def stage2_install(
                 or _canister_id(registry_member["name"], network) or "",
                 network,
             )
+
+    _link_token_nft_canisters(members, network)
 
     print("\n   ✅ mundus installed")
 
