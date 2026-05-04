@@ -199,7 +199,7 @@ def _resolve_artifact(ref: str, artifact_type: str, network: str,
 
     Supported formats:
       - URL (https://...) -> returned as-is
-      - version (e.g. "0.3.2") -> GitHub release URL
+      - version (e.g. "0.3.2" or "v0.3.2") -> GitHub release URL
       - "latest" -> latest GitHub release
       - "build" -> compile from source, upload to deployer
       - local path -> upload to deployer
@@ -226,8 +226,8 @@ def _resolve_artifact(ref: str, artifact_type: str, network: str,
         with urllib.request.urlopen(gh_url, timeout=30) as resp:
             release = json.loads(resp.read())
         version = release["tag_name"].lstrip("v")
-    elif ref.replace(".", "").isdigit():
-        version = ref
+    elif ref.lstrip("v").replace(".", "").isdigit():
+        version = ref.lstrip("v")
     else:
         local_path = Path(ref)
         if local_path.exists():
