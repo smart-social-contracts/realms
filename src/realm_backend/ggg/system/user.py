@@ -57,17 +57,26 @@ class User(Entity, TimestampedMixin):
 
     @staticmethod
     def user_register_posthook(user: "User"):
-        """Hook called after user registration. Dynamically loads codex override if available."""
+        """Hook called after user registration. Dynamically loads codex override if available.
+
+        Looks for a Codex entity named ``user_registration_hook`` (preferred)
+        or ``user_registration_hook_codex`` (legacy naming).  The manifest-based
+        override mechanism in runtime_codex.apply_entity_method_overrides will
+        monkey-patch this method with a proxy when the codex is installed, so
+        this fallback only runs when the override wasn't applied (e.g. first
+        deploy before extension init).
+        """
         try:
             from ggg.governance.codex import Codex
 
+            _HOOK_NAMES = ("user_registration_hook", "user_registration_hook_codex")
             for codex in Codex.instances():
-                if codex.name == "user_registration_hook" and codex.code:
+                if codex.name in _HOOK_NAMES and codex.code:
                     import ggg as _ggg
                     from _cdk import ic as _ic
 
                     ns = {"ic": _ic, "ggg": _ggg, "__builtins__": __builtins__}
-                    exec(compile(codex.code, "user_registration_hook.py", "exec"), ns)
+                    exec(compile(codex.code, f"{codex.name}.py", "exec"), ns)
                     if "user_register_posthook" in ns:
                         logger.info(
                             f"Executing codex user_register_posthook for user {user.id}"
@@ -75,7 +84,7 @@ class User(Entity, TimestampedMixin):
                         ns["user_register_posthook"](user)
                         return
         except Exception as e:
-            logger.error(f"Error executing user_registration_hook_codex: {e}")
+            logger.error(f"Error executing user_registration_hook codex: {e}")
             import traceback
 
             logger.error(traceback.format_exc())

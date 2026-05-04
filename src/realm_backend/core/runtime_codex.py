@@ -273,3 +273,111 @@ def get_all_codex_manifests() -> dict:
         if manifest:
             manifests[codex_id] = manifest
     return manifests
+
+
+# ---------------------------------------------------------------------------
+# Entity method override application
+# ---------------------------------------------------------------------------
+
+
+def _make_override_proxy(codex_name: str, func_name: str):
+    """Create a dynamic proxy that exec()s codex code on every call.
+
+    Re-reads the Codex entity each time so governance proposals that update
+    codex code take effect immediately without a canister restart.
+    """
+
+    def _proxy(*args, **kwargs):
+        import ggg as _ggg
+        from _cdk import Async as _Async
+        from _cdk import ic as _ic
+        from ggg import Codex as _Codex
+        from ic_python_logging import get_logger as _get_logger
+
+        target = _Codex[codex_name]
+        if not target or not target.code:
+            raise RuntimeError(f"Codex '{codex_name}' not found or has no code")
+        ns = {
+            "ic": _ic,
+            "logger": _get_logger(f"codex.{codex_name}"),
+            "ggg": _ggg,
+            "Async": _Async,
+        }
+        exec(str(target.code), ns)
+        fn = ns.get(func_name)
+        if not fn:
+            raise RuntimeError(
+                f"Function '{func_name}' not found in Codex '{codex_name}'"
+            )
+        return fn(*args, **kwargs)
+
+    _proxy.__qualname__ = f"codex_proxy<{codex_name}.{func_name}>"
+    _proxy.__name__ = func_name
+    return _proxy
+
+
+def apply_entity_method_overrides(codex_id: str) -> List[str]:
+    """Apply entity_method_overrides from a codex package's manifest.
+
+    Reads the manifest, resolves each override's entity class and codex, then
+    monkey-patches the entity class method with a dynamic proxy that exec()s
+    the latest codex code on every call.
+
+    Returns list of successfully applied override descriptions.
+    """
+    manifest = _load_manifest(codex_id)
+    if not manifest:
+        logger.info(f"Codex {codex_id}: no manifest, skipping overrides")
+        return []
+
+    overrides = manifest.get("entity_method_overrides", [])
+    if not overrides:
+        logger.info(f"Codex {codex_id}: no entity_method_overrides in manifest")
+        return []
+
+    import ggg
+    from ggg import Codex
+
+    applied = []
+    for o in overrides:
+        entity_name = o.get("entity")
+        method_name = o.get("method")
+        implementation = o.get("implementation")
+        method_type = o.get("type", "method")
+
+        if not all([entity_name, method_name, implementation]):
+            logger.warning(f"Codex {codex_id}: skipping incomplete override: {o}")
+            continue
+
+        parts = implementation.split(".")
+        if len(parts) != 3 or parts[0] != "Codex":
+            logger.warning(
+                f"Codex {codex_id}: invalid implementation format: {implementation}"
+            )
+            continue
+
+        codex_name = parts[1]
+        func_name = parts[2]
+
+        entity_class = getattr(ggg, entity_name, None)
+        if not entity_class:
+            logger.warning(f"Codex {codex_id}: entity '{entity_name}' not in ggg")
+            continue
+
+        target_codex = Codex[codex_name]
+        if not target_codex:
+            logger.warning(f"Codex {codex_id}: Codex['{codex_name}'] not found")
+            continue
+
+        proxy = _make_override_proxy(codex_name, func_name)
+        wrapper = (
+            classmethod(proxy)
+            if method_type == "classmethod"
+            else staticmethod(proxy) if method_type == "staticmethod" else proxy
+        )
+        setattr(entity_class, method_name, wrapper)
+        desc = f"{entity_name}.{method_name}() -> {implementation}"
+        applied.append(desc)
+        logger.info(f"Codex {codex_id}: applied override {desc}")
+
+    return applied

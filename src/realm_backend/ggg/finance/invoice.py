@@ -22,33 +22,23 @@ except ImportError:
 
 logger = get_logger("entity.invoice")
 
-# ICRC-1 decimals for ckBTC
-CKBTC_DECIMALS = 8
+DEFAULT_DECIMALS = 8
 
 
 class Invoice(Entity, TimestampedMixin):
     """
-    Represents an invoice denominated in the realm's accounting currency.
+    Represents an invoice denominated in the realm's currency.
     
     Each invoice has a unique subaccount derived from its ID.
-    Users pay by sending tokens to: vault_principal + invoice_subaccount
+    Users pay by sending tokens to: vault_principal + invoice_subaccount.
     
-    Multi-currency support:
-    - ``amount`` and ``currency`` are in the realm's accounting currency
-      (e.g., ckUSDC). This is the canonical "book" value.
-    - Payments can arrive in *any* registered Token (ckBTC, REALMS, AGO, …).
-    - On refresh, the FX rate from basilisk OS FXPair is used to convert
-      the payment amount to accounting-currency equivalent.
-    - ``payment_currency``, ``payment_amount``, ``fx_rate`` record what
-      was actually received and the conversion rate used.
+    Each realm uses a single currency (e.g. AGO).  The ``currency`` field
+    on the invoice must match a registered Token entity.  ``refresh()``
+    checks the balance of that token on the invoice's subaccount and
+    marks the invoice as Paid when the balance covers the amount.
     
     The subaccount is the invoice ID padded to 32 bytes, allowing direct
     lookup from subaccount → invoice without iteration.
-    
-    Accounting Integration:
-    - Call record_accounting() when invoice is created to record receivable
-    - Call record_payment() when invoice is paid to record revenue
-    - Override accounting_hook() via Codex for custom accounting logic
     """
     
     __alias__ = "id"
@@ -63,12 +53,9 @@ class Invoice(Entity, TimestampedMixin):
     paid_at = String(max_length=64)  # ISO timestamp when paid
     metadata = String(max_length=256)
     
-    # Multi-currency payment fields (populated on payment)
-    payment_currency = String(max_length=16)   # Token actually used to pay (e.g., "ckBTC")
-    payment_amount = Float()                   # Raw amount received in payment currency
-    payment_amount_raw = Integer()             # Raw amount in smallest unit of payment currency
-    fx_rate = Float()                          # FX rate: 1 unit of payment currency = fx_rate units of accounting currency
-    fx_rate_timestamp = String(max_length=64)  # When the FX rate was captured
+    payment_currency = String(max_length=16)   # Token actually used to pay
+    payment_amount = Float()                   # Human-readable amount received
+    payment_amount_raw = Integer()             # Raw amount in smallest unit
 
     def __init__(self, **kwargs):
         # Auto-generate invoice ID if not provided (max 32 chars for subaccount)
@@ -107,13 +94,9 @@ class Invoice(Entity, TimestampedMixin):
         return subaccount.rstrip(b'\x00').decode()
 
     def get_amount_raw(self, decimals: int = None) -> int:
-        """Get the invoice amount in raw units of the accounting currency.
-        
-        Args:
-            decimals: Override decimal places (default: auto-detect from realm or 8)
-        """
+        """Get the invoice amount in smallest token units."""
         if decimals is None:
-            decimals = self._get_accounting_decimals()
+            decimals = DEFAULT_DECIMALS
         return int(self.amount * (10 ** decimals))
 
     def mark_paid(
@@ -121,34 +104,26 @@ class Invoice(Entity, TimestampedMixin):
         payment_currency: str = None,
         payment_amount: float = None,
         payment_amount_raw: int = None,
-        fx_rate: float = None,
-        fx_rate_timestamp: str = None,
     ) -> None:
-        """Mark this invoice as paid with current timestamp and payment details.
-        
-        Args:
-            payment_currency: Symbol of the token used (e.g., "ckBTC")
-            payment_amount: Human-readable amount in payment currency
-            payment_amount_raw: Raw amount in smallest unit of payment currency
-            fx_rate: FX rate used (1 payment unit = fx_rate accounting units)
-            fx_rate_timestamp: When the FX rate was captured
-        """
+        """Mark this invoice as paid with current timestamp."""
+        from datetime import timedelta
+
         self.status = "Paid"
-        self.paid_at = datetime.utcnow().isoformat()
+        try:
+            if ic is not None:
+                epoch_ns = ic.time()
+                self.paid_at = (datetime(1970, 1, 1) + timedelta(seconds=epoch_ns // 1_000_000_000)).isoformat()
+            else:
+                self.paid_at = datetime.utcnow().isoformat()
+        except Exception:
+            self.paid_at = ""
         if payment_currency:
             self.payment_currency = payment_currency
         if payment_amount is not None:
             self.payment_amount = payment_amount
         if payment_amount_raw is not None:
             self.payment_amount_raw = payment_amount_raw
-        if fx_rate is not None:
-            self.fx_rate = fx_rate
-        if fx_rate_timestamp:
-            self.fx_rate_timestamp = fx_rate_timestamp
-        logger.info(
-            f"Invoice {self.id} marked as paid at {self.paid_at}"
-            f" (payment: {payment_amount} {payment_currency}, fx_rate={fx_rate})"
-        )
+        logger.info(f"Invoice {self.id} marked as paid at {self.paid_at} ({payment_amount} {payment_currency})")
 
     def get_payment_address(self) -> dict:
         """
@@ -161,69 +136,18 @@ class Invoice(Entity, TimestampedMixin):
             "subaccount_int": int(self._id) if self._id else 0,
         }
 
-    def _get_accounting_decimals(self) -> int:
-        """Get decimal places for the accounting currency from the Realm entity."""
-        try:
-            from ..governance.realm import Realm
-            realm = list(Realm.instances())[0] if Realm.instances() else None
-            if realm and realm.accounting_currency_decimals:
-                return realm.accounting_currency_decimals
-        except Exception:
-            pass
-        return CKBTC_DECIMALS
+    def _find_token(self):
+        """Find the registered Token entity matching this invoice's currency."""
+        from .token import Token
 
-    def _get_accounting_currency(self) -> str:
-        """Get the realm's accounting currency symbol."""
-        try:
-            from ..governance.realm import Realm
-            realm = list(Realm.instances())[0] if Realm.instances() else None
-            if realm and realm.accounting_currency:
-                return realm.accounting_currency
-        except Exception:
-            pass
-        return self.currency or "ckBTC"
-
-    def _get_fx_rate(self, token_symbol: str) -> tuple:
-        """Look up the FX rate from token_symbol to accounting currency.
-        
-        Uses basilisk OS FXPair entity. The pair must be pre-registered
-        via ``%fx register <token> <accounting_currency>``.
-        
-        Returns:
-            (rate, decimals, timestamp) or (None, None, None) if not found.
-            rate is expressed as: 1 unit of token = rate units of accounting currency.
-        """
-        acct_currency = self._get_accounting_currency()
-        
-        # Map token symbols to XRC base symbols
-        # ckBTC -> BTC, ckUSDC -> USDC, ckETH -> ETH, etc.
-        xrc_symbol = token_symbol
-        if xrc_symbol.startswith("ck"):
-            xrc_symbol = xrc_symbol[2:]
-        
-        acct_xrc = acct_currency
-        if acct_xrc.startswith("ck"):
-            acct_xrc = acct_xrc[2:]
-        
-        try:
-            from ic_basilisk_toolkit.entities import FXPair
-            
-            # Try direct pair: TOKEN/ACCOUNTING (e.g., BTC/USDC)
-            pair_key = f"{xrc_symbol}/{acct_xrc}"
-            pair = FXPair[pair_key]
-            if pair and pair.rate:
-                return (pair.rate, pair.decimals or 0, pair.last_updated)
-            
-            # Try inverse pair: ACCOUNTING/TOKEN (e.g., USDC/BTC)
-            inv_key = f"{acct_xrc}/{xrc_symbol}"
-            inv_pair = FXPair[inv_key]
-            if inv_pair and inv_pair.rate:
-                inv_rate = 1.0 / inv_pair.rate if inv_pair.rate else None
-                return (inv_rate, inv_pair.decimals or 0, inv_pair.last_updated)
-        except Exception as e:
-            logger.warning(f"FX rate lookup failed for {token_symbol}: {e}")
-        
-        return (None, None, None)
+        invoice_currency = self.currency or "ckBTC"
+        for token in Token.instances():
+            if not token.indexer:
+                continue
+            token_symbol = getattr(token, "symbol", token.name) or token.name
+            if token_symbol == invoice_currency or token.name == invoice_currency:
+                return token
+        return None
 
     def record_accounting(
         self,
@@ -266,7 +190,7 @@ class Invoice(Entity, TimestampedMixin):
         transaction_id = f"TXN-INV-{self.id}"
         entry_date = datetime.utcnow().isoformat()
         desc = description or f"Invoice {self.id}"
-        acct_currency = self._get_accounting_currency()
+        currency = self.currency or "ckBTC"
         amount_raw = self.get_amount_raw()
         
         entries = [
@@ -275,18 +199,18 @@ class Invoice(Entity, TimestampedMixin):
                 "category": Category.RECEIVABLE,
                 "debit": amount_raw,
                 "credit": 0,
-                "currency": acct_currency,
+                "currency": currency,
                 "entry_date": entry_date,
-                "description": f"{desc} - Receivable ({acct_currency})",
+                "description": f"{desc} - Receivable ({currency})",
             },
             {
                 "entry_type": EntryType.LIABILITY,
                 "category": Category.DEFERRED_REVENUE,
                 "debit": 0,
                 "credit": amount_raw,
-                "currency": acct_currency,
+                "currency": currency,
                 "entry_date": entry_date,
-                "description": f"{desc} - Deferred revenue ({acct_currency})",
+                "description": f"{desc} - Deferred revenue ({currency})",
             }
         ]
         
@@ -351,54 +275,45 @@ class Invoice(Entity, TimestampedMixin):
         entry_date = self.paid_at or datetime.utcnow().isoformat()
         desc = description or f"Invoice {self.id} payment"
         rev_cat = revenue_category or Category.FEE
-        acct_currency = self._get_accounting_currency()
+        currency = self.currency or "ckBTC"
         amount_raw = self.get_amount_raw()
         
-        # Build description suffix with payment details
-        pay_info = ""
-        if self.payment_currency and self.payment_currency != acct_currency:
-            pay_info = f" [paid {self.payment_amount} {self.payment_currency} @ {self.fx_rate}]"
-        
         entries = [
-            # Cash received (in accounting currency equivalent)
             {
                 "entry_type": EntryType.ASSET,
                 "category": Category.CASH,
                 "debit": amount_raw,
                 "credit": 0,
-                "currency": acct_currency,
+                "currency": currency,
                 "entry_date": entry_date,
-                "description": f"{desc} - Cash received ({acct_currency}){pay_info}",
+                "description": f"{desc} - Cash received ({currency})",
             },
-            # Clear receivable
             {
                 "entry_type": EntryType.ASSET,
                 "category": Category.RECEIVABLE,
                 "debit": 0,
                 "credit": amount_raw,
-                "currency": acct_currency,
+                "currency": currency,
                 "entry_date": entry_date,
-                "description": f"{desc} - Receivable cleared ({acct_currency})",
+                "description": f"{desc} - Receivable cleared ({currency})",
             },
-            # Clear deferred revenue
             {
                 "entry_type": EntryType.LIABILITY,
                 "category": Category.DEFERRED_REVENUE,
                 "debit": amount_raw,
                 "credit": 0,
-                "currency": acct_currency,
+                "currency": currency,
                 "entry_date": entry_date,
-                "description": f"{desc} - Deferred revenue cleared ({acct_currency})",
+                "description": f"{desc} - Deferred revenue cleared ({currency})",
             },
-            # Recognize revenue
             {
                 "entry_type": EntryType.REVENUE,
                 "category": rev_cat,
                 "debit": 0,
                 "credit": amount_raw,
-                "currency": acct_currency,
+                "currency": currency,
                 "entry_date": entry_date,
-                "description": f"{desc} - Revenue recognized ({acct_currency}){pay_info}",
+                "description": f"{desc} - Revenue recognized ({currency})",
             }
         ]
         
@@ -419,95 +334,69 @@ class Invoice(Entity, TimestampedMixin):
         return created
 
     def refresh(self) -> "Async[dict]":
-        """
-        Check if this invoice has been paid by querying token balances
-        on the invoice's subaccount via basilisk OS Wallet.
+        """Check if this invoice has been paid by querying the token balance
+        on the invoice's subaccount.
 
         Must be called with ``yield``::
 
             result = yield invoice.refresh()
-
-        Returns a dict with refresh results per token and updated invoice status.
         """
         return self._refresh()
 
     def _refresh(self) -> "Async[dict]":
         from ic_basilisk_toolkit.wallet import Wallet
-        from .token import Token
 
         wallet = Wallet()
         subaccount = self.get_subaccount()
-        acct_currency = self._get_accounting_currency()
-        acct_decimals = self._get_accounting_decimals()
-        invoice_amount_raw = self.get_amount_raw(acct_decimals)
-        result = {}
+        invoice_currency = self.currency or "ckBTC"
 
-        for token in Token.instances():
-            if not token.indexer:
-                continue
-            try:
-                token_result = yield wallet.refresh(
-                    token.name, subaccount=subaccount
-                )
-                result[token.name] = token_result
-                balance = token_result.get("balance", 0)
-                if balance > 0 and self.status == "Pending":
-                    token_decimals = token.decimals or 8
-                    human_balance = balance / (10 ** token_decimals)
-                    token_symbol = getattr(token, 'symbol', token.name) or token.name
+        token = self._find_token()
+        if not token:
+            return {
+                "invoice_id": self.id,
+                "status": self.status,
+                "currency": invoice_currency,
+                "error": f"No registered Token for '{invoice_currency}'",
+            }
 
-                    # Determine if this token IS the accounting currency
-                    is_acct = token_symbol == acct_currency
+        try:
+            token_result = yield wallet.refresh(token.name, subaccount=subaccount)
+            balance = token_result.get("balance", 0)
 
-                    if is_acct:
-                        # Direct match — no FX conversion needed
-                        acct_equivalent = human_balance
-                        rate_used = 1.0
-                        rate_ts = ""
-                    else:
-                        # Look up FX rate from payment currency to accounting currency
-                        rate_used, _rate_dec, rate_ts = self._get_fx_rate(token_symbol)
-                        if rate_used is None:
-                            logger.warning(
-                                f"Invoice {self.id}: balance {human_balance} {token_symbol} "
-                                f"detected but no FX rate for {token_symbol}->{acct_currency}. "
-                                f"Register pair via: %fx register {token_symbol} {acct_currency}"
-                            )
-                            result[token.name]["fx_missing"] = True
-                            continue
-                        acct_equivalent = human_balance * rate_used
+            if balance > 0 and self.status == "Pending":
+                token_decimals = token.decimals or 8
+                human_balance = balance / (10 ** token_decimals)
 
-                    if acct_equivalent >= self.amount:
-                        logger.info(
-                            f"Invoice {self.id}: payment {human_balance} {token_symbol} "
-                            f"= {acct_equivalent:.6f} {acct_currency} "
-                            f"(rate={rate_used}) >= {self.amount} {acct_currency}"
-                        )
-                        self.mark_paid(
-                            payment_currency=token_symbol,
-                            payment_amount=human_balance,
-                            payment_amount_raw=balance,
-                            fx_rate=rate_used,
-                            fx_rate_timestamp=str(rate_ts) if rate_ts else "",
-                        )
-                    else:
-                        logger.info(
-                            f"Invoice {self.id}: partial payment {human_balance} {token_symbol} "
-                            f"= {acct_equivalent:.6f} {acct_currency} "
-                            f"< {self.amount} {acct_currency}"
-                        )
-            except Exception as e:
-                logger.error(
-                    f"Invoice {self.id}: error refreshing {token.name}: {e}"
-                )
-                result[token.name] = {"error": str(e)}
+                if human_balance >= self.amount:
+                    logger.info(
+                        f"Invoice {self.id}: payment {human_balance} {invoice_currency} "
+                        f">= {self.amount} {invoice_currency}"
+                    )
+                    self.mark_paid(
+                        payment_currency=invoice_currency,
+                        payment_amount=human_balance,
+                        payment_amount_raw=balance,
+                    )
+                else:
+                    logger.info(
+                        f"Invoice {self.id}: partial payment {human_balance} "
+                        f"< {self.amount} {invoice_currency}"
+                    )
 
-        return {
-            "invoice_id": self.id,
-            "status": self.status,
-            "currency": acct_currency,
-            "results": result,
-        }
+            return {
+                "invoice_id": self.id,
+                "status": self.status,
+                "currency": invoice_currency,
+                "results": {token.name: token_result},
+            }
+        except Exception as e:
+            logger.error(f"Invoice {self.id}: error refreshing {token.name}: {e}")
+            return {
+                "invoice_id": self.id,
+                "status": self.status,
+                "currency": invoice_currency,
+                "error": str(e),
+            }
 
     @staticmethod
     def accounting_hook(

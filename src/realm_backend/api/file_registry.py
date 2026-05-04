@@ -171,7 +171,11 @@ def install_codex_from_registry(
     package_name = codex_id.split("/")[-1] if "/" in codex_id else codex_id
 
     # Install via runtime_codex
-    from core.runtime_codex import install_codex_package, run_codex_init
+    from core.runtime_codex import (
+        apply_entity_method_overrides,
+        install_codex_package,
+        run_codex_init,
+    )
 
     ok = install_codex_package(package_name, files)
     if not ok:
@@ -184,6 +188,8 @@ def install_codex_from_registry(
     if run_init:
         init_error = run_codex_init(package_name)
 
+    applied_overrides = apply_entity_method_overrides(package_name)
+
     result = {
         "success": True,
         "codex_id": codex_id,
@@ -191,6 +197,7 @@ def install_codex_from_registry(
         "version": resolved_version,
         "files_count": len(files),
         "source": "registry",
+        "applied_overrides": applied_overrides,
     }
     if init_error:
         result["init_warning"] = init_error
