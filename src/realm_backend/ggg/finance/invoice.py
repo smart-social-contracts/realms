@@ -786,6 +786,14 @@ class Invoice(Entity, TimestampedMixin):
                     }
                 response = getattr(result, "Ok", result)
 
+            # The indexer returns a nested Ok variant:
+            #   CallResult.Ok -> {'Ok': {'balance': ..., 'transactions': [...]}}
+            # Unwrap the inner Ok if present.
+            if isinstance(response, dict) and "Ok" in response:
+                response = response["Ok"]
+            elif hasattr(response, "Ok"):
+                response = response.Ok
+
             _dbg["response_type"] = type(response).__name__
             _dbg["response_repr"] = repr(response)[:500]
 
