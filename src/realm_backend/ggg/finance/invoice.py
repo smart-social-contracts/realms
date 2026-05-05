@@ -760,6 +760,11 @@ class Invoice(Entity, TimestampedMixin):
 
             result = yield indexer.get_account_transactions(args)
 
+            logger.info(
+                f"Invoice {self.id}: indexer raw result type={type(result).__name__}, "
+                f"value={repr(result)[:500]}"
+            )
+
             # Unwrap Ok/Err variant
             if isinstance(result, dict):
                 if "Err" in result:
@@ -779,10 +784,21 @@ class Invoice(Entity, TimestampedMixin):
                     }
                 response = getattr(result, "Ok", result)
 
+            logger.info(
+                f"Invoice {self.id}: response type={type(response).__name__}, "
+                f"value={repr(response)[:500]}"
+            )
+
             transactions = (
                 getattr(response, "transactions", None)
                 or (response.get("transactions") if isinstance(response, dict) else None)
                 or []
+            )
+
+            logger.info(
+                f"Invoice {self.id}: transactions type={type(transactions).__name__}, "
+                f"len={len(transactions) if hasattr(transactions, '__len__') else '?'}, "
+                f"first={repr(transactions[0])[:300] if transactions else 'EMPTY'}"
             )
 
             for tx_with_id in transactions:
