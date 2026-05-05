@@ -760,10 +760,10 @@ class Invoice(Entity, TimestampedMixin):
 
             result = yield indexer.get_account_transactions(args)
 
-            logger.info(
-                f"Invoice {self.id}: indexer raw result type={type(result).__name__}, "
-                f"value={repr(result)[:500]}"
-            )
+            _dbg = {
+                "result_type": type(result).__name__,
+                "result_repr": repr(result)[:500],
+            }
 
             # Unwrap Ok/Err variant
             if isinstance(result, dict):
@@ -772,6 +772,7 @@ class Invoice(Entity, TimestampedMixin):
                         "invoice_id": self.id,
                         "status": self.status,
                         "error": f"Indexer error: {result['Err']}",
+                        "_debug": _dbg,
                     }
                 response = result.get("Ok", result)
             else:
@@ -781,13 +782,12 @@ class Invoice(Entity, TimestampedMixin):
                         "invoice_id": self.id,
                         "status": self.status,
                         "error": f"Indexer error: {err}",
+                        "_debug": _dbg,
                     }
                 response = getattr(result, "Ok", result)
 
-            logger.info(
-                f"Invoice {self.id}: response type={type(response).__name__}, "
-                f"value={repr(response)[:500]}"
-            )
+            _dbg["response_type"] = type(response).__name__
+            _dbg["response_repr"] = repr(response)[:500]
 
             transactions = (
                 getattr(response, "transactions", None)
@@ -795,11 +795,10 @@ class Invoice(Entity, TimestampedMixin):
                 or []
             )
 
-            logger.info(
-                f"Invoice {self.id}: transactions type={type(transactions).__name__}, "
-                f"len={len(transactions) if hasattr(transactions, '__len__') else '?'}, "
-                f"first={repr(transactions[0])[:300] if transactions else 'EMPTY'}"
-            )
+            _dbg["transactions_type"] = type(transactions).__name__
+            _dbg["transactions_len"] = len(transactions) if hasattr(transactions, '__len__') else '?'
+            if transactions:
+                _dbg["first_tx"] = repr(transactions[0])[:300]
 
             for tx_with_id in transactions:
                 tx = (
@@ -870,6 +869,7 @@ class Invoice(Entity, TimestampedMixin):
                 "payment_method": "nonce",
                 "expected_amount_raw": expected_raw,
                 "scanned_transactions": len(transactions),
+                "_debug": _dbg,
             }
 
         except Exception as e:
