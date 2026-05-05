@@ -795,15 +795,19 @@ def enqueue_deployment(manifest_json: text) -> ResultEnqueue:
         ts = "%04d%02d%02d%02d%02d%02d" % (y, m, d, hh, mm, ss)
         suffix = hashlib.sha256(realm_name.encode()).hexdigest()[:4]
         job_id = "job_%s_%s" % (ts, suffix)
+        expected_hashes = manifest.get("expected_hashes", {})
         DeploymentJob(
             name=job_id, status="pending", caller_principal=requester,
             manifest_json=manifest_json[:8190], network=network,
             backend_canister_id=canister_ids.get("backend", ""),
             frontend_canister_id=canister_ids.get("frontend", ""),
             registry_canister_id=registry_id,
+            expected_wasm_hash=expected_hashes.get("backend_wasm", ""),
+            expected_frontend_wasm_hash=expected_hashes.get("frontend_wasm", ""),
             created_at=now_s(),
         )
-        jlog(job_id).info(f"enqueued for '{realm_name}' on {network} (extensions={ext_count}, codex={bool(codex_info)})")
+        has_hashes = bool(expected_hashes.get("backend_wasm") or expected_hashes.get("frontend_wasm"))
+        jlog(job_id).info(f"enqueued for '{realm_name}' on {network} (extensions={ext_count}, codex={bool(codex_info)}, cli_hashes={has_hashes})")
         return ResultEnqueue(Ok=EnqueueOk(
             job_id=job_id, status="pending", realm_name=realm_name, network=network,
         ))
@@ -914,8 +918,10 @@ def report_canister_ready(args: text) -> Async[ResultReportReady]:
         job.registry_canister_id = params.get("registry_canister_id", job.registry_canister_id or "")
         job.status = "verifying"
 
-        if params.get("actual_wasm_hash"):
-            job.expected_wasm_hash = job.expected_wasm_hash or params["actual_wasm_hash"]
+        deployer_hash = params.get("actual_wasm_hash", "")
+        if deployer_hash and not job.expected_wasm_hash:
+            _log.warning("No CLI-provided expected_wasm_hash; falling back to deployer-reported hash")
+            job.expected_wasm_hash = deployer_hash
 
         wasm_verified = False
         try:
@@ -985,8 +991,9 @@ def report_frontend_verified(args: text) -> Async[ResultReportFrontend]:
         failed = False
 
         # --- Verify frontend canister WASM module hash ---
-        if frontend_wasm_hash:
-            job.expected_frontend_wasm_hash = job.expected_frontend_wasm_hash or frontend_wasm_hash
+        if frontend_wasm_hash and not job.expected_frontend_wasm_hash:
+            _log.warning("No CLI-provided expected_frontend_wasm_hash; falling back to deployer-reported hash")
+            job.expected_frontend_wasm_hash = frontend_wasm_hash
         frontend_id = job.frontend_canister_id or ""
         fe_wasm_verified = False
         if frontend_id:

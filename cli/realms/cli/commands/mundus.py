@@ -5,11 +5,14 @@ Implements the deployment pipeline described in REWRITE.md:
 2. For each realm: resolve artifacts, upload to deployer, submit manifest, poll
 """
 
+import hashlib
 import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
+import urllib.request
 from pathlib import Path
 from typing import Optional
 
@@ -83,11 +86,26 @@ _VITE_PARAM_MAP = {
 }
 
 
+def _sha256_file(path: Path) -> str:
+    """Compute SHA-256 hex digest of a file."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _download_and_hash(url: str) -> str:
+    """Download a URL to a temp file, return its SHA-256 hex digest."""
+    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    try:
+        urllib.request.urlretrieve(url, tmp_path)
+        return hashlib.sha256(tmp_path.read_bytes()).hexdigest()
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+
 def _build_artifacts(parameters: dict | None = None) -> dict[str, Path]:
     """Build backend WASM and frontend tarball from source. Returns artifact paths."""
     import gzip
     import tarfile
-    import tempfile
 
     project_root = get_project_root()
 
@@ -195,18 +213,25 @@ def _build_artifacts(parameters: dict | None = None) -> dict[str, Path]:
 
 
 def _resolve_artifact(ref: str, artifact_type: str, network: str,
-                      parameters: dict | None = None) -> str:
-    """Resolve an artifact reference to a URL.
+                      parameters: dict | None = None) -> tuple[str, str]:
+    """Resolve an artifact reference to a (URL, SHA-256 hash) tuple.
+
+    The CLI computes the hash locally so it can be included in the
+    manifest as the pre-approved expected hash.  The on-chain installer
+    will later verify the deployed canister's module_hash against this
+    value, independent of what the off-chain deployer reports.
 
     Supported formats:
-      - URL (https://...) -> returned as-is
+      - URL (https://...) -> downloaded, hashed, returned
       - version (e.g. "0.3.2" or "v0.3.2") -> GitHub release URL
       - "latest" -> latest GitHub release
       - "build" -> compile from source, upload to deployer
       - local path -> upload to deployer
     """
     if ref.startswith("http://") or ref.startswith("https://"):
-        return ref
+        console.print(f"  Hashing remote artifact: {ref}")
+        h = _download_and_hash(ref)
+        return ref, h
 
     if ref == "build":
         cache_key = f"build:{artifact_type}"
@@ -214,16 +239,16 @@ def _resolve_artifact(ref: str, artifact_type: str, network: str,
             return _build_cache[cache_key]
         artifacts = _build_artifacts(parameters=parameters)
         for atype, path in artifacts.items():
-            console.print(f"  Uploading {atype}: {path.name}")
+            h = _sha256_file(path)
+            console.print(f"  Uploading {atype}: {path.name} (sha256={h[:16]}...)")
             url = _upload_file(path)
-            _build_cache[f"build:{atype}"] = url
+            _build_cache[f"build:{atype}"] = (url, h)
             path.unlink(missing_ok=True)
         return _build_cache[cache_key]
 
     repo = "smart-social-contracts/realms"
     if ref == "latest":
         gh_url = f"https://api.github.com/repos/{repo}/releases/latest"
-        import urllib.request
         with urllib.request.urlopen(gh_url, timeout=30) as resp:
             release = json.loads(resp.read())
         version = release["tag_name"].lstrip("v")
@@ -232,25 +257,33 @@ def _resolve_artifact(ref: str, artifact_type: str, network: str,
     else:
         local_path = Path(ref)
         if local_path.exists():
-            console.print(f"  Uploading local artifact: {local_path.name}")
-            return _upload_file(local_path)
+            h = _sha256_file(local_path)
+            console.print(f"  Uploading local artifact: {local_path.name} (sha256={h[:16]}...)")
+            url = _upload_file(local_path)
+            return url, h
         raise ValueError(f"Unknown artifact reference: {ref}")
 
     if artifact_type == "realm_backend":
-        return f"https://github.com/{repo}/releases/download/v{version}/realm_backend.wasm.gz"
+        url = f"https://github.com/{repo}/releases/download/v{version}/realm_backend.wasm.gz"
     elif artifact_type == "realm_frontend":
-        return f"https://github.com/{repo}/releases/download/v{version}/realm_frontend.tar.gz"
+        url = f"https://github.com/{repo}/releases/download/v{version}/realm_frontend.tar.gz"
     else:
         raise ValueError(f"Unknown artifact type: {artifact_type}")
+
+    console.print(f"  Hashing release artifact: {url}")
+    h = _download_and_hash(url)
+    return url, h
 
 
 def _build_manifest(realm_entry: dict, network: str, deploy_mode: str,
                     backend_url: str, frontend_url: str,
-                    canister_filter: str = "", infra: dict | None = None) -> dict:
+                    canister_filter: str = "", infra: dict | None = None,
+                    expected_hashes: dict | None = None) -> dict:
     """Build a deployment manifest for a single realm.
 
     canister_filter: "" = both, "backend" = backend only, "frontend" = frontend only.
     infra: shared infrastructure canister IDs from the descriptor's ``infra`` section.
+    expected_hashes: CLI-computed SHA-256 hashes for integrity verification.
     """
     project_root = get_project_root()
     manifest_path = realm_entry.get("manifest", "")
@@ -297,6 +330,8 @@ def _build_manifest(realm_entry: dict, network: str, deploy_mode: str,
         result["branding"] = branding
     if infra:
         result["infra"] = infra
+    if expected_hashes:
+        result["expected_hashes"] = expected_hashes
     return result
 
 
@@ -483,17 +518,21 @@ def mundus_deploy_new_command(
     cleanup: bool = False,
 ) -> None:
     """Deploy a new realm (no existing canister IDs -- creates new ones)."""
-    backend_url = _resolve_artifact(artifact_version, "realm_backend", network)
-    frontend_url = _resolve_artifact(artifact_version, "realm_frontend", network)
+    backend_url, backend_hash = _resolve_artifact(artifact_version, "realm_backend", network)
+    frontend_url, frontend_hash = _resolve_artifact(artifact_version, "realm_frontend", network)
+
     console.print(f"Artifacts resolved:")
-    console.print(f"  backend:  {backend_url}")
-    console.print(f"  frontend: {frontend_url}\n")
+    console.print(f"  backend:  {backend_url} (sha256={backend_hash[:16]}...)")
+    console.print(f"  frontend: {frontend_url} (sha256={frontend_hash[:16]}...)\n")
 
     manifest = {
         "name": display_name or name,
         "network": network,
         "deploy_mode": "install",
         "artifacts": {"realm_backend": backend_url, "realm_frontend": frontend_url},
+        "expected_hashes": {
+            "backend_wasm": backend_hash,
+        },
         "realm": {
             "name": display_name or name,
             "display_name": display_name or name,
@@ -580,23 +619,32 @@ def mundus_deploy_descriptor_command(
     console.print()
 
     backend_url = ""
+    backend_hash = ""
     frontend_url = ""
+    frontend_hash = ""
     if canister_filter != "frontend":
-        backend_url = _resolve_artifact(artifact_version, "realm_backend", network, parameters=parameters)
+        backend_url, backend_hash = _resolve_artifact(artifact_version, "realm_backend", network, parameters=parameters)
         console.print(f"Artifacts resolved:")
-        console.print(f"  backend:  {backend_url}")
+        console.print(f"  backend:  {backend_url} (sha256={backend_hash[:16]}...)")
     if canister_filter != "backend":
-        frontend_url = _resolve_artifact(artifact_version, "realm_frontend", network, parameters=parameters)
+        frontend_url, frontend_hash = _resolve_artifact(artifact_version, "realm_frontend", network, parameters=parameters)
         if not backend_url:
             console.print(f"Artifacts resolved:")
-        console.print(f"  frontend: {frontend_url}")
+        console.print(f"  frontend: {frontend_url} (sha256={frontend_hash[:16]}...)")
     console.print()
+
+    expected_hashes = {}
+    if backend_hash:
+        expected_hashes["backend_wasm"] = backend_hash
 
     results = []
     for realm in realms:
         name = realm.get("display_name", realm.get("name", "?"))
         console.print(f"--- {name} ---")
-        manifest = _build_manifest(realm, network, deploy_mode, backend_url, frontend_url, canister_filter, infra=infra)
+        manifest = _build_manifest(
+            realm, network, deploy_mode, backend_url, frontend_url,
+            canister_filter, infra=infra, expected_hashes=expected_hashes,
+        )
         ok = _submit_and_poll(manifest, network)
         results.append((name, ok))
         console.print()
