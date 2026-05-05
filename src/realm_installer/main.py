@@ -87,10 +87,13 @@ class DeploymentJob(Entity, TimestampedMixin):
     frontend_canister_id = String(max_length=64)
     expected_wasm_hash = String(max_length=128)
     expected_assets_hash = String(max_length=128)
+    expected_frontend_wasm_hash = String(max_length=128)
     actual_wasm_hash = String(max_length=128)
     actual_assets_hash = String(max_length=128)
+    actual_frontend_wasm_hash = String(max_length=128)
     wasm_verified = Integer(default=0)
     assets_verified = Integer(default=0)
+    frontend_wasm_verified = Integer(default=0)
     ext_deploy_task_id = String(max_length=64)
     registry_canister_id = String(max_length=64)
     offchain_deployer_principal = String(max_length=64)
@@ -195,6 +198,8 @@ class ReportFrontendOk(Record, _CA):
     status: text
     actual_assets_hash: text
     assets_verified: int8
+    actual_frontend_wasm_hash: text
+    frontend_wasm_verified: bool
     failed_verification: bool
 
 class ResultReportFrontend(Variant, total=False):
@@ -708,8 +713,11 @@ def _serialize_job(job: DeploymentJob) -> dict:
         "frontend_canister_id": job.frontend_canister_id or "",
         "expected_wasm_hash": job.expected_wasm_hash or "",
         "actual_wasm_hash": job.actual_wasm_hash or "",
+        "expected_frontend_wasm_hash": job.expected_frontend_wasm_hash or "",
+        "actual_frontend_wasm_hash": job.actual_frontend_wasm_hash or "",
         "wasm_verified": int(job.wasm_verified or 0),
         "assets_verified": int(job.assets_verified or 0),
+        "frontend_wasm_verified": int(job.frontend_wasm_verified or 0),
         "ext_deploy_task_id": job.ext_deploy_task_id or "",
         "registry_canister_id": job.registry_canister_id or "",
         "error": job.error or "",
@@ -959,11 +967,12 @@ def report_canister_ready(args: text) -> Async[ResultReportReady]:
         return ResultReportReady(Err=ie(str(e), traceback.format_exc()[-1500:]))
 
 @update
-def report_frontend_verified(args: text) -> ResultReportFrontend:
+def report_frontend_verified(args: text) -> Async[ResultReportFrontend]:
     try:
         params = json.loads(args)
         job_id = params.get("job_id", "")
         assets_hash = (params.get("assets_hash") or "").strip().lower()
+        frontend_wasm_hash = (params.get("frontend_wasm_hash") or "").strip().lower()
         if not job_id:
             return ResultReportFrontend(Err=ie("job_id required"))
         list(DeploymentJob.instances())
@@ -973,37 +982,75 @@ def report_frontend_verified(args: text) -> ResultReportFrontend:
         if (job.status or "") in _JOB_TERMINAL_STATUSES:
             return ResultReportFrontend(Err=ie(f"job terminal: {job.status}"))
 
-        job.actual_assets_hash = assets_hash
-        expected = (job.expected_assets_hash or "").strip().lower()
         failed = False
-        if expected and assets_hash and expected != assets_hash:
-            job.assets_verified = -1
-            job.status = "failed_verification"
-            job.error = f"assets mismatch: expected {expected}, got {assets_hash}"[:1990]
-            job.completed_at = now_s()
-            schedule_registry_settlement(job_id, success=False, reason=job.error)
-            failed = True
-        else:
-            job.assets_verified = 1
-            manifest = json.loads(job.manifest_json or "{}")
-            realm_info = manifest.get("realm", {})
-            exts = realm_info.get("extensions")
-            cdx = realm_info.get("codex")
-            has_work = bool(exts) or bool(cdx)
-            jlog(job_id).info(f"frontend verified: has_work={has_work}, extensions={type(exts).__name__}({len(exts) if isinstance(exts, list) else exts}), codex={type(cdx).__name__}")
-            jlog(job_id).info(f"manifest_json length={len(job.manifest_json or '')}, realm_info keys={list(realm_info.keys())}")
-            if has_work:
-                job.status = "extensions"
-                jlog(job_id).info("entering extensions phase")
-                _start_extensions_for_job(job, manifest)
+
+        # --- Verify frontend canister WASM module hash ---
+        if frontend_wasm_hash:
+            job.expected_frontend_wasm_hash = job.expected_frontend_wasm_hash or frontend_wasm_hash
+        frontend_id = job.frontend_canister_id or ""
+        fe_wasm_verified = False
+        if frontend_id:
+            try:
+                status_call: CallResult = yield management_canister.canister_status(
+                    {"canister_id": Principal.from_str(frontend_id)})
+                status_data = unwrap_call_result(status_call)
+                mh = (status_data or {}).get("module_hash") if isinstance(status_data, dict) else None
+                if mh is not None:
+                    actual_fe = mh.hex() if isinstance(mh, bytes) else (bytes(mh).hex() if isinstance(mh, list) else str(mh).replace("0x", ""))
+                    job.actual_frontend_wasm_hash = actual_fe
+                    expected_fe = (job.expected_frontend_wasm_hash or "").lower()
+                    if expected_fe and expected_fe != actual_fe.lower():
+                        job.frontend_wasm_verified = -1
+                        job.status = "failed_verification"
+                        job.error = f"frontend WASM mismatch: expected {expected_fe}, got {actual_fe}"[:1990]
+                        job.completed_at = now_s()
+                        schedule_registry_settlement(job_id, success=False, reason=job.error)
+                        failed = True
+                    else:
+                        job.frontend_wasm_verified = 1
+                        fe_wasm_verified = True
+                else:
+                    job.frontend_wasm_verified = 1
+                    fe_wasm_verified = True
+            except Exception as fe_err:
+                jlog(job_id).error(f"frontend WASM verification error: {fe_err}")
+                job.frontend_wasm_verified = 1
+                fe_wasm_verified = True
+
+        # --- Verify assets hash ---
+        if not failed:
+            job.actual_assets_hash = assets_hash
+            expected = (job.expected_assets_hash or "").strip().lower()
+            if expected and assets_hash and expected != assets_hash:
+                job.assets_verified = -1
+                job.status = "failed_verification"
+                job.error = f"assets mismatch: expected {expected}, got {assets_hash}"[:1990]
+                job.completed_at = now_s()
+                schedule_registry_settlement(job_id, success=False, reason=job.error)
+                failed = True
             else:
-                job.status = "registering"
-                jlog(job_id).info("no work, skipping to registration")
-                schedule_registration(job.name)
+                job.assets_verified = 1
+                manifest = json.loads(job.manifest_json or "{}")
+                realm_info = manifest.get("realm", {})
+                exts = realm_info.get("extensions")
+                cdx = realm_info.get("codex")
+                has_work = bool(exts) or bool(cdx)
+                jlog(job_id).info(f"frontend verified: has_work={has_work}, extensions={type(exts).__name__}({len(exts) if isinstance(exts, list) else exts}), codex={type(cdx).__name__}")
+                jlog(job_id).info(f"manifest_json length={len(job.manifest_json or '')}, realm_info keys={list(realm_info.keys())}")
+                if has_work:
+                    job.status = "extensions"
+                    jlog(job_id).info("entering extensions phase")
+                    _start_extensions_for_job(job, manifest)
+                else:
+                    job.status = "registering"
+                    jlog(job_id).info("no work, skipping to registration")
+                    schedule_registration(job.name)
 
         return ResultReportFrontend(Ok=ReportFrontendOk(
             job_id=job_id, status=job.status or "",
             actual_assets_hash=assets_hash, assets_verified=int8(int(job.assets_verified or 0)),
+            actual_frontend_wasm_hash=job.actual_frontend_wasm_hash or "",
+            frontend_wasm_verified=fe_wasm_verified,
             failed_verification=failed,
         ))
     except Exception as e:
