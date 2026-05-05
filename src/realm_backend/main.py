@@ -1760,6 +1760,17 @@ def create_foundational_objects() -> void:
         )
 
         logger.info("Created treasury")
+
+        # 7. Register well-known IC mainnet tokens so the invoice system can
+        #    look up ledger/indexer canister IDs for payment detection.
+        try:
+            from ic_basilisk_toolkit.wallet import Wallet
+            wallet = Wallet()
+            wallet.register_well_known_tokens()
+            logger.info("Registered well-known ICRC-1 tokens (ckBTC, ckUSDC, …)")
+        except Exception as tok_err:
+            logger.warning(f"Could not register well-known tokens: {tok_err}")
+
         logger.info("✅ All foundational objects created successfully")
 
     except Exception as e:
@@ -1824,6 +1835,15 @@ def initialize() -> void:
 
     # Create foundational objects after entity registration
     create_foundational_objects()
+
+    # Ensure well-known IC mainnet tokens are in the registry.
+    # register_token() is an upsert, so this is safe on every startup.
+    try:
+        from ic_basilisk_toolkit.wallet import Wallet
+        Wallet().register_well_known_tokens()
+        logger.info("Ensured well-known ICRC-1 tokens are registered")
+    except Exception as e:
+        logger.warning(f"Could not register well-known tokens: {e}")
 
     # Register OS-level wallet transfer hook for permission enforcement
     _register_wallet_transfer_hook()

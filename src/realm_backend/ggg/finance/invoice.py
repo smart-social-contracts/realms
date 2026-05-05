@@ -740,6 +740,12 @@ class Invoice(Entity, TimestampedMixin):
         expected_raw = self.get_nonce_amount_raw(token_decimals)
         self_principal_str = ic.id().to_str()
 
+        logger.info(
+            f"Invoice {self.id}: nonce refresh — token={token.name}, "
+            f"indexer={token.indexer}, decimals={token_decimals}, "
+            f"expected_raw={expected_raw}, principal={self_principal_str}"
+        )
+
         try:
             indexer = _ICRC1IndexerService(Principal.from_str(token.indexer))
 
@@ -821,7 +827,9 @@ class Invoice(Entity, TimestampedMixin):
                     or (to_account.get("subaccount") if isinstance(to_account, dict) else None)
                 )
 
-                if to_owner == self_principal_str and to_sub is None and amount == expected_raw:
+                # Accept None, empty list, or empty bytes as "no subaccount"
+                no_sub = to_sub is None or to_sub == [] or to_sub == b""
+                if to_owner == self_principal_str and no_sub and amount == expected_raw:
                     logger.info(
                         f"Invoice {self.id}: matched nonce payment — "
                         f"{amount} raw ({invoice_currency}) via indexer"
