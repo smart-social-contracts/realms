@@ -59,7 +59,6 @@ from api.user import (
 )
 from api.vetkeys import derive_vetkey, get_vetkey_public_key
 from api.zones import get_zone_aggregation
-import config as Config
 from core.access import _check_access, require, require_controller, set_controller
 from core.task_manager import TaskManager
 from ggg import Call, Codex, Task, TaskSchedule, TaskStep
@@ -470,7 +469,8 @@ def join_realm(profile: str, preferred_quarter: text, invite_code_checksum_hex: 
         if has_invite:
             # Test mode shortcut: code sha256(b"admin").hexdigest() grants admin without extension call
             _ADMIN_TEST_CODE_CHECKSUM_HEX = "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"
-            if Config.TEST_MODE_ADMIN_SELF_REGISTRATION and invite_code_checksum_hex == _ADMIN_TEST_CODE_CHECKSUM_HEX:
+            import config
+            if config.TEST_MODE_ADMIN_SELF_REGISTRATION and invite_code_checksum_hex == _ADMIN_TEST_CODE_CHECKSUM_HEX:
                 granted_profile = "admin"
             else:
                 # Code-based path: validate and consume the invite code
@@ -1589,8 +1589,14 @@ def get_my_invoices() -> RealmResponse:
 @require(Operations.SELF_INVOICE_REFRESH)
 def refresh_invoice(args: text) -> Async[text]:
     """
-    Refresh payment status for an invoice by querying token balances
-    on the invoice's subaccount via basilisk OS Wallet.
+    Refresh payment status for an invoice.
+
+    Delegates to the invoice's refresh() method, which uses either:
+    • Subaccount mode  (SUBACCOUNT_PAYMENTS_ENABLED = True)  — checks the
+      token balance on the invoice's dedicated 32-byte subaccount.
+    • Nonce-suffix mode (SUBACCOUNT_PAYMENTS_ENABLED = False) — scans the
+      token's ICRC-1 indexer for an incoming transfer whose amount matches
+      the invoice's nonce-adjusted exact amount.
 
     Args (JSON): {"invoice_id": "inv_xxx"}
     Returns (JSON): {"success": true, "data": {...}} or {"success": false, "error": "..."}

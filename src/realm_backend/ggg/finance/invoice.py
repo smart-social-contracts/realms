@@ -3,12 +3,47 @@ from datetime import datetime
 from typing import Optional
 
 try:
-    from _cdk import Async, Principal, ic
+    from _cdk import (
+        Async,
+        Opt,
+        Principal,
+        Record,
+        Service,
+        Variant,
+        Vec,
+        blob,
+        ic,
+        nat,
+        service_query,
+        text,
+    )
+    _CDK_AVAILABLE = True
 except ImportError:
     from typing import Any, List
     Async = List  # subscriptable placeholder for type annotations
     Principal = Any
     ic = None
+    _CDK_AVAILABLE = False
+
+    # Minimal stub base-classes so module-level Record/Service/Variant
+    # subclasses don't explode in non-ICP (test / CLI) environments.
+    class Record:       # type: ignore[no-redef]
+        pass
+    class Service:      # type: ignore[no-redef]
+        pass
+    class Variant:      # type: ignore[no-redef]
+        def __init_subclass__(cls, **kwargs):
+            pass
+
+    def service_query(f):   # type: ignore[no-redef]
+        return f
+
+    Vec = list
+    blob = bytes
+    nat = int
+    text = str
+    Opt = Optional
+
 from ic_python_db import Entity, Float, Integer, ManyToOne, OneToMany, String, TimestampedMixin
 from ic_python_logging import get_logger
 
@@ -24,117 +59,333 @@ logger = get_logger("entity.invoice")
 
 DEFAULT_DECIMALS = 8
 
+# ---------------------------------------------------------------------------
+# Payment mode
+# ---------------------------------------------------------------------------
+#
+# SUBACCOUNT_PAYMENTS_ENABLED controls whether invoices use per-invoice
+# subaccounts (the native ICRC-1 mechanism) or the nonce-suffix fallback.
+#
+# Subaccounts are the *correct* long-term approach: each invoice gets a
+# 32-byte subaccount derived from its ID.  Users send tokens to
+# (vault_principal, invoice_subaccount) and refresh() checks the balance on
+# that subaccount to detect payment.
+#
+# The problem: as of 2026, most ICP ecosystem wallets (Plug, Stoic, NFID,
+# Oisy, …) cannot specify a subaccount when initiating a transfer.  Until
+# wallet support matures, the nonce-suffix approach is used instead:
+#
+#   • Each invoice is assigned a small random integer nonce (1–NONCE_MAX).
+#   • Users are shown the *exact* amount to transfer:
+#         base_amount_raw + nonce  (in smallest token units)
+#     e.g. 1.002347 ckUSDC  instead of  1.000000 ckUSDC
+#   • refresh() scans the token's ICRC-1 indexer for an incoming transfer
+#     to the canister's main account with that exact raw amount, and marks
+#     the invoice paid on match.
+#
+# TODO: Set SUBACCOUNT_PAYMENTS_ENABLED = True once major ICP wallets
+#       support subaccount-addressed transfers.
+#
+SUBACCOUNT_PAYMENTS_ENABLED = False
+
+# Nonce range.  The nonce is added (in raw units) to the invoice amount so
+# each pending invoice requests a *unique* exact amount from the user.
+# Keeping it small limits the tiny "overpayment" built into the request:
+#   ckUSDC (6 dec): NONCE_MAX = 999 → max extra ≈ $0.001
+#   ckBTC  (8 dec): NONCE_MAX = 999 → max extra ≈ $0.6 at $60k / BTC
+NONCE_MIN = 1
+NONCE_MAX = 999
+
+
+# ---------------------------------------------------------------------------
+# ICRC-1 indexer Candid types — used by _refresh_by_nonce()
+# Defined at module level (not inside the method) so the CDK's type system
+# can resolve them correctly at runtime.
+# ---------------------------------------------------------------------------
+
+class _IcrcAccount(Record):
+    owner: Principal
+    subaccount: Opt[blob]
+
+
+class _IcrcTransfer(Record):
+    # Only the fields we need; the CDK ignores unknown fields from the response.
+    # ('from' is omitted because it is a Python keyword and we don't need it.)
+    amount: nat
+    to: _IcrcAccount
+
+
+class _IcrcTransaction(Record):
+    kind: text
+    transfer: Opt[_IcrcTransfer]
+
+
+class _IcrcTransactionWithId(Record):
+    id: nat
+    transaction: _IcrcTransaction
+
+
+class _GetAccountTransactionsArgs(Record):
+    account: _IcrcAccount
+    start: Opt[nat]
+    max_results: nat
+
+
+class _GetAccountTransactionsOk(Record):
+    balance: nat
+    transactions: Vec[_IcrcTransactionWithId]
+
+
+class _GetAccountTransactionsResult(Variant, total=False):
+    Ok: _GetAccountTransactionsOk
+    Err: text
+
+
+class _ICRC1IndexerService(Service):
+    @service_query
+    def get_account_transactions(
+        self, args: _GetAccountTransactionsArgs
+    ) -> _GetAccountTransactionsResult:
+        ...
+
+
+# ---------------------------------------------------------------------------
+# Invoice entity
+# ---------------------------------------------------------------------------
 
 class Invoice(Entity, TimestampedMixin):
     """
     Represents an invoice denominated in the realm's currency.
-    
-    Each invoice has a unique subaccount derived from its ID.
-    Users pay by sending tokens to: vault_principal + invoice_subaccount.
-    
-    Each realm uses a single currency (e.g. AGO).  The ``currency`` field
-    on the invoice must match a registered Token entity.  ``refresh()``
-    checks the balance of that token on the invoice's subaccount and
-    marks the invoice as Paid when the balance covers the amount.
-    
-    The subaccount is the invoice ID padded to 32 bytes, allowing direct
-    lookup from subaccount → invoice without iteration.
+
+    Payment identification
+    ─────────────────────
+    Two modes are supported, toggled by SUBACCOUNT_PAYMENTS_ENABLED:
+
+    • Subaccount mode  (SUBACCOUNT_PAYMENTS_ENABLED = True)
+        The canonical ICRC-1 approach.  Each invoice has a unique 32-byte
+        subaccount derived from its ID (invoice_id padded with null bytes).
+        Users pay by sending tokens to (vault_principal, invoice_subaccount).
+        refresh() checks the balance on that subaccount via the Wallet.
+
+    • Nonce-suffix mode  (SUBACCOUNT_PAYMENTS_ENABLED = False)  ← ACTIVE
+        Temporary fallback while ICP wallets lack subaccount support.
+        A small random nonce (1–NONCE_MAX) is stored on the invoice.
+        Users are asked to send *exactly* (base_amount_raw + nonce) tokens
+        to the canister's main principal — the unique last digits serve as
+        the identifier.  refresh() scans the token's ICRC-1 indexer for an
+        incoming transfer with that exact raw amount.
     """
-    
+
     __alias__ = "id"
     id = String(max_length=32)  # Max 32 chars to fit in subaccount
-    amount = Float()  # Amount in accounting currency (e.g., 10.00 ckUSDC)
-    currency = String(max_length=16, default="ckBTC")  # Accounting currency symbol
-    due_date = String(max_length=64)  # ISO format timestamp
-    status = String(max_length=32)  # Pending, Paid, Overdue, Expired
+    amount = Float()            # Amount in accounting currency (e.g. 10.00 ckUSDC)
+    currency = String(max_length=16, default="ckBTC")
+    due_date = String(max_length=64)
+    status = String(max_length=32)   # Pending | Paid | Overdue | Expired
     user = ManyToOne("User", "invoices")
-    transfers = OneToMany("Transfer", "invoice")  # Transfers that paid this invoice
+    transfers = OneToMany("Transfer", "invoice")
     ledger_entries = OneToMany("LedgerEntry", "invoice")
-    paid_at = String(max_length=64)  # ISO timestamp when paid
+    paid_at = String(max_length=64)
     metadata = String(max_length=256)
-    
-    payment_currency = String(max_length=16)   # Token actually used to pay
-    payment_amount = Float()                   # Human-readable amount received
-    payment_amount_raw = Integer()             # Raw amount in smallest unit
+
+    payment_currency = String(max_length=16)
+    payment_amount = Float()
+    payment_amount_raw = Integer()
+
+    # Nonce for payment identification when subaccounts are unavailable.
+    # Zero means "not yet assigned".
+    payment_nonce = Integer(default=0)
 
     def __init__(self, **kwargs):
-        # Auto-generate invoice ID if not provided (max 32 chars for subaccount)
         if "id" not in kwargs and "_id" not in kwargs:
             kwargs["id"] = generate_unique_id("inv_")
         super().__init__(**kwargs)
+        # Auto-assign a nonce in nonce-suffix mode so callers don't have to
+        # remember to call assign_nonce() separately.
+        if not SUBACCOUNT_PAYMENTS_ENABLED and not self.payment_nonce:
+            self.payment_nonce = self._generate_nonce()
+
+    # ------------------------------------------------------------------
+    # Subaccount helpers
+    # (kept intact; bypassed when SUBACCOUNT_PAYMENTS_ENABLED = False)
+    # ------------------------------------------------------------------
 
     def get_subaccount(self) -> bytes:
         """
-        Get the 32-byte subaccount for this invoice.
-        The invoice ID is padded to 32 bytes with null bytes.
-        This allows direct reverse lookup: subaccount → invoice_id.
+        Return the 32-byte subaccount for this invoice.
+
+        The invoice ID is UTF-8 encoded and right-padded with null bytes to
+        32 bytes.  This allows O(1) reverse lookup: subaccount → invoice_id.
+
+        NOTE: Not used while SUBACCOUNT_PAYMENTS_ENABLED = False.
         """
         return self.id.encode().ljust(32, b'\x00')
 
     def get_subaccount_hex(self) -> str:
-        """Get the subaccount as a hex string for display."""
+        """Return the subaccount as a lowercase hex string."""
         return self.get_subaccount().hex()
 
     def get_subaccount_list(self) -> list:
-        """Get the subaccount as a list of integers (for ICRC-1 API calls)."""
+        """Return the subaccount as a list[int] for ICRC-1 API calls."""
         return list(self.get_subaccount())
 
     @staticmethod
     def from_subaccount(subaccount: bytes) -> "Invoice":
-        """
-        Look up an Invoice by its subaccount bytes.
-        Returns the Invoice or None if not found.
-        """
+        """Look up an Invoice by its subaccount bytes."""
         invoice_id = subaccount.rstrip(b'\x00').decode()
         return Invoice[invoice_id]
 
     @staticmethod
     def id_from_subaccount(subaccount: bytes) -> str:
-        """Extract the invoice ID from a subaccount."""
+        """Extract the invoice ID string from a subaccount byte sequence."""
         return subaccount.rstrip(b'\x00').decode()
 
+    # ------------------------------------------------------------------
+    # Amount helpers
+    # ------------------------------------------------------------------
+
     def get_amount_raw(self, decimals: int = None) -> int:
-        """Get the invoice amount in smallest token units."""
+        """Return the invoice amount in smallest token units (base, no nonce)."""
         if decimals is None:
             decimals = DEFAULT_DECIMALS
         return int(self.amount * (10 ** decimals))
 
-    def mark_paid(
-        self,
-        payment_currency: str = None,
-        payment_amount: float = None,
-        payment_amount_raw: int = None,
-    ) -> None:
-        """Mark this invoice as paid with current timestamp."""
-        from datetime import timedelta
+    def get_nonce_amount_raw(self, decimals: int = None) -> int:
+        """
+        Return the nonce-adjusted amount in smallest token units.
 
-        self.status = "Paid"
+        This is the *exact* amount the user must send when subaccount-based
+        routing is unavailable:
+
+            base_amount_raw + payment_nonce
+
+        Example (ckUSDC, 6 decimals, fee = 1.00, nonce = 2347):
+            1_000_000 + 2347 = 1_002_347 raw → display as 1.002347 ckUSDC
+        """
+        if decimals is None:
+            decimals = DEFAULT_DECIMALS
+        return self.get_amount_raw(decimals) + (self.payment_nonce or 0)
+
+    def get_nonce_amount_human(self, decimals: int = None) -> float:
+        """Return get_nonce_amount_raw() converted to human-readable float."""
+        if decimals is None:
+            decimals = DEFAULT_DECIMALS
+        return self.get_nonce_amount_raw(decimals) / (10 ** decimals)
+
+    # ------------------------------------------------------------------
+    # Nonce management
+    # ------------------------------------------------------------------
+
+    def _generate_nonce(self) -> int:
+        """
+        Generate a pseudo-random nonce in [NONCE_MIN, NONCE_MAX].
+
+        Uses ic.time() (nanoseconds) on-chain.  Falls back to Python's
+        random module in non-ICP environments (tests / CLI).
+
+        Collision avoidance: scans existing pending invoices for the same
+        currency and picks a different value if there is a conflict.
+        """
         try:
-            if ic is not None:
-                epoch_ns = ic.time()
-                self.paid_at = (datetime(1970, 1, 1) + timedelta(seconds=epoch_ns // 1_000_000_000)).isoformat()
-            else:
-                self.paid_at = datetime.utcnow().isoformat()
+            raw = int(ic.time()) if ic is not None else 0
         except Exception:
-            self.paid_at = ""
-        if payment_currency:
-            self.payment_currency = payment_currency
-        if payment_amount is not None:
-            self.payment_amount = payment_amount
-        if payment_amount_raw is not None:
-            self.payment_amount_raw = payment_amount_raw
-        logger.info(f"Invoice {self.id} marked as paid at {self.paid_at} ({payment_amount} {payment_currency})")
+            raw = 0
+
+        span = NONCE_MAX - NONCE_MIN + 1   # 9999
+
+        if raw == 0:
+            try:
+                import random
+                candidate = random.randint(NONCE_MIN, NONCE_MAX)
+            except Exception:
+                candidate = 1234
+        else:
+            candidate = raw % span + NONCE_MIN
+
+        # Avoid collisions with other pending invoices for the same currency.
+        used = {
+            inv.payment_nonce
+            for inv in Invoice.instances()
+            if inv.status == "Pending"
+            and (inv.currency or "ckBTC") == (self.currency or "ckBTC")
+            and inv.payment_nonce
+            and inv.id != self.id
+        }
+        for offset in range(span):
+            probe = NONCE_MIN + (candidate - NONCE_MIN + offset) % span
+            if probe not in used:
+                return probe
+        raise RuntimeError(
+            f"All {span} nonce slots for currency '{self.currency or 'ckBTC'}' "
+            f"are occupied by pending invoices. Expire or pay existing invoices "
+            f"before creating new ones."
+        )
+
+    def assign_nonce(self) -> int:
+        """Assign a nonce if one has not been set yet.  Returns the nonce."""
+        if not self.payment_nonce:
+            self.payment_nonce = self._generate_nonce()
+        return self.payment_nonce
+
+    @staticmethod
+    def find_by_nonce_amount(currency: str, amount_raw: int) -> "Optional[Invoice]":
+        """
+        Find the first pending invoice for *currency* whose nonce-adjusted
+        raw amount equals *amount_raw*.
+
+        Useful when processing an incoming transfer event to identify which
+        invoice it belongs to.
+        """
+        for inv in Invoice.instances():
+            if inv.status != "Pending":
+                continue
+            if (inv.currency or "ckBTC") != currency:
+                continue
+            token = inv._find_token()
+            decimals = (token.decimals if token else None) or DEFAULT_DECIMALS
+            if inv.get_nonce_amount_raw(decimals) == amount_raw:
+                return inv
+        return None
+
+    # ------------------------------------------------------------------
+    # Payment address / instructions
+    # ------------------------------------------------------------------
 
     def get_payment_address(self) -> dict:
         """
-        Get the payment address for this invoice.
-        Returns dict with principal and subaccount for display to user.
+        Return the payment instructions for this invoice.
+
+        • Subaccount mode  → principal + subaccount hex
+        • Nonce-suffix mode → principal + exact nonce-adjusted amount to send
         """
-        return {
-            "principal": ic.id().to_str(),
-            "subaccount": self.get_subaccount_hex(),
-            "subaccount_int": int(self._id) if self._id else 0,
-        }
+        if SUBACCOUNT_PAYMENTS_ENABLED:
+            # TODO: switch back to this path when ICP wallets support subaccounts.
+            return {
+                "principal": ic.id().to_str(),
+                "subaccount": self.get_subaccount_hex(),
+            }
+        else:
+            token = self._find_token()
+            decimals = (token.decimals if token else None) or DEFAULT_DECIMALS
+            nonce_raw = self.get_nonce_amount_raw(decimals)
+            nonce_human = nonce_raw / (10 ** decimals)
+            return {
+                "principal": ic.id().to_str(),
+                # No subaccount — send to main account only.
+                "amount_raw": nonce_raw,
+                "amount_human": nonce_human,
+                "currency": self.currency or "ckBTC",
+                "nonce": self.payment_nonce,
+                "note": (
+                    f"Send EXACTLY {nonce_human} {self.currency or 'ckBTC'} "
+                    "to the principal above (no subaccount). "
+                    "The unique last digits identify your invoice."
+                ),
+            }
+
+    # ------------------------------------------------------------------
+    # Token lookup
+    # ------------------------------------------------------------------
 
     def _find_token(self):
         """Find the registered Token entity matching this invoice's currency."""
@@ -149,6 +400,10 @@ class Invoice(Entity, TimestampedMixin):
                 return token
         return None
 
+    # ------------------------------------------------------------------
+    # Accounting
+    # ------------------------------------------------------------------
+
     def record_accounting(
         self,
         fund: Optional["Fund"] = None,
@@ -157,24 +412,15 @@ class Invoice(Entity, TimestampedMixin):
         description: Optional[str] = None
     ) -> list:
         """
-        Record accounting entries when invoice is created (out-of-the-box).
-        
-        Creates balanced double-entry LedgerEntry records:
-        - Debit: Accounts Receivable (Asset)
-        - Credit: Deferred Revenue (Liability) - until paid
-        
-        Args:
-            fund: Optional Fund to categorize the entries
-            fiscal_period: Optional FiscalPeriod for the entries
-            revenue_category: Category for the revenue (default: 'fee')
-            description: Optional description override
-            
-        Returns:
-            List of created LedgerEntry instances
+        Record double-entry accounting entries on invoice creation.
+
+        Debit:  Accounts Receivable (Asset)
+        Credit: Deferred Revenue   (Liability)
+
+        Returns the list of created LedgerEntry instances.
         """
         from .ledger_entry import Category, EntryType, LedgerEntry
-        
-        # Use hook for custom logic (can be overridden via Codex)
+
         custom_entries = self.accounting_hook(
             invoice=self,
             event="created",
@@ -185,14 +431,13 @@ class Invoice(Entity, TimestampedMixin):
         )
         if custom_entries is not None:
             return custom_entries
-        
-        # Default out-of-the-box: Record receivable and deferred revenue
+
         transaction_id = f"TXN-INV-{self.id}"
         entry_date = datetime.utcnow().isoformat()
         desc = description or f"Invoice {self.id}"
         currency = self.currency or "ckBTC"
         amount_raw = self.get_amount_raw()
-        
+
         entries = [
             {
                 "entry_type": EntryType.ASSET,
@@ -213,8 +458,7 @@ class Invoice(Entity, TimestampedMixin):
                 "description": f"{desc} - Deferred revenue ({currency})",
             }
         ]
-        
-        # Add fund, fiscal_period, and invoice link
+
         for entry in entries:
             if fund:
                 entry["fund"] = fund
@@ -223,7 +467,7 @@ class Invoice(Entity, TimestampedMixin):
             entry["invoice"] = self
             if self.user:
                 entry["user"] = self.user
-        
+
         created = LedgerEntry.create_transaction(transaction_id, entries)
         logger.info(f"Created {len(created)} accounting entries for Invoice {self.id}")
         return created
@@ -237,27 +481,17 @@ class Invoice(Entity, TimestampedMixin):
         description: Optional[str] = None
     ) -> list:
         """
-        Record accounting entries when invoice is paid (out-of-the-box).
-        
-        Creates balanced double-entry LedgerEntry records:
-        - Debit: Cash (Asset) - payment received
-        - Credit: Accounts Receivable (Asset) - receivable cleared
-        - Debit: Deferred Revenue (Liability) - deferred cleared
-        - Credit: Revenue - revenue recognized
-        
-        Args:
-            transfer: Optional Transfer entity that paid the invoice
-            fund: Optional Fund to categorize the entries
-            fiscal_period: Optional FiscalPeriod for the entries
-            revenue_category: Category for the revenue (default: 'fee')
-            description: Optional description override
-            
-        Returns:
-            List of created LedgerEntry instances
+        Record double-entry accounting entries on invoice payment.
+
+        Debit:  Cash              (Asset)     — payment received
+        Credit: Receivable        (Asset)     — receivable cleared
+        Debit:  Deferred Revenue  (Liability) — deferred cleared
+        Credit: Revenue                       — revenue recognised
+
+        Returns the list of created LedgerEntry instances.
         """
         from .ledger_entry import Category, EntryType, LedgerEntry
-        
-        # Use hook for custom logic (can be overridden via Codex)
+
         custom_entries = self.accounting_hook(
             invoice=self,
             event="paid",
@@ -269,15 +503,14 @@ class Invoice(Entity, TimestampedMixin):
         )
         if custom_entries is not None:
             return custom_entries
-        
-        # Default out-of-the-box: Record cash receipt and revenue recognition
+
         transaction_id = f"TXN-INV-PAY-{self.id}"
         entry_date = self.paid_at or datetime.utcnow().isoformat()
         desc = description or f"Invoice {self.id} payment"
         rev_cat = revenue_category or Category.FEE
         currency = self.currency or "ckBTC"
         amount_raw = self.get_amount_raw()
-        
+
         entries = [
             {
                 "entry_type": EntryType.ASSET,
@@ -313,11 +546,10 @@ class Invoice(Entity, TimestampedMixin):
                 "credit": amount_raw,
                 "currency": currency,
                 "entry_date": entry_date,
-                "description": f"{desc} - Revenue recognized ({currency})",
+                "description": f"{desc} - Revenue recognised ({currency})",
             }
         ]
-        
-        # Add fund, fiscal_period, invoice, and transfer links
+
         for entry in entries:
             if fund:
                 entry["fund"] = fund
@@ -328,22 +560,81 @@ class Invoice(Entity, TimestampedMixin):
                 entry["transfer"] = transfer
             if self.user:
                 entry["user"] = self.user
-        
+
         created = LedgerEntry.create_transaction(transaction_id, entries)
         logger.info(f"Created {len(created)} payment entries for Invoice {self.id}")
         return created
 
+    # ------------------------------------------------------------------
+    # mark_paid
+    # ------------------------------------------------------------------
+
+    def mark_paid(
+        self,
+        payment_currency: str = None,
+        payment_amount: float = None,
+        payment_amount_raw: int = None,
+    ) -> None:
+        """Mark this invoice as paid and record the timestamp."""
+        from datetime import timedelta
+
+        self.status = "Paid"
+        try:
+            if ic is not None:
+                epoch_ns = ic.time()
+                self.paid_at = (
+                    datetime(1970, 1, 1) + timedelta(seconds=epoch_ns // 1_000_000_000)
+                ).isoformat()
+            else:
+                self.paid_at = datetime.utcnow().isoformat()
+        except Exception:
+            self.paid_at = ""
+        if payment_currency:
+            self.payment_currency = payment_currency
+        if payment_amount is not None:
+            self.payment_amount = payment_amount
+        if payment_amount_raw is not None:
+            self.payment_amount_raw = payment_amount_raw
+        logger.info(
+            f"Invoice {self.id} marked as paid at {self.paid_at} "
+            f"({payment_amount} {payment_currency})"
+        )
+
+    # ------------------------------------------------------------------
+    # refresh — public entry point
+    # ------------------------------------------------------------------
+
     def refresh(self) -> "Async[dict]":
-        """Check if this invoice has been paid by querying the token balance
-        on the invoice's subaccount.
+        """
+        Check whether this invoice has been paid.
+
+        Delegates to _refresh_by_subaccount() or _refresh_by_nonce()
+        depending on SUBACCOUNT_PAYMENTS_ENABLED.
 
         Must be called with ``yield``::
 
             result = yield invoice.refresh()
         """
-        return self._refresh()
+        if SUBACCOUNT_PAYMENTS_ENABLED:
+            return self._refresh_by_subaccount()
+        else:
+            return self._refresh_by_nonce()
 
-    def _refresh(self) -> "Async[dict]":
+    # ------------------------------------------------------------------
+    # _refresh_by_subaccount  (disabled while SUBACCOUNT_PAYMENTS_ENABLED=False)
+    # ------------------------------------------------------------------
+
+    def _refresh_by_subaccount(self) -> "Async[dict]":
+        """
+        Check payment by querying the token balance on this invoice's
+        dedicated 32-byte subaccount via the Basilisk OS Wallet.
+
+        This is the canonical ICRC-1 mechanism.  Each invoice gets a unique
+        subaccount so payments are unambiguous.
+
+        TODO: This path is currently inactive (SUBACCOUNT_PAYMENTS_ENABLED=False).
+              Re-enable once ICP wallets support specifying a subaccount on send.
+        """
         from ic_basilisk_toolkit.wallet import Wallet
 
         wallet = Wallet()
@@ -369,8 +660,8 @@ class Invoice(Entity, TimestampedMixin):
 
                 if human_balance >= self.amount:
                     logger.info(
-                        f"Invoice {self.id}: payment {human_balance} {invoice_currency} "
-                        f">= {self.amount} {invoice_currency}"
+                        f"Invoice {self.id}: subaccount payment {human_balance} "
+                        f"{invoice_currency} >= {self.amount} {invoice_currency}"
                     )
                     self.mark_paid(
                         payment_currency=invoice_currency,
@@ -379,24 +670,196 @@ class Invoice(Entity, TimestampedMixin):
                     )
                 else:
                     logger.info(
-                        f"Invoice {self.id}: partial payment {human_balance} "
-                        f"< {self.amount} {invoice_currency}"
+                        f"Invoice {self.id}: partial subaccount payment "
+                        f"{human_balance} < {self.amount} {invoice_currency}"
                     )
 
             return {
                 "invoice_id": self.id,
                 "status": self.status,
                 "currency": invoice_currency,
+                "payment_method": "subaccount",
                 "results": {token.name: token_result},
             }
         except Exception as e:
-            logger.error(f"Invoice {self.id}: error refreshing {token.name}: {e}")
+            logger.error(f"Invoice {self.id}: error in subaccount refresh: {e}")
             return {
                 "invoice_id": self.id,
                 "status": self.status,
                 "currency": invoice_currency,
                 "error": str(e),
             }
+
+    # ------------------------------------------------------------------
+    # _refresh_by_nonce  (active while SUBACCOUNT_PAYMENTS_ENABLED=False)
+    # ------------------------------------------------------------------
+
+    def _refresh_by_nonce(self) -> "Async[dict]":
+        """
+        Check payment by scanning the token's ICRC-1 indexer for an incoming
+        transfer whose amount equals exactly (base_amount_raw + payment_nonce).
+
+        Flow:
+          1. Resolve the token and its indexer canister ID.
+          2. Call get_account_transactions() on the indexer for the canister's
+             main account (no subaccount).
+          3. Walk the returned transactions; mark paid on the first match.
+
+        If the token has no indexer registered, the check cannot proceed and
+        an error is returned — the invoice stays Pending until the indexer is
+        configured or the operator uses find_by_nonce_amount() externally.
+        """
+        invoice_currency = self.currency or "ckBTC"
+        token = self._find_token()
+
+        if not token:
+            return {
+                "invoice_id": self.id,
+                "status": self.status,
+                "currency": invoice_currency,
+                "error": f"No registered Token for '{invoice_currency}'",
+            }
+
+        if not token.indexer:
+            logger.warning(
+                f"Invoice {self.id}: token '{invoice_currency}' has no indexer — "
+                "cannot scan transactions for nonce-based payment detection"
+            )
+            return {
+                "invoice_id": self.id,
+                "status": self.status,
+                "currency": invoice_currency,
+                "error": (
+                    f"Token '{invoice_currency}' has no indexer canister configured. "
+                    "Register the ICRC-1 indexer canister ID on the Token entity "
+                    "to enable nonce-based payment detection."
+                ),
+            }
+
+        token_decimals = token.decimals or DEFAULT_DECIMALS
+        expected_raw = self.get_nonce_amount_raw(token_decimals)
+        self_principal_str = ic.id().to_str()
+
+        try:
+            indexer = _ICRC1IndexerService(Principal.from_str(token.indexer))
+
+            args = _GetAccountTransactionsArgs(
+                account=_IcrcAccount(
+                    owner=Principal.from_str(self_principal_str),
+                    subaccount=None,
+                ),
+                start=None,       # start from most recent
+                max_results=200,  # scan last 200 transactions
+            )
+
+            result = yield indexer.get_account_transactions(args)
+
+            # Unwrap Ok/Err variant
+            if isinstance(result, dict):
+                if "Err" in result:
+                    return {
+                        "invoice_id": self.id,
+                        "status": self.status,
+                        "error": f"Indexer error: {result['Err']}",
+                    }
+                response = result.get("Ok", result)
+            else:
+                err = getattr(result, "Err", None)
+                if err is not None:
+                    return {
+                        "invoice_id": self.id,
+                        "status": self.status,
+                        "error": f"Indexer error: {err}",
+                    }
+                response = getattr(result, "Ok", result)
+
+            transactions = (
+                getattr(response, "transactions", None)
+                or (response.get("transactions") if isinstance(response, dict) else None)
+                or []
+            )
+
+            for tx_with_id in transactions:
+                tx = (
+                    getattr(tx_with_id, "transaction", None)
+                    or (tx_with_id.get("transaction") if isinstance(tx_with_id, dict) else None)
+                )
+                if not tx:
+                    continue
+
+                kind = getattr(tx, "kind", None) or (tx.get("kind") if isinstance(tx, dict) else "")
+                # Both 'transfer' (ckUSDC indexer) and '1xfer' (ICRC-3 style) are accepted.
+                if kind not in ("transfer", "1xfer"):
+                    continue
+
+                transfer = (
+                    getattr(tx, "transfer", None)
+                    or (tx.get("transfer") if isinstance(tx, dict) else None)
+                )
+                if not transfer:
+                    continue
+
+                amount = (
+                    getattr(transfer, "amount", None)
+                    or (transfer.get("amount") if isinstance(transfer, dict) else None)
+                    or 0
+                )
+                to_account = (
+                    getattr(transfer, "to", None)
+                    or (transfer.get("to") if isinstance(transfer, dict) else None)
+                )
+                if not to_account:
+                    continue
+
+                to_owner = str(
+                    getattr(to_account, "owner", None)
+                    or (to_account.get("owner") if isinstance(to_account, dict) else "")
+                    or ""
+                )
+                to_sub = (
+                    getattr(to_account, "subaccount", None)
+                    or (to_account.get("subaccount") if isinstance(to_account, dict) else None)
+                )
+
+                if to_owner == self_principal_str and to_sub is None and amount == expected_raw:
+                    logger.info(
+                        f"Invoice {self.id}: matched nonce payment — "
+                        f"{amount} raw ({invoice_currency}) via indexer"
+                    )
+                    self.mark_paid(
+                        payment_currency=invoice_currency,
+                        payment_amount=amount / (10 ** token_decimals),
+                        payment_amount_raw=amount,
+                    )
+                    return {
+                        "invoice_id": self.id,
+                        "status": "Paid",
+                        "payment_method": "nonce",
+                        "matched_amount_raw": amount,
+                        "nonce": self.payment_nonce,
+                    }
+
+            return {
+                "invoice_id": self.id,
+                "status": self.status,
+                "currency": invoice_currency,
+                "payment_method": "nonce",
+                "expected_amount_raw": expected_raw,
+                "scanned_transactions": len(transactions),
+            }
+
+        except Exception as e:
+            logger.error(f"Invoice {self.id}: error in nonce refresh: {e}")
+            return {
+                "invoice_id": self.id,
+                "status": self.status,
+                "currency": invoice_currency,
+                "error": str(e),
+            }
+
+    # ------------------------------------------------------------------
+    # Accounting hook (overridable via Codex)
+    # ------------------------------------------------------------------
 
     @staticmethod
     def accounting_hook(
@@ -409,16 +872,9 @@ class Invoice(Entity, TimestampedMixin):
         description=None
     ):
         """
-        Hook for custom accounting logic. Override via Codex.
-        
-        Args:
-            invoice: The Invoice instance
-            event: 'created' or 'paid'
-            transfer: Transfer entity (for 'paid' event)
-            fund, fiscal_period, revenue_category, description: Optional params
-            
+        Hook for custom accounting logic.  Override via Codex.
+
         Return None to use default logic, or return a list of LedgerEntry
-        to use custom entries instead.
+        instances to replace the default entries entirely.
         """
         return None
-
