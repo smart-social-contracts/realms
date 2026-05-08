@@ -180,7 +180,10 @@ def run_codex_init(codex_id: str) -> Optional[str]:
             code = f.read()
 
         # Set __file__ so relative paths in init.py resolve correctly
-        ns = {"__file__": init_path, "__name__": f"codex_init_{codex_id}"}
+        # Inject 'ic' so codex init scripts can use ic.print() / ic.time() etc.
+        from _cdk import ic as _ic
+
+        ns = {"__file__": init_path, "__name__": f"codex_init_{codex_id}", "ic": _ic}
         exec(compile(code, init_path, "exec"), ns)
         logger.info(f"Codex package {codex_id}: init.py executed successfully")
         return None
