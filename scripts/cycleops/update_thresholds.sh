@@ -66,6 +66,7 @@ declare -A ALL_CANISTERS=(
   ["ehyfg-wyaaa-aaaae-qg3qq-cai"]="demo-marketplace_backend"
   ["ulsvn-pyaaa-aaaae-qj4tq-cai"]="demo-marketplace_frontend"
   # --- File Registry Frontend ---
+  ["rbex3-xyaaa-aaaah-qumma-cai"]="staging-file_registry_frontend"
   ["7ja5c-dqaaa-aaaae-qj5oa-cai"]="demo-file_registry_frontend"
   # --- Platform Dashboard ---
   ["dpgu3-wqaaa-aaaau-agqoa-cai"]="staging-platform_dashboard"
@@ -149,10 +150,16 @@ cleanup_canister() {
 
 TOTAL=$(( ${#HIGH_BURN_CANISTERS[@]} + ${#ALL_CANISTERS[@]} ))
 
+# Stale canisters that were replaced but may still linger in CycleOps
+STALE_CANISTERS=(
+  "qubl6-wiaaa-aaaaa-qhb6a-cai"  # old test-file_registry (no WASM, replaced by uq2mu-...)
+)
+
 # Step 1: Clean up existing entries
-echo "🧹 Cleaning up existing entries for $TOTAL canisters..."
+echo "🧹 Cleaning up existing entries for $TOTAL canisters (+ ${#STALE_CANISTERS[@]} stale)..."
 for canister_id in "${!HIGH_BURN_CANISTERS[@]}"; do cleanup_canister "$canister_id"; done
 for canister_id in "${!ALL_CANISTERS[@]}"; do cleanup_canister "$canister_id"; done
+for canister_id in "${STALE_CANISTERS[@]}"; do cleanup_canister "$canister_id"; done
 echo ""
 
 # Step 2: Add high-burn canisters (8 TC @ 4 TC)

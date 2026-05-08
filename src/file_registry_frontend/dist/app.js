@@ -21,9 +21,16 @@ let HttpAgent, Actor, AuthClient;
 
 // ---- Configuration --------------------------------------------------
 
-// Default to the staging file_registry; can be overridden by
-// ?canister=<id> in the URL (handy for local dev).
-const DEFAULT_REGISTRY = "iebdk-kqaaa-aaaau-agoxq-cai";
+// Map each file_registry_frontend canister to its backend.
+// Falls back to staging if the hosting canister isn't recognized,
+// and can always be overridden with ?canister=<id> in the URL.
+const _FR_BACKEND_MAP = {
+  "2no7h-xqaaa-aaaad-qlxeq-cai": "uq2mu-kaaaa-aaaah-avqcq-cai",   // test
+  "rbex3-xyaaa-aaaah-qumma-cai": "iebdk-kqaaa-aaaau-agoxq-cai",   // staging
+  "7ja5c-dqaaa-aaaae-qj5oa-cai": "vi64l-3aaaa-aaaae-qj4va-cai",   // demo
+};
+const _hostCanister = location.hostname.replace(".icp0.io", "").replace(".ic0.app", "");
+const DEFAULT_REGISTRY = _FR_BACKEND_MAP[_hostCanister] || "iebdk-kqaaa-aaaau-agoxq-cai";
 const II_PROVIDER_URL = "https://identity.ic0.app";
 
 const params = new URLSearchParams(location.search);
