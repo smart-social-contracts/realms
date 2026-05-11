@@ -475,15 +475,18 @@
       position: 'bottomright',
     }).addTo(map);
     
-    // Add zoom event listener to show/hide markers based on zoom level
+    // Scale markers on zoom — smaller when zoomed in so hexes are prominent
     map.on('zoomend', () => {
       if (!markerLayer) return;
       const zoom = map.getZoom();
-      if (zoom >= MARKER_HIDE_ZOOM && map.hasLayer(markerLayer)) {
-        map.removeLayer(markerLayer);
-      } else if (zoom < MARKER_HIDE_ZOOM && !map.hasLayer(markerLayer)) {
-        markerLayer.addTo(map);
-      }
+      const scale = zoom >= MARKER_HIDE_ZOOM ? 0.5 : 1;
+      markerLayer.eachLayer(layer => {
+        if (layer.setRadius) {
+          const base = layer.options._baseRadius || layer.options.radius;
+          if (!layer.options._baseRadius) layer.options._baseRadius = layer.options.radius;
+          layer.setRadius(Math.max(3, base * scale));
+        }
+      });
     });
     
     // First render with demo data, then fetch real zone data from backends
@@ -544,7 +547,13 @@
       // Only use REAL zone data from the realm's backend - no fallback demo data
       if (realZoneData && realZoneData.zones && realZoneData.zones.length > 0) {
         realZoneData.zones.forEach(zone => {
-          const centerHexIndex = zone.h3_index;
+          // Re-derive H3 index using h3-js from lat/lng for full compatibility
+          let centerHexIndex;
+          try {
+            centerHexIndex = h3.latLngToCell(zone.center_lat, zone.center_lng, H3_RESOLUTION);
+          } catch (e) {
+            centerHexIndex = zone.h3_index;
+          }
           const usersInHex = zone.user_count;
           
           // Get the center hex and all neighboring hexes within INFLUENCE_RINGS
@@ -604,8 +613,23 @@
     
     // Second pass: render all hex cells with combined realm info
     Object.entries(hexData).forEach(([hexIndex, data]) => {
-      const boundary = h3.cellToBoundary(hexIndex);
-      const latLngs = boundary.map(coord => [coord[0], coord[1]]);
+      let latLngs;
+      try {
+        const boundary = h3.cellToBoundary(hexIndex);
+        latLngs = boundary.map(coord => [coord[0], coord[1]]);
+      } catch (e) {
+        // Fallback: create a small hexagon from the first realm entry's location
+        const entry = data.realms[0];
+        if (!entry) return;
+        const zone = (realmZoneData[entry.realm.id]?.zones || []).find(z => z.h3_index === hexIndex);
+        if (!zone) return;
+        const lat = zone.center_lat, lng = zone.center_lng;
+        const r = 0.15;
+        latLngs = Array.from({length: 6}, (_, i) => {
+          const angle = (Math.PI / 3) * i;
+          return [lat + r * Math.cos(angle), lng + r * Math.sin(angle)];
+        });
+      }
       
       // Determine dominant color (realm with most users in this hex)
       const sortedRealms = [...data.realms].sort((a, b) => b.users - a.users);
@@ -737,11 +761,8 @@
       });
     });
     
-    // Show/hide markers based on current zoom level
-    const currentZoom = map.getZoom();
-    if (currentZoom < MARKER_HIDE_ZOOM) {
-      markerLayer.addTo(map);
-    }
+    // Always show markers
+    markerLayer.addTo(map);
     
     // Fit map to show all hex zones (world view since realms are scattered globally)
     if (filteredRealms.length > 0) {
