@@ -8,6 +8,8 @@ For local development, these default to IC mainnet values.
 During deployment, the deploy script updates these with actual canister IDs.
 """
 
+TEST_MODE = False
+TEST_MODE_DEMO_DATA = False
 TEST_MODE_ADMIN_SELF_REGISTRATION = False
 TEST_MODE_MEMBER_SELF_REGISTRATION = False
 TEST_MODE_SKIP_PASSPORT_ZKPROOF = False
