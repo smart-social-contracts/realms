@@ -53,7 +53,8 @@
     "zone_selector",
     "llm_chat",
     "hello_world",
-    "test_bench"
+    "test_bench",
+    "demo_simulator"
   ],
   "options": {
     "random": {
