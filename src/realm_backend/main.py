@@ -467,11 +467,14 @@ def join_realm(profile: str, preferred_quarter: text, invite_code_checksum_hex: 
             pass
 
         if has_invite:
-            # Test mode shortcut: code sha256(b"admin").hexdigest() grants admin without extension call
+            # Test mode shortcuts: sha256("admin") / sha256("member") grant respective profiles
             _ADMIN_TEST_CODE_CHECKSUM_HEX = "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"
+            _MEMBER_TEST_CODE_CHECKSUM_HEX = "e31ab643c44f7a0ec824b59d1194d60dac334200d845e61d2d289daa0f087ea4"
             import config
             if config.TEST_MODE_ADMIN_SELF_REGISTRATION and invite_code_checksum_hex == _ADMIN_TEST_CODE_CHECKSUM_HEX:
                 granted_profile = "admin"
+            elif config.TEST_MODE_MEMBER_SELF_REGISTRATION and invite_code_checksum_hex == _MEMBER_TEST_CODE_CHECKSUM_HEX:
+                granted_profile = "member"
             else:
                 # Code-based path: validate and consume the invite code
                 from ggg.system.registration_code import consume_registration_code
@@ -508,9 +511,10 @@ def join_realm(profile: str, preferred_quarter: text, invite_code_checksum_hex: 
             )
 
         else:
-            # Member join without code: allowed only if open_registration is on
+            # Member join without code: allowed if open_registration is on or test bypass
             open_reg = realm and realm.open_registration
-            if not open_reg:
+            import config
+            if not open_reg and not config.TEST_MODE_MEMBER_SELF_REGISTRATION:
                 return RealmResponse(
                     success=False,
                     data=RealmResponseData(

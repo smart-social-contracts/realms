@@ -3,7 +3,7 @@
   import { onMount } from 'svelte';
   import { principal, isAuthenticated } from '$lib/stores/auth';
   import { login, initializeAuthClient } from '$lib/auth';
-  import { TEST_MODE, TEST_MODE_II_BYPASS, TEST_MODE_ADMIN_SELF_REGISTRATION, TEST_MODE_SKIP_TERMS } from '$lib/config.js';
+  import { TEST_MODE, TEST_MODE_II_BYPASS, TEST_MODE_ADMIN_SELF_REGISTRATION, TEST_MODE_MEMBER_SELF_REGISTRATION, TEST_MODE_SKIP_TERMS } from '$lib/config.js';
   import { backend, initBackendWithIdentity, setActiveQuarter } from '$lib/canisters.js';
   import { loadUserProfiles, hasJoined, profilesLoading } from '$lib/stores/profiles';
   import { activeQuarterId } from '$lib/stores/quarters';
@@ -51,7 +51,7 @@
   }
 
   // Invite is required when registration is closed (not open) and user has no valid invite
-  $: inviteRequired = !$realmOpenRegistration && !inviteValid && !TEST_MODE;
+  $: inviteRequired = !$realmOpenRegistration && !inviteValid && !TEST_MODE_MEMBER_SELF_REGISTRATION;
 
   const welcomeImageUrl = '/images/background.png';
   
@@ -140,11 +140,17 @@
     inviteError = '';
     error = '';
     try {
-      // Test mode shortcut: "admin" is accepted client-side
+      // Test mode shortcuts: "admin" / "member" accepted client-side
       if (TEST_MODE_ADMIN_SELF_REGISTRATION && inviteCode.trim() === 'admin') {
         inviteValid = true;
         inviteProfile = 'admin';
         selectedProfile = 'admin';
+        return;
+      }
+      if (TEST_MODE_MEMBER_SELF_REGISTRATION && inviteCode.trim() === 'member') {
+        inviteValid = true;
+        inviteProfile = 'member';
+        selectedProfile = 'member';
         return;
       }
 
@@ -572,6 +578,23 @@
             {/if}
             {#if inviteError && !inviteChecking && !inviteValid}
               <p class="mt-2 text-sm text-red-600">{inviteError}</p>
+            {/if}
+            {#if (TEST_MODE_MEMBER_SELF_REGISTRATION || TEST_MODE_ADMIN_SELF_REGISTRATION) && !inviteValid}
+              <p class="mt-2 text-xs text-gray-400 flex items-start gap-1.5">
+                <svg class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>
+                  Test mode: enter
+                  {#if TEST_MODE_MEMBER_SELF_REGISTRATION && TEST_MODE_ADMIN_SELF_REGISTRATION}
+                    <strong>"member"</strong> or <strong>"admin"</strong> to register as member or administrator.
+                  {:else if TEST_MODE_MEMBER_SELF_REGISTRATION}
+                    <strong>"member"</strong> to register as a member.
+                  {:else}
+                    <strong>"admin"</strong> to register as an administrator.
+                  {/if}
+                </span>
+              </p>
             {/if}
           </div>
           
