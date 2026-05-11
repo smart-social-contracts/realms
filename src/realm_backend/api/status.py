@@ -63,12 +63,14 @@ def get_status() -> "dict[str, Any]":
     realm_name = ""
     realm_welcome_message = ""
     realm_description = ""
+    realm_open_registration = False
     try:
         first_realm = Realm.load("1")
         if first_realm:
             realm_name = first_realm.name or ""
             realm_welcome_message = getattr(first_realm, "welcome_message", None) or ""
             realm_description = getattr(first_realm, "description", None) or ""
+            realm_open_registration = bool(getattr(first_realm, "open_registration", False))
     except Exception:
         pass
 
@@ -247,6 +249,7 @@ def get_status() -> "dict[str, Any]":
         "realm_name": realm_name,
         "realm_welcome_message": realm_welcome_message,
         "realm_description": realm_description,
+        "open_registration": realm_open_registration,
         "users_count": users_count,
         "organizations_count": organizations_count,
         "realms_count": realms_count,

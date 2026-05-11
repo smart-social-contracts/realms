@@ -93,6 +93,7 @@ export async function buildRealmDeploymentManifest(formData, network, brandingUr
     display_name: name,
     description,
     welcome_message,
+    open_registration: !!formData.open_registration,
     extensions: Array.isArray(formData.extensions) ? [...formData.extensions] : ['all'],
   };
 

@@ -267,7 +267,9 @@
     assistant: null, // null means no assistant, or assistant id
     // New: Realm Data (users)
     realm_data_file: null,
-    realm_data_file_name: ''
+    realm_data_file_name: '',
+    // Member registration type
+    open_registration: false
   };
 
   // Validation
@@ -474,7 +476,8 @@
       name: formData.name,
       languages: formData.languages,
       descriptions: formData.descriptions,
-      welcome_messages: formData.welcome_messages
+      welcome_messages: formData.welcome_messages,
+      open_registration: formData.open_registration
     };
 
     // Realm Token (optional)
@@ -741,6 +744,46 @@
               </div>
             {/each}
           </div>
+        </div>
+
+        <div class="form-group">
+          <label>Member Registration</label>
+          <p class="hint" style="margin-bottom: 0.75rem;">Choose how new members can join your realm</p>
+          <div class="registration-type-options">
+            <button
+              type="button"
+              class="registration-option"
+              class:selected={!formData.open_registration}
+              on:click={() => formData.open_registration = false}
+            >
+              <div class="registration-option-icon">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <div class="registration-option-text">
+                <strong>Invitation Only</strong>
+                <span>Members need an invitation code from an admin to join</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              class="registration-option"
+              class:selected={formData.open_registration}
+              on:click={() => formData.open_registration = true}
+            >
+              <div class="registration-option-icon">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                </svg>
+              </div>
+              <div class="registration-option-text">
+                <strong>Open Registration</strong>
+                <span>Anyone can join as a member without an invitation code</span>
+              </div>
+            </button>
+          </div>
+          <p class="hint" style="margin-top: 0.5rem;">Administrator registration always requires an invitation code regardless of this setting.</p>
         </div>
       </div>
 
@@ -2069,6 +2112,68 @@
     color: #22C55E;
     font-weight: 600;
     font-size: 0.75rem;
+  }
+
+  .registration-type-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .registration-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+    border: 2px solid #E5E5E5;
+    border-radius: 0.75rem;
+    background: white;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: left;
+    width: 100%;
+  }
+
+  .registration-option:hover {
+    border-color: #A3A3A3;
+  }
+
+  .registration-option.selected {
+    border-color: #171717;
+    background: #FAFAFA;
+  }
+
+  .registration-option-icon {
+    flex-shrink: 0;
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    background: #F5F5F5;
+    color: #525252;
+  }
+
+  .registration-option.selected .registration-option-icon {
+    background: #171717;
+    color: white;
+  }
+
+  .registration-option-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  .registration-option-text strong {
+    font-size: 0.875rem;
+    color: #171717;
+  }
+
+  .registration-option-text span {
+    font-size: 0.8125rem;
+    color: #737373;
   }
 
   /* Multi-language inputs */

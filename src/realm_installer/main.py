@@ -336,6 +336,7 @@ def schedule_registration(job_id_val: str):
                     "name": realm_name,
                     "description": realm_info.get("description", ""),
                     "welcome_message": realm_info.get("welcome_message", ""),
+                    "open_registration": realm_info.get("open_registration", False),
                 }
                 config_json = json.dumps(config).replace('\\', '\\\\').replace('"', '\\"')
                 config_arg = '("' + config_json + '")'

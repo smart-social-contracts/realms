@@ -7,7 +7,7 @@
   import { backend, initBackendWithIdentity, setActiveQuarter } from '$lib/canisters.js';
   import { loadUserProfiles, hasJoined, profilesLoading } from '$lib/stores/profiles';
   import { activeQuarterId } from '$lib/stores/quarters';
-  import { realmInfo, realmName as realmNameStore, realmWelcomeMessage, realmDescription } from '$lib/stores/realmInfo';
+  import { realmInfo, realmName as realmNameStore, realmWelcomeMessage, realmDescription, realmOpenRegistration } from '$lib/stores/realmInfo';
   import { cn } from '$lib/theme/utilities';
   import { _ } from 'svelte-i18n';
   
@@ -49,6 +49,9 @@
   $: if (profiles.length === 1 && !selectedProfile) {
     selectedProfile = profiles[0].value;
   }
+
+  // Invite is required when registration is closed (not open) and user has no valid invite
+  $: inviteRequired = !$realmOpenRegistration && !inviteValid && !TEST_MODE;
 
   const welcomeImageUrl = '/images/background.png';
   
@@ -454,6 +457,14 @@
 
       <!-- Step: Profile Selection -->
       {:else if currentStep === 'profile'}
+        {#if inviteRequired}
+          <div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm flex items-start gap-2">
+            <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>Registration requires an invitation code.</span>
+          </div>
+        {/if}
         <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
           <div class="flex items-center justify-between mb-2">
             <h2 class="text-2xl font-bold text-gray-900">Select Profile</h2>
@@ -509,7 +520,13 @@
           <!-- Invite code input -->
           <div class="mb-6 p-4 border border-gray-200 rounded-xl">
             <label for="invite-code" class="block text-sm font-medium text-gray-700 mb-2">
-              {inviteValid ? 'Invitation code' : 'Have an invitation code?'}
+              {#if inviteValid}
+                Invitation code
+              {:else if $realmOpenRegistration || TEST_MODE}
+                Have an invitation code?
+              {:else}
+                Invitation code <span class="text-red-500">*</span>
+              {/if}
             </label>
             <div class="flex gap-2">
               <input
@@ -576,7 +593,7 @@
             </button>
             <button
               on:click={handleJoin}
-              disabled={!selectedProfile || loading}
+              disabled={!selectedProfile || loading || inviteRequired}
               class="flex-1 py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {#if loading}

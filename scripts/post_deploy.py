@@ -234,6 +234,7 @@ if os.path.exists(manifest_path):
             "name": manifest.get("name", ""),
             "description": manifest.get("description", ""),
             "welcome_message": manifest.get("welcome_message", ""),
+            "open_registration": manifest.get("open_registration", False),
         }
         # Use ensure_ascii=False to keep UTF-8 characters instead of \uXXXX escapes
         # which dfx Candid parser doesn't understand

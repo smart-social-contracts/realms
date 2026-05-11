@@ -17,6 +17,7 @@ interface RealmInfo {
 	name: string;
 	welcomeMessage: string;
 	description: string;
+	openRegistration: boolean;
 	registries: CanisterInfo[];
 	quarters: QuarterInfo[];
 	isQuarter: boolean;
@@ -30,6 +31,7 @@ const createRealmInfoStore = () => {
 		name: '',
 		welcomeMessage: '',
 		description: '',
+		openRegistration: false,
 		registries: [],
 		quarters: [],
 		isQuarter: false,
@@ -58,6 +60,7 @@ const createRealmInfoStore = () => {
 						name: status.realm_name || '',
 						welcomeMessage: status.realm_welcome_message || '',
 						description: status.realm_description || '',
+						openRegistration: status.open_registration || false,
 						registries: status.registries || [],
 						quarters: status.quarters || [],
 						isQuarter: status.is_quarter || false,
@@ -89,3 +92,6 @@ export const realmWelcomeMessage = derived(realmInfo, $realmInfo => $realmInfo.w
 
 // Derived store for realm description
 export const realmDescription = derived(realmInfo, $realmInfo => $realmInfo.description);
+
+// Derived store for open registration flag
+export const realmOpenRegistration = derived(realmInfo, $realmInfo => $realmInfo.openRegistration);

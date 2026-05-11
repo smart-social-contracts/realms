@@ -1677,6 +1677,7 @@ def create_foundational_objects() -> void:
         realm_name = "Default Realm"
         realm_description = "A realm for digital governance and coordination"
         realm_welcome_message = ""
+        realm_open_registration = False
 
         import json
         import os
@@ -1695,6 +1696,7 @@ def create_foundational_objects() -> void:
                     realm_name = manifest.get("name", realm_name)
                     realm_description = manifest.get("description", realm_description)
                     realm_welcome_message = manifest.get("welcome_message", "")
+                    realm_open_registration = manifest.get("open_registration", False)
                     calendar_config = manifest.get("calendar", {})
                     acct_currency_config = manifest.get("accounting_currency", {})
                     manifest_json_str = json.dumps(manifest)
@@ -1717,6 +1719,7 @@ def create_foundational_objects() -> void:
             accounting_currency_decimals=acct_currency_config.get("decimals", 8),
             principal_id="",
             manifest_data=manifest_json_str,
+            open_registration=bool(realm_open_registration),
         )
 
         logger.info(f"Created realm: {realm_name}")
@@ -2769,6 +2772,10 @@ def update_realm_config(config_json: str) -> str:
             updated_fields.append(
                 f"welcome_message={config['welcome_message'][:50] if config['welcome_message'] else ''}..."
             )
+
+        if "open_registration" in config:
+            realm.open_registration = bool(config["open_registration"])
+            updated_fields.append(f"open_registration={realm.open_registration}")
 
         logger.info(f"✅ Realm config updated: {', '.join(updated_fields)}")
         return json.dumps({"success": True, "updated_fields": updated_fields})
