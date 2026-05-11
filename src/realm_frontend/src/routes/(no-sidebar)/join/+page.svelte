@@ -243,7 +243,7 @@
   }
 </script>
 
-<div class="h-screen grid grid-cols-1 md:grid-cols-2" style="transform: none !important;">
+<div class="min-h-screen md:h-screen grid grid-cols-1 md:grid-cols-2" style="transform: none !important;">
   <!-- Left Brand Panel with Background Image -->
   <div class="hidden md:flex md:col-start-1 text-white flex-col justify-between relative">
     <!-- Background Image - no overlay, full opacity -->
@@ -280,7 +280,7 @@
   </div>
 
   <!-- Right Form Panel -->
-  <div class="flex items-center justify-center p-6 md:p-12 relative bg-gradient-to-br from-gray-50 to-gray-100 md:col-start-2">
+  <div class="flex items-start md:items-center justify-center p-4 pb-16 md:p-12 relative bg-gradient-to-br from-gray-50 to-gray-100 md:col-start-2 overflow-y-auto">
     <!-- Mobile background image -->
     <div class="md:hidden absolute inset-0 z-0">
       <img 
@@ -290,11 +290,11 @@
       />
     </div>
     
-    <div class="w-full max-w-md relative z-10 md:bg-transparent md:backdrop-blur-none md:rounded-none md:p-0 bg-white/80 backdrop-blur-sm rounded-2xl p-4">
+    <div class="w-full max-w-md relative z-10 md:bg-transparent md:backdrop-blur-none md:rounded-none md:p-0 bg-white/80 backdrop-blur-sm rounded-2xl p-3 my-auto">
 
       <!-- Step Indicator -->
       {#if currentStep !== 'success'}
-        <div class="flex items-center justify-center gap-2 mb-8">
+        <div class="flex items-center justify-center gap-2 mb-4 md:mb-8">
           <div class="flex items-center gap-2">
             <div class={cn(
               "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all",
@@ -347,7 +347,7 @@
 
       <!-- Step: Auth -->
       {#if currentStep === 'auth'}
-        <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+        <div class="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-gray-100">
           <div class="text-center mb-8">
             <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg class="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -386,7 +386,7 @@
 
       <!-- Step: Already Joined (Welcome Back) -->
       {:else if currentStep === 'already_joined'}
-        <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+        <div class="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-gray-100">
           <div class="text-center mb-8">
             <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg class="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -412,7 +412,7 @@
 
       <!-- Step: Terms -->
       {:else if currentStep === 'terms'}
-        <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+        <div class="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-gray-100">
           <h2 class="text-2xl font-bold text-gray-900 mb-2">Terms & Conditions</h2>
           <p class="text-gray-500 mb-6">Please review and accept to continue</p>
           
@@ -471,7 +471,7 @@
             <span>Registration requires an invitation code.</span>
           </div>
         {/if}
-        <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+        <div class="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-gray-100">
           <div class="flex items-center justify-between mb-2">
             <h2 class="text-2xl font-bold text-gray-900">Select Profile</h2>
 {#if inviteValid}
@@ -524,7 +524,7 @@
           </div>
 
           <!-- Invite code input -->
-          <div class="mb-6 p-4 border border-gray-200 rounded-xl">
+          <div class="mb-6 p-3 md:p-4 border border-gray-200 rounded-xl">
             <label for="invite-code" class="block text-sm font-medium text-gray-700 mb-2">
               {#if inviteValid}
                 Invitation code
@@ -543,14 +543,14 @@
                 placeholder="Paste your invite code"
                 disabled={inviteValid}
                 class={cn(
-                  "flex-1 px-3 py-2 border rounded-lg text-sm focus:ring-gray-900 focus:border-gray-900",
+                  "min-w-0 flex-1 px-3 py-2 border rounded-lg text-sm focus:ring-gray-900 focus:border-gray-900",
                   inviteValid ? "border-green-300 bg-green-50 text-green-800" : "border-gray-300"
                 )}
               />
               {#if inviteValid}
                 <button
                   on:click={() => { inviteCode = ''; inviteValid = false; inviteProfile = ''; inviteError = ''; selectedProfile = ''; }}
-                  class="px-4 py-2 text-sm font-medium border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  class="shrink-0 px-3 md:px-4 py-2 text-sm font-medium border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Clear
                 </button>
@@ -558,7 +558,7 @@
                 <button
                   on:click={validateInvite}
                   disabled={!inviteCode || inviteChecking}
-                  class="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  class="shrink-0 px-3 md:px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {#if inviteChecking}
                     <Spinner size="4" color="white" />
@@ -610,14 +610,14 @@
           <div class="flex gap-3">
             <button
               on:click={handleBack}
-              class="flex-1 py-4 px-6 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-all"
+              class="flex-1 py-3 md:py-4 px-4 md:px-6 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-all"
             >
               Back
             </button>
             <button
               on:click={handleJoin}
               disabled={!selectedProfile || loading || inviteRequired}
-              class="flex-1 py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              class="flex-1 py-3 md:py-4 px-4 md:px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {#if loading}
                 <Spinner size="5" color="white" />
@@ -631,7 +631,7 @@
 
       <!-- Step: Success -->
       {:else if currentStep === 'success'}
-        <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 text-center">
+        <div class="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-gray-100 text-center">
           <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <svg class="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
@@ -657,7 +657,7 @@
     </div>
     
     <!-- Powered by footer -->
-    <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
+    <div class="hidden md:flex absolute bottom-6 left-1/2 -translate-x-1/2 items-center gap-2 z-20">
       <span class="text-gray-400 text-sm">Powered by</span>
       <a href="https://realmsgos.org" target="_blank" rel="noopener noreferrer">
         <img src="/images/logo_horizontal.svg" alt="Realms" class="h-5 opacity-60 hover:opacity-100 transition-opacity" />
