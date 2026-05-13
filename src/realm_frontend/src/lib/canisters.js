@@ -90,20 +90,20 @@ function initializeBackendStore() {
 
 			if (await client.isAuthenticated()) {
 				const identity = client.getIdentity();
-				const agent = new HttpAgent({ identity });
-				if (isLocalDevelopment()) {
-					await agent.fetchRootKey().catch(() => {});
-				}
-				const actor = createActor(canisterId, { agent });
-				backendStore.set(actor);
-				console.log('Backend store initialized with authenticated identity');
-				return;
+			const agent = new HttpAgent({ identity, verifyQuerySignatures: false });
+			if (isLocalDevelopment()) {
+				await agent.fetchRootKey().catch(() => {});
+			}
+			const actor = createActor(canisterId, { agent });
+			backendStore.set(actor);
+			console.log('Backend store initialized with authenticated identity');
+			return;
 			}
 		} catch (e) {
 			console.warn('Could not check auth during init, falling back to anonymous:', e);
 		}
 
-		const agent = new HttpAgent();
+		const agent = new HttpAgent({ verifyQuerySignatures: false });
 		if (isLocalDevelopment()) {
 			await agent.fetchRootKey().catch(() => {});
 		}
@@ -157,11 +157,11 @@ export async function initBackendWithIdentity() {
 				return currentActor;
 			}
 
-			// Create an agent with the identity
-			const agent = new HttpAgent({ identity });
+		// Create an agent with the identity
+		const agent = new HttpAgent({ identity, verifyQuerySignatures: false });
 
-			// For local development, we need to fetch the root key
-			if (isLocalDevelopment()) {
+		// For local development, we need to fetch the root key
+		if (isLocalDevelopment()) {
 				console.log('Fetching root key for local development');
 				await agent.fetchRootKey().catch((e) => {
 					console.warn('Error fetching root key:', e);
@@ -200,9 +200,9 @@ export async function createQuarterActor(quarterCanisterId) {
 
 	if (await client.isAuthenticated()) {
 		const identity = client.getIdentity();
-		agent = new HttpAgent({ identity });
+		agent = new HttpAgent({ identity, verifyQuerySignatures: false });
 	} else {
-		agent = new HttpAgent();
+		agent = new HttpAgent({ verifyQuerySignatures: false });
 	}
 
 	if (isLocalDevelopment()) {
