@@ -3247,6 +3247,22 @@ def install_extension_from_registry(args: text) -> Async[text]:
         from api.file_registry import install_extension_from_registry as _install
 
         result = yield from _install(registry_id, ext_id, version, frontend_canister_id=frontend_id)
+
+        # After a canister reinstall, init_() runs before extensions are
+        # installed so extension initialize() hooks never fire.  Call it
+        # here so schedules/timers created by the hook get registered in
+        # this @update context (IC timers require init/post_upgrade/update).
+        try:
+            result_data = json.loads(result) if isinstance(result, str) else result
+            if result_data.get("success"):
+                try:
+                    init_result = api.extensions.extension_sync_call(ext_id, "initialize", "{}")
+                    logger.info(f"Extension {ext_id} post-install initialize: {init_result}")
+                except Exception as init_err:
+                    logger.info(f"Extension {ext_id} has no initialize hook (ok): {init_err}")
+        except Exception as e:
+            logger.warning(f"Extension {ext_id} post-install init check failed: {e}")
+
         return result
     except Exception as e:
         logger.error(f"install_extension_from_registry error: {e}\n{traceback.format_exc()}")
