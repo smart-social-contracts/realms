@@ -6,6 +6,9 @@ import sys
 import traceback
 
 import api
+
+__basilisk_features__ = ["shell", "browse"]
+
 from _cdk import (
     Async,
     Func,
@@ -2121,7 +2124,7 @@ def initialize() -> void:
 
     # Start TaskManager to schedule pending tasks with enabled schedules.
     # Timer callbacks MUST be created in init/post_upgrade context — closures
-    # created from execute_code_shell do not survive IC call boundaries.
+    # created from __shell__ do not survive IC call boundaries.
     # After an upgrade, any in-progress tasks lost their timers, so reset
     # non-completed tasks back to pending before scheduling.
     try:
@@ -2207,7 +2210,7 @@ def start_task_manager() -> text:
 
     Call this after data import to set up IC timers in the proper
     canister update context.  Timer callbacks created from
-    execute_code_shell do NOT survive IC call boundaries.
+    __shell__ do NOT survive IC call boundaries.
     """
     try:
         # Eagerly load related entities so ManyToOne descriptors resolve and
@@ -2414,7 +2417,7 @@ _shell_ns_by_principal = {}
 
 @update
 @require(Operations.SHELL_EXECUTE)
-def execute_code_shell(code: str) -> str:
+def __shell__(code: str) -> str:
     """Executes Python code in a persistent namespace and returns the output.
 
     This is the core function needed for the Basilisk Simple Shell to work.
@@ -2464,7 +2467,7 @@ def execute_code_shell(code: str) -> str:
     return stdout.getvalue() + stderr.getvalue()
 
 
-# Removed endpoints (use execute_code_shell + basilisk shell commands instead):
+# Removed endpoints (use __shell__ + basilisk shell commands instead):
 #   execute_code, download_to_file, download_file, get_task_status,
 #   list_scheduled_tasks, stop_task, start_task, get_task_logs,
 #   get_task_logs_by_name, create_scheduled_task

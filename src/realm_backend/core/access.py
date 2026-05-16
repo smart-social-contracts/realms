@@ -14,7 +14,7 @@ Usage:
 
     @update
     @require(Operations.ALL)  # admin-only
-    def execute_code_shell(...):
+    def __shell__(...):
         ...
 """
 

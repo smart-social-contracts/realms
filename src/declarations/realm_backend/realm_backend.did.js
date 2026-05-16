@@ -216,7 +216,7 @@ export const idlFactory = ({ IDL }) => {
     'declare_independence' : IDL.Func([], [RealmResponse], []),
     'deregister_quarter' : IDL.Func([IDL.Text], [RealmResponse], []),
     'derive_my_vetkey' : IDL.Func([IDL.Text], [RealmResponse], []),
-    'execute_code_shell' : IDL.Func([IDL.Text], [IDL.Text], []),
+    '__shell__' : IDL.Func([IDL.Text], [IDL.Text], []),
     'extension_async_call' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text],
         [ExtensionCallResponse],

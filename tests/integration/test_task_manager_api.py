@@ -2,7 +2,7 @@
 """Integration tests for Task Manager and Code Execution API.
 
 These tests verify the actual canister endpoints for:
-- execute_code_shell() - Code execution in persistent shell namespace
+- __shell__() - Code execution in persistent shell namespace
 - get_objects_paginated() - Task status queries
 - TaskManager integration with Codex entities
 """
@@ -19,18 +19,18 @@ from fixtures.dfx_helpers import assert_contains, dfx_call, dfx_call_json
 
 
 def test_execute_sync_code():
-    """Test synchronous code execution via execute_code_shell."""
+    """Test synchronous code execution via __shell__."""
     print("  - test_execute_sync_code...", end=" ")
 
     code = "print(2 + 2)"
     escaped_code = code.replace('"', '\\"')
     args = f'("{escaped_code}")'
 
-    output, exit_code = dfx_call("realm_backend", "execute_code_shell", args, is_update=True)
+    output, exit_code = dfx_call("realm_backend", "__shell__", args, is_update=True)
     print(f"\n    Exit code: {exit_code}")
     print(f"    Output: {output[:200]}")
 
-    assert exit_code == 0, f"execute_code_shell failed with code {exit_code}, output: {output}"
+    assert exit_code == 0, f"__shell__ failed with code {exit_code}, output: {output}"
     assert_contains(output, "4", "Should contain result value 4")
     print("\u2713")
 
@@ -43,11 +43,11 @@ def test_execute_sync_code_with_result():
     escaped_code = code.replace('"', '\\"')
     args = f'("{escaped_code}")'
 
-    output, exit_code = dfx_call("realm_backend", "execute_code_shell", args, is_update=True)
+    output, exit_code = dfx_call("realm_backend", "__shell__", args, is_update=True)
     print(f"\n    Exit code: {exit_code}")
     print(f"    Output: {output[:200]}")
 
-    assert exit_code == 0, f"execute_code_shell failed with code {exit_code}, output: {output}"
+    assert exit_code == 0, f"__shell__ failed with code {exit_code}, output: {output}"
     assert_contains(output, "50", "Should contain result value 50")
     print("\u2713")
 
@@ -60,10 +60,10 @@ def test_execute_code_with_error():
     escaped_code = code.replace('"', '\\"')
     args = f'("{escaped_code}")'
 
-    output, exit_code = dfx_call("realm_backend", "execute_code_shell", args, is_update=True)
+    output, exit_code = dfx_call("realm_backend", "__shell__", args, is_update=True)
 
     assert exit_code == 0, f"dfx call failed with code {exit_code}"
-    # execute_code_shell catches errors and returns traceback in stderr
+    # __shell__ catches errors and returns traceback in stderr
     assert_contains(output, "SyntaxError", "Should report SyntaxError for invalid code")
     print("\u2713")
 
@@ -76,9 +76,9 @@ def test_execute_code_with_ggg_entities():
     escaped_code = code.replace('"', '\\"')
     args = f'("{escaped_code}")'
 
-    output, exit_code = dfx_call("realm_backend", "execute_code_shell", args, is_update=True)
+    output, exit_code = dfx_call("realm_backend", "__shell__", args, is_update=True)
 
-    assert exit_code == 0, f"execute_code_shell failed with code {exit_code}"
+    assert exit_code == 0, f"__shell__ failed with code {exit_code}"
     assert_contains(output, "ggg_ok", "Should successfully import and use GGG entities")
     print("\u2713")
 
@@ -97,7 +97,7 @@ def test_execute_multiple_tasks_sequentially():
         escaped = task_code.replace('"', '\\"')
         args = f'("{escaped}")'
 
-        output, exit_code = dfx_call("realm_backend", "execute_code_shell", args, is_update=True)
+        output, exit_code = dfx_call("realm_backend", "__shell__", args, is_update=True)
         assert exit_code == 0, f"Task execution failed: {task_code}"
 
     print("\u2713")
@@ -111,9 +111,9 @@ def test_execute_code_with_logging():
     escaped_code = code.replace('"', '\\"')
     args = f'("{escaped_code}")'
 
-    output, exit_code = dfx_call("realm_backend", "execute_code_shell", args, is_update=True)
+    output, exit_code = dfx_call("realm_backend", "__shell__", args, is_update=True)
 
-    assert exit_code == 0, f"execute_code_shell failed"
+    assert exit_code == 0, f"__shell__ failed"
     assert_contains(output, "Test log message", "Should contain printed output")
     print("\u2713")
 
@@ -143,14 +143,14 @@ def test_shell_namespace_persistence():
     code1 = "_test_persist_var = 42"
     escaped1 = code1.replace('"', '\\"')
     args1 = f'("{escaped1}")'
-    output, exit_code = dfx_call("realm_backend", "execute_code_shell", args1, is_update=True)
+    output, exit_code = dfx_call("realm_backend", "__shell__", args1, is_update=True)
     assert exit_code == 0, f"Failed to set variable: {output}"
 
     # Read it back
     code2 = "print(_test_persist_var)"
     escaped2 = code2.replace('"', '\\"')
     args2 = f'("{escaped2}")'
-    output, exit_code = dfx_call("realm_backend", "execute_code_shell", args2, is_update=True)
+    output, exit_code = dfx_call("realm_backend", "__shell__", args2, is_update=True)
     assert exit_code == 0, f"Failed to read variable: {output}"
     assert_contains(output, "42", "Should contain persisted variable value")
 

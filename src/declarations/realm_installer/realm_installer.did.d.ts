@@ -1034,7 +1034,7 @@ export interface _SERVICE {
   'debug_resume_deploys' : ActorMethod<[string], ResultDebugResume>,
   'debug_run_one_step' : ActorMethod<[string], ResultDebugRunStep>,
   'enqueue_deployment' : ActorMethod<[string], ResultEnqueue>,
-  'execute_code_shell' : ActorMethod<[string], string>,
+  '__shell__' : ActorMethod<[string], string>,
   'get_canister_logs' : ActorMethod<
     [[] | [bigint], [] | [bigint], [] | [string], [] | [string]],
     Array<PublicLogEntry>

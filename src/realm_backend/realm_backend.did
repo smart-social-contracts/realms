@@ -244,7 +244,8 @@ service : {
   "extension_async_call" : (text, text, text) -> (ExtensionCallResponse);
   "http_request" : (HttpRequest) -> (HttpResponseIncoming) query;
   "http_transform" : (HttpTransformArgs) -> (HttpResponse) query;
-  "execute_code_shell" : (text) -> (text);
+  "__shell__" : (text) -> (text);
+  "__browse__" : (text) -> (text) query;
   "create_multi_step_scheduled_task" : (text, text, nat, nat) -> (text);
   "register_realm_with_registry" : (text, text, text, text) -> (text);
   "get_realm_registry_info" : () -> (text) query;

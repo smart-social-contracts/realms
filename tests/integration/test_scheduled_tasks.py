@@ -2,7 +2,7 @@
 """Integration tests for Scheduled Tasks and TaskManager.
 
 These tests verify scheduled task functionality including:
-- Entity creation via execute_code_shell
+- Entity creation via __shell__
 - Tasks with run_at timestamps
 - Recurring tasks with repeat_every
 - Multi-step task execution
@@ -23,10 +23,10 @@ from fixtures.dfx_helpers import assert_contains, dfx_call, dfx_call_json
 
 
 def _shell_exec(code):
-    """Helper: execute code via execute_code_shell and return (output, exit_code)."""
+    """Helper: execute code via __shell__ and return (output, exit_code)."""
     escaped_code = code.replace('"', '\\"').replace("\n", "\\n")
     args = f'("{escaped_code}")'
-    return dfx_call("realm_backend", "execute_code_shell", args, is_update=True)
+    return dfx_call("realm_backend", "__shell__", args, is_update=True)
 
 
 def test_create_scheduled_task():

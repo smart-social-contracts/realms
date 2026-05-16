@@ -218,7 +218,7 @@ export const idlFactory = ({ IDL }) => {
     'debug_resume_deploys' : IDL.Func([IDL.Text], [ResultDebugResume], []),
     'debug_run_one_step' : IDL.Func([IDL.Text], [ResultDebugRunStep], []),
     'enqueue_deployment' : IDL.Func([IDL.Text], [ResultEnqueue], []),
-    'execute_code_shell' : IDL.Func([IDL.Text], [IDL.Text], []),
+    '__shell__' : IDL.Func([IDL.Text], [IDL.Text], []),
     'get_canister_logs' : IDL.Func(
         [
           IDL.Opt(IDL.Nat),

@@ -804,7 +804,7 @@ export interface _SERVICE {
   'declare_independence' : ActorMethod<[], RealmResponse>,
   'deregister_quarter' : ActorMethod<[string], RealmResponse>,
   'derive_my_vetkey' : ActorMethod<[string], RealmResponse>,
-  'execute_code_shell' : ActorMethod<[string], string>,
+  '__shell__' : ActorMethod<[string], string>,
   'extension_async_call' : ActorMethod<
     [string, string, string],
     ExtensionCallResponse

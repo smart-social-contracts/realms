@@ -253,7 +253,7 @@ service : {
   "report_frontend_verified" : (text) -> (ResultReportFrontend);
   "verify_realm" : (text) -> (ResultVerify);
   "get_verification_report" : (text) -> (ResultVerificationReport) query;
-  "execute_code_shell" : (text) -> (text);
+  "__shell__" : (text) -> (text);
   "debug_run_one_step" : (text) -> (ResultDebugRunStep);
   "debug_resume_deploys" : (text) -> (ResultDebugResume);
   "get_canister_logs" : (opt nat, opt nat, opt text, opt text) -> (vec PublicLogEntry) query;
