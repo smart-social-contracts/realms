@@ -239,6 +239,7 @@ service : {
   "http_request" : (HttpRequest) -> (HttpResponseIncoming) query;
   "http_transform" : (HttpTransformArgs) -> (HttpResponse) query;
   "__shell__" : (text) -> (text);
+  "execute_code_shell" : (text) -> (text);
   "create_multi_step_scheduled_task" : (text, text, nat, nat) -> (text);
   "register_realm_with_registry" : (text, text, text, text, text) -> (text);
   "get_realm_registry_info" : () -> (text) query;

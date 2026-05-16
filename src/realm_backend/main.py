@@ -2474,6 +2474,13 @@ def __shell__(code: str) -> str:
 
 
 @update
+@require(Operations.SHELL_EXECUTE)
+def execute_code_shell(code: str) -> str:
+    """Backward-compatible alias for __shell__ (used by off-chain deployer)."""
+    return __shell__(code)
+
+
+@update
 @require(Operations.TASK_CREATE)
 def create_multi_step_scheduled_task(
     name: str,
