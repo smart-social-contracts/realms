@@ -62,3 +62,4 @@
 62,ic_file_registry_frontend,oe3kv-3aaaa-aaaac-qgmzq-cai,ic,ic-basilisk-toolkit,templates/file_registry/canister_ids.json
 63,tip_jar_backend,o6z3g-eiaaa-aaaau-agj6q-cai,ic,ic-basilisk-toolkit,templates/tip_jar/canister_ids.json
 64,tip_jar_frontend,ox2q2-saaaa-aaaau-agj7a-cai,ic,ic-basilisk-toolkit,templates/tip_jar/canister_ids.json
+65,basilisk_deployer,3dwln-xiaaa-aaaag-ayrva-cai,ic,basilisk,CI deployer canister
