@@ -14,6 +14,11 @@
 
 set -euo pipefail
 
+# dfx 0.29.0 crashes with "ColorOutOfRange" in non-TTY environments.
+# Pin to 0.31.0 which works reliably in headless / CI contexts.
+export DFX_VERSION="${DFX_VERSION:-0.31.0}"
+export DFX_WARNING="${DFX_WARNING:--mainnet_plaintext_identity}"
+
 CYCLEOPS="qc4nb-ciaaa-aaaap-aawqa-cai"
 TEAM_PRINCIPAL="xee7m-jddpf-rwyzl-pobzx-izlbn-vhsbt-ublzn-lf4vo-kbvz2-buwfk-xh6"
 NETWORK="ic"

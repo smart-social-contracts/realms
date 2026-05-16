@@ -58,3 +58,7 @@
 58,test-token_frontend,33mmr-pyaaa-aaaam-ai47q-cai,test,realms,canister_ids.json
 59,test-nft_backend,eelas-yyaaa-aaaao-qps7a-cai,test,realms,canister_ids.json
 60,test-nft_frontend,ysrkl-eqaaa-aaaas-qgosa-cai,test,realms,canister_ids.json
+61,ic_file_registry,od2mb-wyaaa-aaaac-qgmza-cai,ic,ic-basilisk-toolkit,templates/file_registry/canister_ids.json
+62,ic_file_registry_frontend,oe3kv-3aaaa-aaaac-qgmzq-cai,ic,ic-basilisk-toolkit,templates/file_registry/canister_ids.json
+63,tip_jar_backend,o6z3g-eiaaa-aaaau-agj6q-cai,ic,ic-basilisk-toolkit,templates/tip_jar/canister_ids.json
+64,tip_jar_frontend,ox2q2-saaaa-aaaau-agj7a-cai,ic,ic-basilisk-toolkit,templates/tip_jar/canister_ids.json
