@@ -2537,7 +2537,7 @@ def create_multi_step_scheduled_task(
             # Get run_next_after delay (default to 0)
             run_next_after = step_config.get("run_next_after", 0)
 
-            # Create step
+            # Create step (task assigned after Task creation below)
             step = TaskStep(call=call, run_next_after=run_next_after)
             task_steps.append(step)
 
@@ -2546,8 +2546,10 @@ def create_multi_step_scheduled_task(
                 f"run_next_after={run_next_after}s"
             )
 
-        # Create task with multiple steps
-        task = Task(name=name, steps=task_steps)
+        # Create task, then link steps via ManyToOne
+        task = Task(name=name)
+        for step in task_steps:
+            step.task = task
 
         # Create schedule
         schedule = TaskSchedule(
