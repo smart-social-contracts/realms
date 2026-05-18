@@ -2135,24 +2135,11 @@ def initialize() -> void:
     # Start TaskManager to schedule pending tasks with enabled schedules.
     # Timer callbacks MUST be created in init/post_upgrade context — closures
     # created from __shell__ do not survive IC call boundaries.
-    # After an upgrade, any in-progress tasks lost their timers, so reset
-    # non-completed tasks back to pending before scheduling.
+    # TaskManager.run() handles everything: loads all tasks from storage,
+    # resets RUNNING->PENDING (timers lost on upgrade), re-registers timers.
     try:
-        # Relationships resolve via persisted reverse indexes (ic-python-db >= 0.9)
-        # — no need to eagerly load child entity types.
-        all_tasks = Task.load_some(1, Task.max_id()) if Task.max_id() > 0 else []
-
-        manager = TaskManager()
-        for t in all_tasks:
-            if t.status and t.status != "completed":
-                t.status = "pending"
-                t.step_to_execute = 0
-                for step in t.steps:
-                    step.status = "pending"
-                    step.timer_id = None
-            manager.add_task(t)
-        manager.run()
-        logger.info(f"✅ TaskManager started with {len(manager.tasks)} task(s)")
+        TaskManager().run()
+        logger.info("✅ TaskManager started")
     except Exception as e:
         logger.error(
             f"❌ Error starting TaskManager: {str(e)}\n{traceback.format_exc()}"
