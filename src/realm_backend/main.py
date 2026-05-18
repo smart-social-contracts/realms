@@ -2138,17 +2138,12 @@ def initialize() -> void:
     # After an upgrade, any in-progress tasks lost their timers, so reset
     # non-completed tasks back to pending before scheduling.
     try:
-        # Eagerly load related entities so ManyToOne descriptors resolve and
-        # populate bidirectional _relations on Task (steps, schedules) before
-        # any property modifications trigger _save() which would otherwise
-        # serialize entities with empty _relations, losing relationship data.
-        list(Task.instances())
-        list(Call.instances())
-        list(TaskStep.instances())
-        list(TaskSchedule.instances())
+        # Relationships resolve via persisted reverse indexes (ic-python-db >= 0.9)
+        # — no need to eagerly load child entity types.
+        all_tasks = Task.load_some(1, Task.max_id()) if Task.max_id() > 0 else []
 
         manager = TaskManager()
-        for t in Task.instances():
+        for t in all_tasks:
             if t.status and t.status != "completed":
                 t.status = "pending"
                 t.step_to_execute = 0
@@ -2223,17 +2218,13 @@ def start_task_manager() -> text:
     __shell__ do NOT survive IC call boundaries.
     """
     try:
-        # Eagerly load related entities so ManyToOne descriptors resolve and
-        # populate bidirectional _relations on Task (steps, schedules) before
-        # any property modifications trigger _save().
-        list(Task.instances())
-        list(Call.instances())
-        list(TaskStep.instances())
-        list(TaskSchedule.instances())
+        # Relationships resolve via persisted reverse indexes (ic-python-db >= 0.9)
+        # — no need to eagerly load child entity types.
+        all_tasks = Task.load_some(1, Task.max_id()) if Task.max_id() > 0 else []
 
         manager = TaskManager()
         count = 0
-        for t in Task.instances():
+        for t in all_tasks:
             if t.status and t.status != "completed":
                 t.status = "pending"
                 t.step_to_execute = 0
