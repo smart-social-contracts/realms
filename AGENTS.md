@@ -15,6 +15,7 @@ realms/                                          # Main repo
 │           ├── vite.config.ts                   # Lib-mode build config
 │           └── package.json
 ├── .github/workflows/
+│   ├── deploy-infra.yml                         # Deploy infra canisters (registry, file_registry, marketplace, etc.)
 │   ├── deploy-files.yml                         # Publish extensions/codices to file_registry
 │   └── deploy-mundus.yml                        # Deploy realm canisters (backend + frontend)
 ├── scripts/
@@ -49,7 +50,7 @@ Runtime extensions are deployed to the **file_registry** canister and then insta
 
 ### Method 1: GitHub Actions Workflows (Standard for CI)
 
-This is the standard deployment path for staging and production. It uses two workflows in sequence.
+This is the standard deployment path for staging and production. It uses workflows in sequence.
 
 #### Step-by-step: Deploying Extension Changes
 
@@ -103,6 +104,47 @@ gh workflow run deploy-mundus.yml \
 > **GOTCHA 1:** Setting `canister=frontend` will fail with "Missing artifact URLs in manifest" because the on-chain installer expects both backend and frontend URLs in the manifest. Always use `canister=both` with `deploy_mode=upgrade` — the upgrade is safe and won't wipe data.
 
 > **GOTCHA 2:** The `deploy-files.yml` `environment` parameter must match the target environment. If you're deploying to demo realms, use `-f environment=demo`. The default is `staging`. Each environment has its own file_registry canister — publishing to the wrong one means the realm won't see updated extensions.
+
+#### `deploy-infra.yml` Parameters
+
+| Parameter | Options | Default | Description |
+|-----------|---------|---------|-------------|
+| `environment` | `test`, `demo`, `staging` | `staging` | Target environment |
+| `deploy_mode` | `upgrade`, `reinstall`, `install` | `upgrade` | WASM deploy mode |
+| `canisters` | `all`, `realm_registry_backend`, `realm_registry_frontend`, `realm_installer`, `file_registry`, `file_registry_frontend`, `marketplace_backend`, `marketplace_frontend`, `platform_dashboard_frontend` | `all` | Which infra canisters to deploy |
+
+#### Full Platform Re-deployment (All Environments)
+
+When re-deploying the entire platform across all networks, workflows **must run sequentially** in this order:
+
+1. **deploy-infra** — upgrades infrastructure canisters (file_registry, marketplace, realm_registry, etc.)
+2. **deploy-files** — publishes extensions and codices to the file_registry
+3. **deploy-mundus** — deploys realm canisters (which pull extensions from file_registry)
+
+Within each stage, all 3 environments (test, demo, staging) can run in parallel since they have separate concurrency groups.
+
+```bash
+# Stage 1: Deploy infra (all environments in parallel, wait for all to complete)
+gh workflow run deploy-infra.yml -f environment=test -f deploy_mode=upgrade -f canisters=all
+gh workflow run deploy-infra.yml -f environment=demo -f deploy_mode=upgrade -f canisters=all
+gh workflow run deploy-infra.yml -f environment=staging -f deploy_mode=upgrade -f canisters=all
+# Wait for all 3 to complete before proceeding
+
+# Stage 2: Deploy files (all environments in parallel, wait for all to complete)
+gh workflow run deploy-files.yml -f environment=test -f scope=all
+gh workflow run deploy-files.yml -f environment=demo -f scope=all
+gh workflow run deploy-files.yml -f environment=staging -f scope=all
+# Wait for all 3 to complete before proceeding
+
+# Stage 3: Deploy mundus (all environments in parallel)
+gh workflow run deploy-mundus.yml -f descriptor=deployment-descriptors/test-mundus-layered.yml -f deploy_mode=reinstall -f canister=both
+gh workflow run deploy-mundus.yml -f descriptor=deployment-descriptors/demo-mundus-layered.yml -f deploy_mode=reinstall -f canister=both
+gh workflow run deploy-mundus.yml -f descriptor=deployment-descriptors/staging-mundus-layered.yml -f deploy_mode=reinstall -f canister=both
+```
+
+> **GOTCHA 3:** The deploy-mundus workflow deploys realms in parallel (matrix strategy with `fail-fast: false`). Individual realm failures (commonly timeouts on agora) do not block other realms. Retry a single failed realm with `-f realm=agora` rather than re-running the entire workflow.
+
+> **GOTCHA 4:** Never run deploy-mundus before deploy-files completes. The mundus reinstall creates fresh canisters that need to pull extensions from the file_registry — if files haven't been published yet, extension installation will fail or be incomplete.
 
 ### Method 2: CLI Commands (Local / Manual)
 
@@ -193,16 +235,17 @@ dfx canister call --network <network> <realm_backend_canister_id> get_extension_
 
 ## Known Canister IDs
 
-| Canister | Demo | Staging |
-|----------|------|---------|
-| file_registry | `vi64l-3aaaa-aaaae-qj4va-cai` | `iebdk-kqaaa-aaaau-agoxq-cai` |
-| Agora backend | `3bohd-2yaaa-aaaac-qcyla-cai` | `ihbn6-yiaaa-aaaac-beh3a-cai` |
-| Agora frontend | `3gpbx-xaaaa-aaaac-qcylq-cai` | `iaalk-vqaaa-aaaac-beh3q-cai` |
-| Dominion backend | `h5vpp-qyaaa-aaaac-qai3a-cai` | — |
-| Dominion frontend | `gzya5-jyaaa-aaaac-qai5a-cai` | — |
-| Syntropia backend | `2lbfz-yiaaa-aaaac-qcyma-cai` | — |
-| Syntropia frontend | `2madn-vqaaa-aaaac-qcymq-cai` | — |
+| Canister | Test | Demo | Staging |
+|----------|------|------|---------|
+| file_registry | `uq2mu-kaaaa-aaaah-avqcq-cai` | `vi64l-3aaaa-aaaae-qj4va-cai` | `iebdk-kqaaa-aaaau-agoxq-cai` |
+| Dominion backend | `ku6cv-2iaaa-aaaab-agrpa-cai` | `h5vpp-qyaaa-aaaac-qai3a-cai` | `ijdaw-dyaaa-aaaac-beh2a-cai` |
+| Dominion frontend | `2enu3-byaaa-aaaad-qlxfa-cai` | `gzya5-jyaaa-aaaac-qai5a-cai` | `iocgc-oaaaa-aaaac-beh2q-cai` |
+| Agora backend | `rnghe-haaaa-aaaak-qyxyq-cai` | `3bohd-2yaaa-aaaac-qcyla-cai` | `ihbn6-yiaaa-aaaac-beh3a-cai` |
+| Agora frontend | `pqwsi-vyaaa-aaaau-agrbq-cai` | `3gpbx-xaaaa-aaaac-qcylq-cai` | `iaalk-vqaaa-aaaac-beh3q-cai` |
+| Syntropia backend | `m2wv3-uaaaa-aaaah-quoiq-cai` | `2lbfz-yiaaa-aaaac-qcyma-cai` | `jnope-2yaaa-aaaac-beh4a-cai` |
+| Syntropia frontend | `2dmsp-maaaa-aaaad-qlxfq-cai` | `2madn-vqaaa-aaaac-qcymq-cai` | `jkpjq-xaaaa-aaaac-beh4q-cai` |
 
+- Test network uses `.icp0.io` domain
 - Demo network uses `.cp0.io` domain (e.g., `3gpbx-xaaaa-aaaac-qcylq-cai.cp0.io`)
 - Staging network uses `.icp0.io` domain
 - Full canister IDs in `canister_ids.json` and `deployment-descriptors/`
@@ -247,6 +290,8 @@ Verify: `realms --help` and `dfx --version`.
 - The realm frontend must have the dynamic `/extensions/[id]` route to load ESM bundles at runtime.
 - **deploy_mode=upgrade vs reinstall:** `upgrade` preserves all canister state (stable memory, tasks, executions). `reinstall` wipes everything. Always use `upgrade` for production unless a full reset is intended.
 - **Never use `canister=frontend` alone** in `deploy-mundus` — it fails. Use `canister=both` with `deploy_mode=upgrade`.
+- **Deployment ordering is critical:** When running multiple workflows, always execute in order: `deploy-infra` → `deploy-files` → `deploy-mundus`. Each stage must complete before the next begins.
+- **Transient timeout failures:** The agora realm deploy is particularly prone to network timeouts. When this happens, retry just that realm: `gh workflow run deploy-mundus.yml -f descriptor=<descriptor> -f deploy_mode=reinstall -f canister=both -f realm=agora`.
 
 ## Further Reading
 
