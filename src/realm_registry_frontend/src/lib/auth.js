@@ -1,14 +1,45 @@
 // src/lib/auth.js - Internet Identity authentication module
 import { AuthClient } from '@dfinity/auth-client';
-import { CONFIG } from '$lib/config.js';
+import { CONFIG, TEST_MODE_II_BYPASS } from '$lib/config.js';
 
-// Use the Internet Identity URL from config (set during deployment)
 const II_URL = CONFIG.internet_identity_url;
 console.log(`Using Identity Provider: ${II_URL}`);
 
 let authClient;
 
+// --- Test mode support ---
+let _testIdentity = null;
+let _testLoggedIn = false;
+
+async function _createTestIdentity() {
+  if (_testIdentity) return _testIdentity;
+  const { Ed25519KeyIdentity } = await import('@dfinity/identity');
+  const seed = new Uint8Array(32);
+  seed[0] = 0xED; seed[1] = 0x57;
+  _testIdentity = Ed25519KeyIdentity.generate(seed);
+  console.log(`[TEST MODE] Generated test identity: ${_testIdentity.getPrincipal().toText()}`);
+  return _testIdentity;
+}
+
+function _createTestAuthClientMock() {
+  return {
+    isAuthenticated: async () => _testLoggedIn,
+    getIdentity: () => _testIdentity,
+    logout: async () => {
+      _testLoggedIn = false;
+      _testIdentity = null;
+    },
+  };
+}
+
 export async function initializeAuthClient() {
+  if (TEST_MODE_II_BYPASS) {
+    if (!authClient) {
+      authClient = _createTestAuthClientMock();
+      console.log('[TEST MODE] Auth client initialized (mock)');
+    }
+    return authClient;
+  }
   if (!authClient) {
     authClient = await AuthClient.create();
   }
@@ -16,6 +47,15 @@ export async function initializeAuthClient() {
 }
 
 export async function login() {
+  if (TEST_MODE_II_BYPASS) {
+    const identity = await _createTestIdentity();
+    _testLoggedIn = true;
+    authClient = _createTestAuthClientMock();
+    const principal = identity.getPrincipal();
+    console.log(`[TEST MODE] Logged in with principal: ${principal.toText()}`);
+    return { identity, principal };
+  }
+
   const client = await initializeAuthClient();
   
   return new Promise((resolve) => {
@@ -36,17 +76,29 @@ export async function login() {
 }
 
 export async function logout() {
+  if (TEST_MODE_II_BYPASS) {
+    _testLoggedIn = false;
+    _testIdentity = null;
+    console.log('[TEST MODE] Logged out');
+    return;
+  }
   const client = await initializeAuthClient();
   await client.logout();
 }
 
 export async function isAuthenticated() {
+  if (TEST_MODE_II_BYPASS) {
+    return _testLoggedIn;
+  }
   const client = await initializeAuthClient();
   return client.isAuthenticated();
 }
 
 export async function getPrincipal() {
   const client = await initializeAuthClient();
+  if (TEST_MODE_II_BYPASS) {
+    return _testLoggedIn && _testIdentity ? _testIdentity.getPrincipal() : null;
+  }
   if (await client.isAuthenticated()) {
     return client.getIdentity().getPrincipal();
   }
@@ -55,6 +107,9 @@ export async function getPrincipal() {
 
 /** @returns {Promise<import('@dfinity/agent').Identity | null>} */
 export async function getIdentity() {
+  if (TEST_MODE_II_BYPASS) {
+    return _testLoggedIn && _testIdentity ? _testIdentity : null;
+  }
   const client = await initializeAuthClient();
   if (await client.isAuthenticated()) {
     return client.getIdentity();

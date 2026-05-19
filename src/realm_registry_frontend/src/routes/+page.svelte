@@ -98,10 +98,19 @@
       }
       
       // Check auth state
-      const { isAuthenticated, getPrincipal } = await import("$lib/auth");
-      isLoggedIn = await isAuthenticated();
-      if (isLoggedIn) {
-        userPrincipal = await getPrincipal();
+      const { isAuthenticated, getPrincipal, login: authLogin } = await import("$lib/auth");
+      const { TEST_MODE_II_BYPASS } = await import("$lib/config.js");
+      if (TEST_MODE_II_BYPASS) {
+        const result = await authLogin();
+        if (result.principal) {
+          isLoggedIn = true;
+          userPrincipal = result.principal;
+        }
+      } else {
+        isLoggedIn = await isAuthenticated();
+        if (isLoggedIn) {
+          userPrincipal = await getPrincipal();
+        }
       }
       authLoading = false;
     }

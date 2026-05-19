@@ -29,11 +29,21 @@
   onMount(async () => {
     if (browser) {
       try {
-        const { isAuthenticated, getPrincipal } = await import("$lib/auth");
-        isLoggedIn = await isAuthenticated();
-        if (isLoggedIn) {
-          userPrincipal = await getPrincipal();
-          await loadUserCredits();
+        const { isAuthenticated, getPrincipal, login: authLogin } = await import("$lib/auth");
+        const { TEST_MODE_II_BYPASS } = await import("$lib/config.js");
+        if (TEST_MODE_II_BYPASS) {
+          const result = await authLogin();
+          if (result.principal) {
+            isLoggedIn = true;
+            userPrincipal = result.principal;
+            await loadUserCredits();
+          }
+        } else {
+          isLoggedIn = await isAuthenticated();
+          if (isLoggedIn) {
+            userPrincipal = await getPrincipal();
+            await loadUserCredits();
+          }
         }
       } catch (e) {
         console.error('Auth check failed:', e);

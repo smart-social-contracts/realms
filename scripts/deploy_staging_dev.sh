@@ -162,9 +162,27 @@ deploy_registry() {
         fi
         
         # Source .env so canister IDs are available to the vite build
-        echo -e "${GREEN}� Loading canister environment...${NC}"
+        echo -e "${GREEN}🔐 Loading canister environment...${NC}"
         set -a
         source "$registry_dir/.env"
+
+        # Propagate test-mode VITE_ params from the matching deployment descriptor
+        DESCRIPTOR=""
+        if [ -f "$REPO_ROOT/deployment-descriptors/${NETWORK}-mundus-layered.yml" ]; then
+            DESCRIPTOR="$REPO_ROOT/deployment-descriptors/${NETWORK}-mundus-layered.yml"
+        fi
+        if [ -n "$DESCRIPTOR" ]; then
+            _extract_flag() { grep "^  $1:" "$DESCRIPTOR" 2>/dev/null | awk '{print tolower($2)}'; }
+            for param in TEST_MODE TEST_MODE_II_BYPASS TEST_MODE_ADMIN_SELF_REGISTRATION \
+                         TEST_MODE_MEMBER_SELF_REGISTRATION TEST_MODE_DEMO_DATA \
+                         TEST_MODE_SKIP_TERMS TEST_MODE_SKIP_PASSPORT_ZKPROOF; do
+                val=$(_extract_flag "$param")
+                if [ -n "$val" ]; then
+                    export "VITE_${param}=${val}"
+                fi
+            done
+            echo -e "${GREEN}   Test mode params loaded from descriptor${NC}"
+        fi
         set +a
         
         echo -e "${GREEN}� Building registry frontend...${NC}"
@@ -231,6 +249,23 @@ deploy_realm() {
         echo -e "${GREEN}🔧 Loading canister environment...${NC}"
         set -a
         source "$realm_dir/.env"
+
+        # Propagate test-mode VITE_ params from the matching deployment descriptor
+        DESCRIPTOR=""
+        if [ -f "$REPO_ROOT/deployment-descriptors/${NETWORK}-mundus-layered.yml" ]; then
+            DESCRIPTOR="$REPO_ROOT/deployment-descriptors/${NETWORK}-mundus-layered.yml"
+        fi
+        if [ -n "$DESCRIPTOR" ]; then
+            _extract_flag() { grep "^  $1:" "$DESCRIPTOR" 2>/dev/null | awk '{print tolower($2)}'; }
+            for param in TEST_MODE TEST_MODE_II_BYPASS TEST_MODE_ADMIN_SELF_REGISTRATION \
+                         TEST_MODE_MEMBER_SELF_REGISTRATION TEST_MODE_DEMO_DATA \
+                         TEST_MODE_SKIP_TERMS TEST_MODE_SKIP_PASSPORT_ZKPROOF; do
+                val=$(_extract_flag "$param")
+                if [ -n "$val" ]; then
+                    export "VITE_${param}=${val}"
+                fi
+            done
+        fi
         set +a
         
         echo -e "${GREEN}🔨 Building realm frontend...${NC}"

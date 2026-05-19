@@ -131,6 +131,34 @@ jobs:
           emit("platform_dashboard_frontend", "platform_dashboard_frontend")
           PY
 
+      - name: Export deployment parameters as VITE env vars
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, yaml
+          env = "${{ inputs.environment }}"
+          descriptor = pathlib.Path(f"deployment-descriptors/{env}-mundus-layered.yml")
+          if not descriptor.exists():
+              print(f"No descriptor for {env}, skipping parameter export")
+              raise SystemExit(0)
+          data = yaml.safe_load(descriptor.read_text())
+          params = data.get("parameters") or {}
+          vite_map = {
+              "TEST_MODE": "VITE_TEST_MODE",
+              "TEST_MODE_II_BYPASS": "VITE_TEST_MODE_II_BYPASS",
+              "TEST_MODE_ADMIN_SELF_REGISTRATION": "VITE_TEST_MODE_ADMIN_SELF_REGISTRATION",
+              "TEST_MODE_MEMBER_SELF_REGISTRATION": "VITE_TEST_MODE_MEMBER_SELF_REGISTRATION",
+              "TEST_MODE_DEMO_DATA": "VITE_TEST_MODE_DEMO_DATA",
+              "TEST_MODE_SKIP_TERMS": "VITE_TEST_MODE_SKIP_TERMS",
+              "TEST_MODE_SKIP_PASSPORT_ZKPROOF": "VITE_TEST_MODE_SKIP_PASSPORT_ZKPROOF",
+          }
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              for key, vite_key in vite_map.items():
+                  if key in params:
+                      val = str(params[key]).lower()
+                      f.write(f"{vite_key}={val}\n")
+                      print(f"  {vite_key}={val}")
+          PY
+
       # ── Backend canisters (basilisk WASM) ─────────────────────────────
 
       - name: Build & deploy realm_registry_backend

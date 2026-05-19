@@ -102,6 +102,7 @@ export default defineConfig({
     sveltekit(),
     environment("all", { prefix: "CANISTER_" }),
     environment("all", { prefix: "DFX_" }),
+    environment("all", { prefix: "VITE_" }),
   ],
   resolve: {
     alias: [

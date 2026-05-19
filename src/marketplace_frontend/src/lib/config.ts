@@ -37,3 +37,31 @@ export const CONFIG = {
   billing_service_url:
     pick('BILLING_SERVICE_URL', 'VITE_BILLING_SERVICE_URL') || 'https://billing.realmsgos.dev',
 };
+
+// --- TEST_MODE umbrella and sub-flags ---
+// Activation: URL param (?testmode=1), sessionStorage, or VITE_TEST_MODE env var.
+
+const _viteEnv: Record<string, string | undefined> =
+  typeof import.meta !== 'undefined' && (import.meta as any).env ? (import.meta as any).env : {};
+
+function _readFlag(envKey: string, urlParam: string): boolean {
+  if (_viteEnv[envKey] === 'true') return true;
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get(urlParam) === '1') {
+      sessionStorage.setItem(urlParam, '1');
+      return true;
+    }
+    if (sessionStorage.getItem(urlParam) === '1') return true;
+  }
+  return false;
+}
+
+export const TEST_MODE: boolean = _readFlag('VITE_TEST_MODE', 'testmode');
+
+function _testFlag(envKey: string, urlParam: string): boolean {
+  if (!TEST_MODE) return false;
+  return _readFlag(envKey, urlParam);
+}
+
+export const TEST_MODE_II_BYPASS: boolean = _testFlag('VITE_TEST_MODE_II_BYPASS', 'ii_bypass');

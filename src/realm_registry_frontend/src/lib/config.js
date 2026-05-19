@@ -20,3 +20,28 @@ export const CONFIG = {
 };
 
 export const DEV_PORT = 8000;
+
+// --- TEST_MODE umbrella and sub-flags ---
+// Activation: URL param (?testmode=1), sessionStorage, or VITE_TEST_MODE env var.
+
+function _readFlag(envKey, urlParam) {
+  if (viteEnv[envKey] === 'true') return true;
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get(urlParam) === '1') {
+      sessionStorage.setItem(urlParam, '1');
+      return true;
+    }
+    if (sessionStorage.getItem(urlParam) === '1') return true;
+  }
+  return false;
+}
+
+export const TEST_MODE = _readFlag('VITE_TEST_MODE', 'testmode');
+
+function _testFlag(envKey, urlParam) {
+  if (!TEST_MODE) return false;
+  return _readFlag(envKey, urlParam);
+}
+
+export const TEST_MODE_II_BYPASS = _testFlag('VITE_TEST_MODE_II_BYPASS', 'ii_bypass');
