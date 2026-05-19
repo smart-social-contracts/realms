@@ -3027,7 +3027,19 @@ def get_sidebar_manifests() -> text:
             })
 
         out.sort(key=lambda e: (e["categories"][0] if e["categories"] else "z", e["id"]))
-        return json.dumps({"success": True, "manifests": out})
+
+        categories_meta = [
+            {"id": "home", "name": "Home", "order": 0, "show_header": False, "collapsible": False},
+            {"id": "profile", "name": "Profile", "order": 1, "show_header": True, "collapsible": False},
+            {"id": "governance", "name": "Governance", "order": 2, "show_header": True, "collapsible": False},
+            {"id": "finances", "name": "Finances", "order": 3, "show_header": True, "collapsible": False},
+            {"id": "intelligence", "name": "Intelligence", "order": 4, "show_header": True, "collapsible": False},
+            {"id": "land_territory", "name": "Land & Territory", "order": 5, "show_header": True, "collapsible": False},
+            {"id": "administration", "name": "Administration", "order": 6, "show_header": True, "collapsible": False},
+            {"id": "developer", "name": "Developer", "order": 7, "show_header": True, "collapsible": True},
+        ]
+
+        return json.dumps({"success": True, "manifests": out, "categories": categories_meta})
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
 

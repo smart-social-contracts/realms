@@ -216,7 +216,15 @@
 
   // Available extensions and categories (loaded from $lib/extensions-config.json)
   const AVAILABLE_EXTENSIONS = extensionsConfig.extensions;
-  const EXTENSION_CATEGORIES = extensionsConfig.categories;
+  const EXTENSION_CATEGORIES = (() => {
+    const seen = new Map();
+    for (const ext of AVAILABLE_EXTENSIONS) {
+      if (!seen.has(ext.category)) {
+        seen.set(ext.category, { id: ext.category, name: ext.category_name || ext.category });
+      }
+    }
+    return Array.from(seen.values());
+  })();
 
   // Available codices (loaded from $lib/codices-config.json)
   let AVAILABLE_CODICES = codicesConfig.codices;
@@ -1256,7 +1264,6 @@
           {#if categoryExtensions.length > 0}
             <div class="extension-category">
               <h3 class="category-title">{category.name}</h3>
-              <p class="category-desc">{category.description}</p>
               <div class="extensions-grid">
                 {#each categoryExtensions as ext}
                   <button 

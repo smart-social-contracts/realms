@@ -70,6 +70,11 @@
 	
 	let showScrollIndicator = true;
 	let sidebarContainer: HTMLElement;
+	let collapsedSections: Record<string, boolean> = { developer: true };
+	
+	function toggleCollapsible(categoryId: string) {
+		collapsedSections[categoryId] = !collapsedSections[categoryId];
+	}
 	
 	$: {
 		if ($locale) {
@@ -175,7 +180,16 @@
 	// we fall back to the previous code paths (get_extensions() for
 	// bundled, list_runtime_extensions() for runtime) so the sidebar
 	// keeps working during the rollout window.
+	interface CategoryMeta {
+		id: string;
+		name: string;
+		order: number;
+		show_header: boolean;
+		collapsible: boolean;
+	}
+
 	let extensions: ExtensionMetadataWithPath[] = [];
+	let categories: CategoryMeta[] = [];
 	let extensionsLoaded = false;
 	let extensionsLoading = false;
 
@@ -207,6 +221,9 @@
 				return false;
 			}
 			extensions = parsed.manifests.map(manifestEntryToExtension);
+			if (Array.isArray(parsed.categories)) {
+				categories = parsed.categories;
+			}
 			console.log(
 				'[Sidebar] get_sidebar_manifests →',
 				extensions.length,
@@ -394,21 +411,36 @@
 
 	// Group extensions by categories
 	$: extensionsByCategory = (() => {
-		const categories: Record<string, ExtensionMetadataWithPath[]> = {};
+		const cats: Record<string, ExtensionMetadataWithPath[]> = {};
 		
 		filteredExtensions.forEach(ext => {
-			// Get categories from manifest, default to 'other' if none specified
 			const extCategories = ext.categories || ['other'];
 			
 			extCategories.forEach(category => {
-				if (!categories[category]) {
-					categories[category] = [];
+				if (!cats[category]) {
+					cats[category] = [];
 				}
-				categories[category].push(ext);
+				cats[category].push(ext);
 			});
 		});
 		
-		return categories;
+		return cats;
+	})();
+
+	// Categories sorted by backend-provided order; falls back to alphabetical
+	$: sortedCategories = (() => {
+		if (categories.length > 0) {
+			return [...categories].sort((a, b) => a.order - b.order);
+		}
+		// Fallback when backend doesn't provide categories metadata
+		const seen = new Set(Object.keys(extensionsByCategory));
+		return Array.from(seen).sort().map(id => ({
+			id,
+			name: id.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+			order: 0,
+			show_header: true,
+			collapsible: false,
+		}));
 	})();
 
 	// Create navigation items for each category
@@ -463,13 +495,6 @@
 			return name ?? translationKey;
 		}
 		return translated;
-	}
-
-	function formatCategoryName(category: string): string {
-		return category
-			.split('_')
-			.map(word => word.charAt(0).toUpperCase() + word.slice(1))
-			.join(' ');
 	}
 
 	let links: Link[] = [
@@ -530,22 +555,37 @@
 					</SidebarGroup>
 				{/if}
 
-				<!-- Categorized Extension Items -->
-				{#each ['public_services', 'finances', 'oversight', 'other'] as category}
-					{@const items = categorizedNavItems[category] || []}
-					{#if items.length > 0}
-						<SidebarGroup ulClass={groupClass} class="mb-3">
-							<!-- Category Header -->
-							<li class="px-3 py-2">
-								<h3 class={styles.sidebar.categoryHeader()}>
-									{formatCategoryName(category)}
-								</h3>
-							</li>
-							
-							<!-- Category Items -->
+			<!-- Dynamic category sections driven by backend metadata -->
+			{#each sortedCategories as cat (cat.id)}
+				{@const items = categorizedNavItems[cat.id] || []}
+				{#if items.length > 0}
+					<SidebarGroup ulClass={groupClass} class="mb-3">
+						{#if cat.show_header}
+							{#if cat.collapsible}
+								<li class="px-3 py-2">
+									<button
+										class="flex items-center w-full text-left {styles.sidebar.categoryHeader()}"
+										on:click={() => toggleCollapsible(cat.id)}
+									>
+										<span>{cat.name}</span>
+										<svelte:component 
+											this={collapsedSections[cat.id] ? AngleDownOutline : AngleUpOutline} 
+											class="w-3 h-3 ml-auto"
+										/>
+									</button>
+								</li>
+							{:else}
+								<li class="px-3 py-2">
+									<h3 class={styles.sidebar.categoryHeader()}>
+										{cat.name}
+									</h3>
+								</li>
+							{/if}
+						{/if}
+						
+						{#if !cat.collapsible || !collapsedSections[cat.id]}
 							{#each items as { name, translationKey, icon, href }}
 								{#if isExtensionLink(href)}
-									<!-- Use classic browser navigation for extension links -->
 									<li>
 										<a 
 											href={href} 
@@ -562,9 +602,10 @@
 									</SidebarItem>
 								{/if}
 							{/each}
-						</SidebarGroup>
-					{/if}
-				{/each}
+						{/if}
+					</SidebarGroup>
+				{/if}
+			{/each}
 
 
 				<!--
