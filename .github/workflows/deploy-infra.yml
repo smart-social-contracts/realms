@@ -134,14 +134,13 @@ jobs:
       - name: Export deployment parameters as VITE env vars
         run: |
           python3 - <<'PY'
-          import os, pathlib, yaml
+          import os, pathlib, re
           env = "${{ inputs.environment }}"
           descriptor = pathlib.Path(f"deployment-descriptors/{env}-mundus-layered.yml")
           if not descriptor.exists():
               print(f"No descriptor for {env}, skipping parameter export")
               raise SystemExit(0)
-          data = yaml.safe_load(descriptor.read_text())
-          params = data.get("parameters") or {}
+          text = descriptor.read_text()
           vite_map = {
               "TEST_MODE": "VITE_TEST_MODE",
               "TEST_MODE_II_BYPASS": "VITE_TEST_MODE_II_BYPASS",
@@ -153,8 +152,9 @@ jobs:
           }
           with open(os.environ["GITHUB_ENV"], "a") as f:
               for key, vite_key in vite_map.items():
-                  if key in params:
-                      val = str(params[key]).lower()
+                  m = re.search(rf"^\s+{key}:\s*(.+)$", text, re.MULTILINE)
+                  if m:
+                      val = m.group(1).strip().lower()
                       f.write(f"{vite_key}={val}\n")
                       print(f"  {vite_key}={val}")
           PY
