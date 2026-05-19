@@ -57,6 +57,11 @@ class Operations:
     PERMISSION_VIEW = "permission.view"
     PERMISSION_REVOKE = "permission.revoke"
 
+    # Role / permission management
+    ROLE_ASSIGN = "role.assign"
+    ROLE_REVOKE = "role.revoke"
+    PERMISSION_GRANT = "permission.grant"
+
     # Judicial administration
     DISPUTE_CREATE = "dispute.create"
     DISPUTE_VIEW = "dispute.view"
@@ -204,6 +209,19 @@ class Profiles:
             Operations.EXTENSION_ASYNC_CALL,
         ],
     }
+    USER_MANAGER = {
+        "name": "user_manager",
+        "allowed_to": [
+            Operations.ROLE_ASSIGN,
+            Operations.ROLE_REVOKE,
+            Operations.PERMISSION_GRANT,
+            Operations.PERMISSION_REVOKE,
+            Operations.PERMISSION_VIEW,
+            Operations.USER_ADD,
+            Operations.USER_UPDATE_STATUS,
+            Operations.EXTENSION_SYNC_CALL,
+        ],
+    }
 
     ALL_PROFILES = [
         ADMIN,
@@ -217,6 +235,7 @@ class Profiles:
         MERCHANT,
         OPERATOR,
         DEVELOPER,
+        USER_MANAGER,
     ]
 
 

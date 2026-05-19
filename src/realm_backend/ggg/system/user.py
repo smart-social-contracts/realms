@@ -93,6 +93,125 @@ class User(Entity, TimestampedMixin):
         )
         return
 
+    @staticmethod
+    def role_assign_prehook(user: "User", profile_name: str, assigner_principal: str) -> bool:
+        """Called before assigning a profile. Codex override can reject (raise) or allow.
+
+        Default: allow. Codex overrides implement governance policy
+        (e.g., require approved proposal for sensitive roles).
+        """
+        try:
+            from ggg.governance.codex import Codex
+
+            _HOOK_NAMES = ("role_management_hook", "role_management_hook_codex")
+            for codex in Codex.instances():
+                if codex.name in _HOOK_NAMES and codex.code:
+                    import ggg as _ggg
+                    from _cdk import ic as _ic
+
+                    ns = {"ic": _ic, "ggg": _ggg, "__builtins__": __builtins__}
+                    exec(compile(codex.code, f"{codex.name}.py", "exec"), ns)
+                    if "role_assign_prehook" in ns:
+                        logger.info(
+                            f"Executing codex role_assign_prehook for user {user.id}, profile {profile_name}"
+                        )
+                        return ns["role_assign_prehook"](user, profile_name, assigner_principal)
+        except Exception as e:
+            logger.error(f"Error in role_assign_prehook codex: {e}")
+            import traceback
+
+            logger.error(traceback.format_exc())
+            raise
+        return True
+
+    @staticmethod
+    def role_assign_posthook(user: "User", profile_name: str, assigner_principal: str):
+        """Called after successful profile assignment. Codex can handle notifications, logging, etc."""
+        try:
+            from ggg.governance.codex import Codex
+
+            _HOOK_NAMES = ("role_management_hook", "role_management_hook_codex")
+            for codex in Codex.instances():
+                if codex.name in _HOOK_NAMES and codex.code:
+                    import ggg as _ggg
+                    from _cdk import ic as _ic
+
+                    ns = {"ic": _ic, "ggg": _ggg, "__builtins__": __builtins__}
+                    exec(compile(codex.code, f"{codex.name}.py", "exec"), ns)
+                    if "role_assign_posthook" in ns:
+                        logger.info(
+                            f"Executing codex role_assign_posthook for user {user.id}, profile {profile_name}"
+                        )
+                        ns["role_assign_posthook"](user, profile_name, assigner_principal)
+                        return
+        except Exception as e:
+            logger.error(f"Error in role_assign_posthook codex: {e}")
+            import traceback
+
+            logger.error(traceback.format_exc())
+        logger.info(
+            f"Profile '{profile_name}' assigned to user {user.id} by {assigner_principal}"
+        )
+
+    @staticmethod
+    def role_revoke_prehook(user: "User", profile_name: str, revoker_principal: str) -> bool:
+        """Called before revoking a profile. Codex override can reject (raise) or allow.
+
+        Default: allow. Same pattern as role_assign_prehook.
+        """
+        try:
+            from ggg.governance.codex import Codex
+
+            _HOOK_NAMES = ("role_management_hook", "role_management_hook_codex")
+            for codex in Codex.instances():
+                if codex.name in _HOOK_NAMES and codex.code:
+                    import ggg as _ggg
+                    from _cdk import ic as _ic
+
+                    ns = {"ic": _ic, "ggg": _ggg, "__builtins__": __builtins__}
+                    exec(compile(codex.code, f"{codex.name}.py", "exec"), ns)
+                    if "role_revoke_prehook" in ns:
+                        logger.info(
+                            f"Executing codex role_revoke_prehook for user {user.id}, profile {profile_name}"
+                        )
+                        return ns["role_revoke_prehook"](user, profile_name, revoker_principal)
+        except Exception as e:
+            logger.error(f"Error in role_revoke_prehook codex: {e}")
+            import traceback
+
+            logger.error(traceback.format_exc())
+            raise
+        return True
+
+    @staticmethod
+    def role_revoke_posthook(user: "User", profile_name: str, revoker_principal: str):
+        """Called after successful profile revocation. Codex can handle notifications, logging, etc."""
+        try:
+            from ggg.governance.codex import Codex
+
+            _HOOK_NAMES = ("role_management_hook", "role_management_hook_codex")
+            for codex in Codex.instances():
+                if codex.name in _HOOK_NAMES and codex.code:
+                    import ggg as _ggg
+                    from _cdk import ic as _ic
+
+                    ns = {"ic": _ic, "ggg": _ggg, "__builtins__": __builtins__}
+                    exec(compile(codex.code, f"{codex.name}.py", "exec"), ns)
+                    if "role_revoke_posthook" in ns:
+                        logger.info(
+                            f"Executing codex role_revoke_posthook for user {user.id}, profile {profile_name}"
+                        )
+                        ns["role_revoke_posthook"](user, profile_name, revoker_principal)
+                        return
+        except Exception as e:
+            logger.error(f"Error in role_revoke_posthook codex: {e}")
+            import traceback
+
+            logger.error(traceback.format_exc())
+        logger.info(
+            f"Profile '{profile_name}' revoked from user {user.id} by {revoker_principal}"
+        )
+
 
 def user_register(principal: str, profile: str) -> dict[str, Any]:
     logger.info(f"Registering user {principal} with profile {profile}")
