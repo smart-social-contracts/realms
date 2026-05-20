@@ -50,6 +50,12 @@ on:
           - backend
           - frontend
 
+      skip_extensions:
+        description: "Skip extension/codex installation (faster deploys)"
+        required: false
+        type: boolean
+        default: false
+
       ref:
         description: "Commit/branch to deploy from (defaults to workflow ref)"
         required: false
@@ -81,6 +87,11 @@ on:
         type: string
         required: false
         default: ""
+      skip_extensions:
+        description: "Skip extension/codex installation"
+        type: boolean
+        required: false
+        default: false
     secrets:
       IC_IDENTITY_PEM:
         required: true
@@ -103,12 +114,13 @@ jobs:
     steps:
       - name: Deploy parameters
         run: |
-          echo "Descriptor:       ${{ inputs.descriptor }}"
-          echo "Deploy mode:      ${{ inputs.deploy_mode || 'upgrade' }}"
-          echo "Artifact version: ${{ inputs.artifact_version || 'latest' }}"
-          echo "Realm filter:     ${{ inputs.realm || '(all)' }}"
-          echo "Canister filter:  ${{ inputs.canister || '(both)' }}"
-          echo "Ref:              ${{ inputs.ref || github.ref }}"
+          echo "Descriptor:        ${{ inputs.descriptor }}"
+          echo "Deploy mode:       ${{ inputs.deploy_mode || 'upgrade' }}"
+          echo "Artifact version:  ${{ inputs.artifact_version || 'latest' }}"
+          echo "Realm filter:      ${{ inputs.realm || '(all)' }}"
+          echo "Canister filter:   ${{ inputs.canister || '(both)' }}"
+          echo "Skip extensions:   ${{ inputs.skip_extensions || false }}"
+          echo "Ref:               ${{ inputs.ref || github.ref }}"
 
       - uses: actions/checkout@v4
         with:
@@ -246,6 +258,9 @@ jobs:
           )
           if [ "${{ inputs.canister }}" != "both" ] && [ -n "${{ inputs.canister }}" ]; then
             ARGS+=(--canister "${{ inputs.canister }}")
+          fi
+          if [ "${{ inputs.skip_extensions }}" = "true" ]; then
+            ARGS+=(--skip-extensions)
           fi
 
           realms mundus deploy "${ARGS[@]}"

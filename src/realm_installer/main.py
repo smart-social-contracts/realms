@@ -302,8 +302,9 @@ def schedule_registration(job_id_val: str):
             manifest = json.loads(j.manifest_json or "{}")
             realm_info = manifest.get("realm", {})
             realm_name = realm_info.get("display_name") or realm_info.get("name", "")
-            backend_id = j.backend_canister_id or ""
-            frontend_id = j.frontend_canister_id or ""
+            manifest_ids = manifest.get("canister_ids", {})
+            backend_id = j.backend_canister_id or manifest_ids.get("backend", "")
+            frontend_id = j.frontend_canister_id or manifest_ids.get("frontend", "")
             url = f"https://{frontend_id}.icp0.io" if frontend_id else ""
             backend_url = f"https://{backend_id}.icp0.io" if backend_id else ""
             logo = "logo.png"
@@ -912,9 +913,20 @@ def report_canister_ready(args: text) -> Async[ResultReportReady]:
 
         backend_id = params.get("backend_canister_id", "")
         frontend_id = params.get("frontend_canister_id", "")
-        if not backend_id or not frontend_id:
+
+        manifest = json.loads(job.manifest_json or "{}")
+        deploy_scope = manifest.get("deploy_scope", "both")
+
+        if deploy_scope == "both" and (not backend_id or not frontend_id):
             return ResultReportReady(Err=ie("canister IDs required"))
+        if deploy_scope == "backend_only" and not backend_id:
+            return ResultReportReady(Err=ie("backend_canister_id required"))
+        if deploy_scope == "frontend_only" and not frontend_id:
+            return ResultReportReady(Err=ie("frontend_canister_id required"))
+
+        if backend_id:
             job.backend_canister_id = backend_id
+        if frontend_id:
             job.frontend_canister_id = frontend_id
         job.registry_canister_id = params.get("registry_canister_id", job.registry_canister_id or "")
         job.status = "verifying"
@@ -925,34 +937,38 @@ def report_canister_ready(args: text) -> Async[ResultReportReady]:
             job.expected_wasm_hash = deployer_hash
 
         wasm_verified = False
-        try:
-            status_call: CallResult = yield management_canister.canister_status(
-                {"canister_id": Principal.from_str(backend_id)})
-            status_data = unwrap_call_result(status_call)
-            mh = (status_data or {}).get("module_hash") if isinstance(status_data, dict) else None
-            if mh is not None:
-                actual = mh.hex() if isinstance(mh, bytes) else (bytes(mh).hex() if isinstance(mh, list) else str(mh).replace("0x", ""))
-                job.actual_wasm_hash = actual
-                expected = (job.expected_wasm_hash or "").lower()
-                if expected and expected != actual.lower():
-                    job.wasm_verified = -1
-                    job.status = "failed_verification"
-                    job.error = f"WASM mismatch: expected {expected}, got {actual}"
-                    job.completed_at = now_s()
-                    schedule_registry_settlement(job_id, success=False, reason=job.error)
-                    return ResultReportReady(Ok=ReportReadyOk(
-                        job_id=job_id, status="failed_verification", wasm_verified=False,
-                        actual_wasm_hash=actual, extensions_started=False,
-                        expected_wasm_hash=expected, failed_verification=True,
-                    ))
-                    job.wasm_verified = 1
-                    wasm_verified = True
-            else:
-                job.wasm_verified = 1
-                wasm_verified = True
-        except Exception:
+        if deploy_scope == "frontend_only" or not backend_id:
             job.wasm_verified = 1
             wasm_verified = True
+        else:
+            try:
+                status_call: CallResult = yield management_canister.canister_status(
+                    {"canister_id": Principal.from_str(backend_id)})
+                status_data = unwrap_call_result(status_call)
+                mh = (status_data or {}).get("module_hash") if isinstance(status_data, dict) else None
+                if mh is not None:
+                    actual = mh.hex() if isinstance(mh, bytes) else (bytes(mh).hex() if isinstance(mh, list) else str(mh).replace("0x", ""))
+                    job.actual_wasm_hash = actual
+                    expected = (job.expected_wasm_hash or "").lower()
+                    if expected and expected != actual.lower():
+                        job.wasm_verified = -1
+                        job.status = "failed_verification"
+                        job.error = f"WASM mismatch: expected {expected}, got {actual}"
+                        job.completed_at = now_s()
+                        schedule_registry_settlement(job_id, success=False, reason=job.error)
+                        return ResultReportReady(Ok=ReportReadyOk(
+                            job_id=job_id, status="failed_verification", wasm_verified=False,
+                            actual_wasm_hash=actual, extensions_started=False,
+                            expected_wasm_hash=expected, failed_verification=True,
+                        ))
+                    job.wasm_verified = 1
+                    wasm_verified = True
+                else:
+                    job.wasm_verified = 1
+                    wasm_verified = True
+            except Exception:
+                job.wasm_verified = 1
+                wasm_verified = True
 
         return ResultReportReady(Ok=ReportReadyOk(
             job_id=job_id, status=job.status, wasm_verified=wasm_verified,

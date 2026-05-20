@@ -43,9 +43,20 @@ gh workflow run deploy-mundus.yml \
   -f deploy_mode=upgrade \
   -f canister=both \
   -f artifact_version=build
+
+# Frontend-only fast deploy (skips backend build, WASM install, and extensions)
+gh workflow run deploy-mundus.yml \
+  -f descriptor=deployment-descriptors/test-mundus-layered.yml \
+  -f deploy_mode=upgrade \
+  -f canister=frontend \
+  -f skip_extensions=true \
+  -f artifact_version=latest \
+  -f realm=agora
 ```
 
-Choose the descriptor matching the target environment (`test-`, `demo-`, or `staging-mundus-layered.yml`). **Always use `canister=both`** — the on-chain installer requires both backend and frontend artifact URLs in the manifest, even for frontend-only changes. **Always use `deploy_mode=upgrade`** unless a full state reset is intended — upgrade is safe and preserves all canister state.
+Choose the descriptor matching the target environment (`test-`, `demo-`, or `staging-mundus-layered.yml`). **Always use `deploy_mode=upgrade`** unless a full state reset is intended — upgrade is safe and preserves all canister state.
+
+**Frontend-only deploys** (`canister=frontend`) are supported and significantly faster — they skip backend WASM compilation, WASM installation, and WASM verification. Combine with `skip_extensions=true` to also skip the extension/codex installation phase, reducing deploy time from ~5min to ~40s. Use `artifact_version=latest` to skip building from source entirely (uses the latest GitHub release).
 
 This is the preferred workflow for all code changes — no other steps (deploy-infra, deploy-files, etc.) are needed unless you're changing infrastructure canisters or extension bundles.
 
@@ -121,9 +132,10 @@ gh workflow run deploy-mundus.yml \
 | `deploy_mode` | `reinstall`, `upgrade`, `install` | `reinstall` | **Use `upgrade` to preserve data** |
 | `realm` | realm name or blank for all | blank | Filter to single realm |
 | `canister` | `both`, `backend`, `frontend` | `both` | Which canisters to deploy |
+| `skip_extensions` | `true`, `false` | `false` | Skip extension/codex installation (faster deploys) |
 | `artifact_version` | `build`, `latest`, or semver | `build` | WASM artifact source |
 
-> **GOTCHA 1:** Setting `canister=frontend` will fail with "Missing artifact URLs in manifest" because the on-chain installer expects both backend and frontend URLs in the manifest. Always use `canister=both` with `deploy_mode=upgrade` — the upgrade is safe and won't wipe data.
+> **TIP:** For fast frontend-only redeployments, use `canister=frontend` + `skip_extensions=true` + `artifact_version=latest`. This skips backend build/install, WASM verification, and extension installation — completing in ~40s instead of ~5min.
 
 > **GOTCHA 2:** The `deploy-files.yml` `environment` parameter must match the target environment. If you're deploying to demo realms, use `-f environment=demo`. The default is `staging`. Each environment has its own file_registry canister — publishing to the wrong one means the realm won't see updated extensions.
 
@@ -311,7 +323,7 @@ Verify: `realms --help` and `dfx --version`.
 - The realm backend must expose `install_extension_from_registry` and `get_extension_frontend_info` (Layer 2 code) before registry-install works.
 - The realm frontend must have the dynamic `/extensions/[id]` route to load ESM bundles at runtime.
 - **deploy_mode=upgrade vs reinstall:** `upgrade` preserves all canister state (stable memory, tasks, executions). `reinstall` wipes everything. Always use `upgrade` for production unless a full reset is intended.
-- **`canister=frontend`** works for `upgrade` deploys of source-only changes. For `reinstall` deploys, use `canister=both` since the installer expects both artifact URLs.
+- **`canister=frontend`** is fully supported for `upgrade` deploys. The installer and off-chain deployer handle `deploy_scope=frontend_only` manifests correctly, skipping backend steps. Combine with `--skip-extensions` for fastest deploys.
 - **Deployment ordering is critical:** When running multiple workflows, always execute in order: `deploy-infra` → `deploy-files` → `deploy-mundus`. Each stage must complete before the next begins.
 - **Transient timeout failures:** The agora realm deploy is particularly prone to network timeouts. When this happens, retry just that realm: `gh workflow run deploy-mundus.yml -f descriptor=<descriptor> -f deploy_mode=reinstall -f canister=both -f realm=agora`.
 

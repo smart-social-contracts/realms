@@ -512,6 +512,9 @@ def mundus_deploy(
     canister_filter: str = typer.Option(
         "", "--canister", "-c", help="Deploy only 'backend' or 'frontend' (default: both)"
     ),
+    skip_extensions: bool = typer.Option(
+        False, "--skip-extensions", help="Skip extension and codex installation phase"
+    ),
 ) -> None:
     """Deploy realm canisters from a mundus descriptor.
 
@@ -525,10 +528,14 @@ def mundus_deploy(
 
       # Deploy only the backend canister of Agora
       realms mundus deploy deployment-descriptors/staging-mundus-layered.yml --realm agora --canister backend
+
+      # Frontend-only redeploy, skip extensions
+      realms mundus deploy deployment-descriptors/staging-mundus-layered.yml --canister frontend --skip-extensions
     """
     mundus_deploy_descriptor_command(
         descriptor, network, deploy_mode, artifact_version,
         realm_filter=realm_filter, canister_filter=canister_filter,
+        skip_extensions=skip_extensions,
     )
 
 

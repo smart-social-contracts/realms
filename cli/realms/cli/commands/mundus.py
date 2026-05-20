@@ -103,8 +103,13 @@ def _download_and_hash(url: str) -> str:
         tmp_path.unlink(missing_ok=True)
 
 
-def _build_artifacts(parameters: dict | None = None) -> dict[str, Path]:
-    """Build backend WASM and frontend tarball from source. Returns artifact paths."""
+def _build_artifacts(parameters: dict | None = None, scope: str = "both") -> dict[str, Path]:
+    """Build backend WASM and/or frontend tarball from source.
+
+    scope: "both" (default), "frontend_only", or "backend_only".
+    When scope is "frontend_only", skips backend compilation and uses existing
+    declarations from the source tree — significantly faster for frontend-only deploys.
+    """
     import gzip
     import tarfile
 
@@ -124,8 +129,7 @@ def _build_artifacts(parameters: dict | None = None) -> dict[str, Path]:
         if applied:
             console.print(f"  Build parameters: {applied}")
 
-        # Patch backend config.py with matching parameters
-        if backend_config_path.exists():
+        if scope != "frontend_only" and backend_config_path.exists():
             backend_config_backup = backend_config_path.read_text()
             patched = backend_config_backup
             for param_name, value in parameters.items():
@@ -141,76 +145,81 @@ def _build_artifacts(parameters: dict | None = None) -> dict[str, Path]:
             if patched != backend_config_backup:
                 backend_config_path.write_text(patched)
 
-    console.print("  Building backend WASM...")
-    result = subprocess.run(
-        ["python", "-m", "basilisk", "realm_backend", "src/realm_backend/main.py"],
-        cwd=project_root, capture_output=True, text=True, env=build_env,
-    )
-    if result.returncode != 0:
+    artifacts = {}
+
+    if scope != "frontend_only":
+        console.print("  Building backend WASM...")
+        result = subprocess.run(
+            ["python", "-m", "basilisk", "realm_backend", "src/realm_backend/main.py"],
+            cwd=project_root, capture_output=True, text=True, env=build_env,
+        )
+        if result.returncode != 0:
+            if backend_config_backup is not None:
+                backend_config_path.write_text(backend_config_backup)
+            console.print(f"[red]  Backend build failed (exit code {result.returncode})[/red]")
+            console.print(f"[red]  stdout:[/red]\n{result.stdout or '(empty)'}")
+            console.print(f"[red]  stderr:[/red]\n{result.stderr or '(empty)'}")
+            raise RuntimeError(
+                f"Backend build failed (exit code {result.returncode}):\n"
+                f"--- stdout ---\n{result.stdout or '(empty)'}\n"
+                f"--- stderr ---\n{result.stderr or '(empty)'}"
+            )
+
         if backend_config_backup is not None:
             backend_config_path.write_text(backend_config_backup)
-        console.print(f"[red]  Backend build failed (exit code {result.returncode})[/red]")
-        console.print(f"[red]  stdout:[/red]\n{result.stdout or '(empty)'}")
-        console.print(f"[red]  stderr:[/red]\n{result.stderr or '(empty)'}")
-        raise RuntimeError(
-            f"Backend build failed (exit code {result.returncode}):\n"
-            f"--- stdout ---\n{result.stdout or '(empty)'}\n"
-            f"--- stderr ---\n{result.stderr or '(empty)'}"
+
+        wasm_path = project_root / ".basilisk" / "realm_backend" / "realm_backend.wasm"
+        if not wasm_path.exists():
+            raise FileNotFoundError(f"WASM not found at {wasm_path}")
+
+        wasm_gz = Path(tempfile.mktemp(suffix=".wasm.gz", prefix="realm_backend_"))
+        with open(wasm_path, "rb") as f_in, gzip.open(wasm_gz, "wb") as f_out:
+            f_out.write(f_in.read())
+        console.print(f"  Backend WASM built ({wasm_gz.stat().st_size // 1024} KB)")
+        artifacts["realm_backend"] = wasm_gz
+
+        console.print("  Generating Candid declarations...")
+        result = subprocess.run(
+            ["dfx", "generate", "realm_backend"],
+            cwd=project_root, capture_output=True, text=True, env=build_env,
         )
+        if result.returncode != 0:
+            console.print(f"  [yellow]dfx generate warning: {result.stderr[:200]}[/yellow]")
 
-    # Restore original config.py after backend build
-    if backend_config_backup is not None:
-        backend_config_path.write_text(backend_config_backup)
-
-    wasm_path = project_root / ".basilisk" / "realm_backend" / "realm_backend.wasm"
-    if not wasm_path.exists():
-        raise FileNotFoundError(f"WASM not found at {wasm_path}")
-
-    wasm_gz = Path(tempfile.mktemp(suffix=".wasm.gz", prefix="realm_backend_"))
-    with open(wasm_path, "rb") as f_in, gzip.open(wasm_gz, "wb") as f_out:
-        f_out.write(f_in.read())
-    console.print(f"  Backend WASM built ({wasm_gz.stat().st_size // 1024} KB)")
-
-    console.print("  Generating Candid declarations...")
-    result = subprocess.run(
-        ["dfx", "generate", "realm_backend"],
-        cwd=project_root, capture_output=True, text=True, env=build_env,
-    )
-    if result.returncode != 0:
-        console.print(f"  [yellow]dfx generate warning: {result.stderr[:200]}[/yellow]")
-
-    decl_src = project_root / "src" / "declarations" / "realm_backend"
-    decl_dst = project_root / "src" / "realm_frontend" / "src" / "lib" / "declarations" / "realm_backend"
-    if decl_src.exists():
+    if scope != "backend_only":
         import shutil
-        decl_dst.parent.mkdir(parents=True, exist_ok=True)
-        if decl_dst.exists():
-            shutil.rmtree(decl_dst)
-        shutil.copytree(decl_src, decl_dst)
-        console.print("  Declarations copied to frontend")
+        decl_src = project_root / "src" / "declarations" / "realm_backend"
+        decl_dst = project_root / "src" / "realm_frontend" / "src" / "lib" / "declarations" / "realm_backend"
+        if decl_src.exists():
+            decl_dst.parent.mkdir(parents=True, exist_ok=True)
+            if decl_dst.exists():
+                shutil.rmtree(decl_dst)
+            shutil.copytree(decl_src, decl_dst)
+            console.print("  Declarations copied to frontend")
 
-    console.print("  Building frontend...")
-    fe_dir = project_root / "src" / "realm_frontend"
-    result = subprocess.run(["npm", "install", "--legacy-peer-deps"], cwd=fe_dir, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(f"npm install failed:\n{result.stderr}")
-    result = subprocess.run(["npm", "run", "build"], cwd=fe_dir, capture_output=True, text=True, env=build_env)
-    if result.returncode != 0:
-        raise RuntimeError(f"Frontend build failed:\n{result.stderr}")
+        console.print("  Building frontend...")
+        fe_dir = project_root / "src" / "realm_frontend"
+        result = subprocess.run(["npm", "install", "--legacy-peer-deps"], cwd=fe_dir, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"npm install failed:\n{result.stderr}")
+        result = subprocess.run(["npm", "run", "build"], cwd=fe_dir, capture_output=True, text=True, env=build_env)
+        if result.returncode != 0:
+            raise RuntimeError(f"Frontend build failed:\n{result.stderr}")
 
-    dist_dir = fe_dir / "dist"
-    if not dist_dir.exists():
-        dist_dir = fe_dir / "build"
-    if not dist_dir.exists():
-        raise FileNotFoundError("Frontend dist/build directory not found")
+        dist_dir = fe_dir / "dist"
+        if not dist_dir.exists():
+            dist_dir = fe_dir / "build"
+        if not dist_dir.exists():
+            raise FileNotFoundError("Frontend dist/build directory not found")
 
-    tarball = Path(tempfile.mktemp(suffix=".tar.gz", prefix="realm_frontend_"))
-    with tarfile.open(tarball, "w:gz") as tar:
-        for item in dist_dir.iterdir():
-            tar.add(item, arcname=item.name)
-    console.print(f"  Frontend tarball built ({tarball.stat().st_size // 1024} KB)")
+        tarball = Path(tempfile.mktemp(suffix=".tar.gz", prefix="realm_frontend_"))
+        with tarfile.open(tarball, "w:gz") as tar:
+            for item in dist_dir.iterdir():
+                tar.add(item, arcname=item.name)
+        console.print(f"  Frontend tarball built ({tarball.stat().st_size // 1024} KB)")
+        artifacts["realm_frontend"] = tarball
 
-    return {"realm_backend": wasm_gz, "realm_frontend": tarball}
+    return artifacts
 
 
 def _resolve_artifact(ref: str, artifact_type: str, network: str,
@@ -238,7 +247,13 @@ def _resolve_artifact(ref: str, artifact_type: str, network: str,
         cache_key = f"build:{artifact_type}"
         if cache_key in _build_cache:
             return _build_cache[cache_key]
-        artifacts = _build_artifacts(parameters=parameters)
+        if artifact_type == "realm_frontend":
+            scope = "frontend_only"
+        elif artifact_type == "realm_backend":
+            scope = "backend_only"
+        else:
+            scope = "both"
+        artifacts = _build_artifacts(parameters=parameters, scope=scope)
         for atype, path in artifacts.items():
             h = _sha256_file(path)
             console.print(f"  Uploading {atype}: {path.name} (sha256={h[:16]}...)")
@@ -279,12 +294,14 @@ def _resolve_artifact(ref: str, artifact_type: str, network: str,
 def _build_manifest(realm_entry: dict, network: str, deploy_mode: str,
                     backend_url: str, frontend_url: str,
                     canister_filter: str = "", infra: dict | None = None,
-                    expected_hashes: dict | None = None) -> dict:
+                    expected_hashes: dict | None = None,
+                    skip_extensions: bool = False) -> dict:
     """Build a deployment manifest for a single realm.
 
     canister_filter: "" = both, "backend" = backend only, "frontend" = frontend only.
     infra: shared infrastructure canister IDs from the descriptor's ``infra`` section.
     expected_hashes: CLI-computed SHA-256 hashes for integrity verification.
+    skip_extensions: if True, strip extensions/codex from manifest so installer skips that phase.
     """
     project_root = get_project_root()
     manifest_path = realm_entry.get("manifest", "")
@@ -305,25 +322,43 @@ def _build_manifest(realm_entry: dict, network: str, deploy_mode: str,
                 branding[key] = _upload_file(img)
 
     artifacts = {}
-    canister_ids = {}
 
     if canister_filter != "frontend":
         artifacts["realm_backend"] = backend_url
-        canister_ids["backend"] = realm_entry.get("canister_id", "")
     if canister_filter != "backend":
         artifacts["realm_frontend"] = frontend_url
-        canister_ids["frontend"] = realm_entry.get("frontend_canister_id", "")
+
+    # Always include full canister IDs for registration, regardless of deploy scope
+    canister_ids = {
+        "backend": realm_entry.get("canister_id", ""),
+        "frontend": realm_entry.get("frontend_canister_id", ""),
+    }
+
+    # Determine deploy_scope for the installer/deployer
+    if canister_filter == "frontend":
+        deploy_scope = "frontend_only"
+    elif canister_filter == "backend":
+        deploy_scope = "backend_only"
+    else:
+        deploy_scope = "both"
+
+    realm_data = {
+        "name": realm_entry.get("display_name", realm_entry.get("name", "")),
+        **{k: v for k, v in realm_manifest.items() if k not in ("name",)},
+    }
+
+    if skip_extensions:
+        realm_data.pop("extensions", None)
+        realm_data.pop("codex", None)
 
     result = {
         "name": realm_entry.get("display_name", realm_entry.get("name", "unknown")),
         "network": network,
         "deploy_mode": deploy_mode,
+        "deploy_scope": deploy_scope,
         "artifacts": artifacts,
         "canister_ids": canister_ids,
-        "realm": {
-            "name": realm_entry.get("display_name", realm_entry.get("name", "")),
-            **{k: v for k, v in realm_manifest.items() if k not in ("name",)},
-        },
+        "realm": realm_data,
         "registry_canister_id": _REGISTRY_IDS.get(network, ""),
         "installer_canister_id": _INSTALLER_IDS.get(network, ""),
     }
@@ -562,12 +597,14 @@ def mundus_deploy_descriptor_command(
     artifact_version: str = "latest",
     realm_filter: str = "",
     canister_filter: str = "",
+    skip_extensions: bool = False,
 ) -> None:
     """Deploy realms from a mundus descriptor YAML file.
 
     Optional filters:
       realm_filter   — deploy only the realm matching this name/display_name
       canister_filter — "backend", "frontend", or "" (both)
+      skip_extensions — if True, skip extension/codex installation phase
     """
     descriptor_path = Path(descriptor)
     if not descriptor_path.is_absolute():
@@ -614,6 +651,8 @@ def mundus_deploy_descriptor_command(
     scope = f"{len(realms)} realm(s)"
     if canister_filter:
         scope += f" ({canister_filter} only)"
+    if skip_extensions:
+        scope += " [skip extensions]"
     console.print(f"Deploying {scope} to {network} (mode={deploy_mode})")
     if parameters:
         console.print(f"Parameters: {parameters}")
@@ -645,6 +684,7 @@ def mundus_deploy_descriptor_command(
         manifest = _build_manifest(
             realm, network, deploy_mode, backend_url, frontend_url,
             canister_filter, infra=infra, expected_hashes=expected_hashes,
+            skip_extensions=skip_extensions,
         )
         ok = _submit_and_poll(manifest, network)
         results.append((name, ok))
