@@ -35,7 +35,7 @@ export interface TopUtilityItem {
 
 export const topUtilityItems: TopUtilityItem[] = [
 	{ label: 'Account', icon: 'ti-user-circle', href: '/identities' },
-	{ label: 'Messages', icon: 'ti-mail', href: '/extensions/notifications' },
+	{ label: 'Messages', icon: 'ti-mail', href: '/messages' },
 	{ label: 'Settings', icon: 'ti-settings', href: '/settings' },
 ];
 
