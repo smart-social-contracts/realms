@@ -23,8 +23,10 @@
 		verified: boolean;
 	}
 
-	let loading = true;
-	let userStatusLoaded = false;
+	// Per-section loading states
+	let publicDataLoaded = false;
+	let privateDataLoaded = false;
+	let identitiesLoading = true;
 	let identityProviders: IdentityProvider[] = [];
 
 	// Public data
@@ -52,29 +54,44 @@
 
 	$: displayAvatar = avatarUrl?.trim() || `https://api.dicebear.com/9.x/glass/svg?seed=${$principal}`;
 
-	onMount(async () => {
-		// Load user status
+	onMount(() => {
+		loadPublicData();
+		loadPrivateData();
+		loadIdentityProviders();
+	});
+
+	async function loadPublicData() {
 		try {
 			const statusResponse = await backend.get_my_user_status();
 			if (statusResponse?.success && statusResponse.data?.userGet) {
 				const u = statusResponse.data.userGet;
 				nickname = u.nickname || '';
 				avatarUrl = u.avatar || '';
+			}
+		} catch (err) {
+			console.error('Error loading public data:', err);
+		} finally {
+			publicDataLoaded = true;
+		}
+	}
+
+	async function loadPrivateData() {
+		try {
+			const statusResponse = await backend.get_my_user_status();
+			if (statusResponse?.success && statusResponse.data?.userGet) {
+				const u = statusResponse.data.userGet;
 				if (u.private_data) {
-					// Try decrypting with vetKeys first (encrypted hex blob)
 					try {
 						const decrypted = await decryptPrivateData(backend, u.private_data);
 						if (decrypted) {
 							privateData = decrypted;
 							encryptionAvailable = true;
 						} else {
-							// Fallback: try parsing as legacy unencrypted JSON
 							try {
 								privateData = JSON.parse(u.private_data);
 							} catch {
 								privateData = {};
 							}
-							// Probe encryption availability
 							try {
 								await encryptPrivateData(backend, {});
 								encryptionAvailable = true;
@@ -91,7 +108,6 @@
 						} catch {
 							privateData = {};
 						}
-						// Probe whether encryption is actually available
 						try {
 							await encryptPrivateData(backend, {});
 							encryptionAvailable = true;
@@ -102,7 +118,6 @@
 						}
 					}
 				} else {
-					// No private data yet — probe encryption
 					try {
 						await encryptPrivateData(backend, {});
 						encryptionAvailable = true;
@@ -111,14 +126,16 @@
 					}
 				}
 			}
-	} catch (err) {
-		console.error('Error loading user status:', err);
-	} finally {
-		userStatusLoaded = true;
+		} catch (err) {
+			console.error('Error loading private data:', err);
+		} finally {
+			privateDataLoaded = true;
+		}
 	}
 
-	try {
-		const response = await backend.get_extensions();
+	async function loadIdentityProviders() {
+		try {
+			const response = await backend.get_extensions();
 			if (response.success && response.data.extensionsList) {
 				const extensions = response.data.extensionsList.extensions.map((ext: string) => JSON.parse(ext));
 
@@ -126,7 +143,6 @@
 					(ext: any) => ext.identity_provider && ext.enabled !== false
 				);
 
-				// Show providers immediately from manifest data (no canister calls)
 				identityProviders = providerExtensions.map((ext: any) => ({
 					extensionName: ext.name,
 					name: ext.identity_provider.name || ext.name,
@@ -136,7 +152,6 @@
 					verified: false
 				}));
 
-				// Then check verification status in parallel (DB reads, no external calls)
 				Promise.all(
 					providerExtensions.map(async (ext: any, i: number) => {
 						try {
@@ -149,7 +164,7 @@
 								const statusData = JSON.parse(statusResponse.response);
 								if (statusData.verified) {
 									identityProviders[i] = { ...identityProviders[i], verified: true };
-									identityProviders = identityProviders; // trigger reactivity
+									identityProviders = identityProviders;
 								}
 							}
 						} catch (err) {
@@ -161,9 +176,9 @@
 		} catch (error) {
 			console.error('Error loading identity providers:', error);
 		} finally {
-			loading = false;
+			identitiesLoading = false;
 		}
-	});
+	}
 
 	async function savePublicProfile() {
 		publicSaving = true;
@@ -172,7 +187,6 @@
 			const response = await backend.update_my_public_profile(nickname.trim(), avatarUrl.trim());
 			if (response?.success) {
 				publicMessage = 'Public profile updated successfully!';
-				// Update avatar in header
 				window.dispatchEvent(new CustomEvent('profilePictureUpdated', {
 					detail: { profilePictureUrl: avatarUrl.trim() }
 				}));
@@ -195,7 +209,6 @@
 			if (encryptionAvailable) {
 				payload = await encryptPrivateData(backend, privateData);
 			} else {
-				// Fallback to plaintext if encryption is not available
 				payload = JSON.stringify(privateData);
 			}
 			const response = await backend.update_my_private_data(payload);
@@ -217,11 +230,6 @@
 
 <MetaTag {path} {description} title={metaTitle} {subtitle} />
 
-{#if !userStatusLoaded}
-	<div class="flex justify-center items-center py-16">
-		<Spinner size="8" />
-	</div>
-{:else}
 <div class="mt-4 space-y-6 px-4 md:px-6">
 	<!-- Connected Identities -->
 	<Card size="xl">
@@ -229,7 +237,7 @@
 		<p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
 			Verify your identity through external providers for enhanced trust and access.
 		</p>
-		{#if loading}
+		{#if identitiesLoading}
 			<div class="flex justify-center items-center py-8">
 				<Spinner size="8" />
 			</div>
@@ -281,76 +289,88 @@
 		<p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
 			This information is visible to all community members.
 		</p>
-		<div class="flex flex-col sm:flex-row gap-6">
-			<div class="flex-shrink-0">
-				<Avatar src={displayAvatar} class="h-24 w-24 rounded-lg" size="none" rounded />
+		{#if !publicDataLoaded}
+			<div class="flex justify-center items-center py-8">
+				<Spinner size="6" />
 			</div>
-			<div class="flex-1 space-y-4">
-				<div>
-					<Label for="nickname" class="mb-2">Nickname</Label>
-					<Input id="nickname" bind:value={nickname} placeholder="Enter your nickname" />
+		{:else}
+			<div class="flex flex-col sm:flex-row gap-6">
+				<div class="flex-shrink-0">
+					<Avatar src={displayAvatar} class="h-24 w-24 rounded-lg" size="none" rounded />
 				</div>
-				<div>
-					<Label for="avatar-url" class="mb-2">Avatar URL</Label>
-					<Input id="avatar-url" bind:value={avatarUrl} placeholder="https://example.com/your-avatar.jpg" />
+				<div class="flex-1 space-y-4">
+					<div>
+						<Label for="nickname" class="mb-2">Nickname</Label>
+						<Input id="nickname" bind:value={nickname} placeholder="Enter your nickname" />
+					</div>
+					<div>
+						<Label for="avatar-url" class="mb-2">Avatar URL</Label>
+						<Input id="avatar-url" bind:value={avatarUrl} placeholder="https://example.com/your-avatar.jpg" />
+					</div>
 				</div>
 			</div>
-		</div>
-		{#if publicMessage}
-			<p class="mt-3 text-sm {publicMessage.includes('success') ? 'text-green-600' : 'text-red-600'}">{publicMessage}</p>
+			{#if publicMessage}
+				<p class="mt-3 text-sm {publicMessage.includes('success') ? 'text-green-600' : 'text-red-600'}">{publicMessage}</p>
+			{/if}
+			<div class="mt-4">
+				<Button size="sm" color="alternative" on:click={savePublicProfile} disabled={publicSaving}>
+					{publicSaving ? 'Saving...' : 'Save'}
+				</Button>
+			</div>
 		{/if}
-		<div class="mt-4">
-			<Button size="sm" color="alternative" on:click={savePublicProfile} disabled={publicSaving}>
-				{publicSaving ? 'Saving...' : 'Save'}
-			</Button>
-		</div>
 	</Card>
 
 	<!-- Private Data -->
 	<Card size="xl">
 		<Heading tag="h3" class="mb-2 text-xl font-bold dark:text-white">Private Data</Heading>
-			{#if encryptionAvailable}
-			<div class="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-				<p class="text-sm text-green-800 dark:text-green-200">
-					&#x1f512; Your private data is <strong>end-to-end encrypted</strong> using IC vetKeys. Only you can decrypt it.
-				</p>
+		{#if !privateDataLoaded}
+			<div class="flex justify-center items-center py-8">
+				<Spinner size="6" />
+				<span class="ml-3 text-sm text-gray-500">Decrypting private data...</span>
 			</div>
 		{:else}
-			<div class="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-				<p class="text-sm text-yellow-800 dark:text-yellow-200">
-					Encryption is not available{encryptionError ? `: ${encryptionError}` : ''}. Data will be stored unencrypted.
-				</p>
+			{#if encryptionAvailable}
+				<div class="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+					<p class="text-sm text-green-800 dark:text-green-200">
+						&#x1f512; Your private data is <strong>end-to-end encrypted</strong> using IC vetKeys. Only you can decrypt it.
+					</p>
+				</div>
+			{:else}
+				<div class="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+					<p class="text-sm text-yellow-800 dark:text-yellow-200">
+						Encryption is not available{encryptionError ? `: ${encryptionError}` : ''}. Data will be stored unencrypted.
+					</p>
+				</div>
+			{/if}
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+				{#each privateDataFields as field}
+					<div>
+						<Label for="private-{field.key}" class="mb-2">
+							{field.label}
+						</Label>
+						{#if field.type === 'date'}
+							<Input id="private-{field.key}" type="date" value={privateData[field.key] || ''} on:input={(e) => { privateData[field.key] = e.currentTarget.value; }} />
+						{:else if field.type === 'email'}
+							<Input id="private-{field.key}" type="email" value={privateData[field.key] || ''} on:input={(e) => { privateData[field.key] = e.currentTarget.value; }} placeholder="email@example.com" />
+						{:else if field.type === 'tel'}
+							<Input id="private-{field.key}" type="tel" value={privateData[field.key] || ''} on:input={(e) => { privateData[field.key] = e.currentTarget.value; }} placeholder="+1 234 567 890" />
+						{:else if field.type === 'url'}
+							<Input id="private-{field.key}" type="url" value={privateData[field.key] || ''} on:input={(e) => { privateData[field.key] = e.currentTarget.value; }} placeholder="https://..." />
+						{:else}
+							<Input id="private-{field.key}" type="text" value={privateData[field.key] || ''} on:input={(e) => { privateData[field.key] = e.currentTarget.value; }} />
+						{/if}
+					</div>
+				{/each}
+			</div>
+			{#if privateMessage}
+				<p class="mt-3 text-sm {privateMessage.includes('success') ? 'text-green-600' : 'text-red-600'}">{privateMessage}</p>
+			{/if}
+			<div class="mt-4">
+				<Button size="sm" color="alternative" on:click={savePrivateData} disabled={privateSaving}>
+					{privateSaving ? 'Saving...' : 'Save'}
+				</Button>
 			</div>
 		{/if}
-		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-			{#each privateDataFields as field}
-				<div>
-					<Label for="private-{field.key}" class="mb-2">
-						{field.label}
-					</Label>
-					{#if field.type === 'date'}
-						<Input id="private-{field.key}" type="date" value={privateData[field.key] || ''} on:input={(e) => { privateData[field.key] = e.currentTarget.value; }} />
-					{:else if field.type === 'email'}
-						<Input id="private-{field.key}" type="email" value={privateData[field.key] || ''} on:input={(e) => { privateData[field.key] = e.currentTarget.value; }} placeholder="email@example.com" />
-					{:else if field.type === 'tel'}
-						<Input id="private-{field.key}" type="tel" value={privateData[field.key] || ''} on:input={(e) => { privateData[field.key] = e.currentTarget.value; }} placeholder="+1 234 567 890" />
-					{:else if field.type === 'url'}
-						<Input id="private-{field.key}" type="url" value={privateData[field.key] || ''} on:input={(e) => { privateData[field.key] = e.currentTarget.value; }} placeholder="https://..." />
-					{:else}
-						<Input id="private-{field.key}" type="text" value={privateData[field.key] || ''} on:input={(e) => { privateData[field.key] = e.currentTarget.value; }} />
-					{/if}
-				</div>
-			{/each}
-		</div>
-		{#if privateMessage}
-			<p class="mt-3 text-sm {privateMessage.includes('success') ? 'text-green-600' : 'text-red-600'}">{privateMessage}</p>
-		{/if}
-		<div class="mt-4">
-			<Button size="sm" color="alternative" on:click={savePrivateData} disabled={privateSaving}>
-				{privateSaving ? 'Saving...' : 'Save'}
-			</Button>
-		</div>
 	</Card>
 
 </div>
-{/if}

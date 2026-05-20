@@ -2,27 +2,27 @@
 	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
-
+	
 	import { userProfiles, profilesLoading } from '$lib/stores/profiles';
 	import { styles, cn } from '$lib/theme/utilities';
 	import { getSidebarConfig, resolveRole, topUtilityItems } from '$lib/config/sidebar';
 	import { getTablerIcon } from '$lib/utils/tablerIcons';
 
 	export let drawerHidden: boolean = false;
-
+	
 	let showScrollIndicator = true;
 	let sidebarContainer: HTMLElement;
 
 	$: role = resolveRole($userProfiles ?? []);
 	$: sidebarConfig = getSidebarConfig(role);
-
+	
 	function checkScrollPosition() {
 		if (sidebarContainer) {
 			const { scrollTop, scrollHeight, clientHeight } = sidebarContainer;
 			showScrollIndicator = scrollTop + clientHeight < scrollHeight - 20;
 		}
 	}
-
+	
 	onMount(() => {
 		setTimeout(() => {
 			const sidebar = document.querySelector('aside.fixed');
@@ -35,14 +35,14 @@
 				}
 			}
 		}, 100);
-
+		
 		return () => {
 			if (sidebarContainer) {
 				sidebarContainer.removeEventListener('scroll', checkScrollPosition);
 			}
 		};
 	});
-
+	
 	const closeDrawer = () => {
 		drawerHidden = true;
 	};
@@ -76,8 +76,8 @@
 			<ul class="pt-5 lg:pt-3 pb-3 space-y-1">
 				{#each topUtilityItems as item}
 					{@const IconComp = getTablerIcon(item.icon)}
-					<li>
-						<a
+							<li>
+								<a 
 							href={item.href}
 							data-sveltekit-reload={isExtensionLink(item.href) ? '' : undefined}
 							class={cn(
@@ -87,30 +87,30 @@
 						>
 							<svelte:component this={IconComp} size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
 							<span class="ml-3">{item.label}</span>
-						</a>
-					</li>
-				{/each}
+								</a>
+							</li>
+					{/each}
 			</ul>
 
-			<!-- Loading State -->
+				<!-- Loading State -->
 			{#if $profilesLoading}
 				<div class="py-4 flex items-center justify-center">
 					<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
 				</div>
-			{/if}
+				{/if}
 
 			<!-- Role-based category sections -->
 			{#each sidebarConfig.categories as category (category.id)}
 				<ul class="pt-3 pb-3 space-y-1">
-					<li class="px-3 py-2">
-						<h3 class={styles.sidebar.categoryHeader()}>
+								<li class="px-3 py-2">
+									<h3 class={styles.sidebar.categoryHeader()}>
 							{category.label}
-						</h3>
-					</li>
+									</h3>
+								</li>
 					{#each category.items as item}
 						{@const IconComp = getTablerIcon(item.icon)}
-						<li>
-							<a
+									<li>
+										<a 
 								href={item.href}
 								data-sveltekit-reload={isExtensionLink(item.href) ? '' : undefined}
 								class={cn(
@@ -120,12 +120,12 @@
 							>
 								<svelte:component this={IconComp} size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
 								<span class="ml-3">{item.label}</span>
-							</a>
-						</li>
-					{/each}
+										</a>
+									</li>
+							{/each}
 				</ul>
 			{/each}
-		</nav>
+			</nav>
 	</div>
 
 	<!-- Fixed scroll indicator at bottom of sidebar -->
