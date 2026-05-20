@@ -64,17 +64,18 @@
 		principalText = userPrincipal.toText();
 
 		userIdentity.set(principalText);
-		principal.set(principalText); // Update the principal store
+		principal.set(principalText);
 
-		console.log('Principal at login:', principalText); // Debugging principal value after login
-		// Initialize backend with authenticated identity
+		console.log('Principal at login:', principalText);
 		await initBackendWithIdentity();
-		// Load user profiles
 		await loadUserProfiles();
 		await loadUserProfilePicture();
 
-		// Redirect members to their dashboard after login
-		if (hasJoined()) {
+		// Only redirect to dashboard if user is on a neutral page (root, join, welcome).
+		// Don't redirect if they're already viewing a specific extension or page.
+		const currentPath = window.location.pathname;
+		const neutralPages = ['/', '/join', '/welcome', '/dashboard'];
+		if (hasJoined() && neutralPages.includes(currentPath)) {
 			goto('/extensions/member_dashboard');
 		}
 	}
