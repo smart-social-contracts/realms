@@ -41,11 +41,11 @@ git push origin main
 gh workflow run deploy-mundus.yml \
   -f descriptor=deployment-descriptors/test-mundus-layered.yml \
   -f deploy_mode=upgrade \
-  -f canister=frontend \
+  -f canister=both \
   -f artifact_version=build
 ```
 
-Choose the descriptor matching the target environment (`test-`, `demo-`, or `staging-mundus-layered.yml`). Use `canister=frontend` for frontend-only changes or `canister=both` when backend code also changed. **Always use `deploy_mode=upgrade`** unless a full state reset is intended.
+Choose the descriptor matching the target environment (`test-`, `demo-`, or `staging-mundus-layered.yml`). **Always use `canister=both`** — the on-chain installer requires both backend and frontend artifact URLs in the manifest, even for frontend-only changes. **Always use `deploy_mode=upgrade`** unless a full state reset is intended — upgrade is safe and preserves all canister state.
 
 This is the preferred workflow for all code changes — no other steps (deploy-infra, deploy-files, etc.) are needed unless you're changing infrastructure canisters or extension bundles.
 
@@ -123,7 +123,7 @@ gh workflow run deploy-mundus.yml \
 | `canister` | `both`, `backend`, `frontend` | `both` | Which canisters to deploy |
 | `artifact_version` | `build`, `latest`, or semver | `build` | WASM artifact source |
 
-> **GOTCHA 1:** For extension-related deploys (`reinstall` mode), setting `canister=frontend` may fail with "Missing artifact URLs in manifest". Use `canister=both` with `deploy_mode=upgrade` in that case. For `upgrade` mode with source-only changes, `canister=frontend` works fine.
+> **GOTCHA 1:** Setting `canister=frontend` will fail with "Missing artifact URLs in manifest" because the on-chain installer expects both backend and frontend URLs in the manifest. Always use `canister=both` with `deploy_mode=upgrade` — the upgrade is safe and won't wipe data.
 
 > **GOTCHA 2:** The `deploy-files.yml` `environment` parameter must match the target environment. If you're deploying to demo realms, use `-f environment=demo`. The default is `staging`. Each environment has its own file_registry canister — publishing to the wrong one means the realm won't see updated extensions.
 
