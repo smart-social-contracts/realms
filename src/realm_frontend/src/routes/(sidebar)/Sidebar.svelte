@@ -1,96 +1,29 @@
 <script lang="ts">
 	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/stores';
-	import type { SvelteComponent } from 'svelte';
-
-	import {
-		Sidebar,
-		SidebarDropdownWrapper,
-		SidebarGroup,
-		SidebarItem,
-		SidebarWrapper
-	} from 'flowbite-svelte';
-	import {
-		AngleDownOutline,
-		AngleUpOutline,
-		ClipboardListSolid,
-		CogOutline,
-		FileChartBarSolid,
-		GithubSolid,
-		LayersSolid,
-		LifeSaverSolid,
-		LockSolid,
-		WandMagicSparklesOutline,
-		ChartPieOutline,
-		RectangleListSolid,
-		TableColumnSolid,
-		UsersOutline,
-		HomeOutline,
-		WalletSolid,
-		ObjectsColumnOutline,
-
-		FingerprintOutline
-
-	} from 'flowbite-svelte-icons';
-	
-	// Import extension system
-	import { type ExtensionMetadata } from '$lib/extensions';
-	
-	// Extend ExtensionMetadata to include path field and other properties
-	interface ExtensionMetadataWithPath extends ExtensionMetadata {
-		path?: string | null;
-		categories?: string[];
-		profiles?: string[];
-		doc_url?: string;
-		show_in_sidebar?: boolean;
-		enabled?: boolean;
-		// Layered Realm extras (Issue #168) — populated by get_sidebar_manifests()
-		// or back-filled from list_runtime_extensions for runtime entries.
-		version?: string;
-		sidebar_label?: Record<string, string> | string | null;
-		kind?: 'runtime' | 'bundled';
-	}
-	import { getIcon } from '$lib/utils/iconMap';
-	// Import user profiles store
-	import { userProfiles, profilesLoading } from '$lib/stores/profiles';
-	// Import authentication store
-	// @ts-ignore
-	import { isAuthenticated } from '$lib/stores/auth';
-	// Import backend for extension loading
-	import { backend } from '$lib/canisters';
-	
-	// Import i18n functionality
-	import { _, locale, isLoading, getLocaleFromNavigator } from 'svelte-i18n';
 	import { onMount } from 'svelte';
-	
-	// Import theme utilities
+
+	import { userProfiles, profilesLoading } from '$lib/stores/profiles';
 	import { styles, cn } from '$lib/theme/utilities';
+	import { getSidebarConfig, resolveRole, topUtilityItems } from '$lib/config/sidebar';
+	import { getTablerIcon } from '$lib/utils/tablerIcons';
 
 	export let drawerHidden: boolean = false;
-	
+
 	let showScrollIndicator = true;
 	let sidebarContainer: HTMLElement;
-	let collapsedSections: Record<string, boolean> = { developer: true };
-	
-	function toggleCollapsible(categoryId: string) {
-		collapsedSections[categoryId] = !collapsedSections[categoryId];
-	}
-	
-	$: {
-		if ($locale) {
-			console.log('Sidebar: Current locale:', $locale);
-		}
-	}
-	
+
+	$: role = resolveRole($userProfiles ?? []);
+	$: sidebarConfig = getSidebarConfig(role);
+
 	function checkScrollPosition() {
 		if (sidebarContainer) {
 			const { scrollTop, scrollHeight, clientHeight } = sidebarContainer;
 			showScrollIndicator = scrollTop + clientHeight < scrollHeight - 20;
 		}
 	}
-	
+
 	onMount(() => {
-		// Find the scrollable sidebar div after component mounts
 		setTimeout(() => {
 			const sidebar = document.querySelector('aside.fixed');
 			if (sidebar) {
@@ -98,546 +31,115 @@
 				if (scrollDiv) {
 					sidebarContainer = scrollDiv as HTMLElement;
 					sidebarContainer.addEventListener('scroll', checkScrollPosition);
-					checkScrollPosition(); // Initial check
+					checkScrollPosition();
 				}
 			}
 		}, 100);
-		
+
 		return () => {
 			if (sidebarContainer) {
 				sidebarContainer.removeEventListener('scroll', checkScrollPosition);
 			}
 		};
 	});
-	
+
 	const closeDrawer = () => {
 		drawerHidden = true;
 	};
-	
-	// Function to check if a URL is an extension link
-	function isExtensionLink(href: string | undefined): boolean {
-		if (!href) return false;
-		return href.startsWith('/extensions/') && href !== '/extensions';
-	}
-	
-	// Define types for navigation items
-	type NavItemWithHref = {
-		name?: string;
-		translationKey?: string; // Added translation key property for i18n
-		icon: typeof TableColumnSolid;
-		href: string;
-		children?: never;
-		// Add profile restrictions
-		profiles?: string[];
-	};
-	
-	type NavItemWithChildren = {
-		name: string;
-		icon: typeof TableColumnSolid; 
-		children: Record<string, string>;
-		href?: never;
-		// Add profile restrictions
-		profiles?: string[];
-	};
-	
-	type NavItem = NavItemWithHref | NavItemWithChildren;
-	
-	type Link = {
-		label: string;
-		href: string;
-		icon: typeof TableColumnSolid;
-	};
-
-	// Use theme utilities for consistent styling
-	let iconClass = styles.sidebar.icon();
-	let itemClass = styles.sidebar.item();
-	let groupClass = 'pt-2 space-y-2';
-
-	$: mainSidebarUrl = $page.url.pathname;
-	let activeMainSidebar: string;
 
 	afterNavigate((navigation) => {
-		// this fixes https://github.com/themesberg/flowbite-svelte/issues/364
 		document.getElementById('svelte')?.scrollTo({ top: 0 });
-		// Note: Do not close drawer here - sidebar state is persisted
-		activeMainSidebar = navigation.to?.url.pathname ?? '';
+		activeUrl = navigation.to?.url.pathname ?? '';
 	});
 
-	// ---------------------------------------------------------------------
-	// Sidebar data source — unified across bundled + runtime extensions
-	// ---------------------------------------------------------------------
-	// Issue #168 (Layered Realm): the sidebar gets ALL extension metadata
-	// from realm_backend.get_sidebar_manifests(), which returns a single
-	// shape regardless of whether an extension is baked into the WASM
-	// ("bundled") or installed at runtime from file_registry ("runtime").
-	//
-	// This means the sidebar code does not need to special-case runtime
-	// extensions. It also means an operator can flip a realm from bundled
-	// to layered without ANY frontend changes — only the install method
-	// changes; the metadata contract is identical.
-	//
-	// For older realm_backend WASMs that don't yet expose this method,
-	// we fall back to the previous code paths (get_extensions() for
-	// bundled, list_runtime_extensions() for runtime) so the sidebar
-	// keeps working during the rollout window.
-	interface CategoryMeta {
-		id: string;
-		name: string;
-		order: number;
-		show_header: boolean;
-		collapsible: boolean;
+	let activeUrl = '';
+
+	function isActive(href: string): boolean {
+		const pagePath = $page.url.pathname + $page.url.search;
+		if (href === pagePath) return true;
+		if (href.includes('?')) return false;
+		return $page.url.pathname === href || $page.url.pathname.startsWith(href + '/');
 	}
 
-	let extensions: ExtensionMetadataWithPath[] = [];
-	let categories: CategoryMeta[] = [];
-	let extensionsLoaded = false;
-	let extensionsLoading = false;
-
-	function manifestEntryToExtension(entry: any): ExtensionMetadataWithPath {
-		return {
-			id: entry.id,
-			name: entry.name ?? entry.id,
-			icon: entry.icon,
-			categories: Array.isArray(entry.categories) && entry.categories.length > 0
-				? entry.categories
-				: ['other'],
-			profiles: Array.isArray(entry.profiles) ? entry.profiles : [],
-			show_in_sidebar: entry.show_in_sidebar !== false,
-			// Carry version + sidebar_label + kind through so we can render
-			// nicer tooltips and use localized labels below.
-			...(entry.version ? { version: entry.version } : {}),
-			...(entry.sidebar_label ? { sidebar_label: entry.sidebar_label } : {}),
-			...(entry.kind ? { kind: entry.kind } : {}),
-		} as any;
+	function isExtensionLink(href: string): boolean {
+		return href.startsWith('/extensions/');
 	}
-
-	async function loadFromGetSidebarManifests(): Promise<boolean> {
-		const fn = (backend as any)?.get_sidebar_manifests;
-		if (typeof fn !== 'function') return false;
-		try {
-			const raw = await fn.call(backend);
-			const parsed = JSON.parse(raw);
-			if (!parsed?.success || !Array.isArray(parsed.manifests)) {
-				return false;
-			}
-			extensions = parsed.manifests.map(manifestEntryToExtension);
-			if (Array.isArray(parsed.categories)) {
-				categories = parsed.categories;
-			}
-			console.log(
-				'[Sidebar] get_sidebar_manifests →',
-				extensions.length,
-				'entries (',
-				extensions.filter((e: any) => e.kind === 'runtime').length,
-				'runtime,',
-				extensions.filter((e: any) => e.kind !== 'runtime').length,
-				'bundled )',
-			);
-			return true;
-		} catch (e) {
-			console.warn('[Sidebar] get_sidebar_manifests failed, will fall back:', e);
-			return false;
-		}
-	}
-
-	async function loadFromLegacyEndpoints(): Promise<void> {
-		// Bundled extensions (legacy realm_backend without get_sidebar_manifests).
-		const bundled: ExtensionMetadataWithPath[] = [];
-		try {
-			const response = await backend.get_extensions();
-			if (response?.success && response.data?.extensionsList) {
-				const extensionData = response.data.extensionsList.extensions.map(
-					(ext: string) => JSON.parse(ext),
-				);
-				for (const ext of extensionData) {
-					bundled.push({
-						id: ext.name,
-						name: ext.name,
-						icon: ext.icon,
-						categories: ext.categories || ['other'],
-						profiles: ext.profiles || [],
-						show_in_sidebar: ext.show_in_sidebar !== false,
-						...(ext.kind ? { kind: ext.kind } : { kind: 'bundled' }),
-					} as any);
-				}
-			}
-		} catch (e) {
-			console.warn('[Sidebar] get_extensions() fallback failed:', e);
-		}
-
-		// Runtime extensions (still loaded from list_runtime_extensions on legacy).
-		const runtime: ExtensionMetadataWithPath[] = [];
-		try {
-			const raw = await (backend as any).list_runtime_extensions();
-			const parsed = JSON.parse(raw);
-			if (parsed?.success) {
-				const ids: string[] = parsed.runtime_extensions ?? [];
-				const manifests: Record<string, any> = parsed.all_manifests ?? {};
-				for (const id of ids) {
-					const m = manifests?.[id] ?? {};
-					runtime.push(
-						manifestEntryToExtension({
-							id,
-							name: m.name ?? id,
-							version: m.version,
-							icon: m.icon,
-							categories: m.categories,
-							profiles: m.profiles,
-							show_in_sidebar: m.show_in_sidebar,
-							sidebar_label: m.sidebar_label,
-							kind: 'runtime',
-						}),
-					);
-				}
-			}
-		} catch (e) {
-			console.warn('[Sidebar] list_runtime_extensions fallback failed:', e);
-		}
-
-		// Runtime takes precedence over bundled with the same id.
-		const byId = new Map<string, ExtensionMetadataWithPath>();
-		for (const e of bundled) byId.set(e.id as string, e);
-		for (const e of runtime) byId.set(e.id as string, e);
-		extensions = Array.from(byId.values());
-	}
-
-	async function loadSidebarExtensions() {
-		extensionsLoading = true;
-		try {
-			const ok = await loadFromGetSidebarManifests();
-			if (!ok) {
-				console.log('[Sidebar] Falling back to legacy get_extensions + list_runtime_extensions');
-				await loadFromLegacyEndpoints();
-			}
-			extensionsLoaded = true;
-		} catch (e) {
-			console.error('[Sidebar] Failed to load extensions:', e);
-			extensions = [];
-			extensionsLoaded = true;
-		} finally {
-			extensionsLoading = false;
-		}
-	}
-
-	onMount(() => {
-		loadSidebarExtensions();
-		// Re-load when an extension is installed or uninstalled at runtime
-		// (e.g. via the package_manager extension), so the new entry appears
-		// without a full page reload. Components dispatch this event after
-		// a successful install_*/uninstall_* call.
-		const onChanged = () => {
-			console.log('[Sidebar] realms:extensions-changed → reloading manifests');
-			loadSidebarExtensions();
-		};
-		if (typeof window !== 'undefined') {
-			window.addEventListener('realms:extensions-changed', onChanged);
-		}
-		return () => {
-			if (typeof window !== 'undefined') {
-				window.removeEventListener('realms:extensions-changed', onChanged);
-			}
-		};
-	});
-	
-	/**
-	 * Sidebar visibility is driven entirely by the manifest's `profiles` field:
-	 *   - profiles is empty/absent → visible to everyone (including guests)
-	 *   - profiles is non-empty     → user must hold at least one listed profile
-	 */
-	function filterExtensionsForSidebar(extensions: ExtensionMetadataWithPath[], userProfiles: string[]): ExtensionMetadataWithPath[] {
-		if (!extensionsLoaded) return [];
-
-		return extensions.filter(ext => {
-			if (ext.enabled === false) return false;
-			if (ext.show_in_sidebar === false) return false;
-
-			const required = ext.profiles;
-			if (!required || !Array.isArray(required) || required.length === 0) {
-				return true;
-			}
-
-			if (!userProfiles || userProfiles.length === 0) return false;
-
-			return required.some((p: string) => userProfiles.includes(p));
-		});
-	}
-
-	// Core navigation: use translationKey + fallback name so labels stay reactive after i18n loads
-	// (do not call $_() in a const initializer — it runs once before locale is ready).
-	const coreNavItems: NavItemWithHref[] = [
-		{
-			translationKey: 'common.identities',
-			name: 'My Identities',
-			icon: FingerprintOutline,
-			href: '/identities',
-		},
-		{
-			translationKey: 'common.settings',
-			name: 'Settings',
-			icon: CogOutline,
-			href: '/settings',
-		},
-	];
-
-	// Filter core navigation items based on user profiles
-	$: filteredCoreNavItems = coreNavItems.filter(item => {
-		// If no profiles are available, only show Dashboard
-		if (!$userProfiles || $userProfiles.length === 0) {
-			return item.name === $_('navigation.dashboard');
-		}
-		
-		// If no profiles restriction on the item, show to everyone with a profile
-		if (!item.profiles || !item.profiles.length) return true;
-		
-		// Check if user has any of the required profiles
-		return item.profiles.some(profile => $userProfiles.includes(profile));
-	});
-
-	// Filter extensions based on user profiles and create menu items
-	let filteredExtensions: ExtensionMetadataWithPath[] = [];
-	
-	// Re-filter whenever extensions, profiles, or loading state change.
-	// We no longer gate on profilesLoading — if profiles haven't loaded yet
-	// we pass an empty array so the filter treats the user as a guest and
-	// still shows the public subset (llm_chat, public_dashboard).
-	$: {
-		const effectiveProfiles = $profilesLoading ? [] : $userProfiles;
-		if (extensionsLoaded) {
-			filteredExtensions = filterExtensionsForSidebar(extensions, effectiveProfiles);
-		} else {
-			filteredExtensions = [];
-		}
-	}
-
-	// Group extensions by categories
-	$: extensionsByCategory = (() => {
-		const cats: Record<string, ExtensionMetadataWithPath[]> = {};
-		
-		filteredExtensions.forEach(ext => {
-			const extCategories = ext.categories || ['other'];
-			
-			extCategories.forEach(category => {
-				if (!cats[category]) {
-					cats[category] = [];
-				}
-				cats[category].push(ext);
-			});
-		});
-		
-		return cats;
-	})();
-
-	// Categories sorted by backend-provided order; falls back to alphabetical
-	$: sortedCategories = (() => {
-		if (categories.length > 0) {
-			return [...categories].sort((a, b) => a.order - b.order);
-		}
-		// Fallback when backend doesn't provide categories metadata
-		const seen = new Set(Object.keys(extensionsByCategory));
-		return Array.from(seen).sort().map(id => ({
-			id,
-			name: id.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
-			order: 0,
-			show_header: true,
-			collapsible: false,
-		}));
-	})();
-
-	// Create navigation items for each category
-	$: categorizedNavItems = (() => {
-		const excluded = new Set(['demo_loader', 'test_bench']);
-		const result: Record<string, NavItemWithHref[]> = {};
-
-		Object.entries(extensionsByCategory).forEach(([category, exts]) => {
-			result[category] = exts
-				.filter(ext => !excluded.has(ext.id as string))
-				.map(ext => {
-					const href = `/extensions/${ext.id}`;
-
-					const iconComponent = getIcon(ext.icon) || LayersSolid;
-
-					// Resolve display label: sidebar_label[locale] → i18n key → name → id
-					let inlineLabel: string | undefined;
-					const sl = ext.sidebar_label as any;
-					if (sl) {
-						if (typeof sl === 'string') {
-							inlineLabel = sl;
-						} else if (typeof sl === 'object') {
-							const cur = ($locale ?? 'en') as string;
-							inlineLabel =
-								sl[cur] ??
-								sl[cur.split('-')[0]] ??
-								sl.en ??
-								sl[Object.keys(sl)[0]];
-						}
-					}
-
-					const displayName = inlineLabel
-						?? ext.name?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
-						?? ext.id.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
-
-					return {
-						translationKey: inlineLabel ? undefined : `extensions.${ext.id}.sidebar`,
-						name: displayName,
-						icon: iconComponent,
-						href,
-					};
-				});
-		});
-
-		return result;
-	})();
-
-	function resolveLabel(translationKey: string | undefined, name: string | undefined): string {
-		if (!translationKey) return name ?? '';
-		const translated = $_?.(translationKey) ?? translationKey;
-		if (translated === translationKey || translated.startsWith('extensions.')) {
-			return name ?? translationKey;
-		}
-		return translated;
-	}
-
-	let links: Link[] = [
-		// External links removed for brevity
-	];
-	
-	// Make dropdowns reactive based on core nav items
-	$: dropdowns = filteredCoreNavItems ? Object.fromEntries(filteredCoreNavItems.map((item, index) => [index, false])) : {};
-
-	afterNavigate((navigation) => {
-		// this fixes https://github.com/themesberg/flowbite-svelte/issues/364
-		document.getElementById('svelte')?.scrollTo({ top: 0 });
-		// Note: Do not close drawer here - state is persisted via localStorage
-	});
 </script>
 
-<Sidebar
-	class=""
-	activeUrl={mainSidebarUrl}
-	activeClass="bg-gray-50 dark:bg-gray-700"
-	asideClass="fixed top-0 left-0 z-40 flex-none h-[calc(100vh-4rem)] w-64 mt-16 border-r border-gray-200 dark:border-gray-600 transition-transform duration-500 ease-in-out {drawerHidden ? '-translate-x-full' : 'translate-x-0'}"
+<aside
+	class="fixed top-0 left-0 z-40 flex-none h-[calc(100vh-4rem)] w-64 mt-16 border-r border-gray-200 transition-transform duration-500 ease-in-out {drawerHidden ? '-translate-x-full' : 'translate-x-0'}"
 >
-	<h4 class="sr-only">{$_('common.main_menu')}</h4>
-	<SidebarWrapper
-		divClass={cn(styles.sidebar.container(), "overflow-y-auto h-full px-3 pb-12 scrollbar-hide overscroll-contain")}
-		asideClass=""
-	>
-			<nav class="divide-y divide-gray-200 dark:divide-gray-700">
-				<!-- Core Navigation Items -->
-				<SidebarGroup ulClass={groupClass} class="mb-3 pt-5 lg:pt-0">
-					{#each filteredCoreNavItems as { name, translationKey, icon, href }}
-						{#if isExtensionLink(href)}
-							<!-- Use classic browser navigation for extension links -->
-							<li>
-								<a 
-									href={href} 
-									data-sveltekit-reload 
-									class={itemClass}
-								>
-									<svelte:component this={icon} class={iconClass} />
-									<span class="ml-3">{resolveLabel(translationKey, name)}</span>
-								</a>
-							</li>
-						{:else}
-							<SidebarItem label={resolveLabel(translationKey, name)} {href} spanClass="ml-3" class={itemClass}>
-								<svelte:component this={icon} slot="icon" class={iconClass} />
-							</SidebarItem>
-						{/if}
-					{/each}
-				</SidebarGroup>
+	<h4 class="sr-only">Main menu</h4>
+	<div class={cn(styles.sidebar.container(), "overflow-y-auto h-full px-3 pb-12 scrollbar-hide overscroll-contain")}>
+		<nav class="divide-y divide-gray-200">
+			<!-- Top Utility Items (Account, Messages, Settings) -->
+			<ul class="pt-5 lg:pt-3 pb-3 space-y-1">
+				{#each topUtilityItems as item}
+					{@const IconComp = getTablerIcon(item.icon)}
+					<li>
+						<a
+							href={item.href}
+							data-sveltekit-reload={isExtensionLink(item.href) ? '' : undefined}
+							class={cn(
+								styles.sidebar.item(),
+								isActive(item.href) ? 'bg-gray-100 font-medium' : ''
+							)}
+						>
+							<svelte:component this={IconComp} size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
+							<span class="ml-3">{item.label}</span>
+						</a>
+					</li>
+				{/each}
+			</ul>
 
-				<!-- Loading State -->
-				{#if extensionsLoading || $profilesLoading}
-					<SidebarGroup ulClass={groupClass} class="mb-3">
-						<li class="px-3 py-2 flex items-center">
-							<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 dark:border-gray-100"></div>
+			<!-- Loading State -->
+			{#if $profilesLoading}
+				<div class="py-4 flex items-center justify-center">
+					<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
+				</div>
+			{/if}
+
+			<!-- Role-based category sections -->
+			{#each sidebarConfig.categories as category (category.id)}
+				<ul class="pt-3 pb-3 space-y-1">
+					<li class="px-3 py-2">
+						<h3 class={styles.sidebar.categoryHeader()}>
+							{category.label}
+						</h3>
+					</li>
+					{#each category.items as item}
+						{@const IconComp = getTablerIcon(item.icon)}
+						<li>
+							<a
+								href={item.href}
+								data-sveltekit-reload={isExtensionLink(item.href) ? '' : undefined}
+								class={cn(
+									styles.sidebar.item(),
+									isActive(item.href) ? 'bg-gray-100 font-medium' : ''
+								)}
+							>
+								<svelte:component this={IconComp} size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
+								<span class="ml-3">{item.label}</span>
+							</a>
 						</li>
-					</SidebarGroup>
-				{/if}
-
-			<!-- Dynamic category sections driven by backend metadata -->
-			{#each sortedCategories as cat (cat.id)}
-				{@const items = categorizedNavItems[cat.id] || []}
-				{#if items.length > 0}
-					<SidebarGroup ulClass={groupClass} class="mb-3">
-						{#if cat.show_header}
-							{#if cat.collapsible}
-								<li class="px-3 py-2">
-									<button
-										class="flex items-center w-full text-left {styles.sidebar.categoryHeader()}"
-										on:click={() => toggleCollapsible(cat.id)}
-									>
-										<span>{cat.name}</span>
-										<svelte:component 
-											this={collapsedSections[cat.id] ? AngleDownOutline : AngleUpOutline} 
-											class="w-3 h-3 ml-auto"
-										/>
-									</button>
-								</li>
-							{:else}
-								<li class="px-3 py-2">
-									<h3 class={styles.sidebar.categoryHeader()}>
-										{cat.name}
-									</h3>
-								</li>
-							{/if}
-						{/if}
-						
-						{#if !cat.collapsible || !collapsedSections[cat.id]}
-							{#each items as { name, translationKey, icon, href }}
-								{#if isExtensionLink(href)}
-									<li>
-										<a 
-											href={href} 
-											data-sveltekit-reload 
-											class={itemClass}
-										>
-											<svelte:component this={icon} class={iconClass} />
-											<span class="ml-3">{resolveLabel(translationKey, name)}</span>
-										</a>
-									</li>
-								{:else}
-									<SidebarItem label={resolveLabel(translationKey, name)} {href} spanClass="ml-3" class={itemClass}>
-										<svelte:component this={icon} slot="icon" class={iconClass} />
-									</SidebarItem>
-								{/if}
-							{/each}
-						{/if}
-					</SidebarGroup>
-				{/if}
-			{/each}
-
-
-				<!--
-					NOTE: Runtime extensions used to render in their own
-					"Runtime Extensions" group here. With Layered Realm
-					(Issue #168) they are now indistinguishable from
-					bundled ones at the sidebar level — they appear in
-					their proper category above, sourced from the same
-					get_sidebar_manifests() call.
-				-->
-
-				<!-- External Links -->
-				<SidebarGroup ulClass={groupClass}>
-					{#each links as { label, href, icon } (label)}
-						<SidebarItem {label} {href} spanClass="ml-3" class={itemClass} target="_blank">
-							<svelte:component this={icon} slot="icon" class={iconClass} />
-						</SidebarItem>
 					{/each}
-				</SidebarGroup>
-			</nav>
-		</SidebarWrapper>
+				</ul>
+			{/each}
+		</nav>
+	</div>
+
 	<!-- Fixed scroll indicator at bottom of sidebar -->
 	{#if showScrollIndicator}
 		<div class="absolute bottom-0 left-0 right-0 h-12 pointer-events-none bg-gradient-to-t from-white to-transparent flex items-end justify-center pb-2">
-			<span class="text-gray-400 text-lg animate-bounce">⌄</span>
+			<span class="text-gray-400 text-lg animate-bounce">&#8964;</span>
 		</div>
 	{/if}
-</Sidebar>
+</aside>
 
+<!-- Mobile overlay -->
 <div
 	hidden={drawerHidden}
-	class="fixed inset-0 z-20 bg-gray-900/50 dark:bg-gray-900/60 lg:hidden touch-none overscroll-none"
+	class="fixed inset-0 z-20 bg-gray-900/50 lg:hidden touch-none overscroll-none"
 	on:click={closeDrawer}
 	on:keydown={closeDrawer}
 	on:touchmove|preventDefault

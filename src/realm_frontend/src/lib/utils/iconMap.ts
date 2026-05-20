@@ -1,71 +1,70 @@
-import { 
-    WalletSolid, 
-    CogOutline, 
-    ChartPieOutline,
-    LightbulbOutline,
-    DollarOutline,
-    ClipboardListSolid,
-    LayersSolid,
-    LifeSaverSolid,
-    LockSolid,
-    WandMagicSparklesOutline,
-    RectangleListSolid,
-    TableColumnSolid,
-    UsersOutline,
-    HomeOutline,
-    FileChartBarSolid,
-    BellSolid,
-    LandmarkSolid,
-    BookOutline,
-    BrainOutline,
-    MapPinSolid,
-    ProfileCardSolid,
-    ObjectsColumnSolid,
-    ScaleBalancedSolid,
-    CheckCircleOutline,
-    UsersGroupSolid
-} from 'flowbite-svelte-icons';
+import {
+	IconWallet,
+	IconSettings,
+	IconChartPie,
+	IconBulb,
+	IconCurrencyDollar,
+	IconClipboardList,
+	IconStack2,
+	IconLifebuoy,
+	IconLock,
+	IconWand,
+	IconList,
+	IconColumns3,
+	IconUsers,
+	IconHome,
+	IconFileAnalytics,
+	IconBell,
+	IconBuildingBank,
+	IconBook,
+	IconBrain,
+	IconMapPin,
+	IconIdBadge,
+	IconLayoutGrid,
+	IconScale,
+	IconCircleCheck,
+	IconUsersGroup,
+	IconLayoutDashboard,
+} from '@tabler/icons-svelte';
 
 /**
- * Map of icon names to their corresponding icon components
- * Used by the extension system to dynamically render icons
+ * Map of icon names to their corresponding Tabler icon components.
+ * Used by the extension system to dynamically render icons from manifest metadata.
  */
 export const iconMap: Record<string, any> = {
-    'wallet': WalletSolid,
-    'cog': CogOutline,
-    'chart': ChartPieOutline,
-    'chart-pie': ChartPieOutline,
-    'lightbulb': LightbulbOutline,
-    'dollar': DollarOutline,
-    'clipboard': ClipboardListSolid,
-    'layers': LayersSolid,
-    'lifesaver': LifeSaverSolid,
-    'lock': LockSolid,
-    'wand': WandMagicSparklesOutline,
-    'analytics': ChartPieOutline,
-    'list': RectangleListSolid,
-    'table': TableColumnSolid,
-    'users': UsersOutline,
-    'home': HomeOutline,
-    'file': FileChartBarSolid,
-    'bell': BellSolid,
-    'building': LandmarkSolid,
-    'book': BookOutline,
-    'brain': BrainOutline,
-    'map_pin': MapPinSolid,
-    'id_card': ProfileCardSolid,
-    'objects': ObjectsColumnSolid,
-    'scale': ScaleBalancedSolid,
-    'vote': CheckCircleOutline,
-    'users_group': UsersGroupSolid
+	'wallet': IconWallet,
+	'cog': IconSettings,
+	'chart': IconChartPie,
+	'chart-pie': IconChartPie,
+	'lightbulb': IconBulb,
+	'dollar': IconCurrencyDollar,
+	'clipboard': IconClipboardList,
+	'layers': IconStack2,
+	'lifesaver': IconLifebuoy,
+	'lock': IconLock,
+	'wand': IconWand,
+	'analytics': IconChartPie,
+	'list': IconList,
+	'table': IconColumns3,
+	'users': IconUsers,
+	'home': IconHome,
+	'file': IconFileAnalytics,
+	'bell': IconBell,
+	'building': IconBuildingBank,
+	'book': IconBook,
+	'brain': IconBrain,
+	'map_pin': IconMapPin,
+	'id_card': IconIdBadge,
+	'objects': IconLayoutGrid,
+	'scale': IconScale,
+	'vote': IconCircleCheck,
+	'users_group': IconUsersGroup,
+	'dashboard': IconLayoutDashboard,
 };
 
 /**
- * Get an icon component by name, with fallback to default
- * @param iconName The name of the icon to retrieve
- * @param defaultIcon Default icon to use if not found
- * @returns The icon component
+ * Get an icon component by name, with fallback to default.
  */
-export function getIcon(iconName: string, defaultIcon: any = LayersSolid): any {
-    return iconMap[iconName] || defaultIcon;
+export function getIcon(iconName: string, defaultIcon: any = IconStack2): any {
+	return iconMap[iconName] || defaultIcon;
 }

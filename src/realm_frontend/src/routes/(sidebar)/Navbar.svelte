@@ -3,11 +3,12 @@
 	import { realmInfo, realmName } from '$lib/stores/realmInfo';
 	import { onMount } from 'svelte';
 	import { NavHamburger, Navbar } from 'flowbite-svelte';
+	import { IconMessageChatbot } from '@tabler/icons-svelte';
 	import '../../app.pcss';
 
 	export let fluid = true;
 	export let drawerHidden = false;
-	export let list = false;
+	export let aiPanelOpen = false;
 
 	onMount(() => {
 		realmInfo.fetch();
@@ -28,14 +29,24 @@
 				alt={$realmName || 'Realms Logo'}
 			/>
 			<span
-				class="ml-3 self-center whitespace-nowrap text-xl font-medium text-gray-700 dark:text-white sm:text-2xl pointer-events-none"
+				class="ml-3 self-center whitespace-nowrap text-xl font-medium text-gray-700 sm:text-2xl pointer-events-none"
 			>
 				{$realmName || ''}
 			</span>
 		</a>
 	</div>
 
-	<div class="ms-auto flex items-center gap-2 text-gray-500 dark:text-gray-400">
+	<div class="ms-auto flex items-center gap-2 text-gray-500">
+		<!-- AI Assistant toggle button -->
+		<button
+			on:click={() => (aiPanelOpen = !aiPanelOpen)}
+			class="p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200"
+			title="AI Assistant"
+			aria-label="Toggle AI Assistant"
+		>
+			<IconMessageChatbot size={22} class={aiPanelOpen ? 'text-gray-900' : 'text-gray-500'} />
+		</button>
+
 		<AuthButton />
 	</div>
 </Navbar>

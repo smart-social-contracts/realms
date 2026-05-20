@@ -4,29 +4,38 @@
 	import Sidebar from './Sidebar.svelte';
 	import Footer from './Footer.svelte';
 	import DemoBanner from '$lib/components/DemoBanner.svelte';
+	import AiAssistantPanel from '$lib/components/AiAssistantPanel.svelte';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 	
 	const SIDEBAR_STATE_KEY = 'realm_sidebar_state';
+	const AI_PANEL_STATE_KEY = 'realm_ai_panel_state';
 	
-	// Set drawerHidden to true by default
 	let drawerHidden = true;
+	let aiPanelOpen = false;
 	let initialized = false;
 	
-	// Save sidebar state to localStorage
 	function saveSidebarState(hidden) {
 		if (browser && initialized) {
 			localStorage.setItem(SIDEBAR_STATE_KEY, JSON.stringify(hidden));
 		}
 	}
+
+	function saveAiPanelState(open) {
+		if (browser && initialized) {
+			localStorage.setItem(AI_PANEL_STATE_KEY, JSON.stringify(open));
+		}
+	}
 	
-	// Watch for changes to drawerHidden and save (only after initialization)
 	$: if (browser && initialized) {
 		saveSidebarState(drawerHidden);
 	}
 
-	// Lock body scroll when sidebar is open on mobile
+	$: if (browser && initialized) {
+		saveAiPanelState(aiPanelOpen);
+	}
+
 	$: if (browser) {
 		if (!drawerHidden && typeof window !== 'undefined' && window.innerWidth < 1024) {
 			document.body.classList.add('overflow-hidden');
@@ -39,28 +48,27 @@
 
 	onMount(() => {
 		if (browser) {
-			// Ensure light mode is applied by removing dark class
 			document.documentElement.classList.remove('dark');
-			// Force light mode
 			document.documentElement.classList.add('light');
 			
-			// Load saved state or use screen size default
-			const saved = localStorage.getItem(SIDEBAR_STATE_KEY);
-			if (saved !== null) {
-				drawerHidden = JSON.parse(saved);
+			const savedSidebar = localStorage.getItem(SIDEBAR_STATE_KEY);
+			if (savedSidebar !== null) {
+				drawerHidden = JSON.parse(savedSidebar);
 			} else {
-				// Default: visible on desktop, hidden on mobile
 				drawerHidden = window.innerWidth < 1024;
 			}
+
+			const savedAi = localStorage.getItem(AI_PANEL_STATE_KEY);
+			if (savedAi !== null) {
+				aiPanelOpen = JSON.parse(savedAi);
+			}
 			
-			// Mark as initialized so we start saving changes
 			initialized = true;
 			
-			// Only update on resize for mobile breakpoint changes
 			const handleResize = () => {
-				// On mobile, always hide sidebar
 				if (window.innerWidth < 1024) {
 					drawerHidden = true;
+					aiPanelOpen = false;
 				}
 			};
 			
@@ -71,23 +79,20 @@
 			};
 		}
 	});
-
-	console.log("Layout is rendering"); // Debugging line
 </script>
 
 <div class="flex h-screen flex-col overflow-hidden">
 	<header
-		class="flex-none z-50 mx-auto w-full border-b border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800"
+		class="flex-none z-50 mx-auto w-full border-b border-gray-200 bg-white"
 	>
-		<Navbar bind:drawerHidden />
+		<Navbar bind:drawerHidden bind:aiPanelOpen />
 	</header>
 	<div class="flex flex-1 overflow-hidden">
-		<!-- Sidebar -->
+		<!-- Sidebar (left) -->
 		<Sidebar bind:drawerHidden />
 
 		<!-- Main Content -->
-		<div class="relative flex-1 overflow-y-auto overflow-x-hidden bg-white transition-[margin] duration-500 ease-in-out {drawerHidden ? '' : 'lg:ml-64'} lg:pl-6">
-			<!-- Demo Banner -->
+		<div class="relative flex-1 overflow-y-auto overflow-x-hidden bg-white transition-[margin] duration-500 ease-in-out {drawerHidden ? '' : 'lg:ml-64'} {aiPanelOpen ? 'lg:mr-80' : ''} lg:pl-6">
 			<div class="px-4 lg:px-0">
 				<DemoBanner />
 			</div>
@@ -97,5 +102,8 @@
 				<Footer />
 			{/if}
 		</div>
+
+		<!-- AI Assistant Panel (right) -->
+		<AiAssistantPanel bind:open={aiPanelOpen} onClose={() => (aiPanelOpen = false)} />
 	</div>
 </div>
