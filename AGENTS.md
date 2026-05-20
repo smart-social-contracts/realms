@@ -27,6 +27,28 @@ realms/                                          # Main repo
 
 **Important:** `extensions/` is a git submodule pointing to the `realms-extensions` repository. Changes to extensions must be committed/pushed there first, then the submodule ref updated in `realms`.
 
+## Deploying Code Changes (Standard Workflow)
+
+For any change to the realm frontend or backend source code (i.e., files under `src/`), the standard deployment workflow is:
+
+```bash
+# 1. Commit and push to main
+git add <changed files>
+git commit -m "fix: describe the change"
+git push origin main
+
+# 2. Trigger the deploy-mundus workflow (upgrade mode preserves all state)
+gh workflow run deploy-mundus.yml \
+  -f descriptor=deployment-descriptors/test-mundus-layered.yml \
+  -f deploy_mode=upgrade \
+  -f canister=frontend \
+  -f artifact_version=build
+```
+
+Choose the descriptor matching the target environment (`test-`, `demo-`, or `staging-mundus-layered.yml`). Use `canister=frontend` for frontend-only changes or `canister=both` when backend code also changed. **Always use `deploy_mode=upgrade`** unless a full state reset is intended.
+
+This is the preferred workflow for all code changes — no other steps (deploy-infra, deploy-files, etc.) are needed unless you're changing infrastructure canisters or extension bundles.
+
 ## Extension Frontend Build
 
 Each runtime extension has a `frontend-rt/` directory containing a Svelte 5 app built as an ES module library.
@@ -101,7 +123,7 @@ gh workflow run deploy-mundus.yml \
 | `canister` | `both`, `backend`, `frontend` | `both` | Which canisters to deploy |
 | `artifact_version` | `build`, `latest`, or semver | `build` | WASM artifact source |
 
-> **GOTCHA 1:** Setting `canister=frontend` will fail with "Missing artifact URLs in manifest" because the on-chain installer expects both backend and frontend URLs in the manifest. Always use `canister=both` with `deploy_mode=upgrade` — the upgrade is safe and won't wipe data.
+> **GOTCHA 1:** For extension-related deploys (`reinstall` mode), setting `canister=frontend` may fail with "Missing artifact URLs in manifest". Use `canister=both` with `deploy_mode=upgrade` in that case. For `upgrade` mode with source-only changes, `canister=frontend` works fine.
 
 > **GOTCHA 2:** The `deploy-files.yml` `environment` parameter must match the target environment. If you're deploying to demo realms, use `-f environment=demo`. The default is `staging`. Each environment has its own file_registry canister — publishing to the wrong one means the realm won't see updated extensions.
 
@@ -289,7 +311,7 @@ Verify: `realms --help` and `dfx --version`.
 - The realm backend must expose `install_extension_from_registry` and `get_extension_frontend_info` (Layer 2 code) before registry-install works.
 - The realm frontend must have the dynamic `/extensions/[id]` route to load ESM bundles at runtime.
 - **deploy_mode=upgrade vs reinstall:** `upgrade` preserves all canister state (stable memory, tasks, executions). `reinstall` wipes everything. Always use `upgrade` for production unless a full reset is intended.
-- **Never use `canister=frontend` alone** in `deploy-mundus` — it fails. Use `canister=both` with `deploy_mode=upgrade`.
+- **`canister=frontend`** works for `upgrade` deploys of source-only changes. For `reinstall` deploys, use `canister=both` since the installer expects both artifact URLs.
 - **Deployment ordering is critical:** When running multiple workflows, always execute in order: `deploy-infra` → `deploy-files` → `deploy-mundus`. Each stage must complete before the next begins.
 - **Transient timeout failures:** The agora realm deploy is particularly prone to network timeouts. When this happens, retry just that realm: `gh workflow run deploy-mundus.yml -f descriptor=<descriptor> -f deploy_mode=reinstall -f canister=both -f realm=agora`.
 
