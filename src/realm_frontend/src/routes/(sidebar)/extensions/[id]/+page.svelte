@@ -87,7 +87,22 @@
 		};
 	}
 
+	function cleanupMounted() {
+		if (mounted && typeof (mounted as MountResult)?.unmount === 'function') {
+			try {
+				(mounted as MountResult).unmount!();
+			} catch (e) {
+				console.warn('unmount error', e);
+			}
+		}
+		mounted = undefined;
+		if (mountPoint) {
+			mountPoint.innerHTML = '';
+		}
+	}
+
 	async function loadRuntimeExtension(id: string) {
+		cleanupMounted();
 		status = 'loading';
 		errorMsg = '';
 		debugInfo = '';
@@ -137,13 +152,7 @@
 	});
 
 	onDestroy(() => {
-		if (mounted && typeof (mounted as MountResult)?.unmount === 'function') {
-			try {
-				(mounted as MountResult).unmount!();
-			} catch (e) {
-				console.warn('unmount error', e);
-			}
-		}
+		cleanupMounted();
 	});
 </script>
 
