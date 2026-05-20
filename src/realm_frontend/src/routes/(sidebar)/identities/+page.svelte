@@ -24,6 +24,7 @@
 	}
 
 	let loading = true;
+	let userStatusLoaded = false;
 	let identityProviders: IdentityProvider[] = [];
 
 	// Public data
@@ -110,12 +111,14 @@
 					}
 				}
 			}
-		} catch (err) {
-			console.error('Error loading user status:', err);
-		}
+	} catch (err) {
+		console.error('Error loading user status:', err);
+	} finally {
+		userStatusLoaded = true;
+	}
 
-		try {
-			const response = await backend.get_extensions();
+	try {
+		const response = await backend.get_extensions();
 			if (response.success && response.data.extensionsList) {
 				const extensions = response.data.extensionsList.extensions.map((ext: string) => JSON.parse(ext));
 
@@ -214,6 +217,11 @@
 
 <MetaTag {path} {description} title={metaTitle} {subtitle} />
 
+{#if !userStatusLoaded}
+	<div class="flex justify-center items-center py-16">
+		<Spinner size="8" />
+	</div>
+{:else}
 <div class="mt-4 space-y-6 px-4 md:px-6">
 	<!-- Connected Identities -->
 	<Card size="xl">
@@ -345,3 +353,4 @@
 	</Card>
 
 </div>
+{/if}
