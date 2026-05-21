@@ -2306,7 +2306,10 @@ def extension_sync_call(extension_name: text, function_name: text, args: text) -
         if not _check_access(caller, Operations.EXTENSION_SYNC_CALL):
             return ExtensionCallResponse(
                 success=False,
-                response=f"Access denied: user {caller} lacks permission '{Operations.EXTENSION_SYNC_CALL}'",
+                response=json.dumps({
+                    "error": f"Access denied: you lack permission '{Operations.EXTENSION_SYNC_CALL}'",
+                    "denied_operation": Operations.EXTENSION_SYNC_CALL,
+                }),
             )
         logger.debug(
             f"Sync calling extension '{extension_name}' entry point '{function_name}' with args {args}"
@@ -2339,7 +2342,10 @@ def extension_async_call(extension_name: text, function_name: text, args: text) 
         if not _check_access(caller, Operations.EXTENSION_ASYNC_CALL):
             return ExtensionCallResponse(
                 success=False,
-                response=f"Access denied: user {caller} lacks permission '{Operations.EXTENSION_ASYNC_CALL}'",
+                response=json.dumps({
+                    "error": f"Access denied: you lack permission '{Operations.EXTENSION_ASYNC_CALL}'",
+                    "denied_operation": Operations.EXTENSION_ASYNC_CALL,
+                }),
             )
         logger.debug(
             f"Async calling extension '{extension_name}' entry point '{function_name}' with args {args}"
@@ -2770,7 +2776,6 @@ def get_nft_config() -> text:
 
 
 @update
-@require(Operations.REALM_CONFIGURE)
 def update_realm_config(config_json: str) -> str:
     """
     Update the realm configuration (name, description, welcome_message).
@@ -2781,6 +2786,15 @@ def update_realm_config(config_json: str) -> str:
     """
     logger.info("🔧 update_realm_config() called")
     try:
+        import json
+
+        caller = ic.caller().to_str()
+        if not _check_access(caller, Operations.REALM_CONFIGURE):
+            return json.dumps({
+                "success": False,
+                "error": f"Access denied: you lack permission '{Operations.REALM_CONFIGURE}'",
+                "denied_operation": Operations.REALM_CONFIGURE,
+            })
         import json
 
         from ggg import Realm
