@@ -203,7 +203,7 @@ Verify: `realms --help` and `dfx --version`.
 ## Gotchas
 
 1. **deploy-files `environment` must match target.** Publishing to `staging` (default) won't be visible to `demo` or `test` realms.
-2. **Never run deploy-mundus before deploy-files completes.** Fresh canisters pull extensions from file_registry at install time.
+2. **Any change inside `extensions/` (including manifest.json edits) requires `deploy-files` before `deploy-mundus`.** The mundus workflow installs extensions from the file registry — if you skip `deploy-files`, the registry still has stale manifests/bundles and the deploy will use old data. Always: `deploy-files` → wait for green → `deploy-mundus`.
 3. **Agora is prone to timeouts.** Retry a single failed realm: `-f realm=agora`.
 4. **`reinstall` wipes all state.** Use `upgrade` unless you want a clean slate.
 5. **`dist/index.js` is committed.** Always rebuild after source changes to extensions.
@@ -214,7 +214,10 @@ Verify: `realms --help` and `dfx --version`.
 
 - Do not commit unless explicitly told to do so.
 - Always use `deploy_mode=upgrade` for production/test deploys.
-- Always scope deploys to the realm you're testing (`-f realm=agora`).
+- Always scope deploys as narrowly as possible:
+  - **Realm:** `-f realm=agora` — deploy one realm, not all.
+  - **Canister:** `-f canister=frontend` or `-f canister=backend` — skip the half you didn't change.
+  - **Extensions/codices:** `-f extensions=voting,vault` or `-f codices=dominion` — deploy only what changed. Use `none` to skip entirely.
 - The dfx identity is `deployer`. Use `dfx identity use <name>` to switch.
 - **Monitor every workflow you trigger.** After launching a workflow, watch it until it goes green. If it fails, diagnose the error, fix it, re-push, and re-trigger — repeat until the run succeeds. Never leave a red workflow behind.
 
