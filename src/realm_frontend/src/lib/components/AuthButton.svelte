@@ -105,6 +105,7 @@
 
 		console.log('Principal after logout:', principalText);
 		showDropdown = false;
+		goto('/join');
 	}
 
 	function generateAvatarUrl(seed, profilePictureUrl) {

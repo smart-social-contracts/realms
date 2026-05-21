@@ -15,6 +15,8 @@
 	const subtitle: string = 'Settings';
 
 	let principal: string = '';
+	let nickname: string = '';
+	let avatarUrl: string = '';
 	let profiles: string[] = [];
 	let loadingUserStatus = true;
 	let userStatusError = '';
@@ -23,6 +25,8 @@
 	let changingQuarter = false;
 	let quarterChangeError = '';
 	let quarterChangeSuccess = '';
+
+	$: displayAvatar = avatarUrl?.trim() || `https://api.dicebear.com/9.x/glass/svg?seed=${principal}`;
 
 	function getQuarterName(canisterId: string): string {
 		const q = $realmInfo.quarters.find(q => q.canister_id === canisterId);
@@ -50,26 +54,22 @@
 	}
 
 	onMount(async () => {
-		console.log("Settings page mounted");
-		// Fetch user status
 		try {
-			console.log("Backend:", backend);
-			
 			if (!backend || typeof backend.get_my_user_status !== 'function') {
 				throw new Error("Backend canister is not properly initialized");
 			}
 			
-			console.log("Calling backend.get_my_user_status...");
 			const response = await backend.get_my_user_status();
-			console.log("Backend response:", response);
 			
 			if (response && response.success && response.data && response.data.userGet) {
-				principal = response.data.userGet.principal;
-				profiles = response.data.userGet.profiles || [];
-				assignedQuarter = response.data.userGet.assigned_quarter || '';
+				const u = response.data.userGet;
+				principal = u.principal;
+				nickname = u.nickname || '';
+				avatarUrl = u.avatar || '';
+				profiles = u.profiles || [];
+				assignedQuarter = u.assigned_quarter || '';
 				selectedQuarter = assignedQuarter;
 			} else {
-				console.error("Invalid backend response format:", response);
 				throw new Error('Could not fetch user status: Invalid response format.');
 			}
 		} catch (e: any) {
@@ -94,15 +94,39 @@
 				{$_('settings.title', { default: 'User Settings' })}
 			</Heading>
 
-			<!-- User Principal and Profiles -->
+			<!-- User Info -->
 			{#if loadingUserStatus}
 				<div class="mt-4 text-gray-500">Loading user status...</div>
 			{:else if userStatusError}
 				<div class="mt-4 text-red-500">{userStatusError}</div>
 			{:else}
-				<div class="mt-4 p-4 bg-gray-50 rounded border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
-					<div class="mb-2"><span class="font-semibold">Principal:</span> <span class="font-mono break-all">{principal}</span></div>
-					<div><span class="font-semibold">Profiles:</span> {profiles.length > 0 ? profiles.join(', ') : 'None'}</div>
+				<div class="mt-4 p-5 bg-gray-50 rounded-lg border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+					<div class="flex items-center gap-4 mb-4">
+						<img
+							src={displayAvatar}
+							alt="Avatar"
+							class="w-16 h-16 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
+						/>
+						<div>
+							<div class="text-lg font-semibold text-gray-900 dark:text-white">
+								{nickname || 'No nickname set'}
+							</div>
+							<div class="flex flex-wrap gap-1.5 mt-1">
+								{#each profiles as profile}
+									<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 capitalize">
+										{profile}
+									</span>
+								{/each}
+								{#if profiles.length === 0}
+									<span class="text-sm text-gray-500 dark:text-gray-400">No profiles</span>
+								{/if}
+							</div>
+						</div>
+					</div>
+					<div class="pt-3 border-t border-gray-200 dark:border-gray-700">
+						<span class="text-xs font-medium text-gray-500 dark:text-gray-400">Principal</span>
+						<div class="font-mono text-sm text-gray-700 dark:text-gray-300 break-all mt-0.5">{principal}</div>
+					</div>
 				</div>
 			{/if}
 		</div>
@@ -153,27 +177,21 @@
 		</div>
 		{/if}
 
-		<!-- Registries -->
+		<!-- Registries (only shown when there are registries to display) -->
+		{#if $realmInfo.registries.length > 0}
 		<div class="col-span-full mt-6">
 			<Heading tag="h2" class="text-lg font-semibold text-gray-900 dark:text-white mb-3">
 				{$_('settings.registries_title', { default: 'Registries' })}
 			</Heading>
-			{#if $realmInfo.loading}
-				<div class="text-gray-500">Loading...</div>
-			{:else if $realmInfo.registries.length > 0}
-				<div class="space-y-2">
-					{#each $realmInfo.registries as reg}
-						<div class="p-3 bg-gray-50 rounded border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
-							<span class="font-semibold">{reg.canister_type}:</span>
-							<span class="font-mono text-sm break-all ml-1">{reg.canister_id}</span>
-						</div>
-					{/each}
-				</div>
-			{:else}
-				<div class="text-gray-500 dark:text-gray-400">
-					{$_('settings.no_registries', { default: 'This realm is not registered with any registry.' })}
-				</div>
-			{/if}
+			<div class="space-y-2">
+				{#each $realmInfo.registries as reg}
+					<div class="p-3 bg-gray-50 rounded border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+						<span class="font-semibold">{reg.canister_type}:</span>
+						<span class="font-mono text-sm break-all ml-1">{reg.canister_id}</span>
+					</div>
+				{/each}
+			</div>
 		</div>
+		{/if}
 	</div>
 </main>
