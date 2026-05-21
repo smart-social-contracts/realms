@@ -1527,7 +1527,7 @@ def _link_token_nft_canisters(
             continue
 
         opt = lambda v: f'opt "{v}"' if v else "null"
-        arg = f'({opt(frontend_id)}, {opt(token_id)}, {opt(nft_id)}, null, null, {opt(version)})'
+        arg = f'({opt(frontend_id)}, {opt(token_id)}, {opt(nft_id)}, null, null, {opt(version)}, {opt(network)})'
         parts = [f"frontend={frontend_id or '–'}"]
         if token_id:
             parts.append(f"token={token_id}")
@@ -1535,6 +1535,7 @@ def _link_token_nft_canisters(
             parts.append(f"nft={nft_id}")
         if version:
             parts.append(f"version={version}")
+        parts.append(f"network={network}")
         print(f"   🔗 configuring {realm_name}: {', '.join(parts)}")
         try:
             _dfx("canister", "call", realm_cid, "set_canister_config", arg, network=network)

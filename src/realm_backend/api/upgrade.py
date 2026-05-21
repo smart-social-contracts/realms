@@ -112,17 +112,13 @@ def _get_frontend_canister_id() -> str:
 def _get_network() -> str:
     """Determine the IC network this realm is deployed on.
 
-    Attempts to infer from the registry record name. Falls back to "ic"
-    (mainnet) since that's the safest default for production upgrades.
+    Reads the network stored in the Realm entity (set via set_canister_config
+    during deployment). Falls back to "ic" (mainnet).
     """
     try:
-        from api.registry import get_registry_info
-        info = get_registry_info()
-        for reg in info.get("registries", []):
-            name = reg.get("name", "")
-            for network in ("test", "staging", "demo"):
-                if network in name:
-                    return network
+        realm = Realm.load("1")
+        if realm and getattr(realm, "network", None):
+            return str(realm.network)
     except Exception:
         pass
     return "ic"

@@ -412,7 +412,7 @@ def _poll_status_line(elapsed: int, status: str, detail: str = "") -> str:
 def _post_deploy_config(realm: dict, network: str, version: str) -> None:
     """Call set_canister_config on a realm backend after successful deployment.
 
-    Wires frontend_canister_id and installed_version into the realm's DB.
+    Wires frontend_canister_id, installed_version, and network into the realm's DB.
     """
     backend_id = realm.get("canister_id", "")
     frontend_id = realm.get("frontend_canister_id", "")
@@ -420,13 +420,15 @@ def _post_deploy_config(realm: dict, network: str, version: str) -> None:
         return
 
     opt = lambda v: f'opt "{v}"' if v else "null"
-    arg = f'({opt(frontend_id)}, null, null, null, null, {opt(version)})'
+    arg = f'({opt(frontend_id)}, null, null, null, null, {opt(version)}, {opt(network)})'
 
     parts = []
     if frontend_id:
         parts.append(f"frontend={frontend_id}")
     if version:
         parts.append(f"version={version}")
+    if network:
+        parts.append(f"network={network}")
     if not parts:
         return
 

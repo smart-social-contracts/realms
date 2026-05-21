@@ -51,3 +51,5 @@ class Realm(Entity, TimestampedMixin):
     background_image_url = String(max_length=512, default="")
     # Deployed version (set by set_canister_config or CI post-deploy)
     installed_version = String(max_length=32, default="")
+    # IC network this realm is deployed on (e.g. "test", "staging", "demo", "ic")
+    network = String(max_length=16, default="")
