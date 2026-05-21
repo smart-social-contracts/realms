@@ -23,6 +23,16 @@ on:
           - extensions-only
           - codices-only
 
+      extensions:
+        description: "Specific extensions to publish, comma-separated (leave blank for all)"
+        required: false
+        default: ""
+
+      codices:
+        description: "Specific codices to publish, comma-separated (leave blank for all)"
+        required: false
+        default: ""
+
       reinstall:
         description: "Wipe file registry first (reinstall canister)"
         required: false
@@ -50,6 +60,8 @@ jobs:
         run: |
           echo "Environment: ${{ inputs.environment }}"
           echo "Scope:       ${{ inputs.scope }}"
+          echo "Extensions:  ${{ inputs.extensions || '(all)' }}"
+          echo "Codices:     ${{ inputs.codices || '(all)' }}"
           echo "Reinstall:   ${{ inputs.reinstall }}"
           echo "Ref:         ${{ inputs.ref || github.ref }}"
 
@@ -99,16 +111,22 @@ jobs:
 
       - name: Publish to file registry
         run: |
-          SCOPE_FLAG=""
+          ARGS=(
+            --network "${{ inputs.environment }}"
+            --identity ci
+          )
           if [ "${{ inputs.scope }}" = "extensions-only" ]; then
-            SCOPE_FLAG="--extensions-only"
+            ARGS+=(--extensions-only)
           elif [ "${{ inputs.scope }}" = "codices-only" ]; then
-            SCOPE_FLAG="--codices-only"
+            ARGS+=(--codices-only)
           fi
-          realms files publish \
-            --network "${{ inputs.environment }}" \
-            --identity ci \
-            $SCOPE_FLAG
+          if [ -n "${{ inputs.extensions }}" ]; then
+            ARGS+=(--extensions "${{ inputs.extensions }}")
+          fi
+          if [ -n "${{ inputs.codices }}" ]; then
+            ARGS+=(--codices "${{ inputs.codices }}")
+          fi
+          realms files publish "${ARGS[@]}"
 
       - name: Review
         run: |
@@ -130,5 +148,7 @@ jobs:
           echo " File registry publish complete"
           echo " Environment: ${{ inputs.environment }}"
           echo " Scope:       ${{ inputs.scope }}"
+          echo " Extensions:  ${{ inputs.extensions || '(all)' }}"
+          echo " Codices:     ${{ inputs.codices || '(all)' }}"
           echo " Reinstall:   ${{ inputs.reinstall }}"
           echo "═══════════════════════════════════════"

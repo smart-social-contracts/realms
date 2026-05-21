@@ -513,7 +513,13 @@ def mundus_deploy(
         "", "--canister", "-c", help="Deploy only 'backend' or 'frontend' (default: both)"
     ),
     skip_extensions: bool = typer.Option(
-        False, "--skip-extensions", help="Skip extension and codex installation phase"
+        False, "--skip-extensions", help="Skip all extension and codex installation"
+    ),
+    extensions_filter: str = typer.Option(
+        "", "--extensions", help="Extensions to install: comma-separated IDs, or 'none' to skip (default: all)"
+    ),
+    codices_filter: str = typer.Option(
+        "", "--codices", help="Codices to install: comma-separated IDs, or 'none' to skip (default: all)"
     ),
 ) -> None:
     """Deploy realm canisters from a mundus descriptor.
@@ -531,11 +537,32 @@ def mundus_deploy(
 
       # Frontend-only redeploy, skip extensions
       realms mundus deploy deployment-descriptors/staging-mundus-layered.yml --canister frontend --skip-extensions
+
+      # Deploy only specific extensions
+      realms mundus deploy deployment-descriptors/staging-mundus-layered.yml --extensions voting,vault,admin_dashboard
+
+      # Deploy without codices
+      realms mundus deploy deployment-descriptors/staging-mundus-layered.yml --codices none
     """
+    ext_names = None
+    codex_names = None
+    if skip_extensions:
+        ext_names = []
+        codex_names = []
+    else:
+        if extensions_filter:
+            ext_names = [] if extensions_filter.strip().lower() == "none" else [
+                s.strip() for s in extensions_filter.split(",") if s.strip()
+            ]
+        if codices_filter:
+            codex_names = [] if codices_filter.strip().lower() == "none" else [
+                s.strip() for s in codices_filter.split(",") if s.strip()
+            ]
     mundus_deploy_descriptor_command(
         descriptor, network, deploy_mode, artifact_version,
         realm_filter=realm_filter, canister_filter=canister_filter,
         skip_extensions=skip_extensions,
+        extension_names=ext_names, codex_names=codex_names,
     )
 
 
@@ -584,9 +611,18 @@ def files_publish(
     codices_only: bool = typer.Option(
         False, "--codices-only", help="Only publish codices"
     ),
+    extensions_filter: str = typer.Option(
+        "", "--extensions", help="Specific extensions to publish, comma-separated (default: all)"
+    ),
+    codices_filter: str = typer.Option(
+        "", "--codices", help="Specific codices to publish, comma-separated (default: all)"
+    ),
 ) -> None:
-    """Publish all extensions and codices to the file registry."""
-    files_publish_command(network, registry, identity, extensions_only, codices_only)
+    """Publish extensions and codices to the file registry."""
+    ext_names = [s.strip() for s in extensions_filter.split(",") if s.strip()] if extensions_filter else None
+    codex_names = [s.strip() for s in codices_filter.split(",") if s.strip()] if codices_filter else None
+    files_publish_command(network, registry, identity, extensions_only, codices_only,
+                          extension_names=ext_names, codex_names=codex_names)
 
 
 @files_app.command("reset")

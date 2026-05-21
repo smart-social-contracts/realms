@@ -50,11 +50,15 @@ on:
           - backend
           - frontend
 
-      skip_extensions:
-        description: "Skip extension/codex installation (faster deploys)"
+      extensions:
+        description: "Extensions to install: 'all' (default), 'none', or comma-separated IDs"
         required: false
-        type: boolean
-        default: false
+        default: "all"
+
+      codices:
+        description: "Codices to install: 'all' (default), 'none', or comma-separated IDs"
+        required: false
+        default: "all"
 
       ref:
         description: "Commit/branch to deploy from (defaults to workflow ref)"
@@ -87,11 +91,16 @@ on:
         type: string
         required: false
         default: ""
-      skip_extensions:
-        description: "Skip extension/codex installation"
-        type: boolean
+      extensions:
+        description: "Extensions: 'all', 'none', or comma-separated IDs"
+        type: string
         required: false
-        default: false
+        default: "all"
+      codices:
+        description: "Codices: 'all', 'none', or comma-separated IDs"
+        type: string
+        required: false
+        default: "all"
     secrets:
       IC_IDENTITY_PEM:
         required: true
@@ -119,7 +128,8 @@ jobs:
           echo "Artifact version:  ${{ inputs.artifact_version || 'latest' }}"
           echo "Realm filter:      ${{ inputs.realm || '(all)' }}"
           echo "Canister filter:   ${{ inputs.canister || '(both)' }}"
-          echo "Skip extensions:   ${{ inputs.skip_extensions || false }}"
+          echo "Extensions:        ${{ inputs.extensions || 'all' }}"
+          echo "Codices:           ${{ inputs.codices || 'all' }}"
           echo "Ref:               ${{ inputs.ref || github.ref }}"
 
       - uses: actions/checkout@v4
@@ -259,8 +269,22 @@ jobs:
           if [ "${{ inputs.canister }}" != "both" ] && [ -n "${{ inputs.canister }}" ]; then
             ARGS+=(--canister "${{ inputs.canister }}")
           fi
-          if [ "${{ inputs.skip_extensions }}" = "true" ]; then
+
+          EXTENSIONS="${{ inputs.extensions || 'all' }}"
+          CODICES="${{ inputs.codices || 'all' }}"
+          if [ "$EXTENSIONS" = "none" ] && [ "$CODICES" = "none" ]; then
             ARGS+=(--skip-extensions)
+          else
+            if [ "$EXTENSIONS" != "all" ] && [ "$EXTENSIONS" != "none" ]; then
+              ARGS+=(--extensions "$EXTENSIONS")
+            elif [ "$EXTENSIONS" = "none" ]; then
+              ARGS+=(--extensions "none")
+            fi
+            if [ "$CODICES" != "all" ] && [ "$CODICES" != "none" ]; then
+              ARGS+=(--codices "$CODICES")
+            elif [ "$CODICES" = "none" ]; then
+              ARGS+=(--codices "none")
+            fi
           fi
 
           realms mundus deploy "${ARGS[@]}"

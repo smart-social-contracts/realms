@@ -93,8 +93,13 @@ def files_publish_command(
     identity: Optional[str] = None,
     extensions_only: bool = False,
     codices_only: bool = False,
+    extension_names: Optional[list[str]] = None,
+    codex_names: Optional[list[str]] = None,
 ):
-    """Publish all extensions and codices to the file registry."""
+    """Publish extensions and codices to the file registry.
+
+    extension_names / codex_names: if provided, only publish these specific IDs.
+    """
     reg = _resolve_registry(network, registry)
     root = _find_project_root()
     ext_root = root / "extensions" / "extensions"
@@ -106,6 +111,9 @@ def files_publish_command(
                 d for d in codex_root.iterdir()
                 if d.is_dir() and not d.name.startswith("_")
             ])
+            if codex_names is not None:
+                codex_names_set = set(codex_names)
+                codex_dirs = [d for d in codex_dirs if d.name in codex_names_set]
             console.print(f"\n[bold]Publishing {len(codex_dirs)} codices to {reg} ({network})[/bold]\n")
             for cd in codex_dirs:
                 try:
@@ -126,6 +134,9 @@ def files_publish_command(
                 d for d in ext_root.iterdir()
                 if d.is_dir() and not d.name.startswith("_")
             ])
+            if extension_names is not None:
+                ext_names_set = set(extension_names)
+                ext_dirs = [d for d in ext_dirs if d.name in ext_names_set]
             console.print(f"\n[bold]Publishing {len(ext_dirs)} extensions to {reg} ({network})[/bold]\n")
             for ed in ext_dirs:
                 if not (ed / "manifest.json").exists():

@@ -295,13 +295,17 @@ def _build_manifest(realm_entry: dict, network: str, deploy_mode: str,
                     backend_url: str, frontend_url: str,
                     canister_filter: str = "", infra: dict | None = None,
                     expected_hashes: dict | None = None,
-                    skip_extensions: bool = False) -> dict:
+                    skip_extensions: bool = False,
+                    extension_names: list[str] | None = None,
+                    codex_names: list[str] | None = None) -> dict:
     """Build a deployment manifest for a single realm.
 
     canister_filter: "" = both, "backend" = backend only, "frontend" = frontend only.
     infra: shared infrastructure canister IDs from the descriptor's ``infra`` section.
     expected_hashes: CLI-computed SHA-256 hashes for integrity verification.
     skip_extensions: if True, strip extensions/codex from manifest so installer skips that phase.
+    extension_names: if provided, only include these extension IDs (empty list = none).
+    codex_names: if provided, only include these codex IDs (empty list = none).
     """
     project_root = get_project_root()
     manifest_path = realm_entry.get("manifest", "")
@@ -350,6 +354,23 @@ def _build_manifest(realm_entry: dict, network: str, deploy_mode: str,
     if skip_extensions:
         realm_data.pop("extensions", None)
         realm_data.pop("codex", None)
+    else:
+        if extension_names is not None:
+            if len(extension_names) == 0:
+                realm_data.pop("extensions", None)
+            elif "extensions" in realm_data:
+                allowed = set(extension_names)
+                realm_data["extensions"] = [
+                    e for e in realm_data["extensions"] if e in allowed
+                ]
+        if codex_names is not None:
+            if len(codex_names) == 0:
+                realm_data.pop("codex", None)
+            elif "codex" in realm_data and isinstance(realm_data["codex"], dict):
+                pkg = realm_data["codex"].get("package", {})
+                pkg_name = pkg.get("name", "")
+                if pkg_name not in codex_names:
+                    realm_data.pop("codex", None)
 
     result = {
         "name": realm_entry.get("display_name", realm_entry.get("name", "unknown")),
@@ -598,13 +619,17 @@ def mundus_deploy_descriptor_command(
     realm_filter: str = "",
     canister_filter: str = "",
     skip_extensions: bool = False,
+    extension_names: list[str] | None = None,
+    codex_names: list[str] | None = None,
 ) -> None:
     """Deploy realms from a mundus descriptor YAML file.
 
     Optional filters:
-      realm_filter   — deploy only the realm matching this name/display_name
+      realm_filter    — deploy only the realm matching this name/display_name
       canister_filter — "backend", "frontend", or "" (both)
-      skip_extensions — if True, skip extension/codex installation phase
+      skip_extensions — if True, skip all extension/codex installation
+      extension_names — if provided, only install these extensions (empty list = none)
+      codex_names     — if provided, only install these codices (empty list = none)
     """
     descriptor_path = Path(descriptor)
     if not descriptor_path.is_absolute():
@@ -653,6 +678,14 @@ def mundus_deploy_descriptor_command(
         scope += f" ({canister_filter} only)"
     if skip_extensions:
         scope += " [skip extensions]"
+    elif extension_names is not None and len(extension_names) == 0:
+        scope += " [no extensions]"
+    elif extension_names is not None:
+        scope += f" [extensions: {','.join(extension_names)}]"
+    if codex_names is not None and len(codex_names) == 0:
+        scope += " [no codices]"
+    elif codex_names is not None:
+        scope += f" [codices: {','.join(codex_names)}]"
     console.print(f"Deploying {scope} to {network} (mode={deploy_mode})")
     if parameters:
         console.print(f"Parameters: {parameters}")
@@ -685,6 +718,7 @@ def mundus_deploy_descriptor_command(
             realm, network, deploy_mode, backend_url, frontend_url,
             canister_filter, infra=infra, expected_hashes=expected_hashes,
             skip_extensions=skip_extensions,
+            extension_names=extension_names, codex_names=codex_names,
         )
         ok = _submit_and_poll(manifest, network)
         results.append((name, ok))
