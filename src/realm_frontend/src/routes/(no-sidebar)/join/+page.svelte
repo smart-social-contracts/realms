@@ -2,7 +2,7 @@
   import { Button, Spinner } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { principal, isAuthenticated } from '$lib/stores/auth';
-  import { login, initializeAuthClient } from '$lib/auth';
+  import { login, logout, initializeAuthClient } from '$lib/auth';
   import { TEST_MODE, TEST_MODE_II_BYPASS, TEST_MODE_USER_SELF_REGISTRATION, TEST_MODE_SKIP_TERMS } from '$lib/config.js';
   import { backend, initBackendWithIdentity, setActiveQuarter } from '$lib/canisters.js';
   import { loadUserProfiles, hasJoined, profilesLoading } from '$lib/stores/profiles';
@@ -81,6 +81,16 @@
   
   onMount(async () => {
     console.log('[JOIN PAGE v2] onMount - isAuthenticated:', $isAuthenticated);
+
+    // In test mode, always reset auth state so the user can choose an identity
+    if (TEST_MODE_II_BYPASS) {
+      console.log('[JOIN PAGE] [TEST MODE] Resetting auth state for identity selection');
+      await logout();
+      isAuthenticated.set(false);
+      principal.set('');
+      currentStep = 'auth';
+    }
+
     // Fetch realm info
     await realmInfo.fetch();
     if ($realmNameStore) {
@@ -91,7 +101,7 @@
     const urlParams = new URLSearchParams(window.location.search);
     inviteCode = urlParams.get('invite') || urlParams.get('code') || '';
 
-    // If user is already authenticated, load their profiles to check join status
+    // If user is already authenticated (non-test mode), load their profiles to check join status
     if ($isAuthenticated) {
       console.log('[JOIN PAGE v2] Loading profiles for authenticated user...');
       await initBackendWithIdentity();
