@@ -174,3 +174,14 @@
 
 	<div bind:this={mountPoint} data-extension-id={id} class="extension-mount-point"></div>
 </div>
+
+<style>
+	:global(.extension-mount-point svg[role="status"]),
+	:global(.extension-mount-point svg.animate-spin),
+	:global(.extension-mount-point svg[class*="animate-spin"]) {
+		max-width: 3rem !important;
+		max-height: 3rem !important;
+		width: auto !important;
+		height: auto !important;
+	}
+</style>
