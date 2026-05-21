@@ -36,6 +36,7 @@ class Operations:
 
     # Realm administration
     REALM_ADMIN = "realm.admin"
+    REALM_UPGRADE = "realm.upgrade"
     REALM_CONFIGURE = "realm.configure"
     REALM_CONFIGURE_CODEX = "realm.configure.codex"
     REALM_REGISTER = "realm.register"
@@ -190,6 +191,7 @@ class Profiles:
         "name": "operator",
         "allowed_to": [
             Operations.REALM_ADMIN,
+            Operations.REALM_UPGRADE,
             Operations.REALM_CONFIGURE,
             Operations.REALM_CONFIGURE_CODEX,
             Operations.QUARTER_REGISTER,

@@ -198,6 +198,7 @@ from _cdk import (
 )
 from ic_python_db import Database
 from ic_python_logging import get_logger
+from core.models import VersionInfo
 
 # ── Inter-canister: realm_installer ────────────────────────────────────
 
@@ -295,6 +296,18 @@ class GetBillingStatusResult(Variant, total=False):
     Ok: BillingStatusRecord
     Err: text
 
+class VersionInfoRecord(Record):
+    version: text
+    backend_wasm_url: text
+    frontend_tar_url: text
+    backend_wasm_hash: text
+    frontend_tar_hash: text
+    published_at: float64
+
+class UpgradeResult(Variant, total=False):
+    Ok: text
+    Err: text
+
 # ── Storage ────────────────────────────────────────────────────────────
 
 storage = StableBTreeMap[str, str](memory_id=1, max_key_size=200, max_value_size=2000)
@@ -302,11 +315,16 @@ Database.init(db_storage=storage, audit_enabled=True)
 logger = get_logger("main")
 
 DEPLOYMENT_COST_CREDITS = 5
+UPGRADE_COST_CREDITS = 5
+MIN_CYCLES_FOR_UPGRADE = 1_000_000_000_000  # 1T cycles
+
 _INSTALLER_IDS = {
     "staging": "lusjm-wqaaa-aaaau-ago7q-cai",
     "demo": "2s4td-daaaa-aaaao-bazmq-cai",
     "test": "fltjm-tyaaa-aaaap-qunhq-cai",
 }
+
+_NETWORK_FOR_CANISTER = {}  # populated from realm records
 
 
 def _realm_record(r: dict) -> RealmRecord:
@@ -546,5 +564,209 @@ def deployment_succeeded(job_id: text, caller_principal: text = "") -> text:
     try:
         capture_deployment_hold(job_id, "Deployment completed")
         return json.dumps({"success": True, "job_id": job_id, "settlement": "captured"})
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+# ── Version catalog endpoints ──────────────────────────────────────────
+
+@update
+def publish_version(args_json: text) -> UpgradeResult:
+    """Publish a new realm version to the catalog. Controller-only.
+
+    args_json: {
+        "version": "0.3.5",
+        "backend_wasm_url": "https://github.com/.../realm_backend.wasm.gz",
+        "frontend_tar_url": "https://github.com/.../realm_frontend.tar.gz",
+        "backend_wasm_hash": "<sha256>",
+        "frontend_tar_hash": "<sha256>"
+    }
+    """
+    try:
+        if not ic.is_controller(ic.caller()):
+            return {"Err": "Only controllers can publish versions"}
+        params = json.loads(args_json)
+        version = params.get("version", "").strip()
+        if not version:
+            return {"Err": "version is required"}
+
+        import time
+        for vi in VersionInfo.instances():
+            if vi.is_latest:
+                vi.is_latest = False
+
+        existing = VersionInfo[version]
+        if existing:
+            existing.backend_wasm_url = params.get("backend_wasm_url", "")
+            existing.frontend_tar_url = params.get("frontend_tar_url", "")
+            existing.backend_wasm_hash = params.get("backend_wasm_hash", "")
+            existing.frontend_tar_hash = params.get("frontend_tar_hash", "")
+            existing.is_latest = True
+            existing.published_at = time.time()
+        else:
+            VersionInfo(
+                id=version, version=version,
+                backend_wasm_url=params.get("backend_wasm_url", ""),
+                frontend_tar_url=params.get("frontend_tar_url", ""),
+                backend_wasm_hash=params.get("backend_wasm_hash", ""),
+                frontend_tar_hash=params.get("frontend_tar_hash", ""),
+                is_latest=True, published_at=time.time(),
+            )
+        logger.info(f"Published version {version}")
+        return {"Ok": json.dumps({"success": True, "version": version})}
+    except Exception as e:
+        return {"Err": str(e)}
+
+
+@query
+def get_latest_version() -> UpgradeResult:
+    """Get the latest published realm version info."""
+    try:
+        for vi in VersionInfo.instances():
+            if vi.is_latest:
+                return {"Ok": json.dumps(vi.to_dict())}
+        return {"Err": "No versions published yet"}
+    except Exception as e:
+        return {"Err": str(e)}
+
+
+@query
+def list_versions() -> text:
+    """List all published versions."""
+    try:
+        versions = [vi.to_dict() for vi in VersionInfo.instances()]
+        versions.sort(key=lambda v: v.get("published_at", 0), reverse=True)
+        return json.dumps({"success": True, "versions": versions})
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+# ── Realm self-upgrade endpoint ────────────────────────────────────────
+
+@update
+def request_upgrade(args_json: text) -> Async[text]:
+    """Called by a realm_backend canister to request self-upgrade to latest.
+
+    The caller (ic.caller()) must be a registered realm's backend canister.
+    Checks realm credit balance and reported cycles, then enqueues the
+    upgrade via realm_installer.
+
+    args_json: {
+        "backend_canister_id": str,
+        "frontend_canister_id": str,
+        "reported_cycles": int,
+        "current_version": str,
+        "network": str
+    }
+    """
+    try:
+        caller = str(ic.caller())
+        params = json.loads(args_json)
+
+        backend_id = params.get("backend_canister_id", "").strip()
+        frontend_id = params.get("frontend_canister_id", "").strip()
+        reported_cycles = int(params.get("reported_cycles", 0))
+        current_version = params.get("current_version", "")
+        network = params.get("network", "").strip()
+
+        if caller != backend_id:
+            return json.dumps({"success": False,
+                "error": f"Caller {caller} does not match backend_canister_id {backend_id}"})
+
+        if not frontend_id:
+            return json.dumps({"success": False, "error": "frontend_canister_id is required"})
+
+        if not network:
+            return json.dumps({"success": False, "error": "network is required"})
+
+        # Check realm has a registered record
+        realm = get_registered_realm(caller)
+        if not realm.get("success"):
+            return json.dumps({"success": False,
+                "error": f"Realm not registered: {caller}"})
+
+        # Check credit balance
+        cr = get_user_credits(caller)
+        if not cr.get("success"):
+            return json.dumps({"success": False,
+                "error": cr.get("error", "credit check failed")})
+        balance = int((cr.get("credits") or {}).get("balance", 0))
+        if balance < UPGRADE_COST_CREDITS:
+            return json.dumps({"success": False,
+                "error": f"Insufficient credits: {balance} < {UPGRADE_COST_CREDITS}. "
+                         f"Purchase credits by transferring tokens to the registry."})
+
+        # Validate reported cycles
+        if reported_cycles < MIN_CYCLES_FOR_UPGRADE:
+            return json.dumps({"success": False,
+                "error": f"Insufficient cycles: {reported_cycles} < {MIN_CYCLES_FOR_UPGRADE}. "
+                         f"Top up canister cycles before upgrading."})
+
+        # Resolve latest version
+        latest = None
+        for vi in VersionInfo.instances():
+            if vi.is_latest:
+                latest = vi
+                break
+        if not latest:
+            return json.dumps({"success": False,
+                "error": "No versions available for upgrade"})
+
+        if latest.version == current_version:
+            return json.dumps({"success": False,
+                "error": f"Already on latest version: {current_version}"})
+
+        # Build deployment manifest
+        realm_name = (realm.get("realm") or {}).get("name", "unknown")
+        manifest = {
+            "name": realm_name,
+            "network": network,
+            "deploy_mode": "upgrade",
+            "deploy_scope": "both",
+            "upgrade_source": "self",
+            "artifacts": {
+                "realm_backend": latest.backend_wasm_url,
+                "realm_frontend": latest.frontend_tar_url,
+            },
+            "canister_ids": {
+                "backend": backend_id,
+                "frontend": frontend_id,
+            },
+            "expected_hashes": {
+                "backend_wasm": latest.backend_wasm_hash or "",
+            },
+            "realm": {
+                "name": realm_name,
+            },
+            "requesting_principal": caller,
+            "registry_canister_id": str(ic.id()),
+        }
+
+        installer_id = _INSTALLER_IDS.get(network)
+        if not installer_id:
+            return json.dumps({"success": False,
+                "error": f"No installer configured for network '{network}'"})
+
+        installer = RealmInstallerService(Principal.from_str(installer_id))
+        call_result: CallResult = yield installer.enqueue_deployment(json.dumps(manifest))
+
+        result = _unwrap_enqueue(call_result)
+        if not result.get("success"):
+            return json.dumps(result)
+
+        job_id = (result.get("job_id") or "").strip()
+        if not job_id:
+            return json.dumps({"success": False, "error": "installer missing job_id"})
+
+        hold = create_deployment_hold(caller, job_id, UPGRADE_COST_CREDITS,
+                                      f"Realm upgrade to {latest.version}")
+        if not hold.get("success"):
+            try:
+                yield installer.cancel_deployment(job_id)
+            except Exception:
+                pass
+            return json.dumps({"success": False, "error": hold.get("error", "hold failed")})
+
+        result["credits_held"] = UPGRADE_COST_CREDITS
+        result["target_version"] = latest.version
+        return json.dumps(result)
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})

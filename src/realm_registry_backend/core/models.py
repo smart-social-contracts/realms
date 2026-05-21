@@ -1,4 +1,4 @@
-from ic_python_db import Entity, Float, Integer, String, TimestampedMixin
+from ic_python_db import Entity, Float, Integer, String, TimestampedMixin, Boolean
 
 
 class UserCredits(Entity, TimestampedMixin):
@@ -82,4 +82,29 @@ class RealmRecord(Entity, TimestampedMixin):
             "users_count": self.users_count or 0,
             "created_at": self.created_at or 0.0,
             "frontend_canister_id": self.frontend_canister_id or "",
+        }
+
+
+class VersionInfo(Entity, TimestampedMixin):
+    """Tracks available realm versions for self-upgrade."""
+    __alias__ = "id"
+    id = String(max_length=32)
+    version = String(max_length=32)
+    backend_wasm_url = String(max_length=512)
+    frontend_tar_url = String(max_length=512)
+    backend_wasm_hash = String(max_length=128)
+    frontend_tar_hash = String(max_length=128)
+    is_latest = Boolean(default=False)
+    published_at = Float()
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "version": self.version or "",
+            "backend_wasm_url": self.backend_wasm_url or "",
+            "frontend_tar_url": self.frontend_tar_url or "",
+            "backend_wasm_hash": self.backend_wasm_hash or "",
+            "frontend_tar_hash": self.frontend_tar_hash or "",
+            "is_latest": bool(self.is_latest),
+            "published_at": self.published_at or 0.0,
         }

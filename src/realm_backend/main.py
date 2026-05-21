@@ -2691,6 +2691,123 @@ def get_realm_registry_info() -> text:
         )
 
 
+# ── Realm self-upgrade endpoints ───────────────────────────────────────
+
+@update
+@require(Operations.REALM_UPGRADE)
+def request_upgrade(registry_canister_id: text = "") -> Async[text]:
+    """Request an upgrade to the latest realm version.
+
+    Calls the registry to validate credits and cycles, then enqueues
+    the upgrade via the installer/deployer pipeline.
+
+    Args:
+        registry_canister_id: Optional override for registry canister ID.
+            If empty, uses the first registered registry.
+    """
+    from api.upgrade import request_upgrade as _do_upgrade, _get_registry_canister_id
+
+    try:
+        reg_id = registry_canister_id.strip() if registry_canister_id else ""
+        if not reg_id:
+            reg_id = _get_registry_canister_id()
+        if not reg_id:
+            return json.dumps({"success": False,
+                "error": "No registry canister configured. Set via set_canister_config or register first."})
+
+        result = yield _do_upgrade(reg_id)
+        return json.dumps(result)
+    except Exception as e:
+        logger.error(f"Error in request_upgrade: {e}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def get_upgrade_status() -> text:
+    """Get the status of the last upgrade request.
+
+    Returns the job_id of the most recent upgrade and its current version.
+    """
+    from api.upgrade import get_last_upgrade_job_id
+    from api.status import get_status
+
+    try:
+        job_id = get_last_upgrade_job_id()
+        status = get_status()
+        current_version = status.get("version", "")
+        return json.dumps({
+            "success": True,
+            "job_id": job_id,
+            "current_version": current_version,
+            "has_pending_upgrade": bool(job_id),
+        })
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+@require(Operations.REALM_UPGRADE)
+def get_realm_credits(registry_canister_id: text = "") -> Async[text]:
+    """Get this realm's credit balance from the registry.
+
+    Args:
+        registry_canister_id: Optional override for registry canister ID.
+    """
+    from api.upgrade import get_realm_credits as _get_credits, _get_registry_canister_id
+
+    try:
+        reg_id = registry_canister_id.strip() if registry_canister_id else ""
+        if not reg_id:
+            reg_id = _get_registry_canister_id()
+        if not reg_id:
+            return json.dumps({"success": False,
+                "error": "No registry canister configured"})
+
+        result = yield _get_credits(reg_id)
+        return json.dumps(result)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+@require(Operations.REALM_UPGRADE)
+def get_available_upgrade(registry_canister_id: text = "") -> Async[text]:
+    """Check if a newer version is available for upgrade.
+
+    Args:
+        registry_canister_id: Optional override for registry canister ID.
+    """
+    from api.upgrade import get_available_version, _get_registry_canister_id
+    from api.status import get_status
+
+    try:
+        reg_id = registry_canister_id.strip() if registry_canister_id else ""
+        if not reg_id:
+            reg_id = _get_registry_canister_id()
+        if not reg_id:
+            return json.dumps({"success": False,
+                "error": "No registry canister configured"})
+
+        result = yield get_available_version(reg_id)
+        if not result.get("success"):
+            return json.dumps(result)
+
+        status = get_status()
+        current_version = status.get("version", "")
+        latest = result.get("version", {})
+        latest_version = latest.get("version", "")
+
+        return json.dumps({
+            "success": True,
+            "current_version": current_version,
+            "latest_version": latest_version,
+            "upgrade_available": bool(latest_version and latest_version != current_version),
+            "latest": latest,
+        })
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
 @update
 @require(Operations.NFT_MINT)
 def mint_land_nft_for_parcel(

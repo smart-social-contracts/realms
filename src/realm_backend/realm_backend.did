@@ -194,6 +194,7 @@ type _ICRC1IndexerService = service { get_account_transactions : (_GetAccountTra
 type FileRegistryService = service { get_backend_files_icc : (text, text, text) -> (text) query; get_frontend_files_icc : (text, text) -> (text) query; get_extension_manifest : (text) -> (text) query };
 type NFTService = service { mint : (MintArg) -> (MintResult) };
 type RealmRegistryService = service { register_realm : (text, text, text, text, text) -> (AddRealmResult) };
+type RealmRegistryUpgradeService = service { request_upgrade : (text) -> (text); get_credits : (text) -> (text) query; get_latest_version : () -> (text) query };
 type RealmInstallerService = service { enqueue_deployment : (text) -> (RResultEnqueue); cancel_deployment : (text) -> (text) };
 type RealmTargetService = service { install_extension_from_registry : (text) -> (text); install_codex_from_registry : (text) -> (text) };
 
@@ -249,6 +250,10 @@ service : {
   "create_multi_step_scheduled_task" : (text, text, nat, nat) -> (text);
   "register_realm_with_registry" : (text, text, text, text) -> (text);
   "get_realm_registry_info" : () -> (text) query;
+  "request_upgrade" : (text) -> (text);
+  "get_upgrade_status" : () -> (text) query;
+  "get_realm_credits" : (text) -> (text);
+  "get_available_upgrade" : (text) -> (text);
   "mint_land_nft_for_parcel" : (text, text, nat, text) -> (text);
   "get_nft_config" : () -> (text) query;
   "update_realm_config" : (text) -> (text);
