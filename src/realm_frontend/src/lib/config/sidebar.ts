@@ -82,14 +82,20 @@ function getCategoryOrder(catId: string): number {
 
 /**
  * Build a SidebarConfig from extension manifests filtered by user profiles.
+ * When visibleExtensions is provided (from get_my_extensions), only those
+ * extensions are shown regardless of profile match.
  */
 export function buildSidebar(
 	manifests: Record<string, ExtensionManifest>,
 	userProfiles: string[],
 	locale: string = 'en',
+	visibleExtensions: string[] | null = null,
 ): SidebarConfig {
 	const visible = Object.values(manifests).filter((m) => {
 		if (!m.show_in_sidebar) return false;
+		if (visibleExtensions !== null) {
+			return visibleExtensions.includes(m.name);
+		}
 		if (!m.profiles || m.profiles.length === 0) return true;
 		return m.profiles.some((p) => userProfiles.includes(p));
 	});

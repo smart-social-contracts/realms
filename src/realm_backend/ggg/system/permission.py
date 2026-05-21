@@ -18,3 +18,4 @@ class Permission(Entity, TimestampedMixin):
     scope = String(max_length=256)
     users = ManyToMany(["User"], "permissions")
     profiles = ManyToMany(["UserProfile"], "permissions")
+    departments = ManyToMany(["Department"], "permissions")

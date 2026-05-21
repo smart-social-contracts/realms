@@ -2,6 +2,8 @@
 
 from .call import Call
 from .constants import *
+from .department import Department
+from .extension import Extension
 from .notification import Notification
 from .permission import Permission
 from .service import Service
@@ -29,7 +31,9 @@ from .user_profile import Operations, Profiles, UserProfile
 __all__ = [
     "Call",
     "ContractStatus",
+    "Department",
     "DisputeStatus",
+    "Extension",
     "InstrumentStatus",
     "MandateStatus",
     "Notification",

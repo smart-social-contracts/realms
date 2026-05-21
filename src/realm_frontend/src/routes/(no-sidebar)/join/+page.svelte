@@ -3,7 +3,7 @@
   import { onMount } from 'svelte';
   import { principal, isAuthenticated } from '$lib/stores/auth';
   import { login, initializeAuthClient } from '$lib/auth';
-  import { TEST_MODE, TEST_MODE_II_BYPASS, TEST_MODE_ADMIN_SELF_REGISTRATION, TEST_MODE_MEMBER_SELF_REGISTRATION, TEST_MODE_SKIP_TERMS } from '$lib/config.js';
+  import { TEST_MODE, TEST_MODE_II_BYPASS, TEST_MODE_USER_SELF_REGISTRATION, TEST_MODE_SKIP_TERMS } from '$lib/config.js';
   import { backend, initBackendWithIdentity, setActiveQuarter } from '$lib/canisters.js';
   import { loadUserProfiles, hasJoined, profilesLoading } from '$lib/stores/profiles';
   import { activeQuarterId } from '$lib/stores/quarters';
@@ -39,19 +39,28 @@
       iconType: 'cog',
       description: 'Full access to manage realm settings and users'
     },
+    { 
+      value: 'developer', 
+      name: 'Developer',
+      iconType: 'code',
+      description: 'System tools, extension development, and debugging'
+    },
   ];
 
-  // Only show admin profile when TEST_MODE_ADMIN_SELF_REGISTRATION is active
+  // In test mode with self-registration, show all profiles. Otherwise only member is available
+  // unless an invite code grants a specific profile.
   $: profiles = inviteValid && inviteProfile
     ? allProfiles.filter(p => p.value === inviteProfile)
-    : allProfiles.filter(p => p.value !== 'admin' || TEST_MODE_ADMIN_SELF_REGISTRATION);
+    : TEST_MODE_USER_SELF_REGISTRATION
+      ? allProfiles
+      : allProfiles.filter(p => p.value === 'member');
 
   $: if (profiles.length === 1 && !selectedProfile) {
     selectedProfile = profiles[0].value;
   }
 
   // Invite is required when registration is closed (not open) and user has no valid invite
-  $: inviteRequired = !$realmOpenRegistration && !inviteValid && !TEST_MODE_MEMBER_SELF_REGISTRATION;
+  $: inviteRequired = !$realmOpenRegistration && !inviteValid && !TEST_MODE_USER_SELF_REGISTRATION;
 
   const welcomeImageUrl = '/images/background.png';
   
@@ -140,17 +149,13 @@
     inviteError = '';
     error = '';
     try {
-      // Test mode shortcuts: "admin" / "member" accepted client-side
-      if (TEST_MODE_ADMIN_SELF_REGISTRATION && inviteCode.trim() === 'admin') {
+      // Test mode shortcuts: "admin" / "member" / "dev" accepted client-side
+      const trimmed = inviteCode.trim().toLowerCase();
+      if (TEST_MODE_USER_SELF_REGISTRATION && (trimmed === 'admin' || trimmed === 'member' || trimmed === 'dev' || trimmed === 'developer')) {
+        const profile = trimmed === 'dev' || trimmed === 'developer' ? 'developer' : trimmed;
         inviteValid = true;
-        inviteProfile = 'admin';
-        selectedProfile = 'admin';
-        return;
-      }
-      if (TEST_MODE_MEMBER_SELF_REGISTRATION && inviteCode.trim() === 'member') {
-        inviteValid = true;
-        inviteProfile = 'member';
-        selectedProfile = 'member';
+        inviteProfile = profile;
+        selectedProfile = profile;
         return;
       }
 
@@ -512,6 +517,10 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
+                    {:else if profile.iconType === 'code'}
+                      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      </svg>
                     {/if}
                   </div>
                   <div class="flex-1">
@@ -579,20 +588,13 @@
             {#if inviteError && !inviteChecking && !inviteValid}
               <p class="mt-2 text-sm text-red-600">{inviteError}</p>
             {/if}
-            {#if (TEST_MODE_MEMBER_SELF_REGISTRATION || TEST_MODE_ADMIN_SELF_REGISTRATION) && !inviteValid}
+            {#if TEST_MODE_USER_SELF_REGISTRATION && !inviteValid}
               <p class="mt-2 text-xs text-gray-400 flex items-start gap-1.5">
                 <svg class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span>
-                  Test mode: enter
-                  {#if TEST_MODE_MEMBER_SELF_REGISTRATION && TEST_MODE_ADMIN_SELF_REGISTRATION}
-                    <strong>"member"</strong> or <strong>"admin"</strong> to register as member or administrator.
-                  {:else if TEST_MODE_MEMBER_SELF_REGISTRATION}
-                    <strong>"member"</strong> to register as a member.
-                  {:else}
-                    <strong>"admin"</strong> to register as an administrator.
-                  {/if}
+                  Test mode: enter <strong>"member"</strong>, <strong>"admin"</strong>, or <strong>"dev"</strong> to register with that profile.
                 </span>
               </p>
             {/if}

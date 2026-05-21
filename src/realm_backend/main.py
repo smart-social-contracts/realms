@@ -1004,6 +1004,47 @@ def get_my_user_status() -> RealmResponse:
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
+@query
+def get_my_extensions() -> text:
+    """Return the list of extensions accessible to the calling user.
+
+    Visibility is the union of:
+      - Direct user grants (user.extensions)
+      - Department membership (user.departments → dept.extensions)
+      - Profile-level baseline (user.profiles → profile.extensions)
+
+    Returns JSON: {"success": true, "extensions": ["voting", "vault", ...]}
+    """
+    try:
+        from ggg import Extension, User
+
+        caller = ic.caller().to_str()
+        user = User[caller]
+        if not user:
+            return json.dumps({"success": False, "error": "User not found"})
+
+        visible = set()
+
+        # Direct user grants
+        for ext in user.extensions:
+            visible.add(ext.name)
+
+        # Department grants
+        for dept in user.departments:
+            for ext in dept.extensions:
+                visible.add(ext.name)
+
+        # Profile-level baseline
+        for profile in user.profiles:
+            for ext in profile.extensions:
+                visible.add(ext.name)
+
+        return json.dumps({"success": True, "extensions": sorted(visible)})
+    except Exception as e:
+        logger.error(f"Error getting user extensions: {str(e)}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
 @update
 @require(Operations.SELF_UPDATE_PUBLIC_PROFILE)
 def update_my_public_profile(nickname: str, avatar: str) -> RealmResponse:

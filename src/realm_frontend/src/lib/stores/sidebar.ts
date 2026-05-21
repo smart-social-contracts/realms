@@ -30,10 +30,11 @@ function writeCache(profiles: string[], config: SidebarConfig): void {
 
 /**
  * Load the sidebar from the backend's installed extension manifests.
- * Shows cached data instantly, then refreshes from backend in background.
+ * Uses get_my_extensions to determine visibility when available,
+ * falling back to profile-based filtering for older backends.
  */
 export async function loadSidebar(
-	backend: { list_runtime_extensions: () => Promise<string> },
+	backend: { list_runtime_extensions: () => Promise<string>; get_my_extensions?: () => Promise<string> },
 	userProfiles: string[],
 	locale: string = 'en',
 ): Promise<void> {
@@ -44,11 +45,27 @@ export async function loadSidebar(
 
 	sidebarLoading.set(true);
 	try {
-		const raw = await backend.list_runtime_extensions();
-		const parsed = JSON.parse(raw);
+		const [manifestsRaw, myExtRaw] = await Promise.all([
+			backend.list_runtime_extensions(),
+			backend.get_my_extensions?.().catch(() => null) ?? Promise.resolve(null),
+		]);
+
+		const parsed = JSON.parse(manifestsRaw);
 		const manifests: Record<string, ExtensionManifest> = parsed?.all_manifests ?? {};
 
-		const config = buildSidebar(manifests, userProfiles, locale);
+		let visibleExtensions: string[] | null = null;
+		if (myExtRaw) {
+			try {
+				const extParsed = JSON.parse(myExtRaw);
+				if (extParsed?.success && Array.isArray(extParsed.extensions)) {
+					visibleExtensions = extParsed.extensions;
+				}
+			} catch {
+				// fallback to profile-based filtering
+			}
+		}
+
+		const config = buildSidebar(manifests, userProfiles, locale, visibleExtensions);
 		sidebarConfig.set(config);
 		writeCache(userProfiles, config);
 	} catch (e) {

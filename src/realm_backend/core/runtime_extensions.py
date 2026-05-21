@@ -216,6 +216,31 @@ def get_extension_source(ext_id: str) -> Optional[dict]:
         return None
 
 
+def _seed_extension_entity(ext_id: str, manifest: dict):
+    """Create or update the Extension DB entity and link profile-level access."""
+    try:
+        from ggg import Extension, UserProfile
+
+        ext = Extension[ext_id]
+        if not ext:
+            ext = Extension(
+                name=ext_id,
+                description=manifest.get("description", ""),
+            )
+            logger.info(f"Extension {ext_id}: created DB entity")
+        else:
+            ext.description = manifest.get("description", "")
+
+        profile_names = manifest.get("profiles", [])
+        for pname in profile_names:
+            profile = UserProfile[pname]
+            if profile and profile not in ext.profiles:
+                ext.profiles.add(profile)
+                logger.info(f"Extension {ext_id}: linked to profile '{pname}'")
+    except Exception as e:
+        logger.warning(f"Extension {ext_id}: failed to seed DB entity — {e}")
+
+
 def install_extension(
     ext_id: str,
     files: Dict[str, str],
@@ -267,6 +292,8 @@ def install_extension(
     if manifest is None:
         logger.error(f"Extension {ext_id}: installed but missing manifest.json")
         return False
+
+    _seed_extension_entity(ext_id, manifest)
 
     has_entry = os.path.exists(os.path.join(ext_path, "entry.py"))
     if has_entry:

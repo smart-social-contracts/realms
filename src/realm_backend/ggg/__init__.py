@@ -8,6 +8,8 @@ not part of the core GGG standard.
 # System module - user management, permissions, tasks, and core services
 from .system import (
     Call,
+    Department,
+    Extension,
     Notification,
     Operations,
     Permission,
@@ -116,8 +118,10 @@ __all__ = [
     "Category",
     "Codex",
     "Contract",
+    "Department",
     "Dispute",
     "EntryType",
+    "Extension",
     "FiscalPeriod",
     "FiscalPeriodStatus",
     "Fund",

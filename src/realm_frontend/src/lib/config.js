@@ -36,10 +36,11 @@ function _testFlag(envKey, urlParam) {
 
 // Bypass Internet Identity with a deterministic Ed25519 identity (for Playwright).
 export const TEST_MODE_II_BYPASS = _testFlag('VITE_TEST_MODE_II_BYPASS', 'ii_bypass');
-// Allow users to self-register as administrators on the join page.
-export const TEST_MODE_ADMIN_SELF_REGISTRATION = _testFlag('VITE_TEST_MODE_ADMIN_SELF_REGISTRATION', 'admin_self_reg');
-// Allow users to self-register as members without an invitation code.
-export const TEST_MODE_MEMBER_SELF_REGISTRATION = _testFlag('VITE_TEST_MODE_MEMBER_SELF_REGISTRATION', 'member_self_reg');
+// Allow users to self-register with any profile (admin, member, developer) via magic invite codes.
+export const TEST_MODE_USER_SELF_REGISTRATION = _testFlag('VITE_TEST_MODE_USER_SELF_REGISTRATION', 'user_self_reg');
+// Legacy aliases (kept for backward compat with existing URL params / env vars)
+export const TEST_MODE_ADMIN_SELF_REGISTRATION = TEST_MODE_USER_SELF_REGISTRATION || _testFlag('VITE_TEST_MODE_ADMIN_SELF_REGISTRATION', 'admin_self_reg');
+export const TEST_MODE_MEMBER_SELF_REGISTRATION = TEST_MODE_USER_SELF_REGISTRATION || _testFlag('VITE_TEST_MODE_MEMBER_SELF_REGISTRATION', 'member_self_reg');
 // Populate realm with demo/fake data.
 export const TEST_MODE_DEMO_DATA = _testFlag('VITE_TEST_MODE_DEMO_DATA', 'demo_data');
 // Skip terms acceptance step on the join page.

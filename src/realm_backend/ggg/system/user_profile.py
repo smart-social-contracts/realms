@@ -250,6 +250,7 @@ class UserProfile(Entity, TimestampedMixin):
     allowed_to = String()
     users = ManyToMany(["User"], "profiles")
     permissions = ManyToMany(["Permission"], "profiles")
+    extensions = ManyToMany(["Extension"], "profiles")
 
     def __repr__(self):
         return f"UserProfile(name={self.name!r})"
