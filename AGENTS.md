@@ -216,6 +216,7 @@ Verify: `realms --help` and `dfx --version`.
 - Always use `deploy_mode=upgrade` for production/test deploys.
 - Always scope deploys to the realm you're testing (`-f realm=agora`).
 - The dfx identity is `deployer`. Use `dfx identity use <name>` to switch.
+- **Monitor every workflow you trigger.** After launching a workflow, watch it until it goes green. If it fails, diagnose the error, fix it, re-push, and re-trigger — repeat until the run succeeds. Never leave a red workflow behind.
 
 ---
 
