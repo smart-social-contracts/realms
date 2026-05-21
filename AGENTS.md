@@ -132,6 +132,31 @@ gh workflow run deploy-mundus.yml \
 
 ---
 
+## Creating a Release
+
+Bump the version and produce release artifacts (WASM, frontend tarball, CLI on PyPI, GitHub release):
+
+```bash
+gh workflow run release.yml -f release_type=patch   # or minor, major
+```
+
+This will:
+1. Bump `version.txt` (e.g. 0.3.4 → 0.3.5)
+2. Build `realm_backend.wasm.gz` and `realm_frontend.tar.gz`
+3. Publish the CLI to PyPI
+4. Create a GitHub release `v0.3.5` with all artifacts + checksums
+5. Commit and push the version bump
+
+Takes ~5 minutes. The version file determines the current version; the workflow computes the next one automatically.
+
+### `release.yml` Parameters
+
+| Parameter | Options | Default | Notes |
+|---|---|---|---|
+| `release_type` | `patch`, `minor`, `major` | `patch` | Follows semver |
+
+---
+
 ## Full Platform Re-deployment
 
 Run sequentially: **deploy-infra → deploy-files → deploy-mundus**
@@ -197,6 +222,19 @@ pip install -e cli
 ```
 
 Verify: `realms --help` and `dfx --version`.
+
+---
+
+## dfx in this environment
+
+dfx 0.30.2 crashes with `ColorOutOfRange` unless the terminal is set up correctly. Always export these before running any `dfx` command:
+
+```bash
+export TERM=xterm
+export DFX_WARNING=-mainnet_plaintext_identity
+```
+
+The first fixes the color panic, the second suppresses the plaintext identity warning that blocks execution on `test`/`staging` networks.
 
 ---
 

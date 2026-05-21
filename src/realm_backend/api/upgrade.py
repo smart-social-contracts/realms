@@ -44,6 +44,36 @@ class RealmRegistryUpgradeService(Service):
     def get_latest_version(self) -> UpgradeResult: ...
 
 
+def _unwrap_call_result(result):
+    """Unwrap a CallResult[Variant{Ok, Err}] — handles double nesting.
+
+    Inter-canister calls return CallResult which wraps the response variant.
+    Both levels may have Ok/Err, so we unwrap until we reach the final value.
+    """
+    def _get(obj, key):
+        if isinstance(obj, dict) and key in obj:
+            return obj[key]
+        return getattr(obj, key, None)
+
+    # Level 1: CallResult Ok/Err
+    err = _get(result, "Err")
+    if err is not None:
+        return {"error": str(err)}
+    val = _get(result, "Ok")
+    if val is None:
+        val = result
+
+    # Level 2: inner Variant Ok/Err (e.g. GetCreditsResult, UpgradeResult)
+    inner_err = _get(val, "Err")
+    if inner_err is not None:
+        return {"error": str(inner_err)}
+    inner_ok = _get(val, "Ok")
+    if inner_ok is not None:
+        return inner_ok
+
+    return val
+
+
 _last_upgrade_job_id: str = ""
 
 
@@ -200,26 +230,18 @@ def get_realm_credits(registry_canister_id: str) -> Async[Dict]:
         registry = RealmRegistryUpgradeService(Principal.from_str(registry_canister_id))
         result: CallResult[GetCreditsResult] = yield registry.get_credits(realm_principal)
 
-        def _get(obj, key):
-            if isinstance(obj, dict) and key in obj:
-                return obj[key]
-            return getattr(obj, key, None)
+        inner = _unwrap_call_result(result)
+        if isinstance(inner, dict) and "error" in inner:
+            return {"success": False, "error": inner["error"]}
 
-        err = _get(result, "Err")
-        if err is not None:
-            return {"success": False, "error": str(err)}
-
-        ok_val = _get(result, "Ok")
-        if ok_val is not None:
-            if isinstance(ok_val, dict):
-                return {"success": True, "credits": ok_val}
-            return {"success": True, "credits": {
-                "principal_id": str(getattr(ok_val, "principal_id", "") or ""),
-                "balance": int(getattr(ok_val, "balance", 0) or 0),
-                "total_purchased": int(getattr(ok_val, "total_purchased", 0) or 0),
-                "total_spent": int(getattr(ok_val, "total_spent", 0) or 0),
-            }}
-        return {"success": False, "error": f"Unexpected response: {result}"}
+        if isinstance(inner, dict):
+            return {"success": True, "credits": inner}
+        return {"success": True, "credits": {
+            "principal_id": str(getattr(inner, "principal_id", "") or ""),
+            "balance": int(getattr(inner, "balance", 0) or 0),
+            "total_purchased": int(getattr(inner, "total_purchased", 0) or 0),
+            "total_spent": int(getattr(inner, "total_spent", 0) or 0),
+        }}
     except Exception as e:
         logger.error(f"Error getting realm credits: {e}")
         return {"success": False, "error": str(e)}
@@ -241,22 +263,14 @@ def get_available_version(registry_canister_id: str) -> Async[Dict]:
         registry = RealmRegistryUpgradeService(Principal.from_str(registry_canister_id))
         result: CallResult[UpgradeResult] = yield registry.get_latest_version()
 
-        def _get(obj, key):
-            if isinstance(obj, dict) and key in obj:
-                return obj[key]
-            return getattr(obj, key, None)
+        inner = _unwrap_call_result(result)
+        if isinstance(inner, dict) and "error" in inner:
+            return {"success": False, "error": inner["error"]}
 
-        err = _get(result, "Err")
-        if err is not None:
-            return {"success": False, "error": str(err)}
-
-        ok_val = _get(result, "Ok")
-        if ok_val is not None:
-            if isinstance(ok_val, str):
-                parsed = json.loads(ok_val)
-                return {"success": True, "version": parsed}
-            return {"success": True, "version": ok_val}
-        return {"success": False, "error": f"Unexpected response: {result}"}
+        if isinstance(inner, str):
+            parsed = json.loads(inner)
+            return {"success": True, "version": parsed}
+        return {"success": True, "version": inner}
     except Exception as e:
         logger.error(f"Error getting available version: {e}")
         return {"success": False, "error": str(e)}
