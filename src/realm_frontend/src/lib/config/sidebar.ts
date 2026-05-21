@@ -1,19 +1,16 @@
 /**
- * Static sidebar navigation configuration per user role.
+ * Dynamic sidebar configuration built from installed extension manifests.
  *
- * The sidebar structure is static per role — no dynamic show/hide of individual
- * items based on in-session state. Each role sees exactly the sections and items
- * defined here.
+ * The sidebar is populated at runtime by querying the backend for all
+ * installed extensions, filtering by the user's active profiles, and
+ * grouping by the manifest's `categories` field.
  */
-
-export type UserRole = 'member' | 'admin' | 'developer';
 
 export interface SidebarNavItem {
 	label: string;
 	icon: string;
 	extensionId: string;
 	href: string;
-	isDefault?: boolean;
 }
 
 export interface SidebarCategory {
@@ -39,121 +36,111 @@ export const topUtilityItems: TopUtilityItem[] = [
 	{ label: 'Settings', icon: 'ti-settings', href: '/settings' },
 ];
 
-const memberSidebar: SidebarConfig = {
-	defaultPath: '/extensions/member_dashboard',
-	categories: [
-		{
-			id: 'my_realm',
-			label: 'MY REALM',
-			items: [
-				{ label: 'Overview', icon: 'ti-layout-dashboard', extensionId: 'member_dashboard', href: '/extensions/member_dashboard', isDefault: true },
-				{ label: 'Passport', icon: 'ti-id-badge', extensionId: 'passport_verification', href: '/extensions/passport_verification' },
-			],
-		},
-		{
-			id: 'governance',
-			label: 'GOVERNANCE',
-			items: [
-				{ label: 'Voting', icon: 'ti-ballpen', extensionId: 'voting', href: '/extensions/voting' },
-				{ label: 'Justice', icon: 'ti-gavel', extensionId: 'justice_litigation', href: '/extensions/justice_litigation' },
-				{ label: 'Land Registry', icon: 'ti-map-2', extensionId: 'land_registry', href: '/extensions/land_registry' },
-			],
-		},
-		{
-			id: 'finances',
-			label: 'FINANCES',
-			items: [
-				{ label: 'Taxes', icon: 'ti-receipt', extensionId: 'metrics', href: '/extensions/metrics' },
-			],
-		},
-		{
-			id: 'system',
-			label: 'SYSTEM',
-			items: [
-				{ label: 'Codex Viewer', icon: 'ti-file-code', extensionId: 'codex_viewer', href: '/extensions/codex_viewer' },
-			],
-		},
-	],
+export interface ExtensionManifest {
+	name: string;
+	version?: string;
+	profiles?: string[];
+	categories?: string[];
+	show_in_sidebar?: boolean;
+	sidebar_label?: Record<string, string>;
+	icon?: string;
+	is_default?: boolean;
+	[key: string]: unknown;
+}
+
+const categoryMeta: Record<string, { order: number; label: Record<string, string> }> = {
+	profile:        { order: 0, label: { en: 'My Realm' } },
+	administration: { order: 1, label: { en: 'Administration' } },
+	governance:     { order: 2, label: { en: 'Governance' } },
+	land_territory: { order: 3, label: { en: 'Land & Territory' } },
+	finances:       { order: 4, label: { en: 'Finances' } },
+	intelligence:   { order: 5, label: { en: 'AI' } },
+	developer:      { order: 6, label: { en: 'Developer' } },
+	home:           { order: 7, label: { en: 'Home' } },
+	other:          { order: 99, label: { en: 'Other' } },
 };
 
-const adminSidebar: SidebarConfig = {
-	defaultPath: '/extensions/admin_dashboard',
-	categories: [
-		{
-			id: 'administration',
-			label: 'ADMINISTRATION',
-			items: [
-				{ label: 'Dashboard', icon: 'ti-layout-dashboard', extensionId: 'admin_dashboard', href: '/extensions/admin_dashboard', isDefault: true },
-				{ label: 'Onboarding', icon: 'ti-user-plus', extensionId: 'admin_dashboard', href: '/extensions/admin_dashboard?section=onboarding' },
-			],
-		},
-		{
-			id: 'governance',
-			label: 'GOVERNANCE',
-			items: [
-				{ label: 'Voting', icon: 'ti-ballpen', extensionId: 'voting', href: '/extensions/voting' },
-				{ label: 'Justice', icon: 'ti-gavel', extensionId: 'justice_litigation', href: '/extensions/justice_litigation' },
-				{ label: 'Land Registry', icon: 'ti-map-2', extensionId: 'land_registry', href: '/extensions/land_registry' },
-				{ label: 'Zone Selector', icon: 'ti-layers-subtract', extensionId: 'zone_selector', href: '/extensions/zone_selector' },
-			],
-		},
-		{
-			id: 'finances',
-			label: 'FINANCES',
-			items: [
-				{ label: 'Financial Report', icon: 'ti-chart-bar', extensionId: 'metrics', href: '/extensions/metrics' },
-				{ label: 'Vault', icon: 'ti-safe', extensionId: 'vault', href: '/extensions/vault' },
-			],
-		},
-		{
-			id: 'system',
-			label: 'SYSTEM',
-			items: [
-				{ label: 'Codex Viewer', icon: 'ti-file-code', extensionId: 'codex_viewer', href: '/extensions/codex_viewer' },
-				{ label: 'Market Place', icon: 'ti-building-store', extensionId: 'market_place', href: '/extensions/market_place' },
-			],
-		},
-	],
+const fallbackDefaultPaths: Record<string, string> = {
+	admin: '/extensions/admin_dashboard',
+	member: '/extensions/member_dashboard',
+	developer: '/extensions/codex_viewer',
 };
 
-const developerSidebar: SidebarConfig = {
-	defaultPath: '/extensions/codex_viewer',
-	categories: [
-		{
-			id: 'system',
-			label: 'SYSTEM',
-			items: [
-				{ label: 'Codex Viewer', icon: 'ti-file-code', extensionId: 'codex_viewer', href: '/extensions/codex_viewer', isDefault: true },
-				{ label: 'Market Place', icon: 'ti-building-store', extensionId: 'market_place', href: '/extensions/market_place' },
-				{ label: 'Package Manager', icon: 'ti-package', extensionId: 'package_manager', href: '/extensions/package_manager' },
-				{ label: 'System Info', icon: 'ti-server', extensionId: 'system_info', href: '/extensions/system_info' },
-				{ label: 'Task Monitor', icon: 'ti-activity', extensionId: 'task_monitor', href: '/extensions/task_monitor' },
-				{ label: 'ERD Explorer', icon: 'ti-topology-star-3', extensionId: 'erd_explorer', href: '/extensions/erd_explorer' },
-				{ label: 'Demo Simulator', icon: 'ti-database', extensionId: 'public_dashboard', href: '/extensions/public_dashboard?mode=demo' },
-			],
-		},
-	],
-};
+function titleCase(s: string): string {
+	return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
-const sidebarConfigs: Record<UserRole, SidebarConfig> = {
-	member: memberSidebar,
-	admin: adminSidebar,
-	developer: developerSidebar,
-};
+function getCategoryLabel(catId: string, locale: string): string {
+	const meta = categoryMeta[catId];
+	if (meta) return meta.label[locale] ?? meta.label['en'] ?? titleCase(catId);
+	return titleCase(catId);
+}
+
+function getCategoryOrder(catId: string): number {
+	return categoryMeta[catId]?.order ?? 50;
+}
 
 /**
- * Returns the sidebar configuration for the given role.
- * Falls back to member if role is unrecognized.
+ * Build a SidebarConfig from extension manifests filtered by user profiles.
  */
-export function getSidebarConfig(role: UserRole): SidebarConfig {
-	return sidebarConfigs[role] ?? memberSidebar;
+export function buildSidebar(
+	manifests: Record<string, ExtensionManifest>,
+	userProfiles: string[],
+	locale: string = 'en',
+): SidebarConfig {
+	const visible = Object.values(manifests).filter((m) => {
+		if (!m.show_in_sidebar) return false;
+		if (!m.profiles || m.profiles.length === 0) return true;
+		return m.profiles.some((p) => userProfiles.includes(p));
+	});
+
+	const grouped: Record<string, ExtensionManifest[]> = {};
+	for (const m of visible) {
+		const catId = m.categories?.[0] ?? 'other';
+		(grouped[catId] ??= []).push(m);
+	}
+
+	const categories: SidebarCategory[] = Object.entries(grouped)
+		.map(([catId, items]) => ({
+			id: catId,
+			label: getCategoryLabel(catId, locale),
+			order: getCategoryOrder(catId),
+			items: items
+				.map((m) => ({
+					label: m.sidebar_label?.[locale] ?? m.sidebar_label?.['en'] ?? titleCase(m.name),
+					icon: `ti-${m.icon ?? 'layout-dashboard'}`,
+					extensionId: m.name,
+					href: `/extensions/${m.name}`,
+				}))
+				.sort((a, b) => a.label.localeCompare(b.label)),
+		}))
+		.sort((a, b) => a.order - b.order)
+		.map(({ id, label, items }) => ({ id, label, items }));
+
+	const defaultManifest = Object.values(manifests).find(
+		(m) =>
+			m.is_default &&
+			m.show_in_sidebar &&
+			((!m.profiles || m.profiles.length === 0) || m.profiles.some((p) => userProfiles.includes(p))),
+	);
+	let defaultPath = defaultManifest ? `/extensions/${defaultManifest.name}` : '';
+	if (!defaultPath) {
+		for (const role of ['developer', 'admin', 'member']) {
+			if (userProfiles.includes(role) && fallbackDefaultPaths[role]) {
+				defaultPath = fallbackDefaultPaths[role];
+				break;
+			}
+		}
+	}
+
+	return { categories, defaultPath: defaultPath || '/extensions/member_dashboard' };
 }
 
 /**
  * Determines the effective role from a list of user profiles.
- * Priority: developer > admin > member (most privileged wins for sidebar display).
+ * Kept for backward compatibility with components that need a single role string.
  */
-export function resolveRole(profiles: string[]): UserRole {
+export function resolveRole(profiles: string[]): string {
 	if (profiles.includes('developer')) return 'developer';
 	if (profiles.includes('admin')) return 'admin';
 	return 'member';

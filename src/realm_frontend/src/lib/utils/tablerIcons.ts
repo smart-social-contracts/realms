@@ -1,6 +1,7 @@
 /**
  * Tabler icon resolver — maps `ti-<name>` strings to Svelte icon components.
- * Only outline variants are used per the design spec.
+ * Manifest `icon` fields use the bare name (e.g. "gavel"); the sidebar
+ * prepends `ti-` before lookup.
  */
 import {
 	IconUserCircle,
@@ -24,6 +25,14 @@ import {
 	IconTopologyStar3,
 	IconDatabase,
 	IconMessageChatbot,
+	IconBell,
+	IconHome,
+	IconShieldLock,
+	IconFlask,
+	IconWand,
+	IconBug,
+	IconWorld,
+	IconSafe,
 } from '@tabler/icons-svelte';
 
 const tablerIconMap: Record<string, any> = {
@@ -40,7 +49,7 @@ const tablerIconMap: Record<string, any> = {
 	'ti-user-plus': IconUserPlus,
 	'ti-layers-subtract': IconLayersSubtract,
 	'ti-chart-bar': IconChartBar,
-	'ti-safe': IconShieldDollar,
+	'ti-safe': IconSafe,
 	'ti-building-store': IconBuildingStore,
 	'ti-package': IconPackage,
 	'ti-server': IconServer,
@@ -48,6 +57,14 @@ const tablerIconMap: Record<string, any> = {
 	'ti-topology-star-3': IconTopologyStar3,
 	'ti-database': IconDatabase,
 	'ti-message-chatbot': IconMessageChatbot,
+	'ti-bell': IconBell,
+	'ti-home': IconHome,
+	'ti-shield-lock': IconShieldLock,
+	'ti-flask': IconFlask,
+	'ti-wand': IconWand,
+	'ti-bug': IconBug,
+	'ti-world': IconWorld,
+	'ti-shield-dollar': IconShieldDollar,
 };
 
 /**

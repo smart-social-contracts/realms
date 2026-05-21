@@ -2,19 +2,31 @@
 	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
+	import { get } from 'svelte/store';
+	import { locale } from 'svelte-i18n';
 	
 	import { userProfiles, profilesLoading } from '$lib/stores/profiles';
 	import { styles, cn } from '$lib/theme/utilities';
-	import { getSidebarConfig, resolveRole, topUtilityItems } from '$lib/config/sidebar';
+	import { topUtilityItems } from '$lib/config/sidebar';
+	import { sidebarConfig, sidebarLoading, loadSidebar } from '$lib/stores/sidebar';
 	import { getTablerIcon } from '$lib/utils/tablerIcons';
+	// @ts-ignore
+	import { backend } from '$lib/canisters';
 
 	export let drawerHidden: boolean = false;
 	
 	let showScrollIndicator = true;
 	let sidebarContainer: HTMLElement;
+	let lastProfilesKey = '';
 
-	$: role = resolveRole($userProfiles ?? []);
-	$: sidebarConfig = getSidebarConfig(role);
+	$: {
+		const profiles = $userProfiles ?? [];
+		const key = [...profiles].sort().join(',');
+		if (key !== lastProfilesKey && profiles.length > 0 && backend) {
+			lastProfilesKey = key;
+			loadSidebar(backend, profiles, get(locale) || 'en');
+		}
+	}
 	
 	function checkScrollPosition() {
 		if (sidebarContainer) {
@@ -93,14 +105,15 @@
 			</ul>
 
 				<!-- Loading State -->
-			{#if $profilesLoading}
+			{#if $profilesLoading || $sidebarLoading}
 				<div class="py-4 flex items-center justify-center">
 					<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
 				</div>
-				{/if}
+			{/if}
 
-			<!-- Role-based category sections -->
-			{#each sidebarConfig.categories as category (category.id)}
+			<!-- Dynamic category sections from installed extensions -->
+			{#if $sidebarConfig}
+			{#each $sidebarConfig.categories as category (category.id)}
 				<ul class="pt-3 pb-3 space-y-1">
 								<li class="px-3 py-2">
 									<h3 class={styles.sidebar.categoryHeader()}>
@@ -125,6 +138,7 @@
 							{/each}
 				</ul>
 			{/each}
+			{/if}
 			</nav>
 	</div>
 
