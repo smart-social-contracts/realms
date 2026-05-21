@@ -102,7 +102,7 @@ const adminSidebar: SidebarConfig = {
 			label: 'FINANCES',
 			items: [
 				{ label: 'Financial Report', icon: 'ti-chart-bar', extensionId: 'metrics', href: '/extensions/metrics' },
-				{ label: 'Vault', icon: 'ti-safe', extensionId: 'market_place', href: '/extensions/market_place?section=vault' },
+				{ label: 'Vault', icon: 'ti-safe', extensionId: 'vault', href: '/extensions/vault' },
 			],
 		},
 		{
