@@ -1493,12 +1493,14 @@ def _kickoff_deploy(
 
 
 def _link_token_nft_canisters(
-    members: List[Dict[str, Any]], network: str,
+    members: List[Dict[str, Any]], network: str, version: str = "",
 ) -> None:
-    """Link per-realm token/nft canisters to their realm backends via set_canister_config.
+    """Configure realm backends via set_canister_config after deployment.
 
-    Convention: a member named ``<realm>-token`` (type ``token``) is linked
-    to the realm member named ``<realm>``, and similarly for ``<realm>-nft``.
+    Sets frontend_canister_id, token/nft canister IDs, and installed_version
+    on each realm backend. Convention: a member named ``<realm>-token``
+    (type ``token``) is linked to the realm named ``<realm>``, and similarly
+    for ``<realm>-nft``.
     """
     realm_members = {
         m["name"]: m for m in members
@@ -1511,6 +1513,7 @@ def _link_token_nft_canisters(
         token_name = f"{realm_name}-token"
         nft_name = f"{realm_name}-nft"
 
+        frontend_id = realm_m.get("frontend_canister_id", "")
         token_id = ""
         nft_id = ""
         for m in members:
@@ -1519,16 +1522,20 @@ def _link_token_nft_canisters(
             if m["name"] == nft_name:
                 nft_id = m.get("canister_id") or _canister_id(nft_name, network) or ""
 
-        if not token_id and not nft_id:
-            continue
-
         realm_cid = realm_m.get("canister_id") or _canister_id(realm_name, network)
         if not realm_cid:
             continue
 
         opt = lambda v: f'opt "{v}"' if v else "null"
-        arg = f'({opt("")}, {opt(token_id)}, {opt(nft_id)}, null, null)'
-        print(f"   🔗 linking {realm_name}: token={token_id or '–'}, nft={nft_id or '–'}")
+        arg = f'({opt(frontend_id)}, {opt(token_id)}, {opt(nft_id)}, null, null, {opt(version)})'
+        parts = [f"frontend={frontend_id or '–'}"]
+        if token_id:
+            parts.append(f"token={token_id}")
+        if nft_id:
+            parts.append(f"nft={nft_id}")
+        if version:
+            parts.append(f"version={version}")
+        print(f"   🔗 configuring {realm_name}: {', '.join(parts)}")
         try:
             _dfx("canister", "call", realm_cid, "set_canister_config", arg, network=network)
         except Exception as e:
@@ -1584,7 +1591,7 @@ def stage2_install(
                 network,
             )
 
-    _link_token_nft_canisters(members, network)
+    _link_token_nft_canisters(members, network, version=base_version)
 
     print("\n   ✅ mundus installed")
 

@@ -106,6 +106,15 @@ def get_status() -> "dict[str, Any]":
     version = "VERSION_PLACEHOLDER"
     test_mode = False
 
+    # Prefer version stored in DB (set by set_canister_config / CI post-deploy)
+    if version == "VERSION_PLACEHOLDER":
+        try:
+            _realm = Realm.load("1")
+            if _realm and getattr(_realm, "installed_version", None):
+                version = _realm.installed_version
+        except Exception:
+            pass
+
     # Skip expensive TaskManager status to stay under instruction limit
     # TaskManager status can be queried via separate endpoint if needed
     task_manager_status = {"status": "available"}  # Simplified to reduce instructions

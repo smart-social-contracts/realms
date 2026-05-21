@@ -693,9 +693,10 @@ def set_canister_config(
     nft_canister_id: Opt[text],
     file_registry_canister_id: Opt[text],
     marketplace_canister_id: Opt[text],
+    installed_version: Opt[text] = None,
 ) -> RealmResponse:
     """
-    Set canister IDs for this realm (admin only).
+    Set canister IDs and metadata for this realm (admin only).
     Called post-deployment to enable canister discovery via status().
 
     Args:
@@ -704,6 +705,7 @@ def set_canister_config(
         nft_canister_id: Optional nft_backend canister ID
         file_registry_canister_id: Optional file_registry canister ID (shared infra)
         marketplace_canister_id: Optional marketplace_backend canister ID (shared infra)
+        installed_version: Optional deployed version string (e.g. "0.3.5")
     """
     try:
         from ggg import Realm
@@ -724,11 +726,14 @@ def set_canister_config(
             realm.file_registry_canister_id = file_registry_canister_id
         if marketplace_canister_id:
             realm.marketplace_canister_id = marketplace_canister_id
+        if installed_version:
+            realm.installed_version = installed_version
 
         logger.info(
             f"Updated canister config: frontend={frontend_canister_id}, "
             f"token={token_canister_id}, nft={nft_canister_id}, "
-            f"file_registry={file_registry_canister_id}, marketplace={marketplace_canister_id}"
+            f"file_registry={file_registry_canister_id}, marketplace={marketplace_canister_id}, "
+            f"version={installed_version}"
         )
 
         return RealmResponse(

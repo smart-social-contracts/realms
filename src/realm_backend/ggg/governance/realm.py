@@ -49,3 +49,5 @@ class Realm(Entity, TimestampedMixin):
     # Branding URLs (optional; frontend falls back to static /images/ assets)
     logo_url = String(max_length=512, default="")
     background_image_url = String(max_length=512, default="")
+    # Deployed version (set by set_canister_config or CI post-deploy)
+    installed_version = String(max_length=32, default="")
