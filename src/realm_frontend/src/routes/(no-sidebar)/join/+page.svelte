@@ -62,7 +62,7 @@
   // Invite is required when registration is closed (not open) and user has no valid invite
   $: inviteRequired = !$realmOpenRegistration && !inviteValid && !TEST_MODE_USER_SELF_REGISTRATION;
 
-  const welcomeImageUrl = '/images/background.png';
+  $: welcomeImageUrl = $realmInfo.backgroundImageUrl || '/images/background.png';
   
   // Determine initial step based on auth status and join status
   $: {

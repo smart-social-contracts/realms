@@ -42,6 +42,8 @@ export const idlFactory = ({ IDL }) => {
     'accounting_currency' : IDL.Text,
     'quarters' : IDL.Vec(QuarterInfoRecord),
     'registries' : IDL.Vec(CanisterInfo),
+    'logo_url' : IDL.Text,
+    'background_image_url' : IDL.Text,
   });
   const PaginationInfo = IDL.Record({
     'page_size' : IDL.Int,

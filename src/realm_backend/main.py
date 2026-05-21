@@ -2815,6 +2815,14 @@ def update_realm_config(config_json: str) -> str:
             realm.open_registration = bool(config["open_registration"])
             updated_fields.append(f"open_registration={realm.open_registration}")
 
+        if "logo_url" in config:
+            realm.logo_url = config["logo_url"] or ""
+            updated_fields.append(f"logo_url={realm.logo_url[:50]}...")
+
+        if "background_image_url" in config:
+            realm.background_image_url = config["background_image_url"] or ""
+            updated_fields.append(f"background_image_url={realm.background_image_url[:50]}...")
+
         logger.info(f"✅ Realm config updated: {', '.join(updated_fields)}")
         return json.dumps({"success": True, "updated_fields": updated_fields})
     except Exception as e:

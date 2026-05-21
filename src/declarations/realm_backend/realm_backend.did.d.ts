@@ -704,6 +704,8 @@ export interface StatusRecord {
   'accounting_currency' : string,
   'quarters' : Array<QuarterInfoRecord>,
   'registries' : Array<CanisterInfo>,
+  'logo_url' : string,
+  'background_image_url' : string,
 }
 export type StatusResult = { 'Ok' : StatusRecord } |
   { 'Err' : string };

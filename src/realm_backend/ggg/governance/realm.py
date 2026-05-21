@@ -46,3 +46,6 @@ class Realm(Entity, TimestampedMixin):
     # When False (default), all users must present an invite code to join.
     # When True, anyone can join as member without a code. Admin always requires a code.
     open_registration = Boolean(default=False)
+    # Branding URLs (optional; frontend falls back to static /images/ assets)
+    logo_url = String(max_length=512)
+    background_image_url = String(max_length=512)

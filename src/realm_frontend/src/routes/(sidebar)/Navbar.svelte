@@ -24,7 +24,7 @@
 	<div class="absolute left-1/2 transform -translate-x-1/2">
 		<a href="/" class="flex items-center cursor-pointer">
 			<img
-				src="/images/logo.png"
+				src={$realmInfo.logoUrl || '/images/logo.png'}
 				class="h-8 sm:h-10 pointer-events-none"
 				alt={$realmName || 'Realms Logo'}
 			/>

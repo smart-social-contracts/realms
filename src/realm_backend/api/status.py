@@ -64,6 +64,8 @@ def get_status() -> "dict[str, Any]":
     realm_welcome_message = ""
     realm_description = ""
     realm_open_registration = False
+    logo_url = ""
+    background_image_url = ""
     try:
         first_realm = Realm.load("1")
         if first_realm:
@@ -71,6 +73,8 @@ def get_status() -> "dict[str, Any]":
             realm_welcome_message = getattr(first_realm, "welcome_message", None) or ""
             realm_description = getattr(first_realm, "description", None) or ""
             realm_open_registration = bool(getattr(first_realm, "open_registration", False))
+            logo_url = getattr(first_realm, "logo_url", None) or ""
+            background_image_url = getattr(first_realm, "background_image_url", None) or ""
     except Exception:
         pass
 
@@ -292,4 +296,6 @@ def get_status() -> "dict[str, Any]":
         "parent_realm_canister_id": parent_realm_canister_id,
         "accounting_currency": accounting_currency,
         "accounting_currency_decimals": accounting_currency_decimals,
+        "logo_url": logo_url,
+        "background_image_url": background_image_url,
     }

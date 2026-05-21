@@ -22,6 +22,8 @@ interface RealmInfo {
 	quarters: QuarterInfo[];
 	isQuarter: boolean;
 	parentRealmCanisterId: string;
+	logoUrl: string;
+	backgroundImageUrl: string;
 	loading: boolean;
 	error: string | null;
 }
@@ -36,6 +38,8 @@ const createRealmInfoStore = () => {
 		quarters: [],
 		isQuarter: false,
 		parentRealmCanisterId: '',
+		logoUrl: '',
+		backgroundImageUrl: '',
 		loading: true,
 		error: null
 	});
@@ -65,6 +69,8 @@ const createRealmInfoStore = () => {
 						quarters: status.quarters || [],
 						isQuarter: status.is_quarter || false,
 						parentRealmCanisterId: status.parent_realm_canister_id || '',
+						logoUrl: status.logo_url || '',
+						backgroundImageUrl: status.background_image_url || '',
 						loading: false
 					}));
 				} else {
