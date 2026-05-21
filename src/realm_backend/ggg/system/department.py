@@ -1,4 +1,4 @@
-from ic_python_db import Entity, ForeignKey, ManyToMany, OneToMany, String, TimestampedMixin
+from ic_python_db import Entity, ManyToMany, ManyToOne, OneToMany, String, TimestampedMixin
 from ic_python_logging import get_logger
 
 logger = get_logger("entity.department")
@@ -17,11 +17,11 @@ class Department(Entity, TimestampedMixin):
     __alias__ = "name"
     name = String(max_length=256)
     description = String(max_length=512)
-    head = ForeignKey("User", "headed_departments")
+    head = ManyToOne("User", "headed_departments")
     members = ManyToMany(["User"], "departments")
     permissions = ManyToMany(["Permission"], "departments")
     extensions = ManyToMany(["Extension"], "departments")
-    parent = ForeignKey("Department", "sub_departments")
+    parent = ManyToOne("Department", "sub_departments")
     sub_departments = OneToMany("Department", "parent")
 
     def __repr__(self):
