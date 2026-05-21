@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
-	import { Spinner, Alert } from 'flowbite-svelte';
+	import { Alert } from 'flowbite-svelte';
 	import { backend } from '$lib/canisters';
 	import { canisterId as backendCanisterId } from '$lib/declarations/realm_backend';
 	import { principal, isAuthenticated } from '$lib/stores/auth';
@@ -158,9 +158,12 @@
 
 <div class="p-4">
 	{#if status === 'loading'}
-		<div class="flex items-center gap-2 text-gray-600">
-			<Spinner size="5" />
-			<span>{debugInfo || 'Loading extension...'}</span>
+		<div class="flex items-center gap-2 text-gray-500">
+			<svg class="animate-spin h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+				<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+				<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+			</svg>
+			<span class="text-sm">{debugInfo || 'Loading extension...'}</span>
 		</div>
 	{:else if status === 'error'}
 		<Alert color="red" class="mb-4">
