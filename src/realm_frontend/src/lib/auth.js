@@ -14,14 +14,17 @@ let authClient;
 let _testIdentity = null;
 let _testLoggedIn = false;
 
-async function _createTestIdentity() {
-  if (_testIdentity) return _testIdentity;
+async function _createTestIdentity(random = false) {
+  if (_testIdentity && !random) return _testIdentity;
   const { Ed25519KeyIdentity } = await import('@dfinity/identity');
-  // Deterministic 32-byte seed → always produces the same principal
   const seed = new Uint8Array(32);
-  seed[0] = 0xED; seed[1] = 0x57; // deterministic marker bytes
+  if (random) {
+    crypto.getRandomValues(seed);
+  } else {
+    seed[0] = 0xED; seed[1] = 0x57;
+  }
   _testIdentity = Ed25519KeyIdentity.generate(seed);
-  console.log(`[TEST MODE] Generated test identity: ${_testIdentity.getPrincipal().toText()}`);
+  console.log(`[TEST MODE] Generated ${random ? 'random' : 'default'} test identity: ${_testIdentity.getPrincipal().toText()}`);
   return _testIdentity;
 }
 
@@ -58,11 +61,10 @@ export async function initializeAuthClient() {
   return authClient;
 }
 
-export async function login() {
+export async function login({ random = false } = {}) {
   if (TEST_MODE_II_BYPASS) {
-    const identity = await _createTestIdentity();
+    const identity = await _createTestIdentity(random);
     _testLoggedIn = true;
-    // Re-create mock so getIdentity() returns the new identity
     authClient = _createTestAuthClientMock();
     const principal = identity.getPrincipal();
     console.log(`[TEST MODE] Logged in with principal: ${principal.toText()}`);

@@ -91,13 +91,6 @@
     const urlParams = new URLSearchParams(window.location.search);
     inviteCode = urlParams.get('invite') || urlParams.get('code') || '';
 
-    // In test mode with II bypass, auto-login if not already authenticated
-    if (TEST_MODE_II_BYPASS && !$isAuthenticated) {
-      console.log('[JOIN PAGE] [TEST MODE] Auto-login triggered');
-      await handleLogin();
-      return;
-    }
-
     // If user is already authenticated, load their profiles to check join status
     if ($isAuthenticated) {
       console.log('[JOIN PAGE v2] Loading profiles for authenticated user...');
@@ -110,11 +103,11 @@
     }
   });
 
-  async function handleLogin() {
+  async function handleLogin(options = {}) {
     loading = true;
     error = '';
     try {
-      const { principal: userPrincipal } = await login();
+      const { principal: userPrincipal } = await login(options);
       if (userPrincipal) {
         isAuthenticated.set(true);
         principal.set(userPrincipal.toText());
@@ -361,32 +354,70 @@
             </div>
             <h2 class="text-2xl font-bold text-gray-900 mb-2">Sign in to continue</h2>
             <p class="text-gray-500">
-              Authenticate with Internet Identity to join {realmName}
+              {TEST_MODE_II_BYPASS ? 'Choose how to sign in to' : 'Authenticate with Internet Identity to join'} {realmName}
             </p>
           </div>
-          
-          <button
-            on:click={handleLogin}
-            disabled={loading}
-            class="w-full py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {#if loading}
-              <Spinner size="5" color="white" />
-              <span>Connecting...</span>
-            {:else}
-              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
-              </svg>
-              <span>Sign in with Internet Identity</span>
-            {/if}
-          </button>
-          
-          <p class="mt-6 text-center text-sm text-gray-500">
-            Don't have an Internet Identity? 
-            <a href={globalThis.__CANISTER_IDS?.internet_identity || 'https://identity.ic0.app'} target="_blank" rel="noopener noreferrer" class="text-gray-700 hover:text-gray-900 hover:underline font-medium">
-              Create one →
-            </a>
-          </p>
+
+          {#if TEST_MODE_II_BYPASS}
+            <div class="space-y-3">
+              <button
+                on:click={() => handleLogin()}
+                disabled={loading}
+                class="w-full py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {#if loading}
+                  <Spinner size="5" color="white" />
+                  <span>Connecting...</span>
+                {:else}
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <span>Sign in as Default Test User</span>
+                {/if}
+              </button>
+              <button
+                on:click={() => handleLogin({ random: true })}
+                disabled={loading}
+                class="w-full py-4 px-6 bg-white hover:bg-gray-50 text-gray-900 font-medium rounded-xl border-2 border-gray-200 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {#if loading}
+                  <Spinner size="5" color="gray" />
+                  <span>Creating identity...</span>
+                {:else}
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                  </svg>
+                  <span>Create New Test Identity</span>
+                {/if}
+              </button>
+              <p class="text-center text-xs text-gray-400 mt-2">
+                Test mode: Internet Identity is bypassed. Each new identity gets a unique principal.
+              </p>
+            </div>
+          {:else}
+            <button
+              on:click={() => handleLogin()}
+              disabled={loading}
+              class="w-full py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {#if loading}
+                <Spinner size="5" color="white" />
+                <span>Connecting...</span>
+              {:else}
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                </svg>
+                <span>Sign in with Internet Identity</span>
+              {/if}
+            </button>
+            
+            <p class="mt-6 text-center text-sm text-gray-500">
+              Don't have an Internet Identity? 
+              <a href={globalThis.__CANISTER_IDS?.internet_identity || 'https://identity.ic0.app'} target="_blank" rel="noopener noreferrer" class="text-gray-700 hover:text-gray-900 hover:underline font-medium">
+                Create one →
+              </a>
+            </p>
+          {/if}
         </div>
 
       <!-- Step: Already Joined (Welcome Back) -->
