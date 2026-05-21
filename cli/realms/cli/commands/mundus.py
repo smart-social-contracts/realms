@@ -409,6 +409,34 @@ def _poll_status_line(elapsed: int, status: str, detail: str = "") -> str:
     return line
 
 
+def _post_deploy_config(realm: dict, network: str, version: str) -> None:
+    """Call set_canister_config on a realm backend after successful deployment.
+
+    Wires frontend_canister_id and installed_version into the realm's DB.
+    """
+    backend_id = realm.get("canister_id", "")
+    frontend_id = realm.get("frontend_canister_id", "")
+    if not backend_id:
+        return
+
+    opt = lambda v: f'opt "{v}"' if v else "null"
+    arg = f'({opt(frontend_id)}, null, null, null, null, {opt(version)})'
+
+    parts = []
+    if frontend_id:
+        parts.append(f"frontend={frontend_id}")
+    if version:
+        parts.append(f"version={version}")
+    if not parts:
+        return
+
+    console.print(f"  Configuring: {', '.join(parts)}")
+    try:
+        _dfx_call(backend_id, "set_canister_config", arg, network)
+    except Exception as e:
+        console.print(f"  [yellow]⚠ set_canister_config failed: {e}[/yellow]")
+
+
 def _submit_and_poll(manifest: dict, network: str) -> bool:
     """Submit deployment request and poll for completion."""
     realm_name = manifest.get("name", "unknown")
@@ -710,6 +738,15 @@ def mundus_deploy_descriptor_command(
     if backend_hash:
         expected_hashes["backend_wasm"] = backend_hash
 
+    # Resolve deployed version for post-deploy config
+    deployed_version = ""
+    if artifact_version and artifact_version not in ("build",):
+        deployed_version = artifact_version.lstrip("v")
+    elif artifact_version == "build":
+        version_file = get_project_root() / "version.txt"
+        if version_file.exists():
+            deployed_version = version_file.read_text().strip()
+
     results = []
     for realm in realms:
         name = realm.get("display_name", realm.get("name", "?"))
@@ -721,6 +758,8 @@ def mundus_deploy_descriptor_command(
             extension_names=extension_names, codex_names=codex_names,
         )
         ok = _submit_and_poll(manifest, network)
+        if ok:
+            _post_deploy_config(realm, network, deployed_version)
         results.append((name, ok))
         console.print()
 
