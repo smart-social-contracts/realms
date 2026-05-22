@@ -39,6 +39,7 @@ class Operations:
     REALM_UPGRADE = "realm.upgrade"
     REALM_CONFIGURE = "realm.configure"
     REALM_CONFIGURE_CODEX = "realm.configure.codex"
+    REALM_CONFIGURE_INFRASTRUCTURE = "realm.configure.infrastructure"
     REALM_REGISTER = "realm.register"
     QUARTER_REGISTER = "quarter.register"
     QUARTER_DEREGISTER = "quarter.deregister"
@@ -194,6 +195,7 @@ class Profiles:
             Operations.REALM_UPGRADE,
             Operations.REALM_CONFIGURE,
             Operations.REALM_CONFIGURE_CODEX,
+            Operations.REALM_CONFIGURE_INFRASTRUCTURE,
             Operations.QUARTER_REGISTER,
             Operations.QUARTER_DEREGISTER,
             Operations.QUARTER_CONFIGURE,

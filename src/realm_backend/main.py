@@ -2938,8 +2938,11 @@ def get_nft_config() -> text:
 @update
 def update_realm_config(config_json: str) -> str:
     """
-    Update the realm configuration (name, description, welcome_message).
-    This should be called after deployment with the manifest.json data.
+    Update the realm configuration (name, description, welcome_message,
+    branding, registration, and infrastructure settings).
+
+    Infrastructure fields (file_registry_canister_id, marketplace_canister_id)
+    require the stronger ``realm.configure.infrastructure`` permission.
 
     Args:
         config_json: JSON string containing realm configuration fields
@@ -2955,14 +2958,21 @@ def update_realm_config(config_json: str) -> str:
                 "error": f"Access denied: you lack permission '{Operations.REALM_CONFIGURE}'",
                 "denied_operation": Operations.REALM_CONFIGURE,
             })
-        import json
 
         from ggg import Realm
 
         config = json.loads(config_json)
         logger.info(f"📋 Config received: {list(config.keys())}")
 
-        # Get the first realm
+        infra_keys = {"file_registry_canister_id", "marketplace_canister_id"}
+        has_infra_change = bool(infra_keys & set(config.keys()))
+        if has_infra_change and not _check_access(caller, Operations.REALM_CONFIGURE_INFRASTRUCTURE):
+            return json.dumps({
+                "success": False,
+                "error": f"Access denied: you lack permission '{Operations.REALM_CONFIGURE_INFRASTRUCTURE}'",
+                "denied_operation": Operations.REALM_CONFIGURE_INFRASTRUCTURE,
+            })
+
         realms = list(Realm.instances())
         if not realms:
             logger.error("❌ No realm found")
@@ -2996,6 +3006,14 @@ def update_realm_config(config_json: str) -> str:
         if "background_image_url" in config:
             realm.background_image_url = config["background_image_url"] or ""
             updated_fields.append(f"background_image_url={realm.background_image_url[:50]}...")
+
+        if "file_registry_canister_id" in config:
+            realm.file_registry_canister_id = config["file_registry_canister_id"] or ""
+            updated_fields.append(f"file_registry_canister_id={realm.file_registry_canister_id}")
+
+        if "marketplace_canister_id" in config:
+            realm.marketplace_canister_id = config["marketplace_canister_id"] or ""
+            updated_fields.append(f"marketplace_canister_id={realm.marketplace_canister_id}")
 
         logger.info(f"✅ Realm config updated: {', '.join(updated_fields)}")
         return json.dumps({"success": True, "updated_fields": updated_fields})

@@ -66,6 +66,8 @@ def get_status() -> "dict[str, Any]":
     realm_open_registration = False
     logo_url = ""
     background_image_url = ""
+    file_registry_canister_id = ""
+    marketplace_canister_id = ""
     try:
         first_realm = Realm.load("1")
         if first_realm:
@@ -75,6 +77,8 @@ def get_status() -> "dict[str, Any]":
             realm_open_registration = bool(getattr(first_realm, "open_registration", False))
             logo_url = getattr(first_realm, "logo_url", None) or ""
             background_image_url = getattr(first_realm, "background_image_url", None) or ""
+            file_registry_canister_id = getattr(first_realm, "file_registry_canister_id", None) or ""
+            marketplace_canister_id = getattr(first_realm, "marketplace_canister_id", None) or ""
     except Exception:
         pass
 
@@ -330,4 +334,6 @@ def get_status() -> "dict[str, Any]":
         "accounting_currency_decimals": accounting_currency_decimals,
         "logo_url": logo_url,
         "background_image_url": background_image_url,
+        "file_registry_canister_id": file_registry_canister_id,
+        "marketplace_canister_id": marketplace_canister_id,
     }
