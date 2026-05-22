@@ -1525,7 +1525,11 @@ def _link_token_nft_canisters(
         if not realm_cid:
             continue
 
-        opt = lambda v: f'opt "{v}"' if v else "null"
+        def opt(v):
+            if not v:
+                return "null"
+            escaped = str(v).replace('\\', '\\\\').replace('"', '\\"')
+            return f'opt "{escaped}"'
 
         test_flags_json = ""
         if parameters:

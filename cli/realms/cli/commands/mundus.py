@@ -551,7 +551,11 @@ def _post_deploy_config(realm: dict, network: str, version: str, parameters: dic
     if not backend_id:
         return
 
-    opt = lambda v: f'opt "{v}"' if v else "null"
+    def opt(v):
+        if not v:
+            return "null"
+        escaped = str(v).replace('\\', '\\\\').replace('"', '\\"')
+        return f'opt "{escaped}"'
 
     # Build test_flags_json from deployment descriptor parameters
     test_flags_json = ""
