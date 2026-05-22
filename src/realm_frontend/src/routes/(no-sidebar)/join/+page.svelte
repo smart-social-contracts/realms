@@ -3,7 +3,7 @@
   import { onMount } from 'svelte';
   import { principal, isAuthenticated } from '$lib/stores/auth';
   import { login, logout, initializeAuthClient } from '$lib/auth';
-  import { backend, initBackendWithIdentity, setActiveQuarter } from '$lib/canisters.js';
+  import { backend, backendReady, initBackendWithIdentity, setActiveQuarter } from '$lib/canisters.js';
   import { loadUserProfiles, hasJoined, profilesLoading } from '$lib/stores/profiles';
   import { activeQuarterId } from '$lib/stores/quarters';
   import { realmInfo, realmName as realmNameStore, realmWelcomeMessage, realmDescription, realmOpenRegistration, testMode, testModeIIBypass, testModeUserSelfRegistration, testModeSkipTerms } from '$lib/stores/realmInfo';
@@ -81,8 +81,9 @@
   onMount(async () => {
     console.log('[JOIN PAGE v2] onMount - isAuthenticated:', $isAuthenticated);
 
-    // In test mode, always reset auth state so the user can choose an identity
-    // Fetch realm info first so test flags are available
+    // Wait for the backend actor to be ready, then fetch realm info
+    // so test flags and realm name are available before rendering decisions.
+    await backendReady;
     await realmInfo.fetch();
     if ($realmNameStore) {
       realmName = $realmNameStore;
