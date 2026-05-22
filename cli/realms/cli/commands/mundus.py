@@ -460,6 +460,14 @@ def _post_deploy_config(realm: dict, network: str, version: str, parameters: dic
     except Exception as e:
         console.print(f"  [yellow]⚠ set_canister_config failed: {e}[/yellow]")
 
+    # Pin /custom/ on the frontend canister so branding survives asset-sync upgrades
+    if frontend_id:
+        try:
+            _dfx_call(frontend_id, "pin_directory", '(record { prefix = "/custom/" })', network)
+            console.print("  📌 Pinned /custom/ on frontend canister")
+        except Exception as e:
+            console.print(f"  [yellow]⚠ pin_directory failed (non-fatal): {e}[/yellow]")
+
 
 def _submit_and_poll(manifest: dict, network: str) -> bool:
     """Submit deployment request and poll for completion."""

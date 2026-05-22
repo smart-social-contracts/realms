@@ -426,9 +426,9 @@ fi
 echo ""
 echo "🖼️  Checking for realm logo..."
 if [ -f "logo.png" ]; then
-    mkdir -p src/realm_frontend/static/images
-    cp "logo.png" "src/realm_frontend/static/images/logo.png"
-    echo "   ✅ Copied realm logo: logo.png → src/realm_frontend/static/images/logo.png"
+    mkdir -p src/realm_frontend/static/custom
+    cp "logo.png" "src/realm_frontend/static/custom/logo.png"
+    echo "   ✅ Copied realm logo: logo.png → src/realm_frontend/static/custom/logo.png"
     cp "logo.png" "src/realm_frontend/static/favicon.png"
     echo "   ✅ Set realm logo as favicon: logo.png → src/realm_frontend/static/favicon.png"
 else
@@ -439,9 +439,9 @@ fi
 echo ""
 echo "🖼️  Checking for realm background image..."
 if [ -f "background.png" ]; then
-    mkdir -p src/realm_frontend/static/images
-    cp "background.png" "src/realm_frontend/static/images/background.png"
-    echo "   ✅ Copied realm background: background.png → src/realm_frontend/static/images/background.png"
+    mkdir -p src/realm_frontend/static/custom
+    cp "background.png" "src/realm_frontend/static/custom/background.png"
+    echo "   ✅ Copied realm background: background.png → src/realm_frontend/static/custom/background.png"
 else
     echo "   ℹ️  No background.png found in realm directory"
 fi
@@ -474,20 +474,20 @@ if [ -n "$FRONTENDS" ]; then
         fi
         
         if [ -n "$frontend_dir" ] && [ -f "$frontend_dir/package.json" ]; then
-            # Copy realm images (logo, welcome) into frontend static folder before build
-            STATIC_IMAGES="$frontend_dir/static/images"
-            mkdir -p "$STATIC_IMAGES"
+            # Copy realm branding into /custom/ (separate from core /images/)
+            STATIC_CUSTOM="$frontend_dir/static/custom"
+            mkdir -p "$STATIC_CUSTOM"
             
             # Copy logo.png if present beside manifest
             if [ -f "logo.png" ]; then
-                cp "logo.png" "$STATIC_IMAGES/logo.png"
-                echo "      🖼️  Copied logo: logo.png → $STATIC_IMAGES/logo.png"
+                cp "logo.png" "$STATIC_CUSTOM/logo.png"
+                echo "      🖼️  Copied logo: logo.png → $STATIC_CUSTOM/logo.png"
             fi
             
-            # Copy background.png → canonical /images/background.png
+            # Copy background.png → /custom/background.png
             if [ -f "background.png" ]; then
-                cp "background.png" "$STATIC_IMAGES/background.png"
-                echo "      🖼️  Copied background: background.png → $STATIC_IMAGES/background.png"
+                cp "background.png" "$STATIC_CUSTOM/background.png"
+                echo "      🖼️  Copied background: background.png → $STATIC_CUSTOM/background.png"
             fi
             
             # Always install dependencies (npm is fast if already up to date)

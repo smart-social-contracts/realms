@@ -1558,6 +1558,15 @@ def _link_token_nft_canisters(
         except Exception as e:
             print(f"   ⚠ set_canister_config on {realm_name} failed: {e}")
 
+        # Pin /custom/ on the frontend canister so branding survives asset-sync upgrades
+        if frontend_id:
+            try:
+                _dfx("canister", "call", frontend_id, "pin_directory",
+                     '(record { prefix = "/custom/" })', network=network)
+                print(f"   📌 Pinned /custom/ on frontend ({frontend_id})")
+            except Exception as e:
+                print(f"   ⚠ pin_directory failed (non-fatal): {e}")
+
 
 def stage2_install(
     descriptor: Dict[str, Any],

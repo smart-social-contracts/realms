@@ -517,17 +517,17 @@ def deploy_frontend(
     # install_extensions_from_source.
     install_extensions_from_source(extensions_path, env)
 
-    # Copy realm assets from manifest directory
+    # Copy realm branding assets into /custom/ (separate from core /images/)
     if manifest_path:
         manifest_dir = Path(manifest_path).parent
-        static_images = frontend_dir / "static" / "images"
-        static_images.mkdir(parents=True, exist_ok=True)
+        static_custom = frontend_dir / "static" / "custom"
+        static_custom.mkdir(parents=True, exist_ok=True)
 
         for name in ("logo.png", "background.png"):
             src = manifest_dir / name
             if src.exists():
-                shutil.copy2(src, static_images / name)
-                print(f"   🖼️  Copied {name} → {static_images / name}")
+                shutil.copy2(src, static_custom / name)
+                print(f"   🖼️  Copied {name} → {static_custom / name}")
 
     # Generate realm_backend declarations for the frontend bundle.
     # The candid file is git-ignored (Basilisk generates it on backend
@@ -662,6 +662,25 @@ def deploy_frontend(
             ids_file.unlink(missing_ok=True)
 
     print(f"   ✅ Frontend deployed to {frontend_id}")
+
+    # Pin /custom/ so branding survives future asset-sync upgrades
+    if manifest_path:
+        static_custom = frontend_dir / "static" / "custom"
+        has_branding = any(
+            (static_custom / name).exists()
+            for name in ("logo.png", "background.png")
+        )
+        if has_branding:
+            try:
+                subprocess.run(
+                    ["dfx", "canister", "call", frontend_id,
+                     "pin_directory", '(record { prefix = "/custom/" })',
+                     "--network", network],
+                    env=env, check=True,
+                )
+                print("   📌 Pinned /custom/ directory on frontend canister")
+            except Exception as e:
+                print(f"   ⚠️  pin_directory failed (non-fatal): {e}")
 
 
 # ── Layered install strategy (Issue #168) ─────────────────────────────────────
