@@ -73,9 +73,6 @@
 		return $page.url.pathname === href || $page.url.pathname.startsWith(href + '/');
 	}
 
-	function isExtensionLink(href: string): boolean {
-		return href.startsWith('/extensions/');
-	}
 </script>
 
 <aside
@@ -89,44 +86,42 @@
 				{#each topUtilityItems as item}
 					{@const IconComp = getTablerIcon(item.icon)}
 							<li>
-								<a 
-							href={item.href}
-							data-sveltekit-reload={isExtensionLink(item.href) ? '' : undefined}
-							class={cn(
-								styles.sidebar.item(),
-								isActive(item.href) ? 'bg-gray-100 font-medium' : ''
-							)}
-						>
-							<svelte:component this={IconComp} size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
-							<span class="ml-3">{item.label}</span>
-								</a>
+							<a 
+						href={item.href}
+						class={cn(
+							styles.sidebar.item(),
+							isActive(item.href) ? 'bg-gray-100 font-medium' : ''
+						)}
+					>
+						<svelte:component this={IconComp} size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
+						<span class="ml-3">{item.label}</span>
+							</a>
+						</li>
+				{/each}
+		</ul>
+
+			<!-- Loading State -->
+		{#if $profilesLoading || $sidebarLoading}
+			<div class="py-4 flex items-center justify-center">
+				<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
+			</div>
+		{/if}
+
+		<!-- Dynamic category sections from installed extensions -->
+		{#if $sidebarConfig}
+		{#each $sidebarConfig.categories as category (category.id)}
+			<ul class="pt-3 pb-3 space-y-1">
+							<li class="px-3 py-2">
+								<h3 class={styles.sidebar.categoryHeader()}>
+						{category.label}
+								</h3>
 							</li>
-					{/each}
-			</ul>
-
-				<!-- Loading State -->
-			{#if $profilesLoading || $sidebarLoading}
-				<div class="py-4 flex items-center justify-center">
-					<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
-				</div>
-			{/if}
-
-			<!-- Dynamic category sections from installed extensions -->
-			{#if $sidebarConfig}
-			{#each $sidebarConfig.categories as category (category.id)}
-				<ul class="pt-3 pb-3 space-y-1">
-								<li class="px-3 py-2">
-									<h3 class={styles.sidebar.categoryHeader()}>
-							{category.label}
-									</h3>
-								</li>
-					{#each category.items as item}
-						{@const IconComp = getTablerIcon(item.icon)}
-									<li>
-										<a 
-								href={item.href}
-								data-sveltekit-reload={isExtensionLink(item.href) ? '' : undefined}
-								class={cn(
+				{#each category.items as item}
+					{@const IconComp = getTablerIcon(item.icon)}
+								<li>
+									<a 
+							href={item.href}
+							class={cn(
 									styles.sidebar.item(),
 									isActive(item.href) ? 'bg-gray-100 font-medium' : ''
 								)}
