@@ -131,6 +131,10 @@ class StatusRecord(Record):
     parent_realm_canister_id: text
     accounting_currency: text
     accounting_currency_decimals: nat
+    logo_url: text
+    background_image_url: text
+    file_registry_canister_id: text
+    marketplace_canister_id: text
 
 
 class UserGetRecord(Record):
