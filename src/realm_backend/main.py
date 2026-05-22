@@ -113,6 +113,11 @@ class StatusRecord(Record):
     commit_datetime: text
     extensions: Vec[text]
     test_mode: bool
+    test_mode_ii_bypass: bool
+    test_mode_user_self_registration: bool
+    test_mode_demo_data: bool
+    test_mode_skip_terms: bool
+    test_mode_skip_passport_zkproof: bool
     realm_name: text
     realm_description: text
     realm_welcome_message: text
@@ -483,10 +488,10 @@ def join_realm(profile: str, preferred_quarter: text, invite_code_checksum_hex: 
             # Test mode shortcuts: sha256("admin") / sha256("member") grant respective profiles
             _ADMIN_TEST_CODE_CHECKSUM_HEX = "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"
             _MEMBER_TEST_CODE_CHECKSUM_HEX = "e31ab643c44f7a0ec824b59d1194d60dac334200d845e61d2d289daa0f087ea4"
-            import config
-            if config.TEST_MODE_ADMIN_SELF_REGISTRATION and invite_code_checksum_hex == _ADMIN_TEST_CODE_CHECKSUM_HEX:
+            _self_reg = bool(getattr(realm, "test_mode_user_self_registration", False))
+            if _self_reg and invite_code_checksum_hex == _ADMIN_TEST_CODE_CHECKSUM_HEX:
                 granted_profile = "admin"
-            elif config.TEST_MODE_MEMBER_SELF_REGISTRATION and invite_code_checksum_hex == _MEMBER_TEST_CODE_CHECKSUM_HEX:
+            elif _self_reg and invite_code_checksum_hex == _MEMBER_TEST_CODE_CHECKSUM_HEX:
                 granted_profile = "member"
             else:
                 # Code-based path: validate and consume the invite code
@@ -526,8 +531,8 @@ def join_realm(profile: str, preferred_quarter: text, invite_code_checksum_hex: 
         else:
             # Member join without code: allowed if open_registration is on or test bypass
             open_reg = realm and realm.open_registration
-            import config
-            if not open_reg and not config.TEST_MODE_MEMBER_SELF_REGISTRATION:
+            _self_reg = bool(getattr(realm, "test_mode_user_self_registration", False))
+            if not open_reg and not _self_reg:
                 return RealmResponse(
                     success=False,
                     data=RealmResponseData(
@@ -695,6 +700,7 @@ def set_canister_config(
     marketplace_canister_id: Opt[text],
     installed_version: Opt[text] = None,
     network: Opt[text] = None,
+    test_flags_json: Opt[text] = None,
 ) -> RealmResponse:
     """
     Set canister IDs and metadata for this realm (admin only).
@@ -708,6 +714,9 @@ def set_canister_config(
         marketplace_canister_id: Optional marketplace_backend canister ID (shared infra)
         installed_version: Optional deployed version string (e.g. "0.3.5")
         network: Optional IC network name (e.g. "test", "staging", "demo", "ic")
+        test_flags_json: Optional JSON with test mode flags, e.g.
+            {"test_mode":true,"ii_bypass":true,"user_self_registration":true,...}
+            Rejected on mainnet (network=="ic") for security.
     """
     try:
         from ggg import Realm
@@ -733,11 +742,36 @@ def set_canister_config(
         if network:
             realm.network = network
 
+        # Apply test flags (network-gated: rejected on mainnet)
+        if test_flags_json:
+            effective_network = network or getattr(realm, "network", "") or ""
+            flags = json.loads(test_flags_json)
+            any_flag_true = any(v for v in flags.values() if v)
+            if any_flag_true and effective_network == "ic":
+                return RealmResponse(
+                    success=False,
+                    data=RealmResponseData(
+                        error="Test mode flags cannot be enabled on mainnet (network=ic)"
+                    ),
+                )
+            _FLAG_MAP = {
+                "test_mode": "test_mode",
+                "ii_bypass": "test_mode_ii_bypass",
+                "user_self_registration": "test_mode_user_self_registration",
+                "demo_data": "test_mode_demo_data",
+                "skip_terms": "test_mode_skip_terms",
+                "skip_passport_zkproof": "test_mode_skip_passport_zkproof",
+            }
+            for key, attr in _FLAG_MAP.items():
+                if key in flags:
+                    setattr(realm, attr, bool(flags[key]))
+
         logger.info(
             f"Updated canister config: frontend={frontend_canister_id}, "
             f"token={token_canister_id}, nft={nft_canister_id}, "
             f"file_registry={file_registry_canister_id}, marketplace={marketplace_canister_id}, "
-            f"version={installed_version}, network={network}"
+            f"version={installed_version}, network={network}, "
+            f"test_flags={test_flags_json}"
         )
 
         return RealmResponse(

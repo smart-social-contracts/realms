@@ -1,7 +1,7 @@
 // src/lib/auth.js
 import { AuthClient } from '@dfinity/auth-client';
 import { Principal } from '@dfinity/principal';
-import { TEST_MODE_II_BYPASS } from '$lib/config.js';
+import { getTestModeIIBypass } from '$lib/config.js';
 
 const II_URL = globalThis.__CANISTER_IDS?.internet_identity || 'https://identity.ic0.app';
 console.log(`Using Identity Provider: ${II_URL}`);
@@ -44,7 +44,7 @@ function _createTestAuthClientMock() {
 export { authClient };
 
 export async function initializeAuthClient() {
-  if (TEST_MODE_II_BYPASS) {
+  if (getTestModeIIBypass()) {
     if (!authClient) {
       authClient = _createTestAuthClientMock();
       console.log('[TEST MODE] Auth client initialized (mock)');
@@ -62,7 +62,7 @@ export async function initializeAuthClient() {
 }
 
 export async function login({ random = false } = {}) {
-  if (TEST_MODE_II_BYPASS) {
+  if (getTestModeIIBypass()) {
     const identity = await _createTestIdentity(random);
     _testLoggedIn = true;
     authClient = _createTestAuthClientMock();
@@ -92,7 +92,7 @@ export async function login({ random = false } = {}) {
 }
 
 export async function logout() {
-  if (TEST_MODE_II_BYPASS) {
+  if (getTestModeIIBypass()) {
     _testLoggedIn = false;
     _testIdentity = null;
     console.log('[TEST MODE] Logged out');
@@ -103,7 +103,7 @@ export async function logout() {
 }
 
 export async function isAuthenticated() {
-  if (TEST_MODE_II_BYPASS) {
+  if (getTestModeIIBypass()) {
     return _testLoggedIn;
   }
   const client = await initializeAuthClient();

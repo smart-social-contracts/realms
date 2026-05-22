@@ -40,6 +40,11 @@ class StatusRecord(Record):
     commit_datetime: text
     extensions: Vec[text]
     test_mode: bool
+    test_mode_ii_bypass: bool
+    test_mode_user_self_registration: bool
+    test_mode_demo_data: bool
+    test_mode_skip_terms: bool
+    test_mode_skip_passport_zkproof: bool
     realm_name: text
     realm_description: text
     realm_welcome_message: text

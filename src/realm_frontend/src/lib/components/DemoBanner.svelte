@@ -1,6 +1,6 @@
 <script>
 	import { onMount } from 'svelte';
-	import { TEST_MODE } from '$lib/config.js';
+	import { testMode } from '$lib/stores/realmInfo';
 	import { _ } from 'svelte-i18n';
 	
 	let showBanner = false;
@@ -13,7 +13,7 @@
 	}
 	
 	onMount(() => {
-		if (TEST_MODE) {
+		if ($testMode) {
 			const wasDismissed = localStorage.getItem(DEMO_BANNER_DISMISSED_KEY) === 'true';
 			showBanner = !wasDismissed;
 		}

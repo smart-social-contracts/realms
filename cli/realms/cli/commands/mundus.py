@@ -409,10 +409,11 @@ def _poll_status_line(elapsed: int, status: str, detail: str = "") -> str:
     return line
 
 
-def _post_deploy_config(realm: dict, network: str, version: str) -> None:
+def _post_deploy_config(realm: dict, network: str, version: str, parameters: dict = None) -> None:
     """Call set_canister_config on a realm backend after successful deployment.
 
-    Wires frontend_canister_id, installed_version, and network into the realm's DB.
+    Wires frontend_canister_id, installed_version, network, and test flags into
+    the realm's DB.
     """
     backend_id = realm.get("canister_id", "")
     frontend_id = realm.get("frontend_canister_id", "")
@@ -420,7 +421,26 @@ def _post_deploy_config(realm: dict, network: str, version: str) -> None:
         return
 
     opt = lambda v: f'opt "{v}"' if v else "null"
-    arg = f'({opt(frontend_id)}, null, null, null, null, {opt(version)}, {opt(network)})'
+
+    # Build test_flags_json from deployment descriptor parameters
+    test_flags_json = ""
+    if parameters:
+        _TEST_PARAM_MAP = {
+            "TEST_MODE": "test_mode",
+            "TEST_MODE_II_BYPASS": "ii_bypass",
+            "TEST_MODE_USER_SELF_REGISTRATION": "user_self_registration",
+            "TEST_MODE_DEMO_DATA": "demo_data",
+            "TEST_MODE_SKIP_TERMS": "skip_terms",
+            "TEST_MODE_SKIP_PASSPORT_ZKPROOF": "skip_passport_zkproof",
+        }
+        flags = {}
+        for param_name, flag_key in _TEST_PARAM_MAP.items():
+            if param_name in parameters:
+                flags[flag_key] = bool(parameters[param_name])
+        if flags:
+            test_flags_json = json.dumps(flags)
+
+    arg = f'({opt(frontend_id)}, null, null, null, null, {opt(version)}, {opt(network)}, {opt(test_flags_json)})'
 
     parts = []
     if frontend_id:
@@ -429,6 +449,8 @@ def _post_deploy_config(realm: dict, network: str, version: str) -> None:
         parts.append(f"version={version}")
     if network:
         parts.append(f"network={network}")
+    if test_flags_json:
+        parts.append(f"test_flags={test_flags_json}")
     if not parts:
         return
 
@@ -761,7 +783,7 @@ def mundus_deploy_descriptor_command(
         )
         ok = _submit_and_poll(manifest, network)
         if ok:
-            _post_deploy_config(realm, network, deployed_version)
+            _post_deploy_config(realm, network, deployed_version, parameters=parameters)
         results.append((name, ok))
         console.print()
 

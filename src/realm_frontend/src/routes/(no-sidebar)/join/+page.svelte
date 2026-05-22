@@ -3,11 +3,10 @@
   import { onMount } from 'svelte';
   import { principal, isAuthenticated } from '$lib/stores/auth';
   import { login, logout, initializeAuthClient } from '$lib/auth';
-  import { TEST_MODE, TEST_MODE_II_BYPASS, TEST_MODE_USER_SELF_REGISTRATION, TEST_MODE_SKIP_TERMS } from '$lib/config.js';
   import { backend, initBackendWithIdentity, setActiveQuarter } from '$lib/canisters.js';
   import { loadUserProfiles, hasJoined, profilesLoading } from '$lib/stores/profiles';
   import { activeQuarterId } from '$lib/stores/quarters';
-  import { realmInfo, realmName as realmNameStore, realmWelcomeMessage, realmDescription, realmOpenRegistration } from '$lib/stores/realmInfo';
+  import { realmInfo, realmName as realmNameStore, realmWelcomeMessage, realmDescription, realmOpenRegistration, testMode, testModeIIBypass, testModeUserSelfRegistration, testModeSkipTerms } from '$lib/stores/realmInfo';
   import { cn } from '$lib/theme/utilities';
   import { _ } from 'svelte-i18n';
   
@@ -51,7 +50,7 @@
   // unless an invite code grants a specific profile.
   $: profiles = inviteValid && inviteProfile
     ? allProfiles.filter(p => p.value === inviteProfile)
-    : TEST_MODE_USER_SELF_REGISTRATION
+    : $testModeUserSelfRegistration
       ? allProfiles
       : allProfiles.filter(p => p.value === 'member');
 
@@ -60,7 +59,7 @@
   }
 
   // Invite is required when registration is closed (not open) and user has no valid invite
-  $: inviteRequired = !$realmOpenRegistration && !inviteValid && !TEST_MODE_USER_SELF_REGISTRATION;
+  $: inviteRequired = !$realmOpenRegistration && !inviteValid && !$testModeUserSelfRegistration;
 
   $: welcomeImageUrl = $realmInfo.backgroundImageUrl || '/images/background.png';
   
@@ -74,7 +73,7 @@
       if (userHasJoined && (currentStep === 'auth' || currentStep === 'terms')) {
         currentStep = 'already_joined';
       } else if (!userHasJoined && currentStep === 'auth') {
-        currentStep = TEST_MODE_SKIP_TERMS ? 'profile' : 'terms';
+        currentStep = $testModeSkipTerms ? 'profile' : 'terms';
       }
     }
   }
@@ -83,7 +82,13 @@
     console.log('[JOIN PAGE v2] onMount - isAuthenticated:', $isAuthenticated);
 
     // In test mode, always reset auth state so the user can choose an identity
-    if (TEST_MODE_II_BYPASS) {
+    // Fetch realm info first so test flags are available
+    await realmInfo.fetch();
+    if ($realmNameStore) {
+      realmName = $realmNameStore;
+    }
+
+    if ($testModeIIBypass) {
       console.log('[JOIN PAGE] [TEST MODE] Resetting auth state for identity selection');
       await logout();
       isAuthenticated.set(false);
@@ -91,12 +96,6 @@
       currentStep = 'auth';
     }
 
-    // Fetch realm info
-    await realmInfo.fetch();
-    if ($realmNameStore) {
-      realmName = $realmNameStore;
-    }
-    
     // Read invite code from URL params
     const urlParams = new URLSearchParams(window.location.search);
     inviteCode = urlParams.get('invite') || urlParams.get('code') || '';
@@ -154,7 +153,7 @@
     try {
       // Test mode shortcuts: "admin" / "member" / "dev" accepted client-side
       const trimmed = inviteCode.trim().toLowerCase();
-      if (TEST_MODE_USER_SELF_REGISTRATION && (trimmed === 'admin' || trimmed === 'member' || trimmed === 'dev' || trimmed === 'developer')) {
+      if ($testModeUserSelfRegistration && (trimmed === 'admin' || trimmed === 'member' || trimmed === 'dev' || trimmed === 'developer')) {
         const profile = trimmed === 'dev' || trimmed === 'developer' ? 'developer' : trimmed;
         inviteValid = true;
         inviteProfile = profile;
@@ -364,11 +363,11 @@
             </div>
             <h2 class="text-2xl font-bold text-gray-900 mb-2">Sign in to continue</h2>
             <p class="text-gray-500">
-              {TEST_MODE_II_BYPASS ? 'Choose how to sign in to' : 'Authenticate with Internet Identity to join'} {realmName}
+              {$testModeIIBypass ? 'Choose how to sign in to' : 'Authenticate with Internet Identity to join'} {realmName}
             </p>
           </div>
 
-          {#if TEST_MODE_II_BYPASS}
+          {#if $testModeIIBypass}
             <div class="space-y-3">
               <button
                 on:click={() => handleLogin()}
@@ -522,7 +521,7 @@
             <h2 class="text-2xl font-bold text-gray-900">Select Profile</h2>
 {#if inviteValid}
               <span class="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">Invited as {inviteProfile}</span>
-            {:else if TEST_MODE}
+            {:else if $testMode}
               <span class="px-3 py-1 bg-gray-200 text-gray-600 text-xs font-medium rounded-full">Test Mode</span>
             {/if}
           </div>
@@ -578,7 +577,7 @@
             <label for="invite-code" class="block text-sm font-medium text-gray-700 mb-2">
               {#if inviteValid}
                 Invitation code
-              {:else if $realmOpenRegistration || TEST_MODE}
+              {:else if $realmOpenRegistration || $testMode}
                 Have an invitation code?
               {:else}
                 Invitation code <span class="text-red-500">*</span>
@@ -629,7 +628,7 @@
             {#if inviteError && !inviteChecking && !inviteValid}
               <p class="mt-2 text-sm text-red-600">{inviteError}</p>
             {/if}
-            {#if TEST_MODE_USER_SELF_REGISTRATION && !inviteValid}
+            {#if $testModeUserSelfRegistration && !inviteValid}
               <p class="mt-2 text-xs text-gray-400 flex items-start gap-1.5">
                 <svg class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -641,7 +640,7 @@
             {/if}
           </div>
           
-{#if TEST_MODE}
+{#if $testMode}
           <p class="text-xs text-gray-500 mb-6 p-3 bg-gray-100 rounded-lg flex items-start gap-2">
             <svg class="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />

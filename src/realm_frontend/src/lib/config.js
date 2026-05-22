@@ -1,6 +1,10 @@
-// This file is generated during the build process - do not edit manually
-// It contains canister IDs and other configuration for the application
-
+// Runtime configuration — canister IDs and test mode flags.
+//
+// Test mode flags are read from the backend status() response at runtime,
+// NOT baked in at build time. This means self-upgrades and environment changes
+// preserve the correct flags without rebuilding the frontend.
+//
+// The backend enforces a hard gate: test flags cannot be set on mainnet (network=ic).
 
 export const CONFIG = {
   ckbtc_ledger_canister_id: 'mxzaz-hqaaa-aaaar-qaada-cai',
@@ -8,44 +12,30 @@ export const CONFIG = {
   token_backend_canister_id: 'xbkkh-syaaa-aaaah-qq3ya-cai',
 };
 
-// --- TEST_MODE umbrella and sub-flags (see GitHub issue #157) ---
-// TEST_MODE is the master switch. Sub-flags are only effective when TEST_MODE is true.
-// Activation: URL param (?testmode=1), sessionStorage, or VITE_TEST_MODE env var.
-// Once activated via URL, flags persist in sessionStorage for the browser session.
+// --- Test mode flags ---
+// These are read from the realmInfo store (populated by backend status()).
+// For plain JS files (auth.js, canisters.js), use the getter functions.
+// For Svelte components, import the derived stores from realmInfo.ts directly.
 
-function _readFlag(envKey, urlParam) {
-  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[envKey] === 'true') return true;
-  if (typeof window !== 'undefined') {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get(urlParam) === '1') {
-      sessionStorage.setItem(urlParam, '1');
-      return true;
-    }
-    if (sessionStorage.getItem(urlParam) === '1') return true;
-  }
-  return false;
-}
+import { get } from 'svelte/store';
+import { realmInfo } from '$lib/stores/realmInfo';
 
-export const TEST_MODE = _readFlag('VITE_TEST_MODE', 'testmode');
+export function getTestMode() { return get(realmInfo).testMode; }
+export function getTestModeIIBypass() { return get(realmInfo).testModeIIBypass; }
+export function getTestModeUserSelfRegistration() { return get(realmInfo).testModeUserSelfRegistration; }
+export function getTestModeDemoData() { return get(realmInfo).testModeDemoData; }
+export function getTestModeSkipTerms() { return get(realmInfo).testModeSkipTerms; }
 
-// Sub-flags — all disabled by default, even when TEST_MODE is true.
-function _testFlag(envKey, urlParam) {
-  if (!TEST_MODE) return false;
-  return _readFlag(envKey, urlParam);
-}
-
-// Bypass Internet Identity with a deterministic Ed25519 identity (for Playwright).
-export const TEST_MODE_II_BYPASS = _testFlag('VITE_TEST_MODE_II_BYPASS', 'ii_bypass');
-// Allow users to self-register with any profile (admin, member, developer) via magic invite codes.
-export const TEST_MODE_USER_SELF_REGISTRATION = _testFlag('VITE_TEST_MODE_USER_SELF_REGISTRATION', 'user_self_reg');
-// Legacy aliases (kept for backward compat with existing URL params / env vars)
-export const TEST_MODE_ADMIN_SELF_REGISTRATION = TEST_MODE_USER_SELF_REGISTRATION || _testFlag('VITE_TEST_MODE_ADMIN_SELF_REGISTRATION', 'admin_self_reg');
-export const TEST_MODE_MEMBER_SELF_REGISTRATION = TEST_MODE_USER_SELF_REGISTRATION || _testFlag('VITE_TEST_MODE_MEMBER_SELF_REGISTRATION', 'member_self_reg');
-// Populate realm with demo/fake data.
-export const TEST_MODE_DEMO_DATA = _testFlag('VITE_TEST_MODE_DEMO_DATA', 'demo_data');
-// Skip terms acceptance step on the join page.
-export const TEST_MODE_SKIP_TERMS = _testFlag('VITE_TEST_MODE_SKIP_TERMS', 'skip_terms');
-// Skip real ZK passport proof — treat passport verification as always verified.
-export const TEST_MODE_SKIP_PASSPORT_ZKPROOF = _testFlag('VITE_TEST_MODE_SKIP_PASSPORT_ZKPROOF', 'skip_passport');
+// Legacy constant exports for backward compatibility during migration.
+// These evaluate once at import time (before status loads) so they're always false.
+// New code should use the getter functions or the derived stores from realmInfo.ts.
+export const TEST_MODE = false;
+export const TEST_MODE_II_BYPASS = false;
+export const TEST_MODE_USER_SELF_REGISTRATION = false;
+export const TEST_MODE_ADMIN_SELF_REGISTRATION = false;
+export const TEST_MODE_MEMBER_SELF_REGISTRATION = false;
+export const TEST_MODE_DEMO_DATA = false;
+export const TEST_MODE_SKIP_TERMS = false;
+export const TEST_MODE_SKIP_PASSPORT_ZKPROOF = false;
 
 export const DEV_PORT = 8000;

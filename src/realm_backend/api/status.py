@@ -105,6 +105,24 @@ def get_status() -> "dict[str, Any]":
     commit_datetime = "COMMIT_DATETIME_PLACEHOLDER"
     version = "VERSION_PLACEHOLDER"
     test_mode = False
+    test_mode_ii_bypass = False
+    test_mode_user_self_registration = False
+    test_mode_demo_data = False
+    test_mode_skip_terms = False
+    test_mode_skip_passport_zkproof = False
+
+    # Read test flags from Realm entity (set via set_canister_config)
+    try:
+        _tm_realm = Realm.load("1")
+        if _tm_realm:
+            test_mode = bool(getattr(_tm_realm, "test_mode", False))
+            test_mode_ii_bypass = bool(getattr(_tm_realm, "test_mode_ii_bypass", False))
+            test_mode_user_self_registration = bool(getattr(_tm_realm, "test_mode_user_self_registration", False))
+            test_mode_demo_data = bool(getattr(_tm_realm, "test_mode_demo_data", False))
+            test_mode_skip_terms = bool(getattr(_tm_realm, "test_mode_skip_terms", False))
+            test_mode_skip_passport_zkproof = bool(getattr(_tm_realm, "test_mode_skip_passport_zkproof", False))
+    except Exception:
+        pass
 
     # Prefer version stored in DB (set by set_canister_config / CI post-deploy)
     if version == "VERSION_PLACEHOLDER":
@@ -294,6 +312,11 @@ def get_status() -> "dict[str, Any]":
         "commit_datetime": commit_datetime,
         "extensions": extension_entries,
         "test_mode": test_mode,
+        "test_mode_ii_bypass": test_mode_ii_bypass,
+        "test_mode_user_self_registration": test_mode_user_self_registration,
+        "test_mode_demo_data": test_mode_demo_data,
+        "test_mode_skip_terms": test_mode_skip_terms,
+        "test_mode_skip_passport_zkproof": test_mode_skip_passport_zkproof,
         "task_manager": task_manager_status,
         "canisters": canisters,
         "registries": registries,

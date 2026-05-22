@@ -24,6 +24,12 @@ interface RealmInfo {
 	parentRealmCanisterId: string;
 	logoUrl: string;
 	backgroundImageUrl: string;
+	testMode: boolean;
+	testModeIIBypass: boolean;
+	testModeUserSelfRegistration: boolean;
+	testModeDemoData: boolean;
+	testModeSkipTerms: boolean;
+	testModeSkipPassportZkproof: boolean;
 	loading: boolean;
 	error: string | null;
 }
@@ -40,6 +46,12 @@ const createRealmInfoStore = () => {
 		parentRealmCanisterId: '',
 		logoUrl: '',
 		backgroundImageUrl: '',
+		testMode: false,
+		testModeIIBypass: false,
+		testModeUserSelfRegistration: false,
+		testModeDemoData: false,
+		testModeSkipTerms: false,
+		testModeSkipPassportZkproof: false,
 		loading: true,
 		error: null
 	});
@@ -71,6 +83,12 @@ const createRealmInfoStore = () => {
 						parentRealmCanisterId: status.parent_realm_canister_id || '',
 						logoUrl: status.logo_url || '',
 						backgroundImageUrl: status.background_image_url || '',
+						testMode: status.test_mode || false,
+						testModeIIBypass: status.test_mode_ii_bypass || false,
+						testModeUserSelfRegistration: status.test_mode_user_self_registration || false,
+						testModeDemoData: status.test_mode_demo_data || false,
+						testModeSkipTerms: status.test_mode_skip_terms || false,
+						testModeSkipPassportZkproof: status.test_mode_skip_passport_zkproof || false,
 						loading: false
 					}));
 				} else {
@@ -101,3 +119,11 @@ export const realmDescription = derived(realmInfo, $realmInfo => $realmInfo.desc
 
 // Derived store for open registration flag
 export const realmOpenRegistration = derived(realmInfo, $realmInfo => $realmInfo.openRegistration);
+
+// Derived stores for test mode flags (source of truth: backend status)
+export const testMode = derived(realmInfo, $r => $r.testMode);
+export const testModeIIBypass = derived(realmInfo, $r => $r.testModeIIBypass);
+export const testModeUserSelfRegistration = derived(realmInfo, $r => $r.testModeUserSelfRegistration);
+export const testModeDemoData = derived(realmInfo, $r => $r.testModeDemoData);
+export const testModeSkipTerms = derived(realmInfo, $r => $r.testModeSkipTerms);
+export const testModeSkipPassportZkproof = derived(realmInfo, $r => $r.testModeSkipPassportZkproof);

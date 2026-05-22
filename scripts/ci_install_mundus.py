@@ -1494,13 +1494,12 @@ def _kickoff_deploy(
 
 def _link_token_nft_canisters(
     members: List[Dict[str, Any]], network: str, version: str = "",
+    parameters: Dict[str, Any] = None,
 ) -> None:
     """Configure realm backends via set_canister_config after deployment.
 
-    Sets frontend_canister_id, token/nft canister IDs, and installed_version
-    on each realm backend. Convention: a member named ``<realm>-token``
-    (type ``token``) is linked to the realm named ``<realm>``, and similarly
-    for ``<realm>-nft``.
+    Sets frontend_canister_id, token/nft canister IDs, installed_version,
+    network, and test flags on each realm backend.
     """
     realm_members = {
         m["name"]: m for m in members
@@ -1527,7 +1526,22 @@ def _link_token_nft_canisters(
             continue
 
         opt = lambda v: f'opt "{v}"' if v else "null"
-        arg = f'({opt(frontend_id)}, {opt(token_id)}, {opt(nft_id)}, null, null, {opt(version)}, {opt(network)})'
+
+        test_flags_json = ""
+        if parameters:
+            _TEST_PARAM_MAP = {
+                "TEST_MODE": "test_mode",
+                "TEST_MODE_II_BYPASS": "ii_bypass",
+                "TEST_MODE_USER_SELF_REGISTRATION": "user_self_registration",
+                "TEST_MODE_DEMO_DATA": "demo_data",
+                "TEST_MODE_SKIP_TERMS": "skip_terms",
+                "TEST_MODE_SKIP_PASSPORT_ZKPROOF": "skip_passport_zkproof",
+            }
+            flags = {fk: bool(parameters[pk]) for pk, fk in _TEST_PARAM_MAP.items() if pk in parameters}
+            if flags:
+                test_flags_json = json.dumps(flags)
+
+        arg = f'({opt(frontend_id)}, {opt(token_id)}, {opt(nft_id)}, null, null, {opt(version)}, {opt(network)}, {opt(test_flags_json)})'
         parts = [f"frontend={frontend_id or '–'}"]
         if token_id:
             parts.append(f"token={token_id}")
@@ -1536,6 +1550,8 @@ def _link_token_nft_canisters(
         if version:
             parts.append(f"version={version}")
         parts.append(f"network={network}")
+        if test_flags_json:
+            parts.append(f"test_flags")
         print(f"   🔗 configuring {realm_name}: {', '.join(parts)}")
         try:
             _dfx("canister", "call", realm_cid, "set_canister_config", arg, network=network)
@@ -1592,7 +1608,10 @@ def stage2_install(
                 network,
             )
 
-    _link_token_nft_canisters(members, network, version=base_version)
+    _link_token_nft_canisters(
+        members, network, version=base_version,
+        parameters=descriptor.get("parameters"),
+    )
 
     print("\n   ✅ mundus installed")
 

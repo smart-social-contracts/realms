@@ -11,7 +11,7 @@
 	import { _ } from 'svelte-i18n';
 	import T from '$lib/components/T.svelte';
 	import { initBackendWithIdentity, backend, setActiveQuarter } from '$lib/canisters';
-	import { TEST_MODE_II_BYPASS } from '$lib/config.js';
+	import { testModeIIBypass } from '$lib/stores/realmInfo';
 
 	let principalText = '';
 	let showDropdown = false;
@@ -20,7 +20,7 @@
 
 	onMount(async () => {
 		// In test mode, auto-login immediately with deterministic identity
-		if (TEST_MODE_II_BYPASS && !(await checkAuth())) {
+		if ($testModeIIBypass && !(await checkAuth())) {
 			console.log('[TEST MODE] Auto-login triggered');
 			await handleLogin();
 		} else {
