@@ -451,10 +451,28 @@ _BRANDING_CHUNK_SIZE = 1_500_000
 
 
 def _parse_nat(output: str) -> int:
+    """Extract a nat from Candid text or JSON output."""
     import re as _re
+    # Candid text: (record { 1_309_252_224 = 3 : nat })
     m = _re.search(r'=\s*(\d[\d_]*)\s*:\s*nat', output)
     if m:
         return int(m.group(1).replace('_', ''))
+    # JSON: {"batch_id": 3} or just a number
+    try:
+        import json as _json
+        obj = _json.loads(output)
+        if isinstance(obj, int):
+            return obj
+        if isinstance(obj, dict):
+            for v in obj.values():
+                if isinstance(v, int):
+                    return v
+        if isinstance(obj, list) and obj and isinstance(obj[0], dict):
+            for v in obj[0].values():
+                if isinstance(v, int):
+                    return v
+    except (ValueError, TypeError):
+        pass
     raise ValueError(f"Cannot parse nat from: {output}")
 
 
@@ -480,7 +498,7 @@ def _upload_branding_to_canister(frontend_id: str, manifest_dir: Path, network: 
                 _dfx_call_file(frontend_id, "store", arg, network)
             else:
                 # Chunked upload for large files
-                result = _dfx_call(frontend_id, "create_batch", "(record {})", network)
+                result = _dfx_call_file(frontend_id, "create_batch", "(record {})", network)
                 batch_id = _parse_nat(result)
                 chunk_ids = []
                 for i in range(0, len(data), _BRANDING_CHUNK_SIZE):
