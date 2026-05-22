@@ -26,18 +26,6 @@
 	let quarterChangeError = '';
 	let quarterChangeSuccess = '';
 
-	// Upgrade state
-	let isAdmin = false;
-	let upgradeAvailable = false;
-	let currentVersion = '';
-	let latestVersion = '';
-	let creditBalance = 0;
-	let upgradeLoading = false;
-	let upgradeError = '';
-	let upgradeSuccess = '';
-	let upgradeJobId = '';
-	let checkingUpgrade = false;
-
 	$: displayAvatar = avatarUrl?.trim() || `https://api.dicebear.com/9.x/glass/svg?seed=${principal}`;
 
 	function getQuarterName(canisterId: string): string {
@@ -65,54 +53,6 @@
 		}
 	}
 
-	async function checkUpgradeAvailability() {
-		if (!isAdmin) return;
-		checkingUpgrade = true;
-		try {
-			const raw = await backend.get_available_upgrade('');
-			const result = JSON.parse(raw);
-			if (result.success) {
-				currentVersion = result.current_version || '';
-				latestVersion = result.latest_version || '';
-				upgradeAvailable = result.upgrade_available || false;
-			}
-		} catch (e: any) {
-			console.warn('Could not check upgrade availability:', e.message);
-		}
-
-		try {
-			const raw = await backend.get_realm_credits('');
-			const result = JSON.parse(raw);
-			if (result.success && result.credits) {
-				creditBalance = result.credits.balance || 0;
-			}
-		} catch (e: any) {
-			console.warn('Could not fetch realm credits:', e.message);
-		}
-		checkingUpgrade = false;
-	}
-
-	async function handleUpgrade() {
-		upgradeLoading = true;
-		upgradeError = '';
-		upgradeSuccess = '';
-		try {
-			const raw = await backend.request_upgrade('');
-			const result = JSON.parse(raw);
-			if (result.success) {
-				upgradeJobId = result.job_id || '';
-				upgradeSuccess = `Upgrade to ${result.target_version || 'latest'} initiated (job: ${upgradeJobId})`;
-				upgradeAvailable = false;
-			} else {
-				upgradeError = result.error || 'Upgrade request failed';
-			}
-		} catch (e: any) {
-			upgradeError = e.message || 'Failed to request upgrade';
-		} finally {
-			upgradeLoading = false;
-		}
-	}
-
 	onMount(async () => {
 		try {
 			if (!backend || typeof backend.get_my_user_status !== 'function') {
@@ -129,7 +69,6 @@
 				profiles = u.profiles || [];
 				assignedQuarter = u.assigned_quarter || '';
 				selectedQuarter = assignedQuarter;
-				isAdmin = profiles.includes('admin') || profiles.includes('operator');
 			} else {
 				throw new Error('Could not fetch user status: Invalid response format.');
 			}
@@ -139,9 +78,6 @@
 			loadingUserStatus = false;
 		}
 
-		if (isAdmin) {
-			await checkUpgradeAvailability();
-		}
 	});
 </script>
 
@@ -259,71 +195,5 @@
 		</div>
 		{/if}
 
-		<!-- Realm Upgrade (admin/operator only) -->
-		{#if isAdmin}
-		<div class="col-span-full mt-6">
-			<Heading tag="h2" class="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-				Realm Upgrade
-			</Heading>
-			<div class="p-4 bg-gray-50 rounded border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
-				{#if checkingUpgrade}
-					<div class="text-gray-500">Checking for updates...</div>
-				{:else}
-					<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-						<div>
-							<span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Current Version</span>
-							<div class="text-sm font-semibold text-gray-900 dark:text-white mt-0.5">
-								{currentVersion || 'Unknown'}
-							</div>
-						</div>
-						<div>
-							<span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Latest Available</span>
-							<div class="text-sm font-semibold mt-0.5" class:text-green-600={upgradeAvailable} class:dark:text-green-400={upgradeAvailable} class:text-gray-900={!upgradeAvailable} class:dark:text-white={!upgradeAvailable}>
-								{latestVersion || 'None published'}
-								{#if upgradeAvailable}
-									<span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-										Update available
-									</span>
-								{/if}
-							</div>
-						</div>
-						<div>
-							<span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Realm Credits</span>
-							<div class="text-sm font-semibold text-gray-900 dark:text-white mt-0.5">
-								{creditBalance} credits
-								{#if creditBalance < 5}
-									<span class="ml-1 text-xs text-red-500">(need 5 for upgrade)</span>
-								{/if}
-							</div>
-						</div>
-					</div>
-
-					{#if upgradeAvailable && creditBalance >= 5}
-						<button
-							on:click={handleUpgrade}
-							disabled={upgradeLoading}
-							class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-						>
-							{upgradeLoading ? 'Upgrading...' : `Upgrade to ${latestVersion}`}
-						</button>
-						<p class="mt-1 text-xs text-gray-500">Cost: 5 credits. Both backend and frontend will be upgraded.</p>
-					{:else if upgradeAvailable && creditBalance < 5}
-						<p class="text-sm text-amber-600 dark:text-amber-400">
-							Insufficient credits to upgrade. Transfer tokens to the registry to purchase credits.
-						</p>
-					{:else if !upgradeAvailable && latestVersion}
-						<p class="text-sm text-gray-500">Your realm is up to date.</p>
-					{/if}
-
-					{#if upgradeError}
-						<div class="mt-2 text-sm text-red-600 dark:text-red-400">{upgradeError}</div>
-					{/if}
-					{#if upgradeSuccess}
-						<div class="mt-2 text-sm text-green-600 dark:text-green-400">{upgradeSuccess}</div>
-					{/if}
-				{/if}
-			</div>
-		</div>
-		{/if}
 	</div>
 </main>

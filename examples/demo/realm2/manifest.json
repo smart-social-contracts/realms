@@ -54,7 +54,8 @@
     "llm_chat",
     "hello_world",
     "test_bench",
-    "demo_simulator"
+    "demo_simulator",
+    "managed_services"
   ],
   "options": {
     "random": {
