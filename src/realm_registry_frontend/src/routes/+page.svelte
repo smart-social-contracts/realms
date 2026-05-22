@@ -409,7 +409,7 @@
   }
 
   function resolvedRealmLogoUrl(realm) {
-    return resolveRealmAssetUrl(realm, '/images/logo.png') || null;
+    return resolveRealmAssetUrl(realm, '/custom/logo.png') || null;
   }
 
 
@@ -1071,7 +1071,7 @@
       {#if viewMode === 'list'}
         <div class="realms-grid">
           {#each filteredRealms as realm}
-            {@const welcomeBg = resolveRealmAssetUrl(realm, '/images/background.png')}
+            {@const welcomeBg = resolveRealmAssetUrl(realm, '/custom/background.png')}
             {@const logoSrc = resolvedRealmLogoUrl(realm)}
             <div class="realm-card">
               {#if welcomeBg}
