@@ -98,6 +98,9 @@ class DeploymentJob(Entity, TimestampedMixin):
     registry_canister_id = String(max_length=64)
     offchain_deployer_principal = String(max_length=64)
     settlement_notified = Integer(default=0)
+    snapshot_id = String(max_length=200)
+    snapshot_taken = Integer(default=0)
+    skip_snapshot = Integer(default=0)
     error = String(max_length=2000)
     created_at = Integer(default=0)
     completed_at = Integer(default=0)
@@ -227,6 +230,15 @@ class GetStatusResult(Variant, total=False):
     Ok: StatusRecord
     Err: text
 
+class TakeSnapshotOk(Record, _CA):
+    job_id: text
+    snapshot_id: text
+    skipped: bool
+
+class ResultTakeSnapshot(Variant, total=False):
+    Ok: TakeSnapshotOk
+    Err: InstallerError
+
 # ── Helpers ────────────────────────────────────────────────────────────
 
 def jlog(job_id: str):
@@ -280,10 +292,61 @@ def schedule_registry_settlement(job_id: str, success: bool, reason: str = ""):
             job = DeploymentJob[job_id]
             if job:
                 job.settlement_notified = 1
+                if success and int(job.snapshot_taken or 0) == 1 and (job.snapshot_id or "").strip():
+                    _schedule_snapshot_delete(job_id)
         except Exception as e:
             jlog(job_id).error(f"settlement callback failed: {e}")
 
     ic.set_timer(Duration(0), _cb)
+
+
+def _schedule_snapshot_rollback(job_id: str):
+    """Load a previously taken canister snapshot to roll back a failed upgrade."""
+    def _rollback_cb():
+        try:
+            list(DeploymentJob.instances())
+            job = DeploymentJob[job_id]
+            if job is None:
+                return
+            snap_hex = (job.snapshot_id or "").strip()
+            backend_id = (job.backend_canister_id or "").strip()
+            if not snap_hex or not backend_id:
+                jlog(job_id).warning("rollback skipped: missing snapshot_id or backend_canister_id")
+                return
+            snap_bytes = bytes.fromhex(snap_hex)
+            jlog(job_id).info(f"loading snapshot {snap_hex} onto {backend_id}")
+            result: CallResult = yield management_canister.load_canister_snapshot(
+                {"canister_id": Principal.from_str(backend_id),
+                 "snapshot_id": snap_bytes})
+            jlog(job_id).info("snapshot rollback completed")
+        except Exception as e:
+            jlog(job_id).error(f"snapshot rollback failed: {e}")
+
+    ic.set_timer(Duration(0), _rollback_cb)
+
+
+def _schedule_snapshot_delete(job_id: str):
+    """Delete a canister snapshot after a successful deployment."""
+    def _delete_cb():
+        try:
+            list(DeploymentJob.instances())
+            job = DeploymentJob[job_id]
+            if job is None:
+                return
+            snap_hex = (job.snapshot_id or "").strip()
+            backend_id = (job.backend_canister_id or "").strip()
+            if not snap_hex or not backend_id:
+                return
+            snap_bytes = bytes.fromhex(snap_hex)
+            jlog(job_id).info(f"deleting snapshot {snap_hex} from {backend_id}")
+            result: CallResult = yield management_canister.delete_canister_snapshot(
+                {"canister_id": Principal.from_str(backend_id),
+                 "snapshot_id": snap_bytes})
+            jlog(job_id).info("snapshot deleted")
+        except Exception as e:
+            jlog(job_id).warning(f"snapshot delete failed (non-fatal): {e}")
+
+    ic.set_timer(Duration(0), _delete_cb)
 
 
 def schedule_registration(job_id_val: str):
@@ -816,6 +879,65 @@ def enqueue_deployment(manifest_json: text) -> ResultEnqueue:
     except Exception as e:
         return ResultEnqueue(Err=ie(str(e), traceback.format_exc()[-1500:]))
 
+@update
+def take_pre_upgrade_snapshot(args: text) -> Async[ResultTakeSnapshot]:
+    """Take an IC canister snapshot before upgrading the backend WASM.
+
+    Called by the off-chain deployment worker before dfx canister install.
+    The snapshot is stored on the job so it can be loaded on failure or
+    deleted on success.
+    """
+    try:
+        params = json.loads(args)
+        job_id = (params.get("job_id") or "").strip()
+        backend_id = (params.get("backend_canister_id") or "").strip()
+        if not job_id:
+            return ResultTakeSnapshot(Err=ie("job_id required"))
+        if not backend_id:
+            return ResultTakeSnapshot(Err=ie("backend_canister_id required"))
+
+        list(DeploymentJob.instances())
+        job = DeploymentJob[job_id]
+        if job is None:
+            return ResultTakeSnapshot(Err=ie(f"unknown job_id: {job_id}"))
+        if (job.status or "pending") != "pending":
+            return ResultTakeSnapshot(Err=ie(f"job in '{job.status}', expected 'pending'"))
+
+        manifest = json.loads(job.manifest_json or "{}")
+        if manifest.get("skip_snapshot"):
+            job.skip_snapshot = 1
+            jlog(job_id).info("snapshot skipped per manifest flag")
+            return ResultTakeSnapshot(Ok=TakeSnapshotOk(
+                job_id=job_id, snapshot_id="", skipped=True,
+            ))
+
+        jlog(job_id).info(f"taking pre-upgrade snapshot of {backend_id}")
+        snapshot_result: CallResult = yield management_canister.take_canister_snapshot(
+            {"canister_id": Principal.from_str(backend_id)})
+        inner = unwrap_call_result(snapshot_result)
+
+        snap_id_raw = inner.get("id") if isinstance(inner, dict) else getattr(inner, "id", None)
+        if snap_id_raw is None:
+            return ResultTakeSnapshot(Err=ie("snapshot response missing id"))
+
+        if isinstance(snap_id_raw, bytes):
+            snap_id_hex = snap_id_raw.hex()
+        elif isinstance(snap_id_raw, list):
+            snap_id_hex = bytes(snap_id_raw).hex()
+        else:
+            snap_id_hex = str(snap_id_raw).replace("0x", "")
+
+        job.snapshot_id = snap_id_hex
+        job.snapshot_taken = 1
+        jlog(job_id).info(f"snapshot taken: {snap_id_hex}")
+
+        return ResultTakeSnapshot(Ok=TakeSnapshotOk(
+            job_id=job_id, snapshot_id=snap_id_hex, skipped=False,
+        ))
+    except Exception as e:
+        _log.error(f"take_pre_upgrade_snapshot error: {e}")
+        return ResultTakeSnapshot(Err=ie(str(e), traceback.format_exc()[-1500:]))
+
 @query
 def get_pending_deployments() -> ResultPendingJobs:
     try:
@@ -891,6 +1013,10 @@ def report_deployment_failure(args: text) -> ResultReportFailure:
         reg_id = (params.get("registry_canister_id") or "").strip()
         if reg_id and not (job.registry_canister_id or "").strip():
             job.registry_canister_id = reg_id
+
+        if int(job.snapshot_taken or 0) == 1 and (job.snapshot_id or "").strip():
+            _schedule_snapshot_rollback(job_id)
+
         schedule_registry_settlement(job_id, success=False, reason=err)
         return ResultReportFailure(Ok=JobStatusAck(job_id=job_id, prev_status=prev, status="failed", noop=False))
     except Exception as e:
