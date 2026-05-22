@@ -49,6 +49,8 @@ export const idlFactory = ({ IDL }) => {
     'registries' : IDL.Vec(CanisterInfo),
     'logo_url' : IDL.Text,
     'background_image_url' : IDL.Text,
+    'file_registry_canister_id' : IDL.Text,
+    'marketplace_canister_id' : IDL.Text,
   });
   const PaginationInfo = IDL.Record({
     'page_size' : IDL.Int,

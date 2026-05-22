@@ -711,6 +711,8 @@ export interface StatusRecord {
   'registries' : Array<CanisterInfo>,
   'logo_url' : string,
   'background_image_url' : string,
+  'file_registry_canister_id' : string,
+  'marketplace_canister_id' : string,
 }
 export type StatusResult = { 'Ok' : StatusRecord } |
   { 'Err' : string };
