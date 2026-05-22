@@ -51,6 +51,29 @@ def _dfx_call(canister_id: str, method: str, arg: str, network: str, *, query: b
     return result.stdout.strip()
 
 
+def _dfx_call_file(canister_id: str, method: str, arg: str, network: str,
+                    *, candid_file: str = None) -> str:
+    """Like _dfx_call but writes the argument to a temp file (for large blobs)."""
+    import re as _re
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".candid", delete=False) as f:
+        f.write(arg)
+        f.flush()
+        try:
+            cmd = ["dfx", "canister", "call", canister_id, method,
+                   "--argument-file", f.name, "--network", network]
+            if candid_file:
+                cmd += ["--candid", candid_file]
+            project_root = get_project_root()
+            env = {**os.environ, "TERM": "xterm", "DFX_WARNING": "-mainnet_plaintext_identity"}
+            result = subprocess.run(cmd, capture_output=True, text=True,
+                                    cwd=project_root, env=env, timeout=300)
+            if result.returncode != 0:
+                raise RuntimeError(f"dfx {method} failed: {result.stderr}")
+            return result.stdout.strip()
+        finally:
+            os.unlink(f.name)
+
+
 def _upload_file(filepath: Path) -> str:
     """Upload a file to the deployer and return its URL."""
     import urllib.request
@@ -409,6 +432,96 @@ def _poll_status_line(elapsed: int, status: str, detail: str = "") -> str:
     return line
 
 
+_ASSET_COMMIT_DID = """
+type BatchOperationKind = variant {
+    CreateAsset : record { key : text; content_type : text; max_age : opt nat64;
+        headers : opt vec record { text; text }; enable_aliasing : opt bool;
+        allow_raw_access : opt bool; };
+    SetAssetContent : record { key : text; content_encoding : text;
+        chunk_ids : vec nat; sha256 : opt blob; };
+    UnsetAssetContent : record { key : text; content_encoding : text; };
+    DeleteAsset : record { key : text; };
+    Clear : record {};
+};
+service : { commit_batch : (record { batch_id : nat; operations : vec BatchOperationKind }) -> (); }
+"""
+
+_BRANDING_STORE_LIMIT = 1_900_000  # files under this use the simpler store() call
+_BRANDING_CHUNK_SIZE = 1_500_000
+
+
+def _parse_nat(output: str) -> int:
+    import re as _re
+    m = _re.search(r'=\s*(\d[\d_]*)\s*:\s*nat', output)
+    if m:
+        return int(m.group(1).replace('_', ''))
+    raise ValueError(f"Cannot parse nat from: {output}")
+
+
+def _upload_branding_to_canister(frontend_id: str, manifest_dir: Path, network: str) -> None:
+    """Upload logo.png and background.png from manifest_dir to /custom/ on the frontend canister."""
+    files = [("logo.png", "/custom/logo.png"), ("background.png", "/custom/background.png")]
+    uploaded_any = False
+
+    for filename, asset_key in files:
+        src = manifest_dir / filename
+        if not src.exists():
+            continue
+
+        data = src.read_bytes()
+        sha = hashlib.sha256(data).hexdigest()
+        console.print(f"  🖼️  Uploading {filename} ({len(data)} bytes)")
+
+        try:
+            if len(data) < _BRANDING_STORE_LIMIT:
+                blob_hex = "".join(f"\\{b:02x}" for b in data)
+                arg = (f'(record {{ key="{asset_key}"; content_type="image/png"; '
+                       f'content=blob "{blob_hex}"; content_encoding="identity"; sha256=null }})')
+                _dfx_call_file(frontend_id, "store", arg, network)
+            else:
+                # Chunked upload for large files
+                result = _dfx_call(frontend_id, "create_batch", "(record {})", network)
+                batch_id = _parse_nat(result)
+                chunk_ids = []
+                for i in range(0, len(data), _BRANDING_CHUNK_SIZE):
+                    chunk = data[i:i + _BRANDING_CHUNK_SIZE]
+                    blob_hex = "".join(f"\\{b:02x}" for b in chunk)
+                    arg = f'(record {{ batch_id = {batch_id} : nat; content = blob "{blob_hex}" }})'
+                    result = _dfx_call_file(frontend_id, "create_chunk", arg, network)
+                    chunk_ids.append(_parse_nat(result))
+
+                sha_bytes = bytes.fromhex(sha)
+                sha_blob = "".join(f"\\{b:02x}" for b in sha_bytes)
+                chunk_ids_str = "; ".join(f"{c} : nat" for c in chunk_ids)
+
+                did_path = tempfile.mktemp(suffix=".did")
+                Path(did_path).write_text(_ASSET_COMMIT_DID)
+                try:
+                    commit_arg = (
+                        f'(record {{ batch_id = {batch_id} : nat; operations = vec {{'
+                        f' variant {{ CreateAsset = record {{ key = "{asset_key}"; '
+                        f'content_type = "image/png"; max_age = opt (31536000 : nat64); '
+                        f'headers = opt vec {{}}; enable_aliasing = opt false; '
+                        f'allow_raw_access = opt true; }} }};'
+                        f' variant {{ SetAssetContent = record {{ key = "{asset_key}"; '
+                        f'content_encoding = "identity"; '
+                        f'chunk_ids = vec {{ {chunk_ids_str} }}; '
+                        f'sha256 = opt blob "{sha_blob}"; }} }};'
+                        f' }}; }})')
+                    _dfx_call_file(frontend_id, "commit_batch", commit_arg, network,
+                                   candid_file=did_path)
+                finally:
+                    Path(did_path).unlink(missing_ok=True)
+
+            uploaded_any = True
+            console.print(f"       ✅ {asset_key}")
+        except Exception as e:
+            console.print(f"  [yellow]⚠ Upload {filename} failed: {e}[/yellow]")
+
+    if not uploaded_any:
+        console.print("  [dim]No branding files found in manifest directory[/dim]")
+
+
 def _post_deploy_config(realm: dict, network: str, version: str, parameters: dict = None) -> None:
     """Call set_canister_config on a realm backend after successful deployment.
 
@@ -460,8 +573,13 @@ def _post_deploy_config(realm: dict, network: str, version: str, parameters: dic
     except Exception as e:
         console.print(f"  [yellow]⚠ set_canister_config failed: {e}[/yellow]")
 
-    # Pin /custom/ on the frontend canister so branding survives asset-sync upgrades
+    # Upload branding and pin /custom/ on the frontend canister
     if frontend_id:
+        manifest_path = realm.get("manifest", "")
+        if manifest_path:
+            manifest_dir = get_project_root() / Path(manifest_path).parent
+            _upload_branding_to_canister(frontend_id, manifest_dir, network)
+
         try:
             _dfx_call(frontend_id, "pin_directory", '(record { prefix = "/custom/" })', network)
             console.print("  📌 Pinned /custom/ on frontend canister")
