@@ -93,7 +93,7 @@ type DecimalsResult = record { decimals : nat32 };
 type PaginationInfo = record { page_num : int; page_size : int; total_items_count : int; total_pages : int };
 type CanisterInfo = record { canister_id : text; canister_type : text };
 type QuarterInfoRecord = record { name : text; canister_id : text; population : nat; status : text };
-type StatusRecord = record { version : text; status : text; users_count : nat; organizations_count : nat; realms_count : nat; mandates_count : nat; tasks_count : nat; transfers_count : nat; instruments_count : nat; codexes_count : nat; disputes_count : nat; licenses_count : nat; trades_count : nat; proposals_count : nat; votes_count : nat; commit : text; commit_datetime : text; extensions : vec text; test_mode : bool; realm_name : text; realm_description : text; realm_welcome_message : text; user_profiles_count : nat; canisters : vec CanisterInfo; registries : vec CanisterInfo; dependencies : vec text; python_version : text; quarters : vec QuarterInfoRecord; is_quarter : bool; parent_realm_canister_id : text; accounting_currency : text; accounting_currency_decimals : nat; logo_url : text; background_image_url : text };
+type StatusRecord = record { version : text; status : text; users_count : nat; organizations_count : nat; realms_count : nat; mandates_count : nat; tasks_count : nat; transfers_count : nat; instruments_count : nat; codexes_count : nat; disputes_count : nat; licenses_count : nat; trades_count : nat; proposals_count : nat; votes_count : nat; commit : text; commit_datetime : text; extensions : vec text; test_mode : bool; test_mode_ii_bypass : bool; test_mode_user_self_registration : bool; test_mode_demo_data : bool; test_mode_skip_terms : bool; test_mode_skip_passport_zkproof : bool; realm_name : text; realm_description : text; realm_welcome_message : text; user_profiles_count : nat; canisters : vec CanisterInfo; registries : vec CanisterInfo; dependencies : vec text; python_version : text; quarters : vec QuarterInfoRecord; is_quarter : bool; parent_realm_canister_id : text; accounting_currency : text; accounting_currency_decimals : nat; logo_url : text; background_image_url : text };
 type UserGetRecord = record { "principal" : principal; profiles : vec text; nickname : text; avatar : text; private_data : text; assigned_quarter : text };
 type ObjectsListRecordPaginated = record { objects : vec text; pagination : PaginationInfo };
 type ObjectsListRecord = record { objects : vec text };
@@ -200,7 +200,7 @@ service : {
   "change_quarter" : (text) -> (RealmResponse);
   "get_my_principal" : () -> (text) query;
   "get_canister_id" : () -> (text) query;
-  "set_canister_config" : (opt text, opt text, opt text, opt text, opt text) -> (RealmResponse);
+  "set_canister_config" : (opt text, opt text, opt text, opt text, opt text, opt text, opt text, opt text) -> (RealmResponse);
   "register_quarter" : (text, text) -> (RealmResponse);
   "deregister_quarter" : (text) -> (RealmResponse);
   "set_quarter_config" : (text) -> (RealmResponse);

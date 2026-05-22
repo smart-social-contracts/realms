@@ -679,6 +679,11 @@ export interface StatusRecord {
   'is_quarter' : boolean,
   'proposals_count' : bigint,
   'test_mode' : boolean,
+  'test_mode_ii_bypass' : boolean,
+  'test_mode_user_self_registration' : boolean,
+  'test_mode_demo_data' : boolean,
+  'test_mode_skip_terms' : boolean,
+  'test_mode_skip_passport_zkproof' : boolean,
   'realms_count' : bigint,
   'version' : string,
   'extensions' : Array<string>,
@@ -865,7 +870,7 @@ export interface _SERVICE {
   'reload_entity_method_overrides' : ActorMethod<[], string>,
   'set_application_id' : ActorMethod<[string], string>,
   'set_canister_config' : ActorMethod<
-    [[] | [string], [] | [string], [] | [string], [] | [string], [] | [string]],
+    [[] | [string], [] | [string], [] | [string], [] | [string], [] | [string], [] | [string], [] | [string], [] | [string]],
     RealmResponse
   >,
   'set_quarter_config' : ActorMethod<[string], RealmResponse>,
