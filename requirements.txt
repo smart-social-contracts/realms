@@ -1,4 +1,4 @@
-ic-basilisk==0.13.1
+ic-basilisk==0.13.2
     # via ic-basilisk-toolkit
 ic-basilisk-toolkit==0.3.0
     # via -r realms/requirements.in
