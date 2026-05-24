@@ -58,7 +58,9 @@
     "hello_world",
     "test_bench",
     "demo_simulator",
-    "managed_services"
+    "managed_services",
+    "role_manager",
+    "access_manager"
   ],
   "options": {
     "random": {
