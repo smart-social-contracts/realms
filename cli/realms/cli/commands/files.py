@@ -92,7 +92,7 @@ def files_build_command(
 ):
     """Build frontend-rt bundles for extensions that have a package.json.
 
-    Runs ``npm ci && npm run build`` in each extension's frontend-rt/ directory
+    Runs ``npm install && npm run build`` in each extension's frontend-rt/ directory
     and verifies that dist/index.js is produced.
     """
     root = _find_project_root()
@@ -125,10 +125,10 @@ def files_build_command(
         console.print(f"[blue]  Building {ed.name}...[/blue]")
 
         result = subprocess.run(
-            ["npm", "ci"], cwd=fe_dir, capture_output=True, text=True
+            ["npm", "install"], cwd=fe_dir, capture_output=True, text=True
         )
         if result.returncode != 0:
-            console.print(f"[red]    ✗ npm ci failed[/red]")
+            console.print(f"[red]    ✗ npm install failed[/red]")
             console.print(f"[dim]      {result.stderr.strip()[:200]}[/dim]")
             failed.append(ed.name)
             continue
