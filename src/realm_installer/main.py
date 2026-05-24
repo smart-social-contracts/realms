@@ -98,7 +98,7 @@ class DeploymentJob(Entity, TimestampedMixin):
     registry_canister_id = String(max_length=64)
     offchain_deployer_principal = String(max_length=64)
     settlement_notified = Integer(default=0)
-    snapshot_id = String(max_length=200)
+    snapshot_id = String(max_length=200, default="")
     snapshot_taken = Integer(default=0)
     skip_snapshot = Integer(default=0)
     error = String(max_length=2000)
