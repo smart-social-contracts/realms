@@ -21,7 +21,7 @@ class Proposal(Entity, TimestampedMixin):
     votes_abstain = Float()
     total_voters = Float()
     required_threshold = Float()
-    metadata = String(max_length=256)
+    metadata = String(max_length=4096)
     votes = OneToMany("Vote", "proposal")
     budgets = OneToMany("Budget", "proposal")
 
