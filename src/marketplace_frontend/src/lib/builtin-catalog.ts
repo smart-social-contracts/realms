@@ -92,8 +92,26 @@ export const builtinExtensions: ExtensionListing[] = [
   ext(
     'admin_dashboard',
     'Admin Dashboard',
-    'Comprehensive administrative dashboard for the Generalized Global Governance System',
-    '1.0.5', '⚙️', 'other',
+    'Browse, export, and import realm entities',
+    '1.1.0', '⚙️', 'other',
+  ),
+  ext(
+    'census',
+    'Census',
+    'User population statistics and invitation management for onboarding new members',
+    '1.0.0', '👥', 'other',
+  ),
+  ext(
+    'realm_settings',
+    'Realm Settings',
+    'Configure realm name, description, branding, registration, and infrastructure settings',
+    '1.0.0', '⚙️', 'other',
+  ),
+  ext(
+    'extensions_manager',
+    'Extensions',
+    'View installed extensions and codex packages with update status',
+    '1.0.0', '🧩', 'other',
   ),
   ext(
     'metrics',

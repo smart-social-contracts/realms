@@ -90,7 +90,7 @@ class RegistrationCode(Entity, TimestampedMixin):
     @property
     def registration_url(self) -> str:
         """Full registration URL (only meaningful when plaintext code exists)."""
-        return f"{self.frontend_url}/extensions/admin_dashboard/user_registration?code={self.code}"
+        return f"{self.frontend_url}/extensions/census/user_registration?code={self.code}"
 
     def mark_used(self, principal: str = None):
         """Record a redemption, optionally tracking the redeeming principal."""

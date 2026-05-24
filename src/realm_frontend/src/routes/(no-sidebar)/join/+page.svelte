@@ -163,7 +163,7 @@
       }
 
       const result = await backend.extension_call(
-        'admin_dashboard',
+        'census',
         'validate_registration_code',
         JSON.stringify({ code: inviteCode })
       );
