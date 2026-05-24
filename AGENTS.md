@@ -10,7 +10,6 @@ realms/
 │       ├── backend/entry.py          # Python RPC handler (optional)
 │       └── frontend-rt/              # Svelte 5 ESM bundle
 │           ├── src/
-│           ├── dist/index.js         # Built bundle (committed)
 │           └── vite.config.ts        # Lib-mode build
 ├── src/realm_frontend/               # Main SvelteKit frontend
 ├── src/realm_backend/                # Python canister backend
@@ -244,7 +243,7 @@ The first fixes the color panic, the second suppresses the plaintext identity wa
 2. **Any change inside `extensions/` (including manifest.json edits) requires `deploy-files` before `deploy-mundus`.** The mundus workflow installs extensions from the file registry — if you skip `deploy-files`, the registry still has stale manifests/bundles and the deploy will use old data. Always: `deploy-files` → wait for green → `deploy-mundus`.
 3. **Agora is prone to timeouts.** Retry a single failed realm: `-f realm=agora`.
 4. **`reinstall` wipes all state.** Use `upgrade` unless you want a clean slate.
-5. **`dist/index.js` is committed.** Always rebuild after source changes to extensions.
+5. **Frontend bundles are built by CI.** The `deploy-files` workflow runs `realms files build` to compile `frontend-rt/` sources before publishing. No need to commit `dist/index.js`.
 
 ---
 

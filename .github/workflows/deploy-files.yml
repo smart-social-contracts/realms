@@ -87,6 +87,18 @@ jobs:
           pip install -r requirements.txt
           pip install cli/
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build extension frontend bundles
+        run: |
+          ARGS=()
+          if [ -n "${{ inputs.extensions }}" ]; then
+            ARGS+=(--extensions "${{ inputs.extensions }}")
+          fi
+          realms files build "${ARGS[@]}"
+
       - name: Configure dfx identity
         env:
           IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}

@@ -87,6 +87,77 @@ def files_reset_command(
     console.print("[bold green]File registry reset complete.[/bold green]")
 
 
+def files_build_command(
+    extension_names: Optional[list[str]] = None,
+):
+    """Build frontend-rt bundles for extensions that have a package.json.
+
+    Runs ``npm ci && npm run build`` in each extension's frontend-rt/ directory
+    and verifies that dist/index.js is produced.
+    """
+    root = _find_project_root()
+    ext_root = root / "extensions" / "extensions"
+
+    if not ext_root.is_dir():
+        console.print(f"[red]Extensions directory not found: {ext_root}[/red]")
+        raise typer.Exit(1)
+
+    ext_dirs = sorted([
+        d for d in ext_root.iterdir()
+        if d.is_dir()
+        and not d.name.startswith("_")
+        and (d / "frontend-rt" / "package.json").exists()
+    ])
+
+    if extension_names is not None:
+        names_set = set(extension_names)
+        ext_dirs = [d for d in ext_dirs if d.name in names_set]
+
+    if not ext_dirs:
+        console.print("[yellow]No extensions with frontend-rt/package.json found.[/yellow]")
+        return
+
+    console.print(f"\n[bold]Building frontend bundles for {len(ext_dirs)} extensions[/bold]\n")
+
+    failed = []
+    for ed in ext_dirs:
+        fe_dir = ed / "frontend-rt"
+        console.print(f"[blue]  Building {ed.name}...[/blue]")
+
+        result = subprocess.run(
+            ["npm", "ci"], cwd=fe_dir, capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            console.print(f"[red]    ✗ npm ci failed[/red]")
+            console.print(f"[dim]      {result.stderr.strip()[:200]}[/dim]")
+            failed.append(ed.name)
+            continue
+
+        result = subprocess.run(
+            ["npm", "run", "build"], cwd=fe_dir, capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            console.print(f"[red]    ✗ build failed[/red]")
+            console.print(f"[dim]      {result.stderr.strip()[:200]}[/dim]")
+            failed.append(ed.name)
+            continue
+
+        bundle = fe_dir / "dist" / "index.js"
+        if not bundle.exists():
+            console.print(f"[red]    ✗ dist/index.js not produced[/red]")
+            failed.append(ed.name)
+            continue
+
+        size = bundle.stat().st_size
+        console.print(f"[green]    ✓[/green] dist/index.js ({size:,} bytes)")
+
+    if failed:
+        console.print(f"\n[bold red]Build failed for: {', '.join(failed)}[/bold red]")
+        raise typer.Exit(1)
+
+    console.print(f"\n[bold green]All {len(ext_dirs)} extension bundles built successfully.[/bold green]")
+
+
 def files_publish_command(
     network: str,
     registry: Optional[str] = None,

@@ -21,7 +21,7 @@ from .commands.marketplace import (
     marketplace_status_command,
 )
 from .commands.mundus import mundus_deploy_descriptor_command, mundus_deploy_new_command
-from .commands.files import files_publish_command, files_reset_command
+from .commands.files import files_build_command, files_publish_command, files_reset_command
 from .commands.quarter import (
     quarter_create_command,
     quarter_list_command,
@@ -639,6 +639,17 @@ def files_reset(
 ) -> None:
     """Wipe and reinstall the file registry canister."""
     files_reset_command(network, registry, identity)
+
+
+@files_app.command("build")
+def files_build(
+    extensions_filter: str = typer.Option(
+        "", "--extensions", help="Specific extensions to build, comma-separated (default: all)"
+    ),
+) -> None:
+    """Build frontend-rt bundles for extensions (npm ci && npm run build)."""
+    ext_names = [s.strip() for s in extensions_filter.split(",") if s.strip()] if extensions_filter else None
+    files_build_command(extension_names=ext_names)
 
 
 # Create realm subcommand group
