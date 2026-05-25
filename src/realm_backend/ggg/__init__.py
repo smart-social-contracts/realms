@@ -10,6 +10,9 @@ from .system import (
     Call,
     Department,
     Extension,
+    MenuCategoryConfig,
+    MenuDepartmentVisibility,
+    MenuItemConfig,
     Notification,
     Operations,
     Permission,
@@ -140,6 +143,10 @@ __all__ = [
     "license_issue",
     "license_revoke",
     "Mandate",
+    # Menu configuration
+    "MenuCategoryConfig",
+    "MenuDepartmentVisibility",
+    "MenuItemConfig",
     # Justice System
     "JusticeSystem",
     "JusticeSystemType",

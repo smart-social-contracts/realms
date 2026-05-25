@@ -3274,17 +3274,337 @@ def get_sidebar_manifests() -> text:
         out.sort(key=lambda e: (e["categories"][0] if e["categories"] else "z", e["id"]))
 
         categories_meta = [
-            {"id": "home", "name": "Home", "order": 0, "show_header": False, "collapsible": False},
-            {"id": "profile", "name": "Profile", "order": 1, "show_header": True, "collapsible": False},
+            {"id": "public_services", "name": "Public Services", "order": 1, "show_header": True, "collapsible": False},
             {"id": "governance", "name": "Governance", "order": 2, "show_header": True, "collapsible": False},
-            {"id": "finances", "name": "Finances", "order": 3, "show_header": True, "collapsible": False},
-            {"id": "intelligence", "name": "Intelligence", "order": 4, "show_header": True, "collapsible": False},
-            {"id": "land_territory", "name": "Land & Territory", "order": 5, "show_header": True, "collapsible": False},
-            {"id": "administration", "name": "Administration", "order": 6, "show_header": True, "collapsible": False},
-            {"id": "developer", "name": "Developer", "order": 7, "show_header": True, "collapsible": True},
+            {"id": "administration", "name": "Administration", "order": 3, "show_header": True, "collapsible": False},
+            {"id": "land_territory", "name": "Territory", "order": 4, "show_header": True, "collapsible": False},
+            {"id": "finances", "name": "Finances", "order": 5, "show_header": True, "collapsible": False},
+            {"id": "settings", "name": "Settings", "order": 6, "show_header": True, "collapsible": False},
+            {"id": "other", "name": "Other", "order": 99, "show_header": True, "collapsible": True},
         ]
 
         return json.dumps({"success": True, "manifests": out, "categories": categories_meta})
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+DEFAULT_CATEGORY_ORDER = [
+    ("public_services", "Public Services", 1),
+    ("governance", "Governance", 2),
+    ("administration", "Administration", 3),
+    ("land_territory", "Territory", 4),
+    ("finances", "Finances", 5),
+    ("settings", "Settings", 6),
+    ("other", "Other", 99),
+]
+
+
+@query
+def get_sidebar(args: text) -> text:
+    """Return the fully resolved sidebar structure for the calling user.
+
+    Merges extension manifests, hardcoded default category order,
+    database overrides (MenuCategoryConfig, MenuItemConfig), and
+    department visibility (MenuDepartmentVisibility).
+
+    Response (JSON): {
+        "success": true,
+        "welcome_items": [...],       # is_default extensions (top, no category)
+        "categories": [               # ordered categories with ordered items
+            {"id": "public_services", "label": "Public Services", "items": [...]},
+            ...
+        ],
+        "default_path": "/extensions/member_dashboard"
+    }
+    """
+    try:
+        from core.runtime_extensions import (
+            get_all_extension_manifests,
+            list_installed as _list_runtime_installed,
+        )
+        from ggg import Extension, MenuCategoryConfig, MenuDepartmentVisibility, MenuItemConfig, User
+
+        caller = ic.caller().to_str()
+        params = json.loads(args) if args else {}
+        locale = params.get("locale", "en")
+
+        user = User[caller]
+        user_profiles = []
+        user_departments = []
+        if user:
+            user_profiles = [p.name for p in user.profiles] if user.profiles else []
+            user_departments = [d.name for d in user.departments] if user.departments else []
+
+        manifests = get_all_extension_manifests()
+
+        # Determine which extensions are visible to this user
+        visible_extensions = None
+        if user:
+            visible = set()
+            for ext in user.extensions:
+                visible.add(ext.name)
+            for dept in user.departments:
+                for ext in dept.extensions:
+                    visible.add(ext.name)
+            for profile in user.profiles:
+                for ext in profile.extensions:
+                    visible.add(ext.name)
+            visible_extensions = visible
+
+        # Apply department visibility rules
+        hidden_by_dept = set()
+        for rule in MenuDepartmentVisibility.all():
+            if not rule.visible and rule.department:
+                if rule.department.name in user_departments:
+                    hidden_by_dept.add(rule.extension_name)
+
+        # Load category order overrides from DB
+        db_category_configs = {c.category_id: c for c in MenuCategoryConfig.all()}
+
+        # Load item placement overrides from DB
+        db_item_configs = {i.extension_name: i for i in MenuItemConfig.all()}
+
+        # Resolve category ordering: DB overrides > defaults
+        category_order = {}
+        category_labels = {}
+        for cat_id, label, order in DEFAULT_CATEGORY_ORDER:
+            category_order[cat_id] = order
+            category_labels[cat_id] = label
+        for cat_id, config in db_category_configs.items():
+            category_order[cat_id] = config.position
+            if config.label:
+                category_labels[cat_id] = config.label
+
+        # Filter and group extensions
+        welcome_items = []
+        grouped = {}
+
+        for ext_id, m in manifests.items():
+            if not isinstance(m, dict):
+                continue
+            if m.get("show_in_sidebar", True) is False:
+                continue
+            if ext_id in hidden_by_dept:
+                continue
+
+            # Profile-based filtering
+            ext_profiles = m.get("profiles") or []
+            if visible_extensions is not None:
+                if ext_id not in visible_extensions:
+                    continue
+            elif ext_profiles:
+                if not any(p in user_profiles for p in ext_profiles):
+                    continue
+
+            label_obj = m.get("sidebar_label") or {}
+            if isinstance(label_obj, str):
+                label_obj = {"en": label_obj}
+            item_label = label_obj.get(locale) or label_obj.get("en") or ext_id.replace("_", " ").title()
+
+            item = {
+                "label": item_label,
+                "icon": f"ti-{m.get('icon') or 'layout-dashboard'}",
+                "extension_id": ext_id,
+                "href": f"/extensions/{ext_id}",
+            }
+
+            # Welcome pages (is_default) go at top without category
+            if m.get("is_default"):
+                welcome_items.append(item)
+                continue
+
+            # Determine category: DB override > manifest
+            if ext_id in db_item_configs:
+                cat_id = db_item_configs[ext_id].category_id
+            else:
+                cats = m.get("categories") or ["other"]
+                cat_id = cats[0]
+
+            grouped.setdefault(cat_id, []).append((ext_id, item))
+
+        # Sort items within each category: DB position > alphabetical
+        categories_out = []
+        all_cat_ids = set(grouped.keys()) | set(category_order.keys())
+        for cat_id in sorted(all_cat_ids, key=lambda c: category_order.get(c, 50)):
+            if cat_id not in grouped:
+                continue
+            items = grouped[cat_id]
+            # Sort: items with DB position first (by position), then alphabetical
+            def sort_key(entry):
+                eid, itm = entry
+                if eid in db_item_configs and db_item_configs[eid].position:
+                    return (0, db_item_configs[eid].position, itm["label"])
+                return (1, 0, itm["label"])
+
+            items.sort(key=sort_key)
+            cat_label = category_labels.get(cat_id, cat_id.replace("_", " ").title())
+            categories_out.append({
+                "id": cat_id,
+                "label": cat_label,
+                "items": [itm for _, itm in items],
+            })
+
+        # Determine default path
+        default_path = "/extensions/member_dashboard"
+        if welcome_items:
+            default_path = welcome_items[0]["href"]
+
+        return json.dumps({
+            "success": True,
+            "welcome_items": welcome_items,
+            "categories": categories_out,
+            "default_path": default_path,
+        })
+    except Exception as e:
+        logger.error(f"Error building sidebar: {str(e)}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def get_menu_config() -> text:
+    """Return raw menu configuration for the Menus extension admin UI.
+
+    Response (JSON): {
+        "success": true,
+        "category_order": [{"category_id": "...", "label": "...", "position": N}, ...],
+        "item_overrides": [{"extension_name": "...", "category_id": "...", "position": N}, ...],
+        "visibility_rules": [{"extension_name": "...", "department": "...", "visible": bool}, ...]
+    }
+    """
+    try:
+        from ggg import MenuCategoryConfig, MenuDepartmentVisibility, MenuItemConfig
+
+        category_order = [
+            {"category_id": c.category_id, "label": c.label, "position": c.position}
+            for c in MenuCategoryConfig.all()
+        ]
+        item_overrides = [
+            {"extension_name": i.extension_name, "category_id": i.category_id, "position": i.position}
+            for i in MenuItemConfig.all()
+        ]
+        visibility_rules = [
+            {
+                "extension_name": v.extension_name,
+                "department": v.department.name if v.department else None,
+                "visible": v.visible,
+            }
+            for v in MenuDepartmentVisibility.all()
+        ]
+
+        return json.dumps({
+            "success": True,
+            "category_order": category_order,
+            "item_overrides": item_overrides,
+            "visibility_rules": visibility_rules,
+            "defaults": [{"id": c[0], "label": c[1], "position": c[2]} for c in DEFAULT_CATEGORY_ORDER],
+        })
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+@require(Operations.REALM_ADMIN)
+def set_menu_category_order(args: text) -> text:
+    """Save custom category ordering. Replaces all existing MenuCategoryConfig records.
+
+    Args (JSON): {"categories": [{"category_id": "...", "label": "...", "position": N}, ...]}
+    """
+    try:
+        from ggg import MenuCategoryConfig
+
+        params = json.loads(args)
+        categories = params.get("categories", [])
+
+        # Clear existing
+        for existing in list(MenuCategoryConfig.all()):
+            existing.delete()
+
+        # Create new
+        for cat in categories:
+            MenuCategoryConfig.create(
+                category_id=cat["category_id"],
+                label=cat.get("label", ""),
+                position=cat.get("position", 0),
+            )
+
+        return json.dumps({"success": True})
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+@require(Operations.REALM_ADMIN)
+def set_menu_item_config(args: text) -> text:
+    """Save custom extension placement. Creates or updates a MenuItemConfig.
+
+    Args (JSON): {"extension_name": "...", "category_id": "...", "position": N}
+    """
+    try:
+        from ggg import MenuItemConfig
+
+        params = json.loads(args)
+        ext_name = params["extension_name"]
+        category_id = params["category_id"]
+        position = params.get("position", 0)
+
+        existing = None
+        for item in MenuItemConfig.all():
+            if item.extension_name == ext_name:
+                existing = item
+                break
+
+        if existing:
+            existing.category_id = category_id
+            existing.position = position
+            existing.save()
+        else:
+            MenuItemConfig.create(
+                extension_name=ext_name,
+                category_id=category_id,
+                position=position,
+            )
+
+        return json.dumps({"success": True})
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+@require(Operations.REALM_ADMIN)
+def set_menu_visibility(args: text) -> text:
+    """Save per-department extension visibility rule.
+
+    Args (JSON): {"extension_name": "...", "department": "...", "visible": bool}
+    """
+    try:
+        from ggg import Department, MenuDepartmentVisibility
+
+        params = json.loads(args)
+        ext_name = params["extension_name"]
+        dept_name = params["department"]
+        visible = params.get("visible", True)
+
+        dept = Department[dept_name]
+        if not dept:
+            return json.dumps({"success": False, "error": f"Department '{dept_name}' not found"})
+
+        existing = None
+        for rule in MenuDepartmentVisibility.all():
+            if rule.extension_name == ext_name and rule.department and rule.department.name == dept_name:
+                existing = rule
+                break
+
+        if existing:
+            existing.visible = visible
+            existing.save()
+        else:
+            MenuDepartmentVisibility.create(
+                extension_name=ext_name,
+                department=dept,
+                visible=visible,
+            )
+
+        return json.dumps({"success": True})
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
 

@@ -1,18 +1,14 @@
 import { writable, get } from 'svelte/store';
-import { buildSidebar, type SidebarConfig, type ExtensionManifest } from '$lib/config/sidebar';
+import type { SidebarConfig } from '$lib/config/sidebar';
 
 export const sidebarConfig = writable<SidebarConfig | null>(null);
 export const sidebarLoading = writable(false);
 
-const CACHE_PREFIX = 'sidebar_cache_';
+const CACHE_KEY = 'sidebar_cache';
 
-function cacheKey(profiles: string[]): string {
-	return CACHE_PREFIX + [...profiles].sort().join(',');
-}
-
-function readCache(profiles: string[]): SidebarConfig | null {
+function readCache(): SidebarConfig | null {
 	try {
-		const raw = localStorage.getItem(cacheKey(profiles));
+		const raw = localStorage.getItem(CACHE_KEY);
 		if (!raw) return null;
 		return JSON.parse(raw) as SidebarConfig;
 	} catch {
@@ -20,56 +16,46 @@ function readCache(profiles: string[]): SidebarConfig | null {
 	}
 }
 
-function writeCache(profiles: string[], config: SidebarConfig): void {
+function writeCache(config: SidebarConfig): void {
 	try {
-		localStorage.setItem(cacheKey(profiles), JSON.stringify(config));
+		localStorage.setItem(CACHE_KEY, JSON.stringify(config));
 	} catch {
 		// storage full or unavailable
 	}
 }
 
 /**
- * Load the sidebar from the backend's installed extension manifests.
- * Uses get_my_extensions to determine visibility when available,
- * falling back to profile-based filtering for older backends.
+ * Load the sidebar from the backend's get_sidebar endpoint.
+ * The backend resolves all ordering, visibility, and welcome page logic.
  */
 export async function loadSidebar(
-	backend: { list_runtime_extensions: () => Promise<string>; get_my_extensions?: () => Promise<string> },
-	userProfiles: string[],
+	backend: { get_sidebar: (args: string) => Promise<string> },
 	locale: string = 'en',
 ): Promise<void> {
-	const cached = readCache(userProfiles);
+	const cached = readCache();
 	if (cached) {
 		sidebarConfig.set(cached);
 	}
 
 	sidebarLoading.set(true);
 	try {
-		const [manifestsRaw, myExtRaw] = await Promise.all([
-			backend.list_runtime_extensions(),
-			backend.get_my_extensions?.().catch(() => null) ?? Promise.resolve(null),
-		]);
+		const raw = await backend.get_sidebar(JSON.stringify({ locale }));
+		const parsed = JSON.parse(raw);
 
-		const parsed = JSON.parse(manifestsRaw);
-		const manifests: Record<string, ExtensionManifest> = parsed?.all_manifests ?? {};
-
-		let visibleExtensions: string[] | null = null;
-		if (myExtRaw) {
-			try {
-				const extParsed = JSON.parse(myExtRaw);
-				if (extParsed?.success && Array.isArray(extParsed.extensions)) {
-					visibleExtensions = extParsed.extensions;
-				}
-			} catch {
-				// fallback to profile-based filtering
-			}
+		if (!parsed?.success) {
+			throw new Error(parsed?.error || 'Backend returned failure');
 		}
 
-		const config = buildSidebar(manifests, userProfiles, locale, visibleExtensions);
+		const config: SidebarConfig = {
+			welcomeItems: parsed.welcome_items || [],
+			categories: parsed.categories || [],
+			defaultPath: parsed.default_path || '/extensions/member_dashboard',
+		};
+
 		sidebarConfig.set(config);
-		writeCache(userProfiles, config);
+		writeCache(config);
 	} catch (e) {
-		console.error('Failed to load sidebar manifests:', e);
+		console.error('Failed to load sidebar:', e);
 		if (!get(sidebarConfig) && cached) {
 			sidebarConfig.set(cached);
 		}

@@ -51,9 +51,11 @@
   },
   "categories": {
     "public_services": "Public Services",
-    "finances": "Financial Management",
-    "oversight": "Oversight & Analytics",
-    "system": "System Administration",
+    "governance": "Governance",
+    "administration": "Administration",
+    "land_territory": "Territory",
+    "finances": "Finances",
+    "settings": "Settings",
     "other": "Other"
   },
   "extensions": {

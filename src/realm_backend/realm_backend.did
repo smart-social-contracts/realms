@@ -262,6 +262,11 @@ service : {
   "uninstall_extension" : (text) -> (text);
   "list_runtime_extensions" : () -> (text) query;
   "get_sidebar_manifests" : () -> (text) query;
+  "get_sidebar" : (text) -> (text) query;
+  "get_menu_config" : () -> (text) query;
+  "set_menu_category_order" : (text) -> (text);
+  "set_menu_item_config" : (text) -> (text);
+  "set_menu_visibility" : (text) -> (text);
   "get_extension_frontend_info" : (text) -> (text) query;
   "install_codex" : (text) -> (text);
   "uninstall_codex" : (text) -> (text);

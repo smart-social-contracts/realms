@@ -1,9 +1,9 @@
 /**
- * Dynamic sidebar configuration built from installed extension manifests.
+ * Sidebar configuration types and constants.
  *
- * The sidebar is populated at runtime by querying the backend for all
- * installed extensions, filtering by the user's active profiles, and
- * grouping by the manifest's `categories` field.
+ * The sidebar is resolved by the backend (get_sidebar endpoint) which merges
+ * extension manifests, default category ordering, database overrides, and
+ * department visibility rules. The frontend simply renders the result.
  */
 
 export interface SidebarNavItem {
@@ -20,6 +20,7 @@ export interface SidebarCategory {
 }
 
 export interface SidebarConfig {
+	welcomeItems: SidebarNavItem[];
 	categories: SidebarCategory[];
 	defaultPath: string;
 }
@@ -36,111 +37,8 @@ export const topUtilityItems: TopUtilityItem[] = [
 	{ label: 'Settings', icon: 'ti-settings', href: '/settings' },
 ];
 
-export interface ExtensionManifest {
-	name: string;
-	version?: string;
-	profiles?: string[];
-	categories?: string[];
-	show_in_sidebar?: boolean;
-	sidebar_label?: Record<string, string>;
-	icon?: string;
-	is_default?: boolean;
-	[key: string]: unknown;
-}
-
-const categoryMeta: Record<string, { order: number; label: Record<string, string> }> = {
-	profile:        { order: 0, label: { en: 'My Realm' } },
-	administration: { order: 1, label: { en: 'Administration' } },
-	governance:     { order: 2, label: { en: 'Governance' } },
-	land_territory: { order: 3, label: { en: 'Land & Territory' } },
-	finances:       { order: 4, label: { en: 'Finances' } },
-	intelligence:   { order: 5, label: { en: 'AI' } },
-	developer:      { order: 6, label: { en: 'Developer' } },
-	home:           { order: 7, label: { en: 'Home' } },
-	other:          { order: 99, label: { en: 'Other' } },
-};
-
-const fallbackDefaultPaths: Record<string, string> = {
-	admin: '/extensions/admin_dashboard',
-	member: '/extensions/member_dashboard',
-	developer: '/extensions/codex_viewer',
-};
-
-function titleCase(s: string): string {
-	return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function getCategoryLabel(catId: string, locale: string): string {
-	const meta = categoryMeta[catId];
-	if (meta) return meta.label[locale] ?? meta.label['en'] ?? titleCase(catId);
-	return titleCase(catId);
-}
-
-function getCategoryOrder(catId: string): number {
-	return categoryMeta[catId]?.order ?? 50;
-}
-
-/**
- * Build a SidebarConfig from extension manifests filtered by user profiles.
- * When visibleExtensions is provided (from get_my_extensions), only those
- * extensions are shown regardless of profile match.
- */
-export function buildSidebar(
-	manifests: Record<string, ExtensionManifest>,
-	userProfiles: string[],
-	locale: string = 'en',
-	visibleExtensions: string[] | null = null,
-): SidebarConfig {
-	const visible = Object.values(manifests).filter((m) => {
-		if (!m.show_in_sidebar) return false;
-		if (visibleExtensions !== null) {
-			return visibleExtensions.includes(m.name);
-		}
-		if (!m.profiles || m.profiles.length === 0) return true;
-		return m.profiles.some((p) => userProfiles.includes(p));
-	});
-
-	const grouped: Record<string, ExtensionManifest[]> = {};
-	for (const m of visible) {
-		const catId = m.categories?.[0] ?? 'other';
-		(grouped[catId] ??= []).push(m);
-	}
-
-	const categories: SidebarCategory[] = Object.entries(grouped)
-		.map(([catId, items]) => ({
-			id: catId,
-			label: getCategoryLabel(catId, locale),
-			order: getCategoryOrder(catId),
-			items: items
-				.map((m) => ({
-					label: m.sidebar_label?.[locale] ?? m.sidebar_label?.['en'] ?? titleCase(m.name),
-					icon: `ti-${m.icon ?? 'layout-dashboard'}`,
-					extensionId: m.name,
-					href: `/extensions/${m.name}`,
-				}))
-				.sort((a, b) => a.label.localeCompare(b.label)),
-		}))
-		.sort((a, b) => a.order - b.order)
-		.map(({ id, label, items }) => ({ id, label, items }));
-
-	const defaultManifest = Object.values(manifests).find(
-		(m) =>
-			m.is_default &&
-			m.show_in_sidebar &&
-			((!m.profiles || m.profiles.length === 0) || m.profiles.some((p) => userProfiles.includes(p))),
-	);
-	let defaultPath = defaultManifest ? `/extensions/${defaultManifest.name}` : '';
-	if (!defaultPath) {
-		for (const role of ['developer', 'admin', 'member']) {
-			if (userProfiles.includes(role) && fallbackDefaultPaths[role]) {
-				defaultPath = fallbackDefaultPaths[role];
-				break;
-			}
-		}
-	}
-
-	return { categories, defaultPath: defaultPath || '/extensions/member_dashboard' };
-}
+export const SECTION_HEADER_ME = 'ME';
+export const SECTION_HEADER_REALM = 'MY REALM';
 
 /**
  * Determines the effective role from a list of user profiles.

@@ -4,6 +4,9 @@ from .call import Call
 from .constants import *
 from .department import Department
 from .extension import Extension
+from .menu_category_config import MenuCategoryConfig
+from .menu_department_visibility import MenuDepartmentVisibility
+from .menu_item_config import MenuItemConfig
 from .notification import Notification
 from .permission import Permission
 from .service import Service
@@ -36,6 +39,9 @@ __all__ = [
     "Extension",
     "InstrumentStatus",
     "MandateStatus",
+    "MenuCategoryConfig",
+    "MenuDepartmentVisibility",
+    "MenuItemConfig",
     "Notification",
     "Operations",
     "OrganizationStatus",
