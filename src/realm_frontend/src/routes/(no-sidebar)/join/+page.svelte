@@ -46,11 +46,11 @@
     },
   ];
 
-  // In test mode with self-registration, show all profiles. Otherwise only member is available
-  // unless an invite code grants a specific profile.
+  // In test mode (II bypass or self-registration), show all profiles. Otherwise only member
+  // is available unless an invite code grants a specific profile.
   $: profiles = inviteValid && inviteProfile
     ? allProfiles.filter(p => p.value === inviteProfile)
-    : $testModeUserSelfRegistration
+    : ($testModeUserSelfRegistration || $testModeIIBypass)
       ? allProfiles
       : allProfiles.filter(p => p.value === 'member');
 
@@ -59,7 +59,7 @@
   }
 
   // Invite is required when registration is closed (not open) and user has no valid invite
-  $: inviteRequired = !$realmOpenRegistration && !inviteValid && !$testModeUserSelfRegistration;
+  $: inviteRequired = !$realmOpenRegistration && !inviteValid && !$testModeUserSelfRegistration && !$testModeIIBypass;
 
   $: welcomeImageUrl = $realmInfo.backgroundImageUrl || '/custom/background.png';
   
@@ -128,7 +128,7 @@
         }
         // Check if user has already joined
         userHasJoined = hasJoined();
-        currentStep = userHasJoined ? 'already_joined' : 'terms';
+        currentStep = userHasJoined ? 'already_joined' : ($testModeSkipTerms ? 'profile' : 'terms');
       } else {
         error = 'Login was cancelled or failed. Please try again.';
       }
@@ -154,7 +154,7 @@
     try {
       // Test mode shortcuts: "admin" / "member" / "dev" accepted client-side
       const trimmed = inviteCode.trim().toLowerCase();
-      if ($testModeUserSelfRegistration && (trimmed === 'admin' || trimmed === 'member' || trimmed === 'dev' || trimmed === 'developer')) {
+      if (($testModeUserSelfRegistration || $testModeIIBypass) && (trimmed === 'admin' || trimmed === 'member' || trimmed === 'dev' || trimmed === 'developer')) {
         const profile = trimmed === 'dev' || trimmed === 'developer' ? 'developer' : trimmed;
         inviteValid = true;
         inviteProfile = profile;
@@ -201,6 +201,18 @@
     }
   }
   
+  async function resolveInviteChecksum() {
+    if (inviteCode) return sha256Hex(inviteCode);
+    // Test mode shortcuts: backend accepts sha256("admin") / sha256("member") as invite codes
+    if (($testModeUserSelfRegistration || $testModeIIBypass) && selectedProfile === 'admin') {
+      return sha256Hex('admin');
+    }
+    if (($testModeUserSelfRegistration || $testModeIIBypass) && selectedProfile === 'member') {
+      return sha256Hex('member');
+    }
+    return '';
+  }
+
   async function handleJoin() {
     error = '';
     
@@ -213,7 +225,7 @@
       loading = true;
       console.log(`Joining realm with profile: ${selectedProfile}`);
       // Step 1: Register on the capital (current backend) — gets quarter assignment
-      const inviteChecksum = inviteCode ? await sha256Hex(inviteCode) : '';
+      const inviteChecksum = await resolveInviteChecksum();
       const response = await backend.join_realm(selectedProfile, '', inviteChecksum);
       if (response.success) {
         // Step 2: If assigned to a quarter, switch to it and register there too
@@ -369,10 +381,58 @@
           </div>
 
           {#if $testModeIIBypass}
+            <div class="mb-6">
+              <p class="text-sm font-medium text-gray-700 mb-3">Choose your profile</p>
+              <div class="space-y-2">
+                {#each allProfiles as profile}
+                  <button
+                    type="button"
+                    on:click={() => selectedProfile = profile.value}
+                    class={cn(
+                      "w-full p-3 rounded-xl border-2 text-left transition-all",
+                      selectedProfile === profile.value
+                        ? "border-gray-900 bg-gray-50"
+                        : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                    )}
+                  >
+                    <div class="flex items-center gap-3">
+                      <div class={cn(
+                        "w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0",
+                        selectedProfile === profile.value ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600"
+                      )}>
+                        {#if selectedProfile === profile.value}
+                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                          </svg>
+                        {:else if profile.iconType === 'user'}
+                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                        {:else if profile.iconType === 'cog'}
+                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                        {:else if profile.iconType === 'code'}
+                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                          </svg>
+                        {/if}
+                      </div>
+                      <div class="min-w-0">
+                        <div class="font-semibold text-gray-900 text-sm">{profile.name}</div>
+                        <div class="text-xs text-gray-500 truncate">{profile.description}</div>
+                      </div>
+                    </div>
+                  </button>
+                {/each}
+              </div>
+            </div>
+
             <div class="space-y-3">
               <button
                 on:click={() => handleLogin()}
-                disabled={loading}
+                disabled={loading || !selectedProfile}
                 class="w-full py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {#if loading}
@@ -387,7 +447,7 @@
               </button>
               <button
                 on:click={() => handleLogin({ random: true })}
-                disabled={loading}
+                disabled={loading || !selectedProfile}
                 class="w-full py-4 px-6 bg-white hover:bg-gray-50 text-gray-900 font-medium rounded-xl border-2 border-gray-200 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {#if loading}
@@ -401,7 +461,7 @@
                 {/if}
               </button>
               <p class="text-center text-xs text-gray-400 mt-2">
-                Test mode: Internet Identity is bypassed. Each new identity gets a unique principal.
+                Test mode: Internet Identity is bypassed. Choose a profile, then sign in with a default or new test identity.
               </p>
             </div>
           {:else}
@@ -629,7 +689,7 @@
             {#if inviteError && !inviteChecking && !inviteValid}
               <p class="mt-2 text-sm text-red-600">{inviteError}</p>
             {/if}
-            {#if $testModeUserSelfRegistration && !inviteValid}
+            {#if ($testModeUserSelfRegistration || $testModeIIBypass) && !inviteValid}
               <p class="mt-2 text-xs text-gray-400 flex items-start gap-1.5">
                 <svg class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
