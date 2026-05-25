@@ -21,6 +21,7 @@ export interface SidebarCategory {
 
 export interface SidebarConfig {
 	welcomeItems: SidebarNavItem[];
+	mundusItems: SidebarNavItem[];
 	categories: SidebarCategory[];
 	defaultPath: string;
 }
@@ -39,6 +40,7 @@ export const topUtilityItems: TopUtilityItem[] = [
 
 export const SECTION_HEADER_ME = 'ME';
 export const SECTION_HEADER_REALM = 'MY REALM';
+export const SECTION_HEADER_MUNDUS = 'MY MUNDUS';
 
 /**
  * Determines the effective role from a list of user profiles.

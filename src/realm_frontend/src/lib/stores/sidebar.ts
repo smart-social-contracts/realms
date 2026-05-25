@@ -48,6 +48,7 @@ export async function loadSidebar(
 
 		const config: SidebarConfig = {
 			welcomeItems: parsed.welcome_items || [],
+			mundusItems: parsed.mundus_items || [],
 			categories: parsed.categories || [],
 			defaultPath: parsed.default_path || '/extensions/member_dashboard',
 		};

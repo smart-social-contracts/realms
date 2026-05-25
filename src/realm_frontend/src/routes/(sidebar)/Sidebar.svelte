@@ -6,7 +6,7 @@
 	import { locale } from 'svelte-i18n';
 	
 	import { styles, cn } from '$lib/theme/utilities';
-	import { topUtilityItems, SECTION_HEADER_ME, SECTION_HEADER_REALM } from '$lib/config/sidebar';
+	import { topUtilityItems, SECTION_HEADER_ME, SECTION_HEADER_REALM, SECTION_HEADER_MUNDUS } from '$lib/config/sidebar';
 	import { sidebarConfig, sidebarLoading, loadSidebar } from '$lib/stores/sidebar';
 	import { profilesLoading } from '$lib/stores/profiles';
 	import { getTablerIcon } from '$lib/utils/tablerIcons';
@@ -196,6 +196,32 @@
 						{/if}
 					</ul>
 				{/each}
+
+				<!-- MY MUNDUS section (super-category) -->
+				{#if $sidebarConfig.mundusItems.length > 0}
+					<ul class="pt-4 pb-1 space-y-1">
+						<li class="px-3 py-2">
+							<h3 class={styles.sidebar.sectionHeader()}>
+								{SECTION_HEADER_MUNDUS}
+							</h3>
+						</li>
+						{#each $sidebarConfig.mundusItems as item}
+							{@const IconComp = getTablerIcon(item.icon)}
+							<li>
+								<a 
+									href={item.href}
+									class={cn(
+										styles.sidebar.item(),
+										isActive(item.href) ? 'bg-gray-100 font-medium' : ''
+									)}
+								>
+									<svelte:component this={IconComp} size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
+									<span class="ml-3">{item.label}</span>
+								</a>
+							</li>
+						{/each}
+					</ul>
+				{/if}
 			{/if}
 		</nav>
 	</div>

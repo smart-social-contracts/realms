@@ -3383,6 +3383,7 @@ def get_sidebar(args: text) -> text:
 
         # Filter and group extensions
         welcome_items = []
+        mundus_items = []
         grouped = {}
 
         for ext_id, m in manifests.items():
@@ -3426,6 +3427,11 @@ def get_sidebar(args: text) -> text:
                 cats = m.get("categories") or ["other"]
                 cat_id = cats[0]
 
+            # Mundus items go into their own super-category section
+            if cat_id == "mundus":
+                mundus_items.append(item)
+                continue
+
             grouped.setdefault(cat_id, []).append((ext_id, item))
 
         # Sort items within each category: DB position > hardcoded default > alphabetical
@@ -3461,6 +3467,7 @@ def get_sidebar(args: text) -> text:
         return json.dumps({
             "success": True,
             "welcome_items": welcome_items,
+            "mundus_items": mundus_items,
             "categories": categories_out,
             "default_path": default_path,
         })

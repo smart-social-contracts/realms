@@ -272,11 +272,12 @@ export const sidebarStyles = {
   `,
   
   sectionHeader: () => `
-    text-[11px]
-    font-bold
-    text-gray-900
+    text-[13px]
+    font-extrabold
+    text-gray-800
     uppercase
-    tracking-widest
+    tracking-wide
+    leading-tight
     dark:text-gray-100
   `,
 
