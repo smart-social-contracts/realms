@@ -3298,6 +3298,12 @@ DEFAULT_CATEGORY_ORDER = [
     ("other", "Other", 99),
 ]
 
+DEFAULT_ITEM_ORDER = {
+    "governance": ["voting", "codex_viewer"],
+    "finances": ["vault", "metrics"],
+    "settings": ["extensions_manager", "package_manager", "managed_services"],
+}
+
 
 @query
 def get_sidebar(args: text) -> text:
@@ -3422,19 +3428,22 @@ def get_sidebar(args: text) -> text:
 
             grouped.setdefault(cat_id, []).append((ext_id, item))
 
-        # Sort items within each category: DB position > alphabetical
+        # Sort items within each category: DB position > hardcoded default > alphabetical
         categories_out = []
         all_cat_ids = set(grouped.keys()) | set(category_order.keys())
         for cat_id in sorted(all_cat_ids, key=lambda c: category_order.get(c, 50)):
             if cat_id not in grouped:
                 continue
             items = grouped[cat_id]
-            # Sort: items with DB position first (by position), then alphabetical
-            def sort_key(entry):
+            default_order = DEFAULT_ITEM_ORDER.get(cat_id, [])
+
+            def sort_key(entry, _cat_defaults=default_order):
                 eid, itm = entry
                 if eid in db_item_configs and db_item_configs[eid].position:
-                    return (0, db_item_configs[eid].position, itm["label"])
-                return (1, 0, itm["label"])
+                    return (0, db_item_configs[eid].position, "")
+                if eid in _cat_defaults:
+                    return (1, _cat_defaults.index(eid), "")
+                return (2, 0, itm["label"])
 
             items.sort(key=sort_key)
             cat_label = category_labels.get(cat_id, cat_id.replace("_", " ").title())
