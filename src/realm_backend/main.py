@@ -3353,16 +3353,16 @@ def get_sidebar(args: text) -> text:
 
         # Apply department visibility rules
         hidden_by_dept = set()
-        for rule in MenuDepartmentVisibility.all():
+        for rule in MenuDepartmentVisibility.instances():
             if not rule.visible and rule.department:
                 if rule.department.name in user_departments:
                     hidden_by_dept.add(rule.extension_name)
 
         # Load category order overrides from DB
-        db_category_configs = {c.category_id: c for c in MenuCategoryConfig.all()}
+        db_category_configs = {c.category_id: c for c in MenuCategoryConfig.instances()}
 
         # Load item placement overrides from DB
-        db_item_configs = {i.extension_name: i for i in MenuItemConfig.all()}
+        db_item_configs = {i.extension_name: i for i in MenuItemConfig.instances()}
 
         # Resolve category ordering: DB overrides > defaults
         category_order = {}
@@ -3476,11 +3476,11 @@ def get_menu_config() -> text:
 
         category_order = [
             {"category_id": c.category_id, "label": c.label, "position": c.position}
-            for c in MenuCategoryConfig.all()
+            for c in MenuCategoryConfig.instances()
         ]
         item_overrides = [
             {"extension_name": i.extension_name, "category_id": i.category_id, "position": i.position}
-            for i in MenuItemConfig.all()
+            for i in MenuItemConfig.instances()
         ]
         visibility_rules = [
             {
@@ -3488,7 +3488,7 @@ def get_menu_config() -> text:
                 "department": v.department.name if v.department else None,
                 "visible": v.visible,
             }
-            for v in MenuDepartmentVisibility.all()
+            for v in MenuDepartmentVisibility.instances()
         ]
 
         return json.dumps({
@@ -3516,7 +3516,7 @@ def set_menu_category_order(args: text) -> text:
         categories = params.get("categories", [])
 
         # Clear existing
-        for existing in list(MenuCategoryConfig.all()):
+        for existing in list(MenuCategoryConfig.instances()):
             existing.delete()
 
         # Create new
@@ -3548,7 +3548,7 @@ def set_menu_item_config(args: text) -> text:
         position = params.get("position", 0)
 
         existing = None
-        for item in MenuItemConfig.all():
+        for item in MenuItemConfig.instances():
             if item.extension_name == ext_name:
                 existing = item
                 break
@@ -3589,7 +3589,7 @@ def set_menu_visibility(args: text) -> text:
             return json.dumps({"success": False, "error": f"Department '{dept_name}' not found"})
 
         existing = None
-        for rule in MenuDepartmentVisibility.all():
+        for rule in MenuDepartmentVisibility.instances():
             if rule.extension_name == ext_name and rule.department and rule.department.name == dept_name:
                 existing = rule
                 break
