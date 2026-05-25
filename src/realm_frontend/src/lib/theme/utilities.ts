@@ -271,6 +271,15 @@ export const sidebarStyles = {
     dark:group-hover:text-[var(--color-text-inverse)]
   `,
   
+  sectionHeader: () => `
+    text-[11px]
+    font-bold
+    text-gray-900
+    uppercase
+    tracking-widest
+    dark:text-gray-100
+  `,
+
   categoryHeader: () => `
     text-[var(--font-size-xs)] 
     font-[var(--font-weight-semibold)] 
