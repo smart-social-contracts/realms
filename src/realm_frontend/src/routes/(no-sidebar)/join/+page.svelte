@@ -69,8 +69,12 @@
     if ($isAuthenticated && !$profilesLoading) {
       userHasJoined = hasJoined();
       console.log('[JOIN PAGE v3] hasJoined result:', userHasJoined);
-      // Redirect to already_joined if user has joined and is on auth or terms step
-      if (userHasJoined && (currentStep === 'auth' || currentStep === 'terms')) {
+      if ($testModeIIBypass) {
+        // In II bypass test mode, always allow profile selection regardless of join status
+        if (currentStep === 'auth') {
+          currentStep = 'profile';
+        }
+      } else if (userHasJoined && (currentStep === 'auth' || currentStep === 'terms')) {
         currentStep = 'already_joined';
       } else if (!userHasJoined && currentStep === 'auth') {
         currentStep = $testModeSkipTerms ? 'profile' : 'terms';
@@ -128,7 +132,12 @@
         }
         // Check if user has already joined
         userHasJoined = hasJoined();
-        currentStep = userHasJoined ? 'already_joined' : ($testModeSkipTerms ? 'profile' : 'terms');
+        if ($testModeIIBypass) {
+          // In II bypass test mode, always go to profile selection
+          currentStep = 'profile';
+        } else {
+          currentStep = userHasJoined ? 'already_joined' : ($testModeSkipTerms ? 'profile' : 'terms');
+        }
       } else {
         error = 'Login was cancelled or failed. Please try again.';
       }
