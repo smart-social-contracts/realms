@@ -54,6 +54,7 @@ def _check_access(caller_principal: str, operation: str) -> bool:
       3. Check each of the user's profiles for the operation (coarse RBAC)
       4. Check fine-grained Permission entities on the user
       5. Check fine-grained Permission entities on the user's profiles
+      6. Check fine-grained Permission entities on the user's departments
       A profile with Operations.ALL grants everything.
 
     Returns True if allowed, False otherwise.
@@ -108,6 +109,15 @@ def _check_access(caller_principal: str, operation: str) -> bool:
     try:
         for profile in user.profiles:
             for perm in profile.permissions:
+                if perm.name == operation:
+                    return True
+    except Exception:
+        pass
+
+    # 6. Per-department Permission entities (fine-grained)
+    try:
+        for department in user.departments:
+            for perm in department.permissions:
                 if perm.name == operation:
                     return True
     except Exception:
