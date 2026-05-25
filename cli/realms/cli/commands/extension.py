@@ -1054,8 +1054,8 @@ def codex_runtime_list_command(canister: str, network: str = "local", identity: 
 
 # Files larger than this are uploaded via store_file_chunk + finalize_chunked_file
 # (anything above ~1.4 MiB blows the IC ingress message limit when base64 inflates by ~4/3).
-_PUBLISH_CHUNK_THRESHOLD_BYTES = 500 * 1024  # 500 KiB raw — keep below IC instruction limit
-_PUBLISH_CHUNK_SIZE_BYTES = 500 * 1024
+_PUBLISH_CHUNK_THRESHOLD_BYTES = 200 * 1024  # 200 KiB raw — keep below IC instruction limit
+_PUBLISH_CHUNK_SIZE_BYTES = 200 * 1024
 
 
 def _content_type_for(name: str) -> str:
