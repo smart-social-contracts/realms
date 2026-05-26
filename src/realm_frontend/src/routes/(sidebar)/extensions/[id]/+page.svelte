@@ -17,10 +17,13 @@
 	import { mountExtension, resolveExtensionVersion, type MountResult } from '$lib/extension-loader';
 	import { loadExtensionTranslation } from '$lib/i18n';
 	import type { RealmExtensionContext } from '$lib/realm-extension-sdk';
+	import AccessDenied from '$lib/components/AccessDenied.svelte';
+	import { parseAccessError, AccessDeniedError } from '$lib/utils/errors';
 
 	let mountPoint: HTMLDivElement | undefined;
-	let status: 'loading' | 'ready' | 'error' = 'loading';
+	let status: 'loading' | 'ready' | 'error' | 'access_denied' = 'loading';
 	let errorMsg = '';
+	let accessDeniedOperation = '';
 	let debugInfo = '';
 	let mounted: MountResult | void;
 
@@ -47,14 +50,22 @@
 		async function callSync(fn: string, args: Record<string, unknown> = {}): Promise<unknown> {
 			const raw = await backend.extension_sync_call(id, fn, JSON.stringify(args));
 			const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
-			if (res?.success === false) throw new Error(res.response ?? 'extension_sync_call failed');
+			if (res?.success === false) {
+				const denied = parseAccessError(res);
+				if (denied) throw new AccessDeniedError(denied);
+				throw new Error(res.response ?? 'extension_sync_call failed');
+			}
 			if (!res?.response) return res;
 			try { return JSON.parse(res.response); } catch { return res.response; }
 		}
 		async function callAsync(fn: string, args: Record<string, unknown> = {}): Promise<unknown> {
 			const raw = await backend.extension_async_call(id, fn, JSON.stringify(args));
 			const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
-			if (res?.success === false) throw new Error(res.response ?? 'extension_async_call failed');
+			if (res?.success === false) {
+				const denied = parseAccessError(res);
+				if (denied) throw new AccessDeniedError(denied);
+				throw new Error(res.response ?? 'extension_async_call failed');
+			}
 			if (!res?.response) return res;
 			try { return JSON.parse(res.response); } catch { return res.response; }
 		}
@@ -130,9 +141,14 @@
 			debugInfo = `Mounted ${id}@${version}`;
 			status = 'ready';
 		} catch (e: any) {
-			console.error('Extension load failed:', e);
-			status = 'error';
-			errorMsg = String(e?.message ?? e);
+			if (e instanceof AccessDeniedError) {
+				status = 'access_denied';
+				accessDeniedOperation = e.operation;
+			} else {
+				console.error('Extension load failed:', e);
+				status = 'error';
+				errorMsg = String(e?.message ?? e);
+			}
 		}
 	}
 
@@ -165,6 +181,8 @@
 			</svg>
 			<span class="text-sm">{debugInfo || 'Loading extension...'}</span>
 		</div>
+	{:else if status === 'access_denied'}
+		<AccessDenied operation={accessDeniedOperation} />
 	{:else if status === 'error'}
 		<Alert color="red" class="mb-4">
 			<div class="font-semibold">Failed to load extension '{id}'</div>
