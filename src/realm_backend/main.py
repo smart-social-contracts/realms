@@ -489,9 +489,11 @@ def join_realm(profile: str, preferred_quarter: text, invite_code_checksum_hex: 
             pass
 
         if has_invite:
-            # Test mode shortcuts: sha256("admin") / sha256("member") grant respective profiles
+            # Test mode shortcuts: sha256("admin") / sha256("member") / sha256("dev") / sha256("developer") grant respective profiles
             _ADMIN_TEST_CODE_CHECKSUM_HEX = "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"
             _MEMBER_TEST_CODE_CHECKSUM_HEX = "e31ab643c44f7a0ec824b59d1194d60dac334200d845e61d2d289daa0f087ea4"
+            _DEV_TEST_CODE_CHECKSUM_HEX = "ef260e9aa3c673af240d17a2660480361a8e081d1ffeca2a5ed0e3219fc18567"
+            _DEVELOPER_TEST_CODE_CHECKSUM_HEX = "88fa0d759f845b47c044c2cd44e29082cf6fea665c30c146374ec7c8f3d699e3"
             _test_bypass = bool(getattr(realm, "test_mode_user_self_registration", False)) or bool(
                 getattr(realm, "test_mode_ii_bypass", False)
             )
@@ -499,6 +501,8 @@ def join_realm(profile: str, preferred_quarter: text, invite_code_checksum_hex: 
                 granted_profile = "admin"
             elif _test_bypass and invite_code_checksum_hex == _MEMBER_TEST_CODE_CHECKSUM_HEX:
                 granted_profile = "member"
+            elif _test_bypass and invite_code_checksum_hex in (_DEV_TEST_CODE_CHECKSUM_HEX, _DEVELOPER_TEST_CODE_CHECKSUM_HEX):
+                granted_profile = "developer"
             else:
                 # Code-based path: validate and consume the invite code
                 from ggg.system.registration_code import consume_registration_code

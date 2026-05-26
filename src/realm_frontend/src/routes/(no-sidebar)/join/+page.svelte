@@ -212,12 +212,15 @@
   
   async function resolveInviteChecksum() {
     if (inviteCode) return sha256Hex(inviteCode);
-    // Test mode shortcuts: backend accepts sha256("admin") / sha256("member") as invite codes
+    // Test mode shortcuts: backend accepts sha256("admin") / sha256("member") / sha256("dev") as invite codes
     if (($testModeUserSelfRegistration || $testModeIIBypass) && selectedProfile === 'admin') {
       return sha256Hex('admin');
     }
     if (($testModeUserSelfRegistration || $testModeIIBypass) && selectedProfile === 'member') {
       return sha256Hex('member');
+    }
+    if (($testModeUserSelfRegistration || $testModeIIBypass) && selectedProfile === 'developer') {
+      return sha256Hex('dev');
     }
     return '';
   }
