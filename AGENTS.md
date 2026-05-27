@@ -260,6 +260,93 @@ The first fixes the color panic, the second suppresses the plaintext identity wa
 
 ---
 
+## Browser Testing
+
+### Cursor built-in browser
+
+The `@Browser` tool (Cursor IDE browser tab) works with ICP canister frontends. Use `browser_navigate` to open a canister URL and `browser_snapshot` to inspect the accessibility tree.
+
+**Gotcha — test mode identity is stateful**: the test environment uses `TEST_MODE_II_BYPASS=true`, which auto-logs-in with a deterministic hardcoded identity (seed `0xED, 0x57` → principal `2eqns-rmzes-...`). This identity is the **same across all browser sessions**. If a previous test activated, modified, or consumed resources for that principal, subsequent sessions will see the post-modification state. Before concluding a feature is broken, check whether the test identity's on-chain state already reflects a previous test run:
+
+```bash
+dfx canister call <canister_id> is_principal_activated '("2eqns-rmzes-7npxw-dxpw2-qdy2s-mw6ix-svdo2-oya7o-a6ldc-sqgwh-bqe")' --network test
+```
+
+### Playwright (headless Chromium)
+
+For automated, repeatable, screenshot-based testing — or when you need to capture console output, intercept network calls, or interact with forms programmatically — use Playwright.
+
+#### Setup (one-time)
+
+```bash
+pip install playwright        # if not already installed
+playwright install chromium   # downloads ~110 MB headless shell
+```
+
+`playwright install --with-deps chromium` requires sudo and will fail in most agent environments. The `--with-deps` flag is not needed if system libraries are already present (they usually are).
+
+#### Inline test script pattern
+
+```python
+import asyncio
+from playwright.async_api import async_playwright
+
+async def test():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+
+        # Capture console output — must be set up BEFORE page.goto()
+        console_msgs = []
+        page.on("console", lambda msg: console_msgs.append(f"[{msg.type}] {msg.text}"))
+
+        await page.goto("https://<canister_id>.icp0.io/some-page", timeout=30000)
+        await page.wait_for_load_state("networkidle", timeout=15000)
+        await page.wait_for_timeout(3000)  # extra wait for async canister calls
+
+        await page.screenshot(path="/tmp/test_screenshot.png")
+        body = await page.inner_text("body")
+        print(body[:500])
+
+        # Interact with form elements
+        input_el = await page.query_selector('input[type="text"]')
+        if input_el:
+            await input_el.fill("some value")
+            btn = await page.query_selector('button:has-text("Submit")')
+            if btn:
+                await btn.click()
+                await page.wait_for_timeout(5000)
+                await page.screenshot(path="/tmp/test_after_submit.png")
+
+        for msg in console_msgs:
+            if "Permission" not in msg:
+                print(msg)
+
+        await browser.close()
+
+asyncio.run(test())
+```
+
+#### Key tips
+
+- **Screenshots** are saved to `/tmp/` and can be viewed with the `Read` tool (it supports PNG).
+- **`wait_for_timeout(3000–8000)`** after navigation or clicks — canister calls are async and can take several seconds on the IC boundary nodes.
+- **Same test mode identity caveat** applies — Playwright also gets the hardcoded `2eqns-rmzes-...` principal in test environments.
+- **Intercepting responses**: use `page.route("**/*", handler)` to log or modify HTTP requests/responses.
+- **Network failures**: use `page.on("requestfailed", ...)` to catch failed API calls.
+
+### When to use what
+
+| Scenario | Tool |
+|---|---|
+| Quick visual check of a page | Cursor `@Browser` |
+| Verify canister logic (queries, updates, guards) | `dfx canister call` |
+| Automated UI test with screenshots and form interaction | Playwright |
+| Full user flow (UI → canister → UI update) | Playwright |
+| Admin operations (create codes, toggle modes) | `dfx canister call` with controller identity |
+
+---
+
 ## Further Reading
 
 - `docs/reference/DEPLOYMENT_GUIDE.md` — Full deployment guide

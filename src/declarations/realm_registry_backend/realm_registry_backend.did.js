@@ -109,6 +109,7 @@ export const idlFactory = ({ IDL }) => {
     'remove_realm' : IDL.Func([IDL.Text], [AddRealmResult], []),
     'request_deployment' : IDL.Func([IDL.Text], [IDL.Text], []),
     'revoke_invitation_code' : IDL.Func([IDL.Text], [GenericResult], []),
+    'deactivate_principal' : IDL.Func([IDL.Text], [GenericResult], []),
     'search_realms' : IDL.Func([IDL.Text], [IDL.Vec(RealmRecord)], ['query']),
     'set_invitation_mode' : IDL.Func([IDL.Text], [GenericResult], []),
     'status' : IDL.Func([], [GetStatusResult], ['query']),

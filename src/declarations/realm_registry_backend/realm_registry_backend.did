@@ -263,6 +263,7 @@ service : {
   "set_invitation_mode" : (text) -> (GenericResult);
   "create_invitation_codes" : (text) -> (GenericResult);
   "revoke_invitation_code" : (text) -> (GenericResult);
+  "deactivate_principal" : (text) -> (GenericResult);
   "list_invitation_codes" : () -> (text) query;
   "list_activated_principals" : () -> (text) query;
   "__get_candid_interface_tmp_hack" : () -> (text) query;

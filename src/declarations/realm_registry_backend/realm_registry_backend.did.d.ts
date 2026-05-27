@@ -1021,6 +1021,7 @@ export interface _SERVICE {
   'remove_realm' : ActorMethod<[string], AddRealmResult>,
   'request_deployment' : ActorMethod<[string], string>,
   'revoke_invitation_code' : ActorMethod<[string], GenericResult>,
+  'deactivate_principal' : ActorMethod<[string], GenericResult>,
   'search_realms' : ActorMethod<[string], Array<RealmRecord>>,
   'set_invitation_mode' : ActorMethod<[string], GenericResult>,
   'status' : ActorMethod<[], GetStatusResult>,

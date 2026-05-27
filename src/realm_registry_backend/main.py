@@ -904,6 +904,21 @@ def revoke_invitation_code(code_hash: text) -> GenericResult:
         return {"Err": str(e)}
 
 
+@update
+def deactivate_principal(principal_id: text) -> GenericResult:
+    try:
+        if not ic.is_controller(ic.caller()):
+            return {"Err": "Only controllers can deactivate principals"}
+        pid = principal_id.strip()
+        ap = ActivatedPrincipal[pid]
+        if not ap:
+            return {"Err": "Principal not found in activated list"}
+        ap.delete()
+        return {"Ok": f"Principal {pid} deactivated"}
+    except Exception as e:
+        return {"Err": str(e)}
+
+
 @query
 def list_invitation_codes() -> text:
     try:
