@@ -1336,6 +1336,13 @@ def publish_extension_command(
             continue
         _upload("frontend/dist/index.js", b)
 
+    dist_dir = os.path.join(source_dir, "frontend-rt", "dist")
+    if os.path.isdir(dist_dir):
+        for fname in sorted(os.listdir(dist_dir)):
+            if fname == "index.js" or not fname.endswith((".js", ".css")):
+                continue
+            _upload(f"frontend/dist/{fname}", os.path.join(dist_dir, fname))
+
     # Frontend i18n must land at ext/<id>/<ver>/frontend/i18n/<locale>.json
     # (realm_frontend fetch URL). Monorepo layout stores files under
     # frontend/i18n/locales/extensions/<ext_id>/ — upload those with paths
