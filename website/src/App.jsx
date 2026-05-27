@@ -135,6 +135,13 @@ function App() {
               <img src="/logo_horizontal.svg" alt="Realms" className="h-20 sm:h-24 lg:h-28" />
             </div>
             
+            <div className="flex justify-center mb-4">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                {t('hero.alphaBadge')}
+              </span>
+            </div>
+
             <h1 className="text-lg sm:text-xl lg:text-2xl font-bold mb-6 text-center">
               <span className="text-slate-800">{t('hero.title')}</span>
             </h1>
@@ -145,10 +152,15 @@ function App() {
               <p className="break-words">{t('hero.subtitle3')}</p>
             </div>
             
-            <div className="flex justify-center">
+            <div className="flex flex-col sm:flex-row justify-center gap-3">
               <a href="https://demo.realmsgos.org" target="_blank" rel="noopener noreferrer"
                  className="inline-flex items-center justify-center px-8 py-4 bg-primary-900 text-white rounded-xl font-semibold text-lg hover:bg-primary-800 transition-colors">
                 {t('hero.tryDemo')}
+              </a>
+              <a href="https://tally.so/r/GxQ8QL" target="_blank" rel="noopener noreferrer"
+                 className="inline-flex items-center justify-center px-8 py-4 border-2 border-primary-900 text-primary-900 bg-white/80 rounded-xl font-semibold text-lg hover:bg-primary-50 transition-colors">
+                {t('hero.requestInvite')}
+                <ArrowRight className="w-5 h-5 ml-2" />
               </a>
             </div>
           </div>
