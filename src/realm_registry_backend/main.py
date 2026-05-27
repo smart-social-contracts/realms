@@ -198,7 +198,7 @@ from _cdk import (
 )
 from ic_python_db import Database
 from ic_python_logging import get_logger
-from core.models import VersionInfo
+from core.models import ActivatedPrincipal, InvitationCode, RegistryConfig, VersionInfo
 
 # ── Inter-canister: realm_installer ────────────────────────────────────
 
@@ -308,6 +308,10 @@ class UpgradeResult(Variant, total=False):
     Ok: text
     Err: text
 
+class GenericResult(Variant, total=False):
+    Ok: text
+    Err: text
+
 # ── Storage ────────────────────────────────────────────────────────────
 
 storage = StableBTreeMap[str, str](memory_id=1, max_key_size=200, max_value_size=2000)
@@ -325,6 +329,18 @@ _INSTALLER_IDS = {
 }
 
 _NETWORK_FOR_CANISTER = {}  # populated from realm records
+
+_INVITATION_MODE_KEY = "invitation_code_mode"
+
+
+def _is_invitation_mode() -> bool:
+    cfg = RegistryConfig[_INVITATION_MODE_KEY]
+    return cfg is not None and cfg.value == "true"
+
+
+def _hash_code(code: str) -> str:
+    import hashlib
+    return hashlib.sha256(code.strip().encode("utf-8")).hexdigest()
 
 
 def _realm_record(r: dict) -> RealmRecord:
@@ -477,6 +493,12 @@ def billing_status() -> GetBillingStatusResult:
 def request_deployment(manifest_json: text) -> Async[text]:
     try:
         caller = str(ic.caller())
+
+        if _is_invitation_mode():
+            if not ActivatedPrincipal[caller]:
+                return json.dumps({"success": False,
+                    "error": "Account not activated. Please redeem an invitation code first."})
+
         manifest = json.loads(manifest_json)
         network = manifest.get("network", "")
         realm_name = manifest.get("name", "unknown")
@@ -768,5 +790,137 @@ def request_upgrade(args_json: text) -> Async[text]:
         result["credits_held"] = UPGRADE_COST_CREDITS
         result["target_version"] = latest.version
         return json.dumps(result)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+# ── Invitation code endpoints ──────────────────────────────────────────
+
+@query
+def get_invitation_mode() -> GenericResult:
+    try:
+        return {"Ok": "enabled" if _is_invitation_mode() else "disabled"}
+    except Exception as e:
+        return {"Err": str(e)}
+
+
+@query
+def is_principal_activated(principal_id: text) -> GenericResult:
+    try:
+        if not _is_invitation_mode():
+            return {"Ok": "open"}
+        if ActivatedPrincipal[principal_id]:
+            return {"Ok": "activated"}
+        return {"Err": "not_activated"}
+    except Exception as e:
+        return {"Err": str(e)}
+
+
+@update
+def redeem_invitation_code(code: text) -> GenericResult:
+    try:
+        caller = str(ic.caller())
+        if not _is_invitation_mode():
+            return {"Ok": "Invitation mode is not active"}
+
+        if ActivatedPrincipal[caller]:
+            return {"Ok": "Already activated"}
+
+        code_hash = _hash_code(code)
+        invitation = InvitationCode[code_hash]
+        if not invitation or not invitation.is_active:
+            return {"Err": "Invalid invitation code"}
+        if invitation.redeemed_by:
+            return {"Err": "This invitation code has already been used"}
+
+        invitation.redeemed_by = caller
+        invitation.redeemed_at = float(ic.time() / 1_000_000_000)
+        invitation.is_active = False
+
+        ActivatedPrincipal(
+            principal_id=caller,
+            invitation_code_hash=code_hash,
+            activated_at=float(ic.time() / 1_000_000_000),
+        )
+        logger.info(f"Principal {caller} activated with invitation code")
+        return {"Ok": "Account activated"}
+    except Exception as e:
+        return {"Err": str(e)}
+
+
+@update
+def set_invitation_mode(enabled: text) -> GenericResult:
+    try:
+        if not ic.is_controller(ic.caller()):
+            return {"Err": "Only controllers can change invitation mode"}
+        cfg = RegistryConfig[_INVITATION_MODE_KEY]
+        val = "true" if enabled.strip().lower() in ("true", "1", "yes", "enabled") else "false"
+        if cfg:
+            cfg.value = val
+        else:
+            RegistryConfig(key=_INVITATION_MODE_KEY, value=val)
+        logger.info(f"Invitation mode set to {val}")
+        return {"Ok": val}
+    except Exception as e:
+        return {"Err": str(e)}
+
+
+@update
+def create_invitation_codes(hashes_json: text) -> GenericResult:
+    """Controller-only. Input: '["sha256hex1","sha256hex2",...]'"""
+    try:
+        if not ic.is_controller(ic.caller()):
+            return {"Err": "Only controllers can create invitation codes"}
+        hashes = json.loads(hashes_json)
+        created = 0
+        for h in hashes:
+            h = h.strip()
+            if not h:
+                continue
+            if InvitationCode[h]:
+                continue
+            InvitationCode(
+                code_hash=h, redeemed_by="", is_active=True,
+                redeemed_at=0.0,
+                created_at=float(ic.time() / 1_000_000_000),
+            )
+            created += 1
+        logger.info(f"Created {created} invitation codes")
+        return {"Ok": json.dumps({"created": created, "total_submitted": len(hashes)})}
+    except Exception as e:
+        return {"Err": str(e)}
+
+
+@update
+def revoke_invitation_code(code_hash: text) -> GenericResult:
+    try:
+        if not ic.is_controller(ic.caller()):
+            return {"Err": "Only controllers can revoke invitation codes"}
+        invitation = InvitationCode[code_hash.strip()]
+        if not invitation:
+            return {"Err": "Invitation code not found"}
+        invitation.is_active = False
+        return {"Ok": "Invitation code revoked"}
+    except Exception as e:
+        return {"Err": str(e)}
+
+
+@query
+def list_invitation_codes() -> text:
+    try:
+        if not ic.is_controller(ic.caller()):
+            return json.dumps({"success": False, "error": "Only controllers can list invitation codes"})
+        codes = [c.to_dict() for c in InvitationCode.instances()]
+        return json.dumps({"success": True, "codes": codes, "count": len(codes)})
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def list_activated_principals() -> text:
+    try:
+        if not ic.is_controller(ic.caller()):
+            return json.dumps({"success": False, "error": "Only controllers can list activated principals"})
+        principals = [p.to_dict() for p in ActivatedPrincipal.instances()]
+        return json.dumps({"success": True, "principals": principals, "count": len(principals)})
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})

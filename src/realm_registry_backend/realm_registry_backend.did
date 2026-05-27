@@ -242,6 +242,7 @@ type RealmTargetService = service { install_extension_from_registry : (text) -> 
 
 type VersionInfoRecord = record { version : text; backend_wasm_url : text; frontend_tar_url : text; backend_wasm_hash : text; frontend_tar_hash : text; published_at : float64 };
 type UpgradeResult = variant { Ok : text; Err : text };
+type GenericResult = variant { Ok : text; Err : text };
 
 service : {
   "status" : () -> (GetStatusResult) query;
@@ -264,5 +265,13 @@ service : {
   "publish_version" : (text) -> (UpgradeResult);
   "get_latest_version" : () -> (UpgradeResult) query;
   "list_versions" : () -> (text) query;
+  "get_invitation_mode" : () -> (GenericResult) query;
+  "is_principal_activated" : (text) -> (GenericResult) query;
+  "redeem_invitation_code" : (text) -> (GenericResult);
+  "set_invitation_mode" : (text) -> (GenericResult);
+  "create_invitation_codes" : (text) -> (GenericResult);
+  "revoke_invitation_code" : (text) -> (GenericResult);
+  "list_invitation_codes" : () -> (text) query;
+  "list_activated_principals" : () -> (text) query;
   "__get_candid_interface_tmp_hack" : () -> (text) query;
 }

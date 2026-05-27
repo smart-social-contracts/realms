@@ -14,6 +14,14 @@
   let userCredits = 0;
   const REQUIRED_CREDITS = 5;
 
+  // Invitation code gate
+  let invitationMode = false;
+  let principalActivated = false;
+  let invitationCode = '';
+  let invitationError = null;
+  let invitationLoading = false;
+  let checkingActivation = true;
+
   // Deploy mode
   let deployMode = 'automatic'; // 'automatic' or 'manual'
   
@@ -50,6 +58,23 @@
       }
       authLoading = false;
 
+      // Check invitation code mode
+      try {
+        const { backend } = await import('$lib/canisters.js');
+        const modeResult = await backend.get_invitation_mode();
+        invitationMode = modeResult?.Ok === 'enabled';
+        if (invitationMode && isLoggedIn && userPrincipal) {
+          const actResult = await backend.is_principal_activated(userPrincipal.toText());
+          principalActivated = actResult?.Ok === 'activated' || actResult?.Ok === 'open';
+        } else if (!invitationMode) {
+          principalActivated = true;
+        }
+      } catch (e) {
+        console.error('Invitation mode check failed:', e);
+        principalActivated = true;
+      }
+      checkingActivation = false;
+
       // Fetch codex descriptions from remote SHORT_DESCRIPTION.md files
       for (const codex of AVAILABLE_CODICES) {
         if (codex.description_url) {
@@ -83,6 +108,26 @@
       isLoggedIn = true;
       userPrincipal = result.principal;
       await loadUserCredits();
+    }
+  }
+
+  async function handleRedeemCode() {
+    if (!invitationCode.trim() || !userPrincipal) return;
+    invitationError = null;
+    invitationLoading = true;
+    try {
+      const { getAuthenticatedRegistryActor } = await import('$lib/canisters.js');
+      const registry = await getAuthenticatedRegistryActor();
+      const result = await registry.redeem_invitation_code(invitationCode.trim());
+      if (result?.Ok) {
+        principalActivated = true;
+      } else {
+        invitationError = result?.Err || 'Invalid invitation code';
+      }
+    } catch (e) {
+      invitationError = e.message || 'Failed to redeem invitation code';
+    } finally {
+      invitationLoading = false;
     }
   }
 
@@ -616,6 +661,65 @@
   <title>Create Realm | Realms</title>
 </svelte:head>
 
+{#if checkingActivation || authLoading}
+  <div class="wizard-container">
+    <div class="invitation-gate">
+      <p>Loading...</p>
+    </div>
+  </div>
+{:else if invitationMode && isLoggedIn && !principalActivated}
+  <div class="wizard-container">
+    <div class="invitation-gate">
+      <div class="invitation-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.5">
+          <rect x="2" y="6" width="20" height="12" rx="2"/>
+          <path d="M2 8l10 6 10-6"/>
+        </svg>
+      </div>
+      <h2>Invitation Required</h2>
+      <p class="invitation-desc">Realm creation is currently available by invitation only. Enter your invitation code below to get started.</p>
+      <div class="invitation-form">
+        <input
+          type="text"
+          bind:value={invitationCode}
+          placeholder="Enter your invitation code"
+          class="invitation-input"
+          class:error={invitationError}
+          on:keydown={(e) => { if (e.key === 'Enter') handleRedeemCode(); }}
+          disabled={invitationLoading}
+        />
+        {#if invitationError}
+          <p class="invitation-error">{invitationError}</p>
+        {/if}
+        <button
+          class="btn btn-primary invitation-submit"
+          on:click={handleRedeemCode}
+          disabled={invitationLoading || !invitationCode.trim()}
+        >
+          {invitationLoading ? 'Verifying...' : 'Submit Code'}
+        </button>
+      </div>
+      <div class="invitation-request-info">
+        <p>Don't have an invitation code?</p>
+        <p class="invitation-request-channels">Request one by reaching out to us on <a href="https://oc.app/community/x2nkd-waaaa-aaaar-bhh4q-cai" target="_blank" rel="noopener">OpenChat</a>.</p>
+      </div>
+    </div>
+  </div>
+{:else if invitationMode && !isLoggedIn}
+  <div class="wizard-container">
+    <div class="invitation-gate">
+      <div class="invitation-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.5">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+      </div>
+      <h2>Sign In Required</h2>
+      <p class="invitation-desc">Please sign in with Internet Identity to continue. An invitation code is required to create a realm.</p>
+      <button class="btn btn-primary" on:click={handleLogin}>Sign In</button>
+    </div>
+  </div>
+{:else}
 <div class="wizard-container">
   <header class="wizard-header">
     <h1>Create Your Realm</h1>
@@ -1678,8 +1782,103 @@
   </div>
 
 </div>
+{/if}
 
 <style>
+  .invitation-gate {
+    text-align: center;
+    padding: 3rem 2rem;
+    max-width: 480px;
+    margin: 4rem auto;
+  }
+
+  .invitation-icon {
+    margin-bottom: 1.5rem;
+  }
+
+  .invitation-gate h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #171717;
+    margin: 0 0 0.75rem;
+  }
+
+  .invitation-desc {
+    color: #525252;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin: 0 0 2rem;
+  }
+
+  .invitation-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .invitation-input {
+    width: 100%;
+    max-width: 360px;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    border: 2px solid #e5e5e5;
+    border-radius: 8px;
+    text-align: center;
+    letter-spacing: 0.05em;
+    transition: border-color 0.15s;
+  }
+
+  .invitation-input:focus {
+    outline: none;
+    border-color: #6366f1;
+  }
+
+  .invitation-input.error {
+    border-color: #ef4444;
+  }
+
+  .invitation-input:disabled {
+    opacity: 0.6;
+    background: #f5f5f5;
+  }
+
+  .invitation-error {
+    color: #ef4444;
+    font-size: 0.875rem;
+    margin: 0;
+  }
+
+  .invitation-submit {
+    min-width: 160px;
+  }
+
+  .invitation-request-info {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e5e5e5;
+  }
+
+  .invitation-request-info p {
+    margin: 0 0 0.5rem;
+    color: #737373;
+    font-size: 0.875rem;
+  }
+
+  .invitation-request-channels {
+    color: #525252;
+  }
+
+  .invitation-request-channels a {
+    color: #6366f1;
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .invitation-request-channels a:hover {
+    text-decoration: underline;
+  }
+
   .wizard-container {
     max-width: 800px;
     margin: 0 auto;

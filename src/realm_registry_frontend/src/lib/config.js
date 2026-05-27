@@ -45,3 +45,5 @@ function _testFlag(envKey, urlParam) {
 }
 
 export const TEST_MODE_II_BYPASS = _testFlag('VITE_TEST_MODE_II_BYPASS', 'ii_bypass');
+
+export const INVITATION_CODE_MODE = _readFlag('VITE_INVITATION_CODE_MODE', 'invitation_code_mode');

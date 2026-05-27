@@ -65,6 +65,7 @@ export const idlFactory = ({ IDL }) => {
     'Ok' : StatusRecord,
     'Err' : IDL.Text,
   });
+  const GenericResult = IDL.Variant({ 'Ok' : IDL.Text, 'Err' : IDL.Text });
   return IDL.Service({
     '__get_candid_interface_tmp_hack' : IDL.Func([], [IDL.Text], ['query']),
     'add_credits' : IDL.Func(
@@ -73,6 +74,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'billing_status' : IDL.Func([], [GetBillingStatusResult], ['query']),
+    'create_invitation_codes' : IDL.Func([IDL.Text], [GenericResult], []),
     'deduct_credits' : IDL.Func(
         [IDL.Text, IDL.Nat64, IDL.Text],
         [DeductCreditsResult],
@@ -85,6 +87,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'deployment_succeeded' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
     'get_credits' : IDL.Func([IDL.Text], [GetCreditsResult], ['query']),
+    'get_invitation_mode' : IDL.Func([], [GenericResult], ['query']),
     'get_realm' : IDL.Func([IDL.Text], [GetRealmResult], ['query']),
     'get_transactions' : IDL.Func(
         [IDL.Text, IDL.Nat64],
@@ -92,8 +95,12 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'greet' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
+    'is_principal_activated' : IDL.Func([IDL.Text], [GenericResult], ['query']),
+    'list_activated_principals' : IDL.Func([], [IDL.Text], ['query']),
+    'list_invitation_codes' : IDL.Func([], [IDL.Text], ['query']),
     'list_realms' : IDL.Func([], [IDL.Vec(RealmRecord)], ['query']),
     'realm_count' : IDL.Func([], [IDL.Nat64], ['query']),
+    'redeem_invitation_code' : IDL.Func([IDL.Text], [GenericResult], []),
     'register_realm' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text],
         [AddRealmResult],
@@ -101,7 +108,9 @@ export const idlFactory = ({ IDL }) => {
       ),
     'remove_realm' : IDL.Func([IDL.Text], [AddRealmResult], []),
     'request_deployment' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'revoke_invitation_code' : IDL.Func([IDL.Text], [GenericResult], []),
     'search_realms' : IDL.Func([IDL.Text], [IDL.Vec(RealmRecord)], ['query']),
+    'set_invitation_mode' : IDL.Func([IDL.Text], [GenericResult], []),
     'status' : IDL.Func([], [GetStatusResult], ['query']),
   });
 };

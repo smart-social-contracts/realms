@@ -999,22 +999,30 @@ export interface _SERVICE {
     AddCreditsResult
   >,
   'billing_status' : ActorMethod<[], GetBillingStatusResult>,
+  'create_invitation_codes' : ActorMethod<[string], GenericResult>,
   'deduct_credits' : ActorMethod<[string, bigint, string], DeductCreditsResult>,
   'deployment_failed' : ActorMethod<[string, string, string], string>,
   'deployment_succeeded' : ActorMethod<[string, string], string>,
   'get_credits' : ActorMethod<[string], GetCreditsResult>,
+  'get_invitation_mode' : ActorMethod<[], GenericResult>,
   'get_realm' : ActorMethod<[string], GetRealmResult>,
   'get_transactions' : ActorMethod<[string, bigint], TransactionHistoryResult>,
   'greet' : ActorMethod<[string], string>,
+  'is_principal_activated' : ActorMethod<[string], GenericResult>,
+  'list_activated_principals' : ActorMethod<[], string>,
+  'list_invitation_codes' : ActorMethod<[], string>,
   'list_realms' : ActorMethod<[], Array<RealmRecord>>,
   'realm_count' : ActorMethod<[], bigint>,
+  'redeem_invitation_code' : ActorMethod<[string], GenericResult>,
   'register_realm' : ActorMethod<
     [string, string, string, string, string],
     AddRealmResult
   >,
   'remove_realm' : ActorMethod<[string], AddRealmResult>,
   'request_deployment' : ActorMethod<[string], string>,
+  'revoke_invitation_code' : ActorMethod<[string], GenericResult>,
   'search_realms' : ActorMethod<[string], Array<RealmRecord>>,
+  'set_invitation_mode' : ActorMethod<[string], GenericResult>,
   'status' : ActorMethod<[], GetStatusResult>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;

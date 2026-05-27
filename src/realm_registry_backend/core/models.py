@@ -85,6 +85,44 @@ class RealmRecord(Entity, TimestampedMixin):
         }
 
 
+class InvitationCode(Entity, TimestampedMixin):
+    __alias__ = "code_hash"
+    code_hash = String(max_length=64)
+    redeemed_by = String(max_length=64)
+    is_active = Boolean(default=True)
+    redeemed_at = Float()
+    created_at = Float()
+
+    def to_dict(self) -> dict:
+        return {
+            "code_hash": self.code_hash or "",
+            "redeemed_by": self.redeemed_by or "",
+            "is_active": bool(self.is_active),
+            "redeemed_at": self.redeemed_at or 0.0,
+            "created_at": self.created_at or 0.0,
+        }
+
+
+class ActivatedPrincipal(Entity, TimestampedMixin):
+    __alias__ = "principal_id"
+    principal_id = String(max_length=64)
+    invitation_code_hash = String(max_length=64)
+    activated_at = Float()
+
+    def to_dict(self) -> dict:
+        return {
+            "principal_id": self.principal_id or "",
+            "invitation_code_hash": self.invitation_code_hash or "",
+            "activated_at": self.activated_at or 0.0,
+        }
+
+
+class RegistryConfig(Entity):
+    __alias__ = "key"
+    key = String(max_length=64)
+    value = String(max_length=256)
+
+
 class VersionInfo(Entity, TimestampedMixin):
     """Tracks available realm versions for self-upgrade."""
     __alias__ = "id"
