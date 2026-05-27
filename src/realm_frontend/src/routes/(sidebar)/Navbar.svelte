@@ -1,6 +1,7 @@
 <script>
 	import AuthButton from '$lib/components/AuthButton.svelte';
 	import { realmInfo, realmName } from '$lib/stores/realmInfo';
+	import { isAuthenticated } from '$lib/stores/auth';
 	import { onMount } from 'svelte';
 	import { NavHamburger, Navbar } from 'flowbite-svelte';
 	import { IconMessageChatbot } from '@tabler/icons-svelte';
@@ -16,10 +17,12 @@
 </script>
 
 <Navbar {fluid} class="text-black relative z-50" color="default" let:NavContainer style="pointer-events: auto;">
-	<NavHamburger
-		onClick={() => (drawerHidden = !drawerHidden)}
-		class="m-0 md:block p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200"
-	/>
+	{#if $isAuthenticated}
+		<NavHamburger
+			onClick={() => (drawerHidden = !drawerHidden)}
+			class="m-0 md:block p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200"
+		/>
+	{/if}
 
 	<div class="absolute left-1/2 transform -translate-x-1/2">
 		<a href="/" class="flex items-center cursor-pointer">

@@ -5,6 +5,7 @@
 	import Footer from './Footer.svelte';
 	import DemoBanner from '$lib/components/DemoBanner.svelte';
 	import AiAssistantPanel from '$lib/components/AiAssistantPanel.svelte';
+	import { isAuthenticated } from '$lib/stores/auth';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
@@ -88,11 +89,13 @@
 		<Navbar bind:drawerHidden bind:aiPanelOpen />
 	</header>
 	<div class="flex flex-1 overflow-hidden">
-		<!-- Sidebar (left) -->
-		<Sidebar bind:drawerHidden />
+		{#if $isAuthenticated}
+			<!-- Sidebar (left) -->
+			<Sidebar bind:drawerHidden />
+		{/if}
 
 		<!-- Main Content -->
-		<div class="relative flex-1 overflow-y-auto overflow-x-hidden bg-white transition-[margin] duration-500 ease-in-out {drawerHidden ? '' : 'lg:ml-64'} {aiPanelOpen ? 'lg:mr-80' : ''} lg:pl-6">
+		<div class="relative flex-1 overflow-y-auto overflow-x-hidden bg-white transition-[margin] duration-500 ease-in-out {$isAuthenticated && !drawerHidden ? 'lg:ml-64' : ''} {aiPanelOpen ? 'lg:mr-80' : ''} lg:pl-6">
 			<div class="px-4 lg:px-0">
 				<DemoBanner />
 			</div>
