@@ -242,7 +242,6 @@ type RealmTargetService = service { install_extension_from_registry : (text) -> 
 
 type VersionInfoRecord = record { version : text; backend_wasm_url : text; frontend_tar_url : text; backend_wasm_hash : text; frontend_tar_hash : text; published_at : float64 };
 type UpgradeResult = variant { Ok : text; Err : text };
-type GenericResult = variant { Ok : text; Err : text };
 
 service : {
   "status" : () -> (GetStatusResult) query;
