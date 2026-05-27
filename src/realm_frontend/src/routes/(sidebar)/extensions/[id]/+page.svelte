@@ -95,6 +95,14 @@
 				markAsRead,
 			},
 			theme: { cn },
+			ui: {
+				AccessDenied,
+				accessDeniedOperation: (error: unknown) => {
+					if (error instanceof AccessDeniedError) return error.operation;
+					const e = error as { name?: string; operation?: string };
+					return e?.name === 'AccessDeniedError' ? (e.operation ?? null) : null;
+				},
+			},
 		};
 	}
 

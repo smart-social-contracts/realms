@@ -111,6 +111,13 @@ export interface RealmExtensionContext {
 	theme: {
 		cn: (...classes: (string | undefined | null | false)[]) => string;
 	};
+
+	/** Shared UI helpers provided by the host app. */
+	ui: {
+		AccessDenied: import('svelte').Component<{ operation?: string }>;
+		/** Returns the denied operation name, or null if the error is not access-denied. */
+		accessDeniedOperation: (error: unknown) => string | null;
+	};
 }
 
 // ── Mount function signature ───────────────────────────────────────────
