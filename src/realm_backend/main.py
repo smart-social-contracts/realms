@@ -1072,6 +1072,9 @@ def get_my_extensions() -> text:
       - Department membership (user.departments → dept.extensions)
       - Profile-level baseline (user.profiles → profile.extensions)
 
+    When none of the above yield any grants (e.g. profile→extension links
+    have not been seeded yet), falls back to manifest-level profile matching.
+
     Returns JSON: {"success": true, "extensions": ["voting", "vault", ...]}
     """
     try:
@@ -1097,6 +1100,17 @@ def get_my_extensions() -> text:
         for profile in user.profiles:
             for ext in profile.extensions:
                 visible.add(ext.name)
+
+        # Fallback: when DB grants are empty, match against manifest profiles
+        if not visible:
+            from core.runtime_extensions import get_all_extension_manifests
+            user_profiles = [p.name for p in user.profiles] if user.profiles else []
+            for ext_id, m in get_all_extension_manifests().items():
+                if not isinstance(m, dict):
+                    continue
+                ext_profiles = m.get("profiles") or []
+                if not ext_profiles or any(p in user_profiles for p in ext_profiles):
+                    visible.add(ext_id)
 
         return json.dumps({"success": True, "extensions": sorted(visible)})
     except Exception as e:
@@ -3355,7 +3369,11 @@ def get_sidebar(args: text) -> text:
 
         manifests = get_all_extension_manifests()
 
-        # Determine which extensions are visible to this user
+        # Determine which extensions are visible to this user.
+        # Only activate DB-based filtering when there are actual grants;
+        # otherwise fall back to manifest-level profile matching so that
+        # newly registered users (whose profile→extension links may not
+        # yet be seeded) still see the correct sidebar items.
         visible_extensions = None
         if user:
             visible = set()
@@ -3367,7 +3385,8 @@ def get_sidebar(args: text) -> text:
             for profile in user.profiles:
                 for ext in profile.extensions:
                     visible.add(ext.name)
-            visible_extensions = visible
+            if visible:
+                visible_extensions = visible
 
         # Apply department visibility rules
         hidden_by_dept = set()
