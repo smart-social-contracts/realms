@@ -210,30 +210,72 @@ scripts/deploy_local_dev.sh -s .realms/realm_* -b
 
 Runtime extension bundles load dynamically — no full frontend redeploy needed, only file_registry upload + install.
 
-### Fast Remote Extension Deploy (~90s)
+### Fast Remote Extension Deploy (~26s)
 
-For iterating on runtime extension bundles against test canisters without CI. Requires the `my_dev_identity_1` dfx identity (controller of test canisters).
+For iterating on runtime extension bundles against test canisters without CI. No git commit required — edit, deploy, check, repeat. Commit only when the result is correct.
+
+All commands run from the **`realms/` project root**.
+
+**Setup (once per session):**
 
 ```bash
 export TERM=xterm
 export DFX_WARNING=-mainnet_plaintext_identity
 dfx identity use my_dev_identity_1
+```
 
-# 1. Build the extension bundle (~4s)
-realms files build --extensions <ext_id>
+`my_dev_identity_1` (principal `ah6ac-cc73l-...`) is a controller of the test canisters.
 
-# 2. Publish to test file registry (~8s)
-realms files publish --network test --extensions-only --extensions <ext_id>
+**Deploy cycle (edit → live in ~26s):**
 
-# 3. Deploy to realm (~80s)
+```bash
+realms files build --extensions <ext_id> \
+  && realms files publish --network test --extensions-only --extensions <ext_id> \
+  && dfx canister call <backend_canister_id> install_extension_from_registry \
+     '("{\"registry_canister_id\": \"<file_registry_id>\", \"ext_id\": \"<ext_id>\", \"version\": \"<version>\"}")' \
+     --network test
+```
+
+| Step | Command | Time | What it does |
+|------|---------|------|-------------|
+| Build | `realms files build --extensions <ext_id>` | ~4s | Runs `npm install && npm run build` in `frontend-rt/` |
+| Publish | `realms files publish --network test ...` | ~8s | Uploads bundle to the file_registry canister |
+| Install | `dfx canister call ... install_extension_from_registry` | ~14s | Backend pulls bundle from registry and installs it |
+
+**Concrete example** — `public_dashboard` on Agora (test):
+
+```bash
+realms files build --extensions public_dashboard \
+  && realms files publish --network test --extensions-only --extensions public_dashboard \
+  && dfx canister call rnghe-haaaa-aaaak-qyxyq-cai install_extension_from_registry \
+     '("{\"registry_canister_id\": \"uq2mu-kaaaa-aaaah-avqcq-cai\", \"ext_id\": \"public_dashboard\", \"version\": \"1.3.0\"}")' \
+     --network test
+```
+
+The `install_extension_from_registry` call goes directly to the realm backend, bypassing the installer service. It fetches the bundle from the file_registry and copies the frontend files to the asset canister in one call.
+
+**Canister IDs for the install call** (from the Known Canister IDs table and the descriptor):
+
+| Realm | Backend canister (call target) | File registry (test) |
+|-------|-------------------------------|---------------------|
+| Agora | `rnghe-haaaa-aaaak-qyxyq-cai` | `uq2mu-kaaaa-aaaah-avqcq-cai` |
+| Dominion | `ku6cv-2iaaa-aaaab-agrpa-cai` | `uq2mu-kaaaa-aaaah-avqcq-cai` |
+| Syntropia | `m2wv3-uaaaa-aaaah-quoiq-cai` | `uq2mu-kaaaa-aaaah-avqcq-cai` |
+
+**When to use `mundus deploy` instead:** if you need to redeploy the main frontend canister WASM (changes to `src/realm_frontend/`), not just a runtime extension bundle:
+
+```bash
 realms mundus deploy deployment-descriptors/test-mundus-layered.yml \
   --realm agora --canister frontend \
   --extensions <ext_id> --codices none --version latest
 ```
 
-This bypasses CI entirely: edit → build → publish → deploy in ~90s instead of ~8min. No git commit required. When done iterating, commit and push the final version.
+This takes ~90s but handles frontend WASM + branding + extension install together.
 
-**Constraints:** the extension bundle must stay under ~200KB for `files publish` to succeed against the file_registry instruction limit. Keep heavy libraries (leaflet, h3-js) loaded at runtime via `fetch()` + `eval()` instead of bundling them.
+**Constraints:**
+- The extension bundle must stay under ~200KB for `files publish` to succeed (file_registry instruction limit). Keep heavy libraries (leaflet, h3-js) loaded at runtime via `fetch()` + `eval()` instead of bundling them.
+- The extension `version` in `manifest.json` must match the version in the `dfx canister call`. Bump the version when you need to force cache invalidation.
+- After finishing iteration, commit the changes to the submodule and update the ref in `realms` (see "Deploying Extension Changes" above).
 
 ---
 
