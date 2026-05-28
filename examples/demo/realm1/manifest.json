@@ -57,7 +57,8 @@
     "hello_world",
     "test_bench",
     "demo_simulator",
-    "managed_services"
+    "managed_services",
+    "mundus_explorer"
   ],
   "options": {
     "random": {

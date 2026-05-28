@@ -60,7 +60,8 @@
     "demo_simulator",
     "managed_services",
     "role_manager",
-    "access_manager"
+    "access_manager",
+    "mundus_explorer"
   ],
   "options": {
     "random": {
