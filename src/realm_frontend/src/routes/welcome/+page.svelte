@@ -3,7 +3,7 @@
   import { browser } from '$app/environment';
   import Footer from '$lib/../routes/(sidebar)/Footer.svelte';
   import { _ } from 'svelte-i18n';
-  import { realmInfo, realmName, realmWelcomeMessage, realmDescription } from '$lib/stores/realmInfo';
+  import { realmInfo, realmName, realmWelcomeMessage, realmManifesto } from '$lib/stores/realmInfo';
   import { isAuthenticated } from '$lib/stores/auth';
   
   // Fetch realm info on mount
@@ -51,8 +51,8 @@
         {#if $realmWelcomeMessage}
           <p class="hero-subtitle welcome-message">{$realmWelcomeMessage}</p>
         {/if}
-        {#if $realmDescription}
-          <p class="hero-subtitle realm-description">{$realmDescription}</p>
+        {#if $realmManifesto}
+          <p class="hero-subtitle realm-manifesto">{$realmManifesto}</p>
         {/if}
       {/if}
     </div>
@@ -315,7 +315,7 @@
     margin-bottom: 1rem;
   }
   
-  .realm-description {
+  .realm-manifesto {
     font-size: 1rem;
     opacity: 0.9;
   }
