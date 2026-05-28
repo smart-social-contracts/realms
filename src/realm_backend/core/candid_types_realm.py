@@ -46,7 +46,7 @@ class StatusRecord(Record):
     test_mode_skip_terms: bool
     test_mode_skip_passport_zkproof: bool
     realm_name: text
-    realm_description: text
+    realm_manifesto: text
     realm_welcome_message: text
     user_profiles_count: nat
     canisters: Vec[CanisterInfo]

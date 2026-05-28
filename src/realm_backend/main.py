@@ -119,7 +119,7 @@ class StatusRecord(Record):
     test_mode_skip_terms: bool
     test_mode_skip_passport_zkproof: bool
     realm_name: text
-    realm_description: text
+    realm_manifesto: text
     realm_welcome_message: text
     user_profiles_count: nat
     canisters: Vec[CanisterInfo]
@@ -1612,7 +1612,7 @@ def get_objects(params: Vec[Tuple[str, str]]) -> RealmResponse:
         "objectsList": {
           "objects": [
             "{\"timestamp_created\": \"2025-09-10 11:28:41.147\", \"timestamp_updated\": \"2025-09-10 11:28:41.147\", \"creator\": \"system\", \"updater\": \"system\", \"owner\": \"system\", \"_type\": \"User\", \"_id\": \"1\", \"id\": \"system\", \"profile_picture_url\": \"\"}",
-            "{\"timestamp_created\": \"2025-09-10 11:28:41.147\", \"timestamp_updated\": \"2025-09-10 11:28:41.147\", \"creator\": \"system\", \"updater\": \"system\", \"owner\": \"system\", \"_type\": \"Realm\", \"_id\": \"1\", \"name\": \"Generated Demo Realm\", \"description\": \"Generated demo realm with 51 citizens and 5 organizations\", \"id\": \"0\", \"created_at\": \"2025-09-10T13:23:57.099332\", \"status\": \"active\", \"governance_type\": \"democratic\", \"population\": 51, \"organization_count\": 5, \"settings\": {\"voting_period_days\": 7, \"proposal_threshold\": 0.1, \"quorum_percentage\": 0.3, \"tax_rate\": 0.15, \"ubi_amount\": 1000}, \"relations\": {\"treasury\": [{\"_type\": \"Treasury\", \"_id\": \"2\"}]}}"
+            "{\"timestamp_created\": \"2025-09-10 11:28:41.147\", \"timestamp_updated\": \"2025-09-10 11:28:41.147\", \"creator\": \"system\", \"updater\": \"system\", \"owner\": \"system\", \"_type\": \"Realm\", \"_id\": \"1\", \"name\": \"Generated Demo Realm\", \"manifesto\": \"Generated demo realm with 51 citizens and 5 organizations\", \"id\": \"0\", \"created_at\": \"2025-09-10T13:23:57.099332\", \"status\": \"active\", \"governance_type\": \"democratic\", \"population\": 51, \"organization_count\": 5, \"settings\": {\"voting_period_days\": 7, \"proposal_threshold\": 0.1, \"quorum_percentage\": 0.3, \"tax_rate\": 0.15, \"ubi_amount\": 1000}, \"relations\": {\"treasury\": [{\"_type\": \"Treasury\", \"_id\": \"2\"}]}}"
           ]
         }
       },
@@ -1806,7 +1806,7 @@ def create_foundational_objects() -> void:
 
         # 4. Create realm - try to load data from manifest.json if available
         realm_name = "Default Realm"
-        realm_description = "A realm for digital governance and coordination"
+        realm_manifesto = "A realm for digital governance and coordination"
         realm_welcome_message = ""
         realm_open_registration = False
 
@@ -1825,7 +1825,7 @@ def create_foundational_objects() -> void:
                     with open(manifest_path, "r") as f:
                         manifest = json.load(f)
                     realm_name = manifest.get("name", realm_name)
-                    realm_description = manifest.get("description", realm_description)
+                    realm_manifesto = manifest.get("manifesto", realm_manifesto)
                     realm_welcome_message = manifest.get("welcome_message", "")
                     realm_open_registration = manifest.get("open_registration", False)
                     calendar_config = manifest.get("calendar", {})
@@ -1844,7 +1844,7 @@ def create_foundational_objects() -> void:
 
         realm = Realm(
             name=realm_name,
-            description=realm_description,
+            manifesto=realm_manifesto,
             welcome_message=realm_welcome_message,
             accounting_currency=acct_currency_config.get("symbol", "ckBTC"),
             accounting_currency_decimals=acct_currency_config.get("decimals", 8),
@@ -2968,7 +2968,7 @@ def get_nft_config() -> text:
 @update
 def update_realm_config(config_json: str) -> str:
     """
-    Update the realm configuration (name, description, welcome_message,
+    Update the realm configuration (name, manifesto, welcome_message,
     branding, registration, and infrastructure settings).
 
     Infrastructure fields (file_registry_canister_id, marketplace_canister_id)
@@ -3015,9 +3015,9 @@ def update_realm_config(config_json: str) -> str:
             realm.name = config["name"]
             updated_fields.append(f"name={config['name']}")
 
-        if "description" in config and config["description"]:
-            realm.description = config["description"]
-            updated_fields.append(f"description={config['description'][:50]}...")
+        if "manifesto" in config and config["manifesto"]:
+            realm.manifesto = config["manifesto"]
+            updated_fields.append(f"manifesto={config['manifesto'][:50]}...")
 
         if "welcome_message" in config:
             realm.welcome_message = config["welcome_message"] or ""

@@ -771,7 +771,7 @@ def mundus_deploy_new_command(
     network: str,
     artifact_version: str = "latest",
     display_name: str = "",
-    description: str = "",
+    manifesto: str = "",
     cleanup: bool = False,
 ) -> None:
     """Deploy a new realm (no existing canister IDs -- creates new ones)."""
@@ -793,7 +793,7 @@ def mundus_deploy_new_command(
         "realm": {
             "name": display_name or name,
             "display_name": display_name or name,
-            "description": description or f"Realm {name}",
+            "manifesto": manifesto or f"Realm {name}",
         },
         "registry_canister_id": _REGISTRY_IDS.get(network, ""),
         "installer_canister_id": _INSTALLER_IDS.get(network, ""),

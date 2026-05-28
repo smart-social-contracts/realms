@@ -1,7 +1,7 @@
 {
   "type": "realm",
   "name": "Westminster",
-  "description": "A basic generic western-style democratic state with separation of powers, progressive taxation, licensed private service providers, welfare benefits, zones of action, and ZK passport-based citizenship.",
+  "manifesto": "A basic generic western-style democratic state with separation of powers, progressive taxation, licensed private service providers, welfare benefits, zones of action, and ZK passport-based citizenship.",
   "welcome_message": "Welcome to Westminster. A transparent democracy with separation of powers, fair taxation, and welfare for all citizens. Verify your passport to join.",
   "codex": {
     "package": {

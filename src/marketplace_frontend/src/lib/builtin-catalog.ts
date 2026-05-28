@@ -125,7 +125,7 @@ export const builtinExtensions: ExtensionListing[] = [
   ext(
     'realm_settings',
     'Realm Settings',
-    'Configure realm name, description, branding, registration, and infrastructure settings',
+    'Configure realm name, manifesto, branding, registration, and infrastructure settings',
     '1.0.0', '⚙️', 'administration',
   ),
   // Territory

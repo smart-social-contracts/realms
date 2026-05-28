@@ -578,15 +578,15 @@ def mundus_deploy_new(
     display_name: str = typer.Option(
         "", "--display-name", help="Display name (defaults to name)"
     ),
-    description: str = typer.Option(
-        "", "--description", "-d", help="Realm description"
+    manifesto: str = typer.Option(
+        "", "--manifesto", help="Realm manifesto"
     ),
     cleanup: bool = typer.Option(
         False, "--cleanup", help="Delete test canisters after deployment"
     ),
 ) -> None:
     """Deploy a new realm with no existing canister IDs."""
-    mundus_deploy_new_command(name, network, artifact_version, display_name, description, cleanup)
+    mundus_deploy_new_command(name, network, artifact_version, display_name, manifesto, cleanup)
 
 
 # Create files subcommand group

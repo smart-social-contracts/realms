@@ -232,7 +232,7 @@ if os.path.exists(manifest_path):
         
         config = {
             "name": manifest.get("name", ""),
-            "description": manifest.get("description", ""),
+            "manifesto": manifest.get("manifesto", ""),
             "welcome_message": manifest.get("welcome_message", ""),
             "open_registration": manifest.get("open_registration", False),
         }

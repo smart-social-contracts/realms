@@ -80,11 +80,11 @@ class TestRealmFederationFields:
         """Test that existing Realm fields still work after federation additions."""
         r = Realm(
             name="Legacy Realm",
-            description="Existing realm",
+            manifesto="Existing realm",
             status=RealmStatus.ALPHA,
         )
         assert r.name == "Legacy Realm"
-        assert r.description == "Existing realm"
+        assert r.manifesto == "Existing realm"
         assert r.status == RealmStatus.ALPHA
 
 

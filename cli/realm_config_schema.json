@@ -6,7 +6,7 @@
   "properties": {
     "realm": {
       "type": "object",
-      "required": ["id", "name", "description", "admin_principal"],
+      "required": ["id", "name", "manifesto", "admin_principal"],
       "properties": {
         "id": {
           "type": "string",
@@ -17,9 +17,9 @@
           "type": "string",
           "description": "Human-readable name of the realm"
         },
-        "description": {
+        "manifesto": {
           "type": "string",
-          "description": "Description of the realm's purpose"
+          "description": "Manifesto of the realm's purpose"
         },
         "admin_principal": {
           "type": "string",

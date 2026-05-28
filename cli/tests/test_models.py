@@ -20,7 +20,7 @@ class TestRealmMetadata:
         metadata = RealmMetadata(
             id="test_realm",
             name="Test Realm",
-            description="A test realm",
+            manifesto="A test realm",
             admin_principal="2vxsx-fae",
         )
         assert metadata.id == "test_realm"
@@ -33,7 +33,7 @@ class TestRealmMetadata:
             RealmMetadata(
                 id="test-realm",  # hyphens not allowed
                 name="Test Realm",
-                description="A test realm",
+                manifesto="A test realm",
                 admin_principal="2vxsx-fae",
             )
 
@@ -45,7 +45,7 @@ class TestRealmMetadata:
             metadata = RealmMetadata(
                 id=realm_id,
                 name="Test Realm",
-                description="A test realm",
+                manifesto="A test realm",
                 admin_principal="2vxsx-fae",
             )
             assert metadata.id == realm_id
@@ -136,7 +136,7 @@ class TestRealmConfig:
             "realm": {
                 "id": "test_realm",
                 "name": "Test Realm",
-                "description": "A test realm",
+                "manifesto": "A test realm",
                 "admin_principal": "2vxsx-fae",
             },
             "deployment": {"network": "local"},
@@ -154,7 +154,7 @@ class TestRealmConfig:
             "realm": {
                 "id": "test_realm",
                 "name": "Test Realm",
-                "description": "A test realm",
+                "manifesto": "A test realm",
                 "admin_principal": "2vxsx-fae",
             },
             "deployment": {"network": "local"},
@@ -177,7 +177,7 @@ class TestRealmConfig:
                 "realm": {
                     "id": "test_realm",
                     "name": "Test Realm",
-                    "description": "A test realm",
+                    "manifesto": "A test realm",
                     "admin_principal": "2vxsx-fae",
                 },
                 "deployment": {"network": "local"},

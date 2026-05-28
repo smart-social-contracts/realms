@@ -47,8 +47,8 @@
   // Get version from meta tag
   let version = '';
   
-  // Description tooltip state
-  let activeDescriptionRealm = null;
+  // Manifesto tooltip state
+  let activeManifestoRealm = null;
   let showLanguageMenu = false;
   
   // Auth state
@@ -137,11 +137,11 @@
   }
 
   async function fetchRealmDetails() {
-    // Fetch details (user counts, description, logo) from each realm's backend via Candid
+    // Fetch details (user counts, manifesto, logo) from each realm's backend via Candid
     const { Actor, HttpAgent } = await import('@dfinity/agent');
     const { Principal } = await import('@dfinity/principal');
     
-    // IDL for the status method - includes users_count and realm_description
+    // IDL for the status method - includes users_count and realm_manifesto
     const { IDL } = await import('@dfinity/candid');
     
     const statusIdlFactory = ({ IDL }) => {
@@ -165,7 +165,7 @@
         'users_count': IDL.Nat,
         'trades_count': IDL.Nat,
         'realm_name': IDL.Text,
-        'realm_description': IDL.Text,
+        'realm_manifesto': IDL.Text,
         'realm_welcome_message': IDL.Text,
         'user_profiles_count': IDL.Nat,
       });
@@ -205,12 +205,12 @@
             const statusData = response.data.status;
             console.log(`Realm details for ${realm.id}:`, {
               realm_name: statusData.realm_name,
-              realm_description: statusData.realm_description,
+              realm_manifesto: statusData.realm_manifesto,
             });
             return { 
               id: realm.id, 
               users_count: Number(statusData.users_count),
-              description: statusData.realm_description || '',
+              manifesto: statusData.realm_manifesto || '',
               realm_name: statusData.realm_name || '',
             };
           } else {
@@ -226,9 +226,9 @@
     // Update realms with fetched details
     updates.forEach(result => {
       if (result.status === 'fulfilled' && result.value) {
-        const { id, users_count, description, realm_name } = result.value;
-        realms = realms.map(r => r.id === id ? { ...r, users_count, description, realm_name } : r);
-        filteredRealms = filteredRealms.map(r => r.id === id ? { ...r, users_count, description, realm_name } : r);
+        const { id, users_count, manifesto, realm_name } = result.value;
+        realms = realms.map(r => r.id === id ? { ...r, users_count, manifesto, realm_name } : r);
+        filteredRealms = filteredRealms.map(r => r.id === id ? { ...r, users_count, manifesto, realm_name } : r);
       }
     });
   }
@@ -1020,17 +1020,17 @@
     </div>
   {/if}
 
-  <!-- Description Modal -->
-  {#if activeDescriptionRealm}
-    <div class="description-modal-overlay" on:click={() => activeDescriptionRealm = null}>
-      <div class="description-modal" on:click|stopPropagation>
-        <button class="description-modal-close" on:click={() => activeDescriptionRealm = null}>
+  <!-- Manifesto Modal -->
+  {#if activeManifestoRealm}
+    <div class="manifesto-modal-overlay" on:click={() => activeManifestoRealm = null}>
+      <div class="manifesto-modal" on:click|stopPropagation>
+        <button class="manifesto-modal-close" on:click={() => activeManifestoRealm = null}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18 6L6 18M6 6l12 12"></path>
           </svg>
         </button>
-        <h3 class="description-modal-title">{activeDescriptionRealm.name}</h3>
-        <p class="description-modal-text">{activeDescriptionRealm.description}</p>
+        <h3 class="manifesto-modal-title">{activeManifestoRealm.name}</h3>
+        <p class="manifesto-modal-text">{activeManifestoRealm.manifesto}</p>
       </div>
     </div>
   {/if}
@@ -1102,15 +1102,15 @@
               <div class="realm-content">
                 <h3 class="realm-name">{realm.name || realm.realm_name}</h3>
                 
-                {#if realm.description}
+                {#if realm.manifesto}
                   <p 
-                    class="realm-description" 
-                    title={realm.description}
-                    on:click={() => activeDescriptionRealm = { id: realm.id, name: realm.name || realm.realm_name, description: realm.description }}
+                    class="realm-manifesto" 
+                    title={realm.manifesto}
+                    on:click={() => activeManifestoRealm = { id: realm.id, name: realm.name || realm.realm_name, manifesto: realm.manifesto }}
                     role="button"
                     tabindex="0"
                   >
-                    {realm.description}
+                    {realm.manifesto}
                   </p>
                 {/if}
                 
@@ -1946,7 +1946,7 @@
     font-weight: 600;
   }
 
-  .realm-description {
+  .realm-manifesto {
     margin: 0 0 1rem;
     font-size: 0.85rem;
     color: #525252;
@@ -1961,11 +1961,11 @@
     transition: color 0.15s ease;
   }
   
-  .realm-description:hover {
+  .realm-manifesto:hover {
     color: #171717;
   }
   
-  .description-modal-overlay {
+  .manifesto-modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -1979,7 +1979,7 @@
     padding: 1rem;
   }
   
-  .description-modal {
+  .manifesto-modal {
     background: white;
     border-radius: 1rem;
     padding: 1.5rem;
@@ -1991,7 +1991,7 @@
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
   }
   
-  .description-modal-close {
+  .manifesto-modal-close {
     position: absolute;
     top: 1rem;
     right: 1rem;
@@ -2008,12 +2008,12 @@
     transition: all 0.15s ease;
   }
   
-  .description-modal-close:hover {
+  .manifesto-modal-close:hover {
     background: #E5E5E5;
     color: #171717;
   }
   
-  .description-modal-title {
+  .manifesto-modal-title {
     margin: 0 0 1rem;
     font-size: 1.25rem;
     font-weight: 600;
@@ -2021,7 +2021,7 @@
     padding-right: 2rem;
   }
   
-  .description-modal-text {
+  .manifesto-modal-text {
     margin: 0;
     font-size: 0.95rem;
     color: #525252;

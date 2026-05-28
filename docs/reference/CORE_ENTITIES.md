@@ -367,14 +367,14 @@ from ggg import Realm
 
 realm = Realm(
     name="Demo Governance Realm",
-    description="A realm for digital governance",
+    manifesto="A realm for digital governance",
     principal_id="rrkah-fqaaa-...",
     status="active",
     governance_type="democratic"
 )
 ```
 
-**Fields:** `name`, `description`, `principal_id`, `status`, `governance_type`, `population`, `organization_count`, `settings`
+**Fields:** `name`, `manifesto`, `principal_id`, `status`, `governance_type`, `population`, `organization_count`, `settings`
 
 #### **Registry**
 External registry entry.

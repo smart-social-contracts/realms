@@ -42,7 +42,7 @@ export const idlFactory = ({ IDL }) => {
     'commit_datetime' : IDL.Text,
     'users_count' : IDL.Nat,
     'parent_realm_canister_id' : IDL.Text,
-    'realm_description' : IDL.Text,
+    'realm_manifesto' : IDL.Text,
     'trades_count' : IDL.Nat,
     'accounting_currency' : IDL.Text,
     'quarters' : IDL.Vec(QuarterInfoRecord),

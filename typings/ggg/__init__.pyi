@@ -908,8 +908,8 @@ class Realm(Entity):
 
     name: Optional[str]
     """Realm name (min 2, max 256 chars)"""
-    description: Optional[str]
-    """Realm description (max 256 chars)"""
+    manifesto: Optional[str]
+    """Realm manifesto (max 256 chars)"""
     welcome_message: Optional[str]
     """Welcome message (max 1024 chars)"""
     calendar: Optional["Calendar"]
@@ -923,7 +923,7 @@ class Realm(Entity):
     principal_id: Optional[str]
     """Canister principal ID (max 64 chars)"""
 
-    def __init__(self, *, name: Optional[str] = ..., description: Optional[str] = ..., welcome_message: Optional[str] = ..., accounting_currency: Optional[str] = ..., accounting_currency_decimals: Optional[int] = ..., principal_id: Optional[str] = ..., **kwargs) -> None: ...
+    def __init__(self, *, name: Optional[str] = ..., manifesto: Optional[str] = ..., welcome_message: Optional[str] = ..., accounting_currency: Optional[str] = ..., accounting_currency_decimals: Optional[int] = ..., principal_id: Optional[str] = ..., **kwargs) -> None: ...
     @classmethod
     def instances(cls) -> List["Realm"]: ...
     @classmethod

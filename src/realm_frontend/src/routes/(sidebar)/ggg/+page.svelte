@@ -405,7 +405,7 @@
               🏛️ {data.realms[0].name || 'Nova Republic'}
             </h1>
             <p class="text-lg text-gray-600 max-w-2xl mx-auto">
-              {JSON.parse(data.realms[0].description || '{}').description || data.realms[0].description || 'A progressive digital sovereign realm pioneering governance of digital assets, identity, and social contracts'}
+              {JSON.parse(data.realms[0].manifesto || '{}').manifesto || data.realms[0].manifesto || 'A progressive digital sovereign realm pioneering governance of digital assets, identity, and social contracts'}
             </p>
           </div>
         {:else}

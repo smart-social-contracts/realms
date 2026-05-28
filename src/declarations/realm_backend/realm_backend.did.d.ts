@@ -704,7 +704,7 @@ export interface StatusRecord {
   'commit_datetime' : string,
   'users_count' : bigint,
   'parent_realm_canister_id' : string,
-  'realm_description' : string,
+  'realm_manifesto' : string,
   'trades_count' : bigint,
   'accounting_currency' : string,
   'quarters' : Array<QuarterInfoRecord>,

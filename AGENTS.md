@@ -210,6 +210,40 @@ scripts/deploy_local_dev.sh -s .realms/realm_* -b
 
 Runtime extension bundles load dynamically — no full frontend redeploy needed, only file_registry upload + install.
 
+### Local Extension Dev Server (instant feedback)
+
+For visual iteration on runtime extension UIs without deploying. Edit the Svelte component, see changes instantly in the browser.
+
+**How it works:** A local Vite dev server renders the same `PublicDashboard.svelte` that gets deployed to the canister. A thin dev harness (`index.html` + `dev.ts`) provides the wrapper the canister normally provides: nav bar, layout, Tailwind CSS, and a real ICP agent that fetches live data from the test canister. Images (`/custom/logo.png`, `/custom/background.png`) are proxied from the real canister. None of the dev files affect the production build.
+
+**Setup (once):**
+
+```bash
+cd extensions/extensions/<ext_id>/frontend-rt
+npm install
+```
+
+**Run:**
+
+```bash
+npm run dev
+```
+
+Opens on `http://localhost:5555` (or next available port). Edit `src/PublicDashboard.svelte`, save, see changes instantly. When happy, deploy with the fast remote deploy below.
+
+**Key files (dev-only, not included in production build):**
+
+| File | Purpose |
+|------|---------|
+| `index.html` | Mimics the realm shell (nav bar, scroll container, layout) |
+| `src/dev.ts` | Creates a real ICP agent pointing at the test canister |
+| `vite.dev.config.ts` | Vite app mode + image proxy + Tailwind + polling watcher |
+| `src/realm_backend.did.js` | Candid IDL for the backend canister |
+
+**Workflow:** `edit → see locally → happy? → deploy to IC`
+
+---
+
 ### Fast Remote Extension Deploy (~26s)
 
 For iterating on runtime extension bundles against test canisters without CI. No git commit required — edit, deploy, check, repeat. Commit only when the result is correct.
@@ -316,6 +350,7 @@ The first fixes the color panic, the second suppresses the plaintext identity wa
 
 ## Rules
 
+- **Visually verify every UI change before reporting back.** After deploying a frontend or extension change, open the page in the browser and confirm the result matches the requirements. Do not report completion until you have checked the deployed page yourself. If the visual check reveals issues, fix and redeploy in a loop until the result is correct.
 - Do not commit unless explicitly told to do so.
 - Always use `deploy_mode=upgrade` for production/test deploys.
 - Always scope deploys as narrowly as possible:

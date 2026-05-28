@@ -29,7 +29,7 @@ export interface NotificationItem {
 export interface RealmInfo {
 	name: string;
 	welcomeMessage: string;
-	description: string;
+	manifesto: string;
 	registries: { canister_id: string; canister_type: string }[];
 	quarters: { name: string; canister_id: string; population: number; status: string }[];
 	isQuarter: boolean;
@@ -76,7 +76,7 @@ export interface RealmExtensionContext {
 	/** The user's profile tags (e.g. ["member", "admin"]). Empty while loading or anonymous. */
 	userProfiles: Readable<string[]>;
 
-	/** Realm metadata (name, logo, description, quarters, etc.). */
+	/** Realm metadata (name, logo, manifesto, quarters, etc.). */
 	realmInfo: Readable<RealmInfo>;
 	/** Static config values (canister IDs for ckBTC, token backend, etc.). */
 	config: {

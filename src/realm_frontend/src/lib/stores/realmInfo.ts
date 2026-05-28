@@ -16,7 +16,7 @@ interface QuarterInfo {
 interface RealmInfo {
 	name: string;
 	welcomeMessage: string;
-	description: string;
+	manifesto: string;
 	openRegistration: boolean;
 	registries: CanisterInfo[];
 	quarters: QuarterInfo[];
@@ -38,7 +38,7 @@ const createRealmInfoStore = () => {
 	const { subscribe, set, update } = writable<RealmInfo>({
 		name: '',
 		welcomeMessage: '',
-		description: '',
+		manifesto: '',
 		openRegistration: false,
 		registries: [],
 		quarters: [],
@@ -75,7 +75,7 @@ const createRealmInfoStore = () => {
 						...state,
 						name: status.realm_name || '',
 						welcomeMessage: status.realm_welcome_message || '',
-						description: status.realm_description || '',
+						manifesto: status.realm_manifesto || '',
 						openRegistration: status.open_registration || false,
 						registries: status.registries || [],
 						quarters: status.quarters || [],
@@ -114,8 +114,8 @@ export const realmName = derived(realmInfo, $realmInfo => $realmInfo.name);
 // Derived store for welcome message
 export const realmWelcomeMessage = derived(realmInfo, $realmInfo => $realmInfo.welcomeMessage);
 
-// Derived store for realm description
-export const realmDescription = derived(realmInfo, $realmInfo => $realmInfo.description);
+// Derived store for realm manifesto
+export const realmManifesto = derived(realmInfo, $realmInfo => $realmInfo.manifesto);
 
 // Derived store for open registration flag
 export const realmOpenRegistration = derived(realmInfo, $realmInfo => $realmInfo.openRegistration);

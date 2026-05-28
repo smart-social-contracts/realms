@@ -6,7 +6,7 @@
   import { backend, backendReady, initBackendWithIdentity, setActiveQuarter } from '$lib/canisters.js';
   import { loadUserProfiles, hasJoined, profilesLoading } from '$lib/stores/profiles';
   import { activeQuarterId } from '$lib/stores/quarters';
-  import { realmInfo, realmName as realmNameStore, realmWelcomeMessage, realmDescription, realmOpenRegistration, testMode, testModeIIBypass, testModeUserSelfRegistration, testModeSkipTerms } from '$lib/stores/realmInfo';
+  import { realmInfo, realmName as realmNameStore, realmWelcomeMessage, realmManifesto, realmOpenRegistration, testMode, testModeIIBypass, testModeUserSelfRegistration, testModeSkipTerms } from '$lib/stores/realmInfo';
   import { cn } from '$lib/theme/utilities';
   import { _ } from 'svelte-i18n';
   
@@ -302,9 +302,9 @@
           </p>
         {/if}
         
-        {#if $realmDescription}
+        {#if $realmManifesto}
           <p class="text-lg text-white/90">
-            {$realmDescription}
+            {$realmManifesto}
           </p>
         {/if}
       </div>

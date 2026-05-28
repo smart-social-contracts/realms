@@ -11,7 +11,7 @@ class RealmMetadata(BaseModel):
 
     id: str = Field(..., description="Unique identifier for the realm")
     name: str = Field(..., description="Human-readable name of the realm")
-    description: str = Field(..., description="Description of the realm's purpose")
+    manifesto: str = Field(..., description="Manifesto of the realm's purpose")
     admin_principal: str = Field(
         ..., description="Principal ID of the realm administrator"
     )

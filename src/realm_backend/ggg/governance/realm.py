@@ -16,7 +16,7 @@ class RealmStatus:
 class Realm(Entity, TimestampedMixin):
     __alias__ = "name"
     name = String(min_length=2, max_length=256)
-    description = String(max_length=256)
+    manifesto = String(max_length=256)
     welcome_message = String(max_length=1024)  # Welcome message displayed on landing page
     status = String(max_length=STATUS_MAX_LENGTH, default=RealmStatus.ALPHA)
     manifest_data = String(max_length=4096, default="{}")

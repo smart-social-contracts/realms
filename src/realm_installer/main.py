@@ -398,7 +398,7 @@ def schedule_registration(job_id_val: str):
             if backend_id and realm_info:
                 config = {
                     "name": realm_name,
-                    "description": realm_info.get("description", ""),
+                    "manifesto": realm_info.get("manifesto", ""),
                     "welcome_message": realm_info.get("welcome_message", ""),
                     "open_registration": realm_info.get("open_registration", False),
                 }

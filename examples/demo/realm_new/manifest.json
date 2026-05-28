@@ -1,7 +1,7 @@
 {
   "type": "realm",
   "name": "NewRealm",
-  "description": "A new realm",
+  "manifesto": "A new realm",
   "welcome_message": "Welcome to NewRealm",
   "codex": {
     "package": {

@@ -88,4 +88,4 @@ jobs:
             --network "${{ inputs.network }}" \
             --version "${{ inputs.artifact_version || 'latest' }}" \
             --display-name "CI Test Realm" \
-            --description "Automated test realm — created by test-deploy-new-realm.yml"
+            --manifesto "Automated test realm — created by test-deploy-new-realm.yml"

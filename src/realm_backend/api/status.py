@@ -62,7 +62,7 @@ def get_status() -> "dict[str, Any]":
 
     realm_name = ""
     realm_welcome_message = ""
-    realm_description = ""
+    realm_manifesto = ""
     realm_open_registration = False
     logo_url = ""
     background_image_url = ""
@@ -73,7 +73,7 @@ def get_status() -> "dict[str, Any]":
         if first_realm:
             realm_name = first_realm.name or ""
             realm_welcome_message = getattr(first_realm, "welcome_message", None) or ""
-            realm_description = getattr(first_realm, "description", None) or ""
+            realm_manifesto = getattr(first_realm, "manifesto", None) or ""
             realm_open_registration = bool(getattr(first_realm, "open_registration", False))
             logo_url = getattr(first_realm, "logo_url", None) or ""
             background_image_url = getattr(first_realm, "background_image_url", None) or ""
@@ -296,7 +296,7 @@ def get_status() -> "dict[str, Any]":
         "status": "ok",
         "realm_name": realm_name,
         "realm_welcome_message": realm_welcome_message,
-        "realm_description": realm_description,
+        "realm_manifesto": realm_manifesto,
         "open_registration": realm_open_registration,
         "users_count": users_count,
         "organizations_count": organizations_count,

@@ -234,18 +234,18 @@
 
   // Available languages with translated placeholders
   const AVAILABLE_LANGUAGES = [
-    { code: 'en', name: 'English', native: 'English', descPlaceholder: "Describe your realm's vision, values, and purpose...", welcomePlaceholder: "Write a welcoming message for new citizens..." },
-    { code: 'es', name: 'Spanish', native: 'Español', descPlaceholder: "Describe la visión, los valores y el propósito de tu reino...", welcomePlaceholder: "Escribe un mensaje de bienvenida para los nuevos ciudadanos..." },
-    { code: 'fr', name: 'French', native: 'Français', descPlaceholder: "Décrivez la vision, les valeurs et la mission de votre royaume...", welcomePlaceholder: "Rédigez un message de bienvenue pour les nouveaux citoyens..." },
-    { code: 'de', name: 'German', native: 'Deutsch', descPlaceholder: "Beschreiben Sie die Vision, Werte und den Zweck Ihres Reiches...", welcomePlaceholder: "Schreiben Sie eine Willkommensnachricht für neue Bürger..." },
-    { code: 'it', name: 'Italian', native: 'Italiano', descPlaceholder: "Descrivi la visione, i valori e lo scopo del tuo regno...", welcomePlaceholder: "Scrivi un messaggio di benvenuto per i nuovi cittadini..." },
-    { code: 'pt', name: 'Portuguese', native: 'Português', descPlaceholder: "Descreva a visão, os valores e o propósito do seu reino...", welcomePlaceholder: "Escreva uma mensagem de boas-vindas para os novos cidadãos..." },
-    { code: 'zh', name: 'Chinese', native: '中文', descPlaceholder: "描述您领域的愿景、价值观和目标...", welcomePlaceholder: "为新公民写一条欢迎信息..." },
-    { code: 'ja', name: 'Japanese', native: '日本語', descPlaceholder: "あなたの領域のビジョン、価値観、目的を説明してください...", welcomePlaceholder: "新しい市民へのウェルカムメッセージを書いてください..." },
-    { code: 'ko', name: 'Korean', native: '한국어', descPlaceholder: "왕국의 비전, 가치관, 목적을 설명하세요...", welcomePlaceholder: "새로운 시민들을 위한 환영 메시지를 작성하세요..." },
-    { code: 'ar', name: 'Arabic', native: 'العربية', descPlaceholder: "صف رؤية مملكتك وقيمها وهدفها...", welcomePlaceholder: "اكتب رسالة ترحيب للمواطنين الجدد..." },
-    { code: 'hi', name: 'Hindi', native: 'हिन्दी', descPlaceholder: "अपने राज्य की दृष्टि, मूल्यों और उद्देश्य का वर्णन करें...", welcomePlaceholder: "नए नागरिकों के लिए स्वागत संदेश लिखें..." },
-    { code: 'ru', name: 'Russian', native: 'Русский', descPlaceholder: "Опишите видение, ценности и цели вашего королевства...", welcomePlaceholder: "Напишите приветственное сообщение для новых граждан..." }
+    { code: 'en', name: 'English', native: 'English', manifestoPlaceholder: "Share your realm's vision, values, and purpose...", welcomePlaceholder: "Write a welcoming message for new citizens..." },
+    { code: 'es', name: 'Spanish', native: 'Español', manifestoPlaceholder: "Describe la visión, los valores y el propósito de tu reino...", welcomePlaceholder: "Escribe un mensaje de bienvenida para los nuevos ciudadanos..." },
+    { code: 'fr', name: 'French', native: 'Français', manifestoPlaceholder: "Décrivez la vision, les valeurs et la mission de votre royaume...", welcomePlaceholder: "Rédigez un message de bienvenue pour les nouveaux citoyens..." },
+    { code: 'de', name: 'German', native: 'Deutsch', manifestoPlaceholder: "Beschreiben Sie die Vision, Werte und den Zweck Ihres Reiches...", welcomePlaceholder: "Schreiben Sie eine Willkommensnachricht für neue Bürger..." },
+    { code: 'it', name: 'Italian', native: 'Italiano', manifestoPlaceholder: "Descrivi la visione, i valori e lo scopo del tuo regno...", welcomePlaceholder: "Scrivi un messaggio di benvenuto per i nuovi cittadini..." },
+    { code: 'pt', name: 'Portuguese', native: 'Português', manifestoPlaceholder: "Descreva a visão, os valores e o propósito do seu reino...", welcomePlaceholder: "Escreva uma mensagem de boas-vindas para os novos cidadãos..." },
+    { code: 'zh', name: 'Chinese', native: '中文', manifestoPlaceholder: "描述您领域的愿景、价值观和目标...", welcomePlaceholder: "为新公民写一条欢迎信息..." },
+    { code: 'ja', name: 'Japanese', native: '日本語', manifestoPlaceholder: "あなたの領域のビジョン、価値観、目的を説明してください...", welcomePlaceholder: "新しい市民へのウェルカムメッセージを書いてください..." },
+    { code: 'ko', name: 'Korean', native: '한국어', manifestoPlaceholder: "왕국의 비전, 가치관, 목적을 설명하세요...", welcomePlaceholder: "새로운 시민들을 위한 환영 메시지를 작성하세요..." },
+    { code: 'ar', name: 'Arabic', native: 'العربية', manifestoPlaceholder: "صف رؤية مملكتك وقيمها وهدفها...", welcomePlaceholder: "اكتب رسالة ترحيب للمواطنين الجدد..." },
+    { code: 'hi', name: 'Hindi', native: 'हिन्दी', manifestoPlaceholder: "अपने राज्य की दृष्टि, मूल्यों और उद्देश्य का वर्णन करें...", welcomePlaceholder: "नए नागरिकों के लिए स्वागत संदेश लिखें..." },
+    { code: 'ru', name: 'Russian', native: 'Русский', manifestoPlaceholder: "Опишите видение, ценности и цели вашего королевства...", welcomePlaceholder: "Напишите приветственное сообщение для новых граждан..." }
   ];
 
   // Available governance assistants (AI bots)
@@ -296,7 +296,7 @@
   // Form data
   let formData = {
     name: '',
-    descriptions: { en: '' }, // Language-keyed descriptions
+    manifestos: { en: '' }, // Language-keyed manifestos
     languages: ['en'], // Default to English
     logo: null,
     logoPreview: '',
@@ -390,13 +390,13 @@
       if (formData.languages.length === 0) {
         errors.languages = 'At least one language is required';
       }
-      // Validate descriptions for each language
+      // Validate manifestos for each language
       for (const langCode of formData.languages) {
-        const desc = formData.descriptions[langCode] || '';
+        const desc = formData.manifestos[langCode] || '';
         if (!desc.trim()) {
-          errors[`description_${langCode}`] = 'Description is required';
+          errors[`manifesto_${langCode}`] = 'Manifesto is required';
         } else if (desc.length < 20) {
-          errors[`description_${langCode}`] = 'Description must be at least 20 characters';
+          errors[`manifesto_${langCode}`] = 'Manifesto must be at least 20 characters';
         }
       }
     }
@@ -538,7 +538,7 @@
       type: 'realm',
       name: formData.name,
       languages: formData.languages,
-      descriptions: formData.descriptions,
+      manifestos: formData.manifestos,
       welcome_messages: formData.welcome_messages,
       open_registration: formData.open_registration
     };
@@ -815,12 +815,12 @@
                   if (formData.languages.includes(lang.code)) {
                     if (formData.languages.length > 1) {
                       formData.languages = formData.languages.filter(l => l !== lang.code);
-                      delete formData.descriptions[lang.code];
+                      delete formData.manifestos[lang.code];
                       delete formData.welcome_messages[lang.code];
                     }
                   } else {
                     formData.languages = [...formData.languages, lang.code];
-                    formData.descriptions[lang.code] = '';
+                    formData.manifestos[lang.code] = '';
                     formData.welcome_messages[lang.code] = '';
                   }
                 }}
@@ -839,9 +839,9 @@
         </div>
 
         <div class="form-group">
-          <label>Description <span class="required">*</span></label>
+          <label>Manifesto <span class="required">*</span></label>
           {#if formData.languages.length > 1}
-            <p class="hint" style="margin-bottom: 0.75rem;">Enter description in each supported language</p>
+            <p class="hint" style="margin-bottom: 0.75rem;">Enter manifesto in each supported language</p>
           {/if}
           <div class="multilang-inputs">
             {#each formData.languages as langCode}
@@ -854,14 +854,14 @@
                   </div>
                 {/if}
                 <textarea 
-                  id="description_{langCode}" 
-                  bind:value={formData.descriptions[langCode]}
-                  placeholder={lang?.descPlaceholder || "Describe your realm's vision, values, and purpose..."}
+                  id="manifesto_{langCode}" 
+                  bind:value={formData.manifestos[langCode]}
+                  placeholder={lang?.manifestoPlaceholder || "Share your realm's vision, values, and purpose..."}
                   rows="3"
-                  class:error={errors[`description_${langCode}`]}
+                  class:error={errors[`manifesto_${langCode}`]}
                 ></textarea>
-                {#if errors[`description_${langCode}`]}
-                  <span class="error-message">{errors[`description_${langCode}`]}</span>
+                {#if errors[`manifesto_${langCode}`]}
+                  <span class="error-message">{errors[`manifesto_${langCode}`]}</span>
                 {/if}
               </div>
             {/each}

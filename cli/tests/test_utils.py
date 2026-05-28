@@ -25,7 +25,7 @@ class TestConfigUtils:
             "realm": {
                 "id": "test",
                 "name": "Test",
-                "description": "Test realm",
+                "manifesto": "Test realm",
                 "admin_principal": "2vxsx-fae",
             },
             "deployment": {"network": "local"},

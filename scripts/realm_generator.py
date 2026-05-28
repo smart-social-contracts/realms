@@ -806,7 +806,7 @@ class RealmGenerator:
         realm = Realm(
             id=self.realm_id,
             name=realm_name,
-            description=f"Generated demo realm with {members} members and {organizations} organizations",
+            manifesto=f"Generated demo realm with {members} members and {organizations} organizations",
             created_at=datetime.now().isoformat(),
             status="active",
             governance_type="democratic",

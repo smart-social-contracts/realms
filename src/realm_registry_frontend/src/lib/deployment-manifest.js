@@ -73,12 +73,12 @@ export async function buildRealmDeploymentManifest(formData, network, brandingUr
   const name = (formData.name || '').trim();
   const lang = (formData.languages && formData.languages[0]) || 'en';
 
-  let description = (formData.descriptions && formData.descriptions[lang]) || '';
-  if (!description && formData.descriptions) {
-    description =
-      Object.values(formData.descriptions).find((s) => s && String(s).trim()) || '';
+  let manifesto = (formData.manifestos && formData.manifestos[lang]) || '';
+  if (!manifesto && formData.manifestos) {
+    manifesto =
+      Object.values(formData.manifestos).find((s) => s && String(s).trim()) || '';
   }
-  description = String(description).trim() || `Welcome to ${name}.`;
+  manifesto = String(manifesto).trim() || `Welcome to ${name}.`;
 
   let welcome_message = (formData.welcome_messages && formData.welcome_messages[lang]) || '';
   if (!welcome_message && formData.welcome_messages) {
@@ -91,7 +91,7 @@ export async function buildRealmDeploymentManifest(formData, network, brandingUr
   const realm = {
     name,
     display_name: name,
-    description,
+    manifesto,
     welcome_message,
     open_registration: !!formData.open_registration,
     extensions: Array.isArray(formData.extensions) ? [...formData.extensions] : ['all'],
