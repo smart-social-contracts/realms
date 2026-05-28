@@ -210,6 +210,31 @@ scripts/deploy_local_dev.sh -s .realms/realm_* -b
 
 Runtime extension bundles load dynamically — no full frontend redeploy needed, only file_registry upload + install.
 
+### Fast Remote Extension Deploy (~90s)
+
+For iterating on runtime extension bundles against test canisters without CI. Requires the `my_dev_identity_1` dfx identity (controller of test canisters).
+
+```bash
+export TERM=xterm
+export DFX_WARNING=-mainnet_plaintext_identity
+dfx identity use my_dev_identity_1
+
+# 1. Build the extension bundle (~4s)
+realms files build --extensions <ext_id>
+
+# 2. Publish to test file registry (~8s)
+realms files publish --network test --extensions-only --extensions <ext_id>
+
+# 3. Deploy to realm (~80s)
+realms mundus deploy deployment-descriptors/test-mundus-layered.yml \
+  --realm agora --canister frontend \
+  --extensions <ext_id> --codices none --version latest
+```
+
+This bypasses CI entirely: edit → build → publish → deploy in ~90s instead of ~8min. No git commit required. When done iterating, commit and push the final version.
+
+**Constraints:** the extension bundle must stay under ~200KB for `files publish` to succeed against the file_registry instruction limit. Keep heavy libraries (leaflet, h3-js) loaded at runtime via `fetch()` + `eval()` instead of bundling them.
+
 ---
 
 ## Environment Setup
