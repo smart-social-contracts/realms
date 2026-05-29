@@ -2,12 +2,19 @@
 	import MetaTag from '../../utils/MetaTag.svelte';
 	import IdentityCard from '../../utils/settings/IdentityCard.svelte';
 	import { imagesPath } from '../../utils/variables';
-	import { Avatar, Button, Card, Heading, Input, Label, P, Spinner } from 'flowbite-svelte';
+	import { Avatar, Button, Card, Heading, Input, Label, P, Spinner, Toggle } from 'flowbite-svelte';
 	import { FingerprintOutline } from 'flowbite-svelte-icons';
 	import { backend } from '$lib/canisters';
 	import { onMount } from 'svelte';
+	import { get } from 'svelte/store';
 	import { principal } from '$lib/stores/auth';
-	import { encryptPrivateData, decryptPrivateData } from '$lib/crypto/vetkeys';
+	import { decryptPrivateData } from '$lib/crypto/vetkeys';
+	import {
+		buildSharePlan,
+		decryptOwnPrivateData,
+		deriveMyVetKey,
+		PRIVATE_DATA_SCOPE
+	} from '$lib/crypto/sharing';
 
 	const path: string = '/identities';
 	const description: string = 'Manage your digital identities';
@@ -42,6 +49,13 @@
 	let encryptionAvailable = false;
 	let encryptionError = '';
 
+	// Data sharing (consent-based, via vetKey crypto groups — issue #215)
+	const MEMBER_DATA_READERS_GROUP = 'member_data_readers';
+	let shareWithAdmins = false;
+	let sharingLoaded = false;
+	let adminReaders: string[] = [];
+	let currentlySharedWith: string[] = [];
+
 	const privateDataFields = [
 		{ key: 'first_name', label: 'First Name', type: 'text' },
 		{ key: 'last_name', label: 'Last Name', type: 'text' },
@@ -58,7 +72,19 @@
 		loadPublicData();
 		loadPrivateData();
 		loadIdentityProviders();
+		loadSharingStatus();
 	});
+
+	async function probeEncryption(): Promise<boolean> {
+		try {
+			await deriveMyVetKey(backend);
+			return true;
+		} catch (e) {
+			console.warn('Encryption probe failed:', e);
+			encryptionError = 'Encryption not available on this subnet';
+			return false;
+		}
+	}
 
 	async function loadPublicData() {
 		try {
@@ -80,56 +106,66 @@
 			const statusResponse = await backend.get_my_user_status();
 			if (statusResponse?.success && statusResponse.data?.userGet) {
 				const u = statusResponse.data.userGet;
+				const owner = get(principal) as string;
 				if (u.private_data) {
-					try {
-						const decrypted = await decryptPrivateData(backend, u.private_data);
-						if (decrypted) {
-							privateData = decrypted;
+					// 1. Preferred: DEK + envelope model (supports sharing).
+					const decrypted = await decryptOwnPrivateData(backend, owner, u.private_data);
+					if (decrypted) {
+						privateData = decrypted;
+						encryptionAvailable = true;
+					} else {
+						// 2. Legacy: data encrypted directly with the user's vetKey.
+						let legacy: Record<string, string> | null = null;
+						try {
+							legacy = await decryptPrivateData(backend, u.private_data);
+						} catch (decErr) {
+							console.warn('Legacy vetKeys decryption failed:', decErr);
+						}
+						if (legacy) {
+							privateData = legacy;
 							encryptionAvailable = true;
 						} else {
+							// 3. Plaintext / unknown — surface raw JSON if parseable.
 							try {
 								privateData = JSON.parse(u.private_data);
 							} catch {
 								privateData = {};
 							}
-							try {
-								await encryptPrivateData(backend, {});
-								encryptionAvailable = true;
-							} catch (probeErr) {
-								console.warn('Encryption probe failed:', probeErr);
-								encryptionAvailable = false;
-								encryptionError = 'Encryption not available on this subnet';
-							}
-						}
-					} catch (decErr) {
-						console.warn('vetKeys decryption failed, falling back to plaintext:', decErr);
-						try {
-							privateData = JSON.parse(u.private_data);
-						} catch {
-							privateData = {};
-						}
-						try {
-							await encryptPrivateData(backend, {});
-							encryptionAvailable = true;
-						} catch (probeErr) {
-							console.warn('Encryption probe failed:', probeErr);
-							encryptionAvailable = false;
-							encryptionError = 'Encryption not available on this subnet';
+							encryptionAvailable = await probeEncryption();
 						}
 					}
 				} else {
-					try {
-						await encryptPrivateData(backend, {});
-						encryptionAvailable = true;
-					} catch {
-						encryptionAvailable = false;
-					}
+					encryptionAvailable = await probeEncryption();
 				}
 			}
 		} catch (err) {
 			console.error('Error loading private data:', err);
 		} finally {
 			privateDataLoaded = true;
+		}
+	}
+
+	async function loadSharingStatus() {
+		try {
+			const owner = get(principal) as string;
+			const scope = PRIVATE_DATA_SCOPE(owner);
+
+			const envResp = await backend.crypto_list_my_scope_envelopes(scope);
+			const envs = envResp?.data?.envelopeList?.envelopes ?? [];
+			currentlySharedWith = envs
+				.map((e: any) => e.principal_id)
+				.filter((p: string) => p && p !== owner);
+
+			const grpResp = await backend.crypto_get_group_members(MEMBER_DATA_READERS_GROUP);
+			const members = grpResp?.data?.groupMembers?.members ?? [];
+			adminReaders = members.map((m: any) => m.principal_id).filter((p: string) => !!p);
+
+			shareWithAdmins =
+				adminReaders.length > 0 && adminReaders.some((a) => currentlySharedWith.includes(a));
+		} catch (e) {
+			console.warn('loadSharingStatus failed:', e);
+		} finally {
+			sharingLoaded = true;
 		}
 	}
 
@@ -205,26 +241,66 @@
 		privateSaving = true;
 		privateMessage = '';
 		try {
-			let payload: string;
-			if (encryptionAvailable) {
-				payload = await encryptPrivateData(backend, privateData);
-			} else {
-				payload = JSON.stringify(privateData);
+			if (!encryptionAvailable) {
+				const response = await backend.update_my_private_data(JSON.stringify(privateData));
+				privateMessage = response?.success
+					? 'Private data saved (unencrypted).'
+					: 'Failed to update private data';
+				return;
 			}
-			const response = await backend.update_my_private_data(payload);
-			if (response?.success) {
-				privateMessage = encryptionAvailable
-					? 'Private data encrypted and saved successfully!'
-					: 'Private data saved (unencrypted).';
-			} else {
+
+			const owner = get(principal) as string;
+			const scope = PRIVATE_DATA_SCOPE(owner);
+			const recipients = shareWithAdmins ? adminReaders : [];
+
+			// Encrypt with a fresh DEK and wrap it for the owner + each recipient.
+			const plan = await buildSharePlan(backend, owner, privateData, recipients);
+
+			const response = await backend.update_my_private_data(plan.ciphertext);
+			if (!response?.success) {
 				privateMessage = 'Failed to update private data';
+				return;
 			}
+
+			// Owner's own envelope (so the new ciphertext stays self-decryptable).
+			await backend.crypto_store_my_envelope(scope, plan.selfWrappedDek);
+
+			// Grant / refresh access for each consented recipient.
+			const granted = new Set<string>();
+			for (const [p, wrapped] of Object.entries(plan.recipientWrappedDeks)) {
+				await backend.crypto_grant_to_my_scope(scope, p, wrapped);
+				granted.add(p);
+			}
+
+			// Revoke anyone previously shared with who is no longer a recipient.
+			for (const p of currentlySharedWith) {
+				if (!granted.has(p)) {
+					try {
+						await backend.crypto_revoke_from_my_scope(scope, p);
+					} catch (e) {
+						console.warn(`Failed to revoke ${p}:`, e);
+					}
+				}
+			}
+			currentlySharedWith = Array.from(granted);
+
+			privateMessage =
+				recipients.length > 0
+					? `Private data encrypted, saved, and shared with ${recipients.length} admin${recipients.length === 1 ? '' : 's'}.`
+					: 'Private data encrypted and saved successfully!';
 		} catch (err) {
 			console.error('Error updating private data:', err);
 			privateMessage = 'Error updating private data';
 		} finally {
 			privateSaving = false;
 		}
+	}
+
+	async function onToggleSharing() {
+		// Persist immediately only if there is no unsaved data churn risk; we
+		// instead re-save the current private data so envelopes match the toggle.
+		if (!encryptionAvailable) return;
+		await savePrivateData();
 	}
 </script>
 
@@ -370,6 +446,60 @@
 					{privateSaving ? 'Saving...' : 'Save'}
 				</Button>
 			</div>
+		{/if}
+	</Card>
+
+	<!-- Data Sharing -->
+	<Card size="xl">
+		<Heading tag="h3" class="mb-2 text-xl font-bold dark:text-white">Data Sharing</Heading>
+		<p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+			Choose whether realm administrators may read your private data. Sharing is
+			consent-based: your data stays encrypted, and access is granted by wrapping
+			your encryption key for each administrator. You can revoke access at any time.
+		</p>
+		{#if !sharingLoaded}
+			<div class="flex justify-center items-center py-6">
+				<Spinner size="6" />
+			</div>
+		{:else if !encryptionAvailable}
+			<div class="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+				<p class="text-sm text-yellow-800 dark:text-yellow-200">
+					Sharing requires encryption, which is not available on this subnet.
+				</p>
+			</div>
+		{:else if adminReaders.length === 0}
+			<div class="p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+				<p class="text-sm text-gray-600 dark:text-gray-300">
+					No administrators are currently configured to receive shared member data.
+				</p>
+			</div>
+		{:else}
+			<div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+				<div>
+					<p class="text-sm font-medium text-gray-900 dark:text-white">
+						Share my private data with realm administrators
+					</p>
+					<p class="text-xs text-gray-500 dark:text-gray-400">
+						{adminReaders.length} administrator{adminReaders.length === 1 ? '' : 's'} would gain read access.
+					</p>
+				</div>
+				<Toggle bind:checked={shareWithAdmins} on:change={onToggleSharing} disabled={privateSaving} />
+			</div>
+			{#if currentlySharedWith.length > 0}
+				<div class="mt-3">
+					<p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
+						Currently shared with
+					</p>
+					<ul class="space-y-1">
+						{#each currentlySharedWith as p}
+							<li class="text-xs font-mono text-gray-600 dark:text-gray-300 break-all">{p}</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
+			{#if privateSaving}
+				<p class="mt-3 text-sm text-gray-500">Updating sharing…</p>
+			{/if}
 		{/if}
 	</Card>
 

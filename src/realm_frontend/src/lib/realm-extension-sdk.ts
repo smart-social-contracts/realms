@@ -112,6 +112,25 @@ export interface RealmExtensionContext {
 		cn: (...classes: (string | undefined | null | false)[]) => string;
 	};
 
+	/**
+	 * Crypto helpers backed by the host's bundled `@dfinity/vetkeys`, so
+	 * extensions can decrypt consent-shared member data without bundling the
+	 * (large) vetKeys library themselves.
+	 */
+	crypto: {
+		/**
+		 * Decrypt a member's private data the caller has been granted access to.
+		 *
+		 * @param wrappedDekHex  The caller's IBE-wrapped DEK (from a KeyEnvelope).
+		 * @param ciphertext     The member's `enc:v=2:...` private-data ciphertext.
+		 * @returns The decrypted key/value object, or null if decryption fails.
+		 */
+		decryptWithEnvelope: (
+			wrappedDekHex: string,
+			ciphertext: string,
+		) => Promise<Record<string, string> | null>;
+	};
+
 	/** Shared UI helpers provided by the host app. */
 	ui: {
 		AccessDenied: import('svelte').Component<{ operation?: string }>;

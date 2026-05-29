@@ -1227,9 +1227,49 @@ def derive_my_vetkey(transport_public_key_hex: text) -> RealmResponse:
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
+@update
+@require(Operations.SELF_UPDATE_PRIVATE_DATA)
+def get_vetkey_public_key_for(target_principal: text) -> RealmResponse:
+    """Get the vetKD derived public key for *another* principal's context.
+
+    The derived public key is public information used only for encryption
+    (IBE). It can safely be returned to any authenticated caller: only the
+    holder of *target_principal*'s vetKey (derivable solely by that principal
+    via ``derive_my_vetkey``) can decrypt data encrypted under this key.
+
+    Members use this to IBE-wrap their data-encryption key (DEK) for each
+    admin they consent to share their private data with.
+    """
+    try:
+        result = yield get_vetkey_public_key(target_principal)
+        if not result["success"]:
+            return RealmResponse(
+                success=False, data=RealmResponseData(error=result["error"])
+            )
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(message=result["public_key_hex"]),
+        )
+    except Exception as e:
+        logger.error(
+            f"Error getting vetkey public key for {target_principal}: "
+            f"{str(e)}\n{traceback.format_exc()}"
+        )
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
 # ---------------------------------------------------------------------------
 # Crypto envelope & group endpoints
 # ---------------------------------------------------------------------------
+
+
+def _caller_owns_scope(scope: str) -> bool:
+    """A member may only manage sharing for scopes they own.
+
+    Owned scopes are namespaced as ``user:<caller_principal>:<...>``.
+    """
+    caller = ic.caller().to_str()
+    return scope.startswith(f"user:{caller}:")
 
 
 @update
@@ -1294,6 +1334,105 @@ def crypto_get_my_scopes() -> CryptoResponse:
         )
     except Exception as e:
         logger.error(f"Error listing scopes: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+@update
+@require(Operations.SELF_UPDATE_PRIVATE_DATA)
+def crypto_grant_to_my_scope(
+    scope: text, target_principal: text, wrapped_dek: text
+) -> CryptoResponse:
+    """Grant another principal access to a scope the caller owns.
+
+    This is the consent mechanism for member data sharing: a member wraps
+    their data-encryption key for the target principal client-side, then
+    stores the resulting envelope here. The caller may only grant access to
+    scopes namespaced under their own principal (``user:<caller>:...``).
+    """
+    try:
+        if not _caller_owns_scope(scope):
+            return CryptoResponse(
+                success=False,
+                data=CryptoResponseData(
+                    error="You can only share scopes that you own"
+                ),
+            )
+        result = crypto_share_principal(scope, target_principal, wrapped_dek)
+        if not result["success"]:
+            return CryptoResponse(
+                success=False, data=CryptoResponseData(error=result["error"])
+            )
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(
+                message=f"Shared scope {scope} with {target_principal}"
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error granting to own scope: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+@update
+@require(Operations.SELF_UPDATE_PRIVATE_DATA)
+def crypto_revoke_from_my_scope(
+    scope: text, target_principal: text
+) -> CryptoResponse:
+    """Revoke a principal's access to a scope the caller owns."""
+    try:
+        if not _caller_owns_scope(scope):
+            return CryptoResponse(
+                success=False,
+                data=CryptoResponseData(
+                    error="You can only revoke access to scopes that you own"
+                ),
+            )
+        result = crypto_revoke_principal(scope, target_principal)
+        if not result["success"]:
+            return CryptoResponse(
+                success=False, data=CryptoResponseData(error=result["error"])
+            )
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(
+                message=f"Revoked {target_principal} from scope {scope}"
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error revoking from own scope: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+@query
+@require(Operations.SELF_UPDATE_PRIVATE_DATA)
+def crypto_list_my_scope_envelopes(scope: text) -> CryptoResponse:
+    """List all principals with access to a scope the caller owns."""
+    try:
+        if not _caller_owns_scope(scope):
+            return CryptoResponse(
+                success=False,
+                data=CryptoResponseData(
+                    error="You can only inspect scopes that you own"
+                ),
+            )
+        result = crypto_list_envelopes(scope)
+        envelopes = Vec["EnvelopeRecord"]()
+        for e in result["envelopes"]:
+            envelopes.append(
+                EnvelopeRecord(
+                    scope=e["scope"],
+                    principal_id=e["principal"],
+                    wrapped_dek=e["wrapped_dek"],
+                )
+            )
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(
+                envelopeList=EnvelopeListRecord(envelopes=envelopes)
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error listing own scope envelopes: {e}\n{traceback.format_exc()}")
         return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
 
 
