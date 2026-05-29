@@ -212,33 +212,33 @@ Runtime extension bundles load dynamically — no full frontend redeploy needed,
 
 ### Local Extension Dev Server (instant feedback)
 
-For visual iteration on runtime extension UIs without deploying. Edit the Svelte component, see changes instantly in the browser.
+For visual iteration on any runtime extension UI without deploying. Works for all 28+ extensions with zero per-extension setup.
 
-**How it works:** A local Vite dev server renders the same `PublicDashboard.svelte` that gets deployed to the canister. A thin dev harness (`index.html` + `dev.ts`) provides the wrapper the canister normally provides: nav bar, layout, Tailwind CSS, and a real ICP agent that fetches live data from the test canister. Images (`/custom/logo.png`, `/custom/background.png`) are proxied from the real canister. None of the dev files affect the production build.
+**How it works:** A shared dev harness (`extensions/dev-server/`) runs a local Vite server that mounts any extension's Svelte component with real data from the test canister. It provides the same wrapper the canister provides: nav bar, layout shell, Tailwind CSS, and a full `RealmExtensionContext` (backend actor, callSync/callAsync, stores). Images are proxied from the real canister. API calls go through `/api` proxy to `icp0.io`, matching the standard ICP dev workflow. None of the dev harness files affect production builds.
 
 **Setup (once):**
 
 ```bash
-cd extensions/extensions/<ext_id>/frontend-rt
-npm install
+cd extensions/dev-server && npm install
 ```
 
-**Run:**
+**Run (from any extension):**
 
 ```bash
+cd extensions/extensions/<ext_id>/frontend-rt
 npm run dev
 ```
 
-Opens on `http://localhost:5555` (or next available port). Edit `src/PublicDashboard.svelte`, save, see changes instantly. When happy, deploy with the fast remote deploy below.
+Or directly:
 
-**Key files (dev-only, not included in production build):**
+```bash
+cd extensions/dev-server
+node bin/dev.js <ext_id>
+```
 
-| File | Purpose |
-|------|---------|
-| `index.html` | Mimics the realm shell (nav bar, scroll container, layout) |
-| `src/dev.ts` | Creates a real ICP agent pointing at the test canister |
-| `vite.dev.config.ts` | Vite app mode + image proxy + Tailwind + polling watcher |
-| `src/realm_backend.did.js` | Candid IDL for the backend canister |
+Opens on `http://localhost:5555`. Edit the extension's Svelte source, save, see changes instantly via HMR. When happy, deploy with the fast remote deploy below.
+
+**Configuration:** Edit `extensions/dev-server/dev-config.json` to point at a different canister or network.
 
 **Workflow:** `edit → see locally → happy? → deploy to IC`
 

@@ -777,6 +777,7 @@ def set_canister_config(
                 "demo_data": "test_mode_demo_data",
                 "skip_terms": "test_mode_skip_terms",
                 "skip_passport_zkproof": "test_mode_skip_passport_zkproof",
+                "skip_authentication": "test_mode_skip_authentication",
             }
             for key, attr in _FLAG_MAP.items():
                 if key in flags:

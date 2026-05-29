@@ -59,6 +59,15 @@ def _check_access(caller_principal: str, operation: str) -> bool:
 
     Returns True if allowed, False otherwise.
     """
+    # 0. Test mode bypass: skip all permission checks when enabled.
+    try:
+        from ggg import Realm
+        realm = Realm.load("1")
+        if realm and getattr(realm, "test_mode_skip_authentication", False):
+            return True
+    except Exception:
+        pass
+
     # 0a. IC-level controllers always allowed. This is critical for
     # layered deployments where realm_installer (a controller) drives
     # post-install bootstrapping (registry registration, codex install,

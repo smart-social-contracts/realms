@@ -67,3 +67,4 @@ class Realm(Entity, TimestampedMixin):
     test_mode_demo_data = Boolean(default=False)
     test_mode_skip_terms = Boolean(default=False)
     test_mode_skip_passport_zkproof = Boolean(default=False)
+    test_mode_skip_authentication = Boolean(default=False)
