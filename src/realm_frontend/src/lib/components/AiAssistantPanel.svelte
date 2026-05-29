@@ -20,6 +20,7 @@
 	import { mountExtension, resolveExtensionVersion, type MountResult } from '$lib/extension-loader';
 	import { loadExtensionTranslation } from '$lib/i18n';
 	import { IconX } from '@tabler/icons-svelte';
+	import { writable } from 'svelte/store';
 
 	export let open = false;
 	export let onClose: () => void = () => {};
@@ -32,11 +33,36 @@
 	let mounted: MountResult | void;
 	let infraConfig: { fileRegistryCanisterId?: string; marketplaceCanisterId?: string } = {};
 
+	type PageContext = { pathname: string; extensionId: string; title: string };
+
+	// Reactive store so the mounted assistant stays aware of what the user is viewing
+	// as they navigate, without needing to be remounted.
+	const pageContext = writable<PageContext>(computePageContext($page.url.pathname));
+	$: pageContext.set(computePageContext($page.url.pathname));
 	$: activeExtensionId = extractActiveExtension($page.url.pathname);
 
 	function extractActiveExtension(pathname: string): string {
 		const match = pathname.match(/\/extensions\/([^/]+)/);
 		return match?.[1] ?? '';
+	}
+
+	function prettifySegment(segment: string): string {
+		if (!segment) return '';
+		return segment
+			.replace(/[-_]/g, ' ')
+			.replace(/\b\w/g, (c) => c.toUpperCase());
+	}
+
+	function computePageContext(pathname: string): PageContext {
+		const extensionId = extractActiveExtension(pathname);
+		let title = '';
+		if (extensionId) {
+			title = prettifySegment(extensionId);
+		} else {
+			const segments = pathname.split('/').filter(Boolean);
+			title = segments.length ? prettifySegment(segments[segments.length - 1]) : 'Home';
+		}
+		return { pathname, extensionId, title };
 	}
 
 	async function resolveInfraConfig() {
@@ -97,6 +123,7 @@
 				markAsRead,
 			},
 			theme: { cn },
+			pageContext,
 			context: {
 				activeExtensionId,
 			},
