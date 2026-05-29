@@ -121,6 +121,8 @@ class StatusRecord(Record):
     realm_name: text
     realm_manifesto: text
     realm_welcome_message: text
+    realm_stage: text
+    open_registration: bool
     user_profiles_count: nat
     canisters: Vec[CanisterInfo]
     registries: Vec[CanisterInfo]
