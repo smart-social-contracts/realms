@@ -130,9 +130,21 @@ export async function wrapDekForPrincipal(
 	return wrapDekForDpk(dpk, dek);
 }
 
-/** IBE-unwrap a wrapped DEK (hex) using the holder's vetKey. */
-export function unwrapDek(vetKey: VetKey, wrappedDekHex: string): Uint8Array {
-	const ct = IbeCiphertext.deserialize(hexToBytes(wrappedDekHex));
+/**
+ * Strip the toolkit envelope wrapper (`env:v=2:k=<hex>`) if present,
+ * returning the raw wrapped-DEK hex. Mirrors `decode_envelope` in
+ * ic_basilisk_toolkit.crypto, since the canister stores envelopes in this
+ * format via CryptoService.grant_access.
+ */
+export function decodeEnvelope(stored: string): string {
+	const prefix = 'env:v=2:k=';
+	return stored.startsWith(prefix) ? stored.slice(prefix.length) : stored;
+}
+
+/** IBE-unwrap a wrapped DEK using the holder's vetKey. Accepts the toolkit's
+ * `env:v=2:k=<hex>` envelope format or raw hex. */
+export function unwrapDek(vetKey: VetKey, wrappedDek: string): Uint8Array {
+	const ct = IbeCiphertext.deserialize(hexToBytes(decodeEnvelope(wrappedDek)));
 	return ct.decrypt(vetKey);
 }
 
