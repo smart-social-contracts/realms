@@ -1437,6 +1437,69 @@ def crypto_list_my_scope_envelopes(scope: text) -> CryptoResponse:
 
 
 @query
+@require(Operations.SELF_UPDATE_PRIVATE_DATA)
+def list_share_audiences() -> RealmResponse:
+    """List the audiences a member can share their private data with.
+
+    Returns, as a JSON string in ``message``, the set of audiences plus the
+    member principals each one resolves to. The member's browser needs these
+    principals to wrap their data-encryption key for each recipient.
+
+    Audiences:
+      - ``Administrators`` — the member_data_readers crypto group.
+      - one per ``Department`` — its current members.
+    """
+    try:
+        audiences = []
+
+        try:
+            from api.crypto import group_members as _group_members
+
+            res = _group_members("member_data_readers")
+            principals = [m["principal"] for m in res.get("members", []) if m.get("principal")]
+            audiences.append(
+                {
+                    "id": "group:member_data_readers",
+                    "label": "Administrators",
+                    "type": "admins",
+                    "principals": principals,
+                }
+            )
+        except Exception as e:
+            logger.warning(f"list_share_audiences: admins group unavailable: {e}")
+
+        try:
+            from ggg import Department
+
+            for dept in Department.instances():
+                principals = []
+                try:
+                    for m in dept.members:
+                        if getattr(m, "id", None):
+                            principals.append(m.id)
+                except Exception:
+                    pass
+                audiences.append(
+                    {
+                        "id": f"dept:{dept.name}",
+                        "label": dept.name,
+                        "type": "department",
+                        "principals": principals,
+                    }
+                )
+        except Exception as e:
+            logger.warning(f"list_share_audiences: departments unavailable: {e}")
+
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(message=json.dumps({"audiences": audiences})),
+        )
+    except Exception as e:
+        logger.error(f"Error listing share audiences: {e}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@query
 @require(Operations.REALM_ADMIN)
 def crypto_get_envelopes(scope: text) -> CryptoResponse:
     """List all envelopes for a scope (admin only)."""

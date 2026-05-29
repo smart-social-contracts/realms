@@ -50,10 +50,17 @@
 	let encryptionError = '';
 
 	// Data sharing (consent-based, via vetKey crypto groups — issue #215)
-	const MEMBER_DATA_READERS_GROUP = 'member_data_readers';
-	let shareWithAdmins = false;
+	interface ShareAudience {
+		id: string;
+		label: string;
+		type: string;
+		principals: string[];
+	}
 	let sharingLoaded = false;
-	let adminReaders: string[] = [];
+	let sharingSaving = false;
+	let sharingMessage = '';
+	let audiences: ShareAudience[] = [];
+	let selectedAudiences: Record<string, boolean> = {};
 	let currentlySharedWith: string[] = [];
 
 	const privateDataFields = [
@@ -156,17 +163,37 @@
 				.map((e: any) => e.principal_id)
 				.filter((p: string) => p && p !== owner);
 
-			const grpResp = await backend.crypto_get_group_members(MEMBER_DATA_READERS_GROUP);
-			const members = grpResp?.data?.groupMembers?.members ?? [];
-			adminReaders = members.map((m: any) => m.principal_id).filter((p: string) => !!p);
+			const audResp = await backend.list_share_audiences();
+			if (audResp?.success && audResp.data?.message) {
+				const parsed = JSON.parse(audResp.data.message);
+				audiences = (parsed.audiences ?? []).filter(
+					(a: ShareAudience) => (a.principals?.length ?? 0) > 0
+				);
+			}
 
-			shareWithAdmins =
-				adminReaders.length > 0 && adminReaders.some((a) => currentlySharedWith.includes(a));
+			// An audience is shown as selected if at least one of its members
+			// (other than the owner) currently holds an envelope for this scope.
+			const sharedSet = new Set(currentlySharedWith);
+			const sel: Record<string, boolean> = {};
+			for (const a of audiences) {
+				sel[a.id] = a.principals.some((p) => p !== owner && sharedSet.has(p));
+			}
+			selectedAudiences = sel;
 		} catch (e) {
 			console.warn('loadSharingStatus failed:', e);
 		} finally {
 			sharingLoaded = true;
 		}
+	}
+
+	function selectedRecipients(owner: string): string[] {
+		const set = new Set<string>();
+		for (const a of audiences) {
+			if (selectedAudiences[a.id]) {
+				for (const p of a.principals) if (p && p !== owner) set.add(p);
+			}
+		}
+		return Array.from(set);
 	}
 
 	async function loadIdentityProviders() {
@@ -251,7 +278,7 @@
 
 			const owner = get(principal) as string;
 			const scope = PRIVATE_DATA_SCOPE(owner);
-			const recipients = shareWithAdmins ? adminReaders : [];
+			const recipients = selectedRecipients(owner);
 
 			// Encrypt with a fresh DEK and wrap it for the owner + each recipient.
 			const plan = await buildSharePlan(backend, owner, privateData, recipients);
@@ -286,7 +313,7 @@
 
 			privateMessage =
 				recipients.length > 0
-					? `Private data encrypted, saved, and shared with ${recipients.length} admin${recipients.length === 1 ? '' : 's'}.`
+					? `Private data encrypted, saved, and shared with ${recipients.length} recipient${recipients.length === 1 ? '' : 's'}.`
 					: 'Private data encrypted and saved successfully!';
 		} catch (err) {
 			console.error('Error updating private data:', err);
@@ -296,11 +323,18 @@
 		}
 	}
 
-	async function onToggleSharing() {
-		// Persist immediately only if there is no unsaved data churn risk; we
-		// instead re-save the current private data so envelopes match the toggle.
+	async function saveSharingSettings() {
 		if (!encryptionAvailable) return;
-		await savePrivateData();
+		sharingSaving = true;
+		sharingMessage = '';
+		try {
+			await savePrivateData();
+			sharingMessage = 'Sharing settings updated.';
+		} catch {
+			sharingMessage = 'Failed to update sharing settings.';
+		} finally {
+			sharingSaving = false;
+		}
 	}
 </script>
 
@@ -453,9 +487,9 @@
 	<Card size="xl">
 		<Heading tag="h3" class="mb-2 text-xl font-bold dark:text-white">Data Sharing</Heading>
 		<p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
-			Choose whether realm administrators may read your private data. Sharing is
-			consent-based: your data stays encrypted, and access is granted by wrapping
-			your encryption key for each administrator. You can revoke access at any time.
+			Choose who may read your private data — realm administrators and/or specific
+			departments. Sharing is consent-based: your data stays encrypted, and access is
+			granted by wrapping your encryption key for each recipient. You can revoke at any time.
 		</p>
 		{#if !sharingLoaded}
 			<div class="flex justify-center items-center py-6">
@@ -467,38 +501,52 @@
 					Sharing requires encryption, which is not available on this subnet.
 				</p>
 			</div>
-		{:else if adminReaders.length === 0}
+		{:else if audiences.length === 0}
 			<div class="p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
 				<p class="text-sm text-gray-600 dark:text-gray-300">
-					No administrators are currently configured to receive shared member data.
+					There are no administrators or departments available to share with yet.
 				</p>
 			</div>
 		{:else}
-			<div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
-				<div>
-					<p class="text-sm font-medium text-gray-900 dark:text-white">
-						Share my private data with realm administrators
-					</p>
-					<p class="text-xs text-gray-500 dark:text-gray-400">
-						{adminReaders.length} administrator{adminReaders.length === 1 ? '' : 's'} would gain read access.
-					</p>
-				</div>
-				<Toggle bind:checked={shareWithAdmins} on:change={onToggleSharing} disabled={privateSaving} />
+			<ul class="space-y-2">
+				{#each audiences as audience (audience.id)}
+					<li class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+						<div>
+							<p class="text-sm font-medium text-gray-900 dark:text-white">
+								{audience.label}
+								{#if audience.type === 'department'}
+									<span class="ml-1 text-xs font-normal text-gray-400">(department)</span>
+								{/if}
+							</p>
+							<p class="text-xs text-gray-500 dark:text-gray-400">
+								{audience.principals.length} member{audience.principals.length === 1 ? '' : 's'} would gain read access.
+							</p>
+						</div>
+						<Toggle bind:checked={selectedAudiences[audience.id]} disabled={sharingSaving || privateSaving} />
+					</li>
+				{/each}
+			</ul>
+
+			<div class="mt-4 flex items-center gap-3">
+				<Button size="sm" color="blue" on:click={saveSharingSettings} disabled={sharingSaving || privateSaving}>
+					{sharingSaving ? 'Updating…' : 'Save sharing settings'}
+				</Button>
+				{#if sharingMessage}
+					<span class="text-sm {sharingMessage.includes('updated') ? 'text-green-600' : 'text-red-600'}">{sharingMessage}</span>
+				{/if}
 			</div>
+
 			{#if currentlySharedWith.length > 0}
 				<div class="mt-3">
 					<p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
-						Currently shared with
+						Currently shared with ({currentlySharedWith.length})
 					</p>
-					<ul class="space-y-1">
+					<ul class="space-y-1 max-h-32 overflow-y-auto">
 						{#each currentlySharedWith as p}
 							<li class="text-xs font-mono text-gray-600 dark:text-gray-300 break-all">{p}</li>
 						{/each}
 					</ul>
 				</div>
-			{/if}
-			{#if privateSaving}
-				<p class="mt-3 text-sm text-gray-500">Updating sharing…</p>
 			{/if}
 		{/if}
 	</Card>
