@@ -12,6 +12,8 @@
   let filteredRealms = [];
   let showCreateModal = false;
   let viewMode = 'list'; // 'list' or 'map'
+  let filterStage = ''; // '' = all, or a specific stage
+  let sortBy = 'name'; // 'name', 'users_desc', 'users_asc', 'newest'
   let mapContainer;
   let map;
   let L;
@@ -167,6 +169,7 @@
         'realm_name': IDL.Text,
         'realm_manifesto': IDL.Text,
         'realm_welcome_message': IDL.Text,
+        'realm_stage': IDL.Text,
         'user_profiles_count': IDL.Nat,
       });
       const ApiResponse = IDL.Record({
@@ -212,6 +215,7 @@
               users_count: Number(statusData.users_count),
               manifesto: statusData.realm_manifesto || '',
               realm_name: statusData.realm_name || '',
+              realm_stage: statusData.realm_stage || 'alpha',
             };
           } else {
             console.warn(`Status call failed or no status data for ${realm.id}:`, response);
@@ -226,9 +230,9 @@
     // Update realms with fetched details
     updates.forEach(result => {
       if (result.status === 'fulfilled' && result.value) {
-        const { id, users_count, manifesto, realm_name } = result.value;
-        realms = realms.map(r => r.id === id ? { ...r, users_count, manifesto, realm_name } : r);
-        filteredRealms = filteredRealms.map(r => r.id === id ? { ...r, users_count, manifesto, realm_name } : r);
+        const { id, users_count, manifesto, realm_name, realm_stage } = result.value;
+        realms = realms.map(r => r.id === id ? { ...r, users_count, manifesto, realm_name, realm_stage } : r);
+        filteredRealms = filteredRealms.map(r => r.id === id ? { ...r, users_count, manifesto, realm_name, realm_stage } : r);
       }
     });
   }
@@ -414,19 +418,32 @@
 
 
   function searchRealms() {
-    if (!searchQuery.trim()) {
-      filteredRealms = realms;
-      return;
+    let result = realms;
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(realm => 
+        realm.id.toLowerCase().includes(query) || 
+        realm.name.toLowerCase().includes(query)
+      );
     }
-    
-    const query = searchQuery.toLowerCase();
-    filteredRealms = realms.filter(realm => 
-      realm.id.toLowerCase().includes(query) || 
-      realm.name.toLowerCase().includes(query)
-    );
+
+    if (filterStage) {
+      result = result.filter(realm => (realm.realm_stage || 'alpha') === filterStage);
+    }
+
+    if (sortBy === 'users_desc') {
+      result = [...result].sort((a, b) => (b.users_count || 0) - (a.users_count || 0));
+    } else if (sortBy === 'users_asc') {
+      result = [...result].sort((a, b) => (a.users_count || 0) - (b.users_count || 0));
+    } else if (sortBy === 'newest') {
+      result = [...result].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+    }
+
+    filteredRealms = result;
   }
 
-  $: searchQuery, searchRealms();
+  $: searchQuery, filterStage, sortBy, searchRealms();
 
   async function handleLogin() {
     const { login, getPrincipal } = await import("$lib/auth");
@@ -914,6 +931,22 @@
         {/if}
       </div>
     </div>
+
+    <select class="filter-select" bind:value={filterStage}>
+      <option value="">All Stages</option>
+      <option value="alpha">Alpha</option>
+      <option value="beta">Beta</option>
+      <option value="production">Live</option>
+      <option value="deprecation">Winding Down</option>
+      <option value="terminated">Archived</option>
+    </select>
+
+    <select class="filter-select" bind:value={sortBy}>
+      <option value="name">Sort: Name</option>
+      <option value="users_desc">Most Users</option>
+      <option value="users_asc">Fewest Users</option>
+      <option value="newest">Newest First</option>
+    </select>
     
     <div class="view-toggle">
       <button 
@@ -1091,11 +1124,18 @@
                     </div>
                   {/if}
                 </div>
-                <div class="user-badge" class:has-users={realm.users_count > 0}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                  </svg>
-                  <span>{realm.users_count || 0}</span>
+                <div class="realm-badges">
+                  {#if realm.realm_stage}
+                    <span class="stage-badge stage-{realm.realm_stage}">
+                      {realm.realm_stage === 'production' ? 'Live' : realm.realm_stage === 'deprecation' ? 'Winding Down' : realm.realm_stage.charAt(0).toUpperCase() + realm.realm_stage.slice(1)}
+                    </span>
+                  {/if}
+                  <div class="user-badge" class:has-users={realm.users_count > 0}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                    <span>{realm.users_count || 0}</span>
+                  </div>
                 </div>
               </div>
               
@@ -1930,6 +1970,74 @@
 
   .user-badge svg {
     opacity: 0.8;
+  }
+
+  .realm-badges {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.4rem;
+  }
+
+  .stage-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.6rem;
+    border-radius: 2rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  .stage-alpha {
+    background: #DBEAFE;
+    color: #1E40AF;
+  }
+
+  .stage-beta {
+    background: #FEF3C7;
+    color: #92400E;
+  }
+
+  .stage-production {
+    background: #D1FAE5;
+    color: #065F46;
+  }
+
+  .stage-deprecation {
+    background: #FFEDD5;
+    color: #9A3412;
+  }
+
+  .stage-terminated {
+    background: #F3F4F6;
+    color: #6B7280;
+  }
+
+  .filter-select {
+    padding: 0.65rem 2rem 0.65rem 0.75rem;
+    border: 1px solid #E5E5E5;
+    border-radius: 0.5rem;
+    background: #FFFFFF;
+    color: #525252;
+    font-size: 0.875rem;
+    font-family: inherit;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23737373' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    transition: all 0.15s ease;
+  }
+
+  .filter-select:hover {
+    border-color: #D4D4D4;
+  }
+
+  .filter-select:focus {
+    outline: none;
+    border-color: #525252;
+    box-shadow: 0 0 0 3px rgba(82, 82, 82, 0.1);
   }
 
   .realm-content {
