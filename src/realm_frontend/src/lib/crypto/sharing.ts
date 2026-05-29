@@ -200,31 +200,47 @@ export async function aesGcmDecryptWithDek(dek: Uint8Array, ciphertext: string):
 }
 
 // ---------------------------------------------------------------------------
-// High-level orchestration
+// Scope builders
+// ---------------------------------------------------------------------------
+//
+// A scope names an encrypted payload and (server-side) who may manage read
+// access to it. Keep these in sync with core/crypto_scopes.py on the backend.
+
+/** `user:<principal>:<name>` — owned by the principal (self-service). */
+export const userScope = (principal: string, name = 'private') => `user:${principal}:${name}`;
+/** `dept:<department>:<name>` — managed by the department head or a realm admin. */
+export const deptScope = (department: string, name: string) => `dept:${department}:${name}`;
+/** `realm:<name>` — managed by realm admins. */
+export const realmScope = (name: string) => `realm:${name}`;
+
+// ---------------------------------------------------------------------------
+// High-level orchestration (generic over scope — reusable for any payload)
 // ---------------------------------------------------------------------------
 
-export const PRIVATE_DATA_SCOPE = (principal: string) => `user:${principal}:private`;
-
 export interface SharePlan {
-	/** Ciphertext to store via `update_my_private_data`. */
+	/** Ciphertext to persist wherever the payload lives (a field, an entity…). */
 	ciphertext: string;
 	/**
-	 * Wrapped DEK per principal (owner + every consented recipient), ready to
-	 * upsert in a single `crypto_grant_to_my_scope_batch` call.
+	 * Wrapped DEK per recipient principal, ready to upsert in a single
+	 * `crypto_grant_to_scope_batch` call.
 	 */
 	wrappedDeks: Record<string, string>;
 }
 
 /**
- * Encrypt the member's private data with a fresh DEK and wrap that DEK for the
- * member plus every recipient principal in `recipients`. The shared root public
- * key is fetched once; all wraps are local (no per-recipient network call).
+ * Encrypt `data` with a fresh DEK and wrap that DEK for every principal in
+ * `recipients` (deduplicated). The shared root public key is fetched once; all
+ * wraps are local (no per-recipient network call).
+ *
+ * `recipients` should include everyone who must be able to read the payload —
+ * typically the owner plus any consented parties. The caller is responsible for
+ * persisting `ciphertext` (e.g. `update_my_private_data`, or a document field)
+ * and for calling {@link grantScopeData} with `wrappedDeks`.
  */
 export async function buildSharePlan(
 	backend: any,
-	ownerPrincipal: string,
-	data: Record<string, string>,
-	recipients: string[]
+	recipients: string[],
+	data: unknown
 ): Promise<SharePlan> {
 	const dek = randomDek();
 	const ciphertext = await aesGcmEncryptWithDek(dek, JSON.stringify(data));
@@ -232,10 +248,8 @@ export async function buildSharePlan(
 	const rootDpk = await getSharingRootPublicKey(backend);
 
 	const wrappedDeks: Record<string, string> = {};
-	// Owner is always a recipient so the new ciphertext stays self-decryptable.
-	wrappedDeks[ownerPrincipal] = wrapDekForIdentity(rootDpk, ownerPrincipal, dek);
 	for (const r of recipients) {
-		if (r === ownerPrincipal || wrappedDeks[r]) continue;
+		if (!r || wrappedDeks[r]) continue;
 		wrappedDeks[r] = wrapDekForIdentity(rootDpk, r, dek);
 	}
 
@@ -243,28 +257,64 @@ export async function buildSharePlan(
 }
 
 /**
- * Decrypt the member's own private data using the DEK + envelope model, with a
- * fallback to legacy direct-symmetric data (returns null if neither works).
+ * Persist a share plan's access grants for `scope` in (at most) two batch
+ * calls: one grant for all current recipients, and one revoke for principals
+ * who previously had access but no longer do.
+ *
+ * @param previousRecipients principals that currently hold access (to diff against)
+ * @param keep principals that must never be revoked (e.g. the owner)
+ * @returns the principals now granted access (the keys of `wrappedDeks`)
  */
-export async function decryptOwnPrivateData(
+export async function grantScopeData(
 	backend: any,
-	ownerPrincipal: string,
-	ciphertext: string
-): Promise<Record<string, string> | null> {
-	if (!ciphertext) return null;
+	scope: string,
+	wrappedDeks: Record<string, string>,
+	opts: { previousRecipients?: string[]; keep?: string[] } = {}
+): Promise<string[]> {
+	const granted = Object.keys(wrappedDeks);
+	const grantResp = await backend.crypto_grant_to_scope_batch(scope, JSON.stringify(wrappedDeks));
+	if (grantResp?.success === false) {
+		throw new Error(grantResp?.data?.error || 'crypto_grant_to_scope_batch failed');
+	}
 
-	const scope = PRIVATE_DATA_SCOPE(ownerPrincipal);
+	const grantedSet = new Set(granted);
+	const keepSet = new Set(opts.keep ?? []);
+	const toRevoke = (opts.previousRecipients ?? []).filter(
+		(p) => !grantedSet.has(p) && !keepSet.has(p)
+	);
+	if (toRevoke.length > 0) {
+		try {
+			await backend.crypto_revoke_from_scope_batch(scope, JSON.stringify(toRevoke));
+		} catch (e) {
+			console.warn('[sharing] batch revoke failed:', e);
+		}
+	}
+	return granted;
+}
+
+/**
+ * Decrypt a scope's payload for the calling principal: fetch the DEK envelope
+ * wrapped for them, derive their sharing vetKey, unwrap the DEK, and AES-decrypt
+ * `ciphertext`. Returns null if the caller has no envelope or decryption fails.
+ */
+export async function decryptScopeData<T = Record<string, string>>(
+	backend: any,
+	scope: string,
+	myPrincipal: string,
+	ciphertext: string
+): Promise<T | null> {
+	if (!ciphertext) return null;
 	try {
 		const envResp = await backend.crypto_get_my_envelope(scope);
 		const wrapped = envResp?.data?.envelope?.wrapped_dek;
 		if (envResp?.success && wrapped) {
-			const { vetKey } = await deriveMySharingVetKey(backend, ownerPrincipal);
+			const { vetKey } = await deriveMySharingVetKey(backend, myPrincipal);
 			const dek = unwrapDek(vetKey, wrapped);
 			const plaintext = await aesGcmDecryptWithDek(dek, ciphertext);
-			return JSON.parse(plaintext);
+			return JSON.parse(plaintext) as T;
 		}
 	} catch (e) {
-		console.warn('[sharing] DEK-model decrypt failed, will try legacy:', e);
+		console.warn('[sharing] scope decrypt failed:', e);
 	}
 	return null;
 }

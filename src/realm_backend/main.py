@@ -1296,13 +1296,17 @@ def derive_my_sharing_vetkey(transport_public_key_hex: text) -> RealmResponse:
 # ---------------------------------------------------------------------------
 
 
-def _caller_owns_scope(scope: str) -> bool:
-    """A member may only manage sharing for scopes they own.
+def _caller_can_manage_scope(scope: str) -> bool:
+    """Whether the caller may grant/revoke read access for *scope*.
 
-    Owned scopes are namespaced as ``user:<caller_principal>:<...>``.
+    Authorization is pluggable per scope *kind* (``user:``, ``dept:``,
+    ``realm:``, …) and defined in :mod:`core.crypto_scopes`. This keeps the
+    crypto engine generic and reusable for any payload, not just member
+    personal data.
     """
-    caller = ic.caller().to_str()
-    return scope.startswith(f"user:{caller}:")
+    from core.crypto_scopes import caller_can_manage_scope, production_context
+
+    return caller_can_manage_scope(scope, ic.caller().to_str(), production_context())
 
 
 @update
@@ -1370,90 +1374,31 @@ def crypto_get_my_scopes() -> CryptoResponse:
         return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
 
 
-@update
-@require(Operations.SELF_UPDATE_PRIVATE_DATA)
-def crypto_grant_to_my_scope(
-    scope: text, target_principal: text, wrapped_dek: text
-) -> CryptoResponse:
-    """Grant another principal access to a scope the caller owns.
-
-    This is the consent mechanism for member data sharing: a member wraps
-    their data-encryption key for the target principal client-side, then
-    stores the resulting envelope here. The caller may only grant access to
-    scopes namespaced under their own principal (``user:<caller>:...``).
-    """
-    try:
-        if not _caller_owns_scope(scope):
-            return CryptoResponse(
-                success=False,
-                data=CryptoResponseData(
-                    error="You can only share scopes that you own"
-                ),
-            )
-        result = crypto_share_principal(scope, target_principal, wrapped_dek)
-        if not result["success"]:
-            return CryptoResponse(
-                success=False, data=CryptoResponseData(error=result["error"])
-            )
-        return CryptoResponse(
-            success=True,
-            data=CryptoResponseData(
-                message=f"Shared scope {scope} with {target_principal}"
-            ),
-        )
-    except Exception as e:
-        logger.error(f"Error granting to own scope: {e}\n{traceback.format_exc()}")
-        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+# NOTE: These endpoints are generic over the scope *kind* — `user:`, `dept:`,
+# `realm:`, or any kind registered in core.crypto_scopes. Authorization to
+# manage a scope is enforced by `_caller_can_manage_scope`, so the same crypto
+# sharing machinery is reusable for personal data, department documents,
+# realm-level records, etc.
 
 
 @update
 @require(Operations.SELF_UPDATE_PRIVATE_DATA)
-def crypto_revoke_from_my_scope(
-    scope: text, target_principal: text
-) -> CryptoResponse:
-    """Revoke a principal's access to a scope the caller owns."""
-    try:
-        if not _caller_owns_scope(scope):
-            return CryptoResponse(
-                success=False,
-                data=CryptoResponseData(
-                    error="You can only revoke access to scopes that you own"
-                ),
-            )
-        result = crypto_revoke_principal(scope, target_principal)
-        if not result["success"]:
-            return CryptoResponse(
-                success=False, data=CryptoResponseData(error=result["error"])
-            )
-        return CryptoResponse(
-            success=True,
-            data=CryptoResponseData(
-                message=f"Revoked {target_principal} from scope {scope}"
-            ),
-        )
-    except Exception as e:
-        logger.error(f"Error revoking from own scope: {e}\n{traceback.format_exc()}")
-        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
-
-
-@update
-@require(Operations.SELF_UPDATE_PRIVATE_DATA)
-def crypto_grant_to_my_scope_batch(
+def crypto_grant_to_scope_batch(
     scope: text, wrapped_deks_json: text
 ) -> CryptoResponse:
-    """Grant many principals access to a scope the caller owns, in one call.
+    """Grant many principals access to a scope the caller may manage, in one call.
 
     ``wrapped_deks_json`` is a JSON object mapping ``principal -> wrapped_dek``
-    (the DEK IBE-wrapped client-side for each recipient, including the owner).
-    Replacing N update calls with one both saves round-trips and lets the
-    backend upsert all envelopes in a single linear pass.
+    (the DEK IBE-wrapped client-side for each recipient). Replacing N update
+    calls with one both saves round-trips and lets the backend upsert all
+    envelopes in a single linear pass.
     """
     try:
-        if not _caller_owns_scope(scope):
+        if not _caller_can_manage_scope(scope):
             return CryptoResponse(
                 success=False,
                 data=CryptoResponseData(
-                    error="You can only share scopes that you own"
+                    error="You are not allowed to manage sharing for this scope"
                 ),
             )
         try:
@@ -1480,25 +1425,25 @@ def crypto_grant_to_my_scope_batch(
             ),
         )
     except Exception as e:
-        logger.error(f"Error batch granting to own scope: {e}\n{traceback.format_exc()}")
+        logger.error(f"Error batch granting to scope: {e}\n{traceback.format_exc()}")
         return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
 
 
 @update
 @require(Operations.SELF_UPDATE_PRIVATE_DATA)
-def crypto_revoke_from_my_scope_batch(
+def crypto_revoke_from_scope_batch(
     scope: text, principals_json: text
 ) -> CryptoResponse:
-    """Revoke many principals from a scope the caller owns, in one call.
+    """Revoke many principals from a scope the caller may manage, in one call.
 
     ``principals_json`` is a JSON array of principal strings to revoke.
     """
     try:
-        if not _caller_owns_scope(scope):
+        if not _caller_can_manage_scope(scope):
             return CryptoResponse(
                 success=False,
                 data=CryptoResponseData(
-                    error="You can only revoke access to scopes that you own"
+                    error="You are not allowed to manage sharing for this scope"
                 ),
             )
         try:
@@ -1525,20 +1470,20 @@ def crypto_revoke_from_my_scope_batch(
             ),
         )
     except Exception as e:
-        logger.error(f"Error batch revoking from own scope: {e}\n{traceback.format_exc()}")
+        logger.error(f"Error batch revoking from scope: {e}\n{traceback.format_exc()}")
         return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
 
 
 @query
 @require(Operations.SELF_UPDATE_PRIVATE_DATA)
-def crypto_list_my_scope_envelopes(scope: text) -> CryptoResponse:
-    """List all principals with access to a scope the caller owns."""
+def crypto_list_scope_envelopes(scope: text) -> CryptoResponse:
+    """List all principals with access to a scope the caller may manage."""
     try:
-        if not _caller_owns_scope(scope):
+        if not _caller_can_manage_scope(scope):
             return CryptoResponse(
                 success=False,
                 data=CryptoResponseData(
-                    error="You can only inspect scopes that you own"
+                    error="You are not allowed to manage sharing for this scope"
                 ),
             )
         result = crypto_list_envelopes(scope)
@@ -1558,7 +1503,7 @@ def crypto_list_my_scope_envelopes(scope: text) -> CryptoResponse:
             ),
         )
     except Exception as e:
-        logger.error(f"Error listing own scope envelopes: {e}\n{traceback.format_exc()}")
+        logger.error(f"Error listing scope envelopes: {e}\n{traceback.format_exc()}")
         return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
 
 

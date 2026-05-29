@@ -11,9 +11,10 @@
 	import { decryptPrivateData } from '$lib/crypto/vetkeys';
 	import {
 		buildSharePlan,
-		decryptOwnPrivateData,
+		decryptScopeData,
 		deriveMySharingVetKey,
-		PRIVATE_DATA_SCOPE
+		grantScopeData,
+		userScope
 	} from '$lib/crypto/sharing';
 
 	const path: string = '/identities';
@@ -116,7 +117,12 @@
 				const owner = get(principal) as string;
 				if (u.private_data) {
 					// 1. Preferred: DEK + envelope model (supports sharing).
-					const decrypted = await decryptOwnPrivateData(backend, owner, u.private_data);
+					const decrypted = await decryptScopeData<Record<string, string>>(
+						backend,
+						userScope(owner),
+						owner,
+						u.private_data
+					);
 					if (decrypted) {
 						privateData = decrypted;
 						encryptionAvailable = true;
@@ -155,9 +161,9 @@
 	async function loadSharingStatus() {
 		try {
 			const owner = get(principal) as string;
-			const scope = PRIVATE_DATA_SCOPE(owner);
+			const scope = userScope(owner);
 
-			const envResp = await backend.crypto_list_my_scope_envelopes(scope);
+			const envResp = await backend.crypto_list_scope_envelopes(scope);
 			const envs = envResp?.data?.envelopeList?.envelopes ?? [];
 			currentlySharedWith = envs
 				.map((e: any) => e.principal_id)
@@ -277,11 +283,12 @@
 			}
 
 			const owner = get(principal) as string;
-			const scope = PRIVATE_DATA_SCOPE(owner);
+			const scope = userScope(owner);
 			const recipients = selectedRecipients(owner);
 
 			// Encrypt with a fresh DEK and wrap it for the owner + each recipient.
-			const plan = await buildSharePlan(backend, owner, privateData, recipients);
+			// The owner is always included so the new ciphertext stays self-readable.
+			const plan = await buildSharePlan(backend, [owner, ...recipients], privateData);
 
 			const response = await backend.update_my_private_data(plan.ciphertext);
 			if (!response?.success) {
@@ -289,22 +296,12 @@
 				return;
 			}
 
-			// Grant / refresh access for the owner + every consented recipient in a
-			// single batch update call.
-			const granted = Object.keys(plan.wrappedDeks);
-			await backend.crypto_grant_to_my_scope_batch(scope, JSON.stringify(plan.wrappedDeks));
-
-			// Revoke anyone previously shared with who is no longer a recipient
-			// (also in one batch call). The owner is never revoked.
-			const grantedSet = new Set(granted);
-			const toRevoke = currentlySharedWith.filter((p) => p !== owner && !grantedSet.has(p));
-			if (toRevoke.length > 0) {
-				try {
-					await backend.crypto_revoke_from_my_scope_batch(scope, JSON.stringify(toRevoke));
-				} catch (e) {
-					console.warn('Failed to batch-revoke stale recipients:', e);
-				}
-			}
+			// Persist grants (and revoke anyone deselected) in batch calls; never
+			// revoke the owner.
+			const granted = await grantScopeData(backend, scope, plan.wrappedDeks, {
+				previousRecipients: currentlySharedWith,
+				keep: [owner]
+			});
 			currentlySharedWith = granted.filter((p) => p !== owner);
 
 			privateMessage =
