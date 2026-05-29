@@ -15,6 +15,7 @@ Complete reference documentation for the Realms GOS platform.
 - **[Extension Architecture](./EXTENSION_ARCHITECTURE)** - Build custom extensions
 - **[Method Override System](./METHOD_OVERRIDE_SYSTEM)** - Extension method injection
 - **[Frontend Architecture](./FRONTEND_ARCHITECTURE)** - Svelte components and routing
+- **[Quarters](./QUARTERS)** - Horizontal scalability and federation architecture
 
 ### Advanced Features
 - **[Scheduled Tasks](./SCHEDULED_TASKS)** - Task scheduling and automation
