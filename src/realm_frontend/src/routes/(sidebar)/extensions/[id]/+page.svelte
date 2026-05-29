@@ -17,7 +17,7 @@
 	import { mountExtension, resolveExtensionVersion, type MountResult } from '$lib/extension-loader';
 	import { loadExtensionTranslation } from '$lib/i18n';
 	import type { RealmExtensionContext } from '$lib/realm-extension-sdk';
-	import { deriveMyVetKey, unwrapDek, aesGcmDecryptWithDek } from '$lib/crypto/sharing';
+	import { deriveMySharingVetKey, unwrapDek, aesGcmDecryptWithDek } from '$lib/crypto/sharing';
 	import AccessDenied from '$lib/components/AccessDenied.svelte';
 	import { parseAccessError, AccessDeniedError } from '$lib/utils/errors';
 
@@ -103,7 +103,8 @@
 				): Promise<Record<string, string> | null> {
 					if (!wrappedDekHex || !ciphertext) return null;
 					try {
-						const { vetKey } = await deriveMyVetKey(backend);
+						const me = get(principal) as string;
+						const { vetKey } = await deriveMySharingVetKey(backend, me);
 						const dek = unwrapDek(vetKey, wrappedDekHex);
 						const plaintext = await aesGcmDecryptWithDek(dek, ciphertext);
 						return JSON.parse(plaintext);

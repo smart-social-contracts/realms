@@ -3,22 +3,26 @@
  *
  * The member's private data is encrypted with a random per-save Data Encryption
  * Key (DEK) using AES-256-GCM. The DEK is then wrapped (IBE-encrypted) once per
- * authorized recipient under that recipient's vetKD *derived public key* and
- * stored as a `KeyEnvelope` at scope `user:<member>:private`.
+ * authorized recipient and stored as a `KeyEnvelope` at scope
+ * `user:<member>:private`.
  *
  * A recipient (the member themselves, or a consented admin) decrypts by:
- *   1. deriving their own vetKey (only they can — it is bound to their principal
- *      via the vetKD context),
+ *   1. deriving their own *sharing* vetKey (only they can — vetKD binds the
+ *      derivation `input` to their principal via `ic.caller()`),
  *   2. IBE-decrypting their envelope to recover the DEK,
  *   3. AES-GCM decrypting the ciphertext.
  *
  * The plaintext DEK and vetKey never leave the browser; the canister only ever
  * stores ciphertext and opaque wrapped keys.
  *
- * Identity note: recipients derive their vetKey with an empty derivation id
- * (see `derive_my_vetkey` / `deriveAesKey`), so the IBE identity must also be
- * empty. The per-recipient binding is provided by the derived public key, whose
- * vetKD context already includes the recipient's principal.
+ * Key derivation scheme (performance):
+ * Instead of fetching a separate vetKD public key per recipient (one
+ * inter-canister `vetkd_public_key` call each), everyone shares a single *root*
+ * public key. A recipient is distinguished by the IBE **identity** — their
+ * principal text. The browser therefore fetches the root key once and wraps the
+ * DEK for every recipient locally, with zero extra management calls. Security is
+ * unchanged: the matching sharing vetKey for identity `P` can only be derived by
+ * the principal `P` itself (the backend forces `input = ic.caller()`).
  */
 
 import {
@@ -50,56 +54,55 @@ function bytesToHex(bytes: Uint8Array): string {
 		.join('');
 }
 
-/** IBE identity bound to the recipient's (empty) vetKD derivation id. */
-const EMPTY_IDENTITY = IbeIdentity.fromBytes(new Uint8Array());
-
-// ---------------------------------------------------------------------------
-// VetKey derivation
-// ---------------------------------------------------------------------------
-
 /**
- * Derive the caller's raw vetKey (and the matching derived public key).
- *
- * Unlike {@link deriveAesKey}, this returns the underlying `VetKey` object so it
- * can be used for IBE decryption of wrapped DEKs.
+ * The IBE identity / vetKD derivation input for a principal: the UTF-8 bytes of
+ * its textual principal. The backend uses the same encoding
+ * (`caller_principal.encode()`) for the `input`, keeping wrap and unwrap aligned.
  */
-export async function deriveMyVetKey(
-	backend: any
-): Promise<{ vetKey: VetKey; dpk: DerivedPublicKey }> {
-	const pkResp = await backend.get_my_vetkey_public_key();
+export function identityBytesFor(principalText: string): Uint8Array {
+	return new TextEncoder().encode(principalText);
+}
+
+// ---------------------------------------------------------------------------
+// VetKey derivation (shared root context + per-principal identity)
+// ---------------------------------------------------------------------------
+
+/** Fetch the shared root derived public key (one call, cacheable). */
+export async function getSharingRootPublicKey(backend: any): Promise<DerivedPublicKey> {
+	const pkResp = await backend.get_sharing_root_public_key();
 	if (!pkResp.success || !pkResp.data?.message) {
 		throw new Error(
-			`vetKD public key fetch failed: ${pkResp.data?.error || 'unknown error'}`
+			`sharing root public key fetch failed: ${pkResp.data?.error || 'unknown error'}`
 		);
 	}
-	const dpk = DerivedPublicKey.deserialize(hexToBytes(pkResp.data.message));
+	return DerivedPublicKey.deserialize(hexToBytes(pkResp.data.message));
+}
+
+/**
+ * Derive the caller's *sharing* vetKey (bound to their own principal identity)
+ * under the shared root context, for IBE-decrypting wrapped DEKs addressed to
+ * them. `myPrincipal` must be the caller's own principal text.
+ */
+export async function deriveMySharingVetKey(
+	backend: any,
+	myPrincipal: string,
+	rootDpk?: DerivedPublicKey
+): Promise<{ vetKey: VetKey; dpk: DerivedPublicKey }> {
+	const dpk = rootDpk ?? (await getSharingRootPublicKey(backend));
 
 	const tsk = TransportSecretKey.random();
 	const tpkHex = bytesToHex(tsk.publicKeyBytes());
 
-	const deriveResp = await backend.derive_my_vetkey(tpkHex);
+	const deriveResp = await backend.derive_my_sharing_vetkey(tpkHex);
 	if (!deriveResp.success || !deriveResp.data?.message) {
 		throw new Error(
-			`vetKD key derivation failed: ${deriveResp.data?.error || 'unknown error'}`
+			`sharing vetKey derivation failed: ${deriveResp.data?.error || 'unknown error'}`
 		);
 	}
 	const encryptedVetKey = EncryptedVetKey.deserialize(hexToBytes(deriveResp.data.message));
-	const vetKey = encryptedVetKey.decryptAndVerify(tsk, dpk, new Uint8Array());
+	const identity = identityBytesFor(myPrincipal);
+	const vetKey = encryptedVetKey.decryptAndVerify(tsk, dpk, identity);
 	return { vetKey, dpk };
-}
-
-/** Fetch the vetKD derived public key for an arbitrary target principal. */
-export async function getDerivedPublicKeyFor(
-	backend: any,
-	principal: string
-): Promise<DerivedPublicKey> {
-	const resp = await backend.get_vetkey_public_key_for(principal);
-	if (!resp.success || !resp.data?.message) {
-		throw new Error(
-			`derived public key fetch failed for ${principal}: ${resp.data?.error || 'unknown error'}`
-		);
-	}
-	return DerivedPublicKey.deserialize(hexToBytes(resp.data.message));
 }
 
 // ---------------------------------------------------------------------------
@@ -112,22 +115,18 @@ export function randomDek(): Uint8Array {
 }
 
 /**
- * IBE-wrap a DEK for a target principal using their derived public key.
- * Returns the serialized ciphertext as hex (stored in a KeyEnvelope).
+ * IBE-wrap a DEK for a recipient principal under the shared root public key,
+ * using the recipient's principal as the IBE identity. Fully client-side — no
+ * network call. Returns the serialized ciphertext as hex.
  */
-export function wrapDekForDpk(dpk: DerivedPublicKey, dek: Uint8Array): string {
-	const ct = IbeCiphertext.encrypt(dpk, EMPTY_IDENTITY, dek, IbeSeed.random());
-	return bytesToHex(ct.serialize());
-}
-
-/** Convenience: fetch the target's DPK and wrap the DEK for them. */
-export async function wrapDekForPrincipal(
-	backend: any,
-	targetPrincipal: string,
+export function wrapDekForIdentity(
+	rootDpk: DerivedPublicKey,
+	recipientPrincipal: string,
 	dek: Uint8Array
-): Promise<string> {
-	const dpk = await getDerivedPublicKeyFor(backend, targetPrincipal);
-	return wrapDekForDpk(dpk, dek);
+): string {
+	const identity = IbeIdentity.fromBytes(identityBytesFor(recipientPrincipal));
+	const ct = IbeCiphertext.encrypt(rootDpk, identity, dek, IbeSeed.random());
+	return bytesToHex(ct.serialize());
 }
 
 /**
@@ -209,15 +208,17 @@ export const PRIVATE_DATA_SCOPE = (principal: string) => `user:${principal}:priv
 export interface SharePlan {
 	/** Ciphertext to store via `update_my_private_data`. */
 	ciphertext: string;
-	/** Wrapped DEK for the owner (always present). */
-	selfWrappedDek: string;
-	/** Wrapped DEK per consented recipient principal. */
-	recipientWrappedDeks: Record<string, string>;
+	/**
+	 * Wrapped DEK per principal (owner + every consented recipient), ready to
+	 * upsert in a single `crypto_grant_to_my_scope_batch` call.
+	 */
+	wrappedDeks: Record<string, string>;
 }
 
 /**
  * Encrypt the member's private data with a fresh DEK and wrap that DEK for the
- * member plus every recipient principal in `recipients`.
+ * member plus every recipient principal in `recipients`. The shared root public
+ * key is fetched once; all wraps are local (no per-recipient network call).
  */
 export async function buildSharePlan(
 	backend: any,
@@ -228,15 +229,17 @@ export async function buildSharePlan(
 	const dek = randomDek();
 	const ciphertext = await aesGcmEncryptWithDek(dek, JSON.stringify(data));
 
-	const selfWrappedDek = await wrapDekForPrincipal(backend, ownerPrincipal, dek);
+	const rootDpk = await getSharingRootPublicKey(backend);
 
-	const recipientWrappedDeks: Record<string, string> = {};
+	const wrappedDeks: Record<string, string> = {};
+	// Owner is always a recipient so the new ciphertext stays self-decryptable.
+	wrappedDeks[ownerPrincipal] = wrapDekForIdentity(rootDpk, ownerPrincipal, dek);
 	for (const r of recipients) {
-		if (r === ownerPrincipal) continue;
-		recipientWrappedDeks[r] = await wrapDekForPrincipal(backend, r, dek);
+		if (r === ownerPrincipal || wrappedDeks[r]) continue;
+		wrappedDeks[r] = wrapDekForIdentity(rootDpk, r, dek);
 	}
 
-	return { ciphertext, selfWrappedDek, recipientWrappedDeks };
+	return { ciphertext, wrappedDeks };
 }
 
 /**
@@ -255,7 +258,7 @@ export async function decryptOwnPrivateData(
 		const envResp = await backend.crypto_get_my_envelope(scope);
 		const wrapped = envResp?.data?.envelope?.wrapped_dek;
 		if (envResp?.success && wrapped) {
-			const { vetKey } = await deriveMyVetKey(backend);
+			const { vetKey } = await deriveMySharingVetKey(backend, ownerPrincipal);
 			const dek = unwrapDek(vetKey, wrapped);
 			const plaintext = await aesGcmDecryptWithDek(dek, ciphertext);
 			return JSON.parse(plaintext);

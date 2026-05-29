@@ -98,6 +98,54 @@ def revoke_principal(scope: str, target_principal: str) -> dict[str, Any]:
     return {"success": True}
 
 
+def grant_many(scope: str, wrapped_deks: dict[str, str]) -> dict[str, Any]:
+    """Grant access to many principals in a single pass (batch).
+
+    Uses the toolkit's ``grant_many`` when available (single envelope-index
+    snapshot); otherwise falls back to an equivalent local single-pass upsert so
+    this works against older pinned toolkit versions too.
+    """
+    logger.info(f"grant_many: scope={scope!r} ({len(wrapped_deks)} principals)")
+    batch = wrapped_deks or {}
+    if hasattr(_crypto, "grant_many"):
+        count = _crypto.grant_many(scope, batch)
+    else:
+        from ic_basilisk_toolkit.crypto import encode_envelope
+
+        index = {str(e.principal): e for e in _crypto.list_envelopes(scope)}
+        count = 0
+        for principal, dek_hex in batch.items():
+            principal = str(principal)
+            existing = index.get(principal)
+            if existing:
+                if dek_hex:
+                    existing.wrapped_dek = encode_envelope(dek_hex)
+            else:
+                index[principal] = KeyEnvelope(
+                    scope=scope,
+                    principal=principal,
+                    wrapped_dek=encode_envelope(dek_hex or ""),
+                )
+            count += 1
+    return {"success": True, "envelopes_granted": count}
+
+
+def revoke_many(scope: str, principals: list[str]) -> dict[str, Any]:
+    """Revoke access for many principals in a single pass (batch)."""
+    logger.info(f"revoke_many: scope={scope!r} ({len(principals)} principals)")
+    targets = principals or []
+    if hasattr(_crypto, "revoke_many"):
+        count = _crypto.revoke_many(scope, targets)
+    else:
+        target_set = {str(p) for p in targets}
+        count = 0
+        for e in list(_crypto.list_envelopes(scope)):
+            if str(e.principal) in target_set:
+                e.delete()
+                count += 1
+    return {"success": True, "envelopes_revoked": count}
+
+
 # ------------------------------------------------------------------
 # Group operations
 # ------------------------------------------------------------------

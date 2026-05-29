@@ -37,8 +37,10 @@ from api.crypto import group_create as crypto_group_create
 from api.crypto import group_delete as crypto_group_delete
 from api.crypto import group_list as crypto_group_list
 from api.crypto import group_members as crypto_group_members
+from api.crypto import grant_many as crypto_grant_many
 from api.crypto import group_remove_member as crypto_group_remove
 from api.crypto import list_envelopes as crypto_list_envelopes
+from api.crypto import revoke_many as crypto_revoke_many
 from api.crypto import list_scopes as crypto_list_scopes
 from api.crypto import revoke_group as crypto_revoke_group
 from api.crypto import revoke_principal as crypto_revoke_principal
@@ -60,7 +62,12 @@ from api.user import (
     user_update_private_data,
     user_update_public_profile,
 )
-from api.vetkeys import derive_vetkey, get_vetkey_public_key
+from api.vetkeys import (
+    derive_vetkey,
+    derive_vetkey_for_sharing,
+    get_root_public_key,
+    get_vetkey_public_key,
+)
 from api.zones import get_zone_aggregation
 from core.access import _check_access, require, require_controller, set_controller
 from core.task_manager import TaskManager
@@ -1229,19 +1236,18 @@ def derive_my_vetkey(transport_public_key_hex: text) -> RealmResponse:
 
 @update
 @require(Operations.SELF_UPDATE_PRIVATE_DATA)
-def get_vetkey_public_key_for(target_principal: text) -> RealmResponse:
-    """Get the vetKD derived public key for *another* principal's context.
+def get_sharing_root_public_key() -> RealmResponse:
+    """Get the shared *root* vetKD public key used for member data sharing.
 
-    The derived public key is public information used only for encryption
-    (IBE). It can safely be returned to any authenticated caller: only the
-    holder of *target_principal*'s vetKey (derivable solely by that principal
-    via ``derive_my_vetkey``) can decrypt data encrypted under this key.
-
-    Members use this to IBE-wrap their data-encryption key (DEK) for each
-    admin they consent to share their private data with.
+    Unlike :func:`get_my_vetkey_public_key` (one key per principal), this is a
+    single key shared by everyone. The frontend fetches it **once** and derives
+    each recipient's IBE public key locally by using the recipient's principal
+    as the IBE identity — eliminating the previous one-management-call-per-
+    recipient cost. Only the holder of a recipient's sharing vetKey (derivable
+    solely by that principal via :func:`derive_my_sharing_vetkey`) can decrypt.
     """
     try:
-        result = yield get_vetkey_public_key(target_principal)
+        result = yield get_root_public_key()
         if not result["success"]:
             return RealmResponse(
                 success=False, data=RealmResponseData(error=result["error"])
@@ -1252,8 +1258,35 @@ def get_vetkey_public_key_for(target_principal: text) -> RealmResponse:
         )
     except Exception as e:
         logger.error(
-            f"Error getting vetkey public key for {target_principal}: "
-            f"{str(e)}\n{traceback.format_exc()}"
+            f"Error getting sharing root public key: {str(e)}\n{traceback.format_exc()}"
+        )
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@update
+@require(Operations.SELF_UPDATE_PRIVATE_DATA)
+def derive_my_sharing_vetkey(transport_public_key_hex: text) -> RealmResponse:
+    """Derive the caller's sharing vetKey (root context, input = own principal).
+
+    Because the vetKD ``input`` is bound to ``ic.caller()``, a caller can only
+    ever obtain the key for their own identity, and therefore can only decrypt
+    IBE ciphertexts addressed to their principal under the shared root key.
+    """
+    try:
+        result = yield derive_vetkey_for_sharing(
+            ic.caller().to_str(), transport_public_key_hex
+        )
+        if not result["success"]:
+            return RealmResponse(
+                success=False, data=RealmResponseData(error=result["error"])
+            )
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(message=result["encrypted_key_hex"]),
+        )
+    except Exception as e:
+        logger.error(
+            f"Error deriving sharing vetkey: {str(e)}\n{traceback.format_exc()}"
         )
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
@@ -1400,6 +1433,99 @@ def crypto_revoke_from_my_scope(
         )
     except Exception as e:
         logger.error(f"Error revoking from own scope: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+@update
+@require(Operations.SELF_UPDATE_PRIVATE_DATA)
+def crypto_grant_to_my_scope_batch(
+    scope: text, wrapped_deks_json: text
+) -> CryptoResponse:
+    """Grant many principals access to a scope the caller owns, in one call.
+
+    ``wrapped_deks_json`` is a JSON object mapping ``principal -> wrapped_dek``
+    (the DEK IBE-wrapped client-side for each recipient, including the owner).
+    Replacing N update calls with one both saves round-trips and lets the
+    backend upsert all envelopes in a single linear pass.
+    """
+    try:
+        if not _caller_owns_scope(scope):
+            return CryptoResponse(
+                success=False,
+                data=CryptoResponseData(
+                    error="You can only share scopes that you own"
+                ),
+            )
+        try:
+            wrapped_deks = json.loads(wrapped_deks_json)
+        except Exception:
+            return CryptoResponse(
+                success=False,
+                data=CryptoResponseData(error="Invalid wrapped_deks JSON"),
+            )
+        if not isinstance(wrapped_deks, dict):
+            return CryptoResponse(
+                success=False,
+                data=CryptoResponseData(error="wrapped_deks must be a JSON object"),
+            )
+        result = crypto_grant_many(scope, wrapped_deks)
+        if not result["success"]:
+            return CryptoResponse(
+                success=False, data=CryptoResponseData(error=result["error"])
+            )
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(
+                message=f"Granted {result['envelopes_granted']} envelope(s) for {scope}"
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error batch granting to own scope: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+@update
+@require(Operations.SELF_UPDATE_PRIVATE_DATA)
+def crypto_revoke_from_my_scope_batch(
+    scope: text, principals_json: text
+) -> CryptoResponse:
+    """Revoke many principals from a scope the caller owns, in one call.
+
+    ``principals_json`` is a JSON array of principal strings to revoke.
+    """
+    try:
+        if not _caller_owns_scope(scope):
+            return CryptoResponse(
+                success=False,
+                data=CryptoResponseData(
+                    error="You can only revoke access to scopes that you own"
+                ),
+            )
+        try:
+            principals = json.loads(principals_json)
+        except Exception:
+            return CryptoResponse(
+                success=False,
+                data=CryptoResponseData(error="Invalid principals JSON"),
+            )
+        if not isinstance(principals, list):
+            return CryptoResponse(
+                success=False,
+                data=CryptoResponseData(error="principals must be a JSON array"),
+            )
+        result = crypto_revoke_many(scope, principals)
+        if not result["success"]:
+            return CryptoResponse(
+                success=False, data=CryptoResponseData(error=result["error"])
+            )
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(
+                message=f"Revoked {result['envelopes_revoked']} envelope(s) from {scope}"
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error batch revoking from own scope: {e}\n{traceback.format_exc()}")
         return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
 
 

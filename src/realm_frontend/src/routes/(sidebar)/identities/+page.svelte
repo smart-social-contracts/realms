@@ -12,7 +12,7 @@
 	import {
 		buildSharePlan,
 		decryptOwnPrivateData,
-		deriveMyVetKey,
+		deriveMySharingVetKey,
 		PRIVATE_DATA_SCOPE
 	} from '$lib/crypto/sharing';
 
@@ -84,7 +84,7 @@
 
 	async function probeEncryption(): Promise<boolean> {
 		try {
-			await deriveMyVetKey(backend);
+			await deriveMySharingVetKey(backend, get(principal) as string);
 			return true;
 		} catch (e) {
 			console.warn('Encryption probe failed:', e);
@@ -289,27 +289,23 @@
 				return;
 			}
 
-			// Owner's own envelope (so the new ciphertext stays self-decryptable).
-			await backend.crypto_store_my_envelope(scope, plan.selfWrappedDek);
+			// Grant / refresh access for the owner + every consented recipient in a
+			// single batch update call.
+			const granted = Object.keys(plan.wrappedDeks);
+			await backend.crypto_grant_to_my_scope_batch(scope, JSON.stringify(plan.wrappedDeks));
 
-			// Grant / refresh access for each consented recipient.
-			const granted = new Set<string>();
-			for (const [p, wrapped] of Object.entries(plan.recipientWrappedDeks)) {
-				await backend.crypto_grant_to_my_scope(scope, p, wrapped);
-				granted.add(p);
-			}
-
-			// Revoke anyone previously shared with who is no longer a recipient.
-			for (const p of currentlySharedWith) {
-				if (!granted.has(p)) {
-					try {
-						await backend.crypto_revoke_from_my_scope(scope, p);
-					} catch (e) {
-						console.warn(`Failed to revoke ${p}:`, e);
-					}
+			// Revoke anyone previously shared with who is no longer a recipient
+			// (also in one batch call). The owner is never revoked.
+			const grantedSet = new Set(granted);
+			const toRevoke = currentlySharedWith.filter((p) => p !== owner && !grantedSet.has(p));
+			if (toRevoke.length > 0) {
+				try {
+					await backend.crypto_revoke_from_my_scope_batch(scope, JSON.stringify(toRevoke));
+				} catch (e) {
+					console.warn('Failed to batch-revoke stale recipients:', e);
 				}
 			}
-			currentlySharedWith = Array.from(granted);
+			currentlySharedWith = granted.filter((p) => p !== owner);
 
 			privateMessage =
 				recipients.length > 0
