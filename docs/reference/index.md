@@ -43,6 +43,7 @@ Complete reference documentation for the Realms GOS platform.
 **Realm Operators**
 - [Deployment Guide](./DEPLOYMENT_GUIDE) - Deploy your realm
 - [Realm Registration](./REALM_REGISTRATION_GUIDE) - Register with central registry
+- [Realm Lifecycle Stages](./REALM_LIFECYCLE) - Alpha → Beta → Production stages
 - [CLI Reference](./CLI_REFERENCE) - All commands
 
 **Extension Developers**
