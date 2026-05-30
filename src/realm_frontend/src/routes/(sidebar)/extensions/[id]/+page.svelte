@@ -17,7 +17,14 @@
 	import { mountExtension, resolveExtensionVersion, type MountResult } from '$lib/extension-loader';
 	import { loadExtensionTranslation } from '$lib/i18n';
 	import type { RealmExtensionContext } from '$lib/realm-extension-sdk';
-	import { deriveMySharingVetKey, unwrapDek, aesGcmDecryptWithDek } from '$lib/crypto/sharing';
+	import {
+		deriveMySharingVetKey,
+		unwrapDek,
+		aesGcmDecryptWithDek,
+		buildSharePlan,
+		grantScopeData,
+		decryptScopeData
+	} from '$lib/crypto/sharing';
 	import AccessDenied from '$lib/components/AccessDenied.svelte';
 	import { parseAccessError, AccessDeniedError } from '$lib/utils/errors';
 
@@ -112,6 +119,20 @@
 						console.warn('[ctx.crypto] decryptWithEnvelope failed:', e);
 						return null;
 					}
+				},
+				async encryptForRecipients(recipients: string[], data: unknown) {
+					return buildSharePlan(backend, recipients, data);
+				},
+				async grantScope(
+					scope: string,
+					wrappedDeks: Record<string, string>,
+					opts?: { previousRecipients?: string[]; keep?: string[] },
+				) {
+					return grantScopeData(backend, scope, wrappedDeks, opts);
+				},
+				async decryptScope(scope: string, ciphertext: string) {
+					const me = get(principal) as string;
+					return decryptScopeData(backend, scope, me, ciphertext);
 				},
 			},
 			ui: {
