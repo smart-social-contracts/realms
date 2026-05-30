@@ -1612,6 +1612,78 @@ def list_share_audiences() -> RealmResponse:
 
 
 @query
+def directory_list() -> RealmResponse:
+    """Realm directory for entity pickers (e.g. choosing a litigation defendant).
+
+    Returns, as JSON in ``message``, a flat list of ``entries`` — realm users
+    (principal + best display name) and departments (name + head principal) —
+    so any extension can offer name/principal autocomplete via one fast query
+    instead of an expensive per-extension update call. Read-only; exposes only
+    identities already visible across the realm, never private content.
+
+    The client is expected to fetch this once and filter in the browser. We log
+    the instruction count so we can decide whether the simple full-scan needs a
+    projection/index later (see ROADMAP perf notes).
+    """
+    _t0 = ic.performance_counter(0)
+    try:
+        from ggg import Department, User
+
+        entries = []
+
+        user_count = 0
+        for u in User.instances():
+            principal = getattr(u, "id", None)
+            if not principal:
+                continue
+            user_count += 1
+            human = getattr(u, "human", None)
+            human_name = ""
+            if human is not None:
+                human_name = (
+                    getattr(human, "name", None)
+                    or getattr(human, "full_name", None)
+                    or ""
+                )
+            entries.append(
+                {
+                    "kind": "user",
+                    "principal": str(principal),
+                    "label": human_name or (getattr(u, "nickname", "") or "") or str(principal),
+                }
+            )
+
+        dept_count = 0
+        for d in Department.instances():
+            name = getattr(d, "name", "") or ""
+            if not name:
+                continue
+            dept_count += 1
+            head = getattr(d, "head", None)
+            head_principal = str(getattr(head, "id", "")) if head is not None else ""
+            entries.append(
+                {
+                    "kind": "department",
+                    "principal": head_principal,
+                    "label": name,
+                }
+            )
+
+        instructions = ic.performance_counter(0) - _t0
+        logger.info(
+            f"directory_list: {user_count} users + {dept_count} depts "
+            f"({len(entries)} entries) in {instructions} instructions"
+        )
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(message=json.dumps({"entries": entries})),
+        )
+    except Exception as e:
+        logger.error(f"Error in directory_list: {e}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@query
 @require(Operations.REALM_ADMIN)
 def crypto_get_envelopes(scope: text) -> CryptoResponse:
     """List all envelopes for a scope (admin only)."""
