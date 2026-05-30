@@ -1974,8 +1974,8 @@
 
   .realm-badges {
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
+    flex-direction: row;
+    align-items: center;
     gap: 0.4rem;
   }
 

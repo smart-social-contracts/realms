@@ -339,4 +339,7 @@ def get_status() -> "dict[str, Any]":
         "background_image_url": background_image_url,
         "file_registry_canister_id": file_registry_canister_id,
         "marketplace_canister_id": marketplace_canister_id,
+        "realm_logo": logo_url,
+        "realm_description": realm_manifesto,
+        "realm_welcome_image": background_image_url,
     }
