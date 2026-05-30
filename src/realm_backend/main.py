@@ -144,6 +144,9 @@ class StatusRecord(Record):
     background_image_url: text
     file_registry_canister_id: text
     marketplace_canister_id: text
+    realm_logo: text
+    realm_description: text
+    realm_welcome_image: text
 
 
 class UserGetRecord(Record):
@@ -1073,51 +1076,84 @@ def get_my_user_status() -> RealmResponse:
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
+def _seeded_extension_names() -> set:
+    """Return names of extensions that have explicit DB access grants.
+
+    An extension is considered "seeded" when it has at least one user,
+    department, or profile link in the database. Only seeded extensions are
+    subject to strict whitelist filtering; un-seeded extensions fall back to
+    manifest-level profile matching. This prevents a *partial* seed (e.g.
+    installing a single extension, which links only that one to its profiles)
+    from hiding every other extension that has not yet been seeded.
+    """
+    from ggg import Extension
+
+    seeded = set()
+    try:
+        for ext in Extension.instances():
+            try:
+                if list(ext.users) or list(ext.departments) or list(ext.profiles):
+                    seeded.add(ext.name)
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return seeded
+
+
+def _user_granted_extension_names(user) -> set:
+    """Union of extension names directly granted to a user via user, department,
+    or profile links."""
+    granted = set()
+    if not user:
+        return granted
+    for ext in user.extensions:
+        granted.add(ext.name)
+    for dept in user.departments:
+        for ext in dept.extensions:
+            granted.add(ext.name)
+    for profile in user.profiles:
+        for ext in profile.extensions:
+            granted.add(ext.name)
+    return granted
+
+
 @query
 def get_my_extensions() -> text:
     """Return the list of extensions accessible to the calling user.
 
-    Visibility is the union of:
-      - Direct user grants (user.extensions)
-      - Department membership (user.departments → dept.extensions)
-      - Profile-level baseline (user.profiles → profile.extensions)
+    For each installed extension:
+      - If it has been seeded with DB access grants, it is visible only when
+        the user holds a matching user/department/profile grant.
+      - Otherwise (no DB grants for that extension), visibility falls back to
+        manifest-level profile matching.
 
-    When none of the above yield any grants (e.g. profile→extension links
-    have not been seeded yet), falls back to manifest-level profile matching.
+    This per-extension fallback ensures a partial seed never hides extensions
+    that simply have not been linked in the database yet.
 
     Returns JSON: {"success": true, "extensions": ["voting", "vault", ...]}
     """
     try:
-        from ggg import Extension, User
+        from ggg import User
+        from core.runtime_extensions import get_all_extension_manifests
 
         caller = ic.caller().to_str()
         user = User[caller]
         if not user:
             return json.dumps({"success": False, "error": "User not found"})
 
+        user_granted = _user_granted_extension_names(user)
+        seeded = _seeded_extension_names()
+        user_profiles = [p.name for p in user.profiles] if user.profiles else []
+
         visible = set()
-
-        # Direct user grants
-        for ext in user.extensions:
-            visible.add(ext.name)
-
-        # Department grants
-        for dept in user.departments:
-            for ext in dept.extensions:
-                visible.add(ext.name)
-
-        # Profile-level baseline
-        for profile in user.profiles:
-            for ext in profile.extensions:
-                visible.add(ext.name)
-
-        # Fallback: when DB grants are empty, match against manifest profiles
-        if not visible:
-            from core.runtime_extensions import get_all_extension_manifests
-            user_profiles = [p.name for p in user.profiles] if user.profiles else []
-            for ext_id, m in get_all_extension_manifests().items():
-                if not isinstance(m, dict):
-                    continue
+        for ext_id, m in get_all_extension_manifests().items():
+            if not isinstance(m, dict):
+                continue
+            if ext_id in seeded:
+                if ext_id in user_granted:
+                    visible.add(ext_id)
+            else:
                 ext_profiles = m.get("profiles") or []
                 if not ext_profiles or any(p in user_profiles for p in ext_profiles):
                     visible.add(ext_id)
@@ -3646,23 +3682,16 @@ def get_sidebar(args: text) -> text:
         manifests = get_all_extension_manifests()
 
         # Determine which extensions are visible to this user.
-        # Only activate DB-based filtering when there are actual grants;
-        # otherwise fall back to manifest-level profile matching so that
-        # newly registered users (whose profile→extension links may not
-        # yet be seeded) still see the correct sidebar items.
-        visible_extensions = None
-        if user:
-            visible = set()
-            for ext in user.extensions:
-                visible.add(ext.name)
-            for dept in user.departments:
-                for ext in dept.extensions:
-                    visible.add(ext.name)
-            for profile in user.profiles:
-                for ext in profile.extensions:
-                    visible.add(ext.name)
-            if visible:
-                visible_extensions = visible
+        #
+        # Strict DB-based whitelist filtering is applied ONLY to extensions
+        # that have actually been seeded with access grants in the database.
+        # Extensions with no DB grants fall back to manifest-level profile
+        # matching. This per-extension fallback means a partial seed (e.g.
+        # installing a single extension, which links only that one to its
+        # profiles) never hides every other extension that has not yet been
+        # seeded, while still honoring explicit DB grants where they exist.
+        user_granted = _user_granted_extension_names(user)
+        seeded_extensions = _seeded_extension_names()
 
         # Apply department visibility rules
         hidden_by_dept = set()
@@ -3701,10 +3730,11 @@ def get_sidebar(args: text) -> text:
             if ext_id in hidden_by_dept:
                 continue
 
-            # Profile-based filtering
+            # Profile-based filtering (per-extension: strict whitelist only for
+            # seeded extensions, manifest fallback for the rest).
             ext_profiles = m.get("profiles") or []
-            if visible_extensions is not None:
-                if ext_id not in visible_extensions:
+            if ext_id in seeded_extensions:
+                if ext_id not in user_granted:
                     continue
             elif ext_profiles:
                 if not any(p in user_profiles for p in ext_profiles):

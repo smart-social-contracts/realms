@@ -1,6 +1,6 @@
-import type { Principal } from '@dfinity/principal';
-import type { ActorMethod } from '@dfinity/agent';
-import type { IDL } from '@dfinity/candid';
+import type { Principal } from '@icp-sdk/core/principal';
+import type { ActorMethod } from '@icp-sdk/core/agent';
+import type { IDL } from '@icp-sdk/core/candid';
 
 export interface Account {
   'owner' : Principal,
@@ -138,7 +138,7 @@ export type Callback = ActorMethod<
 >;
 export interface CallbackStrategy {
   'token' : StreamingToken,
-  'callback' : Callback,
+  'callback' : [Principal, string],
 }
 export interface CanisterInfo {
   'canister_id' : string,
@@ -486,7 +486,7 @@ export interface HttpResponseIncoming {
   'status_code' : number,
 }
 export interface HttpTransform {
-  'function' : HttpTransformFunc,
+  'function' : [Principal, string],
   'context' : Uint8Array | number[],
 }
 export interface HttpTransformArgs {
@@ -702,7 +702,7 @@ export interface QueryBlocksResponse {
   'archived_blocks' : Array<QueryBlocksResponse_archived_blocks>,
 }
 export interface QueryBlocksResponse_archived_blocks {
-  'callback' : QueryArchiveFn,
+  'callback' : [Principal, string],
   'start' : bigint,
   'length' : bigint,
 }
@@ -951,6 +951,8 @@ export interface UpdateSettingsArgs {
   'canister_id' : Principal,
   'settings' : CanisterSettings,
 }
+export type UpgradeResult = { 'Ok' : string } |
+  { 'Err' : string };
 export interface UserCreditsRecord {
   'total_spent' : bigint,
   'balance' : bigint,
@@ -992,6 +994,14 @@ export interface VerifyOk {
   'module_hash' : string,
   'reason' : string,
 }
+export interface VersionInfoRecord {
+  'backend_wasm_hash' : string,
+  'backend_wasm_url' : string,
+  'published_at' : number,
+  'frontend_tar_url' : string,
+  'version' : string,
+  'frontend_tar_hash' : string,
+}
 export interface _SERVICE {
   '__get_candid_interface_tmp_hack' : ActorMethod<[], string>,
   'add_credits' : ActorMethod<
@@ -1000,11 +1010,13 @@ export interface _SERVICE {
   >,
   'billing_status' : ActorMethod<[], GetBillingStatusResult>,
   'create_invitation_codes' : ActorMethod<[string], GenericResult>,
+  'deactivate_principal' : ActorMethod<[string], GenericResult>,
   'deduct_credits' : ActorMethod<[string, bigint, string], DeductCreditsResult>,
   'deployment_failed' : ActorMethod<[string, string, string], string>,
   'deployment_succeeded' : ActorMethod<[string, string], string>,
   'get_credits' : ActorMethod<[string], GetCreditsResult>,
   'get_invitation_mode' : ActorMethod<[], GenericResult>,
+  'get_latest_version' : ActorMethod<[], UpgradeResult>,
   'get_realm' : ActorMethod<[string], GetRealmResult>,
   'get_transactions' : ActorMethod<[string, bigint], TransactionHistoryResult>,
   'greet' : ActorMethod<[string], string>,
@@ -1012,6 +1024,8 @@ export interface _SERVICE {
   'list_activated_principals' : ActorMethod<[], string>,
   'list_invitation_codes' : ActorMethod<[], string>,
   'list_realms' : ActorMethod<[], Array<RealmRecord>>,
+  'list_versions' : ActorMethod<[], string>,
+  'publish_version' : ActorMethod<[string], UpgradeResult>,
   'realm_count' : ActorMethod<[], bigint>,
   'redeem_invitation_code' : ActorMethod<[string], GenericResult>,
   'register_realm' : ActorMethod<
@@ -1020,8 +1034,8 @@ export interface _SERVICE {
   >,
   'remove_realm' : ActorMethod<[string], AddRealmResult>,
   'request_deployment' : ActorMethod<[string], string>,
+  'request_upgrade' : ActorMethod<[string], string>,
   'revoke_invitation_code' : ActorMethod<[string], GenericResult>,
-  'deactivate_principal' : ActorMethod<[string], GenericResult>,
   'search_realms' : ActorMethod<[string], Array<RealmRecord>>,
   'set_invitation_mode' : ActorMethod<[string], GenericResult>,
   'status' : ActorMethod<[], GetStatusResult>,

@@ -73,9 +73,11 @@ export const idlFactory = ({ IDL }) => {
     'registry_canister_id' : IDL.Text,
     'backend_canister_id' : IDL.Text,
     'offchain_deployer_principal' : IDL.Text,
+    'expected_frontend_wasm_hash' : IDL.Text,
     'ext_deploy_task_id' : IDL.Text,
     'assets_verified' : IDL.Int8,
     'network' : IDL.Text,
+    'frontend_wasm_verified' : IDL.Int8,
     'nft_frontend_canister_id' : IDL.Text,
     'created_at' : IDL.Nat64,
     'error' : IDL.Text,
@@ -89,6 +91,7 @@ export const idlFactory = ({ IDL }) => {
     'completed_at' : IDL.Nat64,
     'token_backend_canister_id' : IDL.Text,
     'actual_assets_hash' : IDL.Text,
+    'actual_frontend_wasm_hash' : IDL.Text,
     'frontend_canister_id' : IDL.Text,
     'nft_backend_canister_id' : IDL.Text,
   });
@@ -192,8 +195,10 @@ export const idlFactory = ({ IDL }) => {
     'status' : IDL.Text,
     'assets_verified' : IDL.Int8,
     'failed_verification' : IDL.Bool,
+    'frontend_wasm_verified' : IDL.Bool,
     'job_id' : IDL.Text,
     'actual_assets_hash' : IDL.Text,
+    'actual_frontend_wasm_hash' : IDL.Text,
   });
   const ResultReportFrontend = IDL.Variant({
     'Ok' : ReportFrontendOk,
@@ -208,7 +213,9 @@ export const idlFactory = ({ IDL }) => {
   });
   const ResultVerify = IDL.Variant({ 'Ok' : VerifyOk, 'Err' : InstallerError });
   return IDL.Service({
+    '__browse__' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     '__get_candid_interface_tmp_hack' : IDL.Func([], [IDL.Text], ['query']),
+    '__shell__' : IDL.Func([IDL.Text], [IDL.Text], []),
     'allocate_deployment_canisters' : IDL.Func(
         [IDL.Text],
         [ResultAllocate],
@@ -218,7 +225,6 @@ export const idlFactory = ({ IDL }) => {
     'debug_resume_deploys' : IDL.Func([IDL.Text], [ResultDebugResume], []),
     'debug_run_one_step' : IDL.Func([IDL.Text], [ResultDebugRunStep], []),
     'enqueue_deployment' : IDL.Func([IDL.Text], [ResultEnqueue], []),
-    '__shell__' : IDL.Func([IDL.Text], [IDL.Text], []),
     'get_canister_logs' : IDL.Func(
         [
           IDL.Opt(IDL.Nat),

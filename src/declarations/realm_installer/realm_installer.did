@@ -88,7 +88,7 @@ type SymbolResult = record { symbol : text };
 type NameResult = record { name : text };
 type DecimalsResult = record { decimals : nat32 };
 type InstallerError = record { message : text; traceback : text };
-type DeploymentJobView = record { job_id : text; status : text; realm_name : text; caller_principal : text; network : text; backend_canister_id : text; frontend_canister_id : text; token_backend_canister_id : text; token_frontend_canister_id : text; nft_backend_canister_id : text; nft_frontend_canister_id : text; expected_wasm_hash : text; expected_assets_hash : text; actual_wasm_hash : text; actual_assets_hash : text; wasm_verified : int8; assets_verified : int8; ext_deploy_task_id : text; offchain_deployer_principal : text; registry_canister_id : text; error : text; created_at : nat64; completed_at : nat64 };
+type DeploymentJobView = record { job_id : text; status : text; realm_name : text; caller_principal : text; network : text; backend_canister_id : text; frontend_canister_id : text; token_backend_canister_id : text; token_frontend_canister_id : text; nft_backend_canister_id : text; nft_frontend_canister_id : text; expected_wasm_hash : text; expected_assets_hash : text; expected_frontend_wasm_hash : text; actual_wasm_hash : text; actual_assets_hash : text; actual_frontend_wasm_hash : text; wasm_verified : int8; assets_verified : int8; frontend_wasm_verified : int8; ext_deploy_task_id : text; offchain_deployer_principal : text; registry_canister_id : text; error : text; created_at : nat64; completed_at : nat64 };
 type PendingJobEntry = record { job : DeploymentJobView; manifest : text };
 type PendingJobsOk = record { jobs : vec PendingJobEntry; count : nat32 };
 type JobsListOk = record { jobs : vec DeploymentJobView; count : nat32 };
@@ -99,7 +99,7 @@ type EnqueueOk = record { job_id : text; status : text; realm_name : text; netwo
 type JobStatusAck = record { job_id : text; prev_status : text; status : text; noop : bool };
 type AllocateOk = record { job_id : text; backend_canister_id : text; frontend_canister_id : text; already_allocated : bool };
 type ReportReadyOk = record { job_id : text; status : text; wasm_verified : bool; actual_wasm_hash : text; extensions_started : bool; expected_wasm_hash : text; failed_verification : bool };
-type ReportFrontendOk = record { job_id : text; status : text; actual_assets_hash : text; assets_verified : int8; failed_verification : bool };
+type ReportFrontendOk = record { job_id : text; status : text; actual_assets_hash : text; assets_verified : int8; actual_frontend_wasm_hash : text; frontend_wasm_verified : bool; failed_verification : bool };
 type VerifyOk = record { backend_canister_id : text; module_hash : text; verified : bool; reason : text; expected_wasm_hash : text };
 type VerificationReport = record { job_id : text; backend_canister_id : text; frontend_canister_id : text; expected_wasm_hash : text; expected_assets_hash : text; actual_wasm_hash : text; actual_assets_hash : text; wasm_verified : int8; assets_verified : int8; status : text };
 type DebugRunStepOk = record { message : text; task_status : text; step_idx : nat32; step_kind : text; step_label : text; step_status : text; step_error : text; remaining_pending : nat32 };
@@ -254,6 +254,7 @@ service : {
   "verify_realm" : (text) -> (ResultVerify);
   "get_verification_report" : (text) -> (ResultVerificationReport) query;
   "__shell__" : (text) -> (text);
+  "__browse__" : (text) -> (text) query;
   "debug_run_one_step" : (text) -> (ResultDebugRunStep);
   "debug_resume_deploys" : (text) -> (ResultDebugResume);
   "get_canister_logs" : (opt nat, opt nat, opt text, opt text) -> (vec PublicLogEntry) query;

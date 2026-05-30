@@ -1,6 +1,6 @@
-import type { Principal } from '@dfinity/principal';
-import type { ActorMethod } from '@dfinity/agent';
-import type { IDL } from '@dfinity/candid';
+import type { Principal } from '@icp-sdk/core/principal';
+import type { ActorMethod } from '@icp-sdk/core/agent';
+import type { IDL } from '@icp-sdk/core/candid';
 
 export interface Account {
   'owner' : Principal,
@@ -138,7 +138,7 @@ export type Callback = ActorMethod<
 >;
 export interface CallbackStrategy {
   'token' : StreamingToken,
-  'callback' : Callback,
+  'callback' : [Principal, string],
 }
 export interface CanisterInfo {
   'canister_id' : string,
@@ -285,9 +285,11 @@ export interface DeploymentJobView {
   'registry_canister_id' : string,
   'backend_canister_id' : string,
   'offchain_deployer_principal' : string,
+  'expected_frontend_wasm_hash' : string,
   'ext_deploy_task_id' : string,
   'assets_verified' : number,
   'network' : string,
+  'frontend_wasm_verified' : number,
   'nft_frontend_canister_id' : string,
   'created_at' : bigint,
   'error' : string,
@@ -301,6 +303,7 @@ export interface DeploymentJobView {
   'completed_at' : bigint,
   'token_backend_canister_id' : string,
   'actual_assets_hash' : string,
+  'actual_frontend_wasm_hash' : string,
   'frontend_canister_id' : string,
   'nft_backend_canister_id' : string,
 }
@@ -486,7 +489,7 @@ export interface HttpResponseIncoming {
   'status_code' : number,
 }
 export interface HttpTransform {
-  'function' : HttpTransformFunc,
+  'function' : [Principal, string],
   'context' : Uint8Array | number[],
 }
 export interface HttpTransformArgs {
@@ -702,7 +705,7 @@ export interface QueryBlocksResponse {
   'archived_blocks' : Array<QueryBlocksResponse_archived_blocks>,
 }
 export interface QueryBlocksResponse_archived_blocks {
-  'callback' : QueryArchiveFn,
+  'callback' : [Principal, string],
   'start' : bigint,
   'length' : bigint,
 }
@@ -771,8 +774,10 @@ export interface ReportFrontendOk {
   'status' : string,
   'assets_verified' : number,
   'failed_verification' : boolean,
+  'frontend_wasm_verified' : boolean,
   'job_id' : string,
   'actual_assets_hash' : string,
+  'actual_frontend_wasm_hash' : string,
 }
 export interface ReportReadyOk {
   'status' : string,
@@ -887,13 +892,13 @@ export interface StatusRecord {
   'is_caller_controller' : boolean,
   'mandates_count' : bigint,
   'tasks_count' : bigint,
+  'realm_manifesto' : string,
   'votes_count' : bigint,
   'licenses_count' : bigint,
   'commit_datetime' : string,
   'likes_count' : bigint,
   'users_count' : bigint,
   'parent_realm_canister_id' : string,
-  'realm_manifesto' : string,
   'trades_count' : bigint,
   'accounting_currency' : string,
   'quarters' : Array<QuarterInfoRecord>,
@@ -1028,13 +1033,14 @@ export interface VerifyOk {
   'reason' : string,
 }
 export interface _SERVICE {
+  '__browse__' : ActorMethod<[string], string>,
   '__get_candid_interface_tmp_hack' : ActorMethod<[], string>,
+  '__shell__' : ActorMethod<[string], string>,
   'allocate_deployment_canisters' : ActorMethod<[string], ResultAllocate>,
   'cancel_deployment' : ActorMethod<[string], ResultJobCancel>,
   'debug_resume_deploys' : ActorMethod<[string], ResultDebugResume>,
   'debug_run_one_step' : ActorMethod<[string], ResultDebugRunStep>,
   'enqueue_deployment' : ActorMethod<[string], ResultEnqueue>,
-  '__shell__' : ActorMethod<[string], string>,
   'get_canister_logs' : ActorMethod<
     [[] | [bigint], [] | [bigint], [] | [string], [] | [string]],
     Array<PublicLogEntry>
