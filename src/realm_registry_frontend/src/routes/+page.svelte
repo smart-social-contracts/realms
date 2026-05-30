@@ -169,7 +169,7 @@
         'realm_name': IDL.Text,
         'realm_manifesto': IDL.Text,
         'realm_welcome_message': IDL.Text,
-        'realm_stage': IDL.Text,
+        'realm_stage': IDL.Opt(IDL.Text),
         'user_profiles_count': IDL.Nat,
       });
       const ApiResponse = IDL.Record({
@@ -215,7 +215,7 @@
               users_count: Number(statusData.users_count),
               manifesto: statusData.realm_manifesto || '',
               realm_name: statusData.realm_name || '',
-              realm_stage: statusData.realm_stage || 'alpha',
+              realm_stage: (Array.isArray(statusData.realm_stage) ? statusData.realm_stage[0] : statusData.realm_stage) || 'alpha',
             };
           } else {
             console.warn(`Status call failed or no status data for ${realm.id}:`, response);

@@ -1,10 +1,14 @@
-# Quarters: Horizontal Scalability Architecture
+# Quarters: Federation Through a Shared Codex
 
 ## Overview
 
-Quarters enable Realms to scale horizontally. Each quarter is a **full, autonomous realm backend** that participates in a **federation** — a group of quarters sharing a common manifest, extensions, and governance framework. Any quarter can **secede** at any time to become an independent realm, taking all its users and data with it.
+A **realm is a set of quarters that run the same codex.** The codex is the realm's constitution — it encodes every policy: admission, fees, governance, taxation, justice, assignment. Quarters are sovereign demoi (each home to up to a few thousand users) that belong to a realm because their users collectively choose to adopt its codex.
 
-This design supports the core Realms GOS principle: **opting out must always be frictionless**.
+The whole architecture reduces to one primitive:
+
+> **A realm is a shared codex. The capital quarter is its origin and pusher. Admission = receive the codex. Governance = amend the codex. Dissent = fork. Secession = drop the codex.**
+
+Everything else — capital, fees, taxation, reputation — is policy *inside* the codex, not load-bearing infrastructure.
 
 ---
 
@@ -12,26 +16,28 @@ This design supports the core Realms GOS principle: **opting out must always be 
 
 | Term | Definition |
 |------|-----------|
-| **Quarter** | A full realm backend canister that participates in a federation. Holds its own users, governance data, extensions. |
-| **Capital** | The quarter designated as the federation coordinator. Hosts the federation codex, coordinates realm-wide votes, tax aggregation. It is still a quarter — holds users, runs governance — and can be moved by vote. |
-| **Federation** | A group of quarters sharing a manifest, extensions, and governance framework. Communication is peer-to-peer. |
-| **Home quarter** | The quarter where a user is registered with full rights (vote, propose, tax obligations). |
-| **Guest access** | Lightweight presence on a non-home quarter (transact, view, participate in local events — no governance weight). |
-| **Secession** | A quarter leaving the federation to become an independent realm. Zero data migration required. |
+| **Quarter** | A full, sovereign realm backend canister, home to up to a few thousand users. Holds its own users, governance data, and extensions. Acts as a collective entity via its codex (decisions made by its users' votes). |
+| **Realm** | The set of quarters running the same codex. Membership *is* codex-adherence. |
+| **Codex** | The shared constitution of a realm. Encodes all policy. Distributed from the capital on admission and on amendment. |
+| **Capital** | The quarter that is the codex's origin and pusher, and the gate for admission. It is still an ordinary quarter (holds users, runs governance). Its only realm-wide powers are **admission** and **codex propagation** — both disciplined by every quarter's freedom to secede. |
+| **Secession** | A quarter dropping the codex and ceasing to sync. Frictionless: all users and data stay with the quarter. |
+| **Fork** | A contentious amendment splits the realm: quarters on the new codex and quarters on the old codex are, by definition, now two realms. Dissent is automatic and frictionless. |
 
 ---
 
 ## Design Principles
 
-1. **A quarter IS a realm.** Same WASM, same entities, same API surface. The only difference is two flags (`is_quarter`, `is_capital`) and a `federation_realm_id`.
+1. **A quarter IS a realm backend.** Same WASM, same entities, same API surface. A quarter is distinguished only by flags (`is_quarter`, `is_capital`) and the codex it runs.
 
-2. **Federation is an opt-in overlay.** Every quarter is born as a full realm that *chooses* to participate. The federation layer is useful but not load-bearing.
+2. **The codex defines the realm.** Two quarters are in the same realm iff they run the same codex. No shared codex, no shared realm.
 
-3. **No quarter depends on another to function.** If the capital goes down, quarters keep operating locally. Realm-wide governance pauses but local governance continues.
+3. **Quarters are sovereign.** No quarter depends on another to function. Users register directly on the quarter they choose and pay that quarter's fees. There is no global user registry and no cross-quarter "guest" presence — to participate in another quarter, you register there.
 
-4. **One frontend serves all quarters.** The frontend is a static SvelteKit app served from a single asset canister. It dynamically switches which backend canister it talks to.
+4. **The capital is a pusher, not a ruler.** Its two central functions (admission, codex propagation) are real but bounded: any quarter can secede at any time, so the capital's power is continuously re-tested by the exit option.
 
-5. **Opting out is frictionless.** Secession = flip a flag. All users, data, governance, extensions remain intact.
+5. **Centralization is allowed where users tolerate it.** If a realm's codex encodes a strong capital — even a monarchy — and users keep choosing it, that is a legitimate outcome. The system stays neutral; the codex carries the values.
+
+6. **Opting out is frictionless.** Secession = drop the codex and stop syncing. All users, data, governance, and extensions remain intact.
 
 ---
 
@@ -47,181 +53,102 @@ This design supports the core Realms GOS principle: **opting out must always be 
               │               │               │
      ┌────────▼───┐  ┌───────▼──────┐  ┌─────▼──────┐
      │ Capital    │  │  Quarter B   │  │ Quarter C  │  ... × N
-     │ (Quarter A)│←→│              │←→│            │  (peer gossip)
-     │ ~1000 users│  │  ~1000 users │  │ ~1000 users│
+     │ (codex      │→ │  (runs codex)│  │(runs codex)│
+     │  origin)    │  │              │  │            │
+     │ ≤ few k     │  │  ≤ few k     │  │ ≤ few k    │
      └────────────┘  └──────────────┘  └────────────┘
+        admission +        sovereign        sovereign
+        codex push
 ```
 
-- **Capital** coordinates realm-wide governance but is logically equal to other quarters.
-- **Peer gossip** syncs quarter list + population counts between all quarters.
-- **Frontend** bootstraps from the capital's canister ID (baked in at build time), then routes dynamically.
+- The **capital** originates and pushes the codex, and gates admission.
+- Each **quarter** is otherwise sovereign: its own users, governance, fees.
+- The **frontend** is one static SvelteKit asset canister that dynamically switches which backend quarter it talks to. It bootstraps from the capital's canister ID (baked in at build time).
 
 ---
 
-## What Quarters Share
+## The Codex
 
-- **Manifest** (`manifest.json`) — source of truth lives on the capital; quarters hold copies.
-- **Extensions** — same set deployed to all quarters.
-- **Federation Codex** — realm-wide governance rules (tax policy, voting rules, quarter assignment strategy).
+The codex is the only thing quarters of a realm share. It encodes, at minimum:
 
-## What Quarters Own Independently
+- **Admission policy** — who may join the realm, and on what terms.
+- **Fee policy** — registration and maintenance fees per quarter, ideally set by supply/demand and technical constraints. Fees are the natural assignment mechanism: users register where they choose and pay accordingly.
+- **Governance** — how proposals are made, who votes, how amendments are ratified.
+- **Capital policy** — whether and how capital-hood can move (advocated: by realm-wide vote across all quarters).
+- **Taxation/tributes (optional)** — the codex may require quarters to pay tributes to the capital. This is allowed but not built-in; absence of tribute policy means no tribute.
+- **Justice, duplicates, sanctions** — how cross-quarter misbehaviour (e.g. duplicate registrations) is detected and punished. Detection is ex-post and codex-driven, analogous to how analog societies handle it — not prevented by central infrastructure.
 
-- **Users** — each user has one home quarter.
-- **Governance data** — proposals, votes, disputes, etc. local to the quarter.
-- **Zones** — potentially same or different geographic zones.
-
----
-
-## User Model
-
-### Home Quarter (Full Membership)
-- User's `User` entity lives here with full profiles and permissions.
-- Votes on realm-wide proposals are counted via home quarter.
-- Tax obligations apply here.
-- Subject to this quarter's justice system.
-- On secession, user goes with the quarter.
-
-### Guest Access (Lightweight)
-- `GuestUser` entity on non-home quarters (principal + home quarter reference + permissions).
-- Can transact, view content, participate in local events.
-- No governance weight (no voting, no proposing).
-- Severed on secession of either quarter.
-
-### Registration Flow
-1. User opens frontend → connects to capital (bootstrap canister ID).
-2. Capital runs assignment strategy (least populated / user choice / codex-defined).
-3. Capital returns assigned quarter canister ID.
-4. Frontend switches actor to the assigned quarter.
-5. User registers on the assigned quarter (this is their home).
-
-### Returning User Flow
-1. Frontend checks localStorage for cached `home_quarter` canister ID.
-2. If cache hit → connect directly to home quarter.
-3. If cache miss → call capital's `get_my_user_status()` → get `home_quarter`.
-4. If capital unavailable → broadcast query to known quarters (slow fallback).
+There is no quantized, system-level reputation. Reputation is whatever a subject infers about another from available records; the codex (and users) decide what to do with it.
 
 ---
 
-## Assignment Strategies
+## Users
 
-Defined in the federation codex (`assign_quarter` function). Built-in strategies:
-
-1. **random** — `hash(principal) % len(active_quarters)` → uniform load.
-2. **user_choice** — honour user's preference if quarter has capacity.
-3. **least_populated** — pick quarter with fewest residents.
-
-Custom codexes can implement arbitrary rules (geography, invitation codes, profile attributes).
+- A user registers directly on the quarter of their choice and pays that quarter's fees.
+- A user is present only on quarters where they have registered. There is **no GuestUser** and no seamless cross-quarter presence — visiting another quarter means registering there.
+- Duplicate identities across quarters are not prevented by infrastructure. They are detected after the fact and sanctioned per the codex if disallowed.
 
 ---
 
-## Auto-Scaling
+## Admission
 
-When all active quarters exceed `MAX_POPULATION`:
-1. Any quarter (or the capital) detects the condition.
-2. Creates a new canister via `ic.create_canister()`.
-3. Deploys the same WASM with the same manifest/extensions.
-4. Announces the new quarter to peers via gossip.
-5. New registrations are directed to the new quarter.
+1. A prospective quarter requests admission from the capital.
+2. The capital applies the realm's codex admission policy.
+3. On acceptance, the quarter **receives the codex** and begins running it. It is now part of the realm.
 
----
-
-## Secession
-
-A quarter declares independence:
-1. Set `is_quarter = False`, `is_capital = False`, clear `federation_realm_id`.
-2. Stop participating in peer gossip.
-3. Deploy own frontend asset canister (optional — can reuse existing).
-4. All local users, data, governance, extensions remain intact.
-5. Former peers remove it from their quarter list.
-6. Guest users from/to this quarter lose cross-access.
-
-**Joining a federation** is the reverse: set `is_quarter = True`, configure `federation_realm_id`, start gossip, register with peers.
+Admission is the capital's gate. Whether a previously-seceded quarter re-enters with its prior history or cold is up to the codex.
 
 ---
 
-## Data Model Changes
+## Governance: Amendment, Fork, Secession
 
-### Realm Entity
-```python
-# Existing
-is_quarter = Boolean(default=False)
-federation_realm_id = String(max_length=64)
+- **Amendment.** The capital pushes codex amendments. Ratification follows the codex's own rules (advocated: realm-wide vote involving all quarters). A fast sync mechanism propagates the new codex; transient version skew during rollout is handled by syncing, not by special-casing.
 
-# New
-is_capital = Boolean(default=False)  # This quarter coordinates federation governance
-```
+- **Fork (dissent).** Because "same codex = same realm," a quarter that rejects an amendment is — by definition — running a different codex, hence a different realm. A contentious amendment therefore *splits* the realm rather than coercing a minority. A realm-wide vote is thus a **coordination signal** (which codex version keeps the most quarters together), not an enforcement act.
 
-### User Entity
-```python
-# New
-home_quarter = String(max_length=64)  # Canister ID of user's home quarter
-```
+- **Secession.** A quarter drops the codex and stops syncing. All its users and data remain intact. Former peers remove it from the realm. This is the only hard check in the system, and it disciplines the capital's admission and propagation powers.
 
-### GuestUser Entity (New)
-```python
-class GuestUser(Entity):
-    principal = String()           # Visitor's IC principal
-    home_quarter = String()        # Where they actually live
-    permissions = String()         # What they can do here
-```
+---
 
-### Quarter Entity (Existing — No Changes Needed)
+## Data Model
+
+### Quarter Entity
 ```python
 class Quarter(Entity, TimestampedMixin):
     name = String()
-    canister_id = String()         # Backend canister principal
+    canister_id = String()         # backend canister principal
     federation = ManyToOne("Realm", "quarter_ids")
     population = Integer(default=0)
     status = String(default="active")  # active/suspended/splitting/merging
 ```
 
----
+### Realm Flags
+```python
+is_quarter = Boolean(default=False)
+is_capital = Boolean(default=False)   # codex origin + admission gate
+federation_realm_id = String(max_length=64)
+codex_version = String(max_length=64) # current codex version this quarter runs
+```
 
-## API Changes
-
-### Modified Endpoints
-
-| Endpoint | Change |
-|----------|--------|
-| `join_realm(profile, preferred_quarter)` | Persist `home_quarter` on User entity after assignment |
-| `get_my_user_status()` | Return stored `home_quarter` instead of `""` |
-| `change_quarter(new_quarter_canister_id)` | Persist new `home_quarter` on User entity |
-
-### New Endpoints
-
-| Endpoint | Purpose |
-|----------|---------|
-| `declare_independence()` | Secede from federation |
-| `join_federation(capital_canister_id)` | Join an existing federation |
-| `sync_quarters()` | Peer gossip: exchange quarter list + populations |
-| `register_guest(principal, home_quarter)` | Create GuestUser for cross-quarter access |
+No `home_quarter` on users, no `GuestUser` entity, no central tax aggregator. Those are removed from the model; any equivalent behaviour, if desired, lives in the codex.
 
 ---
 
-## Frontend Changes
+## Frontend
 
-1. **Auto-routing on login** — after `get_my_user_status()`, call `setActiveQuarter(home_quarter)`.
-2. **Two-step join** — register on capital, get assignment, register on assigned quarter.
-3. **Guest mode** — `QuarterSelector` already exists; tag non-home quarters as "guest" in the UI.
-4. **localStorage cache** — persist `home_quarter` canister ID for instant reconnect.
+1. **Bootstrap** from the capital's canister ID (baked in at build time).
+2. **Quarter selection** — the user picks/registers on a quarter; the frontend switches its actor to that quarter's backend.
+3. **localStorage cache** — remember the user's quarter canister ID for instant reconnect.
 
 ---
 
-## Implementation Phases
+## What Changed From the Earlier Design
 
-### Phase 1: Core Loop (High Priority)
-- Add `is_capital` to Realm entity
-- Add `home_quarter` to User entity
-- Fix `join_realm()`, `get_my_user_status()`, `change_quarter()` to persist/read `home_quarter`
-- Frontend auto-routing on login
-- Frontend two-step join flow
+This document supersedes an earlier, heavier design. Removed or reframed:
 
-### Phase 2: Federation (Medium Priority)
-- GuestUser entity + `register_guest` endpoint
-- Peer gossip (`sync_quarters` inter-canister calls)
-- `declare_independence()` / `join_federation()` endpoints
-- CLI `--capital` flag for `quarter create`
-
-### Phase 3: Automation (Low Priority)
-- Auto-provisioning new quarters at capacity
-- Optional QuarterRouter canister (cache/accelerator, not required)
+- **GuestUser / cross-quarter guest presence** — removed. Participation requires registration on the target quarter.
+- **Central tax aggregation** — removed as a built-in; optional tributes can be encoded in the codex.
+- **`home_quarter` on User** — removed; users simply register where they choose.
+- **Built-in random assignment** — removed as a default; assignment is governed by codex fee policy (supply/demand).
+- **Capital as governance coordinator** — reframed: the capital is the codex origin + admission gate + pusher, nothing more.
+- **Quantized reputation** — removed; reputation is interpretive and codex/user-driven.
