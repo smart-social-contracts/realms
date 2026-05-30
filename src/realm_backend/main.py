@@ -1666,6 +1666,10 @@ def directory_list() -> RealmResponse:
                     "kind": "department",
                     "principal": head_principal,
                     "label": name,
+                    # Stable department identifier so callers can record the
+                    # department itself as a target (e.g. litigation defendant),
+                    # independent of whoever currently heads it.
+                    "id": str(getattr(d, "_id", "") or ""),
                 }
             )
 
