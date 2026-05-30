@@ -165,46 +165,73 @@
 							</svg>
 						</button>
 					</li>
-					{#if !collapsedCategories.has('__section_realm__')}
+				</ul>
+
+				{#if !collapsedCategories.has('__section_realm__')}
+					<!-- Welcome items (My Dashboard, etc.) -->
+					<ul class="pb-1 space-y-1">
 						{#each $sidebarConfig.welcomeItems as item}
 							{@const IconComp = getTablerIcon(item.icon)}
 							<li>
 								<a 
 									href={item.href}
-									class={cn(
-										styles.sidebar.item(),
-										isActive(item.href) ? 'bg-gray-100 font-medium' : ''
-									)}
+									class={styles.sidebar.item()}
 								>
 									<svelte:component this={IconComp} size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
 									<span class="ml-3">{item.label}</span>
 								</a>
 							</li>
 						{/each}
-					{/if}
-				</ul>
+					</ul>
 
-				<!-- Category sections (collapsible) -->
-				{#each $sidebarConfig.categories as category (category.id)}
-					<ul class="pt-2 pb-1 space-y-1">
-						<li class="px-3 pt-2 pb-1">
-							<button
-								class="flex items-center justify-between w-full cursor-pointer group/cat"
-								on:click={() => toggleCategory(category.id)}
-							>
-								<h3 class={styles.sidebar.categoryHeader()}>
-									{category.label}
-								</h3>
-								<svg
-									class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200 {collapsedCategories.has(category.id) ? '-rotate-90' : ''}"
-									fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+					<!-- Category sections (collapsible) -->
+					{#each $sidebarConfig.categories as category (category.id)}
+						<ul class="pt-2 pb-1 space-y-1">
+							<li class="px-3 pt-2 pb-1">
+								<button
+									class="flex items-center justify-between w-full cursor-pointer group/cat"
+									on:click={() => toggleCategory(category.id)}
 								>
-									<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-								</svg>
-							</button>
-						</li>
-						{#if !collapsedCategories.has(category.id)}
-							{#each category.items as item}
+									<h3 class={styles.sidebar.categoryHeader()}>
+										{category.label}
+									</h3>
+									<svg
+										class="w-3.5 h-3.5 text-gray-400 transition-transform duration-200 {collapsedCategories.has(category.id) ? '-rotate-90' : ''}"
+										fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+									>
+										<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+									</svg>
+								</button>
+							</li>
+							{#if !collapsedCategories.has(category.id)}
+								{#each category.items as item}
+									{@const IconComp = getTablerIcon(item.icon)}
+									<li>
+										<a 
+											href={item.href}
+											class={cn(
+												styles.sidebar.item(),
+												isActive(item.href) ? 'bg-gray-100 font-medium' : ''
+											)}
+										>
+											<svelte:component this={IconComp} size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
+											<span class="ml-3">{item.label}</span>
+										</a>
+									</li>
+								{/each}
+							{/if}
+						</ul>
+					{/each}
+
+					<!-- MY MUNDUS section (super-category) -->
+					{#if $sidebarConfig.mundusItems.length > 0}
+						<ul class="pt-4 pb-1 space-y-1">
+							<li class="px-3 py-2">
+								<h3 class={styles.sidebar.sectionHeader()}>
+									{SECTION_HEADER_MUNDUS}
+								</h3>
+							</li>
+							{#each $sidebarConfig.mundusItems as item}
 								{@const IconComp = getTablerIcon(item.icon)}
 								<li>
 									<a 
@@ -219,34 +246,8 @@
 									</a>
 								</li>
 							{/each}
-						{/if}
-					</ul>
-				{/each}
-
-				<!-- MY MUNDUS section (super-category) -->
-				{#if $sidebarConfig.mundusItems.length > 0}
-					<ul class="pt-4 pb-1 space-y-1">
-						<li class="px-3 py-2">
-							<h3 class={styles.sidebar.sectionHeader()}>
-								{SECTION_HEADER_MUNDUS}
-							</h3>
-						</li>
-						{#each $sidebarConfig.mundusItems as item}
-							{@const IconComp = getTablerIcon(item.icon)}
-							<li>
-								<a 
-									href={item.href}
-									class={cn(
-										styles.sidebar.item(),
-										isActive(item.href) ? 'bg-gray-100 font-medium' : ''
-									)}
-								>
-									<svelte:component this={IconComp} size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
-									<span class="ml-3">{item.label}</span>
-								</a>
-							</li>
-						{/each}
-					</ul>
+						</ul>
+					{/if}
 				{/if}
 			{/if}
 		</nav>
