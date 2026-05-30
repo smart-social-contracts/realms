@@ -4,7 +4,11 @@ import type { Config } from 'tailwindcss';
 export default {
 	content: [
 		'./src/**/*.{html,js,svelte,ts,md}',
-		'./node_modules/flowbite-svelte/**/*.{html,js,svelte,ts}'
+		'./node_modules/flowbite-svelte/**/*.{html,js,svelte,ts}',
+		// Dynamically-loaded extensions ship no CSS of their own; scan their
+		// sources so the host keeps the Tailwind classes they use (e.g. button
+		// backgrounds/layout) instead of purging them.
+		'../../extensions/extensions/**/frontend-rt/src/**/*.{html,js,svelte,ts}'
 	],
   darkMode: 'selector',
   theme: {
