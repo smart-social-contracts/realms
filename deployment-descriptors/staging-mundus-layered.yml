@@ -65,5 +65,5 @@ mundus:
 
 parameters:
   TEST_MODE: true
-  TEST_MODE_ADMIN_SELF_REGISTRATION: true
+  TEST_MODE_USER_SELF_REGISTRATION: true
   TEST_MODE_DEMO_DATA: true
