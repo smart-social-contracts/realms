@@ -58,7 +58,8 @@
     "test_bench",
     "demo_simulator",
     "managed_services",
-    "mundus_explorer"
+    "mundus_explorer",
+    "department_docs"
   ],
   "options": {
     "random": {

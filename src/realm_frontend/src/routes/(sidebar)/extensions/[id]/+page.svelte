@@ -17,6 +17,14 @@
 	import { mountExtension, resolveExtensionVersion, type MountResult } from '$lib/extension-loader';
 	import { loadExtensionTranslation } from '$lib/i18n';
 	import type { RealmExtensionContext } from '$lib/realm-extension-sdk';
+	import {
+		deriveMySharingVetKey,
+		unwrapDek,
+		aesGcmDecryptWithDek,
+		buildSharePlan,
+		grantScopeData,
+		decryptScopeData
+	} from '$lib/crypto/sharing';
 	import AccessDenied from '$lib/components/AccessDenied.svelte';
 	import { parseAccessError, AccessDeniedError } from '$lib/utils/errors';
 
@@ -95,6 +103,38 @@
 				markAsRead,
 			},
 			theme: { cn },
+			crypto: {
+				async decryptWithEnvelope(
+					wrappedDekHex: string,
+					ciphertext: string,
+				): Promise<Record<string, string> | null> {
+					if (!wrappedDekHex || !ciphertext) return null;
+					try {
+						const me = get(principal) as string;
+						const { vetKey } = await deriveMySharingVetKey(backend, me);
+						const dek = unwrapDek(vetKey, wrappedDekHex);
+						const plaintext = await aesGcmDecryptWithDek(dek, ciphertext);
+						return JSON.parse(plaintext);
+					} catch (e) {
+						console.warn('[ctx.crypto] decryptWithEnvelope failed:', e);
+						return null;
+					}
+				},
+				async encryptForRecipients(recipients: string[], data: unknown) {
+					return buildSharePlan(backend, recipients, data);
+				},
+				async grantScope(
+					scope: string,
+					wrappedDeks: Record<string, string>,
+					opts?: { previousRecipients?: string[]; keep?: string[] },
+				) {
+					return grantScopeData(backend, scope, wrappedDeks, opts);
+				},
+				async decryptScope(scope: string, ciphertext: string) {
+					const me = get(principal) as string;
+					return decryptScopeData(backend, scope, me, ciphertext);
+				},
+			},
 			ui: {
 				AccessDenied,
 				accessDeniedOperation: (error: unknown) => {

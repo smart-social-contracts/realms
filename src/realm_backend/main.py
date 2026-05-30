@@ -37,8 +37,10 @@ from api.crypto import group_create as crypto_group_create
 from api.crypto import group_delete as crypto_group_delete
 from api.crypto import group_list as crypto_group_list
 from api.crypto import group_members as crypto_group_members
+from api.crypto import grant_many as crypto_grant_many
 from api.crypto import group_remove_member as crypto_group_remove
 from api.crypto import list_envelopes as crypto_list_envelopes
+from api.crypto import revoke_many as crypto_revoke_many
 from api.crypto import list_scopes as crypto_list_scopes
 from api.crypto import revoke_group as crypto_revoke_group
 from api.crypto import revoke_principal as crypto_revoke_principal
@@ -60,7 +62,12 @@ from api.user import (
     user_update_private_data,
     user_update_public_profile,
 )
-from api.vetkeys import derive_vetkey, get_vetkey_public_key
+from api.vetkeys import (
+    derive_vetkey,
+    derive_vetkey_for_sharing,
+    get_root_public_key,
+    get_vetkey_public_key,
+)
 from api.zones import get_zone_aggregation
 from core.access import _check_access, require, require_controller, set_controller
 from core.task_manager import TaskManager
@@ -1229,9 +1236,79 @@ def derive_my_vetkey(transport_public_key_hex: text) -> RealmResponse:
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
+@update
+@require(Operations.SELF_UPDATE_PRIVATE_DATA)
+def get_sharing_root_public_key() -> RealmResponse:
+    """Get the shared *root* vetKD public key used for member data sharing.
+
+    Unlike :func:`get_my_vetkey_public_key` (one key per principal), this is a
+    single key shared by everyone. The frontend fetches it **once** and derives
+    each recipient's IBE public key locally by using the recipient's principal
+    as the IBE identity — eliminating the previous one-management-call-per-
+    recipient cost. Only the holder of a recipient's sharing vetKey (derivable
+    solely by that principal via :func:`derive_my_sharing_vetkey`) can decrypt.
+    """
+    try:
+        result = yield get_root_public_key()
+        if not result["success"]:
+            return RealmResponse(
+                success=False, data=RealmResponseData(error=result["error"])
+            )
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(message=result["public_key_hex"]),
+        )
+    except Exception as e:
+        logger.error(
+            f"Error getting sharing root public key: {str(e)}\n{traceback.format_exc()}"
+        )
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@update
+@require(Operations.SELF_UPDATE_PRIVATE_DATA)
+def derive_my_sharing_vetkey(transport_public_key_hex: text) -> RealmResponse:
+    """Derive the caller's sharing vetKey (root context, input = own principal).
+
+    Because the vetKD ``input`` is bound to ``ic.caller()``, a caller can only
+    ever obtain the key for their own identity, and therefore can only decrypt
+    IBE ciphertexts addressed to their principal under the shared root key.
+    """
+    try:
+        result = yield derive_vetkey_for_sharing(
+            ic.caller().to_str(), transport_public_key_hex
+        )
+        if not result["success"]:
+            return RealmResponse(
+                success=False, data=RealmResponseData(error=result["error"])
+            )
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(message=result["encrypted_key_hex"]),
+        )
+    except Exception as e:
+        logger.error(
+            f"Error deriving sharing vetkey: {str(e)}\n{traceback.format_exc()}"
+        )
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
 # ---------------------------------------------------------------------------
 # Crypto envelope & group endpoints
 # ---------------------------------------------------------------------------
+
+
+def _caller_can_manage_scope(scope: str) -> bool:
+    """Whether the caller may grant/revoke read access for *scope*.
+
+    Authorization is pluggable per scope *kind* (``user:``, ``dept:``,
+    ``realm:``, …) and defined in :mod:`core.crypto_scopes`. This keeps the
+    crypto engine generic and reusable for any payload, not just member
+    personal data.
+    """
+    from core.crypto_scopes import caller_can_manage_scope, production_context
+
+    return caller_can_manage_scope(scope, ic.caller().to_str(), production_context())
 
 
 @update
@@ -1297,6 +1374,202 @@ def crypto_get_my_scopes() -> CryptoResponse:
     except Exception as e:
         logger.error(f"Error listing scopes: {e}\n{traceback.format_exc()}")
         return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+# NOTE: These endpoints are generic over the scope *kind* — `user:`, `dept:`,
+# `realm:`, or any kind registered in core.crypto_scopes. Authorization to
+# manage a scope is enforced by `_caller_can_manage_scope`, so the same crypto
+# sharing machinery is reusable for personal data, department documents,
+# realm-level records, etc.
+
+
+@update
+@require(Operations.SELF_UPDATE_PRIVATE_DATA)
+def crypto_grant_to_scope_batch(
+    scope: text, wrapped_deks_json: text
+) -> CryptoResponse:
+    """Grant many principals access to a scope the caller may manage, in one call.
+
+    ``wrapped_deks_json`` is a JSON object mapping ``principal -> wrapped_dek``
+    (the DEK IBE-wrapped client-side for each recipient). Replacing N update
+    calls with one both saves round-trips and lets the backend upsert all
+    envelopes in a single linear pass.
+    """
+    try:
+        if not _caller_can_manage_scope(scope):
+            return CryptoResponse(
+                success=False,
+                data=CryptoResponseData(
+                    error="You are not allowed to manage sharing for this scope"
+                ),
+            )
+        try:
+            wrapped_deks = json.loads(wrapped_deks_json)
+        except Exception:
+            return CryptoResponse(
+                success=False,
+                data=CryptoResponseData(error="Invalid wrapped_deks JSON"),
+            )
+        if not isinstance(wrapped_deks, dict):
+            return CryptoResponse(
+                success=False,
+                data=CryptoResponseData(error="wrapped_deks must be a JSON object"),
+            )
+        result = crypto_grant_many(scope, wrapped_deks)
+        if not result["success"]:
+            return CryptoResponse(
+                success=False, data=CryptoResponseData(error=result["error"])
+            )
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(
+                message=f"Granted {result['envelopes_granted']} envelope(s) for {scope}"
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error batch granting to scope: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+@update
+@require(Operations.SELF_UPDATE_PRIVATE_DATA)
+def crypto_revoke_from_scope_batch(
+    scope: text, principals_json: text
+) -> CryptoResponse:
+    """Revoke many principals from a scope the caller may manage, in one call.
+
+    ``principals_json`` is a JSON array of principal strings to revoke.
+    """
+    try:
+        if not _caller_can_manage_scope(scope):
+            return CryptoResponse(
+                success=False,
+                data=CryptoResponseData(
+                    error="You are not allowed to manage sharing for this scope"
+                ),
+            )
+        try:
+            principals = json.loads(principals_json)
+        except Exception:
+            return CryptoResponse(
+                success=False,
+                data=CryptoResponseData(error="Invalid principals JSON"),
+            )
+        if not isinstance(principals, list):
+            return CryptoResponse(
+                success=False,
+                data=CryptoResponseData(error="principals must be a JSON array"),
+            )
+        result = crypto_revoke_many(scope, principals)
+        if not result["success"]:
+            return CryptoResponse(
+                success=False, data=CryptoResponseData(error=result["error"])
+            )
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(
+                message=f"Revoked {result['envelopes_revoked']} envelope(s) from {scope}"
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error batch revoking from scope: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+@query
+@require(Operations.SELF_UPDATE_PRIVATE_DATA)
+def crypto_list_scope_envelopes(scope: text) -> CryptoResponse:
+    """List all principals with access to a scope the caller may manage."""
+    try:
+        if not _caller_can_manage_scope(scope):
+            return CryptoResponse(
+                success=False,
+                data=CryptoResponseData(
+                    error="You are not allowed to manage sharing for this scope"
+                ),
+            )
+        result = crypto_list_envelopes(scope)
+        envelopes = Vec["EnvelopeRecord"]()
+        for e in result["envelopes"]:
+            envelopes.append(
+                EnvelopeRecord(
+                    scope=e["scope"],
+                    principal_id=e["principal"],
+                    wrapped_dek=e["wrapped_dek"],
+                )
+            )
+        return CryptoResponse(
+            success=True,
+            data=CryptoResponseData(
+                envelopeList=EnvelopeListRecord(envelopes=envelopes)
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error listing scope envelopes: {e}\n{traceback.format_exc()}")
+        return CryptoResponse(success=False, data=CryptoResponseData(error=str(e)))
+
+
+@query
+@require(Operations.SELF_UPDATE_PRIVATE_DATA)
+def list_share_audiences() -> RealmResponse:
+    """List the audiences a member can share their private data with.
+
+    Returns, as a JSON string in ``message``, the set of audiences plus the
+    member principals each one resolves to. The member's browser needs these
+    principals to wrap their data-encryption key for each recipient.
+
+    Audiences:
+      - ``Administrators`` — the member_data_readers crypto group.
+      - one per ``Department`` — its current members.
+    """
+    try:
+        audiences = []
+
+        try:
+            from api.crypto import group_members as _group_members
+
+            res = _group_members("member_data_readers")
+            principals = [m["principal"] for m in res.get("members", []) if m.get("principal")]
+            audiences.append(
+                {
+                    "id": "group:member_data_readers",
+                    "label": "Administrators",
+                    "type": "admins",
+                    "principals": principals,
+                }
+            )
+        except Exception as e:
+            logger.warning(f"list_share_audiences: admins group unavailable: {e}")
+
+        try:
+            from ggg import Department
+
+            for dept in Department.instances():
+                principals = []
+                try:
+                    for m in dept.members:
+                        if getattr(m, "id", None):
+                            principals.append(m.id)
+                except Exception:
+                    pass
+                audiences.append(
+                    {
+                        "id": f"dept:{dept.name}",
+                        "label": dept.name,
+                        "type": "department",
+                        "principals": principals,
+                    }
+                )
+        except Exception as e:
+            logger.warning(f"list_share_audiences: departments unavailable: {e}")
+
+        return RealmResponse(
+            success=True,
+            data=RealmResponseData(message=json.dumps({"audiences": audiences})),
+        )
+    except Exception as e:
+        logger.error(f"Error listing share audiences: {e}\n{traceback.format_exc()}")
+        return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
 
 
 @query

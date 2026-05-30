@@ -112,6 +112,61 @@ export interface RealmExtensionContext {
 		cn: (...classes: (string | undefined | null | false)[]) => string;
 	};
 
+	/**
+	 * Crypto helpers backed by the host's bundled `@dfinity/vetkeys`, so
+	 * extensions can decrypt consent-shared member data without bundling the
+	 * (large) vetKeys library themselves.
+	 */
+	crypto: {
+		/**
+		 * Decrypt a payload the caller has been granted access to, given the
+		 * caller's IBE-wrapped DEK directly (e.g. from a KeyEnvelope returned by
+		 * an extension backend).
+		 *
+		 * @param wrappedDekHex  The caller's IBE-wrapped DEK.
+		 * @param ciphertext     The `enc:v=2:...` ciphertext.
+		 * @returns The decrypted key/value object, or null if decryption fails.
+		 */
+		decryptWithEnvelope: (
+			wrappedDekHex: string,
+			ciphertext: string,
+		) => Promise<Record<string, string> | null>;
+
+		/**
+		 * Encrypt `data` with a fresh DEK and IBE-wrap it for each recipient
+		 * principal (deduplicated). The shared root key is fetched once and all
+		 * wraps happen locally. Returns the ciphertext to persist plus the
+		 * per-recipient wrapped DEKs to pass to {@link grantScope}.
+		 */
+		encryptForRecipients: (
+			recipients: string[],
+			data: unknown,
+		) => Promise<{ ciphertext: string; wrappedDeks: Record<string, string> }>;
+
+		/**
+		 * Persist access grants for `scope` (one batch grant + a diffed batch
+		 * revoke). Server-side authorization depends on the scope kind
+		 * (e.g. `dept:<name>:...` requires the department head or a realm admin).
+		 *
+		 * @returns the principals now granted access.
+		 */
+		grantScope: (
+			scope: string,
+			wrappedDeks: Record<string, string>,
+			opts?: { previousRecipients?: string[]; keep?: string[] },
+		) => Promise<string[]>;
+
+		/**
+		 * Decrypt a scope's payload for the current caller: fetches the DEK
+		 * envelope wrapped for them, derives their sharing vetKey, and decrypts.
+		 * Returns null if the caller has no access.
+		 */
+		decryptScope: <T = Record<string, string>>(
+			scope: string,
+			ciphertext: string,
+		) => Promise<T | null>;
+	};
+
 	/** Shared UI helpers provided by the host app. */
 	ui: {
 		AccessDenied: import('svelte').Component<{ operation?: string }>;

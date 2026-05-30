@@ -30,15 +30,83 @@ DOMAIN_SEPARATOR = b"realms"
 
 
 def _build_context_hex(caller_principal_str: str) -> str:
-    """Return the vetKD context as a hex string.
+    """Return the per-user vetKD context as a hex string.
 
     Format: ``<1-byte len><domain_separator><scope>``
     where *scope* is the UTF-8 encoding of the caller's principal string.
+
+    Used by the legacy per-user encryption scheme (one vetkd_public_key call
+    per principal).
     """
     ds = DOMAIN_SEPARATOR
     scope = caller_principal_str.encode()
     ctx = bytes([len(ds)]) + ds + scope
     return "".join(f"{b:02x}" for b in ctx)
+
+
+def _build_root_context_hex() -> str:
+    """Return the *shared root* vetKD context as a hex string.
+
+    Format: ``<1-byte len><domain_separator>`` (no per-principal scope).
+
+    This single context is shared by all members.  Recipients are
+    distinguished by the vetKD ``input`` (their principal text) instead of by
+    the context, which lets the frontend derive every recipient's IBE public
+    key locally from one fetched root key — no per-recipient management call.
+    """
+    ds = DOMAIN_SEPARATOR
+    ctx = bytes([len(ds)]) + ds
+    return "".join(f"{b:02x}" for b in ctx)
+
+
+def get_root_public_key() -> Async[dict]:
+    """Retrieve the vetKD public key for the shared *root* context.
+
+    The same key for every member; the frontend fetches it once and IBE-wraps
+    DEKs to each recipient using the recipient's principal as the IBE identity.
+
+    Returns ``{"success": True, "public_key_hex": "..."}`` on success.
+    """
+    ctx_hex = _build_root_context_hex()
+    logger.info(f"vetkd_public_key (root) ctx_len={len(ctx_hex)//2}")
+
+    ctx_blob = _hex_to_blob_escaped(ctx_hex)
+    args = ic.candid_encode(
+        f'(record {{ canister_id = null; '
+        f'context = blob "{ctx_blob}"; '
+        f'key_id = record {{ curve = variant {{ bls12_381_g2 = null }}; '
+        f'name = "{VETKD_KEY_NAME}" }} }})'
+    )
+
+    result = yield ic.call_raw("aaaaa-aa", "vetkd_public_key", args, 26_000_000_000)
+
+    if hasattr(result, "Ok") and result.Ok is not None:
+        decoded = ic.candid_decode(result.Ok)
+        pk_hex = _extract_blob_hex(decoded, "public_key")
+        logger.info(f"vetkd_public_key (root) OK (len={len(pk_hex)//2 if pk_hex else 0})")
+        return {"success": True, "public_key_hex": pk_hex}
+    else:
+        err = str(getattr(result, "Err", result))
+        logger.error(f"vetkd_public_key (root) failed: {err}")
+        return {"success": False, "error": err}
+
+
+def derive_vetkey_for_sharing(
+    caller_principal: str,
+    transport_public_key_hex: str,
+) -> Async[dict]:
+    """Derive an encrypted vetKey for *caller_principal* under the root context.
+
+    The vetKD ``input`` is the caller's principal text (UTF-8). Because the
+    management canister binds ``input`` to ``ic.caller()`` here, a caller can
+    only ever derive the key for their **own** identity — so they can only
+    decrypt IBE ciphertexts addressed to their principal.
+
+    Returns ``{"success": True, "encrypted_key_hex": "..."}`` on success.
+    """
+    ctx_hex = _build_root_context_hex()
+    input_hex = caller_principal.encode().hex()
+    return _derive_vetkey_raw(ctx_hex, transport_public_key_hex, input_hex)
 
 
 def get_vetkey_public_key(caller_principal: str) -> Async[dict]:
@@ -84,12 +152,21 @@ def derive_vetkey(
     Returns ``{"success": True, "encrypted_key_hex": "..."}`` on success.
     """
     ctx_hex = _build_context_hex(caller_principal)
+    return _derive_vetkey_raw(ctx_hex, transport_public_key_hex, input_hex)
+
+
+def _derive_vetkey_raw(
+    ctx_hex: str,
+    transport_public_key_hex: str,
+    input_hex: str = "",
+) -> Async[dict]:
+    """Low-level vetkd_derive_key call for a pre-built context + input."""
     tpk_hex = transport_public_key_hex.strip()
     inp_hex = input_hex.strip() if input_hex else ""
 
     logger.info(
-        f"vetkd_derive_key for {caller_principal} "
-        f"(ctx={len(ctx_hex)//2}B, tpk={len(tpk_hex)//2}B, input={len(inp_hex)//2}B)"
+        f"vetkd_derive_key (ctx={len(ctx_hex)//2}B, tpk={len(tpk_hex)//2}B, "
+        f"input={len(inp_hex)//2}B)"
     )
 
     ctx_blob = _hex_to_blob_escaped(ctx_hex)
