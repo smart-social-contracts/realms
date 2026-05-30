@@ -481,8 +481,10 @@ def join_realm(profile: str, preferred_quarter: text, invite_code_checksum_hex: 
       may join without a code. Admin always requires a code.
     - Controller bypass: IC controllers can join with any profile
       without a code (for manual dfx deploys).
-    - Test mode: when TEST_MODE_ADMIN_SELF_REGISTRATION is True,
-      the code "admin" (sha256-matched) grants admin access.
+    - Test mode: when test_mode_user_self_registration (or
+      test_mode_ii_bypass) is True, the sha256-matched codes "admin",
+      "member", and "dev"/"developer" grant the respective profiles, so
+      a caller may self-register without a real invite code.
     """
     try:
         caller = ic.caller().to_str()

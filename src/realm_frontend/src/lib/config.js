@@ -32,8 +32,6 @@ export function getTestModeSkipTerms() { return get(realmInfo).testModeSkipTerms
 export const TEST_MODE = false;
 export const TEST_MODE_II_BYPASS = false;
 export const TEST_MODE_USER_SELF_REGISTRATION = false;
-export const TEST_MODE_ADMIN_SELF_REGISTRATION = false;
-export const TEST_MODE_MEMBER_SELF_REGISTRATION = false;
 export const TEST_MODE_DEMO_DATA = false;
 export const TEST_MODE_SKIP_TERMS = false;
 export const TEST_MODE_SKIP_PASSPORT_ZKPROOF = false;

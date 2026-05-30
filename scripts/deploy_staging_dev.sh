@@ -173,8 +173,8 @@ deploy_registry() {
         fi
         if [ -n "$DESCRIPTOR" ]; then
             _extract_flag() { grep "^  $1:" "$DESCRIPTOR" 2>/dev/null | awk '{print tolower($2)}'; }
-            for param in TEST_MODE TEST_MODE_II_BYPASS TEST_MODE_ADMIN_SELF_REGISTRATION \
-                         TEST_MODE_MEMBER_SELF_REGISTRATION TEST_MODE_DEMO_DATA \
+            for param in TEST_MODE TEST_MODE_II_BYPASS TEST_MODE_USER_SELF_REGISTRATION \
+                         TEST_MODE_DEMO_DATA \
                          TEST_MODE_SKIP_TERMS TEST_MODE_SKIP_PASSPORT_ZKPROOF; do
                 val=$(_extract_flag "$param")
                 if [ -n "$val" ]; then
@@ -257,8 +257,8 @@ deploy_realm() {
         fi
         if [ -n "$DESCRIPTOR" ]; then
             _extract_flag() { grep "^  $1:" "$DESCRIPTOR" 2>/dev/null | awk '{print tolower($2)}'; }
-            for param in TEST_MODE TEST_MODE_II_BYPASS TEST_MODE_ADMIN_SELF_REGISTRATION \
-                         TEST_MODE_MEMBER_SELF_REGISTRATION TEST_MODE_DEMO_DATA \
+            for param in TEST_MODE TEST_MODE_II_BYPASS TEST_MODE_USER_SELF_REGISTRATION \
+                         TEST_MODE_DEMO_DATA \
                          TEST_MODE_SKIP_TERMS TEST_MODE_SKIP_PASSPORT_ZKPROOF; do
                 val=$(_extract_flag "$param")
                 if [ -n "$val" ]; then
