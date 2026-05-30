@@ -11,6 +11,7 @@ export interface SidebarNavItem {
 	icon: string;
 	extensionId: string;
 	href: string;
+	tooltip?: string;
 }
 
 export interface SidebarCategory {
@@ -30,12 +31,13 @@ export interface TopUtilityItem {
 	label: string;
 	icon: string;
 	href: string;
+	tooltip?: string;
 }
 
 export const topUtilityItems: TopUtilityItem[] = [
-	{ label: 'Account', icon: 'ti-user-circle', href: '/identities' },
-	{ label: 'Messages', icon: 'ti-mail', href: '/messages' },
-	{ label: 'Settings', icon: 'ti-settings', href: '/settings' },
+	{ label: 'Account', icon: 'ti-user-circle', href: '/identities', tooltip: 'Manage your identity and account settings' },
+	{ label: 'Messages', icon: 'ti-mail', href: '/messages', tooltip: 'View and send messages' },
+	{ label: 'Settings', icon: 'ti-settings', href: '/settings', tooltip: 'Configure your preferences' },
 ];
 
 export const SECTION_HEADER_ME = 'ME';

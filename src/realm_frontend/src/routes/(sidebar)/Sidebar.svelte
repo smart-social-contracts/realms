@@ -94,6 +94,46 @@
 		return $page.url.pathname === href || $page.url.pathname.startsWith(href + '/');
 	}
 
+	function sidebarTooltip(node: HTMLElement, text: string | undefined) {
+		if (!text) return {};
+		let tip: HTMLDivElement | null = null;
+
+		function show() {
+			const rect = node.getBoundingClientRect();
+			tip = document.createElement('div');
+			tip.textContent = text;
+			tip.className = [
+				'fixed z-[9999] px-2.5 py-1.5',
+				'bg-gray-900 text-white text-xs rounded-md',
+				'pointer-events-none whitespace-nowrap shadow-lg',
+				'transition-opacity duration-150'
+			].join(' ');
+			tip.style.top = `${rect.top + rect.height / 2}px`;
+			tip.style.left = `${rect.right + 10}px`;
+			tip.style.transform = 'translateY(-50%)';
+			document.body.appendChild(tip);
+		}
+
+		function hide() {
+			tip?.remove();
+			tip = null;
+		}
+
+		node.addEventListener('mouseenter', show);
+		node.addEventListener('mouseleave', hide);
+
+		return {
+			update(newText: string | undefined) {
+				text = newText ?? '';
+			},
+			destroy() {
+				node.removeEventListener('mouseenter', show);
+				node.removeEventListener('mouseleave', hide);
+				hide();
+			}
+		};
+	}
+
 </script>
 
 <aside
@@ -126,6 +166,7 @@
 						<li>
 							<a 
 								href={item.href}
+								use:sidebarTooltip={item.tooltip}
 								class={cn(
 									styles.sidebar.item(),
 									isActive(item.href) ? 'bg-gray-100 font-medium' : ''
@@ -175,6 +216,7 @@
 							<li>
 								<a 
 									href={item.href}
+									use:sidebarTooltip={item.tooltip}
 									class={styles.sidebar.item()}
 								>
 									<svelte:component this={IconComp} size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
@@ -203,23 +245,24 @@
 									</svg>
 								</button>
 							</li>
-							{#if !collapsedCategories.has(category.id)}
-								{#each category.items as item}
-									{@const IconComp = getTablerIcon(item.icon)}
-									<li>
-										<a 
-											href={item.href}
-											class={cn(
-												styles.sidebar.item(),
-												isActive(item.href) ? 'bg-gray-100 font-medium' : ''
-											)}
-										>
-											<svelte:component this={IconComp} size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
-											<span class="ml-3">{item.label}</span>
-										</a>
-									</li>
-								{/each}
-							{/if}
+						{#if !collapsedCategories.has(category.id)}
+							{#each category.items as item}
+								{@const IconComp = getTablerIcon(item.icon)}
+								<li>
+									<a 
+										href={item.href}
+										use:sidebarTooltip={item.tooltip}
+										class={cn(
+											styles.sidebar.item(),
+											isActive(item.href) ? 'bg-gray-100 font-medium' : ''
+										)}
+									>
+										<svelte:component this={IconComp} size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
+										<span class="ml-3">{item.label}</span>
+									</a>
+								</li>
+							{/each}
+						{/if}
 						</ul>
 					{/each}
 
@@ -231,21 +274,22 @@
 									{SECTION_HEADER_MUNDUS}
 								</h3>
 							</li>
-							{#each $sidebarConfig.mundusItems as item}
-								{@const IconComp = getTablerIcon(item.icon)}
-								<li>
-									<a 
-										href={item.href}
-										class={cn(
-											styles.sidebar.item(),
-											isActive(item.href) ? 'bg-gray-100 font-medium' : ''
-										)}
-									>
-										<svelte:component this={IconComp} size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
-										<span class="ml-3">{item.label}</span>
-									</a>
-								</li>
-							{/each}
+						{#each $sidebarConfig.mundusItems as item}
+							{@const IconComp = getTablerIcon(item.icon)}
+							<li>
+								<a 
+									href={item.href}
+									use:sidebarTooltip={item.tooltip}
+									class={cn(
+										styles.sidebar.item(),
+										isActive(item.href) ? 'bg-gray-100 font-medium' : ''
+									)}
+								>
+									<svelte:component this={IconComp} size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
+									<span class="ml-3">{item.label}</span>
+								</a>
+							</li>
+						{/each}
 						</ul>
 					{/if}
 				{/if}

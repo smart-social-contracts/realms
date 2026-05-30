@@ -53,6 +53,7 @@ from api.ggg_entities import (
     list_objects_paginated,
     search_objects,
 )
+from api.messaging import send_realm_message as _send_realm_message
 from api.nft import get_nft_canister_id, mint_land_nft
 from api.registry import get_registry_info, register_realm
 from api.status import get_status
@@ -3078,6 +3079,84 @@ def get_realm_registry_info() -> text:
         )
 
 
+# ── Inter-realm messaging ──────────────────────────────────────────────
+
+@update
+@require(Operations.REALM_ADMIN)
+def send_realm_message(
+    target_canister_id: text,
+    title: text,
+    message: text,
+    topic: text = "",
+) -> Async[text]:
+    """Send a public message from this realm to another realm.
+
+    Admin-only. Cross-realm messages are always public on the receiving end.
+
+    Args:
+        target_canister_id: Canister ID of the target realm's backend.
+        title: Message title.
+        message: Message body.
+        topic: Optional topic label.
+    """
+    try:
+        from ggg import Realm
+
+        realm = Realm.load("1")
+        origin_name = getattr(realm, "name", "") if realm else ""
+
+        result = yield _send_realm_message(
+            target_canister_id, title, message, topic, origin_name
+        )
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        logger.error(f"Error in send_realm_message: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)}, indent=2)
+
+
+@update
+@require_controller
+def receive_realm_message(
+    title: text,
+    message: text,
+    topic: text,
+    origin_name: text,
+) -> text:
+    """Receive a public message from another realm (inter-canister entry point).
+
+    Restricted to controllers / trusted principals (the sending realm canister
+    must be trusted by this realm). Stored as a public, realm-wide notification
+    so every user can read it; cross-realm messages can never be private.
+    """
+    try:
+        from ggg import Notification
+
+        sender_canister = ic.caller().to_str()
+        notification = Notification(
+            topic=topic or "inter-realm",
+            title=title,
+            message=message,
+            sender=origin_name or sender_canister,
+            origin_realm=sender_canister,
+            visibility="public",
+            audience_type="realm",
+            read=False,
+            read_by="",
+            icon="mail",
+            href="/messages",
+            color="purple",
+            metadata="{}",
+        )
+        logger.info(
+            f"Received inter-realm message from {sender_canister} "
+            f"({origin_name!r}): {title!r} -> notification {notification._id}"
+        )
+        return json.dumps({"success": True, "id": notification._id})
+    except Exception as e:
+        logger.error(f"Error in receive_realm_message: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
 # ── Realm self-upgrade endpoints ───────────────────────────────────────
 
 @update
@@ -3747,11 +3826,28 @@ def get_sidebar(args: text) -> text:
                 label_obj = {"en": label_obj}
             item_label = label_obj.get(locale) or label_obj.get("en") or ext_id.replace("_", " ").title()
 
+            _raw_desc = (m.get("short_description") or m.get("description") or "").strip()
+            if _raw_desc:
+                _tooltip = _raw_desc
+                for _sep in [". ", " — ", " - "]:
+                    _idx = _raw_desc.find(_sep)
+                    if 0 < _idx <= 75:
+                        _tooltip = _raw_desc[:_idx].rstrip(".")
+                        break
+                else:
+                    if len(_raw_desc) > 70:
+                        _t = _raw_desc[:70]
+                        _sp = _t.rfind(" ")
+                        _tooltip = (_t[:_sp] if _sp > 40 else _t) + "\u2026"
+            else:
+                _tooltip = ""
+
             item = {
                 "label": item_label,
                 "icon": f"ti-{m.get('icon') or 'layout-dashboard'}",
                 "extension_id": ext_id,
                 "href": f"/extensions/{ext_id}",
+                "tooltip": _tooltip,
             }
 
             # Welcome pages (is_default) go at top without category
