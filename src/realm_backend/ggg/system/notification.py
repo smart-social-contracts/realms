@@ -42,7 +42,7 @@ class Notification(Entity, TimestampedMixin):
     visibility = String(max_length=16, default=VISIBILITY_PRIVATE)
     audience_type = String(max_length=16, default=AUDIENCE_USER)
     # Sending realm's canister id, set for inter-realm messages (always public).
-    origin_realm = String(max_length=64)
+    origin_realm = String(max_length=64, default="")
     user = ManyToOne("User", "notifications")  # set when audience_type == "user"
     department = ManyToOne("Department", "notifications")  # set when audience_type == "department"
     read = Boolean()
