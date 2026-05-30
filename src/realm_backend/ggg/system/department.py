@@ -23,6 +23,7 @@ class Department(Entity, TimestampedMixin):
     extensions = ManyToMany(["Extension"], "departments")
     parent = ManyToOne("Department", "sub_departments")
     sub_departments = OneToMany("Department", "parent")
+    notifications = OneToMany("Notification", "department")
 
     def __repr__(self):
         return f"Department(name={self.name!r})"
