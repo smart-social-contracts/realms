@@ -13,6 +13,7 @@ Complete reference documentation for the Realms GOS platform.
 ### Architecture
 - **[Technical Overview & Canister Diagram](./TECHNICAL_INTRO)** - System architecture and canister relationships
 - **[Extension Architecture](./EXTENSION_ARCHITECTURE)** - Build custom extensions
+- **[Private Data Sharing](./PRIVATE_DATA_SHARING)** - End-to-end encrypted, consent-based sharing for extensions
 - **[Method Override System](./METHOD_OVERRIDE_SYSTEM)** - Extension method injection
 - **[Frontend Architecture](./FRONTEND_ARCHITECTURE)** - Svelte components and routing
 - **[Quarters](./QUARTERS)** - Horizontal scalability and federation architecture
@@ -49,6 +50,7 @@ Complete reference documentation for the Realms GOS platform.
 
 **Extension Developers**
 - [Extension Architecture](./EXTENSION_ARCHITECTURE) - Build extensions
+- [Private Data Sharing](./PRIVATE_DATA_SHARING) - Encrypt and share extension data
 - [Method Overrides](./METHOD_OVERRIDE_SYSTEM) - Override entity methods
 
 **Platform Developers**

@@ -67,6 +67,10 @@ def env():
     entry = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(entry)
 
+    # The extension now owns its DepartmentDocument entity; register it the same
+    # way the host does at init.
+    entry.register_entities()
+
     fake_ic = FakeIc()
     entry._ic = fake_ic
 

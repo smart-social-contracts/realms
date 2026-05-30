@@ -9,7 +9,6 @@ not part of the core GGG standard.
 from .system import (
     Call,
     Department,
-    DepartmentDocument,
     Extension,
     MenuCategoryConfig,
     MenuDepartmentVisibility,
@@ -123,7 +122,6 @@ __all__ = [
     "Codex",
     "Contract",
     "Department",
-    "DepartmentDocument",
     "Dispute",
     "EntryType",
     "Extension",

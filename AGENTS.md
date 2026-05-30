@@ -454,4 +454,5 @@ asyncio.run(test())
 - `docs/reference/DEPLOYMENT_GUIDE.md` — Full deployment guide
 - `docs/reference/RUNTIME_EXTENSION_STAGING_DEPLOY.md` — Layered deploy runbook
 - `docs/reference/EXTENSION_ARCHITECTURE.md` — Extension lifecycle
+- `docs/reference/PRIVATE_DATA_SHARING.md` — End-to-end encrypted, consent-based data sharing for extensions (own entity + scope kind + `ctx.crypto`)
 - `cli/README.md` — CLI command reference
