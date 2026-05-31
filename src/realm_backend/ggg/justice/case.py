@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+import time
+from datetime import datetime
 from typing import Optional
 
 from ic_python_db import Entity, ManyToMany, ManyToOne, OneToMany, OneToOne, String, TimestampedMixin
@@ -8,25 +9,19 @@ from ..system.constants import STATUS_MAX_LENGTH
 
 logger = get_logger("entity.case")
 
-try:
-    from _cdk import ic as _ic
-except ImportError:  # unit-test / non-canister context
-    _ic = None
-
 
 def _now_dt() -> datetime:
-    """UTC "now" as a datetime, canister-safe.
+    """Current time as a datetime, canister-safe.
 
-    The on-chain Python runtime's ``datetime`` has no ``utcnow()``; derive the
-    current time from ``ic.time()`` (nanoseconds since epoch) instead. Falls
-    back to ``datetime.utcnow()`` off-chain (tests / CLI).
+    The on-chain Python runtime's ``datetime`` has no ``utcnow()``. The DB
+    layer's ``SystemTime`` clock relies on ``time.time()`` here, so we do the
+    same and build the datetime via ``fromtimestamp()`` (also used on-chain in
+    ``SystemTime.format_timestamp``).
     """
     try:
-        if _ic is not None:
-            return datetime(1970, 1, 1) + timedelta(seconds=_ic.time() // 1_000_000_000)
+        return datetime.fromtimestamp(time.time())
     except Exception:
-        pass
-    return datetime.utcnow()
+        return datetime.fromtimestamp(0)
 
 
 class CaseStatus:
