@@ -136,8 +136,6 @@ class RegistrationCode(Entity, TimestampedMixin):
             self.used = 1
             self.used_at = _now_ts()
 
-        self.save()
-
     def is_valid(self) -> bool:
         """Return True when the code can still be redeemed."""
         current_timestamp = _now_ts()
@@ -273,7 +271,6 @@ def revoke_registration_code(code: str = None, code_hash: str = None) -> dict:
         return {"success": False, "error": "Registration code not found"}
 
     reg_code.revoked = 1
-    reg_code.save()
 
     return {
         "success": True,
