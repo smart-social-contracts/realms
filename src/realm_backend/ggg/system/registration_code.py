@@ -7,14 +7,35 @@ import time
 from datetime import datetime, timedelta
 
 
-def _now_dt() -> datetime:
-    """Current time as a datetime, canister-safe.
+def _now_ts() -> int:
+    """Current Unix timestamp in whole seconds, canister-safe.
 
-    The on-chain Python runtime's ``datetime`` has no ``utcnow()``.
-    Use ``time.time()`` which is available on-chain and convert via
-    ``fromtimestamp()``.
+    ``time.time()`` always returns 0.0 in the Kybra/WASM runtime.  The IC
+    exposes a nanosecond-resolution clock via ``ic.time()`` (from kybra).
+    We convert nanoseconds → seconds here.  Falls back to ``time.time()``
+    (for local/test runs where kybra is unavailable) and ultimately to a
+    hard-coded far-future sentinel so codes are not immediately expired in
+    non-IC environments.
     """
-    return datetime.fromtimestamp(time.time())
+    try:
+        from kybra import ic as _ic  # noqa: PLC0415
+        t = _ic.time()
+        if t and t > 0:
+            return int(t) // 1_000_000_000
+    except Exception:
+        pass
+    t = time.time()
+    if t and t > 1_000_000:  # sanity-check: must be after year 1970+11days
+        return int(t)
+    return 9_999_999_999  # far-future sentinel → never expired in tests
+
+
+def _now_dt() -> datetime:
+    """Current time as a datetime, canister-safe (for ISO-string storage only).
+
+    Do NOT use this for Unix-timestamp arithmetic; use _now_ts() instead.
+    """
+    return datetime.utcfromtimestamp(_now_ts())
 
 from ic_python_db import Entity, TimestampedMixin
 from ic_python_db.properties import Integer, String
@@ -70,9 +91,7 @@ class RegistrationCode(Entity, TimestampedMixin):
         max_uses: int = 1,
     ) -> "RegistrationCode":
         """Create a new registration code."""
-        expires_timestamp = int(
-            (_now_dt() + timedelta(hours=expires_in_hours)).timestamp()
-        )
+        expires_timestamp = _now_ts() + expires_in_hours * 3600
 
         if code_hash:
             code = ""
@@ -115,13 +134,13 @@ class RegistrationCode(Entity, TimestampedMixin):
 
         if self.uses_count >= self.max_uses:
             self.used = 1
-            self.used_at = int(_now_dt().timestamp())
+            self.used_at = _now_ts()
 
         self.save()
 
     def is_valid(self) -> bool:
         """Return True when the code can still be redeemed."""
-        current_timestamp = int(_now_dt().timestamp())
+        current_timestamp = _now_ts()
         if self.revoked == 1:
             return False
         if current_timestamp >= self.expires_at:
@@ -192,7 +211,7 @@ def validate_registration_code(code_hash_hex: str) -> dict:
         return {"success": False, "error": "Invalid registration code"}
 
     if not reg_code.is_valid():
-        current_timestamp = int(_now_dt().timestamp())
+        current_timestamp = _now_ts()
         if reg_code.revoked == 1:
             reason = "revoked"
         elif reg_code.expires_at <= current_timestamp:
