@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from ic_python_db import Entity, ManyToMany, ManyToOne, OneToMany, OneToOne, String, TimestampedMixin
@@ -7,6 +7,26 @@ from ic_python_logging import get_logger
 from ..system.constants import STATUS_MAX_LENGTH
 
 logger = get_logger("entity.case")
+
+try:
+    from _cdk import ic as _ic
+except ImportError:  # unit-test / non-canister context
+    _ic = None
+
+
+def _now_dt() -> datetime:
+    """UTC "now" as a datetime, canister-safe.
+
+    The on-chain Python runtime's ``datetime`` has no ``utcnow()``; derive the
+    current time from ``ic.time()`` (nanoseconds since epoch) instead. Falls
+    back to ``datetime.utcnow()`` off-chain (tests / CLI).
+    """
+    try:
+        if _ic is not None:
+            return datetime(1970, 1, 1) + timedelta(seconds=_ic.time() // 1_000_000_000)
+    except Exception:
+        pass
+    return datetime.utcnow()
 
 
 class CaseStatus:
@@ -160,7 +180,7 @@ def case_file(
     if not case_number:
         # Generate case number: COURT-YYYY-NNNN
         import uuid
-        year = datetime.utcnow().year
+        year = _now_dt().year
         case_number = f"{court.name[:3].upper()}-{year}-{uuid.uuid4().hex[:8].upper()}"
     
     case = Case(
@@ -168,7 +188,7 @@ def case_file(
         title=title,
         description=description,
         status=CaseStatus.FILED,
-        filed_date=datetime.utcnow().isoformat(),
+        filed_date=_now_dt().isoformat(),
         court=court,
         plaintiff=plaintiff,
         defendant=defendant,
@@ -240,7 +260,7 @@ def case_issue_verdict(
     verdict = Verdict(
         decision=decision,
         reasoning=reasoning,
-        issued_date=datetime.utcnow().isoformat(),
+        issued_date=_now_dt().isoformat(),
         case=case,
         issued_by=case.judges[0] if case.judges else None  # Primary judge
     )
@@ -279,7 +299,7 @@ def case_close(case: "Case") -> "Case":
         raise ValueError(f"Cannot close case in status {case.status}")
     
     case.status = CaseStatus.CLOSED
-    case.closed_date = datetime.utcnow().isoformat()
+    case.closed_date = _now_dt().isoformat()
     
     Case.case_closed_posthook(case)
     return case

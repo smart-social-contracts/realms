@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from ic_python_db import Entity, Float, ManyToOne, OneToMany, String, TimestampedMixin
@@ -7,6 +7,21 @@ from ic_python_logging import get_logger
 from ..system.constants import STATUS_MAX_LENGTH
 
 logger = get_logger("entity.penalty")
+
+try:
+    from _cdk import ic as _ic
+except ImportError:  # unit-test / non-canister context
+    _ic = None
+
+
+def _now_dt() -> datetime:
+    """UTC "now" as a datetime, canister-safe (ic.time() has no utcnow())."""
+    try:
+        if _ic is not None:
+            return datetime(1970, 1, 1) + timedelta(seconds=_ic.time() // 1_000_000_000)
+    except Exception:
+        pass
+    return datetime.utcnow()
 
 
 class PenaltyType:
@@ -135,7 +150,7 @@ def penalty_execute(penalty: "Penalty") -> "Penalty":
         raise ValueError("Penalty execution blocked by prehook")
     
     penalty.status = "executed"
-    penalty.executed_date = datetime.utcnow().isoformat()
+    penalty.executed_date = _now_dt().isoformat()
     
     # Record accounting if financial
     if penalty.is_financial():

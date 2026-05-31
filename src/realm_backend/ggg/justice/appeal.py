@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from ic_python_db import Entity, ManyToOne, OneToMany, OneToOne, String, TimestampedMixin
@@ -7,6 +7,21 @@ from ic_python_logging import get_logger
 from ..system.constants import STATUS_MAX_LENGTH
 
 logger = get_logger("entity.appeal")
+
+try:
+    from _cdk import ic as _ic
+except ImportError:  # unit-test / non-canister context
+    _ic = None
+
+
+def _now_dt() -> datetime:
+    """UTC "now" as a datetime, canister-safe (ic.time() has no utcnow())."""
+    try:
+        if _ic is not None:
+            return datetime(1970, 1, 1) + timedelta(seconds=_ic.time() // 1_000_000_000)
+    except Exception:
+        pass
+    return datetime.utcnow()
 
 
 class AppealStatus:
@@ -105,7 +120,7 @@ def appeal_file(
         id=appeal_id,
         grounds=grounds,
         status=AppealStatus.FILED,
-        filed_date=datetime.utcnow().isoformat(),
+        filed_date=_now_dt().isoformat(),
         original_case=case,
         original_verdict=case.verdict,
         appellate_court=appellate_court,
@@ -146,7 +161,7 @@ def appeal_decide(
     
     appeal.decision = decision
     appeal.decision_reasoning = reasoning
-    appeal.decided_date = datetime.utcnow().isoformat()
+    appeal.decided_date = _now_dt().isoformat()
     
     if decision in ("upheld", "denied"):
         appeal.status = AppealStatus.DENIED
@@ -158,7 +173,7 @@ def appeal_decide(
             new_verdict = Verdict(
                 decision=new_verdict_data.get("decision", ""),
                 reasoning=new_verdict_data.get("reasoning", ""),
-                issued_date=datetime.utcnow().isoformat(),
+                issued_date=_now_dt().isoformat(),
                 case=appeal.original_case
             )
             appeal.new_verdict = new_verdict
