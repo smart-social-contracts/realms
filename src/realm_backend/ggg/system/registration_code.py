@@ -3,7 +3,18 @@
 import hashlib
 import secrets
 import string
+import time
 from datetime import datetime, timedelta
+
+
+def _now_dt() -> datetime:
+    """Current time as a datetime, canister-safe.
+
+    The on-chain Python runtime's ``datetime`` has no ``utcnow()``.
+    Use ``time.time()`` which is available on-chain and convert via
+    ``fromtimestamp()``.
+    """
+    return datetime.fromtimestamp(time.time())
 
 from ic_python_db import Entity, TimestampedMixin
 from ic_python_db.properties import Integer, String
@@ -60,7 +71,7 @@ class RegistrationCode(Entity, TimestampedMixin):
     ) -> "RegistrationCode":
         """Create a new registration code."""
         expires_timestamp = int(
-            (datetime.utcnow() + timedelta(hours=expires_in_hours)).timestamp()
+            (_now_dt() + timedelta(hours=expires_in_hours)).timestamp()
         )
 
         if code_hash:
@@ -104,13 +115,13 @@ class RegistrationCode(Entity, TimestampedMixin):
 
         if self.uses_count >= self.max_uses:
             self.used = 1
-            self.used_at = int(datetime.utcnow().timestamp())
+            self.used_at = int(_now_dt().timestamp())
 
         self.save()
 
     def is_valid(self) -> bool:
         """Return True when the code can still be redeemed."""
-        current_timestamp = int(datetime.utcnow().timestamp())
+        current_timestamp = int(_now_dt().timestamp())
         if self.revoked == 1:
             return False
         if current_timestamp >= self.expires_at:
@@ -181,7 +192,7 @@ def validate_registration_code(code_hash_hex: str) -> dict:
         return {"success": False, "error": "Invalid registration code"}
 
     if not reg_code.is_valid():
-        current_timestamp = int(datetime.utcnow().timestamp())
+        current_timestamp = int(_now_dt().timestamp())
         if reg_code.revoked == 1:
             reason = "revoked"
         elif reg_code.expires_at <= current_timestamp:
