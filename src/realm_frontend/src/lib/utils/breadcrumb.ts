@@ -16,19 +16,37 @@ function pathMatches(href: string, path: string): boolean {
 	return path === href || path.startsWith(href + '/');
 }
 
-function titleFromSlug(slug: string): string {
+export function titleFromSlug(slug: string): string {
 	return slug
 		.replace(/_/g, ' ')
 		.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/**
+ * Human-readable extension name for UI (sidebar label when available).
+ */
+export function resolveExtensionLabel(
+	extensionId: string,
+	config: SidebarConfig | null,
+): string {
+	const segments = resolveBreadcrumb(`/extensions/${extensionId}`, config);
+	return segments[segments.length - 1]?.label ?? titleFromSlug(extensionId);
+}
+
+export function extensionLoadingMessage(
+	extensionId: string,
+	config: SidebarConfig | null,
+): string {
+	return `Loading ${resolveExtensionLabel(extensionId, config)}...`;
+}
+
 function fallbackSegments(path: string): BreadcrumbSegment[] {
 	if (path === '/') {
-		return [{ label: 'Home' }];
+		return [];
 	}
 
 	const parts = path.split('/').filter(Boolean);
-	const segments: BreadcrumbSegment[] = [{ label: 'Home', href: '/' }];
+	const segments: BreadcrumbSegment[] = [];
 
 	let accumulated = '';
 	for (let i = 0; i < parts.length; i++) {
@@ -51,31 +69,30 @@ export function resolveBreadcrumb(
 	config: SidebarConfig | null,
 ): BreadcrumbSegment[] {
 	const path = normalizePath(pathname);
-	const home: BreadcrumbSegment = { label: 'Home', href: '/' };
 
 	for (const item of topUtilityItems) {
 		if (pathMatches(item.href, path)) {
-			return [home, { label: item.label }];
+			return [{ label: item.label }];
 		}
 	}
 
 	if (config) {
 		for (const item of config.welcomeItems) {
 			if (pathMatches(item.href, path)) {
-				return [home, { label: item.label }];
+				return [{ label: item.label }];
 			}
 		}
 
 		for (const item of config.mundusItems) {
 			if (pathMatches(item.href, path)) {
-				return [home, { label: item.label }];
+				return [{ label: item.label }];
 			}
 		}
 
 		for (const category of config.categories) {
 			for (const item of category.items) {
 				if (pathMatches(item.href, path)) {
-					return [home, { label: category.label }, { label: item.label }];
+					return [{ label: category.label }, { label: item.label }];
 				}
 			}
 		}
@@ -85,7 +102,7 @@ export function resolveBreadcrumb(
 	if (extensionMatch) {
 		const extId = extensionMatch[1];
 		const label = titleFromSlug(extId);
-		return [home, { label }];
+		return [{ label }];
 	}
 
 	return fallbackSegments(path);

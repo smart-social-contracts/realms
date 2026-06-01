@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SidebarConfig } from '$lib/config/sidebar';
-import { resolveBreadcrumb } from './breadcrumb';
+import { extensionLoadingMessage, resolveBreadcrumb, resolveExtensionLabel } from './breadcrumb';
 
 const config: SidebarConfig = {
 	welcomeItems: [
@@ -31,22 +31,17 @@ const config: SidebarConfig = {
 
 describe('resolveBreadcrumb', () => {
 	it('maps utility routes', () => {
-		expect(resolveBreadcrumb('/settings', config)).toEqual([
-			{ label: 'Home', href: '/' },
-			{ label: 'Settings' },
-		]);
+		expect(resolveBreadcrumb('/settings', config)).toEqual([{ label: 'Settings' }]);
 	});
 
 	it('maps welcome items', () => {
 		expect(resolveBreadcrumb('/extensions/member_dashboard', config)).toEqual([
-			{ label: 'Home', href: '/' },
 			{ label: 'My Dashboard' },
 		]);
 	});
 
 	it('maps category extension items', () => {
 		expect(resolveBreadcrumb('/extensions/voting', config)).toEqual([
-			{ label: 'Home', href: '/' },
 			{ label: 'Governance' },
 			{ label: 'Voting' },
 		]);
@@ -54,8 +49,21 @@ describe('resolveBreadcrumb', () => {
 
 	it('falls back for unknown extensions', () => {
 		expect(resolveBreadcrumb('/extensions/package_manager', null)).toEqual([
-			{ label: 'Home', href: '/' },
 			{ label: 'Package Manager' },
 		]);
+	});
+
+	it('resolves extension label from sidebar config', () => {
+		expect(resolveExtensionLabel('member_dashboard', config)).toBe('My Dashboard');
+		expect(resolveExtensionLabel('voting', config)).toBe('Voting');
+	});
+
+	it('falls back extension label from slug', () => {
+		expect(resolveExtensionLabel('package_manager', null)).toBe('Package Manager');
+	});
+
+	it('builds user-facing loading message', () => {
+		expect(extensionLoadingMessage('member_dashboard', config)).toBe('Loading My Dashboard...');
+		expect(extensionLoadingMessage('public_dashboard', null)).toBe('Loading Public Dashboard...');
 	});
 });

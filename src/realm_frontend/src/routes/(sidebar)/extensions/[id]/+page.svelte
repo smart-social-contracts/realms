@@ -28,12 +28,13 @@
 	} from '$lib/crypto/sharing';
 	import AccessDenied from '$lib/components/AccessDenied.svelte';
 	import { parseAccessError, AccessDeniedError } from '$lib/utils/errors';
+	import { sidebarConfig } from '$lib/stores/sidebar';
+	import { extensionLoadingMessage } from '$lib/utils/breadcrumb';
 
 	let mountPoint: HTMLDivElement | undefined;
 	let status: 'loading' | 'ready' | 'error' | 'access_denied' = 'loading';
 	let errorMsg = '';
 	let accessDeniedOperation = '';
-	let debugInfo = '';
 	let mounted: MountResult | void;
 
 	let infraConfig: { fileRegistryCanisterId?: string; marketplaceCanisterId?: string } = {};
@@ -173,7 +174,6 @@
 		cleanupMounted();
 		status = 'loading';
 		errorMsg = '';
-		debugInfo = '';
 
 		try {
 			const [version] = await Promise.all([
@@ -185,17 +185,18 @@
 				errorMsg = `Extension '${id}' is not installed on this realm_backend.`;
 				return;
 			}
-			debugInfo = `Loading ${id}@${version}...`;
 
 			if (!mountPoint) {
 				throw new Error('mount point not ready');
 			}
 
+			console.debug(`[extension] Loading ${id}@${version}...`);
+
 			await loadExtensionTranslation(id, version, get(locale) || 'en');
 
 			const ctx = await buildContext(id, version);
 			mounted = await mountExtension(id, version, mountPoint, ctx);
-			debugInfo = `Mounted ${id}@${version}`;
+			console.debug(`[extension] Mounted ${id}@${version}`);
 			status = 'ready';
 		} catch (e: any) {
 			if (e instanceof AccessDeniedError) {
@@ -210,6 +211,7 @@
 	}
 
 	$: id = $page.params.id;
+	$: loadingMessage = id ? extensionLoadingMessage(id, $sidebarConfig) : 'Loading...';
 
 	let lastLoadedId: string | undefined;
 	$: if (browser && id && id !== lastLoadedId && mountPoint) {
@@ -236,7 +238,7 @@
 				<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
 				<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
 			</svg>
-			<span class="text-sm">{debugInfo || 'Loading extension...'}</span>
+			<span class="text-sm">{loadingMessage}</span>
 		</div>
 	{:else if status === 'access_denied'}
 		<AccessDenied operation={accessDeniedOperation} />
