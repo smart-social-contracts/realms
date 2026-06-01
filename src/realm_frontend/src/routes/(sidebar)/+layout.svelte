@@ -96,17 +96,17 @@
 		{/if}
 
 		<!-- Main Content -->
-		<div class="relative flex-1 overflow-y-auto overflow-x-hidden bg-white transition-[margin] duration-500 ease-in-out {$isAuthenticated && !drawerHidden ? 'lg:ml-64' : ''} {aiPanelOpen ? 'lg:mr-80' : ''} lg:pl-6">
-			<div class="px-4 lg:px-0">
-				<DemoBanner />
-			</div>
+		<div class="relative flex-1 overflow-y-auto overflow-x-hidden bg-white transition-[margin] duration-500 ease-in-out {$isAuthenticated && !drawerHidden ? 'lg:ml-64' : ''} {aiPanelOpen ? 'lg:mr-80' : ''}">
+			<DemoBanner />
 
-			<PageBreadcrumb />
-			
-			<slot />
-			{#if !($page.url.pathname.includes('/extensions/') && $page.url.pathname.includes('/llm_chat'))}
-				<Footer />
-			{/if}
+			<div class="px-4 lg:pl-6 lg:pr-0">
+				<PageBreadcrumb />
+				
+				<slot />
+				{#if !($page.url.pathname.includes('/extensions/') && $page.url.pathname.includes('/llm_chat'))}
+					<Footer />
+				{/if}
+			</div>
 		</div>
 
 		<!-- AI Assistant Panel (right) -->
