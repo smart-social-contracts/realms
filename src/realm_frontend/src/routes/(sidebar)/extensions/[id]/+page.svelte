@@ -16,6 +16,7 @@
 	import { cn } from '$lib/theme/utilities';
 	import { mountExtension, resolveExtensionVersion, type MountResult } from '$lib/extension-loader';
 	import { loadExtensionTranslation } from '$lib/i18n';
+	import { createMarketplaceExtensionBackend } from '$lib/marketplace-extension-backend';
 	import type { RealmExtensionContext } from '$lib/realm-extension-sdk';
 	import {
 		deriveMySharingVetKey,
@@ -54,7 +55,15 @@
 		}
 	}
 
-	function buildContext(id: string, version: string): RealmExtensionContext {
+	async function buildContext(id: string, version: string): Promise<RealmExtensionContext> {
+		let extensionBackend: typeof backend = backend;
+		if (id === 'market_place' && infraConfig.marketplaceCanisterId) {
+			extensionBackend = (await createMarketplaceExtensionBackend(
+				infraConfig.marketplaceCanisterId,
+				infraConfig.fileRegistryCanisterId ?? '',
+			)) as typeof backend;
+		}
+
 		async function callSync(fn: string, args: Record<string, unknown> = {}): Promise<unknown> {
 			const raw = await backend.extension_sync_call(id, fn, JSON.stringify(args));
 			const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
@@ -81,7 +90,7 @@
 		return {
 			extensionId: id,
 			version,
-			backend,
+			backend: extensionBackend,
 			callSync,
 			callAsync,
 			principal,
@@ -184,7 +193,7 @@
 
 			await loadExtensionTranslation(id, version, get(locale) || 'en');
 
-			const ctx = buildContext(id, version);
+			const ctx = await buildContext(id, version);
 			mounted = await mountExtension(id, version, mountPoint, ctx);
 			debugInfo = `Mounted ${id}@${version}`;
 			status = 'ready';
