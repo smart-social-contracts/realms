@@ -44,12 +44,14 @@
 		<!-- AI Assistant toggle button -->
 		<button
 			on:click={() => (aiPanelOpen = !aiPanelOpen)}
-			class="inline-flex items-center gap-1.5 p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200"
+			class="group inline-flex items-center gap-1.5 p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200"
 			title={$_('common.assistant', { default: 'Assistant' })}
 			aria-label={$_('common.assistant', { default: 'Assistant' })}
 		>
 			<IconMessageChatbot size={22} class={aiPanelOpen ? 'text-gray-900' : 'text-gray-500'} />
-			<span class="hidden md:inline text-sm font-medium whitespace-nowrap">
+			<span
+				class="hidden md:inline-block md:max-w-0 md:overflow-hidden md:opacity-0 md:group-hover:max-w-[8rem] md:group-hover:opacity-100 md:group-focus-visible:max-w-[8rem] md:group-focus-visible:opacity-100 transition-all duration-200 ease-out text-sm font-medium whitespace-nowrap"
+			>
 				{$_('common.assistant', { default: 'Assistant' })}
 			</span>
 		</button>

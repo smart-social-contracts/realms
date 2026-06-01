@@ -234,12 +234,14 @@
 {:else}
 	<button
 		on:click={() => goto('/join')}
-		class="inline-flex items-center gap-1.5 p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 text-gray-500 hover:text-gray-700"
+		class="group inline-flex items-center gap-1.5 p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 text-gray-500 hover:text-gray-700"
 		title={$_('common.sign_in', { default: 'Sign in' })}
 		aria-label={$_('common.sign_in', { default: 'Sign in' })}
 	>
 		<IconLogin size={22} />
-		<span class="hidden md:inline text-sm font-medium whitespace-nowrap">
+		<span
+			class="hidden md:inline-block md:max-w-0 md:overflow-hidden md:opacity-0 md:group-hover:max-w-[8rem] md:group-hover:opacity-100 md:group-focus-visible:max-w-[8rem] md:group-focus-visible:opacity-100 transition-all duration-200 ease-out text-sm font-medium whitespace-nowrap"
+		>
 			{$_('common.sign_in', { default: 'Sign in' })}
 		</span>
 	</button>
