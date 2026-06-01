@@ -722,13 +722,5 @@
         </div>
       {/if}
     </div>
-    
-    <!-- Powered by footer -->
-    <div class="hidden md:flex absolute bottom-6 left-1/2 -translate-x-1/2 items-center gap-2 z-20">
-      <span class="text-gray-400 text-sm">Powered by</span>
-      <a href="https://realmsgos.org" target="_blank" rel="noopener noreferrer">
-        <img src="/images/logo_horizontal.svg" alt="Realms" class="h-5 opacity-60 hover:opacity-100 transition-opacity" />
-      </a>
-    </div>
   </div>
 </div>

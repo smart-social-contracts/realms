@@ -27,6 +27,8 @@
 		decryptScopeData
 	} from '$lib/crypto/sharing';
 	import AccessDenied from '$lib/components/AccessDenied.svelte';
+	import MonacoEditor from '$lib/components/MonacoEditor.svelte';
+	import MonacoDiffEditor from '$lib/components/MonacoDiffEditor.svelte';
 	import { parseAccessError, AccessDeniedError } from '$lib/utils/errors';
 	import { sidebarConfig } from '$lib/stores/sidebar';
 	import { extensionLoadingMessage } from '$lib/utils/breadcrumb';
@@ -147,6 +149,8 @@
 			},
 			ui: {
 				AccessDenied,
+				MonacoEditor,
+				MonacoDiffEditor,
 				accessDeniedOperation: (error: unknown) => {
 					if (error instanceof AccessDeniedError) return error.operation;
 					const e = error as { name?: string; operation?: string };
@@ -231,7 +235,7 @@
 	});
 </script>
 
-<div class="p-4">
+<div class="{id === 'codex_viewer' ? 'extension-host-codex' : 'p-4'}">
 	{#if status === 'loading'}
 		<div class="flex items-center gap-2 text-gray-500">
 			<svg class="animate-spin h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -253,6 +257,22 @@
 </div>
 
 <style>
+	.extension-host-codex {
+		height: calc(100vh - 4rem);
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	.extension-host-codex :global(.extension-mount-point) {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
 	:global(.extension-mount-point svg[role="status"]),
 	:global(.extension-mount-point svg.animate-spin),
 	:global(.extension-mount-point svg[class*="animate-spin"]) {

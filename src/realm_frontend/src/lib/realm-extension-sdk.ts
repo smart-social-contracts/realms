@@ -172,6 +172,21 @@ export interface RealmExtensionContext {
 		AccessDenied: import('svelte').Component<{ operation?: string }>;
 		/** Returns the denied operation name, or null if the error is not access-denied. */
 		accessDeniedOperation: (error: unknown) => string | null;
+		/** Read-only Monaco code editor (Visual Studio light theme, Python by default). */
+		MonacoEditor: import('svelte').Component<{
+			code?: string;
+			language?: string;
+			readOnly?: boolean;
+			theme?: string;
+		}>;
+		/** Read-only Monaco diff editor (current codex vs proposed). */
+		MonacoDiffEditor: import('svelte').Component<{
+			original?: string;
+			modified?: string;
+			language?: string;
+			readOnly?: boolean;
+			theme?: string;
+		}>;
 	};
 }
 
