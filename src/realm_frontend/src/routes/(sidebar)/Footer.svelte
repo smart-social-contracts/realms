@@ -107,7 +107,7 @@
 	<!-- Built on Internet Computer section -->
 	<div class="flex justify-center mt-3">
 		<a href="https://internetcomputer.org" target="_blank" rel="noopener noreferrer" class="flex items-center text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
-			<img src="/images/internet-computer-icp-logo.svg" alt="Internet Computer Logo" width="24" height="24" class="mr-2" />
+			<img src="/images/internet-computer-icp-logo.svg" alt="Internet Computer Logo" width="24" height="24" class="mr-2 grayscale" />
 			<span class="text-sm">Built on the Internet Computer</span>
 		</a>
 	</div>
