@@ -240,7 +240,7 @@
 	>
 		<IconLogin size={22} />
 		<span
-			class="hidden md:inline-block md:max-w-0 md:overflow-hidden md:opacity-0 md:group-hover:max-w-[8rem] md:group-hover:opacity-100 md:group-focus-visible:max-w-[8rem] md:group-focus-visible:opacity-100 transition-all duration-200 ease-out text-sm font-medium whitespace-nowrap"
+			class="hidden md:inline-block md:max-w-0 md:overflow-hidden md:opacity-0 md:group-hover:max-w-[8rem] md:group-hover:opacity-100 md:group-focus-visible:max-w-[8rem] md:group-focus-visible:opacity-100 transition-[max-width,opacity] duration-500 ease-in-out text-sm font-medium whitespace-nowrap"
 		>
 			{$_('common.sign_in', { default: 'Sign in' })}
 		</span>
