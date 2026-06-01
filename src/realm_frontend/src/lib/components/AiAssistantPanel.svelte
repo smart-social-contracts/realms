@@ -19,13 +19,19 @@
 	import { cn } from '$lib/theme/utilities';
 	import { mountExtension, resolveExtensionVersion, type MountResult } from '$lib/extension-loader';
 	import { loadExtensionTranslation } from '$lib/i18n';
-	import { IconX } from '@tabler/icons-svelte';
+	import { IconSettings, IconX } from '@tabler/icons-svelte';
 	import { writable } from 'svelte/store';
 
 	export let open = false;
 	export let onClose: () => void = () => {};
 
 	const EXTENSION_ID = 'llm_chat';
+	const SETTINGS_PATH = '/extensions/llm_chat';
+	const modelLabel = CONFIG?.llmModelLabel ?? 'Default';
+
+	function openSettings() {
+		goto(SETTINGS_PATH);
+	}
 
 	let mountPoint: HTMLDivElement | undefined;
 	let status: 'idle' | 'loading' | 'ready' | 'error' = 'idle';
@@ -128,7 +134,8 @@
 				activeExtensionId,
 			},
 			sidebarPanel: true,
-			settingsPath: '/extensions/llm_chat',
+			settingsPath: SETTINGS_PATH,
+			hideModelBar: true,
 		};
 	}
 
@@ -180,11 +187,20 @@
 	class="fixed top-16 right-0 z-30 h-[calc(100vh-4rem)] w-80 border-l border-gray-200 bg-white transition-transform duration-300 ease-in-out flex flex-col {open ? 'translate-x-0' : 'translate-x-full'}"
 >
 	<!-- Panel header -->
-	<div class="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-		<h3 class="text-sm font-semibold text-gray-700">AI Assistant</h3>
+	<div class="flex items-center gap-2 px-4 py-3 border-b border-gray-200">
+		<h3 class="text-sm font-semibold text-gray-700 flex-1 min-w-0 truncate">AI Assistant</h3>
+		<span class="text-[11px] text-gray-400 font-medium shrink-0">{modelLabel}</span>
+		<button
+			on:click={openSettings}
+			class="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors shrink-0"
+			title="Open AI Assistant settings"
+			aria-label="Open AI Assistant settings"
+		>
+			<IconSettings size={16} />
+		</button>
 		<button
 			on:click={onClose}
-			class="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+			class="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors shrink-0"
 			aria-label="Close AI Assistant"
 		>
 			<IconX size={18} />
