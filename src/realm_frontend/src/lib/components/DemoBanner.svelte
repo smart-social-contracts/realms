@@ -1,23 +1,22 @@
 <script>
-	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 	import { testMode } from '$lib/stores/realmInfo';
 	import { _ } from 'svelte-i18n';
 	
-	let showBanner = false;
+	let dismissed = false;
 	
 	const DEMO_BANNER_DISMISSED_KEY = 'demo_banner_dismissed';
 	
 	function dismissBanner() {
-		showBanner = false;
+		dismissed = true;
 		localStorage.setItem(DEMO_BANNER_DISMISSED_KEY, 'true');
 	}
 	
-	onMount(() => {
-		if ($testMode) {
-			const wasDismissed = localStorage.getItem(DEMO_BANNER_DISMISSED_KEY) === 'true';
-			showBanner = !wasDismissed;
-		}
-	});
+	if (browser) {
+		dismissed = localStorage.getItem(DEMO_BANNER_DISMISSED_KEY) === 'true';
+	}
+	
+	$: showBanner = browser && $testMode && !dismissed;
 </script>
 
 {#if showBanner}
