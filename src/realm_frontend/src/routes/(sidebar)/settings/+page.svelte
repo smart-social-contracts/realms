@@ -1,7 +1,7 @@
 <script lang="ts">
 	console.log("Settings Svelte script loaded (top of file)");
 
-	import { Breadcrumb, BreadcrumbItem, Heading } from 'flowbite-svelte';
+	import { Heading } from 'flowbite-svelte';
 	import { SITE_NAME } from '$lib/globals';
 	import MetaTag from '../../utils/MetaTag.svelte';
 	import { _ } from 'svelte-i18n';
@@ -86,11 +86,6 @@
 <main class="p-4">
 	<div class="grid grid-cols-1 space-y-2 dark:bg-gray-900">
 		<div class="col-span-full mb-6">
-			<Breadcrumb class="mb-6">
-				<BreadcrumbItem home>Home</BreadcrumbItem>
-				<BreadcrumbItem>Settings</BreadcrumbItem>
-			</Breadcrumb>
-
 			<Heading tag="h1" class="text-xl font-semibold text-gray-900 sm:text-2xl dark:text-white">
 				{$_('settings.title', { default: 'User Settings' })}
 			</Heading>

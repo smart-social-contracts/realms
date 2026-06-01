@@ -5,6 +5,7 @@
 	import Footer from './Footer.svelte';
 	import DemoBanner from '$lib/components/DemoBanner.svelte';
 	import AiAssistantPanel from '$lib/components/AiAssistantPanel.svelte';
+	import PageBreadcrumb from '$lib/components/PageBreadcrumb.svelte';
 	import { isAuthenticated } from '$lib/stores/auth';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
@@ -99,6 +100,8 @@
 			<div class="px-4 lg:px-0">
 				<DemoBanner />
 			</div>
+
+			<PageBreadcrumb />
 			
 			<slot />
 			{#if !($page.url.pathname.includes('/extensions/') && $page.url.pathname.includes('/llm_chat'))}
