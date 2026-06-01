@@ -334,58 +334,6 @@
 <MetaTag {path} {description} title={metaTitle} {subtitle} />
 
 <div class="mt-4 space-y-6 px-4 md:px-6">
-	<!-- Connected Identities -->
-	<Card size="xl">
-		<Heading tag="h3" class="mb-2 text-xl font-bold dark:text-white">Connected Identities</Heading>
-		<p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
-			Verify your identity through external providers for enhanced trust and access.
-		</p>
-		{#if identitiesLoading}
-			<div class="flex justify-center items-center py-8">
-				<Spinner size="8" />
-			</div>
-		{:else if identityProviders.length > 0}
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-				{#each identityProviders as provider}
-					{#if provider.verified}
-						<IdentityCard
-							src={imagesPath(provider.logo)}
-							title={provider.name}
-							description={provider.description}
-							status="Verified"
-						/>
-					{:else}
-						<a href="/extensions/{provider.extensionName}" class="block">
-							<div class="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 hover:border-blue-400 dark:hover:border-blue-500 cursor-pointer transition-colors rounded-lg">
-								{#if provider.logo}
-									<img src={imagesPath(provider.logo)} alt={provider.name} class="w-24 h-24 object-contain mb-3" />
-								{:else}
-									<div class="p-3 mb-3 rounded-full bg-blue-100 dark:bg-blue-900">
-										<FingerprintOutline class="w-8 h-8 text-blue-600 dark:text-blue-400" />
-									</div>
-								{/if}
-								<Heading tag="h4" class="mb-1 text-lg font-semibold text-gray-900 dark:text-white">{provider.name}</Heading>
-								<P class="mb-3 text-sm text-gray-500 dark:text-gray-400 text-center">
-									{provider.description}
-								</P>
-								<Button size="sm" color="blue" class="px-4 py-2">Start Verification</Button>
-							</div>
-						</a>
-					{/if}
-				{/each}
-			</div>
-		{:else}
-			<div class="text-center py-6">
-				<div class="w-12 h-12 mx-auto mb-3 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
-					<FingerprintOutline class="w-6 h-6 text-gray-400 dark:text-gray-500" />
-				</div>
-				<p class="text-gray-500 dark:text-gray-400">
-					No identity verification extensions are currently installed.
-				</p>
-			</div>
-		{/if}
-	</Card>
-
 	<!-- Public Data -->
 	<Card size="xl">
 		<Heading tag="h3" class="mb-2 text-xl font-bold dark:text-white">Public Data</Heading>
@@ -472,6 +420,58 @@
 				<Button size="sm" color="alternative" on:click={savePrivateData} disabled={privateSaving}>
 					{privateSaving ? 'Saving...' : 'Save'}
 				</Button>
+			</div>
+		{/if}
+	</Card>
+
+	<!-- Connected Identities -->
+	<Card size="xl">
+		<Heading tag="h3" class="mb-2 text-xl font-bold dark:text-white">Connected Identities</Heading>
+		<p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+			Verify your identity through external providers for enhanced trust and access.
+		</p>
+		{#if identitiesLoading}
+			<div class="flex justify-center items-center py-8">
+				<Spinner size="8" />
+			</div>
+		{:else if identityProviders.length > 0}
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+				{#each identityProviders as provider}
+					{#if provider.verified}
+						<IdentityCard
+							src={imagesPath(provider.logo)}
+							title={provider.name}
+							description={provider.description}
+							status="Verified"
+						/>
+					{:else}
+						<a href="/extensions/{provider.extensionName}" class="block">
+							<div class="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 hover:border-blue-400 dark:hover:border-blue-500 cursor-pointer transition-colors rounded-lg">
+								{#if provider.logo}
+									<img src={imagesPath(provider.logo)} alt={provider.name} class="w-24 h-24 object-contain mb-3" />
+								{:else}
+									<div class="p-3 mb-3 rounded-full bg-blue-100 dark:bg-blue-900">
+										<FingerprintOutline class="w-8 h-8 text-blue-600 dark:text-blue-400" />
+									</div>
+								{/if}
+								<Heading tag="h4" class="mb-1 text-lg font-semibold text-gray-900 dark:text-white">{provider.name}</Heading>
+								<P class="mb-3 text-sm text-gray-500 dark:text-gray-400 text-center">
+									{provider.description}
+								</P>
+								<Button size="sm" color="blue" class="px-4 py-2">Start Verification</Button>
+							</div>
+						</a>
+					{/if}
+				{/each}
+			</div>
+		{:else}
+			<div class="text-center py-6">
+				<div class="w-12 h-12 mx-auto mb-3 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+					<FingerprintOutline class="w-6 h-6 text-gray-400 dark:text-gray-500" />
+				</div>
+				<p class="text-gray-500 dark:text-gray-400">
+					No identity verification extensions are currently installed.
+				</p>
 			</div>
 		{/if}
 	</Card>
