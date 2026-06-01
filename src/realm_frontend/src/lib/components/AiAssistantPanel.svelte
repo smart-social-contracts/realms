@@ -127,6 +127,8 @@
 			context: {
 				activeExtensionId,
 			},
+			sidebarPanel: true,
+			settingsPath: '/extensions/llm_chat',
 		};
 	}
 
@@ -190,7 +192,7 @@
 	</div>
 
 	<!-- Extension mount point -->
-	<div class="flex-1 overflow-y-auto">
+	<div class="flex-1 min-h-0 overflow-hidden flex flex-col">
 		{#if status === 'loading'}
 			<div class="flex items-center justify-center h-32 text-gray-500">
 				<div class="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-700"></div>
@@ -199,6 +201,6 @@
 		{:else if status === 'error'}
 			<div class="p-4 text-sm text-red-600">{errorMsg}</div>
 		{/if}
-		<div bind:this={mountPoint} class="h-full"></div>
+		<div bind:this={mountPoint} class="flex-1 min-h-0 h-full"></div>
 	</div>
 </div>
