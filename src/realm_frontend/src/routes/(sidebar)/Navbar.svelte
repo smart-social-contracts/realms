@@ -5,6 +5,7 @@
 	import { onMount } from 'svelte';
 	import { NavHamburger, Navbar } from 'flowbite-svelte';
 	import { IconMessageChatbot } from '@tabler/icons-svelte';
+	import { _ } from 'svelte-i18n';
 	import '../../app.pcss';
 
 	export let fluid = true;
@@ -43,11 +44,14 @@
 		<!-- AI Assistant toggle button -->
 		<button
 			on:click={() => (aiPanelOpen = !aiPanelOpen)}
-			class="p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200"
-			title="AI Assistant"
-			aria-label="Toggle AI Assistant"
+			class="inline-flex items-center gap-1.5 p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200"
+			title={$_('common.assistant', { default: 'Assistant' })}
+			aria-label={$_('common.assistant', { default: 'Assistant' })}
 		>
 			<IconMessageChatbot size={22} class={aiPanelOpen ? 'text-gray-900' : 'text-gray-500'} />
+			<span class="hidden md:inline text-sm font-medium whitespace-nowrap">
+				{$_('common.assistant', { default: 'Assistant' })}
+			</span>
 		</button>
 
 		<AuthButton />
