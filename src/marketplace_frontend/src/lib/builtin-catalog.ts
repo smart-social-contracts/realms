@@ -246,11 +246,4 @@ export const builtinCodices: CodexListing[] = [
     '1.0.0', '🌿', 'governance',
     'syntropia',
   ),
-  codex(
-    'westminster', 'westminster',
-    'Westminster',
-    'A parliamentary democracy with land treaties, licensing, tax collection, and a full realm lifecycle from early sign-up through operation to wind-down.',
-    '1.0.0', '🏰', 'governance',
-    'westminster',
-  ),
 ];
