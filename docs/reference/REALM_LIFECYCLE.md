@@ -2,6 +2,8 @@
 
 Every realm progresses through a defined sequence of lifecycle stages. The current stage is visible to all members on the public dashboard and can be managed by admins from **Administration → Realm Settings**.
 
+For **who may join**, **how stages advance** (vote vs admin approval), and **how dashboards should differ** by territory type (new vs existing public administration) or region, see [Onboarding Scenarios & Dashboard Profiles](./ONBOARDING_SCENARIOS.md).
+
 ---
 
 ## Stages
