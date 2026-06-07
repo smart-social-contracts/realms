@@ -12,6 +12,11 @@ on:
           - patch
           - minor
           - major
+      publish_to_registry:
+        description: 'Also publish artifacts to file_registry on all environments'
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   release:
@@ -19,7 +24,7 @@ jobs:
     permissions:
       contents: write
       packages: write
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -27,21 +32,21 @@ jobs:
           fetch-depth: 0
           submodules: recursive
           token: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Pull latest extensions from main
         run: git submodule update --remote extensions
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: npm
-      
+
       - name: Install dfx
         run: |
           DFX_VERSION=0.32.0
@@ -56,37 +61,50 @@ jobs:
           pip install semver build twine
           pip install -r requirements.txt
           pip install -e cli/
-      
+
+      - name: Configure dfx identity (Casals CI key)
+        if: ${{ inputs.publish_to_registry == true }}
+        env:
+          CASALS_CI_PEM: ${{ secrets.CASALS_CI_PEM }}
+          IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
+        run: |
+          PEM="${CASALS_CI_PEM:-$IC_IDENTITY_PEM}"
+          if [ -z "$PEM" ]; then
+            echo "::error::Neither CASALS_CI_PEM nor IC_IDENTITY_PEM is set." >&2
+            exit 1
+          fi
+          printf '%s' "$PEM" > /tmp/identity.pem
+          chmod 600 /tmp/identity.pem
+          dfx identity import ci /tmp/identity.pem --storage-mode=plaintext --force
+          dfx identity use ci
+          rm -f /tmp/identity.pem
+          echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
+          echo "release identity principal: $(dfx identity get-principal)"
+
       # Bump version
       - name: Bump version
         id: bump_version
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          
-          # Create version file if it doesn't exist
+
           if [ ! -f "version.txt" ]; then
             echo "0.1.0" > version.txt
           fi
-          
-          # Calculate new version with Python
+
           CURRENT_VERSION=$(cat version.txt)
           NEW_VERSION=$(python -c "import semver; v=semver.VersionInfo.parse('${CURRENT_VERSION}'); print(v.bump_${{ github.event.inputs.release_type || 'patch' }}())")
-          
-          # Update version file
+
           echo "${NEW_VERSION}" > version.txt
-          
-          # Update CLI version
+
           sed -i "s/version = \".*\"/version = \"${NEW_VERSION}\"/" cli/pyproject.toml
           sed -i "s/__version__ = \".*\"/__version__ = \"${NEW_VERSION}\"/" cli/realms/__init__.py
-          
-          # Update frontend deploy release tag default
+
           sed -i "s#deploy_release_tag: viteEnv.VITE_DEPLOY_RELEASE_TAG || 'v[^']*'#deploy_release_tag: viteEnv.VITE_DEPLOY_RELEASE_TAG || 'v${NEW_VERSION}'#" \
             src/realm_registry_frontend/src/lib/config.js
-          
-          # Store new version for later use
+
           echo "NEW_VERSION=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
-      
+
       - name: Check if release already exists
         run: |
           TAG="v${{ steps.bump_version.outputs.NEW_VERSION }}"
@@ -97,8 +115,8 @@ jobs:
           echo "✅ Release $TAG does not exist yet, proceeding..."
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      # Build artifacts directly (no Docker needed)
+
+      # Build artifacts
       - name: Build backend WASM
         run: |
           export CANISTER_CANDID_PATH="$(pwd)/src/realm_backend/realm_backend.did"
@@ -109,11 +127,10 @@ jobs:
 
       - name: Generate Candid declarations
         run: |
-          # Copy declarations to where the frontend expects them ($lib/declarations/realm_backend)
           mkdir -p src/realm_frontend/src/lib/declarations
           cp -r src/declarations/realm_backend src/realm_frontend/src/lib/declarations/realm_backend
           cp src/realm_backend/realm_backend.did ./realm_backend.did
-          echo "✅ Candid declarations copied to frontend lib, DID file ready"
+          echo "✅ Candid declarations copied, DID file ready"
 
       - name: Build frontend
         run: |
@@ -124,90 +141,99 @@ jobs:
           tar czf ../../../realm_frontend.tar.gz .
           cd ../../..
           echo "✅ Frontend tarball built ($(stat -c%s realm_frontend.tar.gz) bytes)"
-      
+
       - name: Compute release asset checksums
         run: |
           echo "# SHA-256 checksums for release assets" > checksums.txt
           for f in realm_backend.wasm.gz realm_backend.did realm_frontend.tar.gz; do
-            if [ -f "$f" ]; then
-              sha256sum "$f" >> checksums.txt
-            fi
+            [ -f "$f" ] && sha256sum "$f" >> checksums.txt
           done
           cat checksums.txt
-      
+
       - name: Build and publish CLI to PyPI
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           cd cli
-          
-          # Verify version consistency
           PYPROJECT_VERSION=$(grep -Po '^version = "\K[^"]*' pyproject.toml)
           INIT_VERSION=$(grep -Po '(?<=__version__ = ")[^"]*' realms/__init__.py)
-          
-          echo "Version in pyproject.toml: $PYPROJECT_VERSION"
-          echo "Version in __init__.py: $INIT_VERSION"
-          
           if [ "$PYPROJECT_VERSION" != "$INIT_VERSION" ]; then
-            echo "ERROR: Version mismatch"
+            echo "ERROR: Version mismatch between pyproject.toml and __init__.py"
             exit 1
           fi
-          
-          # Build and publish
           python -m build
           twine check dist/*
           twine upload dist/*
-          
           echo "✅ CLI published to PyPI: v${{ steps.bump_version.outputs.NEW_VERSION }}"
-      
-      # Commit version changes
-      - name: Commit and push version changes
-        run: |
-          git add version.txt cli/pyproject.toml cli/realms/__init__.py src/realm_registry_frontend/src/lib/config.js
-          git commit -m "Bump version to ${{ steps.bump_version.outputs.NEW_VERSION }}"
-          git remote set-url origin https://${{ secrets.PAT_GITHUB }}@github.com/${{ github.repository }}.git
-          git push origin
-          
-          echo "✅ Version changes committed and pushed"
-      
-      # Create GitHub release
+
+      # Create GitHub release (reads notes file from workspace before we clean it up)
       - name: Create GitHub Release
+        id: create_release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.bump_version.outputs.NEW_VERSION }}
           name: Release v${{ steps.bump_version.outputs.NEW_VERSION }}
-          generate_release_notes: true
+          body_path: .github/RELEASE_NOTES_NEXT.md
           fail_on_unmatched_files: true
           files: |
             realm_backend.wasm.gz
             realm_backend.did
             realm_frontend.tar.gz
             checksums.txt
-          body: |
-            ## 📦 Release Assets
-            
-            ### 🔧 Canister Artifacts
-            - `realm_backend.wasm.gz` + `realm_backend.did` — Backend canister
-            - `realm_frontend.tar.gz` — Frontend asset canister dist
-            - `checksums.txt` — SHA-256 hashes for all assets above
-            
-            ### 📦 CLI Tool (PyPI)
-            ```bash
-            pip install --upgrade realms-gos==${{ steps.bump_version.outputs.NEW_VERSION }}
-            ```
-            
-            ## Deployment
-            
-            **Via Mundus (decentralized):**
-            ```bash
-            realms mundus deploy <descriptor.yml> --version ${{ steps.bump_version.outputs.NEW_VERSION }}
-            ```
-            
-            **Install CLI:**
-            ```bash
-            pip install realms-gos==${{ steps.bump_version.outputs.NEW_VERSION }}
-            ```
-            
-            ## Commit
-            ${{ github.sha }}
+
+      # Commit version bump + remove the consumed release notes file
+      - name: Commit and push version changes
+        run: |
+          git add version.txt cli/pyproject.toml cli/realms/__init__.py \
+            src/realm_registry_frontend/src/lib/config.js
+          # Remove the release notes file now that the release is published
+          if [ -f ".github/RELEASE_NOTES_NEXT.md" ]; then
+            git rm .github/RELEASE_NOTES_NEXT.md
+          fi
+          git commit -m "chore: bump version to ${{ steps.bump_version.outputs.NEW_VERSION }}"
+          git remote set-url origin https://${{ secrets.PAT_GITHUB }}@github.com/${{ github.repository }}.git
+          git push origin
+          echo "✅ Version changes committed and pushed"
+
+      # Publish artifacts to all three environments
+      - name: Publish to file_registry — test
+        if: ${{ inputs.publish_to_registry == true }}
+        run: |
+          python3 scripts/publish_build.py \
+            --environment test \
+            --family realm \
+            --component both \
+            --version ${{ steps.bump_version.outputs.NEW_VERSION }} \
+            --identity ci
+
+      - name: Publish to file_registry — demo
+        if: ${{ inputs.publish_to_registry == true }}
+        run: |
+          python3 scripts/publish_build.py \
+            --environment demo \
+            --family realm \
+            --component both \
+            --version ${{ steps.bump_version.outputs.NEW_VERSION }} \
+            --identity ci
+
+      - name: Publish to file_registry — staging
+        if: ${{ inputs.publish_to_registry == true }}
+        run: |
+          python3 scripts/publish_build.py \
+            --environment staging \
+            --family realm \
+            --component both \
+            --version ${{ steps.bump_version.outputs.NEW_VERSION }} \
+            --identity ci
+
+      - name: Summary
+        run: |
+          echo "═══════════════════════════════════════════════════════"
+          echo " Release v${{ steps.bump_version.outputs.NEW_VERSION }} complete"
+          echo " GitHub: ${{ steps.create_release.outputs.url }}"
+          echo " PyPI:   https://pypi.org/project/realms-gos/${{ steps.bump_version.outputs.NEW_VERSION }}/"
+          if [ "${{ inputs.publish_to_registry }}" = "true" ]; then
+            echo " file_registry: published to test / demo / staging"
+          fi
+          echo "═══════════════════════════════════════════════════════"
