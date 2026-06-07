@@ -1204,24 +1204,42 @@ def _upload_one_file(
                 )
                 return "failed"
 
-    finalize_payload = json.dumps({"namespace": namespace, "path": registry_path})
-    candid_arg = '("' + finalize_payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
-    raw = _dfx_call(
-        registry,
-        "finalize_chunked_file",
-        candid_arg,
-        network,
-        identity,
-        timeout=600,
-    )
-    try:
-        res = json.loads(raw)
-    except json.JSONDecodeError:
-        res = {"raw": raw}
-    if isinstance(res, dict) and (res.get("ok") is True or res.get("success") is True):
-        console.print(f"  [green]✓[/green] {namespace}/{registry_path} ({size:,} bytes, chunked)")
-        return "uploaded"
-    console.print(f"  [red]✗[/red] finalize failed for {registry_path}: {res}")
+    # Finalize incrementally: the single-shot finalize_chunked_file reassembles
+    # + hashes the whole file in one message, which blows the 40B-instruction
+    # budget for multi-MB files (e.g. the 1.8 MB base WASM). finalize_chunked_file_step
+    # concatenates a small batch of chunks per call and skips on-chain hashing,
+    # so we pass the locally-computed sha256 once and poll until done.
+    expected_sha256 = _local_file_sha256(local_path)
+    # ~800 KiB of byte-copy work per step keeps each message well under budget.
+    batch_size = max(1, (800 * 1024) // _PUBLISH_CHUNK_SIZE_BYTES)
+    max_steps = total_chunks + 5
+    for _step in range(max_steps):
+        step_payload = json.dumps({
+            "namespace": namespace,
+            "path": registry_path,
+            "expected_sha256": expected_sha256,
+            "batch_size": batch_size,
+        })
+        candid_arg = '("' + step_payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
+        raw = _dfx_call(
+            registry,
+            "finalize_chunked_file_step",
+            candid_arg,
+            network,
+            identity,
+            timeout=600,
+        )
+        try:
+            res = json.loads(raw)
+        except json.JSONDecodeError:
+            res = {"raw": raw}
+        if not (isinstance(res, dict) and res.get("ok") is True):
+            console.print(f"  [red]✗[/red] finalize failed for {registry_path}: {res}")
+            return "failed"
+        if res.get("done") is True:
+            console.print(f"  [green]✓[/green] {namespace}/{registry_path} ({size:,} bytes, chunked)")
+            return "uploaded"
+    console.print(f"  [red]✗[/red] finalize did not complete for {registry_path} after {max_steps} steps")
     return "failed"
 
 
