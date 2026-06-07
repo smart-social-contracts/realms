@@ -1,48 +1,14 @@
-import type { Principal } from '@icp-sdk/core/principal';
-import type { ActorMethod } from '@icp-sdk/core/agent';
-import type { IDL } from '@icp-sdk/core/candid';
+import type { Principal } from '@dfinity/principal';
+import type { ActorMethod } from '@dfinity/agent';
+import type { IDL } from '@dfinity/candid';
 
-export interface Account {
-  'owner' : Principal,
-  'subaccount' : [] | [Uint8Array | number[]],
-}
 export interface AccountBalanceArgs { 'account' : Uint8Array | number[] }
 export type AccountIdentifier = Uint8Array | number[];
-export interface AccountTransaction {
-  'id' : bigint,
-  'transaction' : Transaction,
-}
 export type AddCreditsResult = { 'Ok' : UserCreditsRecord } |
   { 'Err' : string };
 export type AddRealmResult = { 'Ok' : string } |
   { 'Err' : string };
 export type Address = string;
-export interface AllocateOk {
-  'backend_canister_id' : string,
-  'already_allocated' : boolean,
-  'job_id' : string,
-  'frontend_canister_id' : string,
-}
-export interface AppDataRecord {
-  'scan_end_tx_id' : bigint,
-  'max_results' : bigint,
-  'scan_start_tx_id' : bigint,
-  'scan_oldest_tx_id' : bigint,
-  'sync_tx_id' : bigint,
-  'max_iteration_count' : bigint,
-  'admin_principal' : Principal,
-  'sync_status' : string,
-}
-export interface Approve {
-  'fee' : [] | [bigint],
-  'from' : Account,
-  'memo' : [] | [Array<bigint>],
-  'created_at_time' : [] | [bigint],
-  'amount' : bigint,
-  'expected_allowance' : [] | [bigint],
-  'expires_at' : [] | [bigint],
-  'spender' : Spender,
-}
 export interface Archive { 'canister_id' : Principal }
 export interface Archives { 'archives' : Array<Archive> }
 export interface AssistantInput {
@@ -104,9 +70,6 @@ export interface AssistantListing {
 }
 export type AssistantResult = { 'Ok' : AssistantListing } |
   { 'Err' : string };
-export interface BadBurnRecord { 'min_burn_amount' : bigint }
-export interface BadFeeRecord { 'expected_fee' : bigint }
-export interface BalanceRecord { 'principal_id' : Principal, 'amount' : bigint }
 export interface BillingStatusRecord {
   'total_spent' : bigint,
   'total_balance' : bigint,
@@ -125,13 +88,6 @@ export interface Block {
 export type BlockHash = Uint8Array | number[];
 export type BlockIndex = bigint;
 export interface BlockRange { 'blocks' : Array<Block> }
-export interface Burn {
-  'from' : Account,
-  'memo' : [] | [Array<bigint>],
-  'created_at_time' : [] | [bigint],
-  'amount' : bigint,
-  'spender' : [] | [Spender],
-}
 export type Callback = ActorMethod<
   [StreamingToken],
   StreamingCallbackHttpResponse
@@ -144,7 +100,6 @@ export interface CanisterInfo {
   'canister_id' : string,
   'canister_type' : string,
 }
-export interface CanisterRecord { 'id' : string, 'principal' : Principal }
 export interface CanisterSettings {
   'freezing_threshold' : [] | [bigint],
   'controllers' : [] | [Array<Principal>],
@@ -162,22 +117,18 @@ export interface CanisterStatusResult {
   'settings' : DefiniteCanisterSettings,
   'module_hash' : [] | [Uint8Array | number[]],
 }
-export interface ChildCanisterHistoryEntry {
-  'install_status' : ChildCanisterInstallStatus,
-  'role' : string,
-  'canister_id' : string,
-  'created_at' : bigint,
-  'job_status' : string,
-  'job_id' : string,
-  'realm_name' : string,
-  'module_hash_hex' : string,
+export interface CasalsConfigView {
+  'provision_via_casals' : boolean,
+  'casals_section' : string,
+  'registry_principal' : string,
+  'casals_canister_id' : string,
 }
-export interface ChildCanisterHistoryOk {
-  'count' : number,
-  'entries' : Array<ChildCanisterHistoryEntry>,
+export interface CasalsService {
+  'create_canister' : ActorMethod<[string], string>,
+  'create_stand' : ActorMethod<[string], string>,
+  'set_commander' : ActorMethod<[string], string>,
+  'upgrade_to' : ActorMethod<[string], string>,
 }
-export type ChildCanisterInstallStatus = { 'Empty' : null } |
-  { 'Installed' : null };
 export interface CodexInput {
   'categories' : string,
   'icon' : string,
@@ -250,25 +201,6 @@ export type CryptoResponseData = { 'scopeList' : ScopeListRecord } |
   { 'group' : GroupRecord } |
   { 'message' : string } |
   { 'groupList' : GroupListRecord };
-export interface DebugResumeItem {
-  'status' : string,
-  'task_id' : string,
-  'pending_steps' : number,
-  'note' : string,
-  'reset_running' : number,
-  'target' : string,
-}
-export interface DebugResumeOk { 'entries' : Array<DebugResumeItem> }
-export interface DebugRunStepOk {
-  'step_label' : string,
-  'step_error' : string,
-  'task_status' : string,
-  'message' : string,
-  'step_idx' : number,
-  'remaining_pending' : number,
-  'step_status' : string,
-  'step_kind' : string,
-}
 export interface DecimalsResult { 'decimals' : number }
 export type DeductCreditsResult = { 'Ok' : UserCreditsRecord } |
   { 'Err' : string };
@@ -284,28 +216,18 @@ export interface DeploymentJobView {
   'expected_wasm_hash' : string,
   'registry_canister_id' : string,
   'backend_canister_id' : string,
-  'offchain_deployer_principal' : string,
-  'expected_frontend_wasm_hash' : string,
   'ext_deploy_task_id' : string,
   'assets_verified' : number,
   'network' : string,
-  'frontend_wasm_verified' : number,
-  'nft_frontend_canister_id' : string,
   'created_at' : bigint,
   'error' : string,
   'wasm_verified' : number,
-  'token_frontend_canister_id' : string,
   'job_id' : string,
   'realm_name' : string,
   'actual_wasm_hash' : string,
   'caller_principal' : string,
-  'expected_assets_hash' : string,
   'completed_at' : bigint,
-  'token_backend_canister_id' : string,
-  'actual_assets_hash' : string,
-  'actual_frontend_wasm_hash' : string,
   'frontend_canister_id' : string,
-  'nft_backend_canister_id' : string,
 }
 export interface DepositCyclesArgs { 'canister_id' : Principal }
 export interface DeveloperLicense {
@@ -318,7 +240,6 @@ export interface DeveloperLicense {
   'is_active' : boolean,
   'expires_at' : number,
 }
-export interface DuplicateRecord { 'duplicate_of' : bigint }
 export type EcdsaCurve = { 'secp256k1' : null };
 export interface EcdsaPublicKeyArgs {
   'key_id' : KeyId,
@@ -328,11 +249,6 @@ export interface EcdsaPublicKeyArgs {
 export interface EcdsaPublicKeyResult {
   'public_key' : Uint8Array | number[],
   'chain_code' : Uint8Array | number[],
-}
-export interface EndpointInfo {
-  'kind' : string,
-  'name' : string,
-  'description' : string,
 }
 export interface EnqueueOk {
   'status' : string,
@@ -399,24 +315,11 @@ export interface ExtensionsListRecord { 'extensions' : Array<string> }
 export interface FileRegistryService {
   'get_backend_files_icc' : ActorMethod<[string, string, string], string>,
   'get_extension_manifest' : ActorMethod<[string], string>,
+  'get_frontend_files_icc' : ActorMethod<[string, string], string>,
 }
 export interface GenericError { 'message' : string, 'error_code' : bigint }
-export interface GenericErrorRecord {
-  'message' : string,
-  'error_code' : bigint,
-}
 export type GenericResult = { 'Ok' : string } |
   { 'Err' : string };
-export interface GetAccountTransactionsRequest {
-  'max_results' : bigint,
-  'start' : [] | [bigint],
-  'account' : Account,
-}
-export interface GetAccountTransactionsResponse {
-  'balance' : bigint,
-  'transactions' : Array<AccountTransaction>,
-  'oldest_tx_id' : [] | [bigint],
-}
 export interface GetBalanceArgs {
   'network' : BitcoinNetwork,
   'address' : string,
@@ -431,8 +334,6 @@ export interface GetCurrentFeePercentilesArgs { 'network' : BitcoinNetwork }
 export type GetRealmResult = { 'Ok' : RealmRecord } |
   { 'Err' : string };
 export type GetStatusResult = { 'Ok' : StatusRecord } |
-  { 'Err' : string };
-export type GetTransactionsResult = { 'Ok' : GetAccountTransactionsResponse } |
   { 'Err' : string };
 export interface GetUtxosArgs {
   'network' : BitcoinNetwork,
@@ -452,12 +353,7 @@ export interface GroupRecord { 'name' : string, 'description' : string }
 export type GuardResult = { 'Ok' : null } |
   { 'Err' : string };
 export type Header = [string, string];
-export interface HealthView {
-  'ok' : boolean,
-  'max_registry_read_bytes' : number,
-  'max_upload_chunk_bytes' : number,
-  'canister' : string,
-}
+export interface HealthView { 'ok' : boolean, 'canister' : string }
 export interface HttpHeader { 'value' : string, 'name' : string }
 export type HttpMethod = { 'get' : null } |
   { 'head' : null } |
@@ -497,17 +393,6 @@ export interface HttpTransformArgs {
   'response' : HttpResponse,
 }
 export type HttpTransformFunc = ActorMethod<[HttpTransformArgs], HttpResponse>;
-export interface ICRCIndexer {
-  'get_account_transactions' : ActorMethod<
-    [GetAccountTransactionsRequest],
-    GetTransactionsResult
-  >,
-}
-export interface ICRCLedger {
-  'icrc1_balance_of' : ActorMethod<[Account], bigint>,
-  'icrc1_fee' : ActorMethod<[], bigint>,
-  'icrc1_transfer' : ActorMethod<[TransferArg], TransferResult>,
-}
 export type InsertError = {
     'ValueTooLarge' : { 'max' : number, 'given' : number }
   } |
@@ -522,13 +407,6 @@ export type InstallCodeMode = { 'reinstall' : null } |
   { 'upgrade' : null } |
   { 'install' : null };
 export interface InstallerError { 'message' : string, 'traceback' : string }
-export interface InstallerInfoView {
-  'endpoints' : Array<EndpointInfo>,
-  'name' : string,
-  'description' : string,
-  'version' : string,
-}
-export interface InsufficientFundsRecord { 'balance' : bigint }
 export interface JobStatusAck {
   'status' : string,
   'prev_status' : string,
@@ -541,7 +419,6 @@ export interface JobsListOk {
 }
 export interface KeyId { 'name' : string, 'curve' : EcdsaCurve }
 export interface KeyTooLarge { 'max' : number, 'given' : number }
-export interface LLMChatResponse { 'response' : string }
 export interface LicensePaymentInput {
   'principal' : string,
   'duration_seconds' : bigint,
@@ -571,12 +448,6 @@ export type MetadataValue = { 'Int' : bigint } |
   { 'Blob' : Uint8Array | number[] } |
   { 'Text' : string };
 export type MillisatoshiPerByte = bigint;
-export interface Mint {
-  'to' : Account,
-  'memo' : [] | [Array<bigint>],
-  'created_at_time' : [] | [bigint],
-  'amount' : bigint,
-}
 export interface MintArg {
   'token_id' : bigint,
   'owner' : NftAccount,
@@ -649,6 +520,13 @@ export interface PendingJobsOk {
   'jobs' : Array<PendingJobEntry>,
   'count' : number,
 }
+export interface ProvisionOk {
+  'status' : string,
+  'backend_canister_id' : string,
+  'stand' : string,
+  'job_id' : string,
+  'frontend_canister_id' : string,
+}
 export interface ProvisionalCreateCanisterWithCyclesArgs {
   'settings' : [] | [CanisterSettings],
   'amount' : [] | [bigint],
@@ -718,14 +596,15 @@ export interface REnqueueOk {
 export interface RInstallerError { 'message' : string, 'traceback' : string }
 export type RResultEnqueue = { 'Ok' : REnqueueOk } |
   { 'Err' : RInstallerError };
-export interface RealmData {
-  'json' : string,
-  'timestamp' : bigint,
-  'principal_id' : string,
-}
 export interface RealmInstallerService {
   'cancel_deployment' : ActorMethod<[string], string>,
   'enqueue_deployment' : ActorMethod<[string], RResultEnqueue>,
+}
+export interface RealmMessagingService {
+  'receive_realm_message' : ActorMethod<
+    [string, string, string, string],
+    string
+  >,
 }
 export interface RealmRecord {
   'id' : string,
@@ -745,6 +624,11 @@ export interface RealmRegistryService {
     string
   >,
 }
+export interface RealmRegistryUpgradeService {
+  'get_credits' : ActorMethod<[string], GetCreditsResult>,
+  'get_latest_version' : ActorMethod<[], UpgradeResult>,
+  'request_upgrade' : ActorMethod<[string], string>,
+}
 export interface RealmResponse {
   'data' : RealmResponseData,
   'success' : boolean,
@@ -759,10 +643,6 @@ export type RealmResponseData = { 'status' : StatusRecord } |
 export interface RealmTargetService {
   'install_codex_from_registry' : ActorMethod<[string], string>,
   'install_extension_from_registry' : ActorMethod<[string], string>,
-}
-export interface RealmsListRecord {
-  'total_count' : bigint,
-  'realms' : Array<RealmRecord>,
 }
 export type RejectionCode = { 'NoError' : null } |
   { 'CanisterError' : null } |
@@ -788,22 +668,7 @@ export interface ReportReadyOk {
   'job_id' : string,
   'actual_wasm_hash' : string,
 }
-export interface Response { 'data' : ResponseData, 'success' : boolean }
-export type ResponseData = { 'Error' : string } |
-  { 'Stats' : StatsRecord } |
-  { 'TestMode' : TestModeRecord } |
-  { 'TransactionId' : TransactionIdRecord } |
-  { 'Message' : string } |
-  { 'Transactions' : Array<TransactionRecord> } |
-  { 'TransactionSummary' : TransactionSummaryRecord } |
-  { 'Balance' : BalanceRecord };
-export type ResultAllocate = { 'Ok' : AllocateOk } |
-  { 'Err' : InstallerError };
-export type ResultChildCanisterHistory = { 'Ok' : ChildCanisterHistoryOk } |
-  { 'Err' : InstallerError };
-export type ResultDebugResume = { 'Ok' : DebugResumeOk } |
-  { 'Err' : InstallerError };
-export type ResultDebugRunStep = { 'Ok' : DebugRunStepOk } |
+export type ResultCasalsConfig = { 'Ok' : CasalsConfigView } |
   { 'Err' : InstallerError };
 export type ResultEnqueue = { 'Ok' : EnqueueOk } |
   { 'Err' : InstallerError };
@@ -815,23 +680,18 @@ export type ResultJobsList = { 'Ok' : JobsListOk } |
   { 'Err' : InstallerError };
 export type ResultPendingJobs = { 'Ok' : PendingJobsOk } |
   { 'Err' : InstallerError };
+export type ResultProvision = { 'Ok' : ProvisionOk } |
+  { 'Err' : InstallerError };
 export type ResultReportFailure = { 'Ok' : JobStatusAck } |
   { 'Err' : InstallerError };
 export type ResultReportFrontend = { 'Ok' : ReportFrontendOk } |
   { 'Err' : InstallerError };
 export type ResultReportReady = { 'Ok' : ReportReadyOk } |
   { 'Err' : InstallerError };
-export type ResultVerificationReport = { 'Ok' : VerificationReport } |
-  { 'Err' : InstallerError };
-export type ResultVerify = { 'Ok' : VerifyOk } |
+export type ResultTakeSnapshot = { 'Ok' : TakeSnapshotOk } |
   { 'Err' : InstallerError };
 export type Satoshi = bigint;
 export interface ScopeListRecord { 'scopes' : Array<string> }
-export interface SearchRealmsResult {
-  'count' : bigint,
-  'query' : string,
-  'realms' : Array<RealmRecord>,
-}
 export interface SendTransactionArgs {
   'transaction' : Uint8Array | number[],
   'network' : BitcoinNetwork,
@@ -844,10 +704,6 @@ export interface SignWithEcdsaArgs {
   'message_hash' : Uint8Array | number[],
 }
 export interface SignWithEcdsaResult { 'signature' : Uint8Array | number[] }
-export interface Spender {
-  'owner' : Principal,
-  'subaccount' : [] | [Uint8Array | number[]],
-}
 export type Stable64GrowResult = { 'Ok' : bigint } |
   { 'Err' : { 'OutOfBounds' : null } | { 'OutOfMemory' : null } };
 export type StableGrowResult = { 'Ok' : number } |
@@ -855,54 +711,11 @@ export type StableGrowResult = { 'Ok' : number } |
 export type StableMemoryError = { 'OutOfBounds' : null } |
   { 'OutOfMemory' : null };
 export interface StartCanisterArgs { 'canister_id' : Principal }
-export interface StatsRecord {
-  'app_data' : AppDataRecord,
-  'canisters' : Array<CanisterRecord>,
-  'balances' : Array<BalanceRecord>,
-}
 export interface StatusRecord {
-  'python_version' : string,
-  'billing_service_principal' : string,
   'status' : string,
-  'transfers_count' : bigint,
-  'codexes_count' : bigint,
-  'purchases_count' : bigint,
-  'is_quarter' : boolean,
-  'proposals_count' : bigint,
-  'extensions_count' : bigint,
-  'test_mode' : boolean,
-  'realms_count' : bigint,
-  'license_price_usd_cents' : bigint,
   'version' : string,
-  'extensions' : Array<string>,
-  'disputes_count' : bigint,
-  'realm_welcome_message' : string,
-  'accounting_currency_decimals' : bigint,
-  'canisters' : Array<CanisterInfo>,
-  'realm_name' : string,
-  'license_duration_seconds' : bigint,
-  'dependencies' : Array<string>,
-  'user_profiles_count' : bigint,
-  'file_registry_canister_id' : string,
-  'assistants_count' : bigint,
   'commit' : string,
-  'codices_count' : bigint,
-  'instruments_count' : bigint,
-  'organizations_count' : bigint,
-  'is_caller_controller' : boolean,
-  'mandates_count' : bigint,
-  'tasks_count' : bigint,
-  'realm_manifesto' : string,
-  'votes_count' : bigint,
-  'licenses_count' : bigint,
   'commit_datetime' : string,
-  'likes_count' : bigint,
-  'users_count' : bigint,
-  'parent_realm_canister_id' : string,
-  'trades_count' : bigint,
-  'accounting_currency' : string,
-  'quarters' : Array<QuarterInfoRecord>,
-  'registries' : Array<CanisterInfo>,
 }
 export type StatusResult = { 'Ok' : StatusRecord } |
   { 'Err' : string };
@@ -915,10 +728,10 @@ export type StreamingStrategy = { 'Callback' : CallbackStrategy };
 export interface StreamingToken { 'key' : string }
 export type SubAccount = Uint8Array | number[];
 export interface SymbolResult { 'symbol' : string }
-export interface TestBenchResponse { 'data' : string }
-export interface TestModeRecord {
-  'tx_id' : bigint,
-  'test_mode_enabled' : boolean,
+export interface TakeSnapshotOk {
+  'skipped' : boolean,
+  'job_id' : string,
+  'snapshot_id' : string,
 }
 export interface TimeStamp { 'timestamp_nanos' : bigint }
 export interface Tokens { 'e8s' : bigint }
@@ -931,40 +744,6 @@ export type TransactionHistoryResult = {
     'Ok' : Array<CreditTransactionRecord>
   } |
   { 'Err' : string };
-export interface TransactionIdRecord { 'transaction_id' : bigint }
-export interface TransactionRecord {
-  'id' : bigint,
-  'kind' : string,
-  'principal_from' : Principal,
-  'timestamp' : bigint,
-  'principal_to' : Principal,
-  'amount' : bigint,
-}
-export interface TransactionSummaryRecord {
-  'scan_end_tx_id' : bigint,
-  'new_txs_count' : bigint,
-  'sync_status' : string,
-}
-export interface TransactionsListRecord {
-  'transactions' : Array<TransactionRecord>,
-}
-export interface Transfer {
-  'to' : Account,
-  'fee' : [] | [bigint],
-  'from' : Account,
-  'memo' : [] | [Array<bigint>],
-  'created_at_time' : [] | [bigint],
-  'amount' : bigint,
-  'spender' : [] | [Spender],
-}
-export interface TransferArg {
-  'to' : Account,
-  'fee' : [] | [bigint],
-  'memo' : [] | [bigint],
-  'from_subaccount' : [] | [Uint8Array | number[]],
-  'created_at_time' : [] | [bigint],
-  'amount' : bigint,
-}
 export interface TransferArgs {
   'to' : Uint8Array | number[],
   'fee' : Tokens,
@@ -991,6 +770,8 @@ export interface UpdateSettingsArgs {
   'canister_id' : Principal,
   'settings' : CanisterSettings,
 }
+export type UpgradeResult = { 'Ok' : string } |
+  { 'Err' : string };
 export interface UserCreditsRecord {
   'total_spent' : bigint,
   'balance' : bigint,
@@ -1013,49 +794,66 @@ export interface Utxo {
 export type UtxosFilter = { 'Page' : Uint8Array | number[] } |
   { 'MinConfirmations' : number };
 export interface ValueTooLarge { 'max' : number, 'given' : number }
-export interface VerificationReport {
-  'status' : string,
-  'expected_wasm_hash' : string,
-  'backend_canister_id' : string,
-  'assets_verified' : number,
-  'wasm_verified' : number,
-  'job_id' : string,
-  'actual_wasm_hash' : string,
-  'expected_assets_hash' : string,
-  'actual_assets_hash' : string,
-  'frontend_canister_id' : string,
+export interface VersionInfoRecord {
+  'backend_wasm_hash' : string,
+  'backend_wasm_url' : string,
+  'published_at' : number,
+  'frontend_tar_url' : string,
+  'version' : string,
+  'frontend_tar_hash' : string,
 }
-export interface VerifyOk {
-  'expected_wasm_hash' : string,
-  'verified' : boolean,
-  'backend_canister_id' : string,
-  'module_hash' : string,
-  'reason' : string,
+export interface _GetAccountTransactionsArgs {
+  'max_results' : bigint,
+  'start' : [] | [bigint],
+  'account' : _IcrcAccount,
 }
+export interface _GetAccountTransactionsOk {
+  'balance' : bigint,
+  'transactions' : Array<_IcrcTransactionWithId>,
+}
+export type _GetAccountTransactionsResult = {
+    'Ok' : _GetAccountTransactionsOk
+  } |
+  { 'Err' : string };
+export interface _ICRC1IndexerService {
+  'get_account_transactions' : ActorMethod<
+    [_GetAccountTransactionsArgs],
+    _GetAccountTransactionsResult
+  >,
+}
+export interface _IcrcAccount {
+  'owner' : Principal,
+  'subaccount' : [] | [Uint8Array | number[]],
+}
+export interface _IcrcTransaction {
+  'kind' : string,
+  'transfer' : [] | [_IcrcTransfer],
+}
+export interface _IcrcTransactionWithId {
+  'id' : bigint,
+  'transaction' : _IcrcTransaction,
+}
+export interface _IcrcTransfer { 'to' : _IcrcAccount, 'amount' : bigint }
 export interface _SERVICE {
-  '__browse__' : ActorMethod<[string], string>,
   '__get_candid_interface_tmp_hack' : ActorMethod<[], string>,
-  '__shell__' : ActorMethod<[string], string>,
-  'allocate_deployment_canisters' : ActorMethod<[string], ResultAllocate>,
   'cancel_deployment' : ActorMethod<[string], ResultJobCancel>,
-  'debug_resume_deploys' : ActorMethod<[string], ResultDebugResume>,
-  'debug_run_one_step' : ActorMethod<[string], ResultDebugRunStep>,
   'enqueue_deployment' : ActorMethod<[string], ResultEnqueue>,
   'get_canister_logs' : ActorMethod<
     [[] | [bigint], [] | [bigint], [] | [string], [] | [string]],
     Array<PublicLogEntry>
   >,
+  'get_casals_config' : ActorMethod<[], ResultCasalsConfig>,
   'get_deployment_job_status' : ActorMethod<[string], ResultJobIdStatus>,
   'get_pending_deployments' : ActorMethod<[], ResultPendingJobs>,
-  'get_verification_report' : ActorMethod<[string], ResultVerificationReport>,
   'health' : ActorMethod<[], HealthView>,
-  'info' : ActorMethod<[], InstallerInfoView>,
-  'list_child_canister_history' : ActorMethod<[], ResultChildCanisterHistory>,
   'list_deployment_jobs' : ActorMethod<[], ResultJobsList>,
+  'provision_via_casals' : ActorMethod<[string], ResultProvision>,
   'report_canister_ready' : ActorMethod<[string], ResultReportReady>,
   'report_deployment_failure' : ActorMethod<[string], ResultReportFailure>,
   'report_frontend_verified' : ActorMethod<[string], ResultReportFrontend>,
-  'verify_realm' : ActorMethod<[string], ResultVerify>,
+  'set_casals_config' : ActorMethod<[string], ResultCasalsConfig>,
+  'status' : ActorMethod<[], GetStatusResult>,
+  'take_pre_upgrade_snapshot' : ActorMethod<[string], ResultTakeSnapshot>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

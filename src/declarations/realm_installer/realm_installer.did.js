@@ -1,53 +1,16 @@
 export const idlFactory = ({ IDL }) => {
-  const AllocateOk = IDL.Record({
-    'backend_canister_id' : IDL.Text,
-    'already_allocated' : IDL.Bool,
-    'job_id' : IDL.Text,
-    'frontend_canister_id' : IDL.Text,
-  });
-  const InstallerError = IDL.Record({
-    'message' : IDL.Text,
-    'traceback' : IDL.Text,
-  });
-  const ResultAllocate = IDL.Variant({
-    'Ok' : AllocateOk,
-    'Err' : InstallerError,
-  });
   const JobStatusAck = IDL.Record({
     'status' : IDL.Text,
     'prev_status' : IDL.Text,
     'noop' : IDL.Bool,
     'job_id' : IDL.Text,
   });
+  const InstallerError = IDL.Record({
+    'message' : IDL.Text,
+    'traceback' : IDL.Text,
+  });
   const ResultJobCancel = IDL.Variant({
     'Ok' : JobStatusAck,
-    'Err' : InstallerError,
-  });
-  const DebugResumeItem = IDL.Record({
-    'status' : IDL.Text,
-    'task_id' : IDL.Text,
-    'pending_steps' : IDL.Nat32,
-    'note' : IDL.Text,
-    'reset_running' : IDL.Nat32,
-    'target' : IDL.Text,
-  });
-  const DebugResumeOk = IDL.Record({ 'entries' : IDL.Vec(DebugResumeItem) });
-  const ResultDebugResume = IDL.Variant({
-    'Ok' : DebugResumeOk,
-    'Err' : InstallerError,
-  });
-  const DebugRunStepOk = IDL.Record({
-    'step_label' : IDL.Text,
-    'step_error' : IDL.Text,
-    'task_status' : IDL.Text,
-    'message' : IDL.Text,
-    'step_idx' : IDL.Nat32,
-    'remaining_pending' : IDL.Nat32,
-    'step_status' : IDL.Text,
-    'step_kind' : IDL.Text,
-  });
-  const ResultDebugRunStep = IDL.Variant({
-    'Ok' : DebugRunStepOk,
     'Err' : InstallerError,
   });
   const EnqueueOk = IDL.Record({
@@ -67,33 +30,33 @@ export const idlFactory = ({ IDL }) => {
     'message' : IDL.Text,
     'timestamp' : IDL.Nat,
   });
+  const CasalsConfigView = IDL.Record({
+    'provision_via_casals' : IDL.Bool,
+    'casals_section' : IDL.Text,
+    'registry_principal' : IDL.Text,
+    'casals_canister_id' : IDL.Text,
+  });
+  const ResultCasalsConfig = IDL.Variant({
+    'Ok' : CasalsConfigView,
+    'Err' : InstallerError,
+  });
   const DeploymentJobView = IDL.Record({
     'status' : IDL.Text,
     'expected_wasm_hash' : IDL.Text,
     'registry_canister_id' : IDL.Text,
     'backend_canister_id' : IDL.Text,
-    'offchain_deployer_principal' : IDL.Text,
-    'expected_frontend_wasm_hash' : IDL.Text,
     'ext_deploy_task_id' : IDL.Text,
     'assets_verified' : IDL.Int8,
     'network' : IDL.Text,
-    'frontend_wasm_verified' : IDL.Int8,
-    'nft_frontend_canister_id' : IDL.Text,
     'created_at' : IDL.Nat64,
     'error' : IDL.Text,
     'wasm_verified' : IDL.Int8,
-    'token_frontend_canister_id' : IDL.Text,
     'job_id' : IDL.Text,
     'realm_name' : IDL.Text,
     'actual_wasm_hash' : IDL.Text,
     'caller_principal' : IDL.Text,
-    'expected_assets_hash' : IDL.Text,
     'completed_at' : IDL.Nat64,
-    'token_backend_canister_id' : IDL.Text,
-    'actual_assets_hash' : IDL.Text,
-    'actual_frontend_wasm_hash' : IDL.Text,
     'frontend_canister_id' : IDL.Text,
-    'nft_backend_canister_id' : IDL.Text,
   });
   const ResultJobIdStatus = IDL.Variant({
     'Ok' : DeploymentJobView,
@@ -111,67 +74,24 @@ export const idlFactory = ({ IDL }) => {
     'Ok' : PendingJobsOk,
     'Err' : InstallerError,
   });
-  const VerificationReport = IDL.Record({
-    'status' : IDL.Text,
-    'expected_wasm_hash' : IDL.Text,
-    'backend_canister_id' : IDL.Text,
-    'assets_verified' : IDL.Int8,
-    'wasm_verified' : IDL.Int8,
-    'job_id' : IDL.Text,
-    'actual_wasm_hash' : IDL.Text,
-    'expected_assets_hash' : IDL.Text,
-    'actual_assets_hash' : IDL.Text,
-    'frontend_canister_id' : IDL.Text,
-  });
-  const ResultVerificationReport = IDL.Variant({
-    'Ok' : VerificationReport,
-    'Err' : InstallerError,
-  });
-  const HealthView = IDL.Record({
-    'ok' : IDL.Bool,
-    'max_registry_read_bytes' : IDL.Nat32,
-    'max_upload_chunk_bytes' : IDL.Nat32,
-    'canister' : IDL.Text,
-  });
-  const EndpointInfo = IDL.Record({
-    'kind' : IDL.Text,
-    'name' : IDL.Text,
-    'description' : IDL.Text,
-  });
-  const InstallerInfoView = IDL.Record({
-    'endpoints' : IDL.Vec(EndpointInfo),
-    'name' : IDL.Text,
-    'description' : IDL.Text,
-    'version' : IDL.Text,
-  });
-  const ChildCanisterInstallStatus = IDL.Variant({
-    'Empty' : IDL.Null,
-    'Installed' : IDL.Null,
-  });
-  const ChildCanisterHistoryEntry = IDL.Record({
-    'install_status' : ChildCanisterInstallStatus,
-    'role' : IDL.Text,
-    'canister_id' : IDL.Text,
-    'created_at' : IDL.Nat64,
-    'job_status' : IDL.Text,
-    'job_id' : IDL.Text,
-    'realm_name' : IDL.Text,
-    'module_hash_hex' : IDL.Text,
-  });
-  const ChildCanisterHistoryOk = IDL.Record({
-    'count' : IDL.Nat32,
-    'entries' : IDL.Vec(ChildCanisterHistoryEntry),
-  });
-  const ResultChildCanisterHistory = IDL.Variant({
-    'Ok' : ChildCanisterHistoryOk,
-    'Err' : InstallerError,
-  });
+  const HealthView = IDL.Record({ 'ok' : IDL.Bool, 'canister' : IDL.Text });
   const JobsListOk = IDL.Record({
     'jobs' : IDL.Vec(DeploymentJobView),
     'count' : IDL.Nat32,
   });
   const ResultJobsList = IDL.Variant({
     'Ok' : JobsListOk,
+    'Err' : InstallerError,
+  });
+  const ProvisionOk = IDL.Record({
+    'status' : IDL.Text,
+    'backend_canister_id' : IDL.Text,
+    'stand' : IDL.Text,
+    'job_id' : IDL.Text,
+    'frontend_canister_id' : IDL.Text,
+  });
+  const ResultProvision = IDL.Variant({
+    'Ok' : ProvisionOk,
     'Err' : InstallerError,
   });
   const ReportReadyOk = IDL.Record({
@@ -204,26 +124,28 @@ export const idlFactory = ({ IDL }) => {
     'Ok' : ReportFrontendOk,
     'Err' : InstallerError,
   });
-  const VerifyOk = IDL.Record({
-    'expected_wasm_hash' : IDL.Text,
-    'verified' : IDL.Bool,
-    'backend_canister_id' : IDL.Text,
-    'module_hash' : IDL.Text,
-    'reason' : IDL.Text,
+  const StatusRecord = IDL.Record({
+    'status' : IDL.Text,
+    'version' : IDL.Text,
+    'commit' : IDL.Text,
+    'commit_datetime' : IDL.Text,
   });
-  const ResultVerify = IDL.Variant({ 'Ok' : VerifyOk, 'Err' : InstallerError });
+  const GetStatusResult = IDL.Variant({
+    'Ok' : StatusRecord,
+    'Err' : IDL.Text,
+  });
+  const TakeSnapshotOk = IDL.Record({
+    'skipped' : IDL.Bool,
+    'job_id' : IDL.Text,
+    'snapshot_id' : IDL.Text,
+  });
+  const ResultTakeSnapshot = IDL.Variant({
+    'Ok' : TakeSnapshotOk,
+    'Err' : InstallerError,
+  });
   return IDL.Service({
-    '__browse__' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     '__get_candid_interface_tmp_hack' : IDL.Func([], [IDL.Text], ['query']),
-    '__shell__' : IDL.Func([IDL.Text], [IDL.Text], []),
-    'allocate_deployment_canisters' : IDL.Func(
-        [IDL.Text],
-        [ResultAllocate],
-        [],
-      ),
     'cancel_deployment' : IDL.Func([IDL.Text], [ResultJobCancel], []),
-    'debug_resume_deploys' : IDL.Func([IDL.Text], [ResultDebugResume], []),
-    'debug_run_one_step' : IDL.Func([IDL.Text], [ResultDebugRunStep], []),
     'enqueue_deployment' : IDL.Func([IDL.Text], [ResultEnqueue], []),
     'get_canister_logs' : IDL.Func(
         [
@@ -235,25 +157,16 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(PublicLogEntry)],
         ['query'],
       ),
+    'get_casals_config' : IDL.Func([], [ResultCasalsConfig], ['query']),
     'get_deployment_job_status' : IDL.Func(
         [IDL.Text],
         [ResultJobIdStatus],
         ['query'],
       ),
     'get_pending_deployments' : IDL.Func([], [ResultPendingJobs], ['query']),
-    'get_verification_report' : IDL.Func(
-        [IDL.Text],
-        [ResultVerificationReport],
-        ['query'],
-      ),
     'health' : IDL.Func([], [HealthView], ['query']),
-    'info' : IDL.Func([], [InstallerInfoView], ['query']),
-    'list_child_canister_history' : IDL.Func(
-        [],
-        [ResultChildCanisterHistory],
-        ['query'],
-      ),
     'list_deployment_jobs' : IDL.Func([], [ResultJobsList], ['query']),
+    'provision_via_casals' : IDL.Func([IDL.Text], [ResultProvision], []),
     'report_canister_ready' : IDL.Func([IDL.Text], [ResultReportReady], []),
     'report_deployment_failure' : IDL.Func(
         [IDL.Text],
@@ -265,7 +178,13 @@ export const idlFactory = ({ IDL }) => {
         [ResultReportFrontend],
         [],
       ),
-    'verify_realm' : IDL.Func([IDL.Text], [ResultVerify], []),
+    'set_casals_config' : IDL.Func([IDL.Text], [ResultCasalsConfig], []),
+    'status' : IDL.Func([], [GetStatusResult], ['query']),
+    'take_pre_upgrade_snapshot' : IDL.Func(
+        [IDL.Text],
+        [ResultTakeSnapshot],
+        [],
+      ),
   });
 };
 export const init = ({ IDL }) => { return []; };

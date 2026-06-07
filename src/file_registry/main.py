@@ -469,6 +469,17 @@ def get_file_size_icc(namespace: text, path: text) -> text:
 
 
 @query
+def list_files_icc(namespace: text) -> text:
+    """Inter-canister variant of list_files (positional arg).
+
+    Lets a controller canister (e.g. Casals) enumerate a whole namespace's files
+    — used to upload an entire frontend bundle into a freshly created asset
+    canister — without passing a JSON-dict arg, which Basilisk cannot encode
+    reliably across canisters."""
+    return list_files(json.dumps({"namespace": namespace}))
+
+
+@query
 def get_stats() -> text:
     """Return overall registry statistics."""
     namespaces = _load_namespaces()

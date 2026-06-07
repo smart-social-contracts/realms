@@ -1,7 +1,17 @@
 {
-  "ckbtc_indexer": {
-    "demo": "n5wcd-faaaa-aaaar-qaaea-cai"
-  },
+ "casals_frontend": {
+  "test": "qic2k-baaaa-aaaae-agvga-cai",
+  "demo": "hvwpv-aiaaa-aaaam-ajddq-cai",
+  "staging": "mcqbx-hyaaa-aaaaj-qsarq-cai"
+ },
+ "casals_backend": {
+  "test": "qthgp-3yaaa-aaaae-agveq-cai",
+  "demo": "jo3cj-faaaa-aaaac-bffea-cai",
+  "staging": "jj2e5-iyaaa-aaaac-bffeq-cai"
+ },
+ "ckbtc_indexer": {
+  "demo": "n5wcd-faaaa-aaaar-qaaea-cai"
+ },
   "ckbtc_ledger": {
     "demo": "mxzaz-hqaaa-aaaar-qaada-cai"
   },
