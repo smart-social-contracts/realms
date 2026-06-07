@@ -1052,10 +1052,16 @@ def codex_runtime_list_command(canister: str, network: str = "local", identity: 
 # Publish commands — upload extensions / codices to file_registry
 # ---------------------------------------------------------------------------
 
-# Files larger than this are uploaded via store_file_chunk + finalize_chunked_file
-# (anything above ~1.4 MiB blows the IC ingress message limit when base64 inflates by ~4/3).
-_PUBLISH_CHUNK_THRESHOLD_BYTES = 200 * 1024  # 200 KiB raw — keep below IC instruction limit
-_PUBLISH_CHUNK_SIZE_BYTES = 200 * 1024
+# Files larger than this are uploaded via store_file_chunk + finalize_chunked_file_step.
+# Each store_file_chunk JSON-parses + base64-decodes its payload inside the WASI
+# Python runtime; ~200 KiB/chunk blows the 40B per-message instruction budget, so
+# keep raw chunks small (64 KiB raw -> ~88 KiB base64 payload).
+_PUBLISH_CHUNK_THRESHOLD_BYTES = 64 * 1024  # 64 KiB raw — single-shot store_file below this
+_PUBLISH_CHUNK_SIZE_BYTES = 64 * 1024
+# Chunks concatenated per finalize_chunked_file_step call. Concatenation is cheap
+# (the expensive on-chain SHA-256 is skipped — we pass the local hash), so several
+# 64 KiB chunks per message stay well under budget.
+_PUBLISH_FINALIZE_BATCH = 8
 
 
 def _content_type_for(name: str) -> str:
@@ -1204,23 +1210,19 @@ def _upload_one_file(
                 )
                 return "failed"
 
-    # Finalize incrementally: the single-shot finalize_chunked_file reassembles
-    # + hashes the whole file in one message, which blows the 40B-instruction
-    # budget for multi-MB files (e.g. the 1.8 MB base WASM). finalize_chunked_file_step
-    # concatenates a small batch of chunks per call and skips on-chain hashing,
-    # so we pass the locally-computed sha256 once and poll until done.
-    expected_sha256 = _local_file_sha256(local_path)
-    # ~800 KiB of byte-copy work per step keeps each message well under budget.
-    batch_size = max(1, (800 * 1024) // _PUBLISH_CHUNK_SIZE_BYTES)
-    max_steps = total_chunks + 5
-    for _step in range(max_steps):
-        step_payload = json.dumps({
+    # Incremental finalize: concatenate chunks a batch at a time. The single-shot
+    # finalize_chunked_file hashes the whole file in one message, which exceeds the
+    # 40B-instruction budget for multi-MB files on the WASI Python runtime. The step
+    # variant skips on-chain hashing and trusts the locally-computed SHA-256.
+    local_sha = _local_file_sha256(local_path)
+    while True:
+        finalize_payload = json.dumps({
             "namespace": namespace,
             "path": registry_path,
-            "expected_sha256": expected_sha256,
-            "batch_size": batch_size,
+            "expected_sha256": local_sha,
+            "batch_size": _PUBLISH_FINALIZE_BATCH,
         })
-        candid_arg = '("' + step_payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
+        candid_arg = '("' + finalize_payload.replace("\\", "\\\\").replace('"', '\\"') + '")'
         raw = _dfx_call(
             registry,
             "finalize_chunked_file_step",
@@ -1239,8 +1241,6 @@ def _upload_one_file(
         if res.get("done") is True:
             console.print(f"  [green]✓[/green] {namespace}/{registry_path} ({size:,} bytes, chunked)")
             return "uploaded"
-    console.print(f"  [red]✗[/red] finalize did not complete for {registry_path} after {max_steps} steps")
-    return "failed"
 
 
 def _publish_namespace(

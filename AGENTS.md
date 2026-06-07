@@ -160,7 +160,14 @@ Takes ~5 minutes. The version file determines the current version; the workflow 
 
 ---
 
-## Casals — On-Chain Deploy & Upgrade (new path)
+## Casals — On-Chain Deploy & Upgrade (preferred path)
+
+> **Always use the Casals path whenever possible.** This means `publish-build.yml` /
+> `publish-main.yml` to publish artifacts and `rollout.yml` (or `realms rollout`)
+> to deploy them. The legacy `deploy-infra`/`deploy-files`/`deploy-mundus` workflows
+> exist only for anything Casals does not yet cover (mainly: the initial infra
+> bootstrap and new-realm provisioning while `provision_via_casals` is still off).
+> When in doubt, use Casals.
 
 Casals is an **on-chain orchestrator** that owns the realm canisters and upgrades
 them for us. Instead of an off-chain CI job installing WASMs, Casals pulls the
@@ -175,9 +182,13 @@ There are exactly **two steps**:
    published version.
 
 This path **coexists** with the legacy `deploy-infra`/`deploy-files`/`deploy-mundus`
-path. Pick per environment (see "Coexistence" below). Today **only `test` runs on
-Casals**; `demo`/`staging` still use the legacy path until their Casals instances
-are deployed.
+path. Pick per environment (see "Coexistence" below). **Casals is deployed and
+wired on all three environments** (`test`, `demo`, `staging`): each one's realm and
+infra canisters are registered in Casals and have `[Casals, CycleOps]` as their
+only controllers. Provisioning of new realms still flows through the legacy path
+until the installer's `provision_via_casals` flag is turned on per environment
+(default off) — but publishing builds and rolling out upgrades already go through
+Casals everywhere.
 
 ### How Casals organizes things
 
@@ -279,14 +290,26 @@ gh workflow run rollout.yml \
 
 ### Casals canister IDs
 
-| Env | Casals | file_registry |
-|---|---|---|
-| Test | `qthgp-3yaaa-aaaae-agveq-cai` | `uq2mu-kaaaa-aaaah-avqcq-cai` |
-| Demo | (not deployed yet) | `vi64l-3aaaa-aaaae-qj4va-cai` |
-| Staging | (not deployed yet) | `iebdk-kqaaa-aaaau-agoxq-cai` |
+| Env | Casals backend | Casals frontend | file_registry |
+|---|---|---|---|
+| Test | `qthgp-3yaaa-aaaae-agveq-cai` | `qic2k-baaaa-aaaae-agvga-cai` | `uq2mu-kaaaa-aaaah-avqcq-cai` |
+| Demo | `jo3cj-faaaa-aaaac-bffea-cai` | `hvwpv-aiaaa-aaaam-ajddq-cai` | `vi64l-3aaaa-aaaae-qj4va-cai` |
+| Staging | `jj2e5-iyaaa-aaaac-bffeq-cai` | `mcqbx-hyaaa-aaaaj-qsarq-cai` | `iebdk-kqaaa-aaaau-agoxq-cai` |
 
-`deployer` is a controller of the test Casals, so it can publish and roll out.
-Add new env IDs to `_CASALS_IDS` in `cli/realms/cli/commands/rollout.py`.
+These are also in `_CASALS_IDS` (`cli/realms/cli/commands/rollout.py`) and
+`canister_ids.json` (`casals_backend`/`casals_frontend`). Add new env IDs there.
+
+### Who controls what
+
+- **Orchestra canisters** (every realm + infra canister Casals manages): controlled
+  only by **Casals itself** plus **CycleOps** (`cpbhu-5iaaa-aaaad-aalta-cai`, for
+  cycle top-ups). Casals does the upgrades; no human key is a controller.
+- **Casals canisters**: controlled by `ah6ac-cc73l-...` (the `my_dev_identity_1` /
+  `deployer` key), the dedicated CI key, and a conductor Internet Identity.
+- **CI identity**: workflows use the **`CASALS_CI_PEM`** secret (a controller of all
+  three Casals), falling back to `IC_IDENTITY_PEM` if it is unset. To change a
+  controller list, call Casals' admin-only `set_canister_controllers` (it refuses to
+  drop Casals from the list unless you pass `force`).
 
 ### Coexistence with the legacy path
 
@@ -310,6 +333,18 @@ Add new env IDs to `_CASALS_IDS` in `cli/realms/cli/commands/rollout.py`.
 3. **`reinstall` wipes canister state** on success (the protective snapshot is
    dropped after a verified reinstall). Use `upgrade` unless you mean it.
 4. **Always dry-run first** (omit `--execute`) and read the plan table.
+5. **Frontend builds need candid declarations.** `publish_build.py` copies the
+   committed `src/declarations/*` into each frontend's `src/lib/declarations/`
+   before `vite build` (the realm frontend imports `$lib/declarations/realm_backend`).
+   Don't remove that step or the main-snapshot build fails to resolve the import.
+6. **Large files use incremental finalize.** Uploads over ~200 KB are chunked, and
+   the CLI finalizes them with `finalize_chunked_file_step` (batched, on-chain
+   hashing skipped, local sha256 passed in). The one-shot `finalize_chunked_file`
+   blows the 40 B-instruction limit (`IC0522`) on multi-MB WASMs — don't switch back.
+
+`publish-main.yml` runs automatically on every push to `main` that touches realm/
+infra source, publishing a `main.<ts>.<sha>` snapshot to **test**. Watch that run
+after merging; it is the live check that the publish path still works.
 
 See `docs/reference/CASALS_ROLLOUT.md` for the full runbook (migrating a realm,
 authorization model, cycle budget).
@@ -510,6 +545,7 @@ The first fixes the color panic, the second suppresses the plaintext identity wa
 
 ## Rules
 
+- **Casals is always the preferred deploy path.** For any realm/infra backend or frontend change, use `publish-build.yml` / `publish-main.yml` + `rollout.yml`. Fall back to the legacy `deploy-*` workflows only when Casals does not cover the operation (e.g. first-time infra bootstrap, or new-realm provisioning before `provision_via_casals` is enabled).
 - **Visually verify every UI change before reporting back.** After deploying a frontend or extension change, open the page in the browser and confirm the result matches the requirements. Do not report completion until you have checked the deployed page yourself. If the visual check reveals issues, fix and redeploy in a loop until the result is correct.
 - Do not commit unless explicitly told to do so.
 - Always use `deploy_mode=upgrade` for production/test deploys.

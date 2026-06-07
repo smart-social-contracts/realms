@@ -24,7 +24,7 @@
 	let loadError = $state('');
 
 	const MONACO_VERSION = '0.52.2';
-	const MONACO_VS = `https://cdn.jsdelivr.net/npm/monaco-editor@${MONACO_VERSION}/min/vs`;
+	const MONACO_VS = `https://unpkg.com/monaco-editor@${MONACO_VERSION}/min/vs`;
 
 	onMount(() => {
 		let disposed = false;
