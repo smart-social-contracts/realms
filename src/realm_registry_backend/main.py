@@ -489,6 +489,26 @@ def billing_status() -> GetBillingStatusResult:
 
 # ── Deployment queue endpoints ─────────────────────────────────────────
 
+def _resolve_latest_version() -> str:
+    """Return the catalog version currently marked is_latest, or '' if none."""
+    try:
+        for vi in VersionInfo.instances():
+            if vi.is_latest:
+                return (vi.version or "").strip()
+    except Exception:
+        pass
+    return ""
+
+
+def _casals_wasm_keys(version: str) -> dict:
+    """Casals authorized-wasm keys for a realm release version. The installer's
+    on-chain provisioning path reads these from manifest['casals']."""
+    return {
+        "backend_wasm_key": f"realm-backend@{version}",
+        "frontend_wasm_key": f"realm-assets@{version}",
+    }
+
+
 @update
 def request_deployment(manifest_json: text) -> Async[text]:
     try:
@@ -517,6 +537,14 @@ def request_deployment(manifest_json: text) -> Async[text]:
 
         manifest["requesting_principal"] = caller
         manifest["registry_canister_id"] = str(ic.id())
+
+        # Supply the Casals authorized-wasm keys the installer's on-chain
+        # provisioning path needs (no-op for the legacy off-chain path). A
+        # caller-provided block wins; otherwise default to the latest release.
+        if not manifest.get("casals", {}).get("backend_wasm_key"):
+            ver = _resolve_latest_version()
+            if ver:
+                manifest.setdefault("casals", {}).update(_casals_wasm_keys(ver))
 
         installer = RealmInstallerService(Principal.from_str(installer_id))
         call_result: CallResult = yield installer.enqueue_deployment(json.dumps(manifest))
@@ -755,6 +783,7 @@ def request_upgrade(args_json: text) -> Async[text]:
             "expected_hashes": {
                 "backend_wasm": latest.backend_wasm_hash or "",
             },
+            "casals": _casals_wasm_keys(latest.version),
             "realm": {
                 "name": realm_name,
             },
