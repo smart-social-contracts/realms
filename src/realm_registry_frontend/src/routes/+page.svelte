@@ -1216,9 +1216,8 @@
       </a>
       {#if casalsUrl}
         <span class="footer-separator">·</span>
-        <a href={casalsUrl} target="_blank" rel="noopener noreferrer" class="dashboard-link">
-          <img src="/images/casals-logo.png" alt="Casals" width="16" height="16" class="casals-logo" />
-          {$_('footer.casals')}
+        <a href={casalsUrl} target="_blank" rel="noopener noreferrer" class="casals-link" aria-label="Casals">
+          <img src="/images/casals-logo.png" alt="Casals" width="20" height="20" class="casals-logo" />
         </a>
       {/if}
     </div>
@@ -2597,6 +2596,20 @@
 
   .github-link:hover {
     color: #171717;
+    background: rgba(0,0,0,0.05);
+  }
+
+  .casals-link {
+    color: #737373;
+    transition: all 0.15s ease-in-out;
+    padding: 0.5rem;
+    border-radius: 6px;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+  }
+
+  .casals-link:hover {
     background: rgba(0,0,0,0.05);
   }
 
