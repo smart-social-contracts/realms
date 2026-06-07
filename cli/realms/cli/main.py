@@ -21,7 +21,13 @@ from .commands.marketplace import (
     marketplace_status_command,
 )
 from .commands.mundus import mundus_deploy_descriptor_command, mundus_deploy_new_command
-from .commands.files import files_build_command, files_publish_command, files_reset_command
+from .commands.files import (
+    files_build_command,
+    files_publish_command,
+    files_publish_release_command,
+    files_reset_command,
+)
+from .commands.rollout import rollout_command
 from .commands.quarter import (
     quarter_create_command,
     quarter_list_command,
@@ -589,6 +595,77 @@ def mundus_deploy_new(
     mundus_deploy_new_command(name, network, artifact_version, display_name, manifesto, cleanup)
 
 
+@app.command("rollout", rich_help_panel="Lifecycle")
+def rollout(
+    environments: str = typer.Option(
+        "test", "--environments", "-e",
+        help="Comma-separated environments (test,staging,demo) or 'all'",
+    ),
+    targets: str = typer.Option(
+        ..., "--targets", "-t",
+        help="Comma-separated stand names, or 'all-realms', 'all-infra', 'all'",
+    ),
+    scope: str = typer.Option(
+        "both", "--scope", "-s",
+        help="Which canisters: backend, frontend, or both",
+    ),
+    mode: str = typer.Option(
+        "upgrade", "--mode", "-m",
+        help="upgrade (preserves state) or reinstall (wipes state on success)",
+    ),
+    version: str = typer.Option(
+        "latest", "--version", "-v",
+        help="Version: 'main' (latest main snapshot), 'latest' (semver), or e.g. 0.4.0",
+    ),
+    realm_family: str = typer.Option(
+        "realm", "--realm-family",
+        help="Artifact family for realm (Deployments) stands (default: realm)",
+    ),
+    execute: bool = typer.Option(
+        False, "--execute",
+        help="Apply changes. Without this flag, only the plan is printed (dry run).",
+    ),
+    include_infra_reinstall: bool = typer.Option(
+        False, "--include-infra-reinstall",
+        help="Allow reinstalling state-wiping infra (file-registry, realm-registry)",
+    ),
+    yes: bool = typer.Option(
+        False, "--yes", "-y", help="Skip confirmation prompts",
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="dfx identity to use for Casals calls",
+    ),
+) -> None:
+    """Upgrade/reinstall realm + infra canisters across environments via Casals.
+
+    \b
+    Drives each environment's Casals directly (snapshot -> install -> verify ->
+    rollback-on-failure built in). Dry-run by default; pass --execute to apply.
+
+    \b
+    EXAMPLES:
+      # Preview upgrading all realms' backends in test
+      realms rollout -e test -t all-realms -s backend
+
+      # Roll out the latest main-branch snapshot (after publish-main)
+      realms rollout -e test -t all-realms -s both -v main --execute
+
+      # Upgrade just Agora's backend in test (upgrade mode)
+      realms rollout -e test -t agora -s backend --execute
+
+      # Upgrade every realm + infra canister across all environments
+      realms rollout -e all -t all -s both --execute
+
+      # Reinstall all infra in test (requires explicit opt-in for wipes)
+      realms rollout -e test -t all-infra -m reinstall --include-infra-reinstall --execute
+    """
+    rollout_command(
+        environments=environments, targets=targets, scope=scope, mode=mode,
+        version=version, realm_family=realm_family, execute=execute,
+        include_infra_reinstall=include_infra_reinstall, yes=yes, identity=identity,
+    )
+
+
 # Create files subcommand group
 files_app = typer.Typer(name="files", help="File registry operations")
 app.add_typer(files_app, name="files", rich_help_panel="Lifecycle")
@@ -623,6 +700,50 @@ def files_publish(
     codex_names = [s.strip() for s in codices_filter.split(",") if s.strip()] if codices_filter else None
     files_publish_command(network, registry, identity, extensions_only, codices_only,
                           extension_names=ext_names, codex_names=codex_names)
+
+
+@files_app.command("publish-release")
+def files_publish_release(
+    network: str = typer.Option(
+        "staging", "--network", "-n", help="Target network: staging, demo, test"
+    ),
+    family: str = typer.Option(
+        "realm", "--family", help="Artifact family base name (default: realm)"
+    ),
+    version: str = typer.Option(
+        ..., "--version", "-v", help="Release version, e.g. 1.4.0"
+    ),
+    backend_wasm: Optional[str] = typer.Option(
+        None, "--backend-wasm", help="Path to the backend WASM (.wasm.gz)"
+    ),
+    frontend_dist: Optional[str] = typer.Option(
+        None, "--frontend-dist", help="Path to the built frontend dist/ directory"
+    ),
+    registry: Optional[str] = typer.Option(
+        None, "--registry", "-r", help="file_registry canister ID (auto-resolved from network)"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="dfx identity to use"
+    ),
+    casals: Optional[str] = typer.Option(
+        None, "--casals", help="Casals canister ID (authorize WASMs after upload)"
+    ),
+    assets_wasm: Optional[str] = typer.Option(
+        None, "--assets-wasm", help="Certified-assets canister WASM (needed to authorize the frontend in Casals)"
+    ),
+    registry_backend: Optional[str] = typer.Option(
+        None, "--registry-backend", help="realm_registry_backend canister ID (publish_version)"
+    ),
+) -> None:
+    """Publish a realm release (backend WASM + frontend bundle) fully on-chain to
+    file_registry, then optionally authorize the WASMs in Casals and record the
+    version in the realm catalog."""
+    files_publish_release_command(
+        network=network, family=family, version=version,
+        backend_wasm=backend_wasm, frontend_dist=frontend_dist,
+        registry=registry, identity=identity, casals=casals,
+        assets_wasm=assets_wasm, registry_backend=registry_backend,
+    )
 
 
 @files_app.command("reset")

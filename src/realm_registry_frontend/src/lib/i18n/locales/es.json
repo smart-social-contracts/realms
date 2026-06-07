@@ -42,8 +42,7 @@
   "footer": {
     "built_on_ic": "Construido en Internet Computer",
     "local_deployment": "Despliegue local",
-    "platform_dashboard": "Panel de Plataforma",
-    "file_registry": "Registro de Archivos"
+    "casals": "Casals"
   },
   "time": {
     "just_now": "ahora mismo",

@@ -1,0 +1,139 @@
+# publish-build.yml — build and publish a realm/infra release into one
+# environment's file_registry + Casals (manually triggered).
+#
+# This does NOT deploy to any realm. It only publishes + authorizes artifacts;
+# use the "Rollout" workflow (rollout.yml) afterwards to upgrade canisters.
+
+name: Publish Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        default: test
+        options:
+          - test
+          - staging
+          - demo
+      family:
+        description: "Artifact family"
+        required: true
+        type: choice
+        default: realm
+        options:
+          - realm
+          - installer
+          - registry
+          - file-registry
+          - dashboard
+          - marketplace
+      component:
+        description: "Which component(s) to build + publish"
+        required: true
+        type: choice
+        default: both
+        options:
+          - both
+          - backend
+          - frontend
+      version:
+        description: "Release version (e.g. 0.4.0); ignored when from_main is true"
+        required: false
+        default: ""
+      from_main:
+        description: "Publish current checkout as main.<ts>.<sha> instead of a semver"
+        required: false
+        type: boolean
+        default: false
+      update_catalog:
+        description: "Also record the version in the realm catalog (Casals-only envs)"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: publish-build-${{ inputs.environment }}-${{ inputs.family }}
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: "3.10"
+  NODE_VERSION: "20"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dfx
+        run: |
+          DFX_VERSION=0.32.0
+          curl -fsSL "https://github.com/dfinity/sdk/releases/download/${DFX_VERSION}/dfx-${DFX_VERSION}-x86_64-linux.tar.gz" -o /tmp/dfx.tar.gz
+          tar -xzf /tmp/dfx.tar.gz -C /usr/local/bin
+          rm /tmp/dfx.tar.gz
+          dfx --version
+
+      - name: Install realms CLI + build deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e cli/
+
+      - name: Configure dfx identity (Casals CI key)
+        env:
+          # Publishing uploads artifacts to file_registry (auto-grants the
+          # caller as publisher on a new namespace) and authorizes WASMs in
+          # Casals (controller-only). The dedicated Casals CI key is a Casals
+          # controller, so it can do both. Falls back to IC_IDENTITY_PEM.
+          CASALS_CI_PEM: ${{ secrets.CASALS_CI_PEM }}
+          IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
+        run: |
+          PEM="${CASALS_CI_PEM:-$IC_IDENTITY_PEM}"
+          if [ -z "$PEM" ]; then
+            echo "::error::Neither CASALS_CI_PEM nor IC_IDENTITY_PEM is set." >&2
+            exit 1
+          fi
+          printf '%s' "$PEM" > /tmp/identity.pem
+          chmod 600 /tmp/identity.pem
+          dfx identity import ci /tmp/identity.pem --storage-mode=plaintext --force
+          dfx identity use ci
+          rm -f /tmp/identity.pem
+          echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
+          echo "publish identity principal: $(dfx identity get-principal)"
+
+      - name: Build + publish
+        run: |
+          ARGS=(
+            --environment "${{ inputs.environment }}"
+            --family "${{ inputs.family }}"
+            --component "${{ inputs.component }}"
+            --identity ci
+          )
+          if [ "${{ inputs.from_main }}" = "true" ]; then
+            ARGS+=(--from-main)
+          else
+            if [ -z "${{ inputs.version }}" ]; then
+              echo "::error::version is required unless from_main is true" >&2
+              exit 1
+            fi
+            ARGS+=(--version "${{ inputs.version }}")
+          fi
+          if [ "${{ inputs.update_catalog }}" = "true" ]; then
+            ARGS+=(--update-catalog)
+          fi
+          python3 scripts/publish_build.py "${ARGS[@]}"

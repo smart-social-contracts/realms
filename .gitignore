@@ -48,3 +48,6 @@ cli/build/
 
 # Separate project with its own git
 website2/src/realm_registry_frontend/vite.config.js.timestamp-*
+
+# Casals build venv (isolated basilisk)
+.venv-basilisk/

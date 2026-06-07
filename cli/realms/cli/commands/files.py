@@ -1,5 +1,6 @@
 """File registry commands — bulk publish extensions and codices."""
 
+import hashlib
 import json
 import os
 import subprocess
@@ -9,7 +10,14 @@ from typing import Optional
 import typer
 from rich.console import Console
 
-from .extension import publish_extension_command, publish_codex_command
+from .extension import (
+    publish_extension_command,
+    publish_codex_command,
+    _dfx_call,
+    _fetch_namespace_hashes,
+    _publish_namespace,
+    _upload_one_file,
+)
 
 console = Console()
 
@@ -226,3 +234,149 @@ def files_publish_command(
             console.print(f"[yellow]Extensions directory not found: {ext_root}[/yellow]")
 
     console.print("\n[bold green]File registry publish complete.[/bold green]")
+
+
+def _sha256_file(path: str) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _casals_add_authorized_wasm(casals: str, params: dict, network: str, identity: Optional[str]) -> bool:
+    """Call Casals add_authorized_wasm with a JSON arg. Returns success."""
+    arg = json.dumps(params)
+    candid_arg = '("' + arg.replace("\\", "\\\\").replace('"', '\\"') + '")'
+    raw = _dfx_call(casals, "add_authorized_wasm", candid_arg, network, identity, timeout=120)
+    try:
+        res = json.loads(raw)
+    except json.JSONDecodeError:
+        res = {"raw": raw}
+    if isinstance(res, dict) and res.get("ok") is True:
+        console.print(f"  [green]✓[/green] authorized wasm {params.get('key')}")
+        return True
+    console.print(f"  [red]✗[/red] add_authorized_wasm({params.get('key')}) failed: {res}")
+    return False
+
+
+def files_publish_release_command(
+    network: str,
+    family: str,
+    version: str,
+    backend_wasm: Optional[str] = None,
+    frontend_dist: Optional[str] = None,
+    registry: Optional[str] = None,
+    identity: Optional[str] = None,
+    casals: Optional[str] = None,
+    assets_wasm: Optional[str] = None,
+    registry_backend: Optional[str] = None,
+):
+    """Publish a realm release fully on-chain (replaces the GitHub-release + off-chain
+    worker download path).
+
+    Uploads:
+      - the backend WASM         -> file_registry  wasm/<family>-backend/<version>/<file>
+      - the frontend build dir   -> file_registry  frontend/<family>-assets/<version>/<rel>
+
+    Then, when the relevant targets are provided:
+      - --casals + --assets-wasm: authorize the backend WASM and the certified-assets
+        WASM (the latter carrying bundle_namespace = the frontend namespace) so Casals
+        can install + upload the bundle per realm;
+      - --registry-backend: record the version in the realm version catalog.
+    """
+    reg = _resolve_registry(network, registry)
+
+    if not backend_wasm and not frontend_dist:
+        raise typer.BadParameter("provide at least one of --backend-wasm / --frontend-dist")
+
+    backend_ns = f"wasm/{family}-backend/{version}"
+    frontend_ns = f"frontend/{family}-assets/{version}"
+    backend_key = f"{family}-backend@{version}"
+    frontend_key = f"{family}-assets@{version}"
+    backend_hash = ""
+    backend_path = ""
+
+    # 1. Backend WASM -------------------------------------------------------
+    if backend_wasm:
+        if not os.path.isfile(backend_wasm):
+            raise typer.BadParameter(f"backend wasm not found: {backend_wasm}")
+        backend_path = os.path.basename(backend_wasm)
+        backend_hash = _sha256_file(backend_wasm)
+        console.print(f"\n[bold]Backend WASM → {reg}:{backend_ns}/{backend_path}[/bold]")
+        console.print(f"  sha256={backend_hash}")
+        existing = _fetch_namespace_hashes(reg, backend_ns, network, identity)
+        if _upload_one_file(reg, backend_ns, backend_path, backend_wasm, network, identity, existing) == "failed":
+            raise typer.Exit(1)
+        _publish_namespace(reg, backend_ns, network, identity)
+
+    # 2. Frontend bundle ----------------------------------------------------
+    fe_count = 0
+    if frontend_dist:
+        if not os.path.isdir(frontend_dist):
+            raise typer.BadParameter(f"frontend dist not found: {frontend_dist}")
+        console.print(f"\n[bold]Frontend bundle → {reg}:{frontend_ns}/[/bold]")
+        existing = _fetch_namespace_hashes(reg, frontend_ns, network, identity)
+        failed = 0
+        for root, _dirs, files in os.walk(frontend_dist):
+            for fname in sorted(files):
+                local = os.path.join(root, fname)
+                rel = os.path.relpath(local, frontend_dist).replace(os.sep, "/")
+                r = _upload_one_file(reg, frontend_ns, rel, local, network, identity, existing)
+                if r == "failed":
+                    failed += 1
+                elif r == "uploaded":
+                    fe_count += 1
+        if failed:
+            console.print(f"[red]frontend upload had {failed} failures[/red]")
+            raise typer.Exit(1)
+        _publish_namespace(reg, frontend_ns, network, identity)
+        console.print(f"  {fe_count} files uploaded")
+
+    # 3. Authorize in Casals ------------------------------------------------
+    if casals:
+        console.print(f"\n[bold]Authorizing WASMs in Casals {casals}[/bold]")
+        if backend_wasm:
+            _casals_add_authorized_wasm(casals, {
+                "key": backend_key, "kind": "backend",
+                "registry_namespace": backend_ns, "registry_path": backend_path,
+                "wasm_hash": backend_hash,
+                "description": f"{family} realm backend {version}",
+            }, network, identity)
+        if frontend_dist:
+            if not assets_wasm or not os.path.isfile(assets_wasm):
+                console.print(
+                    "  [yellow]![/yellow] skipping frontend authorize: pass --assets-wasm "
+                    "(the certified-assets canister WASM) to authorize the frontend"
+                )
+            else:
+                assets_hash = _sha256_file(assets_wasm)
+                assets_ns = f"wasm/{family}-assetstorage/{version}"
+                assets_path = os.path.basename(assets_wasm)
+                console.print(f"  assets wasm → {reg}:{assets_ns}/{assets_path} (sha256={assets_hash})")
+                ex = _fetch_namespace_hashes(reg, assets_ns, network, identity)
+                if _upload_one_file(reg, assets_ns, assets_path, assets_wasm, network, identity, ex) != "failed":
+                    _publish_namespace(reg, assets_ns, network, identity)
+                _casals_add_authorized_wasm(casals, {
+                    "key": frontend_key, "kind": "frontend",
+                    "registry_namespace": assets_ns, "registry_path": assets_path,
+                    "wasm_hash": assets_hash,
+                    "bundle_namespace": frontend_ns,
+                    "description": f"{family} realm frontend {version}",
+                }, network, identity)
+
+    # 4. Record the version in the realm catalog ----------------------------
+    if registry_backend:
+        console.print(f"\n[bold]Publishing version {version} to registry {registry_backend}[/bold]")
+        pv = json.dumps({
+            "version": version,
+            "backend_wasm_url": f"fileregistry://{reg}/{backend_ns}/{backend_path}" if backend_wasm else "",
+            "frontend_tar_url": f"fileregistry://{reg}/{frontend_ns}" if frontend_dist else "",
+            "backend_wasm_hash": backend_hash,
+            "frontend_tar_hash": "",
+        })
+        candid_arg = '("' + pv.replace("\\", "\\\\").replace('"', '\\"') + '")'
+        raw = _dfx_call(registry_backend, "publish_version", candid_arg, network, identity, timeout=120)
+        console.print(f"  registry: {raw}")
+
+    console.print("\n[bold green]Release publish complete.[/bold green]")

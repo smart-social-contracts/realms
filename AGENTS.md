@@ -14,10 +14,14 @@ realms/
 ├── src/realm_frontend/               # Main SvelteKit frontend
 ├── src/realm_backend/                # Python canister backend
 ├── .github/workflows/
-│   ├── deploy-infra.yml              # Infra canisters
-│   ├── deploy-files.yml              # Publish extensions/codices
-│   └── deploy-mundus.yml            # Deploy realm canisters
+│   ├── deploy-infra.yml              # Infra canisters (legacy path)
+│   ├── deploy-files.yml              # Publish extensions/codices (legacy path)
+│   ├── deploy-mundus.yml            # Deploy realm canisters (legacy path)
+│   ├── publish-build.yml            # Build + publish a semver release into Casals
+│   ├── publish-main.yml             # Build + publish current main checkout (no release)
+│   └── rollout.yml                   # Upgrade/reinstall canisters via Casals
 ├── scripts/
+│   └── publish_build.py              # Build+publish engine used by publish-build.yml
 ├── deployment-descriptors/           # Network topology (YAML)
 └── docs/reference/
 ```
@@ -153,6 +157,162 @@ Takes ~5 minutes. The version file determines the current version; the workflow 
 | Parameter | Options | Default | Notes |
 |---|---|---|---|
 | `release_type` | `patch`, `minor`, `major` | `patch` | Follows semver |
+
+---
+
+## Casals — On-Chain Deploy & Upgrade (new path)
+
+Casals is an **on-chain orchestrator** that owns the realm canisters and upgrades
+them for us. Instead of an off-chain CI job installing WASMs, Casals pulls the
+artifacts from `file_registry` and installs them itself, with **automatic
+snapshot → install → verify-hash → rollback-on-failure** built in.
+
+There are exactly **two steps**:
+
+1. **Publish Build** — build the artifacts, upload them into `file_registry`, and
+   register ("authorize") them in Casals. Nothing is deployed yet.
+2. **Rollout** — tell Casals to upgrade (or reinstall) the chosen canisters to a
+   published version.
+
+This path **coexists** with the legacy `deploy-infra`/`deploy-files`/`deploy-mundus`
+path. Pick per environment (see "Coexistence" below). Today **only `test` runs on
+Casals**; `demo`/`staging` still use the legacy path until their Casals instances
+are deployed.
+
+### How Casals organizes things
+
+```
+Section "Deployments"  → one Stand per realm (agora, dominion, syntropia, …)
+Section "Infra"        → one Stand per infra piece (installer, realm-registry, …)
+each Stand             → backend + frontend Canister(s)
+```
+
+Artifacts are named `<family>-backend@<version>` (backend WASM) and
+`<family>-assets@<version>` (frontend bundle). Realms use the family `realm`;
+infra stands map to families `installer`, `registry`, `file-registry`,
+`dashboard`, `marketplace`. (`token`/`nft` are external canisters — managed in
+Casals but not built here.)
+
+### Step 1 — Publish Build
+
+Builds the WASM/bundle, uploads to `file_registry`, authorizes in Casals.
+
+```bash
+# Manual workflow (preferred)
+gh workflow run publish-build.yml \
+  -f environment=test -f family=realm -f component=both -f version=0.4.0
+
+# Or locally (same engine the workflow runs)
+python3 scripts/publish_build.py \
+  --environment test --family realm --component both \
+  --version 0.4.0 --identity deployer
+```
+
+| `publish-build.yml` param | Options | Default | Notes |
+|---|---|---|---|
+| `environment` | `test`, `staging`, `demo` | `test` | |
+| `family` | `realm`, `installer`, `registry`, `file-registry`, `dashboard`, `marketplace` | `realm` | |
+| `component` | `both`, `backend`, `frontend` | `both` | |
+| `version` | semver, e.g. `0.4.0` | — | required unless `from_main` |
+| `from_main` | `true`/`false` | `false` | Publish as `main.<ts>.<sha>` instead of semver |
+| `update_catalog` | `true`/`false` | `false` | Only for Casals-only envs (see Coexistence) |
+
+### Main-branch snapshots (no release)
+
+For day-to-day work on `main`, you do **not** need to cut a semver release. Publish
+the current checkout and roll out with `-v main`:
+
+```bash
+# CI: runs automatically on push to main (realm/infra source paths) → test
+# Or trigger manually:
+gh workflow run publish-main.yml -f environment=test -f family=realm -f component=both
+
+# Locally
+python3 scripts/publish_build.py --environment test --family realm \
+  --component both --from-main --identity deployer
+
+# Roll out the newest main snapshot
+realms rollout -e test -t all-realms -s both -v main --identity deployer --execute --yes
+```
+
+Version label format: `main.<unix_timestamp>.<git_sha>` (e.g. `main.1749254400.a1b2c3d`).
+`-v main` always picks the newest one in that channel. `-v latest` still means the
+newest **semver** release (Casals `latest` flag), not main.
+
+### Step 2 — Rollout
+
+Upgrades/reinstalls any mix of environments × realms/infra × backend/frontend.
+**Dry-run by default** — it prints the plan and changes nothing until `--execute`.
+
+```bash
+# Preview (no changes): all realm backends in test
+realms rollout -e test -t all-realms -s backend -v 0.4.0
+
+# Apply: one realm, backend only
+realms rollout -e test -t agora -s backend -v 0.4.0 --identity deployer --execute --yes
+
+# Apply: all realms, backend + frontend
+realms rollout -e test -t all-realms -s both -v 0.4.0 --identity deployer --execute --yes
+
+# Reinstall all infra (state-wiping infra needs an explicit opt-in)
+realms rollout -e test -t all-infra -m reinstall --include-infra-reinstall --execute --yes
+```
+
+Same inputs are available as a manual workflow:
+
+```bash
+gh workflow run rollout.yml \
+  -f environments=test -f targets=all-realms -f scope=both \
+  -f mode=upgrade -f version=0.4.0 -f execute=true
+```
+
+| `rollout` flag / `rollout.yml` input | Options | Default | Notes |
+|---|---|---|---|
+| `-e` / `environments` | comma list or `all` | `test` | Skips envs with no Casals |
+| `-t` / `targets` | stand names, `all-realms`, `all-infra`, `all` | — | required |
+| `-s` / `scope` | `backend`, `frontend`, `both` | `both` | |
+| `-m` / `mode` | `upgrade`, `reinstall` | `upgrade` | `reinstall` **wipes state** |
+| `-v` / `version` | `main`, `latest`, or semver | `latest` | `main` = newest main snapshot |
+| `--execute` / `execute` | flag / bool | off | Off = dry-run plan only |
+| `--include-infra-reinstall` | flag / bool | off | Required to reinstall `file-registry`/`realm-registry` |
+| `--yes` / (always in CI) | flag | off | Skip confirmation prompts |
+
+### Casals canister IDs
+
+| Env | Casals | file_registry |
+|---|---|---|
+| Test | `qthgp-3yaaa-aaaae-agveq-cai` | `uq2mu-kaaaa-aaaah-avqcq-cai` |
+| Demo | (not deployed yet) | `vi64l-3aaaa-aaaae-qj4va-cai` |
+| Staging | (not deployed yet) | `iebdk-kqaaa-aaaau-agoxq-cai` |
+
+`deployer` is a controller of the test Casals, so it can publish and roll out.
+Add new env IDs to `_CASALS_IDS` in `cli/realms/cli/commands/rollout.py`.
+
+### Coexistence with the legacy path
+
+- The installer flag `provision_via_casals` (per environment, default off) decides
+  whether that environment provisions via Casals or the legacy off-chain deployer.
+- Rollout **never** touches the realm version catalog, so it can't interfere with
+  the legacy self-service upgrade path.
+- Publish Build only updates the catalog when `--update-catalog` is set, so by
+  default it won't feed a legacy-mode env a `fileregistry://` URL it can't use.
+- `release.yml`, `deploy-mundus.yml`, etc. are untouched.
+
+### Casals gotchas
+
+1. **Local backend builds need a clean venv.** `basilisk` refuses to build if the
+   active Python has native (`.so`) packages. Build in an isolated venv with only
+   `ic-basilisk`, `ic-basilisk-toolkit`, `ic-python-db`, `ic-python-logging`
+   (CI runners are already clean). Set `CANISTER_CANDID_PATH=src/<canister>/<canister>.did`.
+2. **Frontend rollout is the slow part.** Casals copies the ~109-file bundle into
+   each asset canister in small batches (6 files/call, with retry) to stay inside
+   the ~5 min ingress window. Expect several minutes per realm; this is normal.
+3. **`reinstall` wipes canister state** on success (the protective snapshot is
+   dropped after a verified reinstall). Use `upgrade` unless you mean it.
+4. **Always dry-run first** (omit `--execute`) and read the plan table.
+
+See `docs/reference/CASALS_ROLLOUT.md` for the full runbook (migrating a realm,
+authorization model, cycle budget).
 
 ---
 
@@ -452,6 +612,7 @@ asyncio.run(test())
 ## Further Reading
 
 - `docs/reference/DEPLOYMENT_GUIDE.md` — Full deployment guide
+- `docs/reference/CASALS_ROLLOUT.md` — On-chain (Casals) deploy & upgrade runbook
 - `docs/reference/RUNTIME_EXTENSION_STAGING_DEPLOY.md` — Layered deploy runbook
 - `docs/reference/EXTENSION_ARCHITECTURE.md` — Extension lifecycle
 - `docs/reference/PRIVATE_DATA_SHARING.md` — End-to-end encrypted, consent-based data sharing for extensions (own entity + scope kind + `ctx.crypto`)
