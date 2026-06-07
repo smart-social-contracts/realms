@@ -156,7 +156,10 @@ def _build_frontend(root: Path, fe_dir: str, environment: str) -> Path:
     d = root / fe_dir
     env = {**os.environ, "DFX_NETWORK": environment}
     _sync_declarations(root, fe_dir)
-    _run(["npm", "install", "--legacy-peer-deps"], cwd=d, env=env)
+    # Workspace frontends (registry, dashboard, …) hoist shared deps from the repo
+    # root; installing only in the subdirectory leaves @sveltejs/kit at the root
+    # without svelte and breaks vite build.
+    _run(["npm", "install", "--legacy-peer-deps"], cwd=root, env=env)
     _run(["npm", "run", "build"], cwd=d, env=env)
     dist = d / "dist"
     if not dist.is_dir():
