@@ -227,13 +227,11 @@ jobs:
 
       - name: Deploy (upgrade) Casals to ${{ inputs.environment }}
         working-directory: casals
-        # --force (re)installs even if the outer WASM hash is unchanged — the
-        # Basilisk-embedded Python source can change without changing it.
         run: |
           icp deploy -e ic \
             --identity casals-ci \
             --mode "${{ inputs.mode }}" \
-            --force -y
+            -y
 
       - name: Report deployed canisters
         if: always()
