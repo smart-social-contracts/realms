@@ -98,20 +98,27 @@ jobs:
           pip install -r requirements.txt
           pip install -e cli/
 
-      - name: Configure dfx identity
+      - name: Configure dfx identity (Casals CI key)
         env:
+          # Publishing uploads artifacts to file_registry (auto-grants the
+          # caller as publisher on a new namespace) and authorizes WASMs in
+          # Casals (controller-only). The dedicated Casals CI key is a Casals
+          # controller, so it can do both. Falls back to IC_IDENTITY_PEM.
+          CASALS_CI_PEM: ${{ secrets.CASALS_CI_PEM }}
           IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
         run: |
-          if [ -z "$IC_IDENTITY_PEM" ]; then
-            echo "::error::IC_IDENTITY_PEM secret is not set." >&2
+          PEM="${CASALS_CI_PEM:-$IC_IDENTITY_PEM}"
+          if [ -z "$PEM" ]; then
+            echo "::error::Neither CASALS_CI_PEM nor IC_IDENTITY_PEM is set." >&2
             exit 1
           fi
-          printf '%s' "$IC_IDENTITY_PEM" > /tmp/identity.pem
+          printf '%s' "$PEM" > /tmp/identity.pem
           chmod 600 /tmp/identity.pem
           dfx identity import ci /tmp/identity.pem --storage-mode=plaintext --force
           dfx identity use ci
           rm -f /tmp/identity.pem
           echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
+          echo "publish identity principal: $(dfx identity get-principal)"
 
       - name: Resolve target environment
         id: env
