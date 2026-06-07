@@ -203,16 +203,19 @@ jobs:
           PY
 
       # ---- Identity (the realms Casals CI key — a controller of all 3 Casals) -
-      - name: Import Casals CI identity
+      - name: Import deploy identity
         env:
-          # Same key the rollout workflow uses; it is a controller of the Casals
-          # canisters in every environment, so it can upgrade them.
-          CASALS_CI_PEM: ${{ secrets.CASALS_CI_PEM }}
+          # icp deploy calls update_settings (IC management canister) before
+          # installing — requires an actual IC-level canister controller, not just
+          # a Casals-method caller. The deployer key (IC_IDENTITY_PEM, principal
+          # ah6ac-cc73l-…) is that controller. CASALS_CI_PEM is only authorized to
+          # call Casals' admin methods and cannot do update_settings.
           IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
+          CASALS_CI_PEM: ${{ secrets.CASALS_CI_PEM }}
         run: |
-          PEM="${CASALS_CI_PEM:-$IC_IDENTITY_PEM}"
+          PEM="${IC_IDENTITY_PEM:-$CASALS_CI_PEM}"
           if [ -z "$PEM" ]; then
-            echo "::error::Neither CASALS_CI_PEM nor IC_IDENTITY_PEM is set." >&2
+            echo "::error::Neither IC_IDENTITY_PEM nor CASALS_CI_PEM is set." >&2
             exit 1
           fi
           umask 077
