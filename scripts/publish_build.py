@@ -25,7 +25,16 @@ import os
 import shutil
 import subprocess
 import sys
+import urllib.request
 from pathlib import Path
+
+# Patched certified-assets WASM used by all Realms frontend canisters.
+# Only needs to be re-downloaded when the certified-assets version itself changes.
+_CERTIFIED_ASSETS_WASM_URL = (
+    "https://github.com/smart-social-contracts/certified-assets"
+    "/releases/download/v0.3.0/assetstorage.wasm.gz"
+)
+_CERTIFIED_ASSETS_WASM_CACHE = Path("/tmp/realms-assetstorage.wasm.gz")
 
 # Per-environment canister IDs (imported from the installed CLI to stay in sync).
 from realms.cli.casals_versions import git_short_sha, main_build_version
@@ -180,7 +189,15 @@ def _find_assets_wasm(root: Path, environment: str) -> str:
             return str(c)
     except Exception:
         pass
-    return ""
+    # Fall back to the known patched certified-assets release used by all Realms
+    # frontend canisters. Cache to /tmp so repeated publishes skip the download.
+    if not _CERTIFIED_ASSETS_WASM_CACHE.exists():
+        print(f"  downloading assetstorage.wasm.gz from {_CERTIFIED_ASSETS_WASM_URL}")
+        urllib.request.urlretrieve(_CERTIFIED_ASSETS_WASM_URL, _CERTIFIED_ASSETS_WASM_CACHE)
+        print(f"  saved to {_CERTIFIED_ASSETS_WASM_CACHE}")
+    else:
+        print(f"  using cached assetstorage.wasm.gz at {_CERTIFIED_ASSETS_WASM_CACHE}")
+    return str(_CERTIFIED_ASSETS_WASM_CACHE)
 
 
 def _resolve_version(from_main: bool, explicit: str | None, root: Path) -> str:
@@ -241,9 +258,6 @@ def main():
         frontend_dist = _build_frontend(root, spec["frontend"], env)
         if not assets_wasm:
             assets_wasm = _find_assets_wasm(root, env)
-            if not assets_wasm:
-                print("  [warn] could not locate assetstorage.wasm.gz; "
-                      "frontend WASM will NOT be authorized in Casals.")
 
     cmd = [
         "realms", "files", "publish-release",
