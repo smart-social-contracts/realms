@@ -1,4 +1,4 @@
-name: Deploy File Registry
+name: Publish Files to File Registry
 
 on:
   workflow_dispatch:

@@ -5,7 +5,7 @@
 #   2. deploy-realm (matrix) — one parallel runner per realm
 #   3. smoke-test — verify all deployments succeeded
 
-name: Deploy Mundus
+name: Deploy Mundus (Legacy)
 
 on:
   workflow_dispatch:
