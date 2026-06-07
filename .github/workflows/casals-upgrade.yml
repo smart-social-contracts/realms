@@ -1,0 +1,245 @@
+# casals-upgrade.yml — upgrade the Casals ORCHESTRATOR canisters that this
+# project's environments run on (NOT the realm/infra canisters Casals manages).
+#
+# Use this after a new version of the Casals project
+# (https://github.com/smart-social-contracts/Casals) ships, to bring an
+# environment's casals_backend / casals_frontend up to that version.
+#
+#   - To upgrade the canisters Casals *manages* (realm/infra WASMs), use
+#     publish-build.yml + rollout.yml instead — NOT this workflow.
+#   - This workflow checks out the Casals repo at a chosen ref, builds it from
+#     source (`make build`), and runs `icp deploy --mode upgrade` against the
+#     environment's Casals canister IDs (from canister_ids.json) using the
+#     CASALS_CI_PEM identity, which is a controller of all three Casals.
+#
+# Trigger: gh workflow run casals-upgrade.yml -f environment=test -f casals_ref=main
+name: Casals Upgrade
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Which environment's Casals orchestrator to upgrade"
+        required: true
+        type: choice
+        default: test
+        options:
+          - test
+          - demo
+          - staging
+      casals_ref:
+        description: "Casals git ref/tag/sha to build (blank = latest main)"
+        required: false
+        type: string
+        default: ""
+      components:
+        description: "Comma-separated: backend, frontend, file-registry. See note on file-registry."
+        required: false
+        type: string
+        default: backend,frontend
+      mode:
+        description: "upgrade (keeps Casals state) or reinstall (WIPES the orchestra tree)"
+        required: true
+        type: choice
+        default: upgrade
+        options:
+          - upgrade
+          - reinstall
+      i_understand_reinstall_wipes_casals:
+        description: "Required for reinstall: confirms you will wipe Casals' orchestra/pool/sheet state"
+        required: false
+        type: boolean
+        default: false
+
+# Never run two Casals-orchestrator deploys against the same environment at once.
+concurrency:
+  group: casals-upgrade-${{ inputs.environment }}
+  cancel-in-progress: false
+
+env:
+  # Source repo for the Casals orchestrator. Override if the org/name ever changes.
+  CASALS_REPO: smart-social-contracts/Casals
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # ---- Guards -------------------------------------------------------------
+      - name: Guard — reinstall confirmation
+        if: ${{ inputs.mode == 'reinstall' && !inputs.i_understand_reinstall_wipes_casals }}
+        run: |
+          echo "::error::mode=reinstall wipes Casals' stable state (the whole orchestra"
+          echo "::error::tree, canister pool, live sheet and authorized-WASM catalog for"
+          echo "::error::this environment). Re-run with i_understand_reinstall_wipes_casals=true"
+          echo "::error::only if you truly mean to reset this environment's Casals."
+          exit 1
+
+      # ---- Checkouts ----------------------------------------------------------
+      # realms (this repo): provides canister_ids.json (the per-env Casals IDs).
+      - name: Checkout realms (this repo)
+        uses: actions/checkout@v4
+        with:
+          path: realms
+
+      # Casals: the orchestrator source we build + deploy.
+      - name: Resolve Casals ref
+        id: ref
+        run: |
+          REF="${{ inputs.casals_ref }}"
+          if [ -z "$REF" ]; then REF="main"; fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "Building Casals ref: $REF (mode: ${{ inputs.mode }}, env: ${{ inputs.environment }})"
+
+      - name: Checkout Casals
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CASALS_REPO }}
+          ref: ${{ steps.ref.outputs.ref }}
+          # file_registry is a (public) submodule needed by `make build`.
+          submodules: recursive
+          path: casals
+
+      # ---- Toolchain (mirrors Casals' own deploy-ic.yml) ----------------------
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install icp-cli + ic-wasm
+        run: npm install -g @icp-sdk/icp-cli @icp-sdk/ic-wasm
+
+      - name: Install Casals backend dependencies
+        working-directory: casals
+        run: pip install -r requirements.txt
+
+      # ---- Point the Casals deploy at THIS environment's canisters ------------
+      - name: Resolve target canister IDs + select components
+        id: target
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          COMPONENTS: ${{ inputs.components }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+
+          env = os.environ["ENVIRONMENT"].strip()
+          raw = os.environ["COMPONENTS"].strip() or "backend,frontend"
+          selected = {c.strip().lower() for c in raw.split(",") if c.strip()}
+
+          alias = {
+              "backend": "casals_backend",
+              "frontend": "casals_frontend",
+              # In THIS project Casals reuses the realms file_registry — there is no
+              # separate ic_file_registry. Map the component onto that canister.
+              "file-registry": "file_registry",
+              "file_registry": "file_registry",
+          }
+          unknown = selected - set(alias)
+          if unknown:
+              sys.exit(f"::error::unknown component(s): {', '.join(sorted(unknown))}. "
+                       "Valid: backend, frontend, file-registry")
+
+          with open("realms/canister_ids.json") as f:
+              ids = json.load(f)
+
+          def cid(key):
+              entry = ids.get(key) or {}
+              canister = entry.get(env)
+              if not canister:
+                  sys.exit(f"::error::no '{key}' canister id for environment '{env}' "
+                           "in canister_ids.json")
+              return canister
+
+          # icp.yaml canister name -> resolved id, but only for selected components.
+          mapping = {}
+          icp_names = []  # icp.yaml canister names to deploy
+          if "backend" in selected:
+              mapping["casals_backend"] = cid("casals_backend")
+              icp_names.append("casals_backend")
+          if "frontend" in selected:
+              mapping["casals_frontend"] = cid("casals_frontend")
+              icp_names.append("casals_frontend")
+          if selected & {"file-registry", "file_registry"}:
+              print("::warning::Deploying 'file-registry' from the Casals checkout onto "
+                    "this project's shared file_registry canister "
+                    f"({cid('file_registry')}). This canister is normally upgraded via "
+                    "publish-build.yml (family=file-registry) + rollout.yml and its source "
+                    "may differ from the Casals submodule. Proceed only if you mean it.")
+              mapping["ic_file_registry"] = cid("file_registry")
+              icp_names.append("ic_file_registry")
+
+          # The .icp mapping must include every canister the (filtered) icp.yaml
+          # references, so write all selected ids under their icp.yaml names.
+          with open("casals/.icp/data/mappings/ic.ids.json", "w") as f:
+              json.dump(mapping, f, indent=2)
+          print("Wrote casals/.icp/data/mappings/ic.ids.json:")
+          print(json.dumps(mapping, indent=2))
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as gh:
+              gh.write(f"icp_names={' '.join(icp_names)}\n")
+          PY
+
+      - name: Filter icp.yaml to selected canisters
+        working-directory: casals
+        env:
+          ICP_NAMES: ${{ steps.target.outputs.icp_names }}
+        run: |
+          pip install pyyaml >/dev/null
+          python3 - <<'PY'
+          import os, yaml
+          keep = set(os.environ["ICP_NAMES"].split())
+          with open("icp.yaml") as f:
+              doc = yaml.safe_load(f)
+          before = [c["name"] for c in doc.get("canisters", [])]
+          doc["canisters"] = [c for c in doc.get("canisters", []) if c["name"] in keep]
+          after = [c["name"] for c in doc["canisters"]]
+          with open("icp.yaml", "w") as f:
+              yaml.safe_dump(doc, f, sort_keys=False)
+          print(f"icp.yaml canisters: {before} -> {after}")
+          PY
+
+      # ---- Identity (the realms Casals CI key — a controller of all 3 Casals) -
+      - name: Import Casals CI identity
+        env:
+          # Same key the rollout workflow uses; it is a controller of the Casals
+          # canisters in every environment, so it can upgrade them.
+          CASALS_CI_PEM: ${{ secrets.CASALS_CI_PEM }}
+          IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
+        run: |
+          PEM="${CASALS_CI_PEM:-$IC_IDENTITY_PEM}"
+          if [ -z "$PEM" ]; then
+            echo "::error::Neither CASALS_CI_PEM nor IC_IDENTITY_PEM is set." >&2
+            exit 1
+          fi
+          umask 077
+          printf '%s' "$PEM" > /tmp/casals_ci.pem
+          icp identity import casals-ci --from-pem /tmp/casals_ci.pem --storage plaintext
+          echo "Upgrade principal: $(icp identity principal --identity casals-ci)"
+
+      # ---- Build + deploy -----------------------------------------------------
+      - name: Build Casals WASMs
+        working-directory: casals
+        run: make build
+
+      - name: Deploy (upgrade) Casals to ${{ inputs.environment }}
+        working-directory: casals
+        # --force (re)installs even if the outer WASM hash is unchanged — the
+        # Basilisk-embedded Python source can change without changing it.
+        run: |
+          icp deploy -e ic \
+            --identity casals-ci \
+            --mode "${{ inputs.mode }}" \
+            --force -y
+
+      - name: Report deployed canisters
+        if: always()
+        working-directory: casals
+        run: icp canister list -e ic --identity casals-ci || true
+
+      - name: Remove identity material
+        if: always()
+        run: rm -f /tmp/casals_ci.pem

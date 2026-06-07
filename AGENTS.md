@@ -288,6 +288,41 @@ gh workflow run rollout.yml \
 | `--include-infra-reinstall` | flag / bool | off | Required to reinstall `file-registry`/`realm-registry` |
 | `--yes` / (always in CI) | flag | off | Skip confirmation prompts |
 
+### Upgrading Casals itself (the orchestrator canisters)
+
+> **Different from rollout.** `rollout.yml` upgrades the realm/infra canisters
+> Casals *manages*. `casals-upgrade.yml` upgrades the **Casals orchestrator
+> canisters themselves** (`casals_backend` / `casals_frontend`) — i.e. when a new
+> version of the [Casals](https://github.com/smart-social-contracts/Casals)
+> project ships and we want this environment's Casals brought up to it.
+
+`casals-upgrade.yml` checks out the Casals repo at a chosen ref, builds it from
+source (`make build`), points the deploy at this environment's Casals canister IDs
+(from `canister_ids.json`), and runs `icp deploy --mode upgrade` with the
+`CASALS_CI_PEM` identity (a controller of all three Casals). `upgrade` preserves
+Casals' on-chain state (orchestra tree, pool, sheet, authorized-WASM catalog).
+
+```bash
+gh workflow run casals-upgrade.yml \
+  -f environment=test -f casals_ref=main -f components=backend,frontend
+```
+
+| `casals-upgrade.yml` param | Options | Default | Notes |
+|---|---|---|---|
+| `environment` | `test`, `demo`, `staging` | `test` | Which env's Casals to upgrade |
+| `casals_ref` | git ref/tag/sha | blank (`main`) | Casals version to build |
+| `components` | `backend`, `frontend`, `file-registry` (comma list) | `backend,frontend` | See file-registry note |
+| `mode` | `upgrade`, `reinstall` | `upgrade` | `reinstall` **wipes Casals state** |
+| `i_understand_reinstall_wipes_casals` | `true`/`false` | `false` | Required to allow `reinstall` |
+
+- **`file-registry` is special here.** This project's Casals instances **reuse the
+  realms `file_registry`** (there is no separate `ic_file_registry`); that canister
+  is realms-managed infra with its own upgrade path (`publish-build.yml`
+  `family=file-registry` + `rollout.yml`). Prefer that path. Only add
+  `file-registry` to `components` if you deliberately want to push the Casals-repo
+  file_registry WASM onto it.
+- Needs the `CASALS_CI_PEM` secret (the only secret required — the Casals repo is public).
+
 ### Casals canister IDs
 
 | Env | Casals backend | Casals frontend | file_registry |
