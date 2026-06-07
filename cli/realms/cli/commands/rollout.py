@@ -8,14 +8,9 @@ by driving each environment's Casals instance directly:
 
   - backend canisters  -> Casals `upgrade_to` (snapshot -> install -> verify
     module hash -> rollback-all-on-failure, built in);
-  - frontend canisters -> Casals `upgrade_to` with a clean reinstall of the
-    certified-assets shell (its entire state is the asset bundle, repopulated
-    immediately afterwards) followed by the batched `provision_assets` loop to
-    upload the new asset bundle. The reinstall is what guarantees the served
-    bundle exactly matches the provisioned one: `provision_assets` is an
-    additive per-(key, encoding) upsert, so provisioning onto a *preserved*
-    store would leave orphaned keys / stale encodings (e.g. an old gzip `/`)
-    that browsers keep getting served.
+  - frontend canisters -> Casals `upgrade_to` (install the new certified-assets
+    WASM, which repoints the canister's `wasm_key`/bundle namespace) followed by
+    the batched `provision_assets` loop to upload the new asset bundle.
 
 Snapshot management is automatic and always on (it is part of `upgrade_to`).
 The orchestrator is dry-run by default and prints the full action matrix before
@@ -219,22 +214,9 @@ def _print_plan(actions: list[dict]) -> None:
 def _upgrade_frontend(action: dict, identity: Optional[str]) -> tuple[bool, str]:
     casals, name = action["casals"], action["canister"]
     # 1. Install the new certified-assets WASM (repoints wasm_key/bundle namespace).
-    #
-    # Always reinstall (wipe) the asset shell, even for `--mode upgrade`. A
-    # certified-assets canister's entire state IS its asset bundle, and we
-    # repopulate it from file_registry via provision_assets immediately below,
-    # so nothing is actually lost. Crucially, `provision_assets` is an additive
-    # per-(key, content_encoding) upsert: on a *preserved* store it overwrites
-    # only the keys/encodings present in the new bundle and leaves orphans
-    # behind. Because our SvelteKit build emits identity-only files
-    # (precompress: false), an old gzip/br encoding of an entry document — or a
-    # stale `/` alias from an earlier precompressed deploy — would survive and
-    # be served to any browser sending `Accept-Encoding: gzip`, pinning the site
-    # to the previous build. Reinstalling guarantees the served bundle exactly
-    # matches what we provision.
     res = _casals_update(casals, "upgrade_to", {
         "canister": name, "wasm_key": action["wasm_key"],
-        "reinstall": True,
+        "reinstall": action["mode"] == "reinstall",
     }, identity)
     if not res.get("ok"):
         return False, f"upgrade_to: {res.get('error', res)}"
