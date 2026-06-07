@@ -4,7 +4,7 @@
 # creates new canisters via CycleOps. The deployer picks up the job,
 # installs WASM, deploys frontend, and reports back.
 
-name: Test Deploy New Realm
+name: Test Deploy New Realm (Legacy)
 
 on:
   workflow_dispatch:
