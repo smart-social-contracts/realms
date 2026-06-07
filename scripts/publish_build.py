@@ -22,6 +22,7 @@ Casals-only envs).
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -130,9 +131,31 @@ def _build_backend(root: Path, canister: str, main_py: str) -> Path:
     return gz
 
 
+def _sync_declarations(root: Path, fe_dir: str) -> None:
+    """Copy committed candid declarations into the frontend's ``$lib/declarations``.
+
+    The realm frontend imports ``$lib/declarations/realm_backend`` at build time,
+    but ``declarations`` is gitignored everywhere except the committed
+    ``src/declarations/`` snapshot. Mirror the proven deploy flow (release.yml /
+    deploy_canisters.sh) by copying that snapshot into place before ``vite build``;
+    a no-op for frontends that don't import declarations.
+    """
+    src = root / "src" / "declarations"
+    if not src.is_dir():
+        return
+    dst = root / fe_dir / "src" / "lib" / "declarations"
+    dst.mkdir(parents=True, exist_ok=True)
+    for entry in src.iterdir():
+        if not entry.is_dir():
+            continue
+        shutil.copytree(entry, dst / entry.name, dirs_exist_ok=True)
+    print(f"  synced declarations -> {dst}")
+
+
 def _build_frontend(root: Path, fe_dir: str, environment: str) -> Path:
     d = root / fe_dir
     env = {**os.environ, "DFX_NETWORK": environment}
+    _sync_declarations(root, fe_dir)
     _run(["npm", "install", "--legacy-peer-deps"], cwd=d, env=env)
     _run(["npm", "run", "build"], cwd=d, env=env)
     dist = d / "dist"
