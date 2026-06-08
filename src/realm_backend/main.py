@@ -721,17 +721,15 @@ def get_canister_id() -> text:
     return ic.id().to_str()
 
 
-@update
-@require(Operations.REALM_ADMIN)
-def set_canister_config(
-    frontend_canister_id: Opt[text],
-    token_canister_id: Opt[text],
-    nft_canister_id: Opt[text],
-    file_registry_canister_id: Opt[text],
-    marketplace_canister_id: Opt[text],
-    installed_version: Opt[text] = None,
-    network: Opt[text] = None,
-    test_flags_json: Opt[text] = None,
+def _set_canister_config_impl(
+    frontend_canister_id=None,
+    token_canister_id=None,
+    nft_canister_id=None,
+    file_registry_canister_id=None,
+    marketplace_canister_id=None,
+    installed_version=None,
+    network=None,
+    test_flags_json=None,
 ) -> RealmResponse:
     """
     Set canister IDs and metadata for this realm (admin only).
@@ -814,6 +812,78 @@ def set_canister_config(
             f"Error setting canister config: {str(e)}\n{traceback.format_exc()}"
         )
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+@update
+@require(Operations.REALM_ADMIN)
+def set_canister_config(
+    frontend_canister_id: Opt[text],
+    token_canister_id: Opt[text],
+    nft_canister_id: Opt[text],
+    file_registry_canister_id: Opt[text],
+    marketplace_canister_id: Opt[text],
+    installed_version: Opt[text] = None,
+    network: Opt[text] = None,
+    test_flags_json: Opt[text] = None,
+) -> RealmResponse:
+    """Set canister IDs and metadata for this realm (admin only). Candid multi-arg
+    form; see _set_canister_config_impl for the full argument docs."""
+    return _set_canister_config_impl(
+        frontend_canister_id,
+        token_canister_id,
+        nft_canister_id,
+        file_registry_canister_id,
+        marketplace_canister_id,
+        installed_version,
+        network,
+        test_flags_json,
+    )
+
+
+@update
+@require(Operations.REALM_ADMIN)
+def set_canister_config_json(args: text) -> text:
+    """JSON text-in / text-out variant of set_canister_config.
+
+    Lets a single declarative call configure a realm post-deploy — e.g. a Casals
+    arrangement step ``{target, method: "set_canister_config_json", args: {...}}``.
+    The multi-arg Candid form (set_canister_config) cannot be expressed as one
+    text argument; this wrapper can.
+
+    Args (JSON, all optional): {frontend_canister_id, token_canister_id,
+    nft_canister_id, file_registry_canister_id, marketplace_canister_id,
+    installed_version, network, and either test_flags_json (a JSON string) or
+    test_flags (a JSON object, e.g. {"test_mode":true,"demo_data":true})}.
+
+    Returns: {"success": bool, "message"?: str, "error"?: str}.
+    """
+    try:
+        params = json.loads(args) if args else {}
+        flags = params.get("test_flags_json")
+        if flags is None and isinstance(params.get("test_flags"), dict):
+            flags = json.dumps(params["test_flags"])
+        resp = _set_canister_config_impl(
+            frontend_canister_id=params.get("frontend_canister_id"),
+            token_canister_id=params.get("token_canister_id"),
+            nft_canister_id=params.get("nft_canister_id"),
+            file_registry_canister_id=params.get("file_registry_canister_id"),
+            marketplace_canister_id=params.get("marketplace_canister_id"),
+            installed_version=params.get("installed_version"),
+            network=params.get("network"),
+            test_flags_json=flags,
+        )
+        data = getattr(resp, "data", None)
+        out = {"success": bool(getattr(resp, "success", False))}
+        msg = getattr(data, "message", None) if data is not None else None
+        err = getattr(data, "error", None) if data is not None else None
+        if msg:
+            out["message"] = msg
+        if err:
+            out["error"] = err
+        return json.dumps(out)
+    except Exception as e:
+        logger.error(f"set_canister_config_json error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
 
 
 @update

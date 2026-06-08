@@ -8,9 +8,10 @@ For local development, these default to IC mainnet values.
 During deployment, the deploy script updates these with actual canister IDs.
 """
 
-TEST_MODE = False
-TEST_MODE_DEMO_DATA = False
-TEST_MODE_SKIP_PASSPORT_ZKPROOF = False
+# Test-mode flags are NOT defined here. They are runtime config on the Realm
+# entity, set via set_canister_config (test_flags_json) and read live through
+# core.runtime_flags (backend, extensions) and status() (frontend). Defining
+# them here would be misleading — a value set in this file has no effect.
 
 # Shared canister IDs - updated during deployment
 CANISTER_IDS = {

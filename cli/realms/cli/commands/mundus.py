@@ -99,14 +99,6 @@ def _upload_file(filepath: Path) -> str:
 
 _build_cache: dict[str, str] = {}
 
-_VITE_PARAM_MAP = {
-    "TEST_MODE": "VITE_TEST_MODE",
-    "TEST_MODE_II_BYPASS": "VITE_TEST_MODE_II_BYPASS",
-    "TEST_MODE_DEMO_DATA": "VITE_TEST_MODE_DEMO_DATA",
-    "TEST_MODE_SKIP_TERMS": "VITE_TEST_MODE_SKIP_TERMS",
-    "TEST_MODE_SKIP_PASSPORT_ZKPROOF": "VITE_TEST_MODE_SKIP_PASSPORT_ZKPROOF",
-}
-
 
 def _sha256_file(path: Path) -> str:
     """Compute SHA-256 hex digest of a file."""
@@ -124,12 +116,16 @@ def _download_and_hash(url: str) -> str:
         tmp_path.unlink(missing_ok=True)
 
 
-def _build_artifacts(parameters: dict | None = None, scope: str = "both") -> dict[str, Path]:
+def _build_artifacts(scope: str = "both") -> dict[str, Path]:
     """Build backend WASM and/or frontend tarball from source.
 
     scope: "both" (default), "frontend_only", or "backend_only".
     When scope is "frontend_only", skips backend compilation and uses existing
     declarations from the source tree — significantly faster for frontend-only deploys.
+
+    Note: test-mode flags are NOT baked in at build time. They are runtime config
+    on the Realm entity, set post-deploy via set_canister_config (see
+    _post_deploy_config) and read live by the backend/extensions and frontend.
     """
     import gzip
     import tarfile
@@ -137,34 +133,6 @@ def _build_artifacts(parameters: dict | None = None, scope: str = "both") -> dic
     project_root = get_project_root()
 
     build_env = {**os.environ, "CANISTER_CANDID_PATH": str(project_root / "src" / "realm_backend" / "realm_backend.did")}
-
-    backend_config_path = project_root / "src" / "realm_backend" / "config.py"
-    backend_config_backup = None
-
-    if parameters:
-        for param_name, value in parameters.items():
-            vite_key = _VITE_PARAM_MAP.get(param_name)
-            if vite_key:
-                build_env[vite_key] = str(value).lower()
-        applied = {k: v for k, v in parameters.items() if k in _VITE_PARAM_MAP}
-        if applied:
-            console.print(f"  Build parameters: {applied}")
-
-        if scope != "frontend_only" and backend_config_path.exists():
-            backend_config_backup = backend_config_path.read_text()
-            patched = backend_config_backup
-            for param_name, value in parameters.items():
-                py_value = "True" if value is True else "False" if value is False else repr(value)
-                old = f"{param_name} = False"
-                new = f"{param_name} = {py_value}"
-                if old in patched:
-                    patched = patched.replace(old, new)
-                else:
-                    old_true = f"{param_name} = True"
-                    if old_true in patched:
-                        patched = patched.replace(old_true, new)
-            if patched != backend_config_backup:
-                backend_config_path.write_text(patched)
 
     artifacts = {}
 
@@ -175,8 +143,6 @@ def _build_artifacts(parameters: dict | None = None, scope: str = "both") -> dic
             cwd=project_root, capture_output=True, text=True, env=build_env,
         )
         if result.returncode != 0:
-            if backend_config_backup is not None:
-                backend_config_path.write_text(backend_config_backup)
             console.print(f"[red]  Backend build failed (exit code {result.returncode})[/red]")
             console.print(f"[red]  stdout:[/red]\n{result.stdout or '(empty)'}")
             console.print(f"[red]  stderr:[/red]\n{result.stderr or '(empty)'}")
@@ -185,9 +151,6 @@ def _build_artifacts(parameters: dict | None = None, scope: str = "both") -> dic
                 f"--- stdout ---\n{result.stdout or '(empty)'}\n"
                 f"--- stderr ---\n{result.stderr or '(empty)'}"
             )
-
-        if backend_config_backup is not None:
-            backend_config_path.write_text(backend_config_backup)
 
         wasm_path = project_root / ".basilisk" / "realm_backend" / "realm_backend.wasm"
         if not wasm_path.exists():
@@ -243,8 +206,7 @@ def _build_artifacts(parameters: dict | None = None, scope: str = "both") -> dic
     return artifacts
 
 
-def _resolve_artifact(ref: str, artifact_type: str, network: str,
-                      parameters: dict | None = None) -> tuple[str, str]:
+def _resolve_artifact(ref: str, artifact_type: str, network: str) -> tuple[str, str]:
     """Resolve an artifact reference to a (URL, SHA-256 hash) tuple.
 
     The CLI computes the hash locally so it can be included in the
@@ -274,7 +236,7 @@ def _resolve_artifact(ref: str, artifact_type: str, network: str,
             scope = "backend_only"
         else:
             scope = "both"
-        artifacts = _build_artifacts(parameters=parameters, scope=scope)
+        artifacts = _build_artifacts(scope=scope)
         for atype, path in artifacts.items():
             h = _sha256_file(path)
             console.print(f"  Uploading {atype}: {path.name} (sha256={h[:16]}...)")
@@ -895,11 +857,11 @@ def mundus_deploy_descriptor_command(
     frontend_url = ""
     frontend_hash = ""
     if canister_filter != "frontend":
-        backend_url, backend_hash = _resolve_artifact(artifact_version, "realm_backend", network, parameters=parameters)
+        backend_url, backend_hash = _resolve_artifact(artifact_version, "realm_backend", network)
         console.print(f"Artifacts resolved:")
         console.print(f"  backend:  {backend_url} (sha256={backend_hash[:16]}...)")
     if canister_filter != "backend":
-        frontend_url, frontend_hash = _resolve_artifact(artifact_version, "realm_frontend", network, parameters=parameters)
+        frontend_url, frontend_hash = _resolve_artifact(artifact_version, "realm_frontend", network)
         if not backend_url:
             console.print(f"Artifacts resolved:")
         console.print(f"  frontend: {frontend_url} (sha256={frontend_hash[:16]}...)")

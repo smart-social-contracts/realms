@@ -253,12 +253,7 @@ newest **semver** release (Casals `latest` flag), not main.
 ### Step 2 — Rollout
 
 Upgrades/reinstalls any mix of environments × realms/infra × backend/frontend.
-**Dry-run by default** — it prints the plan and changes nothing until `--execute`.
-
 ```bash
-# Preview (no changes): all realm backends in test
-realms rollout -e test -t all-realms -s backend -v 0.4.0
-
 # Apply: one realm, backend only
 realms rollout -e test -t agora -s backend -v 0.4.0 --identity deployer --execute --yes
 
@@ -274,7 +269,7 @@ Same inputs are available as a manual workflow:
 ```bash
 gh workflow run rollout.yml \
   -f environments=test -f targets=all-realms -f scope=both \
-  -f mode=upgrade -f version=0.4.0 -f execute=true
+  -f mode=upgrade -f version=0.4.0
 ```
 
 | `rollout` flag / `rollout.yml` input | Options | Default | Notes |
@@ -284,7 +279,7 @@ gh workflow run rollout.yml \
 | `-s` / `scope` | `backend`, `frontend`, `both` | `both` | |
 | `-m` / `mode` | `upgrade`, `reinstall` | `upgrade` | `reinstall` **wipes state** |
 | `-v` / `version` | `main`, `latest`, or semver | `latest` | `main` = newest main snapshot |
-| `--execute` / `execute` | flag / bool | off | Off = dry-run plan only |
+| `--execute` / `execute` | flag / bool | on | Always executes — no dry-run mode |
 | `--include-infra-reinstall` | flag / bool | off | Required to reinstall `file-registry`/`realm-registry` |
 | `--yes` / (always in CI) | flag | off | Skip confirmation prompts |
 
@@ -367,12 +362,11 @@ These are also in `_CASALS_IDS` (`cli/realms/cli/commands/rollout.py`) and
    the ~5 min ingress window. Expect several minutes per realm; this is normal.
 3. **`reinstall` wipes canister state** on success (the protective snapshot is
    dropped after a verified reinstall). Use `upgrade` unless you mean it.
-4. **Always dry-run first** (omit `--execute`) and read the plan table.
-5. **Frontend builds need candid declarations.** `publish_build.py` copies the
+4. **Frontend builds need candid declarations.** `publish_build.py` copies the
    committed `src/declarations/*` into each frontend's `src/lib/declarations/`
    before `vite build` (the realm frontend imports `$lib/declarations/realm_backend`).
    Don't remove that step or the main-snapshot build fails to resolve the import.
-6. **Large files use incremental finalize.** Uploads over ~200 KB are chunked, and
+5. **Large files use incremental finalize.** Uploads over ~200 KB are chunked, and
    the CLI finalizes them with `finalize_chunked_file_step` (batched, on-chain
    hashing skipped, local sha256 passed in). The one-shot `finalize_chunked_file`
    blows the 40 B-instruction limit (`IC0522`) on multi-MB WASMs — don't switch back.

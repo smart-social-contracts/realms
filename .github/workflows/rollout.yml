@@ -1,7 +1,6 @@
 # rollout.yml — upgrade/reinstall realm + infra canisters across environments
 # via Casals (manually triggered).
 #
-# Dry-run by default: leave `execute` unchecked to only print the plan.
 # Publish artifacts first with publish-build.yml (semver) or publish-main.yml (main branch).
 
 name: Rollout
@@ -38,11 +37,6 @@ on:
         description: "Artifact version: 'main' (latest main snapshot), 'latest' (semver), or e.g. 0.4.0"
         required: false
         default: latest
-      execute:
-        description: "Apply changes (unchecked = dry-run plan only)"
-        required: false
-        type: boolean
-        default: false
       include_infra_reinstall:
         description: "Allow reinstalling state-wiping infra (file-registry, realm-registry)"
         required: false
@@ -110,6 +104,6 @@ jobs:
             --mode "${{ inputs.mode }}" \
             --version "${{ inputs.version || 'latest' }}" \
             --identity ci \
+            --execute \
             --yes \
-            ${{ inputs.execute && '--execute' || '' }} \
             ${{ inputs.include_infra_reinstall && '--include-infra-reinstall' || '' }}
