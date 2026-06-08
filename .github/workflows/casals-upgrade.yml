@@ -162,6 +162,11 @@ jobs:
               icp_names.append("casals_backend")
           if "frontend" in selected:
               mapping["casals_frontend"] = cid("casals_frontend")
+              # Always inject backend ID into the mapping so Vite bakes it into the
+              # ic_env cookie even on a frontend-only deploy. Do NOT add to icp_names
+              # (we only deploy what was explicitly selected).
+              if "casals_backend" not in mapping:
+                  mapping["casals_backend"] = cid("casals_backend")
               icp_names.append("casals_frontend")
           if selected & {"file-registry", "file_registry"}:
               print("::warning::Deploying 'file-registry' from the Casals checkout onto "
