@@ -17,6 +17,13 @@ The orchestrator is dry-run by default and prints the full action matrix before
 touching anything; `--execute` is required to apply, and `reinstall` requires an
 extra confirmation because a successful reinstall permanently wipes state.
 
+After the canister actions, each environment's **active arrangement** is applied
+on its own Casals. An environment maps 1:1 to its Casals instance, whose active
+arrangement *is* that environment's post-deploy configuration (runtime params +
+extension/codex installs) — so a rollout (especially a reinstall, which wipes
+state) converges the environment back to ready-to-use. Idempotent; skip with
+`--no-apply-arrangement`.
+
 This path is independent of the legacy off-chain deployer: it never touches the
 registry version catalog, so old and new deployment paths coexist.
 """
@@ -257,6 +264,27 @@ def _upgrade_backend(action: dict, identity: Optional[str]) -> tuple[bool, str]:
     return True, f"hash {(res.get('wasm_hash') or '')[:16]}"
 
 
+def _apply_env_arrangement(casals: str, identity: Optional[str]) -> tuple[bool, str]:
+    """Apply an environment's active arrangement on its own Casals.
+
+    Empty args => the active arrangement, which IS that environment's post-deploy
+    configuration (runtime parameters + extension/codex installs). Steps are
+    best-effort and idempotent, so re-applying after a reinstall converges the
+    environment to its ready-to-use state.
+    """
+    res = _casals_update(casals, "apply_arrangement", {}, identity)
+    if not res.get("ok", False):
+        err = res.get("error", str(res))
+        # An environment with no arrangement is a valid state, not a failure.
+        if "no active arrangement" in err.lower():
+            return True, "no active arrangement (skipped)"
+        return False, err
+    name = res.get("arrangement", "?")
+    applied = res.get("applied", 0)
+    failed = res.get("failed", 0)
+    return failed == 0, f"'{name}': {applied} applied, {failed} failed"
+
+
 def rollout_command(
     environments: str,
     targets: str,
@@ -268,6 +296,7 @@ def rollout_command(
     include_infra_reinstall: bool = False,
     yes: bool = False,
     identity: Optional[str] = None,
+    apply_arrangement: bool = True,
 ) -> None:
     if scope not in ("backend", "frontend", "both"):
         raise typer.BadParameter("--scope must be backend, frontend, or both")
@@ -362,7 +391,39 @@ def rollout_command(
             failures += 1
     console.print(table)
 
-    if failures:
-        console.print(f"[red]{failures} of {len(results)} target(s) failed.[/red]")
+    # Apply each touched environment's active arrangement (its post-deploy
+    # config). One Casals call per environment, after that environment's
+    # canisters are in place.
+    arr_failures = 0
+    if apply_arrangement:
+        env_casals: dict[str, str] = {}
+        for a in actionable:
+            env_casals.setdefault(a["env"], a["casals"])
+        if env_casals:
+            atable = Table(title="Arrangement apply", header_style="bold cyan")
+            atable.add_column("env")
+            atable.add_column("result")
+            atable.add_column("detail")
+            for env, casals in env_casals.items():
+                console.print(f"\n[blue]→ applying {env} active arrangement[/blue]")
+                try:
+                    ok, detail = _apply_env_arrangement(casals, identity)
+                except Exception as e:  # noqa: BLE001 - report and continue
+                    ok, detail = False, str(e)
+                mark = "[green]✓[/green]" if ok else "[red]✗[/red]"
+                console.print(f"  {mark} {detail}")
+                atable.add_row(env, "[green]ok[/green]" if ok else "[red]FAILED[/red]", detail)
+                if not ok:
+                    arr_failures += 1
+            console.print(atable)
+
+    if failures or arr_failures:
+        console.print(
+            f"[red]{failures} of {len(results)} target(s) failed; "
+            f"{arr_failures} arrangement(s) failed.[/red]"
+        )
         raise typer.Exit(1)
-    console.print(f"[bold green]All {len(results)} target(s) succeeded.[/bold green]")
+    console.print(
+        f"[bold green]All {len(results)} target(s) succeeded; "
+        f"arrangements applied.[/bold green]"
+    )

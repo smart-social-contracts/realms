@@ -635,6 +635,12 @@ def rollout(
     identity: Optional[str] = typer.Option(
         None, "--identity", help="dfx identity to use for Casals calls",
     ),
+    apply_arrangement: bool = typer.Option(
+        True, "--apply-arrangement/--no-apply-arrangement",
+        help="After the canister actions, apply each environment's active "
+             "arrangement on its Casals (its post-deploy config: params + "
+             "extension/codex installs). On by default.",
+    ),
 ) -> None:
     """Upgrade/reinstall realm + infra canisters across environments via Casals.
 
@@ -663,6 +669,7 @@ def rollout(
         environments=environments, targets=targets, scope=scope, mode=mode,
         version=version, realm_family=realm_family, execute=execute,
         include_infra_reinstall=include_infra_reinstall, yes=yes, identity=identity,
+        apply_arrangement=apply_arrangement,
     )
 
 
