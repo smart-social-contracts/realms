@@ -29,6 +29,7 @@ registry version catalog, so old and new deployment paths coexist.
 """
 
 import json
+import re
 import time
 from typing import Optional
 
@@ -100,7 +101,10 @@ def _casals_update(casals: str, method: str, payload: dict, identity: Optional[s
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
-        return {"ok": False, "error": f"unparseable response: {raw[:200]}"}
+        # Large responses with nested JSON (e.g. apply_arrangement's per-step
+        # `reply` payloads) can defeat the candid text unescaper. Keep a longer
+        # slice so callers can still recover top-level counts via regex.
+        return {"ok": False, "error": f"unparseable response: {raw[:1000]}"}
 
 
 def _resolve_environments(environments: str) -> list[str]:
@@ -278,6 +282,14 @@ def _apply_env_arrangement(casals: str, identity: Optional[str]) -> tuple[bool, 
         # An environment with no arrangement is a valid state, not a failure.
         if "no active arrangement" in err.lower():
             return True, "no active arrangement (skipped)"
+        # apply_arrangement's summary can be too large/nested for the candid
+        # text unescaper, so json parsing fails even though it ran. Recover the
+        # top-level applied/failed counts from the raw text before giving up.
+        m_app = re.search(r'"applied":\s*(\d+)', err)
+        m_fail = re.search(r'"failed":\s*(\d+)', err)
+        if m_app and m_fail:
+            applied, failed = int(m_app.group(1)), int(m_fail.group(1))
+            return failed == 0, f"applied {applied}, failed {failed}"
         return False, err
     name = res.get("arrangement", "?")
     applied = res.get("applied", 0)
