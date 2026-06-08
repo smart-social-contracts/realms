@@ -50,6 +50,11 @@ on:
         required: false
         type: boolean
         default: false
+      seed_arrangement:
+        description: "Optional: after deploy, seed+activate this environment's arrangement (seed/arrangements/<name>.json) into Casals. Blank = skip. Requires 'backend' in components."
+        required: false
+        type: string
+        default: ""
 
 # Never run two Casals-orchestrator deploys against the same environment at once.
 concurrency:
@@ -240,6 +245,18 @@ jobs:
             --identity casals-ci \
             --mode "${{ inputs.mode }}" \
             -y
+
+      # ---- Seed the environment's arrangement (optional) ----------------------
+      # An environment maps 1:1 to its Casals instance, whose active arrangement
+      # IS that environment's post-deploy config (runtime params + extension/
+      # codex installs). --arrangement-only upserts/activates just that
+      # arrangement; it never touches the authorized-WASM catalog or the sheet.
+      - name: Seed environment arrangement
+        if: ${{ inputs.seed_arrangement != '' && success() }}
+        working-directory: casals
+        run: |
+          python3 scripts/seed.py -e ic --identity casals-ci \
+            --arrangement "${{ inputs.seed_arrangement }}" --arrangement-only
 
       - name: Report deployed canisters
         if: always()
