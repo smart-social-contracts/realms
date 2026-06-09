@@ -1,0 +1,310 @@
+{
+  "$comment": "Every realm gets config + identity + branding + codex + the core extension subset (public_dashboard, member_dashboard, demo_simulator, hello_world, llm_chat), ~27 steps. Proves a full sheet reinstall (all realm canisters + branding) end-to-end without installing every manifest extension. Marked active (exclusive): seeding it deactivates `test`/`test-lite`. Regenerate via casals-config/_gen_test_arrangement.py.",
+  "name": "test-lite-all",
+  "description": "Lite-but-complete realms test arrangement: all 3 realms (Dominion, Agora, Syntropia) with core extensions only (public_dashboard, member_dashboard, demo_simulator, hello_world, llm_chat).",
+  "active": true,
+  "parameters": {
+    "network": "test",
+    "file_registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+    "marketplace_canister_id": "2wldc-niaaa-aaaad-qlxga-cai",
+    "test_flags": {
+      "test_mode": true,
+      "skip_authentication": true,
+      "ii_bypass": true,
+      "user_self_registration": true,
+      "demo_data": true,
+      "skip_terms": true,
+      "skip_passport_zkproof": true
+    }
+  },
+  "steps": [
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "set_canister_config_json",
+      "args": {
+        "network": "test",
+        "file_registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "frontend_canister_id": "2enu3-byaaa-aaaad-qlxfa-cai",
+        "marketplace_canister_id": "2wldc-niaaa-aaaad-qlxga-cai",
+        "test_flags": {
+          "test_mode": true,
+          "skip_authentication": true,
+          "ii_bypass": true,
+          "user_self_registration": true,
+          "demo_data": true,
+          "skip_terms": true,
+          "skip_passport_zkproof": true
+        }
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "update_realm_config",
+      "args": {
+        "name": "Dominion",
+        "manifesto": "A projection of where the world is likely heading: centralized, technocratic governance where algorithms, surveillance, and simulated consent replace genuine democratic agency.",
+        "welcome_message": "Welcome to Dominion. Efficient governance through algorithmic oversight. Your compliance ensures collective prosperity."
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_branding_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "namespace": "branding",
+        "frontend_canister_id": "2enu3-byaaa-aaaad-qlxfa-cai",
+        "files": {
+          "/custom/logo.png": "dominion/logo.png",
+          "/custom/background.png": "dominion/background.png"
+        }
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_codex_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "codex_id": "dominion",
+        "version": null,
+        "run_init": true
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "public_dashboard",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "member_dashboard",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "demo_simulator",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "hello_world",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "llm_chat",
+        "version": null
+      }
+    },
+    {
+      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "method": "set_canister_config_json",
+      "args": {
+        "network": "test",
+        "file_registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "frontend_canister_id": "pqwsi-vyaaa-aaaau-agrbq-cai",
+        "marketplace_canister_id": "2wldc-niaaa-aaaad-qlxga-cai",
+        "test_flags": {
+          "test_mode": true,
+          "skip_authentication": true,
+          "ii_bypass": true,
+          "user_self_registration": true,
+          "demo_data": true,
+          "skip_terms": true,
+          "skip_passport_zkproof": true
+        }
+      }
+    },
+    {
+      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "method": "update_realm_config",
+      "args": {
+        "name": "Agora",
+        "manifesto": "A direct democracy funded by monthly membership dues. Citizens verify their identity via ZK passport and pay monthly bills to stay active. Active members submit and vote on proposals to change the codex code, fund services, or redistribute wealth as social welfare. Every transaction is recorded in real-time double-entry accounting.",
+        "welcome_message": "Welcome to Agora! Join our transparent, participatory community where every citizen has a voice and governance serves the people."
+      }
+    },
+    {
+      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "method": "install_branding_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "namespace": "branding",
+        "frontend_canister_id": "pqwsi-vyaaa-aaaau-agrbq-cai",
+        "files": {
+          "/custom/logo.png": "agora/logo.png",
+          "/custom/background.png": "agora/background.png"
+        }
+      }
+    },
+    {
+      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "method": "install_codex_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "codex_id": "agora",
+        "version": null,
+        "run_init": true
+      }
+    },
+    {
+      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "public_dashboard",
+        "version": null
+      }
+    },
+    {
+      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "member_dashboard",
+        "version": null
+      }
+    },
+    {
+      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "demo_simulator",
+        "version": null
+      }
+    },
+    {
+      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "hello_world",
+        "version": null
+      }
+    },
+    {
+      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "llm_chat",
+        "version": null
+      }
+    },
+    {
+      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "method": "set_canister_config_json",
+      "args": {
+        "network": "test",
+        "file_registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "frontend_canister_id": "2dmsp-maaaa-aaaad-qlxfq-cai",
+        "marketplace_canister_id": "2wldc-niaaa-aaaad-qlxga-cai",
+        "test_flags": {
+          "test_mode": true,
+          "skip_authentication": true,
+          "ii_bypass": true,
+          "user_self_registration": true,
+          "demo_data": true,
+          "skip_terms": true,
+          "skip_passport_zkproof": true
+        }
+      }
+    },
+    {
+      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "method": "update_realm_config",
+      "args": {
+        "name": "Syntropia",
+        "manifesto": "A possible evolutionary future enabled by smart social contracts and Realms GOS, where governance becomes protocol-based, adaptive, and freely chosen through a competitive ecosystem of AI-powered governors.",
+        "welcome_message": "Welcome to Syntropia. Experience adaptive, protocol-based governance where AI-powered systems compete to serve your evolving needs."
+      }
+    },
+    {
+      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "method": "install_branding_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "namespace": "branding",
+        "frontend_canister_id": "2dmsp-maaaa-aaaad-qlxfq-cai",
+        "files": {
+          "/custom/logo.png": "syntropia/logo.png",
+          "/custom/background.png": "syntropia/background.png"
+        }
+      }
+    },
+    {
+      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "method": "install_codex_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "codex_id": "syntropia",
+        "version": null,
+        "run_init": true
+      }
+    },
+    {
+      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "public_dashboard",
+        "version": null
+      }
+    },
+    {
+      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "member_dashboard",
+        "version": null
+      }
+    },
+    {
+      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "demo_simulator",
+        "version": null
+      }
+    },
+    {
+      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "hello_world",
+        "version": null
+      }
+    },
+    {
+      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "llm_chat",
+        "version": null
+      }
+    }
+  ]
+}

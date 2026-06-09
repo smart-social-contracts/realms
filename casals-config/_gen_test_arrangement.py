@@ -249,6 +249,24 @@ def main():
         lite, active=True,
     )
 
+    # Lite-but-complete: EVERY realm, but only the core extensions. Proves a
+    # full sheet reinstall (all realm canisters + branding) works end-to-end
+    # while keeping the per-realm extension set small for speed.
+    lite_all = build_steps(REALMS, ext_filter=LITE_EXTENSIONS)
+    _write(
+        "test-lite-all.json", "test-lite-all",
+        ("Lite-but-complete realms test arrangement: all 3 realms (Dominion, "
+         "Agora, Syntropia) with core extensions only (" +
+         ", ".join(LITE_EXTENSIONS) + ")."),
+        ("Every realm gets config + identity + branding + codex + the core "
+         "extension subset (" + ", ".join(LITE_EXTENSIONS) + "), ~" +
+         str(len(lite_all)) + " steps. Proves a full sheet reinstall (all realm "
+         "canisters + branding) end-to-end without installing every manifest "
+         "extension. Marked active (exclusive): seeding it deactivates `test`/"
+         "`test-lite`. Regenerate via casals-config/_gen_test_arrangement.py."),
+        lite_all, active=True,
+    )
+
 
 if __name__ == "__main__":
     main()
