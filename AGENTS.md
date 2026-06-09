@@ -14,12 +14,12 @@ realms/
 ├── src/realm_frontend/               # Main SvelteKit frontend
 ├── src/realm_backend/                # Python canister backend
 ├── .github/workflows/
-│   ├── deploy-infra.yml              # Infra canisters (legacy path)
-│   ├── deploy-files.yml              # Publish extensions/codices (legacy path)
-│   ├── deploy-mundus.yml            # Deploy realm canisters (legacy path)
-│   ├── publish-build.yml            # Build + publish a semver release into Casals
-│   ├── publish-main.yml             # Build + publish current main checkout (no release)
-│   └── rollout.yml                   # Upgrade/reinstall canisters via Casals
+│   ├── publish-build.yml            # Build + publish artifacts into file_registry + Casals
+│   ├── rollout.yml                   # Upgrade/reinstall realm+infra canisters via Casals
+│   ├── casals-upgrade.yml            # Upgrade the Casals orchestrator itself
+│   └── deploy-files.yml              # Publish extensions/codices into file_registry
+├── casals/                           # Casals orchestrator engine (git submodule)
+├── casals-config/                    # Realms-owned Casals objects (arrangements, sheet)
 ├── scripts/
 │   └── publish_build.py              # Build+publish engine used by publish-build.yml
 ├── deployment-descriptors/           # Network topology (YAML)
@@ -32,74 +32,51 @@ realms/
 
 ## Deploying Code Changes
 
+Deploys go through **Casals** (the on-chain orchestrator): publish artifacts, then
+roll them out. See "Casals — On-Chain Deploy & Upgrade" below for the full reference;
+this is the quick version.
+
 ### Decision: What Changed?
 
-| What changed | Command |
+| What changed | Flow |
 |---|---|
-| **Frontend only** (`src/realm_frontend/`) | Fast deploy (see below) |
-| **Backend** (`src/realm_backend/`) | Full deploy with `canister=both` |
-| **Extension frontend** (`extensions/`) | `deploy-files` → `deploy-mundus` |
-| **Extension backend** (`entry.py`) | `deploy-files` → `deploy-mundus` with `canister=both` |
+| **Frontend** (`src/realm_frontend/`) | `publish-build` (`family=realm component=frontend`) → `rollout` (`scope=frontend`) |
+| **Backend** (`src/realm_backend/`) | `publish-build` (`family=realm component=both`) → `rollout` (`scope=both`) |
+| **Extension** (`extensions/`) | `deploy-files` (publish bundle) → re-install the extension (fast path below) |
 
-### Fast Frontend Deploy (~40s)
-
-For changes to `src/realm_frontend/` only. **Always scope to the realm you're testing.**
+### Realm deploy (publish → rollout)
 
 ```bash
 git add . && git commit -m "fix: describe change" && git push origin main
 
-gh workflow run deploy-mundus.yml \
-  -f descriptor=deployment-descriptors/test-mundus-layered.yml \
-  -f deploy_mode=upgrade \
-  -f canister=frontend \
-  -f extensions=none \
-  -f codices=none \
-  -f realm=agora
+# 1. Publish the current main checkout as a snapshot into test's registry + catalog
+gh workflow run publish-build.yml \
+  -f environment=test -f family=realm -f component=both \
+  -f from_main=true -f update_catalog=true
+
+# 2. Roll it out (scope to what changed; upgrade preserves state)
+gh workflow run rollout.yml \
+  -f environments=test -f targets=all-realms -f scope=both \
+  -f mode=upgrade -f version=main
 ```
 
-Why each flag matters:
-- `canister=frontend` — skips backend WASM build/install/verification
-- `extensions=none` / `codices=none` — skips extension and codex installation
-- `realm=agora` — deploys one realm instead of all three (3x faster)
-- `deploy_mode=upgrade` — preserves all on-chain state
+Scope as narrowly as possible: `scope=frontend` skips the backend; `targets=dominion`
+does one realm instead of all three.
 
-### Full Deploy (~5min)
+### Environments
 
-When backend code changed, or when deploying all realms:
-
-```bash
-gh workflow run deploy-mundus.yml \
-  -f descriptor=deployment-descriptors/test-mundus-layered.yml \
-  -f deploy_mode=upgrade \
-  -f canister=both \
-  -f artifact_version=build
-```
-
-### Descriptors by Environment
-
-| Environment | Descriptor | Domain |
-|---|---|---|
-| Test | `test-mundus-layered.yml` | `<canister_id>.icp0.io` |
-| Demo | `demo-mundus-layered.yml` | `<canister_id>.cp0.io` |
-| Staging | `staging-mundus-layered.yml` | `<canister_id>.icp0.io` |
-
----
-
-## `deploy-mundus.yml` Parameters
-
-| Parameter | Options | Default | Notes |
-|---|---|---|---|
-| `descriptor` | YAML path in `deployment-descriptors/` | staging | Target environment |
-| `deploy_mode` | `reinstall`, `upgrade`, `install` | `reinstall` | **Use `upgrade` unless resetting** |
-| `realm` | realm name or blank | blank (all) | **Always scope for testing** |
-| `canister` | `both`, `backend`, `frontend` | `both` | `frontend` is fastest for UI changes |
-| `extensions` | `all`, `none`, or comma-separated IDs | `all` | e.g. `voting,vault,admin_dashboard` |
-| `codices` | `all`, `none`, or comma-separated IDs | `all` | e.g. `dominion,agora` |
-| `artifact_version` | `build`, `latest`, semver | `build` | `latest` = skip source build |
+| Environment | Domain |
+|---|---|
+| Test | `<canister_id>.icp0.io` |
+| Demo | `<canister_id>.icp0.io` |
+| Staging | `<canister_id>.icp0.io` |
 
 ---
 
 ## Deploying Extension Changes
+
+Extensions/codices are published into the `file_registry` (via `deploy-files.yml` or
+`realms files`), then installed by the realm backend pulling them from the registry.
 
 ```bash
 # 1. Build
@@ -114,13 +91,8 @@ git add extensions && git commit -m "chore: bump extensions" && git push origin 
 # 4. Publish to file_registry (specific extension, or omit --extensions for all)
 gh workflow run deploy-files.yml -f scope=extensions-only -f environment=test -f extensions=<ext_id>
 
-# 5. Deploy realm (wait for step 4 to complete first)
-gh workflow run deploy-mundus.yml \
-  -f descriptor=deployment-descriptors/test-mundus-layered.yml \
-  -f deploy_mode=upgrade \
-  -f canister=both \
-  -f realm=agora \
-  -f extensions=<ext_id>
+# 5. Install it on the realm (see "Fast Remote Extension Deploy" below for the direct call),
+#    or for a fresh full realm, the rollout's active arrangement reinstalls every extension.
 ```
 
 ### `deploy-files.yml` Parameters
@@ -162,12 +134,12 @@ Takes ~5 minutes. The version file determines the current version; the workflow 
 
 ## Casals — On-Chain Deploy & Upgrade (preferred path)
 
-> **Always use the Casals path whenever possible.** This means `publish-build.yml` /
-> `publish-main.yml` to publish artifacts and `rollout.yml` (or `realms rollout`)
-> to deploy them. The legacy `deploy-infra`/`deploy-files`/`deploy-mundus` workflows
-> exist only for anything Casals does not yet cover (mainly: the initial infra
-> bootstrap and new-realm provisioning while `provision_via_casals` is still off).
-> When in doubt, use Casals.
+> **Casals is the deploy path.** Use `publish-build.yml` to publish artifacts (a semver
+> release with `-f version=X.Y.Z`, or a main snapshot with `-f from_main=true`) and
+> `rollout.yml` (or `realms rollout`) to deploy them. `deploy-files.yml` is still used
+> alongside this — it's how extension/codex bundles get into `file_registry` for the
+> rollout's arrangement to install. (The old `deploy-mundus`/`deploy-infra` descriptor
+> workflows have been removed.)
 
 Casals is an **on-chain orchestrator** that owns the realm canisters and upgrades
 them for us. Instead of an off-chain CI job installing WASMs, Casals pulls the
@@ -181,14 +153,12 @@ There are exactly **two steps**:
 2. **Rollout** — tell Casals to upgrade (or reinstall) the chosen canisters to a
    published version.
 
-This path **coexists** with the legacy `deploy-infra`/`deploy-files`/`deploy-mundus`
-path. Pick per environment (see "Coexistence" below). **Casals is deployed and
-wired on all three environments** (`test`, `demo`, `staging`): each one's realm and
-infra canisters are registered in Casals and have `[Casals, CycleOps]` as their
-only controllers. Provisioning of new realms still flows through the legacy path
-until the installer's `provision_via_casals` flag is turned on per environment
-(default off) — but publishing builds and rolling out upgrades already go through
-Casals everywhere.
+**Casals is deployed and wired on all three environments** (`test`, `demo`, `staging`):
+each one's realm and infra canisters are registered in Casals and have `[Casals,
+CycleOps]` as their only controllers. Publishing builds and rolling out upgrades go
+through Casals everywhere. New-realm *provisioning* still has a dormant off-chain code
+path in the installer (gated by `provision_via_casals`, default off), but it is not
+wired to any active workflow.
 
 ### How Casals organizes things
 
@@ -234,9 +204,9 @@ For day-to-day work on `main`, you do **not** need to cut a semver release. Publ
 the current checkout and roll out with `-v main`:
 
 ```bash
-# CI: runs automatically on push to main (realm/infra source paths) → test
-# Or trigger manually:
-gh workflow run publish-main.yml -f environment=test -f family=realm -f component=both
+# Trigger manually (same workflow as a release, with from_main):
+gh workflow run publish-build.yml -f environment=test -f family=realm \
+  -f component=both -f from_main=true
 
 # Locally
 python3 scripts/publish_build.py --environment test --family realm \
@@ -341,15 +311,13 @@ These are also in `_CASALS_IDS` (`cli/realms/cli/commands/rollout.py`) and
   controller list, call Casals' admin-only `set_canister_controllers` (it refuses to
   drop Casals from the list unless you pass `force`).
 
-### Coexistence with the legacy path
+### Catalog / self-service upgrade interaction
 
-- The installer flag `provision_via_casals` (per environment, default off) decides
-  whether that environment provisions via Casals or the legacy off-chain deployer.
 - Rollout **never** touches the realm version catalog, so it can't interfere with
-  the legacy self-service upgrade path.
+  the in-realm self-service upgrade path.
 - Publish Build only updates the catalog when `--update-catalog` is set, so by
-  default it won't feed a legacy-mode env a `fileregistry://` URL it can't use.
-- `release.yml`, `deploy-mundus.yml`, etc. are untouched.
+  default it won't feed an env a `fileregistry://` URL it can't use.
+- `release.yml` (semver release artifacts) is independent of rollout.
 
 ### Casals gotchas
 
@@ -371,37 +339,33 @@ These are also in `_CASALS_IDS` (`cli/realms/cli/commands/rollout.py`) and
    hashing skipped, local sha256 passed in). The one-shot `finalize_chunked_file`
    blows the 40 B-instruction limit (`IC0522`) on multi-MB WASMs — don't switch back.
 
-`publish-main.yml` runs automatically on every push to `main` that touches realm/
-infra source, publishing a `main.<ts>.<sha>` snapshot to **test**. Watch that run
-after merging; it is the live check that the publish path still works.
-
 See `docs/reference/CASALS_ROLLOUT.md` for the full runbook (migrating a realm,
 authorization model, cycle budget).
 
 ---
 
-## Full Platform Re-deployment
+## Full Platform Re-deployment (clean reinstall via Casals)
 
-Run sequentially: **deploy-infra → deploy-files → deploy-mundus**
-
-Each stage must complete before the next. Within a stage, environments can run in parallel.
+Reinstalling the whole orchestra is three stages. Each stage completes before the next.
 
 ```bash
-# Stage 1: Infra
-gh workflow run deploy-infra.yml -f environment=test -f deploy_mode=upgrade
-gh workflow run deploy-infra.yml -f environment=demo -f deploy_mode=upgrade
-gh workflow run deploy-infra.yml -f environment=staging -f deploy_mode=upgrade
+# Stage 1: Publish all artifacts (realm + infra) from main into the env's registry+catalog
+gh workflow run publish-build.yml -f environment=test -f family=realm -f component=both -f from_main=true -f update_catalog=true
+# repeat per family as needed: installer, registry, dashboard, marketplace, file-registry
 
-# Stage 2: Files (after infra completes)
+# Stage 2: Publish extension/codex bundles into file_registry
 gh workflow run deploy-files.yml -f environment=test -f scope=all
-gh workflow run deploy-files.yml -f environment=demo -f scope=all
-gh workflow run deploy-files.yml -f environment=staging -f scope=all
 
-# Stage 3: Mundus (after files completes)
-gh workflow run deploy-mundus.yml -f descriptor=deployment-descriptors/test-mundus-layered.yml -f deploy_mode=reinstall -f canister=both
-gh workflow run deploy-mundus.yml -f descriptor=deployment-descriptors/demo-mundus-layered.yml -f deploy_mode=reinstall -f canister=both
-gh workflow run deploy-mundus.yml -f descriptor=deployment-descriptors/staging-mundus-layered.yml -f deploy_mode=reinstall -f canister=both
+# Stage 3: Reinstall via Casals, then the seeded arrangement reinstalls extensions/codices
+#          and applies runtime config. (reinstall WIPES state — intentional for a clean slate.)
+gh workflow run rollout.yml \
+  -f environments=test -f targets=all -f scope=both \
+  -f mode=reinstall -f version=main -f include_infra_reinstall=true
 ```
+
+The active arrangement (seeded via `casals-upgrade.yml` `-f seed_arrangement=...` from
+`casals-config/arrangements/`) is what reinstalls extensions/codices and applies runtime
+flags after the canisters come up. Use `test-lite` for a fast single-realm iteration.
 
 ---
 
@@ -564,9 +528,9 @@ The first fixes the color panic, the second suppresses the plaintext identity wa
 
 ## Gotchas
 
-1. **deploy-files `environment` must match target.** Publishing to `staging` (default) won't be visible to `demo` or `test` realms.
-2. **Any change inside `extensions/` (including manifest.json edits) requires `deploy-files` before `deploy-mundus`.** The mundus workflow installs extensions from the file registry — if you skip `deploy-files`, the registry still has stale manifests/bundles and the deploy will use old data. Always: `deploy-files` → wait for green → `deploy-mundus`.
-3. **Agora is prone to timeouts.** Retry a single failed realm: `-f realm=agora`.
+1. **`deploy-files` `environment` must match target.** Publishing to `staging` (default) won't be visible to `demo` or `test` realms.
+2. **Any change inside `extensions/` (including manifest.json edits) requires `deploy-files` before installing.** Extensions are pulled from the file registry — if you skip `deploy-files`, the registry still has stale manifests/bundles and the install uses old data. Always: `deploy-files` → wait for green → install / rollout.
+3. **Agora is prone to timeouts.** Retry a single failed realm: `-f targets=agora`.
 4. **`reinstall` wipes all state.** Use `upgrade` unless you want a clean slate.
 5. **Frontend bundles are built by CI.** The `deploy-files` workflow runs `realms files build` to compile `frontend-rt/` sources before publishing. No need to commit `dist/index.js`.
 
@@ -574,14 +538,13 @@ The first fixes the color panic, the second suppresses the plaintext identity wa
 
 ## Rules
 
-- **Casals is always the preferred deploy path.** For any realm/infra backend or frontend change, use `publish-build.yml` / `publish-main.yml` + `rollout.yml`. Fall back to the legacy `deploy-*` workflows only when Casals does not cover the operation (e.g. first-time infra bootstrap, or new-realm provisioning before `provision_via_casals` is enabled).
+- **Casals is the deploy path.** For any realm/infra backend or frontend change, use `publish-build.yml` (`from_main=true` for snapshots, or `version=X.Y.Z` for releases) + `rollout.yml`. Use `deploy-files.yml` to publish extension/codex bundles into the file registry.
 - **Visually verify every UI change before reporting back.** After deploying a frontend or extension change, open the page in the browser and confirm the result matches the requirements. Do not report completion until you have checked the deployed page yourself. If the visual check reveals issues, fix and redeploy in a loop until the result is correct.
 - Do not commit unless explicitly told to do so.
-- Always use `deploy_mode=upgrade` for production/test deploys.
-- Always scope deploys as narrowly as possible:
-  - **Realm:** `-f realm=agora` — deploy one realm, not all.
-  - **Canister:** `-f canister=frontend` or `-f canister=backend` — skip the half you didn't change.
-  - **Extensions/codices:** `-f extensions=voting,vault` or `-f codices=dominion` — deploy only what changed. Use `none` to skip entirely.
+- Always use `mode=upgrade` for production/test deploys (`reinstall` wipes state).
+- Always scope rollouts as narrowly as possible:
+  - **Target:** `-f targets=agora` — roll out one realm, not `all-realms`.
+  - **Scope:** `-f scope=frontend` or `-f scope=backend` — skip the half you didn't change.
 - The dfx identity is `deployer`. Use `dfx identity use <name>` to switch.
 - **Monitor every workflow you trigger.** After launching a workflow, watch it until it goes green. If it fails, diagnose the error, fix it, re-push, and re-trigger — repeat until the run succeeds. Never leave a red workflow behind.
 

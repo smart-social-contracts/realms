@@ -1,7 +1,8 @@
 # rollout.yml — upgrade/reinstall realm + infra canisters across environments
 # via Casals (manually triggered).
 #
-# Publish artifacts first with publish-build.yml (semver) or publish-main.yml (main branch).
+# Publish artifacts first with publish-build.yml — a semver release (-f version=X.Y.Z)
+# or a main-branch snapshot (-f from_main=true).
 
 name: Rollout
 

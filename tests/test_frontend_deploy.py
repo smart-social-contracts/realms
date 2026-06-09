@@ -356,11 +356,15 @@ class TestCIInstallerPipeline:
         assert "deploy-dashboard-staging" not in text
         assert "_deploy-dashboard.yml" not in text
 
-    def test_deploy_mundus_uses_queue_deployment(self):
+    def test_ci_main_staging_uses_casals_rollout(self):
+        # The staging deploy migrated off the deprecated deploy-mundus descriptor
+        # flow onto the Casals path (publish-build + rollout).
+        ci_main = REPO_ROOT / ".github" / "workflows" / "ci-main.yml"
+        text = ci_main.read_text()
+        assert "deploy-mundus.yml" not in text
+        assert "realms rollout" in text
         mundus = REPO_ROOT / ".github" / "workflows" / "deploy-mundus.yml"
-        text = mundus.read_text()
-        assert "request_deployment.py" in text
-        assert "upgrade_installer" not in text
+        assert not mundus.exists(), "deploy-mundus.yml should be deleted"
 
 
 if __name__ == "__main__":

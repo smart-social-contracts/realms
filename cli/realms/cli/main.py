@@ -653,7 +653,7 @@ def rollout(
       # Preview upgrading all realms' backends in test
       realms rollout -e test -t all-realms -s backend
 
-      # Roll out the latest main-branch snapshot (after publish-main)
+      # Roll out the latest main-branch snapshot (after publish-build --from-main)
       realms rollout -e test -t all-realms -s both -v main --execute
 
       # Upgrade just Agora's backend in test (upgrade mode)

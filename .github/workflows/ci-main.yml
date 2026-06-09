@@ -57,10 +57,61 @@ jobs:
         if: always()
         run: dfx stop || true
 
-  # ── Staging deploy (runs in parallel with e2e) ──────────────────────────────
+  # ── Staging deploy via Casals (runs in parallel with e2e) ───────────────────
+  # Publishes the realm artifacts from this checkout into staging's file_registry
+  # + Casals catalog (as a main.<ts>.<sha> snapshot), then rolls staging's realms
+  # out via Casals. This is the Casals path (publish-build + rollout); it replaces
+  # the deprecated deploy-mundus descriptor flow.
   deploy-staging:
-    uses: ./.github/workflows/deploy-mundus.yml
-    with:
-      descriptor: deployment-descriptors/staging-mundus-layered.yml
-    secrets:
-      IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install dfx
+        run: |
+          DFX_VERSION=0.32.0
+          curl -fsSL "https://github.com/dfinity/sdk/releases/download/${DFX_VERSION}/dfx-${DFX_VERSION}-x86_64-linux.tar.gz" -o /tmp/dfx.tar.gz
+          tar -xzf /tmp/dfx.tar.gz -C /usr/local/bin
+          rm /tmp/dfx.tar.gz
+          dfx --version
+      - name: Install realms CLI + build deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e cli/
+      - name: Configure dfx identity (Casals CI key)
+        env:
+          CASALS_CI_PEM: ${{ secrets.CASALS_CI_PEM }}
+          IC_IDENTITY_PEM: ${{ secrets.IC_IDENTITY_PEM }}
+        run: |
+          PEM="${CASALS_CI_PEM:-$IC_IDENTITY_PEM}"
+          if [ -z "$PEM" ]; then
+            echo "::error::Neither CASALS_CI_PEM nor IC_IDENTITY_PEM is set." >&2
+            exit 1
+          fi
+          printf '%s' "$PEM" > /tmp/identity.pem
+          chmod 600 /tmp/identity.pem
+          dfx identity import ci /tmp/identity.pem --storage-mode=plaintext --force
+          dfx identity use ci
+          rm -f /tmp/identity.pem
+          echo "DFX_WARNING=-mainnet_plaintext_identity" >> "$GITHUB_ENV"
+      - name: Publish realm artifacts (from main) to staging
+        run: |
+          python3 scripts/publish_build.py \
+            --environment staging --family realm --component both \
+            --from-main --update-catalog --identity ci
+      - name: Roll out staging realms via Casals
+        run: |
+          realms rollout \
+            --environments staging --targets all-realms \
+            --scope both --mode upgrade --version main \
+            --identity ci --execute --yes

@@ -335,12 +335,11 @@ managed in Casals for visibility / lifecycle).
 Authorized WASM keys follow `\<family\>-backend@\<version\>` and
 `\<family\>-assets@\<version\>` — exactly what Rollout resolves.
 
-**Main-branch snapshots (no release):** use `.github/workflows/publish-main.yml`
-(or `publish_build.py --from-main`). Each publish gets a unique label
-`main.<unix_ts>.<git_sha>`. Roll out with `realms rollout -v main` (or
-`rollout.yml` with `version=main`) to pick the newest main snapshot. Push to
-`main` auto-publishes realm/infra source changes to **test** (when Casals exists
-there). `-v latest` still means the newest **semver** release, not main.
+**Main-branch snapshots (no release):** use `publish-build.yml` with
+`from_main=true` (or `publish_build.py --from-main`). Each publish gets a unique
+label `main.<unix_ts>.<git_sha>`. Roll out with `realms rollout -v main` (or
+`rollout.yml` with `version=main`) to pick the newest main snapshot. `-v latest`
+still means the newest **semver** release, not main.
 
 ### Step B — Rollout (`.github/workflows/rollout.yml` / `realms rollout`)
 
