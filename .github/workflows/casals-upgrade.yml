@@ -263,8 +263,12 @@ jobs:
           def cid(key):
               return ((ids.get(key) or {}).get(env) or "").strip()
 
+          casals_backend = cid("casals_backend")
           backend = cid("file_registry")
           frontend = cid("file_registry_frontend")
+          if not casals_backend:
+              print(f"::warning::no casals_backend id for {env}; skipping settings sync")
+              sys.exit(0)
           if not backend:
               print(f"::warning::no file_registry id for {env}; skipping settings sync")
               sys.exit(0)
@@ -281,7 +285,7 @@ jobs:
           try:
               subprocess.run(
                   [
-                      "icp", "canister", "call", "casals_backend", "set_settings",
+                      "icp", "canister", "call", casals_backend, "set_settings",
                       "--args-file", args_file, "--args-format", "candid",
                       "-e", "ic", "--identity", "casals-ci",
                   ],
