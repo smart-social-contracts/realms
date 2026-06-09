@@ -1,0 +1,58 @@
+{
+  "$comment": "Realms orchestra sheet: the desired topology (Sections > Stands > Canisters) for this project's Casals-managed canisters. Each canister references an authorized WASM by `wasm_key` (bare family => latest authorized version). deploy_sheet reconciles by NAME: a stand/canister whose name matches one already registered in Casals reuses that canister (and its bound canister_id) instead of creating a new one — so the names here MUST match the live registrations (see get_tree). Scope: the 3 demo realms + the Casals-deployed infra (installer, realm-registry). Intentionally EXCLUDED: transient provisioning scaffolding (provtest*, casalspilot*), and externally-managed/registered-only infra that Casals does not install (file-registry, marketplace, token, nft, platform-dashboard) — those are registered for reference, not deployed from this sheet. The authorized-WASM catalog itself is managed by publish-build.yml, not here. Regenerate/verify against `icp canister call <casals> get_tree`.",
+  "name": "realms",
+  "description": "Realms test-environment orchestra: a Deployments section with one stand per demo realm (Dominion, Agora, Syntropia), each a realm backend + certified-assets frontend; and an Infra section with the Casals-deployed installer and realm-registry.",
+  "sections": [
+    {
+      "name": "Deployments",
+      "description": "The demo realms. One stand per realm, each running a realm backend canister plus its certified-assets frontend canister. Post-deploy configuration (runtime flags, identity, codex + extension installs) is applied by the environment's Casals arrangement (see ../arrangements), not by the sheet.",
+      "stands": [
+        {
+          "name": "dominion",
+          "description": "Dominion realm: algorithmic/technocratic-governance demo.",
+          "canisters": [
+            { "name": "dominion-backend", "wasm_key": "realm-backend", "kind": "backend" },
+            { "name": "dominion-frontend", "wasm_key": "realm-assets", "kind": "frontend" }
+          ]
+        },
+        {
+          "name": "agora",
+          "description": "Agora realm: direct-democracy / membership-dues demo.",
+          "canisters": [
+            { "name": "agora-backend", "wasm_key": "realm-backend", "kind": "backend" },
+            { "name": "agora-frontend", "wasm_key": "realm-assets", "kind": "frontend" }
+          ]
+        },
+        {
+          "name": "syntropia",
+          "description": "Syntropia realm: adaptive protocol-based-governance demo.",
+          "canisters": [
+            { "name": "syntropia-backend", "wasm_key": "realm-backend", "kind": "backend" },
+            { "name": "syntropia-frontend", "wasm_key": "realm-assets", "kind": "frontend" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Infra",
+      "description": "Shared infrastructure that Casals deploys for this project. Externally-managed/registered-only canisters (file-registry, marketplace, token, nft, platform-dashboard) are intentionally omitted — they are registered with Casals for reference but not installed from this sheet.",
+      "stands": [
+        {
+          "name": "installer",
+          "description": "Installer backend.",
+          "canisters": [
+            { "name": "installer", "wasm_key": "installer-backend", "kind": "backend" }
+          ]
+        },
+        {
+          "name": "realm-registry",
+          "description": "Realm registry backend + its certified-assets frontend.",
+          "canisters": [
+            { "name": "registry-backend", "wasm_key": "registry-backend", "kind": "backend" },
+            { "name": "registry-frontend", "wasm_key": "registry-assets", "kind": "frontend" }
+          ]
+        }
+      ]
+    }
+  ]
+}

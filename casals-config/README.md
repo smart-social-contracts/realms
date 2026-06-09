@@ -11,7 +11,8 @@ casals-config/
   arrangements/         # post-deploy config overlays applied by Casals
     test.json           #   full fidelity: 3 realms × identity/codex/~28 ext (93 steps)
     test-lite.json      #   fast iteration: 1 realm (Dominion) + 5 core ext (8 steps)
-  sheets/               # orchestra topology (reserved; see note below)
+  sheets/               # orchestra topology
+    realms.json         #   3 realms (Dominion/Agora/Syntropia) + Casals-deployed infra
   _gen_test_arrangement.py   # regenerates the arrangements from the realm manifests
 ```
 
@@ -44,8 +45,21 @@ casals/scripts/seed.py -e ic --identity <id> \
 `templates/`, `assets/`) from here instead of the engine's in-repo `seed/`. The
 `casals-upgrade.yml` workflow does this automatically when given `seed_arrangement`.
 
-## Sheets (topology) — note
+## Sheets (topology)
 
-The live realms topology was built ad-hoc on-chain rather than from a curated sheet
-file, so `sheets/` is reserved for a future export/authoring of the realms orchestra
-sheet. The authorized-WASM **catalog** stays managed by `publish-build.yml`, not here.
+A *sheet* is the desired orchestra: `Sections > Stands > Canisters`, each canister
+referencing an authorized WASM by `wasm_key` (a bare family resolves to the latest
+authorized version). `sheets/realms.json` captures this project's Casals-managed
+topology: the 3 demo realms (`Deployments`) plus the installer and realm-registry
+(`Infra`).
+
+`deploy_sheet` reconciles **by name**: a stand/canister whose name matches one already
+registered in Casals reuses that canister (and its bound `canister_id`) instead of
+creating a new one. So the names here mirror the live registrations (`get_tree`) exactly
+— regenerate/verify against `icp canister call <casals> get_tree` if the topology changes.
+
+Intentionally **excluded** from the sheet: transient provisioning scaffolding
+(`provtest*`, `casalspilot*`), and externally-managed/registered-only infra
+(file-registry, marketplace, token, nft, platform-dashboard) that Casals registers for
+reference but does not install. The authorized-WASM **catalog** stays managed by
+`publish-build.yml`, not here.
