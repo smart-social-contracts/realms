@@ -4467,3 +4467,40 @@ def install_codex_from_registry(args: text) -> Async[text]:
     except Exception as e:
         logger.error(f"install_codex_from_registry error: {e}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+@require(Operations.REALM_ADMIN)
+def install_branding_from_registry(args: text) -> Async[text]:
+    """Pull per-realm branding images (logo, background) from the file registry
+    and upload them to the realm's frontend asset canister so they are served
+    same-origin (e.g. /custom/logo.png) after a reinstall.
+
+    Args (JSON): {
+        "registry_canister_id": str,
+        "namespace": str,                       (default "branding")
+        "files": { "<asset_key>": "<registry_path>" },
+            e.g. {"/custom/logo.png": "dominion/logo.png",
+                  "/custom/background.png": "dominion/background.png"}
+        "frontend_canister_id": str|null        (overrides Realm entity value)
+    }
+    """
+    try:
+        params = json.loads(args)
+        registry_id = params.get("registry_canister_id")
+        namespace = params.get("namespace") or "branding"
+        files_map = params.get("files") or {}
+        frontend_id = params.get("frontend_canister_id") or _get_frontend_canister_id()
+
+        if not registry_id:
+            return json.dumps({"success": False, "error": "registry_canister_id is required"})
+        if not files_map:
+            return json.dumps({"success": False, "error": "files is required"})
+
+        from api.file_registry import install_branding_from_registry as _install
+
+        result = yield from _install(registry_id, namespace, files_map, frontend_id)
+        return result
+    except Exception as e:
+        logger.error(f"install_branding_from_registry error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})

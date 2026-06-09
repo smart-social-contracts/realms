@@ -1,5 +1,5 @@
 {
-  "$comment": "Full-fidelity test-environment arrangement for the realms mundus, applied AFTER a sheet deploy/reinstall to bring the 3 demo realms (Dominion, Agora, Syntropia) up fully configured and usable. Per realm, in order: (1) set_canister_config_json \u2014 runtime test flags + file_registry/frontend/marketplace ids (config that used to be baked in at build time); (2) update_realm_config \u2014 name/manifesto/welcome (identity that used to come from the baked manifest.json); (3) install_codex_from_registry \u2014 the realm's codex; (4..n) install_extension_from_registry for every extension in the realm's manifest. demo_simulator auto-generates rich personas on its schedule from the runtime demo_data flag (step order matters). Targets are raw canister ids from realms/deployment-descriptors/test-mundus-layered.yml. Apply in batches (apply_arrangement offset/limit) \u2014 ~93 steps. Regenerate via casals-config/_gen_test_arrangement.py.",
+  "$comment": "Full-fidelity test-environment arrangement for the realms mundus, applied AFTER a sheet deploy/reinstall to bring the 3 demo realms (Dominion, Agora, Syntropia) up fully configured and usable. Per realm, in order: (1) set_canister_config_json \u2014 runtime test flags + file_registry/frontend/marketplace ids (config that used to be baked in at build time); (2) update_realm_config \u2014 name/manifesto/welcome (identity that used to come from the baked manifest.json); (3) install_codex_from_registry \u2014 the realm's codex; (4..n) install_extension_from_registry for every extension in the realm's manifest. demo_simulator auto-generates rich personas on its schedule from the runtime demo_data flag (step order matters). Targets are raw canister ids from realms/deployment-descriptors/test-mundus-layered.yml. Apply in batches (apply_arrangement offset/limit) \u2014 ~96 steps. Regenerate via casals-config/_gen_test_arrangement.py.",
   "name": "test",
   "description": "Realms test environment: per-realm runtime flags + identity + codex + full extension set (demo_simulator auto-seeds personas).",
   "active": true,
@@ -44,6 +44,19 @@
         "name": "Dominion",
         "manifesto": "A projection of where the world is likely heading: centralized, technocratic governance where algorithms, surveillance, and simulated consent replace genuine democratic agency.",
         "welcome_message": "Welcome to Dominion. Efficient governance through algorithmic oversight. Your compliance ensures collective prosperity."
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_branding_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "namespace": "branding",
+        "frontend_canister_id": "2enu3-byaaa-aaaad-qlxfa-cai",
+        "files": {
+          "/custom/logo.png": "dominion/logo.png",
+          "/custom/background.png": "dominion/background.png"
+        }
       }
     },
     {
@@ -334,6 +347,19 @@
         "name": "Agora",
         "manifesto": "A direct democracy funded by monthly membership dues. Citizens verify their identity via ZK passport and pay monthly bills to stay active. Active members submit and vote on proposals to change the codex code, fund services, or redistribute wealth as social welfare. Every transaction is recorded in real-time double-entry accounting.",
         "welcome_message": "Welcome to Agora! Join our transparent, participatory community where every citizen has a voice and governance serves the people."
+      }
+    },
+    {
+      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "method": "install_branding_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "namespace": "branding",
+        "frontend_canister_id": "pqwsi-vyaaa-aaaau-agrbq-cai",
+        "files": {
+          "/custom/logo.png": "agora/logo.png",
+          "/custom/background.png": "agora/background.png"
+        }
       }
     },
     {
@@ -633,6 +659,19 @@
         "name": "Syntropia",
         "manifesto": "A possible evolutionary future enabled by smart social contracts and Realms GOS, where governance becomes protocol-based, adaptive, and freely chosen through a competitive ecosystem of AI-powered governors.",
         "welcome_message": "Welcome to Syntropia. Experience adaptive, protocol-based governance where AI-powered systems compete to serve your evolving needs."
+      }
+    },
+    {
+      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "method": "install_branding_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "namespace": "branding",
+        "frontend_canister_id": "2dmsp-maaaa-aaaad-qlxfq-cai",
+        "files": {
+          "/custom/logo.png": "syntropia/logo.png",
+          "/custom/background.png": "syntropia/background.png"
+        }
       }
     },
     {

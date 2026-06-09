@@ -23,6 +23,7 @@ from .commands.marketplace import (
 from .commands.mundus import mundus_deploy_descriptor_command, mundus_deploy_new_command
 from .commands.files import (
     files_build_command,
+    files_publish_branding_command,
     files_publish_command,
     files_publish_release_command,
     files_reset_command,
@@ -707,6 +708,26 @@ def files_publish(
     codex_names = [s.strip() for s in codices_filter.split(",") if s.strip()] if codices_filter else None
     files_publish_command(network, registry, identity, extensions_only, codices_only,
                           extension_names=ext_names, codex_names=codex_names)
+
+
+@files_app.command("publish-branding")
+def files_publish_branding(
+    network: str = typer.Option(
+        "staging", "--network", "-n", help="Target network: staging, demo, test"
+    ),
+    registry: Optional[str] = typer.Option(
+        None, "--registry", "-r", help="File registry canister ID (auto-resolved from network)"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="dfx identity to use"
+    ),
+    realms_filter: str = typer.Option(
+        "", "--realms", help="Specific realms to publish branding for, comma-separated (default: all)"
+    ),
+) -> None:
+    """Publish per-realm branding images (logo, background) to the file registry."""
+    realm_names = [s.strip() for s in realms_filter.split(",") if s.strip()] if realms_filter else None
+    files_publish_branding_command(network, registry, identity, realm_names=realm_names)
 
 
 @files_app.command("publish-release")

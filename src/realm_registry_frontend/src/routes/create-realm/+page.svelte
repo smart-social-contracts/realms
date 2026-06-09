@@ -148,18 +148,22 @@
     try {
       const { buildRealmDeploymentManifest } = await import('$lib/deployment-manifest.js');
       const { getAuthenticatedRegistryActor } = await import('$lib/canisters.js');
-      const { uploadBrandingFiles } = await import('$lib/branding-upload.js');
+      const { uploadBrandingFiles, brandingNamespaceFor } = await import('$lib/branding-upload.js');
 
-      let brandingUrls = {};
+      let branding = null;
       if (formData.logo || formData.background) {
-        brandingUrls = await uploadBrandingFiles({
+        // Upload branding straight from the browser into the file_registry
+        // canister (signed by the user's II) — fully decentralized, no server.
+        branding = await uploadBrandingFiles({
           logo: formData.logo,
           background: formData.background,
+          namespace: brandingNamespaceFor(formData.name),
+          fileRegistryCanisterId: CONFIG.file_registry_canister_id,
         });
       }
 
       const manifest = await buildRealmDeploymentManifest(
-        formData, CONFIG.default_deploy_queue_network, brandingUrls,
+        formData, CONFIG.default_deploy_queue_network, branding,
       );
       const manifestJson = JSON.stringify(manifest);
 

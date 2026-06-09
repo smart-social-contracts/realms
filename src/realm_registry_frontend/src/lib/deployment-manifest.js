@@ -66,10 +66,13 @@ async function buildArtifactRefs(tag) {
  *
  * @param {object} formData - create-realm wizard state
  * @param {string} network - e.g. staging, demo
- * @param {{ logo?: string, background?: string }} [brandingUrls]
- *   URLs returned by uploadBrandingFiles (deploy service).
+ * @param {{ file_registry_canister_id: string, namespace: string,
+ *           files: Record<string,string> }} [branding]
+ *   Registry descriptor returned by uploadBrandingFiles (decentralized upload).
+ *   Consumed by the realm_installer, which calls the realm backend's
+ *   install_branding_from_registry to serve the images at /custom/.
  */
-export async function buildRealmDeploymentManifest(formData, network, brandingUrls) {
+export async function buildRealmDeploymentManifest(formData, network, branding) {
   const name = (formData.name || '').trim();
   const lang = (formData.languages && formData.languages[0]) || 'en';
 
@@ -120,10 +123,13 @@ export async function buildRealmDeploymentManifest(formData, network, brandingUr
     ...(canister_artifacts && { canister_artifacts }),
   };
 
-  const branding = {};
-  if (brandingUrls?.logo) branding.logo = brandingUrls.logo;
-  if (brandingUrls?.background) branding.background = brandingUrls.background;
-  if (Object.keys(branding).length > 0) manifest.branding = branding;
+  if (branding?.namespace && branding?.files && Object.keys(branding.files).length > 0) {
+    manifest.branding = {
+      file_registry_canister_id: branding.file_registry_canister_id || '',
+      namespace: branding.namespace,
+      files: branding.files,
+    };
+  }
 
   return manifest;
 }

@@ -236,6 +236,75 @@ def files_publish_command(
     console.print("\n[bold green]File registry publish complete.[/bold green]")
 
 
+_BRANDING_NAMESPACE = "branding"
+_BRANDING_FILES = ("logo.png", "background.png")
+
+
+def files_publish_branding_command(
+    network: str,
+    registry: Optional[str] = None,
+    identity: Optional[str] = None,
+    realm_names: Optional[list[str]] = None,
+):
+    """Publish per-realm branding images (logo.png, background.png) to the file
+    registry under the ``branding`` namespace at ``<realm>/<file>``.
+
+    Source images live in each realm's manifest directory (e.g.
+    ``examples/demo/realm1/`` → realm name read from its ``manifest.json``).
+    The realm backend later pulls these via ``install_branding_from_registry``
+    (driven by the env's Casals arrangement) and serves them at /custom/.
+    """
+    reg = _resolve_registry(network, registry)
+    root = _find_project_root()
+    demo_root = root / "examples" / "demo"
+
+    if not demo_root.is_dir():
+        console.print(f"[red]Demo realms directory not found: {demo_root}[/red]")
+        raise typer.Exit(1)
+
+    realm_dirs = sorted([
+        d for d in demo_root.iterdir()
+        if d.is_dir() and (d / "manifest.json").exists()
+    ])
+
+    wanted = {n.lower() for n in realm_names} if realm_names else None
+    existing = _fetch_namespace_hashes(reg, _BRANDING_NAMESPACE, network, identity)
+
+    published = 0
+    for d in realm_dirs:
+        try:
+            manifest = json.loads((d / "manifest.json").read_text())
+        except (OSError, json.JSONDecodeError) as e:
+            console.print(f"[yellow]  Skipping {d.name}: bad manifest.json ({e})[/yellow]")
+            continue
+        realm_key = str(manifest.get("name", d.name)).strip().lower()
+        if not realm_key:
+            console.print(f"[yellow]  Skipping {d.name}: no realm name in manifest[/yellow]")
+            continue
+        if wanted is not None and realm_key not in wanted:
+            continue
+
+        console.print(f"\n[bold]Branding for '{realm_key}' → {reg}:{_BRANDING_NAMESPACE}/{realm_key}/[/bold]")
+        for fname in _BRANDING_FILES:
+            local = d / fname
+            if not local.exists():
+                console.print(f"  [dim]⊘ {fname} not present, skipping[/dim]")
+                continue
+            registry_path = f"{realm_key}/{fname}"
+            r = _upload_one_file(
+                reg, _BRANDING_NAMESPACE, registry_path, str(local),
+                network, identity, existing,
+            )
+            if r == "failed":
+                console.print(f"[red]  ✗ failed to publish {registry_path}[/red]")
+                raise typer.Exit(1)
+            if r == "uploaded":
+                published += 1
+
+    _publish_namespace(reg, _BRANDING_NAMESPACE, network, identity)
+    console.print(f"\n[bold green]Branding publish complete ({published} file(s) uploaded).[/bold green]")
+
+
 def _sha256_file(path: str) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as f:

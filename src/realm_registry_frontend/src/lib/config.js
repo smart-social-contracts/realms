@@ -15,8 +15,20 @@ export const CONFIG = {
   default_deploy_queue_network: viteEnv.VITE_DEPLOY_QUEUE_NETWORK || 'staging',
   /** GitHub release tag for realm canister artifacts (WASM + frontend tarball). */
   deploy_release_tag: viteEnv.VITE_DEPLOY_RELEASE_TAG || 'v0.4.0',
-  /** Base URL of the deploy service (branding upload, etc.). */
+  /** Base URL of the deploy service (legacy; no longer used for branding). */
   deploy_service_url: viteEnv.VITE_DEPLOY_SERVICE_URL || 'https://deploy.realmsgos.dev',
+  /**
+   * file_registry canister the wizard uploads branding directly to (decentralized,
+   * browser → canister, no server). Resolved per deploy-queue network, overridable
+   * via VITE_FILE_REGISTRY_CANISTER_ID. Keep in sync with cli .../commands/files.py.
+   */
+  file_registry_canister_id:
+    viteEnv.VITE_FILE_REGISTRY_CANISTER_ID ||
+    ({
+      staging: 'iebdk-kqaaa-aaaau-agoxq-cai',
+      demo: 'vi64l-3aaaa-aaaae-qj4va-cai',
+      test: 'uq2mu-kaaaa-aaaah-avqcq-cai',
+    }[viteEnv.VITE_DEPLOY_QUEUE_NETWORK || 'staging'] || ''),
 };
 
 export const DEV_PORT = 8000;

@@ -140,7 +140,25 @@ def build_steps(realms, ext_filter=None):
                 "welcome_message": r["welcome_message"],
             },
         })
-        # 3. The realm's codex package.
+        # 3. Per-realm branding: pull logo + background from the file registry
+        #    (namespace "branding", <realm>/<file>) and upload them to the
+        #    realm's frontend asset canister at /custom/ so they survive a
+        #    reinstall (the asset canister is wiped on reinstall). Publish the
+        #    source images first: `realms files publish-branding --network test`.
+        steps.append({
+            "target": be,
+            "method": "install_branding_from_registry",
+            "args": {
+                "registry_canister_id": FILE_REGISTRY,
+                "namespace": "branding",
+                "frontend_canister_id": r["frontend"],
+                "files": {
+                    "/custom/logo.png": r["codex"] + "/logo.png",
+                    "/custom/background.png": r["codex"] + "/background.png",
+                },
+            },
+        })
+        # 4. The realm's codex package.
         steps.append({
             "target": be,
             "method": "install_codex_from_registry",
@@ -151,7 +169,7 @@ def build_steps(realms, ext_filter=None):
                 "run_init": True,
             },
         })
-        # 4..n. Every extension from the realm manifest. demo_simulator (in the
+        # 5..n. Every extension from the realm manifest. demo_simulator (in the
         #       list) auto-activates persona generation from the runtime
         #       demo_data flag set in step 1.
         for ext in extensions:

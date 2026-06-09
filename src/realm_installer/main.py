@@ -486,6 +486,39 @@ def schedule_registration(job_id_val: str):
                 else:
                     jlog(job_id_val).info(f"set_canister_config: file_registry={fr_id}, marketplace={mp_id}")
 
+            # Per-realm branding: the wizard uploaded the user's logo/background
+            # straight into the file_registry (decentralized, signed by the
+            # user's II). Tell the realm backend to pull them and serve them at
+            # /custom/ on the frontend asset canister. manifest.branding maps
+            # 1:1 onto install_branding_from_registry's args.
+            branding = manifest.get("branding") or {}
+            b_files = branding.get("files") or {}
+            b_ns = (branding.get("namespace") or "").strip()
+            b_reg = (branding.get("file_registry_canister_id") or fr_id or "").strip()
+            if backend_id and frontend_id and b_files and b_ns and b_reg:
+                try:
+                    br_args = {
+                        "registry_canister_id": b_reg,
+                        "namespace": b_ns,
+                        "files": b_files,
+                        "frontend_canister_id": frontend_id,
+                    }
+                    br_json = json.dumps(br_args).replace('\\', '\\\\').replace('"', '\\"')
+                    br_arg = '("' + br_json + '")'
+                    br_result: CallResult = yield ic.call_raw(
+                        Principal.from_str(backend_id), "install_branding_from_registry",
+                        ic.candid_encode(br_arg), 0,
+                    )
+                    if isinstance(br_result, dict) and "Err" in br_result:
+                        jlog(job_id_val).error(f"install_branding_from_registry failed: {br_result['Err']}")
+                    else:
+                        jlog(job_id_val).info(f"branding installed from registry: ns={b_ns}")
+                        # Surface the user's logo in the realm directory listing.
+                        if "/custom/logo.png" in b_files:
+                            logo = f"https://{frontend_id}.icp0.io/custom/logo.png"
+                except Exception as br_err:
+                    jlog(job_id_val).error(f"install_branding_from_registry error: {br_err}")
+
             # Store admin invite hash if present in manifest
             admin_invite_hash = realm_info.get("admin_invite_hash", "")
             if admin_invite_hash and backend_id:
