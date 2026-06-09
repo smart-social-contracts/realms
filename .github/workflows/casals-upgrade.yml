@@ -246,6 +246,53 @@ jobs:
             --mode "${{ inputs.mode }}" \
             -y
 
+      # Point this env's Casals at the Realms file_registry backend + browse UI.
+      - name: Sync file registry settings
+        if: success()
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+        working-directory: casals
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess, sys, tempfile
+
+          env = os.environ["ENVIRONMENT"].strip()
+          with open("../realms/canister_ids.json") as f:
+              ids = json.load(f)
+
+          def cid(key):
+              return ((ids.get(key) or {}).get(env) or "").strip()
+
+          backend = cid("file_registry")
+          frontend = cid("file_registry_frontend")
+          if not backend:
+              print(f"::warning::no file_registry id for {env}; skipping settings sync")
+              sys.exit(0)
+
+          payload = json.dumps({
+              "file_registry_canister_id": backend,
+              **({"file_registry_frontend_canister_id": frontend} if frontend else {}),
+          })
+          escaped = payload.replace("\\", "\\\\").replace('"', '\\"')
+          with tempfile.NamedTemporaryFile(mode="w", suffix=".candid", delete=False) as tmp:
+              tmp.write(f'("{escaped}")')
+              args_file = tmp.name
+
+          try:
+              subprocess.run(
+                  [
+                      "icp", "canister", "call", "casals_backend", "set_settings",
+                      "--args-file", args_file, "--args-format", "candid",
+                      "-e", "ic", "--identity", "casals-ci",
+                  ],
+                  check=True,
+              )
+          finally:
+              os.unlink(args_file)
+
+          print(f"synced file_registry settings for {env}: backend={backend} frontend={frontend or '(none)'}")
+          PY
+
       # ---- Seed the environment's arrangement (optional) ----------------------
       # An environment maps 1:1 to its Casals instance, whose active arrangement
       # IS that environment's post-deploy config (runtime params + extension/
