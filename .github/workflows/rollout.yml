@@ -54,7 +54,10 @@ env:
 jobs:
   rollout:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # A full multi-canister reinstall re-uploads every frontend bundle (~20 min
+    # per 100+ file certified-assets bundle) and then applies the environment
+    # arrangement, so a whole-sheet reinstall easily exceeds the old 30 min cap.
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
 
