@@ -268,33 +268,70 @@ def _upgrade_backend(action: dict, identity: Optional[str]) -> tuple[bool, str]:
     return True, f"hash {(res.get('wasm_hash') or '')[:16]}"
 
 
-def _apply_env_arrangement(casals: str, identity: Optional[str]) -> tuple[bool, str]:
-    """Apply an environment's active arrangement on its own Casals.
+# Steps applied per apply_arrangement call. Each step is an inter-canister call
+# (some are heavy, e.g. extension installs), so keep the per-message batch small
+# to stay within a single update's instruction budget. The loop below walks the
+# arrangement to completion across as many batches as needed.
+_ARRANGEMENT_BATCH = 4
+_ARRANGEMENT_MAX_BATCHES = 500
 
-    Empty args => the active arrangement, which IS that environment's post-deploy
-    configuration (runtime parameters + extension/codex installs). Steps are
-    best-effort and idempotent, so re-applying after a reinstall converges the
+
+def _apply_env_arrangement(casals: str, identity: Optional[str]) -> tuple[bool, str]:
+    """Apply an environment's active arrangement on its own Casals, in batches.
+
+    The active arrangement IS that environment's post-deploy configuration
+    (runtime parameters + extension/codex installs). A long arrangement can
+    exceed one message's instruction budget, so this walks it `_ARRANGEMENT_BATCH`
+    steps per call, advancing `offset` to the returned `next_offset` until `done`.
+    Steps are best-effort and idempotent, so re-applying converges the
     environment to its ready-to-use state.
     """
-    res = _casals_update(casals, "apply_arrangement", {}, identity)
-    if not res.get("ok", False):
-        err = res.get("error", str(res))
-        # An environment with no arrangement is a valid state, not a failure.
-        if "no active arrangement" in err.lower():
-            return True, "no active arrangement (skipped)"
-        # apply_arrangement's summary can be too large/nested for the candid
-        # text unescaper, so json parsing fails even though it ran. Recover the
-        # top-level applied/failed counts from the raw text before giving up.
-        m_app = re.search(r'"applied":\s*(\d+)', err)
-        m_fail = re.search(r'"failed":\s*(\d+)', err)
-        if m_app and m_fail:
-            applied, failed = int(m_app.group(1)), int(m_fail.group(1))
-            return failed == 0, f"applied {applied}, failed {failed}"
-        return False, err
-    name = res.get("arrangement", "?")
-    applied = res.get("applied", 0)
-    failed = res.get("failed", 0)
-    return failed == 0, f"'{name}': {applied} applied, {failed} failed"
+    offset = 0
+    total_applied = 0
+    total_failed = 0
+    steps_total: Optional[int] = None
+    for _ in range(_ARRANGEMENT_MAX_BATCHES):
+        res = _casals_update(
+            casals, "apply_arrangement",
+            {"offset": offset, "limit": _ARRANGEMENT_BATCH}, identity,
+        )
+        if not res.get("ok", False):
+            err = res.get("error", str(res))
+            # An environment with no arrangement is a valid state, not a failure.
+            if "no active arrangement" in err.lower():
+                return True, "no active arrangement (skipped)"
+            # A batch summary can still defeat the candid text unescaper; recover
+            # the progress fields from the raw text before giving up.
+            m_app = re.search(r'"applied":\s*(\d+)', err)
+            m_fail = re.search(r'"failed":\s*(\d+)', err)
+            m_next = re.search(r'"next_offset":\s*(\d+)', err)
+            m_done = re.search(r'"done":\s*(true|false)', err)
+            if m_app and m_fail and m_next and m_done:
+                total_applied += int(m_app.group(1))
+                total_failed += int(m_fail.group(1))
+                offset = int(m_next.group(1))
+                if m_done.group(1) == "true":
+                    break
+                continue
+            return False, err
+        total_applied += int(res.get("applied", 0) or 0)
+        total_failed += int(res.get("failed", 0) or 0)
+        if res.get("steps_total") is not None:
+            steps_total = int(res["steps_total"])
+        new_offset = int(res.get("next_offset", offset) or offset)
+        # Done, or the cursor stopped advancing (older backend with no batch
+        # fields ran everything in one shot, or there is nothing left).
+        if res.get("done") or new_offset <= offset:
+            break
+        offset = new_offset
+    else:
+        return False, (
+            f"did not finish after {_ARRANGEMENT_MAX_BATCHES} batches "
+            f"(reached step {offset})"
+        )
+    tot = f"/{steps_total}" if steps_total is not None else ""
+    detail = f"applied {total_applied}, failed {total_failed} ({offset}{tot} steps)"
+    return total_failed == 0, detail
 
 
 def rollout_command(
