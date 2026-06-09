@@ -51,7 +51,7 @@ on:
         type: boolean
         default: false
       seed_arrangement:
-        description: "Optional: after deploy, seed+activate this environment's arrangement (seed/arrangements/<name>.json) into Casals. Blank = skip. Requires 'backend' in components."
+        description: "Optional: after deploy, seed+activate this environment's arrangement (casals-config/arrangements/<name>.json, realms-owned) into Casals. Blank = skip. Requires 'backend' in components."
         required: false
         type: string
         default: ""
@@ -251,11 +251,17 @@ jobs:
       # IS that environment's post-deploy config (runtime params + extension/
       # codex installs). --arrangement-only upserts/activates just that
       # arrangement; it never touches the authorized-WASM catalog or the sheet.
+      #
+      # The arrangement JSON is realms-owned: it lives in this repo under
+      # casals-config/ (not in the Casals engine), and seed.py reads it via
+      # --config-dir. We run the engine's seeder from the built `casals` checkout
+      # (it carries this env's resolved .icp ids), pointed at realms/casals-config.
       - name: Seed environment arrangement
         if: ${{ inputs.seed_arrangement != '' && success() }}
         working-directory: casals
         run: |
           python3 scripts/seed.py -e ic --identity casals-ci \
+            --config-dir "${{ github.workspace }}/realms/casals-config" \
             --arrangement "${{ inputs.seed_arrangement }}" --arrangement-only
 
       - name: Report deployed canisters
