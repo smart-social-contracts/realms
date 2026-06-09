@@ -22,6 +22,7 @@ on:
           - all
           - extensions-only
           - codices-only
+          - branding-only
 
       extensions:
         description: "Specific extensions to publish, comma-separated (leave blank for all)"
@@ -122,6 +123,7 @@ jobs:
             --identity ci
 
       - name: Publish to file registry
+        if: ${{ inputs.scope != 'branding-only' }}
         run: |
           ARGS=(
             --network "${{ inputs.environment }}"
@@ -139,6 +141,13 @@ jobs:
             ARGS+=(--codices "${{ inputs.codices }}")
           fi
           realms files publish "${ARGS[@]}"
+
+      - name: Publish branding to file registry
+        if: ${{ inputs.scope == 'all' || inputs.scope == 'branding-only' }}
+        run: |
+          realms files publish-branding \
+            --network "${{ inputs.environment }}" \
+            --identity ci
 
       - name: Review
         run: |
