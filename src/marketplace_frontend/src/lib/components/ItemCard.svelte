@@ -1,40 +1,38 @@
-<script lang="ts">
-  import VerifiedBadge from './VerifiedBadge.svelte';
-  import LikeButton from './LikeButton.svelte';
-  import RankBadge from './RankBadge.svelte';
-  import { categories, formatCount, formatPrice, shortPrincipal } from '$lib/format';
-
-  export let kind: 'ext' | 'codex' | 'assistant';
-  export let id: string;
-  export let name: string;
-  export let description: string;
-  export let version: string;
-  export let developer: string;
-  export let icon: string = '';
-  export let priceE8s: number = 0;
-  export let installs: number = 0;
-  export let likes: number = 0;
-  export let categoriesStr: string = '';
-  export let verificationStatus: string = 'unverified';
-  export let liked: boolean = false;
-  export let rank: number | null = null;
-  export let href: string;
+<script lang="ts">import { _ } from "svelte-i18n";
+import VerifiedBadge from "./VerifiedBadge.svelte";
+import LikeButton from "./LikeButton.svelte";
+import ItemIcon from "./ItemIcon.svelte";
+import { categories, developerLabel, formatCount, formatPrice, looksLikePrincipal } from "$lib/format";
+export let kind;
+export let id;
+export let name;
+export let description;
+export let version;
+export let developer;
+export let icon = "";
+export let priceE8s = 0;
+export let installs = 0;
+export let likes = 0;
+export let categoriesStr = "";
+export let verificationStatus = "unverified";
+export let liked = false;
+export let href;
 </script>
 
 <a class="card" {href}>
   <div class="row top">
-    {#if rank != null}
-      <RankBadge {rank} />
-    {/if}
-    <div class="icon">{icon || (kind === 'codex' ? '📜' : kind === 'assistant' ? '🤖' : '🧩')}</div>
+    <div class="icon"><ItemIcon {icon} {kind} /></div>
     <div class="title-block">
       <div class="title-line">
         <h3>{name}</h3>
-        <VerifiedBadge status={verificationStatus} />
       </div>
-      <p class="meta">v{version} · {shortPrincipal(developer)}</p>
+      <p class="meta">
+        <span>v{version}</span>
+        <span class="dot">·</span>
+        <span class="dev" class:mono={looksLikePrincipal(developer)}>{$_('card.by')} {developerLabel(developer)}</span>
+      </p>
     </div>
-    <div class="price-badge" class:free={priceE8s === 0}>{formatPrice(priceE8s)}</div>
+    <div class="price-badge">{priceE8s ? formatPrice(priceE8s) : $_('card.free')}</div>
   </div>
 
   <p class="description">{description}</p>
@@ -48,7 +46,12 @@
   {/if}
 
   <div class="row footer">
-    <span class="stat" title="Installs">⬇ {formatCount(installs)}</span>
+    <div class="footer-left">
+      <VerifiedBadge status={verificationStatus} />
+      {#if installs > 0}
+        <span class="stat">{$_('card.installs', { values: { count: formatCount(installs) } })}</span>
+      {/if}
+    </div>
     <LikeButton {kind} itemId={id} {liked} count={likes} />
   </div>
 </a>
@@ -80,17 +83,23 @@
     background: var(--surface-2);
     display: flex; align-items: center; justify-content: center;
     font-size: 1.4rem; flex-shrink: 0;
+    color: var(--text);
   }
+  .icon .ti { font-size: 1.5rem; line-height: 1; }
   .title-block { flex: 1; min-width: 0; }
   .title-line { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
   h3 { margin: 0; font-size: 1rem; font-weight: 600; color: var(--text); }
-  .meta { margin: 2px 0 0; font-size: 0.75rem; color: var(--text-faint); font-family: monospace; }
+  .meta {
+    margin: 3px 0 0; font-size: 0.75rem; color: var(--text-faint);
+    display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;
+  }
+  .meta .dot { color: var(--border-strong); }
+  .meta .dev.mono { font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; }
   .price-badge {
     background: var(--surface-2); color: var(--text-muted);
     padding: 0.3rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600;
     flex-shrink: 0; align-self: center;
   }
-  .price-badge.free { background: var(--verified-bg); color: var(--verified); }
   .description {
     margin: 0; font-size: 0.85rem; color: var(--text-muted); line-height: 1.55;
     display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2;
@@ -103,5 +112,6 @@
     font-size: 0.7rem; text-transform: capitalize;
   }
   .footer { justify-content: space-between; padding-top: 0.5rem; border-top: 1px solid var(--surface-2); }
-  .stat { color: var(--text-faint); font-size: 0.8rem; font-family: monospace; }
+  .footer-left { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+  .stat { color: var(--text-faint); font-size: 0.8rem; }
 </style>

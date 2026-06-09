@@ -1,112 +1,144 @@
-<script lang="ts">
-  import ItemCard from '$lib/components/ItemCard.svelte';
-  import Spinner from '$lib/components/Spinner.svelte';
-  import { isAuthenticated } from '$lib/auth';
-  import { marketplaceClient, type CodexListing } from '$lib/marketplace-client';
-
-  type SortKey = 'newest' | 'installs' | 'likes';
-
-  let items: CodexListing[] = [];
-  let total = 0;
-  let page = 1;
-  let perPage = 24;
-  let loading = true;
-  let error = '';
-  let searchQuery = '';
-  let verifiedOnly = false;
-  let sortBy: SortKey = 'newest';
-  let likedSet = new Set<string>();
-
-  $: void load(page, perPage, verifiedOnly);
-  $: void refreshLikes($isAuthenticated);
-  $: sorted = applySort(items, sortBy);
-
-  function applySort(list: CodexListing[], key: SortKey): CodexListing[] {
-    const copy = [...list];
-    if (key === 'installs') {
-      copy.sort((a, b) => b.installs - a.installs || b.likes - a.likes);
-    } else if (key === 'likes') {
-      copy.sort((a, b) => b.likes - a.likes || b.installs - a.installs);
+<script lang="ts">import { onMount } from "svelte";
+import { browser } from "$app/environment";
+import { goto } from "$app/navigation";
+import { page as pageStore } from "$app/stores";
+import { _ } from "svelte-i18n";
+import ItemCard from "$lib/components/ItemCard.svelte";
+import SkeletonCard from "$lib/components/SkeletonCard.svelte";
+import { isAuthenticated } from "$lib/auth";
+import { marketplaceClient } from "$lib/marketplace-client";
+let items = [];
+let total = 0;
+let page = 1;
+let perPage = 24;
+let loading = true;
+let error = "";
+let searchQuery = "";
+let verifiedOnly = false;
+let sortBy = "newest";
+let likedSet = new Set();
+let mounted = false;
+let lastUrlQ = "";
+onMount(() => {
+  const params = $pageStore.url.searchParams;
+  searchQuery = params.get("q") ?? "";
+  verifiedOnly = params.get("verified") === "1";
+  lastUrlQ = searchQuery;
+  mounted = true;
+});
+$: if (mounted) void load(page, perPage, verifiedOnly);
+$: if (mounted) adoptUrlQuery($pageStore.url.searchParams);
+$: void refreshLikes($isAuthenticated);
+function adoptUrlQuery(params) {
+  const q = params.get("q") ?? "";
+  if (q === lastUrlQ) return;
+  lastUrlQ = q;
+  searchQuery = q;
+  verifiedOnly = params.get("verified") === "1";
+  page = 1;
+  load(page, perPage, verifiedOnly);
+}
+function syncUrl() {
+  if (!browser) return;
+  const params = new URLSearchParams();
+  if (searchQuery.trim()) params.set("q", searchQuery.trim());
+  if (verifiedOnly) params.set("verified", "1");
+  const qs = params.toString();
+  lastUrlQ = searchQuery.trim();
+  goto(qs ? `/codices?${qs}` : "/codices", { replaceState: true, keepFocus: true, noScroll: true });
+}
+$: sorted = applySort(items, sortBy);
+function applySort(list, key) {
+  const copy = [...list];
+  if (key === "installs") {
+    copy.sort((a, b) => b.installs - a.installs || b.likes - a.likes);
+  } else if (key === "likes") {
+    copy.sort((a, b) => b.likes - a.likes || b.installs - a.installs);
+  } else if (key === "updated") {
+    copy.sort((a, b) => b.updated_at - a.updated_at);
+  } else {
+    copy.sort((a, b) => b.created_at - a.created_at);
+  }
+  return copy;
+}
+async function refreshLikes(_authed) {
+  if (!_authed) {
+    likedSet = new Set();
+    return;
+  }
+  try {
+    const my = await marketplaceClient.myLikes();
+    likedSet = new Set(my.filter((m) => m.item_kind === "codex").map((m) => `codex|${m.item_id}`));
+  } catch {
+    likedSet = new Set();
+  }
+}
+async function load(p, pp, v) {
+  loading = true;
+  error = "";
+  try {
+    if (searchQuery.trim()) {
+      items = await marketplaceClient.searchCodices(searchQuery.trim(), v);
+      total = items.length;
     } else {
-      copy.sort((a, b) => b.updated_at - a.updated_at);
+      const r = await marketplaceClient.listCodices(p, pp, v);
+      items = r.listings;
+      total = r.total_count;
     }
-    return copy;
+  } catch (e) {
+    error = e?.message ?? String(e);
+    items = [];
+    total = 0;
+  } finally {
+    loading = false;
   }
-
-  async function refreshLikes(_authed: boolean) {
-    if (!_authed) {
-      likedSet = new Set();
-      return;
-    }
-    try {
-      const my = await marketplaceClient.myLikes();
-      likedSet = new Set(my.filter((m) => m.item_kind === 'codex').map((m) => `codex|${m.item_id}`));
-    } catch {
-      likedSet = new Set();
-    }
-  }
-
-  async function load(p: number, pp: number, v: boolean) {
-    loading = true;
-    error = '';
-    try {
-      if (searchQuery.trim()) {
-        items = await marketplaceClient.searchCodices(searchQuery.trim(), v);
-        total = items.length;
-      } else {
-        const r = await marketplaceClient.listCodices(p, pp, v);
-        items = r.listings;
-        total = r.total_count;
-      }
-    } catch (e: any) {
-      error = e?.message ?? String(e);
-      items = [];
-      total = 0;
-    } finally {
-      loading = false;
-    }
-  }
-
-  function doSearch() {
-    page = 1;
-    load(page, perPage, verifiedOnly);
-  }
+}
+function doSearch() {
+  page = 1;
+  syncUrl();
+  load(page, perPage, verifiedOnly);
+}
 </script>
 
 <header class="head">
-  <h1>Codices</h1>
-  <p>Governance frameworks and rule packages for realm types — Dominion, Agora, Syntropia and beyond.</p>
+  <h1>{$_('codices.title')}</h1>
+  <p>{$_('codices.subtitle')}</p>
 </header>
 
 <div class="controls">
   <input
     type="search"
-    placeholder="Search codices…"
+    placeholder={$_('codices.search_placeholder')}
     bind:value={searchQuery}
     on:keydown={(e) => e.key === 'Enter' && doSearch()}
   />
-  <button class="btn" on:click={doSearch}>Search</button>
+  <button class="btn" on:click={doSearch}>{$_('nav.search')}</button>
   <label class="sort">
-    Sort
+    {$_('sort.label')}
     <select bind:value={sortBy}>
-      <option value="newest">Newest</option>
-      <option value="installs">Most installs</option>
-      <option value="likes">Most likes</option>
+      <option value="newest">{$_('sort.newest')}</option>
+      <option value="updated">{$_('sort.recently_updated')}</option>
+      <option value="installs">{$_('sort.most_installs')}</option>
+      <option value="likes">{$_('sort.most_likes')}</option>
     </select>
   </label>
   <label class="verified-toggle">
-    <input type="checkbox" bind:checked={verifiedOnly} />
-    Verified only
+    <input type="checkbox" bind:checked={verifiedOnly} on:change={syncUrl} />
+    {$_('filter.verified_only')}
   </label>
 </div>
 
 {#if loading}
-  <div class="state"><Spinner /></div>
+  <div class="grid">
+    {#each Array(8) as _}
+      <SkeletonCard />
+    {/each}
+  </div>
 {:else if error}
-  <div class="state error">⚠️ {error}</div>
+  <div class="state error">{$_('codices.load_error', { values: { error } })}</div>
 {:else if sorted.length === 0}
   <div class="state empty">
-    <p>No codices found. <a href="/upload">Upload one →</a></p>
+    <p>{$_('codices.empty')} <a href="/upload">{$_('codices.empty_action')}</a></p>
   </div>
 {:else}
   <div class="grid">

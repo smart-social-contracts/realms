@@ -1,144 +1,150 @@
-<script lang="ts">
-  import { page } from '$app/stores';
-  import LikeButton from '$lib/components/LikeButton.svelte';
-  import Spinner from '$lib/components/Spinner.svelte';
-  import VerifiedBadge from '$lib/components/VerifiedBadge.svelte';
-  import { isAuthenticated, principalStore } from '$lib/auth';
-  import {
-    fileRegistryBaseUrl,
-    fileUrl,
-    listFiles,
-    type RegistryFile,
-  } from '$lib/file-registry-client';
-  import { marketplaceClient, type AssistantListing } from '$lib/marketplace-client';
-  import { categories, formatCount, formatPrice, formatTimeAgo, shortPrincipal } from '$lib/format';
-
-  type Tab = 'overview' | 'files';
-
-  let item: AssistantListing | null = null;
-  let loading = true;
-  let error = '';
-  let files: RegistryFile[] = [];
-  let filesError = '';
-  let liked = false;
-  let purchased = false;
-  let busy = false;
-  let busyAudit = false;
-  let auditMsg = '';
-  let activeTab: Tab = 'overview';
-
-  $: id = decodeURIComponent($page.params.id);
-  $: void load(id);
-  $: void refreshLikes($isAuthenticated, id);
-  $: void refreshPurchased($isAuthenticated, $principalStore?.toText() ?? null, id);
-
-  async function load(assistantId: string) {
-    loading = true;
-    error = '';
-    try {
-      item = await marketplaceClient.getAssistantDetails(assistantId);
-      filesError = '';
-      if (item.file_registry_canister_id && item.file_registry_namespace) {
-        try {
-          files = await listFiles(item.file_registry_canister_id, item.file_registry_namespace);
-        } catch (e: any) {
-          filesError = e?.message ?? String(e);
-        }
+<script lang="ts">import { page } from "$app/stores";
+import { _ } from "svelte-i18n";
+import LikeButton from "$lib/components/LikeButton.svelte";
+import Spinner from "$lib/components/Spinner.svelte";
+import VerifiedBadge from "$lib/components/VerifiedBadge.svelte";
+import ItemIcon from "$lib/components/ItemIcon.svelte";
+import { isAuthenticated, principalStore } from "$lib/auth";
+import {
+  fileRegistryBaseUrl,
+  fileUrl,
+  listFiles
+} from "$lib/file-registry-client";
+import { marketplaceClient } from "$lib/marketplace-client";
+import { categories, formatCount, formatPrice, formatTimeAgo, shortPrincipal } from "$lib/format";
+let item = null;
+let loading = true;
+let error = "";
+let files = [];
+let filesError = "";
+let liked = false;
+let purchased = false;
+let busy = false;
+let busyAudit = false;
+let auditMsg = "";
+let activeTab = "overview";
+let showInstallGuide = false;
+$: id = decodeURIComponent($page.params.id);
+$: void load(id);
+$: void refreshLikes($isAuthenticated, id);
+$: void refreshPurchased($isAuthenticated, $principalStore?.toText() ?? null, id);
+async function load(assistantId) {
+  loading = true;
+  error = "";
+  try {
+    item = await marketplaceClient.getAssistantDetails(assistantId);
+    filesError = "";
+    if (item.file_registry_canister_id && item.file_registry_namespace) {
+      try {
+        files = await listFiles(item.file_registry_canister_id, item.file_registry_namespace);
+      } catch (e) {
+        filesError = e?.message ?? String(e);
       }
-    } catch (e: any) {
-      error = e?.message ?? String(e);
-      item = null;
-    } finally {
-      loading = false;
     }
+  } catch (e) {
+    error = e?.message ?? String(e);
+    item = null;
+  } finally {
+    loading = false;
   }
-
-  async function refreshLikes(_a: boolean, assistantId: string) {
-    if (!_a) { liked = false; return; }
-    try {
-      const principal = $principalStore?.toText();
-      if (!principal) return;
-      liked = await marketplaceClient.hasLiked(principal, 'assistant', assistantId);
-    } catch { liked = false; }
+}
+async function refreshLikes(_a, assistantId) {
+  if (!_a) {
+    liked = false;
+    return;
   }
-
-  async function refreshPurchased(_a: boolean, principal: string | null, assistantId: string) {
-    if (!_a || !principal) { purchased = false; return; }
-    try {
-      purchased = await marketplaceClient.hasPurchasedAssistant(principal, assistantId);
-    } catch { purchased = false; }
+  try {
+    const principal = $principalStore?.toText();
+    if (!principal) return;
+    liked = await marketplaceClient.hasLiked(principal, "assistant", assistantId);
+  } catch {
+    liked = false;
   }
-
-  async function doHire() {
-    if (!item || busy) return;
-    busy = true;
-    try {
-      await marketplaceClient.buyAssistant(item.assistant_id);
-      purchased = true;
-      item = await marketplaceClient.getAssistantDetails(item.assistant_id);
-    } catch (e: any) {
-      alert(`Hire failed: ${e?.message ?? e}`);
-    } finally { busy = false; }
+}
+async function refreshPurchased(_a, principal, assistantId) {
+  if (!_a || !principal) {
+    purchased = false;
+    return;
   }
-
-  async function doRequestAudit() {
-    if (!item || busyAudit) return;
-    busyAudit = true;
-    auditMsg = '';
-    try {
-      await marketplaceClient.requestAudit('assistant', item.assistant_id);
-      auditMsg = '✅ Audit requested. Smart Social Contracts will review.';
-      item = await marketplaceClient.getAssistantDetails(item.assistant_id);
-    } catch (e: any) {
-      auditMsg = `⚠️ ${e?.message ?? e}`;
-    } finally { busyAudit = false; }
+  try {
+    purchased = await marketplaceClient.hasPurchasedAssistant(principal, assistantId);
+  } catch {
+    purchased = false;
   }
-
-  async function doDelist() {
-    if (!item) return;
-    if (!confirm(`Delist '${item.assistant_id}'? It will be removed from listings and rankings.`)) return;
-    try {
-      await marketplaceClient.delistAssistant(item.assistant_id);
-      auditMsg = '✅ Delisted.';
-      item = null;
-      setTimeout(() => { window.location.href = '/assistants'; }, 800);
-    } catch (e: any) {
-      auditMsg = `⚠️ Could not delist: ${e?.message ?? e}`;
-    }
+}
+async function doHire() {
+  if (!item || busy) return;
+  busy = true;
+  try {
+    await marketplaceClient.buyAssistant(item.assistant_id);
+    purchased = true;
+    item = await marketplaceClient.getAssistantDetails(item.assistant_id);
+  } catch (e) {
+    alert($_("detail.hire_failed", { values: { error: e?.message ?? e } }));
+  } finally {
+    busy = false;
   }
-
-  function isOwner(): boolean {
-    return Boolean(item && $principalStore && $principalStore.toText() === item.developer);
+}
+async function doRequestAudit() {
+  if (!item || busyAudit) return;
+  busyAudit = true;
+  auditMsg = "";
+  try {
+    await marketplaceClient.requestAudit("assistant", item.assistant_id);
+    auditMsg = $_("detail.audit_requested");
+    item = await marketplaceClient.getAssistantDetails(item.assistant_id);
+  } catch (e) {
+    auditMsg = `${e?.message ?? e}`;
+  } finally {
+    busyAudit = false;
   }
+}
+async function doDelist() {
+  if (!item) return;
+  if (!confirm($_("detail.delist_confirm", { values: { id: item.assistant_id } }))) return;
+  try {
+    await marketplaceClient.delistAssistant(item.assistant_id);
+    auditMsg = $_("detail.delisted");
+    item = null;
+    setTimeout(() => {
+      window.location.href = "/assistants";
+    }, 800);
+  } catch (e) {
+    auditMsg = $_("detail.could_not_delist", { values: { error: e?.message ?? e } });
+  }
+}
+function isOwner() {
+  return Boolean(item && $principalStore && $principalStore.toText() === item.developer);
+}
 </script>
 
-<a class="back" href="/assistants">← Back to assistants</a>
+<a class="back" href="/assistants">{$_('detail.back_assistants')}</a>
 
 {#if loading}
   <div class="state"><Spinner size={32} /></div>
 {:else if error || !item}
-  <div class="state error">⚠️ {error || 'Not found'}</div>
+  <div class="state error">{error || $_('detail.not_found')}</div>
 {:else}
   <article class="detail">
     <header>
-      <div class="icon-large">{item.icon || '🤖'}</div>
+      <div class="icon-large"><ItemIcon icon={item.icon} kind="assistant" /></div>
       <div class="title-block">
         <div class="title-row">
           <h1>{item.name}</h1>
           <VerifiedBadge status={item.verification_status} size="md" />
         </div>
         <p class="meta">
-          v{item.version} · by <code>{shortPrincipal(item.developer)}</code> · updated {formatTimeAgo(item.updated_at)}
-          {#if item.runtime} · runtime: <code>{item.runtime}</code>{/if}
+          v{item.version} · {$_('card.by')} <code>{shortPrincipal(item.developer)}</code> · {$_('detail.updated', { values: { time: formatTimeAgo(item.updated_at) } })}
+          {#if item.runtime} · {$_('detail.runtime_badge', { values: { value: item.runtime } })}{/if}
         </p>
         <div class="badges">
-          <span class="badge">⬇ {formatCount(item.installs)} hires</span>
-          <span class="badge">💲 {formatPrice(item.price_e8s)}</span>
+          <span class="badge">{$_('detail.hires', { values: { count: formatCount(item.installs) } })}</span>
+          <span class="badge">{item.price_e8s ? formatPrice(item.price_e8s) : $_('card.free')}</span>
           {#if item.pricing_summary}
             <span class="badge muted-badge">{item.pricing_summary}</span>
           {/if}
           {#if item.base_model}
-            <span class="badge model">model: {item.base_model}</span>
+            <span class="badge model">{$_('detail.model_badge', { values: { value: item.base_model } })}</span>
           {/if}
           {#each categories(item.domains) as d}
             <span class="badge cat">{d.replace(/_/g, ' ')}</span>
@@ -149,9 +155,6 @@
         </div>
       </div>
       <div class="cta">
-        <button class="btn primary big" disabled={busy || purchased} on:click={doHire}>
-          {purchased ? '✓ Hired' : busy ? 'Working…' : 'Hire / Install'}
-        </button>
         <LikeButton kind="assistant" itemId={item.assistant_id} liked={liked} count={item.likes} />
       </div>
     </header>
@@ -163,42 +166,61 @@
         on:click={() => (activeTab = 'overview')}
         role="tab"
         aria-selected={activeTab === 'overview'}
-      >Overview</button>
+      >{$_('detail.overview')}</button>
       <button
         class="tab"
         class:active={activeTab === 'files'}
         on:click={() => (activeTab = 'files')}
         role="tab"
         aria-selected={activeTab === 'files'}
-      >Files {files.length ? `(${files.length})` : ''}</button>
+      >{$_('detail.files')} {files.length ? `(${files.length})` : ''}</button>
     </div>
 
     {#if activeTab === 'overview'}
       <section class="block" role="tabpanel">
-        <p class="description">{item.description || 'No description provided.'}</p>
+        <p class="description">{item.description || $_('detail.no_description')}</p>
 
-        <h3>Runtime &amp; endpoint</h3>
+        <div class="install-guide">
+          <button class="install-toggle" on:click={() => (showInstallGuide = !showInstallGuide)} aria-expanded={showInstallGuide}>
+            <i class="ti ti-user-plus" aria-hidden="true"></i>
+            {$_('detail.how_to_btn_hire')}
+            <i class="ti {showInstallGuide ? 'ti-chevron-up' : 'ti-chevron-down'} chevron" aria-hidden="true"></i>
+          </button>
+          {#if showInstallGuide}
+            <div class="install-body">
+              <p class="intro">{$_('detail.how_to_intro_assistant')}</p>
+              <ol>
+                <li>{$_('detail.how_to_step1')}</li>
+                <li>{$_('detail.how_to_step2')}</li>
+                <li>{$_('detail.how_to_step3')}</li>
+                <li>{$_('detail.how_to_step4')}</li>
+              </ol>
+              <p class="id-row"><span class="id-label">{$_('detail.how_to_id')}:</span> <code>{item.assistant_id}</code></p>
+            </div>
+          {/if}
+        </div>
+
+        <h3>{$_('detail.runtime_section')}</h3>
         <dl class="kv">
-          <dt>Runtime</dt><dd><code>{item.runtime || '(unspecified)'}</code></dd>
-          <dt>Endpoint</dt>
+          <dt>{$_('detail.runtime')}</dt><dd><code>{item.runtime || $_('detail.unspecified')}</code></dd>
+          <dt>{$_('detail.endpoint')}</dt>
           <dd>
             {#if item.endpoint_url}
               <code class="break">{item.endpoint_url}</code>
             {:else}
-              <span class="muted">(none — listing is metadata-only)</span>
+              <span class="muted">{$_('detail.endpoint_none')}</span>
             {/if}
           </dd>
-          <dt>Base model</dt><dd><code>{item.base_model || '(unspecified)'}</code></dd>
+          <dt>{$_('detail.base_model')}</dt><dd><code>{item.base_model || $_('detail.unspecified')}</code></dd>
         </dl>
 
-        <h3>Requested permissions</h3>
+        <h3>{$_('detail.req_perms')}</h3>
         <p class="muted small">
-          When a realm hires this assistant, it asks for the following role and operations.
-          The realm's hire-vote decides whether to grant them.
+          {$_('detail.perms_intro')}
         </p>
         <dl class="kv">
-          <dt>Role</dt><dd><code>{item.requested_role || '(none)'}</code></dd>
-          <dt>Operations</dt>
+          <dt>{$_('detail.role')}</dt><dd><code>{item.requested_role || $_('detail.role_none')}</code></dd>
+          <dt>{$_('detail.operations')}</dt>
           <dd>
             {#if item.requested_permissions}
               <ul class="perms">
@@ -207,25 +229,25 @@
                 {/each}
               </ul>
             {:else}
-              <span class="muted">(none declared — read-only assistant)</span>
+              <span class="muted">{$_('detail.ops_none')}</span>
             {/if}
           </dd>
         </dl>
 
         {#if item.training_data_summary}
-          <h3>Training data summary</h3>
+          <h3>{$_('detail.training_data')}</h3>
           <p class="prewrap">{item.training_data_summary}</p>
         {/if}
 
         {#if item.eval_report_url}
-          <h3>Audit / evaluation report</h3>
+          <h3>{$_('detail.eval_report')}</h3>
           <p>
-            <a class="link" href={item.eval_report_url} target="_blank" rel="noreferrer">Open report ↗</a>
+            <a class="link" href={item.eval_report_url} target="_blank" rel="noreferrer">{$_('detail.open_report')}</a>
           </p>
         {/if}
 
         {#if categories(item.categories).length > 0}
-          <h3>Categories</h3>
+          <h3>{$_('detail.categories')}</h3>
           <div class="badges">
             {#each categories(item.categories) as c}
               <span class="badge cat">{c.replace(/_/g, ' ')}</span>
@@ -236,14 +258,14 @@
     {:else if activeTab === 'files'}
       <section class="block" role="tabpanel">
         {#if !item.file_registry_canister_id || !item.file_registry_namespace}
-          <p class="muted">No file_registry namespace attached to this listing.</p>
+          <p class="muted">{$_('detail.no_namespace')}</p>
         {:else if filesError}
-          <p class="error">⚠️ Could not load files from registry: {filesError}</p>
+          <p class="error">{$_('detail.files_load_error', { values: { error: filesError } })}</p>
         {:else if files.length === 0}
-          <p class="muted">No files published in <code>{item.file_registry_namespace}</code> yet.</p>
+          <p class="muted">{$_('detail.no_files', { values: { namespace: item.file_registry_namespace } })}</p>
         {:else}
           <table class="files">
-            <thead><tr><th>Path</th><th>Size</th><th>Type</th><th></th></tr></thead>
+            <thead><tr><th>{$_('detail.col_path')}</th><th>{$_('detail.col_size')}</th><th>{$_('detail.col_type')}</th><th></th></tr></thead>
             <tbody>
               {#each files as f}
                 <tr>
@@ -251,15 +273,15 @@
                   <td>{formatBytes(f.size)}</td>
                   <td><code>{f.content_type}</code></td>
                   <td>
-                    <a class="link" href={fileUrl(item.file_registry_canister_id, item.file_registry_namespace, f.path)} target="_blank" rel="noreferrer">Open ↗</a>
+                    <a class="link" href={fileUrl(item.file_registry_canister_id, item.file_registry_namespace, f.path)} target="_blank" rel="noreferrer">{$_('detail.open')}</a>
                   </td>
                 </tr>
               {/each}
             </tbody>
           </table>
           <p class="muted small">
-            Served from <code>{item.file_registry_canister_id}</code>
-            (<a href={fileRegistryBaseUrl(item.file_registry_canister_id)} target="_blank" rel="noreferrer">registry root ↗</a>)
+            {$_('detail.served_from')} <code>{item.file_registry_canister_id}</code>
+            (<a href={fileRegistryBaseUrl(item.file_registry_canister_id)} target="_blank" rel="noreferrer">{$_('detail.registry_root')}</a>)
           </p>
         {/if}
       </section>
@@ -267,29 +289,28 @@
 
     {#if isOwner()}
       <section class="block owner">
-        <h2>Owner actions</h2>
+        <h2>{$_('detail.owner_actions')}</h2>
         <div class="owner-actions">
           <button class="btn" disabled={busyAudit} on:click={doRequestAudit}>
-            {busyAudit ? 'Working…' : 'Request audit'}
+            {busyAudit ? $_('detail.working') : $_('detail.request_audit')}
           </button>
-          <a class="btn" href={`/upload?prefill=${encodeURIComponent(item.assistant_id)}`}>Edit / new version</a>
-          <button class="btn danger" on:click={doDelist}>Delist</button>
+          <a class="btn" href={`/upload?prefill=${encodeURIComponent(item.assistant_id)}`}>{$_('detail.edit_new_version')}</a>
+          <button class="btn danger" on:click={doDelist}>{$_('detail.delist')}</button>
           {#if auditMsg}<span class="audit-msg">{auditMsg}</span>{/if}
         </div>
         {#if item.verification_notes}
-          <p class="audit-notes"><strong>Curator notes:</strong> {item.verification_notes}</p>
+          <p class="audit-notes"><strong>{$_('detail.curator_notes')}</strong> {item.verification_notes}</p>
         {/if}
       </section>
     {/if}
   </article>
 {/if}
 
-<script lang="ts" context="module">
-  function formatBytes(n: number): string {
-    if (n < 1024) return `${n} B`;
-    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-    return `${(n / (1024 * 1024)).toFixed(2)} MB`;
-  }
+<script lang="ts" context="module">function formatBytes(n) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+}
 </script>
 
 <style>
@@ -370,5 +391,23 @@
   .owner-actions a.btn { text-decoration: none; }
   .audit-msg { color: var(--text-muted); font-size: 0.85rem; }
   .audit-notes { margin-top: 0.85rem; background: var(--surface-2); padding: 0.75rem 1rem; border-radius: 0.5rem; }
+  /* Install guide */
+  .install-guide { margin-top: 1.5rem; border: 1px solid var(--border); border-radius: 0.6rem; overflow: hidden; }
+  .install-toggle {
+    display: flex; align-items: center; gap: 0.55rem;
+    width: 100%; padding: 0.8rem 1rem;
+    background: var(--surface-2); border: none;
+    color: var(--text-muted); font-size: 0.9rem; font-weight: 500;
+    cursor: pointer; text-align: left; transition: color 0.12s;
+  }
+  .install-toggle:hover { color: var(--text); }
+  .install-toggle .ti { font-size: 1rem; }
+  .install-toggle .chevron { margin-left: auto; }
+  .install-body { padding: 1rem 1.1rem 1.1rem; background: var(--surface); }
+  .install-body .intro { color: var(--text-muted); font-size: 0.875rem; margin: 0 0 0.85rem; line-height: 1.6; }
+  .install-body ol { margin: 0 0 1rem 1.2rem; padding: 0; color: var(--text-muted); font-size: 0.875rem; line-height: 1.8; }
+  .install-body .id-row { margin: 0; font-size: 0.85rem; }
+  .install-body .id-label { color: var(--text-faint); }
+  .install-body code { background: var(--surface-2); padding: 0.15rem 0.45rem; border-radius: 0.3rem; font-size: 0.85rem; user-select: all; }
   @media (max-width: 760px) { header { grid-template-columns: 1fr; } .cta { align-items: flex-start; } .kv { grid-template-columns: 1fr; } }
 </style>

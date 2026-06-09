@@ -1,26 +1,23 @@
-<script lang="ts">
-  /**
-   * Renders a small badge reflecting the verification status of a listing.
-   * Statuses come from the backend: unverified | pending_audit | verified | rejected
-   */
-  export let status: string = 'unverified';
-  export let size: 'sm' | 'md' = 'sm';
-
-  $: meta = (() => {
-    switch (status) {
-      case 'verified':
-        return { label: '✓ Verified', cls: 'verified' };
-      case 'pending_audit':
-        return { label: '⏳ Audit pending', cls: 'pending' };
-      case 'rejected':
-        return { label: '✗ Audit rejected', cls: 'rejected' };
-      default:
-        return { label: 'Unverified', cls: 'unverified' };
-    }
-  })();
+<script lang="ts">import { _ } from "svelte-i18n";
+export let status = "unverified";
+export let size = "sm";
+$: meta = (() => {
+  switch (status) {
+    case "verified":
+      return { label: $_("verified.verified"), cls: "verified" };
+    case "pending_audit":
+      return { label: $_("verified.pending"), cls: "pending" };
+    case "rejected":
+      return { label: $_("verified.rejected"), cls: "rejected" };
+    default:
+      return null;
+  }
+})();
 </script>
 
-<span class="badge {meta.cls} {size}">{meta.label}</span>
+{#if meta}
+  <span class="badge {meta.cls} {size}">{meta.label}</span>
+{/if}
 
 <style>
   .badge {
@@ -36,8 +33,7 @@
     white-space: nowrap;
   }
   .md { font-size: 0.8rem; height: 26px; padding: 4px 10px; }
-  .verified { background: var(--verified-bg); color: var(--verified); border-color: var(--verified); }
-  .pending { background: #FEF3C7; color: #92400E; border-color: #F59E0B; }
-  .rejected { background: #FEE2E2; color: #991B1B; border-color: #DC2626; }
-  .unverified { background: var(--surface-2); color: var(--text-muted); border-color: var(--border); }
+  .verified { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .pending { background: var(--surface); color: var(--text-muted); border-color: var(--border-strong); }
+  .rejected { background: var(--surface); color: var(--text-faint); border-color: var(--border); text-decoration: line-through; }
 </style>

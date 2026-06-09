@@ -46,3 +46,12 @@ export function shortPrincipal(p: string): string {
   if (!p || p.length < 16) return p;
   return `${p.slice(0, 5)}…${p.slice(-3)}`;
 }
+
+export function looksLikePrincipal(dev: string): boolean {
+  return /^[a-z0-9]{5}-[a-z0-9]+/.test(dev);
+}
+
+export function developerLabel(dev: string): string {
+  if (!dev) return '';
+  return looksLikePrincipal(dev) ? shortPrincipal(dev) : dev;
+}

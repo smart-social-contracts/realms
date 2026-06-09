@@ -1,125 +1,224 @@
-<script lang="ts">
-  import { onMount } from 'svelte';
-  import ItemCard from '$lib/components/ItemCard.svelte';
-  import Spinner from '$lib/components/Spinner.svelte';
-  import {
-    marketplaceClient,
-    type AssistantListing,
-    type CodexListing,
-    type ExtensionListing,
-  } from '$lib/marketplace-client';
-  import { isAuthenticated, principalStore } from '$lib/auth';
-
-  type Kind = 'ext' | 'codex' | 'assistant';
-  type Metric = 'downloads' | 'likes';
-
-  let kind: Kind = 'ext';
-  let metric: Metric = 'downloads';
-  let verifiedOnly = false;
-  let loading = true;
-  let error = '';
-  let items: (ExtensionListing | CodexListing | AssistantListing)[] = [];
-  let likedSet = new Set<string>();
-
-  $: void load(kind, metric, verifiedOnly);
-
-  // When auth state changes, refresh "my likes" so the heart shows correctly.
-  $: void refreshLikes($isAuthenticated, $principalStore?.toText());
-
-  async function refreshLikes(_authed: boolean, _principal: string | undefined) {
-    if (!_authed) {
-      likedSet = new Set();
-      return;
+<script lang="ts">import { onMount } from "svelte";
+import { browser } from "$app/environment";
+import { goto } from "$app/navigation";
+import { page } from "$app/stores";
+import { _ } from "svelte-i18n";
+import ItemCard from "$lib/components/ItemCard.svelte";
+import SkeletonCard from "$lib/components/SkeletonCard.svelte";
+import InfoTip from "$lib/components/InfoTip.svelte";
+import { categories as parseCategories } from "$lib/format";
+import {
+  marketplaceClient
+} from "$lib/marketplace-client";
+import { isAuthenticated, principalStore } from "$lib/auth";
+const KIND_VALUES = ["ext", "codex", "assistant"];
+const KIND_I18N = {
+  ext: "kind.extensions",
+  codex: "kind.codices",
+  assistant: "kind.assistants"
+};
+const PUBLISH_I18N = {
+  ext: "discover.publish_ext",
+  codex: "discover.publish_codex",
+  assistant: "discover.publish_assistant"
+};
+const LANG_NAMES = {
+  en: "English",
+  es: "Español",
+  fr: "Français",
+  de: "Deutsch",
+  it: "Italiano",
+  pt: "Português",
+  zh: "\u4E2D\u6587",
+  ja: "\u65E5\u672C\u8A9E",
+  ko: "\uD55C\uAD6D\uC5B4",
+  ar: "\u0627\u0644\u0639\u0631\u0628\u064A\u0629",
+  ru: "\u0420\u0443\u0441\u0441\u043A\u0438\u0439",
+  nl: "Nederlands",
+  pl: "Polski",
+  tr: "T\xFCrk\xE7e",
+  hi: "\u0939\u093F\u0928\u094D\u0926\u0940"
+};
+function parseLangs(raw) {
+  return raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+}
+function langLabel(code) {
+  return LANG_NAMES[code] ?? code.toUpperCase();
+}
+let kind = "ext";
+let metric = "downloads";
+let verifiedOnly = false;
+let selectedCategory = "";
+let selectedLanguage = "";
+let loading = true;
+let error = "";
+let mounted = false;
+let items = [];
+let likedSet = new Set();
+onMount(() => {
+  const params = $page.url.searchParams;
+  const k = params.get("kind");
+  if (k === "ext" || k === "codex" || k === "assistant") kind = k;
+  const s = params.get("sort");
+  if (s === "likes" || s === "downloads" || s === "newest") metric = s;
+  verifiedOnly = params.get("verified") === "1";
+  if (kind === "ext") selectedCategory = params.get("category") ?? "";
+  if (kind === "ext") selectedLanguage = params.get("lang") ?? "";
+  mounted = true;
+});
+$: void load(kind, metric, verifiedOnly);
+$: if (kind !== "ext" && selectedCategory) selectedCategory = "";
+$: if (kind !== "ext" && selectedLanguage) selectedLanguage = "";
+$: availableCategories = kind === "ext" ? Array.from(new Set(items.flatMap((it) => parseCategories(categoriesFor(it))))).sort() : [];
+$: availableLanguages = kind === "ext" ? Array.from(new Set(items.flatMap((it) => parseLangs(it.languages ?? "")))).sort() : [];
+$: displayItems = kind === "ext" ? items.filter((it) => !selectedCategory || parseCategories(categoriesFor(it)).includes(selectedCategory)).filter((it) => !selectedLanguage || parseLangs(it.languages ?? "").includes(selectedLanguage)) : items;
+$: if (browser && mounted) syncUrl(kind, metric, verifiedOnly, selectedCategory, selectedLanguage);
+function syncUrl(k, m, v, cat, lang) {
+  const params = new URLSearchParams();
+  if (k !== "ext") params.set("kind", k);
+  if (m !== "downloads") params.set("sort", m);
+  if (v) params.set("verified", "1");
+  if (k === "ext" && cat) params.set("category", cat);
+  if (k === "ext" && lang) params.set("lang", lang);
+  const qs = params.toString();
+  goto(qs ? `/?${qs}` : "/", { replaceState: true, keepFocus: true, noScroll: true });
+}
+$: void refreshLikes($isAuthenticated, $principalStore?.toText());
+async function refreshLikes(_authed, _principal) {
+  if (!_authed) {
+    likedSet = new Set();
+    return;
+  }
+  try {
+    const my = await marketplaceClient.myLikes();
+    likedSet = new Set(my.map((m) => `${m.item_kind}|${m.item_id}`));
+  } catch {
+    likedSet = new Set();
+  }
+}
+function byNewest(list) {
+  return [...list].sort((a, b) => b.created_at - a.created_at);
+}
+async function load(k, m, v) {
+  loading = true;
+  error = "";
+  try {
+    if (k === "ext") {
+      items = m === "downloads" ? await marketplaceClient.topExtensionsByDownloads(20, v) : m === "likes" ? await marketplaceClient.topExtensionsByLikes(20, v) : byNewest((await marketplaceClient.listExtensions(1, 20, v)).listings);
+    } else if (k === "codex") {
+      items = m === "downloads" ? await marketplaceClient.topCodicesByDownloads(20, v) : m === "likes" ? await marketplaceClient.topCodicesByLikes(20, v) : byNewest((await marketplaceClient.listCodices(1, 20, v)).listings);
+    } else {
+      items = m === "downloads" ? await marketplaceClient.topAssistantsByDownloads(20, v) : m === "likes" ? await marketplaceClient.topAssistantsByLikes(20, v) : byNewest((await marketplaceClient.listAssistants(1, 20, v)).listings);
     }
-    try {
-      const my = await marketplaceClient.myLikes();
-      likedSet = new Set(my.map((m) => `${m.item_kind}|${m.item_id}`));
-    } catch {
-      likedSet = new Set();
-    }
+  } catch (e) {
+    error = e?.message ?? String(e);
+    items = [];
+  } finally {
+    loading = false;
   }
-
-  async function load(k: Kind, m: Metric, v: boolean) {
-    loading = true;
-    error = '';
-    try {
-      if (k === 'ext') {
-        items = m === 'downloads'
-          ? await marketplaceClient.topExtensionsByDownloads(20, v)
-          : await marketplaceClient.topExtensionsByLikes(20, v);
-      } else if (k === 'codex') {
-        items = m === 'downloads'
-          ? await marketplaceClient.topCodicesByDownloads(20, v)
-          : await marketplaceClient.topCodicesByLikes(20, v);
-      } else {
-        items = m === 'downloads'
-          ? await marketplaceClient.topAssistantsByDownloads(20, v)
-          : await marketplaceClient.topAssistantsByLikes(20, v);
-      }
-    } catch (e: any) {
-      error = e?.message ?? String(e);
-      items = [];
-    } finally {
-      loading = false;
-    }
-  }
-
-  function idOf(it: ExtensionListing | CodexListing | AssistantListing): string {
-    return (it as any).extension_id ?? (it as any).codex_id ?? (it as any).assistant_id ?? '';
-  }
-
-  function hrefOf(k: Kind, it: ExtensionListing | CodexListing | AssistantListing): string {
-    if (k === 'ext') return `/extensions/${encodeURIComponent(idOf(it))}`;
-    if (k === 'codex') return `/codices/${encodeURIComponent(idOf(it))}`;
-    return `/assistants/${encodeURIComponent(idOf(it))}`;
-  }
-
-  function defaultIcon(k: Kind): string {
-    if (k === 'codex') return '📜';
-    if (k === 'assistant') return '🤖';
-    return '🧩';
-  }
-
-  function categoriesFor(it: ExtensionListing | CodexListing | AssistantListing): string {
-    if (it.categories) return it.categories;
-    if ((it as AssistantListing).domains) return (it as AssistantListing).domains;
-    return '';
-  }
+}
+function idOf(it) {
+  return it.extension_id ?? it.codex_id ?? it.assistant_id ?? "";
+}
+function hrefOf(k, it) {
+  if (k === "ext") return `/extensions/${encodeURIComponent(idOf(it))}`;
+  if (k === "codex") return `/codices/${encodeURIComponent(idOf(it))}`;
+  return `/assistants/${encodeURIComponent(idOf(it))}`;
+}
+function defaultIcon(k) {
+  if (k === "codex") return "file-code";
+  if (k === "assistant") return "robot";
+  return "puzzle";
+}
+function categoriesFor(it) {
+  if (it.categories) return it.categories;
+  if (it.domains) return it.domains;
+  return "";
+}
 </script>
 
 <section class="hero">
-  <h1>Top Charts</h1>
-  <p>Discover the most popular extensions, codices, and AI assistants powering Realms.</p>
+  <h1>{$_('discover.title')}</h1>
+  <p>{$_('discover.subtitle')}</p>
 </section>
 
-<div class="controls">
-  <div class="toggle">
-    <button class:active={kind === 'ext'} on:click={() => (kind = 'ext')}>Extensions</button>
-    <button class:active={kind === 'codex'} on:click={() => (kind = 'codex')}>Codices</button>
-    <button class:active={kind === 'assistant'} on:click={() => (kind = 'assistant')}>Assistants</button>
-  </div>
-  <div class="toggle">
-    <button class:active={metric === 'downloads'} on:click={() => (metric = 'downloads')}>Most Downloaded</button>
-    <button class:active={metric === 'likes'} on:click={() => (metric = 'likes')}>Most Liked</button>
+<div class="kind-tabs" role="tablist" aria-label="Listing type">
+  {#each KIND_VALUES as k}
+    <button
+      role="tab"
+      aria-selected={kind === k}
+      class:active={kind === k}
+      on:click={() => (kind = k)}
+    >{$_(KIND_I18N[k])}</button>
+  {/each}
+</div>
+
+<div class="filters">
+  <div class="toggle" role="group" aria-label="Sort by">
+    <button aria-pressed={metric === 'downloads'} class:active={metric === 'downloads'} on:click={() => (metric = 'downloads')}>{$_('sort.most_downloaded')}</button>
+    <button aria-pressed={metric === 'likes'} class:active={metric === 'likes'} on:click={() => (metric = 'likes')}>{$_('sort.most_liked')}</button>
+    <button aria-pressed={metric === 'newest'} class:active={metric === 'newest'} on:click={() => (metric = 'newest')}>{$_('sort.newest')}</button>
   </div>
   <label class="verified-toggle">
     <input type="checkbox" bind:checked={verifiedOnly} />
-    <span>Verified only</span>
+    <span>{$_('filter.verified_only')}</span>
+    <InfoTip text={$_('filter.verified_help')} label={$_('filter.verified_help_label')} />
   </label>
 </div>
 
+{#if kind === 'ext' && availableCategories.length > 0}
+  <div class="cat-filter" role="group" aria-label="Filter extensions by category">
+    <button class:active={selectedCategory === ''} on:click={() => (selectedCategory = '')}>{$_('filter.all')}</button>
+    {#each availableCategories as c}
+      <button
+        class:active={selectedCategory === c}
+        on:click={() => (selectedCategory = selectedCategory === c ? '' : c)}
+      >{c.replace(/_/g, ' ')}</button>
+    {/each}
+  </div>
+{/if}
+
+{#if kind === 'ext' && availableLanguages.length > 0}
+  <div class="cat-filter lang-filter" role="group" aria-label="Filter extensions by language">
+    <span class="filter-label">{$_('filter.language')}:</span>
+    <button class:active={selectedLanguage === ''} on:click={() => (selectedLanguage = '')}>{$_('filter.all')}</button>
+    {#each availableLanguages as l}
+      <button
+        class:active={selectedLanguage === l}
+        on:click={() => (selectedLanguage = selectedLanguage === l ? '' : l)}
+      >{langLabel(l)}</button>
+    {/each}
+  </div>
+{/if}
+
 {#if loading}
-  <div class="state"><Spinner size={32} /><p>Loading…</p></div>
+  <div class="grid">
+    {#each Array(8) as _}
+      <SkeletonCard />
+    {/each}
+  </div>
 {:else if error}
-  <div class="state error"><p>⚠️ {error}</p></div>
+  <div class="state error"><p>{$_('discover.load_error', { values: { error } })}</p></div>
 {:else if items.length === 0}
   <div class="state empty">
-    <h2>Nothing here yet</h2>
-    <p>Be the first to <a href="/upload">upload {kind === 'ext' ? 'an extension' : 'a codex'}</a>.</p>
+    <h2>{$_('discover.empty_title')}</h2>
+    <p><a href="/upload">{$_(PUBLISH_I18N[kind])}</a></p>
+  </div>
+{:else if displayItems.length === 0}
+  <div class="state empty">
+    <h2>{$_('discover.no_matches_title')}</h2>
+    <p>
+      {#if selectedLanguage}
+        {$_('discover.no_matches_lang', { values: { language: langLabel(selectedLanguage) } })}
+      {:else}
+        {$_('discover.no_matches', { values: { category: selectedCategory.replace(/_/g, ' ') } })}
+      {/if}
+      <button class="link" on:click={() => { selectedCategory = ''; selectedLanguage = ''; }}>{$_('discover.clear_filter')}</button>
+    </p>
   </div>
 {:else}
   <div class="grid">
-    {#each items as it, i}
+    {#each displayItems as it}
       <ItemCard
         kind={kind}
         id={idOf(it)}
@@ -134,7 +233,6 @@
         categoriesStr={categoriesFor(it)}
         verificationStatus={it.verification_status}
         liked={likedSet.has(`${kind}|${idOf(it)}`)}
-        rank={i + 1}
         href={hrefOf(kind, it)}
       />
     {/each}
@@ -143,13 +241,40 @@
 
 <style>
   .hero h1 { font-size: 2rem; margin: 0 0 0.5rem; }
-  .hero p { color: var(--text-muted); margin: 0 0 2rem; }
-  .controls {
+  .hero p { color: var(--text-muted); margin: 0 0 1.5rem; }
+
+  /* Primary navigation between listing types â reads as content tabs. */
+  .kind-tabs {
+    display: flex;
+    gap: 1.5rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1.25rem;
+  }
+  .kind-tabs button {
+    background: none;
+    border: none;
+    padding: 0.6rem 0;
+    margin-bottom: -1px;
+    border-bottom: 2px solid transparent;
+    font-size: 0.95rem;
+    color: var(--text-faint);
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  .kind-tabs button:hover { color: var(--text); }
+  .kind-tabs button.active {
+    color: var(--text);
+    font-weight: 600;
+    border-bottom-color: var(--primary);
+  }
+
+  /* Secondary filters, right-aligned and visually distinct from the tabs. */
+  .filters {
     display: flex;
     flex-wrap: wrap;
     gap: 1rem;
     margin-bottom: 2rem;
     align-items: center;
+    justify-content: flex-end;
   }
   .toggle {
     display: inline-flex;
@@ -161,7 +286,7 @@
   .toggle button {
     background: transparent;
     border: none;
-    padding: 0.5rem 0.95rem;
+    padding: 0.45rem 0.9rem;
     border-radius: 0.4rem;
     font-size: 0.85rem;
     color: var(--text-faint);
@@ -171,6 +296,7 @@
   .toggle button.active {
     background: var(--surface);
     color: var(--text);
+    font-weight: 600;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   }
   .verified-toggle {
@@ -179,6 +305,43 @@
     gap: 0.4rem;
     color: var(--text-muted);
     font-size: 0.85rem;
+  }
+  .cat-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: -0.75rem 0 1.75rem;
+  }
+  .cat-filter .filter-label {
+    font-size: 0.8rem;
+    color: var(--text-faint);
+    align-self: center;
+  }
+  .cat-filter button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 0.35rem 0.8rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    text-transform: capitalize;
+    transition: all 0.15s ease;
+  }
+  .cat-filter button:hover { border-color: var(--border-strong); color: var(--text); }
+  .cat-filter button.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+    font-weight: 600;
+  }
+  .link {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--text);
+    text-decoration: underline;
+    cursor: pointer;
+    font: inherit;
   }
   .grid {
     display: grid;
