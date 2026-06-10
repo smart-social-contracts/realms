@@ -1,7 +1,7 @@
 {
-  "$comment": "Fast-iteration variant of `test`: just Dominion and a handful of core extensions (public_dashboard, member_dashboard, demo_simulator, hello_world, llm_chat), ~10 steps, to exercise the reinstall\u2192arrangement-apply chain end-to-end without ~93 mainnet calls. Same per-realm step shape as `test`. Marked active: seeding it makes it the env's active arrangement (exclusive, so it deactivates `test`); re-seed/activate `test` to restore full fidelity. Regenerate via casals-config/_gen_test_arrangement.py.",
+  "$comment": "Fast-iteration variant of `test`: just Dominion and a handful of core extensions (public_dashboard, member_dashboard, welcome, demo_simulator, hello_world, llm_chat), ~11 steps, to exercise the reinstall\u2192arrangement-apply chain end-to-end without ~93 mainnet calls. Same per-realm step shape as `test`. Marked active: seeding it makes it the env's active arrangement (exclusive, so it deactivates `test`); re-seed/activate `test` to restore full fidelity. Regenerate via casals-config/_gen_test_arrangement.py.",
   "name": "test-lite",
-  "description": "Lightweight realms test arrangement: 1 realm (Dominion) + core extensions (public_dashboard, member_dashboard, demo_simulator, hello_world, llm_chat) for fast iteration.",
+  "description": "Lightweight realms test arrangement: 1 realm (Dominion) + core extensions (public_dashboard, member_dashboard, welcome, demo_simulator, hello_world, llm_chat) for fast iteration.",
   "active": true,
   "parameters": {
     "network": "test",
@@ -96,6 +96,15 @@
       "args": {
         "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
         "ext_id": "member_dashboard",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "welcome",
         "version": null
       }
     },

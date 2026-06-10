@@ -20,6 +20,7 @@ import os
 LITE_EXTENSIONS = [
     "public_dashboard",
     "member_dashboard",
+    "welcome",
     "demo_simulator",
     "hello_world",
     "llm_chat",

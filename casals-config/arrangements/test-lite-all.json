@@ -1,7 +1,7 @@
 {
-  "$comment": "Every realm gets config + identity + branding + codex + the core extension subset (public_dashboard, member_dashboard, demo_simulator, hello_world, llm_chat), ~30 steps. Proves a full sheet reinstall (all realm canisters + branding) end-to-end without installing every manifest extension. Marked active (exclusive): seeding it deactivates `test`/`test-lite`. Regenerate via casals-config/_gen_test_arrangement.py.",
+  "$comment": "Every realm gets config + identity + branding + codex + the core extension subset (public_dashboard, member_dashboard, welcome, demo_simulator, hello_world, llm_chat), ~33 steps. Proves a full sheet reinstall (all realm canisters + branding) end-to-end without installing every manifest extension. Marked active (exclusive): seeding it deactivates `test`/`test-lite`. Regenerate via casals-config/_gen_test_arrangement.py.",
   "name": "test-lite-all",
-  "description": "Lite-but-complete realms test arrangement: all 3 realms (Dominion, Agora, Syntropia) with core extensions only (public_dashboard, member_dashboard, demo_simulator, hello_world, llm_chat).",
+  "description": "Lite-but-complete realms test arrangement: all 3 realms (Dominion, Agora, Syntropia) with core extensions only (public_dashboard, member_dashboard, welcome, demo_simulator, hello_world, llm_chat).",
   "active": true,
   "parameters": {
     "network": "test",
@@ -96,6 +96,15 @@
       "args": {
         "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
         "ext_id": "member_dashboard",
+        "version": null
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "welcome",
         "version": null
       }
     },
@@ -212,6 +221,15 @@
       "method": "install_extension_from_registry",
       "args": {
         "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "welcome",
+        "version": null
+      }
+    },
+    {
+      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
         "ext_id": "demo_simulator",
         "version": null
       }
@@ -312,6 +330,15 @@
       "args": {
         "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
         "ext_id": "member_dashboard",
+        "version": null
+      }
+    },
+    {
+      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "method": "install_extension_from_registry",
+      "args": {
+        "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
+        "ext_id": "welcome",
         "version": null
       }
     },
