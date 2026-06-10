@@ -100,7 +100,7 @@ gh workflow run deploy-files.yml -f scope=extensions-only -f environment=test -f
 | Parameter | Options | Default | Notes |
 |---|---|---|---|
 | `environment` | `test`, `staging`, `demo` | `staging` | |
-| `scope` | `all`, `extensions-only`, `codices-only` | `all` | |
+| `scope` | `all`, `extensions-only`, `codices-only`, `branding-only` | `all` | `branding-only` publishes the demo realms' logo/background (see Branding below) |
 | `extensions` | comma-separated IDs or blank | blank (all) | e.g. `voting,vault` |
 | `codices` | comma-separated IDs or blank | blank (all) | e.g. `dominion` |
 | `reinstall` | `true`/`false` | `false` | Destructive if true |
@@ -338,11 +338,76 @@ These are also in `_CASALS_IDS` (`cli/realms/cli/commands/rollout.py`) and
    the CLI finalizes them with `finalize_chunked_file_step` (batched, on-chain
    hashing skipped, local sha256 passed in). The one-shot `finalize_chunked_file`
    blows the 40 B-instruction limit (`IC0522`) on multi-MB WASMs — don't switch back.
+6. **Cycle autopilot is not guaranteed on.** Casals can auto-top-up from its treasury,
+   but autopilot may be disabled on an env, and it never *restarts* a canister that
+   already stopped from cycle starvation. A `reinstall` won't start a stopped frontend
+   either (you'll see HTTP 503 "Response Verification Error"). Fix: top up + call
+   `start_canister`, then re-`provision_assets`. Check balances with `casals cycles -e test`.
 
 See `docs/reference/CASALS_ROLLOUT.md` for the full runbook (migrating a realm,
 authorization model, cycle budget).
 
 ---
+
+## Realm config via Casals arrangements (branding, registration, runtime flags)
+
+A sheet rollout stands up the canisters (code); a Casals **arrangement** configures
+them afterwards (state). Realms-owned arrangements live in
+`casals-config/arrangements/` and are **generated** — edit `_gen_test_arrangement.py`
+and re-run it (`python3 casals-config/_gen_test_arrangement.py`), never hand-edit the
+JSON. Variants:
+
+| Arrangement | Scope | Use |
+|---|---|---|
+| `test` | all 3 realms, **full** extension set | full-fidelity test env |
+| `test-lite` | **Dominion only**, core extensions | fast single-realm iteration |
+| `test-lite-all` | **all 3 realms**, core extensions | proves a full sheet reinstall end-to-end, fast |
+
+Each realm gets an ordered set of steps (all `(text)->(text)` calls on the realm
+backend): `set_canister_config_json` (runtime flags + file-registry / frontend /
+marketplace ids) → `update_realm_config` (name / manifesto / welcome message) →
+`register_realm_from_registry` (registry) → `install_branding_from_registry` →
+`install_codex_from_registry` → `install_extension_from_registry` (per extension).
+Seed/activate an arrangement via `casals-upgrade.yml -f seed_arrangement=<name>`; only
+one is active at a time (seeding deactivates the others).
+
+> The **welcome message** is rendered by the `welcome` extension — it's in the full
+> `test` set but **not** in the lite extension set, so on `test-lite`/`test-lite-all`
+> the message is stored in config but has no UI. Add `welcome` to `LITE_EXTENSIONS`
+> (or use `test`) if you need it shown.
+
+### Branding (decentralized)
+
+Branding is **fully decentralized** — no central server. The create-realm wizard
+uploads the user's logo/background straight from the browser to the `file_registry`
+canister (`file-registry-client.js`), and the deploy manifest references those
+registry paths. The realm backend then pulls them and writes them to its own frontend
+asset canister via `install_branding_from_registry` (served same-origin at
+`/custom/logo.png`, `/custom/background.png`). This survives a frontend `reinstall`
+because Casals re-grants the backend `Commit` on the (wiped) asset canister during
+provisioning.
+
+For the demo realms, publish their source images into the registry first:
+
+```bash
+realms files publish-branding --network test          # or: deploy-files.yml -f scope=branding-only
+```
+
+Optimize source PNGs before publishing (logos ~25 KB, backgrounds <1 MB) so they stay
+under the file_registry per-file instruction limit.
+
+### Registration in the realm registry
+
+Realms must register with the `realm-registry` to appear on its frontend (otherwise
+"No Realms"). The registry keys each realm on `ic.caller()` (the realm backend's id),
+so registration is idempotent.
+
+- **User / wizard realms** register automatically — the `realm_installer` calls
+  `registry.register_realm(...)` at finalization.
+- **Demo / sheet realms** are deployed directly by Casals (bypassing the installer),
+  so the **arrangement** registers them via the backend's
+  `register_realm_from_registry(text)` step. To register an already-deployed realm
+  out-of-band, call `register_realm_with_registry` on its backend directly.
 
 ## Full Platform Re-deployment (clean reinstall via Casals)
 
@@ -365,7 +430,8 @@ gh workflow run rollout.yml \
 
 The active arrangement (seeded via `casals-upgrade.yml` `-f seed_arrangement=...` from
 `casals-config/arrangements/`) is what reinstalls extensions/codices and applies runtime
-flags after the canisters come up. Use `test-lite` for a fast single-realm iteration.
+flags after the canisters come up. See "Realm config via Casals arrangements" below for
+the arrangement variants (`test`, `test-lite`, `test-lite-all`) and per-realm steps.
 
 ---
 
