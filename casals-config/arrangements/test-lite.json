@@ -1,5 +1,5 @@
 {
-  "$comment": "Fast-iteration variant of `test`: just Dominion and a handful of core extensions (public_dashboard, member_dashboard, demo_simulator, hello_world, llm_chat), ~9 steps, to exercise the reinstall\u2192arrangement-apply chain end-to-end without ~93 mainnet calls. Same per-realm step shape as `test`. Marked active: seeding it makes it the env's active arrangement (exclusive, so it deactivates `test`); re-seed/activate `test` to restore full fidelity. Regenerate via casals-config/_gen_test_arrangement.py.",
+  "$comment": "Fast-iteration variant of `test`: just Dominion and a handful of core extensions (public_dashboard, member_dashboard, demo_simulator, hello_world, llm_chat), ~10 steps, to exercise the reinstall\u2192arrangement-apply chain end-to-end without ~93 mainnet calls. Same per-realm step shape as `test`. Marked active: seeding it makes it the env's active arrangement (exclusive, so it deactivates `test`); re-seed/activate `test` to restore full fidelity. Regenerate via casals-config/_gen_test_arrangement.py.",
   "name": "test-lite",
   "description": "Lightweight realms test arrangement: 1 realm (Dominion) + core extensions (public_dashboard, member_dashboard, demo_simulator, hello_world, llm_chat) for fast iteration.",
   "active": true,
@@ -44,6 +44,18 @@
         "name": "Dominion",
         "manifesto": "A projection of where the world is likely heading: centralized, technocratic governance where algorithms, surveillance, and simulated consent replace genuine democratic agency.",
         "welcome_message": "Welcome to Dominion. Efficient governance through algorithmic oversight. Your compliance ensures collective prosperity."
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "register_realm_from_registry",
+      "args": {
+        "registry_canister_id": "yhw3g-fyaaa-aaaas-qgorq-cai",
+        "realm_name": "Dominion",
+        "frontend_url": "https://2enu3-byaaa-aaaad-qlxfa-cai.icp0.io",
+        "canister_ids": {
+          "frontend_canister_id": "2enu3-byaaa-aaaad-qlxfa-cai"
+        }
       }
     },
     {

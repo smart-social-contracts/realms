@@ -4504,3 +4504,53 @@ def install_branding_from_registry(args: text) -> Async[text]:
     except Exception as e:
         logger.error(f"install_branding_from_registry error: {e}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})
+
+
+@update
+@require(Operations.REALM_ADMIN)
+def register_realm_from_registry(args: text) -> Async[text]:
+    """Register this realm with the realm registry from a single JSON arg.
+
+    A `(text) -> (text)` wrapper around `api.registry.register_realm` so a Casals
+    arrangement step can drive registration declaratively (arrangement steps are
+    always single-text-in / text-out). The registry keys the realm on
+    `ic.caller()` (== this backend's canister id), so re-applying upserts the
+    same record (idempotent).
+
+    Args (JSON): {
+        "registry_canister_id": str,            (required)
+        "realm_name": str,                      (required)
+        "frontend_url": str,                    (optional)
+        "canister_ids": {                       (optional)
+            "frontend_canister_id": str,
+            "token_canister_id": str,
+            "nft_canister_id": str
+        }
+    }
+    """
+    try:
+        params = json.loads(args)
+        registry_id = params.get("registry_canister_id")
+        realm_name = params.get("realm_name")
+        frontend_url = params.get("frontend_url") or ""
+        canister_ids = params.get("canister_ids") or {}
+
+        if not registry_id:
+            return json.dumps({"success": False, "error": "registry_canister_id is required"})
+        if not realm_name:
+            return json.dumps({"success": False, "error": "realm_name is required"})
+
+        # Default the frontend id to this realm's own asset canister so the
+        # registry can construct the logo/frontend URL client-side.
+        if not canister_ids.get("frontend_canister_id"):
+            fid = _get_frontend_canister_id()
+            if fid:
+                canister_ids["frontend_canister_id"] = fid
+
+        result = yield from register_realm(
+            registry_id, realm_name, frontend_url, "", canister_ids
+        )
+        return json.dumps(result)
+    except Exception as e:
+        logger.error(f"register_realm_from_registry error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})

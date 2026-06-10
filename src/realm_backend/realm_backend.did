@@ -205,7 +205,7 @@ type NFTService = service { mint : (MintArg) -> (MintResult) };
 type RealmRegistryService = service { register_realm : (text, text, text, text, text) -> (AddRealmResult) };
 type RealmRegistryUpgradeService = service { request_upgrade : (text) -> (text); get_credits : (text) -> (GetCreditsResult) query; get_latest_version : () -> (UpgradeResult) query };
 type RealmInstallerService = service { enqueue_deployment : (text) -> (RResultEnqueue); cancel_deployment : (text) -> (text) };
-type RealmTargetService = service { install_extension_from_registry : (text) -> (text); install_codex_from_registry : (text) -> (text); install_branding_from_registry : (text) -> (text) };
+type RealmTargetService = service { install_extension_from_registry : (text) -> (text); install_codex_from_registry : (text) -> (text); install_branding_from_registry : (text) -> (text); register_realm_from_registry : (text) -> (text) };
 type CasalsService = service { create_stand : (text) -> (text); create_canister : (text) -> (text); set_commander : (text) -> (text); upgrade_to : (text) -> (text) };
 
 service : {
@@ -295,6 +295,7 @@ service : {
   "install_extension_from_registry" : (text) -> (text);
   "install_codex_from_registry" : (text) -> (text);
   "install_branding_from_registry" : (text) -> (text);
+  "register_realm_from_registry" : (text) -> (text);
   "list_extensions" : (text) -> (RealmResponse) query;
   "__browse__" : (text) -> (text) query;
   "__get_candid_interface_tmp_hack" : () -> (text) query;

@@ -1,5 +1,5 @@
 {
-  "$comment": "Every realm gets config + identity + branding + codex + the core extension subset (public_dashboard, member_dashboard, demo_simulator, hello_world, llm_chat), ~27 steps. Proves a full sheet reinstall (all realm canisters + branding) end-to-end without installing every manifest extension. Marked active (exclusive): seeding it deactivates `test`/`test-lite`. Regenerate via casals-config/_gen_test_arrangement.py.",
+  "$comment": "Every realm gets config + identity + branding + codex + the core extension subset (public_dashboard, member_dashboard, demo_simulator, hello_world, llm_chat), ~30 steps. Proves a full sheet reinstall (all realm canisters + branding) end-to-end without installing every manifest extension. Marked active (exclusive): seeding it deactivates `test`/`test-lite`. Regenerate via casals-config/_gen_test_arrangement.py.",
   "name": "test-lite-all",
   "description": "Lite-but-complete realms test arrangement: all 3 realms (Dominion, Agora, Syntropia) with core extensions only (public_dashboard, member_dashboard, demo_simulator, hello_world, llm_chat).",
   "active": true,
@@ -44,6 +44,18 @@
         "name": "Dominion",
         "manifesto": "A projection of where the world is likely heading: centralized, technocratic governance where algorithms, surveillance, and simulated consent replace genuine democratic agency.",
         "welcome_message": "Welcome to Dominion. Efficient governance through algorithmic oversight. Your compliance ensures collective prosperity."
+      }
+    },
+    {
+      "target": "ku6cv-2iaaa-aaaab-agrpa-cai",
+      "method": "register_realm_from_registry",
+      "args": {
+        "registry_canister_id": "yhw3g-fyaaa-aaaas-qgorq-cai",
+        "realm_name": "Dominion",
+        "frontend_url": "https://2enu3-byaaa-aaaad-qlxfa-cai.icp0.io",
+        "canister_ids": {
+          "frontend_canister_id": "2enu3-byaaa-aaaad-qlxfa-cai"
+        }
       }
     },
     {
@@ -144,6 +156,18 @@
     },
     {
       "target": "rnghe-haaaa-aaaak-qyxyq-cai",
+      "method": "register_realm_from_registry",
+      "args": {
+        "registry_canister_id": "yhw3g-fyaaa-aaaas-qgorq-cai",
+        "realm_name": "Agora",
+        "frontend_url": "https://pqwsi-vyaaa-aaaau-agrbq-cai.icp0.io",
+        "canister_ids": {
+          "frontend_canister_id": "pqwsi-vyaaa-aaaau-agrbq-cai"
+        }
+      }
+    },
+    {
+      "target": "rnghe-haaaa-aaaak-qyxyq-cai",
       "method": "install_branding_from_registry",
       "args": {
         "registry_canister_id": "uq2mu-kaaaa-aaaah-avqcq-cai",
@@ -236,6 +260,18 @@
         "name": "Syntropia",
         "manifesto": "A possible evolutionary future enabled by smart social contracts and Realms GOS, where governance becomes protocol-based, adaptive, and freely chosen through a competitive ecosystem of AI-powered governors.",
         "welcome_message": "Welcome to Syntropia. Experience adaptive, protocol-based governance where AI-powered systems compete to serve your evolving needs."
+      }
+    },
+    {
+      "target": "m2wv3-uaaaa-aaaah-quoiq-cai",
+      "method": "register_realm_from_registry",
+      "args": {
+        "registry_canister_id": "yhw3g-fyaaa-aaaas-qgorq-cai",
+        "realm_name": "Syntropia",
+        "frontend_url": "https://2dmsp-maaaa-aaaad-qlxfq-cai.icp0.io",
+        "canister_ids": {
+          "frontend_canister_id": "2dmsp-maaaa-aaaad-qlxfq-cai"
+        }
       }
     },
     {

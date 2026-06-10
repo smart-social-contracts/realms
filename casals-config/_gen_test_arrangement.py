@@ -27,6 +27,7 @@ LITE_EXTENSIONS = [
 
 FILE_REGISTRY = "uq2mu-kaaaa-aaaah-avqcq-cai"
 MARKETPLACE = "2wldc-niaaa-aaaad-qlxga-cai"
+REALM_REGISTRY = "yhw3g-fyaaa-aaaas-qgorq-cai"
 NETWORK = "test"
 
 TEST_FLAGS = {
@@ -138,6 +139,21 @@ def build_steps(realms, ext_filter=None):
                 "name": r["name"],
                 "manifesto": r["manifesto"],
                 "welcome_message": r["welcome_message"],
+            },
+        })
+        # 2b. Register this realm with the realm registry so it is discoverable on
+        #     the registry frontend. Demo realms are deployed directly by Casals
+        #     (bypassing the installer, which registers user/wizard realms), so the
+        #     arrangement registers them. The registry keys on the backend's caller
+        #     id, so this is idempotent (re-applying upserts the same record).
+        steps.append({
+            "target": be,
+            "method": "register_realm_from_registry",
+            "args": {
+                "registry_canister_id": REALM_REGISTRY,
+                "realm_name": r["name"],
+                "frontend_url": "https://" + r["frontend"] + ".icp0.io",
+                "canister_ids": {"frontend_canister_id": r["frontend"]},
             },
         })
         # 3. Per-realm branding: pull logo + background from the file registry
