@@ -59,6 +59,16 @@ jobs:
     # arrangement, so a whole-sheet reinstall easily exceeds the old 30 min cap.
     timeout-minutes: 180
     steps:
+      - name: Input parameters
+        run: |
+          echo "Environments:              ${{ inputs.environments }}"
+          echo "Targets:                   ${{ inputs.targets }}"
+          echo "Scope:                     ${{ inputs.scope }}"
+          echo "Mode:                      ${{ inputs.mode }}"
+          echo "Version:                   ${{ inputs.version || 'latest' }}"
+          echo "Include infra reinstall:   ${{ inputs.include_infra_reinstall }}"
+          echo "Ref:                       ${{ github.ref }}"
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
