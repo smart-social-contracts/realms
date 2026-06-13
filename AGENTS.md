@@ -16,6 +16,7 @@ realms/
 ├── .github/workflows/
 │   ├── publish-build.yml            # Build + publish artifacts into file_registry + Casals
 │   ├── rollout.yml                   # Upgrade/reinstall realm+infra canisters via Casals
+│   ├── deploy-mundus.yml             # Off-chain realm deploy (fast path; test/demo/staging)
 │   ├── casals-upgrade.yml            # Upgrade the Casals orchestrator itself
 │   └── deploy-files.yml              # Publish extensions/codices into file_registry
 ├── casals/                           # Casals orchestrator engine (git submodule)
@@ -134,12 +135,9 @@ Takes ~5 minutes. The version file determines the current version; the workflow 
 
 ## Casals — On-Chain Deploy & Upgrade (preferred path)
 
-> **Casals is the deploy path.** Use `publish-build.yml` to publish artifacts (a semver
-> release with `-f version=X.Y.Z`, or a main snapshot with `-f from_main=true`) and
-> `rollout.yml` (or `realms rollout`) to deploy them. `deploy-files.yml` is still used
-> alongside this — it's how extension/codex bundles get into `file_registry` for the
-> rollout's arrangement to install. (The old `deploy-mundus`/`deploy-infra` descriptor
-> workflows have been removed.)
+> **Two deploy paths on non-production:** authoritative Casals (`publish-build.yml` +
+> `rollout.yml`) and fast off-chain (`deploy-mundus.yml` or `realms mundus deploy`).
+> `deploy-files.yml` publishes extension/codex bundles into `file_registry` for either path.
 
 Casals is an **on-chain orchestrator** that owns the realm canisters and upgrades
 them for us. Instead of an off-chain CI job installing WASMs, Casals pulls the
@@ -604,7 +602,7 @@ The first fixes the color panic, the second suppresses the plaintext identity wa
 
 ## Rules
 
-- **Casals is the deploy path.** For any realm/infra backend or frontend change, use `publish-build.yml` (`from_main=true` for snapshots, or `version=X.Y.Z` for releases) + `rollout.yml`. Use `deploy-files.yml` to publish extension/codex bundles into the file registry.
+- **Two deploy paths on non-production:** Casals (`publish-build.yml` + `rollout.yml`) for authoritative rollouts, and off-chain (`deploy-mundus.yml` / `realms mundus deploy`) for fast descriptor-based deploys. Use `deploy-files.yml` to publish extension/codex bundles into the file registry.
 - **Visually verify every UI change before reporting back.** After deploying a frontend or extension change, open the page in the browser and confirm the result matches the requirements. Do not report completion until you have checked the deployed page yourself. If the visual check reveals issues, fix and redeploy in a loop until the result is correct.
 - Do not commit unless explicitly told to do so.
 - Always use `mode=upgrade` for production/test deploys (`reinstall` wipes state).
