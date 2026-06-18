@@ -126,12 +126,12 @@ export async function mountExtension(
   ctx: RealmExtensionContext,
 ): Promise<MountResult | void> {
   const backend: any = ctx?.backend;
-  const info = await resolveFrontendInfo(
+  let info = await resolveFrontendInfo(
     backend,
     extId,
     ctx?.config?.fileRegistryCanisterId,
   );
-  const ver = info.version || version;
+  let ver = info.version || version;
 
   const sameOriginPath = `/ext/${extId}/${ver}/frontend/dist/index.js`;
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
@@ -141,16 +141,36 @@ export async function mountExtension(
   try {
     mod = await import(/* @vite-ignore */ sameOriginUrl);
   } catch (e) {
-    const ns = info.version
-      ? info.namespace
-      : `ext/${extId}/${ver}`;
-    const base = fileRegistryBaseUrlFor(info.registryCanisterId);
-    const fallbackUrl = `${base}/${ns}/${info.frontendPath}`;
-    console.warn(
-      `[extension-loader] Same-origin load failed for '${extId}', falling back to registry: ${fallbackUrl}`,
-      e,
-    );
-    mod = await import(/* @vite-ignore */ fallbackUrl);
+    // Stale version in cache — re-resolve from backend before registry fallback.
+    if (typeof backend?.get_extension_frontend_info === 'function') {
+      try {
+        const fresh = await resolveFrontendInfo(
+          backend,
+          extId,
+          ctx?.config?.fileRegistryCanisterId,
+        );
+        if (fresh.version && fresh.version !== ver) {
+          ver = fresh.version;
+          info = fresh;
+          const retryUrl = `${origin}/ext/${extId}/${ver}/frontend/dist/index.js`;
+          mod = await import(/* @vite-ignore */ retryUrl);
+        }
+      } catch {
+        /* fall through to registry */
+      }
+    }
+    if (!mod) {
+      const ns = info.version
+        ? info.namespace
+        : `ext/${extId}/${ver}`;
+      const base = fileRegistryBaseUrlFor(info.registryCanisterId);
+      const fallbackUrl = `${base}/${ns}/${info.frontendPath}`;
+      console.warn(
+        `[extension-loader] Same-origin load failed for '${extId}', falling back to registry: ${fallbackUrl}`,
+        e,
+      );
+      mod = await import(/* @vite-ignore */ fallbackUrl);
+    }
   }
 
   const mount: ExtensionMountFn | undefined = mod?.default ?? mod?.mount;
