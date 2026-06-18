@@ -24,7 +24,7 @@ Complete reference documentation for the Realms GOS platform.
 - **[Multi-Step Tasks](./MULTI_STEP_TASKS_IMPLEMENTATION)** - Complex workflows
 
 ### Deployment & Operations
-- **[Deployment Guide](./DEPLOYMENT_GUIDE)** - Local → Staging → Production
+- **[Casals Rollout](./CASALS_ROLLOUT)** — Publish-build → rollout (preferred deploy path; see also `AGENTS.md` in repo root)
 - **[On-chain `deploy_realm` (removed)](./ONCHAIN_REALM_DEPLOY)** - See queue + dfx path instead
 - **[Realm Registration](./REALM_REGISTRATION_GUIDE)** - Join the registry
 - **[Troubleshooting](./TROUBLESHOOTING)** - Common issues and solutions
@@ -43,7 +43,7 @@ Complete reference documentation for the Realms GOS platform.
 - [Governance Tutorial](./GOVERNANCE_TUTORIAL) - Vote on proposals
 
 **Realm Operators**
-- [Deployment Guide](./DEPLOYMENT_GUIDE) - Deploy your realm
+- [Casals Rollout](./CASALS_ROLLOUT) — Deploy and upgrade realms (see `AGENTS.md` in repo root)
 - [Realm Registration](./REALM_REGISTRATION_GUIDE) - Register with central registry
 - [Realm Lifecycle Stages](./REALM_LIFECYCLE) - Alpha → Beta → Production stages
 - [Onboarding Scenarios & Dashboard Profiles](./ONBOARDING_SCENARIOS) - Greenfield vs incumbent PA, regional archetypes, public/member dashboard hooks

@@ -55,7 +55,8 @@ let error = "";
 let mounted = false;
 let items = [];
 let likedSet = new Set();
-onMount(() => {
+let searchQuery = "";
+onMount(async () => {
   const params = $page.url.searchParams;
   const k = params.get("kind");
   if (k === "ext" || k === "codex" || k === "assistant") kind = k;
@@ -64,9 +65,13 @@ onMount(() => {
   verifiedOnly = params.get("verified") === "1";
   if (kind === "ext") selectedCategory = params.get("category") ?? "";
   if (kind === "ext") selectedLanguage = params.get("lang") ?? "";
+  searchQuery = params.get("q") ?? "";
+  if (searchQuery.trim() && !k) {
+    kind = await resolveKindForQuery(searchQuery.trim(), verifiedOnly);
+  }
   mounted = true;
 });
-$: void load(kind, metric, verifiedOnly);
+$: void load(kind, metric, verifiedOnly, searchQuery);
 $: if (kind !== "ext" && selectedCategory) selectedCategory = "";
 $: if (kind !== "ext" && selectedLanguage) selectedLanguage = "";
 $: availableCategories = kind === "ext" ? Array.from(new Set(items.flatMap((it) => parseCategories(categoriesFor(it))))).sort() : [];
@@ -75,6 +80,7 @@ $: displayItems = kind === "ext" ? items.filter((it) => !selectedCategory || par
 $: if (browser && mounted) syncUrl(kind, metric, verifiedOnly, selectedCategory, selectedLanguage);
 function syncUrl(k, m, v, cat, lang) {
   const params = new URLSearchParams();
+  if (searchQuery.trim()) params.set("q", searchQuery.trim());
   if (k !== "ext") params.set("kind", k);
   if (m !== "downloads") params.set("sort", m);
   if (v) params.set("verified", "1");
@@ -82,6 +88,21 @@ function syncUrl(k, m, v, cat, lang) {
   if (k === "ext" && lang) params.set("lang", lang);
   const qs = params.toString();
   goto(qs ? `/?${qs}` : "/", { replaceState: true, keepFocus: true, noScroll: true });
+}
+async function resolveKindForQuery(q, verified) {
+  try {
+    const [assistants, extensions, codices] = await Promise.all([
+      marketplaceClient.searchAssistants(q, verified),
+      marketplaceClient.searchExtensions(q, verified),
+      marketplaceClient.searchCodices(q, verified),
+    ]);
+    if (assistants.length) return "assistant";
+    if (extensions.length) return "ext";
+    if (codices.length) return "codex";
+  } catch {
+    /* fall through */
+  }
+  return "ext";
 }
 $: void refreshLikes($isAuthenticated, $principalStore?.toText());
 async function refreshLikes(_authed, _principal) {
@@ -99,11 +120,16 @@ async function refreshLikes(_authed, _principal) {
 function byNewest(list) {
   return [...list].sort((a, b) => b.created_at - a.created_at);
 }
-async function load(k, m, v) {
+async function load(k, m, v, q) {
   loading = true;
   error = "";
   try {
-    if (k === "ext") {
+    const query = (q ?? "").trim();
+    if (query) {
+      if (k === "ext") items = await marketplaceClient.searchExtensions(query, v);
+      else if (k === "codex") items = await marketplaceClient.searchCodices(query, v);
+      else items = await marketplaceClient.searchAssistants(query, v);
+    } else if (k === "ext") {
       items = m === "downloads" ? await marketplaceClient.topExtensionsByDownloads(20, v) : m === "likes" ? await marketplaceClient.topExtensionsByLikes(20, v) : byNewest((await marketplaceClient.listExtensions(1, 20, v)).listings);
     } else if (k === "codex") {
       items = m === "downloads" ? await marketplaceClient.topCodicesByDownloads(20, v) : m === "likes" ? await marketplaceClient.topCodicesByLikes(20, v) : byNewest((await marketplaceClient.listCodices(1, 20, v)).listings);

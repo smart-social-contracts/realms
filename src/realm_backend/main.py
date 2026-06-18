@@ -131,6 +131,7 @@ class StatusRecord(Record):
     realm_welcome_message: text
     realm_stage: text
     open_registration: bool
+    ai_assistant_enabled: bool
     user_profiles_count: nat
     canisters: Vec[CanisterInfo]
     registries: Vec[CanisterInfo]
@@ -3568,6 +3569,10 @@ def update_realm_config(config_json: str) -> str:
             realm.open_registration = bool(config["open_registration"])
             updated_fields.append(f"open_registration={realm.open_registration}")
 
+        if "ai_assistant_enabled" in config:
+            realm.ai_assistant_enabled = bool(config["ai_assistant_enabled"])
+            updated_fields.append(f"ai_assistant_enabled={realm.ai_assistant_enabled}")
+
         if "logo_url" in config:
             realm.logo_url = config["logo_url"] or ""
             updated_fields.append(f"logo_url={realm.logo_url[:50]}...")
@@ -3738,6 +3743,18 @@ def uninstall_extension(args: text) -> text:
 
         if not ext_id:
             return json.dumps({"success": False, "error": "extension_id is required"})
+
+        from core.core_extensions import is_core_extension
+        if is_core_extension(ext_id):
+            return json.dumps({
+                "success": False,
+                "error": (
+                    f"Extension '{ext_id}' is a core extension and cannot be uninstalled. "
+                    "Disable the AI assistant in Realm Settings instead of removing llm_chat."
+                    if ext_id == "llm_chat"
+                    else f"Extension '{ext_id}' is a core extension and cannot be uninstalled."
+                ),
+            })
 
         from core.runtime_extensions import uninstall_extension as _uninstall
 

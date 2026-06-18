@@ -6,16 +6,19 @@
 	import DemoBanner from '$lib/components/DemoBanner.svelte';
 	import AiAssistantPanel from '$lib/components/AiAssistantPanel.svelte';
 	import PageBreadcrumb from '$lib/components/PageBreadcrumb.svelte';
-	import { isAuthenticated } from '$lib/stores/auth';
 	import { onMount } from 'svelte';
+	import { get } from 'svelte/store';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
+	import { hostActionEvents } from '$lib/host-bridge';
+	import { realmInfo, aiAssistantEnabled } from '$lib/stores/realmInfo';
 	
 	const SIDEBAR_STATE_KEY = 'realm_sidebar_state';
 	const AI_PANEL_STATE_KEY = 'realm_ai_panel_state';
 	
 	let drawerHidden = true;
 	let aiPanelOpen = false;
+	let aiPanelWidth = 320;
 	let initialized = false;
 	
 	function saveSidebarState(hidden) {
@@ -50,6 +53,7 @@
 
 	onMount(() => {
 		if (browser) {
+			void realmInfo.fetch();
 			document.documentElement.classList.remove('dark');
 			document.documentElement.classList.add('light');
 			
@@ -75,12 +79,23 @@
 			};
 			
 			window.addEventListener('resize', handleResize);
+
+			const unsubHostActions = hostActionEvents.subscribe((event) => {
+				if (event?.action.type === 'assistant.open' && get(aiAssistantEnabled)) {
+					aiPanelOpen = true;
+				}
+			});
 			
 			return () => {
 				window.removeEventListener('resize', handleResize);
+				unsubHostActions();
 			};
 		}
 	});
+
+	$: if (browser && initialized && !$aiAssistantEnabled) {
+		aiPanelOpen = false;
+	}
 
 	$: isFullBleedExtension =
 		$page.url.pathname.includes('/extensions/codex_viewer') ||
@@ -94,13 +109,15 @@
 		<Navbar bind:drawerHidden bind:aiPanelOpen />
 	</header>
 	<div class="flex flex-1 overflow-hidden">
-		{#if $isAuthenticated}
-			<!-- Sidebar (left) -->
-			<Sidebar bind:drawerHidden />
-		{/if}
+		<!-- Sidebar (left) -->
+		<Sidebar bind:drawerHidden />
 
 		<!-- Main Content -->
-		<div class="relative flex-1 overflow-y-auto overflow-x-hidden bg-white transition-[margin] duration-500 ease-in-out {$isAuthenticated && !drawerHidden ? 'lg:ml-64' : ''} {aiPanelOpen ? 'lg:mr-80' : ''}">
+		<div
+			class="main-content-area relative flex-1 overflow-y-auto overflow-x-hidden bg-white transition-[margin] duration-500 ease-in-out {!drawerHidden ? 'lg:ml-64' : ''}"
+			class:ai-panel-open={aiPanelOpen && $aiAssistantEnabled}
+			style="--ai-panel-width: {aiPanelWidth}px"
+		>
 			<DemoBanner />
 
 			<div class="{isFullBleedExtension ? 'px-0 lg:pl-0 lg:pr-0' : 'px-4 lg:pl-6 lg:pr-0'}">
@@ -114,8 +131,22 @@
 				{/if}
 			</div>
 		</div>
-
-		<!-- AI Assistant Panel (right) -->
-		<AiAssistantPanel bind:open={aiPanelOpen} onClose={() => (aiPanelOpen = false)} />
 	</div>
+
+	<!-- AI Assistant Panel — sibling of overflow-hidden row so resize handle isn't clipped -->
+	{#if $aiAssistantEnabled}
+		<AiAssistantPanel
+			bind:open={aiPanelOpen}
+			bind:panelWidth={aiPanelWidth}
+			onClose={() => (aiPanelOpen = false)}
+		/>
+	{/if}
 </div>
+
+<style>
+	@media (min-width: 1024px) {
+		.main-content-area.ai-panel-open {
+			margin-right: var(--ai-panel-width);
+		}
+	}
+</style>

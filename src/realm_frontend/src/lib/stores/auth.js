@@ -1,18 +1,27 @@
 // src/lib/stores/auth.js
 import { writable } from 'svelte/store';
 
-const isBrowser = typeof window !== 'undefined' && typeof sessionStorage !== 'undefined';
+const isBrowser = typeof window !== 'undefined' && typeof localStorage !== 'undefined';
 
 function createPersistentStore(key, defaultValue) {
-    const initialValue = isBrowser && sessionStorage.getItem(key) 
-        ? JSON.parse(sessionStorage.getItem(key)) 
+    const initialValue = isBrowser && localStorage.getItem(key) 
+        ? JSON.parse(localStorage.getItem(key)) 
         : defaultValue;
     
     const store = writable(initialValue);
     
     if (isBrowser) {
         store.subscribe(value => {
-            sessionStorage.setItem(key, JSON.stringify(value));
+            localStorage.setItem(key, JSON.stringify(value));
+        });
+
+        window.addEventListener('storage', (event) => {
+            if (event.key !== key || event.newValue === null) return;
+            try {
+                store.set(JSON.parse(event.newValue));
+            } catch {
+                // ignore malformed cross-tab payloads
+            }
         });
     }
     

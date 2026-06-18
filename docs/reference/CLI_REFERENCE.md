@@ -550,6 +550,6 @@ realms realm deploy --mode reinstall
 ## See Also
 
 - [API Reference](./API_REFERENCE.md) - Backend endpoints
-- [Deployment Guide](./DEPLOYMENT_GUIDE.md) - Deployment workflows
+- [Casals Rollout](./CASALS_ROLLOUT.md) — Deployment workflows (`AGENTS.md` in repo root)
 - [Task System](./TASK_ENTITY.md) - Task management
 - [Extension Guide](../extensions/README.md) - Extension development

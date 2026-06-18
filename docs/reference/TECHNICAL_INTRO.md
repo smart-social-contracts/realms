@@ -329,7 +329,7 @@ task = Task(name="async_task", codex=codex)
 ## Next Steps
 
 **Deploy Your First Realm:**
-- [Deployment Guide](./DEPLOYMENT_GUIDE.md)
+- [Casals Rollout](./CASALS_ROLLOUT.md) (`AGENTS.md` in repo root)
 - [CLI Reference](./CLI_REFERENCE.md)
 
 **Build Extensions:**

@@ -1519,6 +1519,85 @@ def publish_codex_command(
     )
 
 
+def publish_assistant_command(
+    registry: str,
+    source_dir: str,
+    assistant_id: Optional[str] = None,
+    version: Optional[str] = None,
+    namespace_prefix: str = "assistant",
+    skip_publish: bool = False,
+    network: str = "ic",
+    identity: Optional[str] = None,
+):
+    """Publish an assistant package (manifest, prompts/, persona.yaml, etc.) to file_registry."""
+    source_dir = os.path.abspath(source_dir)
+    if not os.path.isdir(source_dir):
+        console.print(f"[red]Error: source dir not found: {source_dir}[/red]")
+        raise typer.Exit(1)
+
+    manifest_path = os.path.join(source_dir, "manifest.json")
+    if not os.path.exists(manifest_path):
+        console.print(f"[red]Error: manifest.json not found in {source_dir}[/red]")
+        raise typer.Exit(1)
+    with open(manifest_path, "r") as fh:
+        manifest = json.load(fh)
+
+    aid = assistant_id or manifest.get("assistant_id") or os.path.basename(source_dir)
+    ver = version or manifest.get("version") or "0.0.0"
+    namespace = f"{namespace_prefix}/{aid}/{ver}"
+
+    console.print(
+        f"[blue]Publishing assistant '{aid}' v{ver} → {namespace} on "
+        f"{registry} ({network})…[/blue]"
+    )
+
+    existing = _fetch_namespace_hashes(registry, namespace, network, identity)
+    failed = 0
+    uploaded = 0
+
+    def _track(result):
+        nonlocal failed, uploaded
+        if result == "failed":
+            failed += 1
+        elif result == "uploaded":
+            uploaded += 1
+
+    skip_names = {"manifest.json"}
+    for root, _dirs, files in os.walk(source_dir):
+        for fname in sorted(files):
+            if fname.startswith("."):
+                continue
+            local = os.path.join(root, fname)
+            rel = os.path.relpath(local, source_dir).replace(os.sep, "/")
+            if rel in skip_names:
+                continue
+            _track(_upload_one_file(
+                registry, namespace, rel, local, network, identity,
+                existing_hashes=existing,
+            ))
+
+    _track(_upload_one_file(
+        registry, namespace, "manifest.json", manifest_path, network, identity,
+        existing_hashes=existing,
+    ))
+
+    if uploaded == 0 and failed == 0:
+        console.print(f"[green]✓ {aid}@{ver} already up-to-date on {registry}[/green]")
+        return
+
+    if not skip_publish and uploaded > 0:
+        if not _publish_namespace(registry, namespace, network, identity):
+            failed += 1
+
+    if failed:
+        console.print(f"[red]Publish completed with {failed} failures[/red]")
+        raise typer.Exit(1)
+
+    console.print(
+        f"[green]✓ Published assistant {aid}@{ver} to {registry}:{namespace}[/green]"
+    )
+
+
 def codex_registry_install_command(canister: str, registry: str, codex_id: str, version: Optional[str] = None, run_init: bool = True, network: str = "local", identity: Optional[str] = None):
     """Install a codex package from the file registry via the realm canister."""
     console.print(f"[blue]Installing codex '{codex_id}' from registry {registry} on {canister} ({network})...[/blue]")

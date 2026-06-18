@@ -97,7 +97,6 @@ export const idlFactory = ({ IDL }) => {
         [TransactionHistoryResult],
         ['query'],
       ),
-    'greet' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'is_principal_activated' : IDL.Func([IDL.Text], [GenericResult], ['query']),
     'list_activated_principals' : IDL.Func([], [IDL.Text], ['query']),
     'list_invitation_codes' : IDL.Func([], [IDL.Text], ['query']),
@@ -115,7 +114,6 @@ export const idlFactory = ({ IDL }) => {
     'request_deployment' : IDL.Func([IDL.Text], [IDL.Text], []),
     'request_upgrade' : IDL.Func([IDL.Text], [IDL.Text], []),
     'revoke_invitation_code' : IDL.Func([IDL.Text], [GenericResult], []),
-    'search_realms' : IDL.Func([IDL.Text], [IDL.Vec(RealmRecord)], ['query']),
     'set_invitation_mode' : IDL.Func([IDL.Text], [GenericResult], []),
     'status' : IDL.Func([], [GetStatusResult], ['query']),
   });

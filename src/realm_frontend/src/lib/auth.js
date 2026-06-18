@@ -92,6 +92,7 @@ export async function login({ random = false } = {}) {
 }
 
 export async function logout() {
+  resetAuthSessionRestore();
   if (getTestModeIIBypass()) {
     _testLoggedIn = false;
     _testIdentity = null;
@@ -108,4 +109,53 @@ export async function isAuthenticated() {
   }
   const client = await initializeAuthClient();
   return client.isAuthenticated();
+}
+
+let restorePromise = null;
+
+/** Reset so a later call re-checks IC session (e.g. after logout). */
+export function resetAuthSessionRestore() {
+  restorePromise = null;
+}
+
+/**
+ * Restore auth from the IC AuthClient (shared across tabs) and hydrate app stores.
+ * Safe to call from multiple components; runs once until reset.
+ */
+export async function restoreAuthSession() {
+  if (!restorePromise) {
+    restorePromise = _restoreAuthSession().catch((error) => {
+      restorePromise = null;
+      throw error;
+    });
+  }
+  return restorePromise;
+}
+
+async function _restoreAuthSession() {
+  const authenticated = await isAuthenticated();
+  const { isAuthenticated: isAuthenticatedStore, userIdentity, principal } = await import(
+    '$lib/stores/auth.js'
+  );
+
+  if (!authenticated) {
+    isAuthenticatedStore.set(false);
+    return { authenticated: false, principal: '' };
+  }
+
+  const client = await initializeAuthClient();
+  const identity = client.getIdentity();
+  const principalText = identity.getPrincipal().toText();
+
+  isAuthenticatedStore.set(true);
+  userIdentity.set(principalText);
+  principal.set(principalText);
+
+  const { initBackendWithIdentity } = await import('$lib/canisters.js');
+  await initBackendWithIdentity();
+
+  const { loadUserProfiles } = await import('$lib/stores/profiles.js');
+  await loadUserProfiles();
+
+  return { authenticated: true, principal: principalText };
 }

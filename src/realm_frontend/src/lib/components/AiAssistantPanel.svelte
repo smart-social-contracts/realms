@@ -6,28 +6,41 @@
 	// @ts-ignore
 	import { backend } from '$lib/canisters';
 	import { canisterId as backendCanisterId } from '$lib/declarations/realm_backend';
-	// @ts-ignore
 	import { principal, isAuthenticated } from '$lib/stores/auth';
 	import { userProfiles } from '$lib/stores/profiles';
 	import { realmInfo } from '$lib/stores/realmInfo';
 	import { notifications, unreadCount, loadNotifications, markAsRead } from '$lib/stores/notifications';
 	// @ts-ignore
 	import { _, locale } from 'svelte-i18n';
-	import { get } from 'svelte/store';
+	import { get, writable } from 'svelte/store';
+	import { createHostContext } from '$lib/host-bridge';
 	// @ts-ignore
 	import { CONFIG } from '$lib/config.js';
 	import { cn } from '$lib/theme/utilities';
 	import { mountExtension, resolveExtensionVersion, type MountResult } from '$lib/extension-loader';
 	import { loadExtensionTranslation } from '$lib/i18n';
 	import { IconSettings, IconX } from '@tabler/icons-svelte';
-	import { writable } from 'svelte/store';
 
 	export let open = false;
+	export let panelWidth = 320;
 	export let onClose: () => void = () => {};
 
 	const EXTENSION_ID = 'llm_chat';
+	const AI_PANEL_WIDTH_KEY = 'realm_ai_panel_width';
+	const DEFAULT_PANEL_WIDTH = 320;
+	const MIN_PANEL_WIDTH = 280;
+	const MAX_PANEL_WIDTH_RATIO = 0.5;
 	const SETTINGS_PATH = '/extensions/llm_chat';
 	const modelLabel = CONFIG?.llmModelLabel ?? 'Default';
+
+	function runtimeCanisterIds(): { realm_backend?: string; network?: string } {
+		return (globalThis as { __CANISTER_IDS?: { realm_backend?: string; network?: string } })
+			.__CANISTER_IDS ?? {};
+	}
+
+	function getRealmBackendCanisterId(): string {
+		return runtimeCanisterIds().realm_backend ?? backendCanisterId?.toString?.() ?? '';
+	}
 
 	function openSettings() {
 		goto(SETTINGS_PATH);
@@ -38,6 +51,58 @@
 	let errorMsg = '';
 	let mounted: MountResult | void;
 	let infraConfig: { fileRegistryCanisterId?: string; marketplaceCanisterId?: string } = {};
+	let isResizing = false;
+
+	function getMaxPanelWidth(): number {
+		if (!browser) return 600;
+		return Math.max(MIN_PANEL_WIDTH, Math.floor(window.innerWidth * MAX_PANEL_WIDTH_RATIO));
+	}
+
+	function clampPanelWidth(width: number): number {
+		return Math.min(Math.max(width, MIN_PANEL_WIDTH), getMaxPanelWidth());
+	}
+
+	function savePanelWidth() {
+		if (browser) {
+			localStorage.setItem(AI_PANEL_WIDTH_KEY, String(panelWidth));
+		}
+	}
+
+	function startResize(event: PointerEvent) {
+		if (!browser || window.innerWidth < 1024) return;
+		event.preventDefault();
+		event.stopPropagation();
+		isResizing = true;
+		document.body.style.userSelect = 'none';
+		document.body.style.cursor = 'col-resize';
+
+		const handle = event.currentTarget as HTMLElement;
+		handle.setPointerCapture(event.pointerId);
+
+		const onMove = (e: PointerEvent) => {
+			panelWidth = clampPanelWidth(window.innerWidth - e.clientX);
+		};
+
+		const onUp = (e: PointerEvent) => {
+			isResizing = false;
+			document.body.style.userSelect = '';
+			document.body.style.cursor = '';
+			savePanelWidth();
+			handle.releasePointerCapture(e.pointerId);
+			handle.removeEventListener('pointermove', onMove);
+			handle.removeEventListener('pointerup', onUp);
+			handle.removeEventListener('pointercancel', onUp);
+		};
+
+		handle.addEventListener('pointermove', onMove);
+		handle.addEventListener('pointerup', onUp);
+		handle.addEventListener('pointercancel', onUp);
+	}
+
+	function resetPanelWidth() {
+		panelWidth = DEFAULT_PANEL_WIDTH;
+		savePanelWidth();
+	}
 
 	type PageContext = { pathname: string; extensionId: string; title: string };
 
@@ -105,6 +170,7 @@
 		}
 
 		return {
+			...createHostContext(),
 			extensionId: id,
 			version,
 			backend,
@@ -116,7 +182,9 @@
 			realmInfo,
 			config: {
 				...CONFIG,
-				canisterId: backendCanisterId?.toString?.() ?? '',
+				canisterId: getRealmBackendCanisterId(),
+				network: runtimeCanisterIds().network ?? 'ic',
+				aiAssistantEnabled: get(realmInfo).aiAssistantEnabled !== false,
 				...infraConfig,
 			},
 			navigate: goto,
@@ -178,16 +246,44 @@
 		loadAssistant();
 	}
 
+	onMount(() => {
+		if (!browser) return;
+		const saved = localStorage.getItem(AI_PANEL_WIDTH_KEY);
+		if (saved !== null) {
+			const parsed = parseInt(saved, 10);
+			if (!Number.isNaN(parsed)) {
+				panelWidth = clampPanelWidth(parsed);
+			}
+		}
+
+		const handleWindowResize = () => {
+			panelWidth = clampPanelWidth(panelWidth);
+		};
+		window.addEventListener('resize', handleWindowResize);
+		return () => window.removeEventListener('resize', handleWindowResize);
+	});
+
 	onDestroy(() => {
 		cleanupMounted();
 	});
 </script>
 
 <div
-	class="fixed top-16 right-0 z-30 h-[calc(100vh-4rem)] w-80 border-l border-gray-200 bg-white transition-transform duration-300 ease-in-out flex flex-col {open ? 'translate-x-0' : 'translate-x-full'}"
+	class="ai-assistant-panel fixed top-16 right-0 z-30 h-[calc(100vh-4rem)] border-l border-gray-200 bg-white transition-transform duration-300 ease-in-out flex flex-col {open ? 'translate-x-0' : 'translate-x-full'} {isResizing ? 'is-resizing' : ''}"
+	style="--panel-width: {panelWidth}px"
 >
+	<!-- Drag handle (left edge) — must sit above panel content to receive pointer events -->
+	<div
+		class="resize-handle"
+		on:pointerdown|stopPropagation={startResize}
+		on:dblclick|stopPropagation={resetPanelWidth}
+		role="separator"
+		aria-orientation="vertical"
+		aria-label="Resize AI Assistant panel"
+		title="Drag to resize. Double-click to reset."
+	></div>
 	<!-- Panel header -->
-	<div class="flex items-center gap-2 px-4 py-3 border-b border-gray-200">
+	<div class="panel-header flex items-center gap-2 px-4 py-3 border-b border-gray-200">
 		<h3 class="text-sm font-semibold text-gray-700 flex-1 min-w-0 truncate">AI Assistant</h3>
 		<span class="text-[11px] text-gray-400 font-medium shrink-0">{modelLabel}</span>
 		<button
@@ -208,7 +304,7 @@
 	</div>
 
 	<!-- Extension mount point -->
-	<div class="flex-1 min-h-0 overflow-hidden flex flex-col">
+	<div class="panel-body flex-1 min-h-0 overflow-hidden flex flex-col">
 		{#if status === 'loading'}
 			<div class="flex items-center justify-center h-32 text-gray-500">
 				<div class="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-700"></div>
@@ -220,3 +316,63 @@
 		<div bind:this={mountPoint} class="flex-1 min-h-0 h-full"></div>
 	</div>
 </div>
+
+<style>
+	.ai-assistant-panel {
+		position: fixed;
+		width: 100%;
+	}
+
+	@media (min-width: 1024px) {
+		.ai-assistant-panel {
+			width: var(--panel-width);
+		}
+	}
+
+	.resize-handle {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 12px;
+		height: 100%;
+		cursor: col-resize;
+		z-index: 50;
+		touch-action: none;
+	}
+
+	@media (max-width: 1023px) {
+		.resize-handle {
+			display: none;
+		}
+
+		.ai-assistant-panel {
+			border-left: none;
+		}
+	}
+
+	.resize-handle::after {
+		content: '';
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		left: 0;
+		width: 3px;
+		background: transparent;
+		transition: background 0.15s ease;
+	}
+
+	.resize-handle:hover::after,
+	.is-resizing .resize-handle::after {
+		background: #6366f1;
+	}
+
+	.panel-header,
+	.panel-body {
+		position: relative;
+		z-index: 1;
+	}
+
+	.is-resizing {
+		transition: none;
+	}
+</style>

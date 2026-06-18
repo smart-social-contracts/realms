@@ -18,6 +18,7 @@ interface RealmInfo {
 	welcomeMessage: string;
 	manifesto: string;
 	openRegistration: boolean;
+	aiAssistantEnabled: boolean;
 	registries: CanisterInfo[];
 	quarters: QuarterInfo[];
 	isQuarter: boolean;
@@ -40,6 +41,7 @@ const createRealmInfoStore = () => {
 		welcomeMessage: '',
 		manifesto: '',
 		openRegistration: false,
+		aiAssistantEnabled: true,
 		registries: [],
 		quarters: [],
 		isQuarter: false,
@@ -77,6 +79,7 @@ const createRealmInfoStore = () => {
 						welcomeMessage: status.realm_welcome_message || '',
 						manifesto: status.realm_manifesto || '',
 						openRegistration: status.open_registration || false,
+						aiAssistantEnabled: status.ai_assistant_enabled !== false,
 						registries: status.registries || [],
 						quarters: status.quarters || [],
 						isQuarter: status.is_quarter || false,
@@ -119,6 +122,8 @@ export const realmManifesto = derived(realmInfo, $realmInfo => $realmInfo.manife
 
 // Derived store for open registration flag
 export const realmOpenRegistration = derived(realmInfo, $realmInfo => $realmInfo.openRegistration);
+
+export const aiAssistantEnabled = derived(realmInfo, $realmInfo => $realmInfo.aiAssistantEnabled);
 
 // Derived stores for test mode flags (source of truth: backend status)
 export const testMode = derived(realmInfo, $r => $r.testMode);

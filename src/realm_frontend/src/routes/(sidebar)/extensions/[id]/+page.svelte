@@ -32,6 +32,7 @@
 	import { parseAccessError, AccessDeniedError } from '$lib/utils/errors';
 	import { sidebarConfig } from '$lib/stores/sidebar';
 	import { extensionLoadingMessage } from '$lib/utils/breadcrumb';
+	import { createHostContext } from '$lib/host-bridge';
 
 	let mountPoint: HTMLDivElement | undefined;
 	let status: 'loading' | 'ready' | 'error' | 'access_denied' = 'loading';
@@ -91,6 +92,7 @@
 		}
 
 		return {
+			...createHostContext(),
 			extensionId: id,
 			version,
 			backend: extensionBackend,
@@ -103,6 +105,7 @@
 			config: {
 				...CONFIG,
 				canisterId: backendCanisterId?.toString?.() ?? '',
+				aiAssistantEnabled: get(realmInfo).aiAssistantEnabled !== false,
 				...infraConfig,
 			},
 			navigate: goto,

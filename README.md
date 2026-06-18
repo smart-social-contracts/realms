@@ -686,7 +686,7 @@ Then create with your custom manifest:
 realms mundus create --manifest examples/demo/manifest.json --deploy
 ```
 
-See [Deployment Guide](./docs/DEPLOYMENT_GUIDE.md#multi-realm-deployment-mundus) for details.
+See [Casals Rollout](./docs/reference/CASALS_ROLLOUT.md) and `AGENTS.md` for deploy workflows.
 
 ---
 

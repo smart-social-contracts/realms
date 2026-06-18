@@ -20,10 +20,17 @@ import os
 LITE_EXTENSIONS = [
     "public_dashboard",
     "member_dashboard",
+    "realm_settings",
+    "extensions_manager",
+    "voting",
+    "census",
+    "admin_dashboard",
+    "vault",
+    "codex_viewer",
+    "llm_chat",
     "welcome",
     "demo_simulator",
     "hello_world",
-    "llm_chat",
 ]
 
 FILE_REGISTRY = "uq2mu-kaaaa-aaaah-avqcq-cai"

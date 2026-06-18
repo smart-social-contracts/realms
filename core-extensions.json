@@ -1,0 +1,19 @@
+{
+  "$comment": "Authoritative list of core extensions — owned by Realms core, not extension manifests. Keep in sync with src/realm_backend/core/core_extensions.py and src/realm_registry_frontend/src/lib/extensions-config.json (tier: core).",
+  "core_extensions": [
+    "public_dashboard",
+    "member_dashboard",
+    "realm_settings",
+    "extensions_manager",
+    "voting",
+    "census",
+    "admin_dashboard",
+    "vault",
+    "codex_viewer",
+    "llm_chat"
+  ],
+  "defaults": {
+    "ai_assistant_enabled": true,
+    "assistant_consumer_extension": "llm_chat"
+  }
+}

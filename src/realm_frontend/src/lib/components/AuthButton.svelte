@@ -1,6 +1,6 @@
 <!-- src/lib/components/AuthButton.svelte -->
 <script>
-	import { login, logout, isAuthenticated as checkAuth, initializeAuthClient } from '$lib/auth';
+	import { login, logout, restoreAuthSession, resetAuthSessionRestore } from '$lib/auth';
 	import { isAuthenticated, userIdentity, principal } from '$lib/stores/auth';
 	import { loadUserProfiles, resetProfileState, userProfiles, hasJoined } from '$lib/stores/profiles';
 	import { goto } from '$app/navigation';
@@ -21,26 +21,19 @@
 
 	onMount(async () => {
 		// In test mode, auto-login immediately with deterministic identity
-		if ($testModeIIBypass && !(await checkAuth())) {
-			console.log('[TEST MODE] Auto-login triggered');
-			await handleLogin();
+		if ($testModeIIBypass) {
+			const restored = await restoreAuthSession();
+			if (!restored.authenticated) {
+				console.log('[TEST MODE] Auto-login triggered');
+				await handleLogin();
+			} else {
+				await loadUserProfilePicture();
+			}
 		} else {
-			const authStatus = await checkAuth();
-			isAuthenticated.set(authStatus);
-			if (authStatus) {
-				// Get existing identity without triggering new login
-				const client = await initializeAuthClient();
-				const identity = client.getIdentity();
-				const userPrincipal = identity.getPrincipal();
-				principalText = userPrincipal.toText();
-				userIdentity.set(principalText);
-				principal.set(principalText);
-
+			const restored = await restoreAuthSession();
+			if (restored.authenticated) {
+				principalText = restored.principal;
 				console.log('Principal restored from existing session:', principalText);
-				// Initialize backend with authenticated identity
-				await initBackendWithIdentity();
-				// Load user profiles
-				await loadUserProfiles();
 				await loadUserProfilePicture();
 			}
 		}
@@ -83,6 +76,7 @@
 
 	async function handleLogout() {
 		await logout();
+		resetAuthSessionRestore();
 		isAuthenticated.set(false);
 		principalText = '';
 		userIdentity.set(null);
@@ -91,11 +85,11 @@
 		// Reset the entire profile state instead of just clearing profiles array
 		resetProfileState();
 
-		// Clear sessionStorage on logout
-		if (typeof sessionStorage !== 'undefined') {
-			sessionStorage.removeItem('auth_isAuthenticated');
-			sessionStorage.removeItem('auth_userIdentity');
-			sessionStorage.removeItem('auth_principal');
+		// Clear persisted auth flags on logout
+		if (typeof localStorage !== 'undefined') {
+			localStorage.removeItem('auth_isAuthenticated');
+			localStorage.removeItem('auth_userIdentity');
+			localStorage.removeItem('auth_principal');
 		}
 
 		// Reset quarter routing

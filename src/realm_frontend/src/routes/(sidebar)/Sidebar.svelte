@@ -9,7 +9,9 @@
 	import { topUtilityItems, SECTION_HEADER_ME, SECTION_HEADER_REALM, SECTION_HEADER_MUNDUS } from '$lib/config/sidebar';
 	import { sidebarConfig, sidebarLoading, loadSidebar } from '$lib/stores/sidebar';
 	import { profilesLoading } from '$lib/stores/profiles';
+	import { isAuthenticated } from '$lib/stores/auth';
 	import { getTablerIcon } from '$lib/utils/tablerIcons';
+	import { IconLogin, IconLayoutDashboard } from '@tabler/icons-svelte';
 	// @ts-ignore
 	import { backend } from '$lib/canisters';
 
@@ -142,6 +144,36 @@
 	<h4 class="sr-only">Main menu</h4>
 	<div class={cn(styles.sidebar.container(), "overflow-y-auto h-full px-3 pb-12 scrollbar-hide overscroll-contain")}>
 		<nav>
+			{#if !$isAuthenticated}
+				<ul class="pt-5 lg:pt-3 pb-1 space-y-1">
+					<li class="px-3 pb-2">
+						<p class="text-xs text-gray-500 leading-relaxed">
+							Sign in to access your realm navigation and extensions.
+						</p>
+					</li>
+					<li>
+						<a
+							href="/join"
+							class={cn(styles.sidebar.item(), 'font-medium')}
+						>
+							<IconLogin size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
+							<span class="ml-3">Sign in</span>
+						</a>
+					</li>
+					<li>
+						<a
+							href="/extensions/public_dashboard"
+							class={cn(
+								styles.sidebar.item(),
+								isActive('/extensions/public_dashboard') ? 'bg-gray-100 font-medium' : ''
+							)}
+						>
+							<IconLayoutDashboard size={22} class="flex-shrink-0 w-5 h-5 text-gray-500 group-hover:text-gray-900" />
+							<span class="ml-3">Public Dashboard</span>
+						</a>
+					</li>
+				</ul>
+			{:else}
 			<!-- ME section (super-category) -->
 			<ul class="pt-5 lg:pt-3 pb-1 space-y-1">
 				<li>
@@ -293,6 +325,7 @@
 						</ul>
 					{/if}
 				{/if}
+			{/if}
 			{/if}
 		</nav>
 	</div>

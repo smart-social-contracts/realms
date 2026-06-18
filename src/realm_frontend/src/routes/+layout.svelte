@@ -7,6 +7,7 @@
 	import '../app.pcss';
 	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
 	import { initializeTheme } from '$lib/theme/init';
+	import { restoreAuthSession } from '$lib/auth';
 
 	export const SITE_NAME = "Realms GOS";
 
@@ -27,6 +28,11 @@
 		
 		// Initialize theme system
 		initializeTheme();
+
+		// Restore IC auth session early so sidebar/nav render correctly in new tabs
+		if (browser) {
+			void restoreAuthSession();
+		}
 		
 		await initI18n();
 		

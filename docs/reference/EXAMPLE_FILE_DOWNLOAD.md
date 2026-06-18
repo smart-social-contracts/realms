@@ -188,7 +188,7 @@ Task scheduling is managed via `basilisk-toolkit`. See the basilisk-toolkit docu
 
 ## Related Documentation
 
-- [Scheduled Tasks](./DEPLOYMENT_GUIDE.md#scheduled-tasks)
+- [Scheduled Tasks](./SCHEDULED_TASKS.md)
 - [Task Entity Persistence](./TASK_ENTITY.md)
 - [ICP HTTP Outcalls](https://internetcomputer.org/docs/current/developer-docs/smart-contracts/advanced-features/https-outcalls/)
 

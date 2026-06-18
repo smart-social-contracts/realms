@@ -16,7 +16,7 @@ let showLanguageMenu = false;
 function submitSearch() {
   const q = searchTerm.trim();
   if (!q) return;
-  goto(`/extensions?q=${encodeURIComponent(q)}`);
+  goto(`/?q=${encodeURIComponent(q)}`);
 }
 onMount(async () => {
   if (!browser) return;

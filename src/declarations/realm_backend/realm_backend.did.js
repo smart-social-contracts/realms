@@ -19,6 +19,7 @@ export const idlFactory = ({ IDL }) => {
     'proposals_count' : IDL.Nat,
     'test_mode' : IDL.Bool,
     'realms_count' : IDL.Nat,
+    'ai_assistant_enabled' : IDL.Bool,
     'test_mode_skip_passport_zkproof' : IDL.Bool,
     'test_mode_ii_bypass' : IDL.Bool,
     'version' : IDL.Text,
@@ -129,13 +130,6 @@ export const idlFactory = ({ IDL }) => {
     'response' : IDL.Text,
     'success' : IDL.Bool,
   });
-  const PublicLogEntry = IDL.Record({
-    'id' : IDL.Nat,
-    'level' : IDL.Text,
-    'logger_name' : IDL.Text,
-    'message' : IDL.Text,
-    'timestamp' : IDL.Nat,
-  });
   const Header = IDL.Tuple(IDL.Text, IDL.Text);
   const HttpRequest = IDL.Record({
     'url' : IDL.Text,
@@ -180,7 +174,6 @@ export const idlFactory = ({ IDL }) => {
     '__get_candid_interface_tmp_hack' : IDL.Func([], [IDL.Text], ['query']),
     '__shell__' : IDL.Func([IDL.Text], [IDL.Text], []),
     'change_quarter' : IDL.Func([IDL.Text], [RealmResponse], []),
-    'check_verification_status' : IDL.Func([IDL.Text], [IDL.Text], []),
     'create_multi_step_scheduled_task' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Nat, IDL.Nat],
         [IDL.Text],
@@ -209,7 +202,17 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'crypto_get_my_scopes' : IDL.Func([], [CryptoResponse], ['query']),
+    'crypto_grant_to_scope_batch' : IDL.Func(
+        [IDL.Text, IDL.Text],
+        [CryptoResponse],
+        [],
+      ),
     'crypto_list_groups' : IDL.Func([], [CryptoResponse], ['query']),
+    'crypto_list_scope_envelopes' : IDL.Func(
+        [IDL.Text],
+        [CryptoResponse],
+        ['query'],
+      ),
     'crypto_remove_group_member' : IDL.Func(
         [IDL.Text, IDL.Text],
         [CryptoResponse],
@@ -217,6 +220,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'crypto_revoke' : IDL.Func([IDL.Text, IDL.Text], [CryptoResponse], []),
     'crypto_revoke_from_group' : IDL.Func(
+        [IDL.Text, IDL.Text],
+        [CryptoResponse],
+        [],
+      ),
+    'crypto_revoke_from_scope_batch' : IDL.Func(
         [IDL.Text, IDL.Text],
         [CryptoResponse],
         [],
@@ -238,8 +246,9 @@ export const idlFactory = ({ IDL }) => {
       ),
     'declare_independence' : IDL.Func([], [RealmResponse], []),
     'deregister_quarter' : IDL.Func([IDL.Text], [RealmResponse], []),
+    'derive_my_sharing_vetkey' : IDL.Func([IDL.Text], [RealmResponse], []),
     'derive_my_vetkey' : IDL.Func([IDL.Text], [RealmResponse], []),
-    'execute_code_shell' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'directory_list' : IDL.Func([], [RealmResponse], ['query']),
     'extension_async_call' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text],
         [ExtensionCallResponse],
@@ -262,17 +271,6 @@ export const idlFactory = ({ IDL }) => {
       ),
     'get_available_upgrade' : IDL.Func([IDL.Text], [IDL.Text], []),
     'get_canister_id' : IDL.Func([], [IDL.Text], ['query']),
-    'get_canister_logs' : IDL.Func(
-        [
-          IDL.Opt(IDL.Nat),
-          IDL.Opt(IDL.Nat),
-          IDL.Opt(IDL.Text),
-          IDL.Opt(IDL.Text),
-        ],
-        [IDL.Vec(PublicLogEntry)],
-        ['query'],
-      ),
-    'get_current_application_id' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'get_extension_frontend_info' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'get_extensions' : IDL.Func([], [RealmResponse], ['query']),
     'get_menu_config' : IDL.Func([], [IDL.Text], ['query']),
@@ -295,13 +293,14 @@ export const idlFactory = ({ IDL }) => {
     'get_quarter_info' : IDL.Func([], [RealmResponse], ['query']),
     'get_realm_credits' : IDL.Func([IDL.Text], [IDL.Text], []),
     'get_realm_registry_info' : IDL.Func([], [IDL.Text], ['query']),
+    'get_sharing_root_public_key' : IDL.Func([], [RealmResponse], []),
     'get_sidebar' : IDL.Func([IDL.Text], [IDL.Text], ['query']),
     'get_sidebar_manifests' : IDL.Func([], [IDL.Text], ['query']),
     'get_upgrade_status' : IDL.Func([], [IDL.Text], ['query']),
-    'get_verification_link' : IDL.Func([IDL.Text], [IDL.Text], []),
     'get_zones' : IDL.Func([IDL.Nat], [IDL.Text], ['query']),
     'http_request' : IDL.Func([HttpRequest], [HttpResponseIncoming], ['query']),
     'http_transform' : IDL.Func([HttpTransformArgs], [HttpResponse], ['query']),
+    'install_branding_from_registry' : IDL.Func([IDL.Text], [IDL.Text], []),
     'install_codex' : IDL.Func([IDL.Text], [IDL.Text], []),
     'install_codex_from_registry' : IDL.Func([IDL.Text], [IDL.Text], []),
     'install_extension' : IDL.Func([IDL.Text], [IDL.Text], []),
@@ -315,13 +314,20 @@ export const idlFactory = ({ IDL }) => {
     'list_codex_packages' : IDL.Func([], [IDL.Text], ['query']),
     'list_extensions' : IDL.Func([IDL.Text], [RealmResponse], ['query']),
     'list_runtime_extensions' : IDL.Func([], [IDL.Text], ['query']),
+    'list_share_audiences' : IDL.Func([], [RealmResponse], ['query']),
     'mint_land_nft_for_parcel' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Nat, IDL.Text],
         [IDL.Text],
         [],
       ),
+    'receive_realm_message' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text, IDL.Text],
+        [IDL.Text],
+        [],
+      ),
     'refresh_invoice' : IDL.Func([IDL.Text], [IDL.Text], []),
     'register_quarter' : IDL.Func([IDL.Text, IDL.Text], [RealmResponse], []),
+    'register_realm_from_registry' : IDL.Func([IDL.Text], [IDL.Text], []),
     'register_realm_with_registry' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text, IDL.Text],
         [IDL.Text],
@@ -330,7 +336,11 @@ export const idlFactory = ({ IDL }) => {
     'reload_codex' : IDL.Func([IDL.Text], [IDL.Text], []),
     'reload_entity_method_overrides' : IDL.Func([], [IDL.Text], []),
     'request_upgrade' : IDL.Func([IDL.Text], [IDL.Text], []),
-    'set_application_id' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'send_realm_message' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text, IDL.Text],
+        [IDL.Text],
+        [],
+      ),
     'set_canister_config' : IDL.Func(
         [
           IDL.Opt(IDL.Text),
@@ -345,6 +355,7 @@ export const idlFactory = ({ IDL }) => {
         [RealmResponse],
         [],
       ),
+    'set_canister_config_json' : IDL.Func([IDL.Text], [IDL.Text], []),
     'set_menu_category_order' : IDL.Func([IDL.Text], [IDL.Text], []),
     'set_menu_item_config' : IDL.Func([IDL.Text], [IDL.Text], []),
     'set_menu_visibility' : IDL.Func([IDL.Text], [IDL.Text], []),

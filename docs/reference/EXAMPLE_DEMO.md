@@ -253,6 +253,6 @@ Code lives in **realm-specific codexes**:
 
 ## See Also
 
-- [Deployment Guide](./DEPLOYMENT_GUIDE.md) - Deployment scripts overview
+- [Casals Rollout](./CASALS_ROLLOUT.md) — Deploy workflows (`AGENTS.md` in repo root)
 - [Entity Method Overrides](./ENTITY_METHOD_OVERRIDES.md) - Technical reference
 - [Demo Folder README](../examples/demo/README.md) - Configuration structure

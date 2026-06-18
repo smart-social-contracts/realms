@@ -72,7 +72,7 @@ export default defineConfig({
         {
           text: 'Quick Start',
           items: [
-            { text: 'Deployment Guide', link: '/reference/DEPLOYMENT_GUIDE' },
+            { text: 'Casals Rollout', link: '/reference/CASALS_ROLLOUT' },
             { text: 'CLI Reference', link: '/reference/CLI_REFERENCE' },
             { text: 'Governance Tutorial', link: '/reference/GOVERNANCE_TUTORIAL' }
           ]
@@ -108,7 +108,7 @@ export default defineConfig({
         {
           text: 'Operations',
           items: [
-            { text: 'Deployment Guide', link: '/reference/DEPLOYMENT_GUIDE' },
+            { text: 'Casals Rollout', link: '/reference/CASALS_ROLLOUT' },
             { text: 'Realm Registration', link: '/reference/REALM_REGISTRATION_GUIDE' },
             { text: 'Troubleshooting', link: '/reference/TROUBLESHOOTING' }
           ]

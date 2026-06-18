@@ -68,7 +68,7 @@ Now that you have a realm running, you can:
 
 - **[Explore the CLI](/reference/CLI_REFERENCE)** - Learn all available commands
 - **[Understand Core Entities](/reference/CORE_ENTITIES)** - Learn about the data model
-- **[Deploy to Production](/reference/DEPLOYMENT_GUIDE)** - Deploy to the Internet Computer mainnet
+- **[Deploy to test/demo/staging](/reference/CASALS_ROLLOUT)** — Casals publish-build → rollout (see `AGENTS.md`)
 - **[Build Extensions](/reference/EXTENSION_ARCHITECTURE)** - Extend your realm's functionality
 - **[Join the Registry](/reference/REALM_REGISTRATION_GUIDE)** - Register your realm in the Mundus
 

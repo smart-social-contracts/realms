@@ -31,9 +31,9 @@ export class AuthHelper {
 
 	async loginAsAdmin() {
 		await this.page.addInitScript(() => {
-			sessionStorage.setItem('auth_isAuthenticated', 'true');
-			sessionStorage.setItem('auth_principal', '"test-principal-123"');
-			sessionStorage.setItem('auth_userIdentity', '{"principal": "test-principal-123"}');
+			localStorage.setItem('auth_isAuthenticated', 'true');
+			localStorage.setItem('auth_principal', '"test-principal-123"');
+			localStorage.setItem('auth_userIdentity', '"test-principal-123"');
 		});
 
 		await this.page.goto('/extensions/public_dashboard');
@@ -42,9 +42,9 @@ export class AuthHelper {
 
 	async setupAuthenticatedSession() {
 		await this.page.addInitScript(() => {
-			sessionStorage.setItem('auth_isAuthenticated', 'true');
-			sessionStorage.setItem('auth_principal', '"test-principal-123"');
-			sessionStorage.setItem('auth_userIdentity', '{"principal": "test-principal-123"}');
+			localStorage.setItem('auth_isAuthenticated', 'true');
+			localStorage.setItem('auth_principal', '"test-principal-123"');
+			localStorage.setItem('auth_userIdentity', '"test-principal-123"');
 		});
 
 		await this.mockAllAPICalls();
@@ -107,9 +107,9 @@ export class AuthHelper {
 		await this.mockAllAPICalls();
 		
 		await this.page.addInitScript(() => {
-			sessionStorage.setItem('auth_isAuthenticated', 'true');
-			sessionStorage.setItem('auth_principal', '"test-principal-123"');
-			sessionStorage.setItem('auth_userIdentity', '{"principal": "test-principal-123"}');
+			localStorage.setItem('auth_isAuthenticated', 'true');
+			localStorage.setItem('auth_principal', '"test-principal-123"');
+			localStorage.setItem('auth_userIdentity', '"test-principal-123"');
 		});
 		
 		await this.page.goto('/join');

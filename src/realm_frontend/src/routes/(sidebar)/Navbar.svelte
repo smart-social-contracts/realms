@@ -1,10 +1,9 @@
 <script>
 	import AuthButton from '$lib/components/AuthButton.svelte';
-	import { realmInfo, realmName } from '$lib/stores/realmInfo';
-	import { isAuthenticated } from '$lib/stores/auth';
+	import { realmInfo, realmName, aiAssistantEnabled } from '$lib/stores/realmInfo';
 	import { onMount } from 'svelte';
-	import { NavHamburger, Navbar } from 'flowbite-svelte';
-	import { IconMessageChatbot } from '@tabler/icons-svelte';
+	import { Navbar } from 'flowbite-svelte';
+	import { IconMessageChatbot, IconMenu2 } from '@tabler/icons-svelte';
 	import { _ } from 'svelte-i18n';
 	import '../../app.pcss';
 
@@ -18,12 +17,15 @@
 </script>
 
 <Navbar {fluid} class="text-black relative z-50" color="default" let:NavContainer style="pointer-events: auto;">
-	{#if $isAuthenticated}
-		<NavHamburger
-			onClick={() => (drawerHidden = !drawerHidden)}
-			class="m-0 md:block p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200"
-		/>
-	{/if}
+	<button
+		type="button"
+		on:click={() => (drawerHidden = !drawerHidden)}
+		class="m-0 inline-flex p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 text-gray-600 hover:text-gray-900"
+		aria-label="Toggle navigation menu"
+		aria-expanded={!drawerHidden}
+	>
+		<IconMenu2 size={22} />
+	</button>
 
 	<div class="absolute left-1/2 transform -translate-x-1/2">
 		<a href="/" class="flex items-center cursor-pointer">
@@ -41,6 +43,7 @@
 	</div>
 
 	<div class="ms-auto flex items-center gap-2 text-gray-500">
+		{#if $aiAssistantEnabled}
 		<!-- AI Assistant toggle button -->
 		<button
 			on:click={() => (aiPanelOpen = !aiPanelOpen)}
@@ -55,6 +58,7 @@
 				{$_('common.assistant', { default: 'Assistant' })}
 			</span>
 		</button>
+		{/if}
 
 		<AuthButton />
 	</div>

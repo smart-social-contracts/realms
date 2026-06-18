@@ -38,6 +38,31 @@ export interface RealmInfo {
 	error: string | null;
 }
 
+export interface DocumentFocusSnapshot {
+	languageId: string;
+	range: { startLine: number; endLine: number };
+	text: string;
+}
+
+/** Passive pub/sub: what the user is currently viewing in an extension. */
+export interface DocumentFocus {
+	source: string;
+	uri: string;
+	label?: string;
+	snapshot?: DocumentFocusSnapshot;
+}
+
+export type HostAction =
+	| { type: 'assistant.open' }
+	| { type: 'assistant.prompt'; message?: string; autoSend?: boolean }
+	| { type: 'clipboard.write'; text: string };
+
+export interface PendingPrompt {
+	message: string;
+	autoSend: boolean;
+	id: number;
+}
+
 // ── Main context interface ─────────────────────────────────────────────
 
 export interface RealmExtensionContext {
@@ -165,6 +190,17 @@ export interface RealmExtensionContext {
 			scope: string,
 			ciphertext: string,
 		) => Promise<T | null>;
+	};
+
+	/**
+	 * Generic host bridge: document focus pub/sub and cross-extension actions.
+	 * Extensions publish focus; consumers (e.g. llm_chat) react without coupling.
+	 */
+	host: {
+		focus: Readable<DocumentFocus | null>;
+		setFocus: (focus: DocumentFocus | null) => void;
+		dispatch: (action: HostAction) => void;
+		pendingPrompt: Readable<PendingPrompt | null>;
 	};
 
 	/** Shared UI helpers provided by the host app. */

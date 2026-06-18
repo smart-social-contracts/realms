@@ -28,15 +28,15 @@
     "svelte-markdown": "^0.4.1"
   },
   "devDependencies": {
-    "@sveltejs/kit": "^2.49.5"
+    "@sveltejs/kit": "^2.27.0"
   },
   "overrides": {
     "rollup": "^4.59.0",
-    "esbuild": "0.28.1",
+    "esbuild": "0.21.5",
     "flatted": "^3.4.2",
     "immutable": "^5.1.6",
     "vite": {
-      "esbuild": "0.28.1",
+      "esbuild": "0.21.5",
       "rollup": "^4.59.0"
     },
     "svelte-i18n": {

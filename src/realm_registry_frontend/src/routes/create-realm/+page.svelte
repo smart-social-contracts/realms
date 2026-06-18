@@ -6,6 +6,7 @@
   import { CONFIG } from '$lib/config.js';
   import extensionsConfig from '$lib/extensions-config.json';
   import codicesConfig from '$lib/codices-config.json';
+  import AuthControls from '$lib/components/AuthControls.svelte';
 
   // Auth state
   let isLoggedIn = false;
@@ -109,6 +110,14 @@
       userPrincipal = result.principal;
       await loadUserCredits();
     }
+  }
+
+  async function handleLogout() {
+    const { logout } = await import("$lib/auth");
+    await logout();
+    isLoggedIn = false;
+    userPrincipal = null;
+    userCredits = 0;
   }
 
   async function handleRedeemCode() {
@@ -265,6 +274,9 @@
 
   // Available extensions and categories (loaded from $lib/extensions-config.json)
   const AVAILABLE_EXTENSIONS = extensionsConfig.extensions;
+  const defaultExtensionIds = AVAILABLE_EXTENSIONS
+    .filter((e) => e.default || e.tier === 'core' || e.mandatory)
+    .map((e) => e.id);
   const EXTENSION_CATEGORIES = (() => {
     const seen = new Map();
     for (const ext of AVAILABLE_EXTENSIONS) {
@@ -327,8 +339,8 @@
     codex_file: null,
     codex_file_name: '',
     codex_url: '',
-    // New: Extensions
-    extensions: AVAILABLE_EXTENSIONS.map(e => e.id),
+    // New: Extensions (core + default extensions pre-selected)
+    extensions: defaultExtensionIds,
     custom_extensions: [], // Array of { name, source: 'file'|'url', file, url }
     // New: Governance Assistant
     assistant: null, // null means no assistant, or assistant id
@@ -481,9 +493,9 @@
   }
 
   function toggleExtension(extId) {
-    // Prevent toggling mandatory extensions
+    // Prevent toggling mandatory or core extensions
     const ext = AVAILABLE_EXTENSIONS.find(e => e.id === extId);
-    if (ext?.mandatory) return;
+    if (ext?.mandatory || ext?.tier === 'core') return;
     
     if (formData.extensions.includes(extId)) {
       formData.extensions = formData.extensions.filter(id => id !== extId);
@@ -664,6 +676,20 @@
 <svelte:head>
   <title>Create Realm | Realms</title>
 </svelte:head>
+
+<div class="page-shell">
+  <header class="site-header">
+    <a href="/" class="site-logo-link">
+      <img src="/images/logo_horizontal.svg" alt="Realms Logo" class="site-logo" />
+    </a>
+    <AuthControls
+      {authLoading}
+      {isLoggedIn}
+      {userPrincipal}
+      onLogin={handleLogin}
+      onLogout={handleLogout}
+    />
+  </header>
 
 {#if checkingActivation || authLoading}
   <div class="wizard-container">
@@ -1348,18 +1374,18 @@
             type="button" 
             class="btn btn-small btn-outline"
             on:click={() => {
-              const nonMandatory = AVAILABLE_EXTENSIONS.filter(e => !e.mandatory);
-              const allSelected = nonMandatory.every(e => formData.extensions.includes(e.id));
-              if (allSelected) {
-                // Unselect all non-mandatory
-                formData.extensions = AVAILABLE_EXTENSIONS.filter(e => e.mandatory).map(e => e.id);
+              const optional = AVAILABLE_EXTENSIONS.filter(e => !e.mandatory && e.tier !== 'core');
+              const allOptionalSelected = optional.every(e => formData.extensions.includes(e.id));
+              if (allOptionalSelected) {
+                formData.extensions = AVAILABLE_EXTENSIONS
+                  .filter(e => e.mandatory || e.tier === 'core')
+                  .map(e => e.id);
               } else {
-                // Select all
                 formData.extensions = AVAILABLE_EXTENSIONS.map(e => e.id);
               }
             }}
           >
-            {#if AVAILABLE_EXTENSIONS.filter(e => !e.mandatory).every(e => formData.extensions.includes(e.id))}
+            {#if AVAILABLE_EXTENSIONS.filter(e => !e.mandatory && e.tier !== 'core').every(e => formData.extensions.includes(e.id))}
               Unselect All
             {:else}
               Select All
@@ -1378,9 +1404,9 @@
                     type="button"
                     class="extension-card" 
                     class:selected={formData.extensions.includes(ext.id)}
-                    class:mandatory={ext.mandatory}
+                    class:mandatory={ext.mandatory || ext.tier === 'core'}
                     on:click={() => toggleExtension(ext.id)}
-                    disabled={ext.mandatory}
+                    disabled={ext.mandatory || ext.tier === 'core'}
                   >
                     <div class="extension-check">
                       {#if formData.extensions.includes(ext.id)}
@@ -1390,7 +1416,7 @@
                       {/if}
                     </div>
                     <div class="extension-info">
-                      <span class="extension-name">{ext.name}{#if ext.mandatory} <span class="mandatory-badge">Required</span>{/if}</span>
+                      <span class="extension-name">{ext.name}{#if ext.mandatory} <span class="mandatory-badge">Required</span>{:else if ext.tier === 'core'} <span class="mandatory-badge">Core</span>{/if}</span>
                       <span class="extension-desc">{ext.description}</span>
                       {#if ext.doc_url}
                         <a href={ext.doc_url} target="_blank" rel="noopener" class="doc-link" on:click|stopPropagation>
@@ -1787,8 +1813,33 @@
 
 </div>
 {/if}
+</div>
 
 <style>
+  .page-shell {
+    min-height: 100vh;
+    background: #FAFAFA;
+  }
+
+  .site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1rem 2rem 0;
+  }
+
+  .site-logo-link {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .site-logo {
+    height: 48px;
+    width: auto;
+  }
+
   .invitation-gate {
     text-align: center;
     padding: 3rem 2rem;

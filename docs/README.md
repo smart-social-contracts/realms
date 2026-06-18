@@ -19,7 +19,7 @@ Complete documentation for building and deploying governance systems on the Inte
 - [Governance Tutorial](./reference/GOVERNANCE_TUTORIAL.md) - Vote on proposals
 
 ### 👨‍💼 Realm Operators  
-- [Deployment Guide](./reference/DEPLOYMENT_GUIDE.md) - Deploy your realm
+- [Casals Rollout](./reference/CASALS_ROLLOUT.md) - Deploy and upgrade realms (`AGENTS.md` in repo root)
 - [Realm Registration](./reference/REALM_REGISTRATION_GUIDE.md) - Register with central registry
 - [CLI Reference](./reference/CLI_REFERENCE.md) - All commands
 
@@ -44,7 +44,7 @@ Complete documentation for building and deploying governance systems on the Inte
 - **[Frontend Architecture](./reference/FRONTEND_ARCHITECTURE.md)** - UI structure and patterns
 
 ### Deployment & Operations
-- **[Deployment Guide](./reference/DEPLOYMENT_GUIDE.md)** - Local → Staging → Production
+- **[Casals Rollout](./reference/CASALS_ROLLOUT.md)** — Publish-build → rollout deploy path
 - **[Realm Registration](./reference/REALM_REGISTRATION_GUIDE.md)** - Join the registry
 - **[Troubleshooting](./reference/TROUBLESHOOTING.md)** - Common issues
 
@@ -128,7 +128,7 @@ cd generated_realm
 # 3. Upload data
 ./scripts/3-upload-data.sh
 ```
-→ [Deployment Guide](./reference/DEPLOYMENT_GUIDE.md)
+→ [Casals Rollout](./reference/CASALS_ROLLOUT.md) or `AGENTS.md` in repo root
 
 ### Create a Governance Proposal
 ```python

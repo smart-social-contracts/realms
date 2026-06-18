@@ -13,6 +13,7 @@ from rich.console import Console
 from .extension import (
     publish_extension_command,
     publish_codex_command,
+    publish_assistant_command,
     _dfx_call,
     _fetch_namespace_hashes,
     _publish_namespace,
@@ -234,6 +235,24 @@ def files_publish_command(
             console.print(f"[yellow]Extensions directory not found: {ext_root}[/yellow]")
 
     console.print("\n[bold green]File registry publish complete.[/bold green]")
+
+
+def files_publish_assistant_command(
+    network: str,
+    registry: Optional[str],
+    identity: Optional[str],
+    source_dir: str,
+    version: Optional[str] = None,
+):
+    """Publish an assistant package to the file registry."""
+    reg = _resolve_registry(network, registry)
+    publish_assistant_command(
+        registry=reg,
+        source_dir=source_dir,
+        version=version,
+        network=network,
+        identity=identity,
+    )
 
 
 _BRANDING_NAMESPACE = "branding"

@@ -15,7 +15,7 @@ class RealmStatus:
 
 class Realm(Entity, TimestampedMixin):
     __alias__ = "name"
-    __version__ = 2
+    __version__ = 3
     name = String(min_length=2, max_length=256)
     manifesto = String(max_length=256)
 
@@ -23,6 +23,9 @@ class Realm(Entity, TimestampedMixin):
     def migrate(cls, obj, from_version, to_version):
         if from_version < 2:
             obj["manifesto"] = obj.pop("description", "")
+        if from_version < 3:
+            if obj.get("ai_assistant_enabled") is None:
+                obj["ai_assistant_enabled"] = True
         return obj
     welcome_message = String(max_length=1024)  # Welcome message displayed on landing page
     status = String(max_length=STATUS_MAX_LENGTH, default=RealmStatus.ALPHA)
@@ -53,6 +56,9 @@ class Realm(Entity, TimestampedMixin):
     # When False (default), all users must present an invite code to join.
     # When True, anyone can join as member without a code. Admin always requires a code.
     open_registration = Boolean(default=False)
+    # When True (default), the AI assistant sidebar and Explain actions are available.
+    # Admins can disable via update_realm_config without uninstalling llm_chat.
+    ai_assistant_enabled = Boolean(default=True)
     # Branding URLs (optional; frontend falls back to static /images/ assets)
     logo_url = String(max_length=512, default="")
     background_image_url = String(max_length=512, default="")

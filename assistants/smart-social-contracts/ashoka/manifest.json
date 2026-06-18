@@ -1,0 +1,19 @@
+{
+  "assistant_id": "smart-social-contracts/ashoka",
+  "name": "Ashoka",
+  "version": "1.0.0",
+  "description": "AI governance advisor for Realms — plain-language insights on realm activity, codices, and policy.",
+  "developer": "smart-social-contracts",
+  "icon": "🏛️",
+  "categories": "oversight,governance",
+  "domains": "governance,oversight,codex",
+  "languages": "en",
+  "runtime": "self_hosted",
+  "endpoint_url": "https://geister-api.realmsgos.dev/api/ask",
+  "base_model": "gpt-oss:20b",
+  "requested_role": "advisor",
+  "requested_permissions": "read_realm_status,read_codex",
+  "pricing_summary": "Included with core llm_chat on Realms test environments",
+  "training_data_summary": "Governance-focused system prompt; inference via Geister (RunPod/Ollama).",
+  "eval_report_url": "https://github.com/smart-social-contracts/geister/tree/main/prompts/personas"
+}

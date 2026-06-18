@@ -77,5 +77,5 @@ From small towns to entire nations, it empowers communities to design, run, and 
 
 - [Non-Technical Introduction](/reference/NON_TECHNICAL_INTRO) - Understand what Realms is
 - [Technical Overview](/reference/TECHNICAL_INTRO) - Architecture and development
-- [Deployment Guide](/reference/DEPLOYMENT_GUIDE) - Deploy your first realm
+- [Casals Rollout](/reference/CASALS_ROLLOUT) - Deploy realms (`AGENTS.md` in repo root)
 - [CLI Reference](/reference/CLI_REFERENCE) - Command-line tools

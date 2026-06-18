@@ -172,6 +172,48 @@ infra stands map to families `installer`, `registry`, `file-registry`,
 `dashboard`, `marketplace`. (`token`/`nft` are external canisters — managed in
 Casals but not built here.)
 
+### What each deploy path upgrades
+
+After an off-chain redeploy, demo/staging can still show an old **Realm Registry**
+footer (e.g. `0.3.7`) while test shows `0.4.0` — even though the three realms were
+upgraded. That is expected: the footer is **`realm_registry_frontend`** (infra), not
+the realm apps.
+
+| Component | Off-chain (`deploy-mundus` / `realms mundus deploy`) | Casals (`publish-build` → `rollout`) |
+|---|---|---|
+| Realm backends + frontends (Dominion, Agora, Syntropia) | Yes | Yes |
+| Extensions/codices on realms | Yes (manifest + `file_registry`) | Yes (arrangement) |
+| **Realm registry** (backend + frontend — `test`/`demo`/`staging`.realmsgos.org) | **No** | Yes (`family=registry`, target `realm-registry`) |
+| Installer, `file_registry`, marketplace, dashboard | **No** | Yes (`all-infra` or per-family) |
+
+Notes:
+
+- Mundus descriptors only list `type: realm` entries. The registry backend is used
+  to *enqueue* deploy jobs; it is **not** upgraded by mundus deploy.
+- `artifact_version=latest` in mundus deploy refers to **realm** GitHub-release
+  artifacts, not registry/infra.
+- The registry footer version ≠ individual realm WASM version. Realm cards’
+  “updated X ago” is catalog metadata, not proof of realm code version.
+- To align demo/staging registry UI with test after a mundus realm deploy, publish
+  and roll out the **`registry`** family (Casals path, `mode=upgrade`).
+
+```bash
+# Per environment (example: staging)
+gh workflow run publish-build.yml \
+  -f environment=staging -f family=registry -f component=both -f version=0.4.0
+
+gh workflow run rollout.yml \
+  -f environments=staging -f targets=realm-registry -f scope=both \
+  -f mode=upgrade -f version=0.4.0
+```
+
+Repeat for `demo`. Or locally after publish:
+
+```bash
+realms rollout -e staging,demo -t realm-registry -s both -m upgrade -v 0.4.0 \
+  --identity deployer --execute --yes
+```
+
 ### Step 1 — Publish Build
 
 Builds the WASM/bundle, uploads to `file_registry`, authorizes in Casals.
@@ -703,7 +745,7 @@ asyncio.run(test())
 
 ## Further Reading
 
-- `docs/reference/DEPLOYMENT_GUIDE.md` — Full deployment guide
+- `AGENTS.md` — Agent/operator guide (deploy paths, canister IDs, fast iteration)
 - `docs/reference/CASALS_ROLLOUT.md` — On-chain (Casals) deploy & upgrade runbook
 - `docs/reference/RUNTIME_EXTENSION_STAGING_DEPLOY.md` — Layered deploy runbook
 - `docs/reference/EXTENSION_ARCHITECTURE.md` — Extension lifecycle

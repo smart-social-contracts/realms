@@ -23,6 +23,7 @@ from .commands.marketplace import (
 from .commands.mundus import mundus_deploy_descriptor_command, mundus_deploy_new_command
 from .commands.files import (
     files_build_command,
+    files_publish_assistant_command,
     files_publish_branding_command,
     files_publish_command,
     files_publish_release_command,
@@ -708,6 +709,28 @@ def files_publish(
     codex_names = [s.strip() for s in codices_filter.split(",") if s.strip()] if codices_filter else None
     files_publish_command(network, registry, identity, extensions_only, codices_only,
                           extension_names=ext_names, codex_names=codex_names)
+
+
+@files_app.command("publish-assistant")
+def files_publish_assistant(
+    source_dir: str = typer.Option(
+        ..., "--source-dir", help="Path to assistant package (manifest.json + prompts/)"
+    ),
+    network: str = typer.Option(
+        "staging", "--network", "-n", help="Target network: staging, demo, test"
+    ),
+    registry: Optional[str] = typer.Option(
+        None, "--registry", "-r", help="File registry canister ID (auto-resolved from network)"
+    ),
+    identity: Optional[str] = typer.Option(
+        None, "--identity", help="dfx identity to use"
+    ),
+    version: Optional[str] = typer.Option(
+        None, "--version", "-v", help="Override version from manifest.json"
+    ),
+) -> None:
+    """Publish an AI assistant package to the file registry."""
+    files_publish_assistant_command(network, registry, identity, source_dir, version)
 
 
 @files_app.command("publish-branding")
