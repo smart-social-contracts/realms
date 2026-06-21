@@ -183,7 +183,15 @@ def _build_artifacts(scope: str = "both") -> dict[str, Path]:
 
         console.print("  Building frontend...")
         fe_dir = project_root / "src" / "realm_frontend"
-        result = subprocess.run(["npm", "install", "--legacy-peer-deps"], cwd=fe_dir, capture_output=True, text=True)
+        # Workspace frontends hoist shared deps from the repo root; installing
+        # only in the subdirectory leaves vite/svelte-kit unresolved.
+        result = subprocess.run(
+            ["npm", "install", "--legacy-peer-deps"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            env=build_env,
+        )
         if result.returncode != 0:
             raise RuntimeError(f"npm install failed:\n{result.stderr}")
         result = subprocess.run(["npm", "run", "build"], cwd=fe_dir, capture_output=True, text=True, env=build_env)
