@@ -33,7 +33,7 @@ realms/
 
 ## Deploying Code Changes
 
-Visual overview (all paths, coverage matrix): [`.AGENTS/realms-deployment-paths.svg`](.AGENTS/realms-deployment-paths.svg)
+Visual overview (decision tree): [`.AGENTS/realms-deployment-paths.svg`](.AGENTS/realms-deployment-paths.svg) — paths **P1**–**P6** (see diagram footer).
 
 Deploys go through **Casals** (the on-chain orchestrator): publish artifacts, then
 roll them out. See "Casals — On-Chain Deploy & Upgrade" below for the full reference;
@@ -747,7 +747,7 @@ asyncio.run(test())
 
 ## Further Reading
 
-- [`.AGENTS/realms-deployment-paths.svg`](.AGENTS/realms-deployment-paths.svg) — Deployment paths diagram (Casals, mundus, extensions, release)
+- [`.AGENTS/realms-deployment-paths.svg`](.AGENTS/realms-deployment-paths.svg) — Deployment decision tree (Casals, mundus, extensions, release)
 - `AGENTS.md` — Agent/operator guide (deploy paths, canister IDs, fast iteration)
 - `docs/reference/CASALS_ROLLOUT.md` — On-chain (Casals) deploy & upgrade runbook
 - `docs/reference/RUNTIME_EXTENSION_STAGING_DEPLOY.md` — Layered deploy runbook

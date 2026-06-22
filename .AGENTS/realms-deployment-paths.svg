@@ -1,13 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1180" viewBox="0 0 1400 1180">
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1180" viewBox="0 0 1280 1180">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#f8fafc"/>
       <stop offset="100%" stop-color="#f1f5f9"/>
     </linearGradient>
-    <filter id="shadow" x="-4%" y="-4%" width="108%" height="108%">
-      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#0f172a" flood-opacity="0.08"/>
+    <filter id="shadow" x="-6%" y="-6%" width="112%" height="112%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0f172a" flood-opacity="0.1"/>
     </filter>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/>
+    </marker>
     <marker id="arrow-blue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
       <path d="M0,0 L8,4 L0,8 Z" fill="#2563eb"/>
     </marker>
@@ -16,201 +19,244 @@
     </marker>
   </defs>
 
-  <rect width="1400" height="1180" fill="url(#bg)"/>
+  <rect width="1280" height="1180" fill="url(#bg)"/>
 
-  <!-- Header -->
-  <text x="48" y="48" font-size="26" font-weight="700" fill="#0f172a" font-family="system-ui,sans-serif">Realms deployment paths</text>
-  <text x="48" y="72" font-size="13" fill="#64748b" font-family="system-ui,sans-serif">Quick reference - test / demo / staging on IC mainnet - source: realms/AGENTS.md</text>
+  <!-- Title -->
+  <text x="640" y="32" font-size="24" font-weight="700" fill="#0f172a" text-anchor="middle" font-family="system-ui,sans-serif">Realms deployment decision tree</text>
+  <text x="640" y="52" font-size="12" fill="#64748b" text-anchor="middle" font-family="system-ui,sans-serif">test / demo / staging on IC mainnet - paths labeled P1-P6 for reference</text>
 
-  <!-- Decision box -->
+  <!-- WHERE IT RUNS legend -->
   <g filter="url(#shadow)">
-    <rect x="48" y="96" width="1304" height="72" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
-    <text x="68" y="122" font-size="12" font-weight="600" fill="#334155" font-family="system-ui,sans-serif">What changed?</text>
-    <text x="68" y="144" font-size="11" fill="#475569" font-family="system-ui,sans-serif">Realm code - Casals or off-chain mundus | Extension/codex - deploy-files + install | Infra/registry - Casals publish-build + rollout | Casals UI - casals-upgrade</text>
-    <text x="68" y="160" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">Default for full orchestra: mode=upgrade (preserves state). reinstall wipes canisters.</text>
+    <rect x="40" y="68" width="1200" height="52" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="56" y="88" font-size="11" font-weight="700" fill="#334155" font-family="system-ui,sans-serif">Where it runs</text>
+  </g>
+  <rect x="160" y="78" width="88" height="18" rx="4" fill="#24292f"/>
+  <text x="204" y="90" font-size="9" font-weight="600" fill="#ffffff" text-anchor="middle" font-family="system-ui,sans-serif">GH Actions</text>
+  <text x="254" y="90" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">GitHub workflow runner (build, trigger, CLI)</text>
+  <rect x="500" y="78" width="64" height="18" rx="4" fill="#16a34a"/>
+  <text x="532" y="90" font-size="9" font-weight="600" fill="#ffffff" text-anchor="middle" font-family="system-ui,sans-serif">Local CLI</text>
+  <text x="572" y="90" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">Your machine: dfx / realms CLI</text>
+  <rect x="720" y="78" width="76" height="18" rx="4" fill="#2563eb"/>
+  <text x="758" y="90" font-size="9" font-weight="600" fill="#ffffff" text-anchor="middle" font-family="system-ui,sans-serif">IC canister</text>
+  <text x="804" y="90" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">On-chain update/query calls</text>
+  <rect x="920" y="78" width="80" height="18" rx="4" fill="#d97706"/>
+  <text x="960" y="90" font-size="9" font-weight="600" fill="#ffffff" text-anchor="middle" font-family="system-ui,sans-serif">Off-chain svc</text>
+  <text x="1008" y="90" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">deploy.realmsgos.dev worker</text>
+  <rect x="160" y="100" width="88" height="18" rx="4" fill="#7c3aed"/>
+  <text x="204" y="112" font-size="9" font-weight="600" fill="#ffffff" text-anchor="middle" font-family="system-ui,sans-serif">Casals exec</text>
+  <text x="254" y="112" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">Casals canister runs upgrade_to on orchestra (on IC)</text>
+
+  <!-- START -->
+  <g filter="url(#shadow)">
+    <rect x="490" y="140" width="300" height="40" rx="20" fill="#0f172a"/>
+    <text x="640" y="165" font-size="13" font-weight="600" fill="#ffffff" text-anchor="middle" font-family="system-ui,sans-serif">What are you deploying?</text>
   </g>
 
-  <!-- PATH 1: CASALS -->
-  <g filter="url(#shadow)">
-    <rect x="48" y="192" width="420" height="420" rx="12" fill="#eff6ff" stroke="#93c5fd"/>
-    <rect x="48" y="192" width="420" height="36" rx="12" fill="#2563eb"/>
-    <rect x="48" y="216" width="420" height="12" fill="#2563eb"/>
-    <text x="68" y="216" font-size="15" font-weight="700" fill="#ffffff" font-family="system-ui,sans-serif">1. Casals path (authoritative)</text>
-    <text x="380" y="216" font-size="9" font-weight="700" fill="#bfdbfe" text-anchor="end" font-family="system-ui,sans-serif">PREFERRED - FULL ORCHESTRA</text>
+  <!-- CONNECTORS (drawn before boxes so lines stay behind) -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- start -> Q1 -->
+    <path d="M640,180 L640,200" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+    <!-- Q1 -> P1 -->
+    <path d="M525,258 L120,258 L120,338" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <!-- Q1 -> P2 -->
+    <path d="M575,278 L340,278 L340,338" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <!-- Q1 -> P3 -->
+    <path d="M615,316 L560,316 L560,346" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <!-- Q1 -> realm -> Q2 (route below P3 box) -->
+    <path d="M665,316 L690,316 L690,478 L820,478 L820,488" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <!-- Q1 -> orchestra -> skip box -->
+    <path d="M705,278 L1020,278 L1020,338" stroke="#64748b" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+    <!-- Q2 YES -> P4 (bus below leaf row) -->
+    <path d="M715,528 L715,568 L330,568 L330,578" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+    <!-- Q2 NO -> P5 -->
+    <path d="M925,528 L960,528 L960,578" stroke="#0d9488" stroke-width="2" marker-end="url(#arrow-teal)"/>
+    <!-- P3 -> P4 bus -->
+    <path d="M560,436 L560,568 L330,568" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <!-- skip box -> P4 bus -->
+    <path d="M1020,390 L1020,568 L330,568" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="5 4"/>
   </g>
 
-  <rect x="68" y="244" width="380" height="52" rx="8" fill="#ffffff" stroke="#bfdbfe"/>
-  <text x="82" y="264" font-size="10" fill="#334155" font-family="ui-monospace,monospace">publish-build.yml</text>
-  <text x="82" y="282" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">Build WASM/bundle - file_registry - authorize in Casals catalog</text>
+  <!-- Branch labels -->
+  <text x="155" y="248" font-size="10" font-weight="700" fill="#7c3aed" font-family="system-ui,sans-serif">P1</text>
+  <text x="340" y="268" font-size="10" font-weight="700" fill="#ea580c" text-anchor="middle" font-family="system-ui,sans-serif">P2</text>
+  <text x="560" y="306" font-size="10" font-weight="700" fill="#ea580c" text-anchor="middle" font-family="system-ui,sans-serif">P3</text>
+  <text x="700" y="306" font-size="10" font-weight="700" fill="#334155" font-family="system-ui,sans-serif">realm</text>
+  <text x="1020" y="268" font-size="10" font-weight="700" fill="#2563eb" text-anchor="middle" font-family="system-ui,sans-serif">orchestra</text>
+  <text x="660" y="558" font-size="11" font-weight="700" fill="#2563eb" font-family="system-ui,sans-serif">YES - P4</text>
+  <text x="900" y="518" font-size="11" font-weight="700" fill="#0d9488" font-family="system-ui,sans-serif">NO - P5</text>
+  <text x="480" y="558" font-size="9" font-weight="600" fill="#2563eb" font-family="system-ui,sans-serif">P3 then P4</text>
 
-  <line x1="258" y1="296" x2="258" y2="316" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <!-- Q1 diamond -->
+  <polygon points="640,200 755,258 640,316 525,258" fill="#ffffff" stroke="#94a3b8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="640" y="254" font-size="12" font-weight="600" fill="#334155" text-anchor="middle" font-family="system-ui,sans-serif">Which</text>
+  <text x="640" y="270" font-size="12" font-weight="600" fill="#334155" text-anchor="middle" font-family="system-ui,sans-serif">component?</text>
 
-  <rect x="68" y="318" width="380" height="52" rx="8" fill="#ffffff" stroke="#bfdbfe"/>
-  <text x="82" y="338" font-size="10" fill="#334155" font-family="ui-monospace,monospace">rollout.yml / realms rollout</text>
-  <text x="82" y="356" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">Casals upgrade_to: snapshot - install - verify - rollback on fail</text>
-
-  <text x="68" y="392" font-size="12" font-weight="600" fill="#334155" font-family="system-ui,sans-serif">Upgrades</text>
-  <text x="68" y="410" font-size="11" fill="#475569" font-family="system-ui,sans-serif">[yes] Realms (Agora, Dominion, Syntropia) - backend + frontend</text>
-  <text x="68" y="428" font-size="11" fill="#475569" font-family="system-ui,sans-serif">[yes] Infra: installer, realm-registry, file_registry, marketplace, dashboard</text>
-  <text x="68" y="446" font-size="11" fill="#475569" font-family="system-ui,sans-serif">[yes] Extensions/codices (via active Casals arrangement after rollout)</text>
-
-  <text x="68" y="474" font-size="12" font-weight="600" fill="#334155" font-family="system-ui,sans-serif">Key inputs</text>
-  <text x="68" y="492" font-size="10" fill="#334155" font-family="ui-monospace,monospace">-f family=realm|registry|installer|...</text>
-  <text x="68" y="508" font-size="10" fill="#334155" font-family="ui-monospace,monospace">-f targets=all-realms|all-infra|all|dominion</text>
-  <text x="68" y="524" font-size="10" fill="#334155" font-family="ui-monospace,monospace">-f mode=upgrade  -f version=main|0.4.0|latest</text>
-  <text x="68" y="540" font-size="10" fill="#334155" font-family="ui-monospace,monospace">-f from_main=true  (main-branch snapshots)</text>
-
-  <rect x="68" y="556" width="380" height="44" rx="6" fill="#dbeafe" stroke="#93c5fd"/>
-  <text x="82" y="576" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">Casals controls orchestra canisters (realms + infra). CycleOps tops up cycles.</text>
-  <text x="82" y="592" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">Sections: Deployments (realms) | Infra (platform canisters)</text>
-
-  <!-- PATH 2: OFF-CHAIN MUNDUS -->
+  <!-- LEAF: P1 -->
   <g filter="url(#shadow)">
-    <rect x="488" y="192" width="420" height="420" rx="12" fill="#f0fdfa" stroke="#5eead4"/>
-    <rect x="488" y="192" width="420" height="36" rx="12" fill="#0d9488"/>
-    <rect x="488" y="216" width="420" height="12" fill="#0d9488"/>
-    <text x="508" y="216" font-size="15" font-weight="700" fill="#ffffff" font-family="system-ui,sans-serif">2. Off-chain mundus (fast)</text>
-    <text x="880" y="216" font-size="9" font-weight="700" fill="#99f6e4" text-anchor="end" font-family="system-ui,sans-serif">~90s / REALM</text>
+    <rect x="15" y="338" width="210" height="112" rx="8" fill="#f5f3ff" stroke="#a78bfa"/>
+    <rect x="15" y="338" width="210" height="22" rx="8" fill="#7c3aed"/>
+    <rect x="15" y="352" width="210" height="8" fill="#7c3aed"/>
+    <text x="120" y="354" font-size="10" font-weight="700" fill="#ffffff" text-anchor="middle" font-family="system-ui,sans-serif">P1 - Casals orchestrator</text>
+    <text x="27" y="378" font-size="10" fill="#334155" font-family="ui-monospace,monospace">casals-upgrade.yml</text>
+    <rect x="27" y="384" width="88" height="16" rx="3" fill="#24292f"/>
+    <text x="71" y="395" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">GH Actions</text>
+    <text x="27" y="414" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">Runner: build Casals + icp deploy</text>
+    <rect x="27" y="420" width="76" height="16" rx="3" fill="#2563eb"/>
+    <text x="65" y="431" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">IC canister</text>
+    <text x="109" y="431" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">casals_backend + frontend</text>
+    <text x="27" y="448" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">Alt: local icp deploy (controller key)</text>
   </g>
 
-  <rect x="508" y="244" width="380" height="52" rx="8" fill="#ffffff" stroke="#99f6e4"/>
-  <text x="522" y="264" font-size="10" fill="#334155" font-family="ui-monospace,monospace">deploy-mundus.yml / realms mundus deploy</text>
-  <text x="522" y="282" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">Descriptor YAML - registry.request_deployment - installer - deploy service</text>
-
-  <line x1="698" y1="296" x2="698" y2="316" stroke="#0d9488" stroke-width="2" marker-end="url(#arrow-teal)"/>
-
-  <rect x="508" y="318" width="380" height="68" rx="8" fill="#ffffff" stroke="#99f6e4"/>
-  <text x="522" y="338" font-size="12" font-weight="600" fill="#334155" font-family="system-ui,sans-serif">Per env descriptor</text>
-  <text x="522" y="356" font-size="10" fill="#334155" font-family="ui-monospace,monospace">test-mundus-layered.yml</text>
-  <text x="522" y="372" font-size="10" fill="#334155" font-family="ui-monospace,monospace">demo-mundus-layered.yml / staging-mundus-layered.yml</text>
-
-  <text x="508" y="408" font-size="12" font-weight="600" fill="#334155" font-family="system-ui,sans-serif">Upgrades</text>
-  <text x="508" y="426" font-size="11" fill="#475569" font-family="system-ui,sans-serif">[yes] Realm backends + frontends (3 realms per env)</text>
-  <text x="508" y="444" font-size="11" fill="#475569" font-family="system-ui,sans-serif">[yes] Extensions + codices (from file_registry via manifest)</text>
-  <text x="508" y="462" font-size="11" fill="#475569" font-family="system-ui,sans-serif">[no]  Registry UI, installer, file_registry, marketplace, dashboard</text>
-
-  <text x="508" y="490" font-size="12" font-weight="600" fill="#334155" font-family="system-ui,sans-serif">Key inputs</text>
-  <text x="508" y="508" font-size="10" fill="#334155" font-family="ui-monospace,monospace">-f deploy_mode=upgrade  (NOT reinstall)</text>
-  <text x="508" y="524" font-size="10" fill="#334155" font-family="ui-monospace,monospace">-f artifact_version=build|latest|0.4.0</text>
-  <text x="508" y="540" font-size="10" fill="#334155" font-family="ui-monospace,monospace">-f realm=  (blank = all 3 realms, parallel matrix)</text>
-
-  <rect x="508" y="556" width="380" height="44" rx="6" fill="#ccfbf1" stroke="#5eead4"/>
-  <text x="522" y="576" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">Full off-chain pipeline (infra too): scripts/ci_install_mundus.py stages 0-3</text>
-  <text x="522" y="592" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">See local-mundus.yml - not wired into deploy-mundus.yml for mainnet</text>
-
-  <!-- PATH 3: CASALS UPGRADE -->
+  <!-- LEAF: P2 -->
   <g filter="url(#shadow)">
-    <rect x="928" y="192" width="424" height="200" rx="12" fill="#f5f3ff" stroke="#c4b5fd"/>
-    <rect x="928" y="192" width="424" height="36" rx="12" fill="#7c3aed"/>
-    <rect x="928" y="216" width="424" height="12" fill="#7c3aed"/>
-    <text x="948" y="216" font-size="15" font-weight="700" fill="#ffffff" font-family="system-ui,sans-serif">3. Casals orchestrator upgrade</text>
-  </g>
-  <rect x="948" y="244" width="384" height="52" rx="8" fill="#ffffff" stroke="#ddd6fe"/>
-  <text x="962" y="264" font-size="10" fill="#334155" font-family="ui-monospace,monospace">casals-upgrade.yml</text>
-  <text x="962" y="282" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">Upgrades casals_backend + casals_frontend (Casals repo checkout)</text>
-  <text x="948" y="318" font-size="11" fill="#475569" font-family="system-ui,sans-serif">Separate from rollout - this is the conductor, not the orchestra.</text>
-  <text x="948" y="336" font-size="11" fill="#475569" font-family="system-ui,sans-serif">Example: cycles UI, Casals admin. Per env: test, demo, staging.</text>
-  <text x="948" y="360" font-size="10" fill="#334155" font-family="ui-monospace,monospace">-f components=backend,frontend  -f mode=upgrade</text>
-  <text x="948" y="376" font-size="10" fill="#334155" font-family="ui-monospace,monospace">-f casals_ref=main</text>
-
-  <!-- EXTENSIONS + RELEASE -->
-  <g filter="url(#shadow)">
-    <rect x="928" y="408" width="424" height="204" rx="12" fill="#fff7ed" stroke="#fdba74"/>
-    <rect x="928" y="408" width="424" height="36" rx="12" fill="#ea580c"/>
-    <rect x="928" y="432" width="424" height="12" fill="#ea580c"/>
-    <text x="948" y="432" font-size="15" font-weight="700" fill="#ffffff" font-family="system-ui,sans-serif">4. Extensions / 5. Release</text>
-  </g>
-  <text x="948" y="464" font-size="12" font-weight="600" fill="#334155" font-family="system-ui,sans-serif">Extension / codex change only</text>
-  <text x="948" y="482" font-size="10" fill="#334155" font-family="ui-monospace,monospace">deploy-files.yml - install on realm</text>
-  <text x="948" y="498" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">Publish bundles to file_registry (per env!). Fast local: realms files build + publish + dfx call (~26s)</text>
-  <text x="948" y="524" font-size="12" font-weight="600" fill="#334155" font-family="system-ui,sans-serif">Semver release (artifacts + PyPI + GitHub)</text>
-  <text x="948" y="542" font-size="10" fill="#334155" font-family="ui-monospace,monospace">release.yml  -f release_type=patch|minor|major</text>
-  <text x="948" y="558" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">Bumps version.txt, realm WASM tarball, CLI on PyPI - independent of rollout</text>
-  <text x="948" y="584" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">Use version=latest on rollout for newest semver; version=main for main snapshots</text>
-
-  <!-- LAYERED ARCHITECTURE -->
-  <g filter="url(#shadow)">
-    <rect x="48" y="636" width="1304" height="108" rx="12" fill="#ffffff" stroke="#cbd5e1"/>
-    <text x="68" y="662" font-size="12" font-weight="600" fill="#334155" font-family="system-ui,sans-serif">Layered architecture (what gets deployed into a realm)</text>
-  </g>
-  <rect x="68" y="676" width="400" height="52" rx="6" fill="#fef3c7" stroke="#fcd34d"/>
-  <text x="82" y="696" font-size="12" font-weight="600" fill="#92400e" font-family="system-ui,sans-serif">Layer 1 - Base WASM</text>
-  <text x="82" y="714" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">realm_backend - file_registry - installed by installer or Casals</text>
-
-  <rect x="488" y="676" width="400" height="52" rx="6" fill="#fce7f3" stroke="#f9a8d4"/>
-  <text x="502" y="696" font-size="12" font-weight="600" fill="#9d174d" font-family="system-ui,sans-serif">Layer 2 - Extensions and codices</text>
-  <text x="502" y="714" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">ESM bundles + Python modules - file_registry - runtime-loaded by realm_frontend</text>
-
-  <rect x="908" y="676" width="424" height="52" rx="6" fill="#ecfdf5" stroke="#6ee7b7"/>
-  <text x="922" y="696" font-size="12" font-weight="600" fill="#065f46" font-family="system-ui,sans-serif">Layer 3 - Realm data</text>
-  <text x="922" y="714" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">Members, votes, treasuries - stable memory - preserved on upgrade, wiped on reinstall</text>
-
-  <!-- COVERAGE MATRIX -->
-  <g filter="url(#shadow)">
-    <rect x="48" y="764" width="1304" height="200" rx="12" fill="#ffffff" stroke="#cbd5e1"/>
-    <text x="68" y="792" font-size="12" font-weight="600" fill="#334155" font-family="system-ui,sans-serif">Coverage comparison</text>
+    <rect x="235" y="338" width="210" height="138" rx="8" fill="#fff7ed" stroke="#fdba74"/>
+    <rect x="235" y="338" width="210" height="22" rx="8" fill="#ea580c"/>
+    <rect x="235" y="352" width="210" height="8" fill="#ea580c"/>
+    <text x="340" y="354" font-size="10" font-weight="700" fill="#ffffff" text-anchor="middle" font-family="system-ui,sans-serif">P2 - Extension / codex</text>
+    <text x="247" y="378" font-size="10" fill="#334155" font-family="ui-monospace,monospace">1. deploy-files.yml</text>
+    <rect x="247" y="384" width="88" height="16" rx="3" fill="#24292f"/>
+    <text x="291" y="395" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">GH Actions</text>
+    <rect x="343" y="384" width="76" height="16" rx="3" fill="#2563eb"/>
+    <text x="381" y="395" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">IC canister</text>
+    <text x="247" y="414" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">Upload bundle to file_registry</text>
+    <text x="247" y="430" font-size="10" fill="#334155" font-family="ui-monospace,monospace">2. install on realm</text>
+    <rect x="247" y="436" width="64" height="16" rx="3" fill="#16a34a"/>
+    <text x="279" y="447" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">Local CLI</text>
+    <text x="317" y="447" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">dfx call realm_backend</text>
+    <rect x="247" y="454" width="76" height="16" rx="3" fill="#2563eb"/>
+    <text x="285" y="465" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">IC canister</text>
+    <text x="247" y="472" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">install_extension_from_registry on-chain</text>
   </g>
 
-  <rect x="68" y="804" width="1216" height="28" rx="4" fill="#f1f5f9"/>
-  <text x="82" y="822" font-size="12" font-weight="600" fill="#334155" font-family="system-ui,sans-serif">Component</text>
-  <text x="520" y="822" font-size="12" font-weight="600" fill="#334155" text-anchor="middle" font-family="system-ui,sans-serif">Casals publish + rollout</text>
-  <text x="820" y="822" font-size="12" font-weight="600" fill="#334155" text-anchor="middle" font-family="system-ui,sans-serif">Off-chain mundus</text>
-  <text x="1120" y="822" font-size="12" font-weight="600" fill="#334155" text-anchor="middle" font-family="system-ui,sans-serif">deploy-files only</text>
-
-  <line x1="68" y1="848" x2="1284" y2="848" stroke="#e2e8f0"/>
-  <text x="82" y="866" font-size="11" fill="#475569" font-family="system-ui,sans-serif">Realm apps (Agora, Dominion, Syntropia)</text>
-  <text x="520" y="866" font-size="11" fill="#16a34a" text-anchor="middle" font-family="system-ui,sans-serif">yes</text>
-  <text x="820" y="866" font-size="11" fill="#16a34a" text-anchor="middle" font-family="system-ui,sans-serif">yes</text>
-  <text x="1120" y="866" font-size="11" fill="#dc2626" text-anchor="middle" font-family="system-ui,sans-serif">no</text>
-
-  <line x1="68" y1="878" x2="1284" y2="878" stroke="#e2e8f0"/>
-  <text x="82" y="896" font-size="11" fill="#475569" font-family="system-ui,sans-serif">Extensions / codices on realms</text>
-  <text x="520" y="896" font-size="11" fill="#16a34a" text-anchor="middle" font-family="system-ui,sans-serif">yes (arrangement)</text>
-  <text x="820" y="896" font-size="11" fill="#16a34a" text-anchor="middle" font-family="system-ui,sans-serif">yes (manifest)</text>
-  <text x="1120" y="896" font-size="11" fill="#16a34a" text-anchor="middle" font-family="system-ui,sans-serif">yes (+ install)</text>
-
-  <line x1="68" y1="908" x2="1284" y2="908" stroke="#e2e8f0"/>
-  <text x="82" y="926" font-size="11" fill="#475569" font-family="system-ui,sans-serif">Realm registry (backend + frontend footer)</text>
-  <text x="520" y="926" font-size="11" fill="#16a34a" text-anchor="middle" font-family="system-ui,sans-serif">yes (family=registry)</text>
-  <text x="820" y="926" font-size="11" fill="#dc2626" text-anchor="middle" font-family="system-ui,sans-serif">no</text>
-  <text x="1120" y="926" font-size="11" fill="#dc2626" text-anchor="middle" font-family="system-ui,sans-serif">no</text>
-
-  <line x1="68" y1="938" x2="1284" y2="938" stroke="#e2e8f0"/>
-  <text x="82" y="956" font-size="11" fill="#475569" font-family="system-ui,sans-serif">Installer, file_registry, marketplace, dashboard</text>
-  <text x="520" y="956" font-size="11" fill="#16a34a" text-anchor="middle" font-family="system-ui,sans-serif">yes (all-infra)</text>
-  <text x="820" y="956" font-size="11" fill="#dc2626" text-anchor="middle" font-family="system-ui,sans-serif">no</text>
-  <text x="1120" y="956" font-size="11" fill="#dc2626" text-anchor="middle" font-family="system-ui,sans-serif">no</text>
-
-  <!-- ENVIRONMENTS + ACTORS -->
+  <!-- LEAF: P3 -->
   <g filter="url(#shadow)">
-    <rect x="48" y="984" width="640" height="156" rx="12" fill="#ffffff" stroke="#cbd5e1"/>
-    <text x="68" y="1012" font-size="12" font-weight="600" fill="#334155" font-family="system-ui,sans-serif">Environments (all on IC mainnet)</text>
-    <text x="68" y="1036" font-size="11" fill="#475569" font-family="system-ui,sans-serif">test, demo, staging - each has own file_registry, Casals, registry, 3 realms</text>
-    <text x="68" y="1058" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">Canister IDs: realms/canister_ids.json, AGENTS.md Known Canister IDs</text>
-    <text x="68" y="1080" font-size="12" font-weight="600" fill="#334155" font-family="system-ui,sans-serif">Casals families (publish-build)</text>
-    <text x="68" y="1098" font-size="10" fill="#334155" font-family="ui-monospace,monospace">realm, installer, registry, file-registry, dashboard, marketplace</text>
-    <text x="68" y="1118" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">Artifacts: family-backend@version, family-assets@version</text>
+    <rect x="455" y="346" width="210" height="90" rx="8" fill="#fff7ed" stroke="#fdba74"/>
+    <rect x="455" y="346" width="210" height="22" rx="8" fill="#ea580c"/>
+    <rect x="455" y="360" width="210" height="8" fill="#ea580c"/>
+    <text x="560" y="362" font-size="10" font-weight="700" fill="#ffffff" text-anchor="middle" font-family="system-ui,sans-serif">P3 - Semver release</text>
+    <text x="467" y="386" font-size="10" fill="#334155" font-family="ui-monospace,monospace">release.yml</text>
+    <rect x="467" y="392" width="88" height="16" rx="3" fill="#24292f"/>
+    <text x="511" y="403" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">GH Actions</text>
+    <text x="467" y="422" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">Build WASM/tarball, GitHub Release, PyPI</text>
+    <text x="467" y="436" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">Then P4 rollout -v latest (GH or local CLI)</text>
   </g>
 
+  <!-- Orchestra shortcut -->
   <g filter="url(#shadow)">
-    <rect x="712" y="984" width="640" height="156" rx="12" fill="#ffffff" stroke="#cbd5e1"/>
-    <text x="732" y="1012" font-size="12" font-weight="600" fill="#334155" font-family="system-ui,sans-serif">Key canisters and workflows</text>
-    <text x="732" y="1034" font-size="11" fill="#475569" font-family="system-ui,sans-serif">file_registry - artifact store (WASM, extension bundles)</text>
-    <text x="732" y="1052" font-size="11" fill="#475569" font-family="system-ui,sans-serif">realm_installer - off-chain deploy worker, chunked WASM install</text>
-    <text x="732" y="1070" font-size="11" fill="#475569" font-family="system-ui,sans-serif">realm_registry - credits, catalog, request_deployment queue</text>
-    <text x="732" y="1088" font-size="11" fill="#475569" font-family="system-ui,sans-serif">Casals - on-chain orchestrator; upgrade_to with snapshot/rollback</text>
-    <text x="732" y="1110" font-size="10" fill="#334155" font-family="ui-monospace,monospace">.github/workflows/: publish-build, rollout, deploy-mundus, casals-upgrade, deploy-files</text>
+    <rect x="900" y="338" width="240" height="52" rx="8" fill="#eff6ff" stroke="#93c5fd"/>
+    <text x="1020" y="360" font-size="10" font-weight="600" fill="#2563eb" text-anchor="middle" font-family="system-ui,sans-serif">Skip to P4</text>
+    <text x="1020" y="376" font-size="9" fill="#64748b" text-anchor="middle" font-family="system-ui,sans-serif">Already know full orchestra?</text>
   </g>
 
-  <!-- Legend -->
-  <rect x="48" y="1156" width="1304" height="1" fill="#e2e8f0"/>
-  <circle cx="64" cy="1170" r="5" fill="#2563eb"/>
-  <text x="76" y="1174" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">Casals = full orchestra</text>
-  <circle cx="220" cy="1170" r="5" fill="#0d9488"/>
-  <text x="232" y="1174" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">Mundus = fast realms</text>
-  <circle cx="380" cy="1170" r="5" fill="#7c3aed"/>
-  <text x="392" y="1174" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">casals-upgrade = conductor UI</text>
-  <circle cx="580" cy="1170" r="5" fill="#ea580c"/>
-  <text x="592" y="1174" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">deploy-files = extension bundles</text>
-  <text x="1352" y="1174" font-size="10" fill="#64748b" text-anchor="end" font-family="system-ui,sans-serif">Docs: realms/AGENTS.md, docs/reference/CASALS_ROLLOUT.md</text>
+  <!-- Q2 diamond -->
+  <polygon points="820,488 925,528 820,568 715,528" fill="#ffffff" stroke="#94a3b8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="820" y="524" font-size="11" font-weight="600" fill="#334155" text-anchor="middle" font-family="system-ui,sans-serif">Need registry</text>
+  <text x="820" y="540" font-size="11" font-weight="600" fill="#334155" text-anchor="middle" font-family="system-ui,sans-serif">or infra too?</text>
+
+  <!-- P4 bus label -->
+  <rect x="250" y="560" width="160" height="18" rx="4" fill="#dbeafe" stroke="#93c5fd"/>
+  <text x="330" y="572" font-size="9" font-weight="600" fill="#1d4ed8" text-anchor="middle" font-family="system-ui,sans-serif">P4 entry bus</text>
+
+  <!-- CASALS PATH (P4) -->
+  <g filter="url(#shadow)">
+    <rect x="40" y="578" width="580" height="232" rx="10" fill="#eff6ff" stroke="#93c5fd"/>
+    <rect x="40" y="578" width="580" height="28" rx="10" fill="#2563eb"/>
+    <rect x="40" y="594" width="580" height="12" fill="#2563eb"/>
+    <text x="330" y="598" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle" font-family="system-ui,sans-serif">P4 - Casals path (full orchestra)</text>
+  </g>
+  <text x="56" y="626" font-size="10" fill="#334155" font-family="ui-monospace,monospace">Step 1: publish-build.yml</text>
+  <rect x="56" y="632" width="88" height="16" rx="3" fill="#24292f"/>
+  <text x="100" y="643" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">GH Actions</text>
+  <text x="152" y="643" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">or local: publish_build.py</text>
+  <text x="56" y="662" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">Runner builds WASM/frontend; upload to file_registry; authorize_wasm on Casals</text>
+  <text x="330" y="680" font-size="14" fill="#2563eb" text-anchor="middle" font-family="system-ui,sans-serif">|</text>
+  <text x="56" y="700" font-size="10" fill="#334155" font-family="ui-monospace,monospace">Step 2: rollout.yml</text>
+  <rect x="56" y="706" width="88" height="16" rx="3" fill="#24292f"/>
+  <text x="100" y="717" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">GH Actions</text>
+  <text x="152" y="717" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">or local: realms rollout</text>
+  <rect x="56" y="726" width="76" height="16" rx="3" fill="#2563eb"/>
+  <text x="94" y="737" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">IC canister</text>
+  <text x="138" y="737" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">CLI calls Casals upgrade_to</text>
+  <rect x="56" y="744" width="88" height="16" rx="3" fill="#7c3aed"/>
+  <text x="100" y="755" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">Casals exec</text>
+  <text x="152" y="755" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">pulls from file_registry, upgrades targets on IC</text>
+  <text x="56" y="776" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">Realms + registry + installer + file_registry + marketplace + dashboard</text>
+  <rect x="56" y="784" width="548" height="22" rx="4" fill="#dbeafe" stroke="#93c5fd"/>
+  <text x="68" y="799" font-size="9" fill="#1e40af" font-family="system-ui,sans-serif">Rollout scope: </text>
+  <text x="140" y="799" font-size="9" fill="#334155" font-family="ui-monospace,monospace">frontend</text>
+  <text x="198" y="799" font-size="9" fill="#64748b" font-family="system-ui,sans-serif"> | </text>
+  <text x="210" y="799" font-size="9" fill="#334155" font-family="ui-monospace,monospace">both</text>
+  <text x="240" y="799" font-size="9" fill="#64748b" font-family="system-ui,sans-serif"> | </text>
+  <text x="252" y="799" font-size="9" fill="#334155" font-family="ui-monospace,monospace">backend</text>
+  <text x="310" y="799" font-size="9" fill="#64748b" font-family="system-ui,sans-serif"> (rollout.yml scope param; see AGENTS.md)</text>
+
+  <!-- MUNDUS PATH (P5) -->
+  <g filter="url(#shadow)">
+    <rect x="660" y="578" width="580" height="232" rx="10" fill="#f0fdfa" stroke="#5eead4"/>
+    <rect x="660" y="578" width="580" height="28" rx="10" fill="#0d9488"/>
+    <rect x="660" y="594" width="580" height="12" fill="#0d9488"/>
+    <text x="950" y="598" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle" font-family="system-ui,sans-serif">P5 - Off-chain mundus (fast realms)</text>
+  </g>
+  <text x="676" y="626" font-size="10" fill="#334155" font-family="ui-monospace,monospace">deploy-mundus.yml</text>
+  <rect x="676" y="632" width="88" height="16" rx="3" fill="#24292f"/>
+  <text x="720" y="643" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">GH Actions</text>
+  <text x="772" y="643" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">or local: realms mundus deploy</text>
+  <text x="676" y="666" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">Flow (each realm, ~90s):</text>
+  <text x="692" y="682" font-size="9" fill="#475569" font-family="system-ui,sans-serif">1.</text>
+  <rect x="706" y="670" width="76" height="16" rx="3" fill="#2563eb"/>
+  <text x="744" y="681" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">IC canister</text>
+  <text x="788" y="682" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">registry.request_deployment (enqueue job)</text>
+  <text x="692" y="700" font-size="9" fill="#475569" font-family="system-ui,sans-serif">2.</text>
+  <rect x="706" y="688" width="76" height="16" rx="3" fill="#2563eb"/>
+  <text x="744" y="699" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">IC canister</text>
+  <text x="788" y="700" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">realm_installer picks up job, tracks status</text>
+  <text x="692" y="718" font-size="9" fill="#475569" font-family="system-ui,sans-serif">3.</text>
+  <rect x="706" y="706" width="80" height="16" rx="3" fill="#d97706"/>
+  <text x="746" y="717" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">Off-chain svc</text>
+  <text x="792" y="718" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">deploy.realmsgos.dev installs WASM + frontend</text>
+  <text x="692" y="736" font-size="9" fill="#475569" font-family="system-ui,sans-serif">4.</text>
+  <rect x="706" y="724" width="76" height="16" rx="3" fill="#2563eb"/>
+  <text x="744" y="735" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" font-family="system-ui,sans-serif">IC canister</text>
+  <text x="788" y="736" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">realm backend: extensions, codices, config</text>
+  <text x="676" y="760" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">Descriptor: test / demo / staging-mundus-layered.yml</text>
+  <text x="676" y="776" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">deploy_mode=upgrade  artifact_version=build|latest</text>
+  <rect x="676" y="784" width="548" height="22" rx="4" fill="#ccfbf1" stroke="#5eead4"/>
+  <text x="688" y="799" font-size="9" fill="#0f766e" font-family="system-ui,sans-serif">Skips: registry UI, installer, file_registry, marketplace, dashboard</text>
+
+  <!-- P6 callout (separate box below P5) -->
+  <g filter="url(#shadow)">
+    <rect x="660" y="822" width="580" height="36" rx="8" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="676" y="844" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">Need full off-chain infra too?</text>
+    <text x="820" y="844" font-size="9" font-weight="700" fill="#64748b" font-family="system-ui,sans-serif">P6</text>
+    <text x="836" y="844" font-size="9" fill="#64748b" font-family="ui-monospace,monospace">ci_install_mundus.py</text>
+    <text x="990" y="844" font-size="9" fill="#64748b" font-family="system-ui,sans-serif">CI or local CLI, local-mundus.yml, stages 0-3</text>
+  </g>
+
+  <!-- Footer -->
+  <g filter="url(#shadow)">
+    <rect x="40" y="878" width="1200" height="260" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+  </g>
+  <text x="60" y="904" font-size="12" font-weight="600" fill="#334155" font-family="system-ui,sans-serif">Path index (reference by P#)</text>
+  <text x="60" y="924" font-size="10" fill="#475569" font-family="system-ui,sans-serif"><tspan font-weight="700" fill="#7c3aed">P1</tspan> casals-upgrade.yml - upgrade Casals orchestrator UI/backend (per env)</text>
+  <text x="60" y="940" font-size="10" fill="#475569" font-family="system-ui,sans-serif"><tspan font-weight="700" fill="#ea580c">P2</tspan> deploy-files.yml + install - extension/codex bundles only</text>
+  <text x="60" y="956" font-size="10" fill="#475569" font-family="system-ui,sans-serif"><tspan font-weight="700" fill="#ea580c">P3</tspan> release.yml - semver artifacts (GitHub + PyPI); deploy via P4 with -v latest</text>
+  <text x="60" y="972" font-size="10" fill="#475569" font-family="system-ui,sans-serif"><tspan font-weight="700" fill="#2563eb">P4</tspan> publish-build.yml + rollout.yml - full orchestra via Casals (realms + infra)</text>
+  <text x="60" y="988" font-size="10" fill="#475569" font-family="system-ui,sans-serif"><tspan font-weight="700" fill="#0d9488">P5</tspan> deploy-mundus.yml - fast off-chain realm deploy (3 realms, no infra)</text>
+  <text x="60" y="1004" font-size="10" fill="#475569" font-family="system-ui,sans-serif"><tspan font-weight="700" fill="#64748b">P6</tspan> ci_install_mundus.py - full off-chain platform incl. infra (stages 0-3)</text>
+
+  <text x="640" y="904" font-size="12" font-weight="600" fill="#334155" font-family="system-ui,sans-serif">Rules of thumb</text>
+  <text x="640" y="924" font-size="10" fill="#475569" font-family="system-ui,sans-serif">- mode=upgrade preserves state; reinstall wipes canisters</text>
+  <text x="640" y="940" font-size="10" fill="#475569" font-family="system-ui,sans-serif">- publish-build is per environment AND per family</text>
+  <text x="640" y="956" font-size="10" fill="#475569" font-family="system-ui,sans-serif">- deploy-files environment must match target env</text>
+  <text x="640" y="972" font-size="10" fill="#475569" font-family="system-ui,sans-serif">- Agora rollout timeouts: retry targets=agora</text>
+
+  <text x="60" y="1036" font-size="12" font-weight="600" fill="#334155" font-family="system-ui,sans-serif">CLI equivalents (same logic, local machine)</text>
+  <text x="60" y="1056" font-size="10" fill="#475569" font-family="ui-monospace,monospace">P4: python3 scripts/publish_build.py ... ; realms rollout ...</text>
+  <text x="60" y="1072" font-size="10" fill="#475569" font-family="ui-monospace,monospace">P5: realms mundus deploy deployment-descriptors/test-mundus-layered.yml ...</text>
+  <text x="60" y="1088" font-size="10" fill="#475569" font-family="ui-monospace,monospace">P2: realms files build + publish + dfx canister call (~26s)</text>
+  <text x="60" y="1104" font-size="10" fill="#475569" font-family="ui-monospace,monospace">P6: python3 scripts/ci_install_mundus.py --file local-mundus.yml --stages 0,1,2,3</text>
+
+  <text x="640" y="1036" font-size="12" font-weight="600" fill="#334155" font-family="system-ui,sans-serif">Key IC canisters touched</text>
+  <text x="640" y="1056" font-size="10" fill="#475569" font-family="system-ui,sans-serif">file_registry | Casals backend | realm_registry | realm_installer | realm targets</text>
+  <text x="640" y="1076" font-size="10" fill="#64748b" font-family="system-ui,sans-serif">Docs: AGENTS.md | docs/reference/CASALS_ROLLOUT.md</text>
 </svg>

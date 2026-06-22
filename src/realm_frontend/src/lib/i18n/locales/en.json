@@ -68,5 +68,14 @@
       "required_permissions": "Required Permissions",
       "open_extension": "Open Extension"
     }
+  },
+  "extension_info": {
+    "loading": "Loading extension info...",
+    "unavailable": "Extension metadata unavailable.",
+    "version": "Version",
+    "author": "Author",
+    "categories": "Categories",
+    "profiles": "Profiles",
+    "view_on_github": "View on GitHub"
   }
 }
