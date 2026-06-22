@@ -61,8 +61,16 @@ class CasalsService(Service):
     def set_commander(self, args: text) -> text: ...
     @service_update
     def upgrade_to(self, args: text) -> text: ...
+    @service_update
+    def provision_assets(self, args: text) -> text: ...
 
 # ── Entities ───────────────────────────────────────────────────────────
+
+# Max bytes stored for a deployment manifest. The old 8192 cap silently
+# truncated manifests with many extensions/codices (the stored JSON then
+# failed to parse during provisioning); 128 KiB is ample headroom.
+_MANIFEST_MAX = 131072
+
 
 class DeployTask(Entity, TimestampedMixin):
     __alias__ = "name"
@@ -72,7 +80,7 @@ class DeployTask(Entity, TimestampedMixin):
     completed_at = Integer(default=0)
     target_canister_id = String(max_length=64)
     registry_canister_id = String(max_length=64)
-    manifest_json = String(max_length=8192)
+    manifest_json = String(max_length=_MANIFEST_MAX)
     error = String(max_length=2000)
     steps = OneToMany("DeployStep", "task")
 
@@ -95,7 +103,7 @@ class DeploymentJob(Entity, TimestampedMixin):
     name = String(max_length=64)
     status = String(max_length=32, default="pending")
     caller_principal = String(max_length=64)
-    manifest_json = String(max_length=8192)
+    manifest_json = String(max_length=_MANIFEST_MAX)
     network = String(max_length=32)
     backend_canister_id = String(max_length=64)
     frontend_canister_id = String(max_length=64)
@@ -836,7 +844,7 @@ def _start_extensions_for_job(job, manifest: dict):
         jlog(job.name).info(f"creating deploy task {task_id} with {len(ext_list)} ext + {len(codex_list)} codex")
         task = DeployTask(
             name=task_id, status="queued", target_canister_id=job.backend_canister_id,
-            registry_canister_id=registry_id, manifest_json=json.dumps(ext_manifest)[:8190], error="",
+            registry_canister_id=registry_id, manifest_json=json.dumps(ext_manifest)[:_MANIFEST_MAX], error="",
         )
         _build_steps(task, ext_manifest)
         steps = list(task.steps)
@@ -953,7 +961,7 @@ def enqueue_deployment(manifest_json: text) -> ResultEnqueue:
         expected_hashes = manifest.get("expected_hashes", {})
         DeploymentJob(
             name=job_id, status="pending", caller_principal=requester,
-            manifest_json=manifest_json[:8190], network=network,
+            manifest_json=manifest_json[:_MANIFEST_MAX], network=network,
             backend_canister_id=canister_ids.get("backend", ""),
             frontend_canister_id=canister_ids.get("frontend", ""),
             registry_canister_id=registry_id,
@@ -963,6 +971,14 @@ def enqueue_deployment(manifest_json: text) -> ResultEnqueue:
         )
         has_hashes = bool(expected_hashes.get("backend_wasm") or expected_hashes.get("frontend_wasm"))
         jlog(job_id).info(f"enqueued for '{realm_name}' on {network} (extensions={ext_count}, codex={bool(codex_info)}, cli_hashes={has_hashes})")
+
+        # When on-chain provisioning is enabled, drive it automatically in a
+        # background timer (the off-chain deployer that used to poll for pending
+        # jobs is retired). No-op when the flag is off, preserving legacy behavior.
+        if int(_config().provision_via_casals or 0):
+            jlog(job_id).info("on-chain provisioning enabled; scheduling casals provisioning")
+            schedule_casals_provision(job_id)
+
         return ResultEnqueue(Ok=EnqueueOk(
             job_id=job_id, status="pending", realm_name=realm_name, network=network,
         ))
@@ -1176,32 +1192,43 @@ def get_casals_config() -> ResultCasalsConfig:
         return ResultCasalsConfig(Err=ie(str(e)))
 
 
-@update
-def provision_via_casals(job_id: text) -> Async[ResultProvision]:
-    """Drive on-chain provisioning of a pending job through Casals: create the
-    Stand, the backend + frontend canisters (Casals pulls WASMs from file_registry,
-    verifies module hashes, and uploads the frontend bundle into the realm's own
-    asset canister), then assign the realm backend as the Stand commander so the
-    realm can self-upgrade.
+# How many bundle files to (re)upload per provision_assets call on the upgrade
+# path. Kept small so each ingress message stays well under the instruction
+# budget (mirrors the rollout CLI's batching).
+_PROVISION_ASSETS_BATCH = 6
 
-    Opt-in: returns Err unless InstallerConfig.provision_via_casals is set. This is
-    the on-chain replacement for the off-chain deployer's report_canister_ready +
-    report_frontend_verified callbacks; on success it hands off to the same domain
-    tail (extensions/codices -> registration -> credit settlement).
 
-    The realm's frontend/backend WASM keys come from the manifest's optional
-    `casals` block: {section?, stand?, backend_wasm_key, frontend_wasm_key}.
+def schedule_casals_provision(job_id_val: str):
+    """Fire-and-forget trigger for on-chain provisioning.
+
+    Provisioning creates canisters, pulls multi-MB WASMs and uploads a large
+    asset bundle — far more than fits in the caller's single message. So rather
+    than have the registry (or enqueue) block on it, we run it in its own timer
+    message chain; the frontend polls job status meanwhile. Mirrors the existing
+    schedule_registration / _schedule_step_runner pattern.
+    """
+    def _cb():
+        try:
+            yield from _run_casals_provision(job_id_val)
+        except Exception as e:  # defensive: _run_casals_provision already settles
+            jlog(job_id_val).error(f"auto casals provision failed: {e}")
+    ic.set_timer(Duration(0), _cb)
+
+
+def _run_casals_provision(job_id: str):
+    """Generator core shared by the public endpoint and the auto-trigger timer.
+
+    Creates the Stand + canisters (new deploy) or upgrades existing ones
+    (deploy_mode == 'upgrade'), assigns the realm backend as Stand commander,
+    then hands off to the same domain tail (extensions/codices -> registration
+    -> credit settlement). Returns ResultProvision; on failure it marks the job
+    failed and settles the credit hold.
+
+    WASM keys come from the manifest's `casals` block:
+    {section?, stand?, backend_wasm_key, frontend_wasm_key}.
     """
     try:
         cfg = _config()
-        # Authorization: canister controllers (manual/admin trigger) or the
-        # configured registry canister (registry -> installer trigger). This
-        # endpoint spends Casals treasury cycles and advances job state, so it
-        # must never be open to arbitrary callers.
-        caller = str(ic.caller())
-        reg_principal = (cfg.registry_principal or "").strip()
-        if not (ic.is_controller(ic.caller()) or (reg_principal and caller == reg_principal)):
-            return ResultProvision(Err=ie("unauthorized: controller or configured registry only"))
         if not int(cfg.provision_via_casals or 0):
             return ResultProvision(Err=ie("on-chain Casals provisioning is disabled"))
         casals_id = (cfg.casals_canister_id or "").strip()
@@ -1220,6 +1247,7 @@ def provision_via_casals(job_id: text) -> Async[ResultProvision]:
         realm_info = manifest.get("realm", {}) or {}
         realm_name = realm_info.get("name") or job.name
         deploy_scope = manifest.get("deploy_scope", "both")
+        is_upgrade = (manifest.get("deploy_mode") or "").strip() == "upgrade"
 
         section = (cas.get("section") or cfg.casals_section or "Deployments").strip()
         stand = (cas.get("stand") or _slugify(realm_name)).strip()
@@ -1234,55 +1262,89 @@ def provision_via_casals(job_id: text) -> Async[ResultProvision]:
             return ResultProvision(Err=ie("manifest.casals.frontend_wasm_key required"))
 
         casals = CasalsService(Principal.from_str(casals_id))
-
-        # 1. Stand (idempotent — a re-run of a partially provisioned job reuses it).
-        stand_res: CallResult = yield casals.create_stand(json.dumps({
-            "section": section, "name": stand,
-            "description": f"realm {realm_name}",
-        }))
-        try:
-            _casals_ok(stand_res)
-        except RuntimeError as se:
-            if "already exists" not in str(se).lower():
-                raise
-            jlog(job_id).info(f"stand '{stand}' already exists; reusing")
-
+        be_name = f"{stand}-backend"
+        fe_name = f"{stand}-frontend"
         backend_id = job.backend_canister_id or ""
         frontend_id = job.frontend_canister_id or ""
 
-        # 2. Backend canister (Casals installs + verifies module hash).
-        if want_backend and not backend_id:
-            be_res: CallResult = yield casals.create_canister(json.dumps({
-                "stand": stand, "name": f"{stand}-backend",
-                "kind": "backend", "wasm_key": backend_wasm_key,
+        if is_upgrade:
+            # ── Upgrade: canisters already exist in the Stand; repoint their WASM.
+            if want_backend:
+                up_res: CallResult = yield casals.upgrade_to(json.dumps({
+                    "canister": be_name, "wasm_key": backend_wasm_key,
+                }))
+                _casals_ok(up_res)
+                job.wasm_verified = 1
+                jlog(job_id).info(f"casals upgraded backend {backend_id} -> {backend_wasm_key}")
+            if want_frontend:
+                fup_res: CallResult = yield casals.upgrade_to(json.dumps({
+                    "canister": fe_name, "wasm_key": frontend_wasm_key,
+                }))
+                _casals_ok(fup_res)
+                # Reinstalling the assets WASM clears served files, so re-upload
+                # the bundle in small batches (poll next_offset until done).
+                offset = 0
+                while True:
+                    pa_res: CallResult = yield casals.provision_assets(json.dumps({
+                        "canister": fe_name,
+                        "offset": offset, "limit": _PROVISION_ASSETS_BATCH,
+                    }))
+                    pa = _casals_ok(pa_res)
+                    if pa.get("done"):
+                        break
+                    nxt = int(pa.get("next_offset", offset + _PROVISION_ASSETS_BATCH))
+                    if nxt <= offset:  # no progress — avoid an infinite loop
+                        break
+                    offset = nxt
+                job.frontend_wasm_verified = 1
+                jlog(job_id).info(f"casals upgraded frontend {frontend_id} -> {frontend_wasm_key}")
+        else:
+            # ── New deploy: create the Stand + canisters.
+            # 1. Stand (idempotent — a re-run of a partial job reuses it).
+            stand_res: CallResult = yield casals.create_stand(json.dumps({
+                "section": section, "name": stand,
+                "description": f"realm {realm_name}",
             }))
-            backend_id = (_casals_ok(be_res).get("canister_id") or "").strip()
-            if not backend_id:
-                return ResultProvision(Err=ie("casals create_canister(backend) returned no canister_id"))
-            job.backend_canister_id = backend_id
-            job.wasm_verified = 1
-            jlog(job_id).info(f"casals provisioned backend {backend_id} ({backend_wasm_key})")
+            try:
+                _casals_ok(stand_res)
+            except RuntimeError as se:
+                if "already exists" not in str(se).lower():
+                    raise
+                jlog(job_id).info(f"stand '{stand}' already exists; reusing")
 
-        # 3. Frontend canister (Casals installs assets wasm + uploads the bundle).
-        if want_frontend and not frontend_id:
-            fe_res: CallResult = yield casals.create_canister(json.dumps({
-                "stand": stand, "name": f"{stand}-frontend",
-                "kind": "frontend", "wasm_key": frontend_wasm_key,
-            }))
-            frontend_id = (_casals_ok(fe_res).get("canister_id") or "").strip()
-            if not frontend_id:
-                return ResultProvision(Err=ie("casals create_canister(frontend) returned no canister_id"))
-            job.frontend_canister_id = frontend_id
-            job.frontend_wasm_verified = 1
-            jlog(job_id).info(f"casals provisioned frontend {frontend_id} ({frontend_wasm_key})")
+            # 2. Backend canister (Casals installs + verifies module hash).
+            if want_backend and not backend_id:
+                be_res: CallResult = yield casals.create_canister(json.dumps({
+                    "stand": stand, "name": be_name,
+                    "kind": "backend", "wasm_key": backend_wasm_key,
+                }))
+                backend_id = (_casals_ok(be_res).get("canister_id") or "").strip()
+                if not backend_id:
+                    return ResultProvision(Err=ie("casals create_canister(backend) returned no canister_id"))
+                job.backend_canister_id = backend_id
+                job.wasm_verified = 1
+                jlog(job_id).info(f"casals provisioned backend {backend_id} ({backend_wasm_key})")
 
-        # 4. Make the realm backend the Stand commander so it can self-upgrade.
-        if backend_id:
-            cmd_res: CallResult = yield casals.set_commander(json.dumps({
-                "stand": stand, "commander_principal": backend_id,
-            }))
-            _casals_ok(cmd_res)
-            jlog(job_id).info(f"stand '{stand}' commander set to backend {backend_id}")
+            # 3. Frontend canister (Casals installs assets wasm + uploads bundle).
+            if want_frontend and not frontend_id:
+                fe_res: CallResult = yield casals.create_canister(json.dumps({
+                    "stand": stand, "name": fe_name,
+                    "kind": "frontend", "wasm_key": frontend_wasm_key,
+                }))
+                frontend_id = (_casals_ok(fe_res).get("canister_id") or "").strip()
+                if not frontend_id:
+                    return ResultProvision(Err=ie("casals create_canister(frontend) returned no canister_id"))
+                job.frontend_canister_id = frontend_id
+                job.frontend_wasm_verified = 1
+                jlog(job_id).info(f"casals provisioned frontend {frontend_id} ({frontend_wasm_key})")
+
+            # 4. Make the realm backend the Stand commander so it can self-upgrade.
+            if backend_id:
+                cmd_res: CallResult = yield casals.set_commander(json.dumps({
+                    "stand": stand, "commander_principal": backend_id,
+                }))
+                _casals_ok(cmd_res)
+                jlog(job_id).info(f"stand '{stand}' commander set to backend {backend_id}")
 
         # Casals already verified module hashes during install; trust them here.
         job.assets_verified = 1
@@ -1318,6 +1380,28 @@ def provision_via_casals(job_id: text) -> Async[ResultProvision]:
         except Exception:
             pass
         return ResultProvision(Err=ie(str(e), traceback.format_exc()[-1500:]))
+
+
+@update
+def provision_via_casals(job_id: text) -> Async[ResultProvision]:
+    """Drive on-chain provisioning of a pending job through Casals.
+
+    Opt-in: no-op unless InstallerConfig.provision_via_casals is set. This is the
+    on-chain replacement for the off-chain deployer callbacks. Normally the
+    installer auto-triggers provisioning right after enqueue (see
+    schedule_casals_provision); this endpoint remains for manual/admin re-runs of
+    a partially provisioned job.
+    """
+    # Authorization: canister controllers (manual/admin trigger) or the
+    # configured registry canister. Spends Casals treasury cycles + advances job
+    # state, so it must never be open to arbitrary callers.
+    cfg = _config()
+    caller = str(ic.caller())
+    reg_principal = (cfg.registry_principal or "").strip()
+    if not (ic.is_controller(ic.caller()) or (reg_principal and caller == reg_principal)):
+        return ResultProvision(Err=ie("unauthorized: controller or configured registry only"))
+    result = yield from _run_casals_provision(job_id)
+    return result
 
 @update
 def report_canister_ready(args: text) -> Async[ResultReportReady]:
