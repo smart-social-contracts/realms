@@ -246,6 +246,13 @@
       "type": "custom",
       "wasm": "scripts/cycleops/mock_cycleops/mock_cycleops.wasm",
       "build": ""
+    },
+    "cross_quarter_peer": {
+      "candid": "src/realm_backend/realm_backend.did",
+      "type": "custom",
+      "wasm": ".basilisk/realm_backend/realm_backend.wasm",
+      "gzip": true,
+      "build": ""
     }
   },
   "defaults": { 

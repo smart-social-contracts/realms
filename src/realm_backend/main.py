@@ -53,6 +53,7 @@ from api.ggg_entities import (
     list_objects_paginated,
     search_objects,
 )
+from api.cross_quarter import fetch_peer_directory as _fetch_peer_directory
 from api.messaging import send_realm_message as _send_realm_message
 from api.nft import get_nft_canister_id, mint_land_nft
 from api.registry import get_registry_info, register_realm
@@ -71,6 +72,13 @@ from api.vetkeys import (
 )
 from api.zones import get_zone_aggregation
 from core.access import _check_access, require, require_controller, set_controller
+from core.cross_quarter import (
+    ResolutionStatus,
+    classify_ref,
+    merge_quarter_directory,
+    walk_chain,
+)
+from core.realm_ref import RealmRef
 from core.task_manager import TaskManager
 from ggg import Call, Codex, Task, TaskSchedule, TaskStep
 from ggg.system.user_profile import Operations
@@ -1095,6 +1103,312 @@ def join_federation(capital_canister_id: text, as_capital: bool = False) -> Real
     except Exception as e:
         logger.error(f"Error joining federation: {str(e)}\n{traceback.format_exc()}")
         return RealmResponse(success=False, data=RealmResponseData(error=str(e)))
+
+
+# ── Cross-quarter / cross-realm addressing (realm:// refs) ─────────────────
+# See issue #156. A canister id is a canister id, so the same machinery serves
+# both cross-quarter (same realm) and cross-realm references; only the locator
+# fallback (gossip vs registry) differs by scope.
+
+
+def _load_local_entity(entity_type: str, entity_id: str):
+    """Return the live entity for (type, id) on THIS canister, or None."""
+    try:
+        results = list_objects([(entity_type, entity_id)])
+        return results[0] if results else None
+    except Exception:
+        return None
+
+
+def _find_migration_stub(subject: str):
+    """Return the EntityMigration forwarding stub for ``subject`` here, or None."""
+    try:
+        from ggg import EntityMigration
+
+        for m in EntityMigration.instances():
+            if m.subject == subject:
+                return m
+        return None
+    except Exception:
+        return None
+
+
+def _local_stub_next(ref) -> str:
+    """stub_lookup for walk_chain: only this canister's stubs are visible.
+
+    A quarter only knows the forwarding stubs it stored itself, so chain
+    resolution beyond the first remote hop is the caller's/frontend's job
+    (hop to ``next_ref``'s canister and call ``resolve_ref`` again).
+    """
+    self_id = ic.id().to_str()
+    if not ref.is_local(self_id):
+        return ""
+    stub = _find_migration_stub(ref.entity_id)
+    return stub.next_ref if (stub and stub.next_ref) else ""
+
+
+@query
+def resolve_ref(ref_uri: text) -> text:
+    """Resolve a ``realm://<canister>/<Type>/<id>`` reference.
+
+    Returns JSON describing where the entity currently lives:
+
+    * ``status=local``  — entity is on this canister; ``object`` is its JSON.
+    * ``status=remote`` — entity is elsewhere; ``final_ref`` + ``canister_id``
+      tell the frontend which backend to switch its actor to.
+    * ``status=moved``  — a local forwarding stub points onward (``final_ref``).
+    * ``status=not_found`` / ``invalid`` / ``loop`` / ``too_deep`` on failure.
+    """
+    try:
+        self_id = ic.id().to_str()
+        result = walk_chain(
+            ref_uri,
+            self_id,
+            local_lookup=lambda r: _load_local_entity(r.entity_type, r.entity_id),
+            stub_lookup=_local_stub_next,
+        )
+        out = {
+            "status": result["status"],
+            "final_ref": result.get("final_ref"),
+            "hops": result.get("hops", []),
+        }
+        final = result.get("final_ref")
+        if final:
+            fref = RealmRef.try_parse(final)
+            if fref:
+                out["canister_id"] = fref.canister_id
+                out["entity_type"] = fref.entity_type
+                out["entity_id"] = fref.entity_id
+        if result["status"] == ResolutionStatus.LOCAL and final:
+            fref = RealmRef.parse(final)
+            obj = _load_local_entity(fref.entity_type, fref.entity_id)
+            if obj is not None:
+                out["object"] = obj.serialize()
+        return json.dumps(out)
+    except Exception as e:
+        logger.error(f"Error resolving ref {ref_uri!r}: {e}\n{traceback.format_exc()}")
+        return json.dumps({"status": "error", "error": str(e)})
+
+
+@query
+def get_objects_by_ref(refs: Vec[text]) -> text:
+    """Batch-resolve realm refs. Local hits return objects; remote return routes.
+
+    Returns JSON ``{"results": [ {ref, status, object?, canister_id?, ...}, ... ]}``.
+    """
+    try:
+        self_id = ic.id().to_str()
+        results = []
+        for ref_uri in refs:
+            info = classify_ref(ref_uri, self_id)
+            entry = {"ref": ref_uri, "status": info["status"]}
+            if info["status"] == ResolutionStatus.LOCAL:
+                obj = _load_local_entity(info["entity_type"], info["entity_id"])
+                if obj is not None:
+                    entry["object"] = obj.serialize()
+                else:
+                    # Local ref but no entity — maybe it moved on.
+                    stub = _find_migration_stub(info["entity_id"])
+                    if stub and stub.next_ref:
+                        entry["status"] = ResolutionStatus.MOVED
+                        entry["final_ref"] = stub.next_ref
+                    else:
+                        entry["status"] = ResolutionStatus.NOT_FOUND
+            elif info["status"] == ResolutionStatus.REMOTE:
+                entry["canister_id"] = info["canister_id"]
+                entry["entity_type"] = info["entity_type"]
+                entry["entity_id"] = info["entity_id"]
+            results.append(entry)
+        return json.dumps({"results": results})
+    except Exception as e:
+        logger.error(f"Error in get_objects_by_ref: {e}\n{traceback.format_exc()}")
+        return json.dumps({"results": [], "error": str(e)})
+
+
+@query
+def get_migration(subject: text) -> text:
+    """Return this canister's forwarding stub for ``subject`` (for chain walks).
+
+    JSON: ``{"found": bool, "next_ref": str, "prev_ref": str, "moved_at": str}``.
+    """
+    try:
+        stub = _find_migration_stub(subject)
+        if not stub:
+            return json.dumps({"found": False})
+        return json.dumps({
+            "found": True,
+            "subject": stub.subject,
+            "entity_type": stub.entity_type,
+            "prev_ref": stub.prev_ref or "",
+            "next_ref": stub.next_ref or "",
+            "moved_at": stub.moved_at or "",
+        })
+    except Exception as e:
+        logger.error(f"Error in get_migration: {e}")
+        return json.dumps({"found": False, "error": str(e)})
+
+
+@update
+@require(Operations.SELF_CHANGE_QUARTER)
+def record_migration(args_json: text) -> text:
+    """Record a forwarding stub: this subject left here for ``next_ref``.
+
+    Args (JSON): ``{subject, next_ref, entity_type?, prev_ref?, signature?}``.
+    ``next_ref`` must be a valid absolute ``realm://`` URI. Idempotent per
+    subject — re-recording updates the existing stub.
+    """
+    try:
+        from ggg import EntityMigration
+
+        args = json.loads(args_json)
+        subject = (args.get("subject") or "").strip()
+        next_ref = (args.get("next_ref") or "").strip()
+        if not subject:
+            return json.dumps({"success": False, "error": "subject is required"})
+        if not RealmRef.is_ref(next_ref):
+            return json.dumps({
+                "success": False,
+                "error": f"next_ref must be a valid realm:// URI (got {next_ref!r})",
+            })
+
+        entity_type = (args.get("entity_type") or "User").strip()
+        prev_ref = (args.get("prev_ref") or "").strip()
+        signature = (args.get("signature") or "").strip()
+        moved_at = str(ic.time())
+
+        stub = _find_migration_stub(subject)
+        if stub:
+            stub.next_ref = next_ref
+            stub.entity_type = entity_type
+            if prev_ref:
+                stub.prev_ref = prev_ref
+            if signature:
+                stub.signature = signature
+            stub.moved_at = moved_at
+        else:
+            EntityMigration(
+                subject=subject,
+                entity_type=entity_type,
+                prev_ref=prev_ref,
+                next_ref=next_ref,
+                moved_at=moved_at,
+                signature=signature,
+            )
+        logger.info(f"Recorded migration for {subject} -> {next_ref}")
+        return json.dumps({"success": True, "subject": subject, "next_ref": next_ref})
+    except Exception as e:
+        logger.error(f"Error in record_migration: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def get_quarter_directory() -> text:
+    """Coarse quarter directory for gossip — containers only, never contents.
+
+    JSON: ``{"quarters": [{name, canister_id, population, status}, ...]}``.
+    Includes this canister plus every Quarter entity it knows about.
+    """
+    try:
+        from ggg import Quarter, Realm, User
+
+        self_id = ic.id().to_str()
+        realm = Realm.load("1")
+        quarters = []
+        seen = set()
+        if realm is not None:
+            try:
+                self_pop = int(User.count())
+            except Exception:
+                self_pop = 0
+            quarters.append({
+                "name": getattr(realm, "name", "") or "",
+                "canister_id": self_id,
+                "population": self_pop,
+                "status": "active",
+                "is_self": True,
+            })
+            seen.add(self_id)
+        for q in Quarter.instances():
+            cid = q.canister_id or ""
+            if cid in seen:
+                continue
+            seen.add(cid)
+            quarters.append({
+                "name": q.name or "",
+                "canister_id": cid,
+                "population": int(q.population or 0),
+                "status": q.status or "active",
+            })
+        return json.dumps({"quarters": quarters})
+    except Exception as e:
+        logger.error(f"Error in get_quarter_directory: {e}\n{traceback.format_exc()}")
+        return json.dumps({"quarters": [], "error": str(e)})
+
+
+@update
+@require(Operations.QUARTER_REGISTER)
+def sync_quarters(peer_canister_id: text) -> Async[text]:
+    """Gossip: pull a peer quarter's coarse directory and merge it into ours.
+
+    Adds Quarter entities for peers we did not know about and updates known
+    populations. Carries only container-level data (see issue #156).
+    """
+    try:
+        from ggg import Quarter, Realm
+
+        fetched = yield from _fetch_peer_directory(peer_canister_id)
+        if not fetched.get("success"):
+            return json.dumps({"success": False, "error": fetched.get("error", "fetch failed")})
+
+        peer_quarters = fetched.get("quarters", [])
+        self_id = ic.id().to_str()
+        realm = Realm.load("1")
+
+        local = []
+        for q in Quarter.instances():
+            local.append({
+                "name": q.name or "",
+                "canister_id": q.canister_id or "",
+                "population": int(q.population or 0),
+                "status": q.status or "active",
+            })
+
+        merged, changed = merge_quarter_directory(local, peer_quarters)
+
+        existing_ids = {q.canister_id for q in Quarter.instances()}
+        added = 0
+        for entry in merged:
+            cid = entry.get("canister_id")
+            if not cid or cid == self_id or cid in existing_ids:
+                # Update population on a known quarter.
+                for q in Quarter.instances():
+                    if q.canister_id == cid:
+                        new_pop = int(entry.get("population", 0) or 0)
+                        if new_pop > int(q.population or 0):
+                            q.population = new_pop
+                        break
+                continue
+            new_q = Quarter(
+                name=entry.get("name") or cid[:8],
+                canister_id=cid,
+                population=int(entry.get("population", 0) or 0),
+                status=entry.get("status") or "active",
+            )
+            if realm is not None:
+                new_q.federation = realm
+            existing_ids.add(cid)
+            added += 1
+
+        return json.dumps({
+            "success": True,
+            "peer": peer_canister_id,
+            "added": added,
+            "known_quarters": len(existing_ids),
+            "changed": bool(changed),
+        })
+    except Exception as e:
+        logger.error(f"Error in sync_quarters: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
 
 
 @query

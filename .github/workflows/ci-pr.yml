@@ -113,6 +113,11 @@ jobs:
       - name: realm_installer API tests
         run: python3 tests/integration/test_realm_installer_api.py
 
+      # Cross-quarter addressing end-to-end: single-canister endpoints plus a
+      # real inter-canister sync_quarters round-trip against a 2nd realm_backend.
+      - name: cross-quarter live integration tests
+        run: python3 tests/integration/test_cross_quarter_live.py
+
       - name: Stop local replica
         if: always()
         run: dfx stop || true

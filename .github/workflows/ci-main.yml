@@ -53,6 +53,8 @@ jobs:
           python3 scripts/ci_install_mundus.py \
               --file deployment-descriptors/local-mundus.yml \
               --stages 0,1,2,3
+      - name: cross-quarter live integration tests
+        run: python3 tests/integration/test_cross_quarter_live.py
       - name: Stop local replica
         if: always()
         run: dfx stop || true

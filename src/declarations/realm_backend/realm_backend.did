@@ -226,6 +226,12 @@ service : {
   "set_quarter_config" : (text) -> (RealmResponse);
   "declare_independence" : () -> (RealmResponse);
   "join_federation" : (text, bool) -> (RealmResponse);
+  "resolve_ref" : (text) -> (text) query;
+  "get_objects_by_ref" : (vec text) -> (text) query;
+  "get_migration" : (text) -> (text) query;
+  "record_migration" : (text) -> (text);
+  "get_quarter_directory" : () -> (text) query;
+  "sync_quarters" : (text) -> (text);
   "get_zones" : (nat) -> (text) query;
   "get_my_user_status" : () -> (RealmResponse) query;
   "get_my_extensions" : () -> (text) query;

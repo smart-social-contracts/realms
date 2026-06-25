@@ -11,8 +11,8 @@ from ggg import (
     # Identity
     Human, Identity, Member, Organization,
     # Governance
-    Codex, Contract, License, LicenseType, license_issue, license_revoke, Mandate,
-    Proposal, Quarter, QuarterStatus, Realm, Registry, Vote,
+    Codex, Contract, EntityMigration, License, LicenseType, license_issue, license_revoke,
+    Mandate, Proposal, Quarter, QuarterStatus, Realm, Registry, Vote,
     # Justice
     JusticeSystem, JusticeSystemType, Court, CourtLevel, Judge, Case, CaseStatus,
     case_file, case_assign_judges, case_issue_verdict, case_close, Verdict,

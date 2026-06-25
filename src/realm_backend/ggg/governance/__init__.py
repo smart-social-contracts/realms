@@ -3,6 +3,7 @@
 from .calendar import Calendar
 from .codex import Codex
 from .contract import Contract
+from .entity_migration import EntityMigration
 from .license import License, LicenseType, license_issue, license_revoke
 from .mandate import Mandate
 from .proposal import Proposal
@@ -16,6 +17,7 @@ __all__ = [
     "Calendar",
     "Codex",
     "Contract",
+    "EntityMigration",
     "License",
     "LicenseType",
     "license_issue",
