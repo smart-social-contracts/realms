@@ -94,11 +94,25 @@ This design supports the core Realms GOS principle: **opting out must always be 
 4. Frontend switches actor to the assigned quarter.
 5. User registers on the assigned quarter (this is their home).
 
-### Returning User Flow
-1. Frontend checks localStorage for cached `home_quarter` canister ID.
-2. If cache hit → connect directly to home quarter.
-3. If cache miss → call capital's `get_my_user_status()` → get `home_quarter`.
-4. If capital unavailable → broadcast query to known quarters (slow fallback).
+### Returning User Flow (home-quarter discovery ladder)
+There is **no central per-user index**, so a returning user's home quarter is
+recovered from progressively slower sources:
+1. **Client-carried pointer (fast path)** — frontend reads the cached
+   `home_quarter` canister ID from `localStorage` and activates it immediately
+   (`setActiveQuarter`) before any round-trip.
+2. **Capital resolution** — `get_my_user_status()` on the capital confirms /
+   corrects the assigned quarter, which re-caches `home_quarter`.
+3. **User-entered quarter number** — every quarter has a small stable integer
+   `index` in the federation catalog (capital = 0); a user who remembers it can
+   route directly.
+4. **"I forgot my quarter" broadcast** — last-resort search across all known
+   quarters to locate the user's record.
+
+> Note on identity: an Internet Identity principal is **per-frontend-origin**.
+> A single realm frontend yields a stable principal across all its backend
+> quarters; a *seceded* quarter that serves its own frontend origin would see a
+> different principal unless it configures `derivationOrigin` /
+> `/.well-known/ii-alternative-origins`.
 
 ---
 
@@ -114,14 +128,52 @@ Custom codexes can implement arbitrary rules (geography, invitation codes, profi
 
 ---
 
-## Auto-Scaling
+## Auto-Scaling / Sharding
 
-When all active quarters exceed `MAX_POPULATION`:
-1. Any quarter (or the capital) detects the condition.
-2. Creates a new canister via `ic.create_canister()`.
-3. Deploys the same WASM with the same manifest/extensions.
-4. Announces the new quarter to peers via gossip.
-5. New registrations are directed to the new quarter.
+Sharding is **policy-driven, non-blocking, and brokered through Casals**
+(issue #156). It is triggered on **every new user registration** and never
+blocks the join.
+
+### The decision (codex hook + default)
+
+The federation codex may define a `should_deploy_quarter(populations, network,
+realm)` hook. `populations` is the list of per-quarter resident counts
+(including the capital). When the codex defines no hook, the built-in default
+(`core/autoscale.py`) applies:
+
+- **Scale when the fullest quarter reaches 90% of N** — the 90% headroom means
+  the triggering user still lands on an existing quarter.
+- **N = 2000** in production; **N = 10** for the `test` / `staging` / `demo`
+  networks (so CI exercises sharding without thousands of joins).
+- A broken/throwing codex hook safely falls back to the default policy.
+
+### The mechanism (record intent → provision out of band)
+
+1. `user_register` (all join paths) calls `maybe_request_quarter_scale()` after
+   the post-hook. If the policy fires and no deploy is already queued, it sets an
+   **idempotent guard** `Realm.scale_in_flight = True` and records the time. It
+   never performs the deploy itself — joins are never blocked on provisioning.
+2. A separate async endpoint `process_quarter_scaling()` (called by a
+   controller, timer, or task manager) acts on the flag: it asks the
+   `realm_installer` broker to provision **one backend-only quarter** via
+   Casals (`provision_quarter` → `create_canister` under the realm's existing
+   stand → `set_commander`), then **registers** the new canister as a Quarter
+   (assigning the next catalog index) and clears the guard so the next
+   threshold crossing can re-trigger.
+3. **Users stay put.** Existing users are not migrated; the assignment strategy
+   simply starts directing *new* registrations to the freshest quarter once it
+   is registered.
+4. Backend only — new quarters share the capital's single frontend; the frontend
+   switches actors per home quarter (see Frontend Changes).
+
+### Why no central per-user location index
+
+`ic-python-db` caps a canister at ~5000 entities, so we never store a global
+user→quarter map anywhere. Gossip and the registry carry only **coarse**
+container-level data (quarter list, populations, indices), which stays well
+under the cap. A user's location is recovered from their own client-carried
+pointer / a small quarter integer / (last resort) a broadcast search — never
+from a central index.
 
 ---
 
@@ -165,7 +217,7 @@ class GuestUser(Entity):
     permissions = String()         # What they can do here
 ```
 
-### Quarter Entity (Existing — No Changes Needed)
+### Quarter Entity
 ```python
 class Quarter(Entity, TimestampedMixin):
     name = String()
@@ -173,6 +225,15 @@ class Quarter(Entity, TimestampedMixin):
     federation = ManyToOne("Realm", "quarter_ids")
     population = Integer(default=0)
     status = String(default="active")  # active/suspended/splitting/merging
+    index = Integer(default=0)     # stable catalog number (capital = 0)
+```
+
+### Realm Entity (auto-scaling fields)
+```python
+auto_scale_enabled = Boolean(default=True)
+scale_in_flight = Boolean(default=False)   # idempotent provisioning guard
+scale_requested_at = String(max_length=32)
+installer_canister_id = String(max_length=64)  # Casals broker for self-provision
 ```
 
 ---
@@ -194,7 +255,12 @@ class Quarter(Entity, TimestampedMixin):
 | `declare_independence()` | Secede from federation |
 | `join_federation(capital_canister_id)` | Join an existing federation |
 | `sync_quarters()` | Peer gossip: exchange quarter list + populations |
+| `get_scale_status()` | Report auto-scale state (N, threshold, populations, in-flight) |
+| `process_quarter_scaling()` | Act on a pending scale: provision + register a new quarter |
 | `register_guest(principal, home_quarter)` | Create GuestUser for cross-quarter access |
+
+`realm_installer.provision_quarter(args)` is the Casals broker endpoint that
+mints a backend-only quarter canister under the realm's existing stand.
 
 ---
 
@@ -223,5 +289,7 @@ class Quarter(Entity, TimestampedMixin):
 - CLI `--capital` flag for `quarter create`
 
 ### Phase 3: Automation (Low Priority)
-- Auto-provisioning new quarters at capacity
+- Auto-provisioning new quarters at capacity — **implemented** (codex
+  `should_deploy_quarter` hook + 90%-of-N default, `scale_in_flight` guard,
+  `process_quarter_scaling()` → Casals broker `provision_quarter`)
 - Optional QuarterRouter canister (cache/accelerator, not required)

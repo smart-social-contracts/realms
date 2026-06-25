@@ -19,3 +19,8 @@ class Quarter(Entity, TimestampedMixin):
     federation = ManyToOne("Realm", "quarter_ids")
     population = Integer(default=0)
     status = String(max_length=STATUS_MAX_LENGTH, default=QuarterStatus.ACTIVE)
+    # Stable, human-friendly quarter number within the federation catalog.
+    # Assigned monotonically at register_quarter time; the capital is index 0.
+    # Lets users recover their home quarter by remembering a small integer
+    # without any central per-user location index.
+    index = Integer(default=0)

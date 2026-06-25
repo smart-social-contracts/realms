@@ -117,12 +117,28 @@ export async function loadUserProfiles() {
     try {
         // Dynamically import backend to avoid circular dependencies
         // @ts-ignore
-        const { backend } = await import('$lib/canisters');
-        
+        const { backend, setActiveQuarter } = await import('$lib/canisters');
+
         if (!backend || typeof backend.get_my_user_status !== 'function') {
             throw new Error("Backend canister is not properly initialized");
         }
-        
+
+        // Fast path (client-carried pointer): if we cached this user's home
+        // quarter on a previous session, activate it immediately so extension
+        // calls route to the right canister without waiting for the round-trip
+        // below. The authoritative resolution that follows can correct it.
+        if (typeof localStorage !== 'undefined') {
+            const cached = localStorage.getItem('home_quarter');
+            if (cached) {
+                try {
+                    await setActiveQuarter(cached);
+                    console.log('🏘️ Fast-routed to cached home quarter:', cached);
+                } catch (e) {
+                    console.warn('Cached home quarter activation failed:', e);
+                }
+            }
+        }
+
         const response = await backend.get_my_user_status();
 
         console.log("User profiles response:", response);

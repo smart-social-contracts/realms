@@ -1320,6 +1320,66 @@ def provision_via_casals(job_id: text) -> Async[ResultProvision]:
         return ResultProvision(Err=ie(str(e), traceback.format_exc()[-1500:]))
 
 @update
+def provision_quarter(args: text) -> Async[text]:
+    """Provision a new **backend-only** quarter canister via Casals for an
+    already-deployed realm (auto-scaling / sharding — issue #156).
+
+    Unlike ``provision_via_casals`` (which stands up a brand-new realm from a
+    deployment job), this is a thin broker: a capital realm asks the installer
+    to mint one more backend canister under its existing Casals stand, then the
+    capital registers it as a quarter itself. Backend only — quarters share the
+    capital's single frontend.
+
+    ``args`` JSON: ``{stand, backend_wasm_key, name?, section?}``.
+    Returns JSON: ``{"ok": true, "canister_id": "..."}`` or ``{"ok": false, "error": ...}``.
+
+    Authorization mirrors ``provision_via_casals``: controllers or the
+    configured registry principal only — this spends Casals treasury cycles.
+    """
+    try:
+        cfg = _config()
+        caller = str(ic.caller())
+        reg_principal = (cfg.registry_principal or "").strip()
+        if not (ic.is_controller(ic.caller()) or (reg_principal and caller == reg_principal)):
+            return json.dumps({"ok": False, "error": "unauthorized: controller or configured registry only"})
+        if not int(cfg.provision_via_casals or 0):
+            return json.dumps({"ok": False, "error": "on-chain Casals provisioning is disabled"})
+        casals_id = (cfg.casals_canister_id or "").strip()
+        if not casals_id:
+            return json.dumps({"ok": False, "error": "casals_canister_id not configured"})
+
+        params = json.loads(args or "{}")
+        stand = (params.get("stand") or "").strip()
+        backend_wasm_key = (params.get("backend_wasm_key") or "").strip()
+        name = (params.get("name") or "").strip() or f"{stand}-quarter"
+        if not stand:
+            return json.dumps({"ok": False, "error": "stand required"})
+        if not backend_wasm_key:
+            return json.dumps({"ok": False, "error": "backend_wasm_key required"})
+
+        casals = CasalsService(Principal.from_str(casals_id))
+
+        be_res: CallResult = yield casals.create_canister(json.dumps({
+            "stand": stand, "name": name,
+            "kind": "backend", "wasm_key": backend_wasm_key,
+        }))
+        backend_id = (_casals_ok(be_res).get("canister_id") or "").strip()
+        if not backend_id:
+            return json.dumps({"ok": False, "error": "casals create_canister returned no canister_id"})
+
+        # Let the new quarter self-upgrade like any realm backend.
+        cmd_res: CallResult = yield casals.set_commander(json.dumps({
+            "stand": stand, "commander_principal": backend_id,
+        }))
+        _casals_ok(cmd_res)
+
+        _log.info(f"provisioned quarter backend {backend_id} ({backend_wasm_key}) under stand '{stand}'")
+        return json.dumps({"ok": True, "canister_id": backend_id, "stand": stand, "name": name})
+    except Exception as e:
+        _log.error(f"provision_quarter failed: {e}\n{traceback.format_exc()}")
+        return json.dumps({"ok": False, "error": str(e)})
+
+@update
 def report_canister_ready(args: text) -> Async[ResultReportReady]:
     job_id = ""
     try:

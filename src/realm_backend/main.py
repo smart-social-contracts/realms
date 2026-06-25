@@ -54,6 +54,7 @@ from api.ggg_entities import (
     search_objects,
 )
 from api.cross_quarter import fetch_peer_directory as _fetch_peer_directory
+from api.quarter_provisioning import request_provision_quarter as _request_provision_quarter
 from api.messaging import send_realm_message as _send_realm_message
 from api.nft import get_nft_canister_id, mint_land_nft
 from api.registry import get_registry_info, register_realm
@@ -107,6 +108,7 @@ class QuarterInfoRecord(Record):
     canister_id: text
     population: nat
     status: text
+    index: nat
 
 
 class StatusRecord(Record):
@@ -400,6 +402,7 @@ def get_quarter_info() -> RealmResponse:
                         "canister_id": own_id,
                         "population": capital_pop,
                         "status": "active",
+                        "index": 0,
                         "is_capital": True,
                     }
                 )
@@ -415,6 +418,7 @@ def get_quarter_info() -> RealmResponse:
                             "canister_id": qcid,
                             "population": q_pop,
                             "status": q.status or "active",
+                            "index": int(getattr(q, "index", 0) or 0),
                             "is_capital": False,
                         }
                     )
@@ -425,6 +429,7 @@ def get_quarter_info() -> RealmResponse:
                         "canister_id": own_id,
                         "population": User.count(),
                         "status": "active",
+                        "index": 0,
                         "is_capital": True,
                     }
                 )
@@ -925,20 +930,31 @@ def register_quarter(quarter_name: text, quarter_canister_id: text) -> RealmResp
                     ),
                 )
 
+        # Assign a stable, monotonic catalog index (capital is 0, quarters >=1).
+        # Users can recover their home quarter from this small integer without
+        # any central per-user location index.
+        next_index = 1
+        for q in Quarter.instances():
+            try:
+                next_index = max(next_index, int(q.index or 0) + 1)
+            except Exception:
+                continue
+
         quarter = Quarter(
             name=quarter_name,
             canister_id=quarter_canister_id,
+            index=next_index,
         )
         quarter.federation = realm
 
         logger.info(
-            f"Registered quarter '{quarter_name}' (canister: {quarter_canister_id})"
+            f"Registered quarter '{quarter_name}' (canister: {quarter_canister_id}, index: {next_index})"
         )
 
         return RealmResponse(
             success=True,
             data=RealmResponseData(
-                message=f"Quarter '{quarter_name}' registered with ID {quarter._id}"
+                message=f"Quarter '{quarter_name}' registered with ID {quarter._id} (index {next_index})"
             ),
         )
     except Exception as e:
@@ -1325,6 +1341,7 @@ def get_quarter_directory() -> text:
                 "canister_id": self_id,
                 "population": self_pop,
                 "status": "active",
+                "index": 0,
                 "is_self": True,
             })
             seen.add(self_id)
@@ -1338,6 +1355,7 @@ def get_quarter_directory() -> text:
                 "canister_id": cid,
                 "population": int(q.population or 0),
                 "status": q.status or "active",
+                "index": int(q.index or 0),
             })
         return json.dumps({"quarters": quarters})
     except Exception as e:
@@ -1408,6 +1426,150 @@ def sync_quarters(peer_canister_id: text) -> Async[text]:
         })
     except Exception as e:
         logger.error(f"Error in sync_quarters: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def get_scale_status() -> text:
+    """Report the federation's auto-scaling state (issue #156).
+
+    JSON: ``{auto_scale_enabled, scale_in_flight, scale_requested_at, network,
+    n, threshold, populations, should_scale}``. Used by admins/tests/frontend
+    to observe sharding decisions; carries no per-user data.
+    """
+    try:
+        from ggg import Realm
+
+        from core.autoscale import (
+            default_threshold_n,
+            quarter_populations,
+            resolve_should_scale,
+            scale_at,
+            _codex_should_deploy_fn,
+        )
+
+        realm = Realm.load("1")
+        if not realm:
+            return json.dumps({"success": False, "error": "Realm not found"})
+
+        network = getattr(realm, "network", "") or ""
+        pops = quarter_populations(realm)
+        n = default_threshold_n(network)
+        codex_fn = _codex_should_deploy_fn(realm)
+        return json.dumps({
+            "success": True,
+            "auto_scale_enabled": bool(getattr(realm, "auto_scale_enabled", True)),
+            "scale_in_flight": bool(getattr(realm, "scale_in_flight", False)),
+            "scale_requested_at": getattr(realm, "scale_requested_at", "") or "",
+            "network": network,
+            "n": n,
+            "threshold": scale_at(n),
+            "populations": pops,
+            "should_scale": resolve_should_scale(pops, network, codex_fn=codex_fn, realm=realm),
+        })
+    except Exception as e:
+        logger.error(f"Error in get_scale_status: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+def _quarter_casals_args(realm):
+    """Build Casals args for provisioning a new quarter from realm config.
+
+    Reads the optional ``casals`` block persisted in ``manifest_data``:
+    ``{stand, section?, backend_wasm_key}``. Returns None if insufficient.
+    """
+    try:
+        manifest = json.loads(getattr(realm, "manifest_data", "") or "{}")
+    except Exception:
+        manifest = {}
+    cas = manifest.get("casals", {}) or {}
+    stand = (cas.get("stand") or "").strip()
+    backend_wasm_key = (cas.get("backend_wasm_key") or "").strip()
+    if not stand or not backend_wasm_key:
+        return None
+    # Name the new quarter after its prospective catalog index.
+    next_index = 1
+    try:
+        from ggg import Quarter
+
+        for q in Quarter.instances():
+            next_index = max(next_index, int(q.index or 0) + 1)
+    except Exception:
+        pass
+    return {
+        "stand": stand,
+        "backend_wasm_key": backend_wasm_key,
+        "name": f"{stand}-quarter-{next_index}",
+    }
+
+
+@update
+@require(Operations.QUARTER_REGISTER)
+def process_quarter_scaling() -> Async[text]:
+    """Act on a pending auto-scale request: provision a new quarter via the
+    installer broker, register it locally, then clear the in-flight guard.
+
+    Non-blocking by design — user registration only sets ``scale_in_flight``;
+    this endpoint (called by a controller, timer, or task manager) performs the
+    actual Casals provisioning out of band so joins never wait on a deploy.
+    Idempotent: a no-op when no scale is in flight.
+    """
+    try:
+        from ggg import Realm
+
+        realm = Realm.load("1")
+        if not realm:
+            return json.dumps({"success": False, "error": "Realm not found"})
+        if not bool(getattr(realm, "scale_in_flight", False)):
+            return json.dumps({"success": True, "status": "idle", "message": "no scale in flight"})
+
+        installer_id = (getattr(realm, "installer_canister_id", "") or "").strip()
+        if not installer_id:
+            # Keep the flag set: intent is recorded, but we can't self-provision
+            # without a broker. An operator can provision manually + register.
+            return json.dumps({
+                "success": False,
+                "status": "blocked",
+                "error": "installer_canister_id not configured; cannot auto-provision",
+            })
+
+        args = _quarter_casals_args(realm)
+        if not args:
+            return json.dumps({
+                "success": False,
+                "status": "blocked",
+                "error": "manifest_data.casals {stand, backend_wasm_key} required to provision",
+            })
+
+        result = yield from _request_provision_quarter(installer_id, args)
+        if not result.get("ok"):
+            # Clear the guard so a later threshold crossing can retry; surface error.
+            realm.scale_in_flight = False
+            return json.dumps({"success": False, "status": "failed", "error": result.get("error", "provision failed")})
+
+        new_canister_id = (result.get("canister_id") or "").strip()
+        from ggg import Quarter
+
+        # Register the freshly minted backend as a quarter (assign next index).
+        already = any(q.canister_id == new_canister_id for q in Quarter.instances())
+        new_index = 1
+        if not already:
+            for q in Quarter.instances():
+                new_index = max(new_index, int(q.index or 0) + 1)
+            q = Quarter(name=args.get("name") or new_canister_id[:8], canister_id=new_canister_id, index=new_index)
+            q.federation = realm
+
+        # Provisioning complete; allow the next threshold crossing to re-trigger.
+        realm.scale_in_flight = False
+        logger.info(f"Auto-scale provisioned + registered quarter {new_canister_id} (index {new_index})")
+        return json.dumps({
+            "success": True,
+            "status": "provisioned",
+            "canister_id": new_canister_id,
+            "index": new_index,
+        })
+    except Exception as e:
+        logger.error(f"Error in process_quarter_scaling: {e}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})
 
 

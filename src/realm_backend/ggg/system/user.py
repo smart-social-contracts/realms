@@ -238,6 +238,17 @@ def user_register(principal: str, profile: str) -> dict[str, Any]:
 
     if is_new_user:
         User.user_register_posthook(user)  # type: ignore[arg-type]
+        # Auto-scaling: evaluate whether the federation should spawn a new
+        # quarter now that population grew. Runs for *all* user-creation paths
+        # (so a codex posthook override can't disable sharding). Non-blocking —
+        # it only records intent; provisioning happens out of band.
+        try:
+            from core.autoscale import maybe_request_quarter_scale
+
+            if maybe_request_quarter_scale():
+                logger.info(f"Quarter auto-scale requested after registering {principal}")
+        except Exception as e:
+            logger.error(f"Auto-scale evaluation failed for {principal}: {e}")
 
     return {
         "principal": user.id,

@@ -18,6 +18,7 @@ class QuarterInfoRecord(Record):
     canister_id: text
     population: nat
     status: text
+    index: nat
 
 
 class StatusRecord(Record):

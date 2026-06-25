@@ -15,7 +15,7 @@ class RealmStatus:
 
 class Realm(Entity, TimestampedMixin):
     __alias__ = "name"
-    __version__ = 3
+    __version__ = 4
     name = String(min_length=2, max_length=256)
     manifesto = String(max_length=256)
 
@@ -26,6 +26,10 @@ class Realm(Entity, TimestampedMixin):
         if from_version < 3:
             if obj.get("ai_assistant_enabled") is None:
                 obj["ai_assistant_enabled"] = True
+        if from_version < 4:
+            obj.setdefault("auto_scale_enabled", True)
+            obj.setdefault("scale_in_flight", False)
+            obj.setdefault("scale_requested_at", "")
         return obj
     welcome_message = String(max_length=1024)  # Welcome message displayed on landing page
     status = String(max_length=STATUS_MAX_LENGTH, default=RealmStatus.ALPHA)
@@ -50,6 +54,17 @@ class Realm(Entity, TimestampedMixin):
     federation_realm_id = String(max_length=64)  # parent realm ID if this is a quarter
     quarter_ids = OneToMany("Quarter", "federation")
     federation_codex = OneToOne("Codex", "federation")
+    # Auto-scaling / sharding (issue #156). When enabled, a new quarter deploy
+    # is requested once the fullest quarter reaches 90% of N (see core.autoscale).
+    auto_scale_enabled = Boolean(default=True)
+    # Idempotent guard: True while a quarter provisioning job is queued/running.
+    # Set by the user-registration trigger, cleared by the async provisioning
+    # endpoint on success/failure so the next threshold crossing can re-trigger.
+    scale_in_flight = Boolean(default=False)
+    scale_requested_at = String(max_length=32, default="")
+    # Canister id of the realm_installer broker used to provision new quarters
+    # via Casals. Empty => auto-scale records intent but cannot self-provision.
+    installer_canister_id = String(max_length=64, default="")
     # Comma-separated canister principal IDs trusted for inter-canister calls
     # (DAO controllers, AI agents, parent realms). These bypass User-based access checks.
     trusted_principals = String(max_length=2048, default="")

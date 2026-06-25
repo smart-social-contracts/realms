@@ -253,6 +253,7 @@ def get_status() -> "dict[str, Any]":
                         "canister_id": own_id,
                         "population": capital_pop,
                         "status": "active",
+                        "index": 0,
                         "is_capital": True,
                     }
                 )
@@ -268,6 +269,7 @@ def get_status() -> "dict[str, Any]":
                             "canister_id": qcid,
                             "population": q_pop,
                             "status": q.status or "active",
+                            "index": int(getattr(q, "index", 0) or 0),
                             "is_capital": False,
                         }
                     )
@@ -281,6 +283,7 @@ def get_status() -> "dict[str, Any]":
                         "canister_id": own_id,
                         "population": users_count,
                         "status": "active",
+                        "index": 0,
                         "is_capital": True,
                     }
                 )

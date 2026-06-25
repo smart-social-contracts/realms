@@ -4,7 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { Alert } from 'flowbite-svelte';
-	import { backend } from '$lib/canisters';
+	import { backend, quarterBackend } from '$lib/canisters';
 	import { canisterId as backendCanisterId } from '$lib/declarations/realm_backend';
 	import { principal, isAuthenticated } from '$lib/stores/auth';
 	import { userProfiles } from '$lib/stores/profiles';
@@ -60,7 +60,12 @@
 	}
 
 	async function buildContext(id: string, version: string): Promise<RealmExtensionContext> {
-		let extensionBackend: typeof backend = backend;
+		// Extensions operate on the user's data, which lives in their home quarter.
+		// Route the extension-facing surface (backend, callSync/callAsync, crypto)
+		// through `quarterBackend`, which falls back to the capital until a home
+		// quarter is resolved + activated (see setActiveQuarter). The marketplace
+		// is a realm-wide infra canister and keeps its dedicated actor.
+		let extensionBackend: typeof backend = quarterBackend;
 		if (id === 'market_place' && infraConfig.marketplaceCanisterId) {
 			extensionBackend = (await createMarketplaceExtensionBackend(
 				infraConfig.marketplaceCanisterId,
@@ -69,7 +74,7 @@
 		}
 
 		async function callSync(fn: string, args: Record<string, unknown> = {}): Promise<unknown> {
-			const raw = await backend.extension_sync_call(id, fn, JSON.stringify(args));
+			const raw = await extensionBackend.extension_sync_call(id, fn, JSON.stringify(args));
 			const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
 			if (res?.success === false) {
 				const denied = parseAccessError(res);
@@ -80,7 +85,7 @@
 			try { return JSON.parse(res.response); } catch { return res.response; }
 		}
 		async function callAsync(fn: string, args: Record<string, unknown> = {}): Promise<unknown> {
-			const raw = await backend.extension_async_call(id, fn, JSON.stringify(args));
+			const raw = await extensionBackend.extension_async_call(id, fn, JSON.stringify(args));
 			const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
 			if (res?.success === false) {
 				const denied = parseAccessError(res);
@@ -126,7 +131,7 @@
 					if (!wrappedDekHex || !ciphertext) return null;
 					try {
 						const me = get(principal) as string;
-						const { vetKey } = await deriveMySharingVetKey(backend, me);
+						const { vetKey } = await deriveMySharingVetKey(quarterBackend, me);
 						const dek = unwrapDek(vetKey, wrappedDekHex);
 						const plaintext = await aesGcmDecryptWithDek(dek, ciphertext);
 						return JSON.parse(plaintext);
@@ -136,18 +141,18 @@
 					}
 				},
 				async encryptForRecipients(recipients: string[], data: unknown) {
-					return buildSharePlan(backend, recipients, data);
+					return buildSharePlan(quarterBackend, recipients, data);
 				},
 				async grantScope(
 					scope: string,
 					wrappedDeks: Record<string, string>,
 					opts?: { previousRecipients?: string[]; keep?: string[] },
 				) {
-					return grantScopeData(backend, scope, wrappedDeks, opts);
+					return grantScopeData(quarterBackend, scope, wrappedDeks, opts);
 				},
 				async decryptScope(scope: string, ciphertext: string) {
 					const me = get(principal) as string;
-					return decryptScopeData(backend, scope, me, ciphertext);
+					return decryptScopeData(quarterBackend, scope, me, ciphertext);
 				},
 			},
 			ui: {

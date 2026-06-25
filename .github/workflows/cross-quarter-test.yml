@@ -16,19 +16,25 @@ on:
     paths:
       - "src/realm_backend/core/realm_ref.py"
       - "src/realm_backend/core/cross_quarter.py"
+      - "src/realm_backend/core/autoscale.py"
       - "src/realm_backend/ggg/governance/entity_migration.py"
+      - "src/realm_backend/ggg/governance/quarter.py"
       - "src/realm_backend/api/cross_quarter.py"
       - "cli/tests/test_realm_ref.py"
       - "cli/tests/test_cross_quarter.py"
+      - "cli/tests/test_autoscale.py"
       - ".github/workflows/cross-quarter-test.yml"
   pull_request:
     paths:
       - "src/realm_backend/core/realm_ref.py"
       - "src/realm_backend/core/cross_quarter.py"
+      - "src/realm_backend/core/autoscale.py"
       - "src/realm_backend/ggg/governance/entity_migration.py"
+      - "src/realm_backend/ggg/governance/quarter.py"
       - "src/realm_backend/api/cross_quarter.py"
       - "cli/tests/test_realm_ref.py"
       - "cli/tests/test_cross_quarter.py"
+      - "cli/tests/test_autoscale.py"
       - ".github/workflows/cross-quarter-test.yml"
   workflow_dispatch:
 
@@ -55,8 +61,9 @@ jobs:
           pip install -r requirements.txt
           pip install -e cli/
           pip install pytest
-      - name: Run cross-quarter addressing tests (strict)
+      - name: Run cross-quarter addressing + auto-scaling tests (strict)
         run: |
           pytest -v \
             cli/tests/test_realm_ref.py \
-            cli/tests/test_cross_quarter.py
+            cli/tests/test_cross_quarter.py \
+            cli/tests/test_autoscale.py
