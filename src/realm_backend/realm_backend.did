@@ -234,6 +234,8 @@ service : {
   "sync_quarters" : (text) -> (text);
   "get_scale_status" : () -> (text) query;
   "process_quarter_scaling" : () -> (text);
+  "bootstrap_as_quarter" : (text) -> (text);
+  "get_bootstrap_status" : () -> (text) query;
   "get_zones" : (nat) -> (text) query;
   "get_my_user_status" : () -> (RealmResponse) query;
   "get_my_extensions" : () -> (text) query;

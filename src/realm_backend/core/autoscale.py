@@ -173,4 +173,13 @@ def maybe_request_quarter_scale():
         realm.scale_requested_at = str(int(ic.time()))
     except Exception:
         pass
+    # Spin up the on-chain provisioning loop. Lazy/guarded import so the pure
+    # policy path (and unit tests under plain CPython) never depend on the
+    # canister ``main`` module or the TaskManager.
+    try:
+        from main import ensure_autoscale_task
+
+        ensure_autoscale_task()
+    except Exception:
+        pass
     return True

@@ -54,7 +54,12 @@ from api.ggg_entities import (
     search_objects,
 )
 from api.cross_quarter import fetch_peer_directory as _fetch_peer_directory
-from api.quarter_provisioning import request_provision_quarter as _request_provision_quarter
+from api.quarter_provisioning import (
+    request_provision_quarter as _request_provision_quarter,
+    request_casals_create_canister as _request_casals_create_canister,
+    bootstrap_quarter as _bootstrap_quarter,
+    parse_casals_spec as _parse_casals_spec,
+)
 from api.messaging import send_realm_message as _send_realm_message
 from api.nft import get_nft_canister_id, mint_land_nft
 from api.registry import get_registry_info, register_realm
@@ -1034,6 +1039,126 @@ def set_quarter_config(parent_realm_canister_id: text) -> RealmResponse:
 
 
 @update
+@require(Operations.QUARTER_CONFIGURE)
+def bootstrap_as_quarter(args: text) -> text:
+    """Seed a quarter-local self-bootstrap to bring a freshly minted quarter to
+    parity (config + federation codex + extensions).
+
+    Called by the capital immediately after Casals mints this canister. Because
+    Casals co-adds the capital (the stand commander) as a controller of canisters
+    in its stand, the capital passes the controller bypass on this gated call.
+
+    Rather than install everything in this single message (impossible past a
+    handful of extensions, given the IC instruction/time limit), this endpoint:
+
+      1. Does the cheap config synchronously: mark as a quarter of the parent and
+         trust the parent for future inter-canister calls.
+      2. Records an install *plan* (codex + extensions) on the local ``Realm``.
+      3. Seeds a recurring ``TaskManager`` task that installs **one item per
+         tick** with retry/backoff (see ``core.quarter_bootstrap``).
+
+    Returns immediately; progress is observable via ``get_bootstrap_status``.
+
+    Args (JSON)::
+
+        {
+          "parent_realm_canister_id": "ihbn6-...",   # required
+          "registry_canister_id": "iebdk-...",        # required for codex/extensions
+          "codex": {"codex_id": "...", "version": null} | null,
+          "extensions": [{"ext_id": "...", "version": null}, ...],
+          "frontend_canister_id": ""                   # optional (backend-only quarters)
+        }
+    """
+    try:
+        params = json.loads(args or "{}")
+    except Exception as e:
+        return json.dumps({"success": False, "error": f"bad args: {e}"})
+
+    parent = (params.get("parent_realm_canister_id") or "").strip()
+
+    try:
+        from ggg import Realm
+        from core.quarter_bootstrap import (
+            build_bootstrap_plan,
+            save_state,
+            seed_bootstrap_task,
+        )
+
+        realm = Realm.load("1")
+        if not realm:
+            return json.dumps({"success": False, "error": "Realm not found on quarter"})
+
+        # 1. Synchronous config: mark as a quarter + trust the parent.
+        realm.is_quarter = True
+        realm.federation_realm_id = parent
+        if parent:
+            trusted = [p.strip() for p in str(realm.trusted_principals or "").split(",") if p.strip()]
+            if parent not in trusted:
+                trusted.append(parent)
+                realm.trusted_principals = ",".join(trusted)
+
+        # 2. Record the install plan for the local driver.
+        plan = build_bootstrap_plan(params)
+        save_state(realm, plan)
+
+        # 3. Seed the recurring TaskManager task that installs one item per tick.
+        seeded = False
+        if plan.get("items"):
+            try:
+                seed_bootstrap_task()
+                seeded = True
+            except Exception as e:
+                logger.error(f"Failed to seed quarter bootstrap task: {e}\n{traceback.format_exc()}")
+
+        planned = len(plan.get("items", []))
+        status = "bootstrapping" if seeded else ("complete" if not planned else "blocked")
+        logger.info(f"bootstrap_as_quarter seeded plan ({planned} items, parent={parent}, status={status})")
+        return json.dumps({
+            "success": True,
+            "status": status,
+            "parent": parent,
+            "planned": planned,
+            "seeded": seeded,
+        })
+    except Exception as e:
+        logger.error(f"bootstrap_as_quarter failed: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@query
+def get_bootstrap_status() -> text:
+    """Report this quarter's self-bootstrap progress (issue #156).
+
+    Returns the persisted install plan + cursor so the capital (or an operator)
+    can watch a freshly minted quarter reach parity without polling the registry.
+    """
+    try:
+        from ggg import Realm
+        from core.quarter_bootstrap import load_state
+
+        realm = Realm.load("1")
+        if not realm:
+            return json.dumps({"success": False, "error": "Realm not found"})
+        state = load_state(realm)
+        if not state:
+            return json.dumps({"success": True, "status": "none", "plan": None})
+        items = state.get("items") or []
+        return json.dumps({
+            "success": True,
+            "status": state.get("status", "unknown"),
+            "cursor": int(state.get("cursor") or 0),
+            "total": len(items),
+            "done": state.get("done", []),
+            "failed": state.get("failed", []),
+            "current": items[int(state.get("cursor") or 0)].get("id")
+            if int(state.get("cursor") or 0) < len(items) else None,
+        })
+    except Exception as e:
+        logger.error(f"get_bootstrap_status failed: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
 @require(Operations.QUARTER_SECEDE)
 def declare_independence() -> RealmResponse:
     """Secede from the federation, becoming an independent realm.
@@ -1473,20 +1598,22 @@ def get_scale_status() -> text:
 
 
 def _quarter_casals_args(realm):
-    """Build Casals args for provisioning a new quarter from realm config.
+    """Build the provisioning spec for a new quarter from realm config.
 
-    Reads the optional ``casals`` block persisted in ``manifest_data``:
-    ``{stand, section?, backend_wasm_key}``. Returns None if insufficient.
+    Reads the optional ``casals`` block persisted in ``manifest_data``::
+
+        {
+          "stand": "agora",                        # required
+          "backend_wasm_key": "realm-backend@...", # required
+          "casals_canister_id": "jj2e5-...",       # enables the direct path
+          "registry_canister_id": "iebdk-...",     # for codex/extension pull
+          "codex": {"codex_id": "...", "version": null},
+          "extensions": [{"ext_id": "...", "version": null}, ...],
+          "frontend_canister_id": ""               # quarters are backend-only
+        }
+
+    Returns None when the required ``stand``/``backend_wasm_key`` are missing.
     """
-    try:
-        manifest = json.loads(getattr(realm, "manifest_data", "") or "{}")
-    except Exception:
-        manifest = {}
-    cas = manifest.get("casals", {}) or {}
-    stand = (cas.get("stand") or "").strip()
-    backend_wasm_key = (cas.get("backend_wasm_key") or "").strip()
-    if not stand or not backend_wasm_key:
-        return None
     # Name the new quarter after its prospective catalog index.
     next_index = 1
     try:
@@ -1496,23 +1623,41 @@ def _quarter_casals_args(realm):
             next_index = max(next_index, int(q.index or 0) + 1)
     except Exception:
         pass
-    return {
-        "stand": stand,
-        "backend_wasm_key": backend_wasm_key,
-        "name": f"{stand}-quarter-{next_index}",
-    }
+    return _parse_casals_spec(getattr(realm, "manifest_data", "") or "{}", next_index)
 
 
 @update
 @require(Operations.QUARTER_REGISTER)
 def process_quarter_scaling() -> Async[text]:
-    """Act on a pending auto-scale request: provision a new quarter via the
-    installer broker, register it locally, then clear the in-flight guard.
+    """Act on a pending auto-scale request: provision a new quarter, bring it to
+    parity, register it locally, then clear the in-flight guard.
+
+    Two transports, preferred in order:
+
+    1. **Direct** — when ``manifest_data.casals.casals_canister_id`` is set, the
+       capital (commander of its Casals stand) asks Casals to ``create_canister``
+       a backend-only quarter, then drives ``bootstrap_as_quarter`` on it (Casals
+       co-adds the capital as a controller of canisters minted in its stand, so
+       the gated bootstrap calls are authorized).
+    2. **Broker** — otherwise, if ``installer_canister_id`` is set, ask the
+       installer to provision via Casals on the capital's behalf.
 
     Non-blocking by design — user registration only sets ``scale_in_flight``;
     this endpoint (called by a controller, timer, or task manager) performs the
-    actual Casals provisioning out of band so joins never wait on a deploy.
+    actual provisioning out of band so joins never wait on a deploy.
     Idempotent: a no-op when no scale is in flight.
+    """
+    res = yield from _run_quarter_scaling()
+    return res
+
+
+def _run_quarter_scaling() -> Async[text]:
+    """Core auto-scale provisioning driver (un-gated).
+
+    Creates a quarter via Casals (direct) or the installer (broker), seeds the
+    new quarter's local self-bootstrap, registers it locally, then clears the
+    in-flight guard. Shared by the ``process_quarter_scaling`` endpoint and the
+    recurring autoscale task (``run_autoscale_tick``).
     """
     try:
         from ggg import Realm
@@ -1523,31 +1668,67 @@ def process_quarter_scaling() -> Async[text]:
         if not bool(getattr(realm, "scale_in_flight", False)):
             return json.dumps({"success": True, "status": "idle", "message": "no scale in flight"})
 
-        installer_id = (getattr(realm, "installer_canister_id", "") or "").strip()
-        if not installer_id:
-            # Keep the flag set: intent is recorded, but we can't self-provision
-            # without a broker. An operator can provision manually + register.
-            return json.dumps({
-                "success": False,
-                "status": "blocked",
-                "error": "installer_canister_id not configured; cannot auto-provision",
-            })
-
-        args = _quarter_casals_args(realm)
-        if not args:
+        spec = _quarter_casals_args(realm)
+        if not spec:
             return json.dumps({
                 "success": False,
                 "status": "blocked",
                 "error": "manifest_data.casals {stand, backend_wasm_key} required to provision",
             })
 
-        result = yield from _request_provision_quarter(installer_id, args)
-        if not result.get("ok"):
-            # Clear the guard so a later threshold crossing can retry; surface error.
-            realm.scale_in_flight = False
-            return json.dumps({"success": False, "status": "failed", "error": result.get("error", "provision failed")})
+        casals_id = (spec.get("casals_canister_id") or "").strip()
+        installer_id = (getattr(realm, "installer_canister_id", "") or "").strip()
+        bootstrap_result = None
 
-        new_canister_id = (result.get("canister_id") or "").strip()
+        if casals_id:
+            # ── Direct path: the capital commands its own Casals stand. ──
+            create_res = yield from _request_casals_create_canister(casals_id, {
+                "stand": spec["stand"],
+                "name": spec["name"],
+                "kind": "backend",
+                "wasm_key": spec["backend_wasm_key"],
+            })
+            if not create_res.get("ok"):
+                realm.scale_in_flight = False
+                return json.dumps({"success": False, "status": "failed",
+                                   "error": f"Casals create_canister failed: {create_res.get('error')}"})
+            new_canister_id = (create_res.get("canister_id") or "").strip()
+            if not new_canister_id:
+                realm.scale_in_flight = False
+                return json.dumps({"success": False, "status": "failed",
+                                   "error": "Casals create_canister returned no canister_id"})
+
+            # Seed the new quarter's local self-bootstrap (config + codex +
+            # extensions, installed one item per tick by its own TaskManager).
+            bootstrap_result = yield from _bootstrap_quarter(new_canister_id, {
+                "parent_realm_canister_id": ic.id().to_str(),
+                "registry_canister_id": spec.get("registry_canister_id", ""),
+                "codex": spec.get("codex"),
+                "extensions": spec.get("extensions", []),
+                "frontend_canister_id": spec.get("frontend_canister_id", ""),
+            })
+        elif installer_id:
+            # ── Broker path: ask the installer to provision on our behalf. ──
+            result = yield from _request_provision_quarter(installer_id, {
+                "stand": spec["stand"],
+                "backend_wasm_key": spec["backend_wasm_key"],
+                "name": spec["name"],
+            })
+            if not result.get("ok"):
+                realm.scale_in_flight = False
+                return json.dumps({"success": False, "status": "failed",
+                                   "error": result.get("error", "provision failed")})
+            new_canister_id = (result.get("canister_id") or "").strip()
+        else:
+            # Intent recorded but no transport wired; keep the flag set so an
+            # operator can finish wiring and retry.
+            return json.dumps({
+                "success": False,
+                "status": "blocked",
+                "error": "no provisioning transport: set manifest_data.casals.casals_canister_id "
+                         "(direct) or installer_canister_id (broker)",
+            })
+
         from ggg import Quarter
 
         # Register the freshly minted backend as a quarter (assign next index).
@@ -1556,7 +1737,7 @@ def process_quarter_scaling() -> Async[text]:
         if not already:
             for q in Quarter.instances():
                 new_index = max(new_index, int(q.index or 0) + 1)
-            q = Quarter(name=args.get("name") or new_canister_id[:8], canister_id=new_canister_id, index=new_index)
+            q = Quarter(name=spec.get("name") or new_canister_id[:8], canister_id=new_canister_id, index=new_index)
             q.federation = realm
 
         # Provisioning complete; allow the next threshold crossing to re-trigger.
@@ -1567,10 +1748,70 @@ def process_quarter_scaling() -> Async[text]:
             "status": "provisioned",
             "canister_id": new_canister_id,
             "index": new_index,
+            "bootstrap": bootstrap_result,
         })
     except Exception as e:
         logger.error(f"Error in process_quarter_scaling: {e}\n{traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})
+
+
+def run_autoscale_tick() -> Async[text]:
+    """Recurring autoscale driver step (issue #156).
+
+    Provisions a quarter when a scale is in flight, otherwise disables the
+    trigger schedule so the task stops firing until the next registration
+    re-seeds it (see ``ensure_autoscale_task``). Also stops ticking on a
+    ``blocked`` result (misconfiguration needing operator intervention) so a
+    mis-wired realm never busy-loops. Invoked by the ``AUTOSCALE_TASK_NAME``
+    TaskManager task via a tiny codex shim (``from main import run_autoscale_tick``).
+    """
+    try:
+        from ggg import Realm
+        from core.quarter_bootstrap import AUTOSCALE_TASK_NAME, disable_recurring_task
+
+        realm = Realm.load("1")
+        if not realm or not bool(getattr(realm, "scale_in_flight", False)):
+            disable_recurring_task(AUTOSCALE_TASK_NAME)
+            return json.dumps({"success": True, "status": "idle"})
+
+        res = yield from _run_quarter_scaling()
+
+        # Stop ticking once the flag is cleared (done/failed) or we're blocked.
+        stop = False
+        try:
+            parsed = json.loads(res) if isinstance(res, str) else res
+            if isinstance(parsed, dict) and parsed.get("status") == "blocked":
+                stop = True
+        except Exception:
+            pass
+        realm = Realm.load("1")
+        if realm and not bool(getattr(realm, "scale_in_flight", False)):
+            stop = True
+        if stop:
+            disable_recurring_task(AUTOSCALE_TASK_NAME)
+        return res
+    except Exception as e:
+        logger.error(f"run_autoscale_tick failed: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+def ensure_autoscale_task() -> bool:
+    """Seed (or re-enable) the recurring TaskManager task that drives auto-scale
+    provisioning while ``scale_in_flight`` is set. Idempotent; safe to call from
+    the registration path each time a scale is newly requested."""
+    try:
+        from core.quarter_bootstrap import (
+            AUTOSCALE_INTERVAL_S,
+            AUTOSCALE_STEP_CODE,
+            AUTOSCALE_TASK_NAME,
+            seed_recurring_codex_task,
+        )
+
+        seed_recurring_codex_task(AUTOSCALE_TASK_NAME, AUTOSCALE_STEP_CODE, AUTOSCALE_INTERVAL_S)
+        return True
+    except Exception as e:
+        logger.error(f"ensure_autoscale_task failed: {e}\n{traceback.format_exc()}")
+        return False
 
 
 @query

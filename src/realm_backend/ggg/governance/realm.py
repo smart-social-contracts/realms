@@ -15,7 +15,7 @@ class RealmStatus:
 
 class Realm(Entity, TimestampedMixin):
     __alias__ = "name"
-    __version__ = 4
+    __version__ = 5
     name = String(min_length=2, max_length=256)
     manifesto = String(max_length=256)
 
@@ -30,6 +30,8 @@ class Realm(Entity, TimestampedMixin):
             obj.setdefault("auto_scale_enabled", True)
             obj.setdefault("scale_in_flight", False)
             obj.setdefault("scale_requested_at", "")
+        if from_version < 5:
+            obj.setdefault("bootstrap_state", "")
         return obj
     welcome_message = String(max_length=1024)  # Welcome message displayed on landing page
     status = String(max_length=STATUS_MAX_LENGTH, default=RealmStatus.ALPHA)
@@ -62,6 +64,10 @@ class Realm(Entity, TimestampedMixin):
     # endpoint on success/failure so the next threshold crossing can re-trigger.
     scale_in_flight = Boolean(default=False)
     scale_requested_at = String(max_length=32, default="")
+    # Quarter-local self-bootstrap progress (issue #156). JSON install plan +
+    # cursor persisted on a freshly minted quarter; the recurring TaskManager
+    # task in core.quarter_bootstrap installs one item per tick from this state.
+    bootstrap_state = String(max_length=8192, default="")
     # Canister id of the realm_installer broker used to provision new quarters
     # via Casals. Empty => auto-scale records intent but cannot self-provision.
     installer_canister_id = String(max_length=64, default="")
