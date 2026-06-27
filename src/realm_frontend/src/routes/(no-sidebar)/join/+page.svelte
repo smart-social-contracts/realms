@@ -99,10 +99,21 @@
   ];
   $: currentStepIndex = steps.findIndex((s) => s.id === currentStep);
 
+  // The nearest earlier step the user is allowed to return to. Sign In is never
+  // a back target once authenticated (you cannot un-authenticate by clicking,
+  // and the reactive guard would bounce forward anyway), so we skip it. Null
+  // means there is nowhere to go back to from the current step.
+  $: prevStepId = (() => {
+    for (let i = currentStepIndex - 1; i >= 0; i--) {
+      const s = steps[i];
+      if (s.id === 'auth' && $isAuthenticated) continue;
+      return s.id;
+    }
+    return null;
+  })();
+
   // Backward-only navigation from the stepper: a user may revisit any earlier
-  // step, except Sign In once authenticated (you cannot un-authenticate by
-  // clicking, and the reactive guard would bounce them forward anyway) and
-  // never while a join is in flight.
+  // step, except Sign In once authenticated, and never while a join is in flight.
   function goToStep(stepId) {
     const idx = steps.findIndex((s) => s.id === stepId);
     if (idx < 0 || idx >= currentStepIndex) return;
@@ -110,6 +121,13 @@
     if (loading) return;
     error = '';
     currentStep = stepId;
+  }
+
+  // Go to the previous navigable step (used by the explicit "Back" buttons).
+  function goBack() {
+    if (!prevStepId || loading) return;
+    error = '';
+    currentStep = prevStepId;
   }
 
   // Determine initial step based on auth status and join status. We wait until
@@ -391,12 +409,6 @@
     currentStep = 'profile';
   }
 
-  function handleBack() {
-    error = '';
-    if (currentStep === 'profile') {
-      currentStep = 'terms';
-    }
-  }
   
   async function resolveInviteChecksum() {
     if (inviteCode) return sha256Hex(inviteCode);
@@ -508,12 +520,14 @@
     
     <div class="w-full max-w-md relative z-10 md:bg-transparent md:backdrop-blur-none md:rounded-none md:p-0 bg-white/80 backdrop-blur-sm rounded-2xl p-3 my-auto">
 
-      <!-- Step Indicator (dynamic; backward-clickable) -->
+      <!-- Step Indicator (dynamic; backward-clickable). Labels sit under each
+           dot so they never crowd or wrap, and the connectors flex to spread
+           the steps evenly across the full width. -->
       {#if currentStep !== 'already_joined'}
-        <div class="flex items-center justify-center gap-1 sm:gap-2 mb-4 md:mb-8">
+        <div class="flex items-start justify-between mb-6 md:mb-8 px-1">
           {#each steps as step, i}
             {#if i > 0}
-              <div class="w-5 sm:w-8 h-px bg-gray-300"></div>
+              <div class="flex-1 h-px bg-gray-300 mt-3.5 sm:mt-4 mx-1.5"></div>
             {/if}
             {@const isCurrent = i === currentStepIndex}
             {@const isDone = currentStepIndex >= 0 && i < currentStepIndex}
@@ -523,10 +537,10 @@
               on:click={() => goToStep(step.id)}
               disabled={!clickable}
               aria-current={isCurrent ? 'step' : undefined}
-              class={cn('flex items-center gap-2 transition-all', clickable ? 'cursor-pointer group' : 'cursor-default')}
+              class={cn('flex flex-col items-center gap-1.5 shrink-0 transition-all', clickable ? 'cursor-pointer group' : 'cursor-default')}
             >
               <div class={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all",
+                "w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium transition-all",
                 isCurrent ? "bg-gray-900 text-white"
                   : isDone ? "bg-gray-700 text-white group-hover:bg-gray-900"
                   : "bg-gray-200 text-gray-500"
@@ -534,8 +548,8 @@
                 {#if isDone}✓{:else}{i + 1}{/if}
               </div>
               <span class={cn(
-                "text-sm hidden sm:inline transition-colors",
-                isCurrent ? "text-gray-900 font-medium" : "text-gray-600",
+                "text-[11px] sm:text-xs leading-none whitespace-nowrap transition-colors",
+                isCurrent ? "text-gray-900 font-medium" : "text-gray-500",
                 clickable && "group-hover:text-gray-900"
               )}>{step.label}</span>
             </button>
@@ -595,13 +609,23 @@
             {/each}
           </div>
 
-          <button
-            on:click={handlePickQuarter}
-            disabled={!selectedQuarter}
-            class="w-full py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Continue
-          </button>
+          <div class="flex gap-3">
+            {#if prevStepId}
+              <button
+                on:click={goBack}
+                class="flex-1 py-4 px-6 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-all"
+              >
+                Back
+              </button>
+            {/if}
+            <button
+              on:click={handlePickQuarter}
+              disabled={!selectedQuarter}
+              class="flex-1 py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Continue
+            </button>
+          </div>
         </div>
 
       <!-- Step: Auth -->
@@ -770,13 +794,23 @@
             <span class="text-sm font-medium text-gray-700">I agree to these terms and conditions</span>
           </label>
           
-          <button
-            on:click={handleTermsAccept}
-            disabled={!agreement}
-            class="w-full py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Continue
-          </button>
+          <div class="flex gap-3">
+            {#if prevStepId}
+              <button
+                on:click={goBack}
+                class="flex-1 py-4 px-6 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-all"
+              >
+                Back
+              </button>
+            {/if}
+            <button
+              on:click={handleTermsAccept}
+              disabled={!agreement}
+              class="flex-1 py-4 px-6 bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Continue
+            </button>
+          </div>
         </div>
 
       <!-- Step: Profile Selection -->
@@ -943,12 +977,14 @@
 {/if}
           
           <div class="flex gap-3">
-            <button
-              on:click={handleBack}
-              class="flex-1 py-3 md:py-4 px-4 md:px-6 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-all"
-            >
-              Back
-            </button>
+            {#if prevStepId}
+              <button
+                on:click={goBack}
+                class="flex-1 py-3 md:py-4 px-4 md:px-6 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-all"
+              >
+                Back
+              </button>
+            {/if}
             <button
               on:click={handleJoin}
               disabled={!selectedProfile || loading || inviteRequired}

@@ -117,29 +117,40 @@ export async function loadUserProfiles() {
     try {
         // Dynamically import backend to avoid circular dependencies
         // @ts-ignore
-        const { backend, setActiveQuarter } = await import('$lib/canisters');
+        const { backend, setActiveQuarter, createQuarterActor } = await import('$lib/canisters');
+        // @ts-ignore
+        const { activeQuarterId } = await import('$lib/stores/quarters');
 
         if (!backend || typeof backend.get_my_user_status !== 'function') {
             throw new Error("Backend canister is not properly initialized");
         }
 
-        // Fast path (client-carried pointer): if we cached this user's home
-        // quarter on a previous session, activate it immediately so extension
-        // calls route to the right canister without waiting for the round-trip
-        // below. The authoritative resolution that follows can correct it.
+        // Resolve which canister actually holds this user's membership. In a
+        // federation a member lives on a *quarter*, not the capital, so querying
+        // the capital backend would wrongly report them as a non-member
+        // ("Guest"). If we cached the home quarter on a prior session/join,
+        // activate it app-wide AND query it directly for the status below.
+        let statusActor = backend;
         if (typeof localStorage !== 'undefined') {
             const cached = localStorage.getItem('home_quarter');
             if (cached) {
                 try {
                     await setActiveQuarter(cached);
-                    console.log('🏘️ Fast-routed to cached home quarter:', cached);
+                    activeQuarterId.set(cached);
+                    statusActor = await createQuarterActor(cached);
+                    console.log('🏘️ Routed profile lookup to cached home quarter:', cached);
                 } catch (e) {
                     console.warn('Cached home quarter activation failed:', e);
                 }
             }
         }
 
-        const response = await backend.get_my_user_status();
+        let response = await statusActor.get_my_user_status();
+        // Stale cache safety net: if the cached quarter no longer recognizes the
+        // caller, fall back to the capital (which may auto-route us below).
+        if ((!response || !response.success) && statusActor !== backend) {
+            response = await backend.get_my_user_status();
+        }
 
         console.log("User profiles response:", response);
         

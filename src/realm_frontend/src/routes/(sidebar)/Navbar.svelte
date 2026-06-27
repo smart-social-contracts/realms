@@ -1,6 +1,7 @@
 <script>
 	import AuthButton from '$lib/components/AuthButton.svelte';
 	import QuarterSwitcher from '$lib/components/QuarterSwitcher.svelte';
+	import QuarterIndicator from '$lib/components/QuarterIndicator.svelte';
 	import { realmInfo, realmName, aiAssistantEnabled } from '$lib/stores/realmInfo';
 	import { onMount } from 'svelte';
 	import { Navbar } from 'flowbite-svelte';
@@ -44,6 +45,7 @@
 	</div>
 
 	<div class="ms-auto flex items-center gap-2 text-gray-500">
+		<QuarterIndicator />
 		<QuarterSwitcher />
 		{#if $aiAssistantEnabled}
 		<!-- AI Assistant toggle button -->
