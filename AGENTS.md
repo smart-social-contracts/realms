@@ -634,6 +634,88 @@ The first fixes the color panic, the second suppresses the plaintext identity wa
 
 ---
 
+## Debugging Python canisters (`__browse__` / `__shell__`)
+
+Realm backends (and other Basilisk canisters built with
+[`basilisk`](https://github.com/smart-social-contracts/basilisk) /
+[`ic-basilisk-toolkit`](https://github.com/smart-social-contracts/ic-basilisk-toolkit))
+can expose two agent-oriented endpoints. **Use them liberally** for
+investigating live canister state — they are the fastest way to answer “what is
+actually on-chain?” without redeploying or adding one-off query methods.
+
+Enable at build time (realm backend already has both):
+
+```python
+__basilisk_features__ = ["shell", "browse"]
+```
+
+Full reference: [`../basilisk/AGENTS.md`](../basilisk/AGENTS.md).
+
+### `__browse__` — read-only inspection (query, cheap)
+
+Structured JSON access to stable maps/sets/vecs. Good first step when you need
+counts, keys, or individual records without writing Python.
+
+```bash
+export TERM=xterm DFX_WARNING=-mainnet_plaintext_identity
+dfx identity use my_dev_identity_1
+
+# Schema of stable structures
+dfx canister call <canister_id> __browse__ \
+  '("{\"action\": \"schema\"}")' --query --network ic
+
+# List keys / fetch one item (see basilisk AGENTS.md for actions)
+dfx canister call <canister_id> __browse__ \
+  '("{\"action\": \"len\", \"map\": \"User\"}")' --query --network ic
+```
+
+No special permission beyond ordinary query access (subject to any endpoint
+guard you added). Prefer `__browse__` over ad-hoc `status()` fields when you
+need entity-level detail.
+
+### `__shell__` — Python REPL inside the canister (update)
+
+Executes arbitrary Python against the live `ggg` entity model (`User`,
+`Quarter`, `Realm`, …). Persistent namespace **per caller principal** — variables
+from one call are visible on the next.
+
+```bash
+dfx canister call <canister_id> __shell__ \
+  '("from ggg import User; print(len(list(User.instances())))")' \
+  --network ic --identity my_dev_identity_1
+```
+
+Gated by `@require(Operations.SHELL_EXECUTE)`, but **IC controllers bypass** all
+permission checks (`core/access.py`). So `__shell__` works when your dfx
+principal is in that canister's **controller list**.
+
+| Canister | Typical controllers | `__shell__` with `my_dev_identity_1` |
+|---|---|---|
+| Capital realm backend | Casals + CycleOps + deployer (varies by env) | Usually **yes** |
+| Auto-provisioned quarter | Casals + capital + inherited capital controllers | Usually **yes** (after Casals provision) |
+| Casals-managed orchestra stand | Casals + CycleOps only | **no** (use Casals relay below) |
+
+When you are not a controller, relay through Casals (Casals *is* a quarter
+controller):
+
+```bash
+dfx canister call <casals_id> canister_exec \
+  '("{\"canister\":\"agora-quarter-2\",\"code\":\"from ggg import User; print(len(list(User.instances())))\"}")' \
+  --network ic --identity my_dev_identity_1
+```
+
+### Quarter scaling and controllers
+
+Casals **inherits the stand commander's full IC controller list** when minting a
+canister (`lifecycle._resolve_provision_controllers`): new quarters get Casals,
+CycleOps (when enabled), the capital backend as commander, plus every controller
+the capital already has (deploy key, etc.). No separate post-provision step.
+
+Existing quarters provisioned before this change keep their old controller set
+until updated manually or re-provisioned.
+
+---
+
 ## Gotchas
 
 1. **`deploy-files` `environment` must match target.** Publishing to `staging` (default) won't be visible to `demo` or `test` realms.
