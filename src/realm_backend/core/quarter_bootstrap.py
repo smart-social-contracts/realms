@@ -156,6 +156,64 @@ def step_plan(state, ok, error=None):
     return state
 
 
+# ── Capital runtime config + branding mirroring (capital → quarter) ──────────
+
+# Realm fields copied verbatim from the capital onto a new quarter so it comes
+# up branded + registration-ready (issue #156). ``test_mode_demo_data`` is
+# deliberately excluded — a quarter must not spin up its own synthetic personas
+# (that would defeat the load distribution the quarter exists to provide).
+_QUARTER_CONFIG_STR_FIELDS = (
+    "name", "manifesto", "welcome_message", "logo_url", "background_image_url",
+    "network", "accounting_currency",
+    "file_registry_canister_id", "marketplace_canister_id",
+    "token_canister_id", "nft_canister_id",
+)
+_QUARTER_CONFIG_BOOL_FIELDS = ("open_registration", "ai_assistant_enabled")
+_QUARTER_CONFIG_INT_FIELDS = ("accounting_currency_decimals",)
+_QUARTER_TEST_FLAG_FIELDS = (
+    "test_mode", "test_mode_ii_bypass", "test_mode_user_self_registration",
+    "test_mode_skip_terms", "test_mode_skip_passport_zkproof",
+    "test_mode_skip_authentication",
+)
+
+
+def apply_quarter_config(realm, config):
+    """Apply a capital's mirrored runtime config + branding onto a quarter's
+    ``realm`` (issue #156). Only sets attributes — pure enough to unit-test with
+    a stand-in object. Returns the list of applied field names.
+
+    Safe + partial: missing/None keys are skipped, and empty *string* values are
+    ignored so we never wipe a field to a constraint-violating blank (e.g.
+    ``name`` has a min length). Test flags live under a nested ``test_flags`` dict
+    and are copied verbatim — if the capital runs production (flags off) the
+    quarter inherits them off, so this never enables test mode on a real realm.
+    """
+    config = config or {}
+    applied = []
+    for f in _QUARTER_CONFIG_STR_FIELDS:
+        v = config.get(f)
+        if v:  # truthy: skip None and "" (don't clobber with a blank)
+            setattr(realm, f, str(v))
+            applied.append(f)
+    for f in _QUARTER_CONFIG_BOOL_FIELDS:
+        if config.get(f) is not None:
+            setattr(realm, f, bool(config[f]))
+            applied.append(f)
+    for f in _QUARTER_CONFIG_INT_FIELDS:
+        if config.get(f) is not None:
+            try:
+                setattr(realm, f, int(config[f]))
+                applied.append(f)
+            except (TypeError, ValueError):
+                pass
+    flags = config.get("test_flags") or {}
+    for f in _QUARTER_TEST_FLAG_FIELDS:
+        if flags.get(f) is not None:
+            setattr(realm, f, bool(flags[f]))
+            applied.append(f)
+    return applied
+
+
 # ── Live install-set derivation (capital → quarter parity) ──────────────────
 
 def derive_capital_install_set(default_registry=""):

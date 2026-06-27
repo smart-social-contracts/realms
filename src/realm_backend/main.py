@@ -1067,7 +1067,12 @@ def bootstrap_as_quarter(args: text) -> text:
           "codices": [{"codex_id": "...", "version": null, "run_init": true}, ...],
           "codex": {"codex_id": "...", "version": null} | null,  # back-compat single
           "extensions": [{"ext_id": "...", "version": null}, ...],
-          "frontend_canister_id": ""                   # optional (backend-only quarters)
+          "frontend_canister_id": "",                  # optional (backend-only quarters)
+          "config": {                                  # capital's runtime config + branding
+            "name": "Agora", "manifesto": "...", "welcome_message": "...",
+            "open_registration": false, "network": "staging",
+            "file_registry_canister_id": "...", "test_flags": {...}, ...
+          }
         }
 
     The capital auto-derives ``codices``/``extensions`` from its own live
@@ -1084,6 +1089,7 @@ def bootstrap_as_quarter(args: text) -> text:
     try:
         from ggg import Realm
         from core.quarter_bootstrap import (
+            apply_quarter_config,
             build_bootstrap_plan,
             save_state,
             seed_bootstrap_task,
@@ -1102,6 +1108,19 @@ def bootstrap_as_quarter(args: text) -> text:
                 trusted.append(parent)
                 realm.trusted_principals = ",".join(trusted)
 
+        # 1b. Mirror the capital's runtime config + branding so the quarter is
+        # immediately branded and registration-ready (issue #156). The codex/
+        # extension *code* arrives via the install plan below; this brings the
+        # *identity* + runtime flags (name, manifesto, registration, canister
+        # ids) that otherwise only come from out-of-band arrangement steps.
+        applied_config = []
+        cfg = params.get("config")
+        if isinstance(cfg, dict) and cfg:
+            try:
+                applied_config = apply_quarter_config(realm, cfg)
+            except Exception as e:
+                logger.error(f"apply_quarter_config failed: {e}\n{traceback.format_exc()}")
+
         # 2. Record the install plan for the local driver.
         plan = build_bootstrap_plan(params)
         save_state(realm, plan)
@@ -1117,13 +1136,17 @@ def bootstrap_as_quarter(args: text) -> text:
 
         planned = len(plan.get("items", []))
         status = "bootstrapping" if seeded else ("complete" if not planned else "blocked")
-        logger.info(f"bootstrap_as_quarter seeded plan ({planned} items, parent={parent}, status={status})")
+        logger.info(
+            f"bootstrap_as_quarter seeded plan ({planned} items, parent={parent}, "
+            f"status={status}, config_applied={len(applied_config)})"
+        )
         return json.dumps({
             "success": True,
             "status": status,
             "parent": parent,
             "planned": planned,
             "seeded": seeded,
+            "config_applied": applied_config,
         })
     except Exception as e:
         logger.error(f"bootstrap_as_quarter failed: {e}\n{traceback.format_exc()}")
@@ -1631,6 +1654,47 @@ def _quarter_casals_args(realm):
     return _parse_casals_spec(getattr(realm, "manifest_data", "") or "{}", next_index)
 
 
+def _capital_runtime_config(realm) -> dict:
+    """Snapshot the capital's runtime config + branding for a new quarter to
+    mirror (issue #156), consumed by ``bootstrap_as_quarter`` via
+    ``core.quarter_bootstrap.apply_quarter_config``.
+
+    Copies identity (name/manifesto/welcome/branding), registration policy,
+    accounting currency, shared infra canister ids, and the test-mode flags
+    *verbatim* — so the quarter matches the capital's environment (a production
+    capital has the flags off, so the quarter inherits them off). ``demo_data``
+    is intentionally not propagated. ``frontend_canister_id`` is omitted: quarters
+    are backend-only and keep their own empty value.
+    """
+    def g(attr, default=""):
+        return getattr(realm, attr, default)
+
+    return {
+        "name": g("name"),
+        "manifesto": g("manifesto"),
+        "welcome_message": g("welcome_message"),
+        "logo_url": g("logo_url"),
+        "background_image_url": g("background_image_url"),
+        "network": g("network"),
+        "accounting_currency": g("accounting_currency"),
+        "accounting_currency_decimals": int(g("accounting_currency_decimals", 0) or 0),
+        "open_registration": bool(g("open_registration", False)),
+        "ai_assistant_enabled": bool(g("ai_assistant_enabled", True)),
+        "file_registry_canister_id": g("file_registry_canister_id"),
+        "marketplace_canister_id": g("marketplace_canister_id"),
+        "token_canister_id": g("token_canister_id"),
+        "nft_canister_id": g("nft_canister_id"),
+        "test_flags": {
+            "test_mode": bool(g("test_mode", False)),
+            "test_mode_ii_bypass": bool(g("test_mode_ii_bypass", False)),
+            "test_mode_user_self_registration": bool(g("test_mode_user_self_registration", False)),
+            "test_mode_skip_terms": bool(g("test_mode_skip_terms", False)),
+            "test_mode_skip_passport_zkproof": bool(g("test_mode_skip_passport_zkproof", False)),
+            "test_mode_skip_authentication": bool(g("test_mode_skip_authentication", False)),
+        },
+    }
+
+
 @update
 @require(Operations.QUARTER_CONFIGURE)
 def set_quarter_provisioning_config(args: text) -> text:
@@ -1751,9 +1815,14 @@ def _run_quarter_scaling() -> Async[text]:
             [spec["codex"]] if spec.get("codex") else []
         )
         extensions = derived.get("extensions") or spec.get("extensions", [])
+        # Snapshot the capital's runtime config + branding so the quarter comes
+        # up branded and registration-ready (issue #156), not as a bare
+        # "Default Realm" that rejects new users.
+        capital_config = _capital_runtime_config(realm)
         logger.info(
             f"Auto-scale install set (mirroring capital): "
-            f"{len(codices)} codices, {len(extensions)} extensions, registry={registry_id or 'none'}"
+            f"{len(codices)} codices, {len(extensions)} extensions, registry={registry_id or 'none'}; "
+            f"config name={capital_config.get('name')!r} open_reg={capital_config.get('open_registration')}"
         )
 
         if casals_id:
@@ -1782,6 +1851,7 @@ def _run_quarter_scaling() -> Async[text]:
                 "codices": codices,
                 "extensions": extensions,
                 "frontend_canister_id": spec.get("frontend_canister_id", ""),
+                "config": capital_config,
             })
         elif installer_id:
             # ── Broker path: ask the installer to provision on our behalf. ──

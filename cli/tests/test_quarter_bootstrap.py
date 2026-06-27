@@ -105,6 +105,72 @@ class TestBuildBootstrapPlan:
 
 
 # ---------------------------------------------------------------------------
+# apply_quarter_config — mirror capital runtime config + branding onto a quarter
+# ---------------------------------------------------------------------------
+
+class _FakeRealm:
+    """Minimal stand-in for a ggg Realm: just holds attributes."""
+    pass
+
+
+class TestApplyQuarterConfig:
+    def test_applies_identity_branding_and_flags(self):
+        realm = _FakeRealm()
+        applied = qb.apply_quarter_config(realm, {
+            "name": "Agora",
+            "manifesto": "A digital polis",
+            "welcome_message": "Welcome!",
+            "network": "staging",
+            "accounting_currency": "ckUSDC",
+            "accounting_currency_decimals": 6,
+            "open_registration": True,
+            "ai_assistant_enabled": False,
+            "file_registry_canister_id": "iebdk-x",
+            "test_flags": {
+                "test_mode_user_self_registration": True,
+                "test_mode_ii_bypass": True,
+            },
+        })
+        assert realm.name == "Agora"
+        assert realm.manifesto == "A digital polis"
+        assert realm.network == "staging"
+        assert realm.accounting_currency == "ckUSDC"
+        assert realm.accounting_currency_decimals == 6
+        assert realm.open_registration is True
+        assert realm.ai_assistant_enabled is False
+        assert realm.file_registry_canister_id == "iebdk-x"
+        assert realm.test_mode_user_self_registration is True
+        assert realm.test_mode_ii_bypass is True
+        # Reported applied fields cover identity, bools, ints, and nested flags.
+        for f in ("name", "open_registration", "accounting_currency_decimals",
+                  "test_mode_user_self_registration"):
+            assert f in applied
+
+    def test_blank_string_does_not_clobber(self):
+        # An empty name must not overwrite (Realm.name has a min length).
+        realm = _FakeRealm()
+        realm.name = "Existing"
+        applied = qb.apply_quarter_config(realm, {"name": "", "manifesto": "M"})
+        assert realm.name == "Existing"
+        assert "name" not in applied
+        assert realm.manifesto == "M"
+
+    def test_demo_data_is_never_propagated(self):
+        realm = _FakeRealm()
+        applied = qb.apply_quarter_config(realm, {
+            "test_flags": {"test_mode_demo_data": True, "test_mode": True},
+        })
+        assert getattr(realm, "test_mode_demo_data", None) is None
+        assert "test_mode_demo_data" not in applied
+        assert realm.test_mode is True
+
+    def test_empty_config_is_noop(self):
+        realm = _FakeRealm()
+        assert qb.apply_quarter_config(realm, {}) == []
+        assert qb.apply_quarter_config(realm, None) == []
+
+
+# ---------------------------------------------------------------------------
 # step_plan — cursor / retry state machine
 # ---------------------------------------------------------------------------
 
