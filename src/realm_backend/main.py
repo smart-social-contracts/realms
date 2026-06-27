@@ -1627,6 +1627,59 @@ def _quarter_casals_args(realm):
 
 
 @update
+@require(Operations.QUARTER_CONFIGURE)
+def set_quarter_provisioning_config(args: text) -> text:
+    """Set/merge the ``casals`` provisioning block in this realm's ``manifest_data``.
+
+    The whole auto-scale loop is gated on ``manifest_data.casals`` (consumed by
+    ``parse_casals_spec``); this endpoint lets an admin wire it post-deploy
+    without re-importing realm data. Provided keys are merged over any existing
+    ``casals`` block (pass ``{"casals": {...}}`` or the flat fields directly), so
+    a partial update (e.g. just ``casals_canister_id``) leaves the rest intact.
+
+    Recognized keys: ``stand``, ``backend_wasm_key``, ``casals_canister_id``,
+    ``registry_canister_id``, ``codex`` ({codex_id, version, run_init}),
+    ``extensions`` ([{ext_id, version} | "ext_id", ...]), ``frontend_canister_id``.
+
+    Returns ``{"success": bool, "casals": {...}, "error"?: str}``.
+    """
+    try:
+        params = json.loads(args or "{}")
+        if not isinstance(params, dict):
+            return json.dumps({"success": False, "error": "args must be a JSON object"})
+        incoming = params.get("casals") if isinstance(params.get("casals"), dict) else params
+
+        from ggg import Realm
+
+        realm = Realm.load("1")
+        if not realm:
+            return json.dumps({"success": False, "error": "Realm not found"})
+
+        try:
+            manifest = json.loads(getattr(realm, "manifest_data", "") or "{}")
+            if not isinstance(manifest, dict):
+                manifest = {}
+        except Exception:
+            manifest = {}
+
+        casals = manifest.get("casals") if isinstance(manifest.get("casals"), dict) else {}
+        allowed = (
+            "stand", "backend_wasm_key", "casals_canister_id", "registry_canister_id",
+            "codex", "extensions", "frontend_canister_id",
+        )
+        for k in allowed:
+            if k in incoming:
+                casals[k] = incoming[k]
+        manifest["casals"] = casals
+        realm.manifest_data = json.dumps(manifest)
+        logger.info(f"set_quarter_provisioning_config merged casals keys: {sorted(k for k in allowed if k in incoming)}")
+        return json.dumps({"success": True, "casals": casals})
+    except Exception as e:
+        logger.error(f"set_quarter_provisioning_config error: {e}\n{traceback.format_exc()}")
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@update
 @require(Operations.QUARTER_REGISTER)
 def process_quarter_scaling() -> Async[text]:
     """Act on a pending auto-scale request: provision a new quarter, bring it to

@@ -233,6 +233,7 @@ service : {
   "get_quarter_directory" : () -> (text) query;
   "sync_quarters" : (text) -> (text);
   "get_scale_status" : () -> (text) query;
+  "set_quarter_provisioning_config" : (text) -> (text);
   "process_quarter_scaling" : () -> (text);
   "bootstrap_as_quarter" : (text) -> (text);
   "get_bootstrap_status" : () -> (text) query;
