@@ -61,11 +61,14 @@ def build_bootstrap_plan(spec):
     ``spec`` keys (all optional except where a value is needed to act):
         parent_realm_canister_id, registry_canister_id, frontend_canister_id,
         codex ({codex_id, version, run_init} | None),
+        codices ([{codex_id, version, run_init}, ...] — mirrors a capital that
+            has more than one codex package; takes precedence over ``codex``),
         extensions ([{ext_id, version} | "ext_id", ...]).
 
     Returns a JSON-able dict consumed by ``advance_bootstrap``. Codex/extension
     items are only included when a ``registry_canister_id`` is present (nothing
-    to pull from otherwise).
+    to pull from otherwise). Codices are installed before extensions because an
+    extension may depend on codex-provided overrides (entity_method_overrides).
     """
     spec = spec or {}
     registry = (spec.get("registry_canister_id") or "").strip()
@@ -73,18 +76,26 @@ def build_bootstrap_plan(spec):
     parent = (spec.get("parent_realm_canister_id") or "").strip()
 
     items = []
-    codex = spec.get("codex") or None
-    if codex and registry:
-        codex_id = (codex.get("codex_id") or "").strip()
-        if codex_id:
-            items.append(
-                {
-                    "kind": "codex",
-                    "id": codex_id,
-                    "version": codex.get("version"),
-                    "run_init": codex.get("run_init", True),
-                }
-            )
+    # Prefer the explicit ``codices`` list (auto-derived from the capital's live
+    # set); fall back to the single ``codex`` for back-compat with older callers.
+    codices = spec.get("codices")
+    if not codices:
+        single = spec.get("codex") or None
+        codices = [single] if single else []
+    if registry:
+        for codex in codices:
+            if not isinstance(codex, dict):
+                continue
+            codex_id = (codex.get("codex_id") or "").strip()
+            if codex_id:
+                items.append(
+                    {
+                        "kind": "codex",
+                        "id": codex_id,
+                        "version": codex.get("version"),
+                        "run_init": codex.get("run_init", True),
+                    }
+                )
     if registry:
         for ext in spec.get("extensions") or []:
             if isinstance(ext, dict):
@@ -143,6 +154,71 @@ def step_plan(state, ok, error=None):
 
     state["status"] = "complete" if int(state["cursor"]) >= len(items) else "pending"
     return state
+
+
+# ── Live install-set derivation (capital → quarter parity) ──────────────────
+
+def derive_capital_install_set(default_registry=""):
+    """Build the codex + extension install set from the capital's *own live
+    state*, so a freshly minted quarter mirrors whatever the capital currently
+    has installed — no admin-curated list to maintain (issue #156).
+
+    Reads the capital's runtime-installed extensions and codex packages from the
+    persistent filesystem (the same source ``list_runtime_extensions`` /
+    ``list_codex_packages`` expose):
+
+      * extensions — each ``/extensions/<id>/_source.json`` gives the version it
+        was installed at (and the registry it came from);
+      * codices    — each ``/codex_packages/<id>/manifest.json`` gives its version.
+
+    The pull ``registry_canister_id`` is inferred from the extensions' recorded
+    sources (they all come from the same file_registry in practice), falling
+    back to ``default_registry`` (the configured casals-block value) when no
+    source records a registry — e.g. a capital whose extensions were baked in.
+
+    Returns ``{registry_canister_id, codices, extensions}`` shaped for
+    ``build_bootstrap_plan``. Best-effort: any read failure degrades to an empty
+    set for that kind rather than aborting provisioning.
+    """
+    registry = (default_registry or "").strip()
+    inferred_registry = ""
+    extensions = []
+    codices = []
+
+    try:
+        from core.runtime_extensions import (
+            get_extension_source,
+            list_installed as _list_installed_exts,
+        )
+
+        for ext_id in _list_installed_exts():
+            src = get_extension_source(ext_id) or {}
+            if not inferred_registry:
+                inferred_registry = (src.get("registry_canister_id") or "").strip()
+            version = (src.get("version") or "").strip() or None
+            extensions.append({"ext_id": ext_id, "version": version})
+    except Exception as e:
+        logger.error(f"derive_capital_install_set: extensions read failed — {e}")
+
+    try:
+        from core.runtime_codex import (
+            get_all_codex_manifests,
+            list_installed as _list_installed_codices,
+        )
+
+        manifests = get_all_codex_manifests()
+        for codex_id in _list_installed_codices():
+            manifest = manifests.get(codex_id) or {}
+            version = (str(manifest.get("version") or "")).strip() or None
+            codices.append({"codex_id": codex_id, "version": version, "run_init": True})
+    except Exception as e:
+        logger.error(f"derive_capital_install_set: codices read failed — {e}")
+
+    return {
+        "registry_canister_id": registry or inferred_registry,
+        "codices": codices,
+        "extensions": extensions,
+    }
 
 
 # ── Realm-persisted state helpers ───────────────────────────────────────────

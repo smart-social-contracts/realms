@@ -73,6 +73,36 @@ class TestBuildBootstrapPlan:
         })
         assert [i["kind"] for i in plan["items"]] == ["extension"]
 
+    def test_codices_list_installs_all_before_extensions(self):
+        # The auto-derived path mirrors a capital with >1 codex package.
+        plan = qb.build_bootstrap_plan({
+            "registry_canister_id": "reg-1",
+            "codices": [
+                {"codex_id": "agora", "version": "0.2.0", "run_init": True},
+                {"codex_id": "agora/gov", "version": None},
+                {"codex_id": "  "},  # skipped (blank)
+            ],
+            "extensions": ["voting"],
+        })
+        kinds = [(i["kind"], i["id"]) for i in plan["items"]]
+        assert kinds == [
+            ("codex", "agora"),
+            ("codex", "agora/gov"),
+            ("extension", "voting"),
+        ]
+        # run_init carried through; default True when omitted.
+        codex_items = [i for i in plan["items"] if i["kind"] == "codex"]
+        assert codex_items[0]["run_init"] is True
+        assert codex_items[1]["run_init"] is True
+
+    def test_codices_list_takes_precedence_over_single_codex(self):
+        plan = qb.build_bootstrap_plan({
+            "registry_canister_id": "reg-1",
+            "codex": {"codex_id": "legacy-single"},
+            "codices": [{"codex_id": "derived"}],
+        })
+        assert [i["id"] for i in plan["items"] if i["kind"] == "codex"] == ["derived"]
+
 
 # ---------------------------------------------------------------------------
 # step_plan — cursor / retry state machine

@@ -1064,10 +1064,15 @@ def bootstrap_as_quarter(args: text) -> text:
         {
           "parent_realm_canister_id": "ihbn6-...",   # required
           "registry_canister_id": "iebdk-...",        # required for codex/extensions
-          "codex": {"codex_id": "...", "version": null} | null,
+          "codices": [{"codex_id": "...", "version": null, "run_init": true}, ...],
+          "codex": {"codex_id": "...", "version": null} | null,  # back-compat single
           "extensions": [{"ext_id": "...", "version": null}, ...],
           "frontend_canister_id": ""                   # optional (backend-only quarters)
         }
+
+    The capital auto-derives ``codices``/``extensions`` from its own live
+    installed set (see ``derive_capital_install_set``) so the quarter mirrors
+    the capital; ``codex`` (single) is still accepted for older callers.
     """
     try:
         params = json.loads(args or "{}")
@@ -1733,6 +1738,24 @@ def _run_quarter_scaling() -> Async[text]:
         installer_id = (getattr(realm, "installer_canister_id", "") or "").strip()
         bootstrap_result = None
 
+        # Auto-derive the install set from the capital's *own live state* so the
+        # new quarter mirrors whatever the capital currently has installed — no
+        # admin-curated codex/extension list to maintain (issue #156). The
+        # configured casals-block lists are only a fallback for a capital that
+        # has nothing runtime-installed (e.g. fully baked-in extensions).
+        from core.quarter_bootstrap import derive_capital_install_set
+
+        derived = derive_capital_install_set(spec.get("registry_canister_id", ""))
+        registry_id = (derived.get("registry_canister_id") or spec.get("registry_canister_id", "")).strip()
+        codices = derived.get("codices") or (
+            [spec["codex"]] if spec.get("codex") else []
+        )
+        extensions = derived.get("extensions") or spec.get("extensions", [])
+        logger.info(
+            f"Auto-scale install set (mirroring capital): "
+            f"{len(codices)} codices, {len(extensions)} extensions, registry={registry_id or 'none'}"
+        )
+
         if casals_id:
             # ── Direct path: the capital commands its own Casals stand. ──
             create_res = yield from _request_casals_create_canister(casals_id, {
@@ -1755,9 +1778,9 @@ def _run_quarter_scaling() -> Async[text]:
             # extensions, installed one item per tick by its own TaskManager).
             bootstrap_result = yield from _bootstrap_quarter(new_canister_id, {
                 "parent_realm_canister_id": ic.id().to_str(),
-                "registry_canister_id": spec.get("registry_canister_id", ""),
-                "codex": spec.get("codex"),
-                "extensions": spec.get("extensions", []),
+                "registry_canister_id": registry_id,
+                "codices": codices,
+                "extensions": extensions,
                 "frontend_canister_id": spec.get("frontend_canister_id", ""),
             })
         elif installer_id:
