@@ -372,7 +372,12 @@ def seed_recurring_codex_task(name, code, interval_s):
         return existing
 
     codex = Codex(name=f"_{name}_step_{int(ic.time())}", code=code)
-    call = Call(codex=codex)
+    # MUST be async: the step code (BOOTSTRAP_STEP_CODE / AUTOSCALE_STEP_CODE)
+    # defines an ``async_task()`` generator that ``yield from``s into native
+    # code making inter-canister calls. With is_async=False the framework only
+    # exec()s the code (defining the function but never calling/driving it), so
+    # advance_bootstrap()/run_autoscale_tick() would silently never run.
+    call = Call(codex=codex, is_async=True)
     step = TaskStep(call=call, run_next_after=0)
     task = Task(name=name)
     step.task = task
