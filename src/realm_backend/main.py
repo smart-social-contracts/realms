@@ -590,6 +590,35 @@ def join_realm(profile: str, preferred_quarter: text, invite_code_checksum_hex: 
                     ),
                 )
 
+        # --- Coordinator-only capital guard (issue #156) ---
+        # Once this realm acts as a capital (it is not itself a quarter and has
+        # >=1 active sub-quarter) it stops accepting brand-new members directly:
+        # new members register on a quarter (the /join page routes them there).
+        # Controllers and test-mode bypass stay exempt so admin tooling and demos
+        # still work, and existing members can idempotently re-join.
+        _is_quarter_realm = bool(getattr(realm, "is_quarter", False))
+        _test_bypass_guard = bool(getattr(realm, "test_mode_user_self_registration", False)) or bool(
+            getattr(realm, "test_mode_ii_bypass", False)
+        )
+        if realm and not _is_quarter_realm and not is_controller and not _test_bypass_guard:
+            own_id = ic.id().to_str()
+            has_active_sub = any(
+                (q.canister_id and q.canister_id != own_id and (q.status or "active") == "active")
+                for q in Quarter.instances()
+            )
+            already_member = False
+            try:
+                already_member = bool(User[caller])
+            except Exception:
+                already_member = False
+            if has_active_sub and not already_member:
+                return RealmResponse(
+                    success=False,
+                    data=RealmResponseData(
+                        error="This realm is coordinator-only. Please join through a quarter."
+                    ),
+                )
+
         # --- Register user and assign quarter ---
 
         user = user_register(caller, granted_profile)
@@ -1514,6 +1543,86 @@ def get_quarter_directory() -> text:
     except Exception as e:
         logger.error(f"Error in get_quarter_directory: {e}\n{traceback.format_exc()}")
         return json.dumps({"quarters": [], "error": str(e)})
+
+
+@query
+def get_join_targets() -> text:
+    """Public join policy for the registration page (issue #156).
+
+    Tells the /join page where a *new* member may register. Returns:
+    ``{mode, default_quarter, capital_id, quarters: [{canister_id, name,
+    population, status, index, is_capital, joinable}, ...]}``.
+
+    Policy:
+    - ``mode`` is the capital's ``quarter_join_mode`` ("auto" | "choice") and
+      only governs open/codeless joins (invite links always target the encoded
+      quarter regardless of mode).
+    - Once >=1 active sub-quarter exists the capital becomes coordinator-only:
+      it is listed with ``joinable=false`` and ``default_quarter`` points at the
+      newest active sub-quarter (highest index). With no sub-quarters the capital
+      itself is the joinable default.
+
+    Public (no auth): the caller is typically anonymous at this point.
+    """
+    try:
+        from ggg import Quarter, Realm
+
+        self_id = ic.id().to_str()
+        realm = Realm.load("1")
+        mode = (getattr(realm, "quarter_join_mode", "auto") or "auto") if realm else "auto"
+        capital_name = (getattr(realm, "name", "") or "") if realm else ""
+
+        sub_quarters = []
+        if realm is not None:
+            for q in Quarter.instances():
+                cid = q.canister_id or ""
+                if not cid or cid == self_id:
+                    continue
+                status = q.status or "active"
+                sub_quarters.append({
+                    "canister_id": cid,
+                    "name": q.name or "",
+                    "population": int(q.population or 0),
+                    "status": status,
+                    "index": int(getattr(q, "index", 0) or 0),
+                    "is_capital": False,
+                    "joinable": status == "active",
+                })
+
+        active_subs = [q for q in sub_quarters if q["joinable"]]
+        capital_joinable = len(active_subs) == 0
+
+        quarters = [{
+            "canister_id": self_id,
+            "name": capital_name or "Capital",
+            "population": 0,
+            "status": "active",
+            "index": 0,
+            "is_capital": True,
+            "joinable": capital_joinable,
+        }] + sub_quarters
+
+        if active_subs:
+            newest = max(active_subs, key=lambda q: q["index"])
+            default_quarter = newest["canister_id"]
+        else:
+            default_quarter = self_id
+
+        return json.dumps({
+            "mode": mode,
+            "default_quarter": default_quarter,
+            "capital_id": self_id,
+            "quarters": quarters,
+        })
+    except Exception as e:
+        logger.error(f"Error in get_join_targets: {e}\n{traceback.format_exc()}")
+        return json.dumps({
+            "mode": "auto",
+            "default_quarter": "",
+            "capital_id": "",
+            "quarters": [],
+            "error": str(e),
+        })
 
 
 @update
@@ -4431,6 +4540,16 @@ def update_realm_config(config_json: str) -> str:
         if "open_registration" in config:
             realm.open_registration = bool(config["open_registration"])
             updated_fields.append(f"open_registration={realm.open_registration}")
+
+        if "quarter_join_mode" in config:
+            mode = str(config["quarter_join_mode"] or "auto").strip().lower()
+            if mode not in ("auto", "choice"):
+                return json.dumps({
+                    "success": False,
+                    "error": "quarter_join_mode must be 'auto' or 'choice'",
+                })
+            realm.quarter_join_mode = mode
+            updated_fields.append(f"quarter_join_mode={realm.quarter_join_mode}")
 
         if "ai_assistant_enabled" in config:
             realm.ai_assistant_enabled = bool(config["ai_assistant_enabled"])

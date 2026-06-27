@@ -77,6 +77,13 @@ class Realm(Entity, TimestampedMixin):
     # When False (default), all users must present an invite code to join.
     # When True, anyone can join as member without a code. Admin always requires a code.
     open_registration = Boolean(default=False)
+    # Federation join policy (capital-only). Controls how the join page picks a
+    # target quarter for an open (codeless) join once sub-quarters exist:
+    #   "auto"   -> impose the newest active quarter (default)
+    #   "choice" -> let the user pick from the quarter directory
+    # Invite-link joins always target the quarter encoded in the link, so this
+    # only affects open/self-registration. Unused on leaf quarters.
+    quarter_join_mode = String(max_length=16, default="auto")
     # When True (default), the AI assistant sidebar and Explain actions are available.
     # Admins can disable via update_realm_config without uninstalling llm_chat.
     ai_assistant_enabled = Boolean(default=True)
