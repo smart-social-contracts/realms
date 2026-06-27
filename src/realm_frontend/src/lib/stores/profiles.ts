@@ -145,11 +145,51 @@ export async function loadUserProfiles() {
             }
         }
 
+        const hasMembership = (r: any) =>
+            !!(r && r.success && r.data && r.data.userGet &&
+               (r.data.userGet.profiles || []).length > 0);
+
         let response = await statusActor.get_my_user_status();
         // Stale cache safety net: if the cached quarter no longer recognizes the
         // caller, fall back to the capital (which may auto-route us below).
-        if ((!response || !response.success) && statusActor !== backend) {
+        if (!hasMembership(response) && statusActor !== backend) {
             response = await backend.get_my_user_status();
+        }
+
+        // Federated "find my quarter": on a fresh session (e.g. incognito) there
+        // is no cached home quarter, so the lookups above hit the capital, which
+        // does not hold members once sub-quarters exist -> the user looks like a
+        // "Guest". Search every known quarter for this principal and adopt the
+        // first one that recognizes them as the home quarter.
+        if (!hasMembership(response)) {
+            try {
+                const raw = await backend.get_join_targets();
+                const targets = JSON.parse(raw);
+                const capitalId = targets.capital_id;
+                const candidates = (targets.quarters || []).filter(
+                    (q: any) => q && q.canister_id && !q.is_capital && q.canister_id !== capitalId
+                );
+                for (const q of candidates) {
+                    try {
+                        const qActor = await createQuarterActor(q.canister_id);
+                        const r = await qActor.get_my_user_status();
+                        if (hasMembership(r)) {
+                            response = r;
+                            await setActiveQuarter(q.canister_id);
+                            activeQuarterId.set(q.canister_id);
+                            if (typeof localStorage !== 'undefined') {
+                                localStorage.setItem('home_quarter', q.canister_id);
+                            }
+                            console.log('🔎 Recovered home quarter via federated search:', q.canister_id);
+                            break;
+                        }
+                    } catch (qe) {
+                        console.warn('Quarter membership probe failed for', q.canister_id, qe);
+                    }
+                }
+            } catch (e) {
+                console.warn('Federated quarter search unavailable:', e);
+            }
         }
 
         console.log("User profiles response:", response);
