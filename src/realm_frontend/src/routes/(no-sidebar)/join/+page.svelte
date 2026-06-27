@@ -83,7 +83,35 @@
   $: showQuarterBanner = joinTargets.length > 0 && targetQuarterId && targetQuarterId !== capitalId;
 
   $: welcomeImageUrl = $realmInfo.backgroundImageUrl || '/custom/background.png';
-  
+
+  // ── Linear step model for the progress indicator (issue #156) ──────────────
+  // Order: Sign In → Quarter (federation only) → Terms → Profile → Welcome.
+  // The Quarter step only exists when the user actually picks one (choice mode
+  // with >1 joinable quarter); Terms is dropped in test-mode skip. The
+  // 'already_joined' off-ramp is terminal and intentionally excluded.
+  $: quarterStepEnabled = joinMode === 'choice' && joinTargets.length > 1;
+  $: steps = [
+    { id: 'auth', label: 'Sign In' },
+    ...(quarterStepEnabled ? [{ id: 'pick_quarter', label: 'Quarter' }] : []),
+    ...($testModeSkipTerms ? [] : [{ id: 'terms', label: 'Terms' }]),
+    { id: 'profile', label: 'Profile' },
+    { id: 'success', label: 'Welcome' },
+  ];
+  $: currentStepIndex = steps.findIndex((s) => s.id === currentStep);
+
+  // Backward-only navigation from the stepper: a user may revisit any earlier
+  // step, except Sign In once authenticated (you cannot un-authenticate by
+  // clicking, and the reactive guard would bounce them forward anyway) and
+  // never while a join is in flight.
+  function goToStep(stepId) {
+    const idx = steps.findIndex((s) => s.id === stepId);
+    if (idx < 0 || idx >= currentStepIndex) return;
+    if (stepId === 'auth' && $isAuthenticated) return;
+    if (loading) return;
+    error = '';
+    currentStep = stepId;
+  }
+
   // Determine initial step based on auth status and join status. We wait until
   // the join target is resolved (and the quarter is chosen, in choice mode) so
   // we never auto-advance past the quarter picker.
@@ -136,7 +164,10 @@
     }
 
     targetsResolved = true;
-    if (needsQuarterChoice) {
+    // Quarter selection comes AFTER sign-in (Sign In → Quarter → …). Only jump
+    // straight to the picker if the user is already authenticated on arrival;
+    // otherwise we stay on the auth step and route to the picker post-login.
+    if (needsQuarterChoice && $isAuthenticated) {
       currentStep = 'pick_quarter';
     }
   });
@@ -477,42 +508,38 @@
     
     <div class="w-full max-w-md relative z-10 md:bg-transparent md:backdrop-blur-none md:rounded-none md:p-0 bg-white/80 backdrop-blur-sm rounded-2xl p-3 my-auto">
 
-      <!-- Step Indicator -->
-      {#if currentStep !== 'success'}
-        <div class="flex items-center justify-center gap-2 mb-4 md:mb-8">
-          <div class="flex items-center gap-2">
-            <div class={cn(
-              "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all",
-              currentStep === 'auth' ? "bg-gray-900 text-white" : "bg-gray-700 text-white"
-            )}>
-              {currentStep === 'auth' ? '1' : '✓'}
-            </div>
-            <span class="text-sm text-gray-600 hidden sm:inline">Sign In</span>
-          </div>
-          <div class="w-8 h-px bg-gray-300"></div>
-          <div class="flex items-center gap-2">
-            <div class={cn(
-              "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all",
-              currentStep === 'terms' ? "bg-gray-900 text-white" : 
-              currentStep === 'profile' || currentStep === 'success' ? "bg-gray-700 text-white" : 
-              "bg-gray-200 text-gray-500"
-            )}>
-              {currentStep === 'profile' || currentStep === 'success' ? '✓' : '2'}
-            </div>
-            <span class="text-sm text-gray-600 hidden sm:inline">Terms</span>
-          </div>
-          <div class="w-8 h-px bg-gray-300"></div>
-          <div class="flex items-center gap-2">
-            <div class={cn(
-              "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all",
-              currentStep === 'profile' ? "bg-gray-900 text-white" : 
-              currentStep === 'success' ? "bg-gray-700 text-white" : 
-              "bg-gray-200 text-gray-500"
-            )}>
-              3
-            </div>
-            <span class="text-sm text-gray-600 hidden sm:inline">Profile</span>
-          </div>
+      <!-- Step Indicator (dynamic; backward-clickable) -->
+      {#if currentStep !== 'already_joined'}
+        <div class="flex items-center justify-center gap-1 sm:gap-2 mb-4 md:mb-8">
+          {#each steps as step, i}
+            {#if i > 0}
+              <div class="w-5 sm:w-8 h-px bg-gray-300"></div>
+            {/if}
+            {@const isCurrent = i === currentStepIndex}
+            {@const isDone = currentStepIndex >= 0 && i < currentStepIndex}
+            {@const clickable = isDone && !(step.id === 'auth' && $isAuthenticated) && !loading}
+            <button
+              type="button"
+              on:click={() => goToStep(step.id)}
+              disabled={!clickable}
+              aria-current={isCurrent ? 'step' : undefined}
+              class={cn('flex items-center gap-2 transition-all', clickable ? 'cursor-pointer group' : 'cursor-default')}
+            >
+              <div class={cn(
+                "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all",
+                isCurrent ? "bg-gray-900 text-white"
+                  : isDone ? "bg-gray-700 text-white group-hover:bg-gray-900"
+                  : "bg-gray-200 text-gray-500"
+              )}>
+                {#if isDone}✓{:else}{i + 1}{/if}
+              </div>
+              <span class={cn(
+                "text-sm hidden sm:inline transition-colors",
+                isCurrent ? "text-gray-900 font-medium" : "text-gray-600",
+                clickable && "group-hover:text-gray-900"
+              )}>{step.label}</span>
+            </button>
+          {/each}
         </div>
       {/if}
 
