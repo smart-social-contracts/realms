@@ -22,6 +22,26 @@ from ic_python_logging import get_logger
 logger = get_logger("api.quarter_provisioning")
 
 
+def _unwrap_call_text(result) -> str:
+    """Extract the text payload from an inter-canister ``CallResult``.
+
+    Basilisk hands back a ``CallResult`` variant (``{Ok, Err}``); ``str(result)``
+    yields its Python repr (``{'Ok': '...'}``), which is *not* valid JSON. Mirror
+    the unwrap used in ``api/file_registry.py`` so callers can ``json.loads`` the
+    actual canister response. A rejection (``Err``) is surfaced as a parseable
+    ``{"err": ...}`` envelope.
+    """
+    if isinstance(result, str):
+        return result
+    if isinstance(result, dict):
+        return result.get("Ok", result.get("ok", str(result)))
+    if hasattr(result, "Ok") and result.Ok is not None:
+        return result.Ok
+    if hasattr(result, "Err") and result.Err is not None:
+        return json.dumps({"err": str(result.Err)})
+    return str(result)
+
+
 def parse_casals_spec(manifest_data: str, next_index: int) -> Dict:
     """Parse the ``casals`` provisioning block out of a realm's ``manifest_data``.
 
@@ -93,7 +113,7 @@ def request_casals_create_canister(casals_canister_id: str, args: Dict) -> Async
     try:
         service = CasalsProvisionService(Principal.from_str(casals_canister_id))
         result: CallResult[text] = yield service.create_canister(json.dumps(args))
-        raw = str(result)
+        raw = _unwrap_call_text(result)
         try:
             parsed = json.loads(raw)
         except (json.JSONDecodeError, TypeError):
@@ -124,7 +144,7 @@ def bootstrap_quarter(quarter_canister_id: str, args: Dict) -> Async[Dict]:
     try:
         service = QuarterBootstrapService(Principal.from_str(quarter_canister_id))
         result: CallResult[text] = yield service.bootstrap_as_quarter(json.dumps(args))
-        raw = str(result)
+        raw = _unwrap_call_text(result)
         try:
             return json.loads(raw)
         except (json.JSONDecodeError, TypeError):
@@ -145,7 +165,7 @@ def request_provision_quarter(installer_canister_id: str, args: Dict) -> Async[D
     try:
         service = InstallerProvisionService(Principal.from_str(installer_canister_id))
         result: CallResult[text] = yield service.provision_quarter(json.dumps(args))
-        raw = str(result)
+        raw = _unwrap_call_text(result)
         try:
             return json.loads(raw)
         except (json.JSONDecodeError, TypeError):

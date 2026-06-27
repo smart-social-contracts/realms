@@ -36,7 +36,16 @@ def fetch_peer_directory(peer_canister_id: str) -> Async[Dict]:
     try:
         service = QuarterDirectoryService(Principal.from_str(peer_canister_id))
         result: CallResult[text] = yield service.get_quarter_directory()
-        raw = str(result)
+        # Basilisk returns a CallResult variant; str() yields its repr (invalid
+        # JSON). Unwrap the Ok text first (mirrors api/file_registry.py).
+        if isinstance(result, str):
+            raw = result
+        elif isinstance(result, dict):
+            raw = result.get("Ok", result.get("ok", str(result)))
+        elif hasattr(result, "Ok") and result.Ok is not None:
+            raw = result.Ok
+        else:
+            raw = str(result)
         try:
             parsed = json.loads(raw)
         except (json.JSONDecodeError, TypeError):
