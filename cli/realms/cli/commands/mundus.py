@@ -508,7 +508,38 @@ def _upload_branding_to_canister(frontend_id: str, manifest_dir: Path, network: 
         console.print("  [dim]No branding files found in manifest directory[/dim]")
 
 
-def _post_deploy_config(realm: dict, network: str, version: str, parameters: dict = None) -> None:
+def _store_canister_ids(frontend_id: str, backend_id: str, network: str,
+                         file_registry_id: str = "") -> None:
+    """(Re)write /canister_ids.js onto the frontend canister.
+
+    This file is NOT part of the built asset bundle — it carries the realm's
+    backend canister id at runtime (read by the SPA as globalThis.__CANISTER_IDS).
+    The off-chain asset deploy clears+replaces the bundle, so if the installer's
+    registration step doesn't re-inject it last, the SPA loads with no backend id
+    ("Actor not initialized" → every extension/sidebar call fails). We re-assert
+    it here as the final post-deploy step so off-chain deploys are self-healing.
+    """
+    if not frontend_id or not backend_id:
+        return
+    if file_registry_id:
+        js = ('globalThis.__CANISTER_IDS={realm_backend:"' + backend_id
+              + '",internet_identity:"https://identity.ic0.app",file_registry:"'
+              + file_registry_id + '"};')
+    else:
+        js = ('globalThis.__CANISTER_IDS={realm_backend:"' + backend_id
+              + '",internet_identity:"https://identity.ic0.app"};')
+    escaped = js.replace('\\', '\\\\').replace('"', '\\"')
+    arg = ('(record { key = "/canister_ids.js"; content_type = "application/javascript"; '
+           'content_encoding = "identity"; content = blob "' + escaped + '"; sha256 = null })')
+    try:
+        _dfx_call_file(frontend_id, "store", arg, network)
+        console.print("  📍 canister_ids.js re-stored on frontend")
+    except Exception as e:
+        console.print(f"  [yellow]⚠ canister_ids.js store failed: {e}[/yellow]")
+
+
+def _post_deploy_config(realm: dict, network: str, version: str, parameters: dict = None,
+                         infra: dict | None = None) -> None:
     """Call set_canister_config on a realm backend after successful deployment.
 
     Wires frontend_canister_id, installed_version, network, and test flags into
@@ -576,6 +607,11 @@ def _post_deploy_config(realm: dict, network: str, version: str, parameters: dic
             console.print("  📌 Pinned /custom/ on frontend canister")
         except Exception as e:
             console.print(f"  [yellow]⚠ pin_directory failed (non-fatal): {e}[/yellow]")
+
+        # Final step: re-assert /canister_ids.js so the SPA can always resolve its
+        # backend id, even though the asset bundle commit doesn't carry it.
+        fr_id = (infra or {}).get("file_registry_canister_id", "")
+        _store_canister_ids(frontend_id, backend_id, network, file_registry_id=fr_id)
 
 
 def _submit_and_poll(manifest: dict, network: str) -> bool:
@@ -900,7 +936,7 @@ def mundus_deploy_descriptor_command(
         )
         ok = _submit_and_poll(manifest, network)
         if ok:
-            _post_deploy_config(realm, network, deployed_version, parameters=parameters)
+            _post_deploy_config(realm, network, deployed_version, parameters=parameters, infra=infra)
         results.append((name, ok))
         console.print()
 
