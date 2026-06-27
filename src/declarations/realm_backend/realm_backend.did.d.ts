@@ -956,6 +956,7 @@ export interface _SERVICE {
     [string, bigint, bigint, string],
     RealmResponse
   >,
+  'get_join_targets' : ActorMethod<[], string>,
   'get_quarter_info' : ActorMethod<[], RealmResponse>,
   'get_realm_credits' : ActorMethod<[string], string>,
   'get_realm_registry_info' : ActorMethod<[], string>,

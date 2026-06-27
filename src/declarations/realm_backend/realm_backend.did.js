@@ -290,6 +290,7 @@ export const idlFactory = ({ IDL }) => {
         [RealmResponse],
         ['query'],
       ),
+    'get_join_targets' : IDL.Func([], [IDL.Text], ['query']),
     'get_quarter_info' : IDL.Func([], [RealmResponse], ['query']),
     'get_realm_credits' : IDL.Func([IDL.Text], [IDL.Text], []),
     'get_realm_registry_info' : IDL.Func([], [IDL.Text], ['query']),
