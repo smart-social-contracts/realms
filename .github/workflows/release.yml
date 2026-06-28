@@ -149,6 +149,12 @@ jobs:
             [ -f "$f" ] && sha256sum "$f" >> checksums.txt
           done
           cat checksums.txt
+          BACKEND_HASH=$(awk '/realm_backend\.wasm\.gz/ {print $1}' checksums.txt)
+          FRONTEND_HASH=$(awk '/realm_frontend\.tar\.gz/ {print $1}' checksums.txt)
+          sed -i "s#'c9c38a714762fe56e53534c488e645351deb7905020001b408f054c034b5c408'#'${BACKEND_HASH}'#" \
+            src/realm_registry_frontend/src/lib/config.js
+          sed -i "s#'58cf46349679f137c9e481aa7831d367ee14f0f6aba78de9b76a2385d5031406'#'${FRONTEND_HASH}'#" \
+            src/realm_registry_frontend/src/lib/config.js
 
       - name: Build and publish CLI to PyPI
         env:

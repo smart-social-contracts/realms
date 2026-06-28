@@ -154,11 +154,13 @@ There are exactly **two steps**:
    published version.
 
 **Casals is deployed and wired on all three environments** (`test`, `demo`, `staging`):
-each one's realm and infra canisters are registered in Casals and have `[Casals,
-CycleOps]` as their only controllers. Publishing builds and rolling out upgrades go
-through Casals everywhere. New-realm *provisioning* still has a dormant off-chain code
-path in the installer (gated by `provision_via_casals`, default off), but it is not
-wired to any active workflow.
+each one's realm and infra canisters are registered in Casals. Orchestra canisters are
+controlled by **Casals + CycleOps**; on **test/staging**, the **`deployer`** identity
+remains a co-controller so you can use the [fast infra deploy](#fast-infra-deploy-dev-only)
+path during development. Publishing builds and authoritative rollouts still go through
+Casals. New-realm *provisioning* still has a dormant off-chain code path in the
+installer (gated by `provision_via_casals`, default off), but it is not wired to any
+active workflow.
 
 ### How Casals organizes things
 
@@ -185,8 +187,8 @@ the realm apps.
 |---|---|---|
 | Realm backends + frontends (Dominion, Agora, Syntropia) | Yes | Yes |
 | Extensions/codices on realms | Yes (manifest + `file_registry`) | Yes (arrangement) |
-| **Realm registry** (backend + frontend — `test`/`demo`/`staging`.realmsgos.org) | **No** | Yes (`family=registry`, target `realm-registry`) |
-| Installer, `file_registry`, marketplace, dashboard | **No** | Yes (`all-infra` or per-family) |
+| **Realm registry** (backend + frontend — `test`/`demo`/`staging`.realmsgos.org) | **No** (mundus) — **Yes** via [`scripts/infra_dev_deploy.sh`](#fast-infra-deploy-dev-only) | Yes (`family=registry`, target `realm-registry`) |
+| Installer, `file_registry`, marketplace, dashboard | **No** (mundus) — **Yes** via [`scripts/infra_dev_deploy.sh`](#fast-infra-deploy-dev-only) | Yes (`all-infra` or per-family) |
 
 Notes:
 
@@ -213,6 +215,68 @@ Repeat for `demo`. Or locally after publish:
 
 ```bash
 realms rollout -e staging,demo -t realm-registry -s both -m upgrade -v 0.4.0 \
+  --identity deployer --execute --yes
+```
+
+### Fast infra deploy (dev only)
+
+While developing registry / installer / other infra, skip Casals publish + rollout and
+**deploy directly with `dfx`** from the repo root (~2–5 min per component). This updates
+the live canister code immediately but does **not** update the Casals authorized-WASM
+catalog — run the full Casals path before merge.
+
+**Setup (once per shell):**
+
+```bash
+export TERM=xterm
+export DFX_WARNING=-mainnet_plaintext_identity
+dfx identity use deployer
+```
+
+**Deploy:**
+
+```bash
+# Registry backend only (~2–3 min) — e.g. draft APIs, provision_via_casals
+scripts/infra_dev_deploy.sh -e staging -f registry -c backend
+
+# Registry frontend only (~3–5 min) — e.g. wizard UI, version picker
+scripts/infra_dev_deploy.sh -e staging -f registry -c frontend
+
+# Both
+scripts/infra_dev_deploy.sh -e staging -f registry -c both
+
+# Other infra families: installer | file-registry | marketplace | dashboard
+scripts/infra_dev_deploy.sh -e test -f installer -c backend
+```
+
+Equivalent raw commands (registry backend example):
+
+```bash
+export TERM=xterm DFX_WARNING=-mainnet_plaintext_identity
+export PATH="$PWD/.venv-basilisk/bin:$PATH"
+export CANISTER_CANDID_PATH=src/realm_registry_backend/realm_registry_backend.did
+export DFX_NETWORK=staging
+dfx build realm_registry_backend --network staging
+dfx canister install 7wzxh-wyaaa-aaaau-aggyq-cai --network staging --mode upgrade \
+  --wasm .basilisk/realm_registry_backend/realm_registry_backend.wasm.gz
+npm run build --workspace=realm_registry_frontend
+dfx deploy realm_registry_frontend --network staging --yes
+```
+
+**When to use which path:**
+
+| Situation | Path |
+|---|---|
+| Iterating on registry/wizard during development | `scripts/infra_dev_deploy.sh` |
+| Pre-merge / making staging authoritative | `publish_build.py` → `realms rollout` |
+| Realm sheet changes (Agora, Dominion, …) | `realms mundus deploy` (fast) or Casals |
+
+**Before merge**, align Casals with what you deployed:
+
+```bash
+python3 scripts/publish_build.py --environment staging --family registry \
+  --component both --from-main --identity deployer
+realms rollout -e staging -t realm-registry -s both -m upgrade -v main \
   --identity deployer --execute --yes
 ```
 
@@ -344,8 +408,10 @@ These are also in `_CASALS_IDS` (`cli/realms/cli/commands/rollout.py`) and
 ### Who controls what
 
 - **Orchestra canisters** (every realm + infra canister Casals manages): controlled
-  only by **Casals itself** plus **CycleOps** (`cpbhu-5iaaa-aaaad-aalta-cai`, for
-  cycle top-ups). Casals does the upgrades; no human key is a controller.
+  by **Casals** plus **CycleOps** (`cpbhu-5iaaa-aaaad-aalta-cai`, for cycle top-ups).
+  On **test/staging**, **`deployer`** (`ah6ac-cc73l-...`) is also a co-controller so
+  [`scripts/infra_dev_deploy.sh`](#fast-infra-deploy-dev-only) can upgrade infra directly
+  during development. Casals remains the authoritative upgrade path before merge.
 - **Casals canisters**: controlled by `ah6ac-cc73l-...` (the `my_dev_identity_1` /
   `deployer` key), the dedicated CI key, and a conductor Internet Identity.
 - **CI identity**: workflows use the **`CASALS_CI_PEM`** secret (a controller of all
@@ -728,7 +794,11 @@ until updated manually or re-provisioned.
 
 ## Rules
 
-- **Two deploy paths on non-production:** Casals (`publish-build.yml` + `rollout.yml`) for authoritative rollouts, and off-chain (`deploy-mundus.yml` / `realms mundus deploy`) for fast descriptor-based deploys. Use `deploy-files.yml` to publish extension/codex bundles into the file registry.
+- **Three deploy paths on non-production:** Casals (`publish-build.yml` + `rollout.yml`)
+  for authoritative rollouts; fast off-chain (`deploy-mundus.yml` / `realms mundus deploy`)
+  for realm sheets; and **fast infra** (`scripts/infra_dev_deploy.sh` / direct
+  `dfx deploy`) for registry/installer/etc. during development. Use
+  `deploy-files.yml` to publish extension/codex bundles into the file registry.
 - **Visually verify every UI change before reporting back.** After deploying a frontend or extension change, open the page in the browser and confirm the result matches the requirements. Do not report completion until you have checked the deployed page yourself. If the visual check reveals issues, fix and redeploy in a loop until the result is correct.
 - Do not commit unless explicitly told to do so.
 - Always use `mode=upgrade` for production/test deploys (`reinstall` wipes state).

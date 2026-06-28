@@ -12,6 +12,18 @@
         }
     },
     {
+        // Internet Identity fetches this to validate `derivationOrigin` claims from
+        // realm frontends. Must be JSON + CORS-readable by the II canister. This rule
+        // is placed AFTER `.well-known/*` because dfx applies matching header rules
+        // last-match-wins, so the JSON content-type must override the text/plain above.
+        "match": ".well-known/ii-alternative-origins",
+        "ignore": false,
+        "headers": {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+        }
+    },
+    {
         // SVG files need explicit content-type for proper certification
         "match": "**/*.svg",
         "headers": {
@@ -30,7 +42,7 @@
         "security_policy": "standard",
 
         "headers": {
-            "Content-Security-Policy": "default-src 'self';script-src 'self' 'unsafe-eval' 'unsafe-inline';connect-src 'self' http://localhost:* http://*.localhost:* https://icp0.io https://*.icp0.io https://icp-api.io https://*.ic0.app https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://billing.realmsgos.dev https://raw.githubusercontent.com;img-src 'self' data: http://*.localhost:* https://*.icp0.io https://*.ic0.app https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com;style-src * 'unsafe-inline';style-src-elem * 'unsafe-inline';font-src *;object-src 'none';base-uri 'self';frame-ancestors 'none';form-action 'self';upgrade-insecure-requests;",
+            "Content-Security-Policy": "default-src 'self';script-src 'self' 'unsafe-eval' 'unsafe-inline';connect-src 'self' http://localhost:* http://*.localhost:* https://icp0.io https://*.icp0.io https://icp-api.io https://*.ic0.app https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://billing.realmsgos.dev https://geister-api.realmsgos.dev https://geister-mcp.realmsgos.dev https://raw.githubusercontent.com;img-src 'self' data: http://*.localhost:* https://*.icp0.io https://*.ic0.app https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com;style-src * 'unsafe-inline';style-src-elem * 'unsafe-inline';font-src *;object-src 'none';base-uri 'self';frame-ancestors 'none';form-action 'self';upgrade-insecure-requests;",
         },
 
         // Uncomment to disable the warning about using the

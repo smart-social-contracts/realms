@@ -146,6 +146,7 @@ export const idlFactory = ({ IDL }) => {
   return IDL.Service({
     '__get_candid_interface_tmp_hack' : IDL.Func([], [IDL.Text], ['query']),
     'cancel_deployment' : IDL.Func([IDL.Text], [ResultJobCancel], []),
+    'delete_deployment_job' : IDL.Func([IDL.Text], [ResultJobCancel], []),
     'enqueue_deployment' : IDL.Func([IDL.Text], [ResultEnqueue], []),
     'get_canister_logs' : IDL.Func(
         [
@@ -166,6 +167,7 @@ export const idlFactory = ({ IDL }) => {
     'get_pending_deployments' : IDL.Func([], [ResultPendingJobs], ['query']),
     'health' : IDL.Func([], [HealthView], ['query']),
     'list_deployment_jobs' : IDL.Func([], [ResultJobsList], ['query']),
+    'provision_quarter' : IDL.Func([IDL.Text], [IDL.Text], []),
     'provision_via_casals' : IDL.Func([IDL.Text], [ResultProvision], []),
     'report_canister_ready' : IDL.Func([IDL.Text], [ResultReportReady], []),
     'report_deployment_failure' : IDL.Func(

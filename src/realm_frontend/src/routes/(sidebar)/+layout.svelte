@@ -70,12 +70,18 @@
 			}
 			
 			initialized = true;
-			
+
+			// Only react when crossing the lg breakpoint — not on keyboard-open
+			// viewport resizes (those fire `resize` but keep innerWidth < 1024).
+			let wasDesktop = window.innerWidth >= 1024;
+
 			const handleResize = () => {
-				if (window.innerWidth < 1024) {
+				const isDesktop = window.innerWidth >= 1024;
+				if (wasDesktop && !isDesktop) {
 					drawerHidden = true;
 					aiPanelOpen = false;
 				}
+				wasDesktop = isDesktop;
 			};
 			
 			window.addEventListener('resize', handleResize);
@@ -133,7 +139,11 @@
 		</div>
 	</div>
 
-	<!-- AI Assistant Panel — sibling of overflow-hidden row so resize handle isn't clipped -->
+	<!-- AI Assistant Panel — sibling of overflow-hidden row so resize handle isn't clipped.
+	     `ai_assistant_enabled` (#233) governs ONLY this in-realm, realm-context surface
+	     (codex/proposal tools, realm status injection). It does NOT and must not disable
+	     the user's global assistant, which lives on the registry (canonical II origin) and
+	     never consults this realm flag. -->
 	{#if $aiAssistantEnabled}
 		<AiAssistantPanel
 			bind:open={aiPanelOpen}

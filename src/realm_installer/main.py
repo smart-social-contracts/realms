@@ -53,6 +53,8 @@ class CasalsService(Service):
     string and return a JSON string ({"ok": true, ...} | {"ok": false, "error": …}).
     Used only on the on-chain provisioning path (gated by InstallerConfig); the
     legacy off-chain-deployer path does not touch this."""
+    @service_query
+    def get_tree(self) -> text: ...
     @service_update
     def create_stand(self, args: text) -> text: ...
     @service_update
@@ -89,6 +91,10 @@ class DeployStep(Entity, TimestampedMixin):
     error = String(max_length=2000)
 
 _JOB_TERMINAL_STATUSES = ("completed", "failed", "failed_verification", "cancelled")
+# Failed terminal jobs the owner may remove from their dashboard.
+_JOB_DELETABLE_STATUSES = ("failed", "failed_verification", "cancelled")
+# Jobs reserved for on-chain Casals provisioning — invisible to the off-chain worker.
+_CASALS_RESERVED_STATUSES = ("provisioning",)
 
 class DeploymentJob(Entity, TimestampedMixin):
     __alias__ = "name"
@@ -406,6 +412,63 @@ def _schedule_snapshot_delete(job_id: str):
     ic.set_timer(Duration(0), _delete_cb)
 
 
+def _candid_opt_text(v: str) -> str:
+    if not v:
+        return "null"
+    escaped = str(v).replace("\\", "\\\\").replace('"', '\\"')
+    return f'opt "{escaped}"'
+
+
+def _build_canister_ids_js(
+    backend_id: str, file_registry_id: str = "", derivation_origin: str = ""
+) -> str:
+    """Build the /canister_ids.js runtime config for a realm frontend.
+
+    ``derivation_origin`` pins the Internet Identity ``derivationOrigin`` so this
+    realm frontend resolves to the SAME principal as the registry and every other
+    realm (one human → one principal). It must be the canonical origin that lists
+    this realm's frontend in its ``/.well-known/ii-alternative-origins`` (the
+    registry). Empty string preserves legacy per-origin principals. See #233.
+    """
+    fields = {
+        "realm_backend": backend_id,
+        "internet_identity": "https://identity.ic0.app",
+    }
+    if file_registry_id:
+        fields["file_registry"] = file_registry_id
+    if derivation_origin:
+        fields["derivation_origin"] = derivation_origin
+    body = ",".join(f'{k}:"{v}"' for k, v in fields.items())
+    return "globalThis.__CANISTER_IDS={" + body + "};"
+
+
+def _grant_frontend_commit(frontend_id: str, to_principal: str):
+    """Grant Commit on a certified-assets frontend canister (idempotent)."""
+    candid_arg = (
+        f'(record {{ to_principal = principal "{to_principal}"; '
+        f'permission = variant {{ Commit }} }})'
+    )
+    grant_result: CallResult = yield ic.call_raw(
+        Principal.from_str(frontend_id), "grant_permission",
+        ic.candid_encode(candid_arg), 0,
+    )
+    return grant_result
+
+
+def _store_canister_ids_js(frontend_id: str, js: str):
+    """Write /canister_ids.js onto the realm frontend asset canister."""
+    escaped = js.replace("\\", "\\\\").replace('"', '\\"')
+    candid_arg = (
+        '(record { key = "/canister_ids.js"; content_type = "application/javascript"; '
+        'content_encoding = "identity"; content = blob "' + escaped + '"; sha256 = null })'
+    )
+    store_result: CallResult = yield ic.call_raw(
+        Principal.from_str(frontend_id), "store",
+        ic.candid_encode(candid_arg), 0,
+    )
+    return store_result
+
+
 def schedule_registration(job_id_val: str):
     def _register_cb():
         try:
@@ -433,20 +496,16 @@ def schedule_registration(job_id_val: str):
             if frontend_id and backend_id:
                 infra_early = manifest.get("infra") or {}
                 fr_js = infra_early.get("file_registry_canister_id", "") or ""
-                if fr_js:
-                    js = (
-                        'globalThis.__CANISTER_IDS={realm_backend:"' + backend_id
-                        + '",internet_identity:"https://identity.ic0.app",file_registry:"'
-                        + fr_js + '"};'
-                    )
-                else:
-                    js = 'globalThis.__CANISTER_IDS={realm_backend:"' + backend_id + '",internet_identity:"https://identity.ic0.app"};'
-                escaped = js.replace('\\', '\\\\').replace('"', '\\"')
-                candid_arg = '(record { key = "/canister_ids.js"; content_type = "application/javascript"; content_encoding = "identity"; content = blob "' + escaped + '"; sha256 = null })'
-                store_result: CallResult = yield ic.call_raw(
-                    Principal.from_str(frontend_id), "store",
-                    ic.candid_encode(candid_arg), 0,
-                )
+                deriv_origin = infra_early.get("ii_derivation_origin", "") or ""
+                js = _build_canister_ids_js(backend_id, fr_js, deriv_origin)
+                installer_id = ic.id().to_str()
+                for principal in (installer_id, backend_id):
+                    grant_res = yield from _grant_frontend_commit(frontend_id, principal)
+                    if isinstance(grant_res, dict) and "Err" in grant_res:
+                        jlog(job_id_val).warning(
+                            f"grant Commit to {principal} failed (non-fatal): {grant_res['Err']}"
+                        )
+                store_result = yield from _store_canister_ids_js(frontend_id, js)
                 if isinstance(store_result, dict) and "Err" in store_result:
                     jlog(job_id_val).error(f"canister_ids.js upload failed: {store_result['Err']}")
                 else:
@@ -473,10 +532,17 @@ def schedule_registration(job_id_val: str):
             infra = manifest.get("infra") or {}
             fr_id = infra.get("file_registry_canister_id", "")
             mp_id = infra.get("marketplace_canister_id", "")
-            if backend_id and (fr_id or mp_id):
-                def _opt(v):
-                    return f'opt "{v}"' if v else "null"
-                canister_config_arg = f"(null, null, null, {_opt(fr_id)}, {_opt(mp_id)})"
+            network = (manifest.get("network") or "").strip()
+            version = (manifest.get("deploy_version") or "").strip()
+            test_flags = manifest.get("test_flags") or {}
+            test_flags_json = json.dumps(test_flags) if test_flags else ""
+            if backend_id:
+                canister_config_arg = (
+                    f"({_candid_opt_text(frontend_id)}, null, null, "
+                    f"{_candid_opt_text(fr_id)}, {_candid_opt_text(mp_id)}, "
+                    f"{_candid_opt_text(version)}, {_candid_opt_text(network)}, "
+                    f"{_candid_opt_text(test_flags_json)})"
+                )
                 cc_result: CallResult = yield ic.call_raw(
                     Principal.from_str(backend_id), "set_canister_config",
                     ic.candid_encode(canister_config_arg), 0,
@@ -484,7 +550,11 @@ def schedule_registration(job_id_val: str):
                 if isinstance(cc_result, dict) and "Err" in cc_result:
                     jlog(job_id_val).error(f"set_canister_config failed: {cc_result['Err']}")
                 else:
-                    jlog(job_id_val).info(f"set_canister_config: file_registry={fr_id}, marketplace={mp_id}")
+                    jlog(job_id_val).info(
+                        f"set_canister_config: frontend={frontend_id}, "
+                        f"file_registry={fr_id}, marketplace={mp_id}, "
+                        f"version={version}, network={network}, test_flags={test_flags_json}"
+                    )
 
             # Per-realm branding: the wizard uploaded the user's logo/background
             # straight into the file_registry (decentralized, signed by the
@@ -518,6 +588,20 @@ def schedule_registration(job_id_val: str):
                             logo = f"https://{frontend_id}.icp0.io/custom/logo.png"
                 except Exception as br_err:
                     jlog(job_id_val).error(f"install_branding_from_registry error: {br_err}")
+
+            if frontend_id and backend_id:
+                try:
+                    pin_arg = '(record { prefix = "/custom/" })'
+                    pin_result: CallResult = yield ic.call_raw(
+                        Principal.from_str(frontend_id), "pin_directory",
+                        ic.candid_encode(pin_arg), 0,
+                    )
+                    if isinstance(pin_result, dict) and "Err" in pin_result:
+                        jlog(job_id_val).warning(f"pin_directory failed (non-fatal): {pin_result['Err']}")
+                    else:
+                        jlog(job_id_val).info("pinned /custom/ on frontend")
+                except Exception as pin_err:
+                    jlog(job_id_val).warning(f"pin_directory error (non-fatal): {pin_err}")
 
             # Store admin invite hash if present in manifest
             admin_invite_hash = realm_info.get("admin_invite_hash", "")
@@ -951,8 +1035,10 @@ def enqueue_deployment(manifest_json: text) -> ResultEnqueue:
         suffix = hashlib.sha256(realm_name.encode()).hexdigest()[:4]
         job_id = "job_%s_%s" % (ts, suffix)
         expected_hashes = manifest.get("expected_hashes", {})
+        casals_manifest = bool(manifest.get("casals"))
+        initial_status = "provisioning" if casals_manifest else "pending"
         DeploymentJob(
-            name=job_id, status="pending", caller_principal=requester,
+            name=job_id, status=initial_status, caller_principal=requester,
             manifest_json=manifest_json[:8190], network=network,
             backend_canister_id=canister_ids.get("backend", ""),
             frontend_canister_id=canister_ids.get("frontend", ""),
@@ -964,7 +1050,7 @@ def enqueue_deployment(manifest_json: text) -> ResultEnqueue:
         has_hashes = bool(expected_hashes.get("backend_wasm") or expected_hashes.get("frontend_wasm"))
         jlog(job_id).info(f"enqueued for '{realm_name}' on {network} (extensions={ext_count}, codex={bool(codex_info)}, cli_hashes={has_hashes})")
         return ResultEnqueue(Ok=EnqueueOk(
-            job_id=job_id, status="pending", realm_name=realm_name, network=network,
+            job_id=job_id, status=initial_status, realm_name=realm_name, network=network,
         ))
     except Exception as e:
         return ResultEnqueue(Err=ie(str(e), traceback.format_exc()[-1500:]))
@@ -1072,13 +1158,33 @@ def cancel_deployment(job_id: text) -> ResultJobCancel:
         prev = job.status or "pending"
         if prev in _JOB_TERMINAL_STATUSES:
             return ResultJobCancel(Ok=JobStatusAck(job_id=job_id, prev_status=prev, status=prev, noop=True))
-        if prev != "pending":
+        if prev not in ("pending", "provisioning"):
             return ResultJobCancel(Err=ie(f"cannot cancel '{prev}' job"))
         job.status = "cancelled"
         job.error = "cancelled"
         job.completed_at = now_s()
         schedule_registry_settlement(job_id, success=False, reason="cancelled")
         return ResultJobCancel(Ok=JobStatusAck(job_id=job_id, prev_status=prev, status="cancelled", noop=False))
+    except Exception as e:
+        return ResultJobCancel(Err=ie(str(e)))
+
+@update
+def delete_deployment_job(job_id: text) -> ResultJobCancel:
+    """Remove a terminal failed deployment record. Only the job owner may delete."""
+    try:
+        caller = str(ic.caller())
+        list(DeploymentJob.instances())
+        job = DeploymentJob[job_id]
+        if job is None:
+            return ResultJobCancel(Err=ie(f"unknown job_id: {job_id}"))
+        if (job.caller_principal or "") != caller:
+            return ResultJobCancel(Err=ie("only the job owner may delete this deployment"))
+        prev = job.status or "pending"
+        if prev not in _JOB_DELETABLE_STATUSES:
+            return ResultJobCancel(Err=ie(f"cannot delete job with status '{prev}'"))
+        job.delete()
+        jlog(job_id).info(f"deleted by owner ({caller})")
+        return ResultJobCancel(Ok=JobStatusAck(job_id=job_id, prev_status=prev, status="deleted", noop=False))
     except Exception as e:
         return ResultJobCancel(Err=ie(str(e)))
 
@@ -1133,6 +1239,43 @@ def _casals_ok(call_result):
     if isinstance(data, dict) and data.get("ok") is False:
         raise RuntimeError(f"casals: {data.get('error', 'unknown error')}")
     return data
+
+
+def _casals_find_canister(tree: dict, stand: str, canister_name: str) -> str:
+    """Look up an existing Casals canister id by stand + logical name."""
+    for sec in tree.get("sections") or []:
+        for st in sec.get("stands") or []:
+            if (st.get("name") or "").strip() != stand:
+                continue
+            for c in st.get("canisters") or []:
+                if (c.get("name") or "").strip() == canister_name:
+                    return (c.get("canister_id") or "").strip()
+    return ""
+
+
+def _casals_create_or_reuse_canister(casals, job_id: str, stand: str, name: str,
+                                     kind: str, wasm_key: str):
+    """Generator: create a canister via Casals, or reuse one left by a prior attempt."""
+    create_res: CallResult = yield casals.create_canister(json.dumps({
+        "stand": stand, "name": name, "kind": kind, "wasm_key": wasm_key,
+    }))
+    try:
+        parsed = _casals_ok(create_res)
+        cid = (parsed.get("canister_id") or "").strip()
+        if cid:
+            jlog(job_id).info(f"casals created {kind} {cid} ({name})")
+            return cid
+    except RuntimeError as se:
+        if "already exists" not in str(se).lower():
+            raise
+        jlog(job_id).info(f"casals canister '{name}' already exists; looking up for reuse")
+    tree_res: CallResult = yield casals.get_tree()
+    tree = _casals_ok(tree_res)
+    cid = _casals_find_canister(tree, stand, name)
+    if not cid:
+        raise RuntimeError(f"casals: canister '{name}' already exists but was not found in get_tree")
+    jlog(job_id).info(f"reusing existing {kind} {cid} ({name})")
+    return cid
 
 
 @update
@@ -1212,8 +1355,8 @@ def provision_via_casals(job_id: text) -> Async[ResultProvision]:
         job = DeploymentJob[job_id]
         if job is None:
             return ResultProvision(Err=ie(f"unknown job_id: {job_id}"))
-        if (job.status or "pending") != "pending":
-            return ResultProvision(Err=ie(f"job in '{job.status}', expected 'pending'"))
+        if (job.status or "pending") not in ("pending", "provisioning"):
+            return ResultProvision(Err=ie(f"job in '{job.status}', expected 'pending' or 'provisioning'"))
 
         manifest = json.loads(job.manifest_json or "{}")
         cas = manifest.get("casals", {}) or {}
@@ -1252,29 +1395,19 @@ def provision_via_casals(job_id: text) -> Async[ResultProvision]:
 
         # 2. Backend canister (Casals installs + verifies module hash).
         if want_backend and not backend_id:
-            be_res: CallResult = yield casals.create_canister(json.dumps({
-                "stand": stand, "name": f"{stand}-backend",
-                "kind": "backend", "wasm_key": backend_wasm_key,
-            }))
-            backend_id = (_casals_ok(be_res).get("canister_id") or "").strip()
-            if not backend_id:
-                return ResultProvision(Err=ie("casals create_canister(backend) returned no canister_id"))
+            backend_id = yield from _casals_create_or_reuse_canister(
+                casals, job_id, stand, f"{stand}-backend", "backend", backend_wasm_key,
+            )
             job.backend_canister_id = backend_id
             job.wasm_verified = 1
-            jlog(job_id).info(f"casals provisioned backend {backend_id} ({backend_wasm_key})")
 
         # 3. Frontend canister (Casals installs assets wasm + uploads the bundle).
         if want_frontend and not frontend_id:
-            fe_res: CallResult = yield casals.create_canister(json.dumps({
-                "stand": stand, "name": f"{stand}-frontend",
-                "kind": "frontend", "wasm_key": frontend_wasm_key,
-            }))
-            frontend_id = (_casals_ok(fe_res).get("canister_id") or "").strip()
-            if not frontend_id:
-                return ResultProvision(Err=ie("casals create_canister(frontend) returned no canister_id"))
+            frontend_id = yield from _casals_create_or_reuse_canister(
+                casals, job_id, stand, f"{stand}-frontend", "frontend", frontend_wasm_key,
+            )
             job.frontend_canister_id = frontend_id
             job.frontend_wasm_verified = 1
-            jlog(job_id).info(f"casals provisioned frontend {frontend_id} ({frontend_wasm_key})")
 
         # 4. Make the realm backend the Stand commander so it can self-upgrade.
         if backend_id:

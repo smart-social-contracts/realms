@@ -42,6 +42,13 @@
           "name": "candid:service"
         }
       ],
+      "remote": {
+        "id": {
+          "demo": "vi64l-3aaaa-aaaae-qj4va-cai",
+          "staging": "iebdk-kqaaa-aaaau-agoxq-cai",
+          "test": "uq2mu-kaaaa-aaaah-avqcq-cai"
+        }
+      },
       "tech_stack": {
         "cdk": {
           "basilisk": {}
@@ -58,7 +65,14 @@
         "src/file_registry_frontend/dist"
       ],
       "type": "assets",
-      "workspace": "file_registry_frontend"
+      "workspace": "file_registry_frontend",
+      "remote": {
+        "id": {
+          "demo": "7ja5c-dqaaa-aaaae-qj5oa-cai",
+          "staging": "rbex3-xyaaa-aaaah-qumma-cai",
+          "test": "2no7h-xqaaa-aaaad-qlxeq-cai"
+        }
+      }
     },
     "realm_installer": {
       "build": "python -m basilisk realm_installer src/realm_installer/main.py",
@@ -72,6 +86,13 @@
           "name": "candid:service"
         }
       ],
+      "remote": {
+        "id": {
+          "demo": "2s4td-daaaa-aaaao-bazmq-cai",
+          "staging": "lusjm-wqaaa-aaaau-ago7q-cai",
+          "test": "fltjm-tyaaa-aaaap-qunhq-cai"
+        }
+      },
       "tech_stack": {
         "cdk": {
           "basilisk": {}
@@ -125,7 +146,14 @@
         "src/realm_registry_frontend/dist"
       ],
       "type": "assets",
-      "workspace": "realm_registry_frontend"
+      "workspace": "realm_registry_frontend",
+      "remote": {
+        "id": {
+          "demo": "2zaor-5yaaa-aaaac-qbxaa-cai",
+          "staging": "77243-aqaaa-aaaau-aggza-cai",
+          "test": "qtank-3qaaa-aaaaa-qhb6q-cai"
+        }
+      }
     },
     "internet_identity": {
       "candid": "https://github.com/dfinity/internet-identity/releases/download/release-2026-03-09/internet_identity.did",
@@ -216,6 +244,13 @@
           "name": "candid:service"
         }
       ],
+      "remote": {
+        "id": {
+          "demo": "ehyfg-wyaaa-aaaae-qg3qq-cai",
+          "staging": "jji3o-uyaaa-aaaah-qreja-cai",
+          "test": "2wldc-niaaa-aaaad-qlxga-cai"
+        }
+      },
       "tech_stack": {
         "cdk": {
           "basilisk": {}
@@ -232,14 +267,28 @@
         "src/marketplace_frontend/dist"
       ],
       "type": "assets",
-      "workspace": "marketplace_frontend"
+      "workspace": "marketplace_frontend",
+      "remote": {
+        "id": {
+          "demo": "ulsvn-pyaaa-aaaae-qj4tq-cai",
+          "staging": "joj52-zaaaa-aaaah-qrejq-cai",
+          "test": "mxyd5-3qaaa-aaaao-ba2xq-cai"
+        }
+      }
     },
     "platform_dashboard_frontend": {
       "source": [
         "src/platform_dashboard_frontend/dist"
       ],
       "type": "assets",
-      "workspace": "platform_dashboard_frontend"
+      "workspace": "platform_dashboard_frontend",
+      "remote": {
+        "id": {
+          "demo": "rxtxq-kyaaa-aaaac-qgora-cai",
+          "staging": "dpgu3-wqaaa-aaaau-agqoa-cai",
+          "test": "em2mz-rqaaa-aaaag-ayt7q-cai"
+        }
+      }
     },
     "mock_cycleops": {
       "candid": "scripts/cycleops/mock_cycleops/mock_cycleops.did",

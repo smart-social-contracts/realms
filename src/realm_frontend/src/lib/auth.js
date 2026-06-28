@@ -6,6 +6,18 @@ import { getTestModeIIBypass } from '$lib/config.js';
 const II_URL = globalThis.__CANISTER_IDS?.internet_identity || 'https://identity.ic0.app';
 console.log(`Using Identity Provider: ${II_URL}`);
 
+// Canonical Internet Identity derivation origin. II derives a *different*
+// principal per frontend origin unless every frontend logs in with the same
+// `derivationOrigin` (and that origin serves the realm frontend's origin in its
+// `/.well-known/ii-alternative-origins`). Injected at deploy time via
+// canister_ids.js so the whole federation (every realm + the registry) resolves
+// to ONE principal per human. When unset, login falls back to per-origin
+// principals (legacy behaviour). See issue #233 / QUARTERS.md.
+const DERIVATION_ORIGIN = globalThis.__CANISTER_IDS?.derivation_origin || '';
+if (DERIVATION_ORIGIN) {
+  console.log(`Using II derivationOrigin: ${DERIVATION_ORIGIN}`);
+}
+
 let authClient;
 
 // --- Test mode support ---
@@ -76,6 +88,10 @@ export async function login({ random = false } = {}) {
   return new Promise((resolve) => {
     client.login({
       identityProvider: II_URL,
+      // Pin the derivation origin so this realm frontend yields the SAME
+      // principal as every other Realms frontend + the registry. Omitted when
+      // unset to preserve legacy per-origin behaviour.
+      ...(DERIVATION_ORIGIN ? { derivationOrigin: DERIVATION_ORIGIN } : {}),
       maxTimeToLive: BigInt(7 * 24 * 60 * 60 * 1_000_000_000), // 7 days
       onSuccess: () => {
         const identity = client.getIdentity();

@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { initI18n } from '$lib/i18n';
+  import RegistryAssistant from '$lib/components/RegistryAssistant.svelte';
   import '../index.scss';
 
   // Flag to track if i18n is ready
@@ -16,6 +17,8 @@
 
 {#if browser && i18nReady}
   <slot />
+  <!-- User-scoped AI assistant (general mode); see issue #233. -->
+  <RegistryAssistant />
 {:else}
   <div class="loading-screen">
     <div class="spinner"></div>

@@ -5,6 +5,15 @@ import { CONFIG, TEST_MODE_II_BYPASS } from '$lib/config.js';
 const II_URL = CONFIG.internet_identity_url;
 console.log(`Using Identity Provider: ${II_URL}`);
 
+// Canonical II derivation origin (the registry's own public origin). Pinning it
+// here — and listing every realm frontend in this origin's
+// `/.well-known/ii-alternative-origins` — makes one human resolve to ONE
+// principal across the registry and every realm. See issue #233.
+const DERIVATION_ORIGIN = CONFIG.ii_derivation_origin || '';
+if (DERIVATION_ORIGIN) {
+  console.log(`Using II derivationOrigin: ${DERIVATION_ORIGIN}`);
+}
+
 let authClient;
 
 // --- Test mode support ---
@@ -61,6 +70,9 @@ export async function login() {
   return new Promise((resolve) => {
     client.login({
       identityProvider: II_URL,
+      // Pin derivation origin so the registry-issued principal matches the one
+      // every realm frontend gets (they list this origin as canonical).
+      ...(DERIVATION_ORIGIN ? { derivationOrigin: DERIVATION_ORIGIN } : {}),
       onSuccess: () => {
         const identity = client.getIdentity();
         const principal = identity.getPrincipal();

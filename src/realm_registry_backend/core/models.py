@@ -123,6 +123,29 @@ class RegistryConfig(Entity):
     value = String(max_length=256)
 
 
+class WizardDraft(Entity, TimestampedMixin):
+    """Persisted create-realm wizard state so users can leave and resume."""
+    __alias__ = "id"
+    id = String(max_length=64)
+    principal_id = String(max_length=64)
+    realm_name = String(max_length=128)
+    draft_json = String(max_length=8192)
+    current_step = Integer(default=0)
+    deploy_version = String(max_length=32)
+    updated_at = Float(default=0.0)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id or "",
+            "principal_id": self.principal_id or "",
+            "realm_name": self.realm_name or "",
+            "draft_json": self.draft_json or "{}",
+            "current_step": self.current_step or 0,
+            "deploy_version": self.deploy_version or "",
+            "updated_at": self.updated_at or 0.0,
+        }
+
+
 class VersionInfo(Entity, TimestampedMixin):
     """Tracks available realm versions for self-upgrade."""
     __alias__ = "id"

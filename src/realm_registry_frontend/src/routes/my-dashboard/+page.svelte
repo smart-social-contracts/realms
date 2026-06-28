@@ -5,6 +5,16 @@
   import { page } from '$app/stores';
   import { _, locale } from 'svelte-i18n';
   import { CONFIG } from '$lib/config.js';
+  import DeploymentProgress from '$lib/components/DeploymentProgress.svelte';
+  import { deploymentJobUrl } from '$lib/deployment-tracker.js';
+  import {
+    filterVisibleDrafts,
+    findDraftForDeployment,
+    draftResumeUrl,
+    isFailedDeployment,
+  } from '$lib/wizard-drafts.js';
+  import ConfirmModal from '$lib/components/ConfirmModal.svelte';
+  import ConnectClaude from '$lib/components/ConnectClaude.svelte';
 
   let userPrincipal = null;
   let loading = true;
@@ -17,7 +27,7 @@
   // Read tab from URL parameter (?tab=realms or ?tab=credits)
   $: if (browser && $page.url.searchParams.get('tab')) {
     const tabParam = $page.url.searchParams.get('tab');
-    if (tabParam === 'realms' || tabParam === 'credits') {
+    if (tabParam === 'realms' || tabParam === 'credits' || tabParam === 'connect') {
       activeTab = tabParam;
     }
   }
@@ -36,6 +46,13 @@
   let deployments = [];
   let loadingDeployments = true;
   let deploymentPollInterval = null;
+  let deletingDeploymentId = null;
+  let deploymentDeleteError = null;
+  let deleteConfirmDeployment = null;
+
+  // Wizard drafts
+  let wizardDrafts = [];
+  let loadingDrafts = true;
   
   // Top-up state
   let topUpAmount = 10;
@@ -88,13 +105,13 @@
         console.error('Invitation status check failed:', e);
       }
       
-      // Load deployments first (fast API call) - don't wait for slow canister calls
-      loadDeployments();
+      await loadDeployments();
+      loadWizardDrafts();
       
       // Load other data in parallel (canister calls can be slow)
       loadCredits();
-      loadRealms();
       loadVouchers();
+      await loadRealms();
       
       // Start polling for deployment status updates
       startDeploymentPolling();
@@ -130,19 +147,8 @@
     if (!userPrincipal) return;
     loadingRealms = true;
     try {
-      const { backend } = await import('$lib/canisters.js');
-      // Try to get the user's realm (realm ID = user's principal)
-      const result = await backend.get_realm(userPrincipal.toText());
-      if ('Ok' in result) {
-        createdRealms = [{
-          id: result.Ok.id,
-          name: result.Ok.name,
-          url: result.Ok.url
-        }];
-      } else {
-        createdRealms = [];
-      }
-      // TODO: Implement joined realms when membership feature is added
+      const { fetchCreatedRealmsForUser } = await import('$lib/user-created-realms.js');
+      createdRealms = await fetchCreatedRealmsForUser(userPrincipal.toText(), deployments);
       joinedRealms = [];
     } catch (err) {
       console.error('Failed to load realms:', err);
@@ -150,6 +156,78 @@
       joinedRealms = [];
     } finally {
       loadingRealms = false;
+    }
+  }
+
+  async function loadWizardDrafts() {
+    if (!userPrincipal) return;
+    loadingDrafts = true;
+    try {
+      const { listWizardDrafts } = await import('$lib/wizard-drafts.js');
+      wizardDrafts = await listWizardDrafts();
+    } catch (err) {
+      console.error('Failed to load wizard drafts:', err);
+      wizardDrafts = [];
+    } finally {
+      loadingDrafts = false;
+    }
+  }
+
+  async function deleteDraft(draftId) {
+    try {
+      const { deleteWizardDraft } = await import('$lib/wizard-drafts.js');
+      await deleteWizardDraft(draftId);
+      wizardDrafts = wizardDrafts.filter((d) => d.id !== draftId);
+    } catch (e) {
+      console.error('Failed to delete draft:', e);
+    }
+  }
+
+  function draftStepLabel(step) {
+    const labels = ['Codex', 'Land & Tokens', 'Extensions', 'Data', 'Basics', 'Branding', 'Deploy'];
+    return labels[step] || `Step ${(step || 0) + 1}`;
+  }
+
+  $: visibleDrafts = filterVisibleDrafts(wizardDrafts, deployments);
+
+  function editDraftUrlForDeployment(deployment) {
+    const draft = findDraftForDeployment(wizardDrafts, deployment);
+    if (!draft) return '/create-realm';
+    return `${draftResumeUrl(draft, 6)}&edit=1`;
+  }
+
+  function retryDeployUrlForDeployment(deployment) {
+    const draft = findDraftForDeployment(wizardDrafts, deployment);
+    if (!draft) return '/create-realm';
+    return draftResumeUrl(draft, 6);
+  }
+
+  function requestDeleteDeployment(deployment) {
+    if (!deployment?.deployment_id || deletingDeploymentId) return;
+    deleteConfirmDeployment = deployment;
+  }
+
+  function cancelDeleteDeployment() {
+    deleteConfirmDeployment = null;
+  }
+
+  async function confirmDeleteDeployment() {
+    const deployment = deleteConfirmDeployment;
+    if (!deployment) return;
+    const jobId = deployment.deployment_id;
+    deletingDeploymentId = jobId;
+    deploymentDeleteError = null;
+    try {
+      const { deleteDeploymentJob } = await import('$lib/installer-queue.js');
+      await deleteDeploymentJob(jobId);
+      deployments = deployments.filter((d) => d.deployment_id !== jobId);
+      deleteConfirmDeployment = null;
+      await loadWizardDrafts();
+    } catch (err) {
+      console.error('Failed to delete deployment:', err);
+      deploymentDeleteError = err?.message || 'Failed to delete deployment.';
+    } finally {
+      deletingDeploymentId = null;
     }
   }
 
@@ -164,7 +242,7 @@
       const principalText = userPrincipal.toText();
       const mine = jobs.filter((j) => (j.caller_principal || '') === principalText);
       deployments = mine.map(installerJobToDeploymentRow);
-      deployments.sort((a, b) => b.created_at - a.created_at);
+      deployments.sort((a, b) => Number(b.created_at || 0) - Number(a.created_at || 0));
     } catch (err) {
       console.error('Failed to load deployments:', err);
       deployments = [];
@@ -176,48 +254,38 @@
   function startDeploymentPolling() {
     // Poll every 10 seconds for deployment status updates
     deploymentPollInterval = setInterval(async () => {
-      // Only poll if there are active deployments
-      const hasActiveDeployments = deployments.some(d => 
-        d.status === 'pending' || d.status === 'in_progress'
-      );
-      
+      const hasActiveDeployments = deployments.some((d) => d.progress?.isActive);
       if (hasActiveDeployments) {
         await loadDeployments();
-        // Refresh credits if a deployment completed
-        const justCompleted = deployments.some(d => d.status === 'completed');
+        await loadWizardDrafts();
+        const justCompleted = deployments.some((d) => d.raw_status === 'completed');
         if (justCompleted) {
           await loadCredits();
+          await loadRealms();
         }
       }
     }, 10000);
   }
 
-  function getDeploymentStatusColor(status) {
-    switch (status) {
-      case 'completed': return '#22c55e';
-      case 'failed': return '#ef4444';
-      case 'in_progress': return '#3b82f6';
-      case 'pending': return '#f59e0b';
-      default: return '#6b7280';
-    }
-  }
-
-  function getDeploymentStatusLabel(status) {
-    switch (status) {
-      case 'completed': return 'Completed';
-      case 'failed': return 'Failed';
-      case 'in_progress': return 'Deploying...';
-      case 'pending': return 'Pending';
-      default: return status;
-    }
+  function toTimestampMs(value) {
+    if (value == null || value === '') return null;
+    const n = typeof value === 'bigint' ? Number(value) : Number(value);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    // nat64 seconds vs millisecond epoch
+    return n > 1e12 ? n : n * 1000;
   }
 
   function formatDate(dateValue) {
-    // Handle both unix timestamps and ISO date strings
-    if (typeof dateValue === 'number') {
-      return new Date(dateValue * 1000).toLocaleString();
+    const ms = toTimestampMs(dateValue);
+    if (ms == null) {
+      if (typeof dateValue === 'string' && dateValue.trim()) {
+        const parsed = Date.parse(dateValue);
+        if (!Number.isNaN(parsed)) return new Date(parsed).toLocaleString();
+        return dateValue;
+      }
+      return '';
     }
-    return new Date(dateValue).toLocaleDateString();
+    return new Date(ms).toLocaleString();
   }
 
   async function loadVouchers() {
@@ -382,6 +450,17 @@
             <polyline points="9 22 9 12 15 12 15 22"></polyline>
           </svg>
           {$_('dashboard.realms_tab')}
+        </button>
+        <button
+          class="tab"
+          class:active={activeTab === 'connect'}
+          on:click={() => activeTab = 'connect'}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10.5 13.5a5 5 0 0 0 7.07 0l2-2a5 5 0 0 0-7.07-7.07l-1.15 1.14"></path>
+            <path d="M13.5 10.5a5 5 0 0 0-7.07 0l-2 2a5 5 0 0 0 7.07 7.07l1.14-1.14"></path>
+          </svg>
+          {$_('dashboard.connect_tab', { default: 'Connect Claude' })}
         </button>
       </div>
 
@@ -576,10 +655,48 @@
               </a>
             </div>
 
+            <!-- Wizard drafts (in-progress realm creation) -->
+            <div class="realms-group drafts-group">
+              <h3>Drafts</h3>
+              {#if loadingDrafts}
+                <div class="loading-placeholder"></div>
+              {:else if visibleDrafts.length === 0}
+                <div class="empty-state compact">
+                  <p>No drafts yet. Start the wizard to save progress automatically.</p>
+                </div>
+              {:else}
+                <ul class="draft-list">
+                  {#each visibleDrafts as draft}
+                    <li class="draft-item">
+                      <div class="draft-info">
+                        <span class="draft-name">{draft.realm_name || 'Untitled Realm'}</span>
+                        <span class="draft-meta">
+                          Step: {draftStepLabel(draft.current_step)}
+                          {#if draft.deploy_version}
+                            · v{draft.deploy_version}
+                          {/if}
+                          · {formatDate(draft.updated_at)}
+                        </span>
+                      </div>
+                      <div class="draft-actions">
+                        <a href={draftResumeUrl(draft)} class="btn btn-small btn-primary">Resume</a>
+                        <button type="button" class="btn btn-small btn-outline" on:click={() => deleteDraft(draft.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+            </div>
+
             <!-- Active Deployments -->
             {#if deployments.length > 0}
               <div class="realms-group deployments-group">
                 <h3>Deployments</h3>
+                {#if deploymentDeleteError}
+                  <p class="deployment-delete-error">{deploymentDeleteError}</p>
+                {/if}
                 <ul class="deployment-list">
                   {#each deployments as deployment}
                     <li class="deployment-item">
@@ -587,30 +704,39 @@
                         <span class="deployment-name">{deployment.realm_name}</span>
                         <span class="deployment-date">{formatDate(deployment.created_at)}</span>
                       </div>
+
+                      <DeploymentProgress
+                        progress={deployment.progress}
+                        variant={deployment.progress?.isActive ? 'full' : 'compact'}
+                        showSteps={deployment.progress?.isActive}
+                      />
+
                       <div class="deployment-status-row">
-                        <span 
-                          class="deployment-status"
-                          style="background-color: {getDeploymentStatusColor(deployment.status)}20; color: {getDeploymentStatusColor(deployment.status)}; border-color: {getDeploymentStatusColor(deployment.status)}"
-                        >
-                          {#if deployment.status === 'in_progress'}
-                            <span class="spinner-tiny"></span>
-                          {/if}
-                          {getDeploymentStatusLabel(deployment.status)}
-                        </span>
-                        {#if deployment.status === 'completed' && deployment.realm_url}
+                        {#if deployment.deployment_id}
+                          <a href={deploymentJobUrl(deployment.deployment_id)} class="track-btn">
+                            {deployment.progress?.isActive ? 'Track deployment →' : 'View details →'}
+                          </a>
+                        {/if}
+                        {#if isFailedDeployment(deployment)}
+                          <a href={editDraftUrlForDeployment(deployment)} class="track-btn">Edit draft →</a>
+                          <a href={retryDeployUrlForDeployment(deployment)} class="track-btn">Retry deploy →</a>
+                          <button
+                            type="button"
+                            class="delete-deployment-btn"
+                            disabled={deletingDeploymentId === deployment.deployment_id}
+                            on:click={() => requestDeleteDeployment(deployment)}
+                          >
+                            {deletingDeploymentId === deployment.deployment_id ? 'Deleting…' : 'Delete'}
+                          </button>
+                        {/if}
+                        {#if deployment.raw_status === 'completed' && deployment.realm_url}
                           <a href={deployment.realm_url} target="_blank" rel="noopener noreferrer" class="visit-btn">
                             Visit Realm →
                           </a>
                         {/if}
-                        {#if deployment.status === 'failed' && deployment.error}
-                          <span class="deployment-error" title={deployment.error}>Error</span>
-                        {/if}
                       </div>
                       {#if deployment.deployment_id}
                         <div class="deployment-id subtle">Job: {deployment.deployment_id}</div>
-                      {/if}
-                      {#if deployment.credits_charged > 0}
-                        <span class="credits-charged">-{deployment.credits_charged} credits</span>
                       {/if}
                     </li>
                   {/each}
@@ -630,7 +756,9 @@
                     <polyline points="9 22 9 12 15 12 15 22"></polyline>
                   </svg>
                   <p>{$_('dashboard.no_created_realms')}</p>
-                  {#if deployments.length > 0}
+                  {#if deployments.some((d) => d.raw_status === 'completed')}
+                    <p class="empty-hint">Your completed deployment may still be registering. Refresh in a moment or check the homepage directory.</p>
+                  {:else if deployments.length > 0}
                     <p class="empty-hint">Active deployments are listed above. This section updates when your realm is registered on-chain.</p>
                   {/if}
                   <a href="/create-realm" class="create-realm-btn">
@@ -689,10 +817,27 @@
               {/if}
             </div>
           </div>
+
+        {:else if activeTab === 'connect'}
+          <ConnectClaude principal={userPrincipal ? userPrincipal.toText() : ''} />
         {/if}
       </div>
     {/if}
   </div>
+
+  <ConfirmModal
+    open={!!deleteConfirmDeployment}
+    title="Remove failed deployment?"
+    message={deleteConfirmDeployment
+      ? `Remove "${deleteConfirmDeployment.realm_name || deleteConfirmDeployment.deployment_id}" from your dashboard? This cannot be undone.`
+      : ''}
+    confirmLabel="Remove"
+    cancelLabel="Cancel"
+    variant="danger"
+    loading={!!deletingDeploymentId}
+    on:cancel={cancelDeleteDeployment}
+    on:confirm={confirmDeleteDeployment}
+  />
 </div>
 
 <style>
@@ -1314,6 +1459,69 @@
   }
 
   /* Deployments Section */
+  .drafts-group {
+    background: #FFFBEB;
+    border: 1px solid #FDE68A;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .draft-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .draft-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.875rem 1rem;
+    background: #FFFFFF;
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid #E5E5E5;
+  }
+
+  .draft-item:last-child {
+    margin-bottom: 0;
+  }
+
+  .draft-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+
+  .draft-name {
+    font-weight: 600;
+    color: #171717;
+  }
+
+  .draft-meta {
+    font-size: 0.8125rem;
+    color: #737373;
+  }
+
+  .draft-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  .empty-state.compact {
+    padding: 1rem 0;
+  }
+
+  .empty-state.compact p {
+    margin: 0;
+    color: #737373;
+    font-size: 0.875rem;
+  }
+
   .deployments-group {
     background: #F0FDF4;
     border: 1px solid #BBF7D0;
@@ -1384,15 +1592,42 @@
     animation: spin 1s linear infinite;
   }
 
-  .visit-btn {
+  .visit-btn,
+  .track-btn {
     font-size: 0.75rem;
     color: #2563EB;
     text-decoration: none;
     font-weight: 500;
   }
 
-  .visit-btn:hover {
+  .visit-btn:hover,
+  .track-btn:hover {
     text-decoration: underline;
+  }
+
+  .delete-deployment-btn {
+    font-size: 0.75rem;
+    color: #b91c1c;
+    background: none;
+    border: none;
+    padding: 0;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .delete-deployment-btn:hover:not(:disabled) {
+    text-decoration: underline;
+  }
+
+  .delete-deployment-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .deployment-delete-error {
+    margin: 0 0 0.75rem;
+    font-size: 0.8125rem;
+    color: #b91c1c;
   }
 
   .deployment-error {

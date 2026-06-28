@@ -509,7 +509,7 @@ def _upload_branding_to_canister(frontend_id: str, manifest_dir: Path, network: 
 
 
 def _store_canister_ids(frontend_id: str, backend_id: str, network: str,
-                         file_registry_id: str = "") -> None:
+                         file_registry_id: str = "", derivation_origin: str = "") -> None:
     """(Re)write /canister_ids.js onto the frontend canister.
 
     This file is NOT part of the built asset bundle — it carries the realm's
@@ -518,16 +518,21 @@ def _store_canister_ids(frontend_id: str, backend_id: str, network: str,
     registration step doesn't re-inject it last, the SPA loads with no backend id
     ("Actor not initialized" → every extension/sidebar call fails). We re-assert
     it here as the final post-deploy step so off-chain deploys are self-healing.
+
+    ``derivation_origin`` pins the Internet Identity ``derivationOrigin`` so this
+    realm resolves to the same principal as the registry + other realms (one human
+    → one principal). It must be the canonical origin listing this frontend in its
+    ``/.well-known/ii-alternative-origins`` (the registry). See issue #233.
     """
     if not frontend_id or not backend_id:
         return
+    fields = ['realm_backend:"' + backend_id + '"',
+              'internet_identity:"https://identity.ic0.app"']
     if file_registry_id:
-        js = ('globalThis.__CANISTER_IDS={realm_backend:"' + backend_id
-              + '",internet_identity:"https://identity.ic0.app",file_registry:"'
-              + file_registry_id + '"};')
-    else:
-        js = ('globalThis.__CANISTER_IDS={realm_backend:"' + backend_id
-              + '",internet_identity:"https://identity.ic0.app"};')
+        fields.append('file_registry:"' + file_registry_id + '"')
+    if derivation_origin:
+        fields.append('derivation_origin:"' + derivation_origin + '"')
+    js = 'globalThis.__CANISTER_IDS={' + ",".join(fields) + '};'
     escaped = js.replace('\\', '\\\\').replace('"', '\\"')
     arg = ('(record { key = "/canister_ids.js"; content_type = "application/javascript"; '
            'content_encoding = "identity"; content = blob "' + escaped + '"; sha256 = null })')
@@ -611,7 +616,19 @@ def _post_deploy_config(realm: dict, network: str, version: str, parameters: dic
         # Final step: re-assert /canister_ids.js so the SPA can always resolve its
         # backend id, even though the asset bundle commit doesn't carry it.
         fr_id = (infra or {}).get("file_registry_canister_id", "")
-        _store_canister_ids(frontend_id, backend_id, network, file_registry_id=fr_id)
+        # Pin the canonical II derivationOrigin so this realm shares one principal
+        # with the registry + other realms (issue #233). Descriptor `infra` may set
+        # `ii_derivation_origin`; otherwise fall back to the registry's public origin
+        # for the target network. Empty string keeps legacy per-origin principals.
+        deriv = (infra or {}).get("ii_derivation_origin")
+        if deriv is None:
+            deriv = {
+                "staging": "https://staging.realmsgos.org",
+                "demo": "https://demo.realmsgos.org",
+                "test": "https://test.realmsgos.org",
+            }.get(network, "")
+        _store_canister_ids(frontend_id, backend_id, network,
+                            file_registry_id=fr_id, derivation_origin=deriv)
 
 
 def _submit_and_poll(manifest: dict, network: str) -> bool:

@@ -2,11 +2,13 @@
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { _, locale } from 'svelte-i18n';
   import { CONFIG } from '$lib/config.js';
   import extensionsConfig from '$lib/extensions-config.json';
   import codicesConfig from '$lib/codices-config.json';
   import AuthControls from '$lib/components/AuthControls.svelte';
+  import { deploymentJobUrl } from '$lib/deployment-tracker.js';
 
   // Auth state
   let isLoggedIn = false;
@@ -29,11 +31,111 @@
   // Automatic deployment state
   let isDeploying = false;
   let deployError = null;
-  let deploySuccess = null;
-  let deploymentId = null;
-  let deploymentStatus = null; // 'pending' | 'in_progress' | 'completed' | 'failed'
-  let deploymentRealmUrl = null;
-  let pollTimer = null;
+
+  // Wizard draft persistence
+  let draftId = null;
+  let draftSaving = false;
+  let draftSaveError = null;
+  let draftInitialized = false;
+  let draftLockedForDeploy = false;
+  let saveDraftTimer = null;
+  let brandingGenerating = false;
+
+  // Deploy version options (semver catalog + main)
+  let deployVersionOptions = [{ value: 'main', label: 'main (latest from file registry)' }];
+  let loadingDeployVersions = true;
+
+  async function initWizardDraft() {
+    if (!isLoggedIn || !userPrincipal) return;
+    try {
+      const { loadWizardDraft, saveWizardDraft, fetchDeployVersionOptions } = await import(
+        '$lib/wizard-drafts.js'
+      );
+      loadingDeployVersions = true;
+      deployVersionOptions = await fetchDeployVersionOptions();
+      loadingDeployVersions = false;
+
+      const urlDraft = $page.url.searchParams.get('draft');
+      const urlStep = $page.url.searchParams.get('step');
+      const editingAfterFailure = $page.url.searchParams.get('edit') === '1';
+      if (urlDraft) {
+        const loaded = await loadWizardDraft(urlDraft);
+        if (loaded) {
+          draftId = loaded.id;
+          formData = { ...formData, ...loaded.formData };
+          if (loaded.deployVersion) formData.deploy_version = loaded.deployVersion;
+          if (urlStep != null && urlStep !== '') {
+            const stepNum = parseInt(urlStep, 10);
+            if (Number.isFinite(stepNum)) {
+              currentStep = Math.min(Math.max(stepNum, 0), STEPS.length - 1);
+            }
+          } else {
+            currentStep = Math.min(Math.max(loaded.currentStep || 0, 0), STEPS.length - 1);
+          }
+          if (editingAfterFailure && draftId) {
+            const { clearDraftDeploymentLink } = await import('$lib/wizard-drafts.js');
+            await clearDraftDeploymentLink({
+              id: draftId,
+              formData,
+              currentStep,
+              deployVersion: formData.deploy_version,
+            });
+          }
+          draftInitialized = true;
+          return;
+        }
+      }
+
+      const result = await saveWizardDraft({
+        formData,
+        currentStep,
+        deployVersion: formData.deploy_version,
+      });
+      if (result?.success && result.id) {
+        draftId = result.id;
+        const url = new URL(window.location.href);
+        url.searchParams.set('draft', draftId);
+        window.history.replaceState({}, '', url.pathname + url.search);
+      }
+      draftInitialized = true;
+    } catch (e) {
+      console.error('Draft init failed:', e);
+      draftInitialized = true;
+      loadingDeployVersions = false;
+    }
+  }
+
+  async function persistDraft() {
+    if (!draftInitialized || !isLoggedIn || !userPrincipal || draftLockedForDeploy) return;
+    draftSaving = true;
+    draftSaveError = null;
+    try {
+      const { saveWizardDraft } = await import('$lib/wizard-drafts.js');
+      const result = await saveWizardDraft({
+        id: draftId,
+        formData,
+        currentStep,
+        deployVersion: formData.deploy_version,
+      });
+      if (result?.success && result.id) {
+        draftId = result.id;
+      } else if (result?.error) {
+        draftSaveError = result.error;
+      }
+    } catch (e) {
+      draftSaveError = e?.message || 'Failed to save draft';
+    } finally {
+      draftSaving = false;
+    }
+  }
+
+  function scheduleDraftSave() {
+    if (!browser || !draftInitialized) return;
+    if (saveDraftTimer) clearTimeout(saveDraftTimer);
+    saveDraftTimer = setTimeout(() => {
+      persistDraft();
+    }, 800);
+  }
 
   onMount(async () => {
     if (browser) {
@@ -76,6 +178,13 @@
       }
       checkingActivation = false;
 
+      if (isLoggedIn && userPrincipal) {
+        await initWizardDraft();
+      } else {
+        draftInitialized = true;
+        loadingDeployVersions = false;
+      }
+
       // Fetch codex descriptions from remote SHORT_DESCRIPTION.md files
       for (const codex of AVAILABLE_CODICES) {
         if (codex.description_url) {
@@ -109,6 +218,7 @@
       isLoggedIn = true;
       userPrincipal = result.principal;
       await loadUserCredits();
+      if (!draftInitialized) await initWizardDraft();
     }
   }
 
@@ -151,13 +261,14 @@
 
     isDeploying = true;
     deployError = null;
-    deploySuccess = null;
-    deploymentId = null;
 
     try {
       const { buildRealmDeploymentManifest } = await import('$lib/deployment-manifest.js');
       const { getAuthenticatedRegistryActor } = await import('$lib/canisters.js');
       const { uploadBrandingFiles, brandingNamespaceFor } = await import('$lib/branding-upload.js');
+      const { ensureDefaultBranding } = await import('$lib/realm-branding-generator.js');
+
+      await ensureDefaultBranding(formData);
 
       let branding = null;
       if (formData.logo || formData.background) {
@@ -173,6 +284,7 @@
 
       const manifest = await buildRealmDeploymentManifest(
         formData, CONFIG.default_deploy_queue_network, branding,
+        { deployVersion: formData.deploy_version, useCasals: true },
       );
       const manifestJson = JSON.stringify(manifest);
 
@@ -186,52 +298,27 @@
         return;
       }
 
-      deploySuccess = true;
-      deploymentId = result.job_id;
-      deploymentStatus = 'pending';
       await loadUserCredits();
-      startDeploymentPolling(result.job_id);
+      draftLockedForDeploy = true;
+      if (draftId) {
+        try {
+          const { markDraftLinkedToJob } = await import('$lib/wizard-drafts.js');
+          await markDraftLinkedToJob({
+            id: draftId,
+            formData,
+            currentStep,
+            deployVersion: formData.deploy_version,
+            jobId: result.job_id,
+          });
+        } catch (_) { /* non-fatal */ }
+      }
+      await goto(deploymentJobUrl(result.job_id));
     } catch (err) {
       console.error('Automatic deployment failed:', err);
       deployError =
         err?.message || 'Deployment failed. Please check your connection and try again.';
       isDeploying = false;
     }
-  }
-
-  function startDeploymentPolling(jobId) {
-    if (pollTimer) clearInterval(pollTimer);
-    pollTimer = setInterval(async () => {
-      try {
-        const { fetchDeploymentJobStatus, installerJobToDeploymentRow } = await import(
-          '$lib/installer-queue.js'
-        );
-        const data = await fetchDeploymentJobStatus(jobId);
-        if (!data?.success) return;
-        const info = installerJobToDeploymentRow(data);
-        deploymentStatus = info.status;
-        if (info.raw_status === 'completed') {
-          clearInterval(pollTimer);
-          pollTimer = null;
-          deploymentRealmUrl = info.realm_url;
-          isDeploying = false;
-          await loadUserCredits();
-        } else if (
-          info.raw_status === 'failed' ||
-          info.raw_status === 'failed_verification' ||
-          info.raw_status === 'cancelled'
-        ) {
-          clearInterval(pollTimer);
-          pollTimer = null;
-          deployError = info.error || 'Deployment failed on the network.';
-          deploySuccess = false;
-          isDeploying = false;
-          await loadUserCredits();
-        }
-      } catch (e) {
-        console.error('Poll error:', e);
-      }
-    }, 10000);
   }
 
   // Wizard steps
@@ -348,8 +435,16 @@
     realm_data_file: null,
     realm_data_file_name: '',
     // Member registration type
-    open_registration: false
+    open_registration: false,
+    // Realm software version for Casals deploy (semver or main)
+    deploy_version: CONFIG.default_deploy_version || 'main',
   };
+
+  $: if (draftInitialized && browser) {
+    void formData;
+    void currentStep;
+    scheduleDraftSave();
+  }
 
   // Validation
   let errors = {};
@@ -473,6 +568,36 @@
         formData.backgroundPreview = e.target.result;
       };
       reader.readAsDataURL(file);
+    }
+  }
+
+  async function generateBranding(kind) {
+    if (!formData.name?.trim()) {
+      deployError = 'Enter a realm name first (Basics step) so we can generate matching artwork.';
+      return;
+    }
+    brandingGenerating = true;
+    try {
+      const { generateRealmLogo, generateRealmBackground } = await import(
+        '$lib/realm-branding-generator.js'
+      );
+      const seed = String(Date.now());
+      if (kind === 'logo' || kind === 'both') {
+        const file = await generateRealmLogo(formData.name, { seed });
+        formData.logo = file;
+        formData.logoPreview = URL.createObjectURL(file);
+      }
+      if (kind === 'background' || kind === 'both') {
+        const file = await generateRealmBackground(formData.name, { seed });
+        formData.background = file;
+        formData.backgroundPreview = URL.createObjectURL(file);
+      }
+      scheduleDraftSave();
+    } catch (e) {
+      console.error('Branding generation failed:', e);
+      deployError = e?.message || 'Could not generate branding images.';
+    } finally {
+      brandingGenerating = false;
     }
   }
 
@@ -969,6 +1094,14 @@
                 </div>
               {/if}
             </div>
+            <button
+              type="button"
+              class="btn-generate-branding"
+              disabled={brandingGenerating}
+              on:click={() => generateBranding('logo')}
+            >
+              {brandingGenerating ? 'Generating…' : '✨ Generate logo'}
+            </button>
           </div>
 
           <div class="form-group">
@@ -994,7 +1127,29 @@
                 </div>
               {/if}
             </div>
+            <button
+              type="button"
+              class="btn-generate-branding"
+              disabled={brandingGenerating}
+              on:click={() => generateBranding('background')}
+            >
+              {brandingGenerating ? 'Generating…' : '✨ Generate background'}
+            </button>
           </div>
+        </div>
+
+        <div class="branding-generate-row">
+          <button
+            type="button"
+            class="btn btn-outline btn-generate-both"
+            disabled={brandingGenerating || !formData.name?.trim()}
+            on:click={() => generateBranding('both')}
+          >
+            ✨ Generate logo & background
+          </button>
+          <p class="branding-generate-hint">
+            Unique artwork is generated from your realm name. If none is uploaded, defaults are created automatically at deploy time.
+          </p>
         </div>
 
         <div class="form-group">
@@ -1581,6 +1736,26 @@
         <h2>Deploy Your Realm</h2>
         <p class="step-description">Choose how you want to deploy your governance system</p>
 
+        <div class="form-group deploy-version-group">
+          <label for="deploy-version">Realm software version</label>
+          <p class="field-hint">Casals provisions backend and frontend canisters from the file registry at this version.</p>
+          {#if loadingDeployVersions}
+            <p class="field-hint">Loading available versions…</p>
+          {:else}
+            <select id="deploy-version" bind:value={formData.deploy_version} class="deploy-version-select">
+              {#each deployVersionOptions as opt}
+                <option value={opt.value}>{opt.label}</option>
+              {/each}
+            </select>
+          {/if}
+        </div>
+
+        {#if draftId}
+          <p class="draft-status subtle">
+            {#if draftSaving}Saving draft…{:else if draftSaveError}Draft save failed: {draftSaveError}{:else}Draft saved — resume anytime from My Dashboard{/if}
+          </p>
+        {/if}
+
         <div class="deploy-options">
           <!-- Option 1: Automatic Deployment -->
           <div 
@@ -1609,7 +1784,7 @@
                 {/if}
               </div>
             </div>
-            <p class="deploy-option-desc">Let our servers deploy and manage your realm automatically. No technical knowledge required.</p>
+            <p class="deploy-option-desc">Deploy via Casals on the Internet Computer — fully on-chain, no servers required.</p>
             
             {#if !isLoggedIn}
               <div class="deploy-requirement">
@@ -1642,49 +1817,7 @@
               </div>
             {:else if deployMode === 'automatic'}
               <!-- Deploy button when automatic mode is selected and user has credits -->
-              {#if deploymentStatus === 'completed'}
-                <div class="deploy-success deploy-completed">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                  </svg>
-                  <div>
-                    <strong>Your realm has been deployed!</strong>
-                    {#if deploymentRealmUrl}
-                      <p class="deploy-info">Your realm is live at:</p>
-                      <a href={deploymentRealmUrl} target="_blank" rel="noopener" class="realm-url">{deploymentRealmUrl}</a>
-                    {:else}
-                      <p class="deploy-info">Your realm is live. Check your dashboard for details.</p>
-                    {/if}
-                    <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem;">
-                      {#if deploymentRealmUrl}
-                        <a href={deploymentRealmUrl} target="_blank" rel="noopener" class="btn btn-small btn-primary">Visit Realm</a>
-                      {/if}
-                      <a href="/my-dashboard?tab=realms" class="btn btn-small btn-outline">View Dashboard</a>
-                    </div>
-                  </div>
-                </div>
-              {:else if deploySuccess}
-                <div class="deploy-success deploy-in-progress">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spinning">
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
-                  </svg>
-                  <div>
-                    <strong>Your realm is being deployed!</strong>
-                    <p class="deploy-info">
-                      {#if deploymentStatus === 'pending'}
-                        Preparing deployment...
-                      {:else if deploymentStatus === 'in_progress'}
-                        Deploying canisters to the Internet Computer. This typically takes 5-10 minutes...
-                      {:else}
-                        Starting deployment...
-                      {/if}
-                    </p>
-                    <p class="deploy-status-note">This page will update automatically when deployment completes.</p>
-                  </div>
-                </div>
-              {:else}
-                <div class="deploy-action">
+              <div class="deploy-action">
                   <p class="deploy-cost">Cost: <strong>{REQUIRED_CREDITS} credits</strong> (you have {userCredits})</p>
                   <button 
                     type="button" 
@@ -1706,7 +1839,6 @@
                     <p class="deploy-error">{deployError}</p>
                   {/if}
                 </div>
-              {/if}
             {/if}
           </div>
 
@@ -2211,6 +2343,46 @@
     inset: 0;
     opacity: 0;
     cursor: pointer;
+  }
+
+  .btn-generate-branding {
+    margin-top: 0.5rem;
+    width: 100%;
+    padding: 0.45rem 0.75rem;
+    border: 1px dashed #d4d4d4;
+    border-radius: 0.5rem;
+    background: #fafafa;
+    color: #404040;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-generate-branding:hover:not(:disabled) {
+    background: #f5f5f5;
+    border-color: #a3a3a3;
+  }
+
+  .btn-generate-branding:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .branding-generate-row {
+    margin: 0.5rem 0 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .btn-generate-both {
+    align-self: flex-start;
+  }
+
+  .branding-generate-hint {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: #737373;
   }
 
   .upload-placeholder {
@@ -3209,6 +3381,26 @@
     font-size: 0.875rem;
   }
 
+  .deploy-version-group {
+    margin-bottom: 1.25rem;
+    max-width: 420px;
+  }
+
+  .deploy-version-select {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    background: var(--bg-primary, #fff);
+  }
+
+  .draft-status.subtle {
+    font-size: 0.85rem;
+    color: var(--text-muted, #6b7280);
+    margin-bottom: 1rem;
+  }
+
   /* Deploy Step */
   .deploy-options {
     display: flex;
@@ -3863,6 +4055,17 @@
 
   .deploy-success.deploy-in-progress svg.spinning {
     animation: spin 1s linear infinite;
+  }
+
+  .deploy-progress-panel {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .deploy-progress-panel strong {
+    font-size: 1rem;
   }
 
   .deploy-success .deploy-info {

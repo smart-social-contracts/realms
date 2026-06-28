@@ -113,6 +113,14 @@ recovered from progressively slower sources:
 > quarters; a *seceded* quarter that serves its own frontend origin would see a
 > different principal unless it configures `derivationOrigin` /
 > `/.well-known/ii-alternative-origins`.
+>
+> **Secession requirement (#233):** the federation now pins a canonical
+> `derivationOrigin` (the registry) so one human = one principal across all
+> realms + the registry. Any quarter/realm that secedes with **its own frontend
+> origin** MUST be added to the canonical
+> `/.well-known/ii-alternative-origins` list, or its users will get a fresh
+> principal and lose access to their existing records. See
+> [`IDENTITY_AND_ASSISTANT.md`](./IDENTITY_AND_ASSISTANT.md).
 
 ---
 

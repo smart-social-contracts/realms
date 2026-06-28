@@ -74,6 +74,8 @@
 	let mounted: MountResult | void;
 	let infraConfig: { fileRegistryCanisterId?: string; marketplaceCanisterId?: string } = {};
 	let isResizing = false;
+	let mobilePanelHeight = '';
+	let panelElement: HTMLDivElement | undefined;
 
 	function getMaxPanelWidth(): number {
 		if (!browser) return 600;
@@ -278,11 +280,38 @@
 			}
 		}
 
+		const updateMobilePanelHeight = () => {
+			if (window.innerWidth >= 1024) {
+				mobilePanelHeight = '';
+				return;
+			}
+			const vv = window.visualViewport;
+			if (!vv || !panelElement) return;
+			const top = panelElement.getBoundingClientRect().top;
+			mobilePanelHeight = `${Math.max(Math.round(vv.height + vv.offsetTop - top), 200)}px`;
+		};
+
 		const handleWindowResize = () => {
 			panelWidth = clampPanelWidth(panelWidth);
+			updateMobilePanelHeight();
 		};
+
 		window.addEventListener('resize', handleWindowResize);
-		return () => window.removeEventListener('resize', handleWindowResize);
+
+		const vv = window.visualViewport;
+		updateMobilePanelHeight();
+		if (vv) {
+			vv.addEventListener('resize', updateMobilePanelHeight);
+			vv.addEventListener('scroll', updateMobilePanelHeight);
+		}
+
+		return () => {
+			window.removeEventListener('resize', handleWindowResize);
+			if (vv) {
+				vv.removeEventListener('resize', updateMobilePanelHeight);
+				vv.removeEventListener('scroll', updateMobilePanelHeight);
+			}
+		};
 	});
 
 	onDestroy(() => {
@@ -291,8 +320,9 @@
 </script>
 
 <div
-	class="ai-assistant-panel fixed top-16 right-0 z-30 h-[calc(100vh-4rem)] border-l border-gray-200 bg-white transition-transform duration-300 ease-in-out flex flex-col {open ? 'translate-x-0' : 'translate-x-full'} {isResizing ? 'is-resizing' : ''}"
-	style="--panel-width: {panelWidth}px"
+	bind:this={panelElement}
+	class="ai-assistant-panel fixed top-16 right-0 z-30 border-l border-gray-200 bg-white transition-transform duration-300 ease-in-out flex flex-col {open ? 'translate-x-0' : 'translate-x-full'} {isResizing ? 'is-resizing' : ''} {mobilePanelHeight ? '' : 'h-[calc(100dvh-4rem)]'}"
+	style="--panel-width: {panelWidth}px;{mobilePanelHeight ? ` height: ${mobilePanelHeight};` : ''}"
 >
 	<!-- Drag handle (left edge) — must sit above panel content to receive pointer events -->
 	<div
@@ -335,7 +365,7 @@
 		{:else if status === 'error'}
 			<div class="p-4 text-sm text-red-600">{errorMsg}</div>
 		{/if}
-		<div bind:this={mountPoint} class="flex-1 min-h-0 h-full"></div>
+		<div bind:this={mountPoint} class="flex-1 min-h-0 h-full flex flex-col"></div>
 	</div>
 </div>
 

@@ -4,6 +4,11 @@ network: staging
 infra:
   file_registry_canister_id: iebdk-kqaaa-aaaau-agoxq-cai
   marketplace_canister_id: jji3o-uyaaa-aaaah-qreja-cai
+  # Canonical Internet Identity derivationOrigin for the federation. Pinned into
+  # each realm's canister_ids.js so every realm + the registry resolve to ONE
+  # principal per human. Must list each realm frontend in its
+  # /.well-known/ii-alternative-origins (served by the registry). See issue #233.
+  ii_derivation_origin: https://staging.realmsgos.org
 
 mundus:
   - name: dominion

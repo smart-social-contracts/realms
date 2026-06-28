@@ -126,9 +126,13 @@ export interface CasalsConfigView {
   'registry_principal' : string,
   'casals_canister_id' : string,
 }
+export interface CasalsProvisionService {
+  'create_canister' : ActorMethod<[string], string>,
+}
 export interface CasalsService {
   'create_canister' : ActorMethod<[string], string>,
   'create_stand' : ActorMethod<[string], string>,
+  'get_tree' : ActorMethod<[], string>,
   'set_commander' : ActorMethod<[string], string>,
   'upgrade_to' : ActorMethod<[string], string>,
 }
@@ -412,6 +416,9 @@ export type InstallCodeMode = { 'reinstall' : null } |
   { 'upgrade' : null } |
   { 'install' : null };
 export interface InstallerError { 'message' : string, 'traceback' : string }
+export interface InstallerProvisionService {
+  'provision_quarter' : ActorMethod<[string], string>,
+}
 export interface JobStatusAck {
   'status' : string,
   'prev_status' : string,
@@ -559,10 +566,17 @@ export interface PurchaseRecord {
   'item_id' : string,
   'developer' : string,
 }
+export interface QuarterBootstrapService {
+  'bootstrap_as_quarter' : ActorMethod<[string], string>,
+}
+export interface QuarterDirectoryService {
+  'get_quarter_directory' : ActorMethod<[], string>,
+}
 export interface QuarterInfoRecord {
   'status' : string,
   'name' : string,
   'canister_id' : string,
+  'index' : bigint,
   'population' : bigint,
 }
 export type QueryArchiveError = {
@@ -599,11 +613,21 @@ export interface REnqueueOk {
   'realm_name' : string,
 }
 export interface RInstallerError { 'message' : string, 'traceback' : string }
+export interface RProvisionOk {
+  'status' : string,
+  'backend_canister_id' : string,
+  'stand' : string,
+  'job_id' : string,
+  'frontend_canister_id' : string,
+}
 export type RResultEnqueue = { 'Ok' : REnqueueOk } |
+  { 'Err' : RInstallerError };
+export type RResultProvision = { 'Ok' : RProvisionOk } |
   { 'Err' : RInstallerError };
 export interface RealmInstallerService {
   'cancel_deployment' : ActorMethod<[string], string>,
   'enqueue_deployment' : ActorMethod<[string], RResultEnqueue>,
+  'provision_via_casals' : ActorMethod<[string], RResultProvision>,
 }
 export interface RealmMessagingService {
   'receive_realm_message' : ActorMethod<
@@ -859,6 +883,7 @@ export interface _SERVICE {
   'create_invitation_codes' : ActorMethod<[string], GenericResult>,
   'deactivate_principal' : ActorMethod<[string], GenericResult>,
   'deduct_credits' : ActorMethod<[string, bigint, string], DeductCreditsResult>,
+  'delete_wizard_draft' : ActorMethod<[string], string>,
   'deployment_failed' : ActorMethod<[string, string, string], string>,
   'deployment_succeeded' : ActorMethod<[string, string], string>,
   'get_credits' : ActorMethod<[string], GetCreditsResult>,
@@ -866,11 +891,13 @@ export interface _SERVICE {
   'get_latest_version' : ActorMethod<[], UpgradeResult>,
   'get_realm' : ActorMethod<[string], GetRealmResult>,
   'get_transactions' : ActorMethod<[string, bigint], TransactionHistoryResult>,
+  'get_wizard_draft' : ActorMethod<[string], string>,
   'is_principal_activated' : ActorMethod<[string], GenericResult>,
   'list_activated_principals' : ActorMethod<[], string>,
   'list_invitation_codes' : ActorMethod<[], string>,
   'list_realms' : ActorMethod<[], Array<RealmRecord>>,
   'list_versions' : ActorMethod<[], string>,
+  'list_wizard_drafts' : ActorMethod<[], string>,
   'publish_version' : ActorMethod<[string], UpgradeResult>,
   'realm_count' : ActorMethod<[], bigint>,
   'redeem_invitation_code' : ActorMethod<[string], GenericResult>,
@@ -882,6 +909,7 @@ export interface _SERVICE {
   'request_deployment' : ActorMethod<[string], string>,
   'request_upgrade' : ActorMethod<[string], string>,
   'revoke_invitation_code' : ActorMethod<[string], GenericResult>,
+  'save_wizard_draft' : ActorMethod<[string], string>,
   'set_invitation_mode' : ActorMethod<[string], GenericResult>,
   'status' : ActorMethod<[], GetStatusResult>,
 }

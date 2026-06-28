@@ -11,6 +11,9 @@ export type AddRealmResult = { 'Ok' : string } |
 export type Address = string;
 export interface Archive { 'canister_id' : Principal }
 export interface Archives { 'archives' : Array<Archive> }
+export interface AssetCanisterService {
+  'store' : ActorMethod<[_AssetStoreArg], undefined>,
+}
 export interface AssistantInput {
   'categories' : string,
   'eval_report_url' : string,
@@ -123,9 +126,13 @@ export interface CasalsConfigView {
   'registry_principal' : string,
   'casals_canister_id' : string,
 }
+export interface CasalsProvisionService {
+  'create_canister' : ActorMethod<[string], string>,
+}
 export interface CasalsService {
   'create_canister' : ActorMethod<[string], string>,
   'create_stand' : ActorMethod<[string], string>,
+  'get_tree' : ActorMethod<[], string>,
   'set_commander' : ActorMethod<[string], string>,
   'upgrade_to' : ActorMethod<[string], string>,
 }
@@ -315,6 +322,8 @@ export interface ExtensionsListRecord { 'extensions' : Array<string> }
 export interface FileRegistryService {
   'get_backend_files_icc' : ActorMethod<[string, string, string], string>,
   'get_extension_manifest' : ActorMethod<[string], string>,
+  'get_file_chunk_icc' : ActorMethod<[string, string, string, string], string>,
+  'get_file_size_icc' : ActorMethod<[string, string], string>,
   'get_frontend_files_icc' : ActorMethod<[string, string], string>,
 }
 export interface GenericError { 'message' : string, 'error_code' : bigint }
@@ -407,6 +416,9 @@ export type InstallCodeMode = { 'reinstall' : null } |
   { 'upgrade' : null } |
   { 'install' : null };
 export interface InstallerError { 'message' : string, 'traceback' : string }
+export interface InstallerProvisionService {
+  'provision_quarter' : ActorMethod<[string], string>,
+}
 export interface JobStatusAck {
   'status' : string,
   'prev_status' : string,
@@ -554,10 +566,17 @@ export interface PurchaseRecord {
   'item_id' : string,
   'developer' : string,
 }
+export interface QuarterBootstrapService {
+  'bootstrap_as_quarter' : ActorMethod<[string], string>,
+}
+export interface QuarterDirectoryService {
+  'get_quarter_directory' : ActorMethod<[], string>,
+}
 export interface QuarterInfoRecord {
   'status' : string,
   'name' : string,
   'canister_id' : string,
+  'index' : bigint,
   'population' : bigint,
 }
 export type QueryArchiveError = {
@@ -594,11 +613,21 @@ export interface REnqueueOk {
   'realm_name' : string,
 }
 export interface RInstallerError { 'message' : string, 'traceback' : string }
+export interface RProvisionOk {
+  'status' : string,
+  'backend_canister_id' : string,
+  'stand' : string,
+  'job_id' : string,
+  'frontend_canister_id' : string,
+}
 export type RResultEnqueue = { 'Ok' : REnqueueOk } |
+  { 'Err' : RInstallerError };
+export type RResultProvision = { 'Ok' : RProvisionOk } |
   { 'Err' : RInstallerError };
 export interface RealmInstallerService {
   'cancel_deployment' : ActorMethod<[string], string>,
   'enqueue_deployment' : ActorMethod<[string], RResultEnqueue>,
+  'provision_via_casals' : ActorMethod<[string], RResultProvision>,
 }
 export interface RealmMessagingService {
   'receive_realm_message' : ActorMethod<
@@ -802,6 +831,13 @@ export interface VersionInfoRecord {
   'version' : string,
   'frontend_tar_hash' : string,
 }
+export interface _AssetStoreArg {
+  'key' : string,
+  'content' : Uint8Array | number[],
+  'sha256' : [] | [Uint8Array | number[]],
+  'content_type' : string,
+  'content_encoding' : string,
+}
 export interface _GetAccountTransactionsArgs {
   'max_results' : bigint,
   'start' : [] | [bigint],
@@ -837,6 +873,7 @@ export interface _IcrcTransfer { 'to' : _IcrcAccount, 'amount' : bigint }
 export interface _SERVICE {
   '__get_candid_interface_tmp_hack' : ActorMethod<[], string>,
   'cancel_deployment' : ActorMethod<[string], ResultJobCancel>,
+  'delete_deployment_job' : ActorMethod<[string], ResultJobCancel>,
   'enqueue_deployment' : ActorMethod<[string], ResultEnqueue>,
   'get_canister_logs' : ActorMethod<
     [[] | [bigint], [] | [bigint], [] | [string], [] | [string]],
@@ -847,6 +884,7 @@ export interface _SERVICE {
   'get_pending_deployments' : ActorMethod<[], ResultPendingJobs>,
   'health' : ActorMethod<[], HealthView>,
   'list_deployment_jobs' : ActorMethod<[], ResultJobsList>,
+  'provision_quarter' : ActorMethod<[string], string>,
   'provision_via_casals' : ActorMethod<[string], ResultProvision>,
   'report_canister_ready' : ActorMethod<[string], ResultReportReady>,
   'report_deployment_failure' : ActorMethod<[string], ResultReportFailure>,
